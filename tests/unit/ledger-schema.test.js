@@ -292,9 +292,27 @@ describe('canonicalizeDefinition', () => {
       expect(quoted).toBe(bare);
     });
 
-    test('an escaped double-quote ("") inside an identifier does not end it early', () => {
-      const out = canonicalizeDefinition('SELECT "a""b"', null);
-      expect(out).toBe('SELECT "a""b"');
+    // Opus round-3 L5: the prior version of this test ('SELECT "a""b"')
+    // could never fail — splitting an all-quoted string at the "" boundary
+    // produces byte-identical output to treating it as one token, since
+    // there is no unprotected code in between for the split to affect.
+    // [VERIFIED by mutation: temporarily removing the "" lookahead in
+    // tokenizeSqlLiterals's identifier scan (lib/db/ledger-schema.js:111)
+    // and restoring it byte-for-byte afterward] changed THIS test's own
+    // output from '"a  b""public".t' to '"a  b"t' but left the OLD test's
+    // 'SELECT "a""b"' assertion passing unchanged — confirming the old
+    // assertion had no teeth. This version places the embedded "" directly
+    // before the bare schema name, so failing to honor the escape ends the
+    // identifier early and re-opens a SEPARATE token that reads as exactly
+    // "public" — which the schema-stripping rule below then strips,
+    // silently deleting "public" and losing the leading dot. Honoring the
+    // escape keeps it one token (never equal to the bare quoted schema), so
+    // stripping never fires and the double-space inside the identifier
+    // stays intact.
+    test('an escaped double-quote ("") keeps the identifier one token: it is never mistaken for the bare quoted schema, and internal whitespace survives', () => {
+      const out = canonicalizeDefinition('"a  b""public".t', 'public');
+      expect(out).toBe('"a  b""public".t');
+      expect(out).not.toBe('"a  b"t'); // what treating "" as two separate tokens would produce
     });
 
     test('a Unicode-escape identifier (U&"...") is also treated as a protected token', () => {
