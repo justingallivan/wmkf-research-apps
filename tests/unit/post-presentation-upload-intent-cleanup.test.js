@@ -103,6 +103,34 @@ test('an exact registry binding in any lifecycle retains bytes and closes author
   expect(result.bound).toBe(1);
 });
 
+test('a rejected candidate already bound to a Request Document is retained and alerted, never relabeled finalized', async () => {
+  const rejected = { ...ROW, state: 'failed', candidate_item_id: 'item', last_error: 'post_presentation_mp4_malware' };
+  const d = deps({
+    access: () => ({ mode: 'on', valid: true }),
+    destructiveCleanupEnabled: () => true,
+    claim: jest.fn(async () => ({ leaseToken: 'lease', rows: [rejected] })),
+    findByGenerationKey: jest.fn(async () => ({ records: [{
+      wmkf_requestdocumentid: '44444444-4444-4444-8444-444444444444',
+      _wmkf_request_value: ROW.request_id,
+      wmkf_artifacttype: ROW.artifact_type,
+      wmkf_producer: 'meeting-tracker-post-presentation',
+      wmkf_generationkey: ROW.generation_key,
+      wmkf_sharepointdriveid: 'drive',
+      wmkf_sharepointitemid: 'item',
+    }] })),
+  });
+  const result = await cleanupPresentationMaterialUploads({}, d);
+  expect(result.retained).toBe(1);
+  expect(d.bind).not.toHaveBeenCalled();
+  expect(d.deleteByEtag).not.toHaveBeenCalled();
+  expect(d.release).toHaveBeenCalledWith({
+    uploadId: ROW.id, leaseToken: 'lease', lastError: 'rejected_candidate_registered',
+  });
+  expect(d.recordEvent).toHaveBeenCalledWith(expect.objectContaining({
+    metadata: { uploadId: ROW.id, reason: 'rejected_candidate_registered', validationReason: 'post_presentation_mp4_malware' },
+  }));
+});
+
 test('a live session only refreshes server-observed expiry and review-after', async () => {
   const d = deps({ getByPath: jest.fn(async () => null) });
   const result = await cleanupPresentationMaterialUploads({}, d);

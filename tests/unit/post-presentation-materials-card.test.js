@@ -1372,3 +1372,24 @@ test('MP4 finalize replay names the newer current recording and reconciliation',
   fireEvent.click(await screen.findByRole('button', { name: 'Finish saving' }));
   expect(await screen.findByText(/newer recording is current/)).toHaveTextContent('needs reconciliation');
 });
+
+test('a rejected MP4 refreshes the unfinished list before showing the terminal error', async () => {
+  const intent = { uploadId: UPLOAD_ID, filename: 'recording.mp4', size: 4, state: 'uploaded', canFinalize: true };
+  let reads = 0;
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith(`/${UPLOAD_ID}/finalize`)) {
+      return response({ error: 'The uploaded recording is not a valid MP4.', code: 'post_presentation_mp4_signature_invalid' }, 415);
+    }
+    if (url.endsWith('/presentation-link')) return response({ link: null });
+    if (url.endsWith('/presentation-materials')) {
+      reads += 1;
+      return response({ status: 'ready', materials: [], uploads: reads === 1 ? [intent] : [] });
+    }
+    throw new Error(`Unexpected request ${url}`);
+  });
+  render(<PostPresentationMaterialsCard requestId={REQUEST_A} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Finish saving' }));
+  expect(await screen.findByText(/The recording was rejected/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Finish saving' })).not.toBeInTheDocument();
+  expect(reads).toBeGreaterThanOrEqual(2);
+});

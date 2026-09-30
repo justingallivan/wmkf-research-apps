@@ -27,15 +27,7 @@ export default function useSiteVisitContext(requestId) {
   const [context, setContext] = useState(null);
 
   useEffect(() => {
-    setContext(requestId ? {
-      siteVisit: null,
-      materials: [],
-      suggestedTo: [],
-      suggestedCc: [],
-      presentationMaterialsStatus: 'loading',
-      presentationMaterials: [],
-      presentationMaterialConflicts: [],
-    } : null);
+    setContext(null);
     if (!requestId) return undefined;
     const controller = new AbortController();
     let cancelled = false;
@@ -55,23 +47,23 @@ export default function useSiteVisitContext(requestId) {
       const logisticsBody = logisticsEnvelope.data;
       if (cancelled) return;
       if (!logisticsEnvelope.ok) {
-        setContext((value) => value ? {
-          ...value,
+        setContext({
           unavailable: true,
           presentationMaterialsStatus: 'unavailable',
-        } : value);
+        });
         return;
       }
       const visit = logisticsBody.siteVisit || null;
       const projectionReady = logisticsBody.presentationMaterialsStatus === 'ready';
-      setContext((value) => ({
-        ...(value || {}),
+      setContext({
         siteVisit: visit,
         materials: logisticsBody.materials || [],
+        suggestedTo: [],
+        suggestedCc: [],
         presentationMaterialsStatus: projectionReady ? 'loaded' : 'disabled',
         presentationMaterials: projectionReady ? (logisticsBody.presentationMaterials || []) : [],
         presentationMaterialConflicts: projectionReady ? (logisticsBody.presentationMaterialConflicts || []) : [],
-      }));
+      });
       return directory.then((directoryEnvelope) => {
         if (cancelled) return;
         const directoryBody = directoryEnvelope?.ok ? directoryEnvelope.data : {};
@@ -91,11 +83,11 @@ export default function useSiteVisitContext(requestId) {
       });
     }).catch(() => {
       if (!cancelled) {
-        setContext((value) => value ? {
-          ...value,
+        setContext((value) => ({
+          ...(value || {}),
           unavailable: true,
           presentationMaterialsStatus: 'unavailable',
-        } : value);
+        }));
       }
     });
     return () => {

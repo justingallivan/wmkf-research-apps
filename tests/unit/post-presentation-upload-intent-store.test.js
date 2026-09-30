@@ -3,6 +3,7 @@ jest.mock('@vercel/postgres', () => ({ sql: jest.fn() }));
 
 import { sql } from '@vercel/postgres';
 import {
+  bindPresentationMaterialUploadForCleanup,
   cancelPresentationMaterialUploadRecovery,
   claimPresentationMaterialUploadRecovery,
   claimPresentationMaterialUpload,
@@ -15,6 +16,7 @@ import {
   recordPresentationMaterialUploadCandidate,
   recordPresentationMaterialUploadRecoverySession,
   refreshPresentationMaterialUploadSession,
+  releasePresentationMaterialUpload,
   releasePresentationMaterialUploadCleanupLease,
   renewPresentationMaterialUploadCleanupLease,
   renewPresentationMaterialUploadLease,
@@ -86,6 +88,8 @@ test('candidate persistence with a lease preserves finalizing and requires that 
   expect(text).not.toContain("SET state = 'uploaded'");
   expect(text).toContain("state NOT IN ('finalized', 'abandoned')");
   expect(text).toContain('lease_token = ? AND lease_expires_at > NOW()');
+  expect(text).toContain("WHEN state = 'failed' AND candidate_item_id IS NOT NULL THEN 'failed'");
+  expect(text).toContain("WHEN state = 'failed' AND candidate_item_id IS NOT NULL THEN last_error");
 });
 
 test('status candidate persistence cannot demote a live finalizer', async () => {
@@ -102,6 +106,36 @@ test('status candidate persistence cannot demote a live finalizer', async () => 
   expect(text).toContain("state IN ('initiated', 'uploaded', 'failed')");
   expect(text).toContain("state = 'finalizing' AND lease_expires_at <= NOW()");
   expect(text).toContain('(lease_token IS NULL OR lease_expires_at <= NOW())');
+  expect(text).toContain("NOT (state = 'failed' AND candidate_item_id IS NOT NULL)");
+});
+
+test('a permanent validation failure parks its recorded candidate outside the finalize path', async () => {
+  await releasePresentationMaterialUpload({
+    uploadId: INPUT.uploadId,
+    leaseToken: INPUT.leaseToken,
+    lastError: 'post_presentation_mp4_signature_invalid',
+    terminal: true,
+  });
+  expect(statement()).toContain("WHEN ? AND candidate_item_id IS NOT NULL THEN 'failed'");
+  expect(sql.mock.calls.at(-1).slice(1)).toContain(true);
+
+  sql.mockReset();
+  sql.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{
+    state: 'failed', candidate_item_id: 'item', intent_expires_at: '2026-10-03T00:00:00Z',
+  }] });
+  await expect(claimPresentationMaterialUpload(INPUT)).resolves.toMatchObject({ state: 'rejected' });
+});
+
+test('cleanup preserves a rejected candidate reason and cannot bind it as finalized', async () => {
+  await releasePresentationMaterialUploadCleanupLease({
+    uploadId: INPUT.uploadId, leaseToken: INPUT.leaseToken, lastError: 'unbound_inspect_only',
+  });
+  expect(statement()).toContain("WHEN state = 'failed' AND candidate_item_id IS NOT NULL THEN last_error");
+  await bindPresentationMaterialUploadForCleanup({
+    uploadId: INPUT.uploadId, leaseToken: INPUT.leaseToken,
+    requestDocumentId: '44444444-4444-4444-8444-444444444444',
+  });
+  expect(statement()).toContain("NOT (state = 'failed' AND candidate_item_id IS NOT NULL)");
 });
 
 test('late status writes are fenced to the exact session URL they observed', async () => {

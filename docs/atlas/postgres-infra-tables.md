@@ -626,7 +626,14 @@ and offline-tested only on `codex/feature-request`.
   Staff Cancel and terminal-session Retry share the intent lease with finalize and
   cleanup. Cancel abandons only after confirmed session termination and an absent
   exact path; Retry retains the same intent/path/generation and starts a newly
-  confirmed terminal session from byte zero.
+  confirmed terminal session from byte zero. A candidate rejected by MP4 signature
+  or Graph malware validation remains a terminal `failed` intent and is omitted
+  from staff's unfinished-upload actions; status and finalize refuse replay.
+  Its exact item remains for the existing lease-fenced cleanup review, which
+  deletes an unbound item only under the separate general-access and
+  destructive-cleanup gates. If an exact Request Document was already created
+  before a later validation rejection, cleanup retains and alerts instead of
+  relabeling the rejected intent as finalized.
 - `presentation_material_slot_leases` is keyed by Request + Recording,
   Transcript, or Transcript Summary artifact type and stores a paired
   token/expiry plus a positive fence capped at 2,147,483,647.

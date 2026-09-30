@@ -1316,6 +1316,24 @@ test('the Research Presentation Materials card is always mounted with the visit 
   expect(lastMaterialsCardProps.siteVisitContext).toBe(siteVisitContextFeed);
 });
 
+test('the presentation follow-up mounts only after the server enables its projection', async () => {
+  const view = render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  await act(async () => {});
+  expect(screen.queryByTestId('research-presentation-follow-up')).not.toBeInTheDocument();
+
+  siteVisitContextFeed = { presentationMaterialsStatus: 'disabled' };
+  view.rerender(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(screen.queryByTestId('research-presentation-follow-up')).not.toBeInTheDocument();
+
+  siteVisitContextFeed = { unavailable: true, presentationMaterialsStatus: 'unavailable' };
+  view.rerender(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(screen.queryByTestId('research-presentation-follow-up')).not.toBeInTheDocument();
+
+  siteVisitContextFeed = { presentationMaterialsStatus: 'loaded', presentationMaterials: [] };
+  view.rerender(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(screen.getByTestId('research-presentation-follow-up')).toBeInTheDocument();
+});
+
 test('once the brief is shared the materials card renders inside the panel, above Email history', async () => {
   queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);

@@ -166,7 +166,7 @@ works.
 | Every persisted MP4 byte count fits `wmkf_FileSize`. | upload metadata validator, Request Document writer | Boundary tests accept 2,000,000,000 bytes and reject 2,000,000,001; final Graph size must match declared size before registry create. |
 | Deploying code before the Dataverse wave cannot add `wmkf_externalurl` to a live `$select`. | Request Document adapter, readiness helper | Readiness-off test proves the field is absent; readiness-on test proves it is present; invalid/unset readiness fails closed. |
 | A completed SharePoint upload is recoverable if Dataverse registration fails. | upload-intent store/finalizer | Inject failure after candidate persistence; retry registers the exact same drive item and does not upload a second file. |
-| An incomplete or abandoned upload cannot become a Board-visible material. | upload-intent store/finalizer/reader | Only a Ready Request Document is externally eligible; expired intent cleanup never promotes an item. |
+| An incomplete, abandoned, or validation-rejected upload cannot create a new Board-visible material. | upload-intent store/finalizer/reader | Only a Ready Request Document is externally eligible; signature/malware rejection parks the exact candidate in terminal `failed` state for gated cleanup review. If a Request Document was already created before a later rejection, cleanup retains and alerts instead of relabeling the intent finalized. |
 | Cancel never discards a completed or uncertain exact item. | cancel route, intent lease/store, Graph status/path reader | A successful Cancel has a confirmed closed/cancelled session, an absent exact path, and no candidate or Request Document; a complete item becomes Finish saving, while partial/mismatched/uncertain outcomes remain retained for reconciliation. |
 | Terminal Retry starts from zero without duplicating a live session or registry row. | retry route, intent store, Graph session helper, browser card | A live session uses Resume; a confirmed terminal no-item intent may get one fresh session per explicit action under the same intent ID/path, with a new sealed URL and 0-based range. Replay returns that session, and finalization keeps the original generation key. |
 | Cleanup never deletes SharePoint bytes referenced by any Request Document lifecycle state. | transcript staging reconciler, MP4 intent reconciler | Exact generation-key and drive/item match to one registry row means bound even when Superseded; zero matches may delete the exact candidate; ambiguous/mismatched/failed lookup retains and alerts. |
@@ -1898,7 +1898,7 @@ fact-consistency gates each pass after their self-test ran sequentially.
 - slow continuous fragments avoid a fixed 60-second wall timeout; a true stall enters bounded,
   status-aware retry. Network/5xx and 429, ambiguous final commit, duplicate-range 416,
   refreshed expiry, and terminal 404 are covered with positive fixtures;
-- unfinished intent rediscovery, complete-session Finish saving, creating-actor-only resume,
+- unfinished intent rediscovery, valid complete-session Finish saving, terminal signature/malware rejection omitted from staff actions but retained for gated cleanup review, creating-actor-only resume,
   active-visit drift refusal, and automatic bounded retry after a slot conflict;
 - explicit Cancel with confirmed session termination and an absent exact path; 404/late full item,
   partial placeholder, mismatch, or failed read retains rather than abandoning; a successful
@@ -1909,7 +1909,7 @@ fact-consistency gates each pass after their self-test ran sequentially.
 - navigation/request change suppresses stale progress/success/error state;
 - incomplete Graph session never creates a Request Document;
 - completed Graph upload + Dataverse failure retries the same exact item;
-- MP4 signature mismatch, size mismatch, missing item, wrong parent, and malware facet all refuse;
+- MP4 signature mismatch, size mismatch, missing item, wrong parent, and malware facet all refuse; byte-signature and malware rejection are terminal, while missing Graph MIME metadata stays retryable;
 - transcript VTT/TXT/PDF/DOCX validation and infected/unavailable scan refusal;
 - VTT header validation and explicit TXT no-magic-signature behavior;
 - transcript-scope cleanup deletes an exact unbound candidate and retains malformed/ambiguous
@@ -2152,7 +2152,7 @@ The subsequent document-only Opus pass identified six further blockers, now inco
 
 - presentation-token membership explicitly separates the applicant-material collection from
   latest-only singleton types and allowlists `site-visit-materials-portal`;
-- unfinished uploads are rediscoverable, complete sessions expose Finish saving, slot conflicts
+- unfinished uploads are rediscoverable, valid complete sessions expose Finish saving, slot conflicts
   retry, and daily cleanup waits through an explicit three-day finalize grace;
 - the compatibility floor, not a pre-feature runtime, is the rollback minimum once producers run;
 - separate Zoom passcodes without embedded `pwd` are rejected rather than silently discarded;

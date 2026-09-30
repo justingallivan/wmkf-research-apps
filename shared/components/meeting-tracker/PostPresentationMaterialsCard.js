@@ -105,6 +105,9 @@ function finalizeFailureMessage(error) {
   if ([401, 403].includes(error.status)) {
     return 'Your sign-in is no longer authorized. Sign in again, then choose Finish saving.';
   }
+  if (['post_presentation_mp4_signature_invalid', 'post_presentation_mp4_malware', 'post_presentation_upload_rejected'].includes(code)) {
+    return 'The recording was rejected. Choose a different MP4. The rejected file is retained for controlled cleanup.';
+  }
   if (error.status === 410
     || ['post_presentation_upload_session_expired', 'post_presentation_upload_expired'].includes(code)) {
     return 'Microsoft confirmed that this upload can no longer be saved. Reload to check whether Retry upload is available.';
@@ -700,7 +703,10 @@ export default function PostPresentationMaterialsCard({ requestId }) {
       await finalize(uploadId, generation);
       await load();
     } catch (finishError) {
-      if (current(generation)) setError(finalizeFailureMessage(finishError));
+      if (current(generation)) {
+        await load();
+        if (current(generation)) setError(finalizeFailureMessage(finishError));
+      }
     } finally {
       if (current(generation)) setBusyUploadId(null);
     }

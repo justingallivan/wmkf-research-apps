@@ -9,12 +9,18 @@
 
 import { render, screen, waitFor } from '@testing-library/react';
 import useSiteVisitContext from '../../shared/components/workbench/useSiteVisitContext';
+import { presentationMaterialsStatus } from '../../shared/components/workbench/ResearchPresentationMaterialsCard';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 
 function Harness({ requestId }) {
   const context = useSiteVisitContext(requestId);
   return <pre data-testid="context">{JSON.stringify(context)}</pre>;
+}
+
+function StatusHarness({ requestId }) {
+  const context = useSiteVisitContext(requestId);
+  return <span>{presentationMaterialsStatus(context, null)?.text || 'Checking the presentation schedule…'}</span>;
 }
 
 function response(body, status = 200) {
@@ -26,6 +32,22 @@ function response(body, status = 200) {
 }
 
 afterEach(() => jest.restoreAllMocks());
+
+test('keeps the presentation schedule pending until the logistics read settles', async () => {
+  let settleLogistics;
+  global.fetch = jest.fn((url) => (
+    String(url).includes('/logistics')
+      ? new Promise((resolve) => { settleLogistics = resolve; })
+      : Promise.resolve(response({ staff: [], external: [] }))
+  ));
+
+  render(<StatusHarness requestId={REQUEST_ID} />);
+  expect(screen.getByText('Checking the presentation schedule…')).toBeInTheDocument();
+  expect(screen.queryByText('Presentation not scheduled.')).not.toBeInTheDocument();
+
+  settleLogistics(response({ siteVisit: { activityId: 'visit-1' }, materials: [] }));
+  await waitFor(() => expect(screen.getByText('Presentation scheduled · materials not requested.')).toBeInTheDocument());
+});
 
 test('derives siteVisit, materials, and suggested recipients from the logistics read', async () => {
   const visit = {

@@ -236,6 +236,22 @@ test('failed uploads retain Retry after cleanup changes the terminal error label
   expect(result.uploads[0]).toMatchObject({ canCancel: true, canRetry: true });
 });
 
+test('a permanently rejected MP4 is absent from unfinished uploads and cannot be checked again', async () => {
+  const rejected = mp4Intent({ state: 'failed', candidate_item_id: 'item', last_error: 'post_presentation_mp4_signature_invalid' });
+  const d = deps({
+    listUploadIntents: jest.fn(async () => [rejected]),
+    getUploadIntent: jest.fn(async () => rejected),
+  });
+  const projection = await getPresentationMaterials({ requestId: REQUEST_ID, actingUserSystemId: ACTOR_ID }, d);
+  expect(projection.uploads).toEqual([]);
+  await expect(getMp4UploadStatus({
+    requestId: REQUEST_ID, uploadId: OPERATION_ID,
+    actingUserSystemId: ACTOR_ID, resumeFingerprint: 'a'.repeat(64),
+  }, d)).rejects.toMatchObject({ code: 'post_presentation_upload_rejected' });
+  expect(d.getFileMetadataByPath).not.toHaveBeenCalled();
+  expect(d.recordUploadCandidate).not.toHaveBeenCalled();
+});
+
 test('Zoom save derives all governed fields, fences every mutation, and supersedes only the captured predecessor', async () => {
   const old = recording(OLD_ID, 6);
   const current = recording(NEW_ID, 7);
@@ -1208,6 +1224,71 @@ test('MP4 finalize refuses an incomplete placeholder before Request Document cre
     uploadId: OPERATION_ID,
     leaseToken: 'intent-lease',
   }));
+});
+
+test.each([
+  ['invalid signature', { mimeType: 'video/mp4', malware: null, bytes: Buffer.alloc(32) }, 'post_presentation_mp4_signature_invalid'],
+  ['malware', { mimeType: 'application/octet-stream', malware: true, bytes: Buffer.concat([Buffer.alloc(4), Buffer.from('ftyp'), Buffer.alloc(24)]) }, 'post_presentation_mp4_malware'],
+])('MP4 finalize makes %s a terminal rejection before creating a Request Document', async (_label, media, code) => {
+  const pathItem = {
+    siteId: 'site', driveId: 'drive', id: 'item', name: `1003220-Recording-${OPERATION_ID}.mp4`,
+    size: 100, eTag: 'etag', versionId: '1.0',
+  };
+  const d = deps({
+    claimUploadIntent: jest.fn(async () => ({ state: 'claimed', row: mp4Intent({ state: 'finalizing' }), leaseToken: 'intent-lease' })),
+    getFileMetadataByPath: jest.fn(async () => pathItem),
+    getFileMetadataById: jest.fn(async () => pathItem),
+    readMediaRange: jest.fn(async () => media),
+  });
+  await expect(finalizeMp4Upload({
+    requestId: REQUEST_ID, uploadId: OPERATION_ID, actingUserSystemId: ACTOR_ID,
+  }, d)).rejects.toMatchObject({ code });
+  expect(d.recordUploadCandidate).toHaveBeenCalledTimes(1);
+  expect(d.releaseUploadIntent).toHaveBeenCalledWith({
+    uploadId: OPERATION_ID, leaseToken: 'intent-lease', lastError: code, terminal: true,
+  });
+  expect(d.recordEvent).toHaveBeenCalledWith(expect.objectContaining({
+    eventType: 'post_presentation_upload_validation_rejected',
+    metadata: { uploadId: OPERATION_ID, reason: code },
+  }));
+  expect(d.createDocument).not.toHaveBeenCalled();
+});
+
+test('missing Graph MP4 MIME metadata remains retryable when bytes have a valid signature', async () => {
+  const pathItem = {
+    siteId: 'site', driveId: 'drive', id: 'item', name: `1003220-Recording-${OPERATION_ID}.mp4`,
+    size: 100, eTag: 'etag', versionId: '1.0',
+  };
+  const d = deps({
+    claimUploadIntent: jest.fn(async () => ({ state: 'claimed', row: mp4Intent({ state: 'finalizing' }), leaseToken: 'intent-lease' })),
+    getFileMetadataByPath: jest.fn(async () => pathItem),
+    getFileMetadataById: jest.fn(async () => pathItem),
+    readMediaRange: jest.fn(async () => ({
+      mimeType: 'application/octet-stream', malware: null,
+      bytes: Buffer.concat([Buffer.alloc(4), Buffer.from('ftyp'), Buffer.alloc(24)]),
+    })),
+  });
+  await expect(finalizeMp4Upload({
+    requestId: REQUEST_ID, uploadId: OPERATION_ID, actingUserSystemId: ACTOR_ID,
+  }, d)).rejects.toMatchObject({ code: 'post_presentation_mp4_mime_unconfirmed', body: { retryable: true } });
+  expect(d.releaseUploadIntent).toHaveBeenCalledWith({
+    uploadId: OPERATION_ID, leaseToken: 'intent-lease',
+    lastError: 'post_presentation_mp4_mime_unconfirmed', terminal: false,
+  });
+  expect(d.recordEvent).not.toHaveBeenCalledWith(expect.objectContaining({
+    eventType: 'post_presentation_upload_validation_rejected',
+  }));
+});
+
+test('MP4 finalize refuses a previously rejected candidate without reclaiming it', async () => {
+  const d = deps({
+    claimUploadIntent: jest.fn(async () => ({ state: 'rejected', row: mp4Intent({ state: 'failed', candidate_item_id: 'item' }) })),
+  });
+  await expect(finalizeMp4Upload({
+    requestId: REQUEST_ID, uploadId: OPERATION_ID, actingUserSystemId: ACTOR_ID,
+  }, d)).rejects.toMatchObject({ code: 'post_presentation_upload_rejected' });
+  expect(d.getFileMetadataByPath).not.toHaveBeenCalled();
+  expect(d.createDocument).not.toHaveBeenCalled();
 });
 
 test('an old MP4 retry supersedes only its recovered row and preserves the newer winner', async () => {

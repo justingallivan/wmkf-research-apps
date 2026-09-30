@@ -1124,10 +1124,12 @@ export default function StaffDeliberationsTab({
         )}
       </Card>
 
-      <ResearchPresentationFollowUp
-        status={siteVisitContext?.presentationMaterialsStatus || 'loading'}
-        materials={siteVisitContext?.presentationMaterials || EMPTY_LIST}
-      />
+      {siteVisitContext?.presentationMaterialsStatus === 'loaded' && (
+        <ResearchPresentationFollowUp
+          status="loaded"
+          materials={siteVisitContext.presentationMaterials || EMPTY_LIST}
+        />
+      )}
 
       <Card hover={false}>
         <div className="flex flex-wrap items-start justify-between gap-4">
