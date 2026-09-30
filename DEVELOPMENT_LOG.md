@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Managed Factory ledger with registry-guarded runner; scheduled-email engine hardening (Session 553)
+
+**Milestone:** The Test Request Factory's operational ledger moved from one Mac's Docker to a managed Neon project (`wmkf-factory-ledger`: `ledger_prod`, `ledger`), and every ledger-driven CLI mode now passes a registry guard (host/database/TLS/shared-DB fence), a semantic schema fingerprint gate, and a prefix-classifying migration runner before it touches Dataverse. Separately, scheduled personalized emails got a no-resend send intent, an unconfirmed-send marker, classified Dynamics reads and a recipient-generation correlation key (migration 059).
+**Sessions:** 553 (plan, Neon provisioning, build, four Codex adversarial rounds + three Opus rounds, Codex-rescue fixes, merges); Codex's parallel B4 (#369) supplied migration 058.
+**Ship state:**
+- PR #374 (`66dd0974b`) merged after B4; `npm run ledger:apply` adopted 058 on both managed ledgers; `check:factory-ledger` is a `/start` gate and both ledgers match the tracked fingerprint.
+- PR #373 (`9d0119d4d`) merged with 059 applied to shared Production first (tracker `claude-part-a-2026-09-30`); Production tracker: 054–057, 059 (058 deliberately not applied to the app DB).
+- PR #378 (`361fbcdfd`) closed all five Dependabot alerts (next 16.3.8, dompurify 3.4.16, brace-expansion 5.0.12).
+**Why it matters:** The Factory can be run safely from either Mac against one durable ledger, and the runner refuses to write to a ledger whose shape it cannot prove; scheduled emails can no longer be double-sent or silently lost on an uncertain Dynamics response.
+**Pointers:** `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`; `docs/plans/briefs/FACTORY_LEDGER_SNAPSHOT_BRIEF_2026-09-30.md`; `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`; PRs #373, #374, #378.
+
 ## September 2026 — Staff site-visit video released in Production (parallel Codex session during 553)
 
 **Milestone:** Staff can add a Zoom recording link or upload an MP4 after a Site Visit in Meeting Tracker, then watch the current recording from Staff Deliberations; a separate 60-day materials-only link is available for Board sharing.
