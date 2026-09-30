@@ -2416,3 +2416,25 @@ requires a live-session status or terminal/no-item proof before returning a URL.
 and already-finalized stale actions return idempotent results. This branch implementation has
 not been deployed or live-tested against Graph expiry. No migration, SharePoint write/deletion,
 alias move, or Production configuration change was made in Slice 4a.
+
+**2026-09-29 disabled Production merge preflight:** [VERIFIED via PR #365, Vercel CLI,
+read-only Production Wave 30 preflight, and the branded Production host] branch
+`codex/feature-request` at `f1d850004` is mergeable with every PR check green.
+Production `POST_PRESENTATION_MATERIALS_SCHEMA_READY` and
+`POST_PRESENTATION_MATERIALS_ACCESS` have no configured Vercel records; source
+defaults both to off. `EXTERNAL_LINK_SECRET` is present as a Production secret
+(value was not read). The Production Dataverse host is the tracked
+`wmkf.crm.dynamics.com`; `wmkf_externalurl` and `wmkf_slotversion` are both
+absent with no divergent metadata. The pre-merge Production deployment is Ready
+at `dpl_A5Y2YECEra152nghhFZc4CiPJNNV` and serves the branded
+`applications.wmkeck.org` alias. Its immutable rollback URL is
+`https://wmkfresearchapps-81or461yj-justin-gallivans-projects.vercel.app`.
+The owner authorized proceeding with the disabled merge in this chat. Merging
+does not authorize enabling presentation access or applying Wave 30. The
+post-merge check must verify the new Production deployment and sign-in surface;
+rollback is `vercel rollback` to that immutable deployment if needed. With
+access off, the new producers and external resolvers authorize no presentation
+writes or views. Existing unrelated application behavior and credentials remain
+under their current controls. The bounded Production test and general release
+still require the separate Wave 30 apply/readback and owner-approved gate in
+§15.
