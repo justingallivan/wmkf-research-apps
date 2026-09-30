@@ -104,6 +104,7 @@ import {
 import { advanceRun, recipeLeaseSeconds, RECIPE_STEP_ORDER } from '../lib/services/test-requests/run-runner.js';
 import { recheckFoundationTransition } from '../lib/services/test-requests/foundation-transition.js';
 import { classifyLedgerUrl } from '../lib/db/ledger-registry.js';
+import { compareLedgerFingerprint, formatLedgerDiff, readExpectedFingerprint, readLedgerFingerprint } from '../lib/db/ledger-schema.js';
 import { fieldFor, recheckStatusChange, runStatusChange } from '../lib/services/test-requests/status-change-runner.js';
 import { CAST_DEFAULT_NAMES, CAST_ROLE_ORDER, planCastAddresses, readCast, runCastCreate } from '../lib/services/test-requests/cast-runner.js';
 import { runCastBinding } from '../lib/services/test-requests/cast-binding-runner.js';
@@ -248,6 +249,8 @@ export function parseArgs(argv) {
     else if (arg.startsWith('--manifest=')) parsed.manifest = arg.slice('--manifest='.length);
     else if (arg.startsWith('--steps=')) parsed.steps = Number(arg.slice('--steps='.length));
     else if (arg.startsWith('--run-inspect=')) parsed.runInspect = arg.slice('--run-inspect='.length);
+    else if (arg === '--ledger-check') parsed.ledgerCheck = true;
+    else if (arg === '--strict-ledger-check') parsed.strictLedgerCheck = true;
     else if (arg.startsWith('--run-recheck=')) parsed.runRecheck = arg.slice('--run-recheck='.length);
     else if (arg.startsWith('--set-status=')) parsed.setStatus = arg.slice('--set-status='.length);
     else if (arg.startsWith('--field=')) parsed.statusField = arg.slice('--field='.length);
@@ -427,7 +430,7 @@ function printHelp() {
   console.log('Create the reused synthetic cast (owner-run once; addresses must be on the Admin allowlist; prints the plan and stops unless --confirm; every run needs DATAVERSE_ALLOW_PROD_READS=yes, and --confirm also DATAVERSE_PROD_WRITE_ACK): ... --target=production --create-cast --cast-pi=<address> --cast-liaison=<address> --cast-reviewer=<address> --cast-org-leader=<address> --cast-research-leader=<address> [--confirm]');
   console.log('Bind the cast suggested reviewer to a ready production test Request (owner-run; needs DATAVERSE_ALLOW_PROD_READS=yes and DATAVERSE_PROD_WRITE_ACK): ... --target=production --bind-reviewer=<runId>');
   console.log('Production (owner-run; MVP basic only): --target=production with --reserve (plus --director=<your sign-in>, who becomes the program director) or --advance; never --bypass-goverify. Writes need DATAVERSE_PROD_WRITE_ACK="<purpose> <today UTC>" inline.');
-  console.log('Ledger-driven modes require TEST_REQUEST_LEDGER_URL, which must not be the shared Production/Preview database.');
+  console.log('Ledger-driven modes require TEST_REQUEST_LEDGER_URL naming a registered ledger host (lib/db/ledger-registry.js; on the managed ledger, database ledger_prod for --target=production and ledger otherwise), never the shared Production/Preview database. Each such mode first compares the ledger schema with lib/db/ledger-schema-fingerprint.json; --ledger-check runs only that comparison, --strict-ledger-check also blocks on DIFFERS.');
 }
 
 function writeNewJson(filePath, value) {
@@ -773,6 +776,35 @@ function requireLedgerUrl(target = null) {
     throw new Error(`TEST_REQUEST_LEDGER_URL on the managed ledger must name the ${verdict.reason.slice('wrong_database:'.length)} database for --target=${target}.`);
   }
   return url;
+}
+
+/**
+ * Ledger schema check (portability plan Phase 3): compares the ledger's
+ * structural fingerprint with the tracked lib/db/ledger-schema-fingerprint.json
+ * before any ledger-driven mode runs. MISSING objects always refuse (the
+ * ledger is behind the checkout: run `npm run ledger:apply -- --url-env=...`).
+ * DIFFERING objects refuse only with --strict-ledger-check and warn otherwise
+ * (hand-patched ledgers may carry harmless shape differences until they are
+ * reconciled); EXTRA objects warn (the ledger is ahead of the checkout).
+ */
+async function ledgerSchemaCheck(ledgerUrl, { strict = false } = {}) {
+  const db = pgLedgerDb(ledgerUrl);
+  let diff;
+  try {
+    diff = compareLedgerFingerprint(readExpectedFingerprint().fingerprint, await readLedgerFingerprint(db));
+  } finally {
+    await db.end?.();
+  }
+  const database = new URL(ledgerUrl).pathname.replace(/^\//, '');
+  if (diff.missing.length > 0 || (strict && diff.differing.length > 0)) {
+    throw new Error(`Ledger ${database} does not match lib/db/ledger-schema-fingerprint.json:\n${formatLedgerDiff(diff)}\nApply the checkout's ledger migrations (npm run ledger:apply -- --url-env=TEST_REQUEST_LEDGER_URL) or regenerate the fingerprint if the files changed.`);
+  }
+  if (diff.differing.length > 0 || diff.extra.length > 0) {
+    console.warn(`[ledger-check] ${database}: schema differs from the checkout's fingerprint (not blocking${strict ? '' : '; --strict-ledger-check would block on DIFFERS'}):\n${formatLedgerDiff(diff)}`);
+  } else {
+    console.log(`[ledger-check] ${database}: matches lib/db/ledger-schema-fingerprint.json`);
+  }
+  return diff;
 }
 
 /**
@@ -1295,8 +1327,14 @@ async function main() {
   loadEnvLocal();
   applyDefaultReviewerAddress(args);
 
+  if (args.ledgerCheck) {
+    const ledgerUrl = requireLedgerUrl(args.target);
+    await ledgerSchemaCheck(ledgerUrl, { strict: args.strictLedgerCheck });
+    return;
+  }
   if (args.runInspect) {
     const ledgerUrl = requireLedgerUrl();
+    await ledgerSchemaCheck(ledgerUrl, { strict: args.strictLedgerCheck });
     await runRunInspect(args.runInspect, ledgerUrl);
     return;
   }
@@ -1304,6 +1342,7 @@ async function main() {
   const targetUrl = TARGET_URLS[args.target];
   if (args.setStatus || args.statusRecheck) {
     const ledgerUrl = requireLedgerUrl(args.target);
+    await ledgerSchemaCheck(ledgerUrl, { strict: args.strictLedgerCheck });
     // No marker writes: a status change never touches the Test Request marker.
     const statusClient = createClient({ resourceUrl: targetUrl, token: await getAccessToken(targetUrl) });
     await runStatusMode(statusClient, args, ledgerUrl);
@@ -1311,6 +1350,7 @@ async function main() {
   }
   if (args.createCast || args.bindReviewer) {
     const ledgerUrl = requireLedgerUrl(args.target);
+    await ledgerSchemaCheck(ledgerUrl, { strict: args.strictLedgerCheck });
     // The cast person create is a sanctioned marker write (wmkf_potentialreviewerses).
     const castClient = createClient({ resourceUrl: targetUrl, token: await getAccessToken(targetUrl), allowTestRequestMarkerWrites: true });
     await runCastMode(castClient, args, ledgerUrl);
@@ -1318,6 +1358,7 @@ async function main() {
   }
   if (args.runRecheck) {
     const ledgerUrl = requireLedgerUrl(args.target);
+    await ledgerSchemaCheck(ledgerUrl, { strict: args.strictLedgerCheck });
     const readClient = createClient({ resourceUrl: targetUrl, token: await getAccessToken(targetUrl) });
     await runRecheck(readClient, args.runRecheck, ledgerUrl);
     return;
@@ -1346,11 +1387,13 @@ async function main() {
   }
   if (args.reserve) {
     const ledgerUrl = requireLedgerUrl(args.target);
+    await ledgerSchemaCheck(ledgerUrl, { strict: args.strictLedgerCheck });
     await runReserve(client, args, ledgerUrl);
     return;
   }
   if (args.advance) {
     const ledgerUrl = requireLedgerUrl(args.target);
+    await ledgerSchemaCheck(ledgerUrl, { strict: args.strictLedgerCheck });
     await runAdvance(client, args, ledgerUrl);
     return;
   }

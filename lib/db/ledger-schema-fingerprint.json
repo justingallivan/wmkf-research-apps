@@ -1,0 +1,863 @@
+{
+  "generatedFrom": [
+    "054_test_request_runs.sql"
+  ],
+  "fingerprint": {
+    "tables": {
+      "test_request_cast_bindings": {
+        "columns": [
+          {
+            "name": "binding_id",
+            "type": "uuid",
+            "nullable": false
+          },
+          {
+            "name": "run_id",
+            "type": "uuid",
+            "nullable": false
+          },
+          {
+            "name": "member_id",
+            "type": "uuid",
+            "nullable": false
+          },
+          {
+            "name": "status",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "dispatched_at",
+            "type": "timestamptz",
+            "nullable": true
+          },
+          {
+            "name": "readback",
+            "type": "jsonb",
+            "nullable": true
+          },
+          {
+            "name": "error",
+            "type": "text",
+            "nullable": true
+          },
+          {
+            "name": "created_at",
+            "type": "timestamptz",
+            "nullable": false
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamptz",
+            "nullable": false
+          },
+          {
+            "name": "verified_at",
+            "type": "timestamptz",
+            "nullable": true
+          }
+        ],
+        "constraints": [
+          {
+            "name": "test_request_cast_bindings_error_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_cast_bindings_member_id_fkey",
+            "type": "f"
+          },
+          {
+            "name": "test_request_cast_bindings_one_per_run",
+            "type": "u"
+          },
+          {
+            "name": "test_request_cast_bindings_pkey",
+            "type": "p"
+          },
+          {
+            "name": "test_request_cast_bindings_readback_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_cast_bindings_run_id_fkey",
+            "type": "f"
+          },
+          {
+            "name": "test_request_cast_bindings_status_check",
+            "type": "c"
+          }
+        ],
+        "indexes": [
+          "test_request_cast_bindings_one_per_run",
+          "test_request_cast_bindings_pkey"
+        ]
+      },
+      "test_request_cast_members": {
+        "columns": [
+          {
+            "name": "member_id",
+            "type": "uuid",
+            "nullable": false
+          },
+          {
+            "name": "environment",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "role",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "entity",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "first_name",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "last_name",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "address_sha256",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "status",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "dispatched_at",
+            "type": "timestamptz",
+            "nullable": true
+          },
+          {
+            "name": "readback",
+            "type": "jsonb",
+            "nullable": true
+          },
+          {
+            "name": "error",
+            "type": "text",
+            "nullable": true
+          },
+          {
+            "name": "created_at",
+            "type": "timestamptz",
+            "nullable": false
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamptz",
+            "nullable": false
+          },
+          {
+            "name": "verified_at",
+            "type": "timestamptz",
+            "nullable": true
+          }
+        ],
+        "constraints": [
+          {
+            "name": "test_request_cast_members_address_sha256_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_cast_members_entity_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_cast_members_environment_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_cast_members_error_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_cast_members_first_name_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_cast_members_last_name_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_cast_members_one_per_role",
+            "type": "u"
+          },
+          {
+            "name": "test_request_cast_members_pkey",
+            "type": "p"
+          },
+          {
+            "name": "test_request_cast_members_readback_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_cast_members_role_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_cast_members_role_entity",
+            "type": "c"
+          },
+          {
+            "name": "test_request_cast_members_status_check",
+            "type": "c"
+          }
+        ],
+        "indexes": [
+          "test_request_cast_members_one_per_role",
+          "test_request_cast_members_pkey"
+        ]
+      },
+      "test_request_run_resources": {
+        "columns": [
+          {
+            "name": "resource_id",
+            "type": "int8",
+            "nullable": false
+          },
+          {
+            "name": "run_id",
+            "type": "uuid",
+            "nullable": false
+          },
+          {
+            "name": "sequence",
+            "type": "int4",
+            "nullable": false
+          },
+          {
+            "name": "step",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "resource_kind",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "system",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "planned_identity",
+            "type": "jsonb",
+            "nullable": false
+          },
+          {
+            "name": "source_provenance",
+            "type": "jsonb",
+            "nullable": true
+          },
+          {
+            "name": "dispatched_at",
+            "type": "timestamptz",
+            "nullable": true
+          },
+          {
+            "name": "response_status",
+            "type": "int4",
+            "nullable": true
+          },
+          {
+            "name": "readback",
+            "type": "jsonb",
+            "nullable": true
+          },
+          {
+            "name": "outcome",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "error",
+            "type": "text",
+            "nullable": true
+          },
+          {
+            "name": "created_at",
+            "type": "timestamptz",
+            "nullable": false
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamptz",
+            "nullable": false
+          }
+        ],
+        "constraints": [
+          {
+            "name": "test_request_run_resources_error_code",
+            "type": "c"
+          },
+          {
+            "name": "test_request_run_resources_outcome_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_run_resources_pkey",
+            "type": "p"
+          },
+          {
+            "name": "test_request_run_resources_planned_identity_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_run_resources_readback_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_run_resources_resource_kind_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_run_resources_run_id_fkey",
+            "type": "f"
+          },
+          {
+            "name": "test_request_run_resources_run_sequence",
+            "type": "u"
+          },
+          {
+            "name": "test_request_run_resources_source_provenance_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_run_resources_step_enum",
+            "type": "c"
+          },
+          {
+            "name": "test_request_run_resources_system_check",
+            "type": "c"
+          }
+        ],
+        "indexes": [
+          "test_request_run_resources_one_baseline_idx",
+          "test_request_run_resources_pkey",
+          "test_request_run_resources_run_sequence",
+          "test_request_run_resources_run_step_idx"
+        ]
+      },
+      "test_request_run_reviewer_assignments": {
+        "columns": [
+          {
+            "name": "assignment_id",
+            "type": "int8",
+            "nullable": false
+          },
+          {
+            "name": "run_id",
+            "type": "uuid",
+            "nullable": false
+          },
+          {
+            "name": "sequence",
+            "type": "int4",
+            "nullable": false
+          },
+          {
+            "name": "source_person_id",
+            "type": "uuid",
+            "nullable": false
+          },
+          {
+            "name": "destination_person_id",
+            "type": "uuid",
+            "nullable": false
+          },
+          {
+            "name": "reused",
+            "type": "bool",
+            "nullable": false
+          },
+          {
+            "name": "address",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "address_sha256",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "created_at",
+            "type": "timestamptz",
+            "nullable": false
+          }
+        ],
+        "constraints": [
+          {
+            "name": "test_request_run_reviewer_assignments_address_shape",
+            "type": "c"
+          },
+          {
+            "name": "test_request_run_reviewer_assignments_digest_matches_address",
+            "type": "c"
+          },
+          {
+            "name": "test_request_run_reviewer_assignments_digest_shape",
+            "type": "c"
+          },
+          {
+            "name": "test_request_run_reviewer_assignments_pkey",
+            "type": "p"
+          },
+          {
+            "name": "test_request_run_reviewer_assignments_run_address",
+            "type": "u"
+          },
+          {
+            "name": "test_request_run_reviewer_assignments_run_id_fkey",
+            "type": "f"
+          },
+          {
+            "name": "test_request_run_reviewer_assignments_run_sequence",
+            "type": "u"
+          },
+          {
+            "name": "test_request_run_reviewer_assignments_run_source",
+            "type": "u"
+          }
+        ],
+        "indexes": [
+          "test_request_run_reviewer_assignments_pkey",
+          "test_request_run_reviewer_assignments_run_address",
+          "test_request_run_reviewer_assignments_run_sequence",
+          "test_request_run_reviewer_assignments_run_source"
+        ]
+      },
+      "test_request_runs": {
+        "columns": [
+          {
+            "name": "run_id",
+            "type": "uuid",
+            "nullable": false
+          },
+          {
+            "name": "actor_id",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "idempotency_key",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "status",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "current_step",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "step_index",
+            "type": "int4",
+            "nullable": false
+          },
+          {
+            "name": "recipe",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "source_dataverse_host",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "source_request_id",
+            "type": "uuid",
+            "nullable": false
+          },
+          {
+            "name": "source_request_number",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "source_revision",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "bundle_sha256",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "bundle_exported_at",
+            "type": "timestamptz",
+            "nullable": false
+          },
+          {
+            "name": "copy_policy_version",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "copy_policy_digest",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "plan_digest",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "create_body_sha256",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "destination_environment",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "destination_dataverse_host",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "destination_request_id",
+            "type": "uuid",
+            "nullable": false
+          },
+          {
+            "name": "destination_location_id",
+            "type": "uuid",
+            "nullable": false
+          },
+          {
+            "name": "destination_request_number",
+            "type": "text",
+            "nullable": true
+          },
+          {
+            "name": "expected_app_user_id",
+            "type": "uuid",
+            "nullable": false
+          },
+          {
+            "name": "expected_organization_id",
+            "type": "uuid",
+            "nullable": false
+          },
+          {
+            "name": "expected_graph_site_id",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "expected_graph_drive_id",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "fiscal_year",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "meeting_date",
+            "type": "date",
+            "nullable": false
+          },
+          {
+            "name": "test_label",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "version",
+            "type": "int4",
+            "nullable": false
+          },
+          {
+            "name": "lease_token",
+            "type": "uuid",
+            "nullable": true
+          },
+          {
+            "name": "lease_generation",
+            "type": "int4",
+            "nullable": false
+          },
+          {
+            "name": "locked_until",
+            "type": "timestamptz",
+            "nullable": true
+          },
+          {
+            "name": "attempt_count",
+            "type": "int4",
+            "nullable": false
+          },
+          {
+            "name": "needs_attention_reason",
+            "type": "text",
+            "nullable": true
+          },
+          {
+            "name": "last_error",
+            "type": "text",
+            "nullable": true
+          },
+          {
+            "name": "created_at",
+            "type": "timestamptz",
+            "nullable": false
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamptz",
+            "nullable": false
+          },
+          {
+            "name": "completed_at",
+            "type": "timestamptz",
+            "nullable": true
+          }
+        ],
+        "constraints": [
+          {
+            "name": "test_request_runs_actor_id_shape",
+            "type": "c"
+          },
+          {
+            "name": "test_request_runs_actor_idempotency_key",
+            "type": "u"
+          },
+          {
+            "name": "test_request_runs_completed_at_coherence",
+            "type": "c"
+          },
+          {
+            "name": "test_request_runs_current_step_enum",
+            "type": "c"
+          },
+          {
+            "name": "test_request_runs_destination_environment_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_runs_destination_location_id_key",
+            "type": "u"
+          },
+          {
+            "name": "test_request_runs_destination_request_id_key",
+            "type": "u"
+          },
+          {
+            "name": "test_request_runs_digest_shapes",
+            "type": "c"
+          },
+          {
+            "name": "test_request_runs_fiscal_year_shape",
+            "type": "c"
+          },
+          {
+            "name": "test_request_runs_graph_identity_shapes",
+            "type": "c"
+          },
+          {
+            "name": "test_request_runs_host_shapes",
+            "type": "c"
+          },
+          {
+            "name": "test_request_runs_idempotency_key_digest",
+            "type": "c"
+          },
+          {
+            "name": "test_request_runs_needs_attention_reason_coherence",
+            "type": "c"
+          },
+          {
+            "name": "test_request_runs_pkey",
+            "type": "p"
+          },
+          {
+            "name": "test_request_runs_ready_request_number",
+            "type": "c"
+          },
+          {
+            "name": "test_request_runs_reason_codes",
+            "type": "c"
+          },
+          {
+            "name": "test_request_runs_recipe_enum",
+            "type": "c"
+          },
+          {
+            "name": "test_request_runs_request_number_shape",
+            "type": "c"
+          },
+          {
+            "name": "test_request_runs_source_shapes",
+            "type": "c"
+          },
+          {
+            "name": "test_request_runs_status_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_runs_test_label_derived",
+            "type": "c"
+          }
+        ],
+        "indexes": [
+          "test_request_runs_actor_created_idx",
+          "test_request_runs_actor_idempotency_key",
+          "test_request_runs_destination_location_id_key",
+          "test_request_runs_destination_request_id_key",
+          "test_request_runs_pkey",
+          "test_request_runs_status_idx"
+        ]
+      },
+      "test_request_status_changes": {
+        "columns": [
+          {
+            "name": "change_id",
+            "type": "uuid",
+            "nullable": false
+          },
+          {
+            "name": "run_id",
+            "type": "uuid",
+            "nullable": false
+          },
+          {
+            "name": "sequence",
+            "type": "int4",
+            "nullable": false
+          },
+          {
+            "name": "field",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "option_before",
+            "type": "int4",
+            "nullable": true
+          },
+          {
+            "name": "option_after",
+            "type": "int4",
+            "nullable": false
+          },
+          {
+            "name": "etag_before",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "status",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "rerun",
+            "type": "bool",
+            "nullable": false
+          },
+          {
+            "name": "dispatched_at",
+            "type": "timestamptz",
+            "nullable": true
+          },
+          {
+            "name": "effects",
+            "type": "jsonb",
+            "nullable": true
+          },
+          {
+            "name": "error",
+            "type": "text",
+            "nullable": true
+          },
+          {
+            "name": "created_at",
+            "type": "timestamptz",
+            "nullable": false
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamptz",
+            "nullable": false
+          },
+          {
+            "name": "completed_at",
+            "type": "timestamptz",
+            "nullable": true
+          }
+        ],
+        "constraints": [
+          {
+            "name": "test_request_status_changes_distinct",
+            "type": "c"
+          },
+          {
+            "name": "test_request_status_changes_effects_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_status_changes_error_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_status_changes_etag_before_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_status_changes_field_check",
+            "type": "c"
+          },
+          {
+            "name": "test_request_status_changes_pkey",
+            "type": "p"
+          },
+          {
+            "name": "test_request_status_changes_run_id_fkey",
+            "type": "f"
+          },
+          {
+            "name": "test_request_status_changes_run_sequence",
+            "type": "u"
+          },
+          {
+            "name": "test_request_status_changes_status_check",
+            "type": "c"
+          }
+        ],
+        "indexes": [
+          "test_request_status_changes_one_open_idx",
+          "test_request_status_changes_pkey",
+          "test_request_status_changes_run_sequence"
+        ]
+      }
+    },
+    "functions": [
+      "test_request_receipt_ok(receipt jsonb)"
+    ]
+  }
+}
