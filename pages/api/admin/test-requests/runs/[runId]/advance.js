@@ -13,9 +13,8 @@ import {
 } from '../../../../../../lib/services/test-requests/admin-run-route-helpers';
 import { requireSuperuser } from '../../../../../../lib/utils/auth';
 
-const MAX_DURATION_SECONDS = 300;
-
-export const config = { api: { bodyParser: { sizeLimit: '32kb' } }, maxDuration: MAX_DURATION_SECONDS };
+// maxDuration must be a literal: Next reads this export statically and fails the build on an identifier.
+export const config = { api: { bodyParser: { sizeLimit: '32kb' } }, maxDuration: 300 };
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -35,7 +34,7 @@ export default async function handler(req, res) {
       const body = await createAdminRunService().advance({
         profileId: gate.profileId,
         runId,
-        deadlineAt: routeDeadline(MAX_DURATION_SECONDS),
+        deadlineAt: routeDeadline(config.maxDuration),
       });
       res.setHeader('Cache-Control', 'no-store');
       return res.status(200).json(body);

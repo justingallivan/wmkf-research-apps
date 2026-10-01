@@ -271,6 +271,20 @@ describe('runs GET', () => {
 });
 
 describe('deadlines and limits', () => {
+  // Next extracts `config` statically at build time and rejects anything but
+  // literals (Codex slice 2 review: an identifier here failed `next build`
+  // while the evaluated-object assertions below still passed).
+  test('every route file exports a config made only of literals', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const dir = path.join(__dirname, '../../pages/api/admin/test-requests/runs');
+    const files = ['source.js', 'index.js', '[runId]/index.js', '[runId]/advance.js', '[runId]/recheck.js', '[runId]/artifacts.js'];
+    for (const file of files) {
+      const line = fs.readFileSync(path.join(dir, file), 'utf8').split('\n').find((text) => text.startsWith('export const config'));
+      expect(line).toMatch(/^export const config = \{ api: \{ bodyParser: \{ sizeLimit: '32kb' \} \}(, maxDuration: 300)? \};$/);
+    }
+  });
+
   test.each([
     ['source', sourceHandler, () => ({ method: 'POST', query: {}, body: { sourceRequestNumber: '9000001' } }), 'exportSource'],
     ['advance', advanceHandler, () => ({ method: 'POST', query: { runId: RUN_ID }, body: {} }), 'advance'],
