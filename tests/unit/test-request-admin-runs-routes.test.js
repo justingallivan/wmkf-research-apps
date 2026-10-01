@@ -297,6 +297,24 @@ describe('deadlines and limits', () => {
     expect(deadlineAt - before).toBeLessThanOrEqual(280_000 + 1_000);
   });
 
+  test.each([
+    ['source', sourceHandler, () => ({ method: 'POST', query: {}, body: { sourceRequestNumber: '9000001' } }), 'exportSource'],
+    ['advance', advanceHandler, () => ({ method: 'POST', query: { runId: RUN_ID }, body: {} }), 'advance'],
+  ])('%s anchors the deadline at entry: time spent in the gate reduces the budget', async (_name, handler, req, fn) => {
+    const entry = 1_000_000;
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(entry);
+    requireSuperuser.mockImplementationOnce(async () => {
+      clock.mockReturnValue(entry + 140_000); // a slow gate
+      return { profileId: PROFILE };
+    });
+    try {
+      await handler(req(), mockRes());
+      expect(service[fn].mock.calls[0][0].deadlineAt).toBe(entry + 280_000);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   test('config: 32kb body limit everywhere; maxDuration 300 only on source and advance', () => {
     for (const config of [sourceConfig, runsConfig, runConfig, advanceConfig, recheckConfig, artifactsConfig]) {
       expect(config.api.bodyParser.sizeLimit).toBe('32kb');

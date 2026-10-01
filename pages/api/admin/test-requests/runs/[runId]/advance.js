@@ -17,6 +17,8 @@ import { requireSuperuser } from '../../../../../../lib/utils/auth';
 export const config = { api: { bodyParser: { sizeLimit: '32kb' } }, maxDuration: 300 };
 
 export default async function handler(req, res) {
+  // Anchored at entry, before the gate: time spent authenticating counts against the limit.
+  const deadlineAt = routeDeadline(config.maxDuration);
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });
@@ -34,7 +36,7 @@ export default async function handler(req, res) {
       const body = await createAdminRunService().advance({
         profileId: gate.profileId,
         runId,
-        deadlineAt: routeDeadline(config.maxDuration),
+        deadlineAt,
       });
       res.setHeader('Cache-Control', 'no-store');
       return res.status(200).json(body);
