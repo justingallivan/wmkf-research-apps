@@ -271,6 +271,55 @@ test('history cursor is scoped to the request and pages with the timestamp/id tu
   expect(pageCall.values).not.toContain(RUN.created_at);
 });
 
+// Finding 9 (PR #366): repeated Dataverse and SQL reads.
+const screeningReads = (deps) => deps.state.sqlCalls.filter(({ query }) => (
+  query.includes('FROM integrity_screenings') && !query.includes('INSERT')
+));
+
+test('uncursored context reads the run list and its reviews once each', async () => {
+  const review = { id: 7, screening_id: RUN.id, decision: 'hold', notes: 'Check', created_at: RUN.created_at, display_name: 'PD' };
+  const deps = dependenciesFor(dataverseDependencies(), { runs: [{ ...RUN, id: 11, created_at: '2026-09-27T00:00:00.000Z' }, RUN], reviews: [review] });
+  const result = await getWorkbenchIntegrityContext({ requestId: REQUEST_ID, profileId: 42, actingUserSystemId: SYSTEM_ID }, deps);
+  expect(screeningReads(deps)).toHaveLength(1);
+  expect(deps.state.sqlCalls.filter(({ query }) => query.includes('FROM integrity_screening_reviews r'))).toHaveLength(1);
+  expect(result.latestRun).toEqual({
+    id: 11, createdAt: '2026-09-27T00:00:00.000Z', screenedNames: RUN.screened_names,
+    results: RUN.results, matchCount: 0, status: 'pending',
+  });
+  expect(result.latestRun).not.toHaveProperty('reviews');
+  expect(result.history.map((run) => run.id)).toEqual([11, 10]);
+  expect(result.review.latestDecision).toBeNull();
+});
+
+test('cursored context still reports the true latest run, not the page head', async () => {
+  const runs = [{ ...RUN, id: 11, created_at: '2026-09-27T00:00:00.000Z' }, RUN];
+  const db = async (parts, ...values) => {
+    const query = parts.join('?').replace(/\s+/g, ' ').trim();
+    if (query.includes('SELECT id, created_at FROM integrity_screenings')) return { rows: [runs[0]] };
+    if (query.includes('CROSS JOIN')) return { rows: [RUN] };
+    if (query.includes('ORDER BY created_at DESC, id DESC LIMIT 1')) return { rows: [runs[0]] };
+    return { rows: [] };
+  };
+  const result = await getWorkbenchIntegrityContext({
+    requestId: REQUEST_ID, profileId: 42, actingUserSystemId: SYSTEM_ID, beforeRunId: 11,
+  }, { ...dataverseDependencies(), sql: db });
+  expect(result.history.map((run) => run.id)).toEqual([10]);
+  expect(result.latestRun.id).toBe(11);
+});
+
+test('recording a disposition loads Dataverse and the actor role once and reads the target once', async () => {
+  const peopleDeps = dataverseDependencies();
+  const deps = dependenciesFor(peopleDeps);
+  const result = await recordWorkbenchIntegrityReview(reviewArgs(), deps);
+  expect(peopleDeps.grantRequestAdapter.getById).toHaveBeenCalledTimes(1);
+  expect(peopleDeps.appRequestPersonAdapter.queryAllPersons).toHaveBeenCalledTimes(1);
+  expect(peopleDeps.getUserRole).toHaveBeenCalledTimes(1);
+  const insertIndex = deps.state.sqlCalls.findIndex(({ query }) => query.includes('INSERT INTO integrity_screening_reviews'));
+  expect(deps.state.sqlCalls.slice(0, insertIndex).filter(({ query }) => query.includes('FROM integrity_screenings'))).toHaveLength(1);
+  expect(result.review.status).toBe('approved');
+  expect(result.people).toEqual([PERSON]);
+});
+
 test('migration 057 and fresh-install setup preserve append-only review rows and constraints', () => {
   const fs = require('fs');
   const migration = fs.readFileSync('lib/db/migrations/057_integrity_screening_reviews.sql', 'utf8');
