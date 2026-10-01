@@ -49,6 +49,8 @@ is open for this incident.
 
 None for this transcript incident. The owner accepted both formats in Production.
 
+**App Postgres password rotated (2026-10-01 ~02:25Z, owner + Claude, home Mac).** Trigger: Vercel "Needs Attention" badges on the readable `POSTGRES_URL` family, plus Claude accidentally printed the full `POSTGRES_URL` into the session transcript. The owner reset `neondb_owner` in Neon project `expert-reviewers-neon-db` (`falling-surf-05640504`). The integration re-synced all 16 Vercel variables itself, and the owner redeployed Production (Ready 02:28:57Z; `health_check_history` `healthy` at 02:30:51Z). The home Mac `.env.local` and the feature-request `.env.presentation-proof.local` were updated via `vercel env pull`, and all four URL variables connect. **Office Mac `.env.local` still holds the dead password; update it first thing next session** (runbook step 4). Sensitive conversion: owner chose option A (leave readable) because of Preview acceptance; see `docs/CREDENTIALS_RUNBOOK.md` → "Rotating the app Postgres password". The `migration_drift` alert auto-resolved at 01:58:54Z.
+
 **Factory ledger (added 2026-09-30 evening, Claude, home Mac):** the managed-ledger
 load is done and is now the current copy. Evidence:
 `docs/plans/evidence/test-request-factory/ledger-snapshot-2026-09-30.md`.
@@ -147,7 +149,7 @@ prompts remain available in Git history; only this new handoff is retained here.
 ### Owner Decision Needed
 
 1. **D2: retire the local `ledger_prod`** once the Neon restore is confirmed (`docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`).
-2. ~~**Does 058 also run against the shared app database?**~~ **DECIDED and DONE 2026-10-01 (owner: option 1).** 058 applied to Production by the owner's `npm run apply:migrations` (1 applied, 57 skipped) after a scratch rehearsal on the early-054 shape; tracker 58 = manifest. The active `migration_drift` alert (23:03Z 9/30; one ops email) should auto-resolve on the next cold start — confirm. Original question: Production's app DB holds an early-applied 054 copy; `project-migration-numbers-claimed-off-main.md` says B4's 058 was written to repair it, while the ledger rule P6 says the app DB is never the ledger. Not applied in S553. B4/Codex decision.
+2. ~~**Does 058 also run against the shared app database?**~~ **DECIDED and DONE 2026-10-01 (owner: option 1).** 058 applied to Production by the owner's `npm run apply:migrations` (1 applied, 57 skipped) after a scratch rehearsal on the early-054 shape; tracker 58 = manifest. The active `migration_drift` alert (23:03Z 9/30; one ops email) auto-resolved at 01:58:54Z on 10/01. Original question: Production's app DB holds an early-applied 054 copy; `project-migration-numbers-claimed-off-main.md` says B4's 058 was written to repair it, while the ledger rule P6 says the app DB is never the ledger. Not applied in S553. B4/Codex decision.
 
 ### Parked
 
@@ -159,7 +161,7 @@ prompts remain available in Git history; only this new handoff is retained here.
 2. ~~**`migration_drift_ahead` for 055**~~ CHECKED 2026-09-30: 055 tracked and in the manifest; the two 9/30 `migration_drift_ahead` warnings auto-resolved.
 3. **Residue**: Test Requests 1003301–1003303; scratch DBs `ledger_ci_s547`, `ledger_ci_s548`; local Docker `ledger_prod` was created and dropped in S553 (transition proof). List and confirm before deleting.
 4. ~~**Vercel skipped build of `61dafcb81`**~~ DIAGNOSED 2026-09-30 evening: GitHub logged the `main` PushEvent (22:16:05Z) but Vercel created no deployment record at all (not cancelled/ignored; `vercel.json` has no ignore step). One-off: of 66 `main` push heads in GitHub's event window (9/27–9/30) it is the only one without a production deployment; other undeployed `main` commits since 9/16 are non-head commits of multi-commit pushes. Its code went live via `9f408590e` at 22:27Z. Root cause (dropped GitHub-App delivery) is not visible from the CLI; no action needed beyond the existing verify-deploy-is-the-merge-build habit.
-5. `docs/CREDENTIALS_RUNBOOK.md` Postgres rotation procedure — still absent (the S553 sync followed a Downloads brief instead).
+5. ~~`docs/CREDENTIALS_RUNBOOK.md` Postgres rotation procedure~~ ADDED 2026-10-01 (the S553 sync followed a Downloads brief instead).
 6. **Codex refactor survey** — read-only survey in `~/Code/WMKF_Apps-refactor`; whatever it proposes is a plan to review, not a worklist.
 
 ### Do Not Reopen Without New Decision
