@@ -137,6 +137,7 @@
     "lucide-react": "^0.577.0",
     "mammoth": "^1.12.0",
     "marked": "^12.0.2",
+    "music-metadata": "^11.16.1",
     "next": "^16.2.12",
     "next-auth": "^4.24.15",
     "pdf-lib": "^1.17.1",
