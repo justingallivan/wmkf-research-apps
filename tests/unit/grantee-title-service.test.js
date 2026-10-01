@@ -63,6 +63,16 @@ test('passes a custom (valid) runSource through to the Executor', async () => {
   expect(executePrompt).toHaveBeenCalledWith(expect.objectContaining({ runSource: 'Vercel Test' }));
 });
 
+test('forwards an optional absolute deadline unchanged and omits it when absent', async () => {
+  executePrompt.mockResolvedValue(execResult('To investigate non-reciprocal matter'));
+  const deadlineMs = 1_800_000_000_123;
+  await generateGranteeTitle({ sourceTitle: TITLE, sourceAbstract: ABSTRACT, deadlineMs });
+  expect(executePrompt).toHaveBeenLastCalledWith(expect.objectContaining({ deadlineMs }));
+
+  await generateGranteeTitle({ sourceTitle: TITLE, sourceAbstract: ABSTRACT });
+  expect(executePrompt).toHaveBeenLastCalledWith(expect.not.objectContaining({ deadlineMs: expect.anything() }));
+});
+
 test('strips a language-tagged code fence (```text)', async () => {
   const fenced = '```text\nTo visualize electrical communication in fungal networks\n```';
   executePrompt.mockResolvedValue(execResult(fenced));
