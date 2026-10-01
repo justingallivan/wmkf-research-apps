@@ -54,6 +54,20 @@ describe('transcription media inspection', () => {
     expect(result).not.toHaveProperty('tags');
   });
 
+  test('preserves transferred audio when the production bundler adds worker metadata', async () => {
+    const workerThreads = require('node:worker_threads');
+    const NativeWorker = workerThreads.Worker;
+    const wrapped = jest.spyOn(workerThreads, 'Worker').mockImplementation((filename, options) => new NativeWorker(filename, {
+      ...options,
+      // Turbopack spreads workerData into an object to attach its globals.
+      workerData: { ...options.workerData, __turbopack_globals__: {} },
+    }));
+    try {
+      await expect(inspectAudioBuffer(M4A_FIXTURE)).resolves.toMatchObject({ codec: expect.stringMatching(/AAC/i) });
+      expect(wrapped).toHaveBeenCalledTimes(1);
+    } finally { wrapped.mockRestore(); }
+  });
+
   test('parses a synthetic silent MP3 stream and reports MPEG Layer III', async () => {
     const result = await inspectAudioBuffer(syntheticMp3Frames(20));
     expect(result).toMatchObject({
