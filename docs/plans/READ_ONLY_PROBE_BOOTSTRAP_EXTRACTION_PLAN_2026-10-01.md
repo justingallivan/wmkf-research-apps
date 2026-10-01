@@ -1,6 +1,6 @@
 ---
 title: Read-only probe bootstrap extraction — C5
-status: approved
+status: implemented
 domain: architecture
 kind: plan
 summary: Share only the identical environment loader and token request in three Akoya diagnostic scripts, preserving their distinct read and output behavior.
@@ -9,6 +9,20 @@ owner: product-engineering
 ---
 
 # Read-only probe bootstrap extraction — C5
+
+## Implementation status — 2026-10-01
+
+[VERIFIED via commits and synthetic tests] Tests-first commit `0032abaf0` passed 22 tests against the original scripts. Extraction commit `cf0aa7477` adds the helper, three caller replacements, scoped README note and direct helper coverage; the final focused suite passes 25 tests. Sol approved `cf0aa7477`; the orchestrator independently verified exact token source and byte-identical GET/IIFE suffixes with Babel AST locations, including unchanged taxonomy constants. Runtime behavior claims below remain limited to source and isolated Mode A evidence.
+
+[VERIFIED via mutation runs] Membership precedence, cwd-relative lookup and altered token-field mutations each failed their targeted assertions; all were restored and the focused suite passed. Report tests assert representative output, not full golden reports; the unchanged-source comparison supplements those assertions. Full Jest passed 1,189 suites / 18,784 tests / 5 snapshots, with 6 suites / 98 tests skipped. Fable approved implementation `cf0aa7477` on the first pass through host OAuth session `785a49f1-8082-449c-ad13-94efb839806d`, with no substantive findings. API-key variables were removed; no substitute review product was used. Canonical build, type checks, four runtime syntax checks, and lint passed (0 errors / 123 existing warnings). Build emitted two existing Turbopack dynamic-filesystem warnings and two Node localStorage ExperimentalWarnings. All eight scoped gates and their available self-tests passed sequentially: secret-scan, dynamics-context-boundary, script-suggestion-writers, dataverse-access-layer, doc-symbol-refs, build-claim-freshness, docs-catalog and harness-framing. CI remains a PR check, not part of this local result. No live Dataverse or credential verification occurred.
+
+[VERIFIED scoped `/contract-reconcile` and `/sweep`] Operator entry → explicit loader → unchanged token POST → unchanged per-script GET/report/exit paths is covered by source comparison and synthetic execution. There is no new persistence, schema, status/enum, route or application consumer; those audits are N/A. Partial failure remains taxonomy-specific; no retry, background work or stale UI state is introduced. Caller search finds exactly the three script importers and test fixtures, with no imports under lib/pages/shared/modules. README now identifies helper ownership. The candidate survey records current disposition separately from historical rankings. Atlas and Power Tools references describe dated probe evidence; they make no changed bootstrap-ownership claim and remain historical. No live stale ownership claim remains in this bounded sweep; unrelated documentation and live data were not audited.
+
+[PROMOTION PENDING] Implementation and code review are complete on `cf0aa7477`. Owner acceptance of the recorded synthetic Mode A rehearsal, a named last-known-good production rollback target, and explicit merge authorization are still outstanding. No production verification or deployment is claimed. Rollback is a revert of `cf0aa7477`; it changes no persisted data.
+
+## Approved design and validation requirements (historical plan)
+
+The following sections preserve the approved pre-implementation design. Their `[PLANNED]` labels describe that decision point; the implementation evidence above and final review record below determine actual completion. Promotion requirements remain active until fulfilled.
 
 ## Scope and decision
 
@@ -87,4 +101,4 @@ Rollback is reverting the extraction commit or checking out the prior script ver
 
 ## Review status
 
-[VERIFIED] Source reconnaissance establishes the seam and the differing GET contracts. [PLANNED] Characterization, implementation, builds, CI and release are future steps. Fable round 1 requested explicit synthetic-helper isolation, child clock/log/stdio controls, parser expectations, Jest discovery/environment, accurate source references and decidable promotion requirements. Those changes are incorporated. Fable approved round 2 through the host OAuth session `2460000b-ba03-4192-8e22-1c3d4d43f15d` on 2026-10-01 with no remaining substantive findings. This approves implementation, not promotion.
+[HISTORICAL plan review] Source reconnaissance established the seam and the differing GET contracts before implementation. Characterization, implementation, builds, CI and release were future steps at that review; current evidence is recorded at the top of this document. Fable round 1 requested explicit synthetic-helper isolation, child clock/log/stdio controls, parser expectations, Jest discovery/environment, accurate source references and decidable promotion requirements. Those changes are incorporated. Fable approved round 2 through the host OAuth session `2460000b-ba03-4192-8e22-1c3d4d43f15d` on 2026-10-01 with no remaining substantive findings. This approves implementation, not promotion.
