@@ -49,6 +49,20 @@ is open for this incident.
 
 None for this transcript incident. The owner accepted both formats in Production.
 
+**Factory ledger (added 2026-09-30 evening, Claude, home Mac):** the managed-ledger
+load is done and is now the current copy. Evidence:
+`docs/plans/evidence/test-request-factory/ledger-snapshot-2026-09-30.md`.
+Next session, from the **office Mac** (both Neon URLs are already in its
+`.env.local` per the owner), run one read-only check:
+```bash
+npm run check:factory-ledger
+node scripts/rehearse-test-request-sandbox.mjs --target=production --run-inspect=e33fa857-4b00-4c60-94da-77d4406d4027
+```
+Expect `managed-ledger/ledger_prod` with a matching schema check and Test Request 1003303 `ready`.
+Record the result in the evidence file. Do not restore anything into the office
+container; the brief's office step is superseded. D2 (retire local copies) stays
+an owner decision.
+
 ### Verify Before Acting
 
 Other workstreams are not this session's worklist. The prior accumulated mainline prompt
@@ -128,7 +142,7 @@ prompts remain available in Git history; only this new handoff is retained here.
 1. **Watch Part A in Production for one cron cycle.** Evidence: merged without an implementation review (S553 owner call); `lib/utils/migration-drift.js` will now see 058 in the manifest but not in Production's tracker (`migration_drift_behind`-style logging — check what it actually raises). Read the scheduled-email cron logs and the DB alert rows once; run `node scripts/probe-scheduled-email-orphan-drafts.js` read-only.
 2. **Part B (Liaison re-addressing)** of `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` — smaller follow-on, not started.
 3. **Integrity findings 6 and 9** (PR #366 description) — untouched since S552.
-4. **Ledger Phase 1 operational-data restore into Neon** per the snapshot brief (home-Mac dump → shared folder → restore). Evidence: Codex's B4 handoff below says "Operational data restore is pending". Owner-run.
+4. ~~**Ledger Phase 1 operational-data restore into Neon**~~ **DONE 2026-09-30 evening** (data-only load; see the Factory ledger note at the top). Only the office-Mac `--run-inspect` remains.
 
 ### Owner Decision Needed
 
