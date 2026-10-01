@@ -28,8 +28,13 @@ test('baseline canonicalization preserves object sort, integer-key enumeration, 
   expect(JSON.stringify(canonicalize({ values: [1, 2] }))).not.toBe(JSON.stringify(canonicalize({ values: [2, 1] })));
   const sparse = [];
   sparse[2] = 'last';
-  expect(baselineCanonicalize(sparse)).toEqual([undefined, undefined, 'last']);
-  expect(canonicalize(sparse)).toEqual(baselineCanonicalize(sparse));
+  expect(baselineCanonicalize(sparse)).toStrictEqual(sparse);
+  const productionSparse = canonicalize(sparse);
+  expect(productionSparse).toStrictEqual(baselineCanonicalize(sparse));
+  expect(productionSparse).toHaveLength(3);
+  expect(Object.hasOwn(productionSparse, 0)).toBe(false);
+  expect(Object.hasOwn(productionSparse, 1)).toBe(false);
+  expect(Object.hasOwn(productionSparse, 2)).toBe(true);
   const values = [
     null, true, false, 'text', 0, -0, 4.5, NaN, Infinity, -Infinity,
     undefined, { root: undefined, nested: { absent: undefined } },
@@ -39,6 +44,7 @@ test('baseline canonicalization preserves object sort, integer-key enumeration, 
     { composed: 'é', decomposed: 'e\u0301' },
   ];
   for (const value of values) {
+    expect(canonicalize(value)).toStrictEqual(baselineCanonicalize(value));
     expect(JSON.stringify(canonicalize(value))).toBe(JSON.stringify(baselineCanonicalize(value)));
   }
 });
