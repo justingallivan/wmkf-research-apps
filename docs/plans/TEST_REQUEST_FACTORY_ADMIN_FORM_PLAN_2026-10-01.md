@@ -1,6 +1,6 @@
 # Test Request Factory: admin form (production plan item P7)
 
-Status: **DRAFT (2026-10-01, Session 561). Codex rounds 1–3 needs-attention, each revised; round-3 resolutions applied by Codex rescue; Fable review findings applied (S561). All owner decisions 1–11 made. Next: /contract-reconcile, before any build.** Parent plans: `TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md` (P7, P4, P2, MVP scope, Q1–Q5, *Process*), `TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` (*Operation contract and recovery*), `TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` (cast, status setter, B4), `TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md` (managed ledger, D1–D3). Where this plan and the production plan's owner decisions disagree, the production plan wins until this one is accepted.
+Status: **DRAFT (2026-10-01, Session 561). Codex rounds 1–3 needs-attention, each revised; round-3 resolutions applied by Codex rescue; Fable review findings applied (S561). All owner decisions 1–11 made. /contract-reconcile (S561): READY WITH NAMED CHANGES — seven build requirements in *Contract-reconcile*. Next: build slice 1 on a branch.** Parent plans: `TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md` (P7, P4, P2, MVP scope, Q1–Q5, *Process*), `TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` (*Operation contract and recovery*), `TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` (cast, status setter, B4), `TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md` (managed ledger, D1–D3). Where this plan and the production plan's owner decisions disagree, the production plan wins until this one is accepted.
 
 Path convention: a bare basename with line numbers (`run-ledger.js:20-24`) is a file under `lib/services/test-requests/` unless its directory is given in brackets; the CLI is `scripts/rehearse-test-request-sandbox.mjs` ("CLI `:904`"). Earlier evidence labels record the author’s S561 review. Round-3 source claims below were re-read locally; live state is UNVERIFIED in this rescue. Plan changes below are requirements, not built behaviour.
 
@@ -286,6 +286,40 @@ Claude verified findings 1 and 5 in source; the author re-read every cited line.
 Resolutions owner-approved and applied by Codex rescue (S561); implementation remains UNVERIFIED. (1) HIGH, Confirm/sweep could destroy artifacts → create-only run artifacts, unreserved-artifact refusal requiring re-export (Fable P2 correction), no deletion on failed or ambiguous reserve, per-draft keys and never-reused run paths, daily maintenance with idempotent overlap, no-row/24 h deletion and ready-run cleanup (Fable P3/decision 3 corrections) (2b, 2f, slices 1–2/2b). (2) HIGH, recovery could close an active status change → explicit state table: planned resumes through its first CAS/PATCH, CAS loser stays in progress, dispatched/unchanged has no automatic timeout, target-present recovers, applied completes; terminal recovery requires the owner to establish no dispatcher remains. Barrier and interrupted-planned tests check the final journal state, and existing redispatch tests must change (*Status setter*, slice 2b, rollback). (3) MEDIUM, replay wording → non-producing changes may be planned again; producing/unknown-effects repeats remain guarded and require owner inspection plus CLI `--rerun`, absent from the form (slice 2b test). No new locks, columns or tables. Next: `/contract-reconcile`, before any build.
 
 Fable review findings applied (S561): concrete ledger-only CLI `--status-abandon` with confirmation/checklist and tests (+~0.25 session); refuse all unreserved-artifact reuse; idempotent overlapping sweeps; restore owner decision 3’s ready-run artifact deletion and retention tests.
+
+## Contract-reconcile (S561, Mode A plan review)
+
+Verdict: **READY WITH NAMED CHANGES.** The traced path is user → form → route → `admin-run-service` → ledger/Blob/Dataverse → response → UI, plus the CLI, the maintenance cron and the docs and gates. These seven changes are build requirements; each is small.
+
+1. **HIGH: the runner's resume branch fails open on any new outcome.** `status-change-runner.js:225-227` does `decision === 'recovered' ? markStatusChangeApplied : dispatch(...)`. It never compares against `'redispatch'` (the only string consumers are `status-transitions.js:153` and `tests/unit/test-request-status-transitions.test.js:133` [VERIFIED via grep]). So a new `decideResume` outcome such as "in progress" falls into the `dispatch()` arm and PATCHes.
+   - **Required:** an allowlisted switch. Only `planned` + matching before/ETag dispatches. `recovered` marks applied. "In progress" returns without a write. Every other outcome refuses.
+   - **Test:** an unknown or new outcome never reaches `dispatch()`.
+2. **HIGH: the existing automatic `needs_attention` contradicts the state table.** `status-change-runner.js:221-223` marks `needs_attention` on any `decideResume` mismatch, including a `dispatched` change. The table's last row says a potentially active dispatcher must not be closed automatically.
+   - **Required:** for `dispatched`, the mismatch branch refuses (`status_change_resume`) without writing the ledger. Closing it is the owner's `--status-abandon`.
+   - For `planned`, the automatic close stays: no PATCH was sent, `:218-220`.
+3. **MEDIUM: the director's email is not in the gate result.** `requireSuperuser` returns only `{ profileId }` (`lib/utils/auth.js:447-462` [VERIFIED]). Session email is read via `getSession(req, res)` (`auth.js:130`), as `session.user.azureEmail`, the pattern at `pages/api/workbench/grantee-deliverables/send-invite.js:57` [VERIFIED].
+   - **Required:** the reserve route reads `azureEmail` from the server session, never the body. It refuses when the email is missing. It passes the email to `resolveProgramDirector`, which matches `systemuser.domainname` (`basic-clone-steps.js:545-554`).
+4. **MEDIUM: CLI-made runs are invisible to the form.** `listRuns({ actorId })` filters on actor (`run-ledger.js:1501`), and the form's ownership check is the form actor. CLI runs carry `cli:<hash>` (`run-ledger.js:386-392`), so Requests 1003301–1003303 can't be inspected or status-changed from the form.
+   - **Required:** state this as accepted v1 behaviour, so existing runs stay CLI-managed. Or, if the owner wants them in the form, list all runs for any superuser and keep ownership checks only on writes. Recommendation: accept, since it's one owner and the CLI still works.
+5. **MEDIUM: durable-surface omissions.**
+   - The route-file count is canonical (`docs/CANONICAL_COUNTS.md:39-43`, live value 241 [VERIFIED]). Slice 2 must update it by the number of new route files, or `check:fact-consistency` fails.
+   - The Atlas impact must also name the `test_request_status_changes` second writer (the form and `--status-abandon`).
+   - The Factory Blob store gets its own Atlas ownership entry, beside the existing Blob-store pages (`docs/atlas/postgres-cycle-dossiers.md` precedent).
+6. **LOW: input validation at the route.** `runId`, `draftId` and `changeId` from the URL or body are GUID-validated before any ledger, Blob or Dataverse use (the `check:trust-boundary-guid` pattern). `testLabel` is already bounded by `compileTestRequestDraft` (`policy.js:205-206` via `compileBody`, `basic-clone-steps.js:590-594` [VERIFIED]). The empty-label default reads "Codex sandbox request factory rehearsal …" (`:652`), so the form should require a label or supply a production-appropriate default.
+7. **LOW: the UI's auto-continue loop needs a stale-run guard.** When the admin switches runs or leaves the section, a pending advance or status response must not write into the newly selected run's view (generation or abort guard). Only the step the server returned is marked done.
+
+Audits:
+- **Whole-flow** (above): no other gaps.
+- **Partial success:** one step per call, and the response names the step and its outcome; the maintenance cron's per-task `try` blocks (`pages/api/cron/maintenance.js:37-55`) contain a Factory-sweep failure.
+- **Async:** item 7.
+- **Helper extraction:** N/A. The runner, fence and steps are called unchanged, apart from the status rule.
+- **Durable surface:** item 5, plus the plan's existing runbook, tracked-secrets and matrix items.
+- **Doc reconcile:** at slice 5, via `/sweep`.
+- **Symbol fan-out:** item 1. The `needs_attention` readers (replay guard; the one-open index excludes it) are already covered by finding 3 of round 3.
+
+[ASSUMED, not verified here]
+- The Vercel Production DYNAMICS_* credentials are the same app user the CLI uses. The env names match (`lib/dataverse/client.js:94`), but the values were not compared.
+- Vercel crons run only on Production deployments, so the Preview Blob store is not swept. Clean it by hand after the slice 3 rehearsal.
 
 ## Not in scope
 
