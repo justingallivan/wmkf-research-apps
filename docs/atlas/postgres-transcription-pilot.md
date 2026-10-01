@@ -2,8 +2,8 @@
 title: "Atlas: AssemblyAI transcription pilot (Postgres)"
 domain: postgres
 kind: state-page
-status: isolated-061-verified-disabled-preview-synthetic-workflow-passed
-summary: "Isolated migrations 060–061 and the disabled Preview synthetic Workflow retry/sleep/media path are verified. Hourly recovery and daily cleanup are not scheduled in Preview; provider use, large files and staff sign-in remain unverified."
+status: isolated-project-ready-disabled-synthetic-verification-passed
+summary: "Dedicated Production deployment passed 16 readiness checks and synthetic Workflow verification with both flags false. Hourly recovery and daily cleanup are registered and manual native invocations passed; timed delivery, hosted provider jobs, large files and new-origin staff sign-in remain unverified."
 canonical: true
 cataloged: 2026-10-01
 owner: product-engineering
@@ -20,17 +20,25 @@ related:
 
 ## Current status
 
-**[LOCAL PREPARATION; NO NEW DEPLOYMENT]** Dedicated-project configuration and
-server-side isolation are being prepared in branch source. The hosted receipts
-below apply to `d8bb73326`, not these newer changes. No schema or resource changes
-are part of this local slice. The new project's source identity registry is
-empty and no schedules are activated; see the runbook's dedicated-project gates.
+**[VERIFIED via Vercel configuration and hosted probes, 2026-10-01]** Dedicated
+project `wmkf-transcription-pilot-isolated` (`prj_v2aETCFqGBeqMshR7xoMpTcP9K2e`)
+has READY Production deployment `dpl_FybqjEfKVRfbqNggHTJNx6Km1PLh` from source
+`7edc71975`, with both flags false. The source registry pins its project ID and
+`https://wmkf-transcription-pilot-isolated.vercel.app` auth origin. All 16 readiness
+checks passed before and after synthetic verification; transcription jobs and
+dispatch rows remain zero. Empty recovery/cleanup returned HTTP 200, zero counts
+and `incomplete:false`. Synthetic Workflow `wrun_41M3WN29450GQ4ZRP95Q43C50F`
+completed retry attempt 2, ten-second sleep/resume and 16,863-byte AAC inspection.
+Exactly hourly recovery and daily cleanup are registered; manual native cron
+invocations returned HTTP 200, but scheduled-time delivery remains unobserved.
+No schema migrations were rerun for this deployment. The old pilot alias remains
+on its previous Preview deployment. See the runbook for remaining enablement gates.
 
 **[VERIFIED 2026-10-01 via read-only migration verification and deployment/runtime probes]** The job table definition is `lib/db/migrations/060_transcription_jobs.sql`; migrations 060–061 remain provisional because 058/059 are reserved for other work. Both migrations are applied only to the isolated Neon database, not Production or the shared Preview database; no shared-database probe was performed for this entry. Root's independent read-only `--verify-only` receipt confirmed target `neondb`, transaction read-only, zero transcription jobs, on-disk migration tracker match, no pending migration files, migration 061 recorded, and the `transcription_workflow_dispatches` table/schema verified. It was applied exactly once through the canonical existing-database runner; after the initial checker encountered PostgreSQL NOT NULL catalog entries (`contype='n'`), root corrected the read-only verifier to exclude those entries (`contype<>'n'`) and reran verify-only, not the migration. The isolated `neondb` public schema now has 58 migration records, one active linked profile, one superuser role, and zero transcription jobs. The nine pre-existing `neon_auth` relations remain provider-owned; initialization did not alter that schema. The fresh-install repair's executed-SQL provenance, canonical rerun, atomic rollback, and populated-database refusal were separately tested. Current deployed source includes migration 061.
 
 **[VERIFIED 2026-10-01 via Vercel metadata and authenticated hosted probes]** Disabled Preview `dpl_3pBYPpEuVS9pjJCKRPt2cNuyZyx6`, source `d8bb7332654569343e5e1e8985f51a45aae6b25c`, is READY at `https://wmkfresearchapps-ph2tdnosx-justin-gallivans-projects.vercel.app`; the pilot alias `wmkf-transcription-pilot.vercel.app` now points to it. All 13 read-only preflight checks passed before and after the canary and through the alias, with zero jobs and zero dispatch rows. Empty recovery returned HTTP 200 with all counts zero. Synthetic run `wrun_41M3WH0N290GNF967JQG1V18WB` completed: retry resumed on attempt 2, a ten-second sleep resumed, and the 16,863-byte AAC fixture parsed to 3.065034 seconds. The deployed flow uses Node 22, an 800-second timeout and 2,048 MiB memory; an ordinary flow GET returned 404. This proves the bounded SDK retry/sleep and synthetic parser path, not application-job terminal recovery, maximum-size processing, provider behavior or exhaustive queue-auth enforcement.
 
-The deployed source uses job-scoped workflows with bounded active-job checks, 60-second retries (up to 1,440), a 200-cycle handoff, terminal-status-only hourly recovery, and daily physical cleanup; logical expiry blocks reads immediately. The hourly recovery and daily cleanup schedules are not active in Preview: Vercel Cron runs only on Production. Both pilot switches remain false. No AssemblyAI call, real recording, current-alias staff sign-in, hosted Blob roundtrip or 50 MiB runtime test was performed. The earlier local private-Blob synthetic roundtrip and exact-path deletion remain local SDK evidence only. Project-wide environment records and other aliases were not changed by this work. See the runbook for remaining enablement gates.
+The deployed source uses job-scoped workflows with bounded active-job checks, 60-second retries (up to 1,440), a 200-cycle handoff, terminal-status-only hourly recovery, and daily physical cleanup; logical expiry blocks reads immediately. The schedules run only in the dedicated Production project, not the old Preview. One separately authorized local real-audio AssemblyAI quality test completed and the owner accepted its quality. No hosted provider job/callback, new-origin staff sign-in, hosted Blob roundtrip or 50 MiB runtime test was performed. The local private-Blob synthetic roundtrip remains local evidence only. New-origin Microsoft callback addition awaits authorization; monitoring remains an enablement gate. Hosting protection is `all_except_custom_domains`: anonymous immutable deployment access redirects to Vercel, while the default origin relies on app authentication (pilot page 307, unauthenticated cleanup 401, unrelated route 404). Existing shared-project configuration and the old alias were unchanged.
 
 ## Intended state ownership
 
@@ -53,8 +61,8 @@ persisted submission-intent fences prevent blind provider resubmission.
 Migration 061 is applied/read back only in the isolated Neon database. Branch source retries active Workflow steps
 after 60 seconds (up to 1,440 retries), hands off after 200 processing cycles,
 and has an hourly recovery path that queries SDK status and CAS-recovers only
-terminal `completed`, `failed`, or `cancelled` runs. Hosted application-job terminal recovery and an
-hourly Preview schedule remain unverified. This is an enablement gate, distinct
+terminal `completed`, `failed`, or `cancelled` runs. Hosted application-job terminal recovery and
+actual timed delivery on the dedicated project remain unverified. This is an enablement gate, distinct
 from the unchanged daily physical-deletion cadence.
 
 The store implements owner-scoped idempotent creation, a global active-slot
@@ -106,7 +114,7 @@ Before any deployment to a different database, the migration number and
 tracker must be reconciled against that target with owner authorization, then
 physical schema readback must verify both tracker and actual
 table/index/constraint shape. The disabled candidate uses the initialized
-isolated Neon database through explicitly supplied Preview runtime/build environment values; no shared schema was
+isolated Neon database through dedicated-project Production environment values; no shared schema was
 changed or probed.
 The existing-database path is `node scripts/apply-migrations.js`; the
 fresh-install-only `scripts/setup-database.js` must not be used on a populated
