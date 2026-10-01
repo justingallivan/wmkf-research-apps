@@ -13,12 +13,13 @@ related:
   - lib/external/
   - lib/bill/
   - lib/utils/
+  - shared/utils/
   - lib/observability/
 ---
 
 # Service & Utility Catalog
 
-One-line lookup index for files under `lib/services/`, `lib/external/`, `lib/bill/`, `lib/utils/`, and `lib/observability/`. **Source-file headers are authoritative** for per-file contracts, safety posture, storage source-of-truth, and migration/drop history — this doc points there, it doesn't replace them.
+One-line lookup index for files under `lib/services/`, `lib/external/`, `lib/bill/`, `lib/utils/`, `lib/observability/`, and shared utilities in `shared/utils/`. **Source-file headers are authoritative** for per-file contracts, safety posture, storage source-of-truth, and migration/drop history — this doc points there, it doesn't replace them.
 
 If you're touching a service or utility, read its header before this catalog. If a header is sparse or stale, fix it in the same commit as your change rather than rely on this doc.
 
@@ -456,6 +457,7 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ## `shared/utils/` — lifecycle policy (browser-safe)
 
+- **`shared/utils/reviewer-roster-projection.js`** — Canonical bounded reviewer candidate DTO for the durable Workbench Find roster; shared by client search and server roster/discovery writers. `reviewer-search-logic.js` re-exports it for client compatibility. The JSON DTO drops raw enrichment internals while preserving the identity and persistence-gate fields needed after reload.
 - **`shared/utils/graph-browser-upload.js`** — Shared browser-direct Microsoft Graph upload transport. Owns the 10 MiB default, strict sequential range validation, resettable upload-stall and response watchdogs, authorized status reconciliation for ambiguous PUT outcomes, bounded jitter/backoff and `Retry-After` handling, offline wait/manual Resume, same-browser Web Lock, and truthful Graph-confirmed versus in-flight progress. Mbps/ETA samples count only uniquely confirmed ranges attributable to this browser; status-reconciled cross-device progress advances the bar but not the local rate. File bytes travel only browser → preauthenticated Graph URL; application callbacks carry authorization/status metadata, never the full file.
 - **`shared/utils/api-request.js`** — the client request layer: one place for the fetch → parse-body
   → ok-check → error-message dance that client `fetch(` call sites in `shared/components/**` and

@@ -55,10 +55,8 @@ import {
   PROVENANCE_KINDS,
   provenanceKindOf,
 } from '../../../lib/utils/reviewer-provenance';
-import {
-  pruneCandidateForRoster,
-  reviewerCandidateKey,
-} from '../../../shared/components/reviewers/reviewer-search-logic';
+import { pruneCandidateForRoster } from '../../../shared/utils/reviewer-roster-projection';
+import { reviewerCandidateKey } from '../../../lib/utils/reviewer-candidate-key';
 import { listOpenAddressRepairRequests } from '../../../lib/services/reviewer-address-trust-service';
 import {
   measurementEnabled,

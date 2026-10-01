@@ -24,7 +24,7 @@ Find-tab search candidates are no longer ephemeral. Every candidate a search sur
 - **Eligibility receipt boundary:** new roster-managed save payloads require a valid server receipt carrying the immutable pre-enrichment `candidateKey`; missing/expired or legacy receipts without that key return `identity_attestation_required`. Only bare pre-roster payloads with neither an explicit roster candidate key nor an automated receipt retain the legacy correlation path.
 
 ## Files
-Store `lib/services/reviewer-roster-store.js`; route `pages/api/workbench/reviewer-roster.js`; shared name-match `lib/utils/reviewer-name-match.js` (CJS, server+client); `pruneCandidateForRoster` in `shared/components/reviewers/reviewer-search-logic.js`; UI `ReviewerSearchSection.js` (display candidates and selection keyed by `candidateKey`). Atlas `docs/atlas/postgres-reviewer-find-roster.md`. Plan `~/.claude/plans/cosmic-yawning-starlight.md`.
+Store `lib/services/reviewer-roster-store.js`; route `pages/api/workbench/reviewer-roster.js`; shared name-match `lib/utils/reviewer-name-match.js` (CJS, server+client); `pruneCandidateForRoster` in `shared/utils/reviewer-roster-projection.js` (re-exported from the client compatibility module); UI `ReviewerSearchSection.js` (display candidates and selection keyed by `candidateKey`). Atlas `docs/atlas/postgres-reviewer-find-roster.md`. Plan `~/.claude/plans/cosmic-yawning-starlight.md`.
 
 ## Clearing / resetting a request's reviewers — USE THE EXISTING SCRIPT
 `scripts/reset-request-reviewers.mjs` (commit `89b24fb`) already does per-request reviewer teardown — **don't hand-roll probes/SQL for this.** Dry-run by default; its dry-run **already prints the roster breakdown** (status counts) so you don't need a separate counting probe.

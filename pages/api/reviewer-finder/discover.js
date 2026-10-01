@@ -26,7 +26,7 @@ import { lookupReviewerIdentity } from '../../../lib/services/reviewer-identity-
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { resolveProposalPI, excludePiIdentity, appendPiName, piInstitutions } from '../../../lib/services/proposal-pi-identity';
 import { recordCoiDropped } from '../../../lib/services/reviewer-roster-store';
-import { pruneCandidateForRoster } from '../../../shared/components/reviewers/reviewer-search-logic';
+import { pruneCandidateForRoster } from '../../../shared/utils/reviewer-roster-projection';
 import { reviewerCandidateKey } from '../../../lib/utils/reviewer-candidate-key';
 import {
   institutionEvidenceProjection,
