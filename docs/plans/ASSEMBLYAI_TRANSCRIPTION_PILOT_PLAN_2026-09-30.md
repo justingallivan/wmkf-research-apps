@@ -3,13 +3,13 @@ title: AssemblyAI transcription pilot
 domain: transcription
 kind: plan
 status: source-built-not-deployed
-summary: "Admin-only, non-sensitive Zoom transcription pilot; implementation is present in the branch but schema provisioning, deployment, account privacy verification, and live provider behavior remain pending."
+summary: "Admin-only, non-sensitive Zoom transcription pilot; source and local fresh-bootstrap reconciliation are verified, while remote database configuration, deployment, account privacy verification, and live provider behavior remain pending."
 owner: product-engineering
 ---
 
 # AssemblyAI transcription pilot
 
-Revision 3 with resource checkpoint, 2026-09-30. **Current status: source-built; isolated test resources provisioned but unconnected; schema unapplied and not deployed.** This document began as a plan and did not itself authorize implementation. Implementation was later explicitly assigned. The current branch includes the Admin page/routes, provider/runtime/worker services, migration 060, model/store, and focused tests. Do not treat checked-in source or local test/build evidence as shared-database provisioning, deployment, environment configuration, account privacy guarantees, or live provider verification. See the [pre-enable runbook](ASSEMBLYAI_TRANSCRIPTION_PILOT_RUNBOOK_2026-09-30.md) for resource IDs, the fresh-bootstrap blocker, the release boundary and remaining proofs.
+Revision 3 with resource and bootstrap checkpoints, 2026-09-30. **Current status: source-built; the fresh-install bootstrap was reconciled and verified locally; isolated test resources remain unconnected; remote schema, deployment, and pilot use remain pending.** This document began as a plan and did not itself authorize implementation. Implementation was later explicitly assigned. The current branch includes the Admin page/routes, provider/runtime/worker services, migration 060, model/store, and focused tests. Do not treat checked-in source or local test/build evidence as remote database provisioning, deployment, environment configuration, account privacy guarantees, or live provider verification. See the [pre-enable runbook](ASSEMBLYAI_TRANSCRIPTION_PILOT_RUNBOOK_2026-09-30.md) for resource IDs, local bootstrap evidence, the release boundary and remaining proofs.
 
 Claude Fable reviewed revisions 1 and 2 through subscription OAuth. Revision 3 incorporates the second review's findings and qualifications recorded below. Luna built the implementation, Sol independently reviewed it, and root performed the integrated correction/verification pass. Sol's safety acceptance is for the disabled implementation branch, not pilot enablement. Account-specific feasibility checks remain prerequisites to enabling the pilot. Confidential-use approval remains separate.
 
@@ -34,7 +34,8 @@ The original design review inspected source at `a7c68df0162b9461420604fac0e29eb1
 | AssemblyAI privacy controls | Owner screenshot: opt-out on, one-day async TTL; no API/provider probe | Screenshot evidence only; key scope and deletion guarantees UNKNOWN |
 | Isolated test resources | Root Vercel metadata readback: Neon available/unconnected; private Blob empty/unconnected | RESOURCE-ONLY PROVISIONED; no DB connection or schema verification |
 | Existing Preview database binding | Vercel metadata: same DB variable records target Production/Preview/Development | VERIFIED shared configuration; unchanged |
-| Schema, deployment, cron and callback reachability | No SQL connection, migration, deployment or provider call; fresh bootstrap/tracker inconsistency identified | BLOCKED pending bounded bootstrap reconciliation and test identity |
+| Fresh-install bootstrap source and local tracker behavior | Local disposable-database bootstrap recorded 57 entries (53 SQL migrations plus four retired/absent entries); canonical rerun skipped all 57; atomic rollback, populated-database refusal and retired-target rejection were checked | LOCAL BOOTSTRAP VERIFIED; Sol reviewed and root verified; no remote schema proof |
+| Schema, deployment, cron and callback reachability | No remote SQL connection, migration, deployment or provider call; isolated Neon remains unconnected | PENDING remote endpoint/configuration and schema verification, release review, deployment, and runtime proofs |
 
 Postgres is intended to own temporary job metadata; private Blob owns audio and result bytes; AssemblyAI owns remote asynchronous processing. No Dataverse or SharePoint writes are in scope. Production publication requires a later request-bound contract and reauthorization. Existing grant transcription-provider workflow decisions remain pending outside this pilot.
 
@@ -141,7 +142,7 @@ Quality acceptance: owner determines whether reduced correction effort and usabl
 
 Change: isolated Admin transcription pilot. Entry points: upload/start/list/detail/download/evaluation/export/delete/reconcile/abandon, authenticated callback and scheduled worker. Persistence: source-built Postgres operational jobs and private Blob; external AssemblyAI jobs. Consumers: Admin UI, exports, worker and cleanup. Prior design concerns: one-hour staging mismatch; account retention uncertainty; remote-submit acceptance gap.
 
-The whole-flow, partial-success, async/stale-state, helper-boundary, durable-surface, doc-reconcile, and status-consumer audits inform the contract above. Implemented behavior has focused tests, but the full release acceptance matrix is not complete. Vercel resource/configuration metadata has been inspected; no SQL connection, migration apply, provider call, deployment or deployed Node/media runtime test has been performed. See the current evidence table and pre-enable runbook; the dated Fable reviews below remain historical evidence and were not rewritten.
+The whole-flow, partial-success, async/stale-state, helper-boundary, durable-surface, doc-reconcile, and status-consumer audits inform the contract above. Implemented behavior has focused tests, but the full release acceptance matrix is not complete. Vercel metadata and local disposable-database bootstrap were verified; no remote SQL connection, shared migration apply, provider call, deployment or deployed Node/media runtime test has been performed. See the current evidence table and pre-enable runbook; the dated Fable reviews below remain historical evidence and were not rewritten.
 
 ## Vendor references
 
@@ -196,7 +197,7 @@ Claude Code host authentication returned claude.ai/firstParty/Team. After explic
 
 Author also corrected "raw response" wording to allowlisted diagnostics throughout current guidance. Additional design qualification: explicit abandonment can release the local slot but cannot promise cessation of unknown remote work. No provider behavior was newly verified for this amendment.
 
-Changed-fact documentation update (2026-09-30): source is built, unconnected test resources are provisioned, migration 060 is provisional/unapplied, and the branch is not deployed. Resource/configuration metadata and the owner's opt-out/one-day-TTL screenshot do not establish account guarantees or a usable target schema/runtime. The fresh-bootstrap/tracker gap blocks initialization and deployment. The two fingerprinted review records remain verbatim historical evidence. This update is bounded to current pilot state and owner risk acceptance, not a repo-wide audit or release approval.
+Changed-fact documentation update (2026-09-30): source is built, unconnected test resources are provisioned, migration 060 is provisional/unapplied remotely, and the branch is not deployed. The fresh-bootstrap/tracker repair passed local disposable-database checks and Sol/root review. The selected administrator's directory identity is verified; isolated profile/role seeding is pending. Remote endpoint/schema validation, branch configuration and deployment/runtime checks remain. Resource metadata and the owner's opt-out/one-day-TTL screenshot do not establish account guarantees. The two fingerprinted review records remain verbatim historical evidence. This update is bounded to pilot state and owner risk acceptance, not a repo-wide audit or release approval.
 
 ### Historical revision 1 findings and revision 2 author dispositions
 

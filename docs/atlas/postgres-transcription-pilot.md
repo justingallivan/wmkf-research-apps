@@ -3,7 +3,7 @@ title: "Atlas: AssemblyAI transcription pilot (Postgres)"
 domain: postgres
 kind: state-page
 status: source-built-unapplied
-summary: "Branch source for temporary owner-bound transcription jobs; migration 060 is provisional and has not been applied to a shared database."
+summary: "Branch source for temporary owner-bound transcription jobs; local fresh-bootstrap reconciliation is verified, while migration 060 remains unapplied to any remote database."
 canonical: true
 cataloged: 2026-09-30
 owner: product-engineering
@@ -32,9 +32,16 @@ local scratch schema.
 exist: Neon `store_TSn9yHJW1xL0p4h0` and private Blob
 `store_Qri02A1kj96tQYR9`. Neither is bound to the app. This is resource
 provisioning, not schema or database-content verification. Existing shared
-Production/Preview database configuration is unchanged. Fresh bootstrap/tracker
-consistency and an approved test identity block initialization/deployment; see
-the runbook checkpoint for evidence and boundaries.
+Production/Preview database configuration is unchanged. **[VERIFIED locally;
+Sol reviewed and root verified]** The repaired fresh-install path recorded 57 tracked
+entries (53 actual SQL migrations plus four retired/absent entries); its
+canonical rerun skipped all 57, and atomic rollback and populated-database
+refusal were checked. This local disposable-database proof does not establish
+the unconnected Neon database's contents or schema. The selected test admin's
+directory identity is verified, but isolated active profile/superuser-role
+seeding remains pending. No remote SQL connection, environment binding,
+migration 060 apply, or deployment has occurred; see the runbook for the
+separate Preview connection boundary and evidence.
 
 ## Intended state ownership
 

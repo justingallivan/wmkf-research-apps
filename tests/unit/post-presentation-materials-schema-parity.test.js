@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { readMigrationManifest, RETIRED_MIGRATIONS } from '../../scripts/lib/fresh-database-bootstrap';
 
 const ROOT = process.cwd();
 const migration = fs.readFileSync(
@@ -72,7 +73,8 @@ test('migration 055 and fresh install declare the same durable tables and named 
     for (const constraint of CONSTRAINTS) expect(source).toContain(`CONSTRAINT ${constraint}`);
   }
   expect(setup).toContain('const v56Statements = [');
-  expect(setup).toContain('Applying v56 schema updates - post-presentation materials');
+  expect(readMigrationManifest()).toContain('055_post_presentation_materials.sql');
+  expect(Object.keys(RETIRED_MIGRATIONS)).not.toContain('055_post_presentation_materials.sql');
 });
 
 test('migration 055 and fresh install use identical durable CHECK predicates', () => {

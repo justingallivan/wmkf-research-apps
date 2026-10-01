@@ -3,7 +3,7 @@ title: "AssemblyAI transcription pilot pre-enable runbook"
 domain: transcription
 kind: operations-runbook
 status: source-built-not-deployed
-summary: "Source-built pilot with unconnected test resources provisioned; database initialization, branch configuration, deployment and provider tests remain pending."
+summary: "Source-built pilot with locally verified fresh-bootstrap repair and unconnected test resources; remote database configuration, deployment and provider tests remain pending."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -32,8 +32,8 @@ authorized an isolated Preview and new Neon/private Blob resources after possibl
 charges were disclosed. Created in team `justin-gallivans-projects`:
 
 - Neon `wmkf-transcription-pilot`, `store_TSn9yHJW1xL0p4h0`: available,
-  no connected projects. Database contents and pricing/tier have not been
-  inspected; no SQL connection or schema initialization was performed.
+  no connected projects. Launch plan verified; actual pricing and database
+  contents remain unverified. No remote SQL connection or initialization occurred.
 - Blob `wmkf-transcription-pilot`, `store_Qri02A1kj96tQYR9`: private,
   `iad1`, zero objects/bytes, no connected projects.
 
@@ -44,13 +44,35 @@ Development together; those shared settings were not changed. The existing
 Preview upload token's store mapping remains unverified. Future overrides must
 be restricted to Preview branch `codex/transcription-pilot`.
 
-**Initialization blocker:** fresh setup does not establish `schema_migrations`
-and omits at least migrations 015/017's BILL tables. Do not stamp the whole
-manifest or run the existing-database runner blindly after setup. A bounded
-fresh-install reconciliation needs separate scope approval before initialization
-or deployment. Normal Microsoft authentication also needs an explicitly chosen
-test identity and an isolated active profile/superuser role; do not use an auth
-bypass or copy Production user data.
+**Local fresh-bootstrap repair — Sol reviewed and root verified:** the
+repaired setup path uses its public transaction base, real SQL migrations,
+narrow retired-migration handling, and four supplemental schema entries; it
+does not stamp a blanket manifest baseline. In a disposable local database,
+57 tracker entries were recorded (53 actual SQL migrations plus four retired,
+absent migrations), canonical rerun skipped all 57, and atomic rollback and
+populated-database refusal were checked. An injected retired table was refused
+and rolled back; the actual setup CLI also passed on a fresh local database.
+This proves the local bootstrap path,
+not the Neon database's contents or migration state. Do not run the existing-
+database runner blindly after setup.
+
+Repair verification: root ran 15 focused suites / 132 tests, including
+`tests/integration/database-bootstrap.pg.test.js` against disposable local
+databases and the affected schema-parity tests. Manifest, instruction safety,
+Atlas, document currency, fact consistency, document references and catalog
+checks passed; gate/self-test pairs ran sequentially. Sol accepted the bounded
+repair after the retired-target negative test passed. No deployed-runtime proof
+is implied.
+
+The owner authorized the bounded repair and selected `jgallivan@wmkeck.org` as
+the test administrator; directory identity was verified. An isolated active
+profile/superuser-role seed remains a separate prerequisite. Do not use an auth
+bypass or copy Production user data. Remote SQL access, an environment binding,
+and deployment remain undone. The requested Neon URL belongs only in the new
+git-ignored `.env.transcription-preview.local`; do not overwrite `.env.local`.
+The Launch plan was verified from resource metadata, but actual pricing remains
+unverified. Before remote initialization, verify the supplied endpoint belongs
+to this new resource, differs from Production, and has an empty target schema.
 
 **Disabled-by-default source behavior:** `TRANSCRIPTION_PILOT_ENABLED` and
 `TRANSCRIPTION_SUBMISSIONS_ENABLED` each require the literal string `true`.
