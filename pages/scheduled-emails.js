@@ -201,6 +201,12 @@ export default function ScheduledEmailsPage() {
         return;
       }
       if (!ok) {
+        // Part B: a refused send-now can still return the re-addressed row.
+        if (data.message?.id) {
+          setMessages((current) => current.map((message) => (
+            message.id === data.message.id ? data.message : message
+          )));
+        }
         const actionError = new Error(data.error || 'The scheduled email could not be updated.');
         actionError.outcome = data.outcome || 'failed';
         throw actionError;

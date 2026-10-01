@@ -51,7 +51,7 @@ const FORBIDDEN = 'scheduled_email_activity_forbidden';
 
 const httpError = (status) => Object.assign(new Error(`dataverse failed (${status})`), { status });
 
-describeIf('scheduled email engine Part A (live Postgres, migrations 036 + 059)', () => {
+describeIf('scheduled email engine Parts A and B (live Postgres, migrations 036 + 059)', () => {
   const schema = `sched_email_${crypto.randomBytes(4).toString('hex')}`;
   let store;
   let service;
@@ -134,6 +134,9 @@ describeIf('scheduled email engine Part A (live Postgres, migrations 036 + 059)'
       claimActivityRead: store.claimScheduledEmailActivityRead,
       clearActivityCode: store.clearScheduledEmailActivityCode,
       recordStoppedSent: store.recordStoppedScheduledEmailSent,
+      reconcileRecipients: store.reconcileScheduledEmailRecipients,
+      // Part B default: seeded rows have no Liaison and no posture change.
+      readCurrentRecipients: jest.fn(async () => ({ piContactId: null, liaison: null, approvalRequiredNow: false })),
       getDeliverable: jest.fn(async () => ({ _etag: 'W/"1"', wmkf_deliverablestatus: 100000001 })),
       updateDeliverable: jest.fn(async () => ({})),
       createEmailActivity: jest.fn(async () => ACTIVITY),
@@ -390,7 +393,11 @@ describeIf('scheduled email engine Part A (live Postgres, migrations 036 + 059)'
     expect(await read(row.id)).toMatchObject({ dynamics_email_id: null, send_requested_at: null, status: 'scheduled' });
 
     // Next delivery: the generation-1 key is used; a generation-0 draft is never consulted.
-    const d = deps({ getDeliverable: jest.fn(async () => ({ _etag: 'x', wmkf_deliverablestatus: INVITED })) });
+    // The current Liaison matches the rebuilt Cc (no id on either side), so Part B leaves the row alone.
+    const d = deps({
+      getDeliverable: jest.fn(async () => ({ _etag: 'x', wmkf_deliverablestatus: INVITED })),
+      readCurrentRecipients: jest.fn(async () => ({ piContactId: null, liaison: { contactId: null, email: 'liaison@example.edu' }, approvalRequiredNow: false })),
+    });
     d.findEmailByCorrelation.mockImplementation(async (key) => (key === `wmkf-scheduled-recipient:${row.id}` ? [{ activityid: 'old-draft' }] : []));
     d.getEmailActivity
       .mockResolvedValueOnce({ activityid: ACTIVITY, statuscode: 1, statecode: 0 })
@@ -542,5 +549,129 @@ describeIf('scheduled email engine Part A (live Postgres, migrations 036 + 059)'
     expect(group.needsAttention).toHaveLength(2);
     expect(group.upcoming).toHaveLength(1);
     expect(group.approvalPending).toHaveLength(0);
+  });
+
+  /* --------------------------------- Part B -------------------------------- */
+
+  const PI_ID = '11111111-1111-4111-8111-111111111111';
+  const LIAISON_ID = '22222222-2222-4222-8222-222222222222';
+  const NEW_LIAISON_ID = '33333333-3333-4333-8333-333333333333';
+  const seedWithLiaison = (overrides = {}) => seed({
+    ...overrides,
+    set: {
+      cc_recipients: JSON.stringify(['liaison@example.edu']),
+      recipient_contact_ids: JSON.stringify([PI_ID, LIAISON_ID]),
+      ...(overrides.set || {}),
+    },
+  });
+  const current = (liaison, approvalRequiredNow = false) => jest.fn(async () => ({ piContactId: PI_ID, liaison, approvalRequiredNow }));
+
+  test('B3: recipient drift with no approval needed rewrites Cc/ids, bumps generation and version, keeps the lease, and the activity uses the g1 key', async () => {
+    const row = await seedWithLiaison({ set: { approved_at: new Date() } });
+    const d = deps({ readCurrentRecipients: current({ contactId: NEW_LIAISON_ID, email: 'new@example.edu' }) });
+    let leaseDuringCreate = null;
+    d.createEmailActivity.mockImplementation(async () => {
+      leaseDuringCreate = (await read(row.id)).lease_token;
+      return ACTIVITY;
+    });
+    const result = await service.deliverScheduledEmail(row.id, {}, d);
+    expect(result).toMatchObject({ sent: true, readdressed: true });
+    expect(d.createEmailActivity).toHaveBeenCalledWith(expect.objectContaining({
+      cc: ['new@example.edu'], correlationKey: `wmkf-scheduled-recipient:${row.id}:g1`,
+    }));
+    expect(leaseDuringCreate).not.toBeNull();
+    const after = await read(row.id);
+    expect(after).toMatchObject({ status: 'sent', recipient_generation: 1, version: row.version + 1, approved_at: null, approval_required: false });
+    expect(after.cc_recipients).toEqual(['new@example.edu']);
+    expect(after.recipient_contact_ids).toEqual([PI_ID, NEW_LIAISON_ID]);
+  });
+
+  test('B3: recipient drift needing approval holds the row: scheduled, lease released, reason recorded, out of due delivery and into approval-pending', async () => {
+    const row = await seedWithLiaison({ approvalRequired: true, set: { approved_at: new Date() } });
+    const d = deps({ readCurrentRecipients: current({ contactId: NEW_LIAISON_ID, email: 'new@example.edu' }, true) });
+    const result = await service.deliverScheduledEmail(row.id, {}, d);
+    expect(result).toMatchObject({ approvalPending: true, reason: 'recipients_changed' });
+    const after = await read(row.id);
+    expect(after).toMatchObject({
+      status: 'scheduled', lease_token: null, locked_until: null, approval_required: true, approved_at: null,
+      recipient_generation: 1, version: row.version + 1, last_error_code: 'scheduled_email_recipients_changed',
+      dynamics_email_id: null, send_requested_at: null,
+    });
+    expect(d.findEmailByCorrelation).not.toHaveBeenCalled();
+    expect(d.createEmailActivity).not.toHaveBeenCalled();
+    expect(await store.listDueScheduledEmails()).toEqual([]);
+    expect(attention.scheduledEmailAttentionReason(after)).toBeNull();
+    const group = service.groupDigestRowsByPd(await store.listScheduledEmailDigestRows()).find((g) => g.pdSystemUserId === PD_A);
+    expect(group.approvalPending.map((m) => m.id)).toEqual([row.id]);
+    // The PD can approve the re-addressed row; the next run sends it with no further transition.
+    const approved = await store.approveScheduledEmail({ id: row.id, pdSystemUserId: PD_A, profileId: 1, expectedVersion: after.version });
+    expect(approved).not.toBeNull();
+    const again = deps({ readCurrentRecipients: current({ contactId: NEW_LIAISON_ID, email: 'new@example.edu' }, true) });
+    expect(await service.deliverScheduledEmail(row.id, {}, again)).toMatchObject({ sent: true });
+    expect(again.createEmailActivity).toHaveBeenCalledWith(expect.objectContaining({ correlationKey: `wmkf-scheduled-recipient:${row.id}:g1` }));
+  });
+
+  test('B-3: posture-only tightening holds the row without touching recipients or generation; relaxation changes nothing', async () => {
+    const row = await seedWithLiaison({ set: { approved_at: new Date() } });
+    const unchanged = { contactId: LIAISON_ID, email: 'liaison@example.edu' };
+    const held = await service.deliverScheduledEmail(row.id, {}, deps({ readCurrentRecipients: current(unchanged, true) }));
+    expect(held).toMatchObject({ approvalPending: true, reason: 'approval_required' });
+    const after = await read(row.id);
+    expect(after).toMatchObject({ status: 'scheduled', approval_required: true, approved_at: null, recipient_generation: 0, version: row.version + 1, lease_token: null });
+    expect(after.recipient_contact_ids).toEqual([PI_ID, LIAISON_ID]);
+
+    const relaxed = await seedWithLiaison({ approvalRequired: true, set: { approved_at: new Date() } });
+    const d = deps({ readCurrentRecipients: current(unchanged, false) });
+    expect(await service.deliverScheduledEmail(relaxed.id, {}, d)).toMatchObject({ sent: true });
+    expect(await read(relaxed.id)).toMatchObject({ approval_required: true, version: relaxed.version, recipient_generation: 0 });
+  });
+
+  test('B3 fences: a foreign lease, a changed version or an existing activity makes the transition a no-op', async () => {
+    const row = await seedWithLiaison();
+    const claimed = await store.claimScheduledEmailSend(row.id);
+    const transition = { recipientDrift: true, ccRecipients: ['x@example.edu'], recipientContactIds: [PI_ID], approvalRequired: false };
+    expect(await store.reconcileScheduledEmailRecipients({ ...claimed, lease_token: STALE_TOKEN }, transition)).toBeNull();
+    expect(await store.reconcileScheduledEmailRecipients({ ...claimed, version: claimed.version + 5 }, transition)).toBeNull();
+    await mockPg.client.query('UPDATE scheduled_email_messages SET dynamics_email_id = $1 WHERE id = $2', [ACTIVITY, row.id]);
+    expect(await store.reconcileScheduledEmailRecipients(claimed, transition)).toBeNull();
+    const after = await read(row.id);
+    expect(after).toMatchObject({ recipient_generation: 0, version: row.version, lease_token: claimed.lease_token });
+    expect(after.cc_recipients).toEqual(['liaison@example.edu']);
+  });
+
+  test('B4: a recipient read failure leaves the row failed and retryable with nothing re-addressed or sent', async () => {
+    const row = await seedWithLiaison();
+    const d = deps({ readCurrentRecipients: jest.fn(async () => { throw Object.assign(new Error('Could not confirm the current recipients: 503'), { code: 'scheduled_email_recipient_read_failed', retryable: true }); }) });
+    await expect(service.deliverScheduledEmail(row.id, {}, d)).rejects.toMatchObject({ retryable: true });
+    expect(await read(row.id)).toMatchObject({ status: 'failed', last_error_code: 'scheduled_email_recipient_read_failed', lease_token: null, recipient_generation: 0, dynamics_email_id: null });
+    expect(d.sendEmail).not.toHaveBeenCalled();
+    expect((await store.listDueScheduledEmails()).map((m) => m.id)).toEqual([row.id]);
+  });
+
+  test('Send-now under B: recipient drift returns approval-pending without sending; posture-only tightening sends', async () => {
+    const drifted = await seedWithLiaison({ scheduledSendAt: '2099-01-01T08:00:00.000Z' });
+    const d = deps({ readCurrentRecipients: current({ contactId: NEW_LIAISON_ID, email: 'new@example.edu' }) });
+    const held = await service.deliverScheduledEmail(drifted.id, { force: true, pdSystemUserId: PD_A, expectedVersion: drifted.version }, d);
+    expect(held).toMatchObject({ approvalPending: true, reason: 'recipients_changed' });
+    expect(await read(drifted.id)).toMatchObject({ status: 'scheduled', approval_required: true, recipient_generation: 1 });
+    expect(d.sendEmail).not.toHaveBeenCalled();
+
+    const tightened = await seedWithLiaison({ scheduledSendAt: '2099-01-01T08:00:00.000Z' });
+    const t = deps({ readCurrentRecipients: current({ contactId: LIAISON_ID, email: 'liaison@example.edu' }, true) });
+    expect(await service.deliverScheduledEmail(tightened.id, { force: true, pdSystemUserId: PD_A, expectedVersion: tightened.version }, t))
+      .toMatchObject({ sent: true });
+    expect(t.sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  test('B5: a saved activity without send intent is sent as created; recipients are never read or rewritten', async () => {
+    const row = await seedWithLiaison({ set: { dynamics_email_id: ACTIVITY } });
+    const d = deps({ readCurrentRecipients: current({ contactId: NEW_LIAISON_ID, email: 'new@example.edu' }) });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(await service.deliverScheduledEmail(row.id, {}, d)).toMatchObject({ sent: true, savedActivityNotReaddressed: true });
+    warn.mockRestore();
+    expect(d.readCurrentRecipients).not.toHaveBeenCalled();
+    const after = await read(row.id);
+    expect(after).toMatchObject({ status: 'sent', recipient_generation: 0 });
+    expect(after.cc_recipients).toEqual(['liaison@example.edu']);
   });
 });
