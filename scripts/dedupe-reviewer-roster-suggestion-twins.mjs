@@ -73,7 +73,7 @@ function manualFields(candidate) {
   return Array.isArray(candidate?.manualContactFields) ? candidate.manualContactFields : [];
 }
 
-// Mirrors reviewer-search-logic MAX_ROSTER_CONTACT_LEADS so a carried-over lead can never
+// Mirrors shared/utils/reviewer-roster-projection.js MAX_ROSTER_CONTACT_LEADS so a carried-over lead can never
 // grow a roster blob past the size the prune path enforces.
 const MAX_ROSTER_CONTACT_LEADS = 8;
 
