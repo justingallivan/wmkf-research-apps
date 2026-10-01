@@ -2,6 +2,8 @@
 
 Plan: `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`, Phase 1. Owner decision D3 (2026-09-30): dumps go straight to the owner's shared documents folder, unencrypted, and digests are compared on both sides. The owner supplies the folder path as `SHARED` below.
 
+> **Superseded in part (2026-09-30, after PR #374):** the home dump ran as written. The "Office Mac (next morning)" container restore and this brief's Neon section (`--clean` full restore plus a hand re-apply of 058) were NOT run. `--clean` would collide with the tracked 058 slot-bindings foreign key. The managed ledger was loaded data-only instead; it is now the current copy. See `docs/plans/evidence/test-request-factory/ledger-snapshot-2026-09-30.md`.
+
 ## Context
 
 - The operational ledger for production test Requests (`ledger_prod`) and its sandbox counterpart (`ledger`) live only in the `wmkf-ledger-pg` Docker container on the **home Mac** (Colima; `colima start` if the Docker API is down).
