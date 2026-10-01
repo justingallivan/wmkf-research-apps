@@ -2,7 +2,7 @@
 
 ## Session 560 Summary — 2026-10-01 (Claude, home Mac)
 
-A short housekeeping session. The first scheduled-email Part A/B reminder cycle was checked, the stale "migration 036 not applied / not deployed" claims across the docs were reconciled, and the app Neon `main` branch was protected. All 68 start-of-session gate runs (39 gates + self-tests) were green. The owner is on the home Mac until next week, so the office Mac sync and all local ledger cleanup are deferred.
+A short housekeeping session. The overnight email the owner received was the PD daily digest's "Sending soon unless you act" section listing the 1003220 reminder; that section is intentionally not receipted in `digest_fyi_at` (only sent-FYI is), so the empty field was expected. The first scheduled-email Part A/B reminder cycle was checked, the stale "migration 036 not applied / not deployed" claims across the docs were reconciled, and the app Neon `main` branch was protected. All 68 start-of-session gate runs (39 gates + self-tests) were green. The owner is on the home Mac until next week, so the office Mac sync and all local ledger cleanup are deferred.
 
 ### What Was Completed
 
@@ -37,8 +37,7 @@ A short housekeeping session. The first scheduled-email Part A/B reminder cycle 
 
 ### Verify Before Acting
 
-1. **An email the owner received overnight 9/30–10/01** about "the Alert" is unexplained: the reminder row recorded no digest FYI. Ask for the subject/sender before tracing.
-2. **Factory test Requests 1003301–1003303 are NOT residue:** tracked runs in `managed-ledger/ledger_prod` (verified S559). Do not delete as cleanup.
+1. **Factory test Requests 1003301–1003303 are NOT residue:** tracked runs in `managed-ledger/ledger_prod` (verified S559). Do not delete as cleanup.
 
 ### Do Not Reopen Without New Decision
 
