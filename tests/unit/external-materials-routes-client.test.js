@@ -245,9 +245,30 @@ test('a failed replacement Blob transfer keeps the earlier staging id and hides 
   expect(alert).toHaveTextContent('upload link expired');
   expect(alert).toHaveTextContent('choose the file again');
   expect(alert).toHaveTextContent('Your earlier upload remains available with Retry');
-  expect(alert).not.toHaveTextContent('private-sdk-details');
+  expect(alert).not.toHaveTextContent('Vercel Blob');
   expect(JSON.parse(window.sessionStorage.getItem(STORAGE_KEY))).toEqual({ stagingId: STAGING_ID, slot: 'presentation_pdf' });
   expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+});
+
+test('a successful replacement transfer replaces the earlier staging id for Retry', async () => {
+  const replacementId = '33333333-3333-4333-8333-333333333333';
+  window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ stagingId: STAGING_ID, slot: 'presentation_pdf' }));
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, context);
+    if (url.endsWith('/upload-token')) return response(200, { ok: true, stagingId: replacementId, pathname: 'private/replacement', clientToken: 'client', contentType: 'application/pdf' });
+    if (url.endsWith('/finalize')) return response(409, { ok: false, reason: 'slot_busy' });
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  render(<MaterialsContributorPage />);
+  fireEvent.change(await screen.findByLabelText('Presentation different file'), { target: { files: [new File(['%PDF'], 'replacement.pdf', { type: 'application/pdf' })] } });
+  await waitFor(() => expect(JSON.parse(window.sessionStorage.getItem(STORAGE_KEY))).toEqual({ stagingId: replacementId, slot: 'presentation_pdf' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Retry' })).not.toBeDisabled());
+  fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+  await waitFor(() => expect(global.fetch.mock.calls.filter(([url]) => url.endsWith('/finalize'))).toHaveLength(2));
+  for (const [, options] of global.fetch.mock.calls.filter(([url]) => url.endsWith('/finalize'))) {
+    expect(JSON.parse(options.body).stagingId).toBe(replacementId);
+  }
+  expect(put).toHaveBeenCalledTimes(1);
 });
 
 test('the support-email footer renders only when the context includes supportEmail', async () => {

@@ -622,7 +622,7 @@ Owner feedback after the first production smoke (ZZTEST-03). Four items, built o
    assigned, enabled Program Coordinator using a server-resolved name and validated email. A stale
    context cap refreshes from the upload-token response. Failed replacements preserve the prior
    pending upload for Retry; the new file becomes pending only after its Blob transfer succeeds.
-   Transfers above the Graph simple-upload threshold use the Blob SDK multipart option. This
+   Transfers above 60 MiB use the Blob SDK multipart option. This
    multipart path and practical 500 MB transfer throughput remain unverified against the live
    provider; see the implementation review for runtime limits.
 
