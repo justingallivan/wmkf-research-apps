@@ -223,7 +223,7 @@ UI: a third section in `TestRequestsWorkspace` (`admin.js:3433` [pages]): source
 
 ### Slice 2 build record (S562, 2026-10-01)
 
-Built by Sonnet from `docs/plans/briefs/FACTORY_ADMIN_FORM_SLICE2_BRIEF_2026-10-01.md`; Opus review approve-with-fixes (no high or medium); Codex adversarial round 1 one high, round 2 one medium, both fixed by Fable. Six route files under `pages/api/admin/test-requests/runs/` (`source`, `index`, `[runId]/index`, `[runId]/advance`, `[runId]/recheck`, `[runId]/artifacts`), `lib/services/test-requests/admin-run-route-helpers.js`, an optional cooperative `deadlineAt` on the service's `exportSource`, `confirmRun` and `advance`, one `next.config.js` tracing key, six matrix rows, route count 241 → 247.
+Built by Sonnet from `docs/plans/briefs/FACTORY_ADMIN_FORM_SLICE2_BRIEF_2026-10-01.md`; Opus review approve-with-fixes (no high or medium); Codex adversarial round 1 one high, round 2 one medium, both fixed by Fable; round 3 approve. Six route files under `pages/api/admin/test-requests/runs/` (`source`, `index`, `[runId]/index`, `[runId]/advance`, `[runId]/recheck`, `[runId]/artifacts`), `lib/services/test-requests/admin-run-route-helpers.js`, an optional cooperative `deadlineAt` on the service's `exportSource`, `confirmRun` and `advance`, one `next.config.js` tracing key, six matrix rows, route count 241 → 247.
 
 Where the build differs from this plan's text above (the build governs):
 
