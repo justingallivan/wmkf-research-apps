@@ -459,9 +459,9 @@ send. The digest query is a per-PD `ROW_NUMBER()` window (100 rows per PD,
 also used by the action route and `pages/scheduled-emails.js`. Proof:
 `tests/integration/scheduled-email-engine.pg.test.js` (CI ledger job).
 
-**Part B send-time recipient and posture re-check (branch
-`claude/scheduled-email-part-b`, 2026-10-01) [SOURCE-BUILT + LIVE-POSTGRES-TESTED on
-a scratch database; not merged; no migration]:** per plan B1–B5,
+**Part B send-time recipient and posture re-check (PR #384, merged 2026-10-01,
+`3b5002d95`; no migration) [VERIFIED: live-Postgres suite, plus a browser
+rehearsal against a Neon branch of the app database]:** per plan B1–B5,
 `deliverScheduledEmail` re-reads a transport-pristine row's current Liaison
 (`resolveRequestLiaison` + contact) and review posture (review-all + VIP flags
 for `[PI, Liaison?]`) after the claim and before any activity lookup. Any read
