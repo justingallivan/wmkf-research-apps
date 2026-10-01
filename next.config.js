@@ -123,6 +123,7 @@ const nextConfig = {
     // steps, whose worker/parser imports are resolved at runtime.
     '/.well-known/workflow/v1/flow': [
       './lib/services/transcription-pilot/audio-inspector-worker.js',
+      './tests/fixtures/transcription/synthetic-aac.m4a',
       './node_modules/music-metadata/**/*',
       './node_modules/@borewit/text-codec/**/*',
       './node_modules/@tokenizer/**/*',

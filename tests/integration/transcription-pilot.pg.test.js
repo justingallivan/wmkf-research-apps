@@ -156,6 +156,40 @@ describeIf('transcription pilot store (isolated local Postgres proof)', () => {
     expect(await store.getWorkflowDispatch({ jobId: queued.id })).toMatchObject({ state: 'completed', attempt_no: 1 });
   });
 
+  it('recovers only a terminal SDK run matching the current durable run generation', async () => {
+    const queued = await makeQueuedJob();
+    const first = await store.claimWorkflowDispatch({ jobId: queued.id, ownerProfileId: ownerId });
+    await store.acknowledgeWorkflowDispatch({ jobId: queued.id, dispatchToken: first.dispatch_token,
+      attemptNo: first.attempt_no, workflowRunId: 'terminal_run_fixture_1' });
+
+    expect(await store.listRunningWorkflowDispatches({ limit: 20 })).toEqual(expect.arrayContaining([
+      expect.objectContaining({ job_id: queued.id, workflow_run_id: 'terminal_run_fixture_1', attempt_no: 1 }),
+    ]));
+    expect(await store.recoverTerminalWorkflowDispatch({ jobId: queued.id,
+      workflowRunId: 'different_run_fixture', attemptNo: 1, terminalStatus: 'failed' })).toBeNull();
+    expect(await store.recoverTerminalWorkflowDispatch({ jobId: queued.id,
+      workflowRunId: 'terminal_run_fixture_1', attemptNo: 2, terminalStatus: 'failed' })).toBeNull();
+    await expect(store.recoverTerminalWorkflowDispatch({ jobId: queued.id,
+      workflowRunId: 'terminal_run_fixture_1', attemptNo: 1, terminalStatus: 'running' })).rejects.toMatchObject({
+      code: 'transcription_invalid_value',
+    });
+
+    expect(await store.recoverTerminalWorkflowDispatch({ jobId: queued.id,
+      workflowRunId: 'terminal_run_fixture_1', attemptNo: 1, terminalStatus: 'failed' }))
+      .toMatchObject({ job_id: queued.id, attempt_no: 1 });
+    expect(await store.finishWorkflowDispatch({ jobId: queued.id, attemptNo: 1 })).toBeNull();
+
+    const next = await store.claimWorkflowDispatch({ jobId: queued.id, ownerProfileId: ownerId });
+    expect(next.attempt_no).toBe(2);
+    expect(await store.acknowledgeWorkflowDispatch({ jobId: queued.id, dispatchToken: next.dispatch_token,
+      attemptNo: next.attempt_no, workflowRunId: 'fresh_run_fixture_2' })).toMatchObject({ state: 'running' });
+    expect(await store.recoverTerminalWorkflowDispatch({ jobId: queued.id,
+      workflowRunId: 'terminal_run_fixture_1', attemptNo: 1, terminalStatus: 'failed' })).toBeNull();
+    expect(await store.getWorkflowDispatch({ jobId: queued.id })).toMatchObject({
+      state: 'running', attempt_no: 2, workflow_run_id: 'fresh_run_fixture_2',
+    });
+  });
+
   it.each(['reconcile', 'callback'])('fences an old attention workflow after %s re-arms delivery', async recovery => {
     const queued = await makeQueuedJob();
     const dispatch = await store.claimWorkflowDispatch({ jobId: queued.id, ownerProfileId: ownerId });

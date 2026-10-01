@@ -71,6 +71,54 @@ describe('transcription pilot persistence contract', () => {
     expect(params[0]).toBe('00000000-0000-4000-8000-000000000001');
   });
 
+  it('allows a handed-off workflow to recover a still-leased submitting job without reposting it', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    await store.claimWorkflowDispatch({ jobId: '00000000-0000-4000-8000-000000000001' });
+    const [query] = db.query.mock.calls[0];
+    expect(query).toMatch(/job\.status IN \('queued','submitting','processing','saving','submission_uncertain'\)/);
+    expect(query).toMatch(/AND job\.cleanup_requested_at IS NULL/);
+  });
+
+  it('lists active durable run metadata without treating an old heartbeat as failure', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    await store.listRunningWorkflowDispatches({ limit: 20 });
+    const [query, params] = db.query.mock.calls[0];
+    expect(query).toMatch(/dispatch\.state = 'running' AND dispatch\.workflow_run_id IS NOT NULL/);
+    expect(query).toMatch(/ORDER BY dispatch\.updated_at, dispatch\.job_id/);
+    expect(query).not.toMatch(/updated_at < NOW\(\) - INTERVAL/);
+    expect(query).toMatch(/job\.status IN \('queued','submitting','processing','saving'\)/);
+    expect(query).toMatch(/job\.provider_id_conflict = FALSE/);
+    expect(params).toEqual([20]);
+  });
+
+  it('recovers only a terminal run matching the current run id and attempt generation', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    const jobId = '00000000-0000-4000-8000-000000000001';
+    await store.recoverTerminalWorkflowDispatch({
+      jobId, workflowRunId: 'run_fixture_old', attemptNo: 9, terminalStatus: 'failed',
+    });
+    const [query, params] = db.query.mock.calls[0];
+    expect(query).toMatch(/dispatch\.state = 'running' AND dispatch\.workflow_run_id = \$2 AND dispatch\.attempt_no = \$3/);
+    expect(query).toMatch(/job\.cleanup_requested_at IS NULL/);
+    expect(query).toMatch(/job\.expires_at > NOW\(\)/);
+    expect(query).toMatch(/job\.provider_id_conflict = FALSE/);
+    expect(query).toMatch(/dispatch_token = NULL, lease_expires_at = NULL, workflow_run_id = NULL/);
+    expect(params).toEqual([jobId, 'run_fixture_old', 9, 'workflow_failed']);
+  });
+
+  it('rejects unknown Workflow terminal states before SQL', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    await expect(store.recoverTerminalWorkflowDispatch({
+      jobId: '00000000-0000-4000-8000-000000000001', workflowRunId: 'run_fixture',
+      attemptNo: 1, terminalStatus: 'workflow_suspended',
+    })).rejects.toMatchObject({ code: 'transcription_invalid_value' });
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
   it('fences dispatch acknowledgement and errors with opaque attempt tokens', async () => {
     const db = fakeDatabase();
     const store = createTranscriptionPilotStore(db);

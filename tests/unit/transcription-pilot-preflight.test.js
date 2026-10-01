@@ -9,12 +9,20 @@ jest.mock('../../lib/services/transcription-pilot/store', () => ({
 jest.mock('../../lib/services/transcription-pilot/workflow-dispatch', () => ({
   drainTranscriptionWorkflowDispatches: jest.fn(),
 }));
+jest.mock('../../lib/services/transcription-pilot/workflow-probe', () => ({
+  startSyntheticWorkflowProbe: jest.fn(),
+}));
+jest.mock('../../lib/services/transcription-pilot/preflight', () => {
+  const actual = jest.requireActual('../../lib/services/transcription-pilot/preflight');
+  return { ...actual, runTranscriptionPreflight: jest.fn(actual.runTranscriptionPreflight) };
+});
 
 import handler from '../../pages/api/cron/drain-transcriptions';
 import { verifyTranscriptionCronSecret } from '../../lib/utils/cron-auth';
 import { drainTranscriptionCleanup, drainTranscriptionPilot } from '../../lib/services/transcription-pilot/worker';
 import { requeueExpiredPreIntentTranscriptionSubmissions, markExpiredTranscriptionSubmissionsUncertain } from '../../lib/services/transcription-pilot/store';
 import { drainTranscriptionWorkflowDispatches } from '../../lib/services/transcription-pilot/workflow-dispatch';
+import { startSyntheticWorkflowProbe } from '../../lib/services/transcription-pilot/workflow-probe';
 import { runTranscriptionPreflight, validateTranscriptionPreflightEnv } from '../../lib/services/transcription-pilot/preflight';
 
 const endpoint = 'ep-gentle-smoke-b77a6d90-pooler.c-13.us-east-1.aws.neon.tech';
@@ -45,7 +53,7 @@ function response() {
   };
 }
 
-function readOnlyClient({ readOnly = 'on', database = 'neondb', jobs = '0' } = {}) {
+function readOnlyClient({ readOnly = 'on', database = 'neondb', jobs = '0', dispatches = '0', migration = true, shape = true } = {}) {
   const calls = [];
   return {
     calls,
@@ -55,7 +63,13 @@ function readOnlyClient({ readOnly = 'on', database = 'neondb', jobs = '0' } = {
       calls.push(normalized);
       if (normalized === 'SHOW transaction_read_only') return { rows: [{ transaction_read_only: readOnly }] };
       if (normalized === 'SELECT current_database() AS database_name') return { rows: [{ database_name: database }] };
+      if (normalized.startsWith('SELECT EXISTS (SELECT 1 FROM public.schema_migrations WHERE name = $1)')) return { rows: [{ applied: migration }] };
+      if (normalized.startsWith('SELECT to_regclass(')) return { rows: [{
+        table_present: shape, columns_match: shape, constraints_match: shape,
+        primary_key_match: shape, foreign_key_match: shape, due_index_present: shape,
+      }] };
       if (normalized.startsWith('SELECT COUNT(*)::text AS count FROM public.transcription_jobs')) return { rows: [{ count: jobs }] };
+      if (normalized.startsWith('SELECT COUNT(*)::text AS count FROM public.transcription_workflow_dispatches')) return { rows: [{ count: dispatches }] };
       return { rows: [] };
     },
     async end() { calls.push('end'); },
@@ -65,6 +79,10 @@ function readOnlyClient({ readOnly = 'on', database = 'neondb', jobs = '0' } = {
 describe('transcription Preview readiness preflight', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.restoreAllMocks();
+    runTranscriptionPreflight.mockImplementation(
+      jest.requireActual('../../lib/services/transcription-pilot/preflight').runTranscriptionPreflight
+    );
     requeueExpiredPreIntentTranscriptionSubmissions.mockResolvedValue([]);
     markExpiredTranscriptionSubmissionsUncertain.mockResolvedValue([]);
     drainTranscriptionCleanup.mockResolvedValue({ expiredContent: 0, cleanup: 0, incomplete: false });
@@ -108,16 +126,22 @@ describe('transcription Preview readiness preflight', () => {
     expect(client.calls).toEqual([
       'connect', 'BEGIN READ ONLY', 'SHOW transaction_read_only',
       'SELECT current_database() AS database_name', 'SET LOCAL row_security = off',
-      'SELECT COUNT(*)::text AS count FROM public.transcription_jobs', 'COMMIT', 'end',
+      "SELECT EXISTS (SELECT 1 FROM public.schema_migrations WHERE name = $1) AS applied",
+      expect.stringContaining('to_regclass'),
+      'SELECT COUNT(*)::text AS count FROM public.transcription_jobs',
+      'SELECT COUNT(*)::text AS count FROM public.transcription_workflow_dispatches', 'COMMIT', 'end',
     ]);
     expect(result).toEqual({
       ok: true,
       checks: {
         previewDeployment: true, disabledFlags: true, dedicatedDatabase: true, dedicatedBlobStore: true,
         safeDataverseControls: true, dedicatedAuthOrigin: true, applicationSecretsPresent: true,
-        readOnlyDatabase: true, expectedDatabase: true, zeroJobs: true,
+        readOnlyDatabase: true, expectedDatabase: true,
+        workflowDispatchMigration: true, workflowDispatchShape: true,
+        zeroJobs: true, zeroWorkflowDispatches: true,
       },
       jobs: 0,
+      workflowDispatches: 0,
     });
     expect(JSON.stringify(result)).not.toContain(token);
   });
@@ -133,6 +157,24 @@ describe('transcription Preview readiness preflight', () => {
     expect(populatedResult.ok).toBe(false);
     expect(populatedResult.checks.zeroJobs).toBe(false);
     expect(populated.calls).toContain('ROLLBACK');
+
+    const untracked = readOnlyClient({ migration: false });
+    const untrackedResult = await runTranscriptionPreflight({ env: goodEnv, createClient: () => untracked });
+    expect(untrackedResult.ok).toBe(false);
+    expect(untrackedResult.checks.workflowDispatchMigration).toBe(false);
+    expect(untracked.calls).toContain('ROLLBACK');
+
+    const malformed = readOnlyClient({ shape: false });
+    const malformedResult = await runTranscriptionPreflight({ env: goodEnv, createClient: () => malformed });
+    expect(malformedResult.ok).toBe(false);
+    expect(malformedResult.checks.workflowDispatchShape).toBe(false);
+    expect(malformed.calls).toContain('ROLLBACK');
+
+    const nonemptyDispatches = readOnlyClient({ dispatches: '1' });
+    const dispatchResult = await runTranscriptionPreflight({ env: goodEnv, createClient: () => nonemptyDispatches });
+    expect(dispatchResult.ok).toBe(false);
+    expect(dispatchResult.checks.zeroWorkflowDispatches).toBe(false);
+    expect(nonemptyDispatches.calls).toContain('ROLLBACK');
   });
 
   it('requires the strict cron secret before preflight, and preflight never enters the worker', async () => {
@@ -154,6 +196,80 @@ describe('transcription Preview readiness preflight', () => {
     const res = response();
     await handler({ method: 'GET', query: { preflight: ['1', '1'] } }, res);
     expect(res.statusCode).toBe(400);
+    expect(drainTranscriptionPilot).not.toHaveBeenCalled();
+  });
+
+  it('allows only secret-authenticated POST workflow probes after the full read-only preflight', async () => {
+    runTranscriptionPreflight.mockResolvedValue({
+      ok: true, checks: { previewDeployment: true, workflowDispatchMigration: true, workflowDispatchShape: true,
+        zeroJobs: true, zeroWorkflowDispatches: true },
+    });
+    startSyntheticWorkflowProbe.mockResolvedValue({
+      started: true, completed: true, timedOut: false, runId: 'run_safe_id',
+      proof: { retryResumed: true, retryAttempts: 2, sleepResumed: true, syntheticMediaAccepted: true,
+        syntheticAudioBytes: 16863, syntheticAudioDurationSeconds: 3.065 },
+    });
+    const res = response();
+    await handler({ method: 'POST', query: { workflow_probe: '1' } }, res);
+    expect(runTranscriptionPreflight).toHaveBeenCalledTimes(1);
+    expect(startSyntheticWorkflowProbe).toHaveBeenCalledWith({ timeoutMs: 90_000 });
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ ok: true, runId: 'run_safe_id', status: 'completed', proof: { retryResumed: true } });
+    expect(JSON.stringify(res.body)).not.toMatch(/transcript|provider|pathname|password|token/i);
+    expect(drainTranscriptionPilot).not.toHaveBeenCalled();
+  });
+
+  it('does not start a workflow when the strict secret or read-only preflight fails', async () => {
+    verifyTranscriptionCronSecret.mockReturnValueOnce(false);
+    const denied = response();
+    await handler({ method: 'POST', query: { workflow_probe: '1' } }, denied);
+    expect(startSyntheticWorkflowProbe).not.toHaveBeenCalled();
+
+    runTranscriptionPreflight.mockResolvedValueOnce({
+      ok: false, checks: { dedicatedDatabase: false, workflowDispatchMigration: false },
+    });
+    const unavailable = response();
+    await handler({ method: 'POST', query: { workflow_probe: '1' } }, unavailable);
+    expect(unavailable.statusCode).toBe(503);
+    expect(startSyntheticWorkflowProbe).not.toHaveBeenCalled();
+  });
+
+  it('rejects GET, malformed, and mixed probe requests without starting a run', async () => {
+    const get = response();
+    await handler({ method: 'GET', query: { workflow_probe: '1' } }, get);
+    expect(get.statusCode).toBe(405);
+    expect(get.headers.Allow).toBe('POST');
+    const mixed = response();
+    await handler({ method: 'POST', query: { workflow_probe: '1', preflight: '1' } }, mixed);
+    expect(mixed.statusCode).toBe(400);
+    const malformed = response();
+    await handler({ method: 'POST', query: { workflow_probe: ['1', '1'] } }, malformed);
+    expect(malformed.statusCode).toBe(400);
+    expect(startSyntheticWorkflowProbe).not.toHaveBeenCalled();
+  });
+
+  it('runs only the dispatch recovery sweep, without cleanup or media worker work', async () => {
+    drainTranscriptionWorkflowDispatches.mockResolvedValue({ recovered: 2, started: 0, failed: 0, incomplete: false });
+    const res = response();
+    await handler({ method: 'GET', query: { recovery: '1' } }, res);
+    expect(res.statusCode).toBe(200);
+    expect(drainTranscriptionWorkflowDispatches).toHaveBeenCalledWith({ maxRuns: 20, deadline: expect.any(Number) });
+    expect(drainTranscriptionCleanup).not.toHaveBeenCalled();
+    expect(drainTranscriptionPilot).not.toHaveBeenCalled();
+    expect(requeueExpiredPreIntentTranscriptionSubmissions).not.toHaveBeenCalled();
+    expect(markExpiredTranscriptionSubmissionsUncertain).not.toHaveBeenCalled();
+    expect(startSyntheticWorkflowProbe).not.toHaveBeenCalled();
+  });
+
+  it('rejects unknown or mixed cron modes before starting recovery or normal work', async () => {
+    const unknown = response();
+    await handler({ method: 'GET', query: { debug: '1' } }, unknown);
+    expect(unknown.statusCode).toBe(400);
+    const mixed = response();
+    await handler({ method: 'POST', query: { recovery: '1', workflow_probe: '1' } }, mixed);
+    expect(mixed.statusCode).toBe(400);
+    expect(drainTranscriptionWorkflowDispatches).not.toHaveBeenCalled();
+    expect(drainTranscriptionCleanup).not.toHaveBeenCalled();
     expect(drainTranscriptionPilot).not.toHaveBeenCalled();
   });
 
