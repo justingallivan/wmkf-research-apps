@@ -4,10 +4,23 @@ import {
   getTranscriptionPilotDeploymentProfile as profile,
   isDedicatedTranscriptionAuthConfigured as authConfigured,
   isLegacyProxyPassThrough,
+  DEDICATED_TRANSCRIPTION_PROJECT_REGISTRY,
 } from '../../lib/services/transcription-pilot/deployment-policy';
 
 const registry = [{ projectId: 'prj_test_only', authOrigin: 'https://pilot.example.test' }];
 const env = { VERCEL_PROJECT_ID: 'prj_test_only', TRANSCRIPTION_PILOT_DEPLOYMENT_PROFILE: 'transcription-pilot' };
+
+test('verified isolated project stays isolated even without its marker', () => {
+  expect(DEDICATED_TRANSCRIPTION_PROJECT_REGISTRY).toEqual([{
+    projectId: 'prj_v2aETCFqGBeqMshR7xoMpTcP9K2e',
+    authOrigin: 'https://wmkf-transcription-pilot-isolated.vercel.app',
+  }]);
+  const boundEnv = { VERCEL_PROJECT_ID: DEDICATED_TRANSCRIPTION_PROJECT_REGISTRY[0].projectId };
+  expect(profile(boundEnv).identityVerified).toBe(true);
+  expect(profile(boundEnv).dedicated).toBe(true);
+  expect(decide({ env: boundEnv, pathname: '/api/cron/unrelated' }).allowed).toBe(false);
+  expect(profile({ VERCEL_PROJECT_ID: 'prj_56SJKzNer1aV38kKVoP8tl3X0lf3' }).dedicated).toBe(false);
+});
 
 test('source registry rejects even plausible identities until explicitly registered', () => {
   expect(decide({ env, pathname: '/auth/signin' }).allowed).toBe(false);
