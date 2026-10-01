@@ -4,6 +4,7 @@ jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn(async () =>
 
 import { sql } from '@vercel/postgres';
 import handler from '../../pages/api/workbench/reviewer-roster';
+import { parseReviewerRosterOutcomeResponse } from '../../shared/components/reviewers/reviewer-search-logic';
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 
@@ -63,4 +64,54 @@ test('real route and store return a full positional outcome envelope for mocked 
   } finally {
     log.mockRestore();
   }
+});
+
+test('real route and store keep a non-Latin invalid row correlated beside a valid write', async () => {
+  const rows = new Map();
+  sql.mockReset();
+  sql.mockImplementation(async (fragments, ...values) => {
+    const query = fragments.join(' ');
+    if (query.includes('jsonb_array_elements_text')) {
+      const requestedKeys = JSON.parse(values[1]);
+      return { rows: requestedKeys.flatMap((key) => rows.has(key) ? [rows.get(key)] : []), rowCount: 0 };
+    }
+    if (query.includes('INSERT INTO reviewer_find_roster')) {
+      const [requestId, candidateKey, , displayName, status, serializedCandidate, sourceKind] = values;
+      rows.set(candidateKey, {
+        request_id: requestId,
+        candidate_key: candidateKey,
+        status,
+        display_name: displayName,
+        candidate: JSON.parse(serializedCandidate),
+        source_kind: sourceKind,
+        updated_at_token: '2026-09-30T00:00:00.000Z',
+      });
+      return { rows: [], rowCount: 1 };
+    }
+    if (query.includes('DELETE FROM reviewer_find_roster')) return { rows: [], rowCount: 0 };
+    throw new Error(`unexpected SQL in route/store composition: ${query}`);
+  });
+
+  const res = response();
+  await handler({ method: 'POST', body: {
+    requestId: REQUEST_ID,
+    candidates: [
+      { name: '李明', candidateKey: 'candidate:li-ming', provenance: { kind: 'literature_retrieved', sources: ['openalex'] } },
+      { name: 'Valid Reviewer', candidateKey: 'candidate:valid', provenance: { kind: 'literature_retrieved', sources: ['openalex'] } },
+    ],
+  } }, res);
+
+  expect(res.statusCode).toBe(200);
+  expect(res.body).toMatchObject({ success: false, recorded: 1, outcomeVersion: 1 });
+  expect(res.body.results).toHaveLength(2);
+  expect(res.body.results[0]).toMatchObject({
+    inputIndex: 0, candidateKey: null, existingAtAttempt: null,
+    outcome: 'invalid', code: 'invalid_candidate',
+  });
+  expect(res.body.results[1]).toMatchObject({
+    inputIndex: 1, candidateKey: [...rows.keys()][0], existingAtAttempt: false, outcome: 'written',
+  });
+  expect(parseReviewerRosterOutcomeResponse(res.body, 2)?.results.map(({ outcome }) => outcome))
+    .toEqual(['invalid', 'written']);
+  expect(rows.size).toBe(1);
 });

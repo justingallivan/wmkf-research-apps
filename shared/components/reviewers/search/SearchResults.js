@@ -25,6 +25,8 @@ export default function SearchResults({
   displayCandidates,
   rosterExcluded,
   rosterIneligible,
+  transientIneligible = [],
+  rosterLoadFailed = false,
   rosterRetention,
   persistenceState,
   retrySavingResults,
@@ -88,9 +90,12 @@ export default function SearchResults({
     }
   }
   for (const item of persistenceState?.latestDetailsItems || []) {
-    persistenceByKey.set(item.displayKey, 'not_saved');
+    for (const key of [item.displayKey, item.serverCandidateKey, candKey(item.candidate)].filter(Boolean)) {
+      persistenceByKey.set(key, 'details_not_saved');
+    }
   }
   const retainedStatuses = parseReviewerRosterRetention(rosterRetention) || new Map();
+  const transientIneligibleRows = new Set(transientIneligible);
   return (
     <>
       {(rosterNote || displayCandidates.length > 0 || rosterExcluded.length > 0 || rosterIneligible.length > 0 || rosterBlocked.length > 0 || phase === 'results' || phase === 'done') && (
@@ -103,7 +108,18 @@ export default function SearchResults({
               {' '}A missing coauthor warning is not conclusive for {incompleteCoiCandidates.length === 1 ? 'that reviewer' : 'those reviewers'}.
             </div>
           )}
-          {rosterNote && rosterNote !== promotionNotice?.message && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{rosterNote}</div>}
+          {(rosterNote && rosterNote !== promotionNotice?.message || rosterLoadFailed) && (
+            <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
+              {rosterNote && rosterNote !== promotionNotice?.message
+                ? rosterNote : 'Reviewer state could not be confirmed.'}
+              {rosterLoadFailed && ['results', 'done'].includes(phase)
+                && !persistenceState?.requiresReconciliation && !persistenceState?.correlationLost && (
+                <button type="button" onClick={retryRosterLoad} disabled={phase === 'saving' || removingPrevious} className="ml-2 underline font-medium disabled:opacity-50">
+                  {phase === 'saving' ? 'Checking…' : 'Retry reviewer state'}
+                </button>
+              )}
+            </div>
+          )}
           {persistenceState?.summary && (
             <div className="p-3 bg-amber-50 text-amber-900 rounded-lg text-sm" role="status" data-testid="reviewer-roster-persistence-summary">
               <p>{persistenceState.summary}</p>
@@ -277,7 +293,9 @@ export default function SearchResults({
                       {phase === 'saving' ? (
                         <>
                           <span aria-hidden="true" className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                          Adding {savingCount} reviewer{savingCount === 1 ? '' : 's'} to Invite…
+                          {savingCount > 0
+                            ? `Adding ${savingCount} reviewer${savingCount === 1 ? '' : 's'} to Invite…`
+                            : 'Updating reviewer state…'}
                         </>
                       ) : (
                         <>Add {selected.size > 0 ? selected.size : ''} selected to Invite</>
@@ -328,7 +346,13 @@ export default function SearchResults({
                       return (
                         <li key={`ineligible-${candKey(candidate)}`}>
                           <span className="font-medium">{candidate.name}</span>
-                          {retained !== 'ineligible' && <span> · Current search indicates death, but the roster does not confirm ineligibility; this result is read-only for this search.</span>}
+                          {retained !== 'ineligible' && (
+                            <span>
+                              {transientIneligibleRows.has(candidate)
+                                ? ' · Current search indicates death, but the roster does not confirm ineligibility; this result is read-only for this search.'
+                                : ' · Save not confirmed: eligibility was reported during applicant enrichment, but saved roster status has not been rechecked. This result remains read-only.'}
+                            </span>
+                          )}
                           {evidence?.url && (
                             <>
                               {' · '}

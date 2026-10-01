@@ -303,7 +303,9 @@ export default function useReviewerContactActions({
     const key = candKey(cand);
     if (!key || !requestId) return false;
     const myGen = genRef.current;
-    if (runningRef.current !== null) return false;
+    if (runningRef.current !== null) {
+      throw new Error('Another reviewer action is still running. Wait for it to finish, then retry identity confirmation.');
+    }
     runningRef.current = myGen;
     try {
     // An unverified Claude suggestion is ephemeral, but confirm_identity only

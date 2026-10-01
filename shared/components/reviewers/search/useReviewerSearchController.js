@@ -141,6 +141,10 @@ export default function useReviewerSearchController({
     setRosterLoadFailed,
     setRosterNote,
   });
+  const retryRosterState = useCallback(() => {
+    if (persistenceState?.requiresReconciliation || persistenceState?.correlationLost) return;
+    return retryRosterLoad();
+  }, [persistenceState, retryRosterLoad]);
 
   // Reset everything when the request or the loaded proposal changes — stale
   // candidates must never be savable under a different proposal (Finding 6).
@@ -486,7 +490,7 @@ export default function useReviewerSearchController({
     editingContact,
     confirmingContact,
     noSourcesSelected,
-    retryRosterLoad,
+    retryRosterLoad: retryRosterState,
     runSearch,
     enrichRecommended,
     previousSearchKeys,

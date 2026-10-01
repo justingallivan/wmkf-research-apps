@@ -30,8 +30,10 @@ function Harness({ reloadRoster = jest.fn(async () => true), previousSearchRefs 
   const [rosterSavedKeys, setRosterSavedKeys] = useState([]);
   const [rosterNames, setRosterNames] = useState(['Ada Lovelace']);
   const [rosterRetention, setRosterRetention] = useState({ version: 1, rows: [{ candidateKey: CAND.candidateKey, status: 'active' }] });
-  const [repairRequestsByCandidateKey, setRepairRequestsByCandidateKey] = useState({});
-  const [repairRequestsUnavailable, setRepairRequestsUnavailable] = useState(false);
+  const [repairRequestsByCandidateKey, setRepairRequestsByCandidateKey] = useState({
+    'candidate:repair-seeded': { candidateKey: 'candidate:repair-seeded', status: 'open' },
+  });
+  const [repairRequestsUnavailable, setRepairRequestsUnavailable] = useState(true);
   const [rosterLoaded, setRosterLoaded] = useState(true);
   const [rosterLoadFailed, setRosterLoadFailed] = useState(false);
   const [selected, setSelected] = useState(new Set());
@@ -151,7 +153,21 @@ test('promoteCandidate: request bytes are exact', async () => {
   expect(JSON.parse(sentOpts.body)).toEqual({ requestId: REQ, action: 'promote', candidateKey: 'suggestion:s-1' });
 });
 
-test('removePreviousResults: request bytes exact; success repopulates every roster bucket from the response', async () => {
+test.each([
+  [
+    'omitted repair fields preserve known state',
+    {},
+    {
+      byCandidateKey: { 'candidate:repair-seeded': { candidateKey: 'candidate:repair-seeded', status: 'open' } },
+      unavailable: true,
+    },
+  ],
+  [
+    'explicit repair fields replace known state',
+    { repairRequests: [{ candidateKey: 'a', status: 'pending' }], repairRequestsUnavailable: false },
+    { byCandidateKey: { a: { candidateKey: 'a', status: 'pending' } }, unavailable: false },
+  ],
+])('removePreviousResults: %s; request bytes exact and all roster buckets are repopulated', async (_case, repairFields, expectedRepairState) => {
   let sentOpts = null;
   global.fetch = jest.fn((url, opts) => {
     sentOpts = opts;
@@ -166,6 +182,7 @@ test('removePreviousResults: request bytes exact; success repopulates every rost
         handled: [{ candidateKey: 'h', name: 'Handled from snapshot' }],
         savedKeys: ['hidden:saved'],
         allNames: ['Snapshot name'],
+        ...repairFields,
         retention: {
           version: 1,
           rows: [
@@ -178,8 +195,6 @@ test('removePreviousResults: request bytes exact; success repopulates every rost
             { candidateKey: 'hidden:coi-dropped', status: 'coi_dropped' },
           ],
         },
-        repairRequests: [{ candidateKey: 'a', status: 'pending' }],
-        repairRequestsUnavailable: false,
         removedKeys: ['suggestion:s-2'],
         removed: 1,
       }),
@@ -208,10 +223,7 @@ test('removePreviousResults: request bytes exact; success repopulates every rost
     ],
   });
   expect(JSON.parse(screen.getByTestId('roster-readiness').textContent)).toEqual({ loaded: true, loadFailed: false });
-  expect(JSON.parse(screen.getByTestId('repair-requests').textContent)).toEqual({
-    byCandidateKey: { a: { candidateKey: 'a', status: 'pending' } },
-    unavailable: false,
-  });
+  expect(JSON.parse(screen.getByTestId('repair-requests').textContent)).toEqual(expectedRepairState);
   expect(sentOpts.method).toBe('PATCH');
   expect(JSON.parse(sentOpts.body)).toEqual({
     requestId: REQ, action: 'remove_previous_results', candidateRefs: [{ candidateKey: 'suggestion:s-2' }],

@@ -332,6 +332,31 @@ describe('POST recordSurfaced', () => {
     expect(passed[0].candidateKey).toBe('candidate:receipt-bound');
   });
 
+  it('rejects insert-only retries when the receipt-bound key differs from the submitted key', async () => {
+    verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+      valid: true,
+      rosterCandidateKey: 'candidate:receipt-bound',
+      eligibilityEvidenceBound: false,
+    });
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, writeMode: 'insert_missing', candidates: [{
+      name: 'Receipt Bound',
+      candidateKey: 'candidate:submitted',
+      automatedIdentityAttestation: 'signed',
+    }] } }, r);
+
+    expect(r.statusCode).toBe(200);
+    expect(r.body).toMatchObject({ success: false, outcomeVersion: 1, recorded: 0 });
+    expect(r.body.results).toEqual([{
+      inputIndex: 0,
+      candidateKey: 'candidate:receipt-bound',
+      existingAtAttempt: null,
+      outcome: 'invalid',
+      code: 'retry_key_changed',
+    }]);
+    expect(store.recordSurfacedDetailed).not.toHaveBeenCalled();
+  });
+
   it('stores institution evidence only when its token binds the final server candidate key', async () => {
     const candidate = {
       name: 'Bound Evidence',

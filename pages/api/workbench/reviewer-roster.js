@@ -508,7 +508,7 @@ async function handlePost(req, res) {
     resultsByIndex.set(source.inputIndex, {
       ...result,
       inputIndex: source.inputIndex,
-      existingAtAttempt: existingKeys.has(result.candidateKey),
+      existingAtAttempt: result.outcome === 'invalid' ? null : existingKeys.has(result.candidateKey),
     });
   }
   const results = candidates.map((_, index) => resultsByIndex.get(index) || ({

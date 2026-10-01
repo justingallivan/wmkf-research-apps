@@ -335,7 +335,11 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
         <div className="flex-1 min-w-0">
           {persistenceStatus && (
             <p className="mb-1 text-xs font-medium text-amber-800" data-testid="reviewer-roster-persistence-status">
-              {persistenceStatus === 'unconfirmed' ? 'Save not confirmed' : 'Not saved to this request'}
+              {persistenceStatus === 'unconfirmed'
+                ? 'Save not confirmed'
+                : persistenceStatus === 'details_not_saved'
+                  ? 'Latest details not saved'
+                  : 'Not saved to this request'}
             </p>
           )}
           <div className="flex items-center justify-between gap-2">

@@ -769,3 +769,36 @@ test('a stale address-verification await returns false without changing request 
   expect(screen.getByLabelText(`Select ${candidateB.name}`)).toBeInTheDocument();
   expect(screen.queryByText(candidateA.name)).not.toBeInTheDocument();
 });
+
+
+test.each([false, true])('deceased applicant save confirmation comes from the roster snapshot (confirmed=%s)', async (confirmed) => {
+  const deceased = applicantCacheRow('Deceased applicant confirmation', 'deceased-confirmation', {
+    eligibilityStatus: 'deceased', identityStatus: undefined,
+    eligibilityEvidence: { url: 'https://example.edu/memorial' },
+  });
+  global.fetch = jest.fn((url, options = {}) => {
+    if (String(url).includes('/api/workbench/reviewer-roster?')) {
+      return Promise.resolve(rosterSnapshot([], { ineligible: confirmed ? [deceased] : [] }));
+    }
+    if (url === '/api/workbench/enrich-recommended' && options.method === 'POST') {
+      return Promise.resolve(response({}));
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  // This completion payload does not acknowledge a roster write. Successful,
+  // skipped and failed best-effort writes can all emit this same result.
+  readSseStream.mockImplementation(async (_res, onEvent) => {
+    onEvent({ event: 'complete', data: { recommended: [deceased] } });
+  });
+  render(<ReviewerSearchSection requestId={REQUEST_A} blobUrl="blob-a" proposalKey="proposal-a"
+    recommended={[{ suggestionId: deceased.suggestionId, name: deceased.name }]} />);
+  await screen.findByText(deceased.name);
+  if (confirmed) {
+    expect(screen.queryByText(/Save not confirmed/)).not.toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalledWith('/api/workbench/enrich-recommended', expect.anything());
+  } else {
+    expect(await screen.findByText(/Save not confirmed: eligibility was reported during applicant enrichment/)).toBeInTheDocument();
+    expect(screen.queryByText(/Current search indicates death/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/roster does not confirm ineligibility/)).not.toBeInTheDocument();
+  }
+});

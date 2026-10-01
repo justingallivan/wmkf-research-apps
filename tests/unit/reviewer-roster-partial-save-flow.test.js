@@ -132,12 +132,14 @@ test('partial save keeps exact server buckets authoritative through the next sea
 test('successful Retry saving posts only the absent insert, preserves invalid and existing-row warnings, and ignores a repeated click', async () => {
   let posts = 0;
   const postBodies = [];
+  const providerCalls = [];
+  const reboundFirst = { ...first, candidateKey: 'candidate:receipt-bound' };
   const retryPost = deferred();
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
     if (target.includes('/api/workbench/reviewer-roster?')) {
       if (posts === 0) return Promise.resolve(response(rosterSnapshot([])));
-      return Promise.resolve(response(rosterSnapshot(posts === 1 ? [third] : [first, third])));
+      return Promise.resolve(response(rosterSnapshot(posts === 1 ? [third] : [reboundFirst, third])));
     }
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
       posts += 1;
@@ -147,7 +149,7 @@ test('successful Retry saving posts only the absent insert, preserves invalid an
         return Promise.resolve(response({
           success: false, recorded: 0, outcomeVersion: 1,
           results: [
-            { inputIndex: 0, candidateKey: first.candidateKey, existingAtAttempt: false, outcome: 'failed', code: 'roster_write_failed' },
+            { inputIndex: 0, candidateKey: reboundFirst.candidateKey, existingAtAttempt: false, outcome: 'failed', code: 'roster_write_failed' },
             { inputIndex: 1, candidateKey: null, existingAtAttempt: null, outcome: 'invalid', code: 'invalid_candidate' },
             { inputIndex: 2, candidateKey: third.candidateKey, existingAtAttempt: true, outcome: 'failed', code: 'roster_write_failed' },
           ],
@@ -156,6 +158,7 @@ test('successful Retry saving posts only the absent insert, preserves invalid an
       return retryPost.promise;
     }
     if (target === '/api/reviewer-finder/analyze' || target === '/api/reviewer-finder/discover' || target === '/api/reviewer-finder/enrich-contacts') {
+      providerCalls.push(target);
       return Promise.resolve(response({}));
     }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
@@ -168,18 +171,23 @@ test('successful Retry saving posts only the absent insert, preserves invalid an
   await waitFor(() => expect(retry).toBeEnabled());
   expect(screen.getByText(third.name)).toBeInTheDocument();
 
+  const providerCallCountBeforeRetry = providerCalls.length;
+  expect(providerCalls).toEqual([
+    '/api/reviewer-finder/analyze', '/api/reviewer-finder/discover', '/api/reviewer-finder/enrich-contacts',
+  ]);
   fireEvent.click(retry);
   await waitFor(() => expect(posts).toBe(2));
   expect(postBodies[1].writeMode).toBe('insert_missing');
   expect(postBodies[1].candidates).toHaveLength(1);
   expect(postBodies[1].candidates[0].name).toBe(first.name);
+  expect(postBodies[1].candidates[0].candidateKey).toBe(reboundFirst.candidateKey);
   fireEvent.click(screen.getByRole('button', { name: 'Saving…' }));
   expect(posts).toBe(2);
 
   await act(async () => {
     retryPost.resolve(response({
       success: true, recorded: 1, outcomeVersion: 1,
-      results: [{ inputIndex: 0, candidateKey: first.candidateKey, existingAtAttempt: false, outcome: 'written' }],
+      results: [{ inputIndex: 0, candidateKey: reboundFirst.candidateKey, existingAtAttempt: false, outcome: 'written' }],
     }));
     await retryPost.promise;
   });
@@ -189,6 +197,7 @@ test('successful Retry saving posts only the absent insert, preserves invalid an
   expect(screen.getByText(third.name)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Retry saving results' })).not.toBeInTheDocument();
   expect(posts).toBe(2);
+  expect(providerCalls).toHaveLength(providerCallCountBeforeRetry);
 });
 
 test('malformed post-save inventory gives checking-only recovery instructions', async () => {
@@ -343,6 +352,50 @@ test('removal PATCH snapshot renders a newly handled reviewer as read-only', asy
   expect(screen.getByText('Not actionable in Find')).toBeInTheDocument();
   expect(screen.queryByRole('checkbox', { name: `Select ${anchored.name}` })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Add .* to Invite/ })).not.toBeInTheDocument();
+});
+
+test('results-phase removal failure can retry reviewer state and unlock another search', async () => {
+  const previous = { ...first, rosterUpdatedAt: '2026-09-30T00:00:00.000Z' };
+  let rosterReads = 0;
+  let patches = 0;
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) {
+      rosterReads += 1;
+      return Promise.resolve(response(rosterSnapshot(rosterReads === 1 ? [previous] : rosterReads === 2 ? [previous, second] : [second])));
+    }
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
+      return Promise.resolve(response({
+        success: true, recorded: 1, outcomeVersion: 1,
+        results: [{ inputIndex: 0, candidateKey: second.candidateKey, existingAtAttempt: false, outcome: 'written' }],
+      }));
+    }
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
+      patches += 1;
+      return Promise.resolve(response({ error: 'refresh failed after removal' }, false));
+    }
+    if (target === '/api/reviewer-finder/analyze' || target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
+    if (target === '/api/reviewer-finder/enrich-contacts') return Promise.resolve(response({}));
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+  jest.spyOn(window, 'confirm').mockReturnValue(true);
+  streamSearch([second]);
+  render(<ReviewerSearchSection requestId={REQUEST_ID} blobUrl="blob" proposalKey="proposal" />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
+  await screen.findByRole('button', { name: 'Run another search' });
+  const remove = screen.getByRole('button', { name: 'Remove previous results' });
+  await waitFor(() => expect(remove).toBeEnabled());
+  fireEvent.click(remove);
+
+  expect(await screen.findByRole('button', { name: 'Retry reviewer state' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Run another search' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Retry reviewer state' }));
+
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Run another search' })).toBeEnabled());
+  expect(screen.queryByRole('button', { name: 'Retry reviewer state' })).not.toBeInTheDocument();
+  expect(patches).toBe(1);
+  expect(rosterReads).toBe(3);
+  expect(screen.getByText(second.name)).toBeInTheDocument();
 });
 
 const missingReads = [

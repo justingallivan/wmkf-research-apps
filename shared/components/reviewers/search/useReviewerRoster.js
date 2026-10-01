@@ -59,24 +59,37 @@ export default function useReviewerRoster({
   const reloadRoster = useCallback(async (expectedGeneration = genRef.current) => {
     if (!requestId) return null;
     const operationId = ++operationRef.current;
-    const { ok, data } = await requestEnvelope(
-      `/api/workbench/reviewer-roster?requestId=${encodeURIComponent(requestId)}`,
-      { tolerantBody: true },
-    );
+    let envelope;
+    try {
+      envelope = await requestEnvelope(
+        `/api/workbench/reviewer-roster?requestId=${encodeURIComponent(requestId)}`,
+        { tolerantBody: true },
+      );
+    } catch {
+      if (genRef.current === expectedGeneration && operationRef.current === operationId) {
+        setRosterLoaded(false);
+        setRosterLoadFailed(true);
+      }
+      return null;
+    }
+    const { ok, data } = envelope;
     if (genRef.current !== expectedGeneration || operationRef.current !== operationId) return null;
-    if (!ok || !data.success) {
+    if (!ok || !data?.success) {
       setRosterLoaded(false);
+      setRosterLoadFailed(true);
       return null;
     }
     const hasCompleteRetention = parseReviewerRosterRetention(data?.retention) instanceof Map;
     if (!hasCompleteRetention) {
       setRosterLoaded(false);
+      setRosterLoadFailed(true);
       return data;
     }
     applyRosterSnapshot(data);
     setRosterLoaded(true);
+    setRosterLoadFailed(false);
     return data;
-  }, [requestId, genRef, applyRosterSnapshot, setRosterLoaded]);
+  }, [requestId, genRef, applyRosterSnapshot, setRosterLoaded, setRosterLoadFailed]);
 
   const invalidateRosterReads = useCallback(() => {
     operationRef.current += 1;
@@ -89,18 +102,21 @@ export default function useReviewerRoster({
     setRosterLoaded(false);
     setRosterLoadFailed(false);
     setRosterNote(null);
+    const operationId = operationRef.current + 1;
     try {
       const snapshot = await reloadRoster(myGen);
-      if (genRef.current !== myGen) return;
+      if (genRef.current !== myGen || operationRef.current !== operationId) return;
       if (snapshot && parseReviewerRosterRetention(snapshot.retention) instanceof Map) {
         setRosterLoaded(true);
+        setRosterLoadFailed(false);
       } else {
         setRosterLoaded(false);
         setRosterLoadFailed(true);
         setRosterNote('Reviewer engagement could not be reconciled. Retry before searching.');
       }
     } catch {
-      if (genRef.current === myGen) {
+      if (genRef.current === myGen && operationRef.current === operationId) {
+        setRosterLoaded(false);
         setRosterLoadFailed(true);
         setRosterNote('Reviewer engagement could not be reconciled. Retry before searching.');
       }

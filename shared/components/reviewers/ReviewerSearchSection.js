@@ -87,6 +87,7 @@ export default function ReviewerSearchSection({
     selected,
     rosterExcluded,
     rosterIneligible,
+    transientIneligible,
     rosterRetention,
     persistenceState,
     rosterBlocked,
@@ -217,6 +218,7 @@ export default function ReviewerSearchSection({
           previousSearchKeys={previousSearchKeys}
           rosterLoadFailed={rosterLoadFailed}
           retryRosterLoad={retryRosterLoad}
+          rosterRetryAllowed={!persistenceState?.requiresReconciliation && !persistenceState?.correlationLost}
           runSearch={runSearch}
           rosterLoaded={rosterLoaded}
           removingPrevious={removingPrevious}
@@ -227,6 +229,8 @@ export default function ReviewerSearchSection({
           displayCandidates={displayCandidates}
           rosterExcluded={rosterExcluded}
           rosterIneligible={rosterIneligible}
+          transientIneligible={transientIneligible}
+          rosterLoadFailed={rosterLoadFailed}
           rosterRetention={rosterRetention}
           persistenceState={persistenceState}
           retrySavingResults={retrySavingResults}

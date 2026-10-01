@@ -53,7 +53,8 @@ function summarizeRosterPersistence(attempts, { retention, snapshot, correlation
   else if (correlationLost) summary = "Couldn't confirm which results were saved. Use saved results to replace this search with the server roster.";
   else if (latestDetailsItems.length && items.length) summary = `${items.length} of ${currentAttempts.length} results weren't saved. ${latestDetailsItems.length === 1 ? 'Another result is' : `${latestDetailsItems.length} other results are`} retained, but the latest details were not saved; review the current card. Unsaved results are lost if you reload or start a new search.`;
   else if (latestDetailsItems.length) summary = `${latestDetailsItems.length === 1 ? 'The result is' : `${latestDetailsItems.length} results are`} retained, but the latest details were not saved; review the current card.`;
-  else if (items.length) summary = `${items.length} of ${currentAttempts.length} results weren't saved. Keep this page open and retry saving. Unsaved results are lost if you reload or start a new search.`;
+  else if (items.length && retryItems.length > 0) summary = `${items.length} of ${currentAttempts.length} results weren't saved. Keep this page open and retry saving. Unsaved results are lost if you reload or start a new search.`;
+  else if (items.length) summary = `${items.length} of ${currentAttempts.length} results weren't saved. Use saved results to replace this search with the current roster.`;
   return {
     mode: shouldWarn ? (requiresReconciliation || correlationLost ? 'unconfirmed' : 'partial') : 'confirmed',
     attempts: currentAttempts,

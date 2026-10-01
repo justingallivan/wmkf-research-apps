@@ -42,6 +42,7 @@ export default function SearchControls({
   progress,
   rosterLoadFailed,
   retryRosterLoad,
+  rosterRetryAllowed = true,
   runSearch,
   rosterLoaded,
   removingPrevious,
@@ -211,7 +212,9 @@ export default function SearchControls({
           <button
             type="button"
             onClick={rosterLoadFailed ? retryRosterLoad : runSearch}
-            disabled={!rosterLoadFailed && (noSourcesSelected || !rosterLoaded || removingPrevious || errorMeta?.status === 'analysis_refused')}
+            disabled={rosterLoadFailed
+              ? !rosterRetryAllowed
+              : (noSourcesSelected || !rosterLoaded || removingPrevious || errorMeta?.status === 'analysis_refused')}
             className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {rosterLoadFailed
