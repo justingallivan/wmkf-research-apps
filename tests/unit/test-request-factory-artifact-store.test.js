@@ -228,3 +228,39 @@ describe('sweepFactoryArtifacts', () => {
     expect(calls.list.map((c) => c.limit).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(200);
   });
 });
+
+describe('scripts/factory-artifacts-download.mjs', () => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  let script;
+  beforeAll(async () => { script = await import('../../scripts/factory-artifacts-download.mjs'); });
+
+  test('parseArgs validates the run GUID, target and absolute --out', () => {
+    const ok = script.parseArgs([`--run=${RUN.toUpperCase()}`, '--target=sandbox', '--out=/tmp/x']);
+    expect(ok).toEqual({ run: RUN, target: 'sandbox', out: '/tmp/x' });
+    expect(() => script.parseArgs(['--run=nope', '--target=sandbox', '--out=/tmp/x'])).toThrow(/GUID/);
+    expect(() => script.parseArgs([`--run=${RUN}`, '--target=staging', '--out=/tmp/x'])).toThrow(/target/);
+    expect(() => script.parseArgs([`--run=${RUN}`, '--target=sandbox', '--out=rel'])).toThrow(/absolute/);
+    expect(() => script.parseArgs([`--run=${RUN}`, '--target=sandbox', '--out=/tmp/x', '--extra'])).toThrow(/Unknown/);
+  });
+
+  test('writes both files create-only (0600), prints no text, and refuses an existing file', async () => {
+    const out = fs.mkdtempSync(path.join(os.tmpdir(), 'factory-dl-'));
+    const dest = path.join(out, 'run');
+    const seen = [];
+    const get = async (pathname, options) => {
+      seen.push({ pathname, options });
+      const bytes = Buffer.from(JSON.stringify({ secret: 'source text', pathname }));
+      return { stream: new ReadableStream({ start(c) { c.enqueue(new Uint8Array(bytes)); c.close(); } }) };
+    };
+    const written = await script.downloadArtifacts({ run: RUN, target: 'sandbox', out: dest }, { env: ENV, get });
+    expect(seen.map((s) => s.pathname)).toEqual([`sandbox/runs/${RUN}/manifest.json`, `sandbox/runs/${RUN}/bundle.json`]);
+    expect(seen.every((s) => s.options.token === 'fake-token' && s.options.access === 'private')).toBe(true);
+    expect(JSON.stringify(written)).not.toContain('source text');
+    expect(fs.statSync(path.join(dest, 'bundle.json')).mode & 0o777).toBe(0o600);
+    await expect(script.downloadArtifacts({ run: RUN, target: 'sandbox', out: dest }, { env: ENV, get })).rejects.toThrow(/EEXIST/);
+    await expect(script.downloadArtifacts({ run: RUN, target: 'sandbox', out: dest }, { env: {}, get })).rejects.toThrow(/FACTORY_BLOB_RW_TOKEN/);
+    fs.rmSync(out, { recursive: true, force: true });
+  });
+});
