@@ -2,8 +2,8 @@
 title: "AssemblyAI transcription pilot pre-enable runbook"
 domain: transcription
 kind: operations-runbook
-status: source-built-not-deployed
-summary: "Isolated Neon schema and authorized test admin initialized and independently verified; branch environment binding, deployment and provider tests remain pending."
+status: disabled-preview-deployed-auth-pending
+summary: "Isolated Neon schema and test admin are initialized; branch-scoped Preview configuration and a READY disabled deployment exist; staff authentication, runtime checks and provider tests remain pending."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -16,14 +16,15 @@ related:
 
 ## Release status
 
-**[SOURCE-BUILT IN THE IMPLEMENTATION BRANCH; NOT DEPLOYED OR ENABLED]** The
+**[SOURCE-BUILT; DISABLED PREVIEW DEPLOYMENT READY; PILOT NOT ENABLED]** The
 Admin page, API routes, callback, worker, provider/media/runtime services,
 model/store, migration 060, fresh-install registration, and tests are present
-in source. Migration 060 is provisional and unapplied to shared databases.
-The implementation branch is not evidence that feature flags, credentials,
-cron, callback reachability, account privacy settings, or shared schema are
-configured. This runbook documents the gate; it does not authorize a database
-apply, deployment, paid provider call, or pilot use.
+in source. A branch-only Preview deployment is READY with both transcription
+switches false. Migration 060 is applied only to the isolated Neon database,
+not shared databases. Staff sign-in/callback validation, cron execution,
+deployed runtime checks, and account privacy settings remain unverified. This
+runbook documents release gates; it does not authorize paid provider calls or
+pilot use.
 
 ### Isolated database checkpoint — 2026-10-01
 
@@ -52,12 +53,11 @@ charges were disclosed. Created in team `justin-gallivans-projects`:
 - Blob `wmkf-transcription-pilot`, `store_Qri02A1kj96tQYR9`: private,
   `iad1`, zero objects/bytes, no connected projects.
 
-No app environment binding, deployment, shared-database migration, upload, or AssemblyAI call
-was made. Live environment metadata shows the existing `DATABASE_URL`,
-`POSTGRES_URL`, and `NEON_PROJECT_ID` records target Production, Preview and
-Development together; those shared settings were not changed. The existing
-Preview upload token's store mapping remains unverified. Future overrides must
-be restricted to Preview branch `codex/transcription-pilot`.
+At resource creation, no app environment binding or deployment was made. The
+existing project-wide database records still target Production, Preview and
+Development together and remain unchanged; the later branch-only override is
+recorded below. Resource creation did not connect either resource through the
+Marketplace.
 
 **Local fresh-bootstrap repair — Sol reviewed and root verified:** the
 repaired setup path uses its public transaction base, real SQL migrations,
@@ -100,23 +100,66 @@ Targeted ESLint passed. Sol also approved the read-only verification mode.
 An uncertain commit must be reconciled read-only, never automatically retried.
 This target is now populated: do not rerun fresh initialization.
 
-The credential remains only in git-ignored `.env.transcription-preview.local`;
-`.env.local` and shared settings were not overwritten. Resource association is
-owner-confirmed; the saved endpoint matched and differed from local Production
-hosts. The Launch plan is known but actual pricing remains unverified.
-Branch-only environment binding and deployment remain pending.
+The operator copy remains in git-ignored `.env.transcription-preview.local`;
+`.env.local` and shared settings were not overwritten. The saved endpoint
+matched the user-confirmed isolated Neon host and differed from local
+Production hosts. The Launch plan is known but actual pricing remains
+unverified. Branch-only Vercel configuration and deployment are now recorded
+in the checkpoint below.
 
-**Disabled-by-default source behavior:** `TRANSCRIPTION_PILOT_ENABLED` and
+### Disabled Preview deployment checkpoint — 2026-10-01
+
+**[VERIFIED via Vercel environment metadata and deployment readback]** Nine
+records are scoped only to Preview branch `codex/transcription-pilot`:
+`POSTGRES_URL`, `DATABASE_URL`, `UPLOADS_BLOB_RW_TOKEN`,
+`TRANSCRIPTION_PILOT_ENABLED`, `TRANSCRIPTION_SUBMISSIONS_ENABLED`,
+`DATAVERSE_TARGET_INTERLOCK`, `DATAVERSE_ALLOW_PROD_READS`, and
+`DATAVERSE_DAL_ENFORCEMENT`, plus `NEXTAUTH_URL` set to the dedicated Preview
+alias origin. Project-wide and other branch records were not updated. Six
+nonsecret settings (the two transcription switches, three
+Dataverse controls, and `NEXTAUTH_URL`) were checked with `vercel env run` from an empty temporary
+directory: the switches are both `false`, interlock is `on`, production reads
+are `no`, and DAL enforcement is `on`. The secret values are not available via
+that read path, and an attempted full value-equality comparison could not
+complete; exact remote equality for the Neon URLs or Blob token is therefore
+not claimed. The Blob token's local value maps to the dedicated private store
+and a read-only store listing confirmed that resource, but this is not a
+readback of the Vercel secret value. The resources remain unconnected through
+Marketplace integration; branch-scoped manual env binding is present.
+
+**[VERIFIED READY]** Deployment `dpl_AenjaVkv3DCgpmJRxBiMCfZNdZng` targets
+Preview at
+`https://wmkfresearchapps-7umx9mat7-justin-gallivans-projects.vercel.app`,
+commit `b7c6ff12e`. Dedicated alias `wmkf-transcription-pilot.vercel.app`
+was created and currently points to this first deployment. The owner approved
+and the Entra app now registers the exact callback
+`https://wmkf-transcription-pilot.vercel.app/api/auth/callback/azure-ad`;
+readback confirmed the prior seven callback URIs were preserved. A fresh
+deployment is required because this READY deployment predates the branch-only
+`NEXTAUTH_URL` addition. A bounded unauthenticated check
+received HTTP 307 to `/auth/signin` for both `/api/admin/transcription-pilot/jobs`
+and `/admin/transcription-pilot`; this confirms the auth gate only, not staff
+sign-in or disabled-flag/runtime secret correctness. The stable Preview alias
+remains assigned to another branch and was not moved. The new alias must be
+verified against a fresh deployment before sign-in. No sign-in was attempted.
+No AssemblyAI key was provisioned, and no
+provider call or upload occurred. No shared database setting/schema was
+changed.
+
+**Disabled-by-default behavior:** `TRANSCRIPTION_PILOT_ENABLED` and
 `TRANSCRIPTION_SUBMISSIONS_ENABLED` each require the literal string `true`.
-Unset, empty, or any other value is disabled. Preview metadata inspection found
-no pilot flag entries; no deployment was made. Before an enabled pilot, leave both flags unset or
-non-`true`; verify the actual target environment through its approved
-configuration surface before asserting that it is off.
+Unset, empty, or any other value is disabled. For this Preview branch both
+records are explicitly `false`, independently verified as described above.
+Keep them false until the owner separately authorizes enabling and all gates
+are cleared; the READY deployment is not pilot-use approval.
 
 ## Before migration or deployment
 
-1. Obtain explicit owner authorization for the target environment, migration,
-   deployment, and any use that may consume AssemblyAI credits. Confirm only
+1. Owner authorization covers isolated Neon initialization, branch-only
+   Preview environment configuration, and a disabled Preview deployment. It
+   does not authorize enabling the pilot, staff sign-in until the fresh
+   deployment and alias are verified, provider calls/uploads, or any paid
+   AssemblyAI use. Confirm only
    explicitly approved non-sensitive recordings are in scope. Confidential
    recordings remain excluded.
 2. Reconcile the provisional migration number. This branch selects 060;
@@ -151,7 +194,8 @@ configuration surface before asserting that it is off.
    the AssemblyAI callback over HTTPS without weakening deployment protection.
    Source registers a one-minute cron, a 300-second route maximum, a
    240-second internal budget, and seven-minute leases. **No deployed
-   scheduler/callback reachability check has been run.**
+   scheduler/callback reachability check has been run on the READY Preview
+   candidate.**
 
 ## Environment and secret checklist
 

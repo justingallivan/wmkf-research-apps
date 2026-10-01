@@ -2,8 +2,8 @@
 title: "Atlas: AssemblyAI transcription pilot (Postgres)"
 domain: postgres
 kind: state-page
-status: isolated-schema-initialized-not-deployed
-summary: "Isolated Neon schema and authorized test admin initialized and read back; shared databases, deployment and provider use remain unchanged."
+status: isolated-schema-initialized-disabled-preview-deployed-auth-pending
+summary: "Isolated Neon schema initialized; branch-only Preview environment is configured and a disabled candidate is READY; shared databases and provider use remain unchanged, staff auth pending."
 canonical: true
 cataloged: 2026-09-30
 owner: product-engineering
@@ -19,20 +19,23 @@ related:
 
 ## Current status
 
-**[SOURCE-BUILT; ISOLATED TEST SCHEMA INITIALIZED; NOT DEPLOYED]** The table
+**[SOURCE-BUILT; ISOLATED TEST SCHEMA INITIALIZED; DISABLED PREVIEW DEPLOYMENT READY]** The table
 definition is `lib/db/migrations/060_transcription_jobs.sql` and is registered
 in the repository migration manifest and fresh-install shape. Migration 060 is
 provisional. Per owner-confirmed reservations, 058 and 059 remain assigned to
 other work. This implementation has not applied migration 060 to Production,
-the shared Preview database, or another shared database; no shared-database probe was performed
-for this entry. The integration suite applies the migration only in a unique
+the shared Preview database, or another shared database; no shared-database
+probe was performed for this entry. Migration 060 is applied only to the
+isolated Neon database. The integration suite also applies it in a unique
 local scratch schema.
 
 **[VERIFIED 2026-09-30 via Vercel metadata]** Test resources exist: Neon
 `store_TSn9yHJW1xL0p4h0` and private Blob
-`store_Qri02A1kj96tQYR9`. Neither is bound to the app. This is resource
-provisioning; existing shared Production/Preview database configuration is
-unchanged. **[VERIFIED 2026-10-01 via read-only SQL]** The owner-supplied
+`store_Qri02A1kj96tQYR9`. They are manually referenced by branch-scoped
+Preview environment records (not Marketplace-connected). Existing
+project-wide Production/Preview/Development database settings remain
+unchanged; `POSTGRES_URL` and `DATABASE_URL` have branch-only overrides for
+`codex/transcription-pilot`. **[VERIFIED 2026-10-01 via read-only SQL]** The owner-supplied
 isolated Neon endpoint matched the user-confirmed hostname and differed from
 local Production hosts. It connects to `neondb`, current schema `public`; the
 pre-initialization catalog probe at `scripts/probe-transcription-preview.js` showed nine
@@ -54,8 +57,31 @@ active linked profile and superuser role for `jgallivan@wmkeck.org`. Its
 and exact identity/role: 57 migration records, one profile, one role, zero jobs,
 and nine provider-owned Auth tables still present. The operator never writes
 `neon_auth`; a real local Postgres test proved preservation and seed rollback.
-Sol approved and root verified; 14 targeted tests passed. Environment binding,
-deployment and provider calls remain undone. See the runbook for release boundaries.
+Sol approved and root verified; 14 targeted tests passed. Branch-only
+environment binding and a READY disabled Preview deployment are now present;
+staff authentication and provider calls remain undone. See the runbook for
+release boundaries.
+
+**[VERIFIED via Vercel readback 2026-10-01]** Candidate deployment
+`dpl_AenjaVkv3DCgpmJRxBiMCfZNdZng` is READY at
+`https://wmkfresearchapps-7umx9mat7-justin-gallivans-projects.vercel.app`,
+from commit `b7c6ff12e`. Nine environment records are Preview-only for
+`codex/transcription-pilot`: the two isolated database URLs, dedicated private
+Blob token, two transcription switches, three Dataverse controls, and `NEXTAUTH_URL`. The
+switches are explicitly false; the verified controls are interlock `on`,
+production reads `no`, and DAL enforcement `on`. The six nonsecret values
+were verified through `vercel env run` from an empty temporary directory.
+Sensitive value equality for database URLs and Blob token was not established;
+the local Blob token mapped to the dedicated store and read-only store metadata
+confirmed that store, but its Vercel value was not read back. The new alias
+`wmkf-transcription-pilot.vercel.app` points to this first deployment. A bounded unauthenticated request to the
+pilot page and list API redirects to `/auth/signin`, demonstrating the auth
+gate only. The stable Preview alias remains assigned to a different branch and
+was not moved. The owner-approved callback at the new alias's
+`/api/auth/callback/azure-ad` is registered, preserving all seven prior URIs.
+`NEXTAUTH_URL` matches the new alias origin; a fresh deployment is required
+to consume that addition. No staff sign-in, provider call, or upload was
+performed.
 
 ## Intended state ownership
 
@@ -108,9 +134,12 @@ confidential-use approval.
   behavior. This is not evidence of a shared schema, deployment, or live
   AssemblyAI account.
 
-Before any deployment, the migration number and tracker must be reconciled
-against the target database with owner authorization, then physical schema
-readback must verify both tracker and actual table/index/constraint shape.
+Before any deployment to a different database, the migration number and
+tracker must be reconciled against that target with owner authorization, then
+physical schema readback must verify both tracker and actual
+table/index/constraint shape. The disabled candidate uses the initialized
+isolated Neon database through branch-only overrides; no shared schema was
+changed or probed.
 The existing-database path is `node scripts/apply-migrations.js`; the
 fresh-install-only `scripts/setup-database.js` must not be used on a populated
 database. See the [pilot pre-enable runbook](../plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_RUNBOOK_2026-09-30.md).
