@@ -2,8 +2,8 @@
 title: "AssemblyAI transcription pilot pre-enable runbook"
 domain: transcription
 kind: operations-runbook
-status: disabled-preview-deployed-auth-pending
-summary: "Isolated Neon schema and test admin are initialized; branch-scoped Preview configuration and a READY disabled deployment exist; staff authentication, runtime checks and provider tests remain pending."
+status: disabled-preview-runtime-preflight-passed
+summary: "Isolated Neon schema and test admin are initialized; 13 Preview-branch environment records are configured; a disabled deployment passed read-only runtime preflight and empty drain, while staff sign-in, media runtime and provider tests remain pending."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -16,13 +16,19 @@ related:
 
 ## Release status
 
-**[SOURCE-BUILT; DISABLED PREVIEW DEPLOYMENT READY; PILOT NOT ENABLED]** The
+**[SOURCE-BUILT; DISABLED PREVIEW PREFLIGHT PASSED; PILOT NOT ENABLED]** The
 Admin page, API routes, callback, worker, provider/media/runtime services,
 model/store, migration 060, fresh-install registration, and tests are present
-in source. A branch-only Preview deployment is READY with both transcription
-switches false. Migration 060 is applied only to the isolated Neon database,
-not shared databases. Staff sign-in/callback validation, cron execution,
-deployed runtime checks, and account privacy settings remain unverified. This
+in source. Thirteen environment records are scoped to Preview branch
+`codex/transcription-pilot`; both transcription switches are false. The latest
+disabled Preview deployment passed read-only runtime preflight and an empty
+drain, but this does not verify real job processing or media runtime. An
+earlier deployment returned `503 cron_secret_missing` before worker execution;
+its Git metadata was not sufficient evidence that branch-scoped values were
+applied, so runtime binding remained inconclusive. Migration 060 is
+applied only to the isolated Neon database. Refreshed staff sign-in, AssemblyAI
+callback delivery, ongoing schedule, real-job processing, deployed media
+runtime, and account privacy settings remain unverified. This
 runbook documents release gates; it does not authorize paid provider calls or
 pilot use.
 
@@ -107,44 +113,59 @@ Production hosts. The Launch plan is known but actual pricing remains
 unverified. Branch-only Vercel configuration and deployment are now recorded
 in the checkpoint below.
 
-### Disabled Preview deployment checkpoint — 2026-10-01
+### Disabled Preview environment and deployment checkpoint — 2026-10-01
 
-**[VERIFIED via Vercel environment metadata and deployment readback]** Nine
+**[VERIFIED via Vercel environment metadata]** Thirteen
 records are scoped only to Preview branch `codex/transcription-pilot`:
 `POSTGRES_URL`, `DATABASE_URL`, `UPLOADS_BLOB_RW_TOKEN`,
 `TRANSCRIPTION_PILOT_ENABLED`, `TRANSCRIPTION_SUBMISSIONS_ENABLED`,
 `DATAVERSE_TARGET_INTERLOCK`, `DATAVERSE_ALLOW_PROD_READS`, and
-`DATAVERSE_DAL_ENFORCEMENT`, plus `NEXTAUTH_URL` set to the dedicated Preview
-alias origin. Project-wide and other branch records were not updated. Six
-nonsecret settings (the two transcription switches, three
-Dataverse controls, and `NEXTAUTH_URL`) were checked with `vercel env run` from an empty temporary
-directory: the switches are both `false`, interlock is `on`, production reads
-are `no`, and DAL enforcement is `on`. The secret values are not available via
-that read path, and an attempted full value-equality comparison could not
-complete; exact remote equality for the Neon URLs or Blob token is therefore
-not claimed. The Blob token's local value maps to the dedicated private store
-and a read-only store listing confirmed that resource, but this is not a
-readback of the Vercel secret value. The resources remain unconnected through
-Marketplace integration; branch-scoped manual env binding is present.
+`DATAVERSE_DAL_ENFORCEMENT`, `NEXTAUTH_URL`, `ASSEMBLYAI_API_KEY`,
+`ASSEMBLYAI_WEBHOOK_SECRET`, `TRANSCRIPTION_REFERENCE_ENCRYPTION_KEY`, and
+`CRON_SECRET`. Project-wide and other branch records were not updated. Both
+transcription switches are false; the Dataverse controls and auth origin were
+checked from an empty temporary directory. The four provider/worker secrets
+are confirmed by name only; secret values are not readable or reproduced.
+No equality claim is made between remote secret values and local operator
+credentials. The separate local storage check below confirmed the dedicated
+Blob resource; these resources remain unconnected through Marketplace.
 
-**[VERIFIED READY]** Deployment `dpl_3nvB93i9BqX1cM3Dbo7HcR4ELkgU` targets
-Preview at
-`https://wmkfresearchapps-67r7jdwr6-justin-gallivans-projects.vercel.app`,
-commit `56f08ed43`. Dedicated alias `wmkf-transcription-pilot.vercel.app`
-was created and now points to this refreshed deployment. The owner approved
-and the Entra app now registers the exact callback
-`https://wmkf-transcription-pilot.vercel.app/api/auth/callback/azure-ad`;
-readback confirmed the prior seven callback URIs were preserved. This fresh
-deployment includes the branch-only `NEXTAUTH_URL`; its live
-`/api/auth/providers` returns HTTP 200 with the exact registered callback.
-A bounded unauthenticated check
-received HTTP 307 to `/auth/signin` for both `/api/admin/transcription-pilot/jobs`
-and `/admin/transcription-pilot`; this confirms the auth gate only, not staff
-sign-in or disabled-flag/runtime secret correctness. The stable Preview alias
-remains assigned to another branch and was not moved. No staff sign-in was attempted.
-No AssemblyAI key was provisioned, and no
-provider call or upload occurred. No shared database setting/schema was
-changed.
+**[VERIFIED READY; disabled runtime preflight and empty drain passed]**
+Deployment `dpl_DHaVt8QHTzLWo7gr7M6FhVJR344S` targets Preview at
+`https://wmkfresearchapps-62z9wnj9y-justin-gallivans-projects.vercel.app`,
+source commit `78a3d5595e7045680f28eaf00bd0b462c53c73df`, branch
+`codex/transcription-pilot`, Node 22.x. All 13 variables were explicitly
+supplied as runtime and build overrides; the dry package excluded `.env.local`
+and `.env.transcription-preview.local`. The protected `?preflight=1` request
+returned HTTP 200 and all ten checks passed, including Preview target, both
+disabled flags, dedicated database and Blob store, safe Dataverse controls,
+auth origin, required application-secret presence, read-only database access,
+expected database, and zero jobs. A normal protected drain then returned
+HTTP 200 with all result counts zero. No AssemblyAI call/upload occurred.
+The dedicated alias now points to this deployment; an authenticated preflight
+through the alias also returned HTTP 200 with all ten checks passing. Its
+`/api/auth/providers` response returns HTTP 200 and the exact registered
+Microsoft callback. Refreshed staff sign-in remains untested.
+
+An earlier deployment returned `503 cron_secret_missing` before worker
+execution. Vercel CLI Git metadata was not sufficient evidence that
+branch-scoped records were applied; the precise cause of the missing runtime
+secret was not independently established. Its behavior is inconclusive about isolated database
+binding. An earlier sign-in screenshot likewise cannot prove which database
+that deployment used; no shared-database mutation has been established. The
+dedicated Microsoft callback is registered with prior redirect URIs preserved.
+Environment/deployment operations made no shared database setting/schema
+changes; the earlier sign-in screenshot's database target is unknown, and no
+shared-database mutation was established.
+
+**[VERIFIED 2026-10-01; provider-free isolated storage check]**
+`node scripts/check-transcription-preview-storage.js
+--confirm-private-blob-roundtrip` exited 0 against the dedicated operator
+credentials. The isolated database had zero transcription jobs; a synthetic
+AAC fixture (16,863 bytes, 3.065034 seconds) completed private Blob put/read,
+hash/media checks, and exact-path deletion verification. No provider was
+called. This proves the local parser and Blob SDK path, not deployed media
+runtime behavior or remote secret-value equality.
 
 Automatic Git deployment is disabled only for `codex/transcription-pilot`
 in `vercel.json`. The first branch push was checked for no automatic deployment
@@ -197,12 +218,14 @@ are cleared; the READY deployment is not pilot-use approval.
    owner-scoped job create/list/read/start/download/evaluation/delete/reconcile/
    abandon/export, authenticated AssemblyAI callback, and cron drain. Use the
    canonical matrix for final per-route security facts.
-5. Confirm the target deployment can execute the scheduled drain and receive
-   the AssemblyAI callback over HTTPS without weakening deployment protection.
+5. Confirm the target deployment can execute the drain and receive the
+   AssemblyAI callback over HTTPS without weakening deployment protection.
    Source registers a one-minute cron, a 300-second route maximum, a
-   240-second internal budget, and seven-minute leases. **No deployed
-   scheduler/callback reachability check has been run on the READY Preview
-   candidate.**
+   240-second internal budget, and seven-minute leases. Vercel scheduled Cron
+   runs only in Production, not Preview; Preview cleanup/recovery requires an
+   explicitly authorized manual operator invocation or another reviewed
+   scheduler ([Vercel Cron troubleshooting](https://vercel.com/kb/guide/troubleshooting-vercel-cron-jobs)). The disabled Preview preflight and empty drain passed, but no
+   ongoing schedule, callback-delivery, or real-media runtime proof exists.
 
 ## Environment and secret checklist
 
@@ -258,10 +281,10 @@ secret-entry process; this runbook does not replace its registry.
   dependency tree in route output tracing. The implementation checkpoint
   verifies `npm run build` passed and generated route NFT includes those
   dependencies. Root also executed the built worker asset successfully against
-  synthetic M4A locally. This does not prove deployed Node compatibility, a 50 MiB
-  parse/upload in the target Function, peak memory under maximum-size stress,
-  or timeout runway. No separate maximum-size or deployment-runtime test has
-  been run. No audio malware scan is claimed.
+  synthetic M4A locally. Local worker tests also cover near-cap memory
+  regression behavior; this does not prove a 50 MiB parse/upload in the target
+  Function, deployed peak memory, or maximum-size timeout runway. The deployed
+  media runtime has not been exercised. No audio malware scan is claimed.
 - **Build/test evidence:** root's integrated pass verified eleven suites and
   111 tests, including 13 isolated local Postgres regressions; all 67 repository
   `check:*` scripts passed sequentially. The API matrix covers 251 routes with
