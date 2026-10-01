@@ -2,15 +2,29 @@
 title: Refactor Candidates Survey — 2026-09-30
 domain: architecture
 kind: plan
-status: proposed
-summary: Evidence-ranked, behavior-preserving refactor candidates at cd177c471, with active-work exclusions, graph limitations, and separate bug leads.
+status: historical
+summary: Historical refactor survey at cd177c471; C1–C4 are merged and C5 is implemented and reviewed, awaiting promotion. Current disposition is recorded separately from the original rankings.
 canonical: false
 owner: product-engineering
 ---
 
 # Refactor candidates survey — 2026-09-30
 
-## Scope and recommendation
+## Current disposition — 2026-10-01
+
+[VERIFIED via GitHub PR state and merge commits] C1–C4 are merged. C5 is the final eligible candidate and is implemented and reviewed on `codex/c5-probe-bootstrap` under explicit owner authorization. This supersedes the original do-later priority; it does not authorize any excluded cleanup or separate bug lead.
+
+| Candidate | Current disposition | Evidence |
+|---|---|---|
+| C1 — Roster projection | Merged | [PR 386](https://github.com/justingallivan/wmkf-research-apps/pull/386), `855d00dce` |
+| C2 — Roster orchestration | Merged | [PR 387](https://github.com/justingallivan/wmkf-research-apps/pull/387), `6610aa176` |
+| C3 — Review-document canonicalization | Merged | [PR 388](https://github.com/justingallivan/wmkf-research-apps/pull/388), `a1b3daa4f` |
+| C4 — Executable tests | Merged | [PR 385](https://github.com/justingallivan/wmkf-research-apps/pull/385), `a07c3ddf3` |
+| C5 — Read-only probe bootstrap | Implemented and reviewed; not merged | [Implementation evidence](READ_ONLY_PROBE_BOOTSTRAP_EXTRACTION_PLAN_2026-10-01.md) |
+
+## Historical survey — original scope and recommendation
+
+Everything below records the original 2026-09-30 baseline, estimates and recommendations. It is retained as historical evidence, not as the current task queue; use the disposition above for completion status. Blocked/excluded surfaces and bug leads require a fresh scope and evidence review before any work.
 
 [VERIFIED via `git rev-parse HEAD`, `git rev-parse --abbrev-ref HEAD`, and `pwd`] Survey base: `cd177c471e9c9c6fd8a725c9765cbe31b5f6c2f3`, branch `codex/refactor-survey`, directory `/Users/gallivan/Code/WMKF_Apps-refactor`. Fetch succeeded; no pull or merge changed this base. This deliverable is one plan document; no implementation or release is authorized by it.
 
