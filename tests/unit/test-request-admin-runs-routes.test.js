@@ -7,6 +7,7 @@ jest.mock('../../lib/dataverse/core/context', () => ({ withDalContext: jest.fn((
 jest.mock('../../lib/services/test-requests/admin-run-service', () => ({ createAdminRunService: jest.fn() }));
 
 import { requireSuperuser, getSession } from '../../lib/utils/auth';
+import { withDalContext } from '../../lib/dataverse/core/context';
 import { createAdminRunService } from '../../lib/services/test-requests/admin-run-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import sourceHandler, { config as sourceConfig } from '../../pages/api/admin/test-requests/runs/source';
@@ -111,6 +112,8 @@ describe.each(CASES)('$name', (c) => {
     expect(service[c.fn]).toHaveBeenCalledTimes(1);
     expect(service[c.fn].mock.calls[0][0].profileId).toBe(PROFILE);
     expect(res.statusCode).toBe(c.name === 'runs POST' ? 201 : 200);
+    expect(withDalContext).toHaveBeenCalledTimes(1);
+    expect(withDalContext).toHaveBeenCalledWith(expect.stringMatching(/^admin-test-request-runs-[a-z]+$/), expect.any(Function));
   });
 
   test.each([
@@ -136,7 +139,7 @@ describe.each(CASES)('$name', (c) => {
   });
 
   if (c.perRun) {
-    test.each([['not-a-guid'], [undefined], [['a', 'b']], [`${RUN_ID} `.repeat(2)]])('a malformed runId (%p) is 400 and the service is not called', async (bad) => {
+    test.each([['not-a-guid'], [undefined], [['a', 'b']], [`${RUN_ID} `.repeat(2)], [` ${RUN_ID}`], [`${RUN_ID}\n`]])('a malformed runId (%p) is 400 and the service is not called', async (bad) => {
       const res = mockRes();
       await c.handler({ ...c.req(), query: { runId: bad } }, res);
       expect(res.statusCode).toBe(400);
@@ -204,6 +207,7 @@ describe('runs POST (Confirm)', () => {
 
   test.each([
     ['unknown key (profileId)', { ...CONFIRM_BODY, profileId: 99 }],
+    ['draftId padded with whitespace', { ...CONFIRM_BODY, draftId: ` ${DRAFT_ID}` }],
     ['an actorEmail key', { ...CONFIRM_BODY, actorEmail: 'evil@example.com' }],
     ['an email key', { ...CONFIRM_BODY, email: 'evil@example.com' }],
     ...Object.keys(CONFIRM_BODY).map((key) => [`missing ${key}`, Object.fromEntries(Object.entries(CONFIRM_BODY).filter(([k]) => k !== key))]),
@@ -288,6 +292,14 @@ describe('deadlines and limits', () => {
     for (const config of [runsConfig, runConfig, recheckConfig, artifactsConfig]) {
       expect(config.maxDuration).toBeUndefined();
     }
+  });
+});
+
+describe('advance', () => {
+  test('sends Cache-Control: no-store (the body can carry a failed step\'s error text)', async () => {
+    const res = mockRes();
+    await advanceHandler({ method: 'POST', query: { runId: RUN_ID } }, res);
+    expect(res.headers['Cache-Control']).toBe('no-store');
   });
 });
 

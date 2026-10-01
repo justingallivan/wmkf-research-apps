@@ -10,10 +10,9 @@
 import { withDalContext } from '../../../../../lib/dataverse/core/context';
 import { createAdminRunService } from '../../../../../lib/services/test-requests/admin-run-service';
 import {
-  hasOnlyKeys, invalidInput, isIdempotencyKey, isOptionalCycleField, isRequestNumber, isTestLabel, sendError,
+  hasOnlyKeys, invalidInput, isExactGuid, isIdempotencyKey, isOptionalCycleField, isRequestNumber, isTestLabel, sendError,
 } from '../../../../../lib/services/test-requests/admin-run-route-helpers';
 import { getSession, requireSuperuser } from '../../../../../lib/utils/auth';
-import { isGuid } from '../../../../../lib/utils/guid';
 
 const REQUIRED_POST_KEYS = Object.freeze(['draftId', 'idempotencyKey', 'confirmSourceRequestNumber', 'testLabel']);
 const OPTIONAL_POST_KEYS = Object.freeze(['fiscalYear', 'meetingDate']);
@@ -42,7 +41,7 @@ export default async function handler(req, res) {
 
   const body = req.body;
   if (!hasOnlyKeys(body, REQUIRED_POST_KEYS, OPTIONAL_POST_KEYS)
-      || !isGuid(body.draftId)
+      || !isExactGuid(body.draftId)
       || !isIdempotencyKey(body.idempotencyKey)
       || !isRequestNumber(body.confirmSourceRequestNumber)
       || !isTestLabel(body.testLabel)

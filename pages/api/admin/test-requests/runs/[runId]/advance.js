@@ -1,7 +1,9 @@
 /**
  * Admin Test Request Factory: advance one run by one step (POST, no body).
  * Behind TEST_REQUEST_FACTORY_FORM (enforced by the service). The service
- * refuses to start a step with under 150 s of the 300 s limit left.
+ * starts a step only within the first 130 s of the 300 s limit (150 s before
+ * the route deadline). A failed step's error text is returned to the caller
+ * (never stored), so the response is not cacheable.
  */
 
 import { withDalContext } from '../../../../../../lib/dataverse/core/context';
@@ -35,6 +37,7 @@ export default async function handler(req, res) {
         runId,
         deadlineAt: routeDeadline(MAX_DURATION_SECONDS),
       });
+      res.setHeader('Cache-Control', 'no-store');
       return res.status(200).json(body);
     } catch (error) {
       return sendError(res, error);
