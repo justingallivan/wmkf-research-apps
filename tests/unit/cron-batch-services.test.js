@@ -125,6 +125,42 @@ describe('runGranteeTitleGeneration', () => {
     expect(summary).toMatchObject({ skippedNoSource: 1, generated: 1 });
     expect(summary.failures).toEqual([{ requestNum: '1001', reason: 'missing/short title or abstract' }]);
   });
+
+  it('passes one fixed 40-second absolute deadline to each generation call', async () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      grantRequestAdapter.queryAllRequests.mockResolvedValue({ records: [titleRow(1)], totalCount: 1 });
+      await runGranteeTitleGeneration(args);
+      expect(require('../../lib/services/grantee-title-service').generateGranteeTitle).toHaveBeenCalledWith({
+        sourceTitle: 'T1',
+        sourceAbstract: 'x'.repeat(120),
+        runSource: 'PowerAutomate Auto',
+        deadlineMs: 41_000,
+      });
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('returns failed at the row timeout and never writes if generation resolves late', async () => {
+    jest.useFakeTimers();
+    let releaseGeneration;
+    const generation = new Promise((resolve) => { releaseGeneration = resolve; });
+    require('../../lib/services/grantee-title-service').generateGranteeTitle.mockReturnValueOnce(generation);
+    grantRequestAdapter.queryAllRequests.mockResolvedValue({ records: [titleRow(1)], totalCount: 1 });
+    try {
+      const pending = runGranteeTitleGeneration(args);
+      await jest.advanceTimersByTimeAsync(40_000);
+      const summary = await pending;
+      expect(summary).toMatchObject({ failed: 1, generated: 0 });
+      releaseGeneration({ editedTitle: 'To do science after timeout' });
+      await Promise.resolve();
+      expect(grantRequestAdapter.getById).not.toHaveBeenCalled();
+      expect(grantRequestAdapter.updateById).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });
 
 describe('runGranteeDeliverableReminders', () => {
