@@ -1,0 +1,197 @@
+{
+  "pr": 369,
+  "ownerAuthorization": "Let's merge",
+  "candidate": "09b00d7c130931cb5b7922a49dc047a2b0b36372",
+  "mergedAt": "2026-09-30T22:23:03Z",
+  "mergeCommit": "a18882a0b7e7192f4197db76a57362bf06c589b8",
+  "premerge": {
+    "observedAt": "2026-09-30T22:22:54.048Z",
+    "project": "wmkf_research_apps",
+    "scope": "justin-gallivans-projects",
+    "pr": 369,
+    "candidate": "09b00d7c130931cb5b7922a49dc047a2b0b36372",
+    "lastReadyProduction": {
+      "deploymentId": "dpl_HSLQZ6jvdtpJyhSz4L7fxmMBCmkA",
+      "url": "https://wmkfresearchapps-og127m40f-justin-gallivans-projects.vercel.app",
+      "state": "READY",
+      "sourceCommit": "cd177c471e9c9c6fd8a725c9765cbe31b5f6c2f3",
+      "aliases": [
+        "reviews.wmkeck.org",
+        "grantees.wmkeck.org",
+        "submissions.wmkeck.org",
+        "applications.wmkeck.org",
+        "wmkfresearch.vercel.app",
+        "wmkfresearchapps-justin-gallivans-projects.vercel.app",
+        "wmkfresearchapps-git-main-justin-gallivans-projects.vercel.app"
+      ]
+    },
+    "productionConfiguration": {
+      "TEST_REQUEST_ISOLATION": "on",
+      "SYNTHETIC_REVIEWER_ISOLATION": "on"
+    },
+    "secretTemporaryFileDeleted": true
+  },
+  "deployment": {
+    "observedAt": "2026-09-30T22:24:00.506Z",
+    "deploymentId": "dpl_9dLJN7TZ6nDU234PCNYwMKTf9Va5",
+    "url": "https://wmkfresearchapps-f59dhlk5o-justin-gallivans-projects.vercel.app",
+    "state": "READY",
+    "target": "production",
+    "aliases": [
+      "reviews.wmkeck.org",
+      "grantees.wmkeck.org",
+      "submissions.wmkeck.org",
+      "applications.wmkeck.org",
+      "wmkfresearch.vercel.app",
+      "wmkfresearchapps-justin-gallivans-projects.vercel.app",
+      "wmkfresearchapps-git-main-justin-gallivans-projects.vercel.app"
+    ],
+    "buildSkipped": null
+  },
+  "deployedSwitchReadback": {
+    "observedAt": "2026-09-30T22:24:50.045Z",
+    "deploymentId": "dpl_9dLJN7TZ6nDU234PCNYwMKTf9Va5",
+    "capturedSwitchesVerified": false,
+    "secretTemporaryFileDeleted": true,
+    "capturedSwitches": {
+      "TEST_REQUEST_ISOLATION": "unknown",
+      "SYNTHETIC_REVIEWER_ISOLATION": "unknown"
+    },
+    "limitation": "Deployment-specific env pull unavailable"
+  },
+  "httpSmoke": {
+    "observedAt": "2026-09-30T22:24:49.136Z",
+    "authenticated": false,
+    "results": [
+      {
+        "url": "https://applications.wmkeck.org",
+        "status": 307,
+        "location": "/auth/signin"
+      },
+      {
+        "url": "https://applications.wmkeck.org/api/health",
+        "status": 307,
+        "location": "/auth/signin"
+      }
+    ]
+  },
+  "browserSmoke": {
+    "result": "Signed-in staff home and Workbench request list rendered",
+    "signedInSmokePerformed": true,
+    "url": "https://applications.wmkeck.org/workbench?cycleCode=D26",
+    "criticalPath": "Read-only request list",
+    "requestCountShown": 10,
+    "recordMutationPerformed": false
+  },
+  "candidateRuntimeMatchesMerge": true,
+  "ciAtMergedCandidate": [
+    {
+      "name": "claude-review",
+      "result": "SUCCESS"
+    },
+    {
+      "name": "claude-review",
+      "result": "SUCCESS"
+    },
+    {
+      "name": "Analyze (actions)",
+      "result": "SUCCESS"
+    },
+    {
+      "name": "Trivy CVE Scan",
+      "result": "SUCCESS"
+    },
+    {
+      "name": "Gitleaks",
+      "result": "SUCCESS"
+    },
+    {
+      "name": "Static Analysis (Semgrep)",
+      "result": "SUCCESS"
+    },
+    {
+      "name": "Jest",
+      "result": "SUCCESS"
+    },
+    {
+      "name": "Analyze (javascript-typescript)",
+      "result": "SUCCESS"
+    },
+    {
+      "name": "Analyze (python)",
+      "result": "SUCCESS"
+    },
+    {
+      "name": "Run ledger (PostgreSQL 16)",
+      "result": "SUCCESS"
+    },
+    {
+      "name": "CodeQL",
+      "result": "SUCCESS"
+    },
+    {
+      "name": "Vercel",
+      "result": "SUCCESS"
+    },
+    {
+      "name": "Vercel Preview Comments",
+      "result": "SUCCESS"
+    }
+  ],
+  "liveJobDrainRun": false,
+  "jobResumptionVerified": false,
+  "migrationAppliedByAgent": false,
+  "slotPatchRun": false,
+  "ledgerOperationRun": false,
+  "postmergeCi": {
+    "observedAt": "2026-09-30T22:37:40.084526+00:00",
+    "checks": [
+      {
+        "conclusion": "success",
+        "name": "Analyze (actions)",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Jest",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Analyze (python)",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Run ledger (PostgreSQL 16)",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Analyze (javascript-typescript)",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Playwright",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Trivy CVE Scan",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Gitleaks",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Static Analysis (Semgrep)",
+        "status": "completed"
+      }
+    ]
+  },
+  "stopMilestoneLog": "DEVELOPMENT_LOG.md: Factory reviewer B4 runtime promoted (Session 558-B4)"
+}

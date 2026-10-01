@@ -47,6 +47,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 **Why it matters:** The Factory can be run safely from either Mac against one durable ledger, and the runner refuses to write to a ledger whose shape it cannot prove; scheduled emails can no longer be double-sent or silently lost on an uncertain Dynamics response.
 **Pointers:** `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`; `docs/plans/briefs/FACTORY_LEDGER_SNAPSHOT_BRIEF_2026-09-30.md`; `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`; PRs #373, #374, #378.
 
+## September 2026 — Factory reviewer B4 runtime promoted (Session 558-B4)
+
+**Milestone:** Marked synthetic reviewers can use the Request reviewer workflow under exact binding and recipient guards; switch-off binds fail closed and all acceptance jobs pause.
+**Sessions:** B4 implementation and OAuth Opus review, inactive ordinary slot repair, 2026-09-30 owner-directed promotion and stop.
+**Ship state:**
+- PR #369 merged as `a18882a0b7`; Production `dpl_9dLJN7TZ6nDU234PCNYwMKTf9Va5` Ready. All candidate and post-merge CI checks passed; signed-in staff home/Workbench-list smoke passed.
+- Production configuration read on/on before merge. Captured runtime switch values and live job resumption remain unverified.
+- Migration 058/V57 and the one-write slot runner shipped as source; no agent migration or slot PATCH ran. Local ledger restore/schema/digest evidence and Local literal-on checks remain pending; owner explicitly chose deployment with those checks outstanding.
+**Why it matters:** Staff reviewer workflows now admit the synthetic cast only for its verified marked Request, while ordinary inactive applicant slots remain visible for repair.
+**Pointers:** `40ab24f3e`; PR #369; `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`; `docs/plans/evidence/test-request-factory/b4-production-promotion-2026-09-30.md` (evidence limits and rollback).
+
 ## September 2026 — Staff site-visit video released in Production (parallel Codex session during 553)
 
 **Milestone:** Staff can add a Zoom recording link or upload an MP4 after a Site Visit in Meeting Tracker, then watch the current recording from Staff Deliberations; a separate 60-day materials-only link is available for Board sharing.
