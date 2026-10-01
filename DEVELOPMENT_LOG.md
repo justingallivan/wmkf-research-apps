@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Scheduled-email Liaison re-check live; Factory ledger on Neon; app Postgres rotated (Session 559)
+
+**Milestone:** Queued grantee materials reminders now re-check the institution's current Liaison and the PD's review posture before sending (scheduled-email Part B). The Factory's operational data now lives in the managed Neon ledger, and the app Postgres password was rotated.
+**Sessions:** 559 (Claude, home Mac, 2026-09-30 evening PT / 2026-10-01 UTC), with Codex adversarial review in two rounds and an owner-authorized Claude in Chrome rehearsal.
+**Ship state:**
+- PR #384 (`3b5002d95`, Production Ready): lease/version-fenced re-address or approval hold before any Dynamics activity. Send-now with a changed Liaison returns 409 "Recipients changed…". Live-Postgres 28/28; browser rehearsal on a Neon branch with request 1003220.
+- Both home-Mac ledgers loaded data-only into `managed-ledger/ledger_prod` and `managed-ledger/ledger` (counts match; `check:factory-ledger` green); migration 058 applied to the Production app DB, which cleared the active `migration_drift` alert.
+- PR #382 (`186052034`) and PR #383 (`f00e2259c`) closed integrity review findings 6 (SerpApi empty-result signal) and 9 (repeated reads).
+- `neondb_owner` rotated after an accidental transcript print; the Neon integration re-synced Vercel; the owner chose to leave the variables readable (option A) while Preview acceptance uses the shared DB.
+**Why it matters:** A reminder can no longer Cc a former Liaison or skip an approval the PD now requires; both Macs share one durable Factory ledger.
+**Pointers:** `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`; `docs/plans/evidence/test-request-factory/ledger-snapshot-2026-09-30.md`; `docs/CREDENTIALS_RUNBOOK.md` (Postgres rotation); PRs #382–#384.
+
 ## September 2026 — DOCX and VTT transcript upload incident resolved (Session 558)
 
 **Milestone:** Site Visit transcript uploads now tolerate characterized SharePoint DOCX metadata promotion and nonempty private Blob streams without an uncompressed Content-Length.

@@ -22,7 +22,7 @@
 - Production data access: feedback-never-self-authorize-prod-dataverse-reads.md
 - Production smoke residue / cleanup scope: project-test-residue-cleanup-is-for-data-mining.md
 - Sandbox rehearsal --bypass-goverify per-machine allow rule: project-sandbox-rehearsal-bypass-allow-rule.md
-- Local containers / ledger Postgres: project-local-docker-is-colima.md
+- Local containers / ledger Postgres / URL hazards: project-local-docker-is-colima.md; feedback-postgres-url-handling-hazards.md
 - Factory ledger location / owner-run durable state: feedback-operational-state-must-be-reachable-from-every-workstation.md; ../docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md
 
 ## Working Norms
