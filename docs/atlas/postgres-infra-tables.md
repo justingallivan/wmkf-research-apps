@@ -496,7 +496,7 @@ as single interface, and PD onboarding as a rollout precondition (no
 unconfigured runtime state; the legacy direct claim-before-send path is
 deleted).
 
-### `scheduled_email_vip_flags` — MIGRATION 036 APPLIED 2026-08-26; CODE NOT DEPLOYED
+### `scheduled_email_vip_flags` — MIGRATION 036 APPLIED 2026-08-26; CODE DEPLOYED
 
 **Source of truth:** Postgres. Per-(PD, contact) VIP review flags
 (`pd_systemuser_id`, `contact_id`, `created_at`; primary key on the pair).
@@ -508,9 +508,9 @@ reminders cron to set `approval_required` at ledger-row creation (re-checked at
 send time by Part B, tightening only); any flagged recipient contact (PI or
 liaison) requires approval. **[VERIFIED
 2026-08-26 via migration 036 and scheduled-email-store.js on branch
-`codex/scheduled-email-review-p0`; LIVE-PROBED 2026-08-26: table exists in the shared Neon database, empty until the branch deploys.]**
+`codex/scheduled-email-review-p0`; LIVE-PROBED 2026-08-26: table exists in the shared Neon database, empty at probe time; the code deployed the same day (`4a743d63a`).]**
 
-### `scheduled_email_digest_runs` — MIGRATION 036 APPLIED 2026-08-26; CODE NOT DEPLOYED
+### `scheduled_email_digest_runs` — MIGRATION 036 APPLIED 2026-08-26; CODE DEPLOYED
 
 **Source of truth:** Postgres. Per-(PD, UTC day) digest run ledger added
 2026-08-26 after the branch adversarial review. The primary key
@@ -527,7 +527,7 @@ consumed by `sendScheduledEmailDigest`. **Retention:** deliberately
 unbounded — ≤6 PDs × ≤366 rows/PD/year; revisit only if PD count grows
 materially. **[VERIFIED 2026-08-26 via migration 036,
 scheduled-email-store.js, and the digest tests in
-tests/unit/scheduled-email-service.test.js; LIVE-PROBED 2026-08-26: table exists in the shared Neon database, empty until the branch deploys.]**
+tests/unit/scheduled-email-service.test.js; LIVE-PROBED 2026-08-26: table exists in the shared Neon database, empty at probe time; the code deployed the same day (`4a743d63a`).]**
 
 ### `scheduled_email_reviewer_vip_flags` — SOURCE-BUILT (branch); MIGRATION 037 APPLIED
 
