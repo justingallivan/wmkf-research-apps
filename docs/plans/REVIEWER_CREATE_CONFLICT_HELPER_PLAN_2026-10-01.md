@@ -1,6 +1,6 @@
 ---
 title: Reviewer suggestion create-conflict predicate extraction
-status: planned
+status: implemented
 domain: architecture
 kind: plan
 summary: Extract the identical applicant and staff-manual create-conflict predicates without changing recovery behavior.
@@ -10,11 +10,11 @@ owner: product-engineering
 
 # Reviewer suggestion create-conflict predicate extraction
 
-[PLANNED] Root plan → ordinary Fable OAuth review → Luna implementation and validation → Sol and root review → Fable adversarial review. Bound iterations to substantive findings. PR #390 remains on hold. No merge or production deployment is authorized by this plan.
+[VERIFIED via review records below] Root planned with ordinary Fable OAuth review; Luna implemented; Sol, root, and Fable approved the implementation. Full tests, build, and runtime-related gates passed; documentation gates are the final publication check. PR #390 remains on hold. No merge or production deployment is authorized by this plan.
 
 Base: `6b9478d442b3100b0f80434e8ea8a3368ed90367`; branch: `codex/reviewer-create-conflict-helper`.
 
-## Surface and evidence
+## Pre-change surface and evidence
 
 [VERIFIED via source] `lib/dataverse/adapters/reviewer-suggestion.js` contains identical predicates in `ensureApplicantRecommended` and `ensureStaffManualCandidate`: numeric status 412 OR numeric status 409 OR case-insensitive message match for `duplicate|already exists|matching key values|alternate key`. This is existing behavior, not a confirmed defect. Message matches can recover regardless of status. String statuses alone do not match.
 
@@ -26,7 +26,7 @@ Base: `6b9478d442b3100b0f80434e8ea8a3368ed90367`; branch: `codex/reviewer-create
 
 ## Implementation and invariants
 
-[PLANNED] Add one private synchronous predicate, `isSuggestionCreateConflict`, in the same adapter. Move the exact existing expression into it without changing short-circuit order, optional access, fallback, regex, or coercion. Replace only the two identical checks with calls. The helper performs no I/O, has no recovery logic, and is not exported. Keep the recovery blocks and all other predicates untouched. Leave the existing applicant catch rationale comment in place, without moving or rewriting it. A short comment should identify its two scoped create paths; avoid describing it as a universal Dataverse classifier.
+[VERIFIED via implementation `850fa8895`] Added one private synchronous predicate, `isSuggestionCreateConflict`, in the same adapter. Moved the exact existing expression into it without changing short-circuit order, optional access, fallback, regex, or coercion. Replaced only the two identical checks with calls. The helper performs no I/O, has no recovery logic, and is not exported. The recovery blocks, all other predicates, and applicant rationale comment remain untouched. A short comment identifies its two scoped create paths.
 
 | Invariant | Verification |
 |---|---|
@@ -36,14 +36,14 @@ Base: `6b9478d442b3100b0f80434e8ea8a3368ed90367`; branch: `codex/reviewer-create
 | Recovery remains path-specific | Existing and minimal additional caller tests cover excluded winners; applicant selection/provenance and ETag preservation; staff applicant provenance and ordinary winner behavior |
 | Neighboring contracts remain separate | Diff inspection proves general upsert, potential-reviewer and PATCH-412 retry logic unchanged; existing sibling tests remain green |
 
-[PLANNED] Reuse existing adapter test fixtures. Do not export the helper or create a generic classifier framework for tests. Run new characterization tests against the original implementation before extraction; they should pass because behavior is intentionally unchanged. Existing tests may satisfy recovery invariants; add only gaps. No production probes or live Dataverse mutations.
+[VERIFIED via implementation/tests and Luna run logs] Existing fixtures support 35 added caller-level cases. The pre-extraction characterization run passed two suites / 247 tests; the final focused run passed four suites / 275 tests. No production probes or live Dataverse mutations.
 
 [PLANNED] Luna runs focused adapter/caller baseline and regressions, then types, lint, canonical build, full Jest once stable, and relevant available gates/self-tests serially: Dataverse access layer, Dynamics context boundary, route/service boundary, API routes, Atlas, secret scan, doc currency, doc symbol refs, build claim freshness, docs catalog. Discover exact scripts from package.json; do not parallelize a gate with its self-test or fixture battery. Root and Sol inspect the complete diff. Fable reviews the plan and final diff through ordinary OAuth CLI, with API-key variables removed.
 
 ## Contract reconciliation and release
 
-[PLANNED] Whole-flow audit is limited to unchanged adapter callers and their existing result contracts. Partial-success and async behavior are unchanged: this helper adds no await or batch accounting. Helper-extraction audit explicitly preserves differing sibling semantics. Durable-surface and symbol-consumer audits are N/A: no new persisted field, enum, or status. Documentation reconciliation is limited to this plan; no catalog entry is needed for a private local predicate. Held assessment PR #390 remains untouched.
+[VERIFIED via source, diff, and reviews] Whole-flow audit is limited to unchanged adapter callers and their existing result contracts. Partial-success and async behavior are unchanged: this helper adds no await or batch accounting. Helper-extraction audit explicitly preserves differing sibling semantics. Durable-surface and symbol-consumer audits are N/A: no new persisted field, enum, or status. Documentation reconciliation is limited to this plan; no catalog entry is needed for a private local predicate. Held assessment PR #390 remains untouched.
 
 [PLANNED] Conservative Tier 2 due to proximity to Dataverse writes. Use synthetic isolated fixtures, a reviewed branch and PR; promotion is a later explicit owner decision. Rollback is a source revert with no data repair. Residual risk is accidental classification drift, addressed by caller-level characterization and the tiny runtime diff. No production correctness improvement or incidence reduction is claimed.
 
-Review record: Fable plan session `baa46a60-292f-491a-a2a6-7d25a70437c2` APPROVED WITH NAMED CHANGES, incorporated above: distinguish the additional recovery lookup from the initial lookup and keep the applicant rationale comment in place. [VERIFIED via Luna baseline] Four adapter/caller suites pass, 240 tests. Implementation and final validation pending.
+Review record: Fable plan session `baa46a60-292f-491a-a2a6-7d25a70437c2` APPROVED WITH NAMED CHANGES, incorporated above: distinguish the additional recovery lookup from the initial lookup and keep the applicant rationale comment in place. [VERIFIED via Luna baseline] Four adapter/caller suites pass, 240 tests. Implementation `850fa88957b2479033284392d98be533c3b4b1a6` approved by Sol and root. Fable final session `376ce7d3-e825-414d-b990-58fef8cb4089` APPROVED with no required changes. Type check, lint (0 errors / 124 warnings, none in changed files), and canonical build passed. Full Jest passed: 1,196 suites / 18,958 tests / 5 snapshots; 6 suites / 98 tests skipped. Dataverse access layer, Dynamics context boundary, route/service boundary, API routes, Atlas, and secret-scan gates and their self-tests passed serially. Documentation gates are the final publication check; their result is recorded in the PR validation report. [VERIFIED via fetched-main diff and merge-tree] The intervening main commit changes only documentation, with no merge conflict. No merge or deployment is claimed.
