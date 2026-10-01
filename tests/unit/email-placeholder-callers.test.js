@@ -58,13 +58,13 @@ test('respond-by and review-due builders substitute their bodies while renderers
 
 test('thank-you body strips only the legacy marker and maps both subject aliases', () => {
   const rendered = renderThankYou({
-    subjectTemplate: 'Thank you — {{proposalTitle}} / [proposal title]',
+    subjectTemplate: 'Thank you — {{proposalTitle}} / [proposal title] / {{reviewerName}}',
     bodyTemplate: 'Automatically sent on behalf of:\n{{greeting}}\n{{proposalTitle}} / {{honorariumNote}}\n{{signature}}',
     reviewerName: 'Karl Deisseroth',
     title: 'Graphene',
     signatureBlock: SIGNATURE,
   });
-  expect(rendered.subject).toBe('Thank you — Graphene / Graphene');
+  expect(rendered.subject).toBe('Thank you — Graphene / Graphene / {{reviewerName}}');
   expect(rendered.html).toContain('Dear Dr. Deisseroth');
   expect(rendered.html).toContain('Graphene /');
   expect(rendered.html).toContain('Best,<br>Jordan Lee');
@@ -75,12 +75,13 @@ test('thank-you body strips only the legacy marker and maps both subject aliases
 test('withdrawal substitutes its body and preserves the configured subject literally', () => {
   const rendered = renderWithdrawSufficient({
     subjectTemplate: 'Released {{reviewerName}}',
-    bodyTemplate: '{{greeting}}, {{reviewerName}} — {{proposalClause}}\n{{signature}}',
+    bodyTemplate: 'Automatically sent on behalf of:\n{{greeting}}, {{reviewerName}} — {{proposalClause}}\n{{signature}}',
     reviewerName: 'Karl Deisseroth',
     title: 'Graphene',
     signatureBlock: SIGNATURE,
   });
   expect(rendered.subject).toBe('Released {{reviewerName}}');
+  expect(rendered.html).toContain('Automatically sent on behalf of:');
   expect(rendered.html).toContain('Dear Dr. Deisseroth, Karl Deisseroth — the proposal “Graphene”');
   expect(rendered.html).toContain('Best,<br>Jordan Lee');
 });
@@ -130,6 +131,7 @@ test('acceptance maps subject and body tokens and supports both withdrawal URL p
   );
   expect(rendered.body).toContain('Dear Dr. Deisseroth, Karl Deisseroth — Graphene — Your review is due on September 9, 2026.');
   expect(rendered.body).toContain('https://example.org/review/withdraw?a=1&amp;b=2');
+  expect(rendered.body).not.toContain('If something changes before proposal materials are released');
 
   const appended = renderAcceptanceConfirmationEmail({
     ...base,
