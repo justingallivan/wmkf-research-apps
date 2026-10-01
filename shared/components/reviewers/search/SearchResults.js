@@ -65,6 +65,7 @@ export default function SearchResults({
   repairRequestsByCandidateKey,
   repairRequestsUnavailable,
   retryRosterLoad,
+  rosterLoadFailed,
   requestAddressRepair,
   reviewAddressConflict,
   retryAddressCheck,
@@ -122,7 +123,7 @@ export default function SearchResults({
             </div>
           )}
           {displayCandidates.length === 0 && rosterExcluded.length === 0 && rosterIneligible.length === 0 && rosterBlocked.length === 0 && unverifiedToShow.length === 0 ? (
-            <p className="text-sm text-gray-600">No candidates were found for this proposal.</p>
+            <p className="text-sm text-gray-600">{rosterNote ? 'No candidates are available to display.' : 'No candidates were found for this proposal.'}</p>
           ) : (
             <>
               {displayCandidates.length > 0 && (
@@ -248,7 +249,14 @@ export default function SearchResults({
                     >
                       {exporting ? 'Exporting…' : `Export ${selected.size > 0 ? selected.size : ''} to Excel`}
                     </button>
-                    <button type="button" onClick={runSearch} disabled={!blobUrl || busy || removingPrevious || !rosterLoaded} className="text-sm text-gray-500 underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed">Run another search</button>
+                    <button
+                      type="button"
+                      onClick={rosterLoadFailed ? retryRosterLoad : runSearch}
+                      disabled={rosterLoadFailed ? (busy || removingPrevious) : (!blobUrl || busy || removingPrevious || !rosterLoaded)}
+                      className="text-sm text-gray-500 underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
+                    >
+                      {rosterLoadFailed ? 'Retry reviewer state' : 'Run another search'}
+                    </button>
                   </div>
                   {exportError && (
                     <p className="text-sm text-amber-700">Export failed: {exportError}</p>
@@ -336,6 +344,16 @@ export default function SearchResults({
                 </details>
               )}
             </>
+          )}
+          {phase === 'results' && displayCandidates.length === 0 && (
+            <button
+              type="button"
+              onClick={rosterLoadFailed ? retryRosterLoad : runSearch}
+              disabled={rosterLoadFailed ? (busy || removingPrevious) : (!blobUrl || busy || removingPrevious || !rosterLoaded)}
+              className="text-sm text-gray-500 underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
+            >
+              {rosterLoadFailed ? 'Retry reviewer state' : 'Run another search'}
+            </button>
           )}
           {(phase === 'saving' || promotionNotice) && (
             <div

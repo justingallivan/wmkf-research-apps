@@ -226,9 +226,17 @@ describe('pre-extraction shell contract', () => {
       mockTrace.push(`institution:${candidate.name}`);
       return { valid: false, reason: 'no_token' };
     });
-    store.recordSurfaced.mockImplementationOnce(async (_requestId, candidates) => {
+    store.recordSurfaced.mockImplementationOnce(async (_requestId, candidates, options) => {
       mockTrace.push('store:record');
-      return candidates.length;
+      expect(options.includeOutcomes).toBe(true);
+      return {
+        recorded: candidates.length,
+        outcomes: candidates.map((candidate, inputIndex) => ({
+          inputIndex,
+          candidateKey: candidate.candidateKey,
+          status: 'recorded',
+        })),
+      };
     });
     const r = response();
     const pending = handler({ method: 'POST', body: { requestId: REQ, candidates: [
@@ -250,7 +258,14 @@ describe('pre-extraction shell contract', () => {
     expect(mockTrace.indexOf('institution:Alpha Analyst')).toBeLessThan(mockTrace.indexOf('store:record'));
     expect(mockTrace.indexOf('institution:Beta Analyst')).toBeLessThan(mockTrace.indexOf('store:record'));
     expect(r.statusCode).toBe(200);
-    expect(r.body).toEqual({ success: true, recorded: 2 });
+    expect(r.body).toEqual({
+      success: true,
+      recorded: 2,
+      outcomes: [
+        { inputIndex: 0, candidateKey: expect.any(String), status: 'recorded' },
+        { inputIndex: 1, candidateKey: expect.any(String), status: 'recorded' },
+      ],
+    });
   });
 
   it.each([

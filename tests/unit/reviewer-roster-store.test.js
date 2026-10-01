@@ -213,6 +213,38 @@ describe('removePreviousActiveSearchResults', () => {
 });
 
 describe('recordSurfaced', () => {
+  test('opt-in outcomes preserve every input index and distinguish invalid, unchanged, and failed rows', async () => {
+    const priorMeasurement = process.env.REVIEWER_INSTITUTION_MEASUREMENT;
+    process.env.REVIEWER_INSTITUTION_MEASUREMENT = 'off';
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      sql.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      sql.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+      sql.mockRejectedValueOnce(new Error('row write unavailable'));
+      sql.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // cap
+
+      await expect(store.recordSurfaced(REQ, [
+        { name: 'Ann Lee', candidateKey: 'candidate:ann' },
+        { name: '   ' },
+        { name: 'Casey Doe', candidateKey: 'candidate:casey' },
+        { name: 'Bob Roe', candidateKey: 'candidate:bob' },
+      ], { includeOutcomes: true })).resolves.toEqual({
+        recorded: 1,
+        outcomes: [
+          { inputIndex: 0, candidateKey: 'candidate:ann', status: 'recorded' },
+          { inputIndex: 1, candidateKey: null, status: 'invalid' },
+          { inputIndex: 2, candidateKey: 'candidate:casey', status: 'unchanged' },
+          { inputIndex: 3, candidateKey: 'candidate:bob', status: 'failed' },
+        ],
+      });
+      expect(errorLog).toHaveBeenCalledWith('reviewer-roster recordSurfaced row error:', 'row write unavailable');
+    } finally {
+      if (priorMeasurement === undefined) delete process.env.REVIEWER_INSTITUTION_MEASUREMENT;
+      else process.env.REVIEWER_INSTITUTION_MEASUREMENT = priorMeasurement;
+      errorLog.mockRestore();
+    }
+  });
+
   test('keeps a partial successful count when the active-cap DELETE fails', async () => {
     const priorMeasurement = process.env.REVIEWER_INSTITUTION_MEASUREMENT;
     process.env.REVIEWER_INSTITUTION_MEASUREMENT = 'off';

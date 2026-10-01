@@ -58,6 +58,7 @@ test('applicant-excluded collision moves the exact candidate into terminal read-
         excluded: [],
         ineligible: [],
         blocked: [],
+        handled: [],
         savedKeys: [],
         allNames: [blocked.name],
       }));
@@ -108,6 +109,7 @@ test('partial non-2xx response still graduates only the exact server-confirmed s
         excluded: [],
         ineligible: [],
         blocked: [],
+        handled: [],
         savedKeys: [],
         allNames: [saved.name, withheld.name],
       }));
@@ -165,6 +167,7 @@ test('a saved result removes only the indexed roster card when an unsubmitted ca
         excluded: [],
         ineligible: [],
         blocked: [],
+        handled: [],
         savedKeys: [],
         allNames: [primary.name, sibling.name],
       }));
@@ -215,6 +218,7 @@ test('an applicant-excluded result blocks only the indexed roster card when anot
         excluded: [],
         ineligible: [],
         blocked: [],
+        handled: [],
         savedKeys: [],
         allNames: [primary.name, sibling.name],
       }));
@@ -264,6 +268,7 @@ test('same-person different-address conflict exposes identity confirmation on th
         excluded: [],
         ineligible: [],
         blocked: [],
+        handled: [],
         savedKeys: [],
         allNames: [peter.name],
       }));
@@ -322,6 +327,7 @@ test('record-repair conflicts stay on the AkoyaGO retry remedy even when the ser
         excluded: [],
         ineligible: [],
         blocked: [],
+        handled: [],
         savedKeys: [],
         allNames: [reviewer.name],
       }));
@@ -392,6 +398,7 @@ test('a repair request created from the card confirms receipt without adding an 
         excluded: [],
         ineligible: [],
         blocked: [],
+        handled: [],
         savedKeys: [],
         allNames: [reviewer.name],
         repairRequests: [],
@@ -446,6 +453,7 @@ test('applicant promotion repair failure attaches the AkoyaGO retry remedy to th
         excluded: [],
         ineligible: [],
         blocked: [],
+        handled: [],
         savedKeys: [],
         allNames: [reviewer.name],
       }));
@@ -492,6 +500,7 @@ test('applicant promotion address-verification failure exposes the address remed
         excluded: [],
         ineligible: [],
         blocked: [],
+        handled: [],
         savedKeys: [],
         allNames: [reviewer.name],
       }));
@@ -534,6 +543,7 @@ test('plain website edits are durably acknowledged by the request roster before 
         excluded: [],
         ineligible: [],
         blocked: [],
+        handled: [],
         savedKeys: [],
         allNames: [reviewer.name],
       }));
@@ -634,6 +644,7 @@ test('verify contact sends every confirmation-bound field and promotes the serve
         excluded: [],
         ineligible: [],
         blocked: [],
+        handled: [],
         savedKeys: [],
         allNames: [reviewer.name],
       }));
@@ -701,6 +712,7 @@ test('stale promote conflict reloads server truth instead of restoring the revie
         excluded: [stale],
         ineligible: [],
         blocked: [],
+        handled: [],
         savedKeys: [],
         allNames: [stale.name],
       } : {
@@ -709,6 +721,7 @@ test('stale promote conflict reloads server truth instead of restoring the revie
         excluded: [],
         ineligible: [],
         blocked: [],
+        handled: [],
         savedKeys: [],
         allNames: [stale.name],
       }));
@@ -749,6 +762,7 @@ test('saved row with failed roster finalization stays successful and reloads the
         excluded: [],
         ineligible: [],
         blocked: [],
+        handled: [],
         savedKeys: [],
         allNames: [saved.name],
       }));
@@ -803,6 +817,7 @@ test('expired verification refresh targets only the indexed roster card when ano
         excluded: [],
         ineligible: [],
         blocked: [],
+        handled: [],
         savedKeys: [],
         allNames: [primary.name, sibling.name],
       }));
@@ -826,7 +841,12 @@ test('expired verification refresh targets only the indexed roster card when ano
       return Promise.resolve({ ok: true, status: 200, body: {} });
     }
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
-      return Promise.resolve(response({ success: true, recorded: 1 }));
+      const [posted] = JSON.parse(options.body).candidates;
+      return Promise.resolve(response({
+        success: true,
+        recorded: 1,
+        outcomes: [{ inputIndex: 0, candidateKey: posted.candidateKey, status: 'recorded' }],
+      }));
     }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
   });
@@ -880,6 +900,7 @@ test.each([1, 0])('expired verification with roster recorded=%i is acknowledged 
         excluded: [],
         ineligible: [],
         blocked: [],
+        handled: [],
         savedKeys: [],
         allNames: [expired.name],
       }));
@@ -911,7 +932,15 @@ test.each([1, 0])('expired verification with roster recorded=%i is acknowledged 
       expect(body.candidates).toHaveLength(1);
       expect(body.candidates[0].candidateKey).toBe(expired.candidateKey);
       expect(body.candidates[0].automatedIdentityAttestation).toBe('fresh-token');
-      return Promise.resolve(response({ success: true, recorded: recordedCount }));
+      return Promise.resolve(response({
+        success: recordedCount === 1,
+        recorded: recordedCount,
+        outcomes: [{
+          inputIndex: 0,
+          candidateKey: body.candidates[0].candidateKey,
+          status: recordedCount === 1 ? 'recorded' : 'unchanged',
+        }],
+      }));
     }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
   });
@@ -984,6 +1013,7 @@ test('mixed saved and expired rows reconcile independently before the refreshed 
         excluded: [],
         ineligible: [],
         blocked: [],
+        handled: [],
         savedKeys: [],
         allNames: [saved.name, expired.name],
       }));
@@ -1019,7 +1049,12 @@ test('mixed saved and expired rows reconcile independently before the refreshed 
       return Promise.resolve({ ok: true, status: 200, body: {} });
     }
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
-      return Promise.resolve(response({ success: true, recorded: 1 }));
+      const [posted] = JSON.parse(options.body).candidates;
+      return Promise.resolve(response({
+        success: true,
+        recorded: 1,
+        outcomes: [{ inputIndex: 0, candidateKey: posted.candidateKey, status: 'recorded' }],
+      }));
     }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
   });

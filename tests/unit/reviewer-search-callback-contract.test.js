@@ -19,6 +19,7 @@ test('one current successful promotion calls onSaved exactly once without argume
   global.fetch = jest.fn(async (url) => {
     if (String(url).includes('/api/workbench/reviewer-roster?')) return response({
       success: true, active: [candidate], excluded: [], ineligible: [], blocked: [], handled: [], savedKeys: [], allNames: [candidate.name],
+      handled: [],
     });
     if (url === '/api/reviewer-finder/save-candidates') return response({
       success: true, savedCount: 1, savedKeys: [saveKey],

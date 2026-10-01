@@ -94,6 +94,7 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   }))),
   listForRequest: jest.fn(async () => ({
     active: [], excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [],
+    handled: [],
   })),
   findCandidateBySuggestion: jest.fn(async () => ({
     candidateKey: 'roster:applicant',

@@ -89,20 +89,53 @@ function candidate(name, overrides = {}) {
   };
 }
 
-function installSearchFetch({ analyze, discover, enrich, roster = null, onRosterPost } = {}) {
+function installSearchFetch({ analyze, discover, enrich, roster = null, onRosterPost, onRosterGet } = {}) {
   const calls = [];
+  let persistedRoster = roster || rosterSnapshot;
+  let rosterGetCount = 0;
+  const applyReceipt = (candidates, receipt) => {
+    if (!receipt || !Array.isArray(receipt.outcomes)) return;
+    const active = [...persistedRoster.active];
+    const ineligible = [...persistedRoster.ineligible];
+    const allNames = new Set(persistedRoster.allNames);
+    receipt.outcomes.forEach((outcome, index) => {
+      if (outcome.status !== 'recorded') return;
+      const candidate = { ...candidates[index], candidateKey: outcome.candidateKey };
+      allNames.add(candidate.name);
+      const bucket = candidate.eligibilityStatus === 'deceased' ? ineligible : active;
+      if (!bucket.some((row) => row.candidateKey === outcome.candidateKey)) bucket.push(candidate);
+    });
+    persistedRoster = { ...persistedRoster, active, ineligible, allNames: Array.from(allNames) };
+  };
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
     calls.push({ target, options });
     if (target.includes('/api/workbench/reviewer-roster?')) {
-      return Promise.resolve(response(roster || rosterSnapshot));
+      rosterGetCount += 1;
+      if (onRosterGet) return Promise.resolve(onRosterGet(rosterGetCount, persistedRoster));
+      return Promise.resolve(response(persistedRoster));
     }
     if (target === '/api/reviewer-finder/analyze') return Promise.resolve(analyze);
     if (target === '/api/reviewer-finder/discover') return Promise.resolve(discover);
     if (target === '/api/reviewer-finder/enrich-contacts') return Promise.resolve(enrich);
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
-      if (onRosterPost) return onRosterPost(options);
-      return Promise.resolve(response({ success: true, recorded: 1 }));
+      const candidates = JSON.parse(options.body).candidates;
+      const save = onRosterPost
+        ? onRosterPost(options)
+        : Promise.resolve(response({
+            success: true,
+            recorded: candidates.length,
+            outcomes: candidates.map((candidate, inputIndex) => ({
+              inputIndex,
+              candidateKey: candidate.candidateKey,
+              status: 'recorded',
+            })),
+          }));
+      return Promise.resolve(save).then(async (savedResponse) => {
+        const receipt = await savedResponse.json();
+        if (savedResponse.ok) applyReceipt(candidates, receipt);
+        return savedResponse;
+      });
     }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
   });
@@ -170,7 +203,7 @@ test('runs analyze, discover, enrich through real fragmented SSE and awaits prun
   expect(screen.getByText('Analyzing 🧪 proposal')).toBeInTheDocument();
   expect(screen.getByText('Zed Off Topic')).toBeInTheDocument();
   expect(screen.queryByLabelText('Select Dora Deceased')).not.toBeInTheDocument();
-  expect(screen.getByText(/Not eligible \(1\)/)).toBeInTheDocument();
+  expect(screen.queryByText(/Not eligible \(1\)/)).not.toBeInTheDocument();
   const listText = screen.getByTestId('reviewer-candidate-list').textContent;
   expect(listText.indexOf('Ada Active')).toBeLessThan(listText.indexOf('Zed Off Topic'));
   expect(rosterPostSettled).toBe(false);
@@ -192,10 +225,20 @@ test('runs analyze, discover, enrich through real fragmented SSE and awaits prun
   expect(rosterBody.candidates[0].contactEnrichment.emailSource).toBe('institution_page');
 
   await act(async () => {
-    resolveRosterPost(response({ success: true, recorded: 3 }));
+    const postedCandidates = JSON.parse(rosterCall.options.body).candidates;
+    resolveRosterPost(response({
+      success: true,
+      recorded: postedCandidates.length,
+      outcomes: postedCandidates.map((candidate, inputIndex) => ({
+        inputIndex,
+        candidateKey: candidate.candidateKey,
+        status: 'recorded',
+      })),
+    }));
     await rosterPost;
   });
   await waitFor(() => expect(screen.getByRole('button', { name: 'Run another search' })).toBeEnabled());
+  expect(screen.getByText(/Not eligible \(1\)/)).toBeInTheDocument();
   expect(rosterPostSettled).toBe(true);
   expect(calls.map(({ target, options }) => `${options.method || 'GET'} ${target}`)).toEqual([
     `GET /api/workbench/reviewer-roster?requestId=${encodeURIComponent(REQUEST_ID)}`,
@@ -203,7 +246,182 @@ test('runs analyze, discover, enrich through real fragmented SSE and awaits prun
     'POST /api/reviewer-finder/discover',
     'POST /api/reviewer-finder/enrich-contacts',
     'POST /api/workbench/reviewer-roster',
+    `GET /api/workbench/reviewer-roster?requestId=${encodeURIComponent(REQUEST_ID)}`,
   ]);
+});
+
+test('partial roster receipts render the GET row and only GET names exclude the next discovery', async () => {
+  const saved = candidate('Durable Result', { affiliation: 'Search Affiliation' });
+  const failed = candidate('Retryable Result');
+  const analyzeBodies = [];
+  const analyze = streamResponse(sseFrame('result', {
+    proposalInfo: { title: 'Proposal', keywords: 'immunology', authorInstitution: 'Example University' },
+  }));
+  const calls = installSearchFetch({
+    analyze,
+    discover: streamResponse(sseFrame('result', { ranked: [saved, failed], unverified: [] })),
+    enrich: streamResponse(sseFrame('complete', { type: 'complete', results: [saved, failed] })),
+    onRosterPost: (options) => {
+      const posted = JSON.parse(options.body).candidates;
+      return Promise.resolve(response({
+        success: false,
+        recorded: 1,
+        outcomes: [
+          { inputIndex: 0, candidateKey: 'server:durable-result', status: 'recorded' },
+          { inputIndex: 1, candidateKey: posted[1].candidateKey, status: 'failed' },
+        ],
+      }));
+    },
+  });
+  const originalFetch = global.fetch;
+  global.fetch = jest.fn((url, options = {}) => {
+    if (url === '/api/reviewer-finder/analyze') analyzeBodies.push(JSON.parse(options.body));
+    return originalFetch(url, options);
+  });
+
+  renderSearch();
+  fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
+
+  expect(await screen.findByText('Durable Result')).toBeInTheDocument();
+  expect(await screen.findByText('Retryable Result')).toBeInTheDocument();
+  expect(screen.getByText(/1 search result could not be confirmed/)).toBeInTheDocument();
+  expect(calls.some(({ target, options }) => target.includes('/api/workbench/reviewer-roster?') && options.method === 'GET')).toBe(true);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Run another search' }));
+  await waitFor(() => expect(analyzeBodies).toHaveLength(2));
+  expect(analyzeBodies[1].excludedNames).toContain('Durable Result');
+  expect(analyzeBodies[1].excludedNames).not.toContain('Retryable Result');
+});
+
+test('post-save reconciliation trusts canonical GET rows and never promotes protected or name-only rows', async () => {
+  const submitted = [
+    candidate('Canonical Reviewer'),
+    candidate('Excluded Reviewer'),
+    candidate('Ineligible Reviewer'),
+    candidate('Blocked Reviewer'),
+    candidate('Handled Reviewer'),
+    candidate('Saved Name Only'),
+    candidate('At Capacity Reviewer'),
+  ];
+  const [canonical, excluded, ineligible, blocked, handled, nameOnly, atCapacity] = submitted;
+  const authoritative = {
+    ...canonical,
+    affiliation: 'Authoritative GET affiliation',
+    email: 'authoritative@example.edu',
+    candidateKey: canonical.candidateKey,
+  };
+  const protectedSnapshot = {
+    ...rosterSnapshot,
+    active: [authoritative],
+    excluded: [{ ...excluded, candidateKey: excluded.candidateKey }],
+    ineligible: [{ ...ineligible, candidateKey: ineligible.candidateKey }],
+    blocked: [{ ...blocked, candidateKey: blocked.candidateKey }],
+    handled: [{ ...handled, candidateKey: handled.candidateKey }],
+    savedKeys: [nameOnly.candidateKey, atCapacity.candidateKey],
+    allNames: [canonical.name, excluded.name, ineligible.name, blocked.name, handled.name, nameOnly.name],
+  };
+  const analyze = streamResponse(sseFrame('result', {
+    proposalInfo: { title: 'Proposal', keywords: 'immunology' },
+  }));
+  const discovery = streamResponse(sseFrame('result', { ranked: submitted, unverified: [] }));
+  const enrichment = streamResponse(sseFrame('complete', { type: 'complete', results: submitted }));
+  installSearchFetch({
+    analyze,
+    discover: discovery,
+    enrich: enrichment,
+    onRosterGet: (count) => response(count === 1 ? rosterSnapshot : protectedSnapshot),
+    onRosterPost: (options) => {
+      const posted = JSON.parse(options.body).candidates;
+      return Promise.resolve(response({
+        success: true,
+        recorded: posted.length,
+        outcomes: posted.map((row, inputIndex) => ({
+          inputIndex,
+          candidateKey: row.candidateKey,
+          status: 'recorded',
+        })),
+      }));
+    },
+  });
+
+  renderSearch();
+  fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
+
+  const cards = await screen.findByTestId('reviewer-candidate-list');
+  await waitFor(() => expect(cards).toHaveTextContent('Authoritative GET affiliation'));
+  expect(cards).toHaveTextContent('authoritative@example.edu');
+  for (const hidden of submitted.slice(1)) expect(cards).not.toHaveTextContent(hidden.name);
+  expect(cards).not.toHaveTextContent('Example University');
+});
+
+test('malformed post-write GET clears uncertain cards and exposes a working roster-state retry', async () => {
+  const found = candidate('Recovered From GET');
+  const analyzeFrame = streamResponse(sseFrame('result', {
+    proposalInfo: { title: 'Proposal', keywords: 'immunology' },
+  }));
+  let refreshedSnapshot = null;
+  let postCount = 0;
+  const calls = installSearchFetch({
+    analyze: analyzeFrame,
+    discover: streamResponse(sseFrame('result', { ranked: [found], unverified: [] })),
+    enrich: streamResponse(sseFrame('complete', { type: 'complete', results: [found] })),
+    onRosterGet: (getIndex, persisted) => {
+      if (getIndex === 2) return response({ success: true, active: [] }); // malformed authoritative snapshot
+      if (getIndex >= 3) return response(refreshedSnapshot || persisted);
+      return response(persisted);
+    },
+    onRosterPost: (options) => {
+      postCount += 1;
+      const posted = JSON.parse(options.body).candidates;
+      const key = 'server:recovered-from-get';
+      refreshedSnapshot = {
+        success: true,
+        active: [{ ...posted[0], candidateKey: key, affiliation: 'GET authority' }],
+        excluded: [], ineligible: [], blocked: [], handled: [], savedKeys: [], allNames: [found.name],
+      };
+      return Promise.resolve(response({
+        success: true,
+        recorded: 1,
+        outcomes: [{ inputIndex: 0, candidateKey: key, status: 'recorded' }],
+      }));
+    },
+  });
+
+  renderSearch();
+  fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
+  expect(await screen.findByRole('button', { name: 'Retry reviewer state' })).toBeEnabled();
+  expect(screen.queryByText('Recovered From GET')).not.toBeInTheDocument();
+  expect(screen.getByText(/could not be reloaded/i)).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Retry reviewer state' }));
+  expect(await screen.findByText('Recovered From GET')).toBeInTheDocument();
+  expect(screen.getByText('GET authority')).toBeInTheDocument();
+  expect(postCount).toBe(1);
+  expect(calls.filter(({ target, options }) => target === '/api/workbench/reviewer-roster' && options.method === 'POST')).toHaveLength(1);
+});
+
+test('a non-2xx roster body cannot acknowledge writes and empty results keep a fresh-search control', async () => {
+  const found = candidate('Uncertain Result');
+  const calls = installSearchFetch({
+    analyze: streamResponse(sseFrame('result', { proposalInfo: { title: 'Proposal', keywords: 'immunology' } })),
+    discover: streamResponse(sseFrame('result', { ranked: [found], unverified: [] })),
+    enrich: streamResponse(sseFrame('complete', { type: 'complete', results: [found] })),
+    onRosterPost: (options) => {
+      const [posted] = JSON.parse(options.body).candidates;
+      return Promise.resolve(response({
+        success: true,
+        recorded: 1,
+        outcomes: [{ inputIndex: 0, candidateKey: posted.candidateKey, status: 'recorded' }],
+      }, { ok: false, status: 500 }));
+    },
+  });
+
+  renderSearch();
+  fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
+  expect(await screen.findByRole('button', { name: 'Run another search' })).toBeEnabled();
+  expect(screen.queryByText('Uncertain Result')).not.toBeInTheDocument();
+  expect(screen.getByText(/Could not confirm all search saves/)).toBeInTheDocument();
+  expect(calls.filter(({ target, options }) => target === '/api/workbench/reviewer-roster' && options.method === 'POST')).toHaveLength(1);
 });
 
 test.each(['discovery', 'enrichment'])('accepts a %s transport error after its terminal result', async (failedPhase) => {
