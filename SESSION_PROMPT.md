@@ -158,7 +158,7 @@ prompts remain available in Git history; only this new handoff is retained here.
 1. ~~**Production 054 shape**~~ READ 2026-09-30: early shape, `test_request_runs` + `test_request_run_resources` + the receipt function only (all empty). (Original: read-only query of `test_request_*` tables and `pg_get_functiondef('test_request_receipt_ok')`) — still unread; prerequisite for decision 2 above.
 2. ~~**`migration_drift_ahead` for 055**~~ CHECKED 2026-09-30: 055 tracked and in the manifest; the two 9/30 `migration_drift_ahead` warnings auto-resolved.
 3. **Residue**: Test Requests 1003301–1003303; scratch DBs `ledger_ci_s547`, `ledger_ci_s548`; local Docker `ledger_prod` was created and dropped in S553 (transition proof). List and confirm before deleting.
-4. **Vercel skipped build of `61dafcb81`** — undiagnosed.
+4. ~~**Vercel skipped build of `61dafcb81`**~~ DIAGNOSED 2026-09-30 evening: GitHub logged the `main` PushEvent (22:16:05Z) but Vercel created no deployment record at all (not cancelled/ignored; `vercel.json` has no ignore step). One-off: of 66 `main` push heads in GitHub's event window (9/27–9/30) it is the only one without a production deployment; other undeployed `main` commits since 9/16 are non-head commits of multi-commit pushes. Its code went live via `9f408590e` at 22:27Z. Root cause (dropped GitHub-App delivery) is not visible from the CLI; no action needed beyond the existing verify-deploy-is-the-merge-build habit.
 5. `docs/CREDENTIALS_RUNBOOK.md` Postgres rotation procedure — still absent (the S553 sync followed a Downloads brief instead).
 6. **Codex refactor survey** — read-only survey in `~/Code/WMKF_Apps-refactor`; whatever it proposes is a plan to review, not a worklist.
 
