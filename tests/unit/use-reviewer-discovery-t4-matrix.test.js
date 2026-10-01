@@ -62,7 +62,7 @@ function mockSse() {
     });
 }
 
-beforeEach(() => { jest.clearAllMocks(); });
+beforeEach(() => { jest.resetAllMocks(); });
 afterEach(() => { global.fetch = jest.fn(); });
 
 test('runSearch roster-persist POST: exact body bytes/headers; success merges into the active roster', async () => {
@@ -80,6 +80,49 @@ test('runSearch roster-persist POST: exact body bytes/headers; success merges in
   expect(body.requestId).toBe(REQ);
   expect(body.candidates).toHaveLength(1);
   expect(body.candidates[0].candidateKey).toBe(freshCandidate.candidateKey);
+});
+
+test('runSearch treats HTTP 200 with recorded=0 as success, merges locally, and excludes the name on the next search', async () => {
+  const fetch = mockPipeline({
+    rosterPost: () => response({ success: true, recorded: 0 }),
+  });
+  global.fetch = fetch;
+  readSseStream
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({ event: 'result', data: { proposalInfo: { title: 'Proposal', keywords: 'materials', authorInstitution: 'Example U' } } });
+    })
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({ event: 'result', data: { ranked: [freshCandidate], unverified: [] } });
+    })
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({ event: 'complete', data: { type: 'complete', results: [freshCandidate] } });
+    })
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({ event: 'result', data: { proposalInfo: { title: 'Proposal', keywords: 'materials', authorInstitution: 'Example U' } } });
+    })
+    .mockImplementationOnce(async (_response, onEvent) => {
+      onEvent({ event: 'result', data: { ranked: [], unverified: [] } });
+    });
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
+
+  await screen.findByLabelText(`Select ${freshCandidate.name}`);
+  expect(screen.queryByText(/Couldn't save this search to the request/)).not.toBeInTheDocument();
+  fireEvent.click(await screen.findByRole('button', { name: 'Run another search' }));
+
+  await waitFor(() => {
+    const analyzeBodies = fetch.mock.calls
+      .filter(([url]) => String(url) === '/api/reviewer-finder/analyze')
+      .map(([, options]) => JSON.parse(options.body));
+    const discoverBodies = fetch.mock.calls
+      .filter(([url]) => String(url) === '/api/reviewer-finder/discover')
+      .map(([, options]) => JSON.parse(options.body));
+    expect(analyzeBodies).toHaveLength(2);
+    expect(discoverBodies).toHaveLength(2);
+    expect(analyzeBodies[1].excludedNames).toContain(freshCandidate.name);
+    expect(discoverBodies[1].excludedNames).toContain(freshCandidate.name);
+  });
+  expect(screen.getByText(freshCandidate.name)).toBeInTheDocument();
 });
 
 test('runSearch roster-persist POST: non-2xx (body never read) surfaces the fixed roster-note failure, candidates still shown', async () => {

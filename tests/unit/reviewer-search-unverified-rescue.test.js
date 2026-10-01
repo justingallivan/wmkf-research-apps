@@ -315,7 +315,7 @@ test('drops a late PubMed diagnostic after the request context changes', async (
   });
 });
 
-test('confirming an unverified suggestion records it on the roster BEFORE confirm_identity, then renders it as a confirmed active card', async () => {
+test('confirming an unverified suggestion proceeds when its 200 roster write reports recorded=0', async () => {
   const calls = [];
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
@@ -325,7 +325,7 @@ test('confirming an unverified suggestion records it on the roster BEFORE confir
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
       const body = JSON.parse(options.body);
       calls.push({ kind: 'record', body });
-      return Promise.resolve(response({ success: true, recorded: 1 }));
+      return Promise.resolve(response({ success: true, recorded: 0 }));
     }
     if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
       const body = JSON.parse(options.body);
