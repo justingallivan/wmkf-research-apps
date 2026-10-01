@@ -703,9 +703,14 @@ not become current work merely because their document status remains `active`.
   fails.
   
   **Release record (S552):** two review rounds (Claude code review, then Codex
-  adversarial gpt-5.6-sol); all fixed except finding 6 (strict SerpApi empty-result
-  wording, needs a real zero-result response) and finding 9 (repeated Dataverse/SQL
-  reads, performance only), both deferred. The owner chose not to restrict who may
+  adversarial gpt-5.6-sol). Finding 9 (repeated Dataverse/SQL reads) subsequently
+  shipped in `b4bb640c8` on 2026-09-30: uncursored context reuses history,
+  disposition reuses roster/authority, and post-append runs/reviews are still
+  reread. The read-count and cursored-history regression tests passed again in
+  the 2026-10-01 refactor reassessment. Finding 6 (strict SerpApi empty-result
+  handling) also shipped in PR #382 (`186052034`): recorded Google/News
+  zero-result fixtures cover either empty-result signal and fail-closed controls;
+  its 39 strict-source tests passed again in this reassessment. The owner chose not to restrict who may
   re-screen an approved request. Migration numbering: 055 post-presentation (#365),
   056–057 Integrity, 058 B4, 059 scheduled-email Part A.
   
