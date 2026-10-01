@@ -1,4 +1,15 @@
 /** @jest-environment node */
+const mockGetById = jest.fn();
+jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/grant-request.js'),
+  getById: (...args) => mockGetById(...args),
+}));
+
+const mockGetSettingStrict = jest.fn();
+jest.mock('../../lib/services/settings-service.js', () => ({
+  ...jest.requireActual('../../lib/services/settings-service.js'),
+  getSettingStrict: (...args) => mockGetSettingStrict(...args),
+}));
 import {
   canonicalFilename,
   confirmMaterialsReady,
@@ -85,6 +96,112 @@ function deps(overrides = {}) {
   d.__setStored = (row) => { stored = row; };
   return d;
 }
+
+beforeEach(() => {
+  mockGetById.mockClear();
+  mockGetSettingStrict.mockClear();
+  mockGetById.mockResolvedValue({ wmkf_istestrequest: null, wmkf_testcreationrunid: null });
+  mockGetSettingStrict.mockResolvedValue({ found: false, value: null });
+  delete process.env.TEST_REQUEST_ISOLATION;
+});
+
+const MATERIALS_CONTACTS = {
+  pi: { role: 'pi', name: 'Pat Investigator', email: 'PI@example.edu' },
+  liaison: { role: 'liaison', name: 'Lee Liaison', email: 'liaison@example.edu' },
+  liaisonStatus: 'found',
+};
+const MATERIALS_RECIPIENTS = ['PI@example.edu', 'liaison@example.edu'];
+const MATERIALS_PREPARED_EMAIL = {
+  subject: 'Materials request', bodyText: 'Please send the materials.',
+  recipients: MATERIALS_RECIPIENTS,
+  toRecipients: ['PI@example.edu'], ccRecipients: ['liaison@example.edu'],
+};
+
+function openMaterialsRow() {
+  return {
+    id: 'collection-1', request_id: REQUEST_ID, status: 'open',
+    due_at: new Date('2026-10-05T16:00:00.000Z'),
+    closes_at: new Date('2026-10-14T19:00:00.000Z'), created_at: NOW,
+    checklist: [
+      { key: 'presentation_pdf', label: 'Presentation (PDF)', required: true, waived: false },
+      { key: 'presentation_source', label: 'Presentation source', required: true, waived: false },
+      { key: 'participant_bios', label: 'Participant bios', required: true, waived: false },
+    ],
+    contacts: MATERIALS_CONTACTS, token_ciphertext: 'sealed:existing-token', reminder_count: 0,
+  };
+}
+
+async function runMaterialsAction(action, d) {
+  if (action === 'create') {
+    return createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org', preparedEmail: MATERIALS_PREPARED_EMAIL }, d);
+  }
+  d.__setStored(openMaterialsRow());
+  if (action === 'invite') {
+    return inviteMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org', preparedEmail: MATERIALS_PREPARED_EMAIL }, d);
+  }
+  return remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org', preparedEmail: MATERIALS_PREPARED_EMAIL }, d);
+}
+
+function expectMaterialsEffects(d, action, happened) {
+  const calls = action === 'create'
+    ? [d.mint, d.insertCollection, d.sendEmail]
+    : action === 'invite'
+      ? [d.updateContacts, d.sendEmail]
+      : [d.claimManualReminder, d.sendEmail, d.attachReminderEmailId];
+  for (const call of calls) happened ? expect(call).toHaveBeenCalled() : expect(call).not.toHaveBeenCalled();
+}
+
+describe('Test Request recipient checks on manual materials sends', () => {
+  const synthetic = { wmkf_istestrequest: true, wmkf_testcreationrunid: '22222222-2222-4222-8222-222222222222' };
+  const allowlisted = { found: true, value: JSON.stringify({ addresses: ['pi@example.edu', 'liaison@example.edu'] }) };
+
+  test.each(['create', 'invite', 'remind'])('%s sends when every current recipient is allowlisted', async (action) => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    mockGetById.mockResolvedValue(synthetic);
+    mockGetSettingStrict.mockResolvedValue(allowlisted);
+    const d = deps({ resolveRecipients: jest.fn(async () => MATERIALS_CONTACTS) });
+
+    await runMaterialsAction(action, d);
+
+    expect(mockGetSettingStrict).toHaveBeenCalledWith('testRequestEmailAllowlist');
+    expectMaterialsEffects(d, action, true);
+    expect(d.sendEmail.mock.calls[0][0]).toMatchObject({ to: ['PI@example.edu'], cc: ['liaison@example.edu'] });
+  });
+
+  test.each(['create', 'invite', 'remind'])('%s refuses one non-allowlisted recipient before side effects', async (action) => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    mockGetById.mockResolvedValue(synthetic);
+    mockGetSettingStrict.mockResolvedValue({ found: true, value: JSON.stringify({ addresses: ['pi@example.edu'] }) });
+    const d = deps({ resolveRecipients: jest.fn(async () => MATERIALS_CONTACTS) });
+
+    await expect(runMaterialsAction(action, d)).rejects.toMatchObject({ code: 'test_request_email_denied', httpStatus: 409 });
+
+    expect(mockGetSettingStrict).toHaveBeenCalledWith('testRequestEmailAllowlist');
+    expectMaterialsEffects(d, action, false);
+  });
+
+  test.each(['create', 'invite', 'remind'])('%s keeps ordinary Requests working without reading the allowlist', async (action) => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    mockGetById.mockResolvedValue({ wmkf_istestrequest: null, wmkf_testcreationrunid: null });
+    const d = deps({ resolveRecipients: jest.fn(async () => MATERIALS_CONTACTS) });
+
+    await runMaterialsAction(action, d);
+
+    expect(mockGetSettingStrict).not.toHaveBeenCalled();
+    expectMaterialsEffects(d, action, true);
+  });
+
+  test.each(['create', 'invite', 'remind'])('%s fails closed when Request state is unknown', async (action) => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    mockGetById.mockRejectedValue(new Error('state read failed'));
+    const d = deps({ resolveRecipients: jest.fn(async () => MATERIALS_CONTACTS) });
+
+    await expect(runMaterialsAction(action, d)).rejects.toMatchObject({ code: 'test_request_email_denied', httpStatus: 409 });
+
+    expect(mockGetSettingStrict).not.toHaveBeenCalled();
+    expectMaterialsEffects(d, action, false);
+  });
+});
 
 test('canonical filenames follow §7.3 and the registry match is by artifact type + canonical name, newest first', () => {
   expect(canonicalFilename('1003222', 'presentation_pdf', 'pdf')).toBe('1003222 Site Visit Presentation.pdf');
