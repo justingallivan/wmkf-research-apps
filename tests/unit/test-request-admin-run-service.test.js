@@ -388,6 +388,16 @@ describe('Confirm: sandbox and production reservations', () => {
     expect(h.ledger.rows.size).toBe(1);
   });
 
+  test('a same-key retry still requires the typed source number to match the stored run', async () => {
+    const h = harness({ deployment: 'preview' });
+    const draftId = await h.exportDraft();
+    await h.service.confirmRun(h.confirmArgs(draftId));
+    const wrongNumber = h.service.confirmRun({ ...h.confirmArgs(draftId), confirmSourceRequestNumber: '9999999' });
+    expect(await code(wrongNumber)).toBe('factory_source_mismatch');
+    expect(h.ledger.rows.size).toBe(1);
+  });
+
+
   test('a failed or throwing reserveRun leaves artifacts in place and never deletes', async () => {
     const h = harness({ deployment: 'preview' });
     h.ledger.state.failReserve = true;

@@ -7,6 +7,7 @@
 import { jest } from '@jest/globals';
 import {
   createFactoryArtifactStore, sweepFactoryArtifacts, artifactDigest, draftPathname, runPathname,
+  SWEEP_SCAN_LIMIT, SWEEP_DELETE_LIMIT, MAX_BUNDLE_BYTES, MAX_MANIFEST_BYTES,
 } from '../../lib/services/test-requests/factory-artifact-store.js';
 import { deriveActorId } from '../../lib/services/test-requests/admin-run-identity.js';
 
@@ -40,11 +41,15 @@ function fakeBlob(initial = {}) {
       if (!objects.has(pathname)) throw Object.assign(new Error('Vercel Blob: The requested blob does not exist (not found)'), { name: 'BlobNotFoundError' });
       objects.delete(pathname);
     },
-    async list({ prefix, limit }) {
-      calls.list.push({ prefix, limit });
-      const blobs = [...objects.entries()].filter(([p]) => p.startsWith(prefix)).slice(0, limit)
+    // Paginates like the SDK: `cursor` is an opaque offset, `hasMore` when objects remain.
+    async list({ prefix, limit, cursor }) {
+      calls.list.push({ prefix, limit, cursor });
+      const all = [...objects.entries()].filter(([p]) => p.startsWith(prefix));
+      const start = cursor ? Number(cursor) : 0;
+      const blobs = all.slice(start, start + limit)
         .map(([pathname, { text, uploadedAt }]) => ({ pathname, uploadedAt, size: text.length }));
-      return { blobs, hasMore: false };
+      const next = start + blobs.length;
+      return { blobs, hasMore: next < all.length, cursor: next < all.length ? String(next) : undefined };
     },
   };
   return { blob, objects, calls };
@@ -98,6 +103,19 @@ describe('putCreateOnly / read / del', () => {
     const store = createFactoryArtifactStore({ env: ENV, blob });
     await expect(store.putCreateOnly(runPathname('sandbox', RUN, 'bundle'), { v: 1 })).rejects.toThrow('network reset');
     expect(calls.get).toHaveLength(0);
+  });
+
+  test('assertFits refuses an oversized manifest without any Blob call, and putCreateOnly reuses it', async () => {
+    const { blob, calls } = fakeBlob();
+    const store = createFactoryArtifactStore({ env: ENV, blob });
+    const path = runPathname('sandbox', RUN, 'manifest');
+    // The manifest cap exceeds the bundle cap because the manifest embeds the bundle.
+    expect(MAX_MANIFEST_BYTES).toBeGreaterThan(MAX_BUNDLE_BYTES);
+    const oversized = { pad: 'x'.repeat(MAX_MANIFEST_BYTES) };
+    expect(() => store.assertFits(path, oversized)).toThrow(/size limit/);
+    await expect(store.putCreateOnly(path, oversized)).rejects.toMatchObject({ code: 'factory_artifact_too_large' });
+    expect(calls.put).toHaveLength(0);
+    expect(store.assertFits(path, { ok: true }).length).toBeGreaterThan(0);
   });
 
   test('a missing token is a 503 before any Blob call', async () => {
@@ -222,10 +240,30 @@ describe('sweepFactoryArtifacts', () => {
     expect(calls.list).toHaveLength(0);
   });
 
-  test('lists at most 200 objects per invocation', async () => {
+  test('scans at most SWEEP_SCAN_LIMIT objects per prefix, in pages of at most 100', async () => {
     const { blob, calls } = fakeBlob();
     await sweep(blob, () => []).promise;
-    expect(calls.list.map((c) => c.limit).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(200);
+    expect(calls.list.every((c) => c.limit <= 100)).toBe(true);
+    expect(calls.list.map((c) => c.limit).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(2 * SWEEP_SCAN_LIMIT);
+  });
+
+  test('stops deleting at SWEEP_DELETE_LIMIT and reports truncated; every run was still examined', async () => {
+    const initial = {};
+    const rows = {};
+    const count = SWEEP_DELETE_LIMIT / 2 + 1; // one more ready run than the delete cap covers
+    for (let i = 0; i < count; i += 1) {
+      const runId = `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`;
+      initial[bundlePath(runId)] = aged(1);
+      initial[manifestPath(runId)] = aged(1);
+      rows[runId] = 'ready';
+    }
+    const { blob, calls } = fakeBlob(initial);
+    const { db, promise } = sweep(blob, ledgerHas(rows));
+    const stats = await promise;
+    expect(stats.deleted).toBe(SWEEP_DELETE_LIMIT);
+    expect(stats.truncated).toBe(true);
+    expect(calls.del).toHaveLength(SWEEP_DELETE_LIMIT);
+    expect(db.query).toHaveBeenCalledTimes(count); // one ledger read per run: nothing was starved from the scan
   });
 });
 
