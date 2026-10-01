@@ -166,7 +166,14 @@ cold search emitted the new authority envelope.
   `repairRequestsUnavailable: true`. `useReviewerRoster` applies the returned
   buckets, handled rows, saved keys, names, and repair state; its request and
   generation guards prevent an operation for the prior request from replacing
-  the current roster. Standalone `ReviewerSearchSection` callers retain their
+  the current roster. After a discovery POST settles, the browser reloads this
+  snapshot before treating results as durable or excluding their names from a
+  later search. Indexed POST acknowledgments map submitted results to server
+  keys; current-run cards adopt authoritative active rows instead of shadowing
+  restored fields or protected curation. Unknown acknowledgments or a failed
+  reload clear uncertain current-run cards. A failed reload exposes the existing
+  read-retry control in the results view and blocks another search until recovery;
+  it never automatically replays the write. Standalone `ReviewerSearchSection` callers retain their
   internal roster read. The superuser-only Admin repair-alert detail path may
   separately re-read one exact candidate from server-owned alert correlation
   keys to present current repair context and a Workbench deep link; that read
@@ -216,7 +223,21 @@ cold search emitted the new authority envelope.
   the structured address/identity actions, and no Dataverse person write occurs. Browser
   `action:'saved'` returns 409 `server_owned_transition`; clients cannot create
   saved/blocked authority. Browser-authored blobs have staff authority stripped
-  and eligibility reconstructed only from a valid bound receipt.
+  and eligibility reconstructed only from a valid bound receipt. The POST service
+  uses `recordSurfaced`'s opt-in detailed mode and returns one outcome per original
+  input index, including the server-bound candidate key: `recorded`, `unchanged`,
+  `invalid`, or `failed`. The store's other callers retain the numeric result.
+  A processed batch returns HTTP 200; `success` is false if any input is invalid
+  or failed, while protected no-ops are legitimate `unchanged` outcomes. Neither
+  the count nor a recorded outcome proves retention after cap enforcement or
+  concurrent changes. Discovery uses GET for saved state; known failed new rows
+  can remain ephemeral only without a protected-key or conservative allNames
+  collision, and unsaved deceased results are counted in the warning rather than
+  rendered as durable. A fresh search may rediscover unsaved names but is not an
+  exact-candidate retry. Unverified-contact rescue requires an exact recorded
+  singleton acknowledgment and carries its canonical key into identity confirmation.
+  These are branch source changes under
+  `docs/plans/REVIEWER_ROSTER_PARTIAL_SAVE_PLAN_2026-10-01.md`, not a deployment claim.
 - `pages/api/workbench/enrich-recommended.js` is the connected cold applicant
   producer. [VERIFIED via source/tests] it obtains Graph proposal binding
   metadata before and after proposal-dependent analysis, discards a changed

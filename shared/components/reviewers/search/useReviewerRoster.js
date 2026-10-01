@@ -53,7 +53,8 @@ export default function useReviewerRoster({
       { tolerantBody: true },
     );
     if (genRef.current !== expectedGeneration) return null;
-    if (!ok || !data.success) return null;
+    const requiredLists = ['active', 'excluded', 'ineligible', 'blocked', 'handled', 'savedKeys', 'allNames'];
+    if (!ok || data?.success !== true || requiredLists.some((key) => !Array.isArray(data?.[key]))) return null;
     applyRosterSnapshot(data);
     return data;
   }, [requestId, genRef, applyRosterSnapshot]);

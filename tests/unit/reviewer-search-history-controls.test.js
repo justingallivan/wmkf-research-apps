@@ -58,7 +58,20 @@ const applicantCandidate = {
 };
 
 function response(body, ok = true, status = ok ? 200 : 500) {
-  return { ok, status, json: async () => body, body: {} };
+  const payload = body?.success === true && ('active' in body || 'allNames' in body)
+    ? { active: [], excluded: [], ineligible: [], blocked: [], handled: [], savedKeys: [], allNames: [], ...body }
+    : body;
+  return { ok, status, json: async () => payload, body: {} };
+}
+
+function savedReceipt(candidates) {
+  return response({
+    success: true,
+    recorded: candidates.length,
+    outcomes: candidates.map((candidate, inputIndex) => ({
+      inputIndex, candidateKey: candidate.candidateKey, status: 'recorded',
+    })),
+  });
 }
 
 function deferred() {
@@ -528,6 +541,7 @@ test('removal blocks a same-request search until its refreshed roster arrives', 
 
 test('a search blocks prior-result removal until its roster write settles', async () => {
   const rosterWrite = deferred();
+  let postedCandidates = [];
   const freshCandidate = {
     ...generatedCandidate,
     candidateKey: 'candidate:fresh',
@@ -549,6 +563,7 @@ test('a search blocks prior-result removal until its roster write settles', asyn
     if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/enrich-contacts') return Promise.resolve(response({}));
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
+      postedCandidates = JSON.parse(options.body).candidates;
       return rosterWrite.promise;
     }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
@@ -576,7 +591,7 @@ test('a search blocks prior-result removal until its roster write settles', asyn
   expect(screen.getByRole('button', { name: 'Remove previous results' })).toBeDisabled();
 
   await act(async () => {
-    rosterWrite.resolve(response({ success: true, recorded: 1 }));
+    rosterWrite.resolve(savedReceipt(postedCandidates));
     await rosterWrite.promise;
   });
 
@@ -709,19 +724,24 @@ test('continues after a terminal discovery read failure when the complete ranked
     ...generatedCandidate,
     name: 'Fresh Reviewer',
     email: 'fresh@example.edu',
+    contactEnrichment: { email: 'fresh@example.edu', emailSource: 'openalex' },
     addressTrustReceipt: addressTrustReceipt('fresh@example.edu'),
   };
 
+  let persistedRows = [];
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
     if (target.includes('/api/workbench/reviewer-roster?')) {
-      return Promise.resolve(response({ success: true, active: [], excluded: [], allNames: [] }));
+      return Promise.resolve(response({ success: true, active: persistedRows, excluded: [], allNames: persistedRows.map((row) => row.name) }));
     }
     if (target === '/api/reviewer-finder/analyze') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/enrich-contacts') return Promise.resolve(response({}));
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
-      return Promise.resolve(response({ success: true, recorded: 1 }));
+      const postedCandidates = JSON.parse(options.body).candidates;
+      // GET includes trusted stored evidence, rather than echoing browser authority.
+      persistedRows = postedCandidates.map((row) => ({ ...row, addressTrustReceipt: freshCandidate.addressTrustReceipt }));
+      return Promise.resolve(savedReceipt(postedCandidates));
     }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
   });
@@ -748,7 +768,8 @@ test('continues after a terminal discovery read failure when the complete ranked
     fireEvent.click(runButton);
   });
 
-  expect(await screen.findByLabelText(`Select ${freshCandidate.name}`)).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Run another search' })).toBeEnabled());
+  expect(screen.getByLabelText(`Select ${freshCandidate.name}`)).toBeInTheDocument();
   expect(screen.queryByText('Load failed')).not.toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledWith('/api/workbench/reviewer-roster', expect.objectContaining({
     method: 'POST',

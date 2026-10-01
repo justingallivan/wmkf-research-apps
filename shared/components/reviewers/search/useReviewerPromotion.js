@@ -11,6 +11,7 @@ import {
 } from '../reviewer-search-logic';
 import { formatSaveFailureDetails } from './presentation';
 import { candKey, dedupeByName } from './candidateKeys';
+import { readRosterSaveReceipt } from './rosterSaveReceipt';
 import { requestEnvelope } from '../../../utils/api-request';
 import {
   PROVENANCE_KINDS,
@@ -104,9 +105,7 @@ export default function useReviewerPromotion({
       }
     }
 
-    // POST one row at a time because the roster endpoint returns a count, not
-    // per-row identifiers. A recorded=1 response is therefore an exact durable
-    // acknowledgement for this candidate; recorded=0 stays retryable.
+    // POST one row at a time; require an exact, matching server-keyed receipt.
     const refreshed = [];
     for (const candidate of ready) {
       if (genRef.current !== expectedGeneration) {
@@ -124,12 +123,15 @@ export default function useReviewerPromotion({
       if (genRef.current !== expectedGeneration) {
         return { refreshed, failures, stale: true };
       }
-      if (rosterOk && rosterData.success && rosterData.recorded === 1) {
+      const receipt = readRosterSaveReceipt(rosterData, 1);
+      const outcome = receipt?.outcomes[0];
+      if (rosterOk && receipt?.success && receipt.recorded === 1
+        && outcome?.status === 'recorded' && outcome.candidateKey === candKey(candidate)) {
         refreshed.push(candidate);
       } else {
         failures.push({
           name: candidate.name || 'Unknown candidate',
-          error: rosterData.error || 'Refreshed verification could not be written to the active roster.',
+          error: rosterData?.error || 'Refreshed verification could not be written to the active roster.',
         });
       }
     }
