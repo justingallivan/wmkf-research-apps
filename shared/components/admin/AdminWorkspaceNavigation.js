@@ -124,6 +124,17 @@ export function AdminWorkspaceNavigation({ activeWorkspace }) {
             </Link>
           );
         })}
+        <Link
+          href="/admin/transcription-pilot"
+          aria-current={activeWorkspace === 'transcription-pilot' ? 'page' : undefined}
+          className={`min-h-11 border-b-2 px-1 py-3 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 ${
+            activeWorkspace === 'transcription-pilot'
+              ? 'border-gray-900 text-gray-950'
+              : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-900'
+          }`}
+        >
+          Transcription Pilot
+        </Link>
       </div>
     </nav>
   );

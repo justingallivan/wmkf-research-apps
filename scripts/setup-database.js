@@ -1747,6 +1747,13 @@ const v56Statements = [
      ))`,
 ];
 
+// V60: transcription pilot fresh-install shape is sourced directly from its
+// append-only migration so the bootstrap cannot silently drift from it.
+const v60Statements = fs.readFileSync(
+  path.join(__dirname, '..', 'lib/db/migrations/060_transcription_jobs.sql'),
+  'utf8',
+).split(';').map(statement => statement.trim()).filter(Boolean);
+
 // V43: deliberation briefing links (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md).
 // One expiring, revocable link per request for the read-only briefing page;
 // stores a token digest and sealed token, never the raw token. Also binds the
@@ -2903,6 +2910,20 @@ async function runMigration() {
           console.error(`[v56-${i + 1}/${v56Statements.length}] ✗ Error: ${error.message}`);
           throw error;
         }
+      }
+    }
+
+    // Run V60 schema updates (transcription pilot; mirrors migration 060).
+    console.log(`\nApplying v60 schema updates - transcription pilot (${v60Statements.length} statements)...`);
+    for (let i = 0; i < v60Statements.length; i++) {
+      const statement = v60Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v60-${i + 1}/${v60Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        console.error(`[v60-${i + 1}/${v60Statements.length}] ✗ ${error.message}`);
+        throw error;
       }
     }
 

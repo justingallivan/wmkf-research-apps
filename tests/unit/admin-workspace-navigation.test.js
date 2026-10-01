@@ -63,6 +63,13 @@ test('workspace and view navigation are URL-addressable and announce the active 
   );
 });
 
+test('Transcription Pilot links to its dedicated Admin route and marks the active page', () => {
+  render(<AdminWorkspaceNavigation activeWorkspace="transcription-pilot" />);
+
+  expect(screen.getByRole('link', { name: 'Transcription Pilot' })).toHaveAttribute('href', '/admin/transcription-pilot');
+  expect(screen.getByRole('link', { name: 'Transcription Pilot' })).toHaveAttribute('aria-current', 'page');
+});
+
 test('a collapsible editor panel starts closed when asked, keeps its heading visible, and opens on the header', () => {
   const { container } = render(
     <AdminEditorPanel id="p1" title="Workflow policies" description="Policy text." scope="Workflow-specific" collapsible defaultOpen={false}>
