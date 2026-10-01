@@ -17,8 +17,24 @@ export default async function handler(req, res) {
     return res.status(result.ok ? 200 : 503).json(result);
   }
   try {
-    const { drainTranscriptionPilot } = await import('../../../lib/services/transcription-pilot/worker');
-    const summary = await drainTranscriptionPilot({ maxJobs: 4 });
+    const deadline = Date.now() + 270_000;
+    const [worker, store, dispatch] = await Promise.all([
+      import('../../../lib/services/transcription-pilot/worker'),
+      import('../../../lib/services/transcription-pilot/store'),
+      import('../../../lib/services/transcription-pilot/workflow-dispatch'),
+    ]);
+    const recoveredPreIntent = await store.requeueExpiredPreIntentTranscriptionSubmissions({ limit: 100 });
+    const markedUncertain = await store.markExpiredTranscriptionSubmissionsUncertain({ limit: 100 });
+    const cleanup = await worker.drainTranscriptionCleanup({ maxJobs: 100 });
+    const workflowDispatch = await dispatch.drainTranscriptionWorkflowDispatches({ maxRuns: 20, deadline });
+    const summary = {
+      recoveredPreIntent: recoveredPreIntent.length,
+      markedUncertain: markedUncertain.length,
+      cleanup,
+      workflowDispatch,
+      incomplete: cleanup.incomplete || workflowDispatch.incomplete
+        || recoveredPreIntent.length === 100 || markedUncertain.length === 100,
+    };
     return res.status(200).json({ ok: true, summary });
   } catch (error) {
     console.error('[transcription-pilot/cron] worker failed:', error?.code || error?.name || 'unknown');

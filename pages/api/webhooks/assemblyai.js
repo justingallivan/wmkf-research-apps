@@ -1,5 +1,6 @@
 import { verifyAssemblyAIWebhook } from '../../../lib/services/transcription-pilot/crypto';
-import { recordTranscriptionCallbackCandidate } from '../../../lib/services/transcription-pilot/store';
+import { rearmTranscriptionWorkflowDispatch, recordTranscriptionCallbackCandidate } from '../../../lib/services/transcription-pilot/store';
+import { dispatchQueuedTranscriptionWorkflow } from '../../../lib/services/transcription-pilot/workflow-dispatch';
 
 export const config = { api: { bodyParser: { sizeLimit: '64kb' } } };
 
@@ -13,6 +14,10 @@ export default async function handler(req, res) {
   if (typeof providerTranscriptId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(providerTranscriptId)) return res.status(400).end();
   try {
     const result = await recordTranscriptionCallbackCandidate({ attemptCorrelationId: correlationId, providerTranscriptId });
+    if (result.job?.status === 'submission_uncertain' && !result.conflict) {
+      await rearmTranscriptionWorkflowDispatch({ jobId: result.job.id });
+      await dispatchQueuedTranscriptionWorkflow({ jobId: result.job.id });
+    }
     // An authenticated, expired/unknown correlator is intentionally acknowledged;
     // callbacks contain no content and cannot create or publish a job.
     return res.status(200).json({ received: true, recorded: result.recorded === true });

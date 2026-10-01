@@ -5,6 +5,9 @@ jest.mock('../../lib/services/transcription-pilot/store', () => ({
   claimNextDueTranscriptionJob: jest.fn(),
   claimNextExpiredContentTranscriptionJob: jest.fn(),
   claimNextTranscriptionJob: jest.fn(),
+  claimTranscriptionJob: jest.fn(),
+  claimTranscriptionCleanup: jest.fn(),
+  getTranscriptionJob: jest.fn(),
   finishTranscriptionLocalCleanup: jest.fn(),
   getLeasedTranscriptionJob: jest.fn(),
   markExpiredTranscriptionSubmissionsUncertain: jest.fn(),
@@ -41,7 +44,7 @@ import * as runtime from '../../lib/services/transcription-pilot/runtime';
 import { submitAssemblyAITranscription } from '../../lib/services/transcription-pilot/provider';
 import { uploadAssemblyAIAudio } from '../../lib/services/transcription-pilot/provider';
 import { getAssemblyAITranscript, deleteAssemblyAITranscript } from '../../lib/services/transcription-pilot/provider';
-import { drainTranscriptionPilot } from '../../lib/services/transcription-pilot/worker';
+import { advanceTranscriptionPilotJob, drainTranscriptionCleanup, drainTranscriptionPilot } from '../../lib/services/transcription-pilot/worker';
 
 const queued = {
   id: '11111111-1111-4111-8111-111111111111', owner_profile_id: 9,
@@ -82,6 +85,9 @@ describe('transcription worker submission safety', () => {
     store.claimNextDueTranscriptionJob.mockResolvedValueOnce({ job: { ...queued, status: 'submission_uncertain', provider_transcript_id: null, callback_candidate_transcript_id: null }, leaseToken: queued.lease_token }).mockResolvedValue(null);
     store.claimNextExpiredContentTranscriptionJob.mockResolvedValue(null);
     store.claimNextCleanupTranscriptionJob.mockResolvedValue(null);
+    store.claimTranscriptionJob.mockResolvedValue(null);
+    store.claimTranscriptionCleanup.mockResolvedValue(null);
+    store.getTranscriptionJob.mockResolvedValue(null);
     submitAssemblyAITranscription.mockRejectedValue(new Error('network response lost after request write'));
   });
   afterEach(() => {
@@ -196,5 +202,84 @@ describe('transcription worker submission safety', () => {
     expect(deleteAssemblyAITranscript).not.toHaveBeenCalled();
     expect(store.markTranscriptionProviderDeletionCompleted).not.toHaveBeenCalled();
     expect(store.publishReadyTranscriptionJob).not.toHaveBeenCalled();
+  });
+
+  it('pauses a queued job before any claim or provider call when either switch is off', async () => {
+    process.env.TRANSCRIPTION_PILOT_ENABLED = 'true';
+    process.env.TRANSCRIPTION_SUBMISSIONS_ENABLED = 'false';
+    store.getTranscriptionJob.mockResolvedValue({ ...queued, status: 'queued' });
+    await expect(advanceTranscriptionPilotJob(queued.id)).resolves.toEqual({ state: 'paused' });
+    expect(store.claimTranscriptionJob).not.toHaveBeenCalled();
+    expect(uploadAssemblyAIAudio).not.toHaveBeenCalled();
+    expect(submitAssemblyAITranscription).not.toHaveBeenCalled();
+  });
+
+  it('waits exactly until the persisted next-attempt time instead of polling early', async () => {
+    const next = Date.now() + 120_000;
+    store.getTranscriptionJob.mockResolvedValue({ ...queued, status: 'processing', next_attempt_at: new Date(next),
+      lease_expires_at: null, provider_transcript_id: 'provider-1' });
+    store.claimNextDueTranscriptionJob.mockReset().mockResolvedValue(null);
+    const result = await advanceTranscriptionPilotJob(queued.id);
+    expect(result).toEqual({ state: 'wait', waitUntil: next });
+    expect(store.claimNextDueTranscriptionJob).toHaveBeenCalledWith({ jobId: queued.id });
+    expect(getAssemblyAITranscript).not.toHaveBeenCalled();
+  });
+
+  it('waits for a current lease and exits on an unresolved post-intent outcome without resubmitting', async () => {
+    const leaseUntil = Date.now() + 120_000;
+    store.getTranscriptionJob.mockResolvedValueOnce({ ...queued, status: 'processing', provider_transcript_id: 'provider-1', lease_expires_at: new Date(leaseUntil) });
+    store.claimNextDueTranscriptionJob.mockReset().mockResolvedValue(null);
+    const waiting = await advanceTranscriptionPilotJob(queued.id);
+    expect(waiting.state).toBe('wait');
+    expect(waiting.waitUntil).toBeGreaterThanOrEqual(leaseUntil - 5);
+
+    store.getTranscriptionJob.mockResolvedValueOnce({ ...queued, status: 'submission_uncertain', submission_intent_at: new Date(), provider_transcript_id: null, callback_candidate_transcript_id: null });
+    await expect(advanceTranscriptionPilotJob(queued.id)).resolves.toEqual({ state: 'attention' });
+    expect(submitAssemblyAITranscription).not.toHaveBeenCalled();
+    expect(uploadAssemblyAIAudio).not.toHaveBeenCalled();
+  });
+
+  it('continues reconciliation for a callback candidate found during expired-intent recovery', async () => {
+    const candidate = { ...queued, status: 'submission_uncertain', lease_expires_at: new Date(Date.now() - 1),
+      submission_intent_at: new Date(Date.now() - 60_000), callback_candidate_transcript_id: 'candidate-1', provider_transcript_id: null };
+    store.getTranscriptionJob.mockResolvedValueOnce({ ...candidate, status: 'submitting' }).mockResolvedValueOnce(candidate);
+    store.claimNextDueTranscriptionJob.mockReset().mockResolvedValue(null);
+    const result = await advanceTranscriptionPilotJob(queued.id);
+    expect(result.state).toBe('wait');
+    expect(store.requeueExpiredPreIntentTranscriptionSubmissions).toHaveBeenCalledWith({ jobId: queued.id, limit: 1 });
+    expect(store.markExpiredTranscriptionSubmissionsUncertain).toHaveBeenCalledWith({ jobId: queued.id, limit: 1 });
+    expect(store.claimNextDueTranscriptionJob).toHaveBeenCalledWith({ jobId: queued.id });
+    expect(submitAssemblyAITranscription).not.toHaveBeenCalled();
+  });
+
+  it('returns complete for a ready row and never sleeps until its retention deadline', async () => {
+    store.getTranscriptionJob.mockResolvedValue({ ...queued, status: 'ready', expires_at: new Date(Date.now() + 86_400_000) });
+    await expect(advanceTranscriptionPilotJob(queued.id)).resolves.toEqual({ state: 'complete' });
+    expect(store.claimTranscriptionCleanup).not.toHaveBeenCalled();
+  });
+
+  it('runs bounded daily cleanup with expired content first and reports pending work', async () => {
+    const expired = { ...queued, status: 'expired', cleanup_requested_at: new Date(), expires_at: new Date(Date.now() - 1),
+      provider_upload_ref_ciphertext: null, input_cleanup_pathname: null, output_cleanup_pathname: null,
+      diagnostic_cleanup_pathname: null, local_cleanup_completed_at: new Date(), provider_cleanup_completed_at: new Date() };
+    const pending = { ...expired, status: 'failed', expires_at: new Date(Date.now() + 86_400_000),
+      provider_upload_ref_ciphertext: 'encrypted-ref', content_purged_at: null, local_cleanup_completed_at: null,
+      provider_cleanup_completed_at: null };
+    store.claimNextExpiredContentTranscriptionJob.mockResolvedValueOnce({ job: expired, leaseToken: queued.lease_token }).mockResolvedValue(null);
+    store.claimNextCleanupTranscriptionJob.mockResolvedValueOnce({ job: pending, leaseToken: queued.lease_token }).mockResolvedValue(null);
+    store.expireTranscriptionContent.mockResolvedValue(expired);
+    store.getLeasedTranscriptionJob.mockResolvedValue(pending);
+    store.finishTranscriptionLocalCleanup.mockResolvedValue(expired);
+    process.env.TRANSCRIPTION_PILOT_ENABLED = 'false';
+    process.env.TRANSCRIPTION_SUBMISSIONS_ENABLED = 'false';
+
+    const result = await drainTranscriptionCleanup({ maxJobs: 2 });
+    expect(result).toEqual({ expiredContent: 1, cleanup: 1, incomplete: true });
+    expect(store.claimNextExpiredContentTranscriptionJob).toHaveBeenCalledTimes(2);
+    expect(store.claimNextCleanupTranscriptionJob).toHaveBeenCalledTimes(1);
+    expect(store.claimNextExpiredContentTranscriptionJob.mock.invocationCallOrder[0])
+      .toBeLessThan(store.claimNextCleanupTranscriptionJob.mock.invocationCallOrder[0]);
+    expect(uploadAssemblyAIAudio).not.toHaveBeenCalled();
+    expect(submitAssemblyAITranscription).not.toHaveBeenCalled();
   });
 });

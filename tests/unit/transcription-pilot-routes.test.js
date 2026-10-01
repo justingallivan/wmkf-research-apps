@@ -5,6 +5,7 @@ jest.mock('../../lib/services/transcription-pilot/runtime', () => {
     createOwnerUpload: jest.fn(),
     listOwnerJobs: jest.fn(),
     getOwnerJob: jest.fn(),
+    providerReference: jest.fn(),
     requirePilotEnabled: jest.fn(),
     TranscriptionPilotError,
     validateOwnerProfile: jest.fn((profileId) => {
@@ -23,9 +24,11 @@ jest.mock('../../lib/services/transcription-pilot/store', () => ({
 jest.mock('../../lib/services/transcription-pilot/provider', () => ({
   deleteAssemblyAITranscript: jest.fn(), getAssemblyAITranscript: jest.fn(),
 }));
+jest.mock('../../lib/services/transcription-pilot/workflow-dispatch', () => ({ dispatchQueuedTranscriptionWorkflow: jest.fn() }));
 
 import { requireSuperuser } from '../../lib/utils/auth';
-import { createOwnerUpload, listOwnerJobs, requirePilotEnabled, TranscriptionPilotError } from '../../lib/services/transcription-pilot/runtime';
+import { createOwnerUpload, getOwnerJob, providerReference, listOwnerJobs, requirePilotEnabled, TranscriptionPilotError } from '../../lib/services/transcription-pilot/runtime';
+import { dispatchQueuedTranscriptionWorkflow } from '../../lib/services/transcription-pilot/workflow-dispatch';
 import * as store from '../../lib/services/transcription-pilot/store';
 import * as provider from '../../lib/services/transcription-pilot/provider';
 import jobsHandler from '../../pages/api/admin/transcription-pilot/jobs/index';
@@ -42,7 +45,11 @@ function response() {
 
 describe('transcription pilot owner routes', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
+    const runtime = jest.requireMock('../../lib/services/transcription-pilot/runtime');
+    runtime.validateOwnerProfile.mockImplementation(profileId => {
+      if (!Number.isSafeInteger(profileId) || profileId <= 0) throw new TranscriptionPilotError('profile_required', 401);
+    });
     requireSuperuser.mockResolvedValue({ profileId: 42 });
     listOwnerJobs.mockResolvedValue([]);
   });
@@ -85,5 +92,25 @@ describe('transcription pilot owner routes', () => {
     expect(store.claimUncertainTranscriptionJobForReconcile).not.toHaveBeenCalled();
     expect(provider.getAssemblyAITranscript).not.toHaveBeenCalled();
     expect(provider.deleteAssemblyAITranscript).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])('resumes a verified job and reports partial success if delivery fails (%s)', async failDispatch => {
+    const id = '00000000-0000-4000-8000-000000000001';
+    const job = { id, version: 1, status: 'submission_uncertain', provider_region: 'us', provider_upload_ref_ciphertext: 'encrypted-fixture' };
+    store.getOwnerTranscriptionJob.mockResolvedValue(job);
+    store.claimUncertainTranscriptionJobForReconcile.mockResolvedValue({ job, leaseToken: 'lease-fixture' });
+    store.getLeasedTranscriptionJob.mockResolvedValue(job);
+    provider.getAssemblyAITranscript.mockResolvedValue({ audio_url: 'fixture-reference' });
+    providerReference.mockResolvedValue('fixture-reference');
+    store.reconcileVerifiedTranscriptionProviderId.mockResolvedValue({ ...job, version: 2, status: 'processing' });
+    getOwnerJob.mockResolvedValue({ id, status: 'processing' });
+    if (failDispatch) dispatchQueuedTranscriptionWorkflow.mockRejectedValue(new Error('private backend error'));
+    const res = response();
+    await reconcileHandler({ method: 'POST', body: { providerTranscriptId: 'provider-1', expectedVersion: 1 }, query: { id } }, res);
+    expect(dispatchQueuedTranscriptionWorkflow).toHaveBeenCalledWith({ jobId: id, ownerProfileId: 42 });
+    expect(res.statusCode).toBe(failDispatch ? 503 : 200);
+    expect(res.body.job).toEqual({ id, status: 'processing' });
+    expect(JSON.stringify(res.body)).not.toContain('private backend');
+    if (failDispatch) expect(res.body.code).toBe('transcription_dispatch_pending');
   });
 });

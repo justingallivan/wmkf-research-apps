@@ -9,6 +9,7 @@ import {
 } from '../../../../../../lib/services/transcription-pilot/store';
 import { deleteAssemblyAITranscript, getAssemblyAITranscript } from '../../../../../../lib/services/transcription-pilot/provider';
 import { providerReference, getOwnerJob, requirePilotEnabled, TranscriptionPilotError, validateOwnerProfile } from '../../../../../../lib/services/transcription-pilot/runtime';
+import { dispatchQueuedTranscriptionWorkflow } from '../../../../../../lib/services/transcription-pilot/workflow-dispatch';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).json({ error: 'Method not allowed' }); }
@@ -49,6 +50,17 @@ export default async function handler(req, res) {
       return res.status(200).json({ job: await getOwnerJob({ ownerProfileId: gate.profileId, jobId: req.query.id }), cleanupOnly: true, providerDeleted: true });
     }
     await releaseTranscriptionLease({ jobId: reconciled.id, leaseToken: lease.leaseToken, expectedVersion: reconciled.version, expectedStatuses: ['processing', 'submission_uncertain'] });
+    // Reconciliation atomically re-arms the outbox. Resume the verified job,
+    // including when its earlier workflow stopped for operator attention.
+    try {
+      await dispatchQueuedTranscriptionWorkflow({ jobId: reconciled.id, ownerProfileId: gate.profileId });
+    } catch {
+      return res.status(503).json({
+        error: 'Provider verification succeeded; processing delivery is pending. Refresh status before retrying.',
+        code: 'transcription_dispatch_pending', retryable: true,
+        job: await getOwnerJob({ ownerProfileId: gate.profileId, jobId: req.query.id }),
+      });
+    }
     return res.status(200).json({ job: await getOwnerJob({ ownerProfileId: gate.profileId, jobId: req.query.id }) });
   } catch (error) {
     if (lease) {

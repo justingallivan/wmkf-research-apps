@@ -56,6 +56,57 @@ describe('transcription pilot persistence contract', () => {
     expect(db.query).not.toHaveBeenCalled();
   });
 
+  it('creates a workflow outbox record in the same queue transition query', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    await store.queueJob({
+      jobId: '00000000-0000-4000-8000-000000000001', ownerProfileId: 7,
+      expectedVersion: 2, acknowledgementAt: new Date(), verifiedContentType: 'audio/mp4',
+      verifiedBytes: 8192, durationMs: 5000, sha256: 'a'.repeat(64), etag: 'opaque-etag',
+    });
+    const [query, params] = db.query.mock.calls[0];
+    expect(query).toMatch(/WITH queued AS \(\s*UPDATE transcription_jobs SET/s);
+    expect(query).toMatch(/INSERT INTO transcription_workflow_dispatches \(job_id\)/);
+    expect(query).toMatch(/SELECT id FROM queued/);
+    expect(params[0]).toBe('00000000-0000-4000-8000-000000000001');
+  });
+
+  it('fences dispatch acknowledgement and errors with opaque attempt tokens', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    const id = '00000000-0000-4000-8000-000000000001';
+    const token = '00000000-0000-4000-8000-000000000002';
+    await expect(store.acknowledgeWorkflowDispatch({ jobId: id, dispatchToken: token, attemptNo: 1,
+      workflowRunId: 'run_opaque_1' })).resolves.toBeNull();
+    const [ackSql, ackParams] = db.query.mock.calls[0];
+    expect(ackSql).toMatch(/WHERE job_id = \$1 AND dispatch_token = \$2 AND attempt_no = \$3/);
+    expect(ackSql).toMatch(/state = 'dispatching' AND lease_expires_at > NOW\(\)/);
+    expect(ackParams.slice(0, 4)).toEqual([id, token, 1, 'run_opaque_1']);
+
+    await expect(store.failWorkflowDispatch({ jobId: id, dispatchToken: token, attemptNo: 1,
+      errorCode: 'workflow_start_failed' })).resolves.toBeNull();
+    const [failSql] = db.query.mock.calls[1];
+    expect(failSql).toMatch(/WHERE job_id = \$1 AND dispatch_token = \$2 AND attempt_no = \$3/);
+    await expect(store.failWorkflowDispatch({ jobId: id, dispatchToken: token, attemptNo: 1,
+      errorCode: 'raw Provider message' })).rejects.toMatchObject({ code: 'transcription_invalid_value' });
+    expect(db.query).toHaveBeenCalledTimes(2);
+  });
+
+  it('atomically rearms completed dispatches when verified reconciliation restores provider work', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    await store.reconcileVerifiedProviderId({
+      jobId: '00000000-0000-4000-8000-000000000001', ownerProfileId: 7,
+      leaseToken: '00000000-0000-4000-8000-000000000002', expectedVersion: 4,
+      providerTranscriptId: 'verified-provider-id',
+    });
+    const [query] = db.query.mock.calls[0];
+    expect(query).toMatch(/WITH reconciled AS \(\s*UPDATE transcription_jobs SET/s);
+    expect(query).toMatch(/UPDATE transcription_workflow_dispatches dispatch SET state = 'pending'/);
+    expect(query).toMatch(/dispatch_token = NULL, lease_expires_at = NULL/);
+    expect(query).not.toMatch(/dispatch\.state IN \('completed', 'pending'\)/);
+  });
+
   it('suppresses populated evaluation metadata after receipt expiry without waiting for cron', () => {
     const row = { status: 'failed', receipt_expires_at: new Date(Date.now() - 1),
       original_filename: 'meeting.mp3', declared_bytes: 500, verified_bytes: 500,

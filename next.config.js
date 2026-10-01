@@ -2,6 +2,7 @@ const {
   LEGACY_HOST,
   CANONICAL_HOST,
 } = require('./lib/utils/legacy-host-redirect');
+const { withWorkflow } = require('workflow/next');
 
 const securityHeaders = [
   {
@@ -118,6 +119,22 @@ const nextConfig = {
       './node_modules/uint8array-extras/**/*',
       './node_modules/win-guid/**/*',
     ],
+    // The generated Workflow flow route executes durable media-inspection
+    // steps, whose worker/parser imports are resolved at runtime.
+    '/.well-known/workflow/v1/flow': [
+      './lib/services/transcription-pilot/audio-inspector-worker.js',
+      './node_modules/music-metadata/**/*',
+      './node_modules/@borewit/text-codec/**/*',
+      './node_modules/@tokenizer/**/*',
+      './node_modules/content-type/**/*',
+      './node_modules/debug/**/*',
+      './node_modules/file-type/**/*',
+      './node_modules/media-typer/**/*',
+      './node_modules/strtok3/**/*',
+      './node_modules/token-types/**/*',
+      './node_modules/uint8array-extras/**/*',
+      './node_modules/win-guid/**/*',
+    ],
   },
   async redirects() {
     return [
@@ -202,4 +219,4 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig
+module.exports = withWorkflow(nextConfig)

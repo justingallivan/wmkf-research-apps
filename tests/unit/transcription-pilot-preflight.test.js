@@ -1,9 +1,20 @@
 jest.mock('../../lib/utils/cron-auth', () => ({ verifyTranscriptionCronSecret: jest.fn(() => true) }));
-jest.mock('../../lib/services/transcription-pilot/worker', () => ({ drainTranscriptionPilot: jest.fn() }));
+jest.mock('../../lib/services/transcription-pilot/worker', () => ({
+  drainTranscriptionPilot: jest.fn(), drainTranscriptionCleanup: jest.fn(),
+}));
+jest.mock('../../lib/services/transcription-pilot/store', () => ({
+  requeueExpiredPreIntentTranscriptionSubmissions: jest.fn(),
+  markExpiredTranscriptionSubmissionsUncertain: jest.fn(),
+}));
+jest.mock('../../lib/services/transcription-pilot/workflow-dispatch', () => ({
+  drainTranscriptionWorkflowDispatches: jest.fn(),
+}));
 
 import handler from '../../pages/api/cron/drain-transcriptions';
 import { verifyTranscriptionCronSecret } from '../../lib/utils/cron-auth';
-import { drainTranscriptionPilot } from '../../lib/services/transcription-pilot/worker';
+import { drainTranscriptionCleanup, drainTranscriptionPilot } from '../../lib/services/transcription-pilot/worker';
+import { requeueExpiredPreIntentTranscriptionSubmissions, markExpiredTranscriptionSubmissionsUncertain } from '../../lib/services/transcription-pilot/store';
+import { drainTranscriptionWorkflowDispatches } from '../../lib/services/transcription-pilot/workflow-dispatch';
 import { runTranscriptionPreflight, validateTranscriptionPreflightEnv } from '../../lib/services/transcription-pilot/preflight';
 
 const endpoint = 'ep-gentle-smoke-b77a6d90-pooler.c-13.us-east-1.aws.neon.tech';
@@ -52,7 +63,13 @@ function readOnlyClient({ readOnly = 'on', database = 'neondb', jobs = '0' } = {
 }
 
 describe('transcription Preview readiness preflight', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    requeueExpiredPreIntentTranscriptionSubmissions.mockResolvedValue([]);
+    markExpiredTranscriptionSubmissionsUncertain.mockResolvedValue([]);
+    drainTranscriptionCleanup.mockResolvedValue({ expiredContent: 0, cleanup: 0, incomplete: false });
+    drainTranscriptionWorkflowDispatches.mockResolvedValue({ recovered: 0, started: 0, failed: 0, incomplete: false });
+  });
 
   it.each([
     ['not Preview', { VERCEL_ENV: 'production' }],
@@ -138,5 +155,18 @@ describe('transcription Preview readiness preflight', () => {
     await handler({ method: 'GET', query: { preflight: ['1', '1'] } }, res);
     expect(res.statusCode).toBe(400);
     expect(drainTranscriptionPilot).not.toHaveBeenCalled();
+  });
+
+  it('passes one shared route deadline into the dispatch sweep and preserves incomplete status', async () => {
+    drainTranscriptionCleanup.mockResolvedValue({ expiredContent: 3, cleanup: 2, incomplete: true });
+    const res = response();
+    await handler({ method: 'GET', query: {} }, res);
+    expect(res.statusCode).toBe(200);
+    expect(drainTranscriptionCleanup).toHaveBeenCalledWith({ maxJobs: 100 });
+    const [{ deadline, maxRuns }] = drainTranscriptionWorkflowDispatches.mock.calls[0];
+    expect(maxRuns).toBe(20);
+    expect(deadline).toBeGreaterThan(Date.now());
+    expect(deadline).toBeLessThanOrEqual(Date.now() + 270_000);
+    expect(res.body.summary.incomplete).toBe(true);
   });
 });

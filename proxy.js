@@ -203,6 +203,6 @@ export const config = {
      *   match, same safety rationale as the BILL webhook.
      * - /api/webhooks/assemblyai (per-attempt HMAC shared secret); exact path.
      */
-    '/((?!_next/static|_next/image|favicon\\.ico|apple-touch-icon|api/auth|api/cron|api/irs|api/webhooks/bill$|api/webhooks/vercel-log-drain$|api/webhooks/assemblyai$|api/bill/onboard-reviewer$).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|apple-touch-icon|\\.well-known/workflow/|api/auth|api/cron|api/irs|api/webhooks/bill$|api/webhooks/vercel-log-drain$|api/webhooks/assemblyai$|api/bill/onboard-reviewer$).*)',
   ],
 };

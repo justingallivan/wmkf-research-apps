@@ -35,10 +35,17 @@ jest.mock('next/server', () => ({
 }));
 
 import proxyExport from '../../proxy';
+import { config as proxyConfig } from '../../proxy';
 import { _resetWarningsForTests } from '../../lib/utils/auth-policy';
 
 const { proxyFn, options } = proxyExport;
 const authorized = options.callbacks.authorized;
+
+test('proxy excludes only the internal Workflow route subtree', () => {
+  const matcher = proxyConfig.matcher[0];
+  expect(matcher).toContain('\\.well-known/workflow/');
+  expect(matcher).not.toContain('well-known|');
+});
 
 // jest.setup.js replaces global.crypto with an encryption-only mock that lacks
 // getRandomValues (the Web Crypto primitive proxy.js uses for the nonce).

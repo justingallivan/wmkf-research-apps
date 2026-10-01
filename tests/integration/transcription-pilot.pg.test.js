@@ -24,7 +24,10 @@ if (/neon\.tech|vercel-storage/i.test(TEST_URL)
   throw new Error('Refusing to run the transcription pilot proof against a shared Production/Preview database.');
 }
 const describeIf = TEST_URL ? describe : describe.skip;
-const MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/060_transcription_jobs.sql');
+const MIGRATION_PATHS = [
+  path.join(process.cwd(), 'lib/db/migrations/060_transcription_jobs.sql'),
+  path.join(process.cwd(), 'lib/db/migrations/061_transcription_workflow_dispatches.sql'),
+];
 
 describeIf('transcription pilot store (isolated local Postgres proof)', () => {
   let admin;
@@ -79,8 +82,7 @@ describeIf('transcription pilot store (isolated local Postgres proof)', () => {
     await db.query('CREATE TABLE user_profiles (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE)');
     const owners = await db.query("INSERT INTO user_profiles(name) VALUES ('pilot-owner'),('other-owner') RETURNING id");
     [ownerId, otherOwnerId] = owners.rows.map(row => row.id);
-    const migration = fs.readFileSync(MIGRATION_PATH, 'utf8');
-    await db.query(migration);
+    for (const migrationPath of MIGRATION_PATHS) await db.query(fs.readFileSync(migrationPath, 'utf8'));
     store = createTranscriptionPilotStore(db);
   });
 
@@ -133,6 +135,47 @@ describeIf('transcription pilot store (isolated local Postgres proof)', () => {
     expect(claimed.status).toBe('submitting');
     const active = await pool.query("SELECT count(*)::int AS n FROM transcription_jobs WHERE status IN ('submitting','processing','saving','submission_uncertain')");
     expect(active.rows[0].n).toBe(1);
+  });
+
+  it('fences duplicate workflow starts with dispatch lease, attempt number, and late-ack CAS', async () => {
+    const queued = await makeQueuedJob();
+    const [first, duplicate] = await Promise.all([
+      store.claimWorkflowDispatch({ jobId: queued.id, ownerProfileId: ownerId }),
+      store.claimWorkflowDispatch({ jobId: queued.id, ownerProfileId: ownerId }),
+    ]);
+    expect([first, duplicate].filter(Boolean)).toHaveLength(1);
+    const claim = first || duplicate;
+    expect(claim.state).toBe('dispatching');
+    expect(claim.attempt_no).toBe(1);
+    expect(await store.acknowledgeWorkflowDispatch({ jobId: queued.id, dispatchToken: claim.dispatch_token,
+      attemptNo: claim.attempt_no, workflowRunId: 'run_fixture_1' })).toMatchObject({ state: 'running' });
+    expect(await store.checkWorkflowDispatchAttempt({ jobId: queued.id, attemptNo: 1 })).toBe('running');
+    expect(await store.finishWorkflowDispatch({ jobId: queued.id, attemptNo: 1 })).toMatchObject({ state: 'completed' });
+    expect(await store.acknowledgeWorkflowDispatch({ jobId: queued.id, dispatchToken: claim.dispatch_token,
+      attemptNo: claim.attempt_no, workflowRunId: 'run_fixture_late' })).toBeNull();
+    expect(await store.getWorkflowDispatch({ jobId: queued.id })).toMatchObject({ state: 'completed', attempt_no: 1 });
+  });
+
+  it.each(['reconcile', 'callback'])('fences an old attention workflow after %s re-arms delivery', async recovery => {
+    const queued = await makeQueuedJob();
+    const dispatch = await store.claimWorkflowDispatch({ jobId: queued.id, ownerProfileId: ownerId });
+    await store.acknowledgeWorkflowDispatch({ jobId: queued.id, dispatchToken: dispatch.dispatch_token,
+      attemptNo: dispatch.attempt_no, workflowRunId: 'run_before_recovery' });
+    await pool.query(`UPDATE transcription_jobs SET status='submission_uncertain', submission_intent_at=NOW(),
+      attempt_correlation_id=$2, provider_upload_ref_ciphertext='fixture-reference',
+      callback_candidate_transcript_id='verified-candidate' WHERE id=$1`, [queued.id, crypto.randomUUID()]);
+    if (recovery === 'reconcile') {
+      const lease = await store.claimUncertainForReconcile({ jobId: queued.id, ownerProfileId: ownerId });
+      expect(await store.reconcileVerifiedProviderId({ jobId: queued.id, ownerProfileId: ownerId,
+        leaseToken: lease.leaseToken, expectedVersion: lease.job.version,
+        providerTranscriptId: 'verified-candidate' })).toMatchObject({ status: 'processing' });
+    } else {
+      expect(await store.rearmWorkflowDispatch({ jobId: queued.id })).toBeTruthy();
+    }
+    expect(await store.getWorkflowDispatch({ jobId: queued.id })).toMatchObject({ state: 'pending' });
+    expect(await store.finishWorkflowDispatch({ jobId: queued.id, attemptNo: dispatch.attempt_no })).toBeNull();
+    expect(await store.acknowledgeWorkflowDispatch({ jobId: queued.id, dispatchToken: dispatch.dispatch_token,
+      attemptNo: dispatch.attempt_no, workflowRunId: 'late_run' })).toBeNull();
   });
 
   it('recovers pre-intent leases to queued and post-intent leases to uncertain without permitting a second claim', async () => {

@@ -56,6 +56,7 @@
     "055_post_presentation_materials.sql",
     "056_integrity_screenings_request_id.sql",
     "057_integrity_screening_reviews.sql",
-    "060_transcription_jobs.sql"
+    "060_transcription_jobs.sql",
+    "061_transcription_workflow_dispatches.sql"
   ]
 }

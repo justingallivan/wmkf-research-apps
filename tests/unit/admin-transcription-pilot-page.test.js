@@ -371,6 +371,116 @@ test('owner change resets the pending upload controls and busy state', async () 
   expect(requestEnvelope).not.toHaveBeenCalledWith(expect.stringMatching(/\/start$/), expect.anything());
 });
 
+test('Retry start only redelivers an existing queued job with its current version', async () => {
+  const job = readyJob('queued-retry', 'saved-audio.m4a', { status: 'queued', label: 'Queued', version: 8 });
+  const requests = [];
+  requestEnvelope.mockImplementation(async (url, options = {}) => {
+    requests.push({ url, options });
+    if (url.endsWith('/jobs?limit=50')) {
+      return { ok: true, status: 200, data: { pilotEnabled: true, submissionsEnabled: false, jobs: [job] } };
+    }
+    if (url.endsWith(`/jobs/${job.id}`)) {
+      return { ok: true, status: 200, data: { job, transcript: null } };
+    }
+    if (url.endsWith(`/jobs/${job.id}/start`)) {
+      return { ok: true, status: 202, data: { job: { ...job, version: 9 } } };
+    }
+    throw new Error(`Unexpected request ${url}`);
+  });
+
+  render(<TranscriptionPilotPage />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Retry start' }));
+
+  await screen.findByText(/Start delivery was accepted for this existing queued job/);
+  const startRequests = requests.filter(({ url }) => url.endsWith(`/jobs/${job.id}/start`));
+  expect(startRequests).toHaveLength(1);
+  expect(startRequests[0].options.body).toEqual({ expectedVersion: 8, acknowledgeNonSensitive: true });
+  expect(requests.some(({ url, options }) => url.endsWith('/jobs') && options.method === 'POST')).toBe(false);
+  expect(put).not.toHaveBeenCalled();
+});
+
+test('a dispatch-pending upload response selects the saved job and offers delivery retry without another upload', async () => {
+  const queuedJob = readyJob('saved-after-503', 'approved.m4a', { status: 'queued', label: 'Queued', version: 4 });
+  const requests = [];
+  let prepared = false;
+  Object.defineProperty(globalThis.crypto, 'randomUUID', { configurable: true, value: () => 'upload-idempotency-key' });
+  put.mockResolvedValue({ url: 'private-upload' });
+  requestEnvelope.mockImplementation(async (url, options = {}) => {
+    requests.push({ url, options });
+    if (url.endsWith('/jobs?limit=50')) {
+      return { ok: true, status: 200, data: { pilotEnabled: true, submissionsEnabled: true, jobs: prepared ? [queuedJob] : [] } };
+    }
+    if (url.endsWith('/jobs') && options.method === 'POST') {
+      prepared = true;
+      return { ok: true, status: 201, data: { job: { id: queuedJob.id, version: 1 }, upload: { pathname: 'opaque-path', token: 'upload-token' } } };
+    }
+    if (url.endsWith(`/jobs/${queuedJob.id}/start`)) {
+      return { ok: false, status: 503, data: { error: 'Start delivery is pending.', code: 'transcription_dispatch_pending', retryable: true, job: queuedJob } };
+    }
+    if (url.endsWith(`/jobs/${queuedJob.id}`)) {
+      return { ok: true, status: 200, data: { job: queuedJob, transcript: null } };
+    }
+    throw new Error(`Unexpected request ${url}`);
+  });
+
+  render(<TranscriptionPilotPage />);
+  await screen.findByRole('button', { name: 'Upload and start transcription' });
+  fireEvent.change(screen.getByLabelText('Recording'), { target: { files: [new File(['audio'], 'approved.m4a', { type: 'audio/mp4' })] } });
+  fireEvent.click(screen.getByLabelText(/non-sensitive and approved/));
+  fireEvent.click(screen.getByLabelText(/may consume paid credits/));
+  fireEvent.click(screen.getByRole('button', { name: 'Upload and start transcription' }));
+
+  expect(await screen.findByRole('button', { name: 'Retry start' })).toBeInTheDocument();
+  expect(screen.getByText(/already queued, but background start delivery is still pending/)).toBeInTheDocument();
+  expect(screen.getByText(/Use Retry start below; do not upload it again/)).toBeInTheDocument();
+  expect(screen.getByLabelText('Recording')).toHaveValue('');
+  expect(screen.getByLabelText(/non-sensitive and approved/)).not.toBeChecked();
+  expect(screen.getByLabelText(/may consume paid credits/)).not.toBeChecked();
+  expect(put).toHaveBeenCalledTimes(1);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Retry start' }));
+  await screen.findByText(/Start delivery is still pending for this queued job/);
+  const startRequests = requests.filter(({ url }) => url.endsWith(`/jobs/${queuedJob.id}/start`));
+  expect(startRequests).toHaveLength(2);
+  expect(startRequests[1].options.body).toEqual({ expectedVersion: queuedJob.version, acknowledgeNonSensitive: true });
+  expect(requests.filter(({ url, options }) => url.endsWith('/jobs') && options.method === 'POST')).toHaveLength(1);
+  expect(put).toHaveBeenCalledTimes(1);
+});
+
+test('a stale queued-start response is ignored after the owner changes', async () => {
+  const queuedJob = readyJob('old-owner-queued', 'old-owner-audio.m4a', { status: 'queued', label: 'Queued' });
+  let resolveStart;
+  let listingOwner = 73;
+  requestEnvelope.mockImplementation((url) => {
+    if (url.endsWith('/jobs?limit=50')) {
+      return Promise.resolve({ ok: true, status: 200, data: { pilotEnabled: true, submissionsEnabled: false, jobs: listingOwner === 73 ? [queuedJob] : [] } });
+    }
+    if (url.endsWith(`/jobs/${queuedJob.id}`)) {
+      return Promise.resolve({ ok: true, status: 200, data: { job: queuedJob, transcript: null } });
+    }
+    if (url.endsWith(`/jobs/${queuedJob.id}/start`)) {
+      return new Promise((resolve) => { resolveStart = resolve; });
+    }
+    throw new Error(`Unexpected request ${url}`);
+  });
+
+  const view = render(<TranscriptionPilotPage />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Retry start' }));
+  await waitFor(() => expect(resolveStart).toBeDefined());
+
+  listingOwner = 74;
+  useProfile.mockReturnValue({ id: 74, status: 'ready', currentProfile: { id: 74 } });
+  useSession.mockReturnValue({ data: { user: { profileId: 74 } }, status: 'authenticated' });
+  view.rerender(<TranscriptionPilotPage />);
+  await screen.findByText(/Select a recording to review its status/);
+  await act(async () => {
+    resolveStart({ ok: true, status: 202, data: { job: { ...queuedJob, version: queuedJob.version + 1 } } });
+  });
+
+  expect(screen.queryAllByText('old-owner-audio.m4a')).toHaveLength(0);
+  expect(screen.queryByText(/Start delivery was accepted/)).not.toBeInTheDocument();
+});
+
 test('cleanup-requested uncertain jobs offer verified cleanup without transcript publication', async () => {
   const job = readyJob('uncertain-cleanup', 'uncertain.m4a', {
     status: 'submission_uncertain',

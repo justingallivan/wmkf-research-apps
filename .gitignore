@@ -123,3 +123,4 @@ smoke-results-*.txt
 
 # stray agent run logs at repo root
 /*.log
+/.swc

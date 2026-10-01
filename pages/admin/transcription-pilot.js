@@ -74,6 +74,7 @@ async function pilotApi(url, options = {}) {
     const error = new Error(data.message || data.error || `Request failed (${envelope.status || 'network error'}).`);
     error.code = data.code || null;
     error.status = envelope.status || 0;
+    error.payload = data;
     throw error;
   }
   return data;
@@ -396,7 +397,7 @@ function RecoveryPanel({ job, onReconcile, onAbandon, busy, error }) {
   );
 }
 
-function JobDetail({ job, transcript, processingDurationMs, onSaveEvaluation, onReconcile, onAbandon, onDelete, busy, actionError, actionMessage, evaluationDraft, onEvaluationDraft }) {
+function JobDetail({ job, transcript, processingDurationMs, onSaveEvaluation, onReconcile, onAbandon, onDelete, onRetryStart, busy, actionError, actionMessage, evaluationDraft, onEvaluationDraft }) {
   if (!job) {
     return <section className="rounded-xl border border-gray-200 bg-white px-5 py-8 text-sm leading-6 text-gray-700" aria-live="polite">Select a recording to review its status and transcript.</section>;
   }
@@ -424,6 +425,12 @@ function JobDetail({ job, transcript, processingDurationMs, onSaveEvaluation, on
       <ErrorNotice>{actionError}</ErrorNotice>
 
       <div className="mt-5 space-y-5">
+        {job.status === 'queued' && !cleanupRequested && (
+          <div className="border-t border-gray-200 pt-4">
+            <button type="button" onClick={onRetryStart} disabled={Boolean(busy)} className="min-h-10 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">{busy === 'dispatch' ? 'Retrying start…' : 'Retry start'}</button>
+            <p className="mt-2 text-xs leading-5 text-gray-700">Retries delivery of this existing queued job. It does not upload audio again or create another provider submission.</p>
+          </div>
+        )}
         {job.status === 'ready' && job.contentAccessAllowed === true && !cleanupRequested && !job.content_purged_at && transcript && (
           <TranscriptView job={job} transcript={transcript} processingDurationMs={processingDurationMs} />
         )}
@@ -756,6 +763,18 @@ export default function TranscriptionPilotPage() {
       } else if (error.code === 'transcription_submissions_disabled') {
         setSubmissionsEnabled(false);
         setUploadMessage('New submissions are disabled. The uploaded file remains subject to the server cleanup schedule.');
+      } else if (error.code === 'transcription_dispatch_pending' && error.payload?.job?.id) {
+        const queuedJob = rememberJob(error.payload.job).job;
+        setJobs((currentJobs) => currentJobs.some((job) => job.id === queuedJob.id)
+          ? currentJobs.map((job) => job.id === queuedJob.id ? queuedJob : job)
+          : [queuedJob, ...currentJobs]);
+        setSelectedId(queuedJob.id);
+        setSelectedFile(null);
+        setNonSensitiveAcknowledged(false);
+        setCreditsAcknowledged(false);
+        setUploadProgress(null);
+        setUploadError('The upload is already queued, but background start delivery is still pending.');
+        setUploadMessage('The uploaded recording is saved as this queued job. Use Retry start below; do not upload it again.');
       } else {
         setUploadError(error.message || 'The upload or start request could not be completed.');
         if (error.status === 0 || error.name === 'TypeError') {
@@ -771,7 +790,7 @@ export default function TranscriptionPilotPage() {
     }
   };
 
-  const action = async ({ kind, url, method = 'POST', body, cleanupOnly = false, onSuccess }) => {
+  const action = async ({ kind, url, method = 'POST', body, cleanupOnly = false, onSuccess, onFailure }) => {
     if (!ownerKey || !activeJob || busy) return;
     const generation = generationRef.current;
     const expectedOwner = ownerKey;
@@ -811,7 +830,10 @@ export default function TranscriptionPilotPage() {
       await loadJobs({ generation, expectedOwner, quiet: true });
     } catch (error) {
       if (!current(generation, expectedOwner) || error.name === 'AbortError') return;
-      if (selectedJobIdRef.current === expectedJobId) setActionError(error.message || 'The action could not be completed.');
+      if (selectedJobIdRef.current === expectedJobId) {
+        setActionError(error.message || 'The action could not be completed.');
+        if (onFailure) onFailure(error);
+      }
       if (error.status === 409) {
         void loadJobs({ generation, expectedOwner, quiet: true });
       }
@@ -832,6 +854,21 @@ export default function TranscriptionPilotPage() {
         wordAccuracyScore: evaluationDraft.wordAccuracyScore === '' ? null : Number(evaluationDraft.wordAccuracyScore),
         speakerAccuracyScore: evaluationDraft.speakerAccuracyScore === '' ? null : Number(evaluationDraft.speakerAccuracyScore),
         correctionNotes: evaluationDraft.correctionNotes,
+      },
+    });
+  };
+
+  const retryQueuedStart = () => {
+    if (!activeJob || activeJob.status !== 'queued') return;
+    void action({
+      kind: 'dispatch',
+      url: `${API_ROOT}/jobs/${encodeURIComponent(activeJob.id)}/start`,
+      body: { expectedVersion: activeJob.version, acknowledgeNonSensitive: true },
+      onSuccess: () => setActionMessage('Start delivery was accepted for this existing queued job. No audio was uploaded again.'),
+      onFailure: (error) => {
+        if (error.code === 'transcription_dispatch_pending' && error.payload?.job?.id === activeJob.id) {
+          setActionMessage('Start delivery is still pending for this queued job. Retry start only retries delivery; it does not upload or submit the audio again.');
+        }
       },
     });
   };
@@ -951,6 +988,7 @@ export default function TranscriptionPilotPage() {
                   onReconcile={reconcile}
                   onAbandon={abandon}
                   onDelete={deleteJob}
+                  onRetryStart={retryQueuedStart}
                   busy={busy}
                   actionError={actionError}
                   actionMessage={actionMessage}

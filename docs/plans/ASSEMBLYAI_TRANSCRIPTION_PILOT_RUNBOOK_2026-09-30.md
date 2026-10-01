@@ -2,8 +2,8 @@
 title: "AssemblyAI transcription pilot pre-enable runbook"
 domain: transcription
 kind: operations-runbook
-status: disabled-preview-runtime-preflight-passed
-summary: "Isolated Neon schema and test admin are initialized; 13 Preview-branch environment records are configured; a disabled deployment passed read-only runtime preflight and empty drain, while staff sign-in, media runtime and provider tests remain pending."
+status: disabled-preview-preflight-passed-source-ahead
+summary: "An earlier disabled Preview passed runtime preflight; newer Workflow source and migration 061 are not deployed or applied remotely. Hosted workflow security/recovery, daily cleanup, staff sign-in and provider validation remain release gates."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -30,7 +30,10 @@ applied only to the isolated Neon database. Refreshed staff sign-in, AssemblyAI
 callback delivery, ongoing schedule, real-job processing, deployed media
 runtime, and account privacy settings remain unverified. This
 runbook documents release gates; it does not authorize paid provider calls or
-pilot use.
+pilot use. Durable-workflow dispatch and migration 061 were added to source
+after that deployment; the current source revision has not been deployed, and
+the 2026-10-01 runtime receipt does not verify workflow execution or the 061
+table in the isolated database.
 
 ### Isolated database checkpoint — 2026-10-01
 
@@ -190,12 +193,15 @@ are cleared; the READY deployment is not pilot-use approval.
    AssemblyAI use. Confirm only
    explicitly approved non-sensitive recordings are in scope. Confidential
    recordings remain excluded.
-2. Reconcile the provisional migration number. This branch selects 060;
+2. Reconcile the provisional migration numbers. This branch selects 060–061;
    migrations 058 and 059 remain reserved for other work. The bounded catalog
    probe found no `schema_migrations` or application tables among visible
    non-system relations, but did find the pre-existing Neon Auth schema and
    configuration described above. The reviewed isolated initialization has now
-   applied 060 and read back its schema; never repeat fresh setup. For any
+   applied 060 and read back its schema; 061 is not applied remotely. Verify
+   061's outbox constraints and indexes separately after an approved existing-DB
+   migration; the earlier ten-check preflight does not establish its presence.
+   Never repeat fresh setup. For any
    other target, do not assume it is empty or run fresh setup blindly.
    Confirm the target migration tracker and physical schema state in the
    approved procedure. A tracker/object mismatch, existing partial object, or
@@ -218,14 +224,18 @@ are cleared; the READY deployment is not pilot-use approval.
    owner-scoped job create/list/read/start/download/evaluation/delete/reconcile/
    abandon/export, authenticated AssemblyAI callback, and cron drain. Use the
    canonical matrix for final per-route security facts.
-5. Confirm the target deployment can execute the drain and receive the
-   AssemblyAI callback over HTTPS without weakening deployment protection.
-   Source registers a one-minute cron, a 300-second route maximum, a
-   240-second internal budget, and seven-minute leases. Vercel scheduled Cron
-   runs only in Production, not Preview; Preview cleanup/recovery requires an
-   explicitly authorized manual operator invocation or another reviewed
-   scheduler ([Vercel Cron troubleshooting](https://vercel.com/kb/guide/troubleshooting-vercel-cron-jobs)). The disabled Preview preflight and empty drain passed, but no
-   ongoing schedule, callback-delivery, or real-media runtime proof exists.
+5. Confirm the target deployment can start and run the durable job workflow,
+   perform daily physical cleanup, and receive the AssemblyAI callback over
+   HTTPS without weakening deployment protection. Active jobs use bounded
+   workflow due checks rather than minute-by-minute idle polling. Physical
+   cleanup is daily; logical expiry blocks reads immediately, while a healthy
+   cleanup schedule may leave expired bytes for up to 24 hours. Vercel
+   scheduled Cron runs only in Production, not Preview, so Preview has no
+   automatic daily-cleanup guarantee; use only an explicitly authorized
+   operator invocation or another reviewed scheduler until one is established
+   ([Vercel Cron troubleshooting](https://vercel.com/kb/guide/troubleshooting-vercel-cron-jobs)). The earlier disabled Preview preflight and empty drain
+   predate the workflow source change and do not prove workflow execution,
+   ongoing cleanup, callback delivery, or real-media runtime.
 
 ## Environment and secret checklist
 
@@ -262,6 +272,19 @@ secret-entry process; this runbook does not replace its registry.
 
 ## Privacy, vendor, and runtime gates
 
+- **Workflow deployment and recovery:** source uses Workflow 5.0.0; no hosted
+  Workflow execution or paid usage is authorized by this source-build step.
+  Before deployment/use, confirm applicable charges and authorization, generated
+  queue-only trigger authentication, function duration of at least 240 seconds,
+  parser asset tracing, and protected Preview delivery. Workflow arguments and
+  results contain opaque job IDs, attempts and bounded state/timing only; step
+  failures use fixed codes without raw provider/database error causes.
+  **Open enablement blocker:** stale running dispatches currently become
+  recoverable after one day and are then found by the daily recovery run. A
+  stopped runner may therefore take 24–48 hours to recover, exceeding the
+  screenshot's one-day provider TTL. The owner's daily-deletion acceptance does
+  not approve this processing delay. Prove timely hosted retry/recovery or amend
+  that recovery path before enabling real transcription.
 - **Account privacy:** the owner's 2026-09-30 Data Controls screenshot shows
   model-improvement opt-out on and asynchronous TTL set to **one day**, not
   zero retention. Project/key coverage, deletion lag, upload-only cleanup and
@@ -285,7 +308,7 @@ secret-entry process; this runbook does not replace its registry.
   regression behavior; this does not prove a 50 MiB parse/upload in the target
   Function, deployed peak memory, or maximum-size timeout runway. The deployed
   media runtime has not been exercised. No audio malware scan is claimed.
-- **Build/test evidence:** root's integrated pass verified eleven suites and
+- **Earlier build/test evidence (before Workflow integration):** root's integrated pass verified eleven suites and
   111 tests, including 13 isolated local Postgres regressions; all 67 repository
   `check:*` scripts passed sequentially. The API matrix covers 251 routes with
   three pre-existing external-materials token warnings. The final production
@@ -298,6 +321,29 @@ secret-entry process; this runbook does not replace its registry.
 
 ## Retention and cleanup operations
 
+### Local Workflow integration checkpoint — 2026-10-01
+
+**[VERIFIED via local tests and build artifacts; not deployed]** Root's focused
+run passed 12 suites / 119 tests, including the new dispatch, fixed-error,
+acknowledgement-wait, worker and UI regressions. Luna's credential-scrubbed
+Node 22 Webpack build passed; root independently inspected the generated flow
+route trace and confirmed the parser worker and `music-metadata` are included.
+This was a fallback build: the normal Turbopack attempt rejected the temporary
+copy's external `node_modules` symlink. It is not a canonical Turbopack pass or
+hosted Workflow proof. Sol accepted the bounded local worker/Workflow slice;
+the recovery and generated-handler deployment gates above remain open.
+
+**[VERIFIED via disposable local PGlite execution]** Migrations 060–061 and the
+actual store queries passed nine SQL scenarios, including atomic reconciliation
+and callback re-arming, old-run fencing, dispatch acknowledgement, scoped lease
+recovery, due work, expiry and cleanup claims. Root independently repeated the
+probe. PGlite runs PostgreSQL locally in WebAssembly; this is not a native
+multi-connection Postgres concurrency proof. The updated native integration
+suite remains to be rerun against an approved disposable local Postgres server;
+no remote schema or data was touched. The 26 relevant repository gates/self-tests
+and the type check passed; targeted lint has no errors and four existing UI
+hook warnings.
+
 The local source policy is distinct from provider retention:
 
 | Data/state | Source retention behavior |
@@ -308,8 +354,8 @@ The local source policy is distinct from provider retention:
 | Receipt | 30 days after ready; for a never-ready job, 30 days after creation. The implementation was corrected to match this deadline. |
 | Provider-side audio/job | Account-specific TTL and physical deletion behavior remain unverified; local deletion receipts do not establish backup erasure. |
 
-The cron drain is the physical cleanup/retry mechanism in source, not a proven
-live schedule. Deletion targets only exact persisted paths and known exact
+The daily cleanup invocation is the physical cleanup/retry mechanism in
+source, not a proven live schedule. Deletion targets only exact persisted paths and known exact
 provider transcript IDs. A requested DELETE immediately blocks further content
 access but does not cancel remote work, claim successful erasure, or release an
 unknown active slot. Transient cleanup failures retain exact tombstones for
@@ -336,6 +382,10 @@ overwrite, and read back/hash-verified before ready.
 
 ## Recovery and abandonment
 
+- If upload/start returns retryable `503 transcription_dispatch_pending`, the
+  recording is already saved as a queued job. Keep that job selected and use
+  Retry start, which repeats durable-workflow delivery for the same job; do
+  not upload again or create another job/provider submission.
 - Before durable provider submission intent, an expired lease can safely
   return to queued, unless deletion was requested; that job transitions to
   expired and is claimed for cleanup. No provider POST has yet been authorized
@@ -348,8 +398,11 @@ overwrite, and read back/hash-verified before ready.
   the configured API key, compares the provider audio reference with the
   decrypted persisted upload reference, and binds only under the current
   owner/lease/version fence. A cleanup-requested row may be bound solely for
-  exact cleanup, never transcript publication. If the reference is already
-  purged, verification is unavailable.
+  exact cleanup, never transcript publication. Publish reconciliation also
+  atomically re-arms workflow delivery and attempts to resume the same verified
+  job. A delivery failure returns a safe partial-success response; verification
+  is not undone and the durable pending dispatch remains recoverable. If the
+  reference is already purged, verification is unavailable.
 - Explicit abandonment requires the owner's acknowledgement that provider
   work could continue and a later attempt could incur another charge. It
   records a minimized receipt, requests cleanup, and releases the local slot;
