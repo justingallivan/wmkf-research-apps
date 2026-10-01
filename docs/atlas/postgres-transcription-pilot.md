@@ -63,9 +63,9 @@ staff authentication and provider calls remain undone. See the runbook for
 release boundaries.
 
 **[VERIFIED via Vercel readback 2026-10-01]** Candidate deployment
-`dpl_AenjaVkv3DCgpmJRxBiMCfZNdZng` is READY at
-`https://wmkfresearchapps-7umx9mat7-justin-gallivans-projects.vercel.app`,
-from commit `b7c6ff12e`. Nine environment records are Preview-only for
+`dpl_3nvB93i9BqX1cM3Dbo7HcR4ELkgU` is READY at
+`https://wmkfresearchapps-67r7jdwr6-justin-gallivans-projects.vercel.app`,
+from commit `56f08ed43`. Nine environment records are Preview-only for
 `codex/transcription-pilot`: the two isolated database URLs, dedicated private
 Blob token, two transcription switches, three Dataverse controls, and `NEXTAUTH_URL`. The
 switches are explicitly false; the verified controls are interlock `on`,
@@ -74,13 +74,14 @@ were verified through `vercel env run` from an empty temporary directory.
 Sensitive value equality for database URLs and Blob token was not established;
 the local Blob token mapped to the dedicated store and read-only store metadata
 confirmed that store, but its Vercel value was not read back. The new alias
-`wmkf-transcription-pilot.vercel.app` points to this first deployment. A bounded unauthenticated request to the
+`wmkf-transcription-pilot.vercel.app` points to this refreshed deployment. A bounded unauthenticated request to the
 pilot page and list API redirects to `/auth/signin`, demonstrating the auth
 gate only. The stable Preview alias remains assigned to a different branch and
 was not moved. The owner-approved callback at the new alias's
 `/api/auth/callback/azure-ad` is registered, preserving all seven prior URIs.
-`NEXTAUTH_URL` matches the new alias origin; a fresh deployment is required
-to consume that addition. No staff sign-in, provider call, or upload was
+`NEXTAUTH_URL` matches the new alias origin; the refreshed deployment's
+`/api/auth/providers` returns HTTP 200 and that exact callback URL.
+No staff sign-in, provider call, or upload was
 performed.
 
 ## Intended state ownership

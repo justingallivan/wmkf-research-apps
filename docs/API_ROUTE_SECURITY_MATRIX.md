@@ -88,7 +88,7 @@ There are no open findings from the initial matrix pass as of this update. New f
 
 ## Route Matrix
 
-**AssemblyAI transcription pilot (source-built 2026-09-30; not deployed):**
+**AssemblyAI transcription pilot (source-built 2026-09-30; disabled Preview candidate deployed; staff-auth and provider runtime unverified):**
 
 | Route | Methods | Intended Class | Current Guard | Data Scope | Persistence | Risk | Notes |
 |---|---:|---|---|---|---|---|---|
@@ -100,7 +100,7 @@ There are no open findings from the initial matrix pass as of this update. New f
 | `/api/admin/transcription-pilot/jobs/[id]/reconcile` | POST | Superuser | `requireSuperuser`; owner predicate; strict pilot switch | One uncertain owned job | Exact verified AssemblyAI GET/DELETE; fenced PG update | Medium | Candidate ID accepted only after audio-reference correlation. Cleanup mode never publishes transcript. |
 | `/api/admin/transcription-pilot/jobs/[id]/abandon` | POST | Superuser | `requireSuperuser`; owner predicate; strict pilot switch | One uncertain owned job | Fenced PG transition | Medium | Requires explicit possible-duplicate-charge acknowledgment; never resubmits. |
 | `/api/admin/transcription-pilot/evaluation-export` | GET | Superuser | `requireSuperuser`; current profile; strict pilot switch | Aggregate evaluation rows for current profile | Reads PG | Low | Aggregate-only CSV; omits IDs, filenames, notes, owner IDs, transcript. Private no-store. |
-| `/api/cron/drain-transcriptions` | GET, POST | Cron | `verifyTranscriptionCronSecret` (strict `CRON_SECRET`, no dev bypass) | Global transcription queue | PG leases/jobs; private Blob and AssemblyAI through bounded worker | Medium | Source-built; `maxDuration=300`, scheduled minutely but new submissions need both literal-true flags. Recovery/poll/expiry/cleanup remain independent. Not deployed or provider-smoked. |
+| `/api/cron/drain-transcriptions` | GET, POST | Cron | `verifyTranscriptionCronSecret` (strict `CRON_SECRET`, no dev bypass) | Global transcription queue | PG leases/jobs; private Blob and AssemblyAI through bounded worker | Medium | Source-built; `maxDuration=300`, scheduled minutely but new submissions need both literal-true flags. Recovery/poll/expiry/cleanup remain independent. Disabled Preview candidate deployed; cron execution, callback reachability, and provider behavior remain unverified. |
 | `/api/webhooks/assemblyai` | POST | Shared secret (HMAC) | Per-attempt `x-transcription-pilot-auth` HMAC-SHA256 verified against `ASSEMBLYAI_WEBHOOK_SECRET` | Opaque attempt correlation only | Adds callback candidate to `transcription_jobs` (PG); never publishes transcript | Medium | 64 KB raw body cap; unknown valid correlations acknowledged without revealing existence; private no-store. |
 
 

@@ -127,24 +127,31 @@ and a read-only store listing confirmed that resource, but this is not a
 readback of the Vercel secret value. The resources remain unconnected through
 Marketplace integration; branch-scoped manual env binding is present.
 
-**[VERIFIED READY]** Deployment `dpl_AenjaVkv3DCgpmJRxBiMCfZNdZng` targets
+**[VERIFIED READY]** Deployment `dpl_3nvB93i9BqX1cM3Dbo7HcR4ELkgU` targets
 Preview at
-`https://wmkfresearchapps-7umx9mat7-justin-gallivans-projects.vercel.app`,
-commit `b7c6ff12e`. Dedicated alias `wmkf-transcription-pilot.vercel.app`
-was created and currently points to this first deployment. The owner approved
+`https://wmkfresearchapps-67r7jdwr6-justin-gallivans-projects.vercel.app`,
+commit `56f08ed43`. Dedicated alias `wmkf-transcription-pilot.vercel.app`
+was created and now points to this refreshed deployment. The owner approved
 and the Entra app now registers the exact callback
 `https://wmkf-transcription-pilot.vercel.app/api/auth/callback/azure-ad`;
-readback confirmed the prior seven callback URIs were preserved. A fresh
-deployment is required because this READY deployment predates the branch-only
-`NEXTAUTH_URL` addition. A bounded unauthenticated check
+readback confirmed the prior seven callback URIs were preserved. This fresh
+deployment includes the branch-only `NEXTAUTH_URL`; its live
+`/api/auth/providers` returns HTTP 200 with the exact registered callback.
+A bounded unauthenticated check
 received HTTP 307 to `/auth/signin` for both `/api/admin/transcription-pilot/jobs`
 and `/admin/transcription-pilot`; this confirms the auth gate only, not staff
 sign-in or disabled-flag/runtime secret correctness. The stable Preview alias
-remains assigned to another branch and was not moved. The new alias must be
-verified against a fresh deployment before sign-in. No sign-in was attempted.
+remains assigned to another branch and was not moved. No staff sign-in was attempted.
 No AssemblyAI key was provisioned, and no
 provider call or upload occurred. No shared database setting/schema was
 changed.
+
+Automatic Git deployment is disabled only for `codex/transcription-pilot`
+in `vercel.json`. The first branch push was checked for no automatic deployment
+before adding isolated overrides. Future deployments are deliberate Preview
+CLI deployments; repoint only the dedicated pilot alias after READY and
+branch/commit verification. This is isolation for the scoped pilot/sign-in
+test, not certification that unrelated suite applications are isolated.
 
 **Disabled-by-default behavior:** `TRANSCRIPTION_PILOT_ENABLED` and
 `TRANSCRIPTION_SUBMISSIONS_ENABLED` each require the literal string `true`.
