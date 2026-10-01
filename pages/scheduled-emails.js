@@ -176,8 +176,14 @@ export default function ScheduledEmailsPage() {
   useEffect(() => {
     setSubject(selected?.subject || '');
     setBodyText(selected?.bodyText || '');
-    setActionFeedback(null);
   }, [selected?.id, selected?.version]);
+
+  // Feedback clears on a different message (and at the start of each action),
+  // not on a version change: a refused send-now returns the re-addressed row
+  // with a new version, and its "Recipients changed" warning must stay visible.
+  useEffect(() => {
+    setActionFeedback(null);
+  }, [selected?.id]);
 
   const chooseMessage = (id) => {
     setSelectedId(id);
