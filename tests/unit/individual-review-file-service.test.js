@@ -334,6 +334,7 @@ test('read-only planning renders and hashes without requiring the write flag', a
     item: null,
   });
   expect(result.sourceFingerprint).toMatch(/^[a-f0-9]{64}$/);
+  expect(result.sourceFingerprint).toBe('cac45d58c3c69fb8ebc9e170b4615fa2762c97f5b29abd25b4441f5355e1ad52');
   expect(result).not.toHaveProperty('answers');
   expect(graph.uploadFile).not.toHaveBeenCalled();
   expect(suggestion.patchReviewReceipt).not.toHaveBeenCalled();
@@ -449,17 +450,74 @@ test('backfill preflight rejects a non-Production Dataverse target before Graph 
 });
 
 test('manifest source drift fails before render, Graph access, or pointer mutation', async () => {
+  const planned = await planIndividualReviewFileCandidate(SUGGESTION_ID, {
+    cycleCode: 'D26',
+    target: {
+      siteUrl: 'https://appriver3651007194.sharepoint.com/sites/akoyaGO',
+      siteId: 'site-1', driveId: 'drive-1', dynamicsBase: 'https://wmkf.crm.dynamics.com',
+    },
+  });
+  graph.getSiteId.mockClear();
+  graph.getDriveId.mockClear();
+  suggestion.getByIdWithSelect.mockClear();
+  buildIndividualReviewDocx.mockClear();
+  hashGovernedDocxContent.mockClear();
+  graph.getFileMetadataByPath.mockClear();
+  graph.uploadFile.mockClear();
+  suggestion.patchReviewReceipt.mockClear();
+  getRequestById.mockResolvedValueOnce({
+    akoya_requestid: REQUEST_ID,
+    akoya_requestnum: '1002903',
+    akoya_title: 'Changed after review',
+    wmkf_organizationname: 'University',
+    wmkf_meetingdate: '2026-12-03T00:00:00Z',
+  });
   const result = await ensureIndividualReviewFile(SUGGESTION_ID, {
     cycleCode: 'D26',
-    expectedSuggestionEtag: 'W/"stale"',
-    expectedSourceFingerprint: 'stale-source',
-    expectedSemanticHash: 'gdc1:stale',
+    expectedSuggestionEtag: planned.suggestionEtag,
+    expectedSourceFingerprint: planned.sourceFingerprint,
+    expectedSemanticHash: planned.semanticHash,
   });
   expect(result).toMatchObject({ status: 'source_drift', error: { code: 'source_drift' } });
   expect(buildIndividualReviewDocx).not.toHaveBeenCalled();
   expect(graph.getFileMetadataByPath).not.toHaveBeenCalled();
   expect(graph.uploadFile).not.toHaveBeenCalled();
   expect(suggestion.patchReviewReceipt).not.toHaveBeenCalled();
+});
+
+test('manifest ETag drift fails before render, Graph access, or pointer mutation', async () => {
+  const planned = await planIndividualReviewFileCandidate(SUGGESTION_ID, {
+    cycleCode: 'D26',
+    target: {
+      siteUrl: 'https://appriver3651007194.sharepoint.com/sites/akoyaGO',
+      siteId: 'site-1', driveId: 'drive-1', dynamicsBase: 'https://wmkf.crm.dynamics.com',
+    },
+  });
+  graph.getSiteId.mockClear();
+  graph.getDriveId.mockClear();
+  suggestion.getByIdWithSelect.mockClear();
+  buildIndividualReviewDocx.mockClear();
+  hashGovernedDocxContent.mockClear();
+  graph.getFileMetadataByPath.mockClear();
+  graph.uploadFile.mockClear();
+  graph.replaceFileContent.mockClear();
+  graph.deleteFile.mockClear();
+  suggestion.patchReviewReceipt.mockClear();
+
+  const result = await ensureIndividualReviewFile(SUGGESTION_ID, {
+    cycleCode: 'D26',
+    expectedSuggestionEtag: 'W/"stale"',
+    expectedSourceFingerprint: planned.sourceFingerprint,
+    expectedSemanticHash: planned.semanticHash,
+  });
+
+  expect(result).toMatchObject({ status: 'source_drift', error: { code: 'source_drift' } });
+  expect(buildIndividualReviewDocx).not.toHaveBeenCalled();
+  expect(graph.getFileMetadataByPath).not.toHaveBeenCalled();
+  expect(graph.uploadFile).not.toHaveBeenCalled();
+  expect(graph.replaceFileContent).not.toHaveBeenCalled();
+  expect(suggestion.patchReviewReceipt).not.toHaveBeenCalled();
+  expect(graph.deleteFile).not.toHaveBeenCalled();
 });
 
 test('manifest-bound already-filed state is semantically verified without upload or pointer rewrite', async () => {
@@ -937,4 +995,3 @@ test('Stage 1c: rows on test requests are excluded before answer reads, inspecti
   expect(suggestion.getByIdWithSelect).not.toHaveBeenCalled();
   expect(graph.uploadFile).not.toHaveBeenCalled();
 });
-
