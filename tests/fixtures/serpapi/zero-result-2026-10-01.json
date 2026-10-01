@@ -1,0 +1,33 @@
+{
+  "_provenance": "Recorded 2026-10-01 from two owner-authorized live SerpApi calls for a nonsense name (query shapes of IntegrityService.searchPubPeer broad / searchNews broad). Response bodies trimmed to the fields serpSearch reads; menu_links emptied; no API key.",
+  "google": {
+    "search_metadata": {
+      "status": "Success"
+    },
+    "search_parameters": {
+      "engine": "google",
+      "q": "site:pubpeer.com \"Zqxvbnm Wplkjhgf\""
+    },
+    "search_information": {
+      "query_displayed": "site:pubpeer.com \"Zqxvbnm Wplkjhgf\"",
+      "total_results": 0,
+      "time_taken_displayed": 0.23,
+      "organic_results_state": "Fully empty"
+    },
+    "error": "Google hasn't returned any results for this query."
+  },
+  "google_news": {
+    "search_metadata": {
+      "status": "Success"
+    },
+    "search_parameters": {
+      "engine": "google_news",
+      "q": "\"Zqxvbnm Wplkjhgf\" research OR professor OR university"
+    },
+    "search_information": {
+      "news_results_state": "Fully empty"
+    },
+    "error": "Google News hasn't returned any results for this query.",
+    "menu_links": []
+  }
+}
