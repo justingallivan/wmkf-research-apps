@@ -127,9 +127,11 @@ describe('transcription worker submission safety', () => {
     store.getLeasedTranscriptionJob.mockResolvedValueOnce(processing).mockResolvedValueOnce(processing).mockResolvedValueOnce(saving);
     store.mutateLeasedTranscriptionJob.mockResolvedValue(saving);
     const bytes = Buffer.from('{"text":"hello","utterances":[{"start":0,"end":500,"text":"hello","speaker":null}],"outcome":"complete"}');
-    runtime.readPrivateContentIfPresent.mockResolvedValueOnce(null).mockResolvedValueOnce({ buffer: bytes });
+    runtime.readPrivateContentIfPresent.mockResolvedValueOnce(null).mockResolvedValueOnce({ buffer: bytes, blob: {
+      size: 0, pathname: `transcription-pilot/9/${processing.id}/output/transcript.json`,
+    } });
     runtime.writePrivateContent.mockResolvedValue({
-      pathname: `transcription-pilot/9/${processing.id}/output/transcript.json`, size: Buffer.byteLength('{"text":"hello","utterances":[{"start":0,"end":500,"text":"hello","speaker":null}],"outcome":"complete"}'),
+      pathname: `transcription-pilot/9/${processing.id}/output/transcript.json`,
     });
     store.publishReadyTranscriptionJob.mockResolvedValue({ ...processing, status: 'ready', version: 9,
       provider_transcript_id: null, audio_pathname: null });
@@ -142,6 +144,27 @@ describe('transcription worker submission safety', () => {
     expect(store.publishReadyTranscriptionJob).toHaveBeenCalledWith(expect.objectContaining({
       jobId: processing.id, outputSha256: expect.stringMatching(/^[a-f0-9]{64}$/), returnedModel: 'universal-2',
     }));
+    expect(summary.ready).toBe(1);
+  });
+
+  it('recovers a saving job from an existing readback whose SDK metadata size is zero', async () => {
+    store.claimNextTranscriptionJob.mockReset().mockResolvedValue(null);
+    const saving = { ...queued, status: 'saving', provider_transcript_id: 'provider-1', version: 8,
+      output_pathname: 'transcription-pilot/9/11111111-1111-4111-8111-111111111111/output/transcript.json' };
+    store.claimNextDueTranscriptionJob.mockReset().mockResolvedValueOnce({ job: saving, leaseToken: queued.lease_token }).mockResolvedValue(null);
+    store.getLeasedTranscriptionJob.mockResolvedValue(saving);
+    const bytes = Buffer.from('{"text":"hello","utterances":[],"outcome":"complete"}');
+    runtime.readPrivateContentIfPresent.mockResolvedValueOnce({ buffer: bytes, blob: { size: 0, pathname: saving.output_pathname } });
+    store.publishReadyTranscriptionJob.mockResolvedValue({ ...saving, status: 'ready', version: 9,
+      provider_transcript_id: null, audio_pathname: null });
+    getAssemblyAITranscript.mockResolvedValue({ status: 'completed', text: 'hello', utterances: [] });
+
+    const summary = await drainTranscriptionPilot({ maxJobs: 1 });
+
+    expect(store.publishReadyTranscriptionJob).toHaveBeenCalledWith(expect.objectContaining({ jobId: saving.id }));
+    expect(runtime.writePrivateContent).not.toHaveBeenCalled();
+    expect(uploadAssemblyAIAudio).not.toHaveBeenCalled();
+    expect(submitAssemblyAITranscription).not.toHaveBeenCalled();
     expect(summary.ready).toBe(1);
   });
 
@@ -186,6 +209,49 @@ describe('transcription worker submission safety', () => {
     await drainTranscriptionPilot({ maxJobs: 1 });
     expect(runtime.writePrivateContent).toHaveBeenCalled();
     expect(store.publishReadyTranscriptionJob).not.toHaveBeenCalled();
+  });
+
+  it('rejects a write result for a different pathname and schedules a saving retry', async () => {
+    store.claimNextTranscriptionJob.mockReset().mockResolvedValue(null);
+    const job = { ...queued, status: 'saving', provider_transcript_id: 'known-id', output_pathname: 'transcription-pilot/output.json' };
+    store.claimNextDueTranscriptionJob.mockReset().mockResolvedValueOnce({ job, leaseToken: job.lease_token }).mockResolvedValue(null);
+    store.getLeasedTranscriptionJob.mockResolvedValue(job);
+    getAssemblyAITranscript.mockResolvedValue({ status: 'completed', text: 'hello' });
+    runtime.readPrivateContentIfPresent.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      buffer: Buffer.from('{"text":"hello","utterances":[],"outcome":"complete"}'),
+    });
+    runtime.writePrivateContent.mockResolvedValue({ pathname: 'transcription-pilot/output-other.json' });
+    store.mutateLeasedTranscriptionJob.mockResolvedValue({ ...job, version: job.version + 1 });
+
+    await drainTranscriptionPilot({ maxJobs: 1 });
+
+    expect(store.publishReadyTranscriptionJob).not.toHaveBeenCalled();
+    expect(store.mutateLeasedTranscriptionJob).toHaveBeenCalledWith(expect.objectContaining({
+      expectedStatuses: ['saving'], fields: expect.objectContaining({ next_attempt_at: expect.any(Date) }),
+    }));
+    expect(store.releaseTranscriptionLease).toHaveBeenCalledWith(expect.objectContaining({ expectedStatuses: ['saving'] }));
+    expect(submitAssemblyAITranscription).not.toHaveBeenCalled();
+  });
+
+  it('catches async write failures and releases the saving lease for retry without resubmitting', async () => {
+    store.claimNextTranscriptionJob.mockReset().mockResolvedValue(null);
+    const job = { ...queued, status: 'saving', provider_transcript_id: 'known-id', output_pathname: 'transcription-pilot/output.json' };
+    store.claimNextDueTranscriptionJob.mockReset().mockResolvedValueOnce({ job, leaseToken: job.lease_token }).mockResolvedValue(null);
+    store.getLeasedTranscriptionJob.mockResolvedValue(job);
+    getAssemblyAITranscript.mockResolvedValue({ status: 'completed', text: 'hello' });
+    runtime.readPrivateContentIfPresent.mockResolvedValueOnce(null);
+    runtime.writePrivateContent.mockRejectedValue(new Error('storage write failed'));
+    store.mutateLeasedTranscriptionJob.mockResolvedValue({ ...job, version: job.version + 1 });
+
+    await drainTranscriptionPilot({ maxJobs: 1 });
+
+    expect(store.mutateLeasedTranscriptionJob).toHaveBeenCalledWith(expect.objectContaining({
+      expectedStatuses: ['saving'], fields: expect.objectContaining({ next_attempt_at: expect.any(Date) }),
+    }));
+    expect(store.releaseTranscriptionLease).toHaveBeenCalledWith(expect.objectContaining({ expectedStatuses: ['saving'] }));
+    expect(store.publishReadyTranscriptionJob).not.toHaveBeenCalled();
+    expect(uploadAssemblyAIAudio).not.toHaveBeenCalled();
+    expect(submitAssemblyAITranscription).not.toHaveBeenCalled();
   });
 
   it('retains uncertainty and conflict evidence when DELETE follows a bound-ID conflict', async () => {
