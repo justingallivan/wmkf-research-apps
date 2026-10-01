@@ -585,6 +585,78 @@ describe('advance', () => {
 });
 
 describe('exportSource / readArtifacts / recheck', () => {
+  test('the default exporter reads the source Request AND its document locations through the production client, never the deployment host (Codex slice 1)', async () => {
+    // Preview deployment: no DYNAMICS_URL in env, so anything that reached
+    // DynamicsService would throw. Every Dataverse read must go through the
+    // client created for TARGET_URLS.production.
+    const LOC_ID = '5a5a5a5a-5a5a-4a5a-8a5a-5a5a5a5a5a5a';
+    const PARENT_ID = '6b6b6b6b-6b6b-4b6b-8b6b-6b6b6b6b6b6b';
+    const sourceRow = {
+      akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
+      akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', versionnumber: 7,
+    };
+    const gets = [];
+    const fakeClient = (resourceUrl) => ({
+      baseUrl: `${resourceUrl}/api/data/v9.2`,
+      async get(path) {
+        gets.push({ resourceUrl, path });
+        const ok = (body) => ({ ok: true, status: 200, body });
+        if (path.startsWith('/akoya_requests?')) return ok({ value: [sourceRow] });
+        if (path.startsWith(`/akoya_requests(${SOURCE_ID})`)) return ok({ akoya_requestid: SOURCE_ID, versionnumber: 7 });
+        if (path.startsWith('/sharepointdocumentlocations?')) {
+          return ok({ value: [{ sharepointdocumentlocationid: LOC_ID, relativeurl: '9000001_ROOT', _parentsiteorlocation_value: PARENT_ID }] });
+        }
+        if (path.startsWith(`/sharepointdocumentlocations(${PARENT_ID})`)) {
+          return ok({ sharepointdocumentlocationid: PARENT_ID, relativeurl: 'akoya_request' });
+        }
+        throw new Error(`unexpected Dataverse read ${path}`);
+      },
+    });
+    const pdf = Buffer.from('source-pdf');
+    const graphMetadata = { id: 'graph-item-1', name: 'ProjectDescription.pdf', size: pdf.length, mimeType: 'application/pdf', eTag: 'etag-1', versionId: '1.0' };
+    const graphCalls = { listFiles: [] };
+    const sourceDependencies = {
+      getSharePointTargetInfo: () => ({ key: 'akoyago-shared', scope: 'shared', registered: true, hostname: 'appriver3651007194.sharepoint.com', pathname: '/sites/akoyago' }),
+      listFiles: async (library, folder) => {
+        graphCalls.listFiles.push({ library, folder });
+        // An archive miss is accepted only as a 404 folder-not-found (isExpectedArchiveMiss).
+        if (library !== 'akoya_request') throw Object.assign(new Error('folder not found'), { code: 'graph_folder_not_found', status: 404 });
+        return [{ id: 'graph-item-1', name: 'ProjectDescription.pdf', folder: `${folder}/Phase I`, size: pdf.length, mimeType: 'application/pdf', lastModified: '2026-09-20T10:00:00Z' }];
+      },
+      getDriveId: async () => 'drive-1',
+      clearGraphCaches: () => {},
+      getFileMetadataById: async () => graphMetadata,
+      downloadFile: async () => ({ buffer: pdf, filename: graphMetadata.name, mimeType: graphMetadata.mimeType, size: graphMetadata.size }),
+    };
+    const ledger = fakeLedger();
+    const blobs = fakeBlob();
+    const service = createAdminRunService({
+      env: { TEST_REQUEST_FACTORY_FORM: 'on', FACTORY_BLOB_RW_TOKEN: 't', TEST_REQUEST_SANDBOX_LEDGER_URL: SANDBOX_LEDGER },
+      deployment: 'preview',
+      ledgerDbFactory: () => ledger.db,
+      blob: blobs.blob,
+      createClient: ({ resourceUrl }) => fakeClient(resourceUrl),
+      getAccessToken: async () => 'fake-token',
+      sourceDependencies,
+    });
+
+    const result = await service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+
+    expect(result.draftId).toMatch(/^[0-9a-f-]{36}$/);
+    const draft = JSON.parse([...blobs.objects.values()][0].text);
+    expect(draft.documents).toHaveLength(1);
+    // The bundle projection stores the folder relative to its bucket.
+    expect(draft.documents[0]).toMatchObject({ name: 'ProjectDescription.pdf', library: 'akoya_request', folder: 'Phase I' });
+    // Every Dataverse read, including both location reads, went to the production client.
+    expect(gets.length).toBeGreaterThanOrEqual(4);
+    expect(gets.every((g) => g.resourceUrl === PRODUCTION_URL)).toBe(true);
+    expect(gets.some((g) => g.path.startsWith('/sharepointdocumentlocations?') && g.path.includes(SOURCE_ID))).toBe(true);
+    expect(gets.some((g) => g.path.startsWith(`/sharepointdocumentlocations(${PARENT_ID})`))).toBe(true);
+    // The dynamics bucket was listed; the archive probes were tried and their misses accepted.
+    expect(graphCalls.listFiles.some((c) => c.library === 'akoya_request' && c.folder === '9000001_ROOT')).toBe(true);
+    expect(graphCalls.listFiles.length).toBeGreaterThan(1);
+  });
+
   test('export stores the bundle under a minted draft path and never returns bundle text', async () => {
     const h = harness({ deployment: 'preview' });
     const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
