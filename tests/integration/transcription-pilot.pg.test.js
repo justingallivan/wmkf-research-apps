@@ -86,6 +86,16 @@ describeIf('transcription pilot store (isolated local Postgres proof)', () => {
     store = createTranscriptionPilotStore(db);
   });
 
+  it('executes the exact physical-shape preflight SQL with PostgreSQL catalog types', async () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'lib/services/transcription-pilot/preflight.js'), 'utf8');
+    const match = source.match(/const shape = await client.query\(`([\s\S]*?)`\);/);
+    expect(match).not.toBeNull();
+    // Substitute only the isolated test schema; leave all catalog expressions intact.
+    const sql = match[1].replaceAll("'public'", `'${schema}'`).replaceAll("'public.", `'${schema}.`);
+    const result = await pool.query(sql);
+    expect(Object.values(result.rows[0])).toEqual([true, true, true, true, true, true]);
+  });
+
   afterAll(async () => {
     if (pool) await pool.end();
     if (schema) await admin.query(`DROP SCHEMA "${schema}" CASCADE`);

@@ -2,10 +2,10 @@
 title: "Atlas: AssemblyAI transcription pilot (Postgres)"
 domain: postgres
 kind: state-page
-status: disabled-preview-preflight-passed-source-ahead
-summary: "The isolated Neon database has migration 060 and the test admin; later source adds durable workflow dispatch in migration 061 but is not deployed or applied remotely. An earlier disabled Preview passed provider-free preflight and an empty drain; current-alias sign-in and AssemblyAI use remain unverified."
+status: isolated-061-verified-source-ahead-disabled-preview
+summary: "The isolated Neon database has migrations 060–061, the test admin, and a verified outbox schema; the newer Workflow source remains undeployed and Preview switches are false. An earlier Preview passed provider-free preflight and an empty drain; hosted recovery, current-alias sign-in and AssemblyAI use remain unverified."
 canonical: true
-cataloged: 2026-09-30
+cataloged: 2026-10-01
 owner: product-engineering
 related:
   - docs/APPLICATION_STATE_ATLAS.md
@@ -20,11 +20,11 @@ related:
 
 ## Current status
 
-**[VERIFIED 2026-10-01 via migration/readback and deployment/runtime probes]** The job table definition is `lib/db/migrations/060_transcription_jobs.sql`; migration 060 remains provisional because 058/059 are reserved for other work. It is applied only to the isolated Neon database, not Production or the shared Preview database; no shared-database probe was performed for this entry. The isolated `neondb` public schema has 57 migration records, one active linked profile, one superuser role, and zero transcription jobs. The nine pre-existing `neon_auth` relations remain provider-owned; the bootstrap did not alter that schema. The fresh-install repair's executed-SQL provenance, canonical rerun, atomic rollback, and populated-database refusal were separately tested. The public schema includes migration 060's table/index/constraint shape. Later source adds migration 061 and `transcription_workflow_dispatches`, a content-free per-job dispatch outbox; 061 has not been applied to any remote database, including this isolated database, and is not in the earlier deployment.
+**[VERIFIED 2026-10-01 via read-only migration verification and deployment/runtime probes]** The job table definition is `lib/db/migrations/060_transcription_jobs.sql`; migrations 060–061 remain provisional because 058/059 are reserved for other work. Both migrations are applied only to the isolated Neon database, not Production or the shared Preview database; no shared-database probe was performed for this entry. Root's independent read-only `--verify-only` receipt confirmed target `neondb`, transaction read-only, zero transcription jobs, on-disk migration tracker match, no pending migration files, migration 061 recorded, and the `transcription_workflow_dispatches` table/schema verified. It was applied exactly once through the canonical existing-database runner; after the initial checker rejected PostgreSQL NOT NULL catalog entries (`contype='n'`), root corrected the read-only verifier to inspect CHECK constraints (`contype='c'`) and reran verify-only, not the migration. The isolated `neondb` public schema has 57 migration records, one active linked profile, one superuser role, and zero transcription jobs. The nine pre-existing `neon_auth` relations remain provider-owned; initialization did not alter that schema. The fresh-install repair's executed-SQL provenance, canonical rerun, atomic rollback, and populated-database refusal were separately tested. Migration 061 is not present in the earlier deployed source.
 
 **[VERIFIED 2026-10-01 via Vercel deployment metadata and authenticated runtime preflight]** Source commit `78a3d5595` is READY as Preview deployment `dpl_DHaVt8QHTzLWo7gr7M6FhVJR344S` at `https://wmkfresearchapps-62z9wnj9y-justin-gallivans-projects.vercel.app`; `wmkf-transcription-pilot.vercel.app` points to it. The other Preview alias remains on deployment `dpl_cgM9vNTVdC1DAUMR55ZQSBdt9Nt2`. Thirteen environment records are branch-scoped, including both isolated database aliases, the dedicated Blob token, disabled feature/submission switches, three Dataverse controls, auth origin, and four secrets. The 13 Preview values were explicitly supplied as deployment runtime/build environment; the authenticated receipt verifies their effective safety-relevant state without exposing values. An authenticated `GET /api/cron/drain-transcriptions?preflight=1` returned HTTP 200 with all ten safety checks true and zero jobs. That runtime receipt confirms the exact pinned Neon endpoint/database, read-only connection, empty jobs table, matching dedicated-store token prefix, required auth origin/Dataverse values, and presence/length of the application secrets; it does not validate AssemblyAI credentials by calling AssemblyAI or prove private Blob access from the deployment. A separate authenticated empty drain returned HTTP 200 with all summary counts zero.
 
-The authenticated empty-drain receipt is for the earlier deployed source only. The current branch source instead uses durable job-scoped workflows with bounded due checks while a job is active, no minute-by-minute idle polling, and daily physical cleanup/retry; logical expiry blocks reads immediately, while healthy daily cleanup may lag by up to 24 hours. This newer source has not been deployed or runtime-verified, and Preview has no automatic daily-cleanup guarantee. No AssemblyAI call was made, no deployed media/max-size proof was run, and no staff sign-in has been attempted on the current alias. An earlier sign-in screenshot used a deployment whose runtime database target was not established; no shared-database mutation was confirmed. The bounded local synthetic AAC test used 16,863 bytes, verified a 3.065-second audio duration, round-tripped through the dedicated private Blob store, and verified exact-path deletion. This is not a deployed max-size or AssemblyAI proof. Existing project-wide environment records and the stable Preview alias were not changed. See the runbook for release boundaries.
+The authenticated empty-drain receipt is for the earlier deployed source only. The current branch source instead uses durable job-scoped workflows with bounded due checks while a job is active, no minute-by-minute idle polling, and daily physical cleanup/retry; logical expiry blocks reads immediately, while healthy daily cleanup may lag by up to 24 hours. Hourly recovery source queries SDK run status and CAS-recovers only terminal runs; 60-second retry and a 200-cycle handoff are source behavior, not hosted proof. This newer source has not been deployed or runtime-verified. Vercel Cron normally runs only in Production; Preview has no established hourly recovery or automatic daily-cleanup schedule. No AssemblyAI call was made, no deployed media/max-size proof was run, and no staff sign-in has been attempted on the current alias. An earlier sign-in screenshot used a deployment whose runtime database target was not established; no shared-database mutation was confirmed. The bounded local synthetic AAC test used 16,863 bytes, verified a 3.065-second audio duration, round-tripped through the dedicated private Blob store, and verified exact-path deletion. This is not a deployed max-size or AssemblyAI proof. Existing project-wide environment records and the stable Preview alias were not changed. See the runbook for release boundaries.
 
 ## Intended state ownership
 
@@ -44,10 +44,12 @@ dispatch record are atomic. A retryable start-delivery failure returns the
 already-queued owner DTO with `transcription_dispatch_pending`; UI retry
 redelivers the same job without another browser upload. Existing job leases and
 persisted submission-intent fences prevent blind provider resubmission.
-Migration 061 is source-built only and not yet applied remotely. Stale running
-dispatch recovery currently waits one day plus the daily run (up to 24–48 hours),
-which may exceed the one-day provider TTL. Timely recovery is an open enablement
-gate, distinct from the approved daily physical-deletion cadence.
+Migration 061 is applied/read back only in the isolated Neon database. Branch source retries active Workflow steps
+after 60 seconds (up to 1,440 retries), hands off after 200 processing cycles,
+and has an hourly recovery path that queries SDK status and CAS-recovers only
+terminal `completed`, `failed`, or `cancelled` runs. Hosted SDK behavior and an
+hourly Preview schedule remain unverified. This is an enablement gate, distinct
+from the unchanged daily physical-deletion cadence.
 
 The store implements owner-scoped idempotent creation, a global active-slot
 partial unique index, lease/version-fenced worker writes, per-attempt callback
@@ -82,7 +84,8 @@ confidential-use approval.
   `lib/services/transcription-pilot/model.js`; the cron readiness-only mode is
   implemented in `lib/services/transcription-pilot/preflight.js`.
 - Consumers: `lib/services/transcription-pilot/runtime.js` and `worker.js`,
-  `lib/services/transcription-pilot/workflow-dispatch.js` and `workflow.js`,
+  `lib/services/transcription-pilot/workflow-dispatch.js`, `workflow.js`,
+  and the provider-free `workflow-probe.js`,
   the Admin routes under `pages/api/admin/transcription-pilot/`, the AssemblyAI
   callback and scheduled drain routes, and `/admin/transcription-pilot`.
 - Tests: `tests/unit/transcription-pilot-store.test.js` and

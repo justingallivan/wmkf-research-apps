@@ -2,8 +2,8 @@
 title: "AssemblyAI transcription pilot pre-enable runbook"
 domain: transcription
 kind: operations-runbook
-status: disabled-preview-preflight-passed-source-ahead
-summary: "An earlier disabled Preview passed runtime preflight; newer Workflow source and migration 061 are not deployed or applied remotely. Hosted workflow security/recovery, daily cleanup, staff sign-in and provider validation remain release gates."
+status: isolated-061-verified-source-ahead-disabled-preview
+summary: "Migration 061 and its outbox schema are verified only in isolated Neon; newer Workflow source remains undeployed and Preview switches remain false. Hosted workflow/recovery, schedule, staff sign-in and provider validation remain release gates."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -19,7 +19,9 @@ related:
 **[SOURCE-BUILT; DISABLED PREVIEW PREFLIGHT PASSED; PILOT NOT ENABLED]** The
 Admin page, API routes, callback, worker, provider/media/runtime services,
 model/store, migration 060, fresh-install registration, and tests are present
-in source. Thirteen environment records are scoped to Preview branch
+in source. Migration 061 has also been applied once and physically verified
+only in isolated `neondb`; the newer Workflow source remains undeployed.
+Thirteen environment records are scoped to Preview branch
 `codex/transcription-pilot`; both transcription switches are false. The latest
 disabled Preview deployment passed read-only runtime preflight and an empty
 drain, but this does not verify real job processing or media runtime. An
@@ -29,11 +31,12 @@ applied, so runtime binding remained inconclusive. Migration 060 is
 applied only to the isolated Neon database. Refreshed staff sign-in, AssemblyAI
 callback delivery, ongoing schedule, real-job processing, deployed media
 runtime, and account privacy settings remain unverified. This
-runbook documents release gates; it does not authorize paid provider calls or
-pilot use. Durable-workflow dispatch and migration 061 were added to source
-after that deployment; the current source revision has not been deployed, and
-the 2026-10-01 runtime receipt does not verify workflow execution or the 061
-table in the isolated database.
+runbook documents release gates; the owner has explicitly authorized one
+provider-free synthetic Workflow test and isolated migration 061 with the
+Preview pilot disabled. This does not authorize AssemblyAI calls/uploads,
+pilot enablement, or other metered work. The current Workflow source revision
+has not been deployed, and the earlier runtime receipt does not verify its
+execution.
 
 ### Isolated database checkpoint — 2026-10-01
 
@@ -108,6 +111,25 @@ isolation, seed rollback after a role-insert failure, and repeat-seed refusal.
 Targeted ESLint passed. Sol also approved the read-only verification mode.
 An uncertain commit must be reconciled read-only, never automatically retried.
 This target is now populated: do not rerun fresh initialization.
+
+### Isolated workflow-dispatch migration checkpoint — 2026-10-01
+
+**[VERIFIED via root's independent read-only `--verify-only` receipt]** After
+Sol approval, root applied migration 061 exactly once through the canonical
+`node scripts/apply-migrations.js` path. The separate read-only verifier then
+confirmed target database `neondb`, a read-only transaction, zero transcription
+jobs, migration tracker matching all on-disk migration files, no pending files,
+migration 061 recorded, `transcription_workflow_dispatches` present, and its
+physical schema matching the migration. No shared Preview or Production
+database was read or changed.
+
+The first readback attempt was rejected because Neon exposed PostgreSQL
+`pg_constraint` NOT NULL catalog entries (`contype='n'`) to a checker that
+expected only user constraints. Root narrowed that checker to CHECK constraints
+(`contype='c'`) and reran only `--verify-only`; migration 061 was not reapplied.
+The successful receipt, not the initial failed check, is the current readback
+evidence. This proves isolated schema state only, not deployed Workflow
+execution or Preview scheduling.
 
 The operator copy remains in git-ignored `.env.transcription-preview.local`;
 `.env.local` and shared settings were not overwritten. The saved endpoint
@@ -187,10 +209,11 @@ are cleared; the READY deployment is not pilot-use approval.
 ## Before migration or deployment
 
 1. Owner authorization covers isolated Neon initialization, branch-only
-   Preview environment configuration, and a disabled Preview deployment. It
-   does not authorize enabling the pilot, staff sign-in until the fresh
-   deployment and alias are verified, provider calls/uploads, or any paid
-   AssemblyAI use. Confirm only
+   Preview environment configuration, migration 061 applied once in isolated
+   Neon, a disabled Preview deployment, and one provider-free synthetic
+   Workflow test. It does not authorize enabling the pilot, AssemblyAI calls or
+   uploads, staff sign-in until the fresh deployment and alias are verified, or
+   other metered work. Confirm only
    explicitly approved non-sensitive recordings are in scope. Confidential
    recordings remain excluded.
 2. Reconcile the provisional migration numbers. This branch selects 060–061;
@@ -198,9 +221,10 @@ are cleared; the READY deployment is not pilot-use approval.
    probe found no `schema_migrations` or application tables among visible
    non-system relations, but did find the pre-existing Neon Auth schema and
    configuration described above. The reviewed isolated initialization has now
-   applied 060 and read back its schema; 061 is not applied remotely. Verify
-   061's outbox constraints and indexes separately after an approved existing-DB
-   migration; the earlier ten-check preflight does not establish its presence.
+   applied 060 and 061 and read back their schemas only in isolated Neon. The
+   independent 061 receipt confirms the outbox constraints and indexes there;
+   the earlier ten-check Preview preflight does not establish their presence.
+   No shared database has been read or migrated under this authorization.
    Never repeat fresh setup. For any
    other target, do not assume it is empty or run fresh setup blindly.
    Confirm the target migration tracker and physical schema state in the
@@ -216,8 +240,8 @@ are cleared; the READY deployment is not pilot-use approval.
    After any approved apply, perform a separate
    read-only physical schema readback; tracker state alone is insufficient.
    **No shared tracker/schema read or migration apply has been performed for
-   this branch implementation.** Migration 060 was applied only to the isolated
-   test resource, not the shared Preview/Production database.
+   this branch implementation.** Migrations 060–061 were applied only to the
+   isolated test resource, not the shared Preview/Production database.
 4. Confirm the full API route-security matrix and checker registration, secret
    tracking, credential runbook, service catalog, and Atlas entries are
    complete and their gates pass. Route inventory in this branch includes
@@ -272,19 +296,26 @@ secret-entry process; this runbook does not replace its registry.
 
 ## Privacy, vendor, and runtime gates
 
-- **Workflow deployment and recovery:** source uses Workflow 5.0.0; no hosted
-  Workflow execution or paid usage is authorized by this source-build step.
-  Before deployment/use, confirm applicable charges and authorization, generated
+- **Workflow deployment and recovery:** source uses Workflow 5.0.0; the owner
+  has explicitly authorized one provider-free synthetic Workflow test. This
+  does not authorize AssemblyAI use or enabling the pilot. Before deployment,
+  confirm applicable charges and authorization, generated
   queue-only trigger authentication, function duration of at least 240 seconds,
   parser asset tracing, and protected Preview delivery. Workflow arguments and
   results contain opaque job IDs, attempts and bounded state/timing only; step
   failures use fixed codes without raw provider/database error causes.
-  **Open enablement blocker:** stale running dispatches currently become
-  recoverable after one day and are then found by the daily recovery run. A
-  stopped runner may therefore take 24–48 hours to recover, exceeding the
-  screenshot's one-day provider TTL. The owner's daily-deletion acceptance does
-  not approve this processing delay. Prove timely hosted retry/recovery or amend
-  that recovery path before enabling real transcription.
+  **Current branch recovery design [SOURCE-BUILT, HOSTED EXECUTION UNVERIFIED]:**
+  active Workflow steps retry after 60 seconds (up to 1,440 retries) and hand
+  off after 200 bounded processing cycles. The hourly recovery mode queries
+  Workflow SDK run status and uses exact compare-and-set recovery only for
+  terminal `completed`, `failed`, or `cancelled` runs; live/unknown runs are
+  touched without being reclaimed. This replaces the earlier one-day plus
+  daily-run recovery design in branch source, but does not prove hosted SDK
+  status semantics or that an hourly Preview invocation exists. The new source
+  is not deployed; Vercel Cron normally runs only in Production, and Preview
+  hourly scheduling has not been established. Daily cleanup remains unchanged.
+  Prove deployed retry/recovery, queue-only trigger security, execution duration
+  and Preview delivery before enabling real transcription.
 - **Account privacy:** the owner's 2026-09-30 Data Controls screenshot shows
   model-improvement opt-out on and asynchronous TTL set to **one day**, not
   zero retention. Project/key coverage, deletion lag, upload-only cleanup and
