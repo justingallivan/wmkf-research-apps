@@ -240,4 +240,159 @@ describeIf('transcription pilot store (isolated local Postgres proof)', () => {
     )).rejects.toMatchObject({ code: '23514', constraint: 'transcription_jobs_purged_content_shape' });
     expect(bound.job.status).toBe('processing');
   });
+
+  it.each(['processing', 'saving'])('claims %s cleanup after DELETE and lease expiry', async status => {
+    const queued = await makeQueuedJob();
+    await pool.query(
+      `UPDATE transcription_jobs SET status=$2, cleanup_requested_at=NOW(),
+         lease_token=$3, lease_expires_at=NOW()-INTERVAL '1 second'
+       WHERE id=$1`,
+      [queued.id, status, crypto.randomUUID()],
+    );
+    const claim = await store.claimCleanup({ jobId: queued.id });
+    expect(claim.job.id).toBe(queued.id);
+    expect(claim.job.status).toBe(status);
+    expect(claim.leaseToken).toBeTruthy();
+    expect(claim.job.input_cleanup_pathname).toBe(queued.input_cleanup_pathname);
+  });
+
+  it('keeps failed remote deletion independently claimable after local cleanup completes', async () => {
+    const queued = await makeQueuedJob();
+    await pool.query(
+      `UPDATE transcription_jobs SET status='failed', cleanup_requested_at=NOW(),
+         local_cleanup_completed_at=NOW(), content_purged_at=NOW(),
+         input_cleanup_pathname=NULL, audio_pathname=NULL,
+         original_filename=NULL, audio_sha256=NULL, audio_etag=NULL,
+         provider_transcript_id='remote-pending-fixture', provider_cleanup_completed_at=NULL
+       WHERE id=$1`, [queued.id],
+    );
+    const claim = await store.claimCleanup({ jobId: queued.id });
+    expect(claim.job.id).toBe(queued.id);
+    expect(claim.job.provider_transcript_id).toBe('remote-pending-fixture');
+    expect(claim.job.local_cleanup_completed_at).toBeTruthy();
+  });
+
+  it('retains provider receipt identity through purge, then stops claiming after remote resolution', async () => {
+    const queued = await makeQueuedJob();
+    await pool.query(
+      `UPDATE transcription_jobs SET status='failed', expires_at=NOW()-INTERVAL '1 day',
+         receipt_expires_at=NOW()-INTERVAL '1 day', content_purged_at=NOW(),
+         local_cleanup_completed_at=NOW(), input_cleanup_pathname=NULL, audio_pathname=NULL,
+         original_filename=NULL, audio_sha256=NULL, audio_etag=NULL,
+         provider_transcript_id='remote-receipt-fixture', provider_region='eu'
+       WHERE id=$1`, [queued.id],
+    );
+    const claim = await store.claimCleanup({ jobId: queued.id });
+    const purged = await store.purgeExpiredReceipt({
+      jobId: queued.id, leaseToken: claim.leaseToken, expectedVersion: claim.job.version,
+    });
+    expect(purged.provider_transcript_id).toBe('remote-receipt-fixture');
+    expect(purged.provider_region).toBe('eu');
+    expect(purged.receipt_purged_at).toBeTruthy();
+    const sameLease = await store.getLeasedJob({ jobId: queued.id, leaseToken: claim.leaseToken });
+    expect(await store.purgeExpiredReceipt({
+      jobId: queued.id, leaseToken: claim.leaseToken, expectedVersion: sameLease.version,
+    })).toBeNull();
+    const resolved = await store.markProviderDeletionCompleted({
+      jobId: queued.id, leaseToken: claim.leaseToken, expectedVersion: sameLease.version,
+    });
+    expect(resolved.provider_transcript_id).toBeNull();
+    expect(resolved.provider_region).toBe('eu');
+    const released = await store.releaseLease({
+      jobId: queued.id, leaseToken: claim.leaseToken, expectedVersion: resolved.version,
+      expectedStatuses: ['failed'],
+    });
+    expect(released.lease_token).toBeNull();
+    expect(await store.claimCleanup({ jobId: queued.id })).toBeNull();
+    expect(await store.claimNextCleanupJob()).toBeNull();
+  });
+
+  it('keeps upload-reservation reaping pending indefinitely while retaining the exact target', async () => {
+    const queued = await makeQueuedJob();
+    await pool.query(
+      `UPDATE transcription_jobs SET cleanup_requested_at=NOW(), upload_valid_until=NOW()+INTERVAL '1 minute',
+         receipt_expires_at=NOW()-INTERVAL '1 second'
+       WHERE id=$1`, [queued.id],
+    );
+    let claim = await store.claimCleanup({ jobId: queued.id });
+    let finished = await store.finishLocalCleanup({
+      jobId: queued.id, leaseToken: claim.leaseToken, expectedVersion: claim.job.version,
+      deletedPaths: ['input_cleanup_pathname'],
+    });
+    expect(finished.input_cleanup_pathname).toBe(queued.input_cleanup_pathname);
+    expect(finished.audio_pathname).toBeNull();
+    expect(finished.content_purged_at).toBeTruthy();
+    await pool.query(`UPDATE transcription_jobs SET lease_expires_at=NOW()-INTERVAL '1 second',
+      upload_valid_until=NOW()-INTERVAL '6 minutes' WHERE id=$1`, [queued.id]);
+    claim = await store.claimCleanup({ jobId: queued.id });
+    finished = await store.finishLocalCleanup({
+      jobId: queued.id, leaseToken: claim.leaseToken, expectedVersion: claim.job.version,
+      deletedPaths: ['input_cleanup_pathname'],
+    });
+    expect(finished.input_cleanup_pathname).toBe(queued.input_cleanup_pathname);
+    expect(finished.audio_pathname).toBeNull();
+    expect(finished.content_purged_at).toBeTruthy();
+    expect(finished.local_cleanup_completed_at).toBeNull();
+    const receiptPurged = await store.purgeExpiredReceipt({
+      jobId: queued.id, leaseToken: claim.leaseToken, expectedVersion: finished.version,
+    });
+    expect(receiptPurged.input_cleanup_pathname).toBe(queued.input_cleanup_pathname);
+    expect(receiptPurged.receipt_purged_at).toBeTruthy();
+    await pool.query(`UPDATE transcription_jobs SET lease_expires_at=NOW()-INTERVAL '1 second' WHERE id=$1`, [queued.id]);
+    const repeatedClaim = await store.claimCleanup({ jobId: queued.id });
+    expect(repeatedClaim.job.input_cleanup_pathname).toBe(queued.input_cleanup_pathname);
+    const repeatedFinish = await store.finishLocalCleanup({
+      jobId: queued.id, leaseToken: repeatedClaim.leaseToken, expectedVersion: repeatedClaim.job.version,
+      deletedPaths: ['input_cleanup_pathname'],
+    });
+    expect(repeatedFinish.input_cleanup_pathname).toBe(queued.input_cleanup_pathname);
+    expect(repeatedFinish.receipt_purged_at).toBeTruthy();
+  });
+
+  it('does not resolve a conflicting provider binding through DELETE cleanup', async () => {
+    const queued = await makeQueuedJob();
+    await pool.query(
+      `UPDATE transcription_jobs SET status='processing', cleanup_requested_at=NOW(),
+         submission_intent_at=NOW(), attempt_correlation_id=$2,
+         provider_transcript_id='bound-conflict-fixture', callback_candidate_transcript_id='bound-conflict-fixture',
+         conflicting_transcript_id='different-conflict-fixture', provider_id_conflict=TRUE,
+         provider_upload_ref_ciphertext='cipher'
+       WHERE id=$1`, [queued.id, crypto.randomUUID()],
+    );
+    const claim = await store.claimCleanup({ jobId: queued.id });
+    const result = await store.markProviderDeletionCompleted({
+      jobId: queued.id, leaseToken: claim.leaseToken, expectedVersion: claim.job.version,
+    });
+    expect(result).toBeNull();
+    const persisted = await store.getJob(queued.id);
+    expect(persisted.status).toBe('processing');
+    expect(persisted.provider_transcript_id).toBe('bound-conflict-fixture');
+    expect(persisted.provider_id_conflict).toBe(true);
+    expect(persisted.conflicting_transcript_id).toBe('different-conflict-fixture');
+    expect(persisted.provider_cleanup_completed_at).toBeNull();
+    const uncertain = await store.mutateLeasedJob({
+      jobId: queued.id, leaseToken: claim.leaseToken, expectedVersion: persisted.version,
+      expectedStatuses: ['processing', 'saving'], fields: { status: 'submission_uncertain' }, allowCleanup: true,
+    });
+    expect(uncertain.status).toBe('submission_uncertain');
+    expect(uncertain.cleanup_requested_at).toBeTruthy();
+    expect(uncertain.provider_id_conflict).toBe(true);
+    expect(await store.markProviderDeletionCompleted({ jobId: queued.id, leaseToken: claim.leaseToken,
+      expectedVersion: uncertain.version })).toBeNull();
+  });
+
+  it('claims expired content while retaining a known active provider binding', async () => {
+    const queued = await makeQueuedJob();
+    await pool.query(
+      `UPDATE transcription_jobs SET status='processing', provider_transcript_id='known-active-fixture',
+         submission_intent_at=NOW(), attempt_correlation_id=$2, provider_upload_ref_ciphertext='cipher',
+         expires_at=NOW()-INTERVAL '1 second'
+       WHERE id=$1`, [queued.id, crypto.randomUUID()],
+    );
+    const claim = await store.claimNextExpiredContentJob();
+    expect(claim.job.id).toBe(queued.id);
+    expect(claim.job.provider_transcript_id).toBe('known-active-fixture');
+    expect(claim.job.status).toBe('processing');
+    expect(claim.leaseToken).toBeTruthy();
+  });
 });

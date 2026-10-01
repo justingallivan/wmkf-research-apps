@@ -55,4 +55,16 @@ describe('transcription pilot persistence contract', () => {
     })).rejects.toMatchObject({ code: 'transcription_immutable_field', httpStatus: 400 });
     expect(db.query).not.toHaveBeenCalled();
   });
+
+  it('suppresses populated evaluation metadata after receipt expiry without waiting for cron', () => {
+    const row = { status: 'failed', receipt_expires_at: new Date(Date.now() - 1),
+      original_filename: 'meeting.mp3', declared_bytes: 500, verified_bytes: 500,
+      audio_duration_ms: 60000, requested_model: 'universal-2', returned_model: 'universal-2',
+      word_accuracy_score: 5, speaker_accuracy_score: 4, correction_notes: 'notes',
+      cleanup_requested_at: new Date(), local_cleanup_completed_at: null };
+    const dto = projectOwnerTranscriptionJob(row);
+    for (const key of ['original_filename', 'declared_bytes', 'verified_bytes', 'audio_duration_ms',
+      'requested_model', 'returned_model', 'word_accuracy_score', 'speaker_accuracy_score', 'correction_notes']) expect(dto[key]).toBeNull();
+    expect(dto.cleanupPending).toBe(true);
+  });
 });

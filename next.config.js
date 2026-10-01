@@ -86,6 +86,38 @@ const nextConfig = {
   outputFileTracingIncludes: {
     '/api/review-manager/export-reviews': ['./shared/templates/reviews/*.docx'],
     '/api/cron/send-review-thankyous': ['./shared/templates/reviews/*.docx'],
+    // music-metadata is loaded by a Worker whose entrypoint is resolved at
+    // runtime, so NFT cannot discover this dependency graph from route imports.
+    // Include the worker entry and its dynamic parser dependencies in both
+    // transcription routes that perform inspection/processing.
+    '/api/admin/transcription-pilot/jobs/*': [
+      './lib/services/transcription-pilot/audio-inspector-worker.js',
+      './node_modules/music-metadata/**/*',
+      './node_modules/@borewit/text-codec/**/*',
+      './node_modules/@tokenizer/**/*',
+      './node_modules/content-type/**/*',
+      './node_modules/debug/**/*',
+      './node_modules/file-type/**/*',
+      './node_modules/media-typer/**/*',
+      './node_modules/strtok3/**/*',
+      './node_modules/token-types/**/*',
+      './node_modules/uint8array-extras/**/*',
+      './node_modules/win-guid/**/*',
+    ],
+    '/api/cron/drain-transcriptions': [
+      './lib/services/transcription-pilot/audio-inspector-worker.js',
+      './node_modules/music-metadata/**/*',
+      './node_modules/@borewit/text-codec/**/*',
+      './node_modules/@tokenizer/**/*',
+      './node_modules/content-type/**/*',
+      './node_modules/debug/**/*',
+      './node_modules/file-type/**/*',
+      './node_modules/media-typer/**/*',
+      './node_modules/strtok3/**/*',
+      './node_modules/token-types/**/*',
+      './node_modules/uint8array-extras/**/*',
+      './node_modules/win-guid/**/*',
+    ],
   },
   async redirects() {
     return [

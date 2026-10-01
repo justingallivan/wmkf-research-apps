@@ -3,6 +3,7 @@
     "pages/api/cycle-dossier/index.js": { "maxDuration": 300 },
     "pages/api/cron/drain-cycle-dossiers.js": { "maxDuration": 300 },
     "pages/api/cron/drain-review-panels.js": { "maxDuration": 300 },
+    "pages/api/cron/drain-transcriptions.js": { "maxDuration": 300 },
     "pages/api/process.js": {
       "maxDuration": 300
     },
@@ -28,6 +29,7 @@
   "crons": [
     { "path": "/api/cron/drain-cycle-dossiers", "schedule": "*/5 * * * *" },
     { "path": "/api/cron/drain-review-panels", "schedule": "* * * * *" },
+    { "path": "/api/cron/drain-transcriptions", "schedule": "* * * * *" },
     {
       "path": "/api/cron/maintenance",
       "schedule": "0 3 * * *"

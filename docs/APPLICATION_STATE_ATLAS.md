@@ -105,6 +105,7 @@ Promote any of these to a per-entity page if app code starts writing to it.
 
 | Group | Tables | Page |
 |---|---|---|
+| AssemblyAI transcription pilot | `transcription_jobs` — **[SOURCE-BUILT IN BRANCH; migration 060 provisional and unapplied to shared databases]** | [postgres-transcription-pilot.md](atlas/postgres-transcription-pilot.md) |
 | Identity (Postgres) + Wave 1 retired entries | `user_profiles` (live); `user_app_access`, `user_preferences`, `system_settings` (RETIRED 2026-05-12, now Dataverse-only) | [postgres-infra-tables.md](atlas/postgres-infra-tables.md) |
 | Dynamics Explorer state | `dynamics_explorer_requests`, `dynamics_query_log`, `dynamics_feedback`, `dynamics_user_roles`, `dynamics_restrictions` — migration 033 applied and was schema/tracker-read-back in Production on 2026-08-21; one signed-in request proved exact lifecycle/query/usage joins | same |
 | Expertise Finder | `expertise_roster`, `expertise_matches` | same |

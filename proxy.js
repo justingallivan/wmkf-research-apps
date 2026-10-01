@@ -30,6 +30,7 @@ import { SHAREPOINT_CANONICAL_SITE_URL } from './lib/services/graph/constants';
 const SHAREPOINT_CANONICAL_ORIGIN = new URL(SHAREPOINT_CANONICAL_SITE_URL).origin;
 const GRAPH_UPLOAD_ORIGIN = 'https://*.up.1drv.com';
 const PRESENTATION_UPLOAD_PAGE = /^\/meeting-tracker\/visits\/[^/]+\/?$/;
+const TRANSCRIPTION_PILOT_PAGE = /^\/admin\/transcription-pilot(?:\/|$)/;
 const PRESENTATION_MATERIALS_PAGE = /^\/external\/presentation\/[^/]+\/?$/;
 
 export default withAuth(
@@ -44,6 +45,7 @@ export default withAuth(
     const isLoopbackHttp = req.nextUrl?.protocol === 'http:'
       && ['localhost', '127.0.0.1', '::1', '[::1]'].includes(hostname);
     const isPresentationUploadPage = PRESENTATION_UPLOAD_PAGE.test(pathname);
+    const isTranscriptionPilotPage = TRANSCRIPTION_PILOT_PAGE.test(pathname);
     const isPresentationMaterialsPage = PRESENTATION_MATERIALS_PAGE.test(pathname);
 
     // Build CSP directives
@@ -71,6 +73,11 @@ export default withAuth(
       // The canonical tenant origin is included because Microsoft may issue a
       // tenant-hosted session URL for the governed SharePoint drive.
       connectSrc += ` ${GRAPH_UPLOAD_ORIGIN} ${SHAREPOINT_CANONICAL_ORIGIN}`;
+    }
+    if (isTranscriptionPilotPage) {
+      // Browser-direct private Blob uploads are scoped to this authenticated
+      // Admin surface and use short-lived single-path client tokens.
+      connectSrc += ` https://*.blob.vercel-storage.com`;
     }
 
     const directives = [
@@ -194,7 +201,8 @@ export const config = {
      * - /api/webhooks/vercel-log-drain (Vercel Log Drain x-vercel-signature
      *   HMAC-SHA1 of raw body via VERCEL_LOG_DRAIN_SECRET). Exact anchored
      *   match, same safety rationale as the BILL webhook.
+     * - /api/webhooks/assemblyai (per-attempt HMAC shared secret); exact path.
      */
-    '/((?!_next/static|_next/image|favicon\\.ico|apple-touch-icon|api/auth|api/cron|api/irs|api/webhooks/bill$|api/webhooks/vercel-log-drain$|api/bill/onboard-reviewer$).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|apple-touch-icon|api/auth|api/cron|api/irs|api/webhooks/bill$|api/webhooks/vercel-log-drain$|api/webhooks/assemblyai$|api/bill/onboard-reviewer$).*)',
   ],
 };

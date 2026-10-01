@@ -2,14 +2,16 @@
 title: AssemblyAI transcription pilot
 domain: transcription
 kind: plan
-status: draft
-summary: "Admin-only, non-sensitive Zoom transcription pilot; implementation and account retention verification pending."
+status: source-built-not-deployed
+summary: "Admin-only, non-sensitive Zoom transcription pilot; implementation is present in the branch but schema provisioning, deployment, account privacy verification, and live provider behavior remain pending."
 owner: product-engineering
 ---
 
 # AssemblyAI transcription pilot
 
-Revision 3, 2026-09-30. **PLANNED: no runtime, schema, deployment, or provider test is authorized by this planning document.** Claude Fable reviewed revisions 1 and 2 through subscription OAuth. This revision addresses the second review's eight findings with author qualifications recorded below; it has not received a further independent review. Account-specific feasibility checks remain prerequisites to enabling the pilot. Confidential-use approval remains separate.
+Revision 3, 2026-09-30. **Current status: source-built in the implementation branch; not deployed or provisioned.** This document began as a plan and did not itself authorize implementation. Implementation was later explicitly assigned. The current branch includes the Admin page/routes, provider/runtime/worker services, migration 060, model/store, and focused tests. Do not treat checked-in source or local test/build evidence as shared-database provisioning, deployment, environment configuration, account privacy guarantees, or live provider verification. See the [pre-enable runbook](ASSEMBLYAI_TRANSCRIPTION_PILOT_RUNBOOK_2026-09-30.md) for the release boundary and remaining proofs.
+
+Claude Fable reviewed revisions 1 and 2 through subscription OAuth. Revision 3 incorporates the second review's findings and qualifications recorded below. Luna built the implementation, Sol independently reviewed it, and root performed the integrated correction/verification pass. Sol's safety acceptance is for the disabled implementation branch, not pilot enablement. Account-specific feasibility checks remain prerequisites to enabling the pilot. Confidential-use approval remains separate.
 
 ## Objective and scope
 
@@ -17,22 +19,22 @@ Evaluate whether AssemblyAI improves Zoom transcription accuracy and speaker sep
 
 Owner reports model-training opt-out and zero-data-retention enabled and subprocessor review acceptable. These are owner-reported facts, not independently verified account guarantees. Confidential recordings remain excluded until async retention terms are resolved separately.
 
-Proposed pilot defaults: US endpoint, M4A/MP3 only, 50 MiB (52,428,800 bytes; UI says 50 MiB), maximum four hours, one active provider job globally. A partial unique index on a constant for submitting/processing/saving/submission_uncertain enforces that slot across overlapping workers; queued jobs do not consume it. An uncertain job holds the slot until reconciled or explicitly closed by the operator. A server-side pilot flag defaults off. An explicit Start transcription action discloses that AssemblyAI usage may consume paid credits; no background quality benchmarks or automatic retranscription.
+Pilot defaults in source: US endpoint, M4A/MP3 only, 50 MiB (52,428,800 bytes; UI says 50 MiB), maximum four hours, one active provider job globally. A partial unique index on a constant for submitting/processing/saving/submission_uncertain enforces that slot across overlapping workers; queued jobs do not consume it. An uncertain job holds the slot until reconciled or explicitly abandoned by the operator. User and submission switches require literal `true`; source defaults to disabled. An explicit Start transcription action discloses that AssemblyAI usage may consume paid credits; no background quality benchmarks or automatic retranscription.
 
 ## Evidence and boundaries
 
-Source checkout inspected at a7c68df0162b9461420604fac0e29eb1c608be0b on codex/presentation-session-handoff. Working tree was clean. Read-only source checks do not prove Production configuration.
+The original design review inspected source at `a7c68df0162b9461420604fac0e29eb1c608be0b` on `codex/presentation-session-handoff`; that checkout is historical evidence, not this implementation branch. Current source inventory and deployment boundaries are:
 
 | Claim | Evidence | Status |
 |---|---|---|
-| Private upload staging records actor/resource ownership and leases | lib/services/portal-upload-staging.js | VERIFIED in source |
-| Existing staging has a one-hour row TTL and fixed scope allowlist | same file, ROW_TTL_MS and PORTAL_UPLOAD_SCOPES | VERIFIED in source; unsuitable for direct unmodified reuse |
-| Existing post-presentation transcript validation accepts VTT/TXT/PDF/DOCX up to 25 MiB | lib/utils/post-presentation-transcript-file.js | VERIFIED in source; audio is a separate input contract |
-| Admin routes use requireSuperuser | pages/api/admin/stats.js and other Admin routes | Source pattern; implementation must trace auth semantics before reuse |
-| AssemblyAI supports authenticated async callbacks and transcript retrieval/deletion | vendor references below | Documented; NOT tested on this account |
-| Account privacy settings apply to every proposed project/key | owner report only | UNKNOWN scope; verify before first test |
+| Pilot Admin page, API routes, callback, worker, media/provider/runtime services and job store exist in source | `pages/admin/transcription-pilot.js`, `pages/api/admin/transcription-pilot/`, `pages/api/webhooks/assemblyai.js`, `pages/api/cron/drain-transcriptions.js`, `lib/services/transcription-pilot/` | SOURCE-BUILT in branch |
+| Job schema is registered as migration 060 and fresh-install source | `lib/db/migrations/060_transcription_jobs.sql`, manifest, `scripts/setup-database.js` | SOURCE-BUILT; 060 provisional and unapplied to shared databases |
+| Store lease/owner/unique-slot behavior and database constraints | focused Jest unit tests plus `tests/integration/transcription-pilot.pg.test.js` in an isolated local scratch schema | Locally tested; no shared schema proof |
+| Parser, provider, worker, route and safe-fetch branch behavior | implementation checkpoint: focused test suites, targeted ESLint, and production Next build passed | Branch evidence only; see runbook for exact limits |
+| AssemblyAI account privacy, async retention, webhook delivery, deletion, spend, and runtime behavior | no account/API/provider probe in this implementation | UNKNOWN / NOT TESTED |
+| Production/Preview schema, flags, credentials, deployment, cron and callback reachability | no shared DB/configuration/deployment probe in this implementation | UNKNOWN / NOT VERIFIED |
 
-This pilot's artifacts are temporary operational test data. Postgres owns job metadata; private Blob owns bytes. No Dataverse/SharePoint writes in the pilot. Production publication requires a later request-bound contract and reauthorization. Existing grant transcription-provider workflow decisions remain pending outside this pilot.
+Postgres is intended to own temporary job metadata; private Blob owns audio and result bytes; AssemblyAI owns remote asynchronous processing. No Dataverse or SharePoint writes are in scope. Production publication requires a later request-bound contract and reauthorization. Existing grant transcription-provider workflow decisions remain pending outside this pilot.
 
 ## User workflow
 
@@ -40,26 +42,20 @@ Admin opens Transcription Pilot, chooses a file, acknowledges that it is non-sen
 
 Ready shows speaker-labelled utterances and timestamps, processing duration and model identity, downloadable TXT/VTT, and expiry date. The owner can score word accuracy and speaker accuracy from 1–5 and enter correction examples. Speaker labels remain provider labels; no inferred names. Transcript text is rendered as text, never executable HTML. No model executes instructions contained in a transcript.
 
-## Proposed API and service surface
+## Implemented API and service surface (branch source only)
 
-Names below are proposed, not claims that files/routes exist:
+- Admin page: `/admin/transcription-pilot`.
+- Admin API source: `/api/admin/transcription-pilot/jobs` (list/create), `/jobs/[id]` (read/delete), `/jobs/[id]/start`, `/jobs/[id]/download`, `/jobs/[id]/evaluation`, `/jobs/[id]/reconcile`, `/jobs/[id]/abandon`, and `/evaluation-export`.
+- Callback and worker source: `/api/webhooks/assemblyai` and `/api/cron/drain-transcriptions`.
+- Source modules: `media-inspector.js`, `audio-inspector-worker.js`, `crypto.js`, `provider.js`, `runtime.js`, `worker.js`, `model.js`, and `store.js` under `lib/services/transcription-pilot/`.
 
-- Admin page: /admin/transcription-pilot.
-- POST /api/admin/transcription-pilot/jobs: authenticated prepare; creates job and returns a short-lived token for an exact server-chosen private pathname.
-- POST /api/admin/transcription-pilot/jobs/:id/start: verifies ownership, upload metadata, actual bytes/container/duration and non-sensitive acknowledgement; atomically queues validated input.
-- GET list/detail and authenticated download routes: owner-only, including for other superusers during this pilot; recheck current superuser permission and pilot flag on every access.
-- PATCH evaluation route: bounded scores/notes, owner-only, optimistic row version.
-- POST /api/admin/transcription-pilot/jobs/:id/reconcile: owner-only current superuser with non-null profile; accepts an exact provider ID and expected row version for an uncertain attempt. After obtaining a lease, verify the provider object with our API key, matching decrypted upload reference and unique provider-ID binding; commit only with the same lease/version. No arbitrary URLs. Fail closed if the reference has already been purged. A cleanup-requested job proceeds only to cleanup, never publication.
-- POST /api/admin/transcription-pilot/jobs/:id/abandon: same owner/auth and expected-version checks; available only for submission_uncertain with no valid processing lease. Require explicit acknowledgement that provider work may remain active and a later submission may incur another charge. Atomically record a content-free abandonment receipt, mark failed, request cleanup and release the local slot. No resubmit occurs in this action. The Admin Needs attention view exposes both recovery actions and their outcomes; invalid or stale actions make no change. Both recovery routes remain available when submission is disabled; the pilot flag still gates user access. Include both in the security matrix and audit tests.
-- DELETE job route: requests cleanup, blocks new processing and further content access; does not falsely claim remote cancellation or immediate erasure.
-- POST /api/webhooks/assemblyai: HTTPS shared-secret authentication, bounded JSON body and durable per-attempt correlation as specified below. Only records a candidate ID/marks a job due for retrieval; no trust in callback content or status.
-- Scheduled worker endpoint: cron authentication, processes bounded batches with leases; handles submission, status reconciliation, retrieval and cleanup. Worker must continue recovery/cleanup when the UI pilot flag is off; separate submission switch controls new provider work.
+These paths are source inventory, not deployment evidence. User routes require a fresh superuser check and a non-null authenticated profile; job reads and mutations are owner-scoped. Reconcile verifies an exact provider ID against the decrypted upload reference under a lease; abandon requires explicit acknowledgement, records that remote work may remain active, requests cleanup, and does not resubmit. DELETE blocks further content access but does not claim remote cancellation or immediate erasure. Route-security matrix registration and release gates remain tracked separately.
 
 Use a small AssemblyAI-specific audio service (upload, submit, status, result, delete), outside the text-generation Executor. Fable's source review found the existing clients are text-oriented. Route provider HTTP through safeFetch with exact AssemblyAI host allowlisting and fail-on-redirect support; do not use the text model usage log. Track spend in the AssemblyAI dashboard and content-free duration/job receipts during the pilot.
 
 ## Durable model and transitions
 
-New operational table, proposed name transcription_jobs; reserve the migration number at implementation time, since other workstreams have reservations. Update migration manifest and fresh-install shape together.
+New operational table `transcription_jobs` is source-built in `lib/db/migrations/060_transcription_jobs.sql`, registered in the manifest and fresh-install shape. Migration 060 remains provisional and unapplied to shared databases; migrations 058 and 059 remain reserved for other work. Reconcile the target migration tracker and physical schema before any authorized apply; see the pre-enable runbook.
 
 Fields: UUID; owner profile; creation/update/version; acknowledgement timestamp; original filename; declared and verified MIME/size; audio duration/hash/etag; exact input pathname; provider region/model/options snapshot; encrypted provider upload reference (sensitive, server-only); provider transcript ID; immutable attempt correlation ID; candidate/conflicting provider IDs and conflict marker; submission intent; request idempotency key; state; lease token/expiry; attempt count/next-attempt; sanitized error code; output/allowlisted-diagnostic pathnames and hashes; ready/content-expiry/receipt-expiry times; evaluation scores/notes; content_purged_at/reference_purged_at; abandonment acknowledgement/time; cleanup request/provider/local completion times. API responses never expose credentials, provider upload URLs, or storage tokens.
 
@@ -73,25 +69,25 @@ The callback validates the attempt ID/header and compares any already-bound prov
 
 Timeouts between remote acceptance and receipt persistence produce submission_uncertain; do not automatically submit again. Expired submitting leases also enter this state, never queued. Callback correlation can recover it; without callback delivery, an operator may supply a provider ID, which must pass the same API-key, audio-reference and uniqueness checks. No match means no automatic Retry button; explicitly abandoning the attempt records potential duplicate-cost/cleanup exposure before a new attempt. Documentation exposes no creation idempotency parameter; this is not proof that no such vendor capability exists.
 
-Provider processing failures preserve the original error code. Retryable GET/download/save errors use bounded backoff and reuse the same provider ID. Callback is an optimization for known-ID jobs and a recovery aid for uncertain submissions: polling must retrieve promptly enough to beat account TTL. Final completion requires durable normalized JSON plus TXT/VTT derivable from that JSON; save and hash-check before requesting provider deletion. Store only allowlisted provider diagnostics privately for the diagnostic retention period, never the unfiltered raw response. Empty/no-speech results are explicit outcomes, not fabricated transcripts.
+Provider failures preserve only sanitized codes, never raw diagnostic bodies. Retryable GET/download/save errors use bounded backoff and reuse the same provider ID. Callback is an optimization for known-ID jobs and a recovery aid for uncertain submissions: polling must retrieve promptly enough to beat account TTL. Final completion requires durable normalized JSON plus TXT/VTT derivable from that JSON; save and hash-check before requesting provider deletion. The pilot does not persist raw provider diagnostics. Empty/no-speech results are explicit outcomes, not fabricated transcripts.
 
 ## Upload and runtime feasibility
 
-Reuse the private browser-direct upload pattern, but give transcription_jobs ownership of its paths and expiration; do not add a scope to the existing portal helper unless a full cleanup-consumer audit justifies it. UPLOADS_BLOB_RW_TOKEN is a candidate store credential, subject to its store policy; never use the intake or public token. Token mint and finalization independently enforce identity, byte cap and exact job pathname.
+The branch uses private browser-direct Blob upload with transcription-owned paths and expiry, not a new scope in the portal staging helper. Runtime code uses `UPLOADS_BLOB_RW_TOKEN`; verify its private-store policy and intended environment before enabling, and never substitute the intake or public token. Token mint and start validation independently enforce identity, byte cap, and the exact persisted job pathname.
 
-M4A/MP3 filename/MIME are not sufficient validation. Probe actual container, codec and duration with a supported bounded media inspector. Before full implementation, prove runtime/library compatibility, maximum-size upload/transfer, bounded memory, malformed-file behavior, and Function timeout runway. Malware scan support for audio must be established; document unsupported formats rather than claim scanning. If required validation/transfer cannot run safely within the existing runtime, return for a concrete hosting decision instead of adding infrastructure implicitly.
+M4A/MP3 filename/MIME are not sufficient validation. The branch now parses actual container, codec and duration with `music-metadata` in a disposable Node worker thread, using a ten-second default timeout and explicit V8 worker resource limits. The production build/file-trace includes the worker and parser dependency tree for the relevant routes. Focused synthetic parser tests, targeted lint and a production Next build passed per the implementation checkpoint. This does not prove maximum-size transfer/memory behavior, deployed Node compatibility, or execution within the deployed Function; those runtime proofs remain open. No malware scan is claimed for audio. Document unsupported formats rather than claim scanning.
 
 No request or response carries the 50 MiB file through the browser-facing Function. Worker reads with an enforced byte counter into a buffer capped at 50 MiB; measure peak memory including inspection/upload copies. Provider calls reject redirects to prevent credential forwarding and body replay. Implement safeFetch's explicit no-redirect option with unchanged defaults for other callers and regression tests. Jobs continue outside browser lifetime through the scheduled worker; no unawaited fire-and-forget work. Worker deployment must have a verified schedule and callback reachability; authenticated polling supports a protected Preview where callbacks cannot enter, with operator reconciliation for lost-submit responses. Do not disable deployment protection to obtain webhook delivery.
 
-Proposed worker: /api/cron/drain-transcriptions, every minute, explicit maxDuration 300 seconds in route and vercel.json, 240-second internal budget, individual network calls aborted before budget exhaustion, seven-minute lease. No lease renewal extends work beyond invocation budget. Overlapping invocations skip leased work. Media validation in start also needs an explicit bounded duration; if unsafe there, persist a validating state and move it to the worker before queue admission. Verify runtime feasibility before choosing that variant.
+The source registers `/api/cron/drain-transcriptions` on a one-minute schedule, with a 300-second route duration, 240-second internal budget, bounded provider calls, and seven-minute leases. There is no live scheduler/deployment proof. Overlapping workers use leases and skip claimed work. Media validation runs in the authenticated start path with a bounded worker-thread parser; deployed runtime and maximum-size runway are not yet proved.
 
-TRANSCRIPTION_PILOT_ENABLED controls UI/user operations; TRANSCRIPTION_SUBMISSIONS_ENABLED controls only provider upload/create calls. Both require literal true; missing or any other value means disabled. This is a naming/convention choice, not an additional safety mechanism. Automated recovery, callbacks and cleanup continue when either is off; reads and manual recovery may be disabled but cleanup is not. Implement verifyTranscriptionCronSecret with constant-time CRON_SECRET checking and no development bypass, following the strict dossier/review-panel guards. Every user operation requires a non-null authenticated profile in addition to requireSuperuser; local pilot testing requires real authentication, since dev auth bypass cannot create an owner.
+`TRANSCRIPTION_PILOT_ENABLED` controls user operations; `TRANSCRIPTION_SUBMISSIONS_ENABLED` controls provider upload/create calls. Runtime code requires each to equal the literal string `true`; unset or any other value is disabled. The worker still runs recovery and cleanup when either is disabled. No remote environment values were inspected; keep the feature disabled until the runbook gates are explicitly cleared. The cron source uses a strict `CRON_SECRET` check without a development bypass. Every user operation also requires `requireSuperuser` and a non-null authenticated profile.
 
 ## Privacy, retention and deletion
 
 Provider no-training settings are account/project configuration, not an invented request parameter. Record their operator confirmation date and scope; local flags cannot certify external configuration. Non-sensitive acknowledgement limits use but does not automatically detect sensitive speech.
 
-Proposed local policies: uploaded-but-never-started audio expires after 24 hours; successful audio deleted after the result is committed; failed/unresolved audio expires at seven days; results/allowlisted diagnostics/evaluation notes expire seven days after ready (or creation for never-ready jobs). Each read enforces expires_at immediately, independent of cron. The minute worker begins physical cleanup on its next successful tick after expiry; delays/failures are visible. Restricted operational/evaluation receipts expire 30 days after ready, or creation for never-ready jobs. Their allowlist is opaque job ID, owner binding for access control, numeric word/speaker scores, audio and processing duration, requested/returned model identity, lifecycle timestamps, sanitized outcome and cleanup/abandonment status. These fields are minimized, not presumed non-sensitive; they remain owner-only and unavailable for broad analytics. Filename, transcript, correction examples, free-text notes and encrypted upload references are excluded and purged with content. Unresolved cleanup retains only the identifiers and status necessary for exact cleanup until resolution; it does not extend score/content retention. After reference purge, automatic or manual audio-reference reconciliation is unavailable; show that limitation and require explicit abandonment to release an uncertain slot.
+The source implements these local retention targets: unstarted upload rows expire after 24 hours; queued/failed/unresolved content expires seven days after admission/creation as applicable; a ready transcript's readable content and notes expire seven days after ready; successful input audio cleanup begins after durable result publication; receipts expire 30 days after ready or creation for a never-ready job. Reads enforce logical expiry independent of cron, while physical deletion is retried by the scheduled worker. Provider/account retention and deletion behavior are not verified. The source now sets never-ready receipt expiry to 30 days from creation. Receipts are owner-restricted operational metadata, not presumed non-sensitive. Filename, transcript, correction notes and encrypted upload references are not retained as receipt content; exact path tombstones remain only as needed for deletion recovery. Unresolved remote cleanup may retain exact identifiers until resolved; purging an upload reference prevents later audio-reference verification, and explicit abandonment is the acknowledged local-slot release path.
 
 The pilot owner who starts and scores the recordings owns the evaluation export. Trigger it immediately after scoring the third recording, update after any fourth/fifth recording, and complete it before the earliest 30-day receipt expiry. The evaluation view displays that deadline. Export only approved non-sensitive aggregate scores and findings to a dated evaluation record; do not copy filenames, transcripts, notes, owner IDs or per-job provider identifiers. If the pilot ends before three recordings, export at closeout. Receipt retention provides a comparison window, not a promise of automatic archival.
 
@@ -105,23 +101,45 @@ Keep region explicit and API key/webhook secret server-side. No gateway, summari
 
 ## Implementation sequence and acceptance
 
-1. Read-only source/contract check and non-sensitive fixture preparation. Confirm project/key privacy scope and model availability without transmitting recordings.
-2. Implement job migration, private upload/validation, AssemblyAI service and worker. Unit tests plus real scratch-Postgres lease/uniqueness/crash tests.
-3. Implement webhook, polling recovery, deletion lifecycle, and Admin UI. Test owner isolation, revoked access, refresh, stale UI responses, and output escaping.
-4. Deploy a deliberately enabled test environment after review. User supplies API key via approved secret entry, never chat, and authorizes AssemblyAI test usage that may consume credits. No live account writes or metered tests are part of the current plan task.
-5. Run three recordings, then up to five if the initial evidence is useful. Compare the same manually checked passages with Zoom; capture correction time, proper names/technical terms, speaker errors, timestamps, total processing time, duration and billed cost where available. Estimate cost only from a dated verified price; label it estimated.
+### Invariant-to-test map
+
+| Invariant | Enforced by | Discriminating proof |
+|---|---|---|
+| A job always has a real authenticated owner; caller input cannot supply it | Every user route rejects `profileId === null`; owner-scoped store queries | Anonymous/dev-null rejection, cross-owner list/detail/download/recovery denial; mutation check removes owner predicate and must fail |
+| Browser upload is direct to one server-chosen private path, capped at 50 MiB | Prepare route and bounded client token; worker rechecks actual streamed bytes | Token size policy and actual cap/cap+1 stream tests |
+| Provider credentials are never forwarded across redirects | `safeFetch` explicit fail-on-redirect mode on AssemblyAI calls | Redirect credential-forwarding regression test; existing default redirect behavior remains covered |
+| At most one provider job is active globally | Partial unique slot index across submitting/processing/saving/submission_uncertain | Concurrent claims for distinct jobs: one wins; unique violation maps to slot-busy |
+| No stale worker can commit after lease loss | Every post-I/O mutation predicates on lease token and expiry | Mutation check removes lease predicate and must fail; expire/reclaim lease before stale completion |
+| Unknown submission acceptance never triggers an automatic second POST | Expired submit lease/response-loss becomes `submission_uncertain` | Mutation check removes uncertain-state guard and must fail; worker rerun proves submit count unchanged |
+| Callback can only correlate to its immutable attempt | Per-attempt HMAC verified in constant time before DB lookup; candidate IDs verified against provider object | Invalid HMAC, unknown correlation, duplicate/out-of-order delivery, callback/POST mismatch tests |
+| Delete blocks reads without releasing in-flight/uncertain work | `cleanup_requested_at` fences reads and workers; only explicit abandon releases unknown work | Delete during upload and on uncertain job retains slot until safe resolution |
+| Expired content is unavailable immediately and pointers clear atomically | Read-time expiry plus lease-fenced cleanup transition satisfying terminal CHECKs | Expired-ready read denied; cleanup failure keeps truthful state; ready expiry preserves schema checks |
+
+These tests remain the acceptance set before calling the pilot operationally complete. Store mutation checks have been run one at a time and restored after each red proof. Implementation status and the still-open scope are:
+
+| Work | Current evidence | Status |
+|---|---|---|
+| Schema/store/model and owner UI/API/worker/provider/media implementation | Branch files and the focused tests | SOURCE-BUILT |
+| Local Postgres constraints, owner fence, lease fence, global slot, and pre/post-intent recovery | Isolated scratch-schema suite; wrong-owner, wrong-token and resubmit mutations each failed as expected before restoration | LOCALLY PROVED; no shared schema |
+| Focused provider/worker/route/media/crypto/store/UI/safe-fetch test set | Root verified eleven suites / 111 tests, including 13 local scratch Postgres regressions | BRANCH TEST EVIDENCE |
+| Targeted ESLint and `npm run build`/route output trace | Final build passed; lint has zero errors / four UI hook warnings; parser worker/dependencies included in file trace | BRANCH BUILD EVIDENCE; not deployed-runtime proof |
+| API route security inventory/checker | Backend checkpoint reports checker pass with 251 routes and three pre-existing external-materials token warnings | SOURCE REGISTERED; warnings are not attributed to this feature |
+| Maximum-size media/memory/Function runtime, provider fixtures, account privacy/retention, shared migration, environment config, cron/webhook reachability | No corresponding live or target-environment probes | NOT RUN / UNKNOWN |
+| Three-to-five-recording quality evaluation and aggregate export | Requires owner approval, enabled target, explicit spend authorization and the runbook gates | NOT STARTED |
+
+Do not deploy or enable solely on branch tests/build. The remaining evaluation sequence is: first clear the pre-enable runbook and migration/security/configuration gates; then obtain separate approval before any metered test. Run three explicitly non-sensitive recordings, extend to five only if initial evidence is useful, compare identical manually checked passages with Zoom, and capture correction time, terminology/speaker/timestamp errors, processing duration, and billed cost where available. Estimate cost only from a dated verified price and label it estimated.
 
 Discriminating tests: exact cap and cap+1; malformed M4A/MP3; oversized actual bytes despite declared size; cross-owner job/download/reconcile/abandon; invalid callback secret and unknown ID; duplicate/out-of-order callbacks; callback before provider-ID commit; callback/POST ID conflict; secret rotation mid-attempt; database failure/503 with missing redelivery; lost submit response (no automatic second charge); crash after output write before ready; expired lease after external success; missing webhook with known versus unknown provider ID; provider result expires before retrieval; local storage failure; provider deletion failure; DELETE during upload and on uncertain jobs; cleanup racing submission/retrieval; stale reconcile/abandon requests and provider-ID uniqueness conflicts; uncertain-reference purge preserving the slot; late callback after purge/abandonment; score receipt expiry and export deadline; UI navigation during an awaited result.
 
-Relevant build gates: migration manifest, Atlas, route-security matrix, secret tracking/runbook, service catalogue, status/consumer parity, instruction invariants, and applicable security/lifecycle gates with their self-tests sequentially. Explicit integration changes: exact api.assemblyai.com/api.eu.assemblyai.com safeFetch hosts; exact anchored api/webhooks/assemblyai proxy exemption; verifyAssemblyAIWebhook and verifyTranscriptionCronSecret recognition in the route checker; webhook matrix wording "shared secret" (not a claim of provider-signed HMAC); ASSEMBLYAI_API_KEY and ASSEMBLYAI_WEBHOOK_SECRET tracking/runbook entries plus reconcile the missing UPLOADS_BLOB_RW_TOKEN entry if reusing that token. Verify purpose-separated encryption key availability. Gate tests must reject sibling webhook paths, missing secrets, null profiles and redirected credential-bearing requests. Document new table and routes only when implemented; do not publish planned schema as live.
+Required durable-surface checks include migration manifest, Atlas, route-security matrix, secret tracking/credential runbook, service catalog, and applicable auth/security/lifecycle checks, each gate followed by its self-test sequentially. Source integration has registered exact AssemblyAI hosts in `safeFetch`, an anchored webhook proxy exemption, named callback/cron verifiers, and purpose-separated upload-reference encryption. The backend checkpoint reports the route matrix/checker and secret/credential entries registered; its API matrix check passed with 251 routes and three pre-existing external-materials token warnings. Root owns the integrated release gates; this plan, Atlas, and catalog consistently describe the branch source as not deployed, never as a live schema. No live account, DB, privacy, or deployment probe has been performed.
 
 Quality acceptance: owner determines whether reduced correction effort and usable speaker attribution justify adoption; no invented accuracy threshold. Engineering acceptance: each job recovers without silent duplication, each result is owner-protected, cleanup status is truthful, and maximum-size non-sensitive audio completes. Confidential-use acceptance separately requires confirmed async retention and contractual coverage of audio, transcript, derived/de-identified content and subprocessors.
 
 ## Contract review scope
 
-Change: isolated Admin transcription pilot. Entry points: upload/start/list/detail/download/evaluation/delete, callback and worker. Persistence: new Postgres operational jobs and private Blob; external AssemblyAI jobs. Consumers: Admin UI, exports, worker and cleanup. Prior issues: one-hour staging mismatch; account ZDR ambiguity; remote-submit acceptance gap.
+Change: isolated Admin transcription pilot. Entry points: upload/start/list/detail/download/evaluation/export/delete/reconcile/abandon, authenticated callback and scheduled worker. Persistence: source-built Postgres operational jobs and private Blob; external AssemblyAI jobs. Consumers: Admin UI, exports, worker and cleanup. Prior design concerns: one-hour staging mismatch; account retention uncertainty; remote-submit acceptance gap.
 
-Seven audits: whole flow, partial success, async/stale ownership, durable surfaces and status consumers are specified above and require implementation tests. Helper extraction: no generic framework proposed. Durable-doc reconciliation: this is a new proposed capability, not a change to production facts; search AssemblyAI/transcription-pilot restatements before finalizing review. No production probe, migration or runtime test has been performed for this document.
+The whole-flow, partial-success, async/stale-state, helper-boundary, durable-surface, doc-reconcile, and status-consumer audits inform the contract above. Implemented behavior has focused tests, but the full release acceptance matrix is not complete. No shared DB/configuration probe, migration apply, provider call, deployment, privacy/account probe, or deployed Node/media runtime test has been performed. See the current evidence table and pre-enable runbook; the dated Fable reviews below remain historical evidence and were not rewritten.
 
 ## Vendor references
 
@@ -131,6 +149,32 @@ Seven audits: whole flow, partial success, async/stale ownership, durable surfac
 - https://www.assemblyai.com/legal/data-processing-addendum — contractual review source, not evidence of account configuration.
 
 ## Review record
+
+### Implementation review and root handoff
+
+Luna built/reconnoitred; Sol performed independent read-only reviews; root
+corrected integrated lifecycle issues and ran final checks. All 67 repository
+checks passed sequentially, as did the final eleven-suite / 111-test run and
+production build. No push, deployment, shared migration, or paid provider test
+was performed. The contract-reconciliation skill drove the lifecycle tests and
+durable-surface updates, rather than treating a passing build as flow proof.
+
+Sol's integrated findings and dispositions: active DELETE/expiry and independent
+remote retries corrected; receipt expiry no longer destroys pending routing or
+repeats purge writes; callback conflicts enter operator-recoverable uncertainty,
+including after DELETE; Blob operations use abortable deadlines; receipt reads
+redact immediately. A reported NOT NULL purge error was refuted against the
+actual nullable schema. Root additionally required no-overwrite output and
+read-back hash verification. The final conflict transition explicitly permits
+the cleanup marker while retaining lease/version fences, proven against real
+local Postgres. Sol accepted the disabled branch subject to these final gates.
+
+The late-upload completion ceiling could not be established locally. No guessed
+five-minute grace is used: issued-capability input targets remain tracked and
+reaped, with cleanup visibly pending, while receipt metadata expires separately.
+A verified completion/revocation protocol is still an enablement prerequisite.
+See the runbook; this conservative unresolved identifier is not retained audio
+permission or proof of final physical erasure.
 
 Claude Code host authentication returned claude.ai/firstParty/Team. After explicit user authorization of source sharing, Fable completed both read-only reviews as claude-fable-5-1. Full unfiltered historical reviews and fingerprints: [revision 1 review](evidence/ASSEMBLYAI_PILOT_FABLE_REVIEW_2026-09-30.md), [revision 2 review](evidence/ASSEMBLYAI_PILOT_FABLE_REVIEW_R2_2026-09-30.md). Revision 1 verdict: **Not implementation-ready. Direction sound.** Revision 2 verdict: **Design-ready for a bounded non-sensitive implementation slice after four must-fix text corrections.** Neither review authorizes confidential recordings. No model API key, Ultrareview, runtime mutation or deployment was used.
 
@@ -149,7 +193,7 @@ Claude Code host authentication returned claude.ai/firstParty/Team. After explic
 
 Author also corrected "raw response" wording to allowlisted diagnostics throughout current guidance. Additional design qualification: explicit abandonment can release the local slot but cannot promise cessation of unknown remote work. No provider behavior was newly verified for this amendment.
 
-Bounded durable-document sweep (changed-fact mode): current authority is the owner's amendment request plus the two fingerprinted review records. Search of docs, memory, session/instructions and application directories for the plan name, transcription_jobs and TRANSCRIPTION_PILOT_ENABLED found this live plan and the two historical review records only. This plan is updated structurally; review evidence remains verbatim historical. All new behavior remains PLANNED; account configuration, runtime viability and operational tests remain UNKNOWN/unperformed. No current runtime/Atlas/schema claims are changed.
+Changed-fact documentation update (2026-09-30): implementation source and the implementation owner checkpoint now supersede the earlier plan-only state. The two fingerprinted review records remain verbatim historical evidence. Current truth is source-built but not deployed/provisioned; migration 060 is provisional/unapplied; account privacy, target runtime, shared schema, configuration, and deployment state remain UNKNOWN or unverified. Atlas and service catalog entries plus the pre-enable runbook are linked from this plan. This is a bounded documentation reconciliation, not a repo-wide sweep or release approval.
 
 ### Historical revision 1 findings and revision 2 author dispositions
 
@@ -183,4 +227,4 @@ Bounded durable-document sweep (changed-fact mode): current authority is the own
 | 26 | MEDIUM — webhook retry behavior | Docs: 2xx within 10 seconds, up to 10 attempts; 4xx stops retries. Callback contract corrected. |
 | 27 | LOW — returned model/deletion metadata | Submit reference documents speech_model_used and is_deleted. Display requested model plus actual when returned; otherwise "not reported." DELETE metadata semantics remain a fixture check. |
 
-Vendor checks performed 2026-09-30 against references above and https://www.assemblyai.com/docs/pre-recorded-audio/api-reference/transcripts/submit. These are documentation checks, not account probes. Remaining prerequisites: actual TTL/retrieval window; upload-only cleanup; response-loss/correlation and 5xx-retry fixtures; runtime media validation and byte-transfer budget; deployment scheduler availability. Revision 3 incorporates the author's response to the second review and is ready as a plan for a bounded implementation feasibility slice, not certified for enabled or confidential use. Revision 3 has not been independently re-reviewed. Implementation still requires its own authorization, source/Atlas checks, tests and deployment review.
+Vendor documentation checks listed here were performed 2026-09-30; they are not account probes. Remaining prerequisites include account-specific TTL/retrieval and upload-only cleanup behavior, response-loss/correlation and 5xx-retry fixtures, maximum-size media/byte-transfer and deployed Function runtime proof, privacy/contractual confirmation, migration pre-apply tracker plus physical readback, environment/secret verification, verified direct-upload completion, and actual deployment schedule/callback reachability. Revision 3's design verdict was historical: it was ready for a bounded implementation feasibility slice, not certified for enabled or confidential use. Sol's subsequent implementation review and root verification are recorded above and in the linked runbook.

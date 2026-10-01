@@ -43,6 +43,8 @@ describe('safeFetch', () => {
     'https://serpapi.com/search',
     'https://chemrxiv.org/engage/api-gateway/chemrxiv/items',
     'https://api.vercel.com/v1/projects',
+    'https://api.assemblyai.com/v2/transcript',
+    'https://api.eu.assemblyai.com/v2/transcript',
     'https://api.nsf.gov/services/v1/awards.json',
     'https://api.reporter.nih.gov/v2/projects/search',
     'https://appriver3651007194.sharepoint.com/sites/akoyaGO',
@@ -62,6 +64,7 @@ describe('safeFetch', () => {
     ['arbitrary external', 'https://evil.com/steal'],
     ['similar-sounding host', 'https://not-api.anthropic.com/v1/messages'],
     ['subdomain attack', 'https://api.anthropic.com.evil.com/v1/messages'],
+    ['AssemblyAI sibling host', 'https://foo.api.assemblyai.com/v2/transcript'],
   ];
 
   it.each(blockedUrls)('blocks %s (%s)', async (_label, url) => {
@@ -146,6 +149,18 @@ describe('safeFetch', () => {
 
     const res = await safeFetch('https://graph.microsoft.com/v1.0/me');
     expect(res.status).toBe(302);
+  });
+
+  it('returns a redirect without following it when failOnRedirect is true', async () => {
+    fetch.mockResolvedValueOnce(mockRedirect(307, 'https://api.assemblyai.com/v2/steal'));
+    const response = await safeFetch('https://api.assemblyai.com/v2/transcript', {
+      method: 'POST', headers: { authorization: 'secret' }, body: '{}', failOnRedirect: true,
+    });
+    expect(response.status).toBe(307);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith('https://api.assemblyai.com/v2/transcript', {
+      method: 'POST', headers: { authorization: 'secret' }, body: '{}', redirect: 'manual',
+    });
   });
 });
 

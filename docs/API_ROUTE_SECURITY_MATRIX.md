@@ -88,6 +88,22 @@ There are no open findings from the initial matrix pass as of this update. New f
 
 ## Route Matrix
 
+**AssemblyAI transcription pilot (source-built 2026-09-30; not deployed):**
+
+| Route | Methods | Intended Class | Current Guard | Data Scope | Persistence | Risk | Notes |
+|---|---:|---|---|---|---|---|---|
+| `/api/admin/transcription-pilot/jobs` | GET, POST | Superuser | `requireSuperuser`; server-derived profile; strict `TRANSCRIPTION_PILOT_ENABLED === 'true'` | Current superuser's own jobs only | Reads/writes `transcription_jobs` (PG); issues path-scoped private Blob token | Medium | POST creates an idempotent upload request; no owner ID or pathname accepted. |
+| `/api/admin/transcription-pilot/jobs/[id]` | GET, DELETE | Superuser | `requireSuperuser`; owner predicate; strict pilot switch | One current-profile-owned job | Reads PG/private Blob; DELETE requests fenced cleanup | Medium | `private, no-store`; content only while ready and explicitly accessible. |
+| `/api/admin/transcription-pilot/jobs/[id]/start` | POST | Superuser | `requireSuperuser`; owner predicate; literal pilot + submission switches | One owned upload | Reads/hash-validates private Blob; queues PG job | Medium | Explicit acknowledgment/version; bytes never transit the API Function. |
+| `/api/admin/transcription-pilot/jobs/[id]/download` | GET | Superuser | `requireSuperuser`; owner predicate; strict pilot switch | One ready owned job | Reads private Blob output and checks hash | Medium | Bounded TXT/VTT, `private, no-store`; no provider access. |
+| `/api/admin/transcription-pilot/jobs/[id]/evaluation` | PATCH | Superuser | `requireSuperuser`; owner predicate; strict pilot switch | One owned job | Version-CAS score/correction write to PG | Low | Corrections are bounded and redacted after cleanup/expiry. |
+| `/api/admin/transcription-pilot/jobs/[id]/reconcile` | POST | Superuser | `requireSuperuser`; owner predicate; strict pilot switch | One uncertain owned job | Exact verified AssemblyAI GET/DELETE; fenced PG update | Medium | Candidate ID accepted only after audio-reference correlation. Cleanup mode never publishes transcript. |
+| `/api/admin/transcription-pilot/jobs/[id]/abandon` | POST | Superuser | `requireSuperuser`; owner predicate; strict pilot switch | One uncertain owned job | Fenced PG transition | Medium | Requires explicit possible-duplicate-charge acknowledgment; never resubmits. |
+| `/api/admin/transcription-pilot/evaluation-export` | GET | Superuser | `requireSuperuser`; current profile; strict pilot switch | Aggregate evaluation rows for current profile | Reads PG | Low | Aggregate-only CSV; omits IDs, filenames, notes, owner IDs, transcript. Private no-store. |
+| `/api/cron/drain-transcriptions` | GET, POST | Cron | `verifyTranscriptionCronSecret` (strict `CRON_SECRET`, no dev bypass) | Global transcription queue | PG leases/jobs; private Blob and AssemblyAI through bounded worker | Medium | Source-built; `maxDuration=300`, scheduled minutely but new submissions need both literal-true flags. Recovery/poll/expiry/cleanup remain independent. Not deployed or provider-smoked. |
+| `/api/webhooks/assemblyai` | POST | Shared secret (HMAC) | Per-attempt `x-transcription-pilot-auth` HMAC-SHA256 verified against `ASSEMBLYAI_WEBHOOK_SECRET` | Opaque attempt correlation only | Adds callback candidate to `transcription_jobs` (PG); never publishes transcript | Medium | 64 KB raw body cap; unknown valid correlations acknowledged without revealing existence; private no-store. |
+
+
 Guarded-reopen response refinement (source-built 2026-08-22): the Pre-Site
 GET/POST route emits reopen history and nested correction details only to
 superusers, and it omits a pending reason-bearing reopen-attempt row entirely

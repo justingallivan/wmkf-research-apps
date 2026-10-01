@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import Link from 'next/link';
 import Layout from '../../shared/components/Layout';
 import { AdminWorkspaceNavigation } from '../../shared/components/admin/AdminWorkspaceNavigation';
 import { useAppAccess } from '../../shared/context/AppAccessContext';
@@ -880,7 +881,7 @@ export default function TranscriptionPilotPage() {
     <Layout title="Transcription Pilot · Admin" description="Non-sensitive audio transcription pilot for internal evaluation">
       <div className="py-6 sm:py-8">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <a href="/admin" className="text-sm font-medium text-gray-700 underline decoration-gray-400 underline-offset-4 hover:text-gray-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">Back to Admin</a>
+          <Link href="/admin" className="text-sm font-medium text-gray-700 underline decoration-gray-400 underline-offset-4 hover:text-gray-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">Back to Admin</Link>
           {authorized && pilotState === 'enabled' && <a href={exportHref} className="inline-flex min-h-10 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">Export approved evaluation data</a>}
         </div>
         <AdminWorkspaceNavigation activeWorkspace="transcription-pilot" />
