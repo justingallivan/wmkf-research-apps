@@ -109,17 +109,23 @@ test('finalize: permanent byte and validation failures reject the row; transient
   finalizeMaterialUpload.mockRejectedValueOnce(new ServiceHttpError('scan', { httpStatus: 503, code: 'scan_unavailable', body: { ok: false, reason: 'scan_unavailable' } }));
   const scan = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), scan);
   expect(scan.statusCode).toBe(503); expect(staging.releasePortalUpload).toHaveBeenCalledWith({ stagingId: STAGING_ID, leaseToken: 'lease' });
+  for (const code of ['scan_timeout', 'scan_busy']) {
+    finalizeMaterialUpload.mockRejectedValueOnce(new ServiceHttpError(code, { httpStatus: 503, code, body: { ok: false, reason: code } }));
+    const unavailable = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), unavailable);
+    expect(unavailable.statusCode).toBe(503); expect(unavailable.body.reason).toBe(code);
+    expect(staging.releasePortalUpload).toHaveBeenCalledTimes(code === 'scan_timeout' ? 2 : 3);
+  }
   finalizeMaterialUpload.mockRejectedValueOnce(new ServiceHttpError('scan config', { httpStatus: 500, code: 'scan_misconfigured', body: { ok: false, reason: 'scan_misconfigured' } }));
   const scanConfig = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), scanConfig);
-  expect(scanConfig.statusCode).toBe(500); expect(scanConfig.body.reason).toBe('scan_misconfigured'); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(2);
+  expect(scanConfig.statusCode).toBe(500); expect(scanConfig.body.reason).toBe('scan_misconfigured'); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(4);
   finalizeMaterialUpload.mockRejectedValueOnce(new ServiceHttpError('busy', { httpStatus: 409, code: 'slot_busy', body: { ok: false, reason: 'slot_busy' } }));
   const busy = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), busy);
-  expect(busy.statusCode).toBe(409); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(3);
+  expect(busy.statusCode).toBe(409); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(5);
   finalizeMaterialUpload.mockRejectedValueOnce(new ServiceHttpError('ambiguous', { httpStatus: 409, code: 'replay_ambiguous', body: { ok: false, reason: 'replay_ambiguous' } }));
   const ambiguous = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), ambiguous);
-  expect(ambiguous.statusCode).toBe(409); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(3);
+  expect(ambiguous.statusCode).toBe(409); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(5);
   finalizeMaterialUpload.mockRejectedValueOnce(new Error('graph down'));
   const graph = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), graph);
-  expect(graph.statusCode).toBe(503); expect(graph.body.reason).toBe('persist_failed'); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(4);
+  expect(graph.statusCode).toBe(503); expect(graph.body.reason).toBe('persist_failed'); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(6);
   expect(staging.completePortalUpload).not.toHaveBeenCalled();
 });

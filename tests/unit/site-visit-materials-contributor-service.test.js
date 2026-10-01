@@ -110,7 +110,7 @@ test('outOfSync flags PDF and source received more than an hour apart', () => {
 test('finalize validates, scans, uploads under the canonical name with replace, registers a READY/DRAFT row, and supersedes the prior slot row', async () => {
   const d = deps({ findDocumentsByRequest: async () => ({ records: [ROW_PDF] }) });
   const result = await finalizeMaterialUpload(finalizeArgs('presentation_pdf', { filename: 'Our Deck v3.pdf', buffer: PDF }), d);
-  expect(d.scanBytes).toHaveBeenCalledWith(PDF, 'Our Deck v3.pdf');
+  expect(d.scanBytes).toHaveBeenCalledWith(PDF, 'Our Deck v3.pdf', { timeoutMs: 90_000, maxAttempts: 2 });
   expect(d.ensureFolderPath).toHaveBeenCalledWith('akoya_request', 'Neural dust_ABC123/Site Visit - Slides');
   expect(d.uploadFile).toHaveBeenCalledWith('akoya_request', 'Neural dust_ABC123/Site Visit - Slides', '1003222 Site Visit Presentation.pdf', PDF, 'application/pdf', { conflictBehavior: 'replace' });
   const [payload, options] = d.createDocument.mock.calls[0];
@@ -276,14 +276,33 @@ test('slot contention returns retryable 409 before any registry or SharePoint re
   expect(d.uploadFile).not.toHaveBeenCalled();
 });
 
-test('thrown scanner failures are sanitized into unavailable or misconfigured errors', async () => {
+test('thrown scanner failures map to specific safe reasons and log null status as null', async () => {
   const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
   const unavailable = deps({ scanBytes: async () => { throw Object.assign(new Error('socket secret'), { serviceName: 'cloudmersive', status: 503, isTransient: true }); } });
-  await expect(finalizeMaterialUpload(finalizeArgs(), unavailable)).rejects.toMatchObject({ code: 'scan_unavailable', httpStatus: 503 });
+  await expect(finalizeMaterialUpload(finalizeArgs(), unavailable)).rejects.toMatchObject({
+    code: 'scan_unavailable', httpStatus: 503, body: { error: expect.not.stringContaining('socket secret') },
+  });
+  const timeout = deps({ scanBytes: async () => { throw Object.assign(new Error('timeout secret'), { serviceName: 'cloudmersive', status: null, noResponse: true, isTransient: true, causeKind: 'abort' }); } });
+  await expect(finalizeMaterialUpload(finalizeArgs(), timeout)).rejects.toMatchObject({
+    code: 'scan_timeout', httpStatus: 503, body: { error: expect.not.stringContaining('timeout secret') },
+  });
+  const busy = deps({ scanBytes: async () => { throw Object.assign(new Error('provider body secret'), { serviceName: 'cloudmersive', status: 429, isTransient: true }); } });
+  await expect(finalizeMaterialUpload(finalizeArgs(), busy)).rejects.toMatchObject({
+    code: 'scan_busy', httpStatus: 503, body: { error: expect.not.stringContaining('provider body secret') },
+  });
   const misconfigured = deps({ scanBytes: async () => { throw Object.assign(new Error('bad key secret'), { serviceName: 'cloudmersive', status: 401, isTransient: false }); } });
-  await expect(finalizeMaterialUpload(finalizeArgs(), misconfigured)).rejects.toMatchObject({ code: 'scan_misconfigured', httpStatus: 500 });
+  await expect(finalizeMaterialUpload(finalizeArgs(), misconfigured)).rejects.toMatchObject({
+    code: 'scan_misconfigured', httpStatus: 500, body: { error: expect.not.stringContaining('bad key secret') },
+  });
+  for (const failedScan of [unavailable, timeout, busy, misconfigured]) {
+    expect(failedScan.acquireSlotLease).not.toHaveBeenCalled();
+    expect(failedScan.uploadFile).not.toHaveBeenCalled();
+    expect(failedScan.createDocument).not.toHaveBeenCalled();
+  }
   expect(log.mock.calls).toEqual([
     ['[site-visit-materials] malware scan failed', { serviceName: 'cloudmersive', status: 503, isTransient: true, causeKind: null }],
+    ['[site-visit-materials] malware scan failed', { serviceName: 'cloudmersive', status: null, isTransient: true, causeKind: 'abort' }],
+    ['[site-visit-materials] malware scan failed', { serviceName: 'cloudmersive', status: 429, isTransient: true, causeKind: null }],
     ['[site-visit-materials] malware scan failed', { serviceName: 'cloudmersive', status: 401, isTransient: false, causeKind: null }],
   ]);
   log.mockRestore();

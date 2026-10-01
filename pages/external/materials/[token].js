@@ -27,8 +27,10 @@ const UPLOAD_MESSAGE = {
   signature_mismatch: 'That file does not match its extension. Please export it again and retry.',
   empty_file: 'That file is empty.',
   scan_infected: 'That file failed the malware scan and was not accepted.',
-  scan_unavailable: 'The file could not be scanned right now. Please try again in a few minutes.',
-  scan_misconfigured: 'Uploads are temporarily unavailable while the file scanner is repaired.',
+  scan_timeout: 'The security scan did not finish in time, so this file has not been accepted yet. Please press Retry. If this keeps happening, contact the Foundation.',
+  scan_busy: 'The security scanner is busy right now. Please wait a few minutes and press Retry. If this keeps happening, contact the Foundation.',
+  scan_unavailable: 'The security scanner is temporarily unavailable. Please press Retry. If this keeps happening, contact the Foundation.',
+  scan_misconfigured: 'The system could not start the security scan. Please try again shortly. If this keeps happening, contact the Foundation.',
   content_type_not_allowed: 'That file type is not accepted.',
   staging_unavailable: 'Uploads are unavailable right now. Please try again shortly.',
   staged_upload_missing: 'The upload did not complete. Please try again.',
@@ -100,7 +102,7 @@ function SlotUploader({ token, slot, label, required, received, maxMb, disabled,
   const finalize = async (pendingUpload) => {
     setBusy(true);
     setError(null);
-    setProgress('Checking the file…');
+    setProgress('Running the security scan. This can take a few minutes, especially for large files.');
     try {
       const { ok: finalizeOk, status: finalizeStatus, data: result } = await requestEnvelope(
         `/api/external/materials/${encodeURIComponent(token)}/finalize`,

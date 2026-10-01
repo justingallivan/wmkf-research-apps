@@ -67,6 +67,29 @@ test('a transient finalize failure keeps the same staging id and Retry re-posts 
   expect(put).toHaveBeenCalledTimes(1);
 });
 
+test.each([
+  ['scan_timeout', 'The security scan did not finish in time'],
+  ['scan_busy', 'The security scanner is busy right now'],
+  ['scan_unavailable', 'The security scanner is temporarily unavailable'],
+  ['scan_misconfigured', 'The system could not start the security scan'],
+])('the %s message explains the failure and keeps the staged upload retryable', async (reason, message) => {
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, context);
+    if (url.endsWith('/upload-token')) return response(200, { ok: true, stagingId: STAGING_ID, pathname: 'private/path', clientToken: 'client', contentType: 'application/pdf' });
+    if (url.endsWith('/finalize')) return response(reason === 'scan_misconfigured' ? 500 : 503, { ok: false, reason });
+    throw new Error(`unexpected fetch ${url}`);
+  });
+
+  render(<MaterialsContributorPage />);
+  const input = await screen.findByLabelText('Presentation file');
+  fireEvent.change(input, { target: { files: [new File(['%PDF'], 'deck.pdf', { type: 'application/pdf' })] } });
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(message);
+  expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  expect(JSON.parse(window.sessionStorage.getItem(STORAGE_KEY))).toEqual({ stagingId: STAGING_ID, slot: 'presentation_pdf' });
+  expect(put).toHaveBeenCalledTimes(1);
+});
+
 test('reload restores a pending finalize from session storage and retries without minting a new upload', async () => {
   window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ stagingId: STAGING_ID, slot: 'presentation_pdf' }));
   global.fetch = jest.fn(async (url) => {
