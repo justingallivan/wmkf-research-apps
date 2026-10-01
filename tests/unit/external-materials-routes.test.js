@@ -2,7 +2,7 @@
 jest.mock('../../lib/external/rate-limit', () => ({ checkRateLimit: jest.fn(), recordTokenOutcome: jest.fn() }));
 jest.mock('../../lib/external/verify-materials-token', () => ({ verifyMaterialsToken: jest.fn() }));
 jest.mock('../../lib/dataverse/core/context', () => ({ withDalContext: jest.fn((_label, fn) => Promise.resolve().then(fn)) }));
-jest.mock('../../lib/services/site-visit-materials/upload-cap', () => ({ getUploadMaxMb: jest.fn(async () => ({ maxMb: 100 })), uploadMaxBytes: (mb) => mb * 1024 * 1024 }));
+jest.mock('../../lib/services/site-visit-materials/upload-cap', () => ({ getUploadMaxMb: jest.fn(async () => ({ maxMb: 500 })), uploadMaxBytes: (mb) => mb * 1024 * 1024 }));
 jest.mock('../../lib/services/site-visit-materials/contributor-service', () => ({ buildContributorContext: jest.fn(), finalizeMaterialUpload: jest.fn() }));
 jest.mock('../../lib/services/portal-upload-staging', () => ({
   PORTAL_UPLOAD_SCOPES: { SITE_VISIT_MATERIAL: 'site_visit_material' },
@@ -62,18 +62,24 @@ test('context: method, rate limit, then verify; invalid links map to 401/404; a 
 
 test('upload-token: server derives scope, resource, binding, and cap; waived or unknown slots, bad extensions, and oversize declarations are refused', async () => {
   const ok = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', contentType: 'application/pdf', size: 1234 }), ok);
-  expect(staging.createPortalUpload).toHaveBeenCalledWith({ scope: 'site_visit_material', resourceId: REQUEST_ID, actorBinding: 'materials:hash', filename: 'deck.pdf', contentType: 'application/pdf', maxBytes: 100 * 1024 * 1024, allowedContentTypes: ['application/pdf'] });
+  expect(staging.createPortalUpload).toHaveBeenCalledWith({ scope: 'site_visit_material', resourceId: REQUEST_ID, actorBinding: 'materials:hash', filename: 'deck.pdf', contentType: 'application/pdf', maxBytes: 500 * 1024 * 1024, allowedContentTypes: ['application/pdf'] });
   expect(ok.body).toMatchObject({ ok: true, slot: 'presentation_pdf', stagingId: STAGING_ID, clientToken: 'ct' });
+  const boundary = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', contentType: 'application/pdf', size: 500 * 1024 * 1024 }), boundary);
+  expect(boundary.statusCode).toBe(200);
+  getUploadMaxMb.mockResolvedValueOnce({ maxMb: 50 });
+  const staleCap = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', size: 51 * 1024 * 1024 }), staleCap);
+  expect(staleCap.statusCode).toBe(400);
+  expect(staleCap.body).toEqual({ ok: false, reason: 'file_too_large', maxMb: 50 });
   const waived = res(); await uploadTokenHandler(req('POST', { slot: 'participant_bios', filename: 'b.pdf', size: 10 }), waived); expect(waived.statusCode).toBe(400);
   const unknown = res(); await uploadTokenHandler(req('POST', { slot: 'nope', filename: 'b.pdf', size: 10 }), unknown); expect(unknown.statusCode).toBe(400);
   const ext = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pptx', size: 10 }), ext); expect(ext.statusCode).toBe(422); expect(ext.body.reason).toBe('extension_not_allowed');
-  const big = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', size: 101 * 1024 * 1024 }), big); expect(big.statusCode).toBe(400); expect(big.body).toEqual({ ok: false, reason: 'file_too_large', maxMb: 100 });
+  const big = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', size: 501 * 1024 * 1024 }), big); expect(big.statusCode).toBe(400); expect(big.body).toEqual({ ok: false, reason: 'file_too_large', maxMb: 500 });
   // The optional "other" slot is hidden from applicants (SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED=false): mint refuses it before any staging row exists.
   const other = res(); await uploadTokenHandler(req('POST', { slot: 'other', filename: 'map.docx', size: 10 }), other); expect(other.statusCode).toBe(400);
-  expect(staging.createPortalUpload).toHaveBeenCalledTimes(1);
+  expect(staging.createPortalUpload).toHaveBeenCalledTimes(2);
   getUploadMaxMb.mockRejectedValueOnce(new ServiceHttpError('cap', { httpStatus: 503, code: 'site_visit_materials_cap_unavailable', body: { ok: false, reason: 'cap_unavailable' } }));
   const capDown = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', size: 10 }), capDown);
-  expect(capDown.statusCode).toBe(503); expect(capDown.body.reason).toBe('cap_unavailable'); expect(staging.createPortalUpload).toHaveBeenCalledTimes(1);
+  expect(capDown.statusCode).toBe(503); expect(capDown.body.reason).toBe('cap_unavailable'); expect(staging.createPortalUpload).toHaveBeenCalledTimes(2);
   verifyMaterialsToken.mockResolvedValueOnce({ ok: false, reason: 'closed' });
   const closed = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', size: 10 }), closed); expect(closed.statusCode).toBe(401);
 });

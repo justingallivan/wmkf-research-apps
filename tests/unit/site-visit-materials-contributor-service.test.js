@@ -3,11 +3,23 @@ import { buildContributorContext, finalizeMaterialUpload, outOfSync } from '../.
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE, REQUEST_DOCUMENT_LIFECYCLE_STATE, REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument';
 import { SITE_VISIT_MATERIALS_CHECKLIST } from '../../shared/config/siteVisitMaterials';
 import AlertRecipients from '../../lib/services/alert-recipients';
+import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request';
+import * as systemUserAdapter from '../../lib/dataverse/adapters/system-user';
+
+jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/grant-request'),
+  getById: jest.fn(),
+}));
+jest.mock('../../lib/dataverse/adapters/system-user', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/system-user'),
+  getByIdWithSelect: jest.fn(),
+}));
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const COLLECTION_ID = '22222222-2222-4222-8222-222222222222';
 const STAGING_ID = '33333333-3333-4333-8333-333333333333';
 const STAGING_LEASE = '44444444-4444-4444-8444-444444444444';
+const COORDINATOR_ID = '55555555-5555-4555-8555-555555555555';
 const PDF = Buffer.from('%PDF-1.7\n%âãÏÓ\n1 0 obj');
 const ZIP = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(64, 1)]);
 const REQUEST = { akoya_requestid: REQUEST_ID, akoya_requestnum: '1003222', akoya_title: 'Neural dust', wmkf_meetingdate: '2026-12-08T00:00:00Z', _akoya_applicantid_value_formatted: 'Caltech' };
@@ -33,7 +45,7 @@ function deps(overrides = {}) {
     supersedeDocument: jest.fn(async () => ({})),
     scanEnabled: () => true,
     scanBytes: jest.fn(async () => ({ scan_result: 'clean' })),
-    getUploadMaxMb: jest.fn(async () => ({ maxMb: 100 })),
+    getUploadMaxMb: jest.fn(async () => ({ maxMb: 500 })),
     getSupportEmail: jest.fn(async () => null),
     acquireSlotLease: jest.fn(async () => ({ leaseToken: 'slot-lease', expiresAt: new Date('2026-11-21T09:05:00Z') })),
     releaseSlotLease: jest.fn(async () => true),
@@ -51,7 +63,7 @@ test('context shows institution, title, dates, cap, and per-slot receipt; waived
   const ctx = await buildContributorContext({ collection: col }, d);
   expect(ctx.institution).toBe('Caltech');
   expect(ctx.proposalTitle).toBe('Neural dust');
-  expect(ctx.maxMb).toBe(100);
+  expect(ctx.maxMb).toBe(500);
   expect(ctx.closed).toBe(false);
   expect(ctx.checklist.map((i) => i.key)).toEqual(['presentation_pdf', 'presentation_source']);
   expect(ctx.checklist[0].received).toEqual({ filename: '1003222 Site Visit Presentation.pdf', receivedAt: '2026-11-20T10:00:00Z' });
@@ -59,6 +71,51 @@ test('context shows institution, title, dates, cap, and per-slot receipt; waived
   expect(JSON.stringify(ctx)).not.toContain('drive');
   const closed = await buildContributorContext({ collection: collection({ closes_at: '2026-11-01T00:00:00Z' }) }, d);
   expect(closed.closed).toBe(true);
+});
+
+describe('Program Coordinator context', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  test('returns only the enabled assigned coordinator name and validated email', async () => {
+    systemUserAdapter.getByIdWithSelect.mockResolvedValue({
+      systemuserid: COORDINATOR_ID,
+      fullname: ' Casey Coordinator ',
+      internalemailaddress: 'casey@wmkeck.org',
+      isdisabled: false,
+    });
+    const { DEFAULT_DEPENDENCIES } = await import('../../lib/services/site-visit-materials/contributor-service');
+    await expect(DEFAULT_DEPENDENCIES.getProgramCoordinator({ _wmkf_programcoordinator_value: COORDINATOR_ID }))
+      .resolves.toEqual({ name: 'Casey Coordinator', email: 'casey@wmkeck.org' });
+    expect(systemUserAdapter.getByIdWithSelect).toHaveBeenCalledWith(COORDINATOR_ID, 'systemuserid,fullname,internalemailaddress,isdisabled');
+  });
+
+  test('request projection includes the assigned coordinator lookup', async () => {
+    grantRequestAdapter.getById.mockResolvedValue(REQUEST);
+    const { DEFAULT_DEPENDENCIES } = await import('../../lib/services/site-visit-materials/contributor-service');
+    await DEFAULT_DEPENDENCIES.getRequest(REQUEST_ID);
+    expect(grantRequestAdapter.getById.mock.calls[0][1].select).toContain('_wmkf_programcoordinator_value');
+  });
+
+  test.each([
+    ['disabled', { fullname: 'Casey', internalemailaddress: 'casey@wmkeck.org', isdisabled: true }, null],
+    ['missing email', { fullname: 'Casey', internalemailaddress: '', isdisabled: false }, { name: 'Casey', email: null }],
+    ['invalid email', { fullname: 'Casey', internalemailaddress: 'not-an-email', isdisabled: false }, { name: 'Casey', email: null }],
+    ['missing name and email', { fullname: '', internalemailaddress: '', isdisabled: false }, null],
+  ])('handles %s without exposing the lookup record', async (_label, record, expected) => {
+    systemUserAdapter.getByIdWithSelect.mockResolvedValue({ systemuserid: COORDINATOR_ID, ...record });
+    const { DEFAULT_DEPENDENCIES } = await import('../../lib/services/site-visit-materials/contributor-service');
+    await expect(DEFAULT_DEPENDENCIES.getProgramCoordinator({ _wmkf_programcoordinator_value: COORDINATOR_ID }))
+      .resolves.toEqual(expected);
+  });
+
+  test('lookup failure does not prevent building the upload context', async () => {
+    const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const d = deps({ getProgramCoordinator: async () => { throw new Error('lookup failed'); } });
+    const ctx = await buildContributorContext({ collection: collection() }, d);
+    expect(ctx.ok).toBe(true);
+    expect(ctx.programCoordinator).toBeNull();
+    expect(log).toHaveBeenCalledWith('[site-visit-materials] Program Coordinator lookup failed.');
+  });
 });
 
 describe('supportEmail', () => {
@@ -155,7 +212,10 @@ test('finalize refuses: waived slot, oversize, wrong bytes, infected scan, no ac
   const waived = collection(); waived.checklist[0].waived = true;
   await expect(finalizeMaterialUpload(finalizeArgs('presentation_pdf', { filename: 'a.pdf', buffer: PDF }, { collection: waived }), d)).rejects.toMatchObject({ code: 'slot_not_open', httpStatus: 400 });
   const tiny = deps({ getUploadMaxMb: async () => ({ maxMb: 1 }) });
-  await expect(finalizeMaterialUpload(finalizeArgs('presentation_pdf', { filename: 'a.pdf', buffer: Buffer.alloc(1024 * 1024 + 1) }), tiny)).rejects.toMatchObject({ code: 'file_too_large' });
+  await expect(finalizeMaterialUpload(finalizeArgs('presentation_pdf', { filename: 'a.pdf', buffer: Buffer.alloc(1024 * 1024 + 1) }), tiny)).rejects.toMatchObject({
+    code: 'file_too_large',
+    body: { reason: 'file_too_large', maxMb: 1 },
+  });
   await expect(finalizeMaterialUpload(finalizeArgs('presentation_pdf', { filename: 'a.pdf', buffer: ZIP }), d)).rejects.toMatchObject({ code: 'signature_mismatch', httpStatus: 422 });
   const infected = deps({ scanBytes: async () => ({ scan_result: 'infected' }) });
   const unknown = deps({ scanBytes: async () => ({}) });

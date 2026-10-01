@@ -7,7 +7,7 @@ metadata:
   originSessionId: 4645a5a6-2b0a-4200-94ed-4ddc0e8c0b83
   status: active
   scope: site-visit-materials
-  last_verified: 2026-09-11 via docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md §16.3 on claude/applicant-materials-pr3 (PR #252) and the S503 production rollout
+  last_verified: 2026-10-01 via docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md §16 M3, current shared upload-cap source/tests, and owner decision
 ---
 
 ## Recall Rule
@@ -26,7 +26,7 @@ Do not:
 
 ## Applicant materials shipped (2026-09-10, S503)
 
-Owner answered §12: checklist confirmed (PDF presentation, PPTX/Keynote source, participant bios), due two business days before the visit (`lib/utils/business-days.js`), admin-editable cap default 100 MB, flat `Site Visit - Slides|Participant Bios|Other` folders, go. Built: `lib/services/site-visit-materials/*`, `/api/meeting-tracker/visits/[requestId]/materials`, `SiteVisitMaterialsCard` on the visit page, `/external/materials/[token]` + `/api/external/materials/[token]/{context,upload-token,finalize}`, `lib/external/verify-materials-token.js`, `GraphService.uploadFileLarge`. Owner applied 041–044, set `SITE_VISIT_MATERIALS_SCHEMA_READY=on`, redeployed; junk-token probe answers 401 `malformed`. Reminder cron and auto-close landed in PR 3 (S506, PR #252): the cron claims before sending with the same predicate as its candidate read and resolves every precondition (missing items, recipients, enabled sender, readable link, the optional visit read) before the claim; a delivered email whose receipt fails to attach counts as `receiptFailed`, not a transport failure. The PC's manual reminder also claims before sending since S507 (`90641978`); branch `codex/email-templates-configurable` makes both emails' copy configurable and resolves defaults before either claim.
+Owner answered §12: checklist confirmed (PDF presentation, PPTX/Keynote source, participant bios), due two business days before the visit (`lib/utils/business-days.js`), admin-editable shared applicant/staff attachment cap default 500 MB (owner decision 2026-10-01; valid saved 1–500 MB overrides remain effective), flat `Site Visit - Slides|Participant Bios|Other` folders, go. Built: `lib/services/site-visit-materials/*`, `/api/meeting-tracker/visits/[requestId]/materials`, `SiteVisitMaterialsCard` on the visit page, `/external/materials/[token]` + `/api/external/materials/[token]/{context,upload-token,finalize}`, `lib/external/verify-materials-token.js`, `GraphService.uploadFileLarge`. Owner applied 041–044, set `SITE_VISIT_MATERIALS_SCHEMA_READY=on`, redeployed; junk-token probe answers 401 `malformed`. Reminder cron and auto-close landed in PR 3 (S506, PR #252): the cron claims before sending with the same predicate as its candidate read and resolves every precondition (missing items, recipients, enabled sender, readable link, the optional visit read) before the claim; a delivered email whose receipt fails to attach counts as `receiptFailed`, not a transport failure. The PC's manual reminder also claims before sending since S507 (`90641978`); branch `codex/email-templates-configurable` makes both emails' copy configurable and resolves defaults before either claim.
 
 ## Briefing-room subset built (2026-09-09, S502)
 

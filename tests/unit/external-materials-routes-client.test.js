@@ -17,13 +17,20 @@ const context = {
   dueAt: '2026-12-04T23:59:00Z',
   closesAt: '2026-12-08T17:00:00Z',
   closed: false,
-  maxMb: 100,
+  maxMb: 500,
+  programCoordinator: { name: 'Casey Coordinator', email: 'casey@wmkeck.org' },
   checklist: [{ key: 'presentation_pdf', label: 'Presentation', required: true, received: null }],
   other: [],
 };
 
 function response(status, body) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
+}
+
+function fileWithSize(size, name = 'deck.pdf') {
+  const file = new File(['%PDF'], name, { type: 'application/pdf' });
+  Object.defineProperty(file, 'size', { configurable: true, value: size });
+  return file;
 }
 
 beforeEach(() => {
@@ -56,6 +63,7 @@ test('a transient finalize failure keeps the same staging id and Retry re-posts 
   const retry = await screen.findByRole('button', { name: 'Retry' });
   expect(JSON.parse(window.sessionStorage.getItem(STORAGE_KEY))).toEqual({ stagingId: STAGING_ID, slot: 'presentation_pdf' });
   expect(put).toHaveBeenCalledTimes(1);
+  expect(put.mock.calls[0][2]).toMatchObject({ multipart: false });
   fireEvent.click(retry);
 
   await waitFor(() => expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull());
@@ -117,16 +125,16 @@ test('the upload page no longer says the link stays open past the meeting', asyn
   expect(screen.queryByText(/stays open until/i)).toBeNull();
 });
 
-test('a pending upload shows both Retry and Choose a different file; choosing a different file clears the pending key synchronously and never resurrects it if the new upload fails to start', async () => {
+test('a pending upload remains retryable when mint rejects a replacement under a newer lower cap', async () => {
   let tokenCalls = 0;
   global.fetch = jest.fn(async (url, options) => {
     if (url.endsWith('/context')) return response(200, context);
     if (url.endsWith('/upload-token')) {
       tokenCalls += 1;
-      // The first upload-token mints normally; the second (for the different
-      // file) fails to start, so nothing should ever write a new pending key.
+      // The first upload-token mints normally; the second reports that the
+      // context cap was stale and the replacement exceeds the current cap.
       if (tokenCalls === 1) return response(200, { ok: true, stagingId: STAGING_ID, pathname: 'private/path', clientToken: 'client', contentType: 'application/pdf' });
-      return response(500, { ok: false, reason: 'server_error' });
+      return response(400, { ok: false, reason: 'file_too_large', maxMb: 50 });
     }
     if (url.endsWith('/finalize')) {
       // The only file that ever reaches finalize is the first one, and it
@@ -144,24 +152,102 @@ test('a pending upload shows both Retry and Choose a different file; choosing a 
   const differentFileInput = await screen.findByLabelText('Presentation different file');
   expect(JSON.parse(window.sessionStorage.getItem(STORAGE_KEY))).toEqual({ stagingId: STAGING_ID, slot: 'presentation_pdf' });
 
-  fireEvent.change(differentFileInput, { target: { files: [new File(['%PDF'], 'other.pdf', { type: 'application/pdf' })] } });
-  // chooseDifferentFile clears the pending key synchronously (before any
-  // await), independent of whether the subsequent upload-token call
-  // succeeds. A mutant that drops the removePendingUpload call would leave
-  // the first staging id here.
-  expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+  fireEvent.change(differentFileInput, { target: { files: [fileWithSize(75 * 1024 * 1024, 'other.pdf')] } });
 
   await waitFor(() => expect(tokenCalls).toBe(2));
-  // The failed upload-token call must not resurrect the pending key, and the
-  // slot falls back to the plain "Choose file" picker rather than staying on
-  // Retry / "Choose a different file" with stale pending state.
-  expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull();
-  await screen.findByLabelText('Presentation file');
-  expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
-  expect(screen.queryByLabelText('Presentation different file')).toBeNull();
+  expect(JSON.parse(window.sessionStorage.getItem(STORAGE_KEY))).toEqual({ stagingId: STAGING_ID, slot: 'presentation_pdf' });
+  expect(await screen.findByRole('alert')).toHaveTextContent('78,643,200 bytes');
+  expect(screen.getByRole('alert')).toHaveTextContent('current upload limit is 50 MB');
+  expect(screen.getByRole('alert')).toHaveTextContent('Your earlier upload is still available');
+  expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  expect(screen.getByText('Up to 50 MB.')).toBeInTheDocument();
+  expect(screen.getByLabelText('Presentation different file')).toBeInTheDocument();
+  expect(put).toHaveBeenCalledTimes(1);
 
   const finalizeBodies = global.fetch.mock.calls.filter(([url]) => url.endsWith('/finalize')).map(([, options]) => JSON.parse(options.body));
   expect(finalizeBodies).toEqual([{ stagingId: STAGING_ID, slot: 'presentation_pdf' }]);
+});
+
+test('client preflight accepts the exact cap and enables multipart upload for large files', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, context);
+    if (url.endsWith('/upload-token')) return response(200, { ok: true, stagingId: STAGING_ID, pathname: 'private/path', clientToken: 'client', contentType: 'application/pdf' });
+    if (url.endsWith('/finalize')) return response(200, { ok: true, slot: 'presentation_pdf', filename: 'deck.pdf' });
+    throw new Error(`unexpected fetch ${url}`);
+  });
+
+  render(<MaterialsContributorPage />);
+  const input = await screen.findByLabelText('Presentation file');
+  fireEvent.change(input, { target: { files: [fileWithSize(500 * 1024 * 1024)] } });
+
+  await waitFor(() => expect(global.fetch.mock.calls.some(([url]) => url.endsWith('/finalize'))).toBe(true));
+  expect(put).toHaveBeenCalledWith('private/path', expect.any(File), expect.objectContaining({ multipart: true }));
+});
+
+test('preflight rejects one byte over cap without a request and links the assigned coordinator', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, context);
+    throw new Error(`unexpected fetch ${url}`);
+  });
+
+  render(<MaterialsContributorPage />);
+  const input = await screen.findByLabelText('Presentation file');
+  fireEvent.change(input, { target: { files: [fileWithSize(500 * 1024 * 1024 + 1)] } });
+
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent('524,288,001 bytes');
+  expect(alert).toHaveTextContent('current upload limit is 500 MB');
+  expect(alert).toHaveTextContent('Please reduce the file size');
+  expect(alert).toHaveTextContent('Casey Coordinator');
+  expect(screen.getByRole('link', { name: 'casey@wmkeck.org' })).toHaveAttribute('href', 'mailto:casey%40wmkeck.org');
+  expect(global.fetch.mock.calls.some(([url]) => url.endsWith('/upload-token'))).toBe(false);
+  expect(put).not.toHaveBeenCalled();
+});
+
+test('oversize preflight preserves an earlier staged upload for Retry', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, context);
+    if (url.endsWith('/upload-token')) return response(200, { ok: true, stagingId: STAGING_ID, pathname: 'private/path', clientToken: 'client', contentType: 'application/pdf' });
+    if (url.endsWith('/finalize')) return response(409, { ok: false, reason: 'slot_busy' });
+    throw new Error(`unexpected fetch ${url}`);
+  });
+
+  render(<MaterialsContributorPage />);
+  fireEvent.change(await screen.findByLabelText('Presentation file'), { target: { files: [new File(['%PDF'], 'first.pdf', { type: 'application/pdf' })] } });
+  await screen.findByRole('button', { name: 'Retry' });
+  fireEvent.change(screen.getByLabelText('Presentation different file'), { target: { files: [fileWithSize(500 * 1024 * 1024 + 1, 'too-large.pdf')] } });
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Your earlier upload is still available');
+  expect(JSON.parse(window.sessionStorage.getItem(STORAGE_KEY))).toEqual({ stagingId: STAGING_ID, slot: 'presentation_pdf' });
+  expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  expect(global.fetch.mock.calls.filter(([url]) => url.endsWith('/upload-token'))).toHaveLength(1);
+});
+
+test('a failed replacement Blob transfer keeps the earlier staging id and hides SDK error text', async () => {
+  let uploadTokenCalls = 0;
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, context);
+    if (url.endsWith('/upload-token')) {
+      uploadTokenCalls += 1;
+      return response(200, { ok: true, stagingId: uploadTokenCalls === 1 ? STAGING_ID : '33333333-3333-4333-8333-333333333333', pathname: 'private/path', clientToken: 'client', contentType: 'application/pdf' });
+    }
+    if (url.endsWith('/finalize')) return response(409, { ok: false, reason: 'slot_busy' });
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  put.mockImplementationOnce(async () => undefined).mockRejectedValueOnce(new Error('Vercel Blob: Client token has expired.'));
+
+  render(<MaterialsContributorPage />);
+  fireEvent.change(await screen.findByLabelText('Presentation file'), { target: { files: [new File(['%PDF'], 'first.pdf', { type: 'application/pdf' })] } });
+  await screen.findByRole('button', { name: 'Retry' });
+  fireEvent.change(screen.getByLabelText('Presentation different file'), { target: { files: [new File(['%PDF'], 'replacement.pdf', { type: 'application/pdf' })] } });
+
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent('upload link expired');
+  expect(alert).toHaveTextContent('choose the file again');
+  expect(alert).toHaveTextContent('Your earlier upload remains available with Retry');
+  expect(alert).not.toHaveTextContent('private-sdk-details');
+  expect(JSON.parse(window.sessionStorage.getItem(STORAGE_KEY))).toEqual({ stagingId: STAGING_ID, slot: 'presentation_pdf' });
+  expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
 });
 
 test('the support-email footer renders only when the context includes supportEmail', async () => {
@@ -244,7 +330,7 @@ test('(c) finalize: a network rejection preserves the staging id for retry', asy
   render(<MaterialsContributorPage />);
   const input = await screen.findByLabelText('Presentation file');
   fireEvent.change(input, { target: { files: [new File(['%PDF'], 'deck.pdf', { type: 'application/pdf' })] } });
-  await screen.findByText('The file could not be saved. Please retry this same upload.');
+  await screen.findByText('The staged file could not be saved. It remains available with Retry, or choose a different file.');
   expect(JSON.parse(window.sessionStorage.getItem(STORAGE_KEY))).toEqual({ stagingId: STAGING_ID, slot: 'presentation_pdf' });
 });
 
