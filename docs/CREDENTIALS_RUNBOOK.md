@@ -306,6 +306,40 @@ This is the most common maintenance task. Both `AZURE_AD_CLIENT_SECRET` and `DYN
 
 ---
 
+## Rotating the app Postgres password (`POSTGRES_URL` family)
+
+The app database is a Neon project reached through Vercel's Neon integration. One role password (`neondb_owner`) is embedded in every password-bearing variable. The app runtime reads `POSTGRES_URL` (directly and implicitly through `@vercel/postgres` `sql`/`db`) and `DATABASE_URL`. The Factory CLI's shared-database fence also compares against `POSTGRES_URL_NON_POOLING`, `POSTGRES_PRISMA_URL` and `DATABASE_URL_UNPOOLED` (`lib/db/ledger-registry.js:61-64`) [VERIFIED 2026-09-30 by grep of `lib/`, `pages/`, `shared/`, `scripts/`]. Update every password-bearing variable so none drifts.
+
+| Carries the password (Sensitive for Production + Preview; separate `encrypted` entry for Development) | No secret (leave as is) |
+|---|---|
+| `POSTGRES_URL`, `POSTGRES_URL_NON_POOLING`, `POSTGRES_URL_NO_SSL`, `POSTGRES_PRISMA_URL`, `POSTGRES_PASSWORD`, `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `PGPASSWORD` | `PGHOST`, `PGHOST_UNPOOLED`, `PGUSER`, `PGDATABASE`, `POSTGRES_USER`, `POSTGRES_HOST`, `POSTGRES_DATABASE`, `NEON_PROJECT_ID` |
+
+The Sensitive/Development split mirrors this project's other secrets (`INTAKE_BLOB_RW_TOKEN`, `UPLOADS_BLOB_RW_TOKEN`, `ANTHROPIC_ADMIN_API_KEY`): Vercel does not offer Sensitive for the Development target. Vercel's "Needs Attention" badge on a password-bearing variable means it is stored as readable `encrypted`. Converting it to Sensitive does not undo that exposure, so the conversion is always paired with a rotation.
+
+**Cadence:** on exposure (pasted into chat or a ticket, an unredacted log, a readable non-Sensitive variable), on offboarding someone with Vercel or Neon access, or about every 12 months.
+
+**Outage window:** the old password stops working when it is reset. Production cannot reach Postgres until the redeploy in step 4 is Ready (minutes). Do it at a quiet hour, not during a cron window (`vercel.json`; the 08:00 UTC jobs are the busiest).
+
+### Step by step
+
+1. **Reset the password** in the Neon console for the app project (Roles → `neondb_owner` → Reset password). Copy the new connection strings into a local editor. **Never paste them into a chat, ticket or terminal command.**
+2. **Vercel → Settings → Environment Variables.** For each password-bearing variable above: delete the old entry, then add it back as **Sensitive** with targets Production + Preview, plus a separate non-Sensitive entry for Development with the same value. Pooled versus unpooled matters: `POSTGRES_URL`/`DATABASE_URL` use the `-pooler` host; `*_NON_POOLING`/`DATABASE_URL_UNPOOLED` use the direct host.
+3. **Local env files** (find them with `find`, not the Bash tool's `grep`, which skips `.env*` files): the main checkout's `.env.local` (worktree `.env.local` files are symlinks to it) and any standalone proof file such as the feature-request worktree's `.env.presentation-proof.local`. Repeat on every other owner Mac.
+4. **Redeploy Production** (Deployments → latest Production → Redeploy). Environment changes reach only new deployments. Redeploy Preview branches only if they are in active use.
+5. **Verify without printing values:** locally `node -e` a `select 1` through `pg` using `POSTGRES_URL`; in Production, check that `/api/health` is healthy and that no `system_alerts` connection errors follow; in Vercel, check that the badges are gone.
+6. **Record** the rotation date in the session handoff. (Postgres is not yet in `lib/utils/tracked-secrets.js`.)
+
+### Common mistakes
+
+- Converting to Sensitive without rotating: the old value was already readable.
+- Setting Sensitive on all three targets: Development is not allowed, so the Development entry is separate.
+- Updating only `POSTGRES_URL`: `DATABASE_URL` is also read by the runtime.
+- Forgetting the second Mac, or a standalone `.env.*.local` that is not a symlink.
+
+The Factory ledger credentials (`TEST_REQUEST_LEDGER_URL`, `TEST_REQUEST_SANDBOX_LEDGER_URL`) are a different Neon project and are not in Vercel. Rotate them in that project's Neon console, update both Macs' `.env.local`, and run `npm run check:factory-ledger`.
+
+---
+
 ## Private Blob store provisioning (`DVX_BLOB_RW_TOKEN`, `INTAKE_BLOB_RW_TOKEN`, `UPLOADS_BLOB_RW_TOKEN`, `DOSSIER_BLOB_READ_WRITE_TOKEN`)
 
 These env vars hold RW tokens for **dedicated PRIVATE** Vercel Blob stores. They are deliberately separate from the shared `BLOB_READ_WRITE_TOKEN` (which is bound to the public `phase-ii-summaries-blob` store used by uploads / reviewer-finder / review-manager / maintenance) and must NOT be conflated. Apps that PUT or GET against a private store with the public token will fail at the Blob API layer.
