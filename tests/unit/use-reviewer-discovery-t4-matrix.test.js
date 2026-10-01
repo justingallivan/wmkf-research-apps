@@ -5,10 +5,9 @@
  * analyze/discover/enrich-contacts sites (lines 74/117/187) are confirmed SSE
  * (their responses are handed to readSseStream) and stay raw per the §2.6
  * allowlist. Only the runSearch roster-persist POST
- * (/api/workbench/reviewer-roster, line 268) is a JSON site and migrates.
- * It checks ONLY `rRes.ok` (no body read) — this file pins the exact request
- * bytes and both the success and non-2xx-body-never-read outcomes ahead of
- * migrating onto shared/utils/api-request.js.
+ * (/api/workbench/reviewer-roster) is a JSON site. These tests pin the exact
+ * request bytes and require a complete per-item receipt followed by an
+ * authoritative roster GET before the UI accepts saved state.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ReviewerSearchSection from '../../shared/components/reviewers/ReviewerSearchSection';
@@ -21,7 +20,10 @@ jest.mock('../../shared/components/reviewers/sse', () => ({
 const REQ = '11111111-1111-1111-1111-111111111111';
 
 function response(body, ok = true, status = ok ? 200 : 500) {
-  return { ok, status, json: async () => body, body: {} };
+  const payload = body?.success === true && ('active' in body || 'allNames' in body)
+    ? { active: [], excluded: [], ineligible: [], blocked: [], handled: [], savedKeys: [], allNames: [], ...body }
+    : body;
+  return { ok, status, json: async () => payload, body: {} };
 }
 
 const freshCandidate = {
@@ -36,15 +38,30 @@ const freshCandidate = {
 };
 
 function mockPipeline({ rosterPost }) {
+  const rosterState = { success: true, active: [], excluded: [], ineligible: [], blocked: [], handled: [], savedKeys: [], allNames: [] };
   return jest.fn((url, options = {}) => {
     const target = String(url);
     if (target.includes('/api/workbench/reviewer-roster?')) {
-      return Promise.resolve(response({ success: true, active: [], excluded: [], allNames: [] }));
+      return Promise.resolve(response(rosterState));
     }
     if (target === '/api/reviewer-finder/analyze') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/enrich-contacts') return Promise.resolve(response({}));
-    if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') return Promise.resolve(rosterPost(options));
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
+      const posted = JSON.parse(options.body).candidates;
+      return Promise.resolve(rosterPost(options)).then(async (savedResponse) => {
+        if (savedResponse.ok) {
+          const receipt = await savedResponse.json();
+          for (const outcome of receipt.outcomes || []) {
+            if (outcome.status !== 'recorded') continue;
+            const row = { ...posted[outcome.inputIndex], candidateKey: outcome.candidateKey };
+            rosterState.active.push(row);
+            rosterState.allNames.push(row.name);
+          }
+        }
+        return savedResponse;
+      });
+    }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
   });
 }
@@ -65,15 +82,19 @@ function mockSse() {
 beforeEach(() => { jest.resetAllMocks(); });
 afterEach(() => { global.fetch = jest.fn(); });
 
-test('runSearch roster-persist POST: exact body bytes/headers; success merges into the active roster', async () => {
+test('runSearch roster-persist POST: exact body bytes/headers; recorded rows are adopted from GET', async () => {
   let sentOpts = null;
   global.fetch = mockPipeline({
-    rosterPost: (opts) => { sentOpts = opts; return response({ success: true, recorded: 1 }); },
+    rosterPost: (opts) => {
+      sentOpts = opts;
+      const [row] = JSON.parse(opts.body).candidates;
+      return response({ success: true, recorded: 1, outcomes: [{ inputIndex: 0, candidateKey: row.candidateKey, status: 'recorded' }] });
+    },
   });
   mockSse();
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
-  await screen.findByLabelText(`Select ${freshCandidate.name}`);
+  await screen.findByText(freshCandidate.name);
   expect(sentOpts.method).toBe('POST');
   expect(sentOpts.headers).toEqual({ 'Content-Type': 'application/json' });
   const body = JSON.parse(sentOpts.body);
@@ -82,9 +103,12 @@ test('runSearch roster-persist POST: exact body bytes/headers; success merges in
   expect(body.candidates[0].candidateKey).toBe(freshCandidate.candidateKey);
 });
 
-test('runSearch treats HTTP 200 with recorded=0 as success, merges locally, and excludes the name on the next search', async () => {
+test('runSearch treats an unchanged receipt as GET-only and does not exclude a name absent from roster state', async () => {
   const fetch = mockPipeline({
-    rosterPost: () => response({ success: true, recorded: 0 }),
+    rosterPost: (opts) => {
+      const [row] = JSON.parse(opts.body).candidates;
+      return response({ success: true, recorded: 0, outcomes: [{ inputIndex: 0, candidateKey: row.candidateKey, status: 'unchanged' }] });
+    },
   });
   global.fetch = fetch;
   readSseStream
@@ -106,8 +130,8 @@ test('runSearch treats HTTP 200 with recorded=0 as success, merges locally, and 
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
 
-  await screen.findByLabelText(`Select ${freshCandidate.name}`);
-  expect(screen.queryByText(/Couldn't save this search to the request/)).not.toBeInTheDocument();
+  expect(await screen.findByText(/1 search result could not be confirmed in the request roster/)).toBeInTheDocument();
+  expect(screen.queryByText(freshCandidate.name)).not.toBeInTheDocument();
   fireEvent.click(await screen.findByRole('button', { name: 'Run another search' }));
 
   await waitFor(() => {
@@ -119,30 +143,32 @@ test('runSearch treats HTTP 200 with recorded=0 as success, merges locally, and 
       .map(([, options]) => JSON.parse(options.body));
     expect(analyzeBodies).toHaveLength(2);
     expect(discoverBodies).toHaveLength(2);
-    expect(analyzeBodies[1].excludedNames).toContain(freshCandidate.name);
-    expect(discoverBodies[1].excludedNames).toContain(freshCandidate.name);
+    expect(analyzeBodies[1].excludedNames).not.toContain(freshCandidate.name);
+    expect(discoverBodies[1].excludedNames).not.toContain(freshCandidate.name);
   });
-  expect(screen.getByText(freshCandidate.name)).toBeInTheDocument();
+  expect(screen.queryByText(freshCandidate.name)).not.toBeInTheDocument();
 });
 
-test('runSearch roster-persist POST: non-2xx (body never read) surfaces the fixed roster-note failure, candidates still shown', async () => {
+test('runSearch roster-persist POST with unknown outcome reloads GET and clears unconfirmed cards', async () => {
   global.fetch = mockPipeline({
     rosterPost: () => response({ error: 'db down' }, false, 500),
   });
   mockSse();
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
-  await screen.findByLabelText(`Select ${freshCandidate.name}`);
-  expect(await screen.findByText("Couldn't save this search to the request — these candidates may re-appear on a future search.")).toBeInTheDocument();
+  expect(await screen.findByText('Could not confirm all search saves. Reviewer state was reloaded; run a new search to continue.')).toBeInTheDocument();
+  expect(screen.queryByLabelText(`Select ${freshCandidate.name}`)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Run another search' })).toBeInTheDocument();
 });
 
-test('runSearch roster-persist POST: network rejection surfaces the same fixed roster-note failure', async () => {
+test('runSearch roster-persist network rejection reloads GET and clears unconfirmed cards', async () => {
   global.fetch = mockPipeline({
     rosterPost: () => Promise.reject(new Error('offline')),
   });
   mockSse();
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
-  await screen.findByLabelText(`Select ${freshCandidate.name}`);
-  expect(await screen.findByText("Couldn't save this search to the request — these candidates may re-appear on a future search.")).toBeInTheDocument();
+  expect(await screen.findByText('Could not confirm all search saves. Reviewer state was reloaded; run a new search to continue.')).toBeInTheDocument();
+  expect(screen.queryByLabelText(`Select ${freshCandidate.name}`)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Run another search' })).toBeInTheDocument();
 });

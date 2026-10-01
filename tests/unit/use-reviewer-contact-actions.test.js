@@ -195,7 +195,11 @@ test('confirmIdentityContact: unverified candidate records first (POST), then PA
       calls.push(opts);
       const body = JSON.parse(opts.body);
       if (body.action === undefined && body.candidates) {
-        return { ok: true, status: 200, json: async () => ({ success: true }) };
+        return { ok: true, status: 200, json: async () => ({
+          success: true,
+          recorded: 1,
+          outcomes: [{ inputIndex: 0, candidateKey: body.candidates[0].candidateKey, status: 'recorded' }],
+        }) };
       }
       return { ok: true, status: 200, json: async () => ({ success: true, confirmationId: 'c-1', candidate: { ...CAND, confirmed: true } }) };
     },
