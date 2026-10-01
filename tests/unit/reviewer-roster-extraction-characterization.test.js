@@ -558,6 +558,54 @@ describe('pre-extraction shell contract', () => {
     }
   });
 
+  it('awaits enabled exclusion measurement and preserves success when recording rejects', async () => {
+    const stored = { name: 'Morgan Analyst', candidateKey: 'candidate:morgan', rosterStatus: 'excluded' };
+    mockMeasurementEnabled.mockReturnValue(true);
+    store.findCandidatesByKeys.mockResolvedValueOnce([]).mockResolvedValueOnce([stored]);
+    const measurement = deferred();
+    mockRecordInstitutionMeasurement.mockImplementationOnce(async () => {
+      await measurement.promise;
+      throw Object.assign(new Error('measurement unavailable'), { code: 'METRIC_FAILURE' });
+    });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const r = response();
+      const operation = handler({ method: 'PATCH', body: {
+        requestId: REQ, action: 'exclude', candidate: { name: stored.name, candidateKey: stored.candidateKey },
+      } }, r);
+      await waitFor(() => mockRecordInstitutionMeasurement.mock.calls.length === 1);
+      expect(store.setExcluded).toHaveBeenCalledTimes(1);
+      expect(r.body).toBeNull();
+      expect(mockRecordInstitutionMeasurement).toHaveBeenCalledWith({
+        requestId: REQ, candidate: stored, eventType: 'staff_excluded', captureSource: 'stored_roster',
+      });
+      measurement.resolve();
+      await operation;
+      expect(warn).toHaveBeenCalledWith('[reviewer-roster] institution measurement unavailable:', 'METRIC_FAILURE');
+      expect(r.statusCode).toBe(200);
+      expect(r.body).toEqual({ success: true });
+    } finally {
+      measurement.resolve();
+      warn.mockRestore();
+    }
+  });
+
+  it('does not record enabled exclusion measurement when the stored status no longer matches', async () => {
+    const stored = { name: 'Morgan Analyst', candidateKey: 'candidate:morgan', rosterStatus: 'active' };
+    mockMeasurementEnabled.mockReturnValue(true);
+    store.findCandidatesByKeys.mockResolvedValueOnce([]).mockResolvedValueOnce([stored]);
+    const r = response();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ, action: 'exclude', candidate: { name: stored.name, candidateKey: stored.candidateKey },
+    } }, r);
+    expect(store.setExcluded).toHaveBeenCalledTimes(1);
+    expect(store.findCandidatesByKeys).toHaveBeenCalledTimes(2);
+    expect(store.findCandidatesByKeys).toHaveBeenLastCalledWith(REQ, [stored.candidateKey]);
+    expect(mockRecordInstitutionMeasurement).not.toHaveBeenCalled();
+    expect(r.statusCode).toBe(200);
+    expect(r.body).toEqual({ success: true });
+  });
+
   it('preserves omitted versus explicit null contact-draft fields and exact rejection envelopes', async () => {
     const omitted = response();
     await handler({ method: 'PATCH', body: {
