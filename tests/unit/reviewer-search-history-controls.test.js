@@ -724,6 +724,7 @@ test('continues after a terminal discovery read failure when the complete ranked
     ...generatedCandidate,
     name: 'Fresh Reviewer',
     email: 'fresh@example.edu',
+    contactEnrichment: { email: 'fresh@example.edu', emailSource: 'openalex' },
     addressTrustReceipt: addressTrustReceipt('fresh@example.edu'),
   };
 
@@ -738,7 +739,8 @@ test('continues after a terminal discovery read failure when the complete ranked
     if (target === '/api/reviewer-finder/enrich-contacts') return Promise.resolve(response({}));
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
       const postedCandidates = JSON.parse(options.body).candidates;
-      persistedRows = postedCandidates;
+      // GET includes trusted stored evidence, rather than echoing browser authority.
+      persistedRows = postedCandidates.map((row) => ({ ...row, addressTrustReceipt: freshCandidate.addressTrustReceipt }));
       return Promise.resolve(savedReceipt(postedCandidates));
     }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
@@ -766,7 +768,8 @@ test('continues after a terminal discovery read failure when the complete ranked
     fireEvent.click(runButton);
   });
 
-  expect(await screen.findByText(freshCandidate.name)).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Run another search' })).toBeEnabled());
+  expect(screen.getByLabelText(`Select ${freshCandidate.name}`)).toBeInTheDocument();
   expect(screen.queryByText('Load failed')).not.toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledWith('/api/workbench/reviewer-roster', expect.objectContaining({
     method: 'POST',

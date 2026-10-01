@@ -31,6 +31,7 @@ const freshCandidate = {
   name: 'Fresh Reviewer',
   email: 'fresh@example.edu',
   emailSource: 'openalex',
+  contactEnrichment: { email: 'fresh@example.edu', emailSource: 'openalex' },
   emailPersistAllowed: true,
   addressTrustReceipt: { receiptId: 'receipt-fresh', personConfirmed: true, email: 'fresh@example.edu' },
   identityStatus: 'probable',
@@ -54,7 +55,8 @@ function mockPipeline({ rosterPost }) {
           const receipt = await savedResponse.json();
           for (const outcome of receipt.outcomes || []) {
             if (outcome.status !== 'recorded') continue;
-            const row = { ...posted[outcome.inputIndex], candidateKey: outcome.candidateKey };
+            // GET restores server-held address evidence, which POST pruning omits.
+            const row = { ...posted[outcome.inputIndex], candidateKey: outcome.candidateKey, addressTrustReceipt: freshCandidate.addressTrustReceipt };
             rosterState.active.push(row);
             rosterState.allNames.push(row.name);
           }
@@ -94,7 +96,8 @@ test('runSearch roster-persist POST: exact body bytes/headers; recorded rows are
   mockSse();
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
-  await screen.findByText(freshCandidate.name);
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Run another search' })).toBeEnabled());
+  expect(screen.getByLabelText(`Select ${freshCandidate.name}`)).toBeInTheDocument();
   expect(sentOpts.method).toBe('POST');
   expect(sentOpts.headers).toEqual({ 'Content-Type': 'application/json' });
   const body = JSON.parse(sentOpts.body);
