@@ -139,7 +139,7 @@ prompts remain available in Git history; only this new handoff is retained here.
 
 ### Verified Open
 
-1. **Watch Part A in Production for one cron cycle.** Evidence: merged without an implementation review (S553 owner call); `lib/utils/migration-drift.js` will now see 058 in the manifest but not in Production's tracker (`migration_drift_behind`-style logging — check what it actually raises). Read the scheduled-email cron logs and the DB alert rows once; run `node scripts/probe-scheduled-email-orphan-drafts.js` read-only.
+1. **Watch Part A in Production for one cron cycle.** PARTLY DONE 2026-09-30 evening: `scheduled_email_messages` holds 0 rows, so the first Part A cycle (grantee-deliverable-reminders cron, 08:00 UTC 10/01) has nothing to send; orphan-draft probe moot (no generation>0 rows). Remaining: glance at that cron's 10/01 run log for errors. Evidence: merged without an implementation review (S553 owner call); `lib/utils/migration-drift.js` will now see 058 in the manifest but not in Production's tracker (`migration_drift_behind`-style logging — check what it actually raises). Read the scheduled-email cron logs and the DB alert rows once; run `node scripts/probe-scheduled-email-orphan-drafts.js` read-only.
 2. **Part B (Liaison re-addressing)** of `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` — smaller follow-on, not started.
 3. **Integrity findings 6 and 9** (PR #366 description) — untouched since S552.
 4. ~~**Ledger Phase 1 operational-data restore into Neon**~~ **DONE 2026-09-30 evening** (data-only load; see the Factory ledger note at the top). Only the office-Mac `--run-inspect` remains.
@@ -147,7 +147,7 @@ prompts remain available in Git history; only this new handoff is retained here.
 ### Owner Decision Needed
 
 1. **D2: retire the local `ledger_prod`** once the Neon restore is confirmed (`docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`).
-2. **Does 058 also run against the shared app database?** Production's app DB holds an early-applied 054 copy; `project-migration-numbers-claimed-off-main.md` says B4's 058 was written to repair it, while the ledger rule P6 says the app DB is never the ledger. Not applied in S553. B4/Codex decision.
+2. ~~**Does 058 also run against the shared app database?**~~ **DECIDED and DONE 2026-10-01 (owner: option 1).** 058 applied to Production by the owner's `npm run apply:migrations` (1 applied, 57 skipped) after a scratch rehearsal on the early-054 shape; tracker 58 = manifest. The active `migration_drift` alert (23:03Z 9/30; one ops email) should auto-resolve on the next cold start — confirm. Original question: Production's app DB holds an early-applied 054 copy; `project-migration-numbers-claimed-off-main.md` says B4's 058 was written to repair it, while the ledger rule P6 says the app DB is never the ledger. Not applied in S553. B4/Codex decision.
 
 ### Parked
 
@@ -155,8 +155,8 @@ prompts remain available in Git history; only this new handoff is retained here.
 
 ### Verify Before Acting
 
-1. **Production 054 shape** (read-only query of `test_request_*` tables and `pg_get_functiondef('test_request_receipt_ok')`) — still unread; prerequisite for decision 2 above.
-2. **`migration_drift_ahead` for 055** — never checked.
+1. ~~**Production 054 shape**~~ READ 2026-09-30: early shape, `test_request_runs` + `test_request_run_resources` + the receipt function only (all empty). (Original: read-only query of `test_request_*` tables and `pg_get_functiondef('test_request_receipt_ok')`) — still unread; prerequisite for decision 2 above.
+2. ~~**`migration_drift_ahead` for 055**~~ CHECKED 2026-09-30: 055 tracked and in the manifest; the two 9/30 `migration_drift_ahead` warnings auto-resolved.
 3. **Residue**: Test Requests 1003301–1003303; scratch DBs `ledger_ci_s547`, `ledger_ci_s548`; local Docker `ledger_prod` was created and dropped in S553 (transition proof). List and confirm before deleting.
 4. **Vercel skipped build of `61dafcb81`** — undiagnosed.
 5. `docs/CREDENTIALS_RUNBOOK.md` Postgres rotation procedure — still absent (the S553 sync followed a Downloads brief instead).

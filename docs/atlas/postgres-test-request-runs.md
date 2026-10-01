@@ -3,10 +3,10 @@ title: Test Request Factory Run Ledger
 domain: test-request-factory
 kind: atlas
 status: active
-summary: "Durable owner-run test Request ledger; B4 slot migration 058 is built on a branch and unapplied to the shared database. Shared Production has 054; Preview unverified. Managed Neon ledger provisioned 2026-09-30 (054 + 058 applied) behind a tracked host registry and schema fingerprint check."
+summary: "Durable owner-run test Request ledger. Current copy: managed Neon ledger (054 + 058, operational data loaded 2026-09-30) behind a tracked host registry and schema fingerprint check. Shared Production app DB has 054 + 058 tables (empty; never the ledger); Preview unverified."
 canonical: false
 cataloged: 2026-09-23
-last_verified: 2026-09-29
+last_verified: 2026-09-30
 owner: product-engineering
 related:
   - docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md
@@ -21,7 +21,7 @@ Tables: `test_request_runs`, `test_request_run_resources`,
 `test_request_cast_members`, `test_request_cast_bindings`, and
 `test_request_cast_slot_bindings`.
 
-**Where the ledger lives (2026-09-30, S553; `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`).** The operational ledger for production test Requests has lived only in `ledger_prod` inside the `wmkf-ledger-pg` Docker container on the owner's home Mac (sandbox counterpart `ledger`), hand-built and never dumped [VERIFIED S553: the office Mac holds no `ledger_prod`]. Owner decision D1 moved it to Neon project `wmkf-factory-ledger` (Vercel Marketplace, connected to no Vercel project, us-east-1), databases `ledger_prod` and `ledger`, with 054 + 058 applied and the local tracker `ledger_schema_migrations` recording 054; the hand-carried dump/restore in `docs/plans/briefs/FACTORY_LEDGER_SNAPSHOT_BRIEF_2026-09-30.md` migrates the data. On branch `claude/factory-ledger-registry` (unmerged): `lib/db/ledger-registry.js` is the tracked host allowlist the CLI's `requireLedgerUrl(target)` enforces (managed host requires `ledger_prod` for `--target=production`, `ledger` otherwise; the app's `POSTGRES_URL` is always refused), `lib/db/ledger-schema.js` + `lib/db/ledger-schema-fingerprint.json` are the structural schema check every ledger-driven CLI mode runs first (`check:factory-ledger` gate, `--ledger-check`), and `scripts/apply-ledger-migrations.js` is the ledger's own migration runner. Connection strings are local-only `.env.local` variables (`docs/CREDENTIALS_RUNBOOK.md`).
+**Where the ledger lives (2026-09-30, S553; `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`).** The operational ledger for production test Requests has lived only in `ledger_prod` inside the `wmkf-ledger-pg` Docker container on the owner's home Mac (sandbox counterpart `ledger`), hand-built and never dumped [VERIFIED S553: the office Mac holds no `ledger_prod`]. Owner decision D1 moved it to Neon project `wmkf-factory-ledger` (Vercel Marketplace, connected to no Vercel project, us-east-1), databases `ledger_prod` and `ledger`, with 054 + 058 applied and the local tracker `ledger_schema_migrations` recording 054; the home-Mac operational data was loaded into both on 2026-09-30 and the managed ledger is now the current copy [VERIFIED via `docs/plans/evidence/test-request-factory/ledger-snapshot-2026-09-30.md`]. Merged in PR #374: `lib/db/ledger-registry.js` is the tracked host allowlist the CLI's `requireLedgerUrl(target)` enforces (managed host requires `ledger_prod` for `--target=production`, `ledger` otherwise; the app's `POSTGRES_URL` is always refused), `lib/db/ledger-schema.js` + `lib/db/ledger-schema-fingerprint.json` are the structural schema check every ledger-driven CLI mode runs first (`check:factory-ledger` gate, `--ledger-check`), and `scripts/apply-ledger-migrations.js` is the ledger's own migration runner. Connection strings are local-only `.env.local` variables (`docs/CREDENTIALS_RUNBOOK.md`).
 
 **[VERIFIED via source, 2026-09-29]** Migration 054 and its fresh-install
 mirror (scripts/setup-database.js, V55) define the durable run ledger for
@@ -311,13 +311,18 @@ Two tables added in place to migration 054 (and the V55 mirror) for the cast pla
 ## Limits
 
 - The owner-run CLI refuses a ledger URL matching the configured shared
-  Production/Preview URLs or a neon.tech host for every ledger-driven mode [VERIFIED via
-  `scripts/rehearse-test-request-sandbox.mjs:750-760,1283-1341`]; the local
+  Production/Preview URLs or any host outside `lib/db/ledger-registry.js` for every
+  ledger-driven mode (the blanket neon.tech refusal was replaced by the registry in PR #374); the local
   `ledger_prod` is recorded for the production cast creation (cast plan,
   *Order* 4). Which local ledger the 1003303 clone and binding used is not
   recorded (see the header). Shared Production has 054 applied (2026-09-26
-  06:54Z, `codex-feature-request-2026-09-26`) [VERIFIED via an owner-run
-  read-only `schema_migrations` query, S552]; Preview's database is unverified.
+  06:54Z, `codex-feature-request-2026-09-26`, early shape: `test_request_runs`
+  and `test_request_run_resources` only) and 058 applied 2026-10-01 01:56Z by
+  the owner's `npm run apply:migrations`, which added the three cast tables to
+  clear the `migration_drift` alert. `test_request_run_reviewer_assignments` and
+  `test_request_status_changes` remain absent there; all tables are empty and
+  the CLI never uses that database [VERIFIED via owner-authorized read-only
+  queries, 2026-09-30/10-01]. Preview's database is unverified.
 - The owner-run `ledger_prod` and `ledger` need read-only schema preflight,
   explicit 058 application by the owner, and a recorded receipt before the
   slot operation can use them. `apply-migrations.js` must not target these

@@ -46,10 +46,15 @@ origin/main`, 2026-09-30]. The episode shows why "the next number after
 - Production's 054 was applied from `codex/feature-request` at `af65a24bd`
   (2026-09-24), before `main`'s 15 later edits added the Factory cast tables;
   its tracker row means `apply-migrations.js` will never update it. B4's 058
-  must repair it [VERIFIED via git history, S552; Production's table shape not read].
-- [VERIFIED 2026-09-30, S553, owner-run read-only query] Production `schema_migrations`
-  holds 054, 055, 056, 057 and 059. 058 is absent from the app database; it was
-  adopted on the two managed Neon ledgers by `npm run ledger:apply`. 059 was applied
+  must repair it [VERIFIED via git history, S552]. Shape read 2026-09-30: only
+  `test_request_runs` + `test_request_run_resources` + `test_request_receipt_ok`.
+- [VERIFIED 2026-10-01, owner-authorized read-only query] Production `schema_migrations`
+  holds 054–059 (58 rows = manifest). 058 was first adopted on the two managed Neon
+  ledgers by `npm run ledger:apply` (S553), then applied to the app DB by the owner's
+  `npm run apply:migrations` at 2026-10-01 01:56Z (owner decision: option 1, to clear
+  the active `migration_drift` error, which emails ops; rehearsed first on a scratch
+  copy of the early-054 shape). Leaving a manifest migration unapplied raises that
+  error on every cold start until resolved. 059 was applied
   alone through a one-off owner-run script (BEGIN; body; tracker INSERT; COMMIT,
   `applied_by` `claude-part-a-2026-09-30`) because `apply-migrations.js` has no
   per-file filter and would have applied 058 to the app database too.
