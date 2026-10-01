@@ -2,8 +2,8 @@
 title: "Atlas: AssemblyAI transcription pilot (Postgres)"
 domain: postgres
 kind: state-page
-status: source-built-unapplied
-summary: "Branch source for temporary owner-bound transcription jobs; local fresh-bootstrap reconciliation is verified, while migration 060 remains unapplied to any remote database."
+status: isolated-schema-initialized-not-deployed
+summary: "Isolated Neon schema and authorized test admin initialized and read back; shared databases, deployment and provider use remain unchanged."
 canonical: true
 cataloged: 2026-09-30
 owner: product-engineering
@@ -19,29 +19,43 @@ related:
 
 ## Current status
 
-**[SOURCE-BUILT IN THIS BRANCH; SCHEMA UNAPPLIED; NOT DEPLOYED]** The table
+**[SOURCE-BUILT; ISOLATED TEST SCHEMA INITIALIZED; NOT DEPLOYED]** The table
 definition is `lib/db/migrations/060_transcription_jobs.sql` and is registered
 in the repository migration manifest and fresh-install shape. Migration 060 is
 provisional. Per owner-confirmed reservations, 058 and 059 remain assigned to
 other work. This implementation has not applied migration 060 to Production,
-Preview, or another shared database; no shared-database probe was performed
+the shared Preview database, or another shared database; no shared-database probe was performed
 for this entry. The integration suite applies the migration only in a unique
 local scratch schema.
 
-**[VERIFIED 2026-09-30 via Vercel metadata]** Unconnected test resources now
-exist: Neon `store_TSn9yHJW1xL0p4h0` and private Blob
+**[VERIFIED 2026-09-30 via Vercel metadata]** Test resources exist: Neon
+`store_TSn9yHJW1xL0p4h0` and private Blob
 `store_Qri02A1kj96tQYR9`. Neither is bound to the app. This is resource
-provisioning, not schema or database-content verification. Existing shared
-Production/Preview database configuration is unchanged. **[VERIFIED locally;
-Sol reviewed and root verified]** The repaired fresh-install path recorded 57 tracked
+provisioning; existing shared Production/Preview database configuration is
+unchanged. **[VERIFIED 2026-10-01 via read-only SQL]** The owner-supplied
+isolated Neon endpoint matched the user-confirmed hostname and differed from
+local Production hosts. It connects to `neondb`, current schema `public`; the
+pre-initialization catalog probe at `scripts/probe-transcription-preview.js` showed nine
+non-system tables, all in `neon_auth` owned by role `neon_auth`.
+`project_config` reports one visible row; the other eight tables report zero
+visible rows for the connected role (RLS was not disabled or bypassed). No
+public/application tables were observed and no row values were read. Neon
+describes `neon_auth.*` as the Auth data schema and says enabling Auth
+initializes its schema/configuration ([Neon Auth overview](https://neon.com/blog/neon-auth-branchable-identity-in-your-database)).
+This is not a literally empty database. **[VERIFIED locally; Sol reviewed and
+root verified]** The repaired fresh-install path recorded 57 tracked
 entries (53 actual SQL migrations plus four retired/absent entries); its
 canonical rerun skipped all 57, and atomic rollback and populated-database
-refusal were checked. This local disposable-database proof does not establish
-the unconnected Neon database's contents or schema. The selected test admin's
-directory identity is verified, but isolated active profile/superuser-role
-seeding remains pending. No remote SQL connection, environment binding,
-migration 060 apply, or deployment has occurred; see the runbook for the
-separate Preview connection boundary and evidence.
+refusal were checked. **[VERIFIED 2026-10-01 via isolated operator and independent
+read-only readback]** `scripts/bootstrap-transcription-preview.js` initialized
+the isolated public schema, including migration 060, and seeded the authorized
+active linked profile and superuser role for `jgallivan@wmkeck.org`. Its
+`--verify-only` mode checked manifest provenance, key physical schema objects
+and exact identity/role: 57 migration records, one profile, one role, zero jobs,
+and nine provider-owned Auth tables still present. The operator never writes
+`neon_auth`; a real local Postgres test proved preservation and seed rollback.
+Sol approved and root verified; 14 targeted tests passed. Environment binding,
+deployment and provider calls remain undone. See the runbook for release boundaries.
 
 ## Intended state ownership
 

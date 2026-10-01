@@ -3,7 +3,7 @@ title: "AssemblyAI transcription pilot pre-enable runbook"
 domain: transcription
 kind: operations-runbook
 status: source-built-not-deployed
-summary: "Source-built pilot with locally verified fresh-bootstrap repair and unconnected test resources; remote database configuration, deployment and provider tests remain pending."
+summary: "Isolated Neon schema and authorized test admin initialized and independently verified; branch environment binding, deployment and provider tests remain pending."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -25,19 +25,34 @@ cron, callback reachability, account privacy settings, or shared schema are
 configured. This runbook documents the gate; it does not authorize a database
 apply, deployment, paid provider call, or pilot use.
 
-### Resource-only provisioning checkpoint — 2026-09-30
+### Isolated database checkpoint — 2026-10-01
 
 **[VERIFIED via Vercel resource metadata; root readback and Sol review]** Owner
 authorized an isolated Preview and new Neon/private Blob resources after possible
 charges were disclosed. Created in team `justin-gallivans-projects`:
 
 - Neon `wmkf-transcription-pilot`, `store_TSn9yHJW1xL0p4h0`: available,
-  no connected projects. Launch plan verified; actual pricing and database
-  contents remain unverified. No remote SQL connection or initialization occurred.
+  no connected projects. Launch plan verified; actual pricing remains
+  unverified. The owner-supplied local endpoint was confirmed against the
+  user-confirmed Neon hostname and distinguished from local Production hosts.
+- **[VERIFIED 2026-10-01 before initialization via bounded TLS/read-only SQL catalog probe]** The
+  endpoint connects to database `neondb`, current schema `public`. Nine
+  non-system tables were found, all in Neon Auth's `neon_auth` schema and owned
+  by `neon_auth`: `project_config` reports one visible row; `account`,
+  `invitation`, `jwks`, `member`, `organization`, `session`, `user`, and
+  `verification` each report zero visible rows. The counts reflect the
+  connected role; row-level security was not disabled or bypassed. No
+  public/application tables were observed. The probe read catalog metadata
+  and exact visible-row counts only; no table values were read. The reproducible
+  sanitized probe is `node scripts/probe-transcription-preview.js`. Neon
+  documents `neon_auth.*` as its Auth data schema and says enabling Auth
+  initializes schema/configuration ([Neon Auth overview](https://neon.com/blog/neon-auth-branchable-identity-in-your-database)).
+  The database was not literally empty. The reviewed operator preserved this
+  provider-owned schema while initializing only the empty application schema.
 - Blob `wmkf-transcription-pilot`, `store_Qri02A1kj96tQYR9`: private,
   `iad1`, zero objects/bytes, no connected projects.
 
-No app environment binding, deployment, migration, upload, or AssemblyAI call
+No app environment binding, deployment, shared-database migration, upload, or AssemblyAI call
 was made. Live environment metadata shows the existing `DATABASE_URL`,
 `POSTGRES_URL`, and `NEON_PROJECT_ID` records target Production, Preview and
 Development together; those shared settings were not changed. The existing
@@ -52,9 +67,11 @@ does not stamp a blanket manifest baseline. In a disposable local database,
 absent migrations), canonical rerun skipped all 57, and atomic rollback and
 populated-database refusal were checked. An injected retired table was refused
 and rolled back; the actual setup CLI also passed on a fresh local database.
-This proves the local bootstrap path,
-not the Neon database's contents or migration state. Do not run the existing-
-database runner blindly after setup.
+This proves the local bootstrap path, not the Neon database's migration tracker
+or application schema. The separate read-only Neon catalog probe found only
+the provider-owned Auth tables described above, but did not inspect row values
+or apply any migration. Do not run the existing-database runner blindly after
+setup or treat this database as literally empty.
 
 Repair verification: root ran 15 focused suites / 132 tests, including
 `tests/integration/database-bootstrap.pg.test.js` against disposable local
@@ -64,15 +81,30 @@ checks passed; gate/self-test pairs ran sequentially. Sol accepted the bounded
 repair after the retired-target negative test passed. No deployed-runtime proof
 is implied.
 
-The owner authorized the bounded repair and selected `jgallivan@wmkeck.org` as
-the test administrator; directory identity was verified. An isolated active
-profile/superuser-role seed remains a separate prerequisite. Do not use an auth
-bypass or copy Production user data. Remote SQL access, an environment binding,
-and deployment remain undone. The requested Neon URL belongs only in the new
-git-ignored `.env.transcription-preview.local`; do not overwrite `.env.local`.
-The Launch plan was verified from resource metadata, but actual pricing remains
-unverified. Before remote initialization, verify the supplied endpoint belongs
-to this new resource, differs from Production, and has an empty target schema.
+**[VERIFIED 2026-10-01]** The owner-authorized isolated initialization ran once
+with `node scripts/bootstrap-transcription-preview.js --confirm-empty-preview-bootstrap`.
+Luna executed after Sol and root review; both schema and admin transactions
+were acknowledged committed. Root independently ran the same script with
+`--verify-only`: 57 migration records (53 executed SQL plus four retired/absent),
+one active linked profile for `jgallivan@wmkeck.org`, one superuser role, zero
+transcription jobs, and nine provider-owned Auth tables still present. Readback
+checks manifest provenance, key migration-060 columns, named constraints and
+indexes, and the exact authorized directory identity/role. No Production user
+data was copied; no auth bypass, email or Dynamics provisioning path was used.
+The source writes only the public application schema, not `neon_auth`.
+
+Root's final targeted run passed 14 tests across three suites, including real
+local Postgres proof of provider-schema preservation, hostile search-path
+isolation, seed rollback after a role-insert failure, and repeat-seed refusal.
+Targeted ESLint passed. Sol also approved the read-only verification mode.
+An uncertain commit must be reconciled read-only, never automatically retried.
+This target is now populated: do not rerun fresh initialization.
+
+The credential remains only in git-ignored `.env.transcription-preview.local`;
+`.env.local` and shared settings were not overwritten. Resource association is
+owner-confirmed; the saved endpoint matched and differed from local Production
+hosts. The Launch plan is known but actual pricing remains unverified.
+Branch-only environment binding and deployment remain pending.
 
 **Disabled-by-default source behavior:** `TRANSCRIPTION_PILOT_ENABLED` and
 `TRANSCRIPTION_SUBMISSIONS_ENABLED` each require the literal string `true`.
@@ -88,19 +120,27 @@ configuration surface before asserting that it is off.
    explicitly approved non-sensitive recordings are in scope. Confidential
    recordings remain excluded.
 2. Reconcile the provisional migration number. This branch selects 060;
-   migrations 058 and 059 remain reserved for other work. Before applying,
-   perform an owner-approved, read-only check of `schema_migrations` and the
-   physical target schema. Confirm whether 060 is absent from the tracker and
-   whether `transcription_jobs`, its indexes, and constraints are absent. A
-   tracker/object mismatch, existing partial object, or number collision is a
-   stop condition: do not blindly apply, drop, or manually stamp anything.
-3. If the target is a populated database, the only supported apply path is
-   `node scripts/apply-migrations.js` after approval. Confirm migration order
-   and the script's target before running it. `scripts/setup-database.js` is
-   fresh-install-only and must not be run against an existing database. After
-   apply, perform a separate read-only physical schema readback; tracker state
-   alone is insufficient. **No shared tracker/schema read or migration apply
-   has been performed for this branch implementation.**
+   migrations 058 and 059 remain reserved for other work. The bounded catalog
+   probe found no `schema_migrations` or application tables among visible
+   non-system relations, but did find the pre-existing Neon Auth schema and
+   configuration described above. The reviewed isolated initialization has now
+   applied 060 and read back its schema; never repeat fresh setup. For any
+   other target, do not assume it is empty or run fresh setup blindly.
+   Confirm the target migration tracker and physical schema state in the
+   approved procedure. A tracker/object mismatch, existing partial object, or
+   number collision is a stop condition: do not blindly apply, drop, or
+   manually stamp anything.
+3. For an ordinary populated application database, the only supported apply
+   path is `node scripts/apply-migrations.js` after approval. Confirm migration
+   order and the script's target before running it. `scripts/setup-database.js`
+   is fresh-install-only and must not be run against an existing database.
+   This isolated Neon resource is now initialized; its existing provider-owned
+   Neon Auth schema was preserved by the reviewed public-only bootstrap.
+   After any approved apply, perform a separate
+   read-only physical schema readback; tracker state alone is insufficient.
+   **No shared tracker/schema read or migration apply has been performed for
+   this branch implementation.** Migration 060 was applied only to the isolated
+   test resource, not the shared Preview/Production database.
 4. Confirm the full API route-security matrix and checker registration, secret
    tracking, credential runbook, service catalog, and Atlas entries are
    complete and their gates pass. Route inventory in this branch includes
