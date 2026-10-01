@@ -380,13 +380,13 @@ applied/tracked and the Meeting Tracker readiness flag is exact-on. The agenda
 transport itself has not been independently production-smoked, so no live-send
 claim is made.
 
-### `scheduled_email_messages` — MIGRATION 036 APPLIED 2026-08-26; CODE NOT DEPLOYED
+### `scheduled_email_messages` — MIGRATION 036 APPLIED 2026-08-26; LIVE IN PRODUCTION
 
 **Source of truth:** Postgres coordination and audit ledger for personalized
 scheduled email; Dataverse remains workflow authority and Dynamics remains
 email-activity/transport authority. Migration
 `036_scheduled_email_messages.sql` is mirrored in the fresh-install setup.
-**[VERIFIED IN SOURCE + FOCUSED TESTS; LIVE-PROBED 2026-08-26: migration 036 applied to the shared Neon database (tracker row + table exist per read-only information_schema probe); the branch code that writes it is not yet deployed, so the table is empty in production.]**
+**[VERIFIED IN SOURCE + FOCUSED TESTS; LIVE-PROBED 2026-08-26: migration 036 applied to the shared Neon database (tracker row + table exist per read-only information_schema probe); the writer code merged to `main` the same day (`4a743d63a`). A read-only Production read on 2026-10-01 (S560) found the table's only row, created by the 10/01 08:00 UTC `grantee-deliverable-reminders` run and then stopped by the owner; no row has reached a real send yet.]**
 
 The first allowlisted workflow is `grantee_abstract_reminder`. One source
 deliverable can own one row, created on the cron's first sight of an Invited
