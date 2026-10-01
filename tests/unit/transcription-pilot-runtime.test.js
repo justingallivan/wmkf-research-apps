@@ -57,7 +57,17 @@ describe('transcription pilot private Blob runtime', () => {
     expect(order.map(entry => entry[0])).toEqual(['reserve', 'mint']);
     expect(order[0][1]).toEqual(expect.objectContaining({ jobId: job.id, ownerProfileId: 42, validUntil: expect.any(Date) }));
     expect(order[1][1]).toEqual(expect.objectContaining({ pathname: job.input_cleanup_pathname, validUntil: order[0][1].validUntil.getTime() }));
+    expect(store.createTranscriptionJob).toHaveBeenCalledWith(expect.objectContaining({ requestedModel: 'universal-3-5-pro' }));
     expect(result.upload.token).toBe('client-capability');
+  });
+
+  it('keeps new-job model selection server-owned and rejects a client override', async () => {
+    await expect(createOwnerUpload({ ownerProfileId: 42, body: {
+      filename: 'voice.mp3', contentType: 'audio/mpeg', bytes: 100,
+      idempotencyKey: 'model-override', requestedModel: 'universal-2',
+    } })).rejects.toMatchObject({ code: 'unsupported_model' });
+    expect(store.createTranscriptionJob).not.toHaveBeenCalled();
+    expect(generateClientTokenFromReadWriteToken).not.toHaveBeenCalled();
   });
 
   it('does not issue capabilities for expired or cleanup-requested jobs', async () => {

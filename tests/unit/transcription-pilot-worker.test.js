@@ -103,6 +103,7 @@ describe('transcription worker submission safety', () => {
     expect(runtime.inspectOwnerInput).toHaveBeenCalled();
     expect(uploadAssemblyAIAudio).toHaveBeenCalled();
     expect(submitAssemblyAITranscription).toHaveBeenCalledTimes(1);
+    expect(submitAssemblyAITranscription).toHaveBeenCalledWith(expect.objectContaining({ model: 'universal-2' }));
     expect(store.mutateLeasedTranscriptionJob).toHaveBeenCalledWith(expect.objectContaining({
       fields: expect.objectContaining({ status: 'submission_uncertain' }), expectedStatuses: ['submitting'],
     }));
