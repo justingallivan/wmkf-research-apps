@@ -26,13 +26,13 @@ Base: `6b9478d442b3100b0f80434e8ea8a3368ed90367`; branch: `codex/reviewer-create
 
 ## Implementation and invariants
 
-[PLANNED] Add one private synchronous predicate, `isSuggestionCreateConflict`, in the same adapter. Move the exact existing expression into it without changing short-circuit order, optional access, fallback, regex, or coercion. Replace only the two identical checks with calls. The helper performs no I/O, has no recovery logic, and is not exported. Keep the recovery blocks and all other predicates untouched. A short comment should identify its two scoped create paths; avoid describing it as a universal Dataverse classifier.
+[PLANNED] Add one private synchronous predicate, `isSuggestionCreateConflict`, in the same adapter. Move the exact existing expression into it without changing short-circuit order, optional access, fallback, regex, or coercion. Replace only the two identical checks with calls. The helper performs no I/O, has no recovery logic, and is not exported. Keep the recovery blocks and all other predicates untouched. Leave the existing applicant catch rationale comment in place, without moving or rewriting it. A short comment should identify its two scoped create paths; avoid describing it as a universal Dataverse classifier.
 
 | Invariant | Verification |
 |---|---|
 | Both call sites retain status OR message behavior | Parameterized caller-level cases for numeric 409/412 with neutral messages; each regex alternative with no conflict status, including case variation and a non-conflict numeric status |
 | Complement still surfaces original failure | Neutral 400/403/429/500, absent status/message, string 409/412, and Entity Key/code-only messages reject the original value and do not perform a recovery lookup or write |
-| Conflict requires an actual winner | Accepted conflict followed by no row rethrows the same original error after exactly one recovery lookup and no PATCH |
+| Conflict requires an actual winner | Accepted conflict followed by no row rethrows the same original error after one additional lookup beyond the pre-create read (two total suggestion lookups) and no PATCH; assert error identity, not merely shape |
 | Recovery remains path-specific | Existing and minimal additional caller tests cover excluded winners; applicant selection/provenance and ETag preservation; staff applicant provenance and ordinary winner behavior |
 | Neighboring contracts remain separate | Diff inspection proves general upsert, potential-reviewer and PATCH-412 retry logic unchanged; existing sibling tests remain green |
 
@@ -46,4 +46,4 @@ Base: `6b9478d442b3100b0f80434e8ea8a3368ed90367`; branch: `codex/reviewer-create
 
 [PLANNED] Conservative Tier 2 due to proximity to Dataverse writes. Use synthetic isolated fixtures, a reviewed branch and PR; promotion is a later explicit owner decision. Rollback is a source revert with no data repair. Residual risk is accidental classification drift, addressed by caller-level characterization and the tiny runtime diff. No production correctness improvement or incidence reduction is claimed.
 
-Review and validation record: pending.
+Review record: Fable plan session `baa46a60-292f-491a-a2a6-7d25a70437c2` APPROVED WITH NAMED CHANGES, incorporated above: distinguish the additional recovery lookup from the initial lookup and keep the applicant rationale comment in place. [VERIFIED via Luna baseline] Four adapter/caller suites pass, 240 tests. Implementation and final validation pending.
