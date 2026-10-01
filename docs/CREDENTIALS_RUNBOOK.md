@@ -338,6 +338,14 @@ Vercel shows **Needs Attention** on the 8 password-bearing variables because the
 
 Revisit B if Preview acceptance leaves the workflow.
 
+### Protected `main` branch (owner, 2026-10-01)
+
+The app project's `main` branch is a Neon protected branch [owner-reported 2026-10-01, Session 560]. It cannot be deleted or reset (the data reset that restores a branch from its parent), and the project cannot be deleted while it is protected. The Launch plan allows 2 protected branches per project, so one slot remains. The ledger project `wmkf-factory-ledger` is unprotected; the 2026-09-30 `pg_dump` files back it up.
+
+- **Connection strings are unchanged.** Protection did not alter the host, roles or passwords, so no Vercel or local env edits followed.
+- **Password rotation still works.** Resetting the `neondb_owner` *role password* (step 1 above) is allowed on a protected branch.
+- **Child branches get new passwords.** A branch created from `main` (for example, an isolated rehearsal branch) receives freshly generated role passwords. Take every connection variable from that branch's own connection details; never splice Production's password onto the branch host.
+
 ### Common mistakes
 
 - Printing a connection string while trying to extract its host. A `sed` over the URL that fails to match prints the whole URL, password included (2026-10-01, which forced this rotation's urgency). Parse with `new URL()` and print only `hostname`, or don't print at all.
