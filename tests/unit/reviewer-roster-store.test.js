@@ -233,6 +233,34 @@ describe('recordSurfaced', () => {
     }
   });
 
+  test('returns only changed-row count after mixed SQL row success, row failure, and curation no-op', async () => {
+    const priorMeasurement = process.env.REVIEWER_INSTITUTION_MEASUREMENT;
+    process.env.REVIEWER_INSTITUTION_MEASUREMENT = 'off';
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      sql.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      sql.mockRejectedValueOnce(new Error('row write unavailable'));
+      sql.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // protected curation conflict
+      sql.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // cap
+
+      await expect(store.recordSurfaced(REQ, [
+        { name: 'Ann Lee', candidateKey: 'candidate:ann' },
+        { name: 'Bob Roe', candidateKey: 'candidate:bob' },
+        { name: 'Casey Doe', candidateKey: 'candidate:casey' },
+      ])).resolves.toBe(1);
+      expect(sql).toHaveBeenCalledTimes(4);
+      expect(queryTextOf(0)).toMatch(/INSERT INTO reviewer_find_roster/);
+      expect(queryTextOf(1)).toMatch(/INSERT INTO reviewer_find_roster/);
+      expect(queryTextOf(2)).toMatch(/INSERT INTO reviewer_find_roster/);
+      expect(queryTextOf(3)).toMatch(/DELETE FROM reviewer_find_roster/);
+      expect(errorLog).toHaveBeenCalledWith('reviewer-roster recordSurfaced row error:', 'row write unavailable');
+    } finally {
+      if (priorMeasurement === undefined) delete process.env.REVIEWER_INSTITUTION_MEASUREMENT;
+      else process.env.REVIEWER_INSTITUTION_MEASUREMENT = priorMeasurement;
+      errorLog.mockRestore();
+    }
+  });
+
   test('measurement records only a successful roster CAS, and its failure does not change the roster count', async () => {
     process.env.REVIEWER_INSTITUTION_MEASUREMENT = 'on';
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});

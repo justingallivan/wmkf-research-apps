@@ -860,7 +860,7 @@ test('expired verification refresh targets only the indexed roster card when ano
   expect(screen.getByLabelText(`Select ${sibling.name}`)).toBeChecked();
 });
 
-test('expired verification is refreshed durably and deselected for review without automatic promotion', async () => {
+test.each([1, 0])('expired verification with roster recorded=%i is acknowledged only at exact count one', async (recordedCount) => {
   const expired = {
     ...candidate('Expired Verification Reviewer', 'old@example.edu'),
     candidateKey: 'candidate:expired-verification',
@@ -911,7 +911,7 @@ test('expired verification is refreshed durably and deselected for review withou
       expect(body.candidates).toHaveLength(1);
       expect(body.candidates[0].candidateKey).toBe(expired.candidateKey);
       expect(body.candidates[0].automatedIdentityAttestation).toBe('fresh-token');
-      return Promise.resolve(response({ success: true, recorded: 1 }));
+      return Promise.resolve(response({ success: true, recorded: recordedCount }));
     }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
   });
@@ -939,11 +939,16 @@ test('expired verification is refreshed durably and deselected for review withou
   fireEvent.click(checkbox);
   fireEvent.click(screen.getByRole('button', { name: /add 1 selected to invite/i }));
 
-  expect(await screen.findByText(/Contact verification was refreshed for 1 reviewer/i)).toBeInTheDocument();
+  if (recordedCount === 1) {
+    expect(await screen.findByText(/Contact verification was refreshed for 1 reviewer/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(`Select ${expired.name}`)).not.toBeInTheDocument();
+    expect(screen.getByText(/The available evidence for fresh@example.edu is limited/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /verify address/i })).toBeInTheDocument();
+  } else {
+    expect(await screen.findByText(/No candidates were saved: Expired Verification Reviewer: Refreshed verification could not be written to the active roster\./i)).toBeInTheDocument();
+    expect(screen.getByLabelText(`Select ${expired.name}`)).toBeChecked();
+  }
   expect(screen.queryByRole('link', { name: /fresh@example.edu/i })).not.toBeInTheDocument();
-  expect(screen.getByText(/The available evidence for fresh@example.edu is limited/)).toBeInTheDocument();
-  expect(screen.queryByLabelText(`Select ${expired.name}`)).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /verify address/i })).toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledWith(
     '/api/reviewer-finder/save-candidates',
     expect.any(Object),

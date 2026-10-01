@@ -82,6 +82,19 @@ test('runSearch roster-persist POST: exact body bytes/headers; success merges in
   expect(body.candidates[0].candidateKey).toBe(freshCandidate.candidateKey);
 });
 
+test('runSearch treats HTTP 200 with recorded=0 as success and locally merges the candidate', async () => {
+  global.fetch = mockPipeline({
+    rosterPost: () => response({ success: true, recorded: 0 }),
+  });
+  mockSse();
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
+
+  await screen.findByLabelText(`Select ${freshCandidate.name}`);
+  expect(screen.queryByText(/Couldn't save this search to the request/)).not.toBeInTheDocument();
+  expect(screen.getByLabelText(`Select ${freshCandidate.name}`)).toBeInTheDocument();
+});
+
 test('runSearch roster-persist POST: non-2xx (body never read) surfaces the fixed roster-note failure, candidates still shown', async () => {
   global.fetch = mockPipeline({
     rosterPost: () => response({ error: 'db down' }, false, 500),
