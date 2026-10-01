@@ -2,8 +2,8 @@
 title: "AssemblyAI transcription pilot pre-enable runbook"
 domain: transcription
 kind: operations-runbook
-status: dedicated-project-ready-disabled-timer-delivery-unverified
-summary: "Dedicated Production deployment is READY with both transcription flags false. Its 16-check preflight, zero-job recovery/cleanup, route isolation and synthetic Workflow probe passed; manual native-cron invocations were logged, but actual timer delivery remains unverified. One separately authorized real-audio AssemblyAI quality test was accepted by the owner. No old-alias move or pilot enablement is authorized."
+status: dedicated-project-review-enabled-submissions-disabled-speaker-label-live
+summary: "Dedicated Production is READY in review-only mode (pilot enabled, submissions disabled). One authorized hosted job is ready with transcript retained, input Blob absent, and provider API deletion verified. Migration 062 is applied and verified in isolated Neon; speaker-label UI is live and hosted save/reload plus TXT/VTT were verified. Timer delivery and maximum-size processing remain unverified; the old shared-project alias is unchanged."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -16,37 +16,48 @@ related:
 
 ## Release status
 
-**[SOURCE-BUILT; DEDICATED PRODUCTION READY; BOTH FLAGS DISABLED]** Admin page,
-API routes, callback, worker, provider/media/runtime services, model/store,
-migrations 060–061, and tests are present. Migrations 060–061 are applied and
-physically verified only in isolated `neondb`. The earlier disabled Preview
-deployment `dpl_3pBYPpEuVS9pjJCKRPt2cNuyZyx6` at commit `d8bb73326` passed its
-13-check readiness, empty recovery, and provider-free synthetic Workflow
-canary; the existing pilot alias remains on the prior shared project/deployment.
+**[VERIFIED CURRENT STATUS; REVIEW ENABLED, NEW SUBMISSIONS DISABLED]** The
+dedicated project `wmkf-transcription-pilot-isolated`
+(`prj_v2aETCFqGBeqMshR7xoMpTcP9K2e`) is READY at
+`https://wmkf-transcription-pilot-isolated.vercel.app`; current switches are
+`TRANSCRIPTION_PILOT_ENABLED=true` and
+`TRANSCRIPTION_SUBMISSIONS_ENABLED=false`. Deployment
+`dpl_EtKyWuWqTHXuXGQNUGUhTQGFrBhY` from `dffe18ba9` is the current READY
+deployment and has one owner-authorized ready job (version 26). Its transcript
+remains available; the input Blob is absent and provider API deletion was
+verified, without an independent remote byte-erasure claim. The 40,809,588-byte upload is below
+the 50 MiB cap and does not prove maximum-size handling. Signed-in SSO and
+owner-scoped review were verified. The existing pilot alias remains on the
+prior shared project; do not move it or enable new submissions without a
+separate gate.
 
-The owner-authorized dedicated project `wmkf-transcription-pilot-isolated`
-(`prj_v2aETCFqGBeqMshR7xoMpTcP9K2e`) has production origin
-`https://wmkf-transcription-pilot-isolated.vercel.app`, source binding
-`7edc71975`, and Vercel protection `all_except_custom_domains`. Twenty
-allowlisted Production environment-variable names are configured, with both
-transcription flags false. READY deployment `dpl_FybqjEfKVRfbqNggHTJNx6Km1PLh`
-passed all 16 preflight checks, empty recovery and cleanup (`incomplete=false`),
-route-isolation checks, and synthetic Workflow run
-`wrun_41M3WN29450GQ4ZRP95Q43C50F` (retry/sleep/media accepted; 16,863-byte AAC,
-3.065 seconds). The `transcription_jobs` table and
-`transcription_workflow_dispatches` outbox each have zero rows. Remote cron
-registry lists exactly the hourly recovery and daily cleanup schedules; manual
-invocations completed HTTP 200 and logs matched both routes, but actual
-timer-triggered delivery is not yet observed. No hosted provider job, hosted
-real-audio upload, or AssemblyAI callback was exercised. The owner separately
-authorized one paid non-sensitive real-audio quality test using
-`universal-3-5-pro`; the owner accepted its quality. This is not hosted-job or
-callback proof. Staff sign-in testing against the new origin is authorized but
-has not yet been performed; adding a Microsoft callback URI requires separate
-authorization.
-Do not move the existing alias or enable either flag. Account privacy guarantees,
-callback delivery, application-job recovery, and 50 MiB Function behavior remain
-unverified.
+Source commit `6472d92d1` adds speaker-name editing and minute-grouped
+transcript display; current READY deployment `dpl_EtKyWuWqTHXuXGQNUGUhTQGFrBhY`
+from `dffe18ba9` is live at the dedicated default origin. Hosted browser review showed six detected
+speakers; a temporary name survived save/reload and appeared in the TXT/VTT
+downloads. TXT had minute headings without ranges; VTT retained precise cues.
+The temporary name was cleared, with no new audio or provider request. Migration
+062 has been applied exactly once to the isolated Neon database. Read-only
+readback verified one applied/58 skipped/59 total migrations and the
+`speaker_names` JSONB NOT NULL column, `{}` default, and object/65,536-byte
+constraint. After the hosted label save/reset, the existing job remained ready
+at version 26 with `{}` and its expiry unchanged. Migrations 060–061 and 062 are verified only in isolated
+`neondb`; no shared database was changed.
+
+Earlier disabled Preview deployment `dpl_3pBYPpEuVS9pjJCKRPt2cNuyZyx6` at
+commit `d8bb73326` passed its 13-check readiness, empty recovery, and
+provider-free synthetic Workflow canary. On the dedicated project, the prior
+deployment `dpl_FybqjEfKVRfbqNggHTJNx6Km1PLh` passed 16 readiness checks,
+zero-work recovery/cleanup (`incomplete=false`), route isolation, and synthetic
+Workflow retry/sleep/media. Exactly two cron schedules are registered; manual
+invocations completed HTTP 200 and logs matched both routes, but scheduled
+timer delivery remains unobserved. One owner-authorized real-audio hosted job
+and provider API deletion were verified; manual recovery from a cancelled
+Workflow run to a new run succeeded, while automatic terminal-run clock
+delivery, callback delivery, maximum-size handling, and confidential use remain
+unverified. Staff sign-in testing is authorized and SSO was confirmed; adding a
+Microsoft callback URI still requires authorization. Do not move the existing
+alias or enable new submissions.
 
 ### Dedicated project and deployment status — 2026-10-01
 
@@ -75,11 +86,12 @@ sign-in or callback delivery.
 
 The contract review covered caller/query/method allowlists, identity/auth
 fall-throughs, existing Preview preflight shape, and preserved per-route
-authorization. No new persistence or async job transitions were introduced.
-The bounded changed-fact documentation pass distinguishes earlier `d8bb73326`
-Preview receipts, the current dedicated hosted checks, and the separately
-authorized real-audio quality test. Actual timer delivery, staff sign-in,
-callback delivery, and monitored failure/missed-run behavior remain open; the
+authorization. Migration 062 adds only the bounded `speaker_names` overlay;
+it does not alter canonical transcript content or job transitions. The bounded
+changed-fact documentation pass distinguishes earlier `d8bb73326` Preview
+receipts, current dedicated hosted checks, and the separately authorized
+real-audio job. Actual timer delivery, callback delivery, monitored
+failure/missed-run behavior, and maximum-size processing remain open; the
 current checks are not enablement approval.
 
 `vercel.transcription-pilot.json` is a separate manifest; root `vercel.json`
@@ -100,15 +112,15 @@ only the committed manifest; it does not inspect Vercel settings or a package.
 It rejects unrelated configuration/environment names and `.env*` artifact paths.
 The checker is not a deployment operator or remote readiness certificate.
 
-**[REMAINING HOSTED GATES; FLAGS STAY FALSE]** Reuse only the dedicated
-Neon/private Blob; both switches remain literal `false`. The new deployment
-passed protected readiness, zero-work recovery/cleanup, isolation, synthetic
-Workflow, and manual cron invocation checks. Manual invocations are not proof of
+**[REMAINING HOSTED GATES; SUBMISSIONS STAY DISABLED]** Reuse only the dedicated
+Neon/private Blob; keep `TRANSCRIPTION_PILOT_ENABLED=true` for authorized
+review and `TRANSCRIPTION_SUBMISSIONS_ENABLED=false`. The existing hosted
+deployment passed protected readiness, zero-work recovery/cleanup, isolation,
+synthetic Workflow, and manual cron invocation checks. Manual invocations are not proof of
 clock-driven delivery: observe scheduled recovery and cleanup executions, and
 monitor missed runs, failures, and HTTP-200-with-`incomplete`. Do not weaken
-protection to obtain callbacks. New-origin staff sign-in testing is authorized;
-verify the active superuser under the approved procedure. Adding a new Azure
-callback URI requires separate authorization.
+protection to obtain callbacks. Staff sign-in and owner-scoped review are
+verified; adding a new Azure callback URI requires separate authorization.
 Keep the existing alias target and do not enable either flag. A healthy daily
 schedule remains no unconditional 24-hour physical-erasure guarantee.
 

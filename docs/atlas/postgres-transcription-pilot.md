@@ -2,8 +2,8 @@
 title: "Atlas: AssemblyAI transcription pilot (Postgres)"
 domain: postgres
 kind: state-page
-status: isolated-project-ready-disabled-synthetic-verification-passed
-summary: "Dedicated Production deployment passed 16 readiness checks and synthetic Workflow verification with both flags false. Hourly recovery and daily cleanup are registered and manual native invocations passed; timed delivery, hosted provider jobs, large files and new-origin staff sign-in remain unverified."
+status: dedicated-project-review-enabled-one-ready-job-speaker-label-live
+summary: "Dedicated Production is in review-only mode (pilot on, new submissions off). One authorized hosted job is ready with transcript retained, input Blob absent, and provider API deletion verified. Migration 062 is applied in isolated Neon and the speaker-label UI is live; hosted save/reload and TXT/VTT were verified. Timer delivery and maximum-size processing remain unverified."
 canonical: true
 cataloged: 2026-10-01
 owner: product-engineering
@@ -20,25 +20,29 @@ related:
 
 ## Current status
 
-**[VERIFIED via Vercel configuration and hosted probes, 2026-10-01]** Dedicated
-project `wmkf-transcription-pilot-isolated` (`prj_v2aETCFqGBeqMshR7xoMpTcP9K2e`)
-has READY Production deployment `dpl_FybqjEfKVRfbqNggHTJNx6Km1PLh` from source
-`7edc71975`, with both flags false. The source registry pins its project ID and
-`https://wmkf-transcription-pilot-isolated.vercel.app` auth origin. All 16 readiness
-checks passed before and after synthetic verification; transcription jobs and
-dispatch rows remain zero. Empty recovery/cleanup returned HTTP 200, zero counts
-and `incomplete:false`. Synthetic Workflow `wrun_41M3WN29450GQ4ZRP95Q43C50F`
-completed retry attempt 2, ten-second sleep/resume and 16,863-byte AAC inspection.
-Exactly hourly recovery and daily cleanup are registered; manual native cron
-invocations returned HTTP 200, but scheduled-time delivery remains unobserved.
-No schema migrations were rerun for this deployment. The old pilot alias remains
-on its previous Preview deployment. See the runbook for remaining enablement gates.
+**[VERIFIED via Vercel configuration, owner-scoped browser review, and read-only
+database check, 2026-10-01]** Dedicated project
+`wmkf-transcription-pilot-isolated` (`prj_v2aETCFqGBeqMshR7xoMpTcP9K2e`) has
+READY Production deployment `dpl_EtKyWuWqTHXuXGQNUGUhTQGFrBhY` from source
+`dffe18ba9` at the dedicated default origin. Current
+switches are pilot enabled and new submissions disabled. Signed-in SSO and
+owner-scoped transcript review passed. The isolated database contains one ready
+job (version 26); its transcript remains available, its input Blob is absent,
+and the provider API deletion was verified; this does not claim independent
+physical erasure of remote bytes. The accepted 40,809,588-byte upload is below
+the 50 MiB cap, so maximum-size behavior remains unverified. The earlier
+deployment `dpl_FybqjEfKVRfbqNggHTJNx6Km1PLh` passed all 16 preflight checks,
+zero-work recovery/cleanup, and route isolation; its synthetic Workflow probe
+completed retry, sleep/resume, and AAC inspection. Exactly hourly recovery and
+daily cleanup are registered; manual native invocations were logged, but
+scheduled-time delivery remains unobserved. The existing pilot alias remains on
+the prior shared project. See the runbook for remaining gates.
 
-**[VERIFIED 2026-10-01 via read-only migration verification and deployment/runtime probes]** The job table definition is `lib/db/migrations/060_transcription_jobs.sql`; migrations 060–061 remain provisional because 058/059 are reserved for other work. Both migrations are applied only to the isolated Neon database, not Production or the shared Preview database; no shared-database probe was performed for this entry. Root's independent read-only `--verify-only` receipt confirmed target `neondb`, transaction read-only, zero transcription jobs, on-disk migration tracker match, no pending migration files, migration 061 recorded, and the `transcription_workflow_dispatches` table/schema verified. It was applied exactly once through the canonical existing-database runner; after the initial checker encountered PostgreSQL NOT NULL catalog entries (`contype='n'`), root corrected the read-only verifier to exclude those entries (`contype<>'n'`) and reran verify-only, not the migration. The isolated `neondb` public schema now has 58 migration records, one active linked profile, one superuser role, and zero transcription jobs. The nine pre-existing `neon_auth` relations remain provider-owned; initialization did not alter that schema. The fresh-install repair's executed-SQL provenance, canonical rerun, atomic rollback, and populated-database refusal were separately tested. Current deployed source includes migration 061.
+**[VERIFIED 2026-10-01 via read-only migration verification and deployment/runtime probes]** The job table definition is `lib/db/migrations/060_transcription_jobs.sql`; migrations 060–062 were applied only to isolated Neon, not a shared database. Root's independent read-only readback after applying 062 confirmed 59 tracker entries (58 skipped, one applied) and the `speaker_names` JSONB NOT NULL/default `{}` plus object/65,536-byte CHECK. After hosted label save/reset, the existing job remained ready at version 26 with `{}` and unchanged expiry. The isolated public schema has one active linked profile and one superuser role; the nine pre-existing `neon_auth` relations remain provider-owned. The fresh-install repair's executed-SQL provenance, canonical rerun, atomic rollback, and populated-database refusal were separately tested. No shared database was read or changed.
 
-**[VERIFIED 2026-10-01 via Vercel metadata and authenticated hosted probes]** Disabled Preview `dpl_3pBYPpEuVS9pjJCKRPt2cNuyZyx6`, source `d8bb7332654569343e5e1e8985f51a45aae6b25c`, is READY at `https://wmkfresearchapps-ph2tdnosx-justin-gallivans-projects.vercel.app`; the pilot alias `wmkf-transcription-pilot.vercel.app` now points to it. All 13 read-only preflight checks passed before and after the canary and through the alias, with zero jobs and zero dispatch rows. Empty recovery returned HTTP 200 with all counts zero. Synthetic run `wrun_41M3WH0N290GNF967JQG1V18WB` completed: retry resumed on attempt 2, a ten-second sleep resumed, and the 16,863-byte AAC fixture parsed to 3.065034 seconds. The deployed flow uses Node 22, an 800-second timeout and 2,048 MiB memory; an ordinary flow GET returned 404. This proves the bounded SDK retry/sleep and synthetic parser path, not application-job terminal recovery, maximum-size processing, provider behavior or exhaustive queue-auth enforcement.
+**[VERIFIED 2026-10-01 via Vercel metadata and authenticated hosted probes]** Disabled Preview `dpl_3pBYPpEuVS9pjJCKRPt2cNuyZyx6`, source `d8bb7332654569343e5e1e8985f51a45aae6b25c`, is READY at `https://wmkfresearchapps-ph2tdnosx-justin-gallivans-projects.vercel.app`; the pilot alias `wmkf-transcription-pilot.vercel.app` now points to it. All 13 read-only preflight checks passed before and after the canary and through the alias, with zero jobs and zero dispatch rows. Empty recovery returned HTTP 200 with all counts zero. Synthetic run `wrun_41M3WH0N290GNF967JQG1V18WB` completed: retry resumed on attempt 2, a ten-second sleep resumed, and the 16,863-byte AAC fixture parsed to 3.065034 seconds. The deployed flow uses Node 22, an 800-second timeout and 2,048 MiB memory; an ordinary flow GET returned 404. This proves the bounded SDK retry/sleep and synthetic parser path, not automatic scheduled recovery, maximum-size processing, provider behavior or exhaustive queue-auth enforcement.
 
-The deployed source uses job-scoped workflows with bounded active-job checks, 60-second retries (up to 1,440), a 200-cycle handoff, terminal-status-only hourly recovery, and daily physical cleanup; logical expiry blocks reads immediately. The schedules run only in the dedicated Production project, not the old Preview. One separately authorized local real-audio AssemblyAI quality test completed and the owner accepted its quality. No hosted provider job/callback, new-origin staff sign-in, hosted Blob roundtrip or 50 MiB runtime test was performed. The local private-Blob synthetic roundtrip remains local evidence only. New-origin Microsoft callback addition awaits authorization; monitoring remains an enablement gate. Hosting protection is `all_except_custom_domains`: anonymous immutable deployment access redirects to Vercel, while the default origin relies on app authentication (pilot page 307, unauthenticated cleanup 401, unrelated route 404). Existing shared-project configuration and the old alias were unchanged.
+The deployed source uses job-scoped workflows with bounded active-job checks, 60-second retries (up to 1,440), a 200-cycle handoff, terminal-status-only hourly recovery, and daily physical cleanup; logical expiry blocks reads immediately. The schedules run only in dedicated Production; manual native invocations were verified, but scheduled-clock delivery was not. One owner-authorized hosted job completed using a 40,809,588-byte non-sensitive recording; the ready transcript is retained, input Blob is absent, and provider API deletion was verified (without an independent remote byte-erasure claim). Staff SSO is confirmed. This job does not prove the 50 MiB maximum, callback delivery, automatic timer delivery, or confidential-use approval. Migration 062 and the speaker-name feature are live in deployment `dpl_EtKyWuWqTHXuXGQNUGUhTQGFrBhY` from `dffe18ba9`. The six-speaker hosted review verified save/reload and labeled TXT/VTT downloads; TXT uses minute headings without ranges, and VTT preserves precise timing. The temporary name was cleared without another provider request; the job remains ready at version 26 with `speaker_names={}`. Names remain human-authored, validated against detected IDs, excluded from aggregate evaluation CSV, and applied to TXT/VTT only after save. Canonical transcript content is unchanged; the overlay appears only in the owner projection and is redacted when access is blocked/receipt expires. A manually cancelled prior Workflow run was recovered into a new run; automatic terminal-run clock delivery remains unverified. Hosting protection is `all_except_custom_domains`; do not claim every origin/path is Vercel-protected. The existing old alias remains on the prior shared project.
 
 ## Intended state ownership
 
@@ -58,12 +62,14 @@ dispatch record are atomic. A retryable start-delivery failure returns the
 already-queued owner DTO with `transcription_dispatch_pending`; UI retry
 redelivers the same job without another browser upload. Existing job leases and
 persisted submission-intent fences prevent blind provider resubmission.
-Migration 061 is applied/read back only in the isolated Neon database. Branch source retries active Workflow steps
-after 60 seconds (up to 1,440 retries), hands off after 200 processing cycles,
-and has an hourly recovery path that queries SDK status and CAS-recovers only
-terminal `completed`, `failed`, or `cancelled` runs. Hosted application-job terminal recovery and
-actual timed delivery on the dedicated project remain unverified. This is an enablement gate, distinct
-from the unchanged daily physical-deletion cadence.
+Migrations 061 and 062 are applied/read back only in the isolated Neon database.
+Branch source retries active Workflow steps after 60 seconds (up to 1,440
+retries), hands off after 200 processing cycles, and has an hourly recovery path
+that queries SDK status and CAS-recovers only terminal `completed`, `failed`, or
+`cancelled` runs. Manual recovery from a cancelled prior Workflow run to a new
+run was verified; automatic terminal-run scheduled delivery remains unverified.
+This is an enablement gate, distinct from the unchanged daily physical-deletion
+cadence.
 
 The store implements owner-scoped idempotent creation, a global active-slot
 partial unique index, lease/version-fenced worker writes, per-attempt callback
@@ -89,18 +95,31 @@ does not prove late writes impossible. The owner accepts this uncertainty for
 non-sensitive testing; verified closure still gates tombstone removal and
 confidential-use approval.
 
+Migration 062 source adds a sparse Postgres `speaker_names` JSONB overlay for
+human-authored display labels keyed by detected provider speaker IDs. It does
+not rewrite transcript JSON/Blob content. The owner-scoped DTO exposes the
+overlay only while content access is allowed and the evaluation receipt is
+live; aggregate evaluation CSV omits names. Server-side TXT/VTT formatters use
+saved names, with TXT/minute-grouped readable text headed `0:00`, `1:00`, etc.
+and VTT retaining original utterance timing. Migration 062 is applied in
+isolated Neon; the PATCH/UI consumer is live in deployment
+`dpl_EtKyWuWqTHXuXGQNUGUhTQGFrBhY` and its save/download flow was smoke-tested
+on the live one-job transcript.
+
 ## Source paths and evidence
 
 - Schema and bootstrap: `lib/db/migrations/060_transcription_jobs.sql`,
   `lib/db/migrations/061_transcription_workflow_dispatches.sql`,
+  `lib/db/migrations/062_transcription_speaker_names.sql` (applied/read back in isolated Neon),
   `lib/db/migrations-manifest.json`, and `scripts/setup-database.js`.
-- Persistence/model: `lib/services/transcription-pilot/store.js` and
-  `lib/services/transcription-pilot/model.js`; the cron readiness-only mode is
+- Persistence/model/formatters: `lib/services/transcription-pilot/store.js`,
+  `model.js`, and `transcript-format.js`; the cron readiness-only mode is
   implemented in `lib/services/transcription-pilot/preflight.js`.
 - Consumers: `lib/services/transcription-pilot/runtime.js` and `worker.js`,
   `lib/services/transcription-pilot/workflow-dispatch.js`, `workflow.js`,
   and the provider-free `workflow-probe.js`,
-  the Admin routes under `pages/api/admin/transcription-pilot/`, the AssemblyAI
+  the Admin routes under `pages/api/admin/transcription-pilot/` (including
+  live versioned speaker-name PATCH), the AssemblyAI
   callback and scheduled drain routes, and `/admin/transcription-pilot`.
 - Tests: `tests/unit/transcription-pilot-store.test.js` and
   `tests/integration/transcription-pilot.pg.test.js`.
