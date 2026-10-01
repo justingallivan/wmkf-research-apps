@@ -19,7 +19,7 @@ related:
 
 ## Current status
 
-**[SOURCE-BUILT IN THIS BRANCH; NOT DEPLOYED OR PROVISIONED]** The table
+**[SOURCE-BUILT IN THIS BRANCH; SCHEMA UNAPPLIED; NOT DEPLOYED]** The table
 definition is `lib/db/migrations/060_transcription_jobs.sql` and is registered
 in the repository migration manifest and fresh-install shape. Migration 060 is
 provisional. Per owner-confirmed reservations, 058 and 059 remain assigned to
@@ -27,6 +27,14 @@ other work. This implementation has not applied migration 060 to Production,
 Preview, or another shared database; no shared-database probe was performed
 for this entry. The integration suite applies the migration only in a unique
 local scratch schema.
+
+**[VERIFIED 2026-09-30 via Vercel metadata]** Unconnected test resources now
+exist: Neon `store_TSn9yHJW1xL0p4h0` and private Blob
+`store_Qri02A1kj96tQYR9`. Neither is bound to the app. This is resource
+provisioning, not schema or database-content verification. Existing shared
+Production/Preview database configuration is unchanged. Fresh bootstrap/tracker
+consistency and an approved test identity block initialization/deployment; see
+the runbook checkpoint for evidence and boundaries.
 
 ## Intended state ownership
 
@@ -58,7 +66,9 @@ Receipt expiry also redacts evaluation/model/size/duration metadata at read time
 identifiers required for unresolved cleanup. `upload_valid_until` is reserved
 before token minting; issued-capability input targets remain tracked/reaped
 until a verified remote completion protocol can close them. Token expiry alone
-does not prove late writes impossible. This is an enablement gate.
+does not prove late writes impossible. The owner accepts this uncertainty for
+non-sensitive testing; verified closure still gates tombstone removal and
+confidential-use approval.
 
 ## Source paths and evidence
 

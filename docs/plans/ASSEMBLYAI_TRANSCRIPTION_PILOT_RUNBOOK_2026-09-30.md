@@ -3,7 +3,7 @@ title: "AssemblyAI transcription pilot pre-enable runbook"
 domain: transcription
 kind: operations-runbook
 status: source-built-not-deployed
-summary: "Pre-apply and pre-enable checks for the source-built AssemblyAI pilot; no shared database, deployment, account, or provider state is asserted."
+summary: "Source-built pilot with unconnected test resources provisioned; database initialization, branch configuration, deployment and provider tests remain pending."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -25,10 +25,37 @@ cron, callback reachability, account privacy settings, or shared schema are
 configured. This runbook documents the gate; it does not authorize a database
 apply, deployment, paid provider call, or pilot use.
 
+### Resource-only provisioning checkpoint — 2026-09-30
+
+**[VERIFIED via Vercel resource metadata; root readback and Sol review]** Owner
+authorized an isolated Preview and new Neon/private Blob resources after possible
+charges were disclosed. Created in team `justin-gallivans-projects`:
+
+- Neon `wmkf-transcription-pilot`, `store_TSn9yHJW1xL0p4h0`: available,
+  no connected projects. Database contents and pricing/tier have not been
+  inspected; no SQL connection or schema initialization was performed.
+- Blob `wmkf-transcription-pilot`, `store_Qri02A1kj96tQYR9`: private,
+  `iad1`, zero objects/bytes, no connected projects.
+
+No app environment binding, deployment, migration, upload, or AssemblyAI call
+was made. Live environment metadata shows the existing `DATABASE_URL`,
+`POSTGRES_URL`, and `NEON_PROJECT_ID` records target Production, Preview and
+Development together; those shared settings were not changed. The existing
+Preview upload token's store mapping remains unverified. Future overrides must
+be restricted to Preview branch `codex/transcription-pilot`.
+
+**Initialization blocker:** fresh setup does not establish `schema_migrations`
+and omits at least migrations 015/017's BILL tables. Do not stamp the whole
+manifest or run the existing-database runner blindly after setup. A bounded
+fresh-install reconciliation needs separate scope approval before initialization
+or deployment. Normal Microsoft authentication also needs an explicitly chosen
+test identity and an isolated active profile/superuser role; do not use an auth
+bypass or copy Production user data.
+
 **Disabled-by-default source behavior:** `TRANSCRIPTION_PILOT_ENABLED` and
 `TRANSCRIPTION_SUBMISSIONS_ENABLED` each require the literal string `true`.
-Unset, empty, or any other value is disabled. No Production/Preview environment
-was inspected. Before a separately authorized pilot, leave both flags unset or
+Unset, empty, or any other value is disabled. Preview metadata inspection found
+no pilot flag entries; no deployment was made. Before an enabled pilot, leave both flags unset or
 non-`true`; verify the actual target environment through its approved
 configuration surface before asserting that it is off.
 
@@ -93,18 +120,20 @@ values in chat, source, test fixtures, or this document. The code consumes:
   resolved callback URL in the approved environment without exposing secrets.
 
 Required key names and code-side length/guard behavior above were verified in
-source. No remote secret presence, value, scope, or rotation state was
-inspected. Refer to `docs/CREDENTIALS_RUNBOOK.md` for the authoritative
+source. Selected Vercel environment-name/target metadata was inspected, not
+secret values, effective resource access or rotation state. Refer to `docs/CREDENTIALS_RUNBOOK.md` for the authoritative
 secret-entry process; this runbook does not replace its registry.
 
 ## Privacy, vendor, and runtime gates
 
-- **Account privacy:** model-training opt-out, zero-data-retention, project/key
-  scope, subprocessors, asynchronous retention, upload-only cleanup, and
-  deletion semantics are not verified for the account. Owner reports in the
-  plan are not account evidence. Confirm the exact project/key configuration
-  and applicable contractual coverage before enabling. A non-sensitive
-  acknowledgement is a user attestation, not content classification.
+- **Account privacy:** the owner's 2026-09-30 Data Controls screenshot shows
+  model-improvement opt-out on and asynchronous TTL set to **one day**, not
+  zero retention. Project/key coverage, deletion lag, upload-only cleanup and
+  contractual guarantees remain unverified. The owner accepts these uncertainties
+  for explicitly non-sensitive testing without sending vendor support emails;
+  that decision does not approve confidential recordings or paid test calls.
+  Subprocessor acceptance is owner-reported. A non-sensitive acknowledgement
+  is a user attestation, not content classification.
 - **Provider behavior:** no live AssemblyAI request, callback fixture against
   the account, retrieval/deletion probe, TTL probe, or paid usage test has been
   run. Vendor documentation review in the plan is not proof of this account's
@@ -158,8 +187,9 @@ upload cannot commit later. Input cleanup targets for issued capabilities are
 therefore retained and repeatedly reaped after observed deletion;
 `local_cleanup_completed_at` remains unset. This is minimal cleanup tracking,
 not a promise of final erasure. Evaluation metadata expires independently.
-Before enabling, establish and verify a completion/revocation protocol or an
-enforced vendor completion bound, then review the tombstone-closing change.
+The owner accepts this unresolved risk for the non-sensitive pilot. Establish
+and verify a completion/revocation protocol or an enforced vendor completion
+bound before any tombstone-closing change or confidential-use approval.
 Do not manually remove targets or substitute an assumed grace period.
 
 Conflicting provider IDs retain the uncertain slot after DELETE. Automatic
@@ -199,9 +229,9 @@ overwrite, and read back/hash-verified before ready.
 Do not enable the pilot if the migration tracker/physical schema is ambiguous,
 either flag is literal `true` before approval, any required secret is missing
 or mis-scoped, the account privacy/retention terms are unresolved for the
-selected recordings, route/security gates are incomplete, the deployed Node
-runtime cannot safely process the bounded upload, the direct-upload completion
-protocol is unverified, or callback/cron reachability
+selected recordings beyond the owner's explicit non-sensitive risk acceptance,
+route/security gates are incomplete, the deployed Node runtime cannot safely
+process the bounded upload, or callback/cron reachability
 would require weakening a security control. Stop on any uncertain provider
 acceptance; use reconcile or explicitly acknowledged abandon, never a blind
 resubmission.
