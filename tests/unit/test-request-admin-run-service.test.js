@@ -255,7 +255,9 @@ describe('target and ledger selection', () => {
   });
 
   test('a sandbox target with no sandbox variable is refused before the registry fallback to the production variable', async () => {
-    const h = harness({ deployment: 'preview', env: { TEST_REQUEST_SANDBOX_LEDGER_URL: undefined, TEST_REQUEST_LEDGER_URL: PROD_LEDGER } });
+    // The fallback variable names the sandbox database, so the registry alone would ACCEPT it
+    // for a sandbox target; only the service's own guard refuses (discriminating fixture).
+    const h = harness({ deployment: 'preview', env: { TEST_REQUEST_SANDBOX_LEDGER_URL: undefined, TEST_REQUEST_LEDGER_URL: SANDBOX_LEDGER } });
     expect(await code(h.service.listRuns({ profileId: PROFILE }))).toBe('factory_ledger_unconfigured');
     expect(h.dbUrls).toHaveLength(0);
   });
