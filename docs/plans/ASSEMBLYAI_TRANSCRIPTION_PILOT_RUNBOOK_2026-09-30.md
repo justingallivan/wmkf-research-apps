@@ -118,15 +118,15 @@ This target is now populated: do not rerun fresh initialization.
 Sol approval, root applied migration 061 exactly once through the canonical
 `node scripts/apply-migrations.js` path. The separate read-only verifier then
 confirmed target database `neondb`, a read-only transaction, zero transcription
-jobs, migration tracker matching all on-disk migration files, no pending files,
-migration 061 recorded, `transcription_workflow_dispatches` present, and its
-physical schema matching the migration. No shared Preview or Production
+jobs, 58 migration records matching all on-disk migration files, no pending
+files, migration 061 recorded, `transcription_workflow_dispatches` present, and
+its physical schema matching the migration. No shared Preview or Production
 database was read or changed.
 
 The first readback attempt was rejected because Neon exposed PostgreSQL
-`pg_constraint` NOT NULL catalog entries (`contype='n'`) to a checker that
-expected only user constraints. Root narrowed that checker to CHECK constraints
-(`contype='c'`) and reran only `--verify-only`; migration 061 was not reapplied.
+`pg_constraint` NOT NULL catalog entries (`contype='n'`) to the checker. Root
+updated the verifier to exclude those entries (`contype<>'n'`) and reran only
+`--verify-only`; migration 061 was not reapplied.
 The successful receipt, not the initial failed check, is the current readback
 evidence. This proves isolated schema state only, not deployed Workflow
 execution or Preview scheduling.

@@ -27,6 +27,21 @@ function syntheticMp3Frames(count, {
 }
 
 describe('transcription media inspection', () => {
+  test('traces parser transitive dependencies on every worker execution route', () => {
+    const nextConfig = fs.readFileSync(path.join(process.cwd(), 'next.config.js'), 'utf8');
+    const routes = [
+      '/api/admin/transcription-pilot/jobs/*',
+      '/api/cron/drain-transcriptions',
+      '/.well-known/workflow/v1/flow',
+    ];
+    for (const route of routes) {
+      const escapedRoute = route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const match = nextConfig.match(new RegExp(`'${escapedRoute}'\\s*:\\s*\\[([\\s\\S]*?)\\]`));
+      expect(match?.[1]).toContain("'./node_modules/ms/**/*'");
+      expect(match?.[1]).toContain("'./node_modules/ieee754/**/*'");
+    }
+  });
+
   test('parses the local synthetic M4A and reports only safe media facts', async () => {
     const result = await inspectAudioBuffer(M4A_FIXTURE);
     expect(result).toMatchObject({
