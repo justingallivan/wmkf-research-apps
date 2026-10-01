@@ -1,4 +1,5 @@
-import { pruneCandidateForRoster } from '../../shared/components/reviewers/reviewer-search-logic';
+import { pruneCandidateForRoster as compatibilityPruneCandidateForRoster } from '../../shared/components/reviewers/reviewer-search-logic';
+import { pruneCandidateForRoster } from '../../shared/utils/reviewer-roster-projection';
 
 function enrichedCandidate(orcid) {
   return {
@@ -67,6 +68,10 @@ function enrichedCandidate(orcid) {
 }
 
 describe('reviewer roster projection serialized contract', () => {
+  test('the client compatibility export is the canonical shared projection', () => {
+    expect(compatibilityPruneCandidateForRoster).toBe(pruneCandidateForRoster);
+  });
+
   test('preserves the pre-extraction full DTO, false-over-true gates, raw-enrichment exclusion, reload shape, and same-name identities', () => {
     const inputs = [
       enrichedCandidate('0000-0001-2345-6789'),

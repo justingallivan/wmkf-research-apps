@@ -331,7 +331,7 @@ describe('institution consistency checker: consumer scope (behavioral, value-bas
       jest.doMock('../../lib/services/reviewer-request-context', () => ({
         loadReviewerRequestContext: jest.fn(),
       }));
-      jest.doMock('../../shared/components/reviewers/reviewer-search-logic', () => ({
+      jest.doMock('../../shared/utils/reviewer-roster-projection', () => ({
         APPLICANT_ENRICHMENT_CACHE_VERSION: 4,
         pruneCandidateForRoster: jest.fn((c) => c),
       }));

@@ -60,7 +60,7 @@ jest.mock('../../lib/services/reviewer-time-budget', () => ({
 jest.mock('../../lib/services/reviewer-request-context', () => ({
   loadReviewerRequestContext: jest.fn(),
 }));
-jest.mock('../../shared/components/reviewers/reviewer-search-logic', () => ({
+jest.mock('../../shared/utils/reviewer-roster-projection', () => ({
   APPLICANT_ENRICHMENT_CACHE_VERSION: 4, pruneCandidateForRoster: jest.fn(),
 }));
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
