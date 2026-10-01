@@ -68,6 +68,8 @@ consume a `sources.pubpeer` shape (`hasConcerns`, `summary`, `resultCount`, `sea
 - The current Dismiss handler is explicitly a placeholder: it logs and alerts but
   does not call the dismissal API. `screenApplicants` also does not read prior
   dismissals, so future-screen suppression is not implemented.
+- Strict (Workbench) SerpAPI empty-result rule (2026-10-01): a search counts as a complete empty result when `search_metadata.status` is `Success`, no results array is present, and **either** `search_information.{organic,news}_results_state === 'Fully empty'` **or** the known "hasn't returned any results" message is present. Anything else fails closed, including an error that arrives together with results. Live zero-result responses are recorded in `tests/fixtures/serpapi/zero-result-2026-10-01.json`. This closes PR #366 review finding 6.
+- Owner decision (2026-10-01): any user holding both `integrity-screener` and `reviewers` may start a new screen on an already-approved request, which returns it to needs-review. This is intended, not a gap.
 - PDF, JSON, and Markdown exports cover the current run and its source-specific
   summaries; they do not contain durable dismissal records.
 
