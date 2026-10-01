@@ -216,7 +216,7 @@ function AudioUpload({
 
 function JobList({ jobs, selectedId, onSelect, loading, error, onRefresh }) {
   return (
-    <section aria-labelledby="transcription-jobs-title" className="rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
+    <section aria-labelledby="transcription-jobs-title" className="min-w-0 rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 id="transcription-jobs-title" className="text-lg font-semibold text-gray-950">Your recordings</h2>
@@ -1154,9 +1154,9 @@ export default function TranscriptionPilotPage() {
               message={uploadMessage}
             />
             {!submissionsEnabled && <InfoNotice>New provider submissions are disabled. You can continue reviewing existing results and resolving attention items.</InfoNotice>}
-            <div className="grid gap-6 xl:grid-cols-[minmax(18rem,0.8fr)_minmax(0,1.5fr)]">
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(18rem,0.8fr)_minmax(0,1.5fr)]">
               <JobList jobs={visibleJobs} selectedId={selectedId} onSelect={setSelectedId} loading={listLoading} error={listError} onRefresh={refresh} />
-              <div className="space-y-4">
+              <div className="min-w-0 space-y-4">
                 {detailLoading && !activeJob && <div className="rounded-lg border border-gray-200 bg-white px-4 py-5 text-sm text-gray-700" role="status">Loading recording…</div>}
                 {detailError && <ErrorNotice>{detailError}</ErrorNotice>}
                 <JobDetail

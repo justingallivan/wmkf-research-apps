@@ -187,7 +187,8 @@ describeIf('transcription pilot store (isolated local Postgres proof)', () => {
     const updated = await store.updateSpeakerNames({ jobId: queued.id, ownerProfileId: ownerId,
       expectedVersion: ready.version, speakerNames: names });
     expect(updated.speaker_names).toEqual(names);
-    const size = await pool.query('SELECT pg_column_size(speaker_names)::int AS size FROM transcription_jobs WHERE id=$1', [queued.id]);
+    // Measure before TOAST compression; stored repetitive fixtures can be much smaller.
+    const size = await pool.query('SELECT pg_column_size($1::jsonb)::int AS size', [JSON.stringify(names)]);
     expect(size.rows[0].size).toBe(56008);
 
     const cleaned = await store.requestCleanup({ jobId: queued.id, ownerProfileId: ownerId, expectedVersion: updated.version });
