@@ -2,8 +2,8 @@
 title: "AssemblyAI transcription pilot pre-enable runbook"
 domain: transcription
 kind: operations-runbook
-status: isolated-061-verified-source-ahead-disabled-preview
-summary: "Migration 061 and its outbox schema are verified only in isolated Neon; newer Workflow source remains undeployed and Preview switches remain false. Hosted workflow/recovery, schedule, staff sign-in and provider validation remain release gates."
+status: isolated-061-verified-disabled-preview-canary-passed
+summary: "Current source is READY in disabled Preview; the 13-check preflight, empty recovery, and one provider-free synthetic Workflow canary passed. The pilot alias targets that deployment. No AssemblyAI or real-audio test occurred; no recurring Preview schedule is active."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -16,27 +16,31 @@ related:
 
 ## Release status
 
-**[SOURCE-BUILT; DISABLED PREVIEW PREFLIGHT PASSED; PILOT NOT ENABLED]** The
+**[SOURCE-BUILT; DISABLED PREVIEW PREFLIGHT AND SYNTHETIC CANARY PASSED; PILOT NOT ENABLED]** The
 Admin page, API routes, callback, worker, provider/media/runtime services,
 model/store, migration 060, fresh-install registration, and tests are present
 in source. Migration 061 has also been applied once and physically verified
-only in isolated `neondb`; the newer Workflow source remains undeployed.
+only in isolated `neondb`. The current Workflow source is deployed to disabled
+Preview and has passed one bounded provider-free synthetic canary.
 Thirteen environment records are scoped to Preview branch
-`codex/transcription-pilot`; both transcription switches are false. The latest
-disabled Preview deployment passed read-only runtime preflight and an empty
-drain, but this does not verify real job processing or media runtime. An
+`codex/transcription-pilot`; both transcription switches are false. Current
+deployment `dpl_3pBYPpEuVS9pjJCKRPt2cNuyZyx6` passed all 13 read-only readiness
+checks, zero-job/zero-dispatch recovery, and a synthetic Workflow retry/sleep/
+media canary. This does not verify application job terminal recovery, real job
+processing, real audio, or 50 MiB Function behavior. The pilot alias now points
+to the same deployment and its preflight also passed all 13 checks with zero
+jobs/outbox rows. An
 earlier deployment returned `503 cron_secret_missing` before worker execution;
 its Git metadata was not sufficient evidence that branch-scoped values were
 applied, so runtime binding remained inconclusive. Migration 060 is
 applied only to the isolated Neon database. Refreshed staff sign-in, AssemblyAI
-callback delivery, ongoing schedule, real-job processing, deployed media
-runtime, and account privacy settings remain unverified. This
+callback delivery, ongoing schedule, real-job processing, maximum-size deployed media
+runtime, and account privacy guarantees remain unverified. This
 runbook documents release gates; the owner has explicitly authorized one
 provider-free synthetic Workflow test and isolated migration 061 with the
 Preview pilot disabled. This does not authorize AssemblyAI calls/uploads,
-pilot enablement, or other metered work. The current Workflow source revision
-has not been deployed, and the earlier runtime receipt does not verify its
-execution.
+pilot enablement, or other metered work. The current source's synthetic hosted
+receipt is recorded below. No recurring Preview hourly or daily schedule is activated.
 
 ### Isolated database checkpoint — 2026-10-01
 
@@ -138,7 +142,7 @@ Production hosts. The Launch plan is known but actual pricing remains
 unverified. Branch-only Vercel configuration and deployment are now recorded
 in the checkpoint below.
 
-### Disabled Preview environment and deployment checkpoint — 2026-10-01
+### Earlier disabled Preview environment and deployment checkpoint — 2026-10-01
 
 **[VERIFIED via Vercel environment metadata]** Thirteen
 records are scoped only to Preview branch `codex/transcription-pilot`:
@@ -155,7 +159,7 @@ No equality claim is made between remote secret values and local operator
 credentials. The separate local storage check below confirmed the dedicated
 Blob resource; these resources remain unconnected through Marketplace.
 
-**[VERIFIED READY; disabled runtime preflight and empty drain passed]**
+**[HISTORICAL VERIFIED READY; earlier disabled runtime preflight and empty drain passed]**
 Deployment `dpl_DHaVt8QHTzLWo7gr7M6FhVJR344S` targets Preview at
 `https://wmkfresearchapps-62z9wnj9y-justin-gallivans-projects.vercel.app`,
 source commit `78a3d5595e7045680f28eaf00bd0b462c53c73df`, branch
@@ -182,6 +186,44 @@ dedicated Microsoft callback is registered with prior redirect URIs preserved.
 Environment/deployment operations made no shared database setting/schema
 changes; the earlier sign-in screenshot's database target is unknown, and no
 shared-database mutation was established.
+
+### Current disabled Preview deployment and synthetic Workflow checkpoint — 2026-10-01
+
+**[VERIFIED via final deployment and authenticated protected probes]** Deployment
+`dpl_3pBYPpEuVS9pjJCKRPt2cNuyZyx6` runs commit
+`d8bb7332654569343e5e1e8985f51a45aae6b25c` at
+`https://wmkfresearchapps-ph2tdnosx-justin-gallivans-projects.vercel.app`.
+Protected preflight returned HTTP 200 with all 13 checks true, zero jobs, and
+zero dispatches. A protected empty recovery returned HTTP 200 with
+`checked/recovered/started/failed = 0` and `incomplete=false`.
+
+The provider-free canary completed as Workflow run
+`wrun_41M3WH0N290GNF967JQG1V18WB`: retry resumed on attempt 2, the 10-second
+sleep resumed, and the synthetic AAC fixture parsed (16,863 bytes,
+3.0650340136054424 seconds). Deployed flow metadata confirms Node 22.x,
+an 800-second Function timeout and 2,048 MiB memory. This verifies one synthetic Workflow path only; it
+does not test application-job terminal recovery or a real recording. No
+AssemblyAI call/upload, real audio, or 50 MiB deployed Function test occurred.
+
+Two earlier hosted canary runs failed with `audio_malformed`. Reproduction
+identified independent causes: missing `ms`/`ieee754` packages in the generated
+flow trace, and Turbopack's wrapper object spread dropping the raw
+`ArrayBuffer`. Dependency tracing was fixed in `0b734ab8b`; the buffer handoff
+was fixed in `d8bb73326`. The corrected deployed
+canary above passed. Current source also passed 13 focused suites / 126 tests,
+typecheck, ESLint, the default Turbopack production build, and a compiled-worker
+synthetic AAC test. PGlite passed 12 SQL scenarios including the actual
+preflight SQL; new native-Postgres integration regressions were added but not run, so
+native concurrency proof remains outstanding.
+
+The `wmkf-transcription-pilot.vercel.app` alias was verified to target the same
+project/deployment; its protected preflight returned HTTP 200 with all 13
+checks true and zero jobs/outbox rows. Both transcription switches remain
+false. No recurring Preview schedule is active: source defines daily cleanup
+and hourly terminal-run recovery, but Vercel Cron scheduling is not established
+for Preview. The earlier `dpl_E2P1r1aLBD32z5fsxim2Jsh4rVss` readiness check
+passed but its canary failed after the dependency fix and before the buffer fix; it is not current canary
+evidence.
 
 **[VERIFIED 2026-10-01; provider-free isolated storage check]**
 `node scripts/check-transcription-preview-storage.js
@@ -311,8 +353,8 @@ secret-entry process; this runbook does not replace its registry.
   terminal `completed`, `failed`, or `cancelled` runs; live/unknown runs are
   touched without being reclaimed. This replaces the earlier one-day plus
   daily-run recovery design in branch source, but does not prove hosted SDK
-  status semantics or that an hourly Preview invocation exists. The new source
-  is not deployed; Vercel Cron normally runs only in Production, and Preview
+  application-job status semantics or that an hourly Preview invocation exists. The source
+  is deployed disabled with synthetic retry/sleep/parser proof; Vercel Cron runs only in Production, and Preview
   hourly scheduling has not been established. Daily cleanup remains unchanged.
   Prove deployed retry/recovery, queue-only trigger security, execution duration
   and Preview delivery before enabling real transcription.
@@ -338,7 +380,7 @@ secret-entry process; this runbook does not replace its registry.
   synthetic M4A locally. Local worker tests also cover near-cap memory
   regression behavior; this does not prove a 50 MiB parse/upload in the target
   Function, deployed peak memory, or maximum-size timeout runway. The deployed
-  media runtime has not been exercised. No audio malware scan is claimed.
+  media runtime passed the small synthetic canary only. No audio malware scan is claimed.
 - **Earlier build/test evidence (before Workflow integration):** root's integrated pass verified eleven suites and
   111 tests, including 13 isolated local Postgres regressions; all 67 repository
   `check:*` scripts passed sequentially. The API matrix covers 251 routes with
@@ -352,9 +394,9 @@ secret-entry process; this runbook does not replace its registry.
 
 ## Retention and cleanup operations
 
-### Local Workflow integration checkpoint — 2026-10-01
+### Historical local Workflow integration checkpoint — 2026-10-01
 
-**[VERIFIED via local tests and build artifacts; not deployed]** Root's focused
+**[HISTORICAL: verified via local tests/build artifacts before deployment]** Root's focused
 run passed 12 suites / 119 tests, including the new dispatch, fixed-error,
 acknowledgement-wait, worker and UI regressions. Luna's credential-scrubbed
 Node 22 Webpack build passed; root independently inspected the generated flow
@@ -362,7 +404,7 @@ route trace and confirmed the parser worker and `music-metadata` are included.
 This was a fallback build: the normal Turbopack attempt rejected the temporary
 copy's external `node_modules` symlink. It is not a canonical Turbopack pass or
 hosted Workflow proof. Sol accepted the bounded local worker/Workflow slice;
-the recovery and generated-handler deployment gates above remain open.
+the current hosted receipt above supersedes this earlier build-only checkpoint.
 
 **[VERIFIED via disposable local PGlite execution]** Migrations 060–061 and the
 actual store queries passed nine SQL scenarios, including atomic reconciliation
