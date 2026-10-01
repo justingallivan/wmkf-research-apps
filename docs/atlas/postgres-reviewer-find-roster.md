@@ -155,70 +155,27 @@ cold search emitted the new authority envelope.
 - `lib/services/reviewer-roster-store.js` `listForRequest(requestId)` reads the
   rendered roster and returns active/excluded/ineligible/blocked candidates,
   canonical saved applicant suggestion keys (`savedKeys`), and the all-status
-  name union. `findCandidateBySuggestion(requestId, suggestionId)` reads only
-  the canonical `(request_id, suggestion:<id>)` row, rechecks the embedded
-  suggestion id, and returns its `updated_at` token; applicant promotion fails
-  closed when it is absent. `findIdentityConfirmation` is the fail-closed
-  save-boundary read for an exact actor-bound staff confirmation;
-  `findEligibilityByCandidateKey` is the request/candidate-key save-boundary
-  read for ineligible state. In the Workbench Find panel,
-  `ReviewerFindPanel` owns the cached-then-reconciled roster GET and passes its
-  snapshot to `ReviewerSearchSection` for active/excluded/ineligible/blocked
-  rendering, exact saved keys, and the dedup name union; standalone section
-  callers retain their internal roster read. On that embedded warm path, panel
-  mount performs neither proposal preparation nor applicant-input
-  materialization; staff explicitly prepare the canonical/manual proposal and
-  explicitly load applicant suggestions. The superuser-only Admin repair-alert
-  detail path may separately re-read one exact candidate from server-owned
-  alert correlation keys to present current repair context and a Workbench deep
-  link; that read performs no roster mutation. The embedded cold-search control
-  fails closed until that materialization succeeds and its exclusion parse is
-  available, so a search cannot silently omit applicant exclusions. A missing
-  applicant-enrichment cache remains visible and idle until staff choose its verification action. The
-  request/generation and AbortController guards prevent an explicit operation
-  for the prior request from painting the next request. `coi_dropped` contributes only
-  through `allNames`. Its temporary missing-mode compatibility GET performs
-  the existing complete request-scoped
-  `findByRequest(..., { selectedOnly:false, requireComplete:true })` read for
-  every suggestion-anchored visible roster row. The additive `mode=cached`
-  GET instead returns the Postgres projection only with an opaque deterministic
-  snapshot token; it does not enter Dataverse. `mode=reconciled` requires that
-  exact token and returns `409 roster_snapshot_changed` plus a fresh cached
-  projection if the Postgres snapshot changes either before or after
-  trusted-context Dataverse reconciliation. Rows with authoritative engagement are removed from their
-  working-state bucket and returned as compact `handled` entries; a missing
-  Dataverse anchor fails closed rather than becoming actionable. Reconciled
-  `authorityState:'current'` requires both that engagement overlay and the
-  read-only `reviewer-warm-validation-service` proposal/input generation to
-  succeed; it is a bounded panel-read state, not candidate-stage evidence or
-  promotion authority. Candidate plans intentionally invalidate any stage for
-  which this request/metadata read did not obtain that stage's own
-  person/institution/proposal-author dependency; no global placeholder version
-  can make those stages current. An applicant anchor is candidate-specific only
-  for an exact stored potential-reviewer id matching a current recommendation
-  slot; general-search candidates receive a server-issued `not_applicable`
-  anchor so another applicant-slot edit cannot invalidate them. A
-  suggestion-keyed row missing an explicit lane fails closed instead of being
-  guessed as a general-search row. Warm
-  validation reads no proposal bytes: it uses only server-owned request
-  context, Graph item metadata for exact canonical
-  `Reviewer Materials/Proposal_{requestNumber}.pdf`, then the exact current
-  cycle `Phase I/ProjectDescription.pdf` fallback, and derives opaque content
-  and applicant-input versions plus bounded non-PII invalidation plans. A
-  binding is current only with bounded Graph drive/item identifiers and at
-  least one stable eTag/version/last-modified token. Missing, duplicate, or
-  incomplete bindings stay stale/read-only. A historical manual file override
-  is never guessed from query/navigation state; when its authoritative binding
-  cannot be recovered, the roster stays stale. The final Postgres snapshot
-  comparison happens after both engagement and metadata/input reads, so a
-  concurrent roster change still returns `409` with a fresh cached projection.
-  Promotion from `excluded` revalidates the stored suggestion anchor against
-  Dataverse before changing the Postgres row. Unanchored search results retain
-  their Postgres working-state behavior. **[VERIFIED via source +
-  `reviewer-warm-validation-service.test.js` and
-  `reviewer-roster-endpoint.test.js`; deployed source reverified 2026-08-03.
-  The open retry/action classification defect is documented in the incident
-  handoff above.]**
+  name union. `pages/api/workbench/reviewer-roster.js` accepts only the request
+  GUID for GET; it has no `mode` or snapshot-token contract. The route delegates
+  to `lib/services/workbench/reviewer-roster-service.js`, which lists the
+  Postgres roster, reconciles suggestion engagement in the narrow
+  `workbench-reviewer-roster-get` DAL context, then reads matching open address
+  repair requests. Engagement is returned as compact `handled` entries and is
+  not written back to Postgres. A reconciliation failure remains a route error;
+  failure of the supplemental repair lookup degrades to an empty list with
+  `repairRequestsUnavailable: true`. `useReviewerRoster` applies the returned
+  buckets, handled rows, saved keys, names, and repair state; its request and
+  generation guards prevent an operation for the prior request from replacing
+  the current roster. Standalone `ReviewerSearchSection` callers retain their
+  internal roster read. The superuser-only Admin repair-alert detail path may
+  separately re-read one exact candidate from server-owned alert correlation
+  keys to present current repair context and a Workbench deep link; that read
+  performs no roster mutation. `coi_dropped` contributes only through
+  `allNames`. Promotion from `excluded` revalidates the stored suggestion
+  anchor against Dataverse before changing the Postgres row. Unanchored search
+  results retain their Postgres working-state behavior. **[VERIFIED via route,
+  service, store, `useReviewerRoster`, and focused tests; no live production
+  probe is claimed here.]**
 
 ## Write paths
 
@@ -249,9 +206,12 @@ cold search emitted the new authority envelope.
   `roster_persistence` atomically when the upstream set is complete; a lost CAS
   records neither as successful. `warmCacheVersion` denotes only the current
   cache envelope, never that every stage or promotion condition is current.
-- `pages/api/workbench/reviewer-roster.js` handles record-on-results, Exclude,
-  Promote, authenticated identity confirmation, roster-only website/affiliation
-  draft edits, and scoped removal. The contact-draft action re-reads the exact
+- `lib/services/workbench/reviewer-roster-service.js` owns record-on-results,
+  Exclude, Promote, authenticated identity confirmation, roster-only
+  website/affiliation draft edits, scoped removal, and GET reconciliation.
+  `pages/api/workbench/reviewer-roster.js` retains authentication, method and
+  request-scope validation, session-derived actor construction, and HTTP
+  mapping. The contact-draft action re-reads the exact
   active row and merges only those bounded fields; email remains exclusive to
   the structured address/identity actions, and no Dataverse person write occurs. Browser
   `action:'saved'` returns 409 `server_owned_transition`; clients cannot create
@@ -287,9 +247,10 @@ cold search emitted the new authority envelope.
   applicant suggestion with no linked reviewer person is also terminal staff
   action and never receives a fabricated person anchor. The route never runs a
   cold search, promotes, invites, or sends email.
-- `pages/api/workbench/reviewer-roster.js` `confirm_identity` re-resolves the
-  authoritative roster/Dataverse identity and derives the canonical candidate
-  key server-side before persistence. The dedicated structured address route
+- `lib/services/workbench/reviewer-roster-service.js` `confirm_identity`
+  performs applicant anchor/key checks, proposal-author checks, and roster
+  confirmation; `pages/api/workbench/reviewer-roster.js` supplies actor IDs
+  from authenticated access. The dedicated structured address route
   accepts target/action input only; its server service
   re-reads identity/person ETags, then atomically projects matching `contact`
   and `address_trust` receipts in one roster CAS. For a fresh pending

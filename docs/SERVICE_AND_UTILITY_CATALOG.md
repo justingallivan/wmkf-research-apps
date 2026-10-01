@@ -220,6 +220,7 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`reviewer-contact-reconciliation.js`** — Sequential exact-email/ORCID reconciliation for enriched search cards. Produces bounded staff-facing Dataverse evidence; a still-matching server-bound identity decision plus trusted, name-consistent ORCID may also ETag-write person-scoped pending address-conflict state. Provider-only/provisional or browser-authored ORCIDs can require review but never establish a known identity or authorize a durable person write.
 - **`reviewer-address-trust-service.js`** — Authenticated exact-address attestation, fresh conflict disclosure, active-roster retry, and durable repair orchestration. Roster receipts are request-scoped; person conflict/adjudication writes are stable-person-bound and ETag-conditional; receipt-first partial success is explicit.
 - **`contact-enrichment/scholarly-email.js`** — Free NCBI PubMed + Europe PMC author-affiliation email resolver; requires full-forename or exact-ORCID identity plus affiliation corroboration, deduplicates the same work across providers, and abstains on tied addresses.
+- **`workbench/reviewer-roster-service.js`** — Post-auth orchestration for the Workbench Find roster API. Owns GET reconciliation/repair projection, candidate receipt and authority handling, and roster mutation sequencing; the API route retains auth, request-scope validation, and HTTP mapping. It expects an authenticated caller with validated request scope.
 - **`reviewer-roster-store.js`** — Postgres operational roster for
   request-scoped Find state and server-owned promotion finalization. Stores
   actor-bound staff identity confirmation and roster-only manual
@@ -232,25 +233,6 @@ If you're touching a service or utility, read its header before this catalog. If
   through Dataverse, removes already-engaged rows from working-state buckets,
   emits compact `handled` stage entries, and validates excluded→active
   promotion; missing suggestion anchors fail closed.
-- **`workbench/reviewer-warm-validation-service.js`** — Read-only warm-revisit
-  validator for the roster's reconciled mode. It reads only server-owned
-  request inputs and exact Graph metadata for
-  `Reviewer Materials/Proposal_{requestNumber}.pdf`, falling back only to
-  `Phase I/ProjectDescription.pdf`; a binding is current only when Graph
-  returns bounded drive/item identifiers plus a stable change token. It returns
-  opaque content/input versions, bounded non-PII input counts, and
-  server-derived invalidation plans. Its `current` state certifies only those
-  bounded panel reads: it does not fabricate or certify candidate identity,
-  COI, eligibility, contact, address, persistence, or promotion receipts.
-  Applicant-anchor freshness is candidate-specific when an exact stored person
-  id matches a current request slot; ordinary search candidates are explicitly
-  not applicable to that stage. A suggestion-keyed row without an explicit
-  applicant or non-applicant provenance fails closed rather than being inferred
-  as not applicable. It never
-  accepts a browser file key, downloads/uploads proposal content, materializes
-  suggestions, parses exclusions, or calls evidence/model providers. A
-  historical manual file binding is stale when it cannot be recovered from
-  authoritative request persistence.
 - **`workbench/reviewer-stage-refresh-service.js`** — Explicit one-candidate,
   one-stage staff repair for the executable `applicant_anchor` receipt. It
   derives the canonical suggestion key and input dependency from server-read
