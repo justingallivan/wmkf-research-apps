@@ -41,6 +41,7 @@ test.each([
   ['/api/admin/alerts', 'GET', 'summary=true'],
   ['/api/admin/transcription-pilot/jobs', 'GET', 'limit=50'],
   ['/api/admin/transcription-pilot/jobs/a/download', 'GET', 'format=vtt'],
+  ['/api/admin/transcription-pilot/jobs/a', 'PATCH', ''],
   ['/api/webhooks/assemblyai', 'POST', 'attempt=00000000-0000-4000-8000-000000000001'],
   ['/.well-known/workflow/v1/flow', 'POST', ''],
   ['/_next/static/chunks/page.js', 'GET', ''],

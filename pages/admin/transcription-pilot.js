@@ -7,6 +7,7 @@ import { useAppAccess } from '../../shared/context/AppAccessContext';
 import { useProfile } from '../../shared/context/ProfileContext';
 import { requestEnvelope } from '../../shared/utils/api-request';
 import { TRANSCRIPTION_JOB_LABELS } from '../../lib/services/transcription-pilot/model';
+import { formatTranscriptMinuteHeading, getTranscriptSpeakers, groupTranscriptByMinute } from '../../lib/services/transcription-pilot/transcript-format';
 
 const API_ROOT = '/api/admin/transcription-pilot';
 const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
@@ -65,6 +66,15 @@ export function getEarliestReceiptExportDeadline(jobs, now = Date.now()) {
     .map((job) => Date.parse(job?.receipt_expires_at || ''))
     .filter((date) => Number.isFinite(date) && date > now);
   return deadlines.length ? new Date(Math.min(...deadlines)) : null;
+}
+
+function speakerNameMapKey(speakerNames) {
+  return JSON.stringify(Object.fromEntries(
+    Object.entries(speakerNames && typeof speakerNames === 'object' ? speakerNames : {})
+      .filter(([, value]) => typeof value === 'string' && value.trim())
+      .map(([id, value]) => [id, value.trim()])
+      .sort(([left], [right]) => left.localeCompare(right)),
+  ));
 }
 
 async function pilotApi(url, options = {}) {
@@ -302,8 +312,56 @@ function EvaluationForm({ job, draft, onDraft, onSave, saving, error }) {
   );
 }
 
-function TranscriptView({ job, transcript, processingDurationMs }) {
+function SpeakerNameEditor({ speakerIds, job, speakerDraft, speakerDraftBase, onSpeakerDraft, onSaveSpeakerNames, onReloadSpeakerNames, savingSpeakerNames }) {
+  const changed = speakerIds.some((speakerId) => (
+    String(speakerDraft?.[speakerId] ?? '') !== String(job.speaker_names?.[speakerId] ?? '')
+  ));
+  const remoteChanged = speakerDraftBase?.jobId === job.id
+    && speakerNameMapKey(job.speaker_names) !== speakerNameMapKey(speakerDraftBase.names);
+  return (
+    <section className="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-4" aria-labelledby="transcription-speaker-names-title">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h4 id="transcription-speaker-names-title" className="text-sm font-semibold text-gray-900">Detected speakers ({speakerIds.length})</h4>
+        <p className="text-xs text-gray-600">Names are optional and appear in the transcript and downloads after saving.</p>
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {speakerIds.map((speakerId, index) => {
+          const defaultName = `Speaker ${speakerId}`;
+          const inputId = `transcription-speaker-name-${index}`;
+          return (
+            <label key={speakerId} htmlFor={inputId} className="block text-sm font-medium text-gray-800">
+              {defaultName} name
+              <input
+                id={inputId}
+                value={speakerDraft?.[speakerId] ?? job.speaker_names?.[speakerId] ?? ''}
+                onChange={(event) => onSpeakerDraft({ ...speakerDraft, [speakerId]: event.target.value })}
+                maxLength={80}
+                disabled={savingSpeakerNames}
+                placeholder={defaultName}
+                className="mt-1 block min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-100"
+              />
+            </label>
+          );
+        })}
+      </div>
+      {remoteChanged && <p className="mt-3 text-sm leading-5 text-amber-900" role="alert">Saved speaker names changed elsewhere. Your draft is preserved; load the latest saved names before editing further.</p>}
+      {remoteChanged && <button type="button" onClick={onReloadSpeakerNames} disabled={savingSpeakerNames} className="mt-3 min-h-10 rounded-lg border border-amber-700 bg-white px-4 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 disabled:cursor-not-allowed disabled:opacity-60">Use latest saved names</button>}
+      <button
+        type="button"
+        onClick={onSaveSpeakerNames}
+        disabled={savingSpeakerNames || !changed || remoteChanged}
+        className="mt-3 min-h-10 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700"
+      >
+        {savingSpeakerNames ? 'Saving names…' : 'Save speaker names'}
+      </button>
+    </section>
+  );
+}
+
+function TranscriptView({ job, transcript, processingDurationMs, speakerDraft, speakerDraftBase, onSpeakerDraft, onSaveSpeakerNames, onReloadSpeakerNames, savingSpeakerNames }) {
   const utterances = Array.isArray(transcript?.utterances) ? transcript.utterances : [];
+  const speakerIds = getTranscriptSpeakers(transcript);
+  const minuteGroups = groupTranscriptByMinute(transcript, job.speaker_names || {});
   const hasTranscriptText = typeof transcript?.text === 'string' && transcript.text.length > 0;
   return (
     <section aria-labelledby="transcription-result-title" className="border-t border-gray-200 pt-5">
@@ -324,17 +382,35 @@ function TranscriptView({ job, transcript, processingDurationMs }) {
         </div>}
       </div>
       {utterances.length > 0 ? (
-        <ol className="mt-4 max-h-[34rem] divide-y divide-gray-200 overflow-y-auto rounded-lg border border-gray-200" aria-label="Timestamped transcript utterances">
-          {utterances.map((utterance, index) => (
-            <li key={`${utterance.start}-${utterance.end}-${index}`} className="grid gap-2 px-4 py-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
-              <div className="text-xs font-medium tabular-nums text-gray-700">
-                {formatTranscriptTimestamp(utterance.start)}–{formatTranscriptTimestamp(utterance.end)}
-                {utterance.speaker ? <span className="mt-1 block text-gray-600">Speaker {utterance.speaker}</span> : null}
+        <>
+          {speakerIds.length > 0 && <SpeakerNameEditor
+            speakerIds={speakerIds}
+            job={job}
+            speakerDraft={speakerDraft}
+            speakerDraftBase={speakerDraftBase}
+            onSpeakerDraft={onSpeakerDraft}
+            onSaveSpeakerNames={onSaveSpeakerNames}
+            onReloadSpeakerNames={onReloadSpeakerNames}
+            savingSpeakerNames={savingSpeakerNames}
+          />}
+          <div className="mt-4 max-h-[34rem] overflow-y-auto rounded-lg border border-gray-200" aria-label="Transcript grouped by minute">
+          {minuteGroups.map((group) => (
+            <section key={group.minute} aria-labelledby={`transcription-minute-${group.minute}`} className="border-b border-gray-200 last:border-b-0">
+              <h4 id={`transcription-minute-${group.minute}`} className="sticky top-0 border-b border-gray-200 bg-gray-100 px-4 py-2 text-xs font-semibold tabular-nums text-gray-700">
+                {formatTranscriptMinuteHeading(group.minute)}
+              </h4>
+              <div className="space-y-3 px-4 py-3">
+                {group.utterances.map((utterance, index) => (
+                  <p key={`${utterance.start}-${utterance.end}-${index}`} className="whitespace-pre-wrap break-words text-sm leading-6 text-gray-900">
+                    {utterance.speakerName && <span className="font-semibold">{utterance.speakerName}: </span>}
+                    {utterance.text || ''}
+                  </p>
+                ))}
               </div>
-              <p className="whitespace-pre-wrap break-words text-sm leading-6 text-gray-900">{utterance.text || ''}</p>
-            </li>
+            </section>
           ))}
-        </ol>
+          </div>
+        </>
       ) : hasTranscriptText ? (
         <pre className="mt-4 max-h-[34rem] overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-gray-200 bg-gray-50 p-4 font-sans text-sm leading-6 text-gray-900">{transcript.text}</pre>
       ) : (
@@ -397,7 +473,7 @@ function RecoveryPanel({ job, onReconcile, onAbandon, busy, error }) {
   );
 }
 
-function JobDetail({ job, transcript, processingDurationMs, onSaveEvaluation, onReconcile, onAbandon, onDelete, onRetryStart, busy, actionError, actionMessage, evaluationDraft, onEvaluationDraft }) {
+function JobDetail({ job, transcript, processingDurationMs, onSaveEvaluation, onSaveSpeakerNames, onReloadSpeakerNames, speakerDraft, speakerDraftBase, onSpeakerDraft, onReconcile, onAbandon, onDelete, onRetryStart, busy, busyJobId, actionError, actionMessage, evaluationDraft, onEvaluationDraft }) {
   if (!job) {
     return <section className="rounded-xl border border-gray-200 bg-white px-5 py-8 text-sm leading-6 text-gray-700" aria-live="polite">Select a recording to review its status and transcript.</section>;
   }
@@ -421,7 +497,7 @@ function JobDetail({ job, transcript, processingDurationMs, onSaveEvaluation, on
           <span className="mt-1 block">Local cleanup: {job.local_cleanup_completed_at ? `confirmed ${formatPilotDate(job.local_cleanup_completed_at)}` : 'pending'}. Provider cleanup: {job.provider_cleanup_completed_at ? `confirmed ${formatPilotDate(job.provider_cleanup_completed_at)}` : 'pending or not confirmed'}.</span>
         </InfoNotice>
       )}
-      {actionMessage && <div className="mt-4"><InfoNotice>{actionMessage}</InfoNotice></div>}
+      {actionMessage && <div className="mt-4" role="status" aria-live="polite"><InfoNotice>{actionMessage}</InfoNotice></div>}
       <ErrorNotice>{actionError}</ErrorNotice>
 
       <div className="mt-5 space-y-5">
@@ -432,7 +508,17 @@ function JobDetail({ job, transcript, processingDurationMs, onSaveEvaluation, on
           </div>
         )}
         {job.status === 'ready' && job.contentAccessAllowed === true && !cleanupRequested && !job.content_purged_at && transcript && (
-          <TranscriptView job={job} transcript={transcript} processingDurationMs={processingDurationMs} />
+          <TranscriptView
+            job={job}
+            transcript={transcript}
+            processingDurationMs={processingDurationMs}
+            speakerDraft={speakerDraft}
+            speakerDraftBase={speakerDraftBase}
+            onSpeakerDraft={onSpeakerDraft}
+            onSaveSpeakerNames={onSaveSpeakerNames}
+            onReloadSpeakerNames={onReloadSpeakerNames}
+            savingSpeakerNames={busy === 'speaker-names' && busyJobId === job.id}
+          />
         )}
         {job.status === 'ready' && job.contentAccessAllowed === true && !cleanupRequested && !job.content_purged_at && !transcript && (
           <p className="rounded-lg bg-gray-50 px-4 py-4 text-sm leading-6 text-gray-800">The transcript is not available yet. Refresh to check its current state.</p>
@@ -465,6 +551,7 @@ export default function TranscriptionPilotPage() {
   const generationRef = useRef(0);
   const operationControllerRef = useRef(null);
   const evaluationDraftJobRef = useRef(null);
+  const speakerDraftJobRef = useRef(null);
   const jobSnapshotsRef = useRef(new Map());
   const [pilotState, setPilotState] = useState('loading');
   const [submissionsEnabled, setSubmissionsEnabled] = useState(null);
@@ -480,6 +567,7 @@ export default function TranscriptionPilotPage() {
   const [actionError, setActionError] = useState(null);
   const [actionMessage, setActionMessage] = useState(null);
   const [busy, setBusy] = useState(null);
+  const [busyJobId, setBusyJobId] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(null);
   const [uploadError, setUploadError] = useState(null);
@@ -487,6 +575,8 @@ export default function TranscriptionPilotPage() {
   const [nonSensitiveAcknowledged, setNonSensitiveAcknowledged] = useState(false);
   const [creditsAcknowledged, setCreditsAcknowledged] = useState(false);
   const [evaluationDraft, setEvaluationDraft] = useState(null);
+  const [speakerDraft, setSpeakerDraft] = useState(null);
+  const [speakerDraftBase, setSpeakerDraftBase] = useState(null);
 
   const authorized = Boolean(ownerKey && profileStatus === 'ready' && !accessLoading);
   const activeJob = detail?.job?.id === selectedId ? detail.job : null;
@@ -521,6 +611,14 @@ export default function TranscriptionPilotPage() {
       const nextJobs = (Array.isArray(data.jobs) ? data.jobs : [])
         .map((job) => rememberJob(job).job);
       setJobs(nextJobs);
+      const selectedSnapshot = nextJobs.find((job) => job.id === selectedJobIdRef.current);
+      if (selectedSnapshot && (selectedSnapshot.status !== 'ready'
+        || selectedSnapshot.contentAccessAllowed !== true
+        || selectedSnapshot.cleanup_requested_at || selectedSnapshot.content_purged_at)) {
+        setSpeakerDraft(null);
+        setSpeakerDraftBase(null);
+        speakerDraftJobRef.current = null;
+      }
       setDetail((currentDetail) => {
         if (!currentDetail?.job?.id) return currentDetail;
         const latestJob = nextJobs.find((job) => job.id === currentDetail.job.id);
@@ -565,12 +663,16 @@ export default function TranscriptionPilotPage() {
     setDetail(null);
     setEvaluationDraft(null);
     evaluationDraftJobRef.current = null;
+    setSpeakerDraft(null);
+    setSpeakerDraftBase(null);
+    speakerDraftJobRef.current = null;
     selectedJobIdRef.current = null;
     setListError(null);
     setDetailError(null);
     setActionError(null);
     setActionMessage(null);
     setBusy(null);
+    setBusyJobId(null);
     setSelectedFile(null);
     setUploadProgress(null);
     setUploadError(null);
@@ -605,6 +707,9 @@ export default function TranscriptionPilotPage() {
     setDetailError(null);
     setEvaluationDraft(null);
     evaluationDraftJobRef.current = null;
+    setSpeakerDraft(null);
+    setSpeakerDraftBase(null);
+    speakerDraftJobRef.current = null;
     setActionError(null);
     setActionMessage(null);
     if (!ownerKey || !selectedId || pilotState !== 'enabled') {
@@ -626,7 +731,22 @@ export default function TranscriptionPilotPage() {
         if (!current(generation, expectedOwner) || stopped) return;
         const remembered = rememberJob(data.job);
         if (remembered.stale) return;
-        const nextDetail = { job: remembered.job, transcript: data.transcript || null, processingDurationMs: data.processing_duration_ms ?? null };
+        const receiptExpiresAt = Date.parse(remembered.job.expires_at || '');
+        const canKeepContent = remembered.job.status === 'ready'
+          && remembered.job.contentAccessAllowed === true
+          && !remembered.job.cleanup_requested_at
+          && !remembered.job.content_purged_at
+          && (!Number.isFinite(receiptExpiresAt) || receiptExpiresAt > Date.now());
+        const nextDetail = {
+          job: remembered.job,
+          transcript: canKeepContent ? (data.transcript || null) : null,
+          processingDurationMs: data.processing_duration_ms ?? null,
+        };
+        if (!canKeepContent) {
+          setSpeakerDraft(null);
+          setSpeakerDraftBase(null);
+          speakerDraftJobRef.current = null;
+        }
         setDetail(nextDetail);
         setJobs((currentJobs) => currentJobs.map((job) => job.id === remembered.job.id ? remembered.job : job));
         if (evaluationDraftJobRef.current !== remembered.job.id) {
@@ -636,6 +756,14 @@ export default function TranscriptionPilotPage() {
             speakerAccuracyScore: remembered.job.speaker_accuracy_score == null ? '' : String(remembered.job.speaker_accuracy_score),
             correctionNotes: remembered.job.correction_notes || '',
           });
+        }
+        if (speakerDraftJobRef.current !== remembered.job.id) {
+          speakerDraftJobRef.current = remembered.job.id;
+          const savedNames = remembered.job.speaker_names || {};
+          setSpeakerDraft(Object.fromEntries(
+            getTranscriptSpeakers(nextDetail.transcript).map((speakerId) => [speakerId, savedNames[speakerId] || '']),
+          ));
+          setSpeakerDraftBase({ jobId: remembered.job.id, version: remembered.job.version, names: savedNames });
         }
         setDetailError(null);
       } catch (error) {
@@ -799,6 +927,7 @@ export default function TranscriptionPilotPage() {
     operationControllerRef.current?.abort();
     operationControllerRef.current = controller;
     setBusy(kind);
+    setBusyJobId(expectedJobId);
     if (selectedJobIdRef.current === expectedJobId) {
       setActionError(null);
       setActionMessage(null);
@@ -820,8 +949,23 @@ export default function TranscriptionPilotPage() {
             correctionNotes: remembered.correction_notes || '',
           });
         }
+        if (kind === 'speaker-names' && selectedJobIdRef.current === expectedJobId) {
+          speakerDraftJobRef.current = remembered.id;
+          const savedNames = remembered.speaker_names || {};
+          setSpeakerDraft(Object.fromEntries(
+            getTranscriptSpeakers(detail?.job?.id === expectedJobId ? detail.transcript : null)
+              .map((speakerId) => [speakerId, savedNames[speakerId] || '']),
+          ));
+          setSpeakerDraftBase({ jobId: remembered.id, version: remembered.version, names: savedNames });
+        }
+        if (method === 'DELETE' && selectedJobIdRef.current === expectedJobId) {
+          setSpeakerDraft(null);
+          setSpeakerDraftBase(null);
+          speakerDraftJobRef.current = null;
+        }
       }
       if (selectedJobIdRef.current === expectedJobId) {
+        if (kind === 'speaker-names') setActionMessage('Speaker names saved. The transcript and downloads now use the saved names.');
         if (cleanupOnly && result.cleanupOnly === true) {
           setActionMessage('The provider attempt was verified for cleanup. No transcript was retrieved or restored.');
         }
@@ -838,7 +982,10 @@ export default function TranscriptionPilotPage() {
         void loadJobs({ generation, expectedOwner, quiet: true });
       }
     } finally {
-      if (current(generation, expectedOwner)) setBusy(null);
+      if (current(generation, expectedOwner)) {
+        setBusy(null);
+        setBusyJobId(null);
+      }
       if (operationControllerRef.current === controller) operationControllerRef.current = null;
     }
   };
@@ -856,6 +1003,38 @@ export default function TranscriptionPilotPage() {
         correctionNotes: evaluationDraft.correctionNotes,
       },
     });
+  };
+
+  const saveSpeakerNames = () => {
+    if (!activeJob || !speakerDraft || activeJob.status !== 'ready' || activeJob.contentAccessAllowed !== true
+      || activeJob.cleanup_requested_at || activeJob.content_purged_at) return;
+    if (speakerDraftBase?.jobId !== activeJob.id || speakerNameMapKey(activeJob.speaker_names) !== speakerNameMapKey(speakerDraftBase.names)) {
+      setActionError('Saved speaker names changed elsewhere. Use the latest saved names before saving your draft.');
+      return;
+    }
+    const expectedJobId = activeJob.id;
+    const speakerNames = Object.fromEntries(
+      getTranscriptSpeakers(detail?.transcript)
+        .map((speakerId) => [speakerId, String(speakerDraft[speakerId] ?? '').trim()]),
+    );
+    void action({
+      kind: 'speaker-names',
+      url: `${API_ROOT}/jobs/${encodeURIComponent(expectedJobId)}`,
+      method: 'PATCH',
+      body: { expectedVersion: activeJob.version, speakerNames },
+    });
+  };
+
+  const reloadSpeakerNames = () => {
+    if (!activeJob || !detail?.transcript || speakerDraftBase?.jobId !== activeJob.id) return;
+    const savedNames = activeJob.speaker_names || {};
+    speakerDraftJobRef.current = activeJob.id;
+    setSpeakerDraft(Object.fromEntries(
+      getTranscriptSpeakers(detail.transcript).map((speakerId) => [speakerId, savedNames[speakerId] || '']),
+    ));
+    setSpeakerDraftBase({ jobId: activeJob.id, version: activeJob.version, names: savedNames });
+    setActionError(null);
+    setActionMessage('Latest saved speaker names loaded.');
   };
 
   const retryQueuedStart = () => {
@@ -985,11 +1164,17 @@ export default function TranscriptionPilotPage() {
                   transcript={detail?.transcript}
                   processingDurationMs={detail?.processingDurationMs}
                   onSaveEvaluation={saveEvaluation}
+                  onSaveSpeakerNames={saveSpeakerNames}
+                  onReloadSpeakerNames={reloadSpeakerNames}
+                  speakerDraft={speakerDraft}
+                  speakerDraftBase={speakerDraftBase}
+                  onSpeakerDraft={setSpeakerDraft}
                   onReconcile={reconcile}
                   onAbandon={abandon}
                   onDelete={deleteJob}
                   onRetryStart={retryQueuedStart}
                   busy={busy}
+                  busyJobId={busyJobId}
                   actionError={actionError}
                   actionMessage={actionMessage}
                   evaluationDraft={evaluationDraft}

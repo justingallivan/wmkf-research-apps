@@ -144,6 +144,153 @@ test('renders transcript strings as text and exposes the owner-safe downloads', 
   expect(screen.getByRole('link', { name: 'Download VTT' })).toHaveAttribute('href', `/api/admin/transcription-pilot/jobs/${job.id}/download?format=vtt`);
 });
 
+test('groups readable transcript by utterance start minute and saves speaker names explicitly', async () => {
+  const job = readyJob('speaker-labels', 'staff-interview.m4a', { speaker_names: {} });
+  const transcript = {
+    text: 'Good morning. Thank you.',
+    utterances: [
+      { start: 0, end: 900, speaker: 'A', text: 'Good morning.' },
+      { start: 59_800, end: 61_100, speaker: 'B', text: 'Thank you.' },
+      { start: 61_200, end: 62_000, speaker: 'A', text: 'You are welcome.' },
+      { start: 3_600_000, end: 3_600_800, speaker: 'A', text: 'At one hour.' },
+    ],
+  };
+  const requests = [];
+  requestEnvelope.mockImplementation(async (url, options = {}) => {
+    requests.push({ url, options });
+    if (url.endsWith('/jobs?limit=50')) {
+      return { ok: true, status: 200, data: { pilotEnabled: true, submissionsEnabled: false, jobs: [job] } };
+    }
+    if (url.endsWith(`/jobs/${job.id}`) && options.method === 'PATCH') {
+      return { ok: true, status: 200, data: { job: { ...job, version: 4, speaker_names: { A: 'Avery' } } } };
+    }
+    if (url.endsWith(`/jobs/${job.id}`)) {
+      return { ok: true, status: 200, data: { job, transcript } };
+    }
+    throw new Error(`Unexpected request ${url}`);
+  });
+
+  render(<TranscriptionPilotPage />);
+
+  expect(await screen.findByText('Good morning.')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Detected speakers (2)' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '0:00' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '1:00' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '60:00' })).toBeInTheDocument();
+  expect(screen.getAllByText('Speaker A:').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('Speaker B:').length).toBeGreaterThan(0);
+  expect(screen.queryByText(/00:00:00\.000–/)).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Speaker A name'), { target: { value: 'Avery' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save speaker names' }));
+
+  expect(await screen.findByRole('status')).toHaveTextContent(/Speaker names saved/);
+  const saveRequest = requests.find(({ url, options }) => url.endsWith(`/jobs/${job.id}`) && options.method === 'PATCH');
+  expect(saveRequest.options.body).toEqual({ expectedVersion: job.version, speakerNames: { A: 'Avery', B: '' } });
+  expect(screen.getAllByText('Avery:').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('Speaker B:').length).toBeGreaterThan(0);
+});
+
+test('speaker-name version conflicts keep the draft and expose an accessible retry message', async () => {
+  const job = readyJob('speaker-conflict', 'conflict.mp3', { speaker_names: {} });
+  requestEnvelope.mockImplementation(async (url, options = {}) => {
+    if (url.endsWith('/jobs?limit=50')) {
+      return { ok: true, status: 200, data: { pilotEnabled: true, submissionsEnabled: false, jobs: [job] } };
+    }
+    if (url.endsWith(`/jobs/${job.id}`) && options.method === 'PATCH') {
+      return { ok: false, status: 409, data: { code: 'transcription_conflict', message: 'This recording changed. Refresh and try again.' } };
+    }
+    if (url.endsWith(`/jobs/${job.id}`)) {
+      return { ok: true, status: 200, data: { job, transcript: { text: 'Hello', utterances: [{ start: 0, end: 1, speaker: 'A', text: 'Hello' }] } } };
+    }
+    throw new Error(`Unexpected request ${url}`);
+  });
+
+  render(<TranscriptionPilotPage />);
+  expect(await screen.findByText('Hello')).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Speaker A name'), { target: { value: 'Avery' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save speaker names' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(/recording changed/);
+  expect(screen.getByLabelText('Speaker A name')).toHaveValue('Avery');
+  expect(screen.getByRole('button', { name: 'Save speaker names' })).toBeEnabled();
+});
+
+test('speaker-name drafts survive same-job polling without leaking across job selection', async () => {
+  jest.useFakeTimers();
+  const jobA = readyJob('speaker-draft-a', 'first.mp3', { speaker_names: { A: 'Alice' } });
+  const jobB = readyJob('speaker-draft-b', 'second.mp3', { speaker_names: { A: 'Bryn' } });
+  let detailCalls = 0;
+  requestEnvelope.mockImplementation(async (url) => {
+    if (url.endsWith('/jobs?limit=50')) {
+      return { ok: true, status: 200, data: { pilotEnabled: true, submissionsEnabled: false, jobs: [jobA, jobB] } };
+    }
+    if (url.endsWith(`/jobs/${jobA.id}`) || url.endsWith(`/jobs/${jobB.id}`)) {
+      detailCalls += 1;
+      const job = url.includes(jobB.id) ? jobB : jobA;
+      return { ok: true, status: 200, data: { job, transcript: { text: 'Hello', utterances: [{ start: 0, end: 500, speaker: 'A', text: 'Hello' }] } } };
+    }
+    throw new Error(`Unexpected request ${url}`);
+  });
+
+  const view = render(<TranscriptionPilotPage />);
+  try {
+    expect(await screen.findByLabelText('Speaker A name')).toHaveValue('Alice');
+    fireEvent.change(screen.getByLabelText('Speaker A name'), { target: { value: 'Unsaved Alice' } });
+    await act(async () => { jest.advanceTimersByTime(5000); });
+    await waitFor(() => expect(detailCalls).toBeGreaterThanOrEqual(2));
+    expect(screen.getByLabelText('Speaker A name')).toHaveValue('Unsaved Alice');
+
+    fireEvent.click(screen.getByRole('button', { name: /second\.mp3/ }));
+    expect(await screen.findByLabelText('Speaker A name')).toHaveValue('Bryn');
+    fireEvent.click(screen.getByRole('button', { name: /first\.mp3/ }));
+    expect(await screen.findByLabelText('Speaker A name')).toHaveValue('Alice');
+  } finally {
+    view.unmount();
+    jest.useRealTimers();
+  }
+});
+
+test.each(['success', 'error'])('late speaker-name %s response stays scoped to its job selection', async (outcome) => {
+  const jobA = readyJob('speaker-race-a', 'first.mp3', { speaker_names: {} });
+  const jobB = readyJob('speaker-race-b', 'second.mp3', { speaker_names: { A: 'Bryn' } });
+  let resolveSave;
+  requestEnvelope.mockImplementation((url, options = {}) => {
+    if (url.endsWith('/jobs?limit=50')) {
+      return Promise.resolve({ ok: true, status: 200, data: { pilotEnabled: true, submissionsEnabled: false, jobs: [jobA, jobB] } });
+    }
+    if (url.endsWith(`/jobs/${jobA.id}`) && options.method === 'PATCH') {
+      return new Promise((resolve) => { resolveSave = resolve; });
+    }
+    if (url.endsWith(`/jobs/${jobA.id}`)) {
+      return Promise.resolve({ ok: true, status: 200, data: { job: jobA, transcript: { text: 'A', utterances: [{ start: 0, end: 1, speaker: 'A', text: 'A' }] } } });
+    }
+    if (url.endsWith(`/jobs/${jobB.id}`)) {
+      return Promise.resolve({ ok: true, status: 200, data: { job: jobB, transcript: { text: 'B', utterances: [{ start: 0, end: 1, speaker: 'A', text: 'B' }] } } });
+    }
+    throw new Error(`Unexpected request ${url}`);
+  });
+
+  render(<TranscriptionPilotPage />);
+  await screen.findByText('A');
+  fireEvent.change(screen.getByLabelText('Speaker A name'), { target: { value: 'Avery' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save speaker names' }));
+  await waitFor(() => expect(resolveSave).toBeDefined());
+  fireEvent.click(screen.getByRole('button', { name: /second\.mp3/ }));
+  expect(await screen.findByLabelText('Speaker A name')).toHaveValue('Bryn');
+
+  await act(async () => {
+    if (outcome === 'success') {
+      resolveSave({ ok: true, status: 200, data: { job: { ...jobA, version: 4, speaker_names: { A: 'Avery' } } } });
+    } else {
+      resolveSave({ ok: false, status: 409, data: { code: 'transcription_conflict', message: 'This recording changed. Refresh and try again.' } });
+    }
+  });
+
+  expect(screen.getByLabelText('Speaker A name')).toHaveValue('Bryn');
+  expect(screen.queryByText(/Speaker names saved/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/This recording changed/)).not.toBeInTheDocument();
+});
+
 test('clears the previous owner snapshot when the current profile changes', async () => {
   const pendingListRequests = [];
   requestEnvelope.mockImplementation((url) => {

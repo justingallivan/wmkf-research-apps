@@ -53,7 +53,8 @@ function response() {
   };
 }
 
-function readOnlyClient({ readOnly = 'on', database = 'neondb', jobs = '0', dispatches = '0', migration = true, shape = true } = {}) {
+function readOnlyClient({ readOnly = 'on', database = 'neondb', jobs = '0', dispatches = '0', migration = true, shape = true,
+  speakerNamesMigration = true, speakerNamesShape = true } = {}) {
   const calls = [];
   return {
     calls,
@@ -64,6 +65,9 @@ function readOnlyClient({ readOnly = 'on', database = 'neondb', jobs = '0', disp
       if (normalized === 'SHOW transaction_read_only') return { rows: [{ transaction_read_only: readOnly }] };
       if (normalized === 'SELECT current_database() AS database_name') return { rows: [{ database_name: database }] };
       if (normalized.startsWith('SELECT EXISTS (SELECT 1 FROM public.schema_migrations WHERE name = $1)')) return { rows: [{ applied: migration }] };
+      if (normalized.includes('062_transcription_speaker_names.sql')) return { rows: [{
+        migration_applied: speakerNamesMigration, column_present: speakerNamesShape, constraint_present: speakerNamesShape,
+      }] };
       if (normalized.startsWith('SELECT to_regclass(')) return { rows: [{
         table_present: shape, columns_match: shape, constraints_match: shape,
         primary_key_match: shape, foreign_key_match: shape, due_index_present: shape,
@@ -130,6 +134,7 @@ describe('transcription Preview readiness preflight', () => {
       'SELECT current_database() AS database_name', 'SET LOCAL row_security = off',
       "SELECT EXISTS (SELECT 1 FROM public.schema_migrations WHERE name = $1) AS applied",
       expect.stringContaining('to_regclass'),
+      expect.stringContaining('062_transcription_speaker_names.sql'),
       'SELECT COUNT(*)::text AS count FROM public.transcription_jobs',
       'SELECT COUNT(*)::text AS count FROM public.transcription_workflow_dispatches', 'COMMIT', 'end',
     ]);
@@ -140,6 +145,7 @@ describe('transcription Preview readiness preflight', () => {
         safeDataverseControls: true, dedicatedAuthOrigin: true, applicationSecretsPresent: true,
         readOnlyDatabase: true, expectedDatabase: true,
         workflowDispatchMigration: true, workflowDispatchShape: true,
+        speakerNamesMigration: true, speakerNamesShape: true,
         zeroJobs: true, zeroWorkflowDispatches: true,
       },
       jobs: 0,
@@ -165,6 +171,18 @@ describe('transcription Preview readiness preflight', () => {
     expect(untrackedResult.ok).toBe(false);
     expect(untrackedResult.checks.workflowDispatchMigration).toBe(false);
     expect(untracked.calls).toContain('ROLLBACK');
+
+    const missingSpeakerNamesMigration = readOnlyClient({ speakerNamesMigration: false });
+    const missingSpeakerNamesMigrationResult = await runTranscriptionPreflight({ env: goodEnv, createClient: () => missingSpeakerNamesMigration });
+    expect(missingSpeakerNamesMigrationResult.ok).toBe(false);
+    expect(missingSpeakerNamesMigrationResult.checks.speakerNamesMigration).toBe(false);
+    expect(missingSpeakerNamesMigration.calls).toContain('ROLLBACK');
+
+    const malformedSpeakerNamesShape = readOnlyClient({ speakerNamesShape: false });
+    const malformedSpeakerNamesResult = await runTranscriptionPreflight({ env: goodEnv, createClient: () => malformedSpeakerNamesShape });
+    expect(malformedSpeakerNamesResult.ok).toBe(false);
+    expect(malformedSpeakerNamesResult.checks.speakerNamesShape).toBe(false);
+    expect(malformedSpeakerNamesShape.calls).toContain('ROLLBACK');
 
     const malformed = readOnlyClient({ shape: false });
     const malformedResult = await runTranscriptionPreflight({ env: goodEnv, createClient: () => malformed });

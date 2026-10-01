@@ -5,6 +5,7 @@ jest.mock('../../lib/services/transcription-pilot/runtime', () => {
     createOwnerUpload: jest.fn(),
     listOwnerJobs: jest.fn(),
     getOwnerJob: jest.fn(),
+    getOwnerJobContent: jest.fn(),
     providerReference: jest.fn(),
     requirePilotEnabled: jest.fn(),
     TranscriptionPilotError,
@@ -20,6 +21,7 @@ jest.mock('../../lib/services/transcription-pilot/store', () => ({
   markTranscriptionProviderDeletionCompleted: jest.fn(),
   reconcileVerifiedTranscriptionProviderId: jest.fn(),
   releaseTranscriptionLease: jest.fn(),
+  updateTranscriptionSpeakerNames: jest.fn(),
 }));
 jest.mock('../../lib/services/transcription-pilot/provider', () => ({
   deleteAssemblyAITranscript: jest.fn(), getAssemblyAITranscript: jest.fn(),
@@ -32,6 +34,7 @@ import { dispatchQueuedTranscriptionWorkflow } from '../../lib/services/transcri
 import * as store from '../../lib/services/transcription-pilot/store';
 import * as provider from '../../lib/services/transcription-pilot/provider';
 import jobsHandler from '../../pages/api/admin/transcription-pilot/jobs/index';
+import jobHandler from '../../pages/api/admin/transcription-pilot/jobs/[id]';
 import reconcileHandler from '../../pages/api/admin/transcription-pilot/jobs/[id]/reconcile';
 
 function response() {
@@ -82,6 +85,51 @@ describe('transcription pilot owner routes', () => {
     expect(res.body).toEqual({ jobs: [], pilotEnabled: true, submissionsEnabled: false });
     expect(res.headers['Cache-Control']).toBe('private, no-store');
     delete process.env.TRANSCRIPTION_SUBMISSIONS_ENABLED;
+  });
+
+  it('updates names only for IDs present in verified owner transcript and returns the new owner DTO', async () => {
+    const transcript = { utterances: [
+      { start: 0, end: 100, speaker: 'A', text: 'Hello' },
+      { start: 200, end: 300, speaker: 'B', text: 'World' },
+    ] };
+    const runtime = jest.requireMock('../../lib/services/transcription-pilot/runtime');
+    runtime.getOwnerJobContent.mockResolvedValue({ job: { id: 'job', version: 4 }, content: transcript });
+    store.updateTranscriptionSpeakerNames.mockResolvedValue({ id: 'job', status: 'ready', version: 5,
+      expires_at: new Date(Date.now() + 60_000), speaker_names: { A: 'Chair' } });
+    const res = response();
+    await jobHandler({ method: 'PATCH', body: { expectedVersion: 4, speakerNames: { A: ' Chair ' } }, query: { id: 'job' } }, res);
+    expect(store.updateTranscriptionSpeakerNames).toHaveBeenCalledWith({
+      jobId: 'job', ownerProfileId: 42, expectedVersion: 4, speakerNames: { A: 'Chair' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.body.job.speaker_names).toEqual({ A: 'Chair' });
+    expect(res.headers['Cache-Control']).toBe('private, no-store');
+  });
+
+  it('rejects unknown speaker IDs and does not update content when the transcript is blocked', async () => {
+    const runtime = jest.requireMock('../../lib/services/transcription-pilot/runtime');
+    runtime.getOwnerJobContent.mockResolvedValueOnce({ content: { utterances: [{ start: 0, end: 50, speaker: 'A', text: 'Hi' }] } });
+    const unknown = response();
+    await jobHandler({ method: 'PATCH', body: { expectedVersion: 2, speakerNames: { B: 'Other' } }, query: { id: 'job' } }, unknown);
+    expect(unknown.statusCode).toBe(400);
+    expect(unknown.body.code).toBe('invalid_speaker_names');
+    expect(store.updateTranscriptionSpeakerNames).not.toHaveBeenCalled();
+
+    runtime.getOwnerJobContent.mockRejectedValueOnce(new TranscriptionPilotError('content_unavailable', 410));
+    const blocked = response();
+    await jobHandler({ method: 'PATCH', body: { expectedVersion: 2, speakerNames: { A: 'Chair' } }, query: { id: 'job' } }, blocked);
+    expect(blocked.statusCode).toBe(410);
+    expect(store.updateTranscriptionSpeakerNames).not.toHaveBeenCalled();
+  });
+
+  it('returns conflict when the ready job version changed before the overlay CAS', async () => {
+    const runtime = jest.requireMock('../../lib/services/transcription-pilot/runtime');
+    runtime.getOwnerJobContent.mockResolvedValue({ content: { utterances: [{ start: 0, end: 50, speaker: 'A', text: 'Hi' }] } });
+    store.updateTranscriptionSpeakerNames.mockResolvedValue(null);
+    const res = response();
+    await jobHandler({ method: 'PATCH', body: { expectedVersion: 2, speakerNames: { A: 'Chair' } }, query: { id: 'job' } }, res);
+    expect(res.statusCode).toBe(409);
+    expect(res.body.code).toBe('job_changed_or_not_evaluable');
   });
 
   it('blocks reconcile before any store mutation or provider IO when the pilot switch is off', async () => {

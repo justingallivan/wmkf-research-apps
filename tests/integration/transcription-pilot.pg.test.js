@@ -27,6 +27,7 @@ const describeIf = TEST_URL ? describe : describe.skip;
 const MIGRATION_PATHS = [
   path.join(process.cwd(), 'lib/db/migrations/060_transcription_jobs.sql'),
   path.join(process.cwd(), 'lib/db/migrations/061_transcription_workflow_dispatches.sql'),
+  path.join(process.cwd(), 'lib/db/migrations/062_transcription_speaker_names.sql'),
 ];
 
 describeIf('transcription pilot store (isolated local Postgres proof)', () => {
@@ -164,6 +165,35 @@ describeIf('transcription pilot store (isolated local Postgres proof)', () => {
     expect(await store.acknowledgeWorkflowDispatch({ jobId: queued.id, dispatchToken: claim.dispatch_token,
       attemptNo: claim.attempt_no, workflowRunId: 'run_fixture_late' })).toBeNull();
     expect(await store.getWorkflowDispatch({ jobId: queued.id })).toMatchObject({ state: 'completed', attempt_no: 1 });
+  });
+
+  it('persists the maximum bounded speaker overlay within the JSONB storage cap', async () => {
+    const queued = await makeQueuedJob();
+    const outputPath = `transcription-pilot/${queued.id}/output/transcript.json`;
+    await pool.query(
+      `UPDATE transcription_jobs SET status='ready', output_pathname=$2, output_cleanup_pathname=$2,
+         output_sha256=$3, ready_at=NOW() WHERE id=$1`,
+      [queued.id, outputPath, 'a'.repeat(64)],
+    );
+    const ready = await store.getJob(queued.id);
+    const names = Object.fromEntries(Array.from({ length: 200 }, (_, index) => [
+      `S${String(index).padStart(31, '0')}`, '\u0800'.repeat(80),
+    ]));
+
+    expect(await store.updateSpeakerNames({ jobId: queued.id, ownerProfileId: otherOwnerId,
+      expectedVersion: ready.version, speakerNames: names })).toBeNull();
+    expect(await store.updateSpeakerNames({ jobId: queued.id, ownerProfileId: ownerId,
+      expectedVersion: ready.version - 1, speakerNames: names })).toBeNull();
+    const updated = await store.updateSpeakerNames({ jobId: queued.id, ownerProfileId: ownerId,
+      expectedVersion: ready.version, speakerNames: names });
+    expect(updated.speaker_names).toEqual(names);
+    const size = await pool.query('SELECT pg_column_size(speaker_names)::int AS size FROM transcription_jobs WHERE id=$1', [queued.id]);
+    expect(size.rows[0].size).toBe(56008);
+
+    const cleaned = await store.requestCleanup({ jobId: queued.id, ownerProfileId: ownerId, expectedVersion: updated.version });
+    expect(cleaned.speaker_names).toEqual({});
+    expect(await store.updateSpeakerNames({ jobId: queued.id, ownerProfileId: ownerId,
+      expectedVersion: cleaned.version, speakerNames: names })).toBeNull();
   });
 
   it('recovers only a terminal SDK run matching the current durable run generation', async () => {

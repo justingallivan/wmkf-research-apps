@@ -22,6 +22,7 @@ describe('transcription pilot persistence contract', () => {
     const row = {
       id: 'job', status: TRANSCRIPTION_JOB_STATUS.READY, version: 4,
       original_filename: 'private-name.m4a', correction_notes: 'sensitive correction',
+      speaker_names: { A: 'Private speaker name' },
       output_pathname: 'transcription-pilot/job/output.json',
       input_cleanup_pathname: 'transcription-pilot/job/input.m4a',
       provider_transcript_id: 'provider-secret-id', provider_upload_ref_ciphertext: 'ciphertext',
@@ -31,6 +32,7 @@ describe('transcription pilot persistence contract', () => {
     const projected = projectOwnerTranscriptionJob(row);
     expect(projected.original_filename).toBeNull();
     expect(projected.correction_notes).toBeNull();
+    expect(projected.speaker_names).toBeNull();
     expect(projected.contentAccessAllowed).toBe(false);
     expect(projected.cleanupPending).toBe(true);
     expect(projected.providerCleanupPending).toBe(true);
@@ -41,6 +43,7 @@ describe('transcription pilot persistence contract', () => {
     const expired = projectOwnerTranscriptionJob({ ...row, cleanup_requested_at: null, expires_at: new Date(Date.now() - 1) });
     expect(expired.original_filename).toBeNull();
     expect(expired.correction_notes).toBeNull();
+    expect(expired.speaker_names).toBeNull();
   });
 
   it('rejects lease-field injection before it reaches SQL', async () => {
@@ -53,6 +56,29 @@ describe('transcription pilot persistence contract', () => {
       expectedStatuses: ['queued'],
       fields: { lease_token: '00000000-0000-4000-8000-000000000003' },
     })).rejects.toMatchObject({ code: 'transcription_immutable_field', httpStatus: 400 });
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  it('stores speaker-name overlays under owner, version, ready, cleanup and expiry fences', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    await store.updateSpeakerNames({ jobId: '00000000-0000-4000-8000-000000000001', ownerProfileId: 7,
+      expectedVersion: 8, speakerNames: { A: 'Chair' } });
+    const [query, params] = db.query.mock.calls[0];
+    expect(query).toMatch(/WHERE id = \$1 AND owner_profile_id = \$2 AND version = \$3/);
+    expect(query).toMatch(/status = 'ready' AND output_pathname IS NOT NULL/);
+    expect(query).toMatch(/cleanup_requested_at IS NULL AND content_purged_at IS NULL/);
+    expect(query).toMatch(/expires_at > NOW\(\) AND receipt_expires_at > NOW\(\)/);
+    expect(params).toEqual(['00000000-0000-4000-8000-000000000001', 7, 8, '{"A":"Chair"}']);
+  });
+
+  it.each([
+    null, ['not', 'a map'], { 'bad speaker': 'Name' }, { A: 'x'.repeat(81) }, { A: 'Name\nInjected' },
+  ])('rejects malformed speaker overlays before SQL: %j', async (speakerNames) => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    await expect(store.updateSpeakerNames({ jobId: '00000000-0000-4000-8000-000000000001', ownerProfileId: 7,
+      expectedVersion: 8, speakerNames })).rejects.toMatchObject({ code: 'transcription_invalid_value', httpStatus: 400 });
     expect(db.query).not.toHaveBeenCalled();
   });
 
