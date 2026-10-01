@@ -28,7 +28,7 @@ function message(overrides = {}) {
     signature_text: 'Jean Kim\nW. M. Keck Foundation',
     scheduled_send_at: '2026-08-30T08:00:00.000Z',
     approval_required: false,
-    recipient_contact_ids: ['11111111-1111-4111-8111-111111111111'],
+    recipient_contact_ids: ['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222'],
     status: 'scheduled',
     version: 1,
     lease_token: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
@@ -44,6 +44,13 @@ function dependencies(base = message()) {
   const finalized = { ...sent, finalized_at: '2026-08-25T00:00:02.000Z' };
   return {
     claimSend: jest.fn(async () => claimed),
+    // Part B default: the current Liaison and posture match the row (no drift).
+    readCurrentRecipients: jest.fn(async (row) => ({
+      piContactId: '11111111-1111-4111-8111-111111111111',
+      liaison: { contactId: '22222222-2222-4222-8222-222222222222', email: 'liaison@example.edu' },
+      approvalRequiredNow: row.approval_required === true,
+    })),
+    reconcileRecipients: jest.fn(async () => null),
     getDeliverable: jest.fn(async () => ({
       _etag: 'W/"1"',
       wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.INVITED,
@@ -555,5 +562,179 @@ describe('Test Request isolation (Stage 1b)', () => {
     expect(result).toEqual({ skipped: true });
     expect(deps.cancelForSource).not.toHaveBeenCalled();
     expect(deps.claimSend).not.toHaveBeenCalled();
+  });
+});
+
+describe('Part B: send-time recipient and posture re-check', () => {
+  const PI = '11111111-1111-4111-8111-111111111111';
+  const LIAISON = '22222222-2222-4222-8222-222222222222';
+  const OTHER = '33333333-3333-4333-8333-333333333333';
+  // Mirrors reconcileScheduledEmailRecipients' SET list (the SQL itself is
+  // proven against live Postgres in scheduled-email-engine.pg.test.js).
+  const applyTransition = (row, t) => ({
+    ...row,
+    cc_recipients: t.recipientDrift ? t.ccRecipients : row.cc_recipients,
+    recipient_contact_ids: t.recipientDrift ? t.recipientContactIds : row.recipient_contact_ids,
+    recipient_generation: (Number(row.recipient_generation) || 0) + (t.recipientDrift ? 1 : 0),
+    approval_required: t.approvalRequired === true,
+    approved_at: null,
+    version: row.version + 1,
+    status: t.holdForApproval ? 'scheduled' : row.status,
+    lease_token: t.holdForApproval ? null : row.lease_token,
+    last_error_code: t.holdForApproval ? t.reasonCode : row.last_error_code,
+  });
+  function partB({ row = message(), current = {}, force = false } = {}) {
+    const deps = dependencies(row);
+    deps.readCurrentRecipients.mockResolvedValue({
+      piContactId: PI,
+      liaison: { contactId: LIAISON, email: 'liaison@example.edu' },
+      approvalRequiredNow: false,
+      ...current,
+    });
+    deps.reconcileRecipients.mockImplementation(async (claimed, t) => applyTransition(claimed, t));
+    return { deps, run: () => deliverScheduledEmail(row.id, force ? { force: true, pdSystemUserId: row.pd_systemuser_id, expectedVersion: row.version } : {}, deps) };
+  }
+
+  test('changed email on the same contact re-addresses, bumps generation and sends under the returned row', async () => {
+    const { deps, run } = partB({ current: { liaison: { contactId: LIAISON, email: 'new.liaison@example.edu' } } });
+    const result = await run();
+    expect(deps.reconcileRecipients).toHaveBeenCalledWith(expect.objectContaining({ status: 'sending' }), expect.objectContaining({
+      recipientDrift: true, ccRecipients: ['new.liaison@example.edu'], recipientContactIds: [PI, LIAISON],
+      approvalRequired: false, holdForApproval: false,
+    }));
+    // B3: the created activity uses the RETURNED row's generation key and Cc.
+    expect(deps.createEmailActivity).toHaveBeenCalledWith(expect.objectContaining({
+      cc: ['new.liaison@example.edu'], correlationKey: `wmkf-scheduled-recipient:${message().id}:g1`,
+    }));
+    expect(result).toMatchObject({ sent: true, readdressed: true });
+  });
+
+  test('the same normalized email on a different contact still drifts', async () => {
+    const { deps, run } = partB({ current: { liaison: { contactId: OTHER, email: '  Liaison@Example.edu ' } } });
+    await run();
+    expect(deps.reconcileRecipients).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      recipientDrift: true, recipientContactIds: [PI, OTHER],
+    }));
+  });
+
+  test('a case/whitespace-only email difference on the same contact is not drift', async () => {
+    const { deps, run } = partB({ current: { liaison: { contactId: LIAISON.toUpperCase(), email: ' LIAISON@example.edu' } } });
+    await run();
+    expect(deps.reconcileRecipients).not.toHaveBeenCalled();
+    expect(deps.sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  test('a Liaison dropped to none re-addresses with no Cc', async () => {
+    const { deps, run } = partB({ current: { liaison: null } });
+    await run();
+    expect(deps.reconcileRecipients).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      recipientDrift: true, ccRecipients: [], recipientContactIds: [PI],
+    }));
+  });
+
+  test('an approved row that still needs approval is re-addressed into approval-pending without any activity work', async () => {
+    const { deps, run } = partB({
+      row: message({ approval_required: true, approved_at: '2026-08-20T00:00:00.000Z' }),
+      current: { liaison: { contactId: OTHER, email: 'other@example.edu' }, approvalRequiredNow: true },
+    });
+    const result = await run();
+    expect(deps.reconcileRecipients).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      recipientDrift: true, approvalRequired: true, holdForApproval: true, reasonCode: 'scheduled_email_recipients_changed',
+    }));
+    expect(result).toMatchObject({ approvalPending: true, reason: 'recipients_changed' });
+    expect(result.message).toMatchObject({ status: 'scheduled', approvalRequired: true, approvedAt: null, recipientGeneration: 1 });
+    expect(deps.findEmailByCorrelation).not.toHaveBeenCalled();
+    expect(deps.createEmailActivity).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('an approved approval-required row that no longer needs approval clears approval and keeps sending under the same lease', async () => {
+    const row = message({ approval_required: true, approved_at: '2026-08-20T00:00:00.000Z' });
+    const { deps, run } = partB({ row, current: { liaison: { contactId: OTHER, email: 'other@example.edu' } } });
+    const result = await run();
+    const [, transition] = deps.reconcileRecipients.mock.calls[0];
+    expect(transition).toMatchObject({ recipientDrift: true, approvalRequired: false, holdForApproval: false });
+    expect(deps.recordEmailActivity.mock.calls[0][0]).toMatchObject({ lease_token: row.lease_token, approved_at: null, approval_required: false });
+    expect(result.sent).toBe(true);
+  });
+
+  test('a recipient read failure is a retryable failure: no transition, no activity, no send', async () => {
+    const { deps, run } = partB();
+    deps.readCurrentRecipients.mockRejectedValue(Object.assign(new Error('Could not confirm the current recipients: timeout'), {
+      code: 'scheduled_email_recipient_read_failed', retryable: true,
+    }));
+    await expect(run()).rejects.toMatchObject({ code: 'scheduled_email_recipient_read_failed', retryable: true });
+    expect(deps.recordFailure).toHaveBeenCalledWith(expect.objectContaining({ status: 'sending' }), expect.anything(), 'scheduled_email_recipient_read_failed');
+    expect(deps.reconcileRecipients).not.toHaveBeenCalled();
+    expect(deps.findEmailByCorrelation).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['review-all turned on', { approvalRequiredNow: true }],
+    ['an existing recipient became VIP', { approvalRequiredNow: true }],
+  ])('posture-only tightening (%s) holds an ordinary claim without touching recipients or generation', async (_label, current) => {
+    const row = message({ approval_required: false, approved_at: '2026-08-20T00:00:00.000Z' });
+    const { deps, run } = partB({ row, current });
+    const result = await run();
+    const [, transition] = deps.reconcileRecipients.mock.calls[0];
+    expect(transition).toEqual({
+      approvalRequired: true, holdForApproval: true,
+      reasonCode: 'scheduled_email_approval_now_required', reasonMessage: expect.any(String),
+    });
+    expect(result).toMatchObject({ approvalPending: true, reason: 'approval_required' });
+    expect(result.message).toMatchObject({ approvalRequired: true, approvedAt: null, recipientGeneration: 0 });
+    expect(deps.findEmailByCorrelation).not.toHaveBeenCalled();
+  });
+
+  test('relaxation (review-all off on an approved row) changes nothing and sends as approved', async () => {
+    const { deps, run } = partB({
+      row: message({ approval_required: true, approved_at: '2026-08-20T00:00:00.000Z' }),
+      current: { approvalRequiredNow: false },
+    });
+    const result = await run();
+    expect(deps.reconcileRecipients).not.toHaveBeenCalled();
+    expect(result.sent).toBe(true);
+  });
+
+  test('a lost lease/version fence aborts before any activity lookup', async () => {
+    const { deps, run } = partB({ current: { liaison: { contactId: OTHER, email: 'other@example.edu' } } });
+    deps.reconcileRecipients.mockResolvedValue(null);
+    await expect(run()).resolves.toEqual({ skipped: true });
+    expect(deps.findEmailByCorrelation).not.toHaveBeenCalled();
+    expect(deps.createEmailActivity).not.toHaveBeenCalled();
+    expect(deps.recordFailure).not.toHaveBeenCalled();
+  });
+
+  test('send-now: posture-only tightening is skipped (the PD action is the approval) and it sends', async () => {
+    const { deps, run } = partB({ current: { approvalRequiredNow: true }, force: true });
+    const result = await run();
+    expect(deps.reconcileRecipients).not.toHaveBeenCalled();
+    expect(result.sent).toBe(true);
+  });
+
+  test('send-now: recipient drift re-addresses into approval-pending and does not send, even with no approval otherwise required', async () => {
+    const { deps, run } = partB({ current: { liaison: { contactId: OTHER, email: 'other@example.edu' } }, force: true });
+    const result = await run();
+    expect(deps.reconcileRecipients).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      recipientDrift: true, approvalRequired: true, holdForApproval: true,
+    }));
+    expect(result).toMatchObject({ approvalPending: true, reason: 'recipients_changed' });
+    expect(deps.createEmailActivity).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('B5: a saved activity without send intent is sent as created, flagged, and never re-checked', async () => {
+    const row = message({ dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' });
+    const { deps, run } = partB({ row, current: { liaison: { contactId: OTHER, email: 'other@example.edu' } } });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const result = await run();
+    expect(deps.readCurrentRecipients).not.toHaveBeenCalled();
+    expect(deps.reconcileRecipients).not.toHaveBeenCalled();
+    expect(deps.createEmailActivity).not.toHaveBeenCalled();
+    expect(deps.sendEmail).toHaveBeenCalledWith('ffffffff-ffff-4fff-8fff-ffffffffffff', expect.anything());
+    expect(result).toMatchObject({ sent: true, savedActivityNotReaddressed: true });
+    expect(warn.mock.calls.some(([, payload]) => String(payload).includes('scheduled_email_saved_activity_not_readdressed'))).toBe(true);
+    warn.mockRestore();
   });
 });

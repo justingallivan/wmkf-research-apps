@@ -392,8 +392,9 @@ The first allowlisted workflow is `grantee_abstract_reminder`. One source
 deliverable can own one row, created on the cron's first sight of an Invited
 deliverable. The row freezes the exact server-derived PD, recipients,
 recipient contact GUIDs, subject/body/signature, established day-12 send
-time, and `approval_required` (computed once at creation from the PD's
-review-all override plus VIP flags). It records optimistic versions and PD
+time, and `approval_required` (computed at creation from the PD's
+review-all override plus VIP flags; re-checked at send time by Part B,
+tightening only). It records optimistic versions and PD
 edit/approve/stop attribution; the digest FYI receipt (`digest_fyi_at`);
 recipient Dynamics activity identity, send intent, acceptance receipt, retry
 lease/error; and the final Dataverse repair timestamp. Preview uses a visibly
@@ -424,9 +425,9 @@ owned by a different PD. [RECHECKED after lib/services/scheduled-email-store.js 
 [RECHECKED after lib/services/scheduled-email-service.js change: sendScheduledEmailDigest rewritten onto the run ledger 2026-08-26]
 [RECHECKED after lib/services/cron/grantee-deliverable-reminders-service.js change: drift rebuild + reassigned counter added 2026-08-26]
 
-**Part A engine hardening (branch `claude/scheduled-email-part-a`, 2026-09-30,
-S553) [SOURCE-BUILT + LIVE-POSTGRES-TESTED on a scratch database; migration
-059 NOT applied to the shared database; not merged]:** migration
+**Part A engine hardening (PR #373, merged 2026-09-30, S553) [VERIFIED: migration
+059 applied to shared Production (tracker `claude-part-a-2026-09-30`, read-only
+query 2026-09-30)]:** migration
 `059_scheduled_email_recipient_generation.sql` (fresh-install block V58) adds
 `recipient_generation INTEGER NOT NULL DEFAULT 0`, the only new column. Per
 `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` A1–A7:
@@ -458,6 +459,30 @@ send. The digest query is a per-PD `ROW_NUMBER()` window (100 rows per PD,
 also used by the action route and `pages/scheduled-emails.js`. Proof:
 `tests/integration/scheduled-email-engine.pg.test.js` (CI ledger job).
 
+**Part B send-time recipient and posture re-check (branch
+`claude/scheduled-email-part-b`, 2026-10-01) [SOURCE-BUILT + LIVE-POSTGRES-TESTED on
+a scratch database; not merged; no migration]:** per plan B1–B5,
+`deliverScheduledEmail` re-reads a transport-pristine row's current Liaison
+(`resolveRequestLiaison` + contact) and review posture (review-all + VIP flags
+for `[PI, Liaison?]`) after the claim and before any activity lookup. Any read
+failure is a retryable `scheduled_email_recipient_read_failed`.
+`reconcileScheduledEmailRecipients` is the single transition, fenced on
+`lease_token`, `version`, `status = 'sending'` and both transport fields null:
+- **Recipient drift** (Liaison contact id or normalized email, including a
+  Liaison gained or dropped) rewrites `cc_recipients` and the ordered
+  `recipient_contact_ids` and increments `recipient_generation`.
+- **Posture-only tightening** sets `approval_required = true`.
+- **Every transition** clears `approved_at` and increments `version`.
+- **When approval is required** (always for recipient drift on a forced
+  send-now) the row returns to `scheduled` with the lease released and
+  `last_error_code` `scheduled_email_recipients_changed` or
+  `scheduled_email_approval_now_required`. Those codes are not attention
+  codes, so the row sits under approval-pending. Otherwise delivery continues
+  under the same lease with the returned row.
+
+Relaxation changes nothing. A saved activity without send intent is sent as
+created and only counted (`savedActivityNotReaddressed`; owner decision B-2).
+
 **Retention:** daily maintenance defaults to 365 days and deletes only rows
 that are both `sent` and Dataverse-finalized, or explicitly `stopped`. Pending,
 failed, sending, and sent-but-unfinalized rows are ineligible so cleanup cannot
@@ -479,8 +504,9 @@ Deliberately per-PD, never global — the flag does not transfer on request
 handoff. Written/read via `lib/services/scheduled-email-store.js` from the
 profile-owned `/api/scheduled-emails/vip-flags` route (toggles render on the
 Workbench Awardee tab and the `/scheduled-emails` inbox) and read by the
-reminders cron to freeze `approval_required` at ledger-row creation; any
-flagged recipient contact (PI or liaison) requires approval. **[VERIFIED
+reminders cron to set `approval_required` at ledger-row creation (re-checked at
+send time by Part B, tightening only); any flagged recipient contact (PI or
+liaison) requires approval. **[VERIFIED
 2026-08-26 via migration 036 and scheduled-email-store.js on branch
 `codex/scheduled-email-review-p0`; LIVE-PROBED 2026-08-26: table exists in the shared Neon database, empty until the branch deploys.]**
 

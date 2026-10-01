@@ -264,6 +264,23 @@ test('data.outcome === "uncertain" on "Send now" shows the uncertain feedback re
   expect(status).toHaveTextContent('Timed out. Check the recipient before trying again.');
 });
 
+test('Part B: a "Send now" refused for changed recipients shows the new Cc and version and keeps the warning visible', async () => {
+  const copy = "Recipients changed: the institution's Liaison changed. Review and send again.";
+  await renderWithMessage([[/\/api\/scheduled-emails\/m1$/, async () => response(409, {
+    error: copy,
+    outcome: 'failed',
+    message: { ...MESSAGE, version: 2, ccRecipients: ['new.liaison@example.edu'], approvalRequired: true },
+  })]]);
+  fireEvent.click(screen.getByRole('button', { name: 'Send now' }));
+  await screen.findByText('new.liaison@example.edu');
+  const status = await screen.findByRole('status');
+  expect(status).toHaveAttribute('data-status', 'failed');
+  expect(status).toHaveTextContent(copy);
+  // Effects keyed on the new version have settled; the warning is still there.
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+  expect(screen.getByRole('status')).toHaveTextContent(copy);
+});
+
 test('(c) a network rejection on "Send now" shows the uncertain feedback', async () => {
   await renderWithMessage([[/\/api\/scheduled-emails\/m1$/, async () => { throw new Error('network down'); }]]);
   fireEvent.click(screen.getByRole('button', { name: 'Send now' }));

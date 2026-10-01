@@ -18,6 +18,7 @@ jest.mock('../../lib/services/scheduled-email-store', () => ({
 jest.mock('../../lib/services/scheduled-email-service', () => ({
   projectScheduledEmail: jest.fn((row) => row ? ({ id: row.id, version: row.version, status: row.status }) : null),
   deliverScheduledEmail: jest.fn(),
+  RECIPIENTS_CHANGED_COPY: "Recipients changed: the institution's Liaison changed. Review and send again.",
 }));
 
 import listHandler from '../../pages/api/scheduled-emails/index';
@@ -86,6 +87,21 @@ test('send-now action cannot escape PD scope and uses the viewed version', async
     expectedVersion: 2,
   });
   expect(res.body.message.status).toBe('sent');
+});
+
+test('Part B: a send-now held for changed recipients returns 409 with the re-addressed row and the plan copy', async () => {
+  const held = { id: ID, version: 3, status: 'scheduled' };
+  deliverScheduledEmail.mockResolvedValueOnce({ approvalPending: true, reason: 'recipients_changed', message: held });
+  const res = mockRes();
+  await actionHandler({
+    method: 'PATCH', query: { id: ID }, body: { action: 'send_now', version: 2 },
+  }, res);
+  expect(res.statusCode).toBe(409);
+  expect(res.body).toEqual({
+    error: "Recipients changed: the institution's Liaison changed. Review and send again.",
+    outcome: 'failed',
+    message: held,
+  });
 });
 
 test('an uncertain send-now result returns 202 and blocks blind retry language', async () => {

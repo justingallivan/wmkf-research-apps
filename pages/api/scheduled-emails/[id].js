@@ -12,6 +12,7 @@ import {
 } from '../../../lib/services/scheduled-email-store';
 import {
   deliverScheduledEmail,
+  RECIPIENTS_CHANGED_COPY,
   projectScheduledEmail,
 } from '../../../lib/services/scheduled-email-service';
 import {
@@ -111,6 +112,16 @@ export default async function handler(req, res) {
         });
         if (!outcome.message) {
           return res.status(409).json({ error: 'The message changed or is already being processed. Reload and try again.' });
+        }
+        if (outcome.approvalPending) {
+          // Part B: send-now never sends to a Cc the PD has not seen.
+          return res.status(409).json({
+            error: outcome.reason === 'recipients_changed'
+              ? RECIPIENTS_CHANGED_COPY
+              : 'This message now needs your approval. Review it and try again.',
+            outcome: 'failed',
+            message: outcome.message,
+          });
         }
         return res.status(200).json({ message: outcome.message });
       } catch (error) {
