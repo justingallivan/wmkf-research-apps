@@ -67,6 +67,8 @@ function makeFixture(root, { responses = [], envText, envPresent = true } = {}) 
   for (const script of SCRIPTS) {
     fs.copyFileSync(path.join(REPO_ROOT, 'scripts', script), path.join(root, 'scripts', script));
   }
+  const bootstrapPath = path.join(REPO_ROOT, 'scripts', 'lib', 'akoya-readonly-probe-bootstrap.js');
+  if (fs.existsSync(bootstrapPath)) fs.copyFileSync(bootstrapPath, path.join(root, 'scripts', 'lib', 'akoya-readonly-probe-bootstrap.js'));
   if (envPresent) fs.writeFileSync(path.join(root, '.env.local'), envText ?? [
     'DYNAMICS_TENANT_ID=tenant-fixture',
     'DYNAMICS_CLIENT_ID=client-fixture',
@@ -276,6 +278,18 @@ describe('legacy read-only Akoya probe bootstrap characterization', () => {
     } finally { result.cleanup(); }
   });
 
+  test.each([SCRIPTS[0], SCRIPTS[2]])('%s throws on a failed GET', (script) => {
+    const result = runProbe({ script, responses: [
+      ok({ access_token: 'token-fixture' }), { status: 502, body: { error: 'GET unavailable' } },
+    ] });
+    try {
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('PROBE ERROR: GET ');
+      expect(result.stderr).toContain('502');
+      expect(result.requests).toHaveLength(2);
+    } finally { result.cleanup(); }
+  });
+
   test('loader resolves only the synthetic checkout root and ignores a cwd decoy', () => {
     const result = runProbe({ script: SCRIPTS[0] });
     try {
@@ -392,7 +406,7 @@ describe('legacy read-only Akoya probe bootstrap characterization', () => {
       if (expectedError) {
         expect(result.status).toBe(1);
         expect(result.stderr).toMatch(expectedError);
-        if (_label === 'non-2xx full token body') expect(result.stderr).toContain('y'.repeat(500));
+        if (_label === 'non-2xx full token body') expect(result.stderr).toContain('y'.repeat(600));
         expect(result.requests).toHaveLength(1);
       } else {
         expect(result.status).toBe(0);
@@ -444,5 +458,56 @@ describe('legacy read-only Akoya probe bootstrap characterization', () => {
       expect(readFailure.stderr).not.toContain('PROBE ERROR:');
       expect(readFailure.requests).toHaveLength(0);
     } finally { readFailure.cleanup(); }
+  });
+
+  test('copied helper import is inert; explicit calls load env and fetch uncached tokens', () => {
+    const importOnly = runProbe({ script: 'helper-import-only.cjs', responses: [], setup: (root) => {
+      fs.writeFileSync(path.join(root, 'scripts', 'helper-import-only.cjs'), `
+const fs = require('fs');
+let envFileCalls = 0;
+const existsSync = fs.existsSync;
+const readFileSync = fs.readFileSync;
+fs.existsSync = function(filePath, ...args) { if (String(filePath).endsWith('.env.local')) envFileCalls++; return existsSync.call(fs, filePath, ...args); };
+fs.readFileSync = function(filePath, ...args) { if (String(filePath).endsWith('.env.local')) envFileCalls++; return readFileSync.call(fs, filePath, ...args); };
+const before = process.env.DYNAMICS_CLIENT_ID;
+require('./lib/akoya-readonly-probe-bootstrap');
+console.log(JSON.stringify({ before: before ?? null, after: process.env.DYNAMICS_CLIENT_ID ?? null, envFileCalls }));
+`);
+    } });
+    try {
+      expect(importOnly.status).toBe(0);
+      expect(importOnly.stdout.trim()).toBe('{"before":null,"after":null,"envFileCalls":0}');
+      expect(importOnly.requests).toHaveLength(0);
+    } finally { importOnly.cleanup(); }
+
+    const explicitCalls = runProbe({ script: 'helper-token-calls.cjs', responses: [
+      ok({ access_token: 'one' }), ok({ access_token: 'two' }),
+    ], setup: (root) => {
+      fs.appendFileSync(path.join(root, '.env.local'), '\nPROBE_2_KEY=fixture-value');
+      fs.writeFileSync(path.join(root, 'scripts', 'helper-token-calls.cjs'), `
+const fs = require('fs');
+let envFileCalls = 0;
+const existsSync = fs.existsSync;
+const readFileSync = fs.readFileSync;
+fs.existsSync = function(filePath, ...args) { if (String(filePath).endsWith('.env.local')) envFileCalls++; return existsSync.call(fs, filePath, ...args); };
+fs.readFileSync = function(filePath, ...args) { if (String(filePath).endsWith('.env.local')) envFileCalls++; return readFileSync.call(fs, filePath, ...args); };
+const { loadProbeEnvLocal, getToken } = require('./lib/akoya-readonly-probe-bootstrap');
+const imported = process.env.DYNAMICS_CLIENT_ID ?? null;
+loadProbeEnvLocal();
+(async () => {
+  const first = await getToken();
+  process.env.DYNAMICS_CLIENT_ID = 'updated-client';
+  const second = await getToken();
+  console.log(JSON.stringify({ imported, loaded: process.env.DYNAMICS_CLIENT_ID, arbitrary: process.env.PROBE_2_KEY, first, second, envFileCalls }));
+})().catch((error) => { console.error(error); process.exitCode = 1; });
+`);
+    } });
+    try {
+      expect(explicitCalls.status).toBe(0);
+      expect(explicitCalls.stdout.trim()).toBe('{"imported":null,"loaded":"updated-client","arbitrary":"fixture-value","first":"one","second":"two","envFileCalls":2}');
+      expect(explicitCalls.requests).toHaveLength(2);
+      expect(new URLSearchParams(explicitCalls.requests[0].body).get('client_id')).toBe('client-fixture');
+      expect(new URLSearchParams(explicitCalls.requests[1].body).get('client_id')).toBe('updated-client');
+    } finally { explicitCalls.cleanup(); }
   });
 });

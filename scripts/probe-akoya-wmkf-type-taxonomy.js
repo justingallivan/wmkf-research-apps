@@ -15,36 +15,12 @@
  * this live. Only POST is the OAuth token; every Dataverse call is a GET.
  */
 
-const fs = require('fs');
-const path = require('path');
-
-const envPath = path.join(__dirname, '..', '.env.local');
-if (fs.existsSync(envPath)) {
-  for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
-    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (!m) continue;
-    let [, k, v] = m;
-    v = v.trim().replace(/^"(.*)"$/, '$1');
-    if (!process.env[k]) process.env[k] = v;
-  }
-}
+const { loadProbeEnvLocal, getToken } = require('./lib/akoya-readonly-probe-bootstrap');
+loadProbeEnvLocal();
 
 const MIG = `<condition attribute="createdon" operator="on-or-after" value="2023-12-03T00:00:00Z"/>` +
             `<condition attribute="createdon" operator="on-or-before" value="2023-12-03T23:59:59Z"/>`;
 const NAT = `<condition attribute="createdon" operator="gt" value="2023-12-03T23:59:59Z"/>`;
-
-async function getToken() {
-  const r = await fetch(`https://login.microsoftonline.com/${process.env.DYNAMICS_TENANT_ID}/oauth2/v2.0/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials', client_id: process.env.DYNAMICS_CLIENT_ID,
-      client_secret: process.env.DYNAMICS_CLIENT_SECRET, scope: `${process.env.DYNAMICS_URL}/.default`,
-    }),
-  });
-  if (!r.ok) throw new Error(`Token: ${r.status} ${await r.text()}`);
-  return (await r.json()).access_token;
-}
 
 async function get(token, urlPath) {
   const r = await fetch(`${process.env.DYNAMICS_URL}/api/data/v9.2${urlPath}`, {
