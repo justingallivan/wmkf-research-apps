@@ -384,6 +384,10 @@ If you're touching a service or utility, read its header before this catalog. If
 
 - **`form-schema.js`** — Intake-portal form schema loader. Static import map (`SCHEMAS[formKey]`); `findFileField` walker; `countFieldEntries` cardinality helper.
 
+### Email templates
+
+- **`email-placeholders.js`** — Shared literal substitution for reviewer reminder, thank-you, withdrawal, grantee reminder, and acceptance email templates. Applies longer keys first, replaces globally and sequentially, and converts nullish replacement values to empty strings; caller token dictionaries and HTML rendering remain local.
+
 ### Collections
 
 - **`past-cutoff.js`** — `isPastCutoff(meetingDate, cutoffIso)`: true only when a Date-parseable meeting date is strictly before the ISO cutoff instant; `null`/unparseable → `false`, so a missing meeting date can never make a row expiry-eligible. Moved out of `reviewer-engagement/expire-invitation.js` 2026-09-06 (S490); imported by that module and by the stale-invitation sweep's discovery pass.
