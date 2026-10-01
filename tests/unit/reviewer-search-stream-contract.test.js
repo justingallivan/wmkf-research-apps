@@ -317,7 +317,7 @@ test('post-save reconciliation trusts canonical GET rows and never promotes prot
     ineligible: [{ ...ineligible, candidateKey: ineligible.candidateKey }],
     blocked: [{ ...blocked, candidateKey: blocked.candidateKey }],
     handled: [{ ...handled, candidateKey: handled.candidateKey }],
-    savedKeys: [nameOnly.candidateKey, atCapacity.candidateKey],
+    savedKeys: [],
     allNames: [canonical.name, excluded.name, ineligible.name, blocked.name, handled.name, nameOnly.name],
   };
   const analyze = streamResponse(sseFrame('result', {
@@ -333,12 +333,14 @@ test('post-save reconciliation trusts canonical GET rows and never promotes prot
     onRosterPost: (options) => {
       const posted = JSON.parse(options.body).candidates;
       return Promise.resolve(response({
-        success: true,
-        recorded: posted.length,
+        success: false,
+        recorded: 2,
         outcomes: posted.map((row, inputIndex) => ({
           inputIndex,
           candidateKey: row.candidateKey,
-          status: 'recorded',
+          status: inputIndex === 0 || inputIndex === 6
+            ? 'recorded'
+            : inputIndex === 5 ? 'failed' : 'unchanged',
         })),
       }));
     },
