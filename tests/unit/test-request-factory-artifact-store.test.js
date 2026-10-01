@@ -240,11 +240,23 @@ describe('sweepFactoryArtifacts', () => {
     expect(calls.list).toHaveLength(0);
   });
 
-  test('scans at most SWEEP_SCAN_LIMIT objects per prefix, in pages of at most 100', async () => {
-    const { blob, calls } = fakeBlob();
-    await sweep(blob, () => []).promise;
+  test('paginates in pages of at most 100, stops scanning a prefix at SWEEP_SCAN_LIMIT, and reports scanTruncated', async () => {
+    // SWEEP_SCAN_LIMIT + 10 fresh drafts: all kept, the last 10 never examined today.
+    const initial = {};
+    for (let i = 0; i < SWEEP_SCAN_LIMIT + 10; i += 1) {
+      initial[draftPathname('sandbox', ACTOR, `${String(i).padStart(8, '0')}-0000-4000-8000-000000000000`)] = aged(1);
+    }
+    const { blob, calls } = fakeBlob(initial);
+    const stats = await sweep(blob, () => []).promise;
+    const draftPages = calls.list.filter((c) => c.prefix === 'sandbox/drafts/');
+    expect(draftPages.length).toBeGreaterThan(1); // real pagination through the fake's cursor
+    expect(draftPages.slice(1).every((c) => c.cursor)).toBe(true);
     expect(calls.list.every((c) => c.limit <= 100)).toBe(true);
-    expect(calls.list.map((c) => c.limit).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(2 * SWEEP_SCAN_LIMIT);
+    expect(draftPages.map((c) => c.limit).reduce((a, b) => a + b, 0)).toBe(SWEEP_SCAN_LIMIT);
+    expect(stats.kept).toBe(SWEEP_SCAN_LIMIT);
+    expect(stats.deleted).toBe(0);
+    expect(stats.scanTruncated).toBe(true);
+    expect(stats.truncated).toBe(false);
   });
 
   test('stops deleting at SWEEP_DELETE_LIMIT and reports truncated; every run was still examined', async () => {
