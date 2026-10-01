@@ -1,6 +1,6 @@
 ---
 title: Grantee-title generation deadline propagation
-status: planned
+status: in-progress
 domain: architecture
 kind: plan
 summary: Propagate the existing cron row deadline through the title wrapper into the Executor so timeout also cancels provider work and retry delays.
@@ -12,9 +12,9 @@ owner: product-engineering
 
 [PLANNED] Root-authored plan for ordinary Fable OAuth review, then Luna implementation/validation, Sol review, root review, and final Fable adversarial review. Keep iterations bounded to substantive findings. PR #390 remains on hold and is not part of this change.
 
-Base: `7a95313f49c95d5bdbbe7c906fbeabc2212e2627` (fetched main). Branch: `codex/grantee-title-timeout`. Plan approved with named changes incorporated below. No implementation, production reproduction, merge, or deployment is claimed.
+Base: `7a95313f49c95d5bdbbe7c906fbeabc2212e2627` (fetched main). Branch: `codex/grantee-title-timeout`. Plan approved with named changes incorporated below. Implemented in `0b3509b65`; final review and broad validation are in progress. No production reproduction, merge, or deployment is claimed.
 
-## Surface and verified baseline
+## Surface and verified pre-change baseline
 
 - [VERIFIED via source/caller search] Entry is `pages/api/cron/generate-grantee-titles.js`: method/cron-secret/cycle validation and model warming precede trusted DAL context and `runGranteeTitleGeneration`. The only production caller of `generateGranteeTitle` is this cron service. No browser UI contract changes.
 - [VERIFIED via `lib/services/cron/generate-grantee-titles-service.js`] The batch selects research requests in Invited status with an empty `wmkf_wmkfprojectdescription`, excluding test requests under the existing isolation policy. Four workers launch rows within a 70-second soft budget. Each valid row races `generateGranteeTitle` against a 40-second timer. Timeout increments failed and returns before the fresh read or title PATCH, but does not cancel the losing generation promise. Query-level errors remain 503; individual errors remain in the summary's failures.
@@ -55,4 +55,6 @@ Base: `7a95313f49c95d5bdbbe7c906fbeabc2212e2627` (fetched main). Branch: `codex/
 
 [VERIFIED via GitHub open-PR file lists] No open PR changes the two title runtime files or shared Executor/LLMClient. PRs #332/#328 touch separate catalog entries; PR #390 is the held assessment. Recheck overlap before publication/promotion.
 
-Review record: Fable plan session `cdaf364c-a778-40fc-a2d0-40c2ca9419a4` APPROVED WITH NAMED CHANGES: timer-order honesty, discriminating cancellation/hop assertions, and the named Executor doc row. Incorporated above. Root narrows the timer claim to whichever error actually wins; it does not assume all real schedules produce the same message. Sol independently found no material design flaw. Baseline 8 suites / 137 tests passed; implementation and final review pending.
+Review record: Fable plan session `cdaf364c-a778-40fc-a2d0-40c2ca9419a4` APPROVED WITH NAMED CHANGES: timer-order honesty, discriminating cancellation/hop assertions, and the named Executor doc row. Incorporated above. Root narrows the timer claim to whichever error actually wins; it does not assume all real schedules produce the same message. Sol independently found no material design flaw. Baseline 8 suites / 137 tests passed. Luna implemented the two runtime forwarding changes and three test files in `0b3509b65`. New forwarding/cancellation assertions failed before the runtime edits; final focused set passes 9 suites / 142 tests. Root independently inspected the complete runtime/test diff and found no substantive issue. Sol approved the same runtime/test commit with no substantive finding. Broad validation and final Fable review are pending.
+
+[VERIFIED bounded documentation reconciliation] The Executor deadline input row now covers fixed caller budgets as well as leases. The two changed source headers/comments explain provider cancellation and uncancelled preflight/audit; the generation budget estimate explicitly excludes Dataverse I/O. No database shape, route, enum, prompt definition, provider policy, or write contract changes. The security-matrix and catalog statements remain compatible. Historical scan material and held PR #390 were not changed.
