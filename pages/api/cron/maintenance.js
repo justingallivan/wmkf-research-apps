@@ -242,6 +242,17 @@ export default async function handler(req, res) {
       results.presentationMaterialUploads = { error: error.message };
     }
 
+    // 7.6b. Test Request Factory artifact store (admin form): ready-run and
+    // unreserved artifacts and stale drafts only; never a resumable run's.
+    try {
+      results.factoryArtifacts = await MaintenanceService.sweepFactoryArtifacts();
+      if (typeof results.factoryArtifacts?.deleted === 'number') {
+        totalDeleted += results.factoryArtifacts.deleted;
+      }
+    } catch (error) {
+      results.factoryArtifacts = { error: error.message };
+    }
+
     // 7.7. Personalized scheduled-email audit/recovery ledger. Delete only
     // fully finalized sends and explicit stops; unresolved work is retained.
     try {
