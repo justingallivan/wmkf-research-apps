@@ -264,11 +264,11 @@ export default function useReviewerDiscovery({
         setEnrichNote('Contact lookup was incomplete — some cards may be missing emails or citation metrics.');
       }
 
-      // Durably record the surfaced candidates so they persist + dedup future
-      // runs. AWAIT it (don't fire-and-forget) and re-check genRef before trusting
-      // it as deduped — a slow POST must not clobber a newer search's roster
-      // (S224). Verified (Claude) + database discoveries only; unverified stay
-      // ephemeral. A failure degrades to "no dedup this run", never a broken panel.
+      // Record verified discoveries, then reload the retained roster. Indexed
+      // acknowledgments correlate inputs; only GET determines durable buckets
+      // and future search exclusions. Unverified suggestions stay ephemeral.
+      // Both awaits are generation-guarded so an older run cannot replace a new
+      // proposal's state; uncertain outcomes use read recovery, never POST replay.
       if (dedupedEnriched.length > 0 && requestId) {
         const pruned = dedupedEnriched.map(pruneCandidateForRoster);
         let postResponse = null;
@@ -367,7 +367,7 @@ export default function useReviewerDiscovery({
           }
         }
       }
-      // Keep `phase` busy until the roster write settles. Otherwise a user can
+      // Keep `phase` busy until the roster write and readback settle. Otherwise a user can
       // remove prior results while this POST is still in flight, and the two
       // operations can replace client roster state with competing snapshots.
       if (genRef.current !== myGen) return;

@@ -221,14 +221,17 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`reviewer-contact-reconciliation.js`** — Sequential exact-email/ORCID reconciliation for enriched search cards. Produces bounded staff-facing Dataverse evidence; a still-matching server-bound identity decision plus trusted, name-consistent ORCID may also ETag-write person-scoped pending address-conflict state. Provider-only/provisional or browser-authored ORCIDs can require review but never establish a known identity or authorize a durable person write.
 - **`reviewer-address-trust-service.js`** — Authenticated exact-address attestation, fresh conflict disclosure, active-roster retry, and durable repair orchestration. Roster receipts are request-scoped; person conflict/adjudication writes are stable-person-bound and ETag-conditional; receipt-first partial success is explicit.
 - **`contact-enrichment/scholarly-email.js`** — Free NCBI PubMed + Europe PMC author-affiliation email resolver; requires full-forename or exact-ORCID identity plus affiliation corroboration, deduplicates the same work across providers, and abstains on tied addresses.
-- **`workbench/reviewer-roster-service.js`** — Post-auth orchestration for the Workbench Find roster API. Owns GET reconciliation/repair projection, candidate receipt and authority handling, and roster mutation sequencing; the API route retains auth, request-scope validation, and HTTP mapping. It expects an authenticated caller with validated request scope.
+- **`workbench/reviewer-roster-service.js`** — Post-auth orchestration for the Workbench Find roster API. Owns GET reconciliation/repair projection, candidate receipt and authority handling, and roster mutation sequencing. Batch POST reports each original input's server-bound key and `recorded`/`unchanged`/`invalid`/`failed` outcome; a processed partial-failure batch remains HTTP 200 with `success: false`. The API route retains auth, request-scope validation, and HTTP mapping. It expects an authenticated caller with validated request scope.
 - **`reviewer-roster-store.js`** — Postgres operational roster for
   request-scoped Find state and server-owned promotion finalization. Stores
   actor-bound staff identity confirmation and roster-only manual
   website/affiliation drafts (never an unverified email). Ordinary edits invalidate the
   prior exact contact authority and expose explicit re-confirmation; only the successful Dataverse
   promotion service can finalize exact keys as `saved`, while authoritative
-  applicant-excluded collisions become `blocked`.
+  applicant-excluded collisions become `blocked`. `recordSurfaced` keeps its numeric
+  default for server callers; its opt-in detailed result distinguishes SQL writes,
+  protected no-ops, invalid inputs, and row errors. A write outcome does not prove
+  retention after the cap or concurrent changes; browser discovery reloads the roster.
 - **`workbench/reviewer-roster-projection-service.js`** — Read-only Find-roster
   overlay that completely batches one request's visible suggestion anchors
   through Dataverse, removes already-engaged rows from working-state buckets,

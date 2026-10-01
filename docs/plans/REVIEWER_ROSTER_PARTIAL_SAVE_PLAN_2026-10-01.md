@@ -1,6 +1,6 @@
 ---
 title: Reviewer roster partial-save correctness
-status: planned
+status: in-progress
 domain: architecture
 kind: plan
 summary: Per-candidate save outcomes and authoritative roster reloads prevent partial database writes from appearing fully saved in reviewer search.
@@ -10,7 +10,7 @@ owner: product-engineering
 
 # Reviewer roster partial-save correctness
 
-Status: [PLANNED] Approved with named changes by ordinary Claude Fable OAuth review; required clarifications below incorporated. Ready for implementation, not yet built.
+Status: [VERIFIED via source and local validation] Implemented on the feature branch; Sol and root approve. Final Fable implementation review and full-suite validation are pending. Not merged or deployed.
 Base: `9505d22b22381f4f338682fd1874a0493b4bfd62` (`main`, PR #391 merged).
 Branch: `codex/roster-partial-save`.
 
@@ -20,7 +20,7 @@ Branch: `codex/roster-partial-save`.
 
 [PLANNED] Tier 2 runtime change, isolated mocked/fixture validation, reviewed PR, deliberate owner-authorized merge. No live production writes during development. Root plans with Fable; Luna implements/tests; Sol reviews; root reviews; Fable adversarially reviews the final implementation. Limit review loops to substantive correctness issues; root resolves minor churn.
 
-## Verified current flow
+## Verified pre-change baseline (base commit above)
 
 - [VERIFIED via `lib/services/reviewer-roster-store.js:92-170`] `recordSurfaced` catches individual SQL failures, skips invalid rows, counts changed rows, and returns a number. Zero changed rows also covers legitimate protected-curation/CAS no-ops. Cap enforcement runs afterward and catches its own errors (`:231-249`). A write acknowledgment does not prove the row survived the cap or later concurrent changes.
 - [VERIFIED via `lib/services/workbench/reviewer-roster-service.js:340-410`] The service rejects server-managed applicant rows before writes, prunes/strips browser authority, validates receipts, binds server keys, filters missing-name inputs, preserves stored authority, and returns `{ success: true, recorded }`. Filtering currently loses original input indexes.
@@ -32,6 +32,8 @@ Branch: `codex/roster-partial-save`.
 - [VERIFIED via repository caller search] Other numeric store consumers are `reviewer-address-trust-service.js:897,1174` and `workbench/enrich-recommended-service.js:444`; they must keep the numeric default and existing CAS/measurement behavior.
 - [VERIFIED via store upsert and `reviewer-roster-service.js:195-310`] Blind delayed replay can replace an active row's unconfirmed contact draft. Existing stored-authority restoration does not make arbitrary replay safe.
 - [VERIFIED via Luna baseline] Focused baseline: 134/135 tests passed; existing failure in `reviewer-search-promotion-reconciliation.test.js:141` sees “Saved Reviewer” still rendered. Luna reran the isolated test (1/1), its file (17/17), and the identical five-suite command (135/135): all passed. Treat the initial failure as non-reproduced, rerun during final validation, and do not expand into promotion redesign without recurrence and causal evidence.
+
+The following design sections preserve the approved plan; execution evidence is recorded at the end.
 
 ## Response and store contract
 
@@ -52,7 +54,7 @@ Branch: `codex/roster-partial-save`.
 
 ## Discovery state and recovery
 
-1. [PLANNED] Pass existing reloadRoster and load-state setters from controller into discovery. Keep busy through both POST settlement and the following GET. Check the search generation after every await, including error/recovery paths.
+1. [PLANNED] Pass existing reloadRoster and load-state setters from controller into discovery. Keep busy through both POST settlement and the following GET. Check the search generation after every await, including error/recovery paths. Validate the real GET's core arrays (`active`, `excluded`, `ineligible`, `blocked`, `handled`, `savedKeys`, `allNames`) and literal success before applying a snapshot. A malformed successful GET must take the same read-failure/retry path; defaulting an omitted allNames ledger to empty would undermine protected-row reconciliation.
 2. [PLANNED] For request-backed searches, remove optimistic writes to saved active/ineligible/name buckets. After any POST outcome (including transport/non-2xx/unknown response), attempt GET. Only `applyRosterSnapshot` populates saved state; no local merge of submitted names. Preserve request-less search behavior.
 3. [PLANNED] Reconcile current-run cards as well: for a known response, use the input index and canonical key to adopt the GET active row verbatim; do not let submitted DTOs shadow server-restored fields. Rows protected into excluded/ineligible/blocked/saved/handled buckets stay in those views. Recorded/unchanged rows absent from the active snapshot are not recreated as active cards (cap/concurrency/curation). Failed new rows may remain ephemeral cards, with their canonical key, only if the GET does not already place that key in another bucket and the normalized name is absent from GET allNames; existing rows win. The name condition is conservative uncertainty suppression, not identity matching: GET omits noncanonical saved keys, so absence from visible buckets alone cannot establish that a failed input is new. This may hide a distinct same-name failed result; the warning must not claim it was saved. Invalid rows are not treated as persisted.
 4. [PLANNED] Unknown acknowledgments must not manufacture canonical-key mappings or restore protected current-run rows. Show the authoritative roster and a clear “could not confirm all search saves” warning; clear current-run candidates and their selection, leaving the authoritative GET roster visible. Do not claim zero rows saved. No complete-success message for unknown responses.
@@ -87,6 +89,9 @@ Branch: `codex/roster-partial-save`.
 ## Review and release record
 
 - [VERIFIED review] Fable approved with named changes through OAuth session `fe1bfa2e-2ade-4f76-b51a-08b1422fa6a9`: expose read retry in results, warn-and-drop unsaved deceased results, carry rescue canonical key through PATCH, accept warning clearing after explicit recovery, and update the enumerated legacy fixtures. All are incorporated above. Sol also required clearing uncertain current-run cards/selection before recovery and conservative suppression of failed same-name results because GET omits noncanonical saved keys. No new retry/state/authorization framework is added.
-- [PLANNED] Luna build; Sol and root reviews; Fable implementation verdict: pending.
-- [PLANNED] Validation and PR: pending.
+- [VERIFIED source review] During implementation, root and Sol identified that a malformed GET with success but omitted core arrays would invalidate the new protected-row check. Step 1 now requires the existing complete GET shape before application, with the same read-recovery behavior and production-shaped test fixtures; this adds no state or write policy.
+- [VERIFIED via commits and reviews] Luna implemented the approved contract in `b757cd30c` and strengthened reconciliation coverage in `30441754d`. Root completed canonical-key, cap-absence, and deferred-GET regressions and source review. Sol approved the combined implementation and focused tests with no remaining substantive finding. Fable implementation verdict is pending.
+- [VERIFIED via Luna local runs] Focused implementation tests: 10 suites / 196 tests passed before root's two additional stale-GET cases; final stream contract file: 11/11 passed. Type check, full lint, and canonical build passed. Required gates and available self-tests passed serially: api-routes, atlas, route-service-boundary, dynamics-context-boundary, reviewer-engagement-boundary, status-enum-parity, trust-boundary-guid, doc-currency, doc-symbol-refs, build-claim-freshness, docs-catalog, memory-router, secret-scan. Existing external-token guard warnings and secret-scan MaxListeners warnings were nonblocking. Full Jest and PR are pending.
+- [VERIFIED via bounded Mode A reconciliation] Updated source contracts, service/utility catalog, roster Atlas contract, and roster memory for indexed outcomes and GET-derived durable membership. Historical extraction/survey baselines remain historical; broader pre-existing stage-framework documentation is outside this change. No schema, route count, or persisted status changed. This is branch evidence, not a production-state claim.
+- [VERIFIED via GitHub file lists, 2026-10-01] Open PRs #392, #332, and #328 do not change the roster runtime files in this fix. Their catalog edits are separate entries; recheck overlap before merge. PR #390 remains the separate dated survey reassessment.
 - [PLANNED] Rollback is revert of this runtime PR; no schema/data migration. Merge/deploy require the user's later promotion instruction.

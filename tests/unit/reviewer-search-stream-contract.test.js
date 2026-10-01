@@ -302,13 +302,13 @@ test('post-save reconciliation trusts canonical GET rows and never promotes prot
     candidate('Handled Reviewer'),
     candidate('Saved Name Only'),
     candidate('At Capacity Reviewer'),
-  ];
-  const [canonical, excluded, ineligible, blocked, handled, nameOnly, atCapacity] = submitted;
+  ].map((row, index) => ({ ...row, candidateKey: `candidate:reconciliation-${index}` }));
+  const [canonical, excluded, ineligible, blocked, handled, nameOnly] = submitted;
   const authoritative = {
     ...canonical,
     affiliation: 'Authoritative GET affiliation',
     email: 'authoritative@example.edu',
-    candidateKey: canonical.candidateKey,
+    candidateKey: 'server:canonical-reconciliation',
   };
   const protectedSnapshot = {
     ...rosterSnapshot,
@@ -337,7 +337,7 @@ test('post-save reconciliation trusts canonical GET rows and never promotes prot
         recorded: 2,
         outcomes: posted.map((row, inputIndex) => ({
           inputIndex,
-          candidateKey: row.candidateKey,
+          candidateKey: inputIndex === 0 ? authoritative.candidateKey : row.candidateKey,
           status: inputIndex === 0 || inputIndex === 6
             ? 'recorded'
             : inputIndex === 5 ? 'failed' : 'unchanged',
@@ -354,6 +354,47 @@ test('post-save reconciliation trusts canonical GET rows and never promotes prot
   expect(cards).toHaveTextContent('authoritative@example.edu');
   for (const hidden of submitted.slice(1)) expect(cards).not.toHaveTextContent(hidden.name);
   expect(cards).not.toHaveTextContent('Example University');
+  expect(screen.getByText(/2 search results could not be confirmed/)).toBeInTheDocument();
+  expect(screen.queryByText(/restored from an earlier search/)).not.toBeInTheDocument();
+});
+
+test.each([true, false])('a stale post-write GET (success=%s) cannot replace a new proposal context', async (ok) => {
+  const found = candidate('Old Search Result');
+  const current = candidate('New Proposal Roster', { candidateKey: 'candidate:new-proposal' });
+  let resolvePostWriteGet;
+  const pendingGet = new Promise((resolve) => { resolvePostWriteGet = resolve; });
+  let postWriteGetStarted = false;
+  installSearchFetch({
+    analyze: streamResponse(sseFrame('result', { proposalInfo: { title: 'Proposal', keywords: 'immunology' } })),
+    discover: streamResponse(sseFrame('result', { ranked: [found], unverified: [] })),
+    enrich: streamResponse(sseFrame('complete', { type: 'complete', results: [found] })),
+    onRosterGet: (count) => {
+      if (count === 2) {
+        postWriteGetStarted = true;
+        return pendingGet;
+      }
+      return response(count === 1 ? rosterSnapshot : {
+        ...rosterSnapshot, active: [current], allNames: [current.name],
+      });
+    },
+  });
+  const { rerender } = render(
+    <ReviewerSearchSection requestId={REQUEST_ID} blobUrl="blob-old" proposalKey="proposal" />,
+  );
+  fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
+  await waitFor(() => expect(postWriteGetStarted).toBe(true));
+  expect(screen.getByRole('button', { name: 'Run another search' })).toBeDisabled();
+
+  rerender(<ReviewerSearchSection requestId={REQUEST_ID} blobUrl="blob-new" proposalKey="proposal" />);
+  expect(await screen.findByText(current.name)).toBeInTheDocument();
+  await act(async () => {
+    resolvePostWriteGet(response({ ...rosterSnapshot, active: [found], allNames: [found.name] }, { ok }));
+    await pendingGet;
+  });
+  expect(screen.getByText(current.name)).toBeInTheDocument();
+  expect(screen.queryByText(found.name)).not.toBeInTheDocument();
+  expect(screen.queryByText(/could not be reloaded/i)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Run reviewer search' })).toBeEnabled();
 });
 
 test('malformed post-write GET clears uncertain cards and exposes a working roster-state retry', async () => {
