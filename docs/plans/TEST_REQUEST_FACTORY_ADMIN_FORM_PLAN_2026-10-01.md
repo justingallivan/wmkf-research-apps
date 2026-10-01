@@ -1,6 +1,6 @@
 # Test Request Factory: admin form (production plan item P7)
 
-Status: **DRAFT (2026-10-01, Session 561). Awaiting the owner decisions listed at the end, then `/contract-reconcile` and a Codex plan review before any build.** Parent plans: `TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md` (P7, P4, P2, MVP scope, Q1–Q5, *Process*), `TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` (*Operation contract and recovery*), `TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` (cast, status setter, B4), `TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md` (managed ledger, D1–D3). Where this plan and the production plan's owner decisions disagree, the production plan wins until this one is accepted.
+Status: **DRAFT (2026-10-01, Session 561). Owner decisions 1–9 answered in S561 (decision 6 reversed from the draft: the status setter is in v1); decision 10 (rehearsal venue) still open. Next: Codex adversarial plan review, then `/contract-reconcile`, before any build.** Parent plans: `TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md` (P7, P4, P2, MVP scope, Q1–Q5, *Process*), `TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` (*Operation contract and recovery*), `TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` (cast, status setter, B4), `TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md` (managed ledger, D1–D3). Where this plan and the production plan's owner decisions disagree, the production plan wins until this one is accepted.
 
 Path convention: a bare basename with line numbers (`run-ledger.js:20-24`) is a file under `lib/services/test-requests/` unless its directory is given in brackets; the CLI is `scripts/rehearse-test-request-sandbox.mjs` ("CLI `:904`"). Every cited line was read in S561.
 
@@ -110,13 +110,27 @@ Production manifests already require the cast and set status `Phase II Pending` 
 | Advance / Resume (one step per click, auto-continue while `advanced`) | yes | the ask; design says Resume, not "try again" |
 | Inspect (run list for this actor, current step, resources, errors) | yes | needed to understand a stop |
 | Recheck (read-only Foundation recheck) | yes, small | replaces the owner's hour-later CLI command; ~0.25 |
-| Status setter (Phase I/II) in the form | **recommended defer, owner choice** | ~1 session; without it a `Pending` clone opens only by direct link (Workbench/My Proposals filter on `Phase II Pending`, production plan item 5), and the CLI `--set-status` still works |
+| Status setter (Phase I/II) in the form | **yes (owner, S561, decision 6)** | ~1 session; without it a `Pending` clone opens only by direct link (Workbench/My Proposals filter on `Phase II Pending`, production plan item 5), so the form would not replace the CLI. Reuses `runStatusChange` / `recheckStatusChange` (`status-change-runner.js:200,243`) unchanged; see *Status setter in the form* below |
 | Bind reviewer / slot PATCH | defer | B4 operational checks are still incomplete (cast plan status line) |
 | Retire | defer | no ledger method, residue semantics open (production plan open question 3) |
 | Editable reviewer addresses in the form (P7 bullet) | defer | the cast replaced per-run addresses (owner, S548) |
 | Editable program director (P7 bullet) | **drop** | owner decision S546: director = the cloning admin |
 
-**Recommendation:** v1 = lookup + confirm + advance/resume + inspect + recheck, basic recipe only. Estimated 3–4 sessions including review. The status setter is the one deferral with a visible cost; the owner decides (decision 6).
+**Decided (owner, S561):** v1 = lookup + confirm + advance/resume + inspect + recheck + Phase I/II status setter (with its recheck), basic recipe only. Estimated 4–5 sessions including review.
+
+### Status setter in the form
+
+Facts [VERIFIED via `status-change-runner.js:20,29,167-174,200-241,243-275`]:
+- `runStatusChange` plans one change in the ledger (`planStatusChange`), dispatches one `If-Match` PATCH, then waits for the Request's background jobs. `COMPLETION_DEFAULTS` = poll 20 s, `maxWaitMs` 10 min, `minQuietMs` 90 s.
+- The 10-minute wait exceeds a 300 s function. A wait that times out leaves the change `applied` (an open state). It throws `status_change_jobs_open`, and a repeat call with the same field and option resumes at completion without re-sending (`:170-173`, `:208-229`).
+- `recheckStatusChange` is **not purely read-only**: when it finds late effects it writes them to the ledger journal (`recordLateStatusChangeEffects`, `:258-266`). The ledger is the only thing it writes; Dataverse is read only.
+- Replay guard `assertNotDuplicateProducing` (`status-transitions.js:113`) and the live option list (`readLiveOptions`, `status-change-runner.js:59`) apply as on the CLI.
+
+Plan:
+- The form calls `runStatusChange` with `completion: { maxWaitMs: 240_000 }`. That is under the 300 s function limit and above `minQuietMs`.
+- `status_change_jobs_open` is shown as "Still finishing — Check again". Check again repeats the same call, which resumes and never re-sends.
+- The field and option come from a server-read live option list. The browser sends only `field` (`phase1|phase2`) and the option label, which is validated against that list server-side. `rerun` is not offered in v1.
+- The kill switch, the superuser gate and run ownership apply. A status change is a production write, so it runs under the same switch as create.
 
 ## Route, service and UI sketch
 
@@ -130,6 +144,9 @@ Routes under `pages/api/admin/test-requests/` (all `requireSuperuser`, `withDalC
 | `runs/[runId]` | GET | `getRun` + `listRunResources` (inspect), redacted exactly as `--run-inspect` | default |
 | `runs/[runId]/advance` | POST | loads manifest + bundle from Blob, isolation re-check, one `advanceRun`, returns `{ step, outcome, status }`; error text returned to the caller, never to the ledger | 300 s |
 | `runs/[runId]/recheck` | POST | read-only `recheckFoundationTransition` | default |
+| `runs/[runId]/status` | GET | live Phase I/II option lists (`readLiveOptions`) + the run's status-change journal (`listStatusChanges`) | default |
+| `runs/[runId]/status` | POST `{ field: 'phase1'\|'phase2', optionLabel }` | one `runStatusChange` with `maxWaitMs: 240_000`; `status_change_jobs_open` returned as a resumable state | 300 s |
+| `runs/[runId]/status/recheck` | POST | `recheckStatusChange` (Dataverse read; may append late effects to the ledger journal) | default |
 
 Service: one new module `lib/services/test-requests/admin-run-service.js` that owns the Dataverse client bound to the deployment's target (`createClient({ resourceUrl: TARGET_URLS[targetFromDeployment()], token, allowTestRequestMarkerWrites: true })`, needs a DAL-gate exemption entry; on a sandbox target the service skips `readCast`, because `buildCloneManifest` refuses a cast off production, `basic-clone-steps.js:642-643`), the Graph object (the same wrapper shape as the CLI's `buildGraphContext`, `:474-500`), the ledger (`pgLedgerDb(requireLedgerUrl(targetFromDeployment()))` + `ledgerSchemaCheck`), and the Blob store. Routes stay thin. `advanceRun`, `reserveRun`, the fence and the steps are called unchanged.
 
@@ -137,7 +154,7 @@ DAL context: no basic-step module asserts a trusted DAL context [VERIFIED by gre
 
 That the basic steps therefore need no `enterDynamicsBypassForScript` under `withDalContext` is [ASSUMED] until slice 1 exercises it.
 
-UI: a third section in `TestRequestsWorkspace` (`admin.js:3433` [pages]): source number → summary → Confirm (typed re-entry) → progress list of the seven steps with Resume, a run list with Inspect and Recheck. No status, bind or retire controls in v1. Error copy in the owner's voice (memory `feedback-user-facing-error-copy-voice`).
+UI: a third section in `TestRequestsWorkspace` (`admin.js:3433` [pages]): source number → summary → Confirm (typed re-entry) → progress list of the seven steps with Resume, a run list with Inspect and Recheck, and on a `ready` run a Phase I/II status control with Check again and its recheck. No bind or retire controls in v1. Error copy in the owner's voice (memory `feedback-user-facing-error-copy-voice`).
 
 ### Route security matrix rows (format of `docs/API_ROUTE_SECURITY_MATRIX.md:120`)
 
@@ -148,6 +165,8 @@ UI: a third section in `TestRequestsWorkspace` (`admin.js:3433` [pages]): source
 | `/api/admin/test-requests/runs/[runId]` | GET | Superuser | same | Run owned by actor | none | Low | Redacted as `--run-inspect` |
 | `/api/admin/test-requests/runs/[runId]/advance` | POST | Superuser | same + isolation re-check before `create_request` + production write fence | Run owned by actor | One production Dataverse/Graph write step per call; ledger journal | High | `maxDuration 300` = lease; ambiguous outcomes recovered by exact GUID, never re-POSTed |
 | `/api/admin/test-requests/runs/[runId]/recheck` | POST | Superuser | same | Run owned by actor | ledger read; Dataverse read | Low | Read-only Foundation transition recheck |
+| `/api/admin/test-requests/runs/[runId]/status` | GET, POST | Superuser | same; option label validated against the server-read live list | Run owned by actor; `ready` production run only (`assertChangeable`) | POST: one `If-Match` PATCH of `wmkf_phaseistatus`/`wmkf_phaseiistatus` on the test Request; ledger status-change journal | High | Resume, not re-send, on `status_change_jobs_open`; replay guard unchanged; no `rerun` in v1 |
+| `/api/admin/test-requests/runs/[runId]/status/recheck` | POST | Superuser | same | Run owned by actor | Dataverse read; ledger journal append of late effects only | Low | Not purely read-only (ledger) |
 
 ### Atlas impact
 
@@ -163,8 +182,9 @@ UI: a third section in `TestRequestsWorkspace` (`admin.js:3433` [pages]): source
 |---|---|---|---|
 | 1 | **Server plumbing**: `admin-run-service.js` (target-bound client, graph, ledger via guard, Blob, cast skipped off production), `targetFromDeployment`, kill switch, UUIDv5 ids in `buildCloneManifest`, remove/rename `vercelPostgresLedgerDb` | unit: guard picks `ledger_prod` and the production host only when the deployment is production; Blob pathnames server-minted; manifest ids deterministic; existing CLI tests unchanged | 1 |
 | 2 | **Routes + matrix rows**: the six routes above, `vercel.json` entries | route tests (auth, body shape, kill switch off → 503, isolation off → 503, null profile → 403); `check:api-routes` | 1 |
-| 3 | **UI** section | component tests; Preview deployment smoke per decision 10: either the full path against the **sandbox** target + `ledger` database (Preview cannot write production: interlock), or, without production reads in Preview, only sign-in, kill switch, ledger guard, list and inspect | 0.5–1 |
-| 4 | **Production first run** (owner-run, in the browser): one basic clone from the current seed; Recheck after an hour; owner Audit History read | same P5 contract as the CLI runs; `--run-inspect` from a Mac must show the same row | 0.25 + owner |
+| 2b | **Status setter routes**: `runs/[runId]/status` GET/POST and `status/recheck` | route tests: option label outside the live list refused; non-`ready` or non-owned run refused; `status_change_jobs_open` → resumable response, second call does not re-PATCH (mock asserts one PATCH); `vercel.json` 300 s entry | 1 |
+| 3 | **UI** section (includes the status control and Check again) | component tests; Preview deployment smoke per decision 10: either the full path against the **sandbox** target + `ledger` database (Preview cannot write production: interlock), or, without production reads in Preview, only sign-in, kill switch, ledger guard, list and inspect | 0.5–1 |
+| 4 | **Production first run** (owner-run, in the browser): one basic clone from the current seed; one Phase II status change through the form (as S547's first CLI change) and its recheck; Foundation Recheck after an hour; owner Audit History read | same P5 contract as the CLI runs; `--run-inspect` from a Mac must show the same row | 0.25 + owner |
 | 5 | Durable facts: runbook, Atlas, portability plan, production plan P4/P7, tracked secrets | doc gates | 0.25 |
 
 Codex adversarial review once per slice (production plan *Process*); findings weighed safety vs fidelity (memory `feedback-factory-safe-not-full-fidelity`).
@@ -175,18 +195,27 @@ Codex adversarial review once per slice (production plan *Process*); findings we
 
 Rollback: set `TEST_REQUEST_FACTORY_FORM` to anything but `on` (every route returns 503, no deploy needed); then revert the merge if required. A run stopped mid-way stays `creating`/`needs_attention` in the ledger; it is resumable from the form after re-enabling, or from the CLI if the owner downloads its manifest and bundle from Blob (a small owner-run helper, deferred unless needed). No schema step: 054 + 058 are already applied to the ledger.
 
-## Owner decisions needed
+## Owner decisions
 
-1. **Put `TEST_REQUEST_LEDGER_URL` into Vercel Production (and `TEST_REQUEST_SANDBOX_LEDGER_URL` into Preview), reversing D1's "never a Vercel variable"?** Recommended: **yes**, those two environments only, same variable names, guard unchanged. Without it there is no form.
-2. **Write authority on the server: kill switch `TEST_REQUEST_FACTORY_FORM=on` (fails closed when unset) plus typed re-entry of the source Request number at Confirm, checked against the reserved plan?** Recommended: **yes, both**; no second-person approval.
-3. **Bundle and manifest storage: a new dedicated private Blob store with its own token (`FACTORY_BLOB_RW_TOKEN`), files deleted when the run finishes?** Recommended: **yes**. Alternative is a new table in the Neon ledger (more review surface). Also accept that a bundle bound at reserve may finish a run after the 6-hour window, as the CLI does today.
-4. **Replace P4's readiness endpoint with the in-process isolation-switch check at reserve and before `create_request`?** Recommended: **yes**; close P4.
-5. **v1 scope = source lookup, confirm, advance/resume, inspect, recheck; basic recipe only; program director = the signed-in admin, not editable?** Recommended: **yes**.
-6. **Include the Phase I/II status setter in v1 (about one more session), or keep using the CLI `--set-status` until v2?** Recommended: **defer**, accepting that a fresh clone opens only by direct link until its status is moved.
-7. **Defer bind-reviewer, slot PATCH and retire to later slices?** Recommended: **yes** (B4 checks incomplete; no ledger retire method).
-8. **Release as Tier 2, with the first production run owner-driven from the browser with the P5 recheck?** Recommended: **yes**.
-9. **Delete `vercelPostgresLedgerDb` (no callers) so the app database can never be chosen as the ledger by a future caller?** Recommended: **delete**.
-10. **Rehearsal venue: set `DATAVERSE_ALLOW_PROD_READS=yes` in the Preview environment so the whole form path (production source read → sandbox clone) rehearses on a Preview deployment before the first production run; or keep Preview without production reads and smoke only sign-in, kill switch, ledger guard, list and inspect, making slice 4 the first create through the form?** Recommended: **set it in Preview for the duration of slice 3 and remove it afterwards**: it reads what the owner already authorizes the local CLI to read, Preview cannot write production, and it is the only way to exercise `create_request` through the form before Production. Caveat: every recorded sandbox clone was created with the GoVerify bypass, which the form never offers, so the Preview rehearsal may stop at `create_request` (see *Facts not verified*); that would still rehearse reserve, fence and resume.
+Answered by the owner in S561 (2026-10-01):
+
+1. **Ledger URL in Vercel**: yes. `TEST_REQUEST_LEDGER_URL` in Production and `TEST_REQUEST_SANDBOX_LEDGER_URL` in Preview only, same names, guard unchanged. This reverses D1's "never a Vercel variable" for the form only.
+2. **Write authority on the server**: yes, both. Kill switch `TEST_REQUEST_FACTORY_FORM=on` (fails closed when unset) plus typed re-entry of the source Request number at Confirm. No second-person approval.
+3. **Bundle and manifest storage**: yes. A dedicated private Blob store with its own token (`FACTORY_BLOB_RW_TOKEN`), files deleted when the run finishes. Accepted: a bundle bound at reserve may finish a run after the 6-hour window, as the CLI does today.
+4. **P4**: replaced by the in-process isolation-switch check at reserve and before `create_request`; P4 closed.
+5. **v1 scope**: source lookup, confirm, advance/resume, inspect, recheck; basic recipe only; program director = the signed-in admin, not editable.
+6. **Status setter**: **in v1** (reversing the draft's recommendation). See *Status setter in the form*.
+7. **Deferred**: bind-reviewer, slot PATCH and retire.
+8. **Release**: Tier 2; the first production run is owner-driven from the browser, with the P5 recheck.
+9. **`vercelPostgresLedgerDb`**: delete.
+
+Still open:
+
+10. **Rehearsal venue.** Two options:
+    - **(a)** Set `DATAVERSE_ALLOW_PROD_READS=yes` in Preview for slice 3 only, so the whole path (production source read → sandbox clone) rehearses on Preview. Caveat: every recorded sandbox create used the GoVerify bypass, which the form never offers, so the rehearsal may stop at `create_request`.
+    - **(b)** Keep Preview without production reads and smoke only sign-in, kill switch, ledger guard, list and inspect. Slice 4 is then the first create through the form.
+    - Fable recommended (a). Claude recommended (b): a Preview environment variable reaches every branch's Preview deployment; the engine is already proven in production by the CLI (1003302, 1003303); and the new surfaces (routes, Blob, idempotency, UI) can be tested without a create.
+    - The owner has not chosen.
 
 ## Facts not verified this session
 
