@@ -19,8 +19,9 @@
  */
 
 // withAuth(fn, options) → expose both for direct invocation.
+jest.mock('next-auth/jwt', () => ({ getToken: jest.fn() }));
 jest.mock('next-auth/middleware', () => ({
-  withAuth: (proxyFn, options) => ({ proxyFn, options }),
+  withAuth: jest.fn((proxyFn, options) => Object.assign(jest.fn(proxyFn), { proxyFn, options })),
 }));
 
 // NextResponse.next({ request: { headers } }) → a captureable response object.
@@ -34,17 +35,15 @@ jest.mock('next/server', () => ({
   },
 }));
 
-import proxyExport from '../../proxy';
+import { withAuth } from 'next-auth/middleware';
 import { config as proxyConfig } from '../../proxy';
 import { _resetWarningsForTests } from '../../lib/utils/auth-policy';
 
-const { proxyFn, options } = proxyExport;
+const { proxyFn, options } = withAuth.mock.results[0].value;
 const authorized = options.callbacks.authorized;
 
-test('proxy excludes only the internal Workflow route subtree', () => {
-  const matcher = proxyConfig.matcher[0];
-  expect(matcher).toContain('\\.well-known/workflow/');
-  expect(matcher).not.toContain('well-known|');
+test('outer proxy covers every path before applying profile-specific exceptions', () => {
+  expect(proxyConfig.matcher).toEqual(['/:path*']);
 });
 
 // jest.setup.js replaces global.crypto with an encryption-only mock that lacks

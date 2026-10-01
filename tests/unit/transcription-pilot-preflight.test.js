@@ -91,6 +91,8 @@ describe('transcription Preview readiness preflight', () => {
 
   it.each([
     ['not Preview', { VERCEL_ENV: 'production' }],
+    ['dedicated profile has no registered project identity', { VERCEL_ENV: 'production', TRANSCRIPTION_PILOT_DEPLOYMENT_PROFILE: 'transcription-pilot', VERCEL_PROJECT_ID: 'prj_unregistered' }],
+    ['invalid profile cannot fall back to Preview', { TRANSCRIPTION_PILOT_DEPLOYMENT_PROFILE: '' }],
     ['pilot switch not literally false', { TRANSCRIPTION_PILOT_ENABLED: 'true' }],
     ['submission switch absent', { TRANSCRIPTION_SUBMISSIONS_ENABLED: undefined }],
     ['database alias not pinned', { DATABASE_URL: 'postgres://x:y@other.neon.tech/neondb?sslmode=require' }],

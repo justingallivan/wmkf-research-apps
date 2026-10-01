@@ -2,8 +2,8 @@
 title: "AssemblyAI transcription pilot pre-enable runbook"
 domain: transcription
 kind: operations-runbook
-status: isolated-061-verified-disabled-preview-canary-passed
-summary: "Current source is READY in disabled Preview; the 13-check preflight, empty recovery, and one provider-free synthetic Workflow canary passed. The pilot alias targets that deployment. No AssemblyAI or real-audio test occurred; no recurring Preview schedule is active."
+status: dedicated-project-local-preparation-not-deployed
+summary: "Disabled Preview at d8bb73326 passed bounded synthetic checks. New dedicated-project isolation/configuration is local-only; no new project, identity registration, deployment, schedule activation or alias move is authorized by the local-build approval."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -20,7 +20,7 @@ related:
 Admin page, API routes, callback, worker, provider/media/runtime services,
 model/store, migration 060, fresh-install registration, and tests are present
 in source. Migration 061 has also been applied once and physically verified
-only in isolated `neondb`. The current Workflow source is deployed to disabled
+only in isolated `neondb`. The Workflow source at `d8bb73326` is deployed to disabled
 Preview and has passed one bounded provider-free synthetic canary.
 Thirteen environment records are scoped to Preview branch
 `codex/transcription-pilot`; both transcription switches are false. Current
@@ -39,8 +39,73 @@ runtime, and account privacy guarantees remain unverified. This
 runbook documents release gates; the owner has explicitly authorized one
 provider-free synthetic Workflow test and isolated migration 061 with the
 Preview pilot disabled. This does not authorize AssemblyAI calls/uploads,
-pilot enablement, or other metered work. The current source's synthetic hosted
+pilot enablement, or other metered work. That deployed commit's synthetic hosted
 receipt is recorded below. No recurring Preview hourly or daily schedule is activated.
+
+### Dedicated project preparation — local only
+
+**[SOURCE PREPARATION; NOT DEPLOYED]** The owner approved a local build for a
+separate pilot-only Vercel project. Its eventual Vercel **Production** environment
+would belong to that dedicated project, not the shared WMKF Production project.
+Do not create resources, configure remote variables, deploy, move the pilot alias,
+activate schedules, or enable either transcription switch under this approval.
+
+**[VERIFIED locally, 2026-10-01]** Luna prepared the manifest/checker and initial
+identity policy; root corrected the outer proxy boundary, added regression tests,
+and performed the integrated verification. Sol found no remaining blocker in the
+bounded source review. Nine focused suites passed 136 tests; typecheck, targeted
+lint, the dedicated check/self-test and 15 scoped route/security/document gates
+passed (gate/self-test pairs sequentially). A credential-scrubbed Node 22
+Turbopack build passed; its two unrelated document-renderer tracing warnings
+remain. The compiled server returned 404 for all ten tested unknown-identity
+paths, including sign-in, auth, cron, Workflow, assets and page data.
+An isolated temporary source-only identity fixture then proved pilot sign-in
+page/auth discovery pass-through, anonymous pilot redirect, synthetic staff
+pilot-page access, and rejection of unrelated Admin/cron/IRS/image paths.
+The real checked-in registry remains empty. Without the dedicated marker,
+existing auth-status/cron/Workflow paths reached their original handlers.
+Cron refused absent credentials and Workflow rejected the unsigned request;
+neither response proves successful hosted delivery. No database/provider
+credentials, remote writes, real OAuth sign-in, or scheduler executions were
+used in these local runtime tests.
+
+The contract review covered caller/query/method allowlists, identity/auth
+fall-throughs, existing Preview preflight shape, and preserved per-route
+authorization. No new persistence or async job transitions were introduced.
+The bounded changed-fact documentation pass distinguishes the deployed
+`d8bb73326` receipts from this local-only preparation in the plan, this runbook,
+and the Atlas page. Hosted scheduling/monitoring and real sign-in remain open;
+the local checks are not release approval.
+
+`vercel.transcription-pilot.json` is a separate manifest; root `vercel.json`
+remains the shared project's configuration. It sets the non-secret
+`TRANSCRIPTION_PILOT_DEPLOYMENT_PROFILE=transcription-pilot` for build and runtime,
+disables Git deployments, and contains exactly hourly recovery (`0 * * * *`) and
+daily cleanup (`0 3 * * *`, UTC), with a 300-second drain Function cap.
+The source registry in `lib/services/transcription-pilot/deployment-policy.js`
+is intentionally empty. Do not supply an invented project ID or an environment
+variable claiming to be the expected ID. After separately approved creation,
+review and commit the actual project identity and auth origin before deployment.
+
+Run `npm run check:transcription-pilot-deployment` followed by
+`npm run check:transcription-pilot-deployment:self-test`. The offline checker can
+also consume `--env-names <file>` and `--artifact-paths <file>` (newline-delimited
+names/paths only, never values). Without those inventories its success proves
+only the committed manifest; it does not inspect Vercel settings or a package.
+It rejects unrelated configuration/environment names and `.env*` artifact paths.
+The checker is not a deployment operator or remote readiness certificate.
+
+**[PLANNED; separate authorization and proof required]** Reuse only the dedicated
+Neon/private Blob, keep both switches literal `false`, omit unrelated provider
+and Dataverse credentials, and verify the actual complete environment/artifact
+inventories. The shared profile/sign-in dependencies require an end-to-end check;
+do not resolve a missing dependency by copying shared-system credentials.
+Prove native cron and Workflow delivery through deployment protection, including
+missed-run, failed-run and HTTP-200-with-`incomplete` monitoring. That monitoring
+is not established by this local configuration. Before alias cutover, verify zero
+jobs/outbox rows and no active runs; retain the existing alias target until the
+new protected synthetic, sign-in and scheduling checks pass. A healthy daily
+schedule is a target, not an unconditional 24-hour physical-erasure guarantee.
 
 ### Isolated database checkpoint — 2026-10-01
 
@@ -210,7 +275,7 @@ identified independent causes: missing `ms`/`ieee754` packages in the generated
 flow trace, and Turbopack's wrapper object spread dropping the raw
 `ArrayBuffer`. Dependency tracing was fixed in `0b734ab8b`; the buffer handoff
 was fixed in `d8bb73326`. The corrected deployed
-canary above passed. Current source also passed 13 focused suites / 126 tests,
+canary above passed. That deployed source also passed 13 focused suites / 126 tests,
 typecheck, ESLint, the default Turbopack production build, and a compiled-worker
 synthetic AAC test. PGlite passed 12 SQL scenarios including the actual
 preflight SQL; new native-Postgres integration regressions were added but not run, so
@@ -237,7 +302,8 @@ runtime behavior or remote secret-value equality.
 Automatic Git deployment is disabled only for `codex/transcription-pilot`
 in `vercel.json`. The first branch push was checked for no automatic deployment
 before adding isolated overrides. Future deployments are deliberate Preview
-CLI deployments; repoint only the dedicated pilot alias after READY and
+CLI deployments for the existing shared-project Preview; the proposed dedicated
+project requires its own separate authorization. Repoint only the dedicated pilot alias after READY and
 branch/commit verification. This is isolation for the scoped pilot/sign-in
 test, not certification that unrelated suite applications are isolated.
 

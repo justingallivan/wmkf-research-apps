@@ -13,6 +13,8 @@
     "check:migrations-manifest": "node scripts/check-migrations-manifest.js",
     "check:reviewer-reminder-hold": "node scripts/check-reviewer-reminder-hold.js",
     "check:reviewer-reminder-hold:self-test": "node scripts/check-reviewer-reminder-hold-self-test.js",
+    "check:transcription-pilot-deployment": "node scripts/check-transcription-pilot-deployment.js",
+    "check:transcription-pilot-deployment:self-test": "node scripts/check-transcription-pilot-deployment.js --self-test",
     "check:agent-invariants": "node scripts/check-agent-invariants.js",
     "check:agent-invariants:ci": "node scripts/check-agent-invariants.js --tracked-only",
     "check:instruction-architecture": "node scripts/check-instruction-architecture.js",
