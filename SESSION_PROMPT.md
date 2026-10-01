@@ -1,76 +1,70 @@
-# Session 560 Prompt: office Mac sync first, then the first Part A/B reminder cycle
+# Session 561 Prompt: office Mac sync when back at work; ledger cleanup after that
 
-## Session 559 Summary — 2026-09-30 evening PT / 2026-10-01 UTC (Claude, home Mac)
+## Session 560 Summary — 2026-10-01 (Claude, home Mac)
 
-Seven things shipped or closed. The scheduled-email Part B Liaison/posture re-check merged and is live (PR #384). Both Factory ledgers now live in the managed Neon ledger. Migration 058 was applied to the Production app DB, which cleared the drift alert. The app Postgres password was rotated. Integrity findings 6 and 9 merged (PRs #382, #383). The missing Vercel deployment was diagnosed. A Postgres rotation procedure now exists.
+A short housekeeping session. The first scheduled-email Part A/B reminder cycle was checked, the stale "migration 036 not applied / not deployed" claims across the docs were reconciled, and the app Neon `main` branch was protected. All 68 start-of-session gate runs (39 gates + self-tests) were green. The owner is on the home Mac until next week, so the office Mac sync and all local ledger cleanup are deferred.
 
 ### What Was Completed
 
-1. **Factory ledger → managed Neon.** Full `pg_dump -Fc` backups of the home-Mac `wmkf-ledger-pg/ledger_prod` and `/ledger` went to `~/Documents/Temp` (SHA-256 recorded). Both were then loaded data-only, single-transaction, into `managed-ledger/ledger_prod` and `managed-ledger/ledger`. Counts match; `check:factory-ledger` is green; `--target=production --run-inspect=e33fa857…` (Test Request 1003303, `ready`) read from `managed-ledger/ledger_prod`. Hazard found and cleared: pg_dump's empty `search_path` stuck on the pooled backend. The brief's `--clean` + hand-058 method was marked superseded. Evidence: `docs/plans/evidence/test-request-factory/ledger-snapshot-2026-09-30.md`.
-2. **Migration 058 on the Production app DB** (owner chose option 1). Production's early-054 shape was read first (only `test_request_runs` + `test_request_run_resources`, empty). 058 was rehearsed on a scratch copy of that shape; then the owner ran `npm run apply:migrations` (1 applied, 57 skipped). Tracker is 58 = manifest. The active `migration_drift` alert (one ops email) auto-resolved at 01:58:54Z. `test_request_run_reviewer_assignments` / `test_request_status_changes` are still absent there (harmless; CLI never uses the app DB).
-3. **Scheduled-email Part A pre-cycle watch:** `scheduled_email_messages` held 0 rows, so the 10/01 08:00 UTC cycle had nothing queued except whatever the cron creates (see Verified Open 2). The 055 "ahead" check is clean.
-4. **App Postgres rotated** (`neondb_owner`, project `expert-reviewers-neon-db` / `falling-surf-05640504`), triggered by Vercel "Needs Attention" badges plus an accidental full-URL print by Claude. The Neon integration re-synced all 16 Vercel variables; the owner redeployed. The home `.env.local` and the feature-request `.env.presentation-proof.local` were synced via `vercel env pull`. Sensitive conversion: **owner chose A (leave readable)** because Preview acceptance uses the shared DB. Runbook: `docs/CREDENTIALS_RUNBOOK.md` → "Rotating the app Postgres password". Memory: `feedback-postgres-url-handling-hazards`.
-5. **Integrity:** PR #382 (`186052034`, finding 6) accepts either SerpApi empty signal, tested against two owner-authorized live zero-result responses. PR #383 (`f00e2259c`, finding 9) drops repeated Dataverse/SQL reads. Owner decision: re-screening an approved request is allowed. Both are deployed.
-6. **Scheduled-email Part B: PR #384 (`3b5002d95`, Production Ready).** Codex adversarial round 1 found one medium (the send-now warning cleared on a version change), fixed in `655dbc701`; round 2 approved. Browser rehearsal (Claude in Chrome): local dev against a Neon branch, request 1003220, a seeded stale Cc. It showed the 409 "Recipients changed…", the real Liaison Cc, "Waiting for your approval", and the row held with no activity or send intent. The Neon test branch auto-expires about 2026-10-08; `.env.partb-test.local` was deleted by the owner.
-7. **Vercel `61dafcb81`:** GitHub logged the push, but Vercel created no deployment record. It was the only one of 66 `main` push heads in the window; the code went live via `9f408590e`. Nothing to fix.
+1. **First Part A + Part B reminder cycle checked (10/01 08:00 UTC).** Vercel: the `/api/cron/grantee-deliverable-reminders` run returned 200 with no warn/error lines. The cron's summary counts live only in its HTTP response, not in logs. Production `scheduled_email_messages` (owner-run read-only script; the auto-mode classifier blocks agent Production reads): exactly one row, for the owner's 1003220 test deliverable, `scheduled`, send due 10/13, 1 To + 1 Cc. The **owner then stopped it** at `/scheduled-emails`; a re-read confirmed `stopped`, version 2. So Part B's send-time re-check has not yet run on a real send.
+2. **Docs reconciled to the deployed scheduled-email state** (`59ab69817`, `1494a3ae7`). The code merged to `main` 2026-08-26 (`4a743d63a`). Fixed: the Atlas row and the `scheduled_email_messages` / `_vip_flags` / `_digest_runs` headings, `docs/API_ROUTE_SECURITY_MATRIX.md`, `docs/SERVICE_AND_UTILITY_CATALOG.md`, and `docs/GRANTEE_PORTAL_SPEC.md`. Spec item 8 was rewritten from the retired per-PD 1–14 day review window to the VIP/digest model plus the Part B re-check.
+3. **Two more stale spots** (`66fd4c51a`): the `EMAIL_AUTOMATION` comment in `shared/config/reviewerFinderPreferences.js` now describes `{ reviewAll }` (the contract in `shared/config/emailAutomation.js`), and the `scheduled_email_reviewer_vip_flags` heading now says deployed (merged `dc46fa183`, 2026-08-27).
+4. **App Neon `main` protected** (owner, in the console; project `expert-reviewers-neon-db`). Neon docs checked: the Launch plan allows 2 protected branches *per project*; protection blocks branch delete/reset and project delete; it changes no passwords; child branches of a protected branch get fresh role passwords. The ledger project stays unprotected (the 09-30 dumps back it up). Recorded in `docs/CREDENTIALS_RUNBOOK.md` → "Protected `main` branch" (`e76fc60c4`).
 
-### Commits (all on `main`)
-- `6f5028dff` ledger snapshot evidence · `d0ffc601c` office run-inspect note · `2c59a0c31` 058 + Part A watch docs · `2784331df` Vercel diagnosis
-- `3d5523ec9`, `9d1020190` Postgres rotation procedure + decision · `5bde11910` office sync brief
-- `186052034` (PR #382), `f00e2259c` (PR #383), `3b5002d95` (PR #384; fix `655dbc701`), with handoff updates `7b7a001c5`, `577d6d130`, `02a25dc2b`, `03d4a3136`, `becda2071`, `3cee03ae5`
-- Parallel Codex merges seen on `main`: `a07c3ddf3` (PR #385, Explorer call-config tests), `d1800e404` (refactor survey doc)
+### Commits
+- `59ab69817` docs(atlas): scheduled_email_messages is deployed and live
+- `1494a3ae7` docs: rewrite grantee reminder cadence to the shipped VIP/digest model
+- `66fd4c51a` docs: correct stale email-automation comment and reviewer VIP flag status
+- `e76fc60c4` docs(credentials): record protected app Neon main branch; merge `0f86cc214`
+- Parallel Codex merges on `main`: PR #386 (roster projection), #387 (roster orchestration service), #388 (`a1b3daa4f`, shared review-document canonicalization). Codex owns the refactor-survey work on its own branches.
 
 ## Next Items
 
 ### Verified Open
 
-1. **Office Mac: run `docs/plans/briefs/OFFICE_MAC_SYNC_BRIEF_2026-10-01.md` before anything else.** Evidence: that Mac's `.env.local` still holds the dead `neondb_owner` password. The brief syncs it via `vercel env pull`, verifies the 4 URL variables, then runs `check:factory-ledger` and `--run-inspect=e33fa857-4b00-4c60-94da-77d4406d4027` against `managed-ledger/ledger_prod`. Record the inspect result in the ledger evidence file.
-2. **Check the first Part A + Part B cron cycle (10/01 08:00 UTC, `grantee-deliverable-reminders`).** Evidence: Part A and B are both live; the owner's new Invited deliverable `2316e650…` on request 1003220 should produce one Production `scheduled_email_messages` row. Read the cron summary (look for `readdressed`/`readdressHeld`/`postureTightened`/`savedActivityNotReaddressed` and `sendFailed`) and that row, read-only.
+1. **Office Mac: run `docs/plans/briefs/OFFICE_MAC_SYNC_BRIEF_2026-10-01.md` first thing at the office** (owner there next week). Evidence: that Mac's `.env.local` still holds the dead `neondb_owner` password. Protecting Neon `main` changed no connection strings, so the brief is unchanged. Record the `--run-inspect` result (`managed-ledger/ledger_prod`) in the ledger evidence file.
 
 ### Owner Decision Needed
 
-1. **The 1003220 reminder** (due about 2026-10-13, to owner-controlled addresses): let it send as a real Part B exercise, or Stop it at `/scheduled-emails`.
-2. **D2: retire the local ledger copies** (`wmkf-ledger-pg/ledger_prod`, `/ledger` on the home Mac). Only after Verified Open 1 passes. Destructive: list the DBs and confirm first.
-3. **Local scratch DBs** `ledger_ci_s547`, `ledger_ci_s548`, `ledger_test` in the home-Mac container (verified present 10/01). List and confirm before dropping.
-4. **Optional:** protect both Neon `main` branches (Launch plan allows 2; prevents delete/reset; reset the password before protecting).
+1. **D2: retire the home Mac's local ledger copies** (`wmkf-ledger-pg/ledger_prod`, `/ledger`). Owner deferred (S560) until the office Mac is set up. Destructive: list the DBs and confirm first.
+2. **Home-Mac scratch DBs** `ledger_ci_s547`, `ledger_ci_s548`, `ledger_test`. Deferred with D2. List and confirm before dropping.
 
 ### Parked
 
 1. Deeper recipes, admin form, slice 5a, late-2026 `expiresAt` fixtures, cast ledger reset path, AkoyaGO TEST Factory Reviewer search, Liaison follow-ups, the Dataverse "Integrity review complete" flag. Unchanged since S553.
-2. Postgres in `lib/utils/tracked-secrets.js`: not tracked today (runbook step 6 says so). Re-open if the owner wants rotation-age alerts.
+2. Postgres in `lib/utils/tracked-secrets.js`: not tracked (runbook step 6). Re-open if the owner wants rotation-age alerts.
+3. **First live Part B send:** the 1003220 test reminder was stopped, so the re-check will first run on whichever real reminder sends next. No action unless the owner wants another deliberate exercise.
 
 ### Verify Before Acting
 
-1. **Codex refactor survey** `docs/plans/REFACTOR_CANDIDATES_SURVEY_2026-09-30.md` (merged `d1800e404`). It is a set of proposals, not a worklist; review it with the owner.
-2. **Stale Atlas lines** (pre-existing): `docs/APPLICATION_STATE_ATLAS.md:215` and the `scheduled_email_messages` heading in `docs/atlas/postgres-infra-tables.md` still say "migration 036 … not applied / code not deployed". This is a doc fix; confirm the deploy history first.
-3. **Factory test Requests 1003301–1003303 are NOT residue:** all three are tracked runs in `managed-ledger/ledger_prod` (1003301 `needs_attention`, 1003302/1003303 `ready`; verified 10/01). Do not delete them as cleanup.
+1. **An email the owner received overnight 9/30–10/01** about "the Alert" is unexplained: the reminder row recorded no digest FYI. Ask for the subject/sender before tracing.
+2. **Factory test Requests 1003301–1003303 are NOT residue:** tracked runs in `managed-ledger/ledger_prod` (verified S559). Do not delete as cleanup.
 
 ### Do Not Reopen Without New Decision
 
-1. 058 on the app DB (option 1, applied); Sensitive option A (Preview acceptance); re-screening approved integrity requests is allowed; Part B design decisions B-1/B-2/B-3 as built in #384.
-2. The DOCX/VTT transcript incident (closed S558). S553 decisions (D1 Neon, D3 shared folder, Part A merged, 059 applied alone).
+1. 058 on the app DB (applied); Sensitive option A; re-screening approved integrity requests allowed; Part B decisions B-1/B-2/B-3 as built in #384; the 1003220 reminder stopped (owner, S560).
+2. Neon protection: app `main` only; ledger unprotected (owner, S560).
+3. Refactor survey items: Codex is executing them on its own branches; do not start them here.
+4. The DOCX/VTT transcript incident (closed S558). S553 decisions (D1 Neon, D3 shared folder, Part A merged, 059 applied alone).
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `lib/services/scheduled-email-service.js` | `readCurrentRecipients`, `reconcileRecipientsBeforeSend`, the Part B hook in `deliverScheduledEmail` |
-| `lib/services/scheduled-email-store.js` | `reconcileScheduledEmailRecipients` (the lease/version-fenced transition) |
 | `docs/plans/briefs/OFFICE_MAC_SYNC_BRIEF_2026-10-01.md` | Office Mac env sync + ledger check |
-| `docs/plans/evidence/test-request-factory/ledger-snapshot-2026-09-30.md` | Ledger dump digests, Neon load, pooler hazard |
-| `docs/CREDENTIALS_RUNBOOK.md` | App Postgres rotation procedure and the Sensitive decision |
-| `lib/services/integrity-service.js` / `lib/services/workbench/integrity-service.js` | Findings 6 and 9 |
+| `docs/CREDENTIALS_RUNBOOK.md` | App Postgres rotation, Sensitive decision, protected `main` |
+| `docs/GRANTEE_PORTAL_SPEC.md` (item 8) | Reminder cadence as deployed (VIP/digest + Part B) |
+| `docs/atlas/postgres-infra-tables.md` | `scheduled_email_*` tables state and contracts |
+| `lib/services/cron/grantee-deliverable-reminders-service.js` | Row creation and approval posture |
+| `lib/services/scheduled-email-service.js` | Send path, Part B re-check, digest |
 
 ## Testing
 
 ```bash
 npx jest --testPathPatterns "scheduled-email|scheduled-emails|grantee-deliverable-reminders|integrity"
-# live Postgres (scratch DB on the local container, never a shared URL):
-docker exec wmkf-ledger-pg createdb -U postgres scratch_x && \
-TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/scratch_x TEST_REQUEST_LEDGER_REQUIRE=1 \
-  npx jest tests/integration/scheduled-email-engine.pg.test.js tests/integration/integrity-screening-reviews.pg.test.js; \
-docker exec wmkf-ledger-pg dropdb -U postgres scratch_x
 npm run check:factory-ledger -- --allow-unreachable
 ```
 
-Prior accumulated handoffs (including the S553 Fable snapshot) are in Git history at `3cee03ae5:SESSION_PROMPT.md`.
+Production reads: the auto-mode classifier blocks agent reads of the Production app DB. Write a read-only script to the scratchpad that prints no addresses, bodies or URLs, and have the owner run it with `!`. Load packages via `createRequire('<repo>/package.json')` and env via `process.loadEnvFile` (`dotenv` is not installed).
+
+Prior handoff (S559 detail): `0f86cc214:SESSION_PROMPT.md` and earlier in Git history.
