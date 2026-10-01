@@ -24,6 +24,18 @@ const {
   isBlockingReviewDocxBackfillManifest,
   validateReviewDocxBackfillManifest,
 } = require('../../lib/services/review-documents/backfill-service');
+const savedBackfillManifest = require('../fixtures/review-docx-backfill-v1.json');
+const crypto = require('node:crypto');
+
+function frozenBaselineCanonicalize(value) {
+  if (Array.isArray(value)) return value.map(frozenBaselineCanonicalize);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, frozenBaselineCanonicalize(value[key])]));
+}
+
+function frozenBaselineDigest(value) {
+  return crypto.createHash('sha256').update(JSON.stringify(frozenBaselineCanonicalize(value))).digest('hex');
+}
 
 const FIRST_ID = '11111111-1111-4111-8111-111111111111';
 const SECOND_ID = '22222222-2222-4222-8222-222222222222';
@@ -87,6 +99,7 @@ test('builds a redacted hash-bound dry-run manifest', async () => {
     requestNumber: '1002903',
     observedAt: '2026-09-03T18:00:00.000Z',
   });
+  expect(JSON.stringify(manifest)).toMatchSnapshot('fixed-clock complete backfill manifest');
 
   expect(manifest).toMatchObject({
     artifactType: 'review_docx_sharepoint_backfill_v1',
@@ -108,6 +121,52 @@ test('builds a redacted hash-bound dry-run manifest', async () => {
   const tampered = JSON.parse(JSON.stringify(manifest));
   tampered.candidates[0].requestNumber = '9999999';
   expect(() => validateReviewDocxBackfillManifest(tampered)).toThrow('hash');
+});
+
+test('preserves a bare read-failure candidate through the JSON manifest round trip', async () => {
+  planIndividualReviewFileCandidate.mockResolvedValue({
+    suggestionId: FIRST_ID,
+    status: 'read_failed',
+    error: { code: 'read_failed' },
+  });
+  const manifest = await buildReviewDocxBackfillManifest({
+    cycleCode: 'D26', observedAt: '2026-09-03T18:00:00.000Z',
+  });
+  const candidate = manifest.candidates[0];
+  expect(Object.hasOwn(candidate, 'selected')).toBe(true);
+  expect(candidate.selected).toBeUndefined();
+  expect(Object.hasOwn(candidate, 'richTextPresent')).toBe(true);
+  expect(candidate.richTextPresent).toBeUndefined();
+  const onDisk = `${JSON.stringify(manifest, null, 2)}\n`;
+  const parsed = JSON.parse(onDisk);
+  expect(parsed.candidates[0]).not.toHaveProperty('selected');
+  expect(parsed.candidates[0]).not.toHaveProperty('richTextPresent');
+  expect(parsed.manifestHash).toBe('f6d7c20b9a65b9cbe83a0378289b4ed3505d2e3f5e40349bdb9b7f698f632238');
+  expect(parsed.populationDigest).toBe('4c2bf874a284fb64d039d5f05bd749aa0bc305397b1cbfea5ed6466bc5f8d280');
+  const { manifestHash, ...body } = parsed;
+  expect(frozenBaselineDigest(body)).toBe(manifestHash);
+  expect(frozenBaselineDigest({
+    scope: parsed.scope, target: parsed.target,
+    candidates: parsed.candidates, anomalies: parsed.anomalies,
+  })).toBe(parsed.populationDigest);
+  expect(() => validateReviewDocxBackfillManifest(parsed)).not.toThrow();
+  jest.clearAllMocks();
+  await expect(executeReviewDocxBackfill(parsed)).rejects.toThrow('blocking');
+  expect(preflightReviewDocxWrite).not.toHaveBeenCalled();
+  expect(ensureIndividualReviewFile).not.toHaveBeenCalled();
+});
+
+test('consumes a pre-extraction saved backfill manifest and revalidates before writing', async () => {
+  expect(() => validateReviewDocxBackfillManifest(savedBackfillManifest)).not.toThrow();
+  const report = await executeReviewDocxBackfill(savedBackfillManifest);
+  expect(report.status).toBe('completed');
+  expect(preflightReviewDocxWrite).toHaveBeenCalledWith({
+    executionMode: 'backfill', suggestionIds: [FIRST_ID],
+  });
+  expect(ensureIndividualReviewFile).toHaveBeenCalledWith(FIRST_ID, expect.objectContaining({
+    expectedSuggestionEtag: 'W/"1"',
+    expectedSourceFingerprint: `source-${FIRST_ID}`,
+  }));
 });
 
 test('orders candidates by code-point keys independent of discovery order', async () => {
