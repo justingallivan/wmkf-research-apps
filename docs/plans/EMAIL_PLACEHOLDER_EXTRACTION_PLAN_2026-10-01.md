@@ -1,14 +1,34 @@
 ---
 title: Shared email placeholder extraction
-status: planned
+status: implemented
 domain: architecture
 kind: plan
-summary: Extract the identical pure replacement operation from four email modules, preserving caller-specific rendering and send behavior.
+summary: Four email modules now share the unchanged pure replacement operation. Sol, orchestrator and Fable approved; local validation passed. Promotion remains owner-gated.
 canonical: false
 owner: product-engineering
 ---
 
 # Shared email placeholder extraction
+
+## Implementation record
+
+[VERIFIED via commits/tests] Tests-first commits `62ee517ba` and `79a086b7f` characterize the public callers. Extraction commit `0d04ea007` adds the dependency-free helper, direct tests and catalog entry. Luna reports nine focused suites / 80 tests passing. Removing the sort failed the shorter-key-first overlap test; the mutation was restored and the suite passed again. Baseline plain-Node import/render passed on Node v26.6.0, with only the existing typeless-package warning.
+
+[VERIFIED via independent source comparison] The orchestrator compared Babel-generated ASTs against `31c3ace4a`: each extracted function body is unchanged, and each remaining module is unchanged after excluding its removed local declaration and added helper import. Comments are excluded from that comparison. This proves the mechanical source change, not live email delivery.
+
+[VERIFIED reviews] Sol approved `0d04ea007` without substantive findings. After the orchestrator's independent review, Fable approved the implementation through host OAuth session `4725549f-e8d6-4319-b47b-a8ccfe54a3cb`, with no required changes. Both Claude reviews used the requested Fable model through subscription authentication with API-key/provider overrides removed, read-only tools and no substitute review product. Optional documentation notes were addressed: source verification date refreshed and the exercised Node runtime recorded. The plain-Node test uses the installed runtime and tolerates typeless-package warnings; CI's Node 20 job independently exercises that import path. No package-wide module-type or runtime-version change is included.
+
+[VERIFIED local validation] Full Jest passed **1,191 suites / 18,800 tests / 5 snapshots**, with 6 suites / 98 tests skipped. Canonical `npm run build`, `npm run check:types`, and lint passed (0 errors / 123 existing warnings, none in changed files). Build retained two dynamic-filesystem tracing warnings and the Node experimental localStorage warning. All eight scoped gates and their available self-tests passed sequentially: reviewer-reminder-hold, dataverse-access-layer, reviewer-engagement-boundary, doc-symbol-refs, build-claim-freshness, docs-catalog, secret-scan, and harness-framing. The PR's CI result is separate from these local results; no live delivery, token minting, database or provider test was performed.
+
+[VERIFIED bounded `/sweep`, Mode A] Changed fact: four server modules use `lib/utils/email-placeholders.js` while retaining their token dictionaries. Source and caller comparison establish the fact; persistence is N/A. Exact symbol/ownership searches across docs, memory, wiki and session found four durable surfaces: this plan, the service catalog and token-syntax memory are AGREE after the structural updates; the original survey's extra-candidate row is HISTORICAL under its explicit baseline boundary. Its separate reassessment PR #390 remains dated to `31c3ace4a`. In-scope source headers and the raw-Node comment match the implementation. Tests and final diff disconfirm any change to caller dictionaries or the helper algorithm. No remaining live stale ownership claim was found in this bounded domain; other email policy, stored defaults and live operational state were excluded. The old preview-script copies remain deliberately separate.
+
+[VERIFIED overlap recheck] Main advanced to `b763e3d8f` during this build through two Factory-plan documentation commits only; none overlaps this change. Open PR #332 still has no overlap with the five runtime files. Its service-catalog overlap is separate and should be rechecked at merge time.
+
+[PROMOTION PENDING] Code reviews and local validation are complete. No merge or production deployment has occurred. Owner acceptance of the bounded Mode A rehearsal, a named last-known-good production deployment and explicit merge authorization remain outstanding under the release boundary below.
+
+## Approved plan (historical design)
+
+The following records the approved pre-implementation design. Planned labels describe that decision point; the implementation record above determines current progress. The release boundary remains active until the owner fulfills it.
 
 ## Scope and evidence
 
