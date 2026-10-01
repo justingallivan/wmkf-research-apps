@@ -485,6 +485,41 @@ test('manifest source drift fails before render, Graph access, or pointer mutati
   expect(suggestion.patchReviewReceipt).not.toHaveBeenCalled();
 });
 
+test('manifest ETag drift fails before render, Graph access, or pointer mutation', async () => {
+  const planned = await planIndividualReviewFileCandidate(SUGGESTION_ID, {
+    cycleCode: 'D26',
+    target: {
+      siteUrl: 'https://appriver3651007194.sharepoint.com/sites/akoyaGO',
+      siteId: 'site-1', driveId: 'drive-1', dynamicsBase: 'https://wmkf.crm.dynamics.com',
+    },
+  });
+  graph.getSiteId.mockClear();
+  graph.getDriveId.mockClear();
+  suggestion.getByIdWithSelect.mockClear();
+  buildIndividualReviewDocx.mockClear();
+  hashGovernedDocxContent.mockClear();
+  graph.getFileMetadataByPath.mockClear();
+  graph.uploadFile.mockClear();
+  graph.replaceFileContent.mockClear();
+  graph.deleteFile.mockClear();
+  suggestion.patchReviewReceipt.mockClear();
+
+  const result = await ensureIndividualReviewFile(SUGGESTION_ID, {
+    cycleCode: 'D26',
+    expectedSuggestionEtag: 'W/"stale"',
+    expectedSourceFingerprint: planned.sourceFingerprint,
+    expectedSemanticHash: planned.semanticHash,
+  });
+
+  expect(result).toMatchObject({ status: 'source_drift', error: { code: 'source_drift' } });
+  expect(buildIndividualReviewDocx).not.toHaveBeenCalled();
+  expect(graph.getFileMetadataByPath).not.toHaveBeenCalled();
+  expect(graph.uploadFile).not.toHaveBeenCalled();
+  expect(graph.replaceFileContent).not.toHaveBeenCalled();
+  expect(suggestion.patchReviewReceipt).not.toHaveBeenCalled();
+  expect(graph.deleteFile).not.toHaveBeenCalled();
+});
+
 test('manifest-bound already-filed state is semantically verified without upload or pointer rewrite', async () => {
   suggestion.getByIdWithSelect.mockResolvedValueOnce(exactPointer());
   graph.getFileMetadataByPath.mockResolvedValueOnce(ITEM);
@@ -960,4 +995,3 @@ test('Stage 1c: rows on test requests are excluded before answer reads, inspecti
   expect(suggestion.getByIdWithSelect).not.toHaveBeenCalled();
   expect(graph.uploadFile).not.toHaveBeenCalled();
 });
-
