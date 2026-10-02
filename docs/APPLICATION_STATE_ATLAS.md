@@ -7,7 +7,7 @@ summary: "Created: 2026-05-07 (S137, Phase 1 of docs/CLAUDE_REMEDIATION_PLAN.md)
 canonical: true
 cataloged: 2026-07-02
 owner: product-engineering
-last_verified: 2026-09-25
+last_verified: 2026-10-01
 related:
   - docs/CLAUDE_REMEDIATION_PLAN.md
   - scripts/audit-postgres-state.js
@@ -112,6 +112,7 @@ Promote any of these to a per-entity page if app code starts writing to it.
 | Virtual Review Panel | `panel_reviews`, `panel_review_items` | same |
 | Intake portal (pre-pilot) | `intake_drafts`, `intake_audit` | same |
 | Portal upload staging | `portal_upload_staging` (private Blob ownership, finalize lease/idempotency, candidate reconciliation; no published content authority) | [postgres-infra-tables.md](atlas/postgres-infra-tables.md) |
+| Applicant materials background uploads | `materials_upload_jobs` + `portal_upload_staging.background_job_id` (durable scan/finalize orchestration; SharePoint bytes and `wmkf_requestdocument` remain content/receipt authority) — **[SOURCE-BUILT on `codex/materials-background-processing`; migration 060 is not applied or live-verified, and runtime flag state/deployment are unverified]** | [postgres-infra-tables.md](atlas/postgres-infra-tables.md) |
 | External reviewer acceptance follow-up | `reviewer_acceptance_jobs` (post-accept side-effect queue; Dataverse suggestion row remains accepted-state source) | [postgres-infra-tables.md](atlas/postgres-infra-tables.md) |
 | Review synthesis lifecycle | `review_synthesis_jobs` (generation queue/currentness ledger; no review text; Dataverse request memo remains content source) — **[VERIFIED 2026-07-28 via controlled automatic smoke and post-deploy probes] migration 028 applied; Production automation enabled; job `2` completed in one claim with AI run `1b882cf6-bf8a-f111-ab0f-7ced8d3d15a6`; exact cleanup returned zero eligible requests; final deployment `dpl_FdUJSjNwhbNWKWVzpyymiB2mpJo1` Ready** | [postgres-infra-tables.md](atlas/postgres-infra-tables.md) |
 | Pre-Site informational distribution | `pre_site_distribution_attempts` (exact preview, cross-system send recovery, transport receipt; no attachment bytes) — **[VERIFIED LIVE 2026-08-25: migration 035 applied; 66 columns including 11 calendar/Site Visit/material additions; base and calendar/material sends for Request `1002379` reached `sent`]** — Pre-RP Brief drift-acknowledgement columns **[VERIFIED LIVE 2026-09-16 — migration 052 applied to the shared Production/Preview database by the owner via `node scripts/apply-migrations.js` (tracker `applied_at` 2026-09-17T03:59:31Z); readback exact: five nullable columns, both CHECK constraints, 14 pre-existing attempt rows all satisfy the constraints]** | [postgres-infra-tables.md](atlas/postgres-infra-tables.md) |

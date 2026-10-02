@@ -1,0 +1,612 @@
+/** @jest-environment node */
+import crypto from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { Client, Pool } from 'pg';
+
+const mockPoolRef = { current: null };
+const mockBlob = { del: jest.fn(async () => {}), get: jest.fn(), head: jest.fn() };
+jest.mock('@vercel/blob', () => ({
+  del: (...args) => mockBlob.del(...args),
+  get: (...args) => mockBlob.get(...args),
+  head: (...args) => mockBlob.head(...args),
+}));
+jest.mock('@vercel/postgres', () => ({
+  db: { connect: () => mockPoolRef.current.connect() },
+  sql: (strings, ...values) => mockPoolRef.current.query(
+    strings.reduce((text, part, i) => text + part + (i < values.length ? `$${i + 1}` : ''), ''),
+    values,
+  ),
+}));
+
+const TEST_URL = process.env.TEST_REQUEST_LEDGER_TEST_URL || '';
+if (!TEST_URL && process.env.TEST_REQUEST_LEDGER_REQUIRE === '1') {
+  throw new Error('TEST_REQUEST_LEDGER_REQUIRE=1 but TEST_REQUEST_LEDGER_TEST_URL is unset.');
+}
+if (/neon\.tech/i.test(TEST_URL) || (process.env.POSTGRES_URL && TEST_URL === process.env.POSTGRES_URL)) {
+  throw new Error('Refusing to run materials background-job integration tests against a shared Production/Preview database.');
+}
+const describeIf = TEST_URL ? describe : describe.skip;
+const MIGRATIONS = [
+  '031_portal_upload_staging.sql',
+  '042_site_visit_material_collections.sql',
+  '043_portal_upload_staging_document_scope.sql',
+  '044_site_visit_material_slot_leases.sql',
+  '060_materials_background_jobs.sql',
+].map((file) => fs.readFileSync(path.join(process.cwd(), 'lib/db/migrations', file), 'utf8'));
+
+describeIf('applicant materials background-job store (live PostgreSQL)', () => {
+  const schema = `materials_jobs_${crypto.randomBytes(5).toString('hex')}`;
+  let admin;
+  let jobs;
+  let collections;
+  let stagingStore;
+  let originalSchemaReadyFlag;
+  let originalBlobToken;
+
+  beforeAll(async () => {
+    admin = new Client({ connectionString: TEST_URL });
+    await admin.connect();
+    await admin.query(`CREATE SCHEMA ${schema}`);
+    const scopedUrl = new URL(TEST_URL);
+    scopedUrl.searchParams.set('options', `-c search_path=${schema}`);
+    mockPoolRef.current = new Pool({ connectionString: scopedUrl.toString(), max: 6 });
+    for (const migration of MIGRATIONS) await mockPoolRef.current.query(migration);
+    jobs = await import('../../lib/services/site-visit-materials/background-job-store.js');
+    collections = await import('../../lib/services/site-visit-materials/collection-store.js');
+    originalSchemaReadyFlag = process.env.SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY;
+    originalBlobToken = process.env.UPLOADS_BLOB_RW_TOKEN;
+    process.env.SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY = 'on';
+    process.env.UPLOADS_BLOB_RW_TOKEN = 'test-private-blob-token';
+    stagingStore = await import('../../lib/services/portal-upload-staging.js');
+  });
+
+  afterAll(async () => {
+    if (originalSchemaReadyFlag === undefined) delete process.env.SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY;
+    else process.env.SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY = originalSchemaReadyFlag;
+    if (originalBlobToken === undefined) delete process.env.UPLOADS_BLOB_RW_TOKEN;
+    else process.env.UPLOADS_BLOB_RW_TOKEN = originalBlobToken;
+    if (mockPoolRef.current) await mockPoolRef.current.end();
+    if (admin) {
+      await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+      await admin.end();
+    }
+  });
+
+  beforeEach(async () => {
+    await mockPoolRef.current.query('TRUNCATE materials_upload_jobs, portal_upload_staging, site_visit_material_collections');
+  });
+
+  function checklist(waivedSlot = null) {
+    return ['presentation_pdf', 'presentation_source', 'participant_bios'].map((key) => ({
+      key,
+      waived: key === waivedSlot,
+    }));
+  }
+
+  async function makeCollection({ requestId = crypto.randomUUID(), status = 'open', waivedSlot = null } = {}) {
+    const id = crypto.randomUUID();
+    const tokenDigest = crypto.randomBytes(32).toString('hex');
+    await mockPoolRef.current.query(
+      `INSERT INTO site_visit_material_collections
+         (id, request_id, site_visit_activity_id, status, due_at, closes_at, checklist, contacts,
+          jti, token_digest, token_ciphertext, created_by, invited_at, ready_confirmed_at, ready_confirmed_by)
+       VALUES ($1,$2,$3,$4,NOW()-INTERVAL '1 day',NOW()+INTERVAL '30 days',$5::jsonb,'{}'::jsonb,
+               $6,$7,'sealed',$8,NOW(),CASE WHEN $4='ready' THEN NOW() END,CASE WHEN $4='ready' THEN $9::uuid END)`,
+      [id, requestId, crypto.randomUUID(), status, JSON.stringify(checklist(waivedSlot)), crypto.randomUUID(), tokenDigest, crypto.randomUUID(), crypto.randomUUID()],
+    );
+    return { id, requestId, tokenDigest };
+  }
+
+  async function makeStaging({ requestId, actorBinding = 'actor-1', status = 'finalizing', expiresInHours = 4, leaseInHours = 1 } = {}) {
+    const id = crypto.randomUUID();
+    const leaseToken = crypto.randomUUID();
+    await mockPoolRef.current.query(
+      `INSERT INTO portal_upload_staging
+         (id,scope,resource_id,actor_binding,pathname,filename,declared_content_type,max_bytes,status,
+          lease_token,lease_expires_at,expires_at)
+       VALUES ($1,'site_visit_material',$2,$3,$4,$5,'application/pdf',1000,$6,$7,
+               NOW()+($8::text||' hours')::interval,NOW()+($9::text||' hours')::interval)`,
+      [id, requestId, actorBinding, `test/${id}`, 'paper.pdf', status, status === 'finalizing' ? leaseToken : null, leaseInHours, expiresInHours],
+    );
+    return { id, leaseToken, actorBinding };
+  }
+
+  async function admit({ collection, staging, slot = 'presentation_pdf', requestId = collection.requestId }) {
+    return jobs.enqueueMaterialsUploadJob({
+      stagingId: staging.id,
+      stagingLeaseToken: staging.leaseToken,
+      requestId,
+      collectionId: collection.id,
+      actorBinding: staging.actorBinding,
+      tokenDigest: collection.tokenDigest,
+      slot,
+      otherUploadsEnabled: slot === 'other',
+    });
+  }
+
+  async function row(sql, values = []) {
+    return (await mockPoolRef.current.query(sql, values)).rows[0];
+  }
+
+  async function waitForBlockedQuery(fragment, count = 1) {
+    const deadline = Date.now() + 3000;
+    while (Date.now() < deadline) {
+      const blocked = await admin.query(
+        `SELECT COUNT(*)::int AS count FROM pg_stat_activity
+          WHERE datname=current_database() AND wait_event_type='Lock' AND query ILIKE $1`,
+        [`%${fragment}%`],
+      );
+      if (blocked.rows[0].count >= count) return;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    throw new Error(`Timed out waiting for PostgreSQL lock wait on ${fragment}`);
+  }
+
+  test('admission is replay-idempotent for the same staging identity and owns it atomically', async () => {
+    const collection = await makeCollection();
+    const staging = await makeStaging({ requestId: collection.requestId });
+    const first = await admit({ collection, staging });
+    const replay = await admit({ collection, staging });
+    expect(replay.id).toBe(first.id);
+    expect(await row('SELECT COUNT(*)::int AS count FROM materials_upload_jobs')).toMatchObject({ count: 1 });
+    expect(await row('SELECT status, background_job_id, lease_token FROM portal_upload_staging WHERE id=$1', [staging.id]))
+      .toMatchObject({ status: 'pending', background_job_id: first.id, lease_token: null });
+  });
+
+  test('the active checklist slot is unique across collections for the same request', async () => {
+    const requestId = crypto.randomUUID();
+    const collectionA = await makeCollection({ requestId });
+    const stagingA = await makeStaging({ requestId });
+    await admit({ collection: collectionA, staging: stagingA });
+    await mockPoolRef.current.query("UPDATE site_visit_material_collections SET status='closed' WHERE id=$1", [collectionA.id]);
+    const collectionB = await makeCollection({ requestId });
+    const stagingB = await makeStaging({ requestId });
+
+    await expect(admit({ collection: collectionB, staging: stagingB }))
+      .rejects.toMatchObject({ code: 'slot_busy', httpStatus: 409 });
+    expect(await row('SELECT background_job_id, status FROM portal_upload_staging WHERE id=$1', [stagingB.id]))
+      .toMatchObject({ background_job_id: null, status: 'finalizing' });
+  });
+
+  test('cleanup claim that locks an expired row first prevents queue admission from taking ownership', async () => {
+    const collection = await makeCollection();
+    const staging = await makeStaging({ requestId: collection.requestId, expiresInHours: -1, leaseInHours: -2 });
+    const cleanup = await mockPoolRef.current.connect();
+    try {
+      await cleanup.query('BEGIN');
+      const eligible = await cleanup.query(
+        `SELECT id FROM portal_upload_staging WHERE id=$1 AND expires_at<NOW()
+          AND background_job_id IS NULL AND NOT(status='finalizing' AND lease_expires_at>=NOW()) FOR UPDATE`,
+        [staging.id],
+      );
+      expect(eligible.rowCount).toBe(1);
+      const admission = admit({ collection, staging });
+      await waitForBlockedQuery('FROM portal_upload_staging');
+      await cleanup.query(
+        `UPDATE portal_upload_staging SET status='expired',lease_token=NULL,lease_expires_at=NULL
+          WHERE id=$1 AND background_job_id IS NULL AND expires_at<NOW()
+            AND NOT(status='finalizing' AND lease_expires_at>=NOW())`, [staging.id],
+      );
+      await cleanup.query('COMMIT');
+      await expect(admission).rejects.toMatchObject({ code: 'staging_lease_lost' });
+      expect(await row('SELECT status, background_job_id FROM portal_upload_staging WHERE id=$1', [staging.id]))
+        .toMatchObject({ status: 'expired', background_job_id: null });
+    } finally {
+      await cleanup.query('ROLLBACK').catch(() => {});
+      cleanup.release();
+    }
+  });
+
+  test('real staging cleanup preserves an expired attention-owned row and never deletes its Blob', async () => {
+    const collection = await makeCollection();
+    const staging = await makeStaging({ requestId: collection.requestId });
+    const job = await admit({ collection, staging });
+    await mockPoolRef.current.query(
+      `UPDATE materials_upload_jobs SET status='needs_attention',completed_at=NOW(),error_code='uncertain_write'
+        WHERE id=$1`, [job.id],
+    );
+    await mockPoolRef.current.query("UPDATE portal_upload_staging SET expires_at=NOW()-INTERVAL '1 day' WHERE id=$1", [staging.id]);
+    mockBlob.del.mockClear();
+
+    const result = await stagingStore.cleanupExpiredPortalUploads();
+
+    expect(result).toMatchObject({ deleted: 0, pruned: 0, errors: 0, retained: 0 });
+    expect(mockBlob.del).not.toHaveBeenCalled();
+    expect(await row('SELECT status, background_job_id FROM portal_upload_staging WHERE id=$1', [staging.id]))
+      .toMatchObject({ status: 'pending', background_job_id: job.id });
+  });
+
+  test('schema-off staging helpers run against a pre-060 PostgreSQL schema', async () => {
+    const legacySchema = `materials_legacy_${crypto.randomBytes(5).toString('hex')}`;
+    const previousPool = mockPoolRef.current;
+    const previousFlag = process.env.SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY;
+    const legacyUrl = new URL(TEST_URL);
+    legacyUrl.searchParams.set('options', `-c search_path=${legacySchema}`);
+    const legacyPool = new Pool({ connectionString: legacyUrl.toString(), max: 3 });
+    try {
+      await admin.query(`CREATE SCHEMA ${legacySchema}`);
+      mockPoolRef.current = legacyPool;
+      for (const file of MIGRATIONS.slice(0, 4)) await legacyPool.query(file);
+      delete process.env.SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY;
+      const oldSchemaShape = await legacyPool.query(
+        `SELECT to_regclass('materials_upload_jobs') AS jobs_table,
+                EXISTS (SELECT 1 FROM information_schema.columns
+                         WHERE table_schema=current_schema() AND table_name='portal_upload_staging'
+                           AND column_name='background_job_id') AS has_owner_column`,
+      );
+      expect(oldSchemaShape.rows[0]).toMatchObject({ jobs_table: null, has_owner_column: false });
+
+      const requestId = crypto.randomUUID();
+      const stagingId = crypto.randomUUID();
+      const pathname = `portal-staging/site_visit_material/${requestId}/${stagingId}`;
+      await legacyPool.query(
+        `INSERT INTO portal_upload_staging
+           (id,scope,resource_id,actor_binding,pathname,filename,declared_content_type,max_bytes,status,expires_at)
+         VALUES ($1,'site_visit_material',$2,'legacy-actor',$3,'legacy.pdf','application/pdf',1000,'pending',NOW()+INTERVAL '1 day')`,
+        [stagingId, requestId, pathname],
+      );
+
+      const firstClaim = await stagingStore.claimPortalUpload({ stagingId, scope: 'site_visit_material', resourceId: requestId, actorBinding: 'legacy-actor' });
+      await stagingStore.recordPortalUploadCandidate({ stagingId, leaseToken: firstClaim.leaseToken, candidate: { driveId: 'drive', itemId: 'item' } });
+      await stagingStore.releasePortalUpload({ stagingId, leaseToken: firstClaim.leaseToken });
+      const secondClaim = await stagingStore.claimPortalUpload({ stagingId, scope: 'site_visit_material', resourceId: requestId, actorBinding: 'legacy-actor' });
+      await stagingStore.completePortalUpload({ stagingId, leaseToken: secondClaim.leaseToken, resultPayload: { saved: true } });
+      expect(await legacyPool.query('SELECT status, result_payload FROM portal_upload_staging WHERE id=$1', [stagingId]))
+        .toMatchObject({ rows: [expect.objectContaining({ status: 'consumed', result_payload: { saved: true } })] });
+
+      const rejectedId = crypto.randomUUID();
+      const rejectedPath = `portal-staging/site_visit_material/${requestId}/${rejectedId}`;
+      await legacyPool.query(
+        `INSERT INTO portal_upload_staging
+           (id,scope,resource_id,actor_binding,pathname,filename,declared_content_type,max_bytes,status,lease_token,lease_expires_at,expires_at)
+         VALUES ($1,'site_visit_material',$2,'legacy-actor',$3,'bad.pdf','application/pdf',1000,'finalizing',$4,NOW()+INTERVAL '5 minutes',NOW()+INTERVAL '1 day')`,
+        [rejectedId, requestId, rejectedPath, crypto.randomUUID()],
+      );
+      const rejected = await legacyPool.query('SELECT lease_token FROM portal_upload_staging WHERE id=$1', [rejectedId]);
+      const rejectedResult = await stagingStore.rejectPortalUpload({ stagingId: rejectedId, leaseToken: rejected.rows[0].lease_token, resultCode: 'invalid_file' });
+      expect(rejectedResult).toBeUndefined();
+      expect(await legacyPool.query('SELECT status, result_code FROM portal_upload_staging WHERE id=$1', [rejectedId]))
+        .toMatchObject({ rows: [expect.objectContaining({ status: 'rejected', result_code: 'invalid_file' })] });
+
+      const expiredId = crypto.randomUUID();
+      const expiredPath = `portal-staging/site_visit_material/${requestId}/${expiredId}`;
+      await legacyPool.query(
+        `INSERT INTO portal_upload_staging
+           (id,scope,resource_id,actor_binding,pathname,filename,declared_content_type,max_bytes,status,expires_at)
+         VALUES ($1,'site_visit_material',$2,'legacy-actor',$3,'old.pdf','application/pdf',1000,'pending',NOW()-INTERVAL '1 day')`,
+        [expiredId, requestId, expiredPath],
+      );
+      mockBlob.del.mockClear();
+      await expect(stagingStore.cleanupExpiredPortalUploads()).resolves.toMatchObject({ deleted: 1, errors: 0 });
+      expect(mockBlob.del).toHaveBeenCalledWith(expiredPath, { token: 'test-private-blob-token' });
+      expect(await legacyPool.query('SELECT status FROM portal_upload_staging WHERE id=$1', [expiredId]))
+        .toMatchObject({ rows: [expect.objectContaining({ status: 'expired' })] });
+    } finally {
+      if (previousFlag === undefined) delete process.env.SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY;
+      else process.env.SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY = previousFlag;
+      mockPoolRef.current = previousPool;
+      await legacyPool.end();
+      await admin.query(`DROP SCHEMA IF EXISTS ${legacySchema} CASCADE`);
+    }
+  });
+
+  test('Ready cannot be asserted after admission wins the collection lock', async () => {
+    const collection = await makeCollection({ status: 'open' });
+    const staging = await makeStaging({ requestId: collection.requestId });
+    const blocker = await mockPoolRef.current.connect();
+    try {
+      await blocker.query('BEGIN');
+      await blocker.query('SELECT id FROM site_visit_material_collections WHERE id=$1 FOR UPDATE', [collection.id]);
+      // Queue admission first while holding the collection lock, then Ready.
+      // PostgreSQL will run admission and commit before markReady's lock check.
+      const admission = admit({ collection, staging });
+      await waitForBlockedQuery('FROM site_visit_material_collections');
+      const ready = collections.markReady(collection.id, crypto.randomUUID());
+      await waitForBlockedQuery("status = 'open' FOR UPDATE");
+      await blocker.query('COMMIT');
+      await admission;
+      const marked = await ready;
+      expect(marked).toBeNull();
+      const current = await row('SELECT status, ready_confirmed_at FROM site_visit_material_collections WHERE id=$1', [collection.id]);
+      expect(current).toMatchObject({ status: 'open', ready_confirmed_at: null });
+    } finally {
+      await blocker.query('ROLLBACK').catch(() => {});
+      blocker.release();
+    }
+  });
+
+  test('a crashed worker lease expires, is reclaimed with a new token, and stale token cannot settle', async () => {
+    const collection = await makeCollection();
+    const staging = await makeStaging({ requestId: collection.requestId });
+    const job = await admit({ collection, staging });
+    const first = await jobs.claimNextMaterialsUploadJob({ leaseSeconds: 60 });
+    expect(first).toMatchObject({ id: job.id, status: 'processing', attempt_count: 1, staging_status: 'pending' });
+    await mockPoolRef.current.query("UPDATE materials_upload_jobs SET locked_until=NOW()-INTERVAL '1 second' WHERE id=$1", [job.id]);
+    await mockPoolRef.current.query("UPDATE portal_upload_staging SET lease_expires_at=NOW()-INTERVAL '1 second' WHERE id=$1", [staging.id]);
+    const second = await jobs.claimNextMaterialsUploadJob({ leaseSeconds: 60 });
+    expect(second).toMatchObject({ id: job.id, status: 'processing', attempt_count: 2 });
+    expect(second.lease_token).not.toBe(first.lease_token);
+    expect(await jobs.completeMaterialsUploadJob({ jobId: job.id, leaseToken: first.lease_token, resultPayload: { ok: true } })).toBeNull();
+    expect(await jobs.assertMaterialsUploadJobLease(job.id, second.lease_token)).toBe(true);
+    expect(await jobs.giveBackMaterialsUploadJobAttempt(first)).toBeNull();
+    expect(await jobs.giveBackMaterialsUploadJobAttempt(second)).toMatchObject({ status: 'queued', attempt_count: 1 });
+  });
+
+  test('settlement SQL supports retry, safe failure, attention, and terminal constraint shapes', async () => {
+    const expected = [
+      ['queued', { status: 'pending', owner: true, attempts: 1 }],
+      ['failed', { status: 'rejected', owner: false, attempts: 1 }],
+      ['needs_attention', { status: 'pending', owner: true, attempts: 1 }],
+      ['cancelled', { status: 'rejected', owner: false, attempts: 1 }],
+    ];
+    for (const [status, expectation] of expected) {
+      await mockPoolRef.current.query('TRUNCATE materials_upload_jobs, portal_upload_staging, site_visit_material_collections');
+      const collection = await makeCollection();
+      const staging = await makeStaging({ requestId: collection.requestId });
+      await admit({ collection, staging });
+      const claimed = await jobs.claimNextMaterialsUploadJob();
+      expect(claimed.id).toBe((await row('SELECT id FROM materials_upload_jobs LIMIT 1')).id);
+      expect(await row('SELECT background_job_id, lease_token FROM portal_upload_staging WHERE id=$1', [staging.id]))
+        .toMatchObject({ background_job_id: claimed.id, lease_token: claimed.lease_token });
+      const settled = await jobs.settleMaterialsUploadJob({
+        job: claimed,
+        status,
+        errorCode: 'test_failure',
+        retryAt: status === 'queued' ? new Date(Date.now() + 60_000) : null,
+        clearStageOwner: !expectation.owner,
+        rejectStage: !expectation.owner,
+      });
+      expect(settled).toMatchObject({ status, attempt_count: expectation.attempts });
+      const staged = await row('SELECT status, background_job_id, lease_token FROM portal_upload_staging WHERE id=$1', [staging.id]);
+      expect(staged.status).toBe(expectation.status);
+      expect(Boolean(staged.background_job_id)).toBe(expectation.owner);
+      expect(staged.lease_token).toBeNull();
+    }
+  });
+
+  test('operator retry resets an exhausted budget through the actual loopback CLI and retains evidence', async () => {
+    const retryCollection = await makeCollection();
+    const retryStage = await makeStaging({ requestId: retryCollection.requestId });
+    const retryJob = await admit({ collection: retryCollection, staging: retryStage });
+    await mockPoolRef.current.query(
+      `UPDATE materials_upload_jobs SET status='needs_attention',attempt_count=8,deadline_at=NOW()-INTERVAL '1 hour',
+         expires_at=NOW()-INTERVAL '1 day',completed_at=NOW(),error_code='uncertain_write',
+         scan_checkpoint='{"clean":true,"sha256":"proof"}'::jsonb
+        WHERE id=$1`, [retryJob.id],
+    );
+    await mockPoolRef.current.query(
+      `UPDATE portal_upload_staging SET candidate_result='{"generationKey":"preserve-me"}'::jsonb,
+         expires_at=NOW()-INTERVAL '1 day',lease_token=NULL,lease_expires_at=NULL WHERE id=$1`, [retryStage.id],
+    );
+    const scopedUrl = new URL(TEST_URL);
+    scopedUrl.searchParams.set('options', `-c search_path=${schema}`);
+    const cli = spawnSync(process.execPath, [
+      path.join(process.cwd(), 'scripts/materials-upload-job.js'),
+      '--database-url', scopedUrl.toString(), '--job-id', retryJob.id, '--action', 'retry',
+    ], { cwd: process.cwd(), encoding: 'utf8', timeout: 15_000 });
+    expect(cli.status).toBe(0);
+    expect(JSON.parse(cli.stdout)).toMatchObject({ jobId: retryJob.id, action: 'retry', status: 'queued', attemptCount: 0 });
+    const retry = await row('SELECT status, attempt_count, error_code, deadline_at, expires_at, scan_checkpoint FROM materials_upload_jobs WHERE id=$1', [retryJob.id]);
+    expect(retry).toMatchObject({ status: 'queued', attempt_count: 0, error_code: null, scan_checkpoint: { clean: true, sha256: 'proof' } });
+    expect(new Date(retry.deadline_at).getTime()).toBeGreaterThan(Date.now() + 60 * 60 * 1000);
+    expect(new Date(retry.expires_at).getTime()).toBeGreaterThan(Date.now() + 29 * 24 * 60 * 60 * 1000);
+    expect(await row('SELECT status, background_job_id, candidate_result, expires_at FROM portal_upload_staging WHERE id=$1', [retryStage.id]))
+      .toMatchObject({ status: 'pending', background_job_id: retryJob.id, candidate_result: { generationKey: 'preserve-me' } });
+    expect(new Date((await row('SELECT expires_at FROM portal_upload_staging WHERE id=$1', [retryStage.id])).expires_at).getTime())
+      .toBeGreaterThan(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    await expect(stagingStore.claimPortalUpload({
+      stagingId: retryStage.id,
+      scope: 'site_visit_material',
+      resourceId: retryCollection.requestId,
+      actorBinding: retryStage.actorBinding,
+    })).rejects.toMatchObject({ code: 'finalize_in_progress' });
+    await expect(jobs.resolveMaterialsUploadJob({ jobId: retryJob.id, action: 'retry' }))
+      .rejects.toMatchObject({ code: 'job_not_resolvable' });
+
+    const infectedCollection = await makeCollection();
+    const infectedStage = await makeStaging({ requestId: infectedCollection.requestId });
+    const infectedJob = await admit({ collection: infectedCollection, staging: infectedStage });
+    await mockPoolRef.current.query(
+      `UPDATE materials_upload_jobs SET status='needs_attention',completed_at=NOW(),error_code='scan_infected' WHERE id=$1`,
+      [infectedJob.id],
+    );
+    await mockPoolRef.current.query(
+      `UPDATE portal_upload_staging SET lease_token=NULL,lease_expires_at=NULL WHERE id=$1`, [infectedStage.id],
+    );
+    const infectedCli = spawnSync(process.execPath, [
+      path.join(process.cwd(), 'scripts/materials-upload-job.js'),
+      '--database-url', scopedUrl.toString(), '--job-id', infectedJob.id, '--action', 'retry',
+    ], { cwd: process.cwd(), encoding: 'utf8', timeout: 15_000 });
+    expect(infectedCli.status).toBe(1);
+    expect(infectedCli.stderr).toContain('infected_upload_cannot_retry');
+    expect(await row('SELECT status, error_code FROM materials_upload_jobs WHERE id=$1', [infectedJob.id]))
+      .toMatchObject({ status: 'needs_attention', error_code: 'scan_infected' });
+
+    const consumedCollection = await makeCollection();
+    const consumedStage = await makeStaging({ requestId: consumedCollection.requestId });
+    const consumedJob = await admit({ collection: consumedCollection, staging: consumedStage });
+    await mockPoolRef.current.query(
+      `UPDATE materials_upload_jobs SET status='needs_attention',completed_at=NOW(),error_code='uncertain_write' WHERE id=$1`,
+      [consumedJob.id],
+    );
+    await mockPoolRef.current.query(
+      `UPDATE portal_upload_staging SET status='consumed',consumed_at=NOW(),result_code='ok',result_payload='{"ok":true}'::jsonb,
+         lease_token=NULL,lease_expires_at=NULL WHERE id=$1`, [consumedStage.id],
+    );
+    const consumedCli = spawnSync(process.execPath, [
+      path.join(process.cwd(), 'scripts/materials-upload-job.js'),
+      '--database-url', scopedUrl.toString(), '--job-id', consumedJob.id, '--action', 'retry',
+    ], { cwd: process.cwd(), encoding: 'utf8', timeout: 15_000 });
+    expect(consumedCli.status).toBe(1);
+    expect(consumedCli.stderr).toContain('durable_receipt_already_committed');
+
+    const leasedCollection = await makeCollection();
+    const leasedStage = await makeStaging({ requestId: leasedCollection.requestId });
+    const leasedJob = await admit({ collection: leasedCollection, staging: leasedStage });
+    const liveToken = crypto.randomUUID();
+    await mockPoolRef.current.query(
+      `UPDATE materials_upload_jobs SET status='processing',completed_at=NULL,error_code='uncertain_write',
+         locked_until=NOW()+INTERVAL '10 minutes',lease_token=$2 WHERE id=$1`,
+      [leasedJob.id, liveToken],
+    );
+    await mockPoolRef.current.query(
+      `UPDATE portal_upload_staging SET status='finalizing',lease_token=$2,
+         lease_expires_at=NOW()+INTERVAL '10 minutes' WHERE id=$1`, [leasedStage.id, liveToken],
+    );
+    const leasedCli = spawnSync(process.execPath, [
+      path.join(process.cwd(), 'scripts/materials-upload-job.js'),
+      '--database-url', scopedUrl.toString(), '--job-id', leasedJob.id, '--action', 'retry',
+    ], { cwd: process.cwd(), encoding: 'utf8', timeout: 15_000 });
+    expect(leasedCli.status).toBe(1);
+    expect(leasedCli.stderr).toContain('job_not_resolvable');
+
+    const stagingLeaseCollection = await makeCollection();
+    const stagingLease = await makeStaging({ requestId: stagingLeaseCollection.requestId });
+    const stagingLeaseJob = await admit({ collection: stagingLeaseCollection, staging: stagingLease });
+    await mockPoolRef.current.query(
+      `UPDATE materials_upload_jobs SET status='needs_attention',completed_at=NOW(),error_code='uncertain_write' WHERE id=$1`,
+      [stagingLeaseJob.id],
+    );
+    await mockPoolRef.current.query(
+      `UPDATE portal_upload_staging SET status='finalizing',lease_token=$2,
+         lease_expires_at=NOW()+INTERVAL '10 minutes' WHERE id=$1`,
+      [stagingLease.id, crypto.randomUUID()],
+    );
+    const stagingLeaseCli = spawnSync(process.execPath, [
+      path.join(process.cwd(), 'scripts/materials-upload-job.js'),
+      '--database-url', scopedUrl.toString(), '--job-id', stagingLeaseJob.id, '--action', 'retry',
+    ], { cwd: process.cwd(), encoding: 'utf8', timeout: 15_000 });
+    expect(stagingLeaseCli.status).toBe(1);
+    expect(stagingLeaseCli.stderr).toContain('staging_lease_active');
+
+    const ownerCollection = await makeCollection();
+    const ownerStage = await makeStaging({ requestId: ownerCollection.requestId });
+    const ownerJob = await admit({ collection: ownerCollection, staging: ownerStage });
+    await mockPoolRef.current.query(
+      `UPDATE materials_upload_jobs SET status='needs_attention',completed_at=NOW(),error_code='uncertain_write' WHERE id=$1`,
+      [ownerJob.id],
+    );
+    await mockPoolRef.current.query(
+      `UPDATE portal_upload_staging SET lease_token=NULL,lease_expires_at=NULL,background_job_id=$2 WHERE id=$1`,
+      [ownerStage.id, crypto.randomUUID()],
+    );
+    const ownerMismatchCli = spawnSync(process.execPath, [
+      path.join(process.cwd(), 'scripts/materials-upload-job.js'),
+      '--database-url', scopedUrl.toString(), '--job-id', ownerJob.id, '--action', 'retry',
+    ], { cwd: process.cwd(), encoding: 'utf8', timeout: 15_000 });
+    expect(ownerMismatchCli.status).toBe(1);
+    expect(ownerMismatchCli.stderr).toContain('staging_owner_mismatch');
+    expect(await row('SELECT status, attempt_count FROM materials_upload_jobs WHERE id=$1', [ownerJob.id]))
+      .toMatchObject({ status: 'needs_attention', attempt_count: 0 });
+
+    const redirectedUrl = new URL(scopedUrl);
+    redirectedUrl.searchParams.set('host', 'example.invalid');
+    const redirectedCli = spawnSync(process.execPath, [
+      path.join(process.cwd(), 'scripts/materials-upload-job.js'),
+      '--database-url', redirectedUrl.toString(), '--job-id', retryJob.id, '--action', 'retry',
+    ], { cwd: process.cwd(), encoding: 'utf8', timeout: 15_000 });
+    expect(redirectedCli.status).toBe(2);
+    expect(redirectedCli.stderr).toContain('loopback Postgres URLs only');
+
+    const cancelCollection = await makeCollection();
+    const cancelStage = await makeStaging({ requestId: cancelCollection.requestId });
+    const cancelJob = await admit({ collection: cancelCollection, staging: cancelStage });
+    await mockPoolRef.current.query(
+      `UPDATE materials_upload_jobs SET status='needs_attention',completed_at=NOW(),error_code='uncertain_write'
+        WHERE id=$1`, [cancelJob.id],
+    );
+    const cancelled = await jobs.resolveMaterialsUploadJob({ jobId: cancelJob.id, action: 'cancel' });
+    expect(cancelled).toMatchObject({ status: 'cancelled', error_code: 'operator_cancelled' });
+    expect(await row('SELECT status, background_job_id, result_code FROM portal_upload_staging WHERE id=$1', [cancelStage.id]))
+      .toMatchObject({ status: 'rejected', background_job_id: null, result_code: 'cancelled' });
+    await expect(stagingStore.claimPortalUpload({
+      stagingId: cancelStage.id,
+      scope: 'site_visit_material',
+      resourceId: cancelCollection.requestId,
+      actorBinding: cancelStage.actorBinding,
+    })).rejects.toMatchObject({ code: 'cancelled' });
+  });
+
+  test('consumed staging is claimable for receipt recovery without changing its receipt', async () => {
+    const collection = await makeCollection();
+    const staging = await makeStaging({ requestId: collection.requestId });
+    const job = await admit({ collection, staging });
+    await mockPoolRef.current.query(
+      `UPDATE portal_upload_staging SET status='consumed',consumed_at=NOW(),result_code='ok',
+         result_payload='{"receipt":"saved"}'::jsonb WHERE id=$1`, [staging.id],
+    );
+    const claimed = await jobs.claimNextMaterialsUploadJob();
+    expect(claimed).toMatchObject({ id: job.id, status: 'processing', staging_status: 'consumed' });
+    const done = await jobs.completeMaterialsUploadJob({ jobId: job.id, leaseToken: claimed.lease_token, resultPayload: { recovered: true } });
+    expect(done).toMatchObject({ status: 'completed' });
+    expect(await row('SELECT status, result_code, result_payload, consumed_at FROM portal_upload_staging WHERE id=$1', [staging.id]))
+      .toMatchObject({ status: 'consumed', result_code: 'ok', result_payload: { receipt: 'saved' } });
+  });
+
+  test('staging foreign key restricts pruning, and terminal job metadata expires independently', async () => {
+    const collection = await makeCollection();
+    const staging = await makeStaging({ requestId: collection.requestId });
+    const job = await admit({ collection, staging });
+    await mockPoolRef.current.query(
+      `UPDATE portal_upload_staging SET status='consumed',consumed_at=NOW(),result_code='ok',
+         result_payload='{"receipt":"saved"}'::jsonb WHERE id=$1`, [staging.id],
+    );
+    const claimed = await jobs.claimNextMaterialsUploadJob();
+    await jobs.completeMaterialsUploadJob({ jobId: job.id, leaseToken: claimed.lease_token, resultPayload: { ok: true } });
+    expect(await row('SELECT status, background_job_id FROM portal_upload_staging WHERE id=$1', [staging.id]))
+      .toMatchObject({ status: 'consumed', background_job_id: null });
+    await mockPoolRef.current.query(
+      `UPDATE portal_upload_staging SET updated_at=NOW()-INTERVAL '40 days',expires_at=NOW()-INTERVAL '1 second' WHERE id=$1`,
+      [staging.id],
+    );
+    await expect(mockPoolRef.current.query('DELETE FROM portal_upload_staging WHERE id=$1', [staging.id]))
+      .rejects.toMatchObject({ code: '23503' });
+    const firstCleanup = await stagingStore.cleanupExpiredPortalUploads({ retentionDays: 30 });
+    expect(firstCleanup).toMatchObject({ deleted: 1, pruned: 0, errors: 0 });
+    expect(await row('SELECT id FROM portal_upload_staging WHERE id=$1', [staging.id])).toBeDefined();
+    await mockPoolRef.current.query("UPDATE materials_upload_jobs SET expires_at=NOW()-INTERVAL '1 second' WHERE id=$1", [job.id]);
+    expect(await jobs.pruneMaterialsUploadJobs()).toBe(1);
+    const secondCleanup = await stagingStore.cleanupExpiredPortalUploads({ retentionDays: 30 });
+    expect(secondCleanup).toMatchObject({ deleted: 1, pruned: 1, errors: 0 });
+    expect(await row('SELECT id FROM portal_upload_staging WHERE id=$1', [staging.id])).toBeUndefined();
+  });
+
+  test.each(['queued', 'processing', 'needs_attention'])('synchronous slot claim is blocked by %s work in an earlier collection', async (status) => {
+    const requestId = crypto.randomUUID();
+    const oldCollection = await makeCollection({ requestId });
+    const staging = await makeStaging({ requestId });
+    const job = await admit({ collection: oldCollection, staging });
+    if (status !== 'queued') {
+      const claimed = await jobs.claimNextMaterialsUploadJob();
+      if (status === 'needs_attention') await jobs.settleMaterialsUploadJob({ job: claimed, status, errorCode: 'uncertain_write' });
+    }
+    await mockPoolRef.current.query("UPDATE site_visit_material_collections SET status='closed' WHERE id=$1", [oldCollection.id]);
+    const newCollection = await makeCollection({ requestId });
+    expect(await collections.acquireSlotLease({ collectionId: newCollection.id, slotKey: 'presentation_pdf' })).toBeNull();
+    expect(await collections.acquireSlotLease({ collectionId: newCollection.id, slotKey: 'participant_bios' })).not.toBeNull();
+    expect(await collections.acquireSlotLease({ collectionId: oldCollection.id, slotKey: 'presentation_pdf', backgroundJobId: job.id })).not.toBeNull();
+  });
+
+  test('a synchronous slot lease prevents queue admission before provider work', async () => {
+    const collection = await makeCollection();
+    const staging = await makeStaging({ requestId: collection.requestId });
+    const lease = await collections.acquireSlotLease({ collectionId: collection.id, slotKey: 'presentation_pdf' });
+    expect(lease).not.toBeNull();
+    await expect(admit({ collection, staging })).rejects.toMatchObject({ code: 'slot_busy' });
+    expect(await row('SELECT background_job_id FROM portal_upload_staging WHERE id=$1', [staging.id])).toMatchObject({ background_job_id: null });
+  });
+
+
+  test('multiple optional Other jobs do not block each other from starting', async () => {
+    const collection = await makeCollection();
+    const firstStage = await makeStaging({ requestId: collection.requestId });
+    const secondStage = await makeStaging({ requestId: collection.requestId });
+    const first = await admit({ collection, staging: firstStage, slot: 'other' });
+    await admit({ collection, staging: secondStage, slot: 'other' });
+    const lease = await collections.acquireSlotLease({ collectionId: collection.id, slotKey: 'other', backgroundJobId: first.id });
+    expect(lease).not.toBeNull();
+  });
+
+});

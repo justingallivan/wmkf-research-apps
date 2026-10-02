@@ -22,8 +22,10 @@ related:
 
 ## 1. Status and recommendation
 
-This section preserves the 2026-09-08 planning snapshot; §16 records subsequent
-build and release status. This document does not itself authorize new work.
+Sections 1–15 preserve the 2026-09-08 planning snapshot; §16 records subsequent
+build and release status. Background processing is separately specified in
+[the 2026-10-01 plan](plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md),
+currently under implementation and not enabled in Production. This document does not itself authorize new work.
 
 Build one **Site Visit Materials** workflow that collects applicant files, lets a Program
 Coordinator (PC) verify that the required files are present and render, and publishes selected
@@ -822,13 +824,20 @@ them in the Workbench without opening AkoyaGo.
   `lib/services/site-visit-materials/folder-files-service.js`. It lists the two folders,
   non-recursively, under the same active Dynamics bucket the portal writes to
   (`activeBucket` in `contributor-service.js`), and returns names and staff SharePoint `webUrl`s.
-  Portal uploads land in the same folders and appear too. There are no counters and no registry
-  writes: a hand-placed file still does not count toward the collection summary or appear on the
-  briefing page.
-- **Residual risk:** the Workbench materials summary (`getMaterialsSummaryForRequest` on the
-  `/api/workbench/pre-site-visit` GET) is fail-open `null` with no availability signal. A failed
-  summary read therefore shows "materials not requested" for a scheduled presentation. The file
-  rows are unaffected because they come from the folder read.
+  Synchronous portal uploads land in the same folders and appear too. [BUILT on the background
+  processing branch; not enabled in Production] With the background schema flag on, the reader
+  also merges current Ready registry links from staging-specific subfolders, suppresses known
+  superseded portal root items by exact drive/item identity. Separately, all five generic
+  internal recursive document readers now opt into pruning `portal-<UUID>` children beneath
+  canonical Site Visit materials folders, excluding uncommitted candidates and prior background
+  copies. **[VERIFIED via source, four call sites, and focused regressions: five suites, 79 tests,
+  one snapshot passed.]** There are no counters or registry writes: a hand-placed file still does
+  not count toward the collection summary or appear on the briefing page.
+- **Summary availability:** the PR #338 production baseline returned fail-open `null` on a
+  Workbench summary failure, which could show "materials not requested". [BUILT on the background
+  processing branch; not enabled in Production] The reader now carries an explicit unavailable
+  result through `/api/workbench/pre-site-visit` to the card; it no longer reports an outage as
+  confirmed absence. File rows still use the separate folder read.
 - **Retire when** the portal is the only intake route. The card's status line and the registry
   can then carry the links, and this route can go. A retirement needs its own caller check.
 
@@ -839,7 +848,7 @@ both rows link the hand-placed files. An unauthenticated production call to the 
 the same as the sibling Workbench routes.
 
 
-### 16.14 2026-10-01: large-upload memory mitigation [SOURCE-BUILT; PROVIDER REHEARSAL PENDING]
+### 16.14 2026-10-01: large-upload memory mitigation [DEPLOYED via PR #400; NEAR-LIMIT REHEARSAL PENDING]
 
 The owner retained the shared admin-editable 500 MB cap after a 300+ MB PPTX failed in
 production. Vercel logged an out-of-memory termination at 17:28:01 PDT for materials
@@ -847,7 +856,7 @@ finalization. Read-only deployment inspection confirmed Node 22, 2048 MB memory,
 300-second duration for the deployed finalizer. The exact allocation/concurrency combination
 that caused that termination has not been reproduced locally.
 
-The follow-up branch `codex/materials-memory-fix` reduces memory use without changing file
+PR #400 (`499d9e29a3b217950e755ea41767c7dff8eba9e5`) reduces memory use without changing file
 ownership, private staging, scanning policy, or SharePoint/registry recovery:
 
 - The shared staging reader allocates one bounded buffer and hashes bytes incrementally.
@@ -882,7 +891,32 @@ fixture hash. The benchmark also exercises concurrent requests and a small unkno
 unknown length can still reserve the entire cap even for a small file. Synthetic Office
 structure and local sinks do not establish acceptance by Cloudmersive or real SharePoint.
 
-**Release evidence boundary:** local tests and memory measurements establish mitigation,
-not provider-resolved 500 MB support. The actual 300+ MB deck and a near-limit file still need
-an end-to-end provider rehearsal. No memory-tier increase or production setting write is part
-of this branch. Preserve this distinction in the release report.
+**Release evidence boundary:** the owner reported the actual 300+ MB PowerPoint upload on
+Request 1003302 successful after deployment. Correlated production logs measured a
+326,914,310-byte file, 67,045 ms scanning, 61,531 ms SharePoint upload, and 142,803 ms
+server finalization; the highest logged RSS was 542,785,536 bytes. Browser transfer was
+approximately 76 seconds based on token/finalize request times, not a measured client timer.
+These observations do not establish near-limit 500 MB provider support. That rehearsal
+remains pending. Production retains the 2048 MB memory tier.
+
+### 16.15 Background processing [SOURCE-BUILT; bounded follow-up fixes in progress; not deployed]
+
+The owner authorized reusing the durable reviewer-acceptance queue pattern to let applicants
+leave after private Blob transfer and committed Postgres admission. The bytes remain in
+private Blob; Postgres stores ownership and processing state. The settled
+[background-processing plan](plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md)
+records the two OAuth Fable plan reviews, Sol's replacement-safety finding, invariant tests,
+and disabled-by-default rollout. It supersedes the synchronous wait and same-item replacement
+contract only for newly admitted background jobs: those jobs use per-staging subfolders with
+canonical filenames, retain the previous physical file through partial failures, and publish
+only after clean scanning and registry persistence. Existing synchronous scanning-off policy
+is unchanged; background admission requires enabled scanning.
+
+No migration, flag change, merge, deployment or provider test is performed by this build.
+CI passed on prior head `837729b4e280317a3e20f93a377bf2947bd358a9` (1,199 suites,
+19,110 tests, five snapshots; seven PostgreSQL suites, 114 tests). The L1 reader fix
+passed five focused suites (79 tests, one snapshot). L2/L3 shared recovery passed 95
+focused unit tests and 16 real-PostgreSQL tests through the actual loopback CLI.
+Fable approved the L1/L2/L3 fixes; final-head CI remains required, as recorded in
+the linked plan. The production-recovery prerequisite remains separate; this is not a
+production-enabled capability.

@@ -24,6 +24,7 @@ const GUARD = /createRequestTestStateLookup\(|resolveRequestTestState|resolveTes
 //   n/a         — cannot reach a test request
 const RECORDED_CRONS = {
   'auth-bypass-check': { scheduled: true, class: 'operational' },
+  'drain-materials-uploads': { scheduled: true, class: 'allowed', note: 'continues an explicitly submitted token-authorized applicant upload; no request selection or email; materials background plan records this decision' },
   'drain-cycle-dossiers': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/cycle-dossier-service.js'], note: 'cycle-wide report: roster excludes test requests' },
   'drain-review-panels': { scheduled: true, class: 'allowed', note: 'staff-launched AI panel on chosen requests' },
   'drain-review-syntheses': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/review-synthesis-drain.js'] },

@@ -25,9 +25,20 @@ export function presentationMaterialsStatus(siteVisitContext, summary) {
   if (!siteVisitContext) return null;
   if (siteVisitContext.unavailable) return { tone: 'error', text: 'The presentation schedule could not be loaded.' };
   if (!siteVisitContext.siteVisit) return { tone: 'muted', text: 'Presentation not scheduled.' };
+  if (summary?.unavailable || summary?.availability === 'unavailable') return { tone: 'error', text: 'Applicant materials status could not be loaded.' };
   if (!summary) return { tone: 'body', text: 'Presentation scheduled · materials not requested.' };
+  const processingCount = Number.isSafeInteger(summary.processingCount) ? summary.processingCount : 0;
+  const attentionCount = Number.isSafeInteger(summary.attentionCount) ? summary.attentionCount : 0;
+  const attention = attentionCount > 0 || summary.state === 'needs_attention';
+  const processing = processingCount > 0 || summary.state === 'processing';
+  if (summary.state === 'closed') {
+    const activity = attention ? ` · ${attentionCount || 1} upload${attentionCount === 1 ? ' needs' : 's need'} attention`
+      : processing ? ` · ${processingCount || 1} upload${processingCount === 1 ? '' : 's'} processing` : '';
+    return { tone: attention ? 'error' : 'body', text: `Presentation scheduled · materials request closed${activity}.` };
+  }
+  if (attention) return { tone: 'error', text: `Presentation scheduled · ${attentionCount || 1} upload${attentionCount === 1 ? ' needs' : 's need'} coordinator attention.` };
+  if (processing) return { tone: 'body', text: `Presentation scheduled · ${processingCount || 1} upload${processingCount === 1 ? '' : 's'} processing.` };
   if (summary.state === 'ready') return { tone: 'body', text: 'Presentation scheduled · materials ready.' };
-  if (summary.state === 'closed') return { tone: 'body', text: 'Presentation scheduled · materials request closed.' };
   return { tone: 'body', text: 'Presentation scheduled · materials requested.' };
 }
 

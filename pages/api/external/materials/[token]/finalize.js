@@ -12,6 +12,18 @@ import { withDalContext } from '../../../../../lib/dataverse/core/context';
 import { isGuid } from '../../../../../lib/utils/guid';
 import { ServiceHttpError } from '../../../../../lib/services/service-http-error';
 import { finalizeMaterialUpload } from '../../../../../lib/services/site-visit-materials/contributor-service';
+import { isVirusScanEnabled } from '../../../../../lib/utils/virus-scan-config.js';
+import { SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED } from '../../../../../shared/config/siteVisitMaterials.js';
+import { getUploadMaxMb } from '../../../../../lib/services/site-visit-materials/upload-cap.js';
+import {
+  isMaterialsBackgroundAdmissionEnabled,
+  isMaterialsBackgroundSchemaReady,
+} from '../../../../../lib/utils/site-visit-materials-background-readiness.js';
+import {
+  enqueueMaterialsUploadJob,
+  getMaterialsUploadJobForStaging,
+  MaterialsJobConflict,
+} from '../../../../../lib/services/site-visit-materials/background-job-store.js';
 import {
   acquireLargeUploadAdmission,
   LARGE_UPLOAD_RETRY_AFTER_SECONDS,
@@ -23,6 +35,7 @@ import {
   claimPortalUpload,
   completePortalUpload,
   externalMaterialsActorBinding,
+  inspectClaimedPortalUploadMetadata,
   loadClaimedPortalImage,
   rejectPortalUpload,
   releasePortalUpload,
@@ -30,9 +43,17 @@ import {
 
 export const config = { api: { bodyParser: { sizeLimit: '16kb' } }, maxDuration: 300 };
 
-const PERMANENT_BYTE_CODES = new Set(['empty_image', 'image_too_large', 'staged_upload_mismatch', 'staging_publicly_readable']);
+const PERMANENT_BYTE_CODES = new Set(['empty_image', 'image_too_large', 'file_too_large', 'staged_upload_missing', 'staged_upload_mismatch', 'staging_publicly_readable']);
 const PERMANENT_RESULT_CODES = new Set(['file_too_large', 'extension_not_allowed', 'signature_mismatch', 'empty_file', 'scan_infected', 'slot_not_open', 'unknown_slot', 'filename_required']);
 const HOLD_STAGING_CODES = new Set(['replay_ambiguous']);
+
+function queuedJobResponse(res, job, stagingId) {
+  if (job.status === 'completed') return res.status(200).json(job.result_payload || { ok: true });
+  if (['queued', 'processing', 'needs_attention'].includes(job.status)) {
+    return res.status(202).json({ ok: true, jobId: job.id, stagingId, status: job.status });
+  }
+  return res.status(409).json({ ok: false, jobId: job.id, stagingId, status: job.status, reason: job.error_code || job.status });
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -52,6 +73,17 @@ export default async function handler(req, res) {
   const stagingId = typeof req.body?.stagingId === 'string' ? req.body.stagingId.trim() : '';
   const slot = typeof req.body?.slot === 'string' ? req.body.slot : '';
   if (!isGuid(stagingId) || !slot) return res.status(400).json({ ok: false, reason: 'bad_request' });
+
+  const backgroundSchemaReady = isMaterialsBackgroundSchemaReady();
+  const queueThisUpload = isMaterialsBackgroundAdmissionEnabled() && isVirusScanEnabled();
+  if (backgroundSchemaReady) {
+    const existing = await getMaterialsUploadJobForStaging({
+      stagingId,
+      requestId: verified.requestId,
+      actorBinding: externalMaterialsActorBinding(token),
+    });
+    if (existing) return queuedJobResponse(res, existing, stagingId);
+  }
 
   const admission = acquireLargeUploadAdmission();
   if (!admission) {
@@ -80,6 +112,45 @@ export default async function handler(req, res) {
     throw error;
   }
   if (claim.state === 'consumed') return res.status(200).json(claim.result || { ok: true });
+
+  if (queueThisUpload) {
+    stage = 'admit_background_job';
+    try {
+      const metadata = await inspectClaimedPortalUploadMetadata({ row: claim.row });
+      const maxMb = await getUploadMaxMb();
+      const liveByteLimit = maxMb.maxMb * 1024 * 1024;
+      if (metadata.size > liveByteLimit) {
+        await rejectPortalUpload({ stagingId, leaseToken: claim.leaseToken, resultCode: 'file_too_large' });
+        return res.status(400).json({ ok: false, reason: 'file_too_large' });
+      }
+      const job = await enqueueMaterialsUploadJob({
+        stagingId,
+        stagingLeaseToken: claim.leaseToken,
+        requestId: verified.requestId,
+        collectionId: verified.collection.id,
+        actorBinding: externalMaterialsActorBinding(token),
+        tokenDigest: verified.collection.token_digest,
+        slot,
+        otherUploadsEnabled: SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED,
+      });
+      return res.status(202).json({ ok: true, jobId: job.id, stagingId, status: job.status });
+    } catch (error) {
+      if (error instanceof MaterialsJobConflict) {
+        await releasePortalUpload({ stagingId, leaseToken: claim.leaseToken });
+        return res.status(error.httpStatus).json({ ok: false, reason: error.code });
+      }
+      if (error instanceof PortalUploadStagingError) {
+        if (PERMANENT_BYTE_CODES.has(error.code)) {
+          await rejectPortalUpload({ stagingId, leaseToken: claim.leaseToken, resultCode: error.code });
+        } else {
+          await releasePortalUpload({ stagingId, leaseToken: claim.leaseToken });
+        }
+        return res.status(error.httpStatus).json({ ok: false, reason: error.code });
+      }
+      await releasePortalUpload({ stagingId, leaseToken: claim.leaseToken });
+      throw error;
+    }
+  }
 
   let file;
   stage = 'load';

@@ -250,7 +250,7 @@ async function runScenario(mode, shape, fixturePath) {
   const postgresEsmStub = path.join(moduleStubs, 'vercel-postgres.mjs');
   const blobEsmStub = path.join(moduleStubs, 'vercel-blob.mjs');
   const blobClientEsmStub = path.join(moduleStubs, 'vercel-blob-client.mjs');
-  writeFileSync(postgresStub, "exports.sql = async function () { return { rows: [{ id: 'bench-staging-row' }] }; };\n");
+  writeFileSync(postgresStub, "exports.db = { connect: async () => { throw new Error('unexpected benchmark transaction'); } }; exports.sql = async function () { return { rows: [{ id: 'bench-staging-row' }] }; };\n");
   writeFileSync(blobStub, `
     const fs = require('node:fs'); const { Readable } = require('node:stream');
     exports.get = async function (pathname) {
@@ -260,10 +260,11 @@ async function runScenario(mode, shape, fixturePath) {
         blob: { pathname, contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
           size: c.lengthKnown ? c.fixtureBytes : 0, url: 'http://blob-object.invalid/private', etag: 'benchmark-etag' } };
     };
+    exports.head = async function () { throw new Error('unexpected benchmark HEAD'); };
     exports.del = async function () { return {}; };
   `);
   writeFileSync(blobClientStub, "exports.generateClientTokenFromReadWriteToken = async function () { return 'local-benchmark-token'; };\n");
-  writeFileSync(postgresEsmStub, "export const sql = async function () { return { rows: [{ id: 'bench-staging-row' }] }; };\n");
+  writeFileSync(postgresEsmStub, "export const db = { connect: async () => { throw new Error('unexpected benchmark transaction'); } }; export const sql = async function () { return { rows: [{ id: 'bench-staging-row' }] }; };\n");
   writeFileSync(blobEsmStub, `
     import fs from 'node:fs'; import { Readable } from 'node:stream';
     export async function get(pathname) {
@@ -273,6 +274,7 @@ async function runScenario(mode, shape, fixturePath) {
         blob: { pathname, contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
           size: c.lengthKnown ? c.fixtureBytes : 0, url: 'http://blob-object.invalid/private', etag: 'benchmark-etag' } };
     }
+    export async function head() { throw new Error('unexpected benchmark HEAD'); }
     export async function del() { return {}; }
   `);
   writeFileSync(blobClientEsmStub, "export async function generateClientTokenFromReadWriteToken() { return 'local-benchmark-token'; }\n");

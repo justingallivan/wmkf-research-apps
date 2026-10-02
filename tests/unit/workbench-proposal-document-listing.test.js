@@ -64,6 +64,10 @@ test('surfaces only the two exact canonical AI Materials files and ignores expec
 
   const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'D26');
 
+  expect(listFiles).toHaveBeenCalledWith('akoya_request', ROOT, expect.objectContaining({
+    recursive: true,
+    excludeApplicantMaterialsBackgroundUploads: true,
+  }));
   expect(result.errors).toEqual([]);
   expect(result.slots[0]).toMatchObject({ found: true, name: 'ProjectDescription.pdf' });
   expect(result.phaseIIDocuments).toEqual([

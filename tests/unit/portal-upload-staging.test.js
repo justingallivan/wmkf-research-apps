@@ -4,6 +4,7 @@ jest.mock('@vercel/postgres', () => ({ sql: jest.fn() }));
 jest.mock('@vercel/blob', () => ({
   del: jest.fn(),
   get: jest.fn(),
+  head: jest.fn(),
 }));
 jest.mock('@vercel/blob/client', () => ({
   generateClientTokenFromReadWriteToken: jest.fn(),
@@ -13,7 +14,7 @@ jest.mock('../../lib/services/sharepoint-cleanup', () => ({
 }));
 
 import { sql } from '@vercel/postgres';
-import { del, get } from '@vercel/blob';
+import { del, get, head } from '@vercel/blob';
 import { generateClientTokenFromReadWriteToken } from '@vercel/blob/client';
 import {
   PORTAL_UPLOAD_SCOPES,
@@ -24,6 +25,7 @@ import {
   externalGranteeActorBinding,
   loadClaimedPortalImage,
   loadClaimedPortalDocument,
+  inspectClaimedPortalUploadMetadata,
   renewPortalUploadLease,
 } from '../../lib/services/portal-upload-staging';
 
@@ -226,6 +228,31 @@ test('load streams into one bounded allocation when Content-Length is absent', a
   expect(sql.mock.calls[0][0].join('')).toContain('actual_bytes');
 });
 
+test('Blob download retries on an ambiguous outage but rejects confirmed absence', async () => {
+  const args = {
+    row: { id: STAGING_ID, pathname: 'exact', filename: 'x.vtt', declared_content_type: 'text/vtt', max_bytes: 100 },
+    leaseToken: '33333333-3333-4333-8333-333333333333',
+  };
+  get.mockRejectedValueOnce(Object.assign(new Error('temporary timeout'), { status: 503 }));
+  await expect(loadClaimedPortalDocument(args)).rejects.toMatchObject({ code: 'staged_upload_unavailable', httpStatus: 503 });
+  get.mockRejectedValueOnce(Object.assign(new Error('gone'), { name: 'BlobNotFoundError' }));
+  await expect(loadClaimedPortalDocument(args)).rejects.toMatchObject({ code: 'staged_upload_missing', httpStatus: 409 });
+});
+
+test('metadata admission distinguishes an outage from a missing Blob and an unverified privacy probe', async () => {
+  const args = { row: { pathname: 'exact', declared_content_type: 'text/vtt', max_bytes: 100 } };
+  head.mockRejectedValueOnce(Object.assign(new Error('temporary timeout'), { status: 503 }));
+  await expect(inspectClaimedPortalUploadMetadata(args)).rejects.toMatchObject({ code: 'staged_upload_unavailable', httpStatus: 503 });
+  head.mockRejectedValueOnce(Object.assign(new Error('gone'), { name: 'BlobNotFoundError' }));
+  await expect(inspectClaimedPortalUploadMetadata(args)).rejects.toMatchObject({ code: 'staged_upload_missing', httpStatus: 409 });
+  head.mockResolvedValueOnce({ pathname: 'exact', contentType: 'text/vtt', size: 5, url: 'https://private.example/exact' });
+  global.fetch.mockRejectedValueOnce(new Error('network down'));
+  await expect(inspectClaimedPortalUploadMetadata(args)).rejects.toMatchObject({ code: 'staging_privacy_unverified', httpStatus: 503 });
+  head.mockResolvedValueOnce({ pathname: 'exact', contentType: 'text/vtt', size: 5, url: 'https://private.example/exact' });
+  global.fetch.mockResolvedValueOnce({ status: 200 });
+  await expect(inspectClaimedPortalUploadMetadata(args)).rejects.toMatchObject({ code: 'staging_publicly_readable', httpStatus: 503 });
+});
+
 test('stream bytes beyond a trusted Content-Length reject the row as a mismatch', async () => {
   let cancelled = false;
   const stream = new ReadableStream({
@@ -312,7 +339,7 @@ test('cleanup deletes only exact ledger pathnames and reports pruning separately
   del.mockResolvedValue(undefined);
   sql.mockResolvedValueOnce({
     rows: [{ id: STAGING_ID, pathname: 'portal-staging/grantee_image/exact-object' }],
-  }).mockResolvedValueOnce({ rows: [], rowCount: 1 })
+  }).mockResolvedValueOnce({ rows: [{ id: STAGING_ID }], rowCount: 1 })
     .mockResolvedValueOnce({ rows: [{ id: 'pruned' }], rowCount: 1 });
 
   const result = await cleanupExpiredPortalUploads({ retentionDays: 7 });

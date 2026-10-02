@@ -24,10 +24,39 @@ function formatDateTime(iso) {
 
 const STATE_COPY = {
   missing: 'Waiting on the applicant.',
+  processing: 'Upload received. We’re checking and saving the file.',
+  needs_attention: 'An upload needs coordinator attention before it can be replaced.',
   received: 'Every required item is in. Confirm the files open, then the collection is ready.',
   ready: 'Ready. The files open on the briefing page.',
   closed: 'Closed. The contributor link has expired.',
 };
+
+const ACTIVE_UPLOAD_STATUSES = new Set(['queued', 'processing']);
+const BLOCKING_UPLOAD_STATUSES = new Set(['queued', 'processing', 'needs_attention']);
+
+function uploadJobsForSlot(collection, slot) {
+  return Array.isArray(collection?.uploadJobs) ? collection.uploadJobs.filter((job) => job?.slot === slot) : [];
+}
+
+function UploadJobNotice({ jobs, programCoordinator }) {
+  if (!jobs.length) return null;
+  return (
+    <div className="mt-2 space-y-1">
+      {jobs.map((job) => {
+        if (ACTIVE_UPLOAD_STATUSES.has(job.status)) {
+          return <p key={job.jobId} className="text-xs text-blue-800" role="status">Upload received. We’re checking and saving the file.</p>;
+        }
+        if (job.status === 'needs_attention') {
+          const name = typeof programCoordinator?.name === 'string' ? programCoordinator.name.trim() : '';
+          const email = typeof programCoordinator?.email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(programCoordinator.email.trim()) ? programCoordinator.email.trim() : '';
+          return <p key={job.jobId} className="text-xs text-amber-900" role="alert">Needs coordinator attention before replacement is safe{name ? ` · ${name}` : ''}{email ? <> · <a className="underline" href={`mailto:${encodeURIComponent(email)}`}>{email}</a></> : ''}</p>;
+        }
+        if (job.status === 'failed') return <p key={job.jobId} className="text-xs text-amber-900" role="status">The new upload could not be saved. The previously received file remains on record.</p>;
+        return null;
+      })}
+    </div>
+  );
+}
 
 export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
   const [collection, setCollection] = useState(null);
@@ -162,6 +191,19 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
     : liaisonStatus === 'none' ? ' · No institution Liaison'
       : !liaisonStatus ? ' · Liaison not verified'
         : !collection.contacts?.liaison?.email ? ' · Liaison email missing from saved recipients' : '';
+  const uploadJobs = Array.isArray(collection?.uploadJobs) ? collection.uploadJobs : [];
+  const processingCount = Number.isSafeInteger(collection?.processingCount)
+    ? collection.processingCount
+    : uploadJobs.filter((job) => ACTIVE_UPLOAD_STATUSES.has(job?.status)).length;
+  const attentionCount = Number.isSafeInteger(collection?.attentionCount)
+    ? collection.attentionCount
+    : uploadJobs.filter((job) => job?.status === 'needs_attention').length;
+  const hasBlockingJobs = processingCount > 0 || attentionCount > 0
+    || uploadJobs.some((job) => BLOCKING_UPLOAD_STATUSES.has(job?.status));
+  const collectionStateCopy = collection?.state === 'closed' ? STATE_COPY.closed
+    : attentionCount > 0 || collection?.state === 'needs_attention' ? STATE_COPY.needs_attention
+      : processingCount > 0 || collection?.state === 'processing' ? STATE_COPY.processing
+        : STATE_COPY[collection?.state] || 'Materials status is unavailable.';
 
   return (
     <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm" data-testid="site-visit-materials-card">
@@ -170,7 +212,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
           <h2 className="text-xl font-semibold text-gray-900">Applicant materials</h2>
           <p className="mt-1 text-sm text-gray-600">
             {collection
-              ? STATE_COPY[collection.state]
+              ? collectionStateCopy
               : 'Ask the applicant for the presentation, its source file, and participant bios. They upload through one link; the files appear on the briefing page.'}
           </p>
         </div>
@@ -181,6 +223,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
 
       {error && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
       {notice && <div role="status" className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">{notice}</div>}
+      {collection?.uploadStatusUnavailable && <div role="status" className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Upload processing status is temporarily unavailable. Refresh this page to check again.</div>}
       {emailFeedback && <EmailSendFeedback className="mt-4" status={emailFeedback.outcome} message={emailFeedback.detail} />}
       {loading && <p className="mt-4 text-sm text-gray-500">Loading…</p>}
 
@@ -206,8 +249,9 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
                 <div>
                   <p className={item.waived ? 'text-gray-400 line-through' : 'font-medium text-gray-900'}>{item.label}</p>
                   <p className="text-xs text-gray-500">
-                    {item.received ? `Received ${formatDateTime(item.received.receivedAt)} · ${item.received.filename}` : item.waived ? 'Waived' : 'Missing'}
+                    {item.received ? `${uploadJobsForSlot(collection, item.key).some((job) => BLOCKING_UPLOAD_STATUSES.has(job.status)) ? 'Previously received' : 'Received'} ${formatDateTime(item.received.receivedAt)} · ${item.received.filename}` : item.waived ? 'Waived' : 'Missing'}
                   </p>
+                  <UploadJobNotice jobs={uploadJobsForSlot(collection, item.key)} programCoordinator={collection.programCoordinator} />
                 </div>
                 {collection.state !== 'closed' && !item.received && (
                   <button type="button" disabled={busy} onClick={() => act('waive', { key: item.key, waived: !item.waived })} className="text-xs font-semibold text-gray-600 underline underline-offset-4 hover:text-gray-900 disabled:opacity-50">
@@ -218,6 +262,12 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
             ))}
             {collection.other.map((file) => (
               <li key={file.artifactId} className="px-4 py-3 text-sm"><p className="font-medium text-gray-900">Other: {file.filename}</p><p className="text-xs text-gray-500">Received {formatDateTime(file.receivedAt)}</p></li>
+            ))}
+            {uploadJobs.filter((job) => job.slot === 'other').map((job) => (
+              <li key={job.jobId} className="px-4 py-3 text-sm">
+                <p className="font-medium text-gray-900">Other: {job.filename || 'Additional material'}</p>
+                <UploadJobNotice jobs={[job]} programCoordinator={collection.programCoordinator} />
+              </li>
             ))}
           </ul>
 
@@ -232,8 +282,11 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
               {collection.state === 'missing' && (
                 <button type="button" disabled={busy} onClick={() => setComposerAction('remind')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50">Send reminder</button>
               )}
-              {collection.state === 'received' && (
+              {collection.state === 'received' && !hasBlockingJobs && (
                 <Button type="button" loading={busy} onClick={() => act('ready', {}, 'Marked ready.')}>Confirm the files open</Button>
+              )}
+              {collection.state === 'received' && hasBlockingJobs && (
+                <p className="text-sm text-amber-900" role="status">Confirm readiness after every upload is finished and any attention item is resolved.</p>
               )}
             </div>
           )}

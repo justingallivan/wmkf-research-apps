@@ -126,3 +126,35 @@ test('StrictMode effect replay still loads the current request', async () => {
   render(<StrictMode><SiteVisitMaterialsCard requestId={REQUEST_ID} requestNumber="1003222" /></StrictMode>);
   expect(await screen.findByText(/Pat Investigator/)).toBeInTheDocument();
 });
+
+test('queued applicant upload is visible beside the previous receipt and blocks ready confirmation', async () => {
+  const queued = collection({
+    state: 'received',
+    uploadJobs: [{ jobId: 'job-1', slot: 'presentation_pdf', status: 'queued', filename: 'new.pdf' }],
+    processingCount: 1,
+    attentionCount: 0,
+  });
+  global.fetch = jest.fn(async () => response({ success: true, collection: queued }));
+  render(<SiteVisitMaterialsCard requestId={REQUEST_ID} requestNumber="1003222" />);
+
+  expect(await screen.findAllByText('Upload received. We’re checking and saving the file.')).toHaveLength(2);
+  expect(screen.getByText(/Previously received .*1003222 Site Visit Presentation\.pdf/)).toBeInTheDocument();
+  expect(screen.getByText(/Confirm readiness after every upload is finished/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Confirm the files open' })).not.toBeInTheDocument();
+});
+
+test('needs-attention jobs remain visible after collection close and carry coordinator contact', async () => {
+  const attention = collection({
+    state: 'closed',
+    programCoordinator: { name: 'Casey Coordinator', email: 'casey@wmkeck.org' },
+    uploadJobs: [{ jobId: 'job-2', slot: 'presentation_source', status: 'needs_attention', filename: 'new.pptx' }],
+    processingCount: 0,
+    attentionCount: 1,
+  });
+  global.fetch = jest.fn(async () => response({ success: true, collection: attention }));
+  render(<SiteVisitMaterialsCard requestId={REQUEST_ID} requestNumber="1003222" />);
+
+  expect(await screen.findByText(/Needs coordinator attention before replacement is safe/)).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'casey@wmkeck.org' })).toHaveAttribute('href', 'mailto:casey%40wmkeck.org');
+  expect(screen.getByText('Closed. The contributor link has expired.')).toBeInTheDocument();
+});

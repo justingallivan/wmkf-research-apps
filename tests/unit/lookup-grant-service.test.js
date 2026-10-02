@@ -67,6 +67,9 @@ describe('lookupGrant', () => {
     expect(r.found).toBe(true);
     // Cross-library duplicates are NOT deduped (different library key); same-key dupes are.
     expect(r.documents.files).toHaveLength(3);
+    for (const call of GraphService.listFiles.mock.calls) {
+      expect(call[2]).toMatchObject({ recursive: true, excludeApplicantMaterialsBackgroundUploads: true });
+    }
     const narrative = r.documents.files.find((f) => f.name.includes('Narrative'));
     expect(narrative).toMatchObject({ subfolder: 'Final Report', classification: 'proposal' });
     expect(r.documents.proposalBestGuess).toBe('akoya_request::F1/Final Report::Project Narrative.docx');

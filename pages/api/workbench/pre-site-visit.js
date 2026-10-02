@@ -84,7 +84,8 @@ export default async function handler(req, res) {
         // Session line (tracker §5.4 via the briefing seam): fail-open null
         // until the tracker is enabled or a slot exists.
         // Applicant materials summary (plan §16.3, PR 3): counts and window
-        // only, never the contributor link or contacts; null when off/failed.
+        // only, never the contributor link or contacts; null when off and an
+        // unavailable sentinel when a runtime read fails.
         const [stageLabels, session, materials] = await Promise.all([
           readDeliberationStageLabels(),
           getDeliberationSessionForRequest(requestId).catch(() => null),

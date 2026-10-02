@@ -28,6 +28,10 @@ describe('presentationMaterialsStatus', () => {
     ['all received, unconfirmed', VISIT, { state: 'received' }, 'Presentation scheduled · materials requested.'],
     ['ready', VISIT, { state: 'ready' }, 'Presentation scheduled · materials ready.'],
     ['closed', VISIT, { state: 'closed' }, 'Presentation scheduled · materials request closed.'],
+    ['processing upload', VISIT, { state: 'processing', processingCount: 2 }, 'Presentation scheduled · 2 uploads processing.'],
+    ['attention upload', VISIT, { state: 'needs_attention', attentionCount: 1 }, 'Presentation scheduled · 1 upload needs coordinator attention.'],
+    ['closed with attention', VISIT, { state: 'closed', attentionCount: 1 }, 'Presentation scheduled · materials request closed · 1 upload needs attention.'],
+    ['failed materials status read', VISIT, { unavailable: true }, 'Applicant materials status could not be loaded.'],
   ])('%s', (_label, context, summary, text) => {
     expect(presentationMaterialsStatus(context, summary)?.text ?? null).toBe(text);
   });
@@ -86,5 +90,12 @@ describe('ResearchPresentationMaterialsCard', () => {
     render(<ResearchPresentationMaterialsCard requestId={REQUEST_ID} siteVisitContext={{ siteVisit: null }} materialsSummary={null} />);
     expect(await screen.findByText('This request has no SharePoint folder yet.')).toBeInTheDocument();
     expect(screen.getByText('Presentation not scheduled.')).toBeInTheDocument();
+  });
+
+  it('surfaces processing and attention counts without changing file-list availability', async () => {
+    global.fetch = jest.fn(async () => respond({ success: true, folderFound: true, slides: [], participantBios: [] }));
+    render(<ResearchPresentationMaterialsCard requestId={REQUEST_ID} siteVisitContext={VISIT} materialsSummary={{ state: 'processing', processingCount: 1, attentionCount: 1 }} />);
+    expect(await screen.findByText('Presentation scheduled · 1 upload needs coordinator attention.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText('Not received yet')).toHaveLength(2));
   });
 });
