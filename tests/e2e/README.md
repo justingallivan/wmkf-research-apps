@@ -59,9 +59,11 @@ docs-only PRs). The HTML report is uploaded as a build artifact on every run.
 
 [`materials-scan-rejection.spec.js`](materials-scan-rejection.spec.js) exercises the
 real contributor page in Chromium with all API traffic intercepted before navigation.
-Unknown APIs and third-party requests are aborted. The only Blob API request is
-intercepted in the transfer-progress test, where a generated local file exercises the
-installed Blob SDK without writing to a Blob store.
+Unknown APIs and third-party requests are aborted. The single-part and multipart Blob
+SDK requests are intercepted, including a generated file larger than 60 MiB to exercise
+multipart create, part, and completion calls without writing to a Blob store. Browser
+interception shows the single-part initial progress state but does not expose byte
+movement; the unit tests cover intermediate progress callback updates.
 
 Run the spec against the local production build with the regular config:
 
