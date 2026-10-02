@@ -111,7 +111,7 @@ const SITE_VISIT_MATERIALS_DEFAULTS_DATAVERSE_FIELDS = [
   appSystemSettingField(
     'Applicant materials upload cap',
     'site_visit_materials.upload_max_mb',
-    'Whole number of megabytes (1–500). Unset reads as the 100 MB default. The briefing page opens files up to 50 MB and lists larger ones with a note.',
+    'Whole number of megabytes (1–500). Unset reads as the 500 MB default. The briefing page opens files up to 50 MB and lists larger ones with a note.',
   ),
 ];
 

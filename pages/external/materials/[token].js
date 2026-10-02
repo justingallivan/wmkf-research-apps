@@ -22,13 +22,15 @@ const REASON_MESSAGE = {
   server_error: 'Something went wrong on our end. Please try again shortly.',
 };
 const UPLOAD_MESSAGE = {
-  file_too_large: 'That file is larger than the upload limit.',
+  file_too_large: 'This file exceeds the upload limit. Choose a smaller file.',
   extension_not_allowed: 'That file type is not accepted for this item.',
   signature_mismatch: 'That file does not match its extension. Please export it again and retry.',
   empty_file: 'That file is empty.',
   scan_infected: 'That file failed the malware scan and was not accepted.',
-  scan_unavailable: 'The file could not be scanned right now. Please try again in a few minutes.',
-  scan_misconfigured: 'Uploads are temporarily unavailable while the file scanner is repaired.',
+  scan_timeout: 'The security scan did not finish in time, so this file has not been accepted yet. Please press Retry. If this keeps happening, contact the Foundation.',
+  scan_busy: 'The security scanner is busy right now. Please wait a few minutes and press Retry. If this keeps happening, contact the Foundation.',
+  scan_unavailable: 'The security scanner is temporarily unavailable. Please press Retry. If this keeps happening, contact the Foundation.',
+  scan_misconfigured: 'The system could not start the security scan. Please try again shortly. If this keeps happening, contact the Foundation.',
   content_type_not_allowed: 'That file type is not accepted.',
   staging_unavailable: 'Uploads are unavailable right now. Please try again shortly.',
   staged_upload_missing: 'The upload did not complete. Please try again.',
@@ -36,7 +38,33 @@ const UPLOAD_MESSAGE = {
   slot_busy: 'Another upload for this item is being processed. Please wait a moment and retry.',
   replay_ambiguous: 'This upload needs staff attention before it can be finalized.',
   cap_unavailable: 'The upload limit is unavailable right now. Please try again shortly.',
+  blob_upload_failed: 'The file transfer did not finish. Please choose the file again to start a new upload. If it keeps failing, contact the Foundation.',
+  blob_token_expired: 'The upload link expired before the transfer finished. Please choose the file again to start a new upload.',
 };
+
+const MEBIBYTE = 1024 * 1024;
+
+function validLimitMb(value) {
+  return Number.isSafeInteger(value) && value > 0;
+}
+
+function validCoordinatorEmail(value) {
+  return typeof value === 'string' && value.length <= 254
+    && /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value.trim());
+}
+
+function SizeLimitError({ error, programCoordinator }) {
+  const coordinatorName = typeof programCoordinator?.name === 'string' ? programCoordinator.name.trim() : '';
+  const coordinatorEmail = validCoordinatorEmail(programCoordinator?.email) ? programCoordinator.email.trim() : '';
+  const sizeText = Number.isSafeInteger(error.fileSize) ? ` The selected file is ${error.fileSize.toLocaleString()} bytes.` : '';
+  const limitText = validLimitMb(error.maxMb) ? ` The current upload limit is ${error.maxMb} MB.` : '';
+  return (
+    <>
+      <span>This file exceeds the upload limit.{sizeText}{limitText} Please reduce the file size or contact your Program Coordinator{coordinatorName ? `, ${coordinatorName}` : ''}{coordinatorEmail ? <> at{' '}<a className="underline" href={`mailto:${encodeURIComponent(coordinatorEmail)}`}>{coordinatorEmail}</a></> : ''}.</span>
+      {error.previousPendingAvailable && <span className="block mt-1">Your earlier upload is still available. Use Retry to finish it, or choose a different file.</span>}
+    </>
+  );
+}
 
 function pendingStorageKey(token, slot) {
   return `site-visit-materials:pending:${token}:${slot}`;
@@ -86,7 +114,7 @@ function Shell({ title, children }) {
   );
 }
 
-function SlotUploader({ token, slot, label, required, received, maxMb, disabled, onDone }) {
+function SlotUploader({ token, slot, label, required, received, maxMb, programCoordinator, disabled, onDone, onCapChange }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState(null);
@@ -97,10 +125,10 @@ function SlotUploader({ token, slot, label, required, received, maxMb, disabled,
     return () => window.clearTimeout(timer);
   }, [token, slot]);
 
-  const finalize = async (pendingUpload) => {
+  const finalize = async (pendingUpload, { newlyUploaded = false } = {}) => {
     setBusy(true);
     setError(null);
-    setProgress('Checking the file…');
+    setProgress('Running the security scan. This can take a few minutes, especially for large files.');
     try {
       const { ok: finalizeOk, status: finalizeStatus, data: result } = await requestEnvelope(
         `/api/external/materials/${encodeURIComponent(token)}/finalize`,
@@ -116,7 +144,13 @@ function SlotUploader({ token, slot, label, required, received, maxMb, disabled,
           removePendingUpload(token, slot);
           setPending(null);
         }
-        setError(UPLOAD_MESSAGE[result.reason] || REASON_MESSAGE[result.reason] || 'The file could not be saved.');
+        if (result.reason === 'file_too_large') {
+          const serverLimit = validLimitMb(result.maxMb) ? result.maxMb : null;
+          if (serverLimit !== null) onCapChange?.(serverLimit);
+          setError({ type: 'size_limit', maxMb: serverLimit });
+        } else {
+          setError(UPLOAD_MESSAGE[result.reason] || REASON_MESSAGE[result.reason] || 'The file could not be saved.');
+        }
         return;
       }
       removePendingUpload(token, slot);
@@ -125,7 +159,9 @@ function SlotUploader({ token, slot, label, required, received, maxMb, disabled,
     } catch {
       // Network failures retain the exact staging id so Retry never mints a
       // second upload or loses the server's replay/candidate state.
-      setError('The file could not be saved. Please retry this same upload.');
+      setError(newlyUploaded
+        ? 'The staged file could not be saved. It remains available with Retry, or choose a different file.'
+        : 'The file could not be saved. Please retry this upload.');
     } finally {
       setBusy(false);
       setProgress(null);
@@ -134,14 +170,22 @@ function SlotUploader({ token, slot, label, required, received, maxMb, disabled,
 
   const chooseDifferentFile = async (file) => {
     if (!file) return;
-    removePendingUpload(token, slot);
-    setPending(null);
     setError(null);
     await upload(file);
   };
 
   const upload = async (file) => {
     if (!file) return;
+    const currentLimit = validLimitMb(maxMb) ? maxMb : null;
+    if (currentLimit !== null && file.size > currentLimit * MEBIBYTE) {
+      setError({
+        type: 'size_limit',
+        fileSize: file.size,
+        maxMb: currentLimit,
+        previousPendingAvailable: Boolean(pending),
+      });
+      return;
+    }
     setBusy(true);
     setError(null);
     setProgress('Preparing…');
@@ -155,16 +199,44 @@ function SlotUploader({ token, slot, label, required, received, maxMb, disabled,
           tolerantBody: true,
         },
       );
-      if (!tokenOk) throw new Error(UPLOAD_MESSAGE[tokenData.reason] || REASON_MESSAGE[tokenData.reason] || 'The upload could not start.');
+      if (!tokenOk) {
+        if (tokenData.reason === 'file_too_large') {
+          const serverLimit = validLimitMb(tokenData.maxMb) ? tokenData.maxMb : null;
+          if (serverLimit !== null) onCapChange?.(serverLimit);
+          setError({
+            type: 'size_limit',
+            fileSize: file.size,
+            maxMb: serverLimit,
+            previousPendingAvailable: Boolean(pending),
+          });
+          return;
+        }
+        throw new Error(UPLOAD_MESSAGE[tokenData.reason] || REASON_MESSAGE[tokenData.reason] || 'The upload could not start.');
+      }
       setProgress('Uploading…');
       const { put } = await import('@vercel/blob/client');
-      await put(tokenData.pathname, file, { access: 'private', token: tokenData.clientToken, contentType: tokenData.contentType });
+      try {
+        await put(tokenData.pathname, file, {
+          access: 'private',
+          token: tokenData.clientToken,
+          contentType: tokenData.contentType,
+          multipart: file.size > 60 * MEBIBYTE,
+        });
+      } catch (blobError) {
+        // The SDK error inherits Error without setting its name, so use its
+        // stable SDK-owned message as a discriminator and never show it to users.
+        const expired = blobError?.message === 'Vercel Blob: Client token has expired.';
+        throw new Error(UPLOAD_MESSAGE[expired ? 'blob_token_expired' : 'blob_upload_failed']);
+      }
       const nextPending = { stagingId: tokenData.stagingId, slot };
       writePendingUpload(token, slot, nextPending);
       setPending(nextPending);
-      await finalize(nextPending);
+      await finalize(nextPending, { newlyUploaded: true });
     } catch (uploadError) {
-      setError(uploadError.message);
+      const message = uploadError instanceof Error ? uploadError.message : 'The upload could not start. Please try again.';
+      setError(pending
+        ? `${message} Your earlier upload remains available with Retry, or choose a different file.`
+        : message);
     } finally {
       setBusy(false);
       setProgress(null);
@@ -180,7 +252,11 @@ function SlotUploader({ token, slot, label, required, received, maxMb, disabled,
             {received ? `Received ${formatDate(received.receivedAt)} · ${received.filename}` : 'Not yet received'}
           </p>
           {progress && <p className="mt-1 text-sm text-blue-800" role="status">{progress}</p>}
-          {error && <p className="mt-1 text-sm text-red-700" role="alert">{error}</p>}
+          {error && <p className="mt-1 text-sm text-red-700" role="alert">
+            {error.type === 'size_limit'
+              ? <SizeLimitError error={error} programCoordinator={programCoordinator} />
+              : error}
+          </p>}
         </div>
         {!disabled && pending && (
           <div className="flex flex-wrap items-center gap-2">
@@ -232,6 +308,12 @@ export default function MaterialsContributorPage() {
     }
   };
 
+  const updateUploadCap = (maxMb) => {
+    setState((current) => current.status === 'ok'
+      ? { ...current, data: { ...current.data, maxMb } }
+      : current);
+  };
+
   useEffect(() => {
     if (!token) return undefined;
     let cancelled = false;
@@ -270,10 +352,10 @@ export default function MaterialsContributorPage() {
       </section>
       <ul className="mt-6 space-y-3">
         {data.checklist.map((item) => (
-          <SlotUploader key={item.key} token={token} slot={item.key} label={item.label} required={item.required} received={item.received} maxMb={data.maxMb} disabled={data.closed} onDone={load} />
+          <SlotUploader key={item.key} token={token} slot={item.key} label={item.label} required={item.required} received={item.received} maxMb={data.maxMb} programCoordinator={data.programCoordinator} disabled={data.closed} onDone={load} onCapChange={updateUploadCap} />
         ))}
         {SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED && (
-          <SlotUploader key="other" token={token} slot="other" label="Anything else you would like the Foundation to have" required={false} received={null} maxMb={data.maxMb} disabled={data.closed} onDone={load} />
+          <SlotUploader key="other" token={token} slot="other" label="Anything else you would like the Foundation to have" required={false} received={null} maxMb={data.maxMb} programCoordinator={data.programCoordinator} disabled={data.closed} onDone={load} onCapChange={updateUploadCap} />
         )}
       </ul>
       {data.other?.length > 0 && (

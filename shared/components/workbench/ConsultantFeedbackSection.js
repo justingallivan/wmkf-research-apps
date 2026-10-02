@@ -23,14 +23,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { requestJson, requestEnvelope } from '../../utils/api-request';
 import RichReviewEditor from '../external/RichReviewEditor';
-import { SITE_VISIT_MATERIALS_UPLOAD_MAX_MB_DEFAULT } from '../../config/siteVisitMaterials';
 
 // Slice 2 attachments (docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md §4):
 // PDF or DOCX only, one per entry. The server (`getUploadMaxMb`, an
-// admin-editable Postgres setting shared with site-visit materials) is the
-// authority on the actual cap; this default is shown as a label only — the
-// upload-token mint route rejects an oversize file regardless of what this
-// says.
+// admin-editable setting shared with site-visit materials) is the authority
+// on the actual cap. The UI does not fetch it here; the upload-token mint
+// route rejects an oversize file.
 const ATTACHMENT_ACCEPT = '.pdf,.docx';
 const ATTACHMENT_CONTENT_TYPES = new Set([
   'application/pdf',
@@ -743,7 +741,7 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
                   onChange={handleAttachFileChange}
                   className="mt-1 block w-full text-sm text-gray-700"
                 />
-                <p className="mt-1 text-xs text-gray-500">PDF or DOCX, up to {SITE_VISIT_MATERIALS_UPLOAD_MAX_MB_DEFAULT} MB.</p>
+                <p className="mt-1 text-xs text-gray-500">PDF or DOCX. Size limit is set by the administrator.</p>
                 {attachFile && <p className="mt-1 text-xs text-gray-700">{attachFile.name}</p>}
                 {attachUploadProgress != null && attachUploadProgress < 100 && (
                   <p className="mt-1 text-xs text-gray-500">Uploading… {attachUploadProgress}%</p>

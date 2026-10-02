@@ -6,7 +6,7 @@ status: active
 summary: "Canonical Site Visit-led plan for applicant material collection, staff follow-up, and a shared external briefing room."
 canonical: true
 cataloged: 2026-09-08
-last_verified: 2026-09-17
+last_verified: 2026-10-01
 owner: product-engineering
 related:
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
@@ -496,7 +496,7 @@ needs no manifest and no viewer work; a finalized upload appears on the page on 
 |---|---|
 | M1 | Baseline checklist: **Presentation (PDF)**, **Presentation source (PPTX or Keynote)**, **Participant bios (PDF or Word)**. One cycle template; the PC may waive an item per request and applicants may add bounded "Other" files. |
 | M2 | Due date: **two business days before the site visit starts**, computed in the visit's IANA zone (`lib/utils/business-days.js`, weekends only; no holiday calendar this cycle). Contributor access closes seven days after the visit ends. This is independent of briefing-link expiry, which is 60 days from issuance under deliberation-briefing decision D17 revised 2026-09-15. |
-| M3 | Upload size cap: an **admin-editable setting** `site_visit_materials.upload_max_mb` (Admin › Site visits), **default 100 MB**. The briefing page serves files up to 50 MB and lists larger ones with a note (D19). |
+| M3 | Upload size cap: an **admin-editable setting** `site_visit_materials.upload_max_mb` (Admin › Site visits), **default 500 MB** (owner decision 2026-10-01). Saved administrator overrides remain effective within the supported 1–500 MB range. The briefing page serves files up to 50 MB and lists larger ones with a note (D19). |
 | M4 | SharePoint layout: **flat request-relative folders** `Site Visit - Slides`, `Site Visit - Participant Bios`, `Site Visit - Other`; no nested `Site Visit/Applicant Materials/…` form. Canonical filenames per §7.3. |
 | M5 | **Go for this cycle.** Reminders are PC-triggered in the first release; an automated reminder cron is a follow-up the owner has flagged to remember. *Follow-up closed 2026-09-17: the automatic cron is retired; staff monitor arrivals manually (§16.6 item 1).* |
 
@@ -569,7 +569,7 @@ merged and production-smoked (ZZTEST-03, 2026-09-10). PR 3 was built 2026-09-11 
   request-bound READY, non-superseded generation row and retires that recorded predecessor; a
   candidate with no generation row is redone from the top, while a superseded or mismatched row
   stays held for staff attention. Codex adversarial review (2026-09-10) also made
-  cap reads strict (only an absent setting uses the 100 MB default), requires the settings writer
+  cap reads strict (an absent, malformed, or out-of-range setting uses the current 500 MB default; a read outage returns 503 and never widens a configured cap), requires the settings writer
   to confirm success, classifies thrown scanner failures, retains the same staging id in browser
   session storage for transient finalize retry, and validates PPTX/DOCX through bounded exact ZIP
   central-directory entries rather than marker substrings.
@@ -617,6 +617,14 @@ Owner feedback after the first production smoke (ZZTEST-03). Four items, built o
 4. The upload page shows a "Need help?" mailto footer using the `support` alert-recipients
    category's first configured address (`getSupportEmail()` in `contributor-service.js`; no
    fallback to `default`), surfaced as `supportEmail` on the context response.
+5. The contributor page checks the selected file's exact byte size against the current server
+   cap before minting an upload. Oversized files explain how to reduce the file or contact the
+   assigned, enabled Program Coordinator using a server-resolved name and validated email. A stale
+   context cap refreshes from the upload-token response. Failed replacements preserve the prior
+   pending upload for Retry; the new file becomes pending only after its Blob transfer succeeds.
+   Transfers above 60 MiB use the Blob SDK multipart option. This
+   multipart path and practical 500 MB transfer throughput remain unverified against the live
+   provider; see the implementation review for runtime limits.
 
 ### 16.5 2026-09-11 (S507): optional "other" upload hidden from applicants
 
