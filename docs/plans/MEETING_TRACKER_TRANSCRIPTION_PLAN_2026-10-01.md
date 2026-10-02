@@ -2,7 +2,7 @@
 title: Meeting Tracker transcription integration
 domain: transcription
 kind: plan
-status: draft-fable-review-in-progress
+status: draft-fable-r1-reviewed-owner-decisions-pending
 summary: "Meeting Tracker transcription and contextual speaker selection: owner approved explicit publication, audio-only inputs, and OAuth Fable reviews. Collaboration and permanent-format choices remain open; implementation has not started."
 owner: product-engineering
 related:
@@ -153,13 +153,49 @@ upload bounds. Run relevant migrations/Atlas/API/security/docs gates and their
 self-tests sequentially, focused tests and build. Hosted tests require a
 separately confirmed safe target and authority.
 
-## Review status
+## Fable round 1 and root dispositions
 
 Luna completed read-only reconnaissance; no files or external state were
 changed by that agent. Root verified Claude host authentication as subscription
 OAuth. An initial review attempt was blocked before execution; after explicit
 disclosure and owner approval, the OAuth-only Fable review was launched with
-read-only source tools and provider API-key variables removed. Its verdict is
-pending; no Fable approval is claimed.
+read-only source tools and provider API-key variables removed. Fable completed
+as `claude-fable-5-1` with no permission denials. Its full findings are retained
+in [round 1 evidence](evidence/MEETING_TRANSCRIPTION_FABLE_R1_2026-10-01.md).
+Verdict: implementable as a bounded slice after blocking choices/contracts are
+recorded; not deployment approval. The requested final adversarial review has
+not occurred because implementation has not begun.
+
+Root dispositions:
+
+- Accept the source findings on app-grant access, dedicated-project isolation,
+  one transcript slot, immediate reader exposure, and required publication
+  recovery. Do not claim per-user request ACLs: current access is app grant,
+  rollout request eligibility, and verified request/visit/job binding.
+- Accept shared request-bound drafts as the recommendation, subject to the
+  pending owner choice. Keep initiating actor attribution, mapped staff
+  identity for publication, and existing private pilot jobs isolated. A new
+  Meeting Tracker gate must not require enabling the Admin pilot surface.
+- Fable recommends permanent TXT only and VTT/corrections within the temporary
+  seven-day window. Do not silently adopt that reduction: the owner has been
+  asked whether permanent dual-format output and later corrections are needed.
+  If required, amend the final-artifact contract rather than publishing two
+  competing transcript winners or prolonging temporary storage implicitly.
+- Accept a durable publication-operation/candidate receipt, frozen job version
+  and labels, and expected-current-artifact comparison under the existing slot
+  lease. The precise ledger design must handle expiry/delete racing publication
+  and unresolved remote success; a dependency override alone is not proof.
+  Temporary cleanup must not erase recovery evidence or finalize unknown writes.
+- Accept local Dataverse-only PI reads; do not call the enrichment-oriented
+  `resolveProposalPI` path, which may contact ORCID/OpenAlex. Read Co-PI contact
+  identifiers from the junction. Exclude email-only fallback strings from
+  speaker-name suggestions; manual display-name entry needs no email.
+- Reject the blanket assertion that all Site Visit recordings are sensitive;
+  classification is not derivable from the feature name. Preserve the current
+  non-sensitive testing boundary until an explicit broader processing decision.
+  Do not mislabel sensitive recordings with the pilot acknowledgement.
+- Require separately approved shared-runtime/schema release operations after
+  confirming target state and migration numbering. Do not broaden the isolated
+  pilot allowlist or treat a source build as operational enablement.
 
 Verdict: **DRAFT — NOT IMPLEMENTATION-READY.**
