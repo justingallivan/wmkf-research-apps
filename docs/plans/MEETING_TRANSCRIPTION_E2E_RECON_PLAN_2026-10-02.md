@@ -38,7 +38,7 @@ Acceptance criteria are: one recording reaches a completed transcript; detected 
 
 Once the target and prerequisites are established, obtain the previously requested bounded Fable plan review through OAuth only. Any required build follows Luna implementation, Sol review, root final review, and Fable adversarial review, with material findings prioritized over incremental polish. This reconnaissance does not authorize those environment changes or the paid test.
 
-## Findings
+## Source findings
 
 Luna completed source reconnaissance, and root checked the publication boundary and Workbench consumer. No remote requests, provider calls, application changes, or business-record mutations were made in this pass. The following are source findings, not hosted execution proof.
 
@@ -52,10 +52,38 @@ Luna completed source reconnaissance, and root checked the publication boundary 
 
 Root corrected one reconnaissance inference before accepting it: the cycle-wide Staff Deliberations list reads briefing artifacts, but that does not describe the individual request's Staff Deliberations tab. The tab has the transcript reflection above. Do not scope a replacement Workbench feature based on the cycle-list result.
 
+## Live metadata findings
+
+The owner approved the bounded live pass after the source review. [VERIFIED via Vercel CLI project inspect and inspect, 2026-10-02] The dedicated project remains `prj_v9lOh6NdInOGxIPSmcX8IYiBPVQB`; the stable test hostname resolves to READY deployment `dpl_Fyu3auFAgsDkGCtuPjzD1u1AVKmP`.
+
+[VERIFIED via Preview env pull and `scripts/probe-meeting-transcription-config.js`] Project Preview configuration points to sandbox Dataverse `orgd9e66399.crm.dynamics.com` and dedicated Neon `ep-aged-dew-b7gtigyy-pooler.c-13.us-east-1.aws.neon.tech`. Rehearsal and transcription schema flags are on; access remains pinned to the synthetic request; pilot and submissions are false; bundle readiness is off; interlock and DAL enforcement are on. A second read with the expanded safe-value allowlist verified `DATAVERSE_ALLOW_PROD_READS=no`. Both `POST_PRESENTATION_MATERIALS_SCHEMA_READY` and `POST_PRESENTATION_MATERIALS_ACCESS` are unset. The checked AssemblyAI and Dynamics client credential keys are absent; the upload Blob token key is present, not capability-tested. This checks project configuration, not an exhaustive deployed-runtime environment snapshot. Both temporary pulled environment files were removed. No environment changes or deployment occurred. An attempted `env run` failed with a CLI single-file deployment error before the projection ran; the explicit env-pull read succeeded instead.
+
+[VERIFIED via Luna's pinned GET-only sandbox probe, 2026-10-02 21:03 UTC] The Azure identity resolves to exactly one enabled Dataverse system user. [VERIFIED via the config probe's `--profile` mode, pinned dedicated Neon, `BEGIN READ ONLY` and SELECT] Profile 1 is active and linked, but `dynamics_systemuser_id` is null. No profile was changed. Luna's additional pinned sandbox grant GET returned zero `meeting-tracker` grants for the resolved actor. App grants are Dataverse-backed, not stored in this Neon database; the application also checks local roles before the grant path. This pass does not claim an exhaustive effective-permission test.
+
+The corrected canonical Workbench visibility filter, restricted to non-test requests with a meeting date and at most five candidates, returned one request: `1000334` (`4236c2b3-b053-f111-bec7-6045bd015cb0`). It has one active visit (`38bf47c0-c1aa-46fc-b9d0-167aa76ad962`), but its request meeting date is 2026-12-11 while the visit starts on 2026-07-07. It has no PI/research-leader reference and no valid saved attendee map. These are representativeness concerns, not a claim that the binding service rejects mismatched dates or requires suggestions. It is not recommended as the full speaker-dropdown test without owner clarification. No meeting was changed or selected for execution.
+
+The initial probe incorrectly mirrored triage constants; root rejected its empty-result inference and required the canonical visibility function before accepting the corrected live result. Artifact-winner assertions from an incomplete metadata selection were also rejected. The final simplified probe at 21:04 UTC returned complete counts of zero TRANSCRIPT rows and three RECORDING rows for this request, not a current-recording selection. Recipient exposure and SharePoint destination remain unverified. No safe-publication verdict follows from this pass.
+
+[VERIFIED via Luna's additional bounded Dataverse GETs] One request document location and one parent location resolve the candidate's active library/folder metadata. Existing recording document site IDs identify `appriver3651007194.sharepoint.com`. This is evidence about existing recording metadata, not independent verification of the future Graph upload destination. No Graph files were opened or written. Sandbox Dynamics does not establish isolated SharePoint storage. The follow-up reads used the read-only path inspected in `lib/utils/sharepoint-buckets.js`; no folder-creation helper was invoked.
+
+## Fable review and root disposition
+
+Fable reviewed the plan through the verified first-party Claude Max OAuth session, using `claude-fable-5-1` with Read/Grep/Glob only. No API-key authentication, Ultrareview, web access, delegated agents, or live writes were used. The review returned **conditional, not ready to execute; reconnaissance may continue**. It supports an existing-meeting test rather than broad infrastructure work, conditional on safe storage and working Preview workflow dispatch.
+
+Root accepts these material requirements:
+
+- Include post-presentation schema/access controls for both publishing and Workbench readback. Source `jobSubmissionEnabled` permits request-bound Meeting Tracker jobs through meeting controls independently of the old pilot switches; do not enable the old pilot merely to enable this test.
+- Verify actual SharePoint destination and audience, including active recipient links. Check relevant Request Document create/update automation before publication; do not repeat an unrelated whole-workflow census.
+- Separately establish sandbox actor identity, dedicated profile mapping, and app access. Any correction is a separately listed write, not reconnaissance.
+- A narrow deployment-policy change must account for the actual request-bound Tracker and Workbench routes plus required authenticated provider/workflow callbacks. Do not broadly allow wildcard endpoints or bypass their own guards. Unexpected dispatch failure is a stop condition, not permission to build a replacement runner.
+- Identify temporary-copy cleanup before the test; preserved originals and published SharePoint files have different retention. Unresolved publication must retain its receipt and candidates for operator review.
+
+Root corrects two reviewer assertions: grants are Dataverse-backed (`lib/services/app-access-service.js`), not a Neon app-grants table; the browser VTT failure's cause is still unknown, not proven to be an extension. Neither assertion is a basis for implementation. The review's proposed route-only code scope is provisional until actual dependency routes and credentials are checked.
+
 ## Recommended next action
 
-Do one bounded live metadata pass before changing code. Confirm the dedicated deployment's target and flags, the operator's actual Dataverse identity mapping, and one owner-approved existing meeting with its current transcript and publication audience. Verify required schema and storage destinations using read-only operations. If no suitable sandbox meeting exists, return that result; do not create one or switch to Production implicitly.
+Resolve the test meeting and storage boundary before changing the application. The bounded sandbox pass did not establish a representative meeting with the intended attendee context or independently isolated SharePoint destination. Ask the owner for an existing suitable sandbox meeting, or approval to plan preparation of a representative sandbox test meeting with an explicitly approved storage destination. Do not create a meeting, modify the candidate, grant access, add credentials, or switch to Production implicitly. The exact setup writes and relevant automation checks must precede an execution approval packet.
 
-These checks are within read-only reconnaissance, but were not executed during this source pass. The exact existing meeting is still unresolved. Once that target is identified, prepare the small test-enablement change for Fable's OAuth plan review rather than commissioning another broad infrastructure build.
+The exact existing meeting remains unresolved. Once it is identified and the remaining prerequisites are established, prepare the small test-enablement change rather than commissioning another broad infrastructure build. Fable's OAuth review is conditional planning advice, not live-write authorization.
 
-Immediate blockers to the proposed test are the rehearsal-only route boundary and unverified live prerequisites (identity, meeting binding, processing configuration, destination and publication effects). VTT download and Workbench readback are test acceptance checks, not reasons to redesign the workflow. Broader rollout, automated operational verification, and cosmetic improvements remain separate from this supervised test proposal.
+Immediate blockers are the rehearsal-only route boundary, absent dedicated profile actor mapping and required configuration, and unresolved test selection, destination, audience, and publication effects. VTT download and Workbench readback are test acceptance checks, not reasons to redesign the workflow. Broader rollout, automated operational verification, and cosmetic improvements remain separate from this supervised test proposal. No implementation or live-write approval is claimed.
