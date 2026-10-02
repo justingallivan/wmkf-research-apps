@@ -227,8 +227,11 @@ describeIf('transcription pilot store (isolated local Postgres proof)', () => {
     expect(await store.recoverTerminalWorkflowDispatch({ jobId: queued.id,
       workflowRunId: 'terminal_run_fixture_1', attemptNo: 1, terminalStatus: 'failed' })).toBeNull();
     expect(await store.getWorkflowDispatch({ jobId: queued.id })).toMatchObject({
-      state: 'running', attempt_no: 2, workflow_run_id: 'fresh_run_fixture_2',
+      state: 'running', attempt_no: 2,
     });
+    expect(await store.listRunningWorkflowDispatches({ limit: 20 })).toEqual(expect.arrayContaining([
+      expect.objectContaining({ job_id: queued.id, workflow_run_id: 'fresh_run_fixture_2', attempt_no: 2 }),
+    ]));
   });
 
   it.each(['reconcile', 'callback'])('fences an old attention workflow after %s re-arms delivery', async recovery => {

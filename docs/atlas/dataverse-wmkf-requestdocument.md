@@ -23,6 +23,7 @@ related:
   - lib/dataverse/schema/wave22-final-writeup-transition/wmkf_requestdocument_final_writeup_transition.json
   - lib/dataverse/schema/wave30-post-presentation-materials/wmkf_requestdocument_post_presentation_materials.json
   - lib/dataverse/schema/wave31-meeting-transcript-bundle/wmkf_requestdocument_transcript_bundle.json
+  - scripts/preflight-meeting-transcript-bundle-schema.mjs
   - scripts/preflight-post-presentation-materials-schema.mjs
   - lib/utils/post-presentation-materials-readiness.js
   - lib/utils/meeting-transcript-bundle-readiness.js
@@ -102,8 +103,12 @@ adds the optional `wmkf_TranscriptBundleJson` Memo (logical name
 `wmkf_transcriptbundlejson`, maximum 32,000 characters) to
 `wmkf_requestdocument`. The schema-as-code record is
 `lib/dataverse/schema/wave31-meeting-transcript-bundle/wmkf_requestdocument_transcript_bundle.json`;
-it defines no relationship. No Dataverse apply or live field readback is
-claimed. `MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY` must be exactly
+it defines no relationship. **[VERIFIED via read-only sandbox metadata
+preflight, 2026-10-02]** the memo is absent; the Wave 16
+`wmkf_requestdocument_generation_key` over `wmkf_generationkey` is exact and
+Active, and both Wave 30 fields are exact. Production was not probed. The
+read-only preflight is `scripts/preflight-meeting-transcript-bundle-schema.mjs`.
+`MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY` must be exactly
 `on` before the field is selected. In addition, `requestDocumentSelect()`
 includes it only when a caller explicitly sets
 `includeMeetingTranscriptBundle: true`; its default and
@@ -117,8 +122,10 @@ whose primary SharePoint file is TXT. Its optional manifest binds the TXT,
 VTT, and normalized source-file descriptors for staff-side publication,
 verification, and correction. All bundle reads explicitly opt into the
 projection and cap each new Graph read at 4 MB; ordinary Request Document
-readers omit the memo field. This source remains disabled, Wave 31 is unapplied,
-and Postgres migrations 063–064 are unapplied. Recipient DTOs do not
+readers omit the memo field. This source remains disabled. Wave 31 is unapplied
+to sandbox and Production; migrations 063–064 were exercised only in a
+disposable local PostgreSQL 16 test schema, not applied to a persistent
+database. Recipient DTOs do not
 project the manifest or source-file descriptor; no recipient manifest, source
 projection, or recipient file inventory is implemented. No production
 behavior is claimed here.

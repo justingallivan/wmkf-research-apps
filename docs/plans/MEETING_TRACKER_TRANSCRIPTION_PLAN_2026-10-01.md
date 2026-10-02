@@ -3,7 +3,7 @@ title: Meeting Tracker transcription integration
 domain: transcription
 kind: plan
 status: source-reviewed-disabled
-summary: "Shared staff drafts, retained TXT/VTT/source, and explicit publication are built and source-reviewed. Fable returned READY FOR DISABLED SOURCE; schemas remain unapplied and hosted release proof is still required."
+summary: "Shared staff drafts, retained TXT/VTT/source, and explicit publication are source-reviewed and disabled. Local PostgreSQL migrations pass integration proof; sandbox readback finds the Wave 31 memo absent and the Wave 16 generation key active. Hosted provisioning and release proof remain pending."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -444,16 +444,45 @@ and excluded from commits. Its added Workbench processing/attention cases
 currently fail against unchanged UI; the original HEAD cases pass. That is
 not a claim of a fully green whole-repository test run.
 
-**Current verdict: SOURCE-REVIEWED, DISABLED; NOT RELEASE-READY.** The feature remains disabled and
-source-only. Real PostgreSQL migration/concurrency verification, physical
-Dataverse field and generation-key readiness, and hosted end-to-end testing
-remain release gates, not properties proved by mocked tests. Production or
-Preview deployment, schema applies, feature enablement, and real-recording or
-provider tests require separate authorization.
+**Current verdict: SOURCE-REVIEWED, DISABLED; NOT RELEASE-READY.** On
+2026-10-02, an isolated local PostgreSQL 16 schema applied migrations 060–064
+and passed all 23 integration tests: 4 Meeting Tracker publication tests and
+19 existing pilot tests. The four new tests cover migration constraints,
+competing publication and cleanup fencing, recovery lease fencing, and close
+attribution. A real candidate-writer run exposed an untyped `$3` parameter;
+the correction was `$3::text`, with no other production-code fix required by
+that database check. An old pilot assertion was also corrected after proving
+that `getWorkflowDispatch` intentionally omits the run ID and the recovery
+consumer reads the durable ID and attempt through
+`listRunningWorkflowDispatches`. The 58 focused unit tests and scoped lint
+passed. This bounded evidence does not establish broader migration coverage
+or hosted behavior.
 
-Release preparation must verify both migrations **063 and 064** before setting
-the schema readiness flag. The independent Dataverse bundle field and existing
-generation-key uniqueness also need physical readback. Candidate files retained
-by closed attempts are not registered final products; committed but unverifiable
-receipts remain attention-only. These operational limitations must be addressed
-in the supervised readiness exercise, not hidden by enabling the feature.
+The read-only Dataverse preflight on sandbox found the Wave 31
+`wmkf_transcriptbundlejson` memo absent, the Wave 16
+`wmkf_requestdocument_generation_key` over `wmkf_generationkey` exact and
+Active. The Wave 31 probe is
+`scripts/preflight-meeting-transcript-bundle-schema.mjs`; Wave 30 exactness
+was reported by `scripts/preflight-post-presentation-materials-schema.mjs`.
+No schema was applied. The shared Preview branch's `DYNAMICS_URL` resolved to
+the Production host during configuration inspection. The CLI pulled the
+environment into a temporary file containing secret placeholders; only the
+target host and flags were parsed, then the file was removed. No environment
+was changed and no secret values were retained. A separate sandbox
+infrastructure test approval remains pending.
+Fable's final OAuth review returned **Commit OK**, with no substantive defect;
+it explicitly retains the hosted-adapter, quarantine/lease, correction, and
+cleanup gaps listed in its review evidence. No deployment, persistent database
+migration, Dataverse apply, feature enablement, provider call, or audio test
+occurred.
+
+Detailed bounded results and review limits are recorded in
+[the 2026-10-02 readiness check](evidence/MEETING_TRANSCRIPTION_READINESS_CHECK_2026-10-02.md).
+
+Before release, migrations 063 and 064 still require application and exact
+readback on an authorized persistent target. Wave 31 must be applied and read
+back before schema readiness can be enabled. The sandbox generation key is
+already exact/Active, but this does not authorize or prove an application
+write. Hosted end-to-end proof remains pending. Candidate files retained by
+closed attempts are not registered final products; committed but unverifiable
+receipts remain attention-only.

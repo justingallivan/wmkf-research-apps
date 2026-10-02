@@ -3,7 +3,7 @@ title: "Atlas: Meeting Tracker transcript publications (Postgres)"
 domain: postgres
 kind: state-page
 status: source-only-not-applied-source-reviewed-disabled
-summary: "Migrations 063–064 and the Meeting Tracker transcription flow are source-reviewed for disabled source; schema remains unapplied and the feature is not released or live."
+summary: "Migrations 063–064 and the Meeting Tracker transcription flow are source-reviewed for disabled source. An isolated local PostgreSQL 16 schema test passed; no persistent database apply, release, or live feature is claimed."
 canonical: true
 cataloged: 2026-10-01
 owner: product-engineering
@@ -11,6 +11,7 @@ related:
   - docs/APPLICATION_STATE_ATLAS.md
   - docs/atlas/postgres-transcription-pilot.md
   - docs/plans/MEETING_TRACKER_TRANSCRIPTION_PLAN_2026-10-01.md
+  - docs/plans/evidence/MEETING_TRANSCRIPTION_READINESS_CHECK_2026-10-02.md
   - lib/db/migrations/063_meeting_tracker_transcription.sql
   - lib/db/migrations/064_meeting_transcript_close_attribution.sql
   - lib/services/transcription-pilot/store.js
@@ -24,15 +25,23 @@ related:
 request/Site Visit bindings to `transcription_jobs` and defines
 `meeting_transcript_publications`; migration 064 adds the optional
 `closed_by_profile_id` audit field. Neither migration has been applied or
-read back in a shared database. No deployment or enabled Meeting Tracker
+read back in a persistent shared or hosted database. **[VERIFIED via isolated
+local PostgreSQL 16 integration run, 2026-10-02]** a disposable test schema
+applied migrations 060–064; the four new Meeting Tracker tests and 19 existing
+pilot tests passed (23/23). The new tests cover binding/source constraints,
+competing publication and cleanup fencing, recovery lease fencing, and close
+actor attribution. A real candidate-writer run exposed an unknown `$3`
+parameter; root corrected it with `$3::text`, with no other production-code
+fix required by that database check. No deployment or enabled Meeting Tracker
 transcription feature is claimed. The dedicated AssemblyAI pilot's deployment
 and isolated-Neon state are recorded separately in [the pilot Atlas](postgres-transcription-pilot.md);
 those historical claims are unchanged by these source migrations.
 
 The source now includes request-bound upload/job, review, publication,
 correction, download, explicit reconciliation, and a `SiteVisitEditor` consumer.
-This is reviewed source evidence only: migrations 063–064 are not applied and
-the Meeting Tracker feature is not released or live. The global active
+The source remains disabled: migrations 063–064 are not applied to a persistent
+target, and the Meeting Tracker feature is not released or live. The local
+integration proof does not verify hosted schema or runtime behavior. The global active
 provider-slot limit remains unchanged. A valid text-only provider draft with
 no timed utterances remains readable and downloadable as TXT; publication
 fails with `meeting_transcript_timed_vtt_required` and does not invent cue
@@ -176,8 +185,9 @@ code), and the newer current artifact remains unchanged.
 ## Source evidence
 
 - Migrations: `lib/db/migrations/063_meeting_tracker_transcription.sql` and
-  `lib/db/migrations/064_meeting_transcript_close_attribution.sql` (both
-  source-only and unapplied).
+  `lib/db/migrations/064_meeting_transcript_close_attribution.sql` (exercised
+  only in a disposable local PostgreSQL 16 test schema, not applied to a
+  persistent target).
 - Store: `lib/services/transcription-pilot/store.js`.
 - Settled product and publication contract: [Meeting Tracker transcription plan](../plans/MEETING_TRACKER_TRANSCRIPTION_PLAN_2026-10-01.md).
 - Dedicated pilot deployment and isolated Neon evidence: [AssemblyAI transcription pilot Atlas](postgres-transcription-pilot.md).
