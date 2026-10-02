@@ -936,8 +936,8 @@ Production CLI probe passed fixed-target/TLS checks and returned expected `job_n
 intentionally nonexistent UUID `00000000-0000-4000-8000-000000000000`; no recovery mutation
 was run. No automatic email is sent, so operational monitoring remains required.
 
-PR #405 (connection-copy follow-up) remains open at head `7fc6c109`; its branch conflicts
-with current main and is not merged or deployed. The 500 MB configured cap is covered by
+PR #405 (connection-copy follow-up) remains open and is not merged or deployed. Its conflicts
+with main were resolved in `8081fca57`; verify current-head CI before merging. The 500 MB configured cap is covered by
 tests, but the exact 500 MB live transfer and a concurrent background-job exercise remain
 unverified. The real 300+ MB PPTX upload succeeded before background activation (§16.14).
 
