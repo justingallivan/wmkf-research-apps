@@ -347,6 +347,7 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
           multipart: file.size > 60 * MEBIBYTE,
         });
       } catch (blobError) {
+        if (!mountedRef.current) return;
         // The SDK error inherits Error without setting its name, so use its
         // stable SDK-owned message as a discriminator and never show it to users.
         const expired = blobError?.message === 'Vercel Blob: Client token has expired.';
