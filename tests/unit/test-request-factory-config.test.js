@@ -112,19 +112,23 @@ describe('labels for the run record and the source summary', () => {
   test('every needs-attention reason with its own copy is a real ledger reason code; others get the default', () => {
     for (const code of Object.keys(ATTENTION_COPY)) expect(LEDGER_REASON_CODES).toContain(code);
     const fallback = attentionCopyFor('file_copy_failed');
-    expect(fallback).toBe("This step stopped. Retrying never creates a second Request: the run checks where it stands first. If it stops here again, the run can't continue. Whatever it created stays as a marked test record. Start a new run from a fresh lookup.");
+    expect(fallback).toBe('This step stopped. Retrying never creates a second Request: the run checks where it stands first and, if nothing had been written, does the step again. If it keeps stopping here, find the cause in the technical detail or the function log and clear it before retrying again.');
     expect(attentionCopyFor(null)).toBe(fallback);
     expect(attentionCopyFor('timeout (http 504)')).toBe(ATTENTION_COPY.timeout);
   });
 
   test('no stop claims the command-line tool resolves a run; a dead end says so and names the way out', () => {
     // No mode of scripts/rehearse-test-request-sandbox.mjs abandons, resets or force-advances a run; `--run-inspect` only reads.
-    const cannotContinue = ['ambiguous_create_outcome', 'file_journal_unverified', 'file_ambiguous_unrecovered', 'location_readback_mismatch', 'bundle_stale', 'file_copy_failed'];
+    const cannotContinue = ['ambiguous_create_outcome', 'file_journal_unverified', 'file_ambiguous_unrecovered', 'location_readback_mismatch', 'bundle_stale'];
     for (const code of cannotContinue) {
       const text = attentionCopyFor(code);
       expect(text).toMatch(/can't continue/);
       expect(text).toMatch(/Start a new run from a fresh lookup\./);
     }
+    // The default covers retryable stops (file_copy_failed before upload, upstream_http, unknown_error): it never declares the run finished.
+    for (const code of ['file_copy_failed', 'upstream_http', 'unknown_error']) expect(attentionCopyFor(code)).not.toMatch(/can't continue|Start a new run/);
+    // provision_location re-reads on retry and records a late, owned location as recovered (run-runner.js stepProvisionLocation).
+    expect(attentionCopyFor('location_readback_mismatch')).toMatch(/If the record appears and is this run's, the run continues/);
     for (const text of Object.values(ATTENTION_COPY)) expect(text).not.toMatch(/resolv\w* (?:by hand )?with the command-line tool/i);
   });
 
@@ -146,7 +150,7 @@ describe('needs-attention copy refinements', () => {
     for (const code of ['preflight_identity_changed', 'meeting_date_readback_mismatch', 'request_readback_mismatch', 'verification_failed', 'observation_side_effects', 'manifest_digest_mismatch']) {
       expect(attentionCopyFor(code)).toBe(failed);
     }
-    expect(attentionCopyFor('location_readback_mismatch')).toBe(attentionCopyFor('file_journal_unverified'));
+    expect(attentionCopyFor('file_ambiguous_unrecovered')).toBe(attentionCopyFor('file_journal_unverified'));
     expect(attentionCopyFor('source_fence_failed')).toBe("The run couldn't confirm the source Request is unchanged: either it changed, or it couldn't be read. Nothing was created. Retry; if it stops here again, look up the source Request again and start a new run.");
   });
 

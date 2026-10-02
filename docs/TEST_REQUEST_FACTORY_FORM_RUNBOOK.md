@@ -62,7 +62,8 @@ vercel logs --environment production --since 1h -q "admin test-request run" -x
 | `create_request` | first stop after the create was sent and refused or lost; a refusal is recorded as `unknown_error` **[RUN: Preview]** | Looks for the Request by its reserved ID. Found and owned: recovered, continues. Not found: `ambiguous_create_outcome` | Only if the create actually landed |
 | `create_request` | `ambiguous_create_outcome` **[RUN: Preview]**, `preallocated_request_present_not_owned` | Stops again. Never sends a second create | No. Start a new run |
 | `correct_meeting_date` | `meeting_date_readback_mismatch` | Production never writes the date; stops again | No |
-| `provision_location` | `location_preexisting`, `location_readback_mismatch` | Re-reads; stops again | No |
+| `provision_location` | `location_preexisting` | Re-reads; stops again | No |
+| `provision_location` | `location_readback_mismatch` | Re-reads; never creates a second location. A late-appearing location this run owns is recorded as recovered and the run continues; otherwise it stops again | Only if the location appears |
 | `provision_location` | a transient error | Re-reads the location. If it exists and is this run's, continues; if a create was journaled and nothing exists, `location_readback_mismatch` | Depends |
 | `copy_file` | an error before the upload was attempted (source changed since lookup, source hash mismatch, destination file already exists) | Re-attempts that file | Only if the cause is gone |
 | `copy_file` | an error after the upload was attempted with no item recorded; the next retry shows `file_ambiguous_unrecovered` | Stops again. Never uploads again | No |

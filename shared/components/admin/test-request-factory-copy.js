@@ -75,7 +75,8 @@ export const ERROR_COPY = Object.freeze({
 // can, and otherwise stops at the same place. No command-line mode abandons, resets or force-advances a run
 // (scripts/rehearse-test-request-sandbox.mjs); `--run-inspect` only reads its record.
 const CANNOT_CONTINUE = 'Whatever it created stays as a marked test record. Start a new run from a fresh lookup.';
-const ATTENTION_DEFAULT = `This step stopped. Retrying never creates a second Request: the run checks where it stands first. If it stops here again, the run can't continue. ${CANNOT_CONTINUE}`;
+// The default also covers retryable stops (a file failure before upload, upstream_http, unknown_error), so it never declares the run finished.
+const ATTENTION_DEFAULT = 'This step stopped. Retrying never creates a second Request: the run checks where it stands first and, if nothing had been written, does the step again. If it keeps stopping here, find the cause in the technical detail or the function log and clear it before retrying again.';
 const ATTENTION_CHECK_FAILED = 'A check on this step failed, and retrying will most likely stop here again. Nothing further was written. Inspect the run with the command-line tool.';
 const ATTENTION_UNCONFIRMED = `An earlier attempt at this step may or may not have gone through, and the run can't tell which. Retrying won't repeat the write: the run checks again and stops here. Nothing confirms the result, so the run can't continue; the command-line tool can only read its record. ${CANNOT_CONTINUE}`;
 const ATTENTION_TRANSIENT_RETRY = 'Retrying checks where the run stands first. If nothing had been written yet, it does the step again. If a write had been sent, the run looks for its result and may stop again under a different reason.';
@@ -86,7 +87,8 @@ export const ATTENTION_COPY = Object.freeze({
   preallocated_request_present_not_owned: "A Request already exists under this run's reserved ID, and this run did not create it. Retrying will stop here again; the run can't continue.",
   location_preexisting: 'A document folder record already exists for this Request, and this run did not create it. Retrying will stop here again; the run needs to be resolved by hand.',
   source_fence_failed: "The run couldn't confirm the source Request is unchanged: either it changed, or it couldn't be read. Nothing was created. Retry; if it stops here again, look up the source Request again and start a new run.",
-  location_readback_mismatch: ATTENTION_UNCONFIRMED,
+  // stepProvisionLocation re-reads on every retry: a late-appearing location this run owns is recorded as recovered.
+  location_readback_mismatch: `An earlier attempt created the document folder record, or may have, and it can't be read yet. Retrying is safe: the run reads again and never creates a second record. If the record appears and is this run's, the run continues. If it keeps stopping here, the run can't continue. ${CANNOT_CONTINUE}`,
   preflight_identity_changed: ATTENTION_CHECK_FAILED,
   meeting_date_readback_mismatch: ATTENTION_CHECK_FAILED,
   // Sandbox only: production never writes the date (it stops as meeting_date_readback_mismatch instead).
