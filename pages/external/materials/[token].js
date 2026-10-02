@@ -163,9 +163,11 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(null);
   const [pending, setPending] = useState(null);
   const [acceptedJob, setAcceptedJob] = useState(null);
   const mountedRef = useRef(true);
+  const uploadSequenceRef = useRef(0);
   const waitTimerRef = useRef(null);
   const waitResolverRef = useRef(null);
 
@@ -178,6 +180,7 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      uploadSequenceRef.current += 1;
       if (waitTimerRef.current !== null) window.clearTimeout(waitTimerRef.current);
       waitResolverRef.current?.(false);
       waitTimerRef.current = null;
@@ -311,7 +314,9 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
     }
     setBusy(true);
     setError(null);
+    setUploadProgress(null);
     setProgress('Preparing…');
+    const uploadSequence = ++uploadSequenceRef.current;
     try {
       const { ok: tokenOk, data: tokenData } = await requestEnvelope(
         `/api/external/materials/${encodeURIComponent(token)}/upload-token`,
@@ -337,22 +342,38 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
         }
         throw new Error(UPLOAD_MESSAGE[tokenData.reason] || REASON_MESSAGE[tokenData.reason] || 'The upload could not start.');
       }
-      setProgress('Uploading…');
       const { put } = await import('@vercel/blob/client');
       if (!mountedRef.current) return;
+      setProgress('Uploading…');
+      setUploadProgress({ percentage: null });
       try {
         await put(tokenData.pathname, file, {
           access: 'private',
           token: tokenData.clientToken,
           contentType: tokenData.contentType,
           multipart: file.size > 60 * MEBIBYTE,
+          onUploadProgress: (event) => {
+            if (!mountedRef.current || uploadSequenceRef.current !== uploadSequence) return;
+            const total = event?.total;
+            const rawPercentage = event?.percentage;
+            if (typeof total !== 'number' || !Number.isFinite(total) || total <= 0
+              || typeof rawPercentage !== 'number' || !Number.isFinite(rawPercentage)) {
+              setUploadProgress({ percentage: null });
+              return;
+            }
+            setUploadProgress({ percentage: Math.round(Math.min(100, Math.max(0, rawPercentage))) });
+          },
         });
       } catch (blobError) {
+        if (uploadSequenceRef.current === uploadSequence) uploadSequenceRef.current += 1;
+        if (mountedRef.current) setUploadProgress(null);
         // The SDK error inherits Error without setting its name, so use its
         // stable SDK-owned message as a discriminator and never show it to users.
         const expired = blobError?.message === 'Vercel Blob: Client token has expired.';
         throw new Error(UPLOAD_MESSAGE[expired ? 'blob_token_expired' : 'blob_upload_failed']);
       }
+      if (uploadSequenceRef.current === uploadSequence) uploadSequenceRef.current += 1;
+      if (mountedRef.current) setUploadProgress(null);
       const nextPending = { stagingId: tokenData.stagingId, slot };
       writePendingUpload(token, slot, nextPending);
       if (!mountedRef.current) return;
@@ -361,6 +382,8 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
     } catch (uploadError) {
       const message = uploadError instanceof Error ? uploadError.message : 'The upload could not start. Please try again.';
       if (mountedRef.current) {
+        uploadSequenceRef.current += 1;
+        setUploadProgress(null);
         setError(pending
           ? `${message} Your earlier upload remains available with Retry, or choose a different file.`
           : message);
@@ -369,6 +392,7 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
       if (mountedRef.current) {
         setBusy(false);
         setProgress(null);
+        setUploadProgress(null);
       }
     }
   };
@@ -387,6 +411,17 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
             </p>
           )}
           {progress && <p className="mt-1 text-sm text-blue-800" role="status">{progress}</p>}
+          {progress === 'Uploading…' && uploadProgress && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-blue-800">
+              <progress
+                aria-label="File transfer progress"
+                className="h-2 w-48 accent-blue-700"
+                max={100}
+                value={uploadProgress.percentage ?? undefined}
+              />
+              <span>{uploadProgress.percentage === null ? 'Uploading…' : `${uploadProgress.percentage}%`}</span>
+            </div>
+          )}
           {error && <p className="mt-1 text-sm text-red-700" role="alert">
             {error.type === 'size_limit'
               ? <SizeLimitError error={error} programCoordinator={programCoordinator} />
