@@ -348,7 +348,7 @@ async function runScenario(mode, shape, fixturePath) {
   const { loadClaimedPortalDocument } = await import('../lib/services/portal-upload-staging.js');
   const { validateSiteVisitMaterial } = await import('../lib/utils/site-visit-material-file.js');
   const { scanBytes } = await import('../lib/services/cloudmersive-scan.js');
-  const { uploadFileLarge } = await import('../lib/services/graph/upload-session.js');
+  const { GraphService } = await import('../lib/services/graph-service.js');
   const { acquireLargeUploadAdmission, releaseLargeUploadAdmission } = await import('../lib/services/large-upload-admission.js');
   const row = {
     id: 'bench-staging-row', pathname: 'portal-staging/site_visit_material/bench/id',
@@ -445,7 +445,7 @@ async function runScenario(mode, shape, fixturePath) {
       buildHeaders() { return { Authorization: 'Bearer local-only-fake-graph-token' }; },
       async uploadFile(_library, _folder, name, content) { return { id: 'benchmark-small-item', size: content.length, name }; },
     };
-    const uploaded = await stage(`graph_upload_${id}`, () => uploadFileLarge(
+    const uploaded = await stage(`graph_upload_${id}`, () => GraphService.uploadFileLarge.call(
       svc, 'akoya_request', 'Site Visit Materials', 'benchmark.pptx', file.buffer,
       'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     ));
