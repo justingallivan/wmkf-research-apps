@@ -1,5 +1,6 @@
 /** @jest-environment node */
 import crypto from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Client, Pool } from 'pg';
@@ -365,18 +366,36 @@ describeIf('applicant materials background-job store (live PostgreSQL)', () => {
     }
   });
 
-  test('operator retry and cancel are guarded by attention state and do not restore old browser ownership', async () => {
+  test('operator retry resets an exhausted budget through the actual loopback CLI and retains evidence', async () => {
     const retryCollection = await makeCollection();
     const retryStage = await makeStaging({ requestId: retryCollection.requestId });
     const retryJob = await admit({ collection: retryCollection, staging: retryStage });
     await mockPoolRef.current.query(
-      `UPDATE materials_upload_jobs SET status='needs_attention',completed_at=NOW(),error_code='uncertain_write'
+      `UPDATE materials_upload_jobs SET status='needs_attention',attempt_count=8,deadline_at=NOW()-INTERVAL '1 hour',
+         expires_at=NOW()-INTERVAL '1 day',completed_at=NOW(),error_code='uncertain_write',
+         scan_checkpoint='{"clean":true,"sha256":"proof"}'::jsonb
         WHERE id=$1`, [retryJob.id],
     );
-    const retry = await jobs.resolveMaterialsUploadJob({ jobId: retryJob.id, action: 'retry' });
-    expect(retry).toMatchObject({ status: 'queued', error_code: null, lease_token: null });
-    expect(await row('SELECT status, background_job_id FROM portal_upload_staging WHERE id=$1', [retryStage.id]))
-      .toMatchObject({ status: 'pending', background_job_id: retryJob.id });
+    await mockPoolRef.current.query(
+      `UPDATE portal_upload_staging SET candidate_result='{"generationKey":"preserve-me"}'::jsonb,
+         expires_at=NOW()-INTERVAL '1 day',lease_token=NULL,lease_expires_at=NULL WHERE id=$1`, [retryStage.id],
+    );
+    const scopedUrl = new URL(TEST_URL);
+    scopedUrl.searchParams.set('options', `-c search_path=${schema}`);
+    const cli = spawnSync(process.execPath, [
+      path.join(process.cwd(), 'scripts/materials-upload-job.js'),
+      '--database-url', scopedUrl.toString(), '--job-id', retryJob.id, '--action', 'retry',
+    ], { cwd: process.cwd(), encoding: 'utf8', timeout: 15_000 });
+    expect(cli.status).toBe(0);
+    expect(JSON.parse(cli.stdout)).toMatchObject({ jobId: retryJob.id, action: 'retry', status: 'queued', attemptCount: 0 });
+    const retry = await row('SELECT status, attempt_count, error_code, deadline_at, expires_at, scan_checkpoint FROM materials_upload_jobs WHERE id=$1', [retryJob.id]);
+    expect(retry).toMatchObject({ status: 'queued', attempt_count: 0, error_code: null, scan_checkpoint: { clean: true, sha256: 'proof' } });
+    expect(new Date(retry.deadline_at).getTime()).toBeGreaterThan(Date.now() + 60 * 60 * 1000);
+    expect(new Date(retry.expires_at).getTime()).toBeGreaterThan(Date.now() + 29 * 24 * 60 * 60 * 1000);
+    expect(await row('SELECT status, background_job_id, candidate_result, expires_at FROM portal_upload_staging WHERE id=$1', [retryStage.id]))
+      .toMatchObject({ status: 'pending', background_job_id: retryJob.id, candidate_result: { generationKey: 'preserve-me' } });
+    expect(new Date((await row('SELECT expires_at FROM portal_upload_staging WHERE id=$1', [retryStage.id])).expires_at).getTime())
+      .toBeGreaterThan(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await expect(stagingStore.claimPortalUpload({
       stagingId: retryStage.id,
       scope: 'site_visit_material',
@@ -385,6 +404,111 @@ describeIf('applicant materials background-job store (live PostgreSQL)', () => {
     })).rejects.toMatchObject({ code: 'finalize_in_progress' });
     await expect(jobs.resolveMaterialsUploadJob({ jobId: retryJob.id, action: 'retry' }))
       .rejects.toMatchObject({ code: 'job_not_resolvable' });
+
+    const infectedCollection = await makeCollection();
+    const infectedStage = await makeStaging({ requestId: infectedCollection.requestId });
+    const infectedJob = await admit({ collection: infectedCollection, staging: infectedStage });
+    await mockPoolRef.current.query(
+      `UPDATE materials_upload_jobs SET status='needs_attention',completed_at=NOW(),error_code='scan_infected' WHERE id=$1`,
+      [infectedJob.id],
+    );
+    await mockPoolRef.current.query(
+      `UPDATE portal_upload_staging SET lease_token=NULL,lease_expires_at=NULL WHERE id=$1`, [infectedStage.id],
+    );
+    const infectedCli = spawnSync(process.execPath, [
+      path.join(process.cwd(), 'scripts/materials-upload-job.js'),
+      '--database-url', scopedUrl.toString(), '--job-id', infectedJob.id, '--action', 'retry',
+    ], { cwd: process.cwd(), encoding: 'utf8', timeout: 15_000 });
+    expect(infectedCli.status).toBe(1);
+    expect(infectedCli.stderr).toContain('infected_upload_cannot_retry');
+    expect(await row('SELECT status, error_code FROM materials_upload_jobs WHERE id=$1', [infectedJob.id]))
+      .toMatchObject({ status: 'needs_attention', error_code: 'scan_infected' });
+
+    const consumedCollection = await makeCollection();
+    const consumedStage = await makeStaging({ requestId: consumedCollection.requestId });
+    const consumedJob = await admit({ collection: consumedCollection, staging: consumedStage });
+    await mockPoolRef.current.query(
+      `UPDATE materials_upload_jobs SET status='needs_attention',completed_at=NOW(),error_code='uncertain_write' WHERE id=$1`,
+      [consumedJob.id],
+    );
+    await mockPoolRef.current.query(
+      `UPDATE portal_upload_staging SET status='consumed',consumed_at=NOW(),result_code='ok',result_payload='{"ok":true}'::jsonb,
+         lease_token=NULL,lease_expires_at=NULL WHERE id=$1`, [consumedStage.id],
+    );
+    const consumedCli = spawnSync(process.execPath, [
+      path.join(process.cwd(), 'scripts/materials-upload-job.js'),
+      '--database-url', scopedUrl.toString(), '--job-id', consumedJob.id, '--action', 'retry',
+    ], { cwd: process.cwd(), encoding: 'utf8', timeout: 15_000 });
+    expect(consumedCli.status).toBe(1);
+    expect(consumedCli.stderr).toContain('durable_receipt_already_committed');
+
+    const leasedCollection = await makeCollection();
+    const leasedStage = await makeStaging({ requestId: leasedCollection.requestId });
+    const leasedJob = await admit({ collection: leasedCollection, staging: leasedStage });
+    const liveToken = crypto.randomUUID();
+    await mockPoolRef.current.query(
+      `UPDATE materials_upload_jobs SET status='processing',completed_at=NULL,error_code='uncertain_write',
+         locked_until=NOW()+INTERVAL '10 minutes',lease_token=$2 WHERE id=$1`,
+      [leasedJob.id, liveToken],
+    );
+    await mockPoolRef.current.query(
+      `UPDATE portal_upload_staging SET status='finalizing',lease_token=$2,
+         lease_expires_at=NOW()+INTERVAL '10 minutes' WHERE id=$1`, [leasedStage.id, liveToken],
+    );
+    const leasedCli = spawnSync(process.execPath, [
+      path.join(process.cwd(), 'scripts/materials-upload-job.js'),
+      '--database-url', scopedUrl.toString(), '--job-id', leasedJob.id, '--action', 'retry',
+    ], { cwd: process.cwd(), encoding: 'utf8', timeout: 15_000 });
+    expect(leasedCli.status).toBe(1);
+    expect(leasedCli.stderr).toContain('job_not_resolvable');
+
+    const stagingLeaseCollection = await makeCollection();
+    const stagingLease = await makeStaging({ requestId: stagingLeaseCollection.requestId });
+    const stagingLeaseJob = await admit({ collection: stagingLeaseCollection, staging: stagingLease });
+    await mockPoolRef.current.query(
+      `UPDATE materials_upload_jobs SET status='needs_attention',completed_at=NOW(),error_code='uncertain_write' WHERE id=$1`,
+      [stagingLeaseJob.id],
+    );
+    await mockPoolRef.current.query(
+      `UPDATE portal_upload_staging SET status='finalizing',lease_token=$2,
+         lease_expires_at=NOW()+INTERVAL '10 minutes' WHERE id=$1`,
+      [stagingLease.id, crypto.randomUUID()],
+    );
+    const stagingLeaseCli = spawnSync(process.execPath, [
+      path.join(process.cwd(), 'scripts/materials-upload-job.js'),
+      '--database-url', scopedUrl.toString(), '--job-id', stagingLeaseJob.id, '--action', 'retry',
+    ], { cwd: process.cwd(), encoding: 'utf8', timeout: 15_000 });
+    expect(stagingLeaseCli.status).toBe(1);
+    expect(stagingLeaseCli.stderr).toContain('staging_lease_active');
+
+    const ownerCollection = await makeCollection();
+    const ownerStage = await makeStaging({ requestId: ownerCollection.requestId });
+    const ownerJob = await admit({ collection: ownerCollection, staging: ownerStage });
+    await mockPoolRef.current.query(
+      `UPDATE materials_upload_jobs SET status='needs_attention',completed_at=NOW(),error_code='uncertain_write' WHERE id=$1`,
+      [ownerJob.id],
+    );
+    await mockPoolRef.current.query(
+      `UPDATE portal_upload_staging SET lease_token=NULL,lease_expires_at=NULL,background_job_id=$2 WHERE id=$1`,
+      [ownerStage.id, crypto.randomUUID()],
+    );
+    const ownerMismatchCli = spawnSync(process.execPath, [
+      path.join(process.cwd(), 'scripts/materials-upload-job.js'),
+      '--database-url', scopedUrl.toString(), '--job-id', ownerJob.id, '--action', 'retry',
+    ], { cwd: process.cwd(), encoding: 'utf8', timeout: 15_000 });
+    expect(ownerMismatchCli.status).toBe(1);
+    expect(ownerMismatchCli.stderr).toContain('staging_owner_mismatch');
+    expect(await row('SELECT status, attempt_count FROM materials_upload_jobs WHERE id=$1', [ownerJob.id]))
+      .toMatchObject({ status: 'needs_attention', attempt_count: 0 });
+
+    const redirectedUrl = new URL(scopedUrl);
+    redirectedUrl.searchParams.set('host', 'example.invalid');
+    const redirectedCli = spawnSync(process.execPath, [
+      path.join(process.cwd(), 'scripts/materials-upload-job.js'),
+      '--database-url', redirectedUrl.toString(), '--job-id', retryJob.id, '--action', 'retry',
+    ], { cwd: process.cwd(), encoding: 'utf8', timeout: 15_000 });
+    expect(redirectedCli.status).toBe(2);
+    expect(redirectedCli.stderr).toContain('loopback Postgres URLs only');
 
     const cancelCollection = await makeCollection();
     const cancelStage = await makeStaging({ requestId: cancelCollection.requestId });
@@ -433,22 +557,19 @@ describeIf('applicant materials background-job store (live PostgreSQL)', () => {
     await jobs.completeMaterialsUploadJob({ jobId: job.id, leaseToken: claimed.lease_token, resultPayload: { ok: true } });
     expect(await row('SELECT status, background_job_id FROM portal_upload_staging WHERE id=$1', [staging.id]))
       .toMatchObject({ status: 'consumed', background_job_id: null });
-    await mockPoolRef.current.query("UPDATE portal_upload_staging SET updated_at=NOW()-INTERVAL '40 days' WHERE id=$1", [staging.id]);
+    await mockPoolRef.current.query(
+      `UPDATE portal_upload_staging SET updated_at=NOW()-INTERVAL '40 days',expires_at=NOW()-INTERVAL '1 second' WHERE id=$1`,
+      [staging.id],
+    );
     await expect(mockPoolRef.current.query('DELETE FROM portal_upload_staging WHERE id=$1', [staging.id]))
       .rejects.toMatchObject({ code: '23503' });
-    const pruned = await mockPoolRef.current.query(
-      `DELETE FROM portal_upload_staging s WHERE s.id=$1 AND s.updated_at<NOW()-INTERVAL '30 days'
-        AND s.status IN ('consumed','rejected','expired') AND s.candidate_result IS NULL
-        AND NOT EXISTS (SELECT 1 FROM materials_upload_jobs j WHERE j.staging_id=s.id)`, [staging.id],
-    );
-    expect(pruned.rowCount).toBe(0);
+    const firstCleanup = await stagingStore.cleanupExpiredPortalUploads({ retentionDays: 30 });
+    expect(firstCleanup).toMatchObject({ deleted: 1, pruned: 0, errors: 0 });
+    expect(await row('SELECT id FROM portal_upload_staging WHERE id=$1', [staging.id])).toBeDefined();
     await mockPoolRef.current.query("UPDATE materials_upload_jobs SET expires_at=NOW()-INTERVAL '1 second' WHERE id=$1", [job.id]);
     expect(await jobs.pruneMaterialsUploadJobs()).toBe(1);
-    const stageDelete = await mockPoolRef.current.query(
-      `DELETE FROM portal_upload_staging WHERE id=$1 AND updated_at<NOW()-INTERVAL '30 days'
-        AND status='consumed' AND candidate_result IS NULL`, [staging.id],
-    );
-    expect(stageDelete.rowCount).toBe(1);
+    const secondCleanup = await stagingStore.cleanupExpiredPortalUploads({ retentionDays: 30 });
+    expect(secondCleanup).toMatchObject({ deleted: 1, pruned: 1, errors: 0 });
     expect(await row('SELECT id FROM portal_upload_staging WHERE id=$1', [staging.id])).toBeUndefined();
   });
 
