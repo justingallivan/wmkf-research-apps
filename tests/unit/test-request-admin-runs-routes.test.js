@@ -15,6 +15,8 @@ import runsHandler, { config as runsConfig } from '../../pages/api/admin/test-re
 import runHandler, { config as runConfig } from '../../pages/api/admin/test-requests/runs/[runId]/index';
 import advanceHandler, { config as advanceConfig } from '../../pages/api/admin/test-requests/runs/[runId]/advance';
 import recheckHandler, { config as recheckConfig } from '../../pages/api/admin/test-requests/runs/[runId]/recheck';
+import statusHandler, { config as statusConfig } from '../../pages/api/admin/test-requests/runs/[runId]/status/index';
+import statusRecheckHandler, { config as statusRecheckConfig } from '../../pages/api/admin/test-requests/runs/[runId]/status/recheck';
 import artifactsHandler, { config as artifactsConfig } from '../../pages/api/admin/test-requests/runs/[runId]/artifacts';
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
@@ -39,6 +41,9 @@ const service = {
   inspectRun: jest.fn(),
   advance: jest.fn(),
   recheck: jest.fn(),
+  statusOptions: jest.fn(),
+  changeStatus: jest.fn(),
+  statusRecheck: jest.fn(),
   readArtifacts: jest.fn(),
 };
 
@@ -69,6 +74,18 @@ const CASES = [
     req: () => ({ method: 'POST', query: { runId: RUN_ID }, body: {} }),
   },
   {
+    name: 'status GET', handler: statusHandler, method: 'GET', allow: 'GET, POST', fn: 'statusOptions', wrong: 'DELETE', perRun: true,
+    req: () => ({ method: 'GET', query: { runId: RUN_ID } }),
+  },
+  {
+    name: 'status POST', handler: statusHandler, method: 'POST', allow: 'GET, POST', fn: 'changeStatus', wrong: 'DELETE', perRun: true,
+    req: () => ({ method: 'POST', query: { runId: RUN_ID }, body: { field: 'phase2', optionLabel: 'Recommended' } }),
+  },
+  {
+    name: 'status recheck POST', handler: statusRecheckHandler, method: 'POST', allow: 'POST', fn: 'statusRecheck', wrong: 'GET', perRun: true,
+    req: () => ({ method: 'POST', query: { runId: RUN_ID }, body: {} }),
+  },
+  {
     name: 'artifacts GET', handler: artifactsHandler, method: 'GET', allow: 'GET', fn: 'readArtifacts', wrong: 'POST', perRun: true,
     req: () => ({ method: 'GET', query: { runId: RUN_ID } }),
   },
@@ -88,6 +105,9 @@ beforeEach(() => {
   service.advance.mockResolvedValue({ step: 'x', outcome: 'advanced' });
   service.recheck.mockResolvedValue({ runId: RUN_ID, ok: true });
   service.readArtifacts.mockResolvedValue({ runId: RUN_ID, cleanedUp: false });
+  service.statusOptions.mockResolvedValue({ runId: RUN_ID, runStatus: 'ready', options: { phase1: [], phase2: [] }, changes: [] });
+  service.changeStatus.mockResolvedValue({ outcome: 'complete', sequence: 1 });
+  service.statusRecheck.mockResolvedValue({ sequence: 1, ok: true });
 });
 afterEach(() => errorSpy.mockRestore());
 
@@ -113,7 +133,7 @@ describe.each(CASES)('$name', (c) => {
     expect(service[c.fn].mock.calls[0][0].profileId).toBe(PROFILE);
     expect(res.statusCode).toBe(c.name === 'runs POST' ? 201 : 200);
     expect(withDalContext).toHaveBeenCalledTimes(1);
-    expect(withDalContext).toHaveBeenCalledWith(expect.stringMatching(/^admin-test-request-runs-[a-z]+$/), expect.any(Function));
+    expect(withDalContext).toHaveBeenCalledWith(expect.stringMatching(/^admin-test-request-runs-[a-z-]+$/), expect.any(Function));
   });
 
   test.each([
@@ -278,7 +298,7 @@ describe('deadlines and limits', () => {
     const fs = require('fs');
     const path = require('path');
     const dir = path.join(__dirname, '../../pages/api/admin/test-requests/runs');
-    const files = ['source.js', 'index.js', '[runId]/index.js', '[runId]/advance.js', '[runId]/recheck.js', '[runId]/artifacts.js'];
+    const files = ['source.js', 'index.js', '[runId]/index.js', '[runId]/advance.js', '[runId]/recheck.js', '[runId]/status/index.js', '[runId]/status/recheck.js', '[runId]/artifacts.js'];
     for (const file of files) {
       const line = fs.readFileSync(path.join(dir, file), 'utf8').split('\n').find((text) => text.startsWith('export const config'));
       expect(line).toMatch(/^export const config = \{ api: \{ bodyParser: \{ sizeLimit: '32kb' \} \}(, maxDuration: 300)? \};$/);
@@ -288,6 +308,7 @@ describe('deadlines and limits', () => {
   test.each([
     ['source', sourceHandler, () => ({ method: 'POST', query: {}, body: { sourceRequestNumber: '9000001' } }), 'exportSource'],
     ['advance', advanceHandler, () => ({ method: 'POST', query: { runId: RUN_ID }, body: {} }), 'advance'],
+    ['status', statusHandler, () => ({ method: 'POST', query: { runId: RUN_ID }, body: { field: 'phase1', optionLabel: 'Invited' } }), 'changeStatus'],
   ])('%s passes a numeric deadlineAt about 280 s out', async (_name, handler, req, fn) => {
     const before = Date.now();
     await handler(req(), mockRes());
@@ -300,6 +321,7 @@ describe('deadlines and limits', () => {
   test.each([
     ['source', sourceHandler, () => ({ method: 'POST', query: {}, body: { sourceRequestNumber: '9000001' } }), 'exportSource'],
     ['advance', advanceHandler, () => ({ method: 'POST', query: { runId: RUN_ID }, body: {} }), 'advance'],
+    ['status', statusHandler, () => ({ method: 'POST', query: { runId: RUN_ID }, body: { field: 'phase1', optionLabel: 'Invited' } }), 'changeStatus'],
   ])('%s anchors the deadline at entry: time spent in the gate reduces the budget', async (_name, handler, req, fn) => {
     const entry = 1_000_000;
     const clock = jest.spyOn(Date, 'now').mockReturnValue(entry);
@@ -315,13 +337,14 @@ describe('deadlines and limits', () => {
     }
   });
 
-  test('config: 32kb body limit everywhere; maxDuration 300 only on source and advance', () => {
-    for (const config of [sourceConfig, runsConfig, runConfig, advanceConfig, recheckConfig, artifactsConfig]) {
+  test('config: 32kb body limit everywhere; maxDuration 300 only on source, advance and status', () => {
+    for (const config of [sourceConfig, runsConfig, runConfig, advanceConfig, recheckConfig, statusConfig, statusRecheckConfig, artifactsConfig]) {
       expect(config.api.bodyParser.sizeLimit).toBe('32kb');
     }
     expect(sourceConfig.maxDuration).toBe(300);
     expect(advanceConfig.maxDuration).toBe(300);
-    for (const config of [runsConfig, runConfig, recheckConfig, artifactsConfig]) {
+    expect(statusConfig.maxDuration).toBe(300);
+    for (const config of [runsConfig, runConfig, recheckConfig, statusRecheckConfig, artifactsConfig]) {
       expect(config.maxDuration).toBeUndefined();
     }
   });
@@ -332,6 +355,66 @@ describe('advance', () => {
     const res = mockRes();
     await advanceHandler({ method: 'POST', query: { runId: RUN_ID } }, res);
     expect(res.headers['Cache-Control']).toBe('no-store');
+  });
+});
+
+describe('status', () => {
+  const post = (body) => ({ method: 'POST', query: { runId: RUN_ID }, body });
+
+  test.each([
+    ['status POST', statusHandler, post({ field: 'phase1', optionLabel: 'Invited' })],
+    ['status recheck POST', statusRecheckHandler, post({})],
+    ['status GET', statusHandler, { method: 'GET', query: { runId: RUN_ID } }],
+  ])('%s sends Cache-Control: no-store', async (_name, handler, req) => {
+    const res = mockRes();
+    await handler(req, res);
+    expect(res.headers['Cache-Control']).toBe('no-store');
+  });
+
+  test.each([
+    ['an unknown field', { field: 'phase3', optionLabel: 'Invited' }],
+    ['a missing optionLabel', { field: 'phase1' }],
+    ['a missing field', { optionLabel: 'Invited' }],
+    ['an over-length optionLabel', { field: 'phase1', optionLabel: 'x'.repeat(201) }],
+    ['a blank optionLabel', { field: 'phase1', optionLabel: '   ' }],
+    ['a non-string optionLabel', { field: 'phase1', optionLabel: 5 }],
+    ['a rerun key', { field: 'phase1', optionLabel: 'Invited', rerun: true }],
+    ['a profileId key', { field: 'phase1', optionLabel: 'Invited', profileId: 99 }],
+    ['an empty body', {}],
+    ['an absent body', undefined],
+    ['a string body', 'text'],
+  ])('POST with %s is 400 and the service is not called', async (_name, body) => {
+    const res = mockRes();
+    await statusHandler(post(body), res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body.code).toBe('factory_invalid_input');
+    expect(service.changeStatus).not.toHaveBeenCalled();
+  });
+
+  test('POST passes exactly field, a trimmed optionLabel and deadlineAt, never rerun', async () => {
+    await statusHandler(post({ field: 'phase2', optionLabel: '  Recommended ' }), mockRes());
+    expect(service.changeStatus.mock.calls[0][0]).toEqual({
+      profileId: PROFILE, runId: RUN_ID, field: 'phase2', optionLabel: 'Recommended', deadlineAt: expect.any(Number),
+    });
+  });
+
+  test('a 200 is only for outcome complete; every other outcome is 202', async () => {
+    for (const [outcome, code] of [['complete', 200], ['jobs_open', 202], ['in_progress', 202], ['unconfirmed', 202]]) {
+      service.changeStatus.mockResolvedValueOnce({ outcome });
+      const res = mockRes();
+      await statusHandler(post({ field: 'phase1', optionLabel: 'Invited' }), res);
+      expect(res.statusCode).toBe(code);
+      expect(res.body.outcome).toBe(outcome);
+    }
+  });
+
+  test('status recheck refuses any body field', async () => {
+    for (const body of [{ profileId: 99 }, { x: 1 }, 'text', [1]]) {
+      const res = mockRes();
+      await statusRecheckHandler(post(body), res);
+      expect(res.statusCode).toBe(400);
+    }
+    expect(service.statusRecheck).not.toHaveBeenCalled();
   });
 });
 
