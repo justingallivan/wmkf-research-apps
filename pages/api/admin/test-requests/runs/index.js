@@ -1,7 +1,7 @@
 /**
  * Admin Test Request Factory runs.
  *
- * GET lists the signed-in staff member's runs ({ runs }). POST confirms a
+ * GET lists the signed-in staff member's runs ({ runs, formEnabled, target }). POST confirms a
  * saved source draft and reserves a run (201 new, 200 same-key retry); it runs
  * at the default function limit and never starts a step. Writes sit behind
  * TEST_REQUEST_FACTORY_FORM (enforced by the service).
@@ -31,8 +31,8 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     return withDalContext('admin-test-request-runs-list', async () => {
       try {
-        const runs = await createAdminRunService().listRuns({ profileId: gate.profileId });
-        return res.status(200).json({ runs });
+        const body = await createAdminRunService().listRuns({ profileId: gate.profileId });
+        return res.status(200).json(body); // { runs, formEnabled, target }
       } catch (error) {
         return sendError(res, error);
       }

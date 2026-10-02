@@ -100,7 +100,7 @@ beforeEach(() => {
   createAdminRunService.mockReturnValue(service);
   service.exportSource.mockResolvedValue({ draftId: DRAFT_ID, summary: {}, defaults: {} });
   service.confirmRun.mockResolvedValue({ run: { runId: RUN_ID }, created: true });
-  service.listRuns.mockResolvedValue([{ runId: RUN_ID }]);
+  service.listRuns.mockResolvedValue({ runs: [{ runId: RUN_ID }], formEnabled: true, target: 'production' });
   service.inspectRun.mockResolvedValue({ run: { runId: RUN_ID }, resources: [] });
   service.advance.mockResolvedValue({ step: 'x', outcome: 'advanced' });
   service.recheck.mockResolvedValue({ runId: RUN_ID, ok: true });
@@ -283,10 +283,10 @@ describe('runs POST (Confirm)', () => {
 });
 
 describe('runs GET', () => {
-  test('wraps the list as { runs }', async () => {
+  test('passes through { runs, formEnabled, target }', async () => {
     const res = mockRes();
     await runsHandler({ method: 'GET', query: {} }, res);
-    expect(res.body).toEqual({ runs: [{ runId: RUN_ID }] });
+    expect(res.body).toEqual({ runs: [{ runId: RUN_ID }], formEnabled: true, target: 'production' });
   });
 });
 

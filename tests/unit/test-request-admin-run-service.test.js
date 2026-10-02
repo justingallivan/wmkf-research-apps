@@ -56,7 +56,7 @@ function runRowFromInsert(p) {
 function fakeLedger({ failReserve = false } = {}) {
   const rows = new Map();
   const ends = { count: 0 };
-  const state = { failReserve };
+  const state = { failReserve, resources: [] };
   const db = {
     async query(text, params = []) {
       if (/INSERT INTO test_request_runs/.test(text)) {
@@ -70,6 +70,7 @@ function fakeLedger({ failReserve = false } = {}) {
         return { rows: [...rows.values()].filter((r) => r.actor_id === params[0] && r.idempotency_key === params[1]) };
       }
       if (/FROM test_request_runs WHERE run_id/.test(text)) return { rows: rows.has(params[0]) ? [rows.get(params[0])] : [] };
+      if (/FROM test_request_run_resources WHERE run_id/.test(text)) return { rows: state.resources.filter((r) => r.run_id === params[0]) };
       if (/FROM test_request_runs WHERE actor_id/.test(text)) return { rows: [...rows.values()].filter((r) => r.actor_id === params[0]) };
       return { rows: [] };
     },
@@ -189,6 +190,7 @@ function harness({ deployment = 'preview', env = {}, preflightTarget = null, dep
     runStatusChange: jest.fn(async () => ({ changeId: CHANGE_ID, sequence: 1, field: 'wmkf_phaseiistatus', after: 100000002 })),
     recheckStatusChange: jest.fn(async () => ({ sequence: 1, ok: true })),
     readLiveOptions: jest.fn(async (_client, field) => [{ value: 1, label: `option of ${field}` }]),
+    readCurrentStatus: jest.fn(async () => ({ phase1: 100000001, phase2: null })),
   };
   const fullEnv = {
     TEST_REQUEST_FACTORY_FORM: 'on',
@@ -216,6 +218,7 @@ function harness({ deployment = 'preview', env = {}, preflightTarget = null, dep
     runStatusChange: spies.runStatusChange,
     recheckStatusChange: spies.recheckStatusChange,
     readLiveOptions: spies.readLiveOptions,
+    readCurrentStatus: spies.readCurrentStatus,
     ...deps,
   });
   const actorId = deriveActorId(PROFILE);
@@ -474,7 +477,7 @@ describe('kill switch and isolation', () => {
       expect(await code(h.service.advance({ profileId: PROFILE, runId: '11111111-1111-4111-8111-111111111111' }))).toBe('factory_form_disabled');
       expect(h.blobs.calls.put).toHaveLength(0);
       expect(h.dbUrls).toHaveLength(0);
-      expect(await h.service.listRuns({ profileId: PROFILE })).toEqual([]);
+      expect(await h.service.listRuns({ profileId: PROFILE })).toEqual({ runs: [], formEnabled: false, target: 'sandbox' });
       const { runId } = ids(h.actorId);
       h.seedRun(runId, { status: 'ready' });
       expect((await h.service.inspectRun({ profileId: PROFILE, runId })).run.runId).toBe(runId);
@@ -521,7 +524,7 @@ describe('identity and ownership', () => {
     await h.confirm();
     const { runId } = ids(h.actorId);
     const other = 99;
-    expect(await h.service.listRuns({ profileId: other })).toEqual([]);
+    expect((await h.service.listRuns({ profileId: other })).runs).toEqual([]);
     for (const call of [
       () => h.service.inspectRun({ profileId: other, runId }),
       () => h.service.readArtifacts({ profileId: other, runId }),
@@ -546,7 +549,9 @@ describe('advance', () => {
     const { runId } = ids(h.actorId);
     h.seedRun(runId, { status: 'ready', current_step: 'verify', destination_request_number: '1004000' });
     const result = await h.service.advance({ profileId: PROFILE, runId });
-    expect(result).toMatchObject({ outcome: 'ready', status: 'ready', destinationRequestNumber: '1004000' });
+    expect(result).toMatchObject({
+      outcome: 'ready', status: 'ready', destinationRequestNumber: '1004000', currentStep: 'verify', stepIndex: 0,
+    });
     expect(h.blobs.calls.get).toHaveLength(0);
     expect(h.spies.advanceRun).not.toHaveBeenCalled();
     expect(h.createClientCalls).toHaveLength(0);
@@ -569,7 +574,7 @@ describe('advance', () => {
     const { runId } = ids(h.actorId);
     const result = await h.service.advance({ profileId: PROFILE, runId });
     expect(result).toEqual({
-      step: 'create_request', outcome: 'advanced', status: 'creating', destinationRequestNumber: null, errorMessage: null,
+      step: 'create_request', outcome: 'advanced', currentStep: null, stepIndex: null, status: 'creating', destinationRequestNumber: null, errorMessage: null,
     });
     expect(h.spies.advanceRun).toHaveBeenCalledTimes(1);
     const call = h.spies.advanceRun.mock.calls[0][0];
@@ -918,8 +923,13 @@ describe('status setter service (slice 2b)', () => {
     const { h, runId } = readyProduction();
     const result = await h.service.statusOptions({ profileId: PROFILE, runId });
     expect(result).toEqual({
-      runId, runStatus: 'ready', options: { phase1: [{ value: 1, label: 'option of wmkf_phaseistatus' }], phase2: [{ value: 1, label: 'option of wmkf_phaseiistatus' }] }, changes: [],
+      runId,
+      runStatus: 'ready',
+      options: { phase1: [{ value: 1, label: 'option of wmkf_phaseistatus' }], phase2: [{ value: 1, label: 'option of wmkf_phaseiistatus' }] },
+      current: { phase1: 100000001, phase2: null },
+      changes: [],
     });
+    expect(h.spies.readCurrentStatus).toHaveBeenCalledWith(expect.anything(), '12121212-1212-4121-8121-121212121212');
     expect(h.createClientCalls.every((c) => !c.allowTestRequestMarkerWrites)).toBe(true);
   });
 
@@ -1129,5 +1139,93 @@ describe('status setter service (slice 2b)', () => {
     expect(second).toMatchObject({ outcome: 'complete', sequence: 1 });
     expect(patches).toHaveLength(1);
     expect(rows[0].status).toBe('complete');
+  });
+});
+
+// ---- slice 3 Part 0: contract fixes the form relies on -----------------------
+
+describe('slice 3 server contract', () => {
+  const exporterFor = (rows, extra = {}) => {
+    const ledger = fakeLedger();
+    const blobs = fakeBlob();
+    const service = createAdminRunService({
+      env: { TEST_REQUEST_FACTORY_FORM: 'on', FACTORY_BLOB_RW_TOKEN: 't', TEST_REQUEST_SANDBOX_LEDGER_URL: SANDBOX_LEDGER },
+      deployment: 'preview',
+      ledgerDbFactory: () => ledger.db,
+      blob: blobs.blob,
+      createClient: () => ({ baseUrl: 'x', async get() { return { ok: true, status: 200, body: { value: rows, ...extra } }; } }),
+      getAccessToken: async () => 'fake-token',
+    });
+    return service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+  };
+
+  test('0.1 a source number with no row is 404 factory_source_not_found, never the generic 500', async () => {
+    const error = await exporterFor([]).catch((e) => e);
+    expect(error.httpStatus).toBe(404);
+    expect(error.code).toBe('factory_source_not_found');
+    expect(error.message).toBe('No Request has that number.');
+  });
+
+  test('0.1 two rows, or a next link, is 409 factory_source_ambiguous', async () => {
+    const row = { akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001' };
+    const two = await exporterFor([row, { ...row, akoya_requestid: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }]).catch((e) => e);
+    expect([two.httpStatus, two.code]).toEqual([409, 'factory_source_ambiguous']);
+    const linked = await exporterFor([row], { '@odata.nextLink': 'https://x/next' }).catch((e) => e);
+    expect([linked.httpStatus, linked.code]).toEqual([409, 'factory_source_ambiguous']);
+  });
+
+  test('0.2 a source with no usable cycle and no admin-supplied cycle is 400 factory_invalid_input with the form copy', async () => {
+    const noCycle = (exportedAt) => buildSourceBundle({
+      sourceRow: {
+        akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
+        akoya_request: 5000, akoya_fiscalyear: null, wmkf_meetingdate: null, versionnumber: 1,
+      },
+      documents: [],
+      dataverseHost: PRODUCTION_HOSTS[0],
+      exportedAt: new Date(exportedAt),
+    });
+    const h = harness({ deployment: 'preview', deps: { exportBundle: async ({ exportedAt }) => noCycle(exportedAt) } });
+    const exported = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+    expect(exported.defaults).toEqual({ fiscalYear: null, meetingDate: null });
+    const error = await h.service.confirmRun(h.confirmArgs(exported.draftId)).catch((e) => e);
+    expect([error.httpStatus, error.code]).toEqual([400, 'factory_invalid_input']);
+    expect(error.message).toBe('A fiscal year and a meeting date are required for this source.');
+    expect(h.ledger.rows.size).toBe(0);
+    const ok = await h.service.confirmRun(h.confirmArgs(exported.draftId, { fiscalYear: 'December 2026', meetingDate: '2026-12-01' }));
+    expect(ok.created).toBe(true);
+  });
+
+  test('0.3 listRuns reports formEnabled and target, and still answers with the switch off', async () => {
+    const on = harness({ deployment: 'production' });
+    expect(await on.service.listRuns({ profileId: PROFILE })).toEqual({ runs: [], formEnabled: true, target: 'production' });
+    const off = harness({ deployment: 'preview', env: { TEST_REQUEST_FACTORY_FORM: 'off' } });
+    expect(await off.service.listRuns({ profileId: PROFILE })).toEqual({ runs: [], formEnabled: false, target: 'sandbox' });
+  });
+
+  test('0.4 every advance return carries currentStep and stepIndex from the run after the step', async () => {
+    const h = harness({ deployment: 'preview' });
+    await h.confirm();
+    const { runId } = ids(h.actorId);
+    h.spies.advanceRun.mockResolvedValueOnce({
+      step: 'create_request', outcome: 'advanced', run: { status: 'creating', currentStep: 'correct_meeting_date', stepIndex: 2, destinationRequestNumber: null },
+    });
+    expect(await h.service.advance({ profileId: PROFILE, runId })).toMatchObject({ outcome: 'advanced', currentStep: 'correct_meeting_date', stepIndex: 2 });
+    h.seedRun(runId, { status: 'retired', current_step: 'verify', step_index: 6 });
+    expect(await h.service.advance({ profileId: PROFILE, runId })).toMatchObject({ outcome: 'not_advanced', currentStep: 'verify', stepIndex: 6 });
+  });
+
+  test('0.5 inspectRun returns foundationCapturedAt from the fence_source Foundation baseline, else null', async () => {
+    const h = harness({ deployment: 'production' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { status: 'creating' });
+    expect((await h.service.inspectRun({ profileId: PROFILE, runId })).foundationCapturedAt).toBeNull();
+    const resource = (step, kind, planned) => ({ run_id: runId, sequence: 1, step, resource_kind: kind, planned_identity: planned });
+    h.ledger.state.resources.push(
+      resource('verify', 'foundation_transition', { capturedAt: '2026-01-01T00:00:00.000Z' }),
+      resource('fence_source', 'foundation_transition', { capturedAt: '2026-10-01T12:00:00.000Z' }),
+    );
+    const result = await h.service.inspectRun({ profileId: PROFILE, runId });
+    expect(result.foundationCapturedAt).toBe('2026-10-01T12:00:00.000Z');
+    expect(result.resources).toHaveLength(2);
   });
 });

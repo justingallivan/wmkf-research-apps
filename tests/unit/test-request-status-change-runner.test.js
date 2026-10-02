@@ -4,7 +4,7 @@
  * ledger and a fake Dataverse client.
  */
 import { jest } from '@jest/globals';
-import { recheckStatusChange, runStatusChange } from '../../lib/services/test-requests/status-change-runner.js';
+import { readCurrentStatus, recheckStatusChange, runStatusChange } from '../../lib/services/test-requests/status-change-runner.js';
 
 const RUN_ID = '7293496e-cbe2-4245-81b7-63f6136cb1af';
 const REQUEST_ID = '83162701-82da-4669-94f7-6648bc9abbd3';
@@ -478,5 +478,21 @@ describe('recheckStatusChange', () => {
     const client = fakeClient({ jobs: [[{ asyncoperationid: '55555555-5555-4555-8555-555555555555', statecode: 1, statuscode: 10, createdon: AFTER }]] });
     const ledger = memoryLedger(READY_RUN, [{ changeId: 'c1', sequence: 1, field: PHASE2, optionBefore: null, optionAfter: 100000002, etagBefore: 'W/"100"', status: 'complete', dispatchedAt: '2026-09-28T22:00:00Z', effects: {} }]);
     await expect(recheckStatusChange({ client, ledger, runId: RUN_ID })).resolves.toMatchObject({ ok: false, openJobs: 1, failedJobs: 0 });
+  });
+});
+
+describe('readCurrentStatus', () => {
+  test('reads both option values with one $select GET; unset values are null', async () => {
+    const get = jest.fn(async () => ({ ok: true, status: 200, body: { akoya_requestid: REQUEST_ID, [PHASE1]: 100000001 } }));
+    expect(await readCurrentStatus({ get }, REQUEST_ID)).toEqual({ phase1: 100000001, phase2: null });
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(get.mock.calls[0][0]).toBe(`/akoya_requests(${REQUEST_ID})?$select=akoya_requestid,${PHASE1},${PHASE2}`);
+  });
+
+  test('a different row, or a failed read, is an error', async () => {
+    const other = { get: async () => ({ ok: true, status: 200, body: { akoya_requestid: SOURCE_ID } }) };
+    await expect(readCurrentStatus(other, REQUEST_ID)).rejects.toThrow();
+    const failed = { get: async () => ({ ok: false, status: 500, body: {} }) };
+    await expect(readCurrentStatus(failed, REQUEST_ID)).rejects.toThrow();
   });
 });
