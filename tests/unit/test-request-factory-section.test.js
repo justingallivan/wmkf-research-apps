@@ -356,7 +356,8 @@ describe('advance loop', () => {
 
   test.each(['lease_unavailable', 'lease_lost'])('%s stops with the copy and sends no further POST', async (outcome) => {
     const server = await setup();
-    server.on('POST', advancePath(), reply(outcome, { status: 'creating' }));
+    // The second reply is only reachable if the loop wrongly retries.
+    server.on('POST', advancePath(), reply(outcome, { status: 'creating' }), reply('ready', { status: 'ready' }));
     server.on('GET', `${BASE}/${RUN_A}`, runBody(makeRun({ status: 'creating', stepIndex: 1 })));
     start();
     await screen.findByText('Another process is advancing this run. Try again in a few minutes.');
@@ -387,7 +388,7 @@ describe('advance loop', () => {
   test('Stop after this step sends no further POST after the in-flight one', async () => {
     const server = await setup();
     const gate = deferred();
-    server.on('POST', advancePath(), async () => { await gate.promise; return reply('advanced', { stepIndex: 1 }); });
+    server.on('POST', advancePath(), async () => { await gate.promise; return reply('advanced', { stepIndex: 1 }); }, reply('ready', { status: 'ready' }));
     start();
     await waitFor(() => expect(server.count('POST', advancePath())).toBe(1));
     fireEvent.click(screen.getByRole('button', { name: 'Stop after this step' }));
@@ -410,7 +411,7 @@ describe('advance loop', () => {
       await gate.promise;
       consumed = true;
       return reply('advanced', { stepIndex: 5, currentStep: 'observe', status: 'creating' });
-    });
+    }, reply('ready', { status: 'ready' })); // only reachable if the loop wrongly continues
     fireEvent.click(screen.getByRole('button', { name: 'Start' }));
     await waitFor(() => expect(server.count('POST', advancePath(RUN_A))).toBe(1));
     await selectRun('Run B');
@@ -429,7 +430,7 @@ describe('advance loop', () => {
   test('starting a new lookup aborts the run in flight: its late answer changes nothing and the panel is at rest', async () => {
     const server = await setup();
     const gate = deferred();
-    server.on('POST', advancePath(), async () => { await gate.promise; return reply('advanced', { stepIndex: 5 }); });
+    server.on('POST', advancePath(), async () => { await gate.promise; return reply('advanced', { stepIndex: 5 }); }, reply('ready', { status: 'ready' }));
     start();
     await waitFor(() => expect(server.count('POST', advancePath())).toBe(1));
     await lookup(server);
