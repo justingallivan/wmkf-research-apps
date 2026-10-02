@@ -1,84 +1,57 @@
-# Session 562 Prompt: Factory admin form slice 2 (routes); office Mac sync when back at work
+# Session 563 Prompt: choose the next work item; preserve the active Factory lane
 
-## Session 561 Summary — 2026-10-01 (Fable orchestrating; Sonnet build, Opus/Fable/Codex reviews; home Mac)
+## Session 562 Summary — 2026-10-01 PT (Codex refactor lane)
 
-The Test Request Factory admin form went from "parked P7 sketch" to an accepted plan and a merged first slice in one session. The owner answered eleven design decisions; the plan survived three Codex adversarial rounds, two Fable reviews and `/contract-reconcile`; slice 1 (server plumbing, no routes or UI) was built by Sonnet, reviewed by Opus, fixed by Fable, passed two Codex adversarial rounds, and merged as PR #395 (`6b9478d44`). Separately, the "Email is disabled for test requests" refusal on test Request 1003302 was diagnosed (the early email guard never passed recipients to the allowlist), handed to Codex with a brief, and merged by the owner as PR #392. Factory plan docs were brought current, and the Codex default model is now `gpt-6-astra` at medium. All 68 start-of-session gate runs were green.
+The reviewer duplicate-create-conflict cleanup is complete. [VERIFIED via GitHub PR #397] Owner-authorized squash merge `2cd1987dac6a7e35b0fe87a4c7df2d9ecbfbd7b5` landed on main after all CI checks passed. [OWNER CONFIRMED] Justin reported PR #397 in production. [VERIFIED via GitHub deployment status] Production deployment `6798624722` for that exact commit is successful. This is deployment evidence, not an independent functional production smoke test.
 
 ### What Was Completed
 
-1. **Factory docs brought current** (`0cfc9726f`). The production plan now records MVP items 1–5 merged (PRs #349–#352, #354); the design doc lists the three production runs (1003301 stopped at verify, 1003302 and 1003303 `ready`); Codex's B4 promotion record and plan updates were carried from `codex/factory-reviewer-b4-runtime` to `main` (its lane `SESSION_PROMPT.md` left behind).
-2. **Admin form plan** `docs/plans/TEST_REQUEST_FACTORY_ADMIN_FORM_PLAN_2026-10-01.md`: drafted by Fable (`fba7da66b`); owner decisions 1–9 recorded, status setter moved into v1 (`b763e3d8f`); Codex (Astra, medium) rounds 1–3 each needs-attention and revised (`ddeba4e43`, `cf1ae1df7`, `080715c69`); decisions 10 (a: branch-scoped Preview rehearsal) and 11 (deploy-time kill switch; rollback is the instant stop) recorded; Fable review → Codex-rescue fixes → Fable re-review "ready" (`5cee05b2f`, `1cebefae8`, `5ee5b2257`); `/contract-reconcile` READY WITH NAMED CHANGES, seven build requirements written into the plan (`7a95313f4`).
-3. **Slice 1 built and merged** (PR #395, `6b9478d44`): `admin-run-identity.js` (UUIDv5 actor and ids, `targetFromDeployment`), `factory-artifact-store.js` (private Blob, create-only, capped digest-checked reads, daily sweep), `admin-run-service.js` (export/confirm/advance/list/inspect/artifacts/recheck), `buildCloneManifest` optional ids, `pgLedgerDb` pool options, `vercelPostgresLedgerDb` deleted, `factoryFormEnabled`, tracked secret `factory_blob_rw_token`, DAL-gate exemption, maintenance-cron sweep task, `scripts/factory-artifacts-download.mjs`. 1,996 unit tests; slice gates green. Review chain: Opus approve (P2s fixed by Fable: `createRequire` loader, typed number on retry, manifest pre-size, sweep scan 1000 / delete 200 caps); Codex round 1 one HIGH (document discovery went through the deployment's `DYNAMICS_URL`, not the production client, so a Preview export would silently omit documents — fixed with `getLocations`/`resolveLocationParents`, mutation-tested); Codex round 2 approve. Brief: `docs/plans/briefs/FACTORY_ADMIN_FORM_SLICE1_BRIEF_2026-10-01.md`.
-4. **Test-request email fix** (Codex, merged by owner as PR #392 `fix: pass test-request email recipients to early allowlist checks`). Cause: `assertRequestEmailAllowed` applies the S546 allowlist rule only when given `recipients`, and all four callers (materials create/invite/remind, grantee invite) called it bare since Stage 1b. Brief: `docs/plans/briefs/TEST_REQUEST_EMAIL_RECIPIENTS_BRIEF_2026-10-01.md` (on that branch). **Not yet verified in the browser.**
-5. **Codex default model**: `~/.codex/config.toml` now `gpt-6-astra` / `medium` (owner-authorized); memory `feedback-codex-model-gpt56-sol.md` leads with the new rule (`6b4cd2b5c`). Astra is accepted on ChatGPT OAuth.
+1. **Reviewer conflict helper — PR #397.** A private `isSuggestionCreateConflict` now holds the exact shared expression used by `ensureApplicantRecommended` and `ensureStaffManualCandidate`. Recovery blocks, general-upsert classification, potential-reviewer classification, and PATCH retry logic remain unchanged. Thirty-five added caller-level cases cover classification and distinct recovery behavior. Root planned with ordinary Fable OAuth review; Luna built and tested; Sol, root, and Fable approved. No API-key agent usage or metered review substitute.
+2. **Earlier work in this chat is merged.** [VERIFIED via main history] Email placeholder extraction #391 (`9505d22b2`), partial reviewer-roster save/reload fix #393 (`abc1d0403`), and grantee-title provider deadline propagation #394 (`7bf0916ac`) are ancestors of main. Their plans contain scope and review records; do not rebuild them from the older survey.
+3. **Session close.** Owner directed closing docs to main. This is a Tier 0 documentation update. No new runtime code, provider calls, live Dataverse probes, or data mutations at close. No DEVELOPMENT_LOG milestone entry is required for this bounded maintenance/refactor close; no new capability, architecture, or cutover was introduced by #397.
 
-### Commits (main)
-- `0cfc9726f` docs(factory): bring current status to the Factory plans; land B4 promotion record
-- `fba7da66b`, `b763e3d8f`, `ddeba4e43`, `cf1ae1df7`, `080715c69`, `5cee05b2f`, `1cebefae8`, `5ee5b2257`, `7a95313f4` — admin form plan through contract-reconcile
-- `6b4cd2b5c` memory: Codex default is gpt-6-astra at medium
-- `6b9478d44` Merge PR #395 (slice 1); PR #392 merged by owner (email recipients)
-- Parallel Codex merges on `main` today: #389, #393, #394.
+### Commits for the final refactor
+
+- `c6a6e00af` — initial plan.
+- `4cdf596fc` — Fable plan clarifications.
+- `850fa8895` — helper and characterization tests.
+- `b6890fffa` — review and validation record.
+- `2cd1987da` — squash merge of PR #397 to main.
 
 ## Next Items
 
-### Verified Open
+### Verified Open — separate lane, do not duplicate
 
-1. **Slice 2: routes + matrix rows** (plan slice table; estimate 1 session). Owner directive: Fable orchestrates, Sonnet builds and reconnoiters, Opus reviews, Fable final review, Codex adversarial to satisfaction; no tail-chasing. Build-brief must carry: (a) `next.config.js` `outputFileTracingIncludes` entries for `lib/db/ledger-schema-fingerprint.json` and `ledger-schema-ahead.json` on the reserve route, since `ledgerSchemaCheck` reads them from `process.cwd()` [VERIFIED S561 recon, `ledger-schema.js:35-36`]; (b) contract-reconcile items 3 (director email from `session.user.azureEmail`, never the body), 5 (bump `docs/CANONICAL_COUNTS.md` `api-route-file-count` 241 → +new route files; Atlas rows for `test_request_status_changes` second writer and the Factory Blob store), 6 (GUID-validate `runId`/`draftId`/`changeId` at the route; require a label), 7 (UI stale-run guard belongs to slice 3); (c) **never run `npm run check:factory-ledger` during a build** — it connects to the live managed ledgers (Sonnet did this in slice 1 by mistake; read-only, names only, but against the no-live-systems rule).
-   Evidence: plan `## Slices, build order, verification`; `## Contract-reconcile`; slice 1 PR #395 body.
-2. **Verify the email fix in the browser on 1003303** (cast-bound; PI/Liaison are synthetic allowlisted addresses). Request site-visit materials from Meeting Tracker. 1003302 will still be refused by design: it is not cast-bound (owner S548 #4), so its real PI/Liaison are not allowlisted; the message should now name the recipient, not "Email is disabled". Then the read-only review of PR #392's diff that was promised and not done (merged before review).
-   Evidence: PR #392 merged 2026-10-01T20:54Z; `lib/services/test-requests/request-test-state.js:71-96`.
-3. **Office Mac: run `docs/plans/briefs/OFFICE_MAC_SYNC_BRIEF_2026-10-01.md` first thing at the office** (owner there next week). Unchanged from S560. Record the `--run-inspect` result (`managed-ledger/ledger_prod`) in the ledger evidence file.
-4. **Worktree hygiene** (home Mac): `/Users/gallivan/Code/WMKF_Apps-factory-form` (branch `claude/factory-admin-form-slice1`, merged) and `/Users/gallivan/Code/WMKF_Apps-codex-email` (branch `codex/test-request-email-recipients`, merged) can be removed with `git worktree remove`; both branches are fully on `origin`. Reuse `-factory-form` for slice 2 if preferred (`git -C <path> fetch origin && git -C <path> checkout -B claude/factory-admin-form-slice2 origin/main`).
+1. **Factory admin routes: PR #398** (`claude/factory-admin-form-slice2`) is OPEN; **status setter: PR #399** (`claude/factory-admin-form-slice2b`) is OPEN. [VERIFIED via GitHub at close] The previous handoff's instruction to start slice 2 is superseded by these existing PRs. Coordinate with their owner and inspect current heads/reviews before doing anything. This stop did not review or authorize merging either PR.
 
 ### Owner Decision Needed
 
-1. **Before slice 3 (Preview rehearsal), owner provisions:** a Preview Blob store + `FACTORY_BLOB_RW_TOKEN`, `TEST_REQUEST_SANDBOX_LEDGER_URL`, `TEST_REQUEST_FACTORY_FORM=on`, and the branch-scoped `DATAVERSE_ALLOW_PROD_READS=yes` (decision 10a); before slice 4, the Production store + token and `TEST_REQUEST_LEDGER_URL` (decision 1). Nothing needed for slice 2.
-2. **D2: retire the home Mac's local ledger copies** (`wmkf-ledger-pg/ledger_prod`, `/ledger`) and the scratch DBs `ledger_ci_s547`, `ledger_ci_s548`, `ledger_test`. Deferred (S560) until the office Mac is set up. Destructive: list and confirm first.
-
-### Parked
-
-1. Deeper recipes, slice 5a, late-2026 `expiresAt` fixtures, cast ledger reset path, AkoyaGO TEST Factory Reviewer search, Liaison follow-ups, the Dataverse "Integrity review complete" flag. Unchanged since S553.
-2. Postgres in `lib/utils/tracked-secrets.js`: not tracked (runbook step 6).
-3. **First live Part B send:** waits for whichever real reminder sends next.
-4. Form v2: status-setter `rerun`, bind-reviewer, slot PATCH, retire (decision 7).
+1. Choose whether to resume refactor assessment later. PR #390, “docs: refresh remaining refactor candidate assessment,” is still OPEN but explicitly on hold by Justin. Do not merge it or treat its remaining-candidate list as current without a fresh source check and owner direction. No next refactor is selected or authorized.
 
 ### Verify Before Acting
 
-1. **Factory test Requests 1003301–1003303 are NOT residue:** tracked runs in `managed-ledger/ledger_prod` (verified S559). Do not delete as cleanup.
-2. **Blob overwrite-refusal wording is UNVERIFIED:** `factory-artifact-store.js putCreateOnly` matches `/already exists/i` because @vercel/blob 2.6.1 attaches no error code. The slice 3 rehearsal must plant an object at a run path, retry Confirm, and record the real message (a miss gives a raw error, never a wrong write).
-3. **Slice 1 is not deployable on its own** (no routes; `ledgerSchemaCheck` fingerprint files untraced). The merge deployed inert code: the cron sweep skips when `TEST_REQUEST_LEDGER_URL`/`FACTORY_BLOB_RW_TOKEN` are unset (tested). Production deployment of `6b9478d44`: see the line under *Testing*.
+1. **Parallel Factory handoff:** read `4d5a32b40503a1031deab35c0139b8610d5b1948:SESSION_PROMPT.md` for the full S561 handoff, then reconcile with PRs #398/#399 and their current plan. Office-Mac sync, Preview/Production provisioning, browser email verification, parked features, and ledger retirement were not independently revalidated in this refactor close. They are carryover context, not a verified actionable queue.
+2. Preserve the prior warning that Requests 1003301–1003303 are tracked Factory runs in `managed-ledger/ledger_prod`, not presumed cleanup residue. Verify ledger and current callers before any destructive work. Do not remove old worktrees or databases merely because the previous handoff suggested cleanup.
+3. The claim-evidence observation report could not read local state in this Codex session. No observation count or zero-advisory row was invented, and the pilot directive was not edited.
 
-### Do Not Reopen Without New Decision
+### Do Not Reopen Without New Evidence or Owner Direction
 
-1. Admin form decisions 1–11 (owner, S561; plan `## Owner decisions`): ledger URL in Vercel; kill switch + typed confirmation; private Blob store, ready-run cleanup; P4 closed; v1 scope incl. status setter; defer bind/slot/retire; Tier 2; delete `vercelPostgresLedgerDb`; rehearsal (a) branch-scoped; deploy-time kill switch.
-2. Slice-1 scope decisions (owner, S561): CLI-made runs (`cli:` actors) are invisible to the form in v1; the sweep skips quietly when unconfigured; slice 1 touched no live systems.
-3. Status-setter contract change (plan): one PATCH per change, no automatic redispatch for CLI or form, owner `--status-abandon` for `dispatched` only, producing replays need CLI `--rerun`.
-4. 058 on the app DB (applied); Sensitive option A; Part B decisions B-1/B-2/B-3; the 1003220 reminder stopped (S560); Neon protection app `main` only; refactor-survey items are Codex's; DOCX/VTT incident closed (S558).
+1. PR #397's two-call-site scope and approvals are complete; no behavior change was intended. Do not consolidate the differing sibling classifiers.
+2. PR #390 stays on hold. Its older survey is excluded from this bounded close reconciliation by explicit owner instruction.
+3. The established delegated cadence is root/Fable planning, Luna build/reconnaissance, Sol review, root review, and ordinary OAuth-only Fable adversarial review. Bound iterations; root takes over minor churn. Runtime merges still require explicit owner authorization.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/plans/TEST_REQUEST_FACTORY_ADMIN_FORM_PLAN_2026-10-01.md` | Admin form plan: decisions, Codex rounds, contract-reconcile, slices |
-| `docs/plans/briefs/FACTORY_ADMIN_FORM_SLICE1_BRIEF_2026-10-01.md` | Slice 1 build brief (template for slice 2) |
-| `lib/services/test-requests/admin-run-service.js` | The form's service: export/confirm/advance/list/inspect/artifacts/recheck |
-| `lib/services/test-requests/factory-artifact-store.js` | Private Blob store + daily sweep |
-| `lib/services/test-requests/admin-run-identity.js` | Actor and id derivation, `targetFromDeployment` |
-| `scripts/factory-artifacts-download.mjs` | Owner-run CLI fallback for a run's manifest and bundle |
-| `docs/plans/briefs/OFFICE_MAC_SYNC_BRIEF_2026-10-01.md` | Office Mac env sync + ledger check |
-| `docs/AGENT_ADJACENT_VERIFICATION_PILOT_DIRECTIVE.md` | Pilot observation table (S561 row added) |
+| `docs/plans/REVIEWER_CREATE_CONFLICT_HELPER_PLAN_2026-10-01.md` | Scope, characterization, approvals and production record |
+| `lib/dataverse/adapters/reviewer-suggestion.js` | Private helper and its two create-path callers |
+| `tests/unit/reviewer-suggestion-disposition.test.js` | Applicant conflict/recovery characterization |
+| `tests/unit/reviewer-adapters-writeback.test.js` | Staff-manual conflict/recovery characterization |
+| `docs/plans/TEST_REQUEST_FACTORY_ADMIN_FORM_PLAN_2026-10-01.md` | Separate Factory lane; inspect current PR versions before continuation |
 
-## Testing
+## Validation
 
-```bash
-npx jest --testPathPatterns "test-request|ledger|maintenance"     # 80 suites, 1996 tests (3 .pg suites skip without TEST_REQUEST_LEDGER_TEST_URL)
-npm run check:dataverse-access-layer && npm run check:dataverse-access-layer:self-test
-npm run check:api-routes && npm run check:api-routes:self-test     # slice 2 adds matrix rows
-npm run check:factory-ledger -- --allow-unreachable                # session start only; never inside a build
-```
+[VERIFIED via Luna logs and review record] Focused four suites / 275 tests; full Jest 1,196 suites / 18,958 tests / five snapshots passed; six suites / 98 tests skipped. Types, canonical build and lint passed (zero errors; 124 warnings, none in changed files). Dataverse access layer, Dynamics context boundary, route/service boundary, API routes, Atlas, secret scan, doc currency, doc symbol refs, and build claim freshness gates plus available self-tests passed serially; docs catalog passed. PR #397 CI was green on reviewed head `b6890fffa1498f85e22dfe3cc88f222f170bb427` before merge.
 
-Production deployment of merge `6b9478d44`: [VERIFIED via `gh api …/commits/6b9478d44/statuses` → Vercel deployment `dpl_DyystUaYAbp33mKK36tHyLBgv7ab`, and `vercel inspect` of that deployment → status Ready, target production, url `wmkfresearchapps-g02951hdc`, created 2026-10-01 16:08 PT] The serving production build is the slice-1 merge.
-
-Production reads: the auto-mode classifier blocks agent reads of the Production app DB. Write a read-only script to the scratchpad that prints no addresses, bodies or URLs, and have the owner run it with `!`. Load packages via `createRequire('<repo>/package.json')` and env via `process.loadEnvFile` (`dotenv` is not installed).
-
-Prior handoff (S560 detail): `8a050bb4b:SESSION_PROMPT.md` and earlier in Git history.
+[VERIFIED bounded Mode A reconciliation] Scope: #397 merge/deployment and closing handoff. GitHub/source establish the change; code persistence/consumer behavior is unchanged. Updated this handoff and the helper plan. The original survey remains excluded under the explicit hold; no whole-repo current-refactor-menu claim is made. Production functional behavior beyond the user's confirmation remains unprobed.
