@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Test Request Factory admin form live in Production (Session 563)
+
+**Milestone:** A superuser can create a marked test Request from a source Request, and set its Phase I or II status, from Admin → Test Requests, without the command line.
+**Sessions:** 563 (Claude, home Mac, 2026-10-01/02 PT; recorded as S562 in the Factory plan documents), Sonnet builds, Opus reviews, Codex adversarial rounds, owner click-through rehearsal and production runs.
+**Ship state:**
+- Slices 2, 2b, 3 merged (PRs #398, #399, #401); stop logging (#403); XLSX package verification with a settle check (#406); two display fixes (#408, #409).
+- Enabled in Production 2026-10-02: `TEST_REQUEST_FACTORY_FORM=on`, `TEST_REQUEST_LEDGER_URL` and `FACTORY_BLOB_RW_TOKEN` (store `wmkf-factory-private`) are now Vercel Production variables.
+- First complete run: `a5161f47-7b02-5ad3-8f20-3f645ec3c254` in `managed-ledger/ledger_prod`, test Request 1003310 from 1002988, seven documents, one status change. An earlier run (`20407283-c279-5e0c-b396-210ad6842482`, same ledger, Request 1003308) stopped on an XLSX and is not resumable.
+- Limits: `basic` recipe only; no way to abandon or resume a stuck run; a Preview rehearsal ends at the create.
+**Why it matters:** Staff can produce realistic test Requests in the production org on demand, with every write fenced to marked test records and journaled.
+**Pointers:** `docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md`; `docs/plans/TEST_REQUEST_FACTORY_ADMIN_FORM_PLAN_2026-10-01.md`; `docs/atlas/postgres-test-request-runs.md`; PRs #398, #399, #401, #403, #406, #408, #409.
+
 ## September 2026 — Scheduled-email Liaison re-check live; Factory ledger on Neon; app Postgres rotated (Session 559)
 
 **Milestone:** Queued grantee materials reminders now re-check the institution's current Liaison and the PD's review posture before sending (scheduled-email Part B). The Factory's operational data now lives in the managed Neon ledger, and the app Postgres password was rotated.
