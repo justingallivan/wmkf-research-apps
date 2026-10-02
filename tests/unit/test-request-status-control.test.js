@@ -118,6 +118,23 @@ describe('status control', () => {
     expect(server.count('POST', BASE)).toBe(1);
   });
 
+  test('an option the server marks blocked is disabled, and Set status refuses it with the reason even if it is chosen', async () => {
+    const blockedOptions = {
+      ...OPTIONS,
+      phase2: OPTIONS.phase2.map((option) => (option.label === 'Recommended' ? { ...option, blocked: 'status_change_edge' } : option)),
+    };
+    const server = makeServer().on('GET', BASE, { status: 200, body: { ...statusBody().body, options: blockedOptions } });
+    await renderControl(server);
+    const option = within(screen.getByLabelText('New status')).getByRole('option', { name: 'Recommended (not available now)' });
+    expect(option.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText('New status'), { target: { value: option.value } });
+    expect(screen.getByRole('button', { name: 'Set status' }).disabled).toBe(true);
+    expect(screen.getByText(/isn't allowed from the Request's current Phase I and Phase II statuses/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
+    expect(screen.queryByRole('group', { name: 'Confirm the status change' })).toBeNull();
+    expect(server.count('POST', BASE)).toBe(0);
+  });
+
   test('Cancel leaves nothing sent', async () => {
     const server = makeServer().on('GET', BASE, statusBody());
     await renderControl(server);

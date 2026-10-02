@@ -925,12 +925,29 @@ describe('status setter service (slice 2b)', () => {
     expect(result).toEqual({
       runId,
       runStatus: 'ready',
-      options: { phase1: [{ value: 1, label: 'option of wmkf_phaseistatus' }], phase2: [{ value: 1, label: 'option of wmkf_phaseiistatus' }] },
+      // Option 1 is not in the transition table, so the planner's verdict blocks it.
+      options: {
+        phase1: [{ value: 1, label: 'option of wmkf_phaseistatus', blocked: 'status_change_refused' }],
+        phase2: [{ value: 1, label: 'option of wmkf_phaseiistatus', blocked: 'status_change_refused' }],
+      },
       current: { phase1: 100000001, phase2: null },
       changes: [],
     });
     expect(h.spies.readCurrentStatus).toHaveBeenCalledWith(expect.anything(), '12121212-1212-4121-8121-121212121212');
     expect(h.createClientCalls.every((c) => !c.allowTestRequestMarkerWrites)).toBe(true);
+  });
+
+  test('statusOptions marks each option with the planner verdict for the current pair', async () => {
+    const { h, runId } = readyProduction();
+    h.spies.readCurrentStatus.mockResolvedValueOnce({ phase1: 100000003, phase2: 100000003 }); // Invited / Approved
+    h.spies.readLiveOptions.mockImplementation(async (_client, field) => (field === 'wmkf_phaseiistatus'
+      ? [{ value: 100000003, label: 'Approved' }, { value: 100000004, label: 'Recommended' }, { value: 100000001, label: 'Declined' }]
+      : [{ value: 100000003, label: 'Invited' }]));
+    const { options } = await h.service.statusOptions({ profileId: PROFILE, runId });
+    const byLabel = Object.fromEntries(options.phase2.map((option) => [option.label, option.blocked]));
+    // Approved is the current value; Recommended would create a payment and is not allowed from Approved; Declined is allowed.
+    expect(byLabel).toEqual({ Approved: 'status_change_noop', Recommended: 'status_change_edge', Declined: null });
+    expect(options.phase1[0].blocked).toBe('status_change_noop');
   });
 
   test('F7: a run that is not ready answers options and journal with current null and reads no Request', async () => {

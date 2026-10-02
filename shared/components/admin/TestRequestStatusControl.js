@@ -8,6 +8,13 @@ import {
 } from './test-request-factory-ui';
 
 const RISK_SENTENCE = 'This changes a real status on the test Request and can send emails or create payment and tracking rows.';
+// The server's own verdict for each option (`blocked`, from the status GET), in the owner's voice.
+const BLOCKED_COPY = {
+  status_change_noop: 'That status is already set. Choose a different one.',
+  status_change_edge: "This change can create a payment or a status-tracking row, and it isn't allowed from the Request's current Phase I and Phase II statuses.",
+  status_change_replay: "An earlier change to this status created, or may have created, a payment or status-tracking row. Repeating it needs the owner; it can't be done from this form.",
+  default: "This status isn't one the form can set.",
+};
 const RELOAD_CODES = new Set(['status_change_concurrent', 'status_change_open']);
 
 const fieldByColumn = (column) => STATUS_FIELDS.find((field) => field.column === column) || null;
@@ -207,7 +214,8 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
     if (busy) return 'Waiting for the last request to finish.';
     if (!selected) return 'Choose the status to set.';
     // Mirrors the server's no-op refusal: the journal reload after a change makes the chosen option the current one.
-    if (selected.value === current) return 'That status is already set. Choose a different one.';
+    if (selected.value === current) return BLOCKED_COPY.status_change_noop;
+    if (selected.blocked) return BLOCKED_COPY[selected.blocked] || BLOCKED_COPY.default;
     return '';
   })();
   const checkReason = (() => {
@@ -251,9 +259,10 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
             <option value="">{open ? '' : 'Choose a status'}</option>
             {options.map((option) => {
               const already = option.value === current;
+              const blocked = already || Boolean(option.blocked);
               return (
-                <option key={option.value} value={String(option.value)} disabled={already}>
-                  {already ? `${option.label} (already set)` : option.label}
+                <option key={option.value} value={String(option.value)} disabled={blocked}>
+                  {already ? `${option.label} (already set)` : (blocked ? `${option.label} (not available now)` : option.label)}
                 </option>
               );
             })}
