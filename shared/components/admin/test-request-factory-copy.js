@@ -70,27 +70,36 @@ export const ERROR_COPY = Object.freeze({
   status_change_ambiguous: "The change was sent but its result couldn't be read. Check again; don't start a different change.",
 });
 
-// Every line here was checked against the step that raises the code (run-runner.js): a retry never repeats a
-// write whose result is unknown. It re-reads, recovers if it can, and otherwise stops at the same place.
-const ATTENTION_DEFAULT = 'This step stopped. Retrying never creates a second Request: the run checks where it stands first. If it stops here again, it needs to be resolved with the command-line tool.';
+// Every line here was checked against the step that raises the code (run-runner.js, basic-clone-steps.js,
+// bundle-file-copy.js): a retry never repeats a write whose result is unknown. It re-reads, recovers if it
+// can, and otherwise stops at the same place. No command-line mode abandons, resets or force-advances a run
+// (scripts/rehearse-test-request-sandbox.mjs); `--run-inspect` only reads its record.
+const CANNOT_CONTINUE = 'Whatever it created stays as a marked test record. Start a new run from a fresh lookup.';
+// The default also covers retryable stops (a file failure before upload, upstream_http, unknown_error), so it never declares the run finished.
+const ATTENTION_DEFAULT = 'This step stopped. Retrying never creates a second Request: the run checks where it stands first and, if nothing had been written, does the step again. If it keeps stopping here, find the cause in the technical detail or the function log and clear it before retrying again.';
 const ATTENTION_CHECK_FAILED = 'A check on this step failed, and retrying will most likely stop here again. Nothing further was written. Inspect the run with the command-line tool.';
-const ATTENTION_UNCONFIRMED = "An earlier attempt at this step may or may not have gone through, and the run can't tell which. Retrying won't repeat the write: the run checks again and stops here until the result is confirmed by hand. Inspect the run with the command-line tool before continuing.";
+const ATTENTION_UNCONFIRMED = `An earlier attempt at this step may or may not have gone through, and the run can't tell which. Retrying won't repeat the write: the run checks again and stops here. Nothing confirms the result, so the run can't continue; the command-line tool can only read its record. ${CANNOT_CONTINUE}`;
+const ATTENTION_TRANSIENT_RETRY = 'Retrying checks where the run stands first. If nothing had been written yet, it does the step again. If a write had been sent, the run looks for its result and may stop again under a different reason.';
 const ATTENTION_WORKFLOW = 'A workflow that this step switches off and back on may not have been restored. Check it in Dynamics before continuing, and inspect the run with the command-line tool.';
 // Keyed by the run's stored needs-attention reason (a LEDGER_REASON_CODES token). Anything unlisted gets the default.
 export const ATTENTION_COPY = Object.freeze({
-  ambiguous_create_outcome: "The request to create the test Request was sent, but the new Request can't be found. Retrying is safe: the run looks for the Request again and never sends a second create. If it keeps stopping here, the run can't continue and needs to be resolved by hand with the command-line tool.",
+  ambiguous_create_outcome: `The request to create the test Request was sent, but the new Request can't be found. Retrying is safe: the run looks for the Request again and never sends a second create. If it keeps stopping here, the run can't continue. ${CANNOT_CONTINUE}`,
   preallocated_request_present_not_owned: "A Request already exists under this run's reserved ID, and this run did not create it. Retrying will stop here again; the run can't continue.",
   location_preexisting: 'A document folder record already exists for this Request, and this run did not create it. Retrying will stop here again; the run needs to be resolved by hand.',
   source_fence_failed: "The run couldn't confirm the source Request is unchanged: either it changed, or it couldn't be read. Nothing was created. Retry; if it stops here again, look up the source Request again and start a new run.",
-  location_readback_mismatch: ATTENTION_UNCONFIRMED,
+  // stepProvisionLocation re-reads on every retry: a late-appearing location this run owns is recorded as recovered.
+  location_readback_mismatch: `An earlier attempt created the document folder record, or may have, and it can't be read yet. Retrying is safe: the run reads again and never creates a second record. If the record appears and is this run's, the run continues. If it keeps stopping here, the run can't continue. ${CANNOT_CONTINUE}`,
   preflight_identity_changed: ATTENTION_CHECK_FAILED,
   meeting_date_readback_mismatch: ATTENTION_CHECK_FAILED,
+  // Sandbox only: production never writes the date (it stops as meeting_date_readback_mismatch instead).
+  meeting_date_patch_failed: "The meeting-date correction was sent, but the Request doesn't show the planned date. Retrying reads the Request again: if the date is right it continues, otherwise it sends the correction once more.",
   request_readback_mismatch: ATTENTION_CHECK_FAILED,
   verification_failed: ATTENTION_CHECK_FAILED,
   observation_side_effects: ATTENTION_CHECK_FAILED,
   manifest_digest_mismatch: ATTENTION_CHECK_FAILED,
-  timeout: 'A service took too long to answer during this step. Retrying picks the run up where it stopped.',
-  network: 'The connection dropped during this step. Retrying picks the run up where it stopped.',
+  timeout: `A service took too long to answer during this step. ${ATTENTION_TRANSIENT_RETRY}`,
+  network: `The connection dropped during this step. ${ATTENTION_TRANSIENT_RETRY}`,
+  bundle_stale: `This run's saved copy of the source can't be used any more: it's too old, or the copy rules changed since it was saved. Retrying will stop here again; the run can't continue. ${CANNOT_CONTINUE}`,
   file_ambiguous_unrecovered: ATTENTION_UNCONFIRMED,
   file_journal_unverified: ATTENTION_UNCONFIRMED,
   goverify_deactivation_uncertain: ATTENTION_WORKFLOW,

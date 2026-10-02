@@ -60,14 +60,16 @@ vercel logs --environment production --since 1h -q "admin test-request run" -x
 | any | `timeout`, `network`, `upstream_http`, `unknown_error` **before** the step's write was attempted | Re-attempts the step | Yes |
 | `fence_source` | `source_fence_failed`, `preflight_identity_changed`, `manifest_digest_mismatch`, `preallocated_request_present` | Re-reads; stops again unless the cause was a transient read failure | Only if it clears. Nothing was created; look up the source again and start a new run |
 | `create_request` | first stop after the create was sent and refused or lost; a refusal is recorded as `unknown_error` **[RUN: Preview]** | Looks for the Request by its reserved ID. Found and owned: recovered, continues. Not found: `ambiguous_create_outcome` | Only if the create actually landed |
-| `create_request` | `ambiguous_create_outcome` **[RUN: Preview]**, `preallocated_request_present_not_owned` | Stops again. Never sends a second create | No. Start a new run |
+| `create_request` | `ambiguous_create_outcome` **[RUN: Preview]** | Reads the reserved ID again; never sends a second create. Found and owned: recovered, continues. Still absent: stops again | Only if the create eventually landed. Otherwise start a new run |
+| `create_request` | `preallocated_request_present_not_owned` | Stops again. Never sends a second create | No. Start a new run |
 | `correct_meeting_date` | `meeting_date_readback_mismatch` | Production never writes the date; stops again | No |
-| `provision_location` | `location_preexisting`, `location_readback_mismatch` | Re-reads; stops again | No |
+| `provision_location` | `location_preexisting` | Re-reads; stops again | No |
+| `provision_location` | `location_readback_mismatch` | Re-reads; never creates a second location. A late-appearing location this run owns is recorded as recovered and the run continues; otherwise it stops again | Only if the location appears |
 | `provision_location` | a transient error | Re-reads the location. If it exists and is this run's, continues; if a create was journaled and nothing exists, `location_readback_mismatch` | Depends |
 | `copy_file` | an error before the upload was attempted (source changed since lookup, source hash mismatch, destination file already exists) | Re-attempts that file | Only if the cause is gone |
 | `copy_file` | an error after the upload was attempted with no item recorded; the next retry shows `file_ambiguous_unrecovered` | Stops again. Never uploads again | No |
 | `copy_file` | an error after the file was uploaded (failed comparison, "did not settle"); the next retry shows `file_journal_unverified` **[RUN: production run `20407283`]** | Stops again. Never uploads again | No |
-| `copy_file` | `bundle_stale` | Stops again | No. The 6 hours have passed |
+| `copy_file` | `bundle_stale` | Stops again | No. The 6 hours have passed, or the copy policy changed since the bundle was saved (`bundleSourceOf` refuses both) |
 | `observe` | a transient error | Repeats the wait; reads only | Yes |
 | `verify` | `verification_failed` | Re-reads everything; no write | Only if the cause was transient (for example a failed folder listing) |
 
@@ -127,8 +129,5 @@ With the form off, the run list, run detail and artifacts download still work.
 ## Known gaps
 
 - **First lookup refused once.** The first lookup of source 1002988 (Preview) and of source 1002860 (Production) was refused with "changed while its bytes were being verified" and passed on retry; the production log named an XLSX **[RUN]**. A later lookup of 1002988 passed first time. Cause not established. Retry the lookup.
-- **Form copy that overstates the CLI.** Several stops tell the operator to resolve the run "with the command-line tool"; for `ambiguous_create_outcome`, `file_journal_unverified`, `file_ambiguous_unrecovered` and `location_readback_mismatch` no mode does that **[SOURCE]**.
-- **Form copy for `timeout` and `network`** says a retry picks the run up where it stopped. That holds only when no write had been attempted **[SOURCE]**.
-- **`bundle_stale` and `meeting_date_patch_failed`** have no copy of their own and get the default text **[SOURCE]**.
 - **XLSX verification** is characterized for one SharePoint rewrite (`docProps/custom.xml`). A spreadsheet rewritten in another way, or one over the package limits, stops at `copy_file` after upload and cannot continue.
 - **Not checked in a browser:** long-label wrapping, the selected-row tint, a narrow window.
