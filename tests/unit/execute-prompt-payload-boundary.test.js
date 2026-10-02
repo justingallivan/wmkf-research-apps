@@ -32,6 +32,26 @@ jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: jest.fn((tag, fn) => fn()),
 }));
 
+const mockGraphListFiles = jest.fn();
+const mockGraphDownload = jest.fn();
+const mockSharePointBuckets = jest.fn();
+const mockGrantRequestGetById = jest.fn();
+jest.mock('../../lib/services/graph-service', () => ({
+  GraphService: {
+    listFiles: (...args) => mockGraphListFiles(...args),
+    downloadFileByPath: (...args) => mockGraphDownload(...args),
+  },
+}));
+jest.mock('../../lib/utils/sharepoint-buckets', () => ({
+  getRequestSharePointBuckets: (...args) => mockSharePointBuckets(...args),
+}));
+jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
+  getById: (...args) => mockGrantRequestGetById(...args),
+}));
+jest.mock('../../lib/utils/file-loader.js', () => ({
+  extractTextFromBuffer: jest.fn(async () => 'selected document text '.repeat(8)),
+}));
+
 // S145 added a `loadAvailableModels()` warmup call inside callClaude that
 // makes a fetch to /v1/models before the Claude messages call. Without this
 // mock the global.fetch stub captures BOTH requests, breaking the "exactly
@@ -85,6 +105,7 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 beforeEach(() => {
   fetchedBodies.length = 0;
   createdRunRows.length = 0;
+  jest.clearAllMocks();
   process.env.CLAUDE_API_KEY = 'sk-ant-test';
 });
 
@@ -131,6 +152,41 @@ function buildPromptRow({
 // ---------------------------------------------------------------------------
 
 describe('executePrompt — declarative payload boundary', () => {
+  test('sharepoint document discovery opts out of applicant background staging folders', async () => {
+    const requestId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    PROMPT_ROW = buildPromptRow({
+      variables: [{
+        name: 'proposal_text',
+        source: { kind: 'sharepoint', pattern: 'proposal.pdf' },
+        required: true,
+      }],
+      promptBody: '{{proposal_text}}',
+    });
+    mockGrantRequestGetById.mockResolvedValue({ akoya_requestnum: '1002836' });
+    mockSharePointBuckets.mockResolvedValue([
+      { library: 'akoya_request', folder: '1002836_request', source: 'dynamics' },
+    ]);
+    mockGraphListFiles.mockResolvedValue([
+      { name: 'proposal.pdf', folder: '1002836_request/Reviewer Materials' },
+    ]);
+    mockGraphDownload.mockResolvedValue({
+      buffer: Buffer.from('document'),
+      filename: 'proposal.pdf',
+      mimeType: 'application/pdf',
+    });
+
+    await executePrompt({
+      promptName: 'phase-i.summary',
+      requestId,
+      runSource: 'Vercel Test',
+    });
+
+    expect(mockGraphListFiles).toHaveBeenCalledWith('akoya_request', '1002836_request', expect.objectContaining({
+      recursive: true,
+      excludeApplicantMaterialsBackgroundUploads: true,
+    }));
+  });
+
   test('over-cap variable bounded: marker in prompt, no tail, metadata on result.meta', async () => {
     const overLimit = `${'A'.repeat(100_500)}UNSENT_TAIL`;
 

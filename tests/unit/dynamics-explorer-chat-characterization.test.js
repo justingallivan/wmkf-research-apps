@@ -343,6 +343,11 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
     await handler(req, res);
     await new Promise(resolve => setTimeout(resolve, 0));
 
+    expect(mockListFiles).toHaveBeenCalledWith('akoya_request', 'REQ-123_ABCDE', expect.objectContaining({
+      recursive: true,
+      excludeApplicantMaterialsBackgroundUploads: true,
+    }));
+
     const requestId = mockStartRequest.mock.calls[0][0].requestId;
     const blocks = parseSse(res);
 

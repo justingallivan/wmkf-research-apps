@@ -151,6 +151,10 @@ test('default prefers the exact active canonical proposal over the Phase I fallb
   ]);
   const out = await loadProposal({ requestId: REQ });
   expect(out.picked).toBe('akoya_request::F/Reviewer Materials::Proposal_1002836.pdf');
+  expect(listFiles).toHaveBeenCalledWith('akoya_request', 'F', expect.objectContaining({
+    recursive: true,
+    excludeApplicantMaterialsBackgroundUploads: true,
+  }));
 });
 
 test('default fails closed and returns the picker list when neither automatic path exists', async () => {
