@@ -67,7 +67,7 @@ vercel logs --environment production --since 1h -q "admin test-request run" -x
 | `copy_file` | an error before the upload was attempted (source changed since lookup, source hash mismatch, destination file already exists) | Re-attempts that file | Only if the cause is gone |
 | `copy_file` | an error after the upload was attempted with no item recorded; the next retry shows `file_ambiguous_unrecovered` | Stops again. Never uploads again | No |
 | `copy_file` | an error after the file was uploaded (failed comparison, "did not settle"); the next retry shows `file_journal_unverified` **[RUN: production run `20407283`]** | Stops again. Never uploads again | No |
-| `copy_file` | `bundle_stale` | Stops again | No. The 6 hours have passed |
+| `copy_file` | `bundle_stale` | Stops again | No. The 6 hours have passed, or the copy policy changed since the bundle was saved (`bundleSourceOf` refuses both) |
 | `observe` | a transient error | Repeats the wait; reads only | Yes |
 | `verify` | `verification_failed` | Re-reads everything; no write | Only if the cause was transient (for example a failed folder listing) |
 
@@ -127,8 +127,5 @@ With the form off, the run list, run detail and artifacts download still work.
 ## Known gaps
 
 - **First lookup refused once.** The first lookup of source 1002988 (Preview) and of source 1002860 (Production) was refused with "changed while its bytes were being verified" and passed on retry; the production log named an XLSX **[RUN]**. A later lookup of 1002988 passed first time. Cause not established. Retry the lookup.
-- **Form copy that overstates the CLI.** Several stops tell the operator to resolve the run "with the command-line tool"; for `ambiguous_create_outcome`, `file_journal_unverified`, `file_ambiguous_unrecovered` and `location_readback_mismatch` no mode does that **[SOURCE]**.
-- **Form copy for `timeout` and `network`** says a retry picks the run up where it stopped. That holds only when no write had been attempted **[SOURCE]**.
-- **`bundle_stale` and `meeting_date_patch_failed`** have no copy of their own and get the default text **[SOURCE]**.
 - **XLSX verification** is characterized for one SharePoint rewrite (`docProps/custom.xml`). A spreadsheet rewritten in another way, or one over the package limits, stops at `copy_file` after upload and cannot continue.
 - **Not checked in a browser:** long-label wrapping, the selected-row tint, a narrow window.

@@ -112,9 +112,31 @@ describe('labels for the run record and the source summary', () => {
   test('every needs-attention reason with its own copy is a real ledger reason code; others get the default', () => {
     for (const code of Object.keys(ATTENTION_COPY)) expect(LEDGER_REASON_CODES).toContain(code);
     const fallback = attentionCopyFor('file_copy_failed');
-    expect(fallback).toBe('This step stopped. Retrying never creates a second Request: the run checks where it stands first. If it stops here again, it needs to be resolved with the command-line tool.');
+    expect(fallback).toBe("This step stopped. Retrying never creates a second Request: the run checks where it stands first. If it stops here again, the run can't continue. Whatever it created stays as a marked test record. Start a new run from a fresh lookup.");
     expect(attentionCopyFor(null)).toBe(fallback);
     expect(attentionCopyFor('timeout (http 504)')).toBe(ATTENTION_COPY.timeout);
+  });
+
+  test('no stop claims the command-line tool resolves a run; a dead end says so and names the way out', () => {
+    // No mode of scripts/rehearse-test-request-sandbox.mjs abandons, resets or force-advances a run; `--run-inspect` only reads.
+    const cannotContinue = ['ambiguous_create_outcome', 'file_journal_unverified', 'file_ambiguous_unrecovered', 'location_readback_mismatch', 'bundle_stale', 'file_copy_failed'];
+    for (const code of cannotContinue) {
+      const text = attentionCopyFor(code);
+      expect(text).toMatch(/can't continue/);
+      expect(text).toMatch(/Start a new run from a fresh lookup\./);
+    }
+    for (const text of Object.values(ATTENTION_COPY)) expect(text).not.toMatch(/resolv\w* (?:by hand )?with the command-line tool/i);
+  });
+
+  test('timeout and network say a retry re-checks first and may stop under a different reason; bundle_stale and meeting_date_patch_failed have their own copy', () => {
+    for (const code of ['timeout', 'network']) {
+      expect(attentionCopyFor(code)).toMatch(/checks where the run stands first/);
+      expect(attentionCopyFor(code)).toMatch(/may stop again under a different reason/);
+      expect(attentionCopyFor(code)).not.toMatch(/picks the run up where it stopped/);
+    }
+    expect(attentionCopyFor('bundle_stale')).toMatch(/too old, or the copy rules changed/);
+    expect(attentionCopyFor('meeting_date_patch_failed')).toMatch(/sends the correction once more/);
+    expect(attentionCopyFor('meeting_date_patch_failed')).not.toBe(attentionCopyFor('file_copy_failed'));
   });
 });
 
