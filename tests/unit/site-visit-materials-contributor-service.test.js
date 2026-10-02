@@ -1,5 +1,6 @@
 /** @jest-environment node */
-import { buildContributorContext, finalizeMaterialUpload, outOfSync } from '../../lib/services/site-visit-materials/contributor-service';
+import { createHash } from 'node:crypto';
+import { buildContributorContext, finalizeMaterialUpload, outOfSync, MATERIAL_SCAN_POLICY_VERSION } from '../../lib/services/site-visit-materials/contributor-service';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE, REQUEST_DOCUMENT_LIFECYCLE_STATE, REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument';
 import { SITE_VISIT_MATERIALS_CHECKLIST } from '../../shared/config/siteVisitMaterials';
 import AlertRecipients from '../../lib/services/alert-recipients';
@@ -410,4 +411,114 @@ test('replay_ambiguous records one durable staff event keyed on the staging id; 
     candidateResult: { requestId: REQUEST_ID, slot: 'presentation_pdf', generationKey: 'stale' },
   }), broken)).rejects.toMatchObject({ code: 'replay_ambiguous', httpStatus: 409 });
   log.mockRestore();
+});
+
+
+describe('background finalization preserves scan and replacement contracts', () => {
+  const sha256 = createHash('sha256').update(PDF).digest('hex');
+  const backgroundJob = { jobId: 'durable-job', leaseToken: STAGING_LEASE,
+    lockedUntil: '2026-11-21T09:06:00Z', scanCheckpoint: null };
+  const args = (job = backgroundJob) => finalizeArgs('presentation_pdf', { filename: 'a.pdf', buffer: PDF, sha256 }, { backgroundJob: job });
+  const backgroundDeps = (overrides = {}) => deps({
+    assertBackgroundJobLease: jest.fn(async () => true), recordBackgroundScan: jest.fn(async () => true), ...overrides,
+  });
+
+  test('clean checkpoint commits before any Graph mutation and exact candidate receipt precedes registry publication', async () => {
+    const d = backgroundDeps();
+    await finalizeMaterialUpload(args(), d);
+    expect(d.recordBackgroundScan).toHaveBeenCalledWith(expect.objectContaining({ jobId: backgroundJob.jobId, sha256, policyVersion: MATERIAL_SCAN_POLICY_VERSION }));
+    expect(d.recordBackgroundScan.mock.invocationCallOrder[0]).toBeLessThan(d.ensureFolderPath.mock.invocationCallOrder[0]);
+    expect(d.recordPortalUploadCandidate.mock.invocationCallOrder[0]).toBeLessThan(d.createDocument.mock.invocationCallOrder[0]);
+    expect(d.recordPortalUploadCandidate).toHaveBeenCalledWith(expect.objectContaining({ backgroundJobId: backgroundJob.jobId, candidate: expect.objectContaining({ driveId: 'drive', itemId: 'item-1', eTag: '"1"' }) }));
+  });
+
+  test('only a matching clean hash and scan policy checkpoint skips the scanner', async () => {
+    const d = backgroundDeps();
+    await finalizeMaterialUpload(args({ ...backgroundJob, scanCheckpoint: { clean: true, sha256, policyVersion: MATERIAL_SCAN_POLICY_VERSION } }), d);
+    expect(d.scanBytes).not.toHaveBeenCalled();
+    expect(d.recordBackgroundScan).not.toHaveBeenCalled();
+    expect(d.createDocument).toHaveBeenCalledTimes(1);
+    expect(d.assertBackgroundJobLease).toHaveBeenCalled();
+  });
+
+  test.each([
+    { clean: true, sha256: 'different-bytes', policyVersion: MATERIAL_SCAN_POLICY_VERSION },
+    { clean: true, sha256, policyVersion: 'obsolete-policy' },
+    { clean: false, sha256, policyVersion: MATERIAL_SCAN_POLICY_VERSION },
+  ])('a mismatched checkpoint triggers a new scan: %j', async (scanCheckpoint) => {
+    const d = backgroundDeps();
+    await finalizeMaterialUpload(args({ ...backgroundJob, scanCheckpoint }), d);
+    expect(d.scanBytes).toHaveBeenCalledWith(PDF, 'a.pdf', expect.any(Object));
+    expect(d.recordBackgroundScan).toHaveBeenCalled();
+  });
+
+  test.each(['infected', 'unknown'])('%s verdict cannot checkpoint or publish', async (scan_result) => {
+    const d = backgroundDeps({ scanBytes: jest.fn(async () => ({ scan_result })) });
+    await expect(finalizeMaterialUpload(args(), d)).rejects.toMatchObject({ code: scan_result === 'infected' ? 'scan_infected' : 'scan_unavailable' });
+    expect(d.recordBackgroundScan).not.toHaveBeenCalled();
+    expect(d.ensureFolderPath).not.toHaveBeenCalled();
+    expect(d.uploadFile).not.toHaveBeenCalled();
+    expect(d.createDocument).not.toHaveBeenCalled();
+  });
+
+  test('background cannot use the synchronous scanner-disabled exemption', async () => {
+    const d = backgroundDeps({ scanEnabled: () => false });
+    await expect(finalizeMaterialUpload(args(), d)).rejects.toMatchObject({ code: 'scan_paused' });
+    expect(d.uploadFile).not.toHaveBeenCalled();
+    expect(d.createDocument).not.toHaveBeenCalled();
+  });
+
+  test('checkpoint persistence failure stops before creating a SharePoint folder or file', async () => {
+    const d = backgroundDeps({ recordBackgroundScan: jest.fn(async () => false) });
+    await expect(finalizeMaterialUpload(args(), d)).rejects.toMatchObject({ code: 'background_lease_lost' });
+    expect(d.ensureFolderPath).not.toHaveBeenCalled();
+    expect(d.uploadFile).not.toHaveBeenCalled();
+  });
+
+  test('failed replacement writes only its staging-specific folder, leaving the prior item and registry row intact', async () => {
+    const d = backgroundDeps({ findDocumentsByRequest: jest.fn(async () => ({ records: [ROW_PDF] })),
+      createDocument: jest.fn(async () => { throw new Error('registry unavailable'); }) });
+    await expect(finalizeMaterialUpload(args(), d)).rejects.toThrow('registry unavailable');
+    expect(d.uploadFile).toHaveBeenCalledWith('akoya_request', `Neural dust_ABC123/Site Visit - Slides/portal-${STAGING_ID}`,
+      '1003222 Site Visit Presentation.pdf', PDF, 'application/pdf', { conflictBehavior: 'replace' });
+    expect(d.recordPortalUploadCandidate).toHaveBeenCalledWith(expect.objectContaining({ candidate: expect.objectContaining({ predecessorArtifactId: ROW_PDF.wmkf_requestdocumentid }) }));
+    expect(d.supersedeDocument).not.toHaveBeenCalled();
+    expect(d.releaseSlotLease).toHaveBeenCalled();
+  });
+
+  test('successful background registry links identify the isolated canonical file', async () => {
+    const d = backgroundDeps();
+    await finalizeMaterialUpload(args(), d);
+    expect(d.createDocument).toHaveBeenCalledWith(expect.objectContaining({
+      wmkf_sharepointfolderpath: `Neural dust_ABC123/Site Visit - Slides/portal-${STAGING_ID}`,
+      wmkf_filename: '1003222 Site Visit Presentation.pdf', wmkf_sharepointweburl: 'https://sp/x',
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    }), expect.any(Object));
+    expect(d.acquireSlotLease).toHaveBeenCalledWith(expect.objectContaining({ backgroundJobId: backgroundJob.jobId, expiresAt: backgroundJob.lockedUntil }));
+  });
+
+  test('lost authority after Graph returns cannot publish a candidate or registry row', async () => {
+    const d = backgroundDeps();
+    d.uploadFile.mockImplementation(async () => {
+      d.assertBackgroundJobLease.mockResolvedValue(false);
+      return { driveId: 'drive', id: 'new-unpublished-item' };
+    });
+    await expect(finalizeMaterialUpload(args(), d)).rejects.toMatchObject({ code: 'background_lease_lost' });
+    expect(d.recordPortalUploadCandidate).not.toHaveBeenCalled();
+    expect(d.createDocument).not.toHaveBeenCalled();
+    expect(d.supersedeDocument).not.toHaveBeenCalled();
+  });
+});
+
+
+test.each([
+ ['invalid_file','invalid_file'], ['size_limit','size_limit'], ['retry_limit','processing_deadline'],
+ ['storage_unavailable','storage_unavailable'], ['scan_infected','infected'],
+])('context carries the worker reason %s as safe user-facing %s', async (error_code, expected) => {
+ const d=deps({ backgroundJobsSchemaReady:()=>true, listBackgroundJobs:async()=>[
+  {job_id:'job',staging_id:STAGING_ID,slot:'presentation_pdf',status:'failed',error_code, private_diagnostic:'provider secret'},
+ ] });
+ const result=await buildContributorContext({collection:collection()},d);
+ expect(result.jobs[0]).toMatchObject({errorCode:expected});
+ expect(JSON.stringify(result)).not.toContain('provider secret');
 });

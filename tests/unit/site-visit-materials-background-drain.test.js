@@ -175,3 +175,22 @@ test('an infected verdict after lease takeover cannot delete the successor-owned
   expect(d.settleJob).not.toHaveBeenCalled();
   expect(d.deleteStagedBlob).not.toHaveBeenCalled();
 });
+
+
+test.each(['staging', 'job'])('a %s completion outage after the durable receipt remains recoverable without attention or another upload', async (failurePoint) => {
+  const d = dependencies();
+  d.completeStaging.mockImplementation(async () => {
+    d.getStage.mockResolvedValue({ ...STAGE, status: 'consumed', result_payload: { ok: true, filename: 'canonical.pdf' } });
+    d.getCurrentSideEffects.mockResolvedValue({ scan_checkpoint: CHECKPOINT, candidate_result: {}, staging_status: 'consumed' });
+    if (failurePoint === 'staging') throw new Error('staging commit response lost');
+  });
+  if (failurePoint === 'job') d.completeJob.mockRejectedValueOnce(new Error('completion database outage'));
+  expect(await drainOneMaterialsUpload(d)).toMatchObject({ status: 'completion_recovery_pending' });
+  expect(d.settleJob).not.toHaveBeenCalled();
+  expect(d.recordEvent).not.toHaveBeenCalled();
+  // Once its expired lease is claimed again, the existing consumed replay path
+  // finishes the acknowledgement with no second byte load/provider operation.
+  expect(await drainOneMaterialsUpload(d)).toMatchObject({ status: 'completed', replayed: true });
+  expect(d.loadFile).toHaveBeenCalledTimes(1);
+  expect(d.finalize).toHaveBeenCalledTimes(1);
+});

@@ -824,13 +824,17 @@ them in the Workbench without opening AkoyaGo.
   `lib/services/site-visit-materials/folder-files-service.js`. It lists the two folders,
   non-recursively, under the same active Dynamics bucket the portal writes to
   (`activeBucket` in `contributor-service.js`), and returns names and staff SharePoint `webUrl`s.
-  Portal uploads land in the same folders and appear too. There are no counters and no registry
-  writes: a hand-placed file still does not count toward the collection summary or appear on the
-  briefing page.
-- **Residual risk:** the Workbench materials summary (`getMaterialsSummaryForRequest` on the
-  `/api/workbench/pre-site-visit` GET) is fail-open `null` with no availability signal. A failed
-  summary read therefore shows "materials not requested" for a scheduled presentation. The file
-  rows are unaffected because they come from the folder read.
+  Synchronous portal uploads land in the same folders and appear too. [BUILT on the background
+  processing branch; not enabled in Production] With the background schema flag on, the reader
+  also merges current Ready registry links from staging-specific subfolders, suppresses known
+  superseded portal root items by exact drive/item identity, and never recursively exposes
+  uncommitted candidates. There are no counters or registry writes: a hand-placed file still
+  does not count toward the collection summary or appear on the briefing page.
+- **Summary availability:** the PR #338 production baseline returned fail-open `null` on a
+  Workbench summary failure, which could show "materials not requested". [BUILT on the background
+  processing branch; not enabled in Production] The reader now carries an explicit unavailable
+  result through `/api/workbench/pre-site-visit` to the card; it no longer reports an outage as
+  confirmed absence. File rows still use the separate folder read.
 - **Retire when** the portal is the only intake route. The card's status line and the registry
   can then carry the links, and this route can go. A retirement needs its own caller check.
 

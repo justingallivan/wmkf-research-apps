@@ -49,3 +49,20 @@ test('waiving the only required item produces Check files, not Ready, without fi
  const result=await dashboard(reads(),async()=>value);
  expect(classifications(result)).toEqual(['unavailable','unavailable']);
 });
+
+
+test.each([
+ ['queued', 'open', 'processing'],
+ ['processing', 'open', 'processing'],
+ ['needs_attention', 'open', 'needs_attention'],
+ ['queued', 'closed', 'processing'],
+ ['needs_attention', 'closed', 'needs_attention'],
+])('durable %s upload in a %s collection remains visible through summary, dashboard and classifier', async (status, collectionStatus, expected) => {
+ const result = await dashboard(reads({
+  listLatestCollections: async () => [row(A, { status: collectionStatus })],
+  backgroundJobsSchemaReady: () => true,
+  listUploadJobsForRequest: async () => [{ job_id:'job', staging_id:'stage', request_id:A, collection_id:A, slot:'presentation_pdf', status, filename:'a.pdf' }],
+ }));
+ expect(classifications(result)[0]).toBe(expected);
+ expect(result.proposals[0].materials).toMatchObject({ processingCount:status==='needs_attention'?0:1, attentionCount:status==='needs_attention'?1:0 });
+});

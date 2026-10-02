@@ -7,7 +7,7 @@ last_verified: 2026-10-01
 
 # Applicant materials background processing
 
-[PLANNED, implementation underway] Applicant Site Visit / Research Presentation uploads will return after the private Blob transfer and a durable Postgres admission transaction. A scheduled worker will scan and save the file. This branch does not authorize production migration, flag changes, merge, deployment, or provider rehearsal. Consultant Feedback and other upload workflows retain synchronous processing and the shared configurable 500 MB cap.
+[SOURCE-BUILT; final adversarial review and full validation underway] Applicant Site Visit / Research Presentation uploads will return after the private Blob transfer and a durable Postgres admission transaction. A scheduled worker will scan and save the file. This branch does not authorize production migration, flag changes, merge, deployment, or provider rehearsal. Consultant Feedback and other upload workflows retain synchronous processing and the shared configurable 500 MB cap.
 
 ## Evidence and review decisions
 
@@ -21,7 +21,7 @@ Claude Fable reviewed the plan twice through the Claude Code OAuth/subscription 
 
 Only after server authorization, private object metadata verification and committed queue ownership does finalize return HTTP 202: “Upload received. We’re checking and saving your file. You can close this page.” A failed or uncertain admission keeps the staging identity available for Retry. Session storage is a convenience, not the work owner.
 
-Durable context distinguishes queued/processing/completed/failed/cancelled/needs-attention. Existing registry receipts remain separate from new processing uploads. Processing and attention hold the affected checklist slot and prevent Ready; reminders do not ask applicants to replace a held upload. Failure copy explains the reason in safe language and resolves the Program Coordinator name/email from the request. No new automatic emails.
+Durable context distinguishes queued/processing/completed/failed/cancelled/needs-attention. Existing registry receipts remain separate from new processing uploads. Processing and attention hold the affected checklist slot and prevent Ready; reminders do not ask applicants to replace a held upload. Failure copy explains the reason in safe language and resolves the Program Coordinator name/email from the request. No new automatic emails. The cron is classified `allowed` in the Test Request Factory scheduled-job census: it continues an explicitly submitted, token-authorized upload on the chosen request, including a test request; it does not independently select requests or send mail.
 
 One page-level poll, at least 15 seconds apart, refreshes active work; hidden-page, unmount, token-change cancellation and 429 backoff prevent stale updates and rate-limit churn. Reopening without session storage recovers durable state. Staff status includes processing/attention even after natural collection closure. Expired external links continue to deny access.
 
@@ -46,7 +46,7 @@ Background uploads use a staging-ID-specific subfolder beneath the existing slot
 
 Recover consumed staging receipts without rereading already-deleted Blob bytes. Preserve generation-key/candidate reconciliation; do not promise exactly-once SharePoint version creation across a crash before receipt persistence.
 
-Automatic processing is bounded to two hours and eight attempts. Deadline exhaustion with no clean checkpoint/candidate can fail safely; evidence of possible external writes holds `needs_attention`. An exact-job operator command supports inspect and guarded retry/cancel only without a live worker lease. Preserve candidate/generation identity and bounded retry. No live operator command is run during development.
+Automatic processing is bounded to two hours and eight attempts. Deadline exhaustion with no clean checkpoint/candidate can fail safely; evidence of possible external writes holds `needs_attention`. An exact-job operator command supports inspect and guarded retry/cancel only without a live worker lease. Preserve candidate/generation identity and bounded retry. No live operator command is run during development. [BUILD LIMITATION] The operator CLI currently accepts loopback databases only and refuses retry of a consumed receipt. Automatic approval review rejected expanding it to remote mutations and removing that safeguard as outside the authorized local operational scope. A production recovery path therefore requires separate authorization before release; the build does not claim that operational prerequisite is complete.
 
 ## Cleanup safeguards
 

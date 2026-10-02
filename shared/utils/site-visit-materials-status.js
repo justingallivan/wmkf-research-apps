@@ -1,11 +1,12 @@
 /** Pure row classification shared by the tracker pill and its filter counts. */
 export const MATERIALS_STATUS = Object.freeze({
   NOT_REQUESTED: 'not_requested', WAITING: 'waiting', LATE: 'late',
+  PROCESSING: 'processing', NEEDS_ATTENTION: 'needs_attention',
   CHECK_FILES: 'check_files', READY: 'ready', CLOSED: 'closed',
   NO_VISIT: 'no_visit', UNAVAILABLE: 'unavailable',
 });
 
-const STATES = new Set(['missing', 'received', 'ready', 'closed']);
+const STATES = new Set(['missing', 'received', 'ready', 'closed', 'processing', 'needs_attention']);
 
 function validSummary(summary) {
   return summary && typeof summary === 'object' && !Array.isArray(summary)
@@ -26,6 +27,8 @@ export function classifySiteVisitMaterialsStatus(summary, { availability = 'unav
       ? { key: MATERIALS_STATUS.NOT_REQUESTED, label: 'Not requested', tone: 'neutral' }
       : { key: MATERIALS_STATUS.NO_VISIT, label: 'No visit', tone: 'neutral' };
   }
+  if (summary.state === 'needs_attention' || summary.attentionCount > 0) return { key: MATERIALS_STATUS.NEEDS_ATTENTION, label: 'Needs attention', tone: 'warning' };
+  if (summary.state === 'processing' || summary.processingCount > 0) return { key: MATERIALS_STATUS.PROCESSING, label: 'Saving files', tone: 'info' };
   if (summary.state === 'closed') return { key: MATERIALS_STATUS.CLOSED, label: 'Closed', tone: 'neutral' };
   if (summary.state === 'ready') return { key: MATERIALS_STATUS.READY, label: 'Ready', tone: 'success' };
   if (!summary.invited) return { key: MATERIALS_STATUS.NOT_REQUESTED, label: 'Not requested', tone: 'neutral' };
@@ -40,5 +43,6 @@ export function classifySiteVisitMaterialsStatus(summary, { availability = 'unav
 
 export const MATERIALS_STATUS_FILTERS = Object.freeze([
   { key: 'not_requested', label: 'Not requested' }, { key: 'waiting', label: 'Waiting' },
+  { key: 'processing', label: 'Saving files' }, { key: 'needs_attention', label: 'Needs attention' },
   { key: 'late', label: 'Late' }, { key: 'check_files', label: 'Check files' }, { key: 'ready', label: 'Ready' },
 ]);

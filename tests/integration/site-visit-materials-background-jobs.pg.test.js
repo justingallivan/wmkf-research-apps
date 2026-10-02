@@ -350,4 +350,41 @@ describeIf('applicant materials background-job store (live PostgreSQL)', () => {
     expect(stageDelete.rowCount).toBe(1);
     expect(await row('SELECT id FROM portal_upload_staging WHERE id=$1', [staging.id])).toBeUndefined();
   });
+
+  test.each(['queued', 'processing', 'needs_attention'])('synchronous slot claim is blocked by %s work in an earlier collection', async (status) => {
+    const requestId = crypto.randomUUID();
+    const oldCollection = await makeCollection({ requestId });
+    const staging = await makeStaging({ requestId });
+    const job = await admit({ collection: oldCollection, staging });
+    if (status !== 'queued') {
+      const claimed = await jobs.claimNextMaterialsUploadJob();
+      if (status === 'needs_attention') await jobs.settleMaterialsUploadJob({ job: claimed, status, errorCode: 'uncertain_write' });
+    }
+    await mockPoolRef.current.query("UPDATE site_visit_material_collections SET status='closed' WHERE id=$1", [oldCollection.id]);
+    const newCollection = await makeCollection({ requestId });
+    expect(await collections.acquireSlotLease({ collectionId: newCollection.id, slotKey: 'presentation_pdf' })).toBeNull();
+    expect(await collections.acquireSlotLease({ collectionId: newCollection.id, slotKey: 'participant_bios' })).not.toBeNull();
+    expect(await collections.acquireSlotLease({ collectionId: oldCollection.id, slotKey: 'presentation_pdf', backgroundJobId: job.id })).not.toBeNull();
+  });
+
+  test('a synchronous slot lease prevents queue admission before provider work', async () => {
+    const collection = await makeCollection();
+    const staging = await makeStaging({ requestId: collection.requestId });
+    const lease = await collections.acquireSlotLease({ collectionId: collection.id, slotKey: 'presentation_pdf' });
+    expect(lease).not.toBeNull();
+    await expect(admit({ collection, staging })).rejects.toMatchObject({ code: 'slot_busy' });
+    expect(await row('SELECT background_job_id FROM portal_upload_staging WHERE id=$1', [staging.id])).toMatchObject({ background_job_id: null });
+  });
+
+
+  test('multiple optional Other jobs do not block each other from starting', async () => {
+    const collection = await makeCollection();
+    const firstStage = await makeStaging({ requestId: collection.requestId });
+    const secondStage = await makeStaging({ requestId: collection.requestId });
+    const first = await admit({ collection, staging: firstStage, slot: 'other' });
+    await admit({ collection, staging: secondStage, slot: 'other' });
+    const lease = await collections.acquireSlotLease({ collectionId: collection.id, slotKey: 'other', backgroundJobId: first.id });
+    expect(lease).not.toBeNull();
+  });
+
 });

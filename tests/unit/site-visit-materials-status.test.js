@@ -15,6 +15,10 @@ describe('classifySiteVisitMaterialsStatus', () => {
     [summary({ state: 'received', receivedCount: 3 }), {}, MATERIALS_STATUS.CHECK_FILES],
     [summary({ state: 'ready', receivedCount: 3 }), {}, MATERIALS_STATUS.READY],
     [summary({ state: 'closed' }), {}, MATERIALS_STATUS.CLOSED],
+    [summary({ state: 'processing' }), {}, MATERIALS_STATUS.PROCESSING],
+    [summary({ state: 'needs_attention' }), {}, MATERIALS_STATUS.NEEDS_ATTENTION],
+    [summary({ state: 'closed', processingCount: 1 }), {}, MATERIALS_STATUS.PROCESSING],
+    [summary({ state: 'closed', attentionCount: 1 }), {}, MATERIALS_STATUS.NEEDS_ATTENTION],
     [summary(), { availability: 'unavailable' }, MATERIALS_STATUS.UNAVAILABLE],
     [{ state: 'wat', invited: true, overdue: false, receivedCount: 0, requiredCount: 0 }, {}, MATERIALS_STATUS.UNAVAILABLE],
   ])('classifies the complete row state', (value, options, expected) => {
