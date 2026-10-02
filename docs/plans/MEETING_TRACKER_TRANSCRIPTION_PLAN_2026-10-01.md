@@ -2,8 +2,8 @@
 title: Meeting Tracker transcription integration
 domain: transcription
 kind: plan
-status: draft-fable-r1-reviewed-owner-decisions-pending
-summary: "Meeting Tracker transcription and contextual speaker selection: owner approved explicit publication, audio-only inputs, and OAuth Fable reviews. Collaboration and permanent-format choices remain open; implementation has not started."
+status: ready-for-disabled-implementation
+summary: "Owner-approved shared staff drafts and retained TXT/VTT, with explicit publication. Fable's conditional approval is incorporated; disabled implementation and separately authorized release remain pending."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -30,6 +30,15 @@ recipient links. First-slice inputs are M4A/MP3, not automatic MP4 extraction or
 Zoom-link retrieval. The owner approved Fable OAuth reviews after disclosure
 of subscription usage/credits and relevant repository-source sharing; secrets,
 audio and transcript content are excluded from review inputs.
+
+**[VERIFIED via owner confirmation, 2026-10-01]** Any authorized Meeting
+Tracker staff member may review, name speakers and publish the request's
+draft. Retain both TXT and VTT final products for now. This is not an
+indefinite retention-policy decision: use the existing governed-material
+retention posture, preserve superseded revisions, and do not apply the pilot
+seven-day purge to final products. The confirmed option included later
+speaker-name corrections; revisions must remain possible without another
+AssemblyAI call after temporary-job expiry.
 
 **[VERIFIED via owner instructions, 2026-10-01]** One-day AssemblyAI provider
 retention is acceptable, with model-training opt-out maintained. This replaces
@@ -93,21 +102,194 @@ do not weaken that boundary or repurpose its database for shared records.
    and labels; retries reuse one publication identity. Do not overwrite an
    intervening newer transcript silently. Partial SharePoint/Dataverse success
    must be recoverable without a second paid transcription or duplicate final.
-   This boundary needs an implementation-level contract before builds start.
+   The implementation-level contract is specified below.
 7. Published output survives temporary-job cleanup. Temporary audio/results
    keep their existing bounded retention unless separately approved. Cleanup
    must never delete finalized SharePoint materials. Existing recipient and
    Workbench readers see only governed final materials, not pilot drafts.
 
-## Decisions required before final plan
+## Revision 2 implementation contract [PLANNED, NOT BUILT]
 
-- Resolve staff collaboration scope explicitly: initiator-only drafts versus
-  authorized Meeting Tracker staff, with request access checked independently.
-- Specify final durable formats and post-publication name corrections; do not
-  promise permanent TXT/VTT regeneration from a seven-day temporary Blob.
-- Verify actual release target, Dataverse/Postgres schema prerequisites and
-  rollout authorization. No live writes, new provider tests, deployments,
-  alias moves, or pilot enablement are authorized by this draft.
+### Identity and access
+
+Add nullable `request_id` and `site_visit_activity_id` UUIDs to the operational
+job ledger with a both-or-neither CHECK; both null means private pilot job.
+The initiating `owner_profile_id` remains attribution, not the authorization
+boundary for request-bound jobs. Every Tracker operation independently requires
+active authenticated profile, Meeting Tracker grant, valid request GUID,
+feature request eligibility and matching persisted job/request/visit binding.
+Reject auth-bypass/null profiles. Pilot queries explicitly exclude bound jobs;
+Tracker queries explicitly exclude unbound jobs. There is no new per-user
+request ACL: authorized Tracker staff share the same request-bound drafts.
+Authoritative request/visit lookup failures fail closed, unlike optional
+candidate-directory failures. Start and Publish additionally require a mapped
+Dataverse staff actor. Missing/duplicate/replaced active visits block new work
+and mutation; cleanup remains independent. Never silently rebind old work to a
+new visit. Record each saving/publishing actor separately from the initiator.
+
+Pilot exclusion must work both before the new columns exist and after Tracker
+flags are turned off. Use a schema-compatible row JSON projection (missing
+`request_id` means unbound), or an equivalently verified capability strategy;
+never fall back to unrestricted owner queries when a rollout flag is disabled.
+Test old schema, new schema with flags off, and populated bound-job fixtures.
+
+Keep the existing pilot routes, superuser requirement and dedicated project
+allowlist unchanged. Add independent literal-on schema readiness and
+`off` / `test:<requestId>` / `on` access controls for Meeting Tracker
+transcription, with invalid/unset values disabled. Worker/provider processing
+must distinguish authorized scopes without needing the Admin pilot UI enabled.
+Keep start/submission gating independent of recovery and cleanup. Reuse
+existing provider/runtime modules only through explicit scope-aware contracts,
+never by passing the initiator's identity as a substitute for caller auth.
+
+### One governed revision, three bounded files
+
+Publish exactly ONE Request Document of existing artifact type TRANSCRIPT.
+Its primary SharePoint identity is the minute-grouped TXT, so existing final
+material readers remain compatible. Add one optional, separately readiness-
+gated Dataverse Memo field `wmkf_transcriptbundlejson` (schema-as-code name
+`wmkf_TranscriptBundleJson`, maximum 32,000 characters). Do not repurpose
+Pre-Site snapshot fields or create a second competing TRANSCRIPT row.
+Manifest selection is additionally opt-in per caller: only bundle read,
+replay and reconciliation request it, not the default adapter projection.
+Use the existing post-presentation producer constant; manifest presence
+distinguishes generated bundles from manual transcripts.
+
+The version-1 manifest contains only typed metadata: schema version, request
+and exact Site Visit identity, immutable revision/operation ID, source revision
+ID when correcting, formatter version, and three file descriptors (`txt`,
+`vtt`, `source`). Each descriptor binds stable site/drive/item/version IDs,
+ETag, exact SHA-256, bounded byte size, filename and content type. Primary TXT
+descriptor must equal the normal registry primary fields. Reject unknown
+schema versions, missing/extra file roles, mismatched request/visit/revision,
+unsafe sizes/types, and incomplete identities. No URLs from request input.
+
+The companion VTT preserves exact cues with saved names. The internal source
+JSON stores only schema version, request/visit/revision identity, normalized
+utterance speaker IDs/start/end/text and saved name mapping needed for later
+correction. No raw provider response, audio URL, callback data, credentials,
+email directory, or provider upload reference. Source is a retained final
+artifact, not an extension of temporary-job retention. Reuse the existing
+normalized transcript cap (4,000,000 bytes); generated TXT/VTT also have exact
+code-owned byte bounds and validation before upload. All three files use the
+request's governed SharePoint location/access, immutable operation-specific
+paths, create-only uploads, read-back hash/metadata checks and one revision.
+Source downloads enforce the byte cap while reading, not only against claimed
+metadata, and validate the resulting hash before parsing.
+
+Only TXT is projected to existing recipient/Workbench consumers in this slice.
+Meeting Tracker staff can download both final TXT and VTT and edit names from
+verified source. The manifest and source file are never serialized to external
+recipient DTOs, accepted as arbitrary media selectors, or linked in recipient
+pages. Future Workbench dual-format display remains deferred. Missing/malformed
+bundle metadata leaves legacy single-file transcript reads intact; new bundle
+editing/download actions fail closed with a repair message. No implicit
+conversion of previously manually uploaded transcripts into editable bundles.
+
+Name corrections load verified source through the current registry row, not
+the expired pilot job. They create a staff-only correction draft, preserve the
+previous published revision until explicit Publish, and create a new immutable
+bundle. Require the expected current artifact ID and version/hash to match at
+activation. No in-place overwrite of finalized TXT/VTT/source. Existing manual
+transcript replacement remains supported and can make an older generated bundle
+non-current; a stale correction must not silently replace it.
+Shared correction drafts live in the publication table's `draft` state with
+source artifact identity, bounded labels, optimistic version and seven-day
+expiry; do not copy transcript text into Postgres. Publishing freezes that row.
+Expiry clears draft labels but leaves final source intact, allowing a fresh
+correction draft later. Candidate IDs are suggestions, not authority; saved
+labels are validated strings, never client-supplied identity credentials.
+
+### Publication receipt and commit boundary
+
+Use an operational `meeting_transcript_publications` table for durable,
+versioned publication intent/recovery; do not overload a one-hour upload-staging
+row or retain transcript text in Postgres. The receipt binds operation UUID,
+request/visit, initiator and publishing actor, input job or source artifact,
+expected current artifact (including explicit no-current), frozen input hash,
+formatter version, state/version, lease token/expiry, exact candidate paths and
+verified file descriptors, resulting document ID and fixed error code. It may
+retain a bounded frozen name mapping only while an operation is unresolved;
+clear it after the verified source artifact is durably bound or cleanup is
+closed. Failed/retryable operations remain visible in Tracker to authorized
+staff; operational events carry IDs/codes only, not transcript/name contents.
+
+Freeze source and names under job/source version CAS and a publication lease.
+Before any SharePoint write persist deterministic candidate identities/paths.
+Upload/verify all three files before registry activation. Renew/check leases
+before and after I/O. A known candidate is reconciled by exact ID/hash; an
+ambiguous timeout never triggers overwrite or a new paid transcription.
+
+Generalize only the narrow transcript publication seam in material-service:
+the existing manual-upload caller keeps its current validation, scan, staging,
+actor, recovery and replacement behavior. The generated-bundle caller supplies
+the explicit receipt-backed candidate/lease contract and complete verified
+manifest, not invented staging state. Both acquire the SAME request/type slot
+lease; generated publication checks expected-current identity under that lease
+before registry activation. Allocate a deterministic generation key and one
+document identity per immutable publication operation. Replays use that exact
+identity; a newer winner remains current and is reported as such, not success
+for replacing it. Do not allocate a fresh fence that lets a stale retry win.
+Generation key is the digest of producer/request/TRANSCRIPT/operation ID/frozen
+input hash; `wmkf_inputfingerprint` is that frozen input hash and
+`wmkf_contenthash` is the TXT hash. Replay compares all three manifest file
+descriptors with the receipt in addition to existing registry checks. Freeze
+formatter version and bytes so a code upgrade cannot create a second identity.
+
+The atomic visibility boundary is creation/activation of one complete READY
+registry row containing the primary TXT and complete manifest. Earlier files
+are not visible through material readers. Superseding older rows and recording
+the Postgres receipt may fail afterward: recover by deterministic generation
+identity and return explicit committed/reconciliation status, never retry as a
+new publication or erase the usable winner. Slot-fence ordering continues to
+choose one winner. Truthful UI distinguishes publishing, published,
+published-with-reconciliation-needed, retryable failure and outcome unknown.
+
+### Cleanup and retention boundaries
+
+Temporary jobs retain the existing seven-day content and thirty-day receipt
+policy. Freeze is a single version-checked transaction using the ready,
+unexpired, output-present, not-cleaning/not-purged predicates of speaker save:
+copy labels, job version and content hash into the publication receipt and take
+the job row's own lease token before any SharePoint I/O. The publisher renews
+that job lease until source JSON is uploaded and read-back verified; retries
+thereafter use only frozen files. Tracker delete-draft returns 409 while that
+job has an unresolved publication receipt. A separate receipt lease alone is
+insufficient: existing cleanup checks the job lease. A valid job lease blocks
+deletion of bytes publication is reading;
+expiry blocks new publication immediately. Publication recovery first reconciles
+the exact registry generation key and all file identities: a committed row,
+including Superseded, protects ALL bundle files regardless of receipt state.
+No-candidate expiry cannot publish. An unresolved operation can finish only
+from already verified frozen files, not newer job labels; otherwise retain
+exact minimal recovery identifiers and surface attention. Do not extend a
+readable temporary draft's expiry to make recovery convenient.
+
+Before permitting orphan deletion, account for any in-flight upload that might
+commit later and any ambiguous registry write. Unknown, mismatched, unavailable
+or multiple binding results retain candidates and report attention. Only
+positively unbound exact owned candidates can be removed; no prefix deletion.
+Require version-checked receipt closure and a quarantine longer than the
+maximum request duration after its last lease expiry before orphan deletion.
+Lease expiry plus a zero-row lookup alone is not permission to delete.
+Existing staging cleanup must remain unable to claim generated bundle files.
+Add a bounded publication cleanup/reconciliation pass to existing maintenance
+cadence, not a new frequent scheduler. Do not clear exact candidate references
+until safe closure is established. No automatic final-product expiration or
+deletion is added in this slice; existing records policy remains authoritative.
+
+### Release boundary
+
+Build disabled on `codex/transcription-pilot`; no shared deployment merely to
+test the UI. Proposed runtime home is the shared application, not the isolated
+pilot. New Postgres migration(s) and an additive Dataverse wave are source-only
+until numbering, physical schema, target configuration and owner-approved apply
+are verified. Scope checks include existing 060–062, post-presentation schema,
+private storage, provider controls and actual scheduler delivery. Schema
+readiness must gate select lists as well as routes so older environments still
+read legacy documents. Never enable the Admin pilot to activate Tracker.
+Production deployment, schema applies, feature enablement, real-recording tests
+and any newly metered service calls remain separately authorized operations.
 
 ## Build and acceptance sequence [PLANNED]
 
@@ -172,15 +354,13 @@ Root dispositions:
   one transcript slot, immediate reader exposure, and required publication
   recovery. Do not claim per-user request ACLs: current access is app grant,
   rollout request eligibility, and verified request/visit/job binding.
-- Accept shared request-bound drafts as the recommendation, subject to the
-  pending owner choice. Keep initiating actor attribution, mapped staff
+- Accept shared request-bound drafts, now confirmed by the owner. Keep initiating actor attribution, mapped staff
   identity for publication, and existing private pilot jobs isolated. A new
   Meeting Tracker gate must not require enabling the Admin pilot surface.
-- Fable recommends permanent TXT only and VTT/corrections within the temporary
-  seven-day window. Do not silently adopt that reduction: the owner has been
-  asked whether permanent dual-format output and later corrections are needed.
-  If required, amend the final-artifact contract rather than publishing two
-  competing transcript winners or prolonging temporary storage implicitly.
+- Fable recommended permanent TXT only and VTT/corrections within the temporary
+  seven-day window. Owner confirmed retaining both formats; revision 2 replaces
+  that recommendation with one governed bundle and retained normalized source,
+  not two competing winners or indefinite temporary-job retention.
 - Accept a durable publication-operation/candidate receipt, frozen job version
   and labels, and expected-current-artifact comparison under the existing slot
   lease. The precise ledger design must handle expiry/delete racing publication
@@ -198,4 +378,20 @@ Root dispositions:
   confirming target state and migration numbering. Do not broaden the isolated
   pilot allowlist or treat a source build as operational enablement.
 
-Verdict: **DRAFT — NOT IMPLEMENTATION-READY.**
+## Fable round 2 and settled plan
+
+[VERIFIED via OAuth review result] Fable returned one named blocking change,
+then READY TO IMPLEMENT as disabled source. Full output is retained in
+[round 2 evidence](evidence/MEETING_TRANSCRIPTION_FABLE_R2_2026-10-01.md).
+Root verified the cleanup predicates in `store.js::claimCleanup`,
+`claimNextCleanupJob` and `requestCleanup` and incorporated the required
+transactional job lease, renewals and unresolved-publication delete guard.
+The small producer, hash mapping, opt-in manifest projection, correction-draft
+home and orphan-quarantine contracts are also incorporated above. Root added
+old-schema pilot isolation and bounded source reads to the build invariants.
+These are planned mechanisms, not tested implementation claims.
+
+Verdict: **READY FOR DISABLED IMPLEMENTATION.** Fable's named plan condition
+is incorporated; Sol, root and final adversarial Fable implementation reviews
+remain required. No schema apply, deployment, enablement or provider test is
+authorized by this verdict.
