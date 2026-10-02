@@ -17,7 +17,7 @@ import {
 import { TEST_REQUEST_PREVIEW_READ_LIMITS } from '../../lib/services/test-requests/admin-preview-service.js';
 import { renderInitialAssessmentDocx } from '../../lib/services/initial-assessment/template.js';
 import { SYNTHETIC_GENERATED } from '../../lib/services/test-requests/fixtures/initial-assessment-synthetic.js';
-import { XLSX_MIME, buildXlsxCopyFixtures } from '../helpers/minimal-xlsx-package.js';
+import { XLSX_MIME, buildMinimalXlsx, buildXlsxCopyFixtures, customProperty, customPropertiesXml } from '../helpers/minimal-xlsx-package.js';
 
 const SITE = { key: 'akoyago-shared', hostname: 'appriver3651007194.sharepoint.com', pathname: '/sites/akoyago' };
 const TARGET = { ...SITE, registered: true };
@@ -721,11 +721,85 @@ describe('XLSX package integrity mode (Basic recipe)', () => {
     expect(verifyCopiedFiles(copies, listing(sourceXlsx.length))).toEqual(['Project Budget spreadsheet.xlsx listing does not match the journaled copy']);
   });
 
+  describe('settle check before journaling', () => {
+    // Serves the destination item's metadata from `metaFor(call)` and its bytes from `bytesFor(call)`
+    // (call = 1-based count of destination reads/downloads), leaving every other item alone.
+    function settlingDependencies({ metaFor, bytesFor }) {
+      const { deps } = xlsxDependencies();
+      const baseMetadata = deps.getFileMetadataById.getMockImplementation();
+      const baseDownload = deps.downloadFile.getMockImplementation();
+      let metaCalls = 0;
+      let downloads = 0;
+      deps.sleep = jest.fn(async () => {});
+      deps.getFileMetadataById.mockImplementation(async (driveId, itemId) => {
+        const metadata = await baseMetadata(driveId, itemId);
+        if (itemId !== 'new-xlsx') return metadata;
+        metaCalls += 1;
+        return { ...metadata, ...metaFor(metaCalls) };
+      });
+      deps.downloadFile.mockImplementation(async (driveId, itemId) => {
+        if (itemId !== 'new-xlsx') return baseDownload(driveId, itemId);
+        downloads += 1;
+        return { buffer: bytesFor(downloads) };
+      });
+      return deps;
+    }
+    let laterXlsx;
+    beforeAll(async () => {
+      laterXlsx = await buildMinimalXlsx({ custom: customPropertiesXml(customProperty('ContentTypeId', 2, '0x0101'), customProperty('TaxKeyword', 3, 'revised')) });
+    });
+
+    test('a content revision between the before and after reads is retried; the journal comes from the settled attempt', async () => {
+      // Reads: attempt 1 before/after (cTag moves), attempt 2 before/after (stable, new size).
+      const deps = settlingDependencies({
+        metaFor: (call) => (call === 1 ? { cTag: '"c1"' } : call === 2 ? { cTag: '"c2"' } : { cTag: '"c3"', size: laterXlsx.length }),
+        bytesFor: (call) => (call === 1 ? promotedXlsx : laterXlsx),
+      });
+      const copies = await copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {}));
+      expect(copies[0].status).toBe('verified');
+      expect(copies[0].attestedDigest).toBe(hash(laterXlsx));
+      expect(copies[0].item.size).toBe(laterXlsx.length);
+      expect(deps.sleep).toHaveBeenCalledTimes(1);
+    });
+
+    test('content that never settles stops after 3 attempts with a clear error and no verified entry', async () => {
+      let reads = 0;
+      const deps = settlingDependencies({ metaFor: () => { reads += 1; return { cTag: `"c${reads}"` }; }, bytesFor: () => promotedXlsx });
+      const journal = jest.fn(async () => {});
+      await expect(copyBundleFiles(params(xlsxPlan()), deps, journal))
+        .rejects.toThrow('Created item Project Budget spreadsheet.xlsx did not settle after upload; its content was still changing.');
+      expect(deps.sleep).toHaveBeenCalledTimes(2);
+      expect(deps.downloadFile.mock.calls.filter(([, itemId]) => itemId === 'new-xlsx')).toHaveLength(3);
+      const last = journal.mock.calls.at(-1)[0][0];
+      expect(last.status).not.toBe('verified');
+    });
+
+    test('a comparison failure on the first attempt throws without retrying', async () => {
+      const deps = settlingDependencies({ metaFor: () => ({}), bytesFor: () => tamperedXlsx });
+      await expect(copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {}))).rejects.toThrow(/differs from the source/);
+      expect(deps.sleep).not.toHaveBeenCalled();
+      expect(deps.downloadFile.mock.calls.filter(([, itemId]) => itemId === 'new-xlsx')).toHaveLength(1);
+    });
+  });
+
+  test('an XLSX whose workbook relationships were rewritten (an added customXml relationship and part) is refused in package mode', async () => {
+    const zip = await JSZip.loadAsync(promotedXlsx);
+    const rels = await zip.file('xl/_rels/workbook.xml.rels').async('string');
+    zip.file('xl/_rels/workbook.xml.rels', rels.replace('</Relationships>', '<Relationship Id="rId9" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="../customXml/item2.xml"/></Relationships>'));
+    zip.file('customXml/item2.xml', await zip.file('customXml/item1.xml').async('string'));
+    zip.file('customXml/itemProps2.xml', await zip.file('customXml/itemProps1.xml').async('string'));
+    zip.file('customXml/_rels/item2.xml.rels', (await zip.file('customXml/_rels/item1.xml.rels').async('string')).replace('itemProps1', 'itemProps2'));
+    const rewritten = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    const { deps } = xlsxDependencies({ uploadedBytes: rewritten });
+    await expect(copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {}))).rejects.toThrow(/differs from the source.*xl\/_rels\/workbook\.xml\.rels/);
+  });
+
   test('a PDF copy is unchanged: exact hash, no attestedDigest, listing compared to the source size', async () => {
     const { deps } = fakeDependencies();
     const copies = await copyBundleFiles(params(planBundleFileCopies(bundle([doc()]), { destinationRequestNumber: '1000400' })), deps, jest.fn(async () => {}));
     expect(copies[0].status).toBe('verified');
     expect(copies[0].attestedDigest).toBeUndefined();
+    expect(deps.getFileMetadataById.mock.calls.filter(([, id]) => id === copies[0].item.id)).toHaveLength(1); // one readback, never a settle pair
     expect(await reverifyCopiedItems(copies, deps)).toEqual([]);
     const listing = [{ id: copies[0].item.id, name: copies[0].destination.filename, size: NARRATIVE.length, folder: copies[0].destination.folder }];
     expect(verifyCopiedFiles(copies, listing)).toEqual([]);

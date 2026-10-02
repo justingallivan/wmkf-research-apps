@@ -35,12 +35,14 @@ The source already carried SharePoint's `customXml/*` parts and `[trash]/0000.da
 
 - **Characterized for XLSX: the `docProps/custom.xml` rewrite only.** The attestation's tolerance for *added* customXml is Word-shaped (`DOCUMENT_RELS_PART = 'word/_rels/document.xml.rels'`, `docx-package-attestation.js:42`). An XLSX that had never been promoted would get `xl/_rels/workbook.xml.rels` rewritten, which falls to the byte-identical branch (`:954-956`) and fails closed. That is the intended v1 behaviour. Do not generalize `DOCUMENT_RELS_PART` without a live case.
 - **No resume path for a run stopped at `file_journal_unverified`** (`run-runner.js:945-949`). Run `20407283` stays parked; its bundle passes the 6-hour bound (`BUNDLE_MAX_AGE_MS`, `bundle-file-copy.js:87`) at 2026-10-03T00:20Z. Leave that refusal and its sibling at `:2698` as they are.
+- The package budget and part ceilings written for DOCX now apply to XLSX unchanged: `DOCX_PACKAGE_BUDGET` (`docx-package-attestation.js:242`) allows at most 2,000 entries, 100 MiB per uncompressed part and 200 MiB total uncompressed; `NORMALIZED_PART_CEILINGS` (`:505`) caps `[Content_Types].xml`, `word/_rels/document.xml.rels`, `_rels/.rels` at 32 KiB and `docProps/core.xml`, `docProps/custom.xml` at 8 KiB each. `CUSTOMXML_LIMITS` (`:105`) bounds SharePoint-added customXml items.
+- The custom-properties validator (`validateCustomProperties`, `:686`) accepts at most 64 properties, each holding exactly one scalar `vt:*` value from `VT_VALUE_TYPES` (`:520`) of at most 1,024 characters. A spreadsheet outside those bounds (a larger or non-scalar `docProps/custom.xml`, an oversized package) stops at `copy_file` and fails closed; nothing is relaxed for it.
 - The first-lookup "changed while its bytes were being verified" refusal is not part of this work.
 - No change to `validateCustomProperties` or any attestation rule. No new mechanism.
 
 ## Not verified
 
-- Whether SharePoint rewrites an uploaded XLSX more than once over time. The copy step journals `attestedDigest` about a second after upload and the `verify` step compares the later download to it. The DOCX path makes the same assumption and passes in production. The next production run is the test.
+- A SharePoint rewrite that happens after the settle check passes. For package-mode files (DOCX and XLSX), `verifyCreatedItem` now reads metadata, downloads and attests, then reads metadata again, and journals only when size, eTag, cTag and versionId agree, trying at most 3 times about 2 seconds apart (the first live XLSX had eTag revision 1 but cTag revision 3). A later revision after that point would still fail the `verify` step on a good copy. The next production run is the test.
 - XLSX sources outside the `akoya_request` library family.
 
 ## Rules for the build
