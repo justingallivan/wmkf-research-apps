@@ -256,8 +256,10 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
     if (selected.blocked) return BLOCKED_COPY[selected.blocked] || BLOCKED_COPY.default;
     return '';
   })();
-  const blockedOptions = options.filter((option) => option.value === current || option.blocked);
-  const blockedWhy = (option) => (option.value === current ? BLOCKED_COPY.status_change_noop : (BLOCKED_COPY[option.blocked] || BLOCKED_COPY.default));
+  // The status already set is not a refusal: the menu marks it "(already set)" and the line below names it,
+  // so it stays out of this list. Right after a successful change it would otherwise read as a failure.
+  const blockedOptions = options.filter((option) => option.value !== current && option.blocked && option.blocked !== 'status_change_noop');
+  const blockedWhy = (option) => BLOCKED_COPY[option.blocked] || BLOCKED_COPY.default;
   const checkReason = (() => {
     if (writeBlock) return writeBlock;
     if (busy) return 'Waiting for the last request to finish.';

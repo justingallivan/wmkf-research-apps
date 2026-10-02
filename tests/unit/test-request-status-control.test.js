@@ -115,6 +115,8 @@ describe('status control', () => {
     expect(screen.getByText('Phase II status', { selector: 'td' })).toBeTruthy();
     // The option just set is now the current one: no second change can be started for it (the server would refuse a no-op).
     await screen.findAllByText('That status is already set. Choose a different one.');
+    // A successful change must not be followed by a list of statuses that "can't be set".
+    expect(screen.queryByText(/can't be set now/)).toBeNull();
     expect(screen.getByRole('button', { name: 'Set status' }).disabled).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
     expect(screen.queryByRole('group', { name: 'Confirm the status change' })).toBeNull();
@@ -380,7 +382,7 @@ describe('status choices and confirmation', () => {
     expect(screen.getByLabelText('New status').disabled).toBe(false);
   });
 
-  test('blocked and already-set options are listed with their reasons in a details under the select', async () => {
+  test('blocked options are listed with their reasons in a details under the select; the status already set is not', async () => {
     const blocked = {
       status: 200,
       body: { ...statusBody().body, options: { phase1: OPTIONS.phase1, phase2: OPTIONS.phase2.map((o) => (o.label === 'Recommended' ? { ...o, blocked: 'status_change_edge', effects: null } : o)) } },
@@ -388,11 +390,12 @@ describe('status choices and confirmation', () => {
     const server = makeServer().on('GET', BASE, blocked);
     await renderControl(server);
     fireEvent.change(screen.getByLabelText('Status field'), { target: { value: 'phase2' } });
-    const summary = screen.getByText("Why 2 statuses can't be set now");
+    const summary = screen.getByText("Why 1 status can't be set now");
     expect(summary.closest('details').open).toBe(false);
     const list = within(summary.closest('details'));
     expect(list.getByText(/Recommended/).parentElement.textContent).toMatch(/can create a payment or a status-tracking row/);
-    expect(list.getByText(/Not invited/).parentElement.textContent).toMatch(/already set/);
+    // The status already set is marked in the menu, not listed here as a refusal.
+    expect(list.queryByText(/Not invited/)).toBeNull();
   });
 
   test.each([
