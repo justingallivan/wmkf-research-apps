@@ -9,6 +9,7 @@
  */
 import { jest } from '@jest/globals';
 import { createAdminRunService } from '../../lib/services/test-requests/admin-run-service.js';
+import { runStatusChange as realRunStatusChange } from '../../lib/services/test-requests/status-change-runner.js';
 import { deriveActorId, deriveRunIds } from '../../lib/services/test-requests/admin-run-identity.js';
 import { artifactDigest, draftPathname, runPathname } from '../../lib/services/test-requests/factory-artifact-store.js';
 import { SANDBOX_URL, PRODUCTION_URL, sha256 } from '../../lib/services/test-requests/basic-clone-steps.js';
@@ -31,6 +32,7 @@ const SOURCE_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const SITE_ID = 'appriver3651007194.sharepoint.com,48930e19-0000-4000-8000-000000000000,11111111-1111-4111-8111-111111111111';
 const DRIVE_ID = 'b!GQ6TSC-650adweD3-KAAAAAAAAAAAA';
 const HOUR = 3600_000;
+const CHANGE_ID = '9a9a9a9a-9a9a-4a9a-8a9a-9a9a9a9a9a9a';
 const PROFILE = 11;
 const KEY = 'draft-key-1';
 
@@ -168,7 +170,7 @@ function bundleAt(exportedAt) {
   });
 }
 
-function harness({ deployment = 'preview', env = {}, preflightTarget = null } = {}) {
+function harness({ deployment = 'preview', env = {}, preflightTarget = null, deps = {} } = {}) {
   const production = deployment === 'production';
   const ledger = fakeLedger();
   const blobs = fakeBlob();
@@ -184,6 +186,9 @@ function harness({ deployment = 'preview', env = {}, preflightTarget = null } = 
     advanceRun: jest.fn(async () => ({
       step: 'create_request', outcome: 'advanced', run: { status: 'creating', destinationRequestNumber: null }, errorMessage: null,
     })),
+    runStatusChange: jest.fn(async () => ({ changeId: CHANGE_ID, sequence: 1, field: 'wmkf_phaseiistatus', after: 100000002 })),
+    recheckStatusChange: jest.fn(async () => ({ sequence: 1, ok: true })),
+    readLiveOptions: jest.fn(async (_client, field) => [{ value: 1, label: `option of ${field}` }]),
   };
   const fullEnv = {
     TEST_REQUEST_FACTORY_FORM: 'on',
@@ -208,6 +213,10 @@ function harness({ deployment = 'preview', env = {}, preflightTarget = null } = 
     readCast: spies.readCast,
     resolveProgramDirector: spies.resolveProgramDirector,
     advanceRun: spies.advanceRun,
+    runStatusChange: spies.runStatusChange,
+    recheckStatusChange: spies.recheckStatusChange,
+    readLiveOptions: spies.readLiveOptions,
+    ...deps,
   });
   const actorId = deriveActorId(PROFILE);
   const target = production ? 'production' : 'sandbox';
@@ -888,5 +897,237 @@ describe('slice 2 recovery cases', () => {
     expect(h.blobs.objects.has(draftPathname('sandbox', h.actorId, first.draftId))).toBe(true);
     expect(h.blobs.objects.has(draftPathname('sandbox', h.actorId, second.draftId))).toBe(true);
     expect(h.blobs.objects.size).toBe(2);
+  });
+});
+
+// ---- slice 2b: status setter ---------------------------------------------------
+
+describe('status setter service (slice 2b)', () => {
+  const readyProduction = (extra = {}) => {
+    const h = harness({ deployment: 'production', ...extra });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { status: 'ready' });
+    return { h, runId };
+  };
+  const change = (h, runId, extra = {}) => h.service.changeStatus({
+    profileId: PROFILE, runId, field: 'phase2', optionLabel: 'Recommended', deadlineAt: h.clock.t + 280_000, ...extra,
+  });
+  const runnerError = (errorCode, message = 'upstream detail: secret-host.example', extra = {}) => Object.assign(new Error(message), { code: errorCode, changeId: CHANGE_ID, sequence: 1, ...extra });
+
+  test('statusOptions returns both fields live options, the journal and the run status, through a read client', async () => {
+    const { h, runId } = readyProduction();
+    const result = await h.service.statusOptions({ profileId: PROFILE, runId });
+    expect(result).toEqual({
+      runId, runStatus: 'ready', options: { phase1: [{ value: 1, label: 'option of wmkf_phaseistatus' }], phase2: [{ value: 1, label: 'option of wmkf_phaseiistatus' }] }, changes: [],
+    });
+    expect(h.createClientCalls.every((c) => !c.allowTestRequestMarkerWrites)).toBe(true);
+  });
+
+  test('changeStatus calls the runner once with the run, the mapped Dataverse field, label and a deadline-bound completion, never rerun', async () => {
+    const { h, runId } = readyProduction();
+    const deadlineAt = h.clock.t + 280_000;
+    const result = await change(h, runId, { deadlineAt });
+    expect(result).toMatchObject({ outcome: 'complete', changeId: CHANGE_ID, sequence: 1 });
+    expect(h.spies.runStatusChange).toHaveBeenCalledTimes(1);
+    const call = h.spies.runStatusChange.mock.calls[0][0];
+    expect(call).toMatchObject({ runId, field: 'wmkf_phaseiistatus', optionLabel: 'Recommended' });
+    expect(call.completion.deadlineAt).toBe(deadlineAt - 30_000);
+    expect(Object.hasOwn(call, 'rerun')).toBe(false);
+    expect(call.client.allowTestRequestMarkerWrites).toBeUndefined();
+  });
+
+  test.each([
+    ['status_change_jobs_open', 202, { outcome: 'jobs_open', code: 'status_change_jobs_open', message: 'The change was written. Background jobs on the Request are still finishing; check again.', changeId: CHANGE_ID }],
+  ])('runner %s becomes a returned value', async (errorCode, _status, expected) => {
+    const { h, runId } = readyProduction();
+    h.spies.runStatusChange.mockRejectedValueOnce(runnerError(errorCode));
+    expect(await change(h, runId)).toEqual(expected);
+  });
+
+  test('in progress returns the owner abandon command and no upstream text', async () => {
+    const { h, runId } = readyProduction();
+    h.spies.runStatusChange.mockRejectedValueOnce(runnerError('status_change_in_progress'));
+    const result = await change(h, runId);
+    expect(result).toEqual({
+      outcome: 'in_progress', code: 'status_change_in_progress',
+      message: 'This change is being sent, or was sent and its result is not yet known. Do not retry. If it never resolves, the owner closes it from the CLI after establishing that no sender is still running.',
+      changeId: CHANGE_ID,
+      abandonCommand: `node scripts/rehearse-test-request-sandbox.mjs --target=production --status-abandon=${runId} --change-id=${CHANGE_ID}`,
+    });
+  });
+
+  test('an ambiguous send is unconfirmed and never carries the upstream error text', async () => {
+    const { h, runId } = readyProduction();
+    h.spies.runStatusChange.mockRejectedValueOnce(runnerError('status_change_ambiguous', 'The status PATCH has no readable result (connect ECONNRESET secret-host.example)'));
+    const result = await change(h, runId);
+    expect(result).toEqual({
+      outcome: 'unconfirmed', code: 'status_change_ambiguous',
+      message: 'The change was sent but its result could not be read. Check again; do not start a different change.', changeId: CHANGE_ID,
+    });
+    expect(JSON.stringify(result)).not.toMatch(/ECONNRESET|secret-host/);
+  });
+
+  test.each([
+    'status_change_noop', 'status_change_open', 'status_change_conflict', 'status_change_resume', 'status_change_effects',
+    'status_change_edge', 'status_change_concurrent', 'status_change_refused',
+  ])('runner %s is a 409 with the runner code and message', async (errorCode) => {
+    const { h, runId } = readyProduction();
+    h.spies.runStatusChange.mockRejectedValueOnce(runnerError(errorCode, 'runner says no'));
+    const error = await change(h, runId).catch((e) => e);
+    expect(error).toMatchObject({ httpStatus: 409, code: errorCode, message: 'runner says no' });
+  });
+
+  test('a replay is a 409 pointing at the owner CLI', async () => {
+    const { h, runId } = readyProduction();
+    h.spies.runStatusChange.mockRejectedValueOnce(runnerError('status_change_replay', 'pass --rerun'));
+    const error = await change(h, runId).catch((e) => e);
+    expect(error).toMatchObject({ httpStatus: 409, code: 'status_change_replay' });
+    expect(error.message).toBe('An earlier change to this status created, or may have created, a payment or status-tracking row on this Request. Repeating it needs the owner CLI (`--set-status … --rerun`) after inspection.');
+  });
+
+  test('a Postgres unique violation from planning is a 409 status_change_open', async () => {
+    const { h, runId } = readyProduction();
+    h.spies.runStatusChange.mockRejectedValueOnce(Object.assign(new Error('duplicate key value violates unique constraint'), { code: '23505' }));
+    const error = await change(h, runId).catch((e) => e);
+    expect(error).toMatchObject({ httpStatus: 409, code: 'status_change_open', message: 'Another status change on this run is already open; reload.' });
+  });
+
+  test('an unlisted error is rethrown unchanged (the route answers a generic 500)', async () => {
+    const { h, runId } = readyProduction();
+    const boom = new Error('Request read failed');
+    h.spies.runStatusChange.mockRejectedValueOnce(boom);
+    await expect(change(h, runId)).rejects.toBe(boom);
+  });
+
+  test('write switch off: changeStatus and statusRecheck are 503, statusOptions still answers', async () => {
+    const { h, runId } = readyProduction({ env: { TEST_REQUEST_FACTORY_FORM: 'off' } });
+    expect(await code(change(h, runId))).toBe('factory_form_disabled');
+    expect(await code(h.service.statusRecheck({ profileId: PROFILE, runId }))).toBe('factory_form_disabled');
+    await expect(h.service.statusOptions({ profileId: PROFILE, runId })).resolves.toMatchObject({ runStatus: 'ready' });
+    expect(h.spies.runStatusChange).not.toHaveBeenCalled();
+    expect(h.spies.recheckStatusChange).not.toHaveBeenCalled();
+  });
+
+  test('isolation off on production: changeStatus is 503 before the runner', async () => {
+    const { h, runId } = readyProduction({ env: { TEST_REQUEST_ISOLATION: 'off' } });
+    expect(await code(change(h, runId))).toBe('factory_isolation_off');
+    expect(h.spies.runStatusChange).not.toHaveBeenCalled();
+  });
+
+  test("another actor's run is 404 on all three", async () => {
+    const { h, runId } = readyProduction();
+    for (const call of [
+      () => h.service.statusOptions({ profileId: 99, runId }),
+      () => change(h, runId, { profileId: 99 }),
+      () => h.service.statusRecheck({ profileId: 99, runId }),
+    ]) expect(await code(call())).toBe('factory_run_not_found');
+    expect(h.spies.runStatusChange).not.toHaveBeenCalled();
+    expect(h.spies.recheckStatusChange).not.toHaveBeenCalled();
+  });
+
+  test('a sandbox run is 409 on all three', async () => {
+    const h = harness({ deployment: 'preview' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { status: 'ready' });
+    for (const call of [
+      () => h.service.statusOptions({ profileId: PROFILE, runId }),
+      () => change(h, runId),
+      () => h.service.statusRecheck({ profileId: PROFILE, runId }),
+    ]) expect(await code(call())).toBe('factory_run_not_production');
+    expect(h.spies.runStatusChange).not.toHaveBeenCalled();
+  });
+
+  test('a run that is not ready is 409 before the runner is called', async () => {
+    const h = harness({ deployment: 'production' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { status: 'creating' });
+    expect(await code(change(h, runId))).toBe('factory_run_not_ready');
+    expect(h.spies.runStatusChange).not.toHaveBeenCalled();
+  });
+
+  test('under 150 s of route time left is a 504 and the runner is not called; exactly 150 s is allowed', async () => {
+    const { h, runId } = readyProduction();
+    expect(await code(change(h, runId, { deadlineAt: h.clock.t + 149_999 }))).toBe('factory_deadline_exceeded');
+    expect(h.spies.runStatusChange).not.toHaveBeenCalled();
+    await expect(change(h, runId, { deadlineAt: h.clock.t + 150_000 })).resolves.toMatchObject({ outcome: 'complete' });
+  });
+
+  test('field and label are validated before any ledger work', async () => {
+    const { h, runId } = readyProduction();
+    expect(await code(change(h, runId, { field: 'phase3' }))).toBe('factory_invalid_input');
+    expect(await code(change(h, runId, { optionLabel: '  ' }))).toBe('factory_invalid_input');
+    expect(h.spies.runStatusChange).not.toHaveBeenCalled();
+  });
+
+  test('statusRecheck passes through the runner result; a runner refusal is a 409', async () => {
+    const { h, runId } = readyProduction();
+    await expect(h.service.statusRecheck({ profileId: PROFILE, runId })).resolves.toEqual({ sequence: 1, ok: true });
+    h.spies.recheckStatusChange.mockRejectedValueOnce(runnerError('status_change_refused', 'This run has no status change to recheck.'));
+    expect(await h.service.statusRecheck({ profileId: PROFILE, runId }).catch((e) => ({ s: e.httpStatus, c: e.code }))).toEqual({ s: 409, c: 'status_change_refused' });
+  });
+
+  test('a second POST for a jobs_open change calls the runner again and the real runner sends no second PATCH', async () => {
+    const PHASE2 = 'wmkf_phaseiistatus';
+    const REQUEST_ID = '13131313-1313-4131-8131-131313131313';
+    const state = {
+      akoya_requestid: REQUEST_ID, wmkf_istestrequest: true, wmkf_testcreationrunid: null, wmkf_phaseistatus: null, wmkf_phaseiistatus: null,
+      _wmkf_grantprogram_value: PROGRAM_ID, akoya_requeststatus: 'Pending', '@odata.etag': 'W/"100"',
+    };
+    const patches = [];
+    let jobsDone = false;
+    const rows = [];
+    const move = (id, from, to, extra = {}) => {
+      const row = rows.find((r) => r.changeId === id);
+      if (!row || !from.includes(row.status)) return null;
+      Object.assign(row, { status: to }, extra);
+      return { ...row };
+    };
+    const memoryLedger = {
+      getRun: async (id) => ({ runId: id, status: 'ready', destinationEnvironment: 'production', destinationRequestId: REQUEST_ID, sourceRequestId: SOURCE_ID }),
+      listStatusChanges: async () => rows.map((r) => ({ ...r })),
+      planStatusChange: async (input) => { const row = { ...input, sequence: 1, status: 'planned', dispatchedAt: null, effects: null }; rows.push(row); return { ...row }; },
+      markStatusChangeDispatched: async ({ changeId }) => move(changeId, ['planned'], 'dispatched', { dispatchedAt: '2026-09-28T22:00:00Z' }),
+      markStatusChangeApplied: async ({ changeId }) => move(changeId, ['dispatched', 'applied'], 'applied'),
+      completeStatusChange: async ({ changeId, effects }) => move(changeId, ['applied'], 'complete', { effects }),
+      markStatusChangeNeedsAttention: async ({ changeId, onlyIf }) => move(changeId, onlyIf ? [onlyIf] : ['planned', 'dispatched', 'applied'], 'needs_attention'),
+    };
+    const ok = (body) => ({ ok: true, status: 200, body });
+    const client = {
+      baseUrl: `${PRODUCTION_URL}/api/data/v9.2`,
+      async get(raw) {
+        const path = decodeURIComponent(raw);
+        if (path.startsWith(`/akoya_requests(${REQUEST_ID})`)) return ok({ ...state, wmkf_testcreationrunid: currentRunId });
+        if (path.startsWith(`/wmkf_grantprograms(${PROGRAM_ID})`)) return ok({ wmkf_name: 'Research' });
+        if (path.includes(`LogicalName='${PHASE2}'`)) return ok({ GlobalOptionSet: { Options: [{ Value: 100000002, Label: { UserLocalizedLabel: { Label: 'Phase II Pending Committee Review' } } }] } });
+        if (path.startsWith('/asyncoperations')) {
+          return ok({ value: [{ asyncoperationid: '33333333-3333-4333-8333-333333333333', statecode: jobsDone ? 3 : 1, statuscode: jobsDone ? 30 : 10, createdon: '2026-09-28T22:00:05Z' }] });
+        }
+        if (/^\/(emails|akoya_goapplystatustrackings|akoya_requestpayments)/.test(path)) return ok({ value: [] });
+        throw new Error(`unexpected path ${path}`);
+      },
+      async patchWithOptions(path, body, headers) {
+        patches.push({ path, body, headers });
+        Object.assign(state, body, { '@odata.etag': 'W/"101"' });
+        return { ok: true, status: 204 };
+      },
+    };
+    let currentRunId;
+    let t = Date.now();
+    const { h, runId } = readyProduction({
+      deps: {
+        runStatusChange: (args) => { currentRunId = args.runId; return realRunStatusChange({ ...args, client, ledger: memoryLedger }); },
+        statusCompletion: { now: () => (t += 1000), sleep: async () => {}, pollMs: 1000, minQuietMs: 0 },
+      },
+    });
+    const deadlineAt = () => h.clock.t + 280_000;
+    const first = await change(h, runId, { deadlineAt: deadlineAt(), optionLabel: 'Phase II Pending Committee Review' });
+    expect(first).toMatchObject({ outcome: 'jobs_open', code: 'status_change_jobs_open' });
+    expect(patches).toHaveLength(1);
+    jobsDone = true;
+    h.clock.t = t; // the first wait used up its budget; the second POST arrives later with a fresh one
+    const second = await change(h, runId, { deadlineAt: deadlineAt(), optionLabel: 'Phase II Pending Committee Review' });
+    expect(second).toMatchObject({ outcome: 'complete', sequence: 1 });
+    expect(patches).toHaveLength(1);
+    expect(rows[0].status).toBe('complete');
   });
 });

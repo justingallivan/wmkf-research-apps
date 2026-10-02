@@ -217,6 +217,8 @@ export function parseArgs(argv) {
     statusOption: null,
     rerun: false,
     statusRecheck: null,
+    statusAbandon: null,
+    changeId: null,
     target: 'sandbox',
     director: null,
     createCast: false,
@@ -257,6 +259,8 @@ export function parseArgs(argv) {
     else if (arg.startsWith('--field=')) parsed.statusField = arg.slice('--field='.length);
     else if (arg.startsWith('--option=')) parsed.statusOption = arg.slice('--option='.length);
     else if (arg === '--rerun') parsed.rerun = true;
+    else if (arg.startsWith('--status-abandon=')) parsed.statusAbandon = arg.slice('--status-abandon='.length);
+    else if (arg.startsWith('--change-id=')) parsed.changeId = arg.slice('--change-id='.length);
     else if (arg.startsWith('--status-recheck=')) parsed.statusRecheck = arg.slice('--status-recheck='.length);
     else if (arg.startsWith('--target=')) parsed.target = arg.slice('--target='.length);
     else if (arg.startsWith('--director=')) parsed.director = arg.slice('--director='.length);
@@ -273,7 +277,7 @@ export function parseArgs(argv) {
     else if (arg === '--help' || arg === '-h') parsed.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
-  const modes = [parsed.prepare, parsed.execute, parsed.inspect, parsed.reserve ? '--reserve' : null, parsed.advance, parsed.runInspect, parsed.runRecheck, parsed.setStatus, parsed.statusRecheck, parsed.createCast ? '--create-cast' : null, parsed.bindReviewer, parsed.bindReviewerSlot];
+  const modes = [parsed.prepare, parsed.execute, parsed.inspect, parsed.reserve ? '--reserve' : null, parsed.advance, parsed.runInspect, parsed.runRecheck, parsed.setStatus, parsed.statusRecheck, parsed.statusAbandon, parsed.createCast ? '--create-cast' : null, parsed.bindReviewer, parsed.bindReviewerSlot];
   if (modes.filter(Boolean).length > 1) {
     throw new Error('Choose exactly one run mode, including --bind-reviewer-slot.');
   }
@@ -286,9 +290,14 @@ export function parseArgs(argv) {
   if (parsed.createCast && !(parsed.castPi && parsed.castLiaison && parsed.castReviewer && parsed.castOrgLeader && parsed.castResearchLeader)) {
     throw new Error('--create-cast requires --cast-pi=, --cast-liaison=, --cast-reviewer=, --cast-org-leader= and --cast-research-leader= (allowlisted addresses).');
   }
-  if (!parsed.createCast && (parsed.castPi || parsed.castLiaison || parsed.castReviewer || parsed.castOrgLeader || parsed.castResearchLeader || parsed.confirm)) {
-    throw new Error('--cast-* addresses and --confirm are valid only with --create-cast.');
+  if (!parsed.createCast && (parsed.castPi || parsed.castLiaison || parsed.castReviewer || parsed.castOrgLeader || parsed.castResearchLeader)) {
+    throw new Error('--cast-* addresses are valid only with --create-cast.');
   }
+  if (parsed.confirm && !parsed.createCast && !parsed.statusAbandon) {
+    throw new Error('--confirm is valid only with --create-cast or --status-abandon.');
+  }
+  if (parsed.statusAbandon && !parsed.changeId) throw new Error('--status-abandon requires --change-id=<changeId>.');
+  if (parsed.changeId && !parsed.statusAbandon) throw new Error('--change-id is valid only with --status-abandon.');
   // Production plan P1 / MVP list item 1: the destination is an explicit
   // operator choice, never inferred from the environment.
   if (!Object.hasOwn(TARGET_URLS, parsed.target)) throw new Error('--target must be sandbox or production.');
@@ -301,8 +310,8 @@ export function parseArgs(argv) {
       throw new Error('--target=production --reserve requires --recipe=basic (the default) and --director=<your sign-in>.');
     }
   }
-  if ((parsed.setStatus || parsed.statusRecheck) && parsed.target !== 'production') {
-    throw new Error('--set-status and --status-recheck are valid only with --target=production.');
+  if ((parsed.setStatus || parsed.statusRecheck || parsed.statusAbandon) && parsed.target !== 'production') {
+    throw new Error('--set-status, --status-recheck and --status-abandon are valid only with --target=production.');
   }
   if (parsed.setStatus && (!['phase1', 'phase2'].includes(parsed.statusField) || !String(parsed.statusOption || '').trim())) {
     throw new Error('--set-status requires --field=phase1|phase2 and --option="<live option label>".');
@@ -399,9 +408,10 @@ export function parseArgs(argv) {
       parsed.reviewerAddressFlags = parsedFlags;
     }
   }
-  for (const runId of [parsed.advance, parsed.runInspect, parsed.runRecheck, parsed.setStatus, parsed.statusRecheck, parsed.bindReviewer, parsed.bindReviewerSlot].filter(Boolean)) {
+  for (const runId of [parsed.advance, parsed.runInspect, parsed.runRecheck, parsed.setStatus, parsed.statusRecheck, parsed.statusAbandon, parsed.bindReviewer, parsed.bindReviewerSlot].filter(Boolean)) {
     if (!RUN_ID.test(runId)) throw new Error('Run modes take a run ID GUID.');
   }
+  if (parsed.changeId && !RUN_ID.test(parsed.changeId)) throw new Error('--change-id takes a change ID GUID.');
   if (parsed.advance && (!parsed.manifest || !parsed.bundle)) {
     throw new Error('--advance requires --manifest and --bundle.');
   }
@@ -431,6 +441,7 @@ function printHelp() {
   console.log('Advance a reserved run by bounded steps: ... --advance=<runId> --manifest=/absolute/manifest.json --bundle=/absolute/source-bundle.json [--steps=N] [--bypass-goverify]');
   console.log('Inspect a ledger run (read-only, no Dataverse): ... --run-inspect=<runId>');
   console.log('Set Phase I or II Status on a ready production test Request (owner-run; writes need DATAVERSE_PROD_WRITE_ACK): ... --target=production --set-status=<runId> --field=phase1|phase2 --option="<live option label>" [--rerun]');
+  console.log('Close a status change stuck dispatched, after establishing that no sender is still running (owner-run; writes the ledger only, never Dataverse; needs DATAVERSE_ALLOW_PROD_READS=yes for the Request read; prints the checklist and the proposed transition and stops unless --confirm): ... --target=production --status-abandon=<runId> --change-id=<changeId> [--confirm]');
   console.log('Recheck a status change for late effects (read-only): DATAVERSE_ALLOW_PROD_READS=yes ... --target=production --status-recheck=<runId>');
   console.log('Recheck a production run\'s Foundation account against its pre-create baseline (read-only; plan P5\'s later check): DATAVERSE_ALLOW_PROD_READS=yes ... --target=production --run-recheck=<runId>');
   console.log('Create the reused synthetic cast (owner-run once; addresses must be on the Admin allowlist; prints the plan and stops unless --confirm; every run needs DATAVERSE_ALLOW_PROD_READS=yes, and --confirm also DATAVERSE_PROD_WRITE_ACK): ... --target=production --create-cast --cast-pi=<address> --cast-liaison=<address> --cast-reviewer=<address> --cast-org-leader=<address> --cast-research-leader=<address> [--confirm]');
@@ -1198,6 +1209,49 @@ export async function runStatusMode(client, args, ledgerUrl) {
   }
 }
 
+const ABANDON_REASON = 'Owner confirmed no dispatcher is running; abandoned unresolved status change.';
+
+/**
+ * --status-abandon: the owner closes a status change left `dispatched` (its
+ * PATCH sent, result unknown) as `needs_attention`, once no sender can still
+ * be running. Never sends anything to Dataverse; the Request read only
+ * refuses a change that actually landed (that one resumes with --set-status).
+ * Without --confirm it prints the checklist and the proposed transition.
+ */
+export async function runStatusAbandonMode(client, args, ledgerUrl, { ledger: injected = null } = {}) {
+  const db = injected ? null : pgLedgerDb(ledgerUrl);
+  try {
+    const ledger = injected ?? createRunLedger(db);
+    const run = await ledger.getRun(args.statusAbandon);
+    if (!run || run.destinationEnvironment !== 'production') throw new Error('No production test request run with that ID.');
+    const change = (await ledger.listStatusChanges(run.runId)).find((c) => c.changeId === args.changeId);
+    if (!change) throw new Error('That run has no status change with that change ID.');
+    if (change.status === 'planned' || change.status === 'applied') {
+      throw new Error(`Change ${change.sequence} is ${change.status}; resume with --set-status instead.`);
+    }
+    if (change.status !== 'dispatched') throw new Error(`Change ${change.sequence} is already closed (${change.status}); nothing to abandon.`);
+    const response = await client.get(`/akoya_requests(${run.destinationRequestId})?$select=akoya_requestid,${change.field}`);
+    if (!response?.ok || !guidEqual(response.body?.akoya_requestid, run.destinationRequestId)) throw new Error('The Request read failed; nothing was changed.');
+    if (response.body[change.field] === change.optionAfter) {
+      throw new Error(`Change ${change.sequence}: the Request already holds the target value, so the change recovered; resume with --set-status instead.`);
+    }
+    console.log(`Abandoning change ${change.sequence} on run ${run.runId} is safe only when no sender remains. Before --confirm, check every item:`);
+    console.log('  1. Stop or disable form dispatch (TEST_REQUEST_FACTORY_FORM off).');
+    console.log('  2. Establish that every form invocation (the 300 s status route) has ended.');
+    console.log('  3. Stop or account for every CLI process, including paused ones (a suspended --set-status can still resume and send).');
+    console.log('  A timer or a rollback alone is not enough: the unchanged Request cannot prove that no sender is still running.');
+    if (!args.confirm) {
+      console.log(JSON.stringify({ mode: 'STATUS_ABANDON_PLAN', runId: run.runId, changeId: change.changeId, sequence: change.sequence, from: 'dispatched', to: 'needs_attention', written: false }, null, 2));
+      return;
+    }
+    const closed = await ledger.markStatusChangeNeedsAttention({ changeId: change.changeId, onlyIf: 'dispatched', error: ABANDON_REASON });
+    if (!closed) throw new Error(`Change ${change.sequence} moved on while abandoning; nothing was changed.`);
+    console.log(JSON.stringify({ mode: 'STATUS_ABANDONED', runId: run.runId, changeId: change.changeId, sequence: change.sequence, status: closed.status }, null, 2));
+  } finally {
+    if (db) await db.end();
+  }
+}
+
 /** The Admin test-Request allowlist, read from the target org (the local settings service may point at the sandbox). */
 async function readTargetAllowlist(client) {
   const filter = odata.eq('wmkf_settingkey', TEST_REQUEST_EMAIL_ALLOWLIST_KEY);
@@ -1317,12 +1371,13 @@ async function main() {
   }
 
   const targetUrl = TARGET_URLS[args.target];
-  if (args.setStatus || args.statusRecheck) {
+  if (args.setStatus || args.statusRecheck || args.statusAbandon) {
     const ledgerUrl = requireLedgerUrl(args.target);
-    await ledgerSchemaCheck(ledgerUrl, { mode: args.setStatus ? 'set-status' : 'status-recheck' });
+    await ledgerSchemaCheck(ledgerUrl, { mode: args.setStatus ? 'set-status' : (args.statusAbandon ? 'status-abandon' : 'status-recheck') });
     // No marker writes: a status change never touches the Test Request marker.
     const statusClient = createClient({ resourceUrl: targetUrl, token: await getAccessToken(targetUrl) });
-    await runStatusMode(statusClient, args, ledgerUrl);
+    if (args.statusAbandon) await runStatusAbandonMode(statusClient, args, ledgerUrl);
+    else await runStatusMode(statusClient, args, ledgerUrl);
     return;
   }
   if (args.createCast || args.bindReviewer || args.bindReviewerSlot) {
