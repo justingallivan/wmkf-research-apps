@@ -223,6 +223,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
 
       {error && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
       {notice && <div role="status" className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">{notice}</div>}
+      {collection?.uploadStatusUnavailable && <div role="status" className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Upload processing status is temporarily unavailable. Refresh this page to check again.</div>}
       {emailFeedback && <EmailSendFeedback className="mt-4" status={emailFeedback.outcome} message={emailFeedback.detail} />}
       {loading && <p className="mt-4 text-sm text-gray-500">Loading…</p>}
 

@@ -103,7 +103,7 @@ test('single request: projects the tracker read down; readiness 503 and other fa
   expect(await getMaterialsSummaryForRequest({ requestId: R1 }, { getCollection: async () => ({ collection: null }) })).toBeNull();
   expect(await getMaterialsSummaryForRequest({ requestId: R1 }, { getCollection: async () => { throw Object.assign(new Error('off'), { code: 'site_visit_materials_schema_not_ready' }); } })).toBeNull();
   const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
-  expect(await getMaterialsSummaryForRequest({ requestId: R1 }, { getCollection: async () => { throw new Error('db'); } })).toBeNull();
+  expect(await getMaterialsSummaryForRequest({ requestId: R1 }, { getCollection: async () => { throw new Error('db'); } })).toEqual({ unavailable: true, availability: 'unavailable' });
   expect(log).toHaveBeenCalled();
   log.mockRestore();
 });

@@ -712,6 +712,28 @@ test('an older same-token poll cannot overwrite a newer enqueue context', async 
   }
 });
 
+test('a terminal expiry discovered during background polling closes the upload view', async () => {
+  const active = { ...context, jobs: [{ jobId: 'job-1', stagingId: STAGING_ID, slot: 'presentation_pdf', status: 'processing' }] };
+  let contextCalls = 0;
+  global.fetch = jest.fn(async (url) => {
+    if (!url.endsWith('/context')) throw new Error(`unexpected fetch ${url}`);
+    contextCalls += 1;
+    return contextCalls === 1 ? response(200, active) : response(401, { ok: false, reason: 'expired' });
+  });
+  jest.useFakeTimers();
+  const view = render(<MaterialsContributorPage />);
+  try {
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.getByText('Upload received. We’re checking and saving your file. You can close this page.')).toBeInTheDocument();
+    await act(async () => { await jest.advanceTimersByTimeAsync(15_000); });
+    expect(await screen.findByText('This link has expired. Please contact the Foundation if you still need to send materials.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Presentation file')).not.toBeInTheDocument();
+  } finally {
+    view.unmount();
+    jest.useRealTimers();
+  }
+});
+
 test('late context success after token change cannot replace the new token context', async () => {
   let resolveOld;
   let jwtCalls = 0;

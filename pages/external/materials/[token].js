@@ -453,6 +453,10 @@ export default function MaterialsContributorPage() {
         setState({ status: 'ok', data, token: expectedToken, statusUnavailable: false });
         return data;
       }
+      if (background && ['expired', 'closed'].includes(data.reason)) {
+        setState({ status: 'error', reason: data.reason });
+        return null;
+      }
       if (background && stateRef.current.status === 'ok') {
         setState((current) => current.status === 'ok' ? { ...current, statusUnavailable: true } : current);
         return null;

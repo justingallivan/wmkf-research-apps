@@ -1,6 +1,6 @@
 # Atlas: Postgres infrastructure tables (compact)
 
-**Last verified (schema sources):** 2026-09-26. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`, except the distribution ledger and explicitly dated migration readbacks below. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
+**Last verified (schema sources):** 2026-10-01. The migration 060 section below is source-only; no database apply or live schema probe is claimed. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`, except the distribution ledger and explicitly dated migration readbacks below. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
 
 Compact summary for the Postgres tables outside the reviewer-finder domain. Promote any of these to its own page on next significant touch.
 
@@ -552,7 +552,7 @@ expected columns, 0 rows at probe time; the code merged to `main` 2026-08-27 (`d
 
 ## Portal upload staging
 
-### `portal_upload_staging` (migrations 031, 043, 049, 055)
+### `portal_upload_staging` (migrations 031, 043, 049, 055, 060)
 **Source of truth:** Postgres coordination ledger; published abstract/caption/image
 authority remains Dataverse + SharePoint.
 
@@ -617,6 +617,13 @@ proof is wired for them too.
 Private-store prerequisite is covered by
 `scripts/probe-private-blob-client-access.mjs`: public-mode PUT must fail, private
 PUT must succeed, and anonymous HEAD must return 403.
+
+Migration 060 adds the nullable `background_job_id` ownership marker used only
+by applicant materials background uploads. While present, staging cleanup and
+ordinary finalize claims must respect the exact job owner; the job ledger is
+coordination state and does not replace the staged pathname, Blob hash, or
+domain receipt. **[SOURCE-BUILT on `codex/materials-background-processing`; migration
+060 has not been applied or live-verified.]**
 
 ## Monitoring / observability
 
@@ -902,3 +909,46 @@ registry, malformed-result, or thrown dependency failures and render those rows 
 the collection row and sealed contributor link are created only on explicit Send. A user's
 invitation/reminder subject and body defaults live in Dataverse `wmkf_appuserpreferences`, not in
 this Postgres row. One-off edits are not saved as defaults.
+
+### `materials_upload_jobs` (migration 060; source-built)
+
+Owner: durable background processing for applicant Site Visit materials uploads.
+The ledger binds one `portal_upload_staging` row to a collection, request, fixed
+checklist slot, actor binding, and token digest. It records queued/processing and
+terminal status, bounded attempt count, retry time, worker lease, processing
+deadline, clean malware-scan checkpoint, sanitized error code, and the exact
+finalize receipt needed for replay. An active required-slot job is unique across
+collections for the request; optional `other` uploads may have multiple active
+jobs. A replacement is written under a unique `portal-${stagingId}` SharePoint
+subfolder so prior bytes remain preserved until the new receipt is committed.
+SharePoint remains the byte store and `wmkf_requestdocument` the published
+receipt; this table owns neither.
+
+The worker at `/api/cron/drain-materials-uploads` claims at most one job per
+invocation, checks the existing virus scanner, renews/fences the job lease,
+resumes from a hash-bound scan checkpoint, and calls the existing applicant
+materials finalizer. Transient failures use bounded exponential retry; terminal
+failures that have a clean scan or SharePoint candidate become
+`needs_attention` for coordinator review. The cron is source-configured every
+minute with a five-minute function maximum. Public contributor context exposes
+sanitized `jobs`; staff projections expose sanitized `uploadJobs` and counts.
+Request-wide active jobs remain visible when a newer collection exists, so
+Ready and manual/automatic reminders account for work admitted by an older
+collection. Runtime read failures are rendered unavailable, never as confirmed
+zero jobs.
+
+Admission is gated by `SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY=on`,
+`SITE_VISIT_MATERIALS_BACKGROUND_ADMISSION_ENABLED=on`, and
+`VIRUS_SCAN_ENABLED` enabled. The schema gate must follow a successful
+migration-060 apply and physical readiness check; admission also requires the
+schema gate. If admission is off, the existing synchronous finalize path is
+used. These gates and the cron route are source-built on
+`codex/materials-background-processing`; migration 060, environment state,
+deployment, and live operation have not been verified.
+
+Terminal jobs expire after 30 days; rejected staging/blob cleanup uses the
+existing exact-path cleanup with a seven-day retention. `scripts/materials-upload-job.js`
+is a loopback-database-only local inspection/cancel/retry tool. Retry requires
+unleased `needs_attention` state, unconsumed staging, and remaining automatic
+attempt allowance. This work authorizes no remote Production recovery path;
+separate authorization is required before one is introduced.
