@@ -5,6 +5,12 @@ import path from 'node:path';
 import { Client, Pool } from 'pg';
 
 const mockPoolRef = { current: null };
+const mockBlob = { del: jest.fn(async () => {}), get: jest.fn(), head: jest.fn() };
+jest.mock('@vercel/blob', () => ({
+  del: (...args) => mockBlob.del(...args),
+  get: (...args) => mockBlob.get(...args),
+  head: (...args) => mockBlob.head(...args),
+}));
 jest.mock('@vercel/postgres', () => ({
   db: { connect: () => mockPoolRef.current.connect() },
   sql: (strings, ...values) => mockPoolRef.current.query(
@@ -35,8 +41,8 @@ describeIf('applicant materials background-job store (live PostgreSQL)', () => {
   let jobs;
   let collections;
   let stagingStore;
-  let now;
   let originalSchemaReadyFlag;
+  let originalBlobToken;
 
   beforeAll(async () => {
     admin = new Client({ connectionString: TEST_URL });
@@ -49,14 +55,17 @@ describeIf('applicant materials background-job store (live PostgreSQL)', () => {
     jobs = await import('../../lib/services/site-visit-materials/background-job-store.js');
     collections = await import('../../lib/services/site-visit-materials/collection-store.js');
     originalSchemaReadyFlag = process.env.SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY;
+    originalBlobToken = process.env.UPLOADS_BLOB_RW_TOKEN;
     process.env.SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY = 'on';
+    process.env.UPLOADS_BLOB_RW_TOKEN = 'test-private-blob-token';
     stagingStore = await import('../../lib/services/portal-upload-staging.js');
-    now = new Date(Date.now());
   });
 
   afterAll(async () => {
     if (originalSchemaReadyFlag === undefined) delete process.env.SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY;
     else process.env.SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY = originalSchemaReadyFlag;
+    if (originalBlobToken === undefined) delete process.env.UPLOADS_BLOB_RW_TOKEN;
+    else process.env.UPLOADS_BLOB_RW_TOKEN = originalBlobToken;
     if (mockPoolRef.current) await mockPoolRef.current.end();
     if (admin) {
       await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
@@ -103,7 +112,7 @@ describeIf('applicant materials background-job store (live PostgreSQL)', () => {
     return { id, leaseToken, actorBinding };
   }
 
-  async function admit({ collection, staging, slot = 'presentation_pdf', requestId = collection.requestId, nowOverride = now }) {
+  async function admit({ collection, staging, slot = 'presentation_pdf', requestId = collection.requestId }) {
     return jobs.enqueueMaterialsUploadJob({
       stagingId: staging.id,
       stagingLeaseToken: staging.leaseToken,
@@ -113,7 +122,6 @@ describeIf('applicant materials background-job store (live PostgreSQL)', () => {
       tokenDigest: collection.tokenDigest,
       slot,
       otherUploadsEnabled: slot === 'other',
-      now: nowOverride,
     });
   }
 
@@ -161,7 +169,7 @@ describeIf('applicant materials background-job store (live PostgreSQL)', () => {
       .toMatchObject({ background_job_id: null, status: 'finalizing' });
   });
 
-  test('admission racing expired cleanup has one durable winner and cleanup cannot delete owned staging', async () => {
+  test('cleanup claim that locks an expired row first prevents queue admission from taking ownership', async () => {
     const collection = await makeCollection();
     const staging = await makeStaging({ requestId: collection.requestId, expiresInHours: -1, leaseInHours: -2 });
     const cleanup = await mockPoolRef.current.connect();
@@ -173,7 +181,7 @@ describeIf('applicant materials background-job store (live PostgreSQL)', () => {
         [staging.id],
       );
       expect(eligible.rowCount).toBe(1);
-      const admission = admit({ collection, staging, nowOverride: new Date(Date.now() - 3 * 60 * 60 * 1000) });
+      const admission = admit({ collection, staging });
       await waitForBlockedQuery('FROM portal_upload_staging');
       await cleanup.query(
         `UPDATE portal_upload_staging SET status='expired',lease_token=NULL,lease_expires_at=NULL
@@ -187,6 +195,99 @@ describeIf('applicant materials background-job store (live PostgreSQL)', () => {
     } finally {
       await cleanup.query('ROLLBACK').catch(() => {});
       cleanup.release();
+    }
+  });
+
+  test('real staging cleanup preserves an expired attention-owned row and never deletes its Blob', async () => {
+    const collection = await makeCollection();
+    const staging = await makeStaging({ requestId: collection.requestId });
+    const job = await admit({ collection, staging });
+    await mockPoolRef.current.query(
+      `UPDATE materials_upload_jobs SET status='needs_attention',completed_at=NOW(),error_code='uncertain_write'
+        WHERE id=$1`, [job.id],
+    );
+    await mockPoolRef.current.query("UPDATE portal_upload_staging SET expires_at=NOW()-INTERVAL '1 day' WHERE id=$1", [staging.id]);
+    mockBlob.del.mockClear();
+
+    const result = await stagingStore.cleanupExpiredPortalUploads();
+
+    expect(result).toMatchObject({ deleted: 0, pruned: 0, errors: 0, retained: 0 });
+    expect(mockBlob.del).not.toHaveBeenCalled();
+    expect(await row('SELECT status, background_job_id FROM portal_upload_staging WHERE id=$1', [staging.id]))
+      .toMatchObject({ status: 'pending', background_job_id: job.id });
+  });
+
+  test('schema-off staging helpers run against a pre-060 PostgreSQL schema', async () => {
+    const legacySchema = `materials_legacy_${crypto.randomBytes(5).toString('hex')}`;
+    const previousPool = mockPoolRef.current;
+    const previousFlag = process.env.SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY;
+    const legacyUrl = new URL(TEST_URL);
+    legacyUrl.searchParams.set('options', `-c search_path=${legacySchema}`);
+    const legacyPool = new Pool({ connectionString: legacyUrl.toString(), max: 3 });
+    try {
+      await admin.query(`CREATE SCHEMA ${legacySchema}`);
+      mockPoolRef.current = legacyPool;
+      for (const file of MIGRATIONS.slice(0, 4)) await legacyPool.query(file);
+      delete process.env.SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY;
+      const oldSchemaShape = await legacyPool.query(
+        `SELECT to_regclass('materials_upload_jobs') AS jobs_table,
+                EXISTS (SELECT 1 FROM information_schema.columns
+                         WHERE table_schema=current_schema() AND table_name='portal_upload_staging'
+                           AND column_name='background_job_id') AS has_owner_column`,
+      );
+      expect(oldSchemaShape.rows[0]).toMatchObject({ jobs_table: null, has_owner_column: false });
+
+      const requestId = crypto.randomUUID();
+      const stagingId = crypto.randomUUID();
+      const pathname = `portal-staging/site_visit_material/${requestId}/${stagingId}`;
+      await legacyPool.query(
+        `INSERT INTO portal_upload_staging
+           (id,scope,resource_id,actor_binding,pathname,filename,declared_content_type,max_bytes,status,expires_at)
+         VALUES ($1,'site_visit_material',$2,'legacy-actor',$3,'legacy.pdf','application/pdf',1000,'pending',NOW()+INTERVAL '1 day')`,
+        [stagingId, requestId, pathname],
+      );
+
+      const firstClaim = await stagingStore.claimPortalUpload({ stagingId, scope: 'site_visit_material', resourceId: requestId, actorBinding: 'legacy-actor' });
+      await stagingStore.recordPortalUploadCandidate({ stagingId, leaseToken: firstClaim.leaseToken, candidate: { driveId: 'drive', itemId: 'item' } });
+      await stagingStore.releasePortalUpload({ stagingId, leaseToken: firstClaim.leaseToken });
+      const secondClaim = await stagingStore.claimPortalUpload({ stagingId, scope: 'site_visit_material', resourceId: requestId, actorBinding: 'legacy-actor' });
+      await stagingStore.completePortalUpload({ stagingId, leaseToken: secondClaim.leaseToken, resultPayload: { saved: true } });
+      expect(await legacyPool.query('SELECT status, result_payload FROM portal_upload_staging WHERE id=$1', [stagingId]))
+        .toMatchObject({ rows: [expect.objectContaining({ status: 'consumed', result_payload: { saved: true } })] });
+
+      const rejectedId = crypto.randomUUID();
+      const rejectedPath = `portal-staging/site_visit_material/${requestId}/${rejectedId}`;
+      await legacyPool.query(
+        `INSERT INTO portal_upload_staging
+           (id,scope,resource_id,actor_binding,pathname,filename,declared_content_type,max_bytes,status,lease_token,lease_expires_at,expires_at)
+         VALUES ($1,'site_visit_material',$2,'legacy-actor',$3,'bad.pdf','application/pdf',1000,'finalizing',$4,NOW()+INTERVAL '5 minutes',NOW()+INTERVAL '1 day')`,
+        [rejectedId, requestId, rejectedPath, crypto.randomUUID()],
+      );
+      const rejected = await legacyPool.query('SELECT lease_token FROM portal_upload_staging WHERE id=$1', [rejectedId]);
+      const rejectedResult = await stagingStore.rejectPortalUpload({ stagingId: rejectedId, leaseToken: rejected.rows[0].lease_token, resultCode: 'invalid_file' });
+      expect(rejectedResult).toBeUndefined();
+      expect(await legacyPool.query('SELECT status, result_code FROM portal_upload_staging WHERE id=$1', [rejectedId]))
+        .toMatchObject({ rows: [expect.objectContaining({ status: 'rejected', result_code: 'invalid_file' })] });
+
+      const expiredId = crypto.randomUUID();
+      const expiredPath = `portal-staging/site_visit_material/${requestId}/${expiredId}`;
+      await legacyPool.query(
+        `INSERT INTO portal_upload_staging
+           (id,scope,resource_id,actor_binding,pathname,filename,declared_content_type,max_bytes,status,expires_at)
+         VALUES ($1,'site_visit_material',$2,'legacy-actor',$3,'old.pdf','application/pdf',1000,'pending',NOW()-INTERVAL '1 day')`,
+        [expiredId, requestId, expiredPath],
+      );
+      mockBlob.del.mockClear();
+      await expect(stagingStore.cleanupExpiredPortalUploads()).resolves.toMatchObject({ deleted: 1, errors: 0 });
+      expect(mockBlob.del).toHaveBeenCalledWith(expiredPath, { token: 'test-private-blob-token' });
+      expect(await legacyPool.query('SELECT status FROM portal_upload_staging WHERE id=$1', [expiredId]))
+        .toMatchObject({ rows: [expect.objectContaining({ status: 'expired' })] });
+    } finally {
+      if (previousFlag === undefined) delete process.env.SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY;
+      else process.env.SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY = previousFlag;
+      mockPoolRef.current = previousPool;
+      await legacyPool.end();
+      await admin.query(`DROP SCHEMA IF EXISTS ${legacySchema} CASCADE`);
     }
   });
 
