@@ -109,7 +109,8 @@ export default function TestRequestStatusControl({ run, formEnabled, getScope })
         setLastBody(body);
         setResult({ tone: 'amber', text: reply.message });
       }
-      if (reply.outcome !== 'in_progress') await loadJournal(scope);
+      // Reload after every answer so the journal shows the change (an in-progress change stays without a retry control).
+      await loadJournal(scope);
     } catch (error) {
       if (!scope.alive() || error?.name === 'AbortError') return;
       setResult({ tone: 'red', text: messageFor(error) });
