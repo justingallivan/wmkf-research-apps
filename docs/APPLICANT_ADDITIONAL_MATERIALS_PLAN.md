@@ -610,7 +610,7 @@ Owner feedback after the first production smoke (ZZTEST-03). Four items, built o
    stays open past the meeting (`closes_at`, the token expiry, and the auto-close sweep are
    unchanged).
 3. A failed finalize now offers "Choose a different file" alongside "Retry" in `SlotUploader`,
-   clearing the abandoned pending staging key client-side and minting a fresh staging id. The
+   retaining the earlier pending staging key until a replacement transfer succeeds and minting a fresh staging id. The
    abandoned staging row itself is left alone: it is swept by the existing portal-upload-staging
    TTL sweep (60-minute row expiry, then pruned after the retention window) via the daily
    maintenance cron's "Private portal-upload staging cleanup" step — no new cleanup was added.
@@ -623,8 +623,8 @@ Owner feedback after the first production smoke (ZZTEST-03). Four items, built o
    context cap refreshes from the upload-token response. Failed replacements preserve the prior
    pending upload for Retry; the new file becomes pending only after its Blob transfer succeeds.
    Transfers above 60 MiB use the Blob SDK multipart option. This
-   multipart path and practical 500 MB transfer throughput remain unverified against the live
-   provider; see the implementation review for runtime limits.
+   multipart transfer reached finalization in the 2026-10-01 production test, but finalization
+   exhausted memory. Practical 500 MB end-to-end completion remains unverified; see §16.14.
 
 ### 16.5 2026-09-11 (S507): optional "other" upload hidden from applicants
 
@@ -837,3 +837,52 @@ Production deployment `dpl_HCSqQTQartDj6QujF8j5RC3LFFzk` reached Ready and serve
 `applications.wmkeck.org`. The owner confirmed on Request 1002903 in local dev (production reads) that
 both rows link the hand-placed files. An unauthenticated production call to the route redirects to sign-in,
 the same as the sibling Workbench routes.
+
+
+### 16.14 2026-10-01: large-upload memory mitigation [SOURCE-BUILT; PROVIDER REHEARSAL PENDING]
+
+The owner retained the shared admin-editable 500 MB cap after a 300+ MB PPTX failed in
+production. Vercel logged an out-of-memory termination at 17:28:01 PDT for materials
+finalization. Read-only deployment inspection confirmed Node 22, 2048 MB memory, and a
+300-second duration for the deployed finalizer. The exact allocation/concurrency combination
+that caused that termination has not been reproduced locally.
+
+The follow-up branch `codex/materials-memory-fix` reduces memory use without changing file
+ownership, private staging, scanning policy, or SharePoint/registry recovery:
+
+- The shared staging reader allocates one bounded buffer and hashes bytes incrementally.
+  Trusted-length overflow is rejected before copying; unknown-length responses reserve the
+  persisted cap and return only the filled view without another full-file copy. Allocation
+  failures remain retryable rather than permanently rejecting a valid file.
+- The shared scanner sends a fresh Web `ReadableStream` multipart body per attempt with an
+  exact Content-Length. All callers retain their advanced scan flags, timeout and retry
+  profiles. It no longer creates a whole-file Blob copy. Graph retains its chunked upload.
+- Applicant materials and staff Consultant Feedback finalization use a shared process-local
+  admission guard before claiming or loading staged bytes. A busy instance returns 503
+  `processing_busy` and Retry-After. The guard is not a distributed ownership lock; existing
+  database claims remain authoritative. Release checks the holder token. Six-minute stale
+  takeover assumes a holder beyond the 300-second invocation budget plus margin is no longer
+  active; that platform behavior remains unverified in the provider rehearsal.
+- Applicant processing uses the truthful combined status “Checking and saving your file.”
+  Busy retries are bounded and cancelled on request changes/unmount. A 429 keeps the staged
+  upload retryable. Unrecognized 5xx/network failures explain that saving was not confirmed
+  and advise waiting before Retry. Existing receipts are labelled “Previously received”
+  while a replacement is busy, pending, or has failed.
+- Safe stage logs record elapsed time and RSS around download, scan, and save, without file
+  contents, original filenames, bearer links, or storage URLs.
+
+`node --import ./scripts/lib/use-extensionless.mjs scripts/benchmark-materials-upload-memory.mjs`
+requires Node 22 and runs the real staging reader, PPTX validator, scanner request, and Graph
+large-upload helper with temporary synthetic ZIP/PPTX-shaped files and local-only network
+sinks. On Node 22.23.2 (macOS arm64), the nonzero 499 MiB fixture reached 721 MiB peak RSS
+through the revised path. The pre-fix timeout/retry case reached 2210.8 MiB; the revised retry
+case reached 703.1 MiB. These measurements support a possible failure mechanism, not proof of
+the exact production trigger. Each complete scanner file part and Graph upload matched the
+fixture hash. The benchmark also exercises concurrent requests and a small unknown-length response;
+unknown length can still reserve the entire cap even for a small file. Synthetic Office
+structure and local sinks do not establish acceptance by Cloudmersive or real SharePoint.
+
+**Release evidence boundary:** local tests and memory measurements establish mitigation,
+not provider-resolved 500 MB support. The actual 300+ MB deck and a near-limit file still need
+an end-to-end provider rehearsal. No memory-tier increase or production setting write is part
+of this branch. Preserve this distinction in the release report.

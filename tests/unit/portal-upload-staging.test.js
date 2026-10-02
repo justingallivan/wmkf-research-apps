@@ -204,6 +204,68 @@ test('load fetches only the ledger pathname as private and records verified byte
   expect(result.sha256).toMatch(/^[0-9a-f]{64}$/);
 });
 
+test('load streams into one bounded allocation when Content-Length is absent', async () => {
+  const bytes = Buffer.from('unknown-length bytes');
+  get.mockResolvedValue({
+    statusCode: 200,
+    stream: new Blob([bytes]).stream(),
+    blob: { url: 'https://private.example/exact', pathname: 'exact', contentType: 'text/vtt', size: 0, etag: 'e' },
+    headers: new Headers(),
+  });
+  sql.mockResolvedValue({ rows: [{ id: STAGING_ID }] });
+  const allocation = jest.spyOn(Buffer, 'allocUnsafe');
+  const result = await loadClaimedPortalDocument({
+    row: { id: STAGING_ID, pathname: 'exact', filename: 'x.vtt', declared_content_type: 'text/vtt', max_bytes: 100 },
+    leaseToken: '33333333-3333-4333-8333-333333333333',
+  });
+
+  expect(result.buffer).toEqual(bytes);
+  expect(allocation).toHaveBeenCalledWith(100);
+  allocation.mockRestore();
+  expect(result.sha256).toBe(require('node:crypto').createHash('sha256').update(bytes).digest('hex'));
+  expect(sql.mock.calls[0][0].join('')).toContain('actual_bytes');
+});
+
+test('stream bytes beyond a trusted Content-Length reject the row as a mismatch', async () => {
+  let cancelled = false;
+  const stream = new ReadableStream({
+    start(controller) { controller.enqueue(Buffer.from('N+1')); },
+    cancel() { cancelled = true; },
+  });
+  get.mockResolvedValue({
+    statusCode: 200,
+    stream,
+    blob: { url: 'https://private.example/exact', pathname: 'exact', contentType: 'text/vtt', size: 2, etag: 'e' },
+    headers: new Headers({ 'content-length': '2' }),
+  });
+
+  await expect(loadClaimedPortalDocument({
+    row: { id: STAGING_ID, pathname: 'exact', filename: 'x.vtt', declared_content_type: 'text/vtt', max_bytes: 100 },
+    leaseToken: '33333333-3333-4333-8333-333333333333',
+  })).rejects.toMatchObject({ code: 'staged_upload_mismatch', httpStatus: 422 });
+  expect(cancelled).toBe(true);
+  expect(sql).not.toHaveBeenCalled();
+});
+
+test('a bounded-buffer allocation failure leaves the staged upload retryable', async () => {
+  get.mockResolvedValue({
+    statusCode: 200,
+    stream: new Blob(['x']).stream(),
+    blob: { url: 'https://private.example/exact', pathname: 'exact', contentType: 'text/vtt', size: 1, etag: 'e' },
+    headers: new Headers({ 'content-length': '1' }),
+  });
+  const allocation = jest.spyOn(Buffer, 'allocUnsafe').mockImplementationOnce(() => { throw new RangeError('test allocation failure'); });
+  try {
+    await expect(loadClaimedPortalDocument({
+      row: { id: STAGING_ID, pathname: 'exact', filename: 'x.vtt', declared_content_type: 'text/vtt', max_bytes: 100 },
+      leaseToken: '33333333-3333-4333-8333-333333333333',
+    })).rejects.toMatchObject({ code: 'staged_upload_unavailable', httpStatus: 503 });
+  } finally {
+    allocation.mockRestore();
+  }
+  expect(sql).not.toHaveBeenCalled();
+});
+
 test('metadata mismatch rejects before bytes reach the domain writer', async () => {
   get.mockResolvedValue({
     statusCode: 200,

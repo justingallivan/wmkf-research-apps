@@ -4,7 +4,7 @@
  * site visit, uploads one file per item directly to the private staging
  * store, and the server files it. The page never sees SharePoint identity.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { requestEnvelope } from '../../../shared/utils/api-request';
@@ -31,6 +31,7 @@ const UPLOAD_MESSAGE = {
   scan_busy: 'The security scanner is busy right now. Please wait a few minutes and press Retry. If this keeps happening, contact the Foundation.',
   scan_unavailable: 'The security scanner is temporarily unavailable. Please press Retry. If this keeps happening, contact the Foundation.',
   scan_misconfigured: 'The system could not start the security scan. Please try again shortly. If this keeps happening, contact the Foundation.',
+  processing_busy: 'Another large upload is being processed. Please wait a few minutes and press Retry.',
   content_type_not_allowed: 'That file type is not accepted.',
   staging_unavailable: 'Uploads are unavailable right now. Please try again shortly.',
   staged_upload_missing: 'The upload did not complete. Please try again.',
@@ -119,52 +120,100 @@ function SlotUploader({ token, slot, label, required, received, maxMb, programCo
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState(null);
   const [pending, setPending] = useState(null);
+  const mountedRef = useRef(true);
+  const waitTimerRef = useRef(null);
+  const waitResolverRef = useRef(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setPending(readPendingUpload(token, slot)), 0);
     return () => window.clearTimeout(timer);
   }, [token, slot]);
 
-  const finalize = async (pendingUpload, { newlyUploaded = false } = {}) => {
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (waitTimerRef.current !== null) window.clearTimeout(waitTimerRef.current);
+      waitResolverRef.current?.(false);
+      waitTimerRef.current = null;
+      waitResolverRef.current = null;
+    };
+  }, []);
+
+  const waitForProcessingRetry = (delayMs) => new Promise((resolve) => {
+    waitResolverRef.current = resolve;
+    waitTimerRef.current = window.setTimeout(() => {
+      waitTimerRef.current = null;
+      waitResolverRef.current = null;
+      resolve(true);
+    }, delayMs);
+  });
+
+  const finalize = async (pendingUpload) => {
     setBusy(true);
     setError(null);
-    setProgress('Running the security scan. This can take a few minutes, especially for large files.');
+    setProgress('Checking and saving your file. This can take a few minutes for large files.');
     try {
-      const { ok: finalizeOk, status: finalizeStatus, data: result } = await requestEnvelope(
-        `/api/external/materials/${encodeURIComponent(token)}/finalize`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: { stagingId: pendingUpload.stagingId, slot },
-          tolerantBody: true,
-        },
-      );
-      if (!finalizeOk) {
-        if (finalizeStatus >= 400 && finalizeStatus < 500 && finalizeStatus !== 409) {
-          removePendingUpload(token, slot);
-          setPending(null);
+      let busyRetries = 0;
+      while (true) {
+        setProgress('Checking and saving your file. This can take a few minutes for large files.');
+        const { ok: finalizeOk, status: finalizeStatus, data: result } = await requestEnvelope(
+          `/api/external/materials/${encodeURIComponent(token)}/finalize`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: { stagingId: pendingUpload.stagingId, slot },
+            tolerantBody: true,
+          },
+        );
+        if (!mountedRef.current) return;
+        if (!finalizeOk) {
+          if (result.reason === 'processing_busy' && busyRetries < 3) {
+            busyRetries += 1;
+            const retryAfter = Number(result.retryAfterSeconds);
+            const delayMs = Number.isInteger(retryAfter) && retryAfter >= 10 && retryAfter <= 60
+              ? retryAfter * 1000 : 30_000;
+            setProgress('Another large upload is being processed. Waiting before retry.');
+            const waited = await waitForProcessingRetry(delayMs);
+            if (!waited || !mountedRef.current) return;
+            continue;
+          }
+          if (result.reason === 'processing_busy') {
+            setError(UPLOAD_MESSAGE.processing_busy);
+            return;
+          }
+          if (finalizeStatus >= 400 && finalizeStatus < 500 && finalizeStatus !== 409 && finalizeStatus !== 429) {
+            removePendingUpload(token, slot);
+            setPending(null);
+          }
+          if (result.reason === 'file_too_large') {
+            const serverLimit = validLimitMb(result.maxMb) ? result.maxMb : null;
+            if (serverLimit !== null) onCapChange?.(serverLimit);
+            setError({ type: 'size_limit', maxMb: serverLimit });
+          } else {
+            const message = UPLOAD_MESSAGE[result.reason] || REASON_MESSAGE[result.reason];
+            setError(message || (finalizeStatus >= 500
+              ? 'Processing stopped before we could confirm this upload was saved. Wait a few minutes and press Retry.'
+              : 'The file could not be saved.'));
+          }
+          return;
         }
-        if (result.reason === 'file_too_large') {
-          const serverLimit = validLimitMb(result.maxMb) ? result.maxMb : null;
-          if (serverLimit !== null) onCapChange?.(serverLimit);
-          setError({ type: 'size_limit', maxMb: serverLimit });
-        } else {
-          setError(UPLOAD_MESSAGE[result.reason] || REASON_MESSAGE[result.reason] || 'The file could not be saved.');
-        }
+        removePendingUpload(token, slot);
+        setPending(null);
+        await onDone?.();
         return;
       }
-      removePendingUpload(token, slot);
-      setPending(null);
-      await onDone?.();
     } catch {
       // Network failures retain the exact staging id so Retry never mints a
       // second upload or loses the server's replay/candidate state.
-      setError(newlyUploaded
-        ? 'The staged file could not be saved. It remains available with Retry, or choose a different file.'
-        : 'The file could not be saved. Please retry this upload.');
+      if (mountedRef.current) {
+        setError('Processing stopped before we could confirm this upload was saved. Wait a few minutes and press Retry.');
+      }
     } finally {
-      setBusy(false);
-      setProgress(null);
+      if (mountedRef.current) {
+        setBusy(false);
+        setProgress(null);
+      }
     }
   };
 
@@ -199,6 +248,7 @@ function SlotUploader({ token, slot, label, required, received, maxMb, programCo
           tolerantBody: true,
         },
       );
+      if (!mountedRef.current) return;
       if (!tokenOk) {
         if (tokenData.reason === 'file_too_large') {
           const serverLimit = validLimitMb(tokenData.maxMb) ? tokenData.maxMb : null;
@@ -215,6 +265,7 @@ function SlotUploader({ token, slot, label, required, received, maxMb, programCo
       }
       setProgress('Uploading…');
       const { put } = await import('@vercel/blob/client');
+      if (!mountedRef.current) return;
       try {
         await put(tokenData.pathname, file, {
           access: 'private',
@@ -230,16 +281,21 @@ function SlotUploader({ token, slot, label, required, received, maxMb, programCo
       }
       const nextPending = { stagingId: tokenData.stagingId, slot };
       writePendingUpload(token, slot, nextPending);
+      if (!mountedRef.current) return;
       setPending(nextPending);
-      await finalize(nextPending, { newlyUploaded: true });
+      await finalize(nextPending);
     } catch (uploadError) {
       const message = uploadError instanceof Error ? uploadError.message : 'The upload could not start. Please try again.';
-      setError(pending
-        ? `${message} Your earlier upload remains available with Retry, or choose a different file.`
-        : message);
+      if (mountedRef.current) {
+        setError(pending
+          ? `${message} Your earlier upload remains available with Retry, or choose a different file.`
+          : message);
+      }
     } finally {
-      setBusy(false);
-      setProgress(null);
+      if (mountedRef.current) {
+        setBusy(false);
+        setProgress(null);
+      }
     }
   };
 
@@ -249,7 +305,7 @@ function SlotUploader({ token, slot, label, required, received, maxMb, programCo
         <div>
           <p className="font-medium text-gray-900">{label}{required ? '' : <span className="ml-2 text-xs font-normal text-gray-500">optional</span>}</p>
           <p className="mt-1 text-sm text-gray-600">
-            {received ? `Received ${formatDate(received.receivedAt)} · ${received.filename}` : 'Not yet received'}
+            {received ? `${pending || busy || error ? 'Previously received' : 'Received'} ${formatDate(received.receivedAt)} · ${received.filename}` : 'Not yet received'}
           </p>
           {progress && <p className="mt-1 text-sm text-blue-800" role="status">{progress}</p>}
           {error && <p className="mt-1 text-sm text-red-700" role="alert">
@@ -352,10 +408,10 @@ export default function MaterialsContributorPage() {
       </section>
       <ul className="mt-6 space-y-3">
         {data.checklist.map((item) => (
-          <SlotUploader key={item.key} token={token} slot={item.key} label={item.label} required={item.required} received={item.received} maxMb={data.maxMb} programCoordinator={data.programCoordinator} disabled={data.closed} onDone={load} onCapChange={updateUploadCap} />
+          <SlotUploader key={`${token}:${item.key}`} token={token} slot={item.key} label={item.label} required={item.required} received={item.received} maxMb={data.maxMb} programCoordinator={data.programCoordinator} disabled={data.closed} onDone={load} onCapChange={updateUploadCap} />
         ))}
         {SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED && (
-          <SlotUploader key="other" token={token} slot="other" label="Anything else you would like the Foundation to have" required={false} received={null} maxMb={data.maxMb} programCoordinator={data.programCoordinator} disabled={data.closed} onDone={load} onCapChange={updateUploadCap} />
+          <SlotUploader key={`${token}:other`} token={token} slot="other" label="Anything else you would like the Foundation to have" required={false} received={null} maxMb={data.maxMb} programCoordinator={data.programCoordinator} disabled={data.closed} onDone={load} onCapChange={updateUploadCap} />
         )}
       </ul>
       {data.other?.length > 0 && (

@@ -1,3 +1,7 @@
+/** @jest-environment node */
+
+import { fetch as undiciFetch, FormData as UndiciFormData, Request as UndiciRequest } from 'undici';
+
 /**
  * cloudmersive-scan.test.js
  *
@@ -17,6 +21,19 @@
 
 const originalFetch = global.fetch;
 const originalKey = process.env.CLOUDMERSIVE_API_KEY;
+
+function parseMultipartBody(body, contentType) {
+  const boundary = contentType.match(/boundary=([^;]+)/)?.[1];
+  if (!boundary) throw new Error('multipart boundary is missing');
+  const headerEnd = body.indexOf(Buffer.from('\r\n\r\n'));
+  const headers = body.subarray(0, headerEnd).toString('utf8');
+  const filename = headers.match(/filename="([^"]*)"/)?.[1];
+  const payloadStart = headerEnd + 4;
+  const terminator = Buffer.from(`\r\n--${boundary}--\r\n`);
+  const payloadEnd = body.lastIndexOf(terminator);
+  if (headerEnd < 0 || !filename || payloadEnd < payloadStart) throw new Error('multipart body is malformed');
+  return { headers, filename, payload: body.subarray(payloadStart, payloadEnd) };
+}
 
 let fetchCalls = [];
 
@@ -265,6 +282,91 @@ describe('scanBytes — transient retry', () => {
     } finally {
       random.mockRestore();
       jest.useRealTimers();
+    }
+  });
+});
+
+describe('scanBytes — streamed multipart protocol', () => {
+  test('posts exact multipart bytes and retries the complete body after 503', async () => {
+    const http = await import('node:http');
+    const requests = [];
+    const server = http.createServer((req, res) => {
+      const chunks = [];
+      req.on('data', (chunk) => chunks.push(chunk));
+      req.on('end', () => {
+        requests.push({
+          method: req.method,
+          headers: req.headers,
+          body: Buffer.concat(chunks),
+        });
+        if (requests.length === 1) {
+          res.writeHead(503, { 'Content-Type': 'text/plain' });
+          res.end('try again');
+        } else {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ CleanResult: true, FoundViruses: [] }));
+        }
+      });
+    });
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address();
+    global.fetch = (_url, init) => undiciFetch(`http://127.0.0.1:${port}/scan`, init);
+    const bytes = Buffer.from([0, 1, 2, 13, 10, 255]);
+    const filename = 'proposal "final"\r\n雪.pptx';
+    const referenceForm = new UndiciFormData();
+    referenceForm.append('inputFile', new Blob([bytes]), filename);
+    const referenceRequest = new UndiciRequest('http://unit.test/scan', { method: 'POST', body: referenceForm });
+    const expected = parseMultipartBody(Buffer.from(await referenceRequest.arrayBuffer()), referenceRequest.headers.get('content-type'));
+
+    try {
+      const { scanBytes } = await loadService();
+      const result = await scanBytes(bytes, filename, { timeoutMs: 5_000, maxAttempts: 2 });
+      expect(result.scan_result).toBe('clean');
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+
+    expect(requests).toHaveLength(2);
+    for (const request of requests) {
+      expect(request.method).toBe('POST');
+      expect(request.headers['transfer-encoding']).toBeUndefined();
+      expect(Number(request.headers['content-length'])).toBe(request.body.length);
+      const parsed = parseMultipartBody(request.body, request.headers['content-type']);
+      expect(parsed.headers).toContain('name="inputFile"');
+      expect(parsed.headers).toContain('Content-Type: application/octet-stream');
+      expect(parsed.filename).toBe(expected.filename);
+      expect(parsed.payload).toEqual(expected.payload);
+    }
+  });
+
+  test('an abort during a backpressured streamed request remains a timeout error', async () => {
+    const http = await import('node:http');
+    let bytesReceived = 0;
+    const sockets = new Set();
+    const server = http.createServer((req) => {
+      req.on('data', (chunk) => {
+        bytesReceived += chunk.length;
+        req.pause();
+      });
+    });
+    server.on('connection', (socket) => {
+      sockets.add(socket);
+      socket.on('close', () => sockets.delete(socket));
+    });
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address();
+    global.fetch = (_url, init) => undiciFetch(`http://127.0.0.1:${port}/scan`, init);
+
+    try {
+      const { scanBytes } = await loadService();
+      await expect(scanBytes(Buffer.alloc(32 * 1024 * 1024), 'slow.pptx', { timeoutMs: 200, maxAttempts: 1 }))
+        .rejects.toMatchObject({ serviceName: 'cloudmersive', noResponse: true, causeKind: 'abort', isTransient: true });
+      expect(bytesReceived).toBeGreaterThan(0);
+    } finally {
+      // The deliberately paused request may still be open after the client
+      // aborts. Destroy accepted sockets so server.close cannot hang on it.
+      for (const socket of sockets) socket.destroy();
+      await new Promise((resolve) => server.close(resolve));
     }
   });
 });

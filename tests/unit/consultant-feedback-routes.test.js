@@ -49,6 +49,7 @@ import {
   releasePortalUpload,
 } from '../../lib/services/portal-upload-staging';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
+import { acquireLargeUploadAdmission, releaseLargeUploadAdmission } from '../../lib/services/large-upload-admission';
 import handler from '../../pages/api/workbench/consultant-feedback';
 import consultantsHandler from '../../pages/api/workbench/consultant-feedback/consultants';
 import uploadTokenHandler from '../../pages/api/workbench/consultant-feedback/upload-token';
@@ -302,6 +303,22 @@ describe('finalize route', () => {
     await finalizeHandler({ method: 'POST', body: { requestId: REQUEST_ID, stagingId: STAGING_ID, entryId: 9, newEntry: {} } }, res2);
     expect(res2.statusCode).toBe(400);
     expect(claimPortalUpload).not.toHaveBeenCalled();
+  });
+
+  test('a busy process slot returns retry guidance before claiming the staff upload', async () => {
+    const holder = acquireLargeUploadAdmission();
+    expect(holder).toBeTruthy();
+    try {
+      const res = mockRes();
+      await finalizeHandler({ method: 'POST', body: { requestId: REQUEST_ID, stagingId: STAGING_ID, entryId: 9 } }, res);
+      expect(res.statusCode).toBe(503);
+      expect(res.headers['Retry-After']).toBe('30');
+      expect(res.body).toMatchObject({ ok: false, reason: 'processing_busy', retryAfterSeconds: 30 });
+      expect(claimPortalUpload).not.toHaveBeenCalled();
+      expect(loadClaimedPortalImage).not.toHaveBeenCalled();
+    } finally {
+      releaseLargeUploadAdmission(holder.token);
+    }
   });
 
   test('a consumed staging row replays the stored result with zero further writes', async () => {
