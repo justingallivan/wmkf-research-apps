@@ -4,10 +4,13 @@
  *
  * Pinned to the Dataverse sandbox. Uses the repository Dataverse client with
  * the write interlock forced on and performs GETs only after token acquisition.
- * Prints identifiers and coarse metadata only; never prints names, emails,
- * attendee JSON, SharePoint URLs/paths, or document contents.
+ * Prints identifiers and coarse metadata only; never prints people names,
+ * emails, attendee JSON, SharePoint URLs/paths, or document contents.
+ * Automation metadata names are intentionally included in safety mode.
  * `--publication-metadata` repeats the bounded app-grant, document-location,
  * and existing-recording site-host reads for the fixed candidate only.
+ * `--safety-metadata` performs bounded sandbox GETs for RequestDocument
+ * automation metadata and resolves only the registered SharePoint site/drive.
  */
 const {
   loadEnvLocal,
@@ -20,6 +23,13 @@ const AZURE_OID = '893369cc-1925-40ec-bbc6-6f12b0684a31';
 const TRANSCRIPT = 100000006;
 const RECORDING = 100000005;
 const PUBLICATION_METADATA_REQUEST = '4236c2b3-b053-f111-bec7-6045bd015cb0';
+
+function safeGraphMetadataFailure(error) {
+  const status = Number(error?.status);
+  return Number.isInteger(status) && status >= 100 && status <= 599
+    ? `Registered SharePoint metadata lookup failed (HTTP ${status}).`
+    : 'Registered SharePoint metadata lookup failed.';
+}
 
 function savedAttendeeMapAvailable(raw) {
   if (!raw) return false;
@@ -37,6 +47,10 @@ function selfTest() {
     throw new Error('Version-1 attendee map should be recognized.');
   }
   if (savedAttendeeMapAvailable('{"version":2}')) throw new Error('Unknown attendee-map version must be unavailable.');
+  const safeFailure = safeGraphMetadataFailure({ status: 403, message: 'response body contains a secret' });
+  if (safeFailure !== 'Registered SharePoint metadata lookup failed (HTTP 403).' || safeFailure.includes('secret')) {
+    throw new Error('Graph metadata failure summary must omit response details.');
+  }
   console.log('PASS: bounded probe projection self-test.');
 }
 
@@ -117,6 +131,79 @@ async function publicationMetadata(client) {
   }, null, 2));
 }
 
+async function safetyMetadata(client) {
+  const stepFilter = "sdkmessagefilterid/primaryobjecttypecode eq 'wmkf_requestdocument'";
+  const stepResponse = await client.get(
+    `/sdkmessageprocessingsteps?$select=name,stage,mode,statecode,rank&$expand=sdkmessageid($select=name),sdkmessagefilterid($select=primaryobjecttypecode)&$filter=${encodeURIComponent(stepFilter)}&$top=100`,
+  );
+  if (!stepResponse.ok) throw new Error(`Pinned sandbox RequestDocument step metadata returned HTTP ${stepResponse.status}.`);
+  const steps = stepResponse.body?.value || [];
+
+  // This intentionally excludes workflow.clientdata: cloud-flow trigger
+  // entities may exist only inside that definition, which is not read here.
+  const workflowFilter = "type eq 1 and primaryentity eq 'wmkf_requestdocument'";
+  const workflowResponse = await client.get(
+    `/workflows?$select=name,category,statecode,type,primaryentity,triggeroncreate,triggerondelete,triggeronupdateattributelist&$filter=${encodeURIComponent(workflowFilter)}&$top=100`,
+  );
+  if (!workflowResponse.ok) throw new Error(`Pinned sandbox RequestDocument workflow metadata returned HTTP ${workflowResponse.status}.`);
+  const workflows = workflowResponse.body?.value || [];
+
+  const [{ GraphService }, { configuredSharePointTargetInfo }] = await Promise.all([
+    import('../lib/services/graph-service.js'),
+    import('../lib/services/sharepoint-target-registry.js'),
+  ]);
+  const sharePointTarget = configuredSharePointTargetInfo();
+  if (!sharePointTarget.registered) throw new Error('Configured SharePoint target is not in the tracked registry.');
+  let siteId;
+  let driveId;
+  try {
+    siteId = await GraphService.getSiteId();
+    driveId = await GraphService.getDriveId('akoya_request', { siteId });
+  } catch (error) {
+    throw new Error(safeGraphMetadataFailure(error));
+  }
+
+  console.log(JSON.stringify({
+    mode: 'READ_ONLY_PINNED_SANDBOX_SAFETY_METADATA',
+    checkedAt: new Date().toISOString(),
+    dynamicsTarget: new URL(SANDBOX).hostname,
+    method: 'GET only after OAuth token acquisition',
+    sharePoint: {
+      configuredHost: sharePointTarget.hostname,
+      registeredTarget: sharePointTarget.registered,
+      siteMetadataResolved: Boolean(siteId),
+      requestLibraryDriveResolved: Boolean(driveId),
+    },
+    requestDocumentSteps: {
+      queryFilter: stepFilter,
+      rowCount: steps.length,
+      capped: Boolean(stepResponse.body?.['@odata.nextLink']),
+      createUpdate: steps.filter((step) => ['Create', 'Update'].includes(step.sdkmessageid?.name))
+        .map((step) => ({
+          name: step.name || null,
+          message: step.sdkmessageid.name,
+          statecode: step.statecode,
+          stage: step.stage,
+          mode: step.mode,
+        })),
+    },
+    requestDocumentWorkflows: {
+      queryFilter: workflowFilter,
+      rowCount: workflows.length,
+      capped: Boolean(workflowResponse.body?.['@odata.nextLink']),
+      matchingRows: workflows.map((workflow) => ({
+        name: workflow.name || null,
+        category: workflow.category,
+        statecode: workflow.statecode,
+        triggeroncreate: workflow.triggeroncreate === true,
+        hasUpdateTrigger: Boolean(workflow.triggeronupdateattributelist),
+      })),
+      definitionContentsRead: false,
+    },
+    note: 'No SharePoint files, workflow definitions, or document contents are read. Workflow rows whose trigger entity exists only in clientdata are not covered by the entity filter.',
+  }, null, 2));
+}
+
 async function main() {
   const { buildVisibilityFilter } = await import('../shared/config/workbenchVisibility.js');
   if (process.argv.includes('--self-test')) return selfTest();
@@ -128,6 +215,7 @@ async function main() {
   }
   const token = await getAccessToken(SANDBOX);
   const client = createClient({ resourceUrl: SANDBOX, token });
+  if (process.argv.includes('--safety-metadata')) return safetyMetadata(client);
   if (process.argv.includes('--publication-metadata')) return publicationMetadata(client);
 
   const actorResponse = await client.get(

@@ -87,7 +87,6 @@ const sharedAuthProxy = withAuth(
       // Admin surface and use short-lived single-path client tokens.
       connectSrc += ` https://*.blob.vercel-storage.com`;
     }
-
     const directives = [
       `default-src 'self'`,
       `script-src ${scriptSrc}`,
@@ -189,7 +188,7 @@ const sharedAuthProxy = withAuth(
 export default async function proxy(req, event) {
   const pathname = req.nextUrl?.pathname || '';
   const testPolicy = decideMeetingTranscriptionTestRequest({
-    pathname, method: req.method, searchParams: req.nextUrl?.searchParams,
+    pathname, method: req.method, searchParams: req.nextUrl?.searchParams, origin: req.nextUrl?.origin,
   });
   if (testPolicy.dedicated) {
     if (!testPolicy.identityVerified || !testPolicy.enabled || !testPolicy.allowed) {

@@ -33,6 +33,51 @@ const OLD_ID = '55555555-5555-4555-8555-555555555555';
 const NEW_ID = '66666666-6666-4666-8666-666666666666';
 const STAGING_ID = '88888888-8888-4888-8888-888888888888';
 const ZOOM_URL = 'https://us02web.zoom.us/rec/share/abc?pwd=secret';
+const SUPERVISED_REQUEST_ID = '4236c2b3-b053-f111-bec7-6045bd015cb0';
+const SUPERVISED_VISIT_ID = '38bf47c0-c1aa-46fc-b9d0-167aa76ad962';
+
+function withSupervisedTestEnv(callback, overrides = {}) {
+  const keys = [
+    'MEETING_TRANSCRIPTION_SUPERVISED_TEST_ENABLED', 'VERCEL_PROJECT_ID', 'VERCEL_ENV', 'NODE_ENV',
+    'MEETING_TRANSCRIPTION_TEST_DEPLOYMENT_PROFILE', 'NEXTAUTH_URL', 'DYNAMICS_URL', 'DYNAMICS_SANDBOX_URL',
+    'MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY', 'MEETING_TRACKER_TRANSCRIPTION_ACCESS',
+    'POST_PRESENTATION_MATERIALS_SCHEMA_READY', 'POST_PRESENTATION_MATERIALS_ACCESS',
+    'MEETING_TRANSCRIPTION_REHEARSAL_ENABLED', 'TRANSCRIPTION_PILOT_ENABLED', 'TRANSCRIPTION_SUBMISSIONS_ENABLED',
+    'AUTH_REQUIRED', 'EMERGENCY_AUTH_BYPASS', 'AZURE_AD_CLIENT_ID', 'AZURE_AD_CLIENT_SECRET',
+    'AZURE_AD_TENANT_ID', 'NEXTAUTH_SECRET',
+  ];
+  const previous = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+  Object.assign(process.env, {
+    MEETING_TRANSCRIPTION_SUPERVISED_TEST_ENABLED: 'on',
+    VERCEL_PROJECT_ID: 'prj_v9lOh6NdInOGxIPSmcX8IYiBPVQB',
+    VERCEL_ENV: 'preview',
+    NODE_ENV: 'production',
+    MEETING_TRANSCRIPTION_TEST_DEPLOYMENT_PROFILE: 'meeting-transcription-test',
+    NEXTAUTH_URL: 'https://wmkf-meeting-transcription-test.vercel.app',
+    DYNAMICS_URL: 'https://orgd9e66399.crm.dynamics.com',
+    DYNAMICS_SANDBOX_URL: 'https://orgd9e66399.crm.dynamics.com',
+    MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY: 'on',
+    MEETING_TRACKER_TRANSCRIPTION_ACCESS: `test:${SUPERVISED_REQUEST_ID}`,
+    POST_PRESENTATION_MATERIALS_SCHEMA_READY: 'on',
+    POST_PRESENTATION_MATERIALS_ACCESS: `test:${SUPERVISED_REQUEST_ID}`,
+    AUTH_REQUIRED: 'true',
+    EMERGENCY_AUTH_BYPASS: 'false',
+    AZURE_AD_CLIENT_ID: 'configured',
+    AZURE_AD_CLIENT_SECRET: 'configured',
+    AZURE_AD_TENANT_ID: 'configured',
+    NEXTAUTH_SECRET: 'unit-test-secret-that-is-long-enough',
+    MEETING_TRANSCRIPTION_REHEARSAL_ENABLED: 'off',
+    TRANSCRIPTION_PILOT_ENABLED: 'false',
+    TRANSCRIPTION_SUBMISSIONS_ENABLED: 'false',
+    ...overrides,
+  });
+  return Promise.resolve().then(callback).finally(() => {
+    for (const key of keys) {
+      if (previous[key] === undefined) delete process.env[key];
+      else process.env[key] = previous[key];
+    }
+  });
+}
 
 function recording(id, fence, overrides = {}) {
   return {
@@ -203,6 +248,73 @@ test('meeting transcript preparation freezes the exact real SharePoint destinati
   });
   expect(d.ensureFolderPath).not.toHaveBeenCalled();
   expect(d.uploadFile).not.toHaveBeenCalled();
+});
+
+test('supervised publication prepares only the pinned test folder and rejects wrong request, visit, or host', async () => {
+  await withSupervisedTestEnv(async () => {
+    const d = deps({
+      getRequest: jest.fn(async () => ({ akoya_requestid: SUPERVISED_REQUEST_ID, akoya_requestnum: '1000334', wmkf_meetingdate: '2026-12-10T00:00:00Z' })),
+      findActiveSiteVisit: jest.fn(async () => ({ records: [{ activityid: SUPERVISED_VISIT_ID,
+        _regardingobjectid_value: SUPERVISED_REQUEST_ID }] })),
+      getSharePointBuckets: jest.fn(async () => ([{ source: 'dynamics', library: 'akoya_request', folder: '1000334' }])),
+    });
+    const prepared = await prepareMeetingTranscriptBundlePublication({ requestId: SUPERVISED_REQUEST_ID,
+      operationId: OPERATION_ID, siteVisitActivityId: SUPERVISED_VISIT_ID }, d);
+    expect(prepared.folderPath).toBe(`1000334/TEST - Transcription Pilot/${OPERATION_ID}`);
+    expect(prepared.candidatePaths.txt).toBe(`1000334/TEST - Transcription Pilot/${OPERATION_ID}/1000334-Transcript-${OPERATION_ID}.txt`);
+    expect(d.ensureFolderPath).not.toHaveBeenCalled();
+    expect(d.uploadFile).not.toHaveBeenCalled();
+
+    await expect(prepareMeetingTranscriptBundlePublication({ requestId: REQUEST_ID,
+      operationId: OPERATION_ID, siteVisitActivityId: SUPERVISED_VISIT_ID }, d))
+      .rejects.toMatchObject({ code: 'meeting_transcription_supervised_test_binding_mismatch' });
+    await expect(withSupervisedTestEnv(() => prepareMeetingTranscriptBundlePublication({
+      requestId: SUPERVISED_REQUEST_ID, operationId: OPERATION_ID, siteVisitActivityId: SUPERVISED_VISIT_ID,
+    }, d), { DYNAMICS_URL: 'https://wmkf.crm.dynamics.com' }))
+      .rejects.toMatchObject({ code: 'meeting_transcription_supervised_test_misconfigured' });
+    d.findActiveSiteVisit.mockResolvedValue({ records: [{ activityid: VISIT_ID,
+      _regardingobjectid_value: SUPERVISED_REQUEST_ID }] });
+    await expect(prepareMeetingTranscriptBundlePublication({ requestId: SUPERVISED_REQUEST_ID,
+      operationId: OPERATION_ID, siteVisitActivityId: VISIT_ID }, d))
+      .rejects.toMatchObject({ code: 'meeting_transcription_supervised_test_binding_mismatch' });
+    expect(d.ensureFolderPath).not.toHaveBeenCalled();
+  });
+});
+
+test('supervised publication refuses a newly present current transcript before acquiring a slot or writing', async () => {
+  await withSupervisedTestEnv(async () => {
+    const d = deps({
+      getRequest: jest.fn(async () => ({ akoya_requestid: SUPERVISED_REQUEST_ID, akoya_requestnum: '1000334', wmkf_meetingdate: '2026-12-10T00:00:00Z' })),
+      findActiveSiteVisit: jest.fn(async () => ({ records: [{ activityid: SUPERVISED_VISIT_ID,
+        _regardingobjectid_value: SUPERVISED_REQUEST_ID }] })),
+      findDocuments: jest.fn(async () => ({ records: [transcript(OLD_ID, 1, { _wmkf_request_value: SUPERVISED_REQUEST_ID })] })),
+      getSharePointBuckets: jest.fn(async () => ([{ source: 'dynamics', library: 'akoya_request', folder: '1000334' }])),
+    });
+    const prepared = await prepareMeetingTranscriptBundlePublication({ requestId: SUPERVISED_REQUEST_ID,
+      operationId: OPERATION_ID, siteVisitActivityId: SUPERVISED_VISIT_ID }, d);
+    const oldSchemaFlag = process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+    process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = 'on';
+    try {
+      await expect(publishMeetingTranscriptBundle({ requestId: SUPERVISED_REQUEST_ID,
+        operationId: OPERATION_ID, actorProfileId: 12, actingUserSystemId: ACTOR_ID,
+        identity: { requestId: SUPERVISED_REQUEST_ID, siteVisitActivityId: SUPERVISED_VISIT_ID,
+          revisionId: OPERATION_ID, operationId: OPERATION_ID, sourceRevisionId: null, formatterVersion: '1' },
+        files: Object.fromEntries(['txt', 'vtt', 'source'].map(role => [role, {
+          bytes: Buffer.from(role), sha256: createHash('sha256').update(role).digest('hex'), contentType: 'text/plain',
+        }])), frozenInputSha256: 'a'.repeat(64), expectedCurrentArtifactId: null,
+        expectedCurrentFingerprint: null, prepared, candidatePaths: prepared.candidatePaths,
+        callbacks: { renew: jest.fn(async () => true), recordCandidate: jest.fn(async () => true),
+          bindSlotFence: jest.fn(async () => true) },
+      }, d)).rejects.toMatchObject({ code: 'meeting_transcription_supervised_test_transcript_exists' });
+      expect(d.acquireSlotLease).not.toHaveBeenCalled();
+      expect(d.ensureFolderPath).not.toHaveBeenCalled();
+      expect(d.uploadFile).not.toHaveBeenCalled();
+      expect(d.createDocument).not.toHaveBeenCalled();
+    } finally {
+      if (oldSchemaFlag === undefined) delete process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+      else process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = oldSchemaFlag;
+    }
+  });
 });
 
 test('bundle writer refuses to upload without mandatory durable receipt callbacks', async () => {

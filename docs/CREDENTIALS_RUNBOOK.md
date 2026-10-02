@@ -112,21 +112,30 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 | `CYCLE_DOSSIER_OPERATOR_STOP` | Immediate process-level outer stop checked before paid calls and SharePoint writes | **Source-built 2026-09-07; unset by default.** The durable Postgres operator stop is the authoritative pause and settles queued/running runs. |
 | `NODE_ENV` | Environment flag | Auto-set (`production` on Vercel, `development` locally) |
 
-### Optional — Meeting Tracker transcription (source-only, disabled)
+### Optional — Meeting Tracker transcription (disabled by default)
 
 These non-secret controls belong to the Meeting Tracker transcription source
 slice, not the separately hosted AssemblyAI `transcription-pilot` deployment
 and its `TRANSCRIPTION_PILOT_ENABLED` / `TRANSCRIPTION_SUBMISSIONS_ENABLED`
-switches. Routes, service, and UI integration are source-reviewed for disabled
-source, not released or live; Postgres binding schema and optional Dataverse
-memo remain unapplied. Keep these controls unset/off until the schema
-apply/readback and release checks are complete and separately approved.
+switches. The Meeting Tracker flow and a separate supervised-test mode are
+source-implemented, but remain disabled unless their independent gates pass;
+this does not release transcription to the shared application. Keep these
+controls unset/off outside an explicitly approved supervised test on the
+dedicated test Preview project. The supervised test is pinned to sandbox
+request 1000334 and its Site Visit, and is mutually exclusive with the synthetic
+speaker rehearsal. It additionally requires the exact test-project identity,
+Preview/auth configuration, sandbox Dynamics origin, request-scoped access,
+Meeting Tracker and post-presentation schema readiness/access, and provider
+submission switches not enabled. No current live enablement is asserted here;
+see the approved [Meeting Tracker transcription E2E reconnaissance plan](plans/MEETING_TRANSCRIPTION_E2E_RECON_PLAN_2026-10-02.md)
+for the controlled-test prerequisites and remaining checks.
 
 | Variable | Purpose | Contract |
 |----------|---------|----------|
 | `MEETING_TRACKER_TRANSCRIPTION_ACCESS` | Independent request-scoped rollout access for Meeting Tracker transcription | `on` allows eligible server-bound requests; exact `test:<request GUID>` allows only that matching request. Unset, malformed, or any other value resolves to off. This does not replace schema readiness. |
 | `MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY` | Meeting Tracker transcription schema interlock | Only literal `on` marks the required schema ready. The service fails closed unless this and the access control both allow the request. Set only after the approved schema apply and exact readback; readiness alone does not authorize a request. |
 | `MEETING_TRANSCRIPTION_REHEARSAL_ENABLED` | Narrow synthetic speaker read/save rehearsal interlock | Only literal `on` permits the exact rehearsal page/API after independent project, Preview, identity, schema-ready, and request-access checks. Intended only for the dedicated test Preview project; it does not enable transcription processing or the provider. Keep unset/off elsewhere. |
+| `MEETING_TRANSCRIPTION_SUPERVISED_TEST_ENABLED` | Separate fixed-request Meeting Tracker supervised-test interlock | Only literal `on` enables this mode, and only when the dedicated test project, Preview/auth, exact sandbox Dynamics origin, fixed request access, Meeting Tracker and post-presentation schema/access, and callback-origin checks pass. It is mutually exclusive with `MEETING_TRANSCRIPTION_REHEARSAL_ENABLED=on`; `TRANSCRIPTION_PILOT_ENABLED` and `TRANSCRIPTION_SUBMISSIONS_ENABLED` must not be `true`. Unset or literal `off` disables it; any other present value claims the mode and fails closed unless the complete contract is valid. Keep unset/off elsewhere. No live enablement is claimed. |
 | `MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY` | Optional Request Document transcript-manifest projection readiness | Only literal `on` permits the optional memo field to be selected, and only for a read explicitly opting into the transcript-bundle projection. It does not enable transcription or grant access. Set only after the optional Dataverse field is provisioned and read back exactly. |
 
 No additional credential is introduced by this source slice. The AssemblyAI
