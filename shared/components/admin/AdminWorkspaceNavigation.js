@@ -46,7 +46,7 @@ export const ADMIN_WORKSPACES = Object.freeze([
     key: 'test-requests',
     label: 'Test Requests',
     title: 'Test Request preparation',
-    description: 'Inspect a sandbox Request and prepare a non-writing clone preview before any separately authorized create.',
+    description: 'Preview a clone read-only, then create a test Request and set its status. Creating and status changes write real data and are switched on per deployment.',
     defaultView: 'preview',
     views: [{ key: 'preview', label: 'Preview' }],
   },
