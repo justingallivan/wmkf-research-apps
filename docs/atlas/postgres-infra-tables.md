@@ -1,6 +1,6 @@
 # Atlas: Postgres infrastructure tables (compact)
 
-**Last verified (schema sources):** 2026-10-01. The migration 060 section below is source-only; no database apply or live schema probe is claimed. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`, except the distribution ledger and explicitly dated migration readbacks below. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
+**Last verified (schema sources and Production read-only probe):** 2026-10-02. Migration 060 and the `materials_upload_jobs` table plus `portal_upload_staging.background_job_id` were verified in Production; see the dated section below. No Production SQL mutation was performed for that readback. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`, except the distribution ledger and explicitly dated migration readbacks below. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
 
 Compact summary for the Postgres tables outside the reviewer-finder domain. Promote any of these to its own page on next significant touch.
 
@@ -553,6 +553,8 @@ expected columns, 0 rows at probe time; the code merged to `main` 2026-08-27 (`d
 ## Portal upload staging
 
 ### `portal_upload_staging` (migrations 031, 043, 049, 055, 060)
+
+**[PRODUCTION-VERIFIED 2026-10-02 via owner-run read-only probe: migration 060 applied at `2026-10-02T17:08:20.197Z`; `background_job_id` is present in `public`; no migrations pending.]**
 **Source of truth:** Postgres coordination ledger; published abstract/caption/image
 authority remains Dataverse + SharePoint.
 
@@ -910,7 +912,7 @@ the collection row and sealed contributor link are created only on explicit Send
 invitation/reminder subject and body defaults live in Dataverse `wmkf_appuserpreferences`, not in
 this Postgres row. One-off edits are not saved as defaults.
 
-### `materials_upload_jobs` (migration 060; source-built)
+### `materials_upload_jobs` (migration 060; Production schema and worker deployed; admission off)
 
 Owner: durable background processing for applicant Site Visit materials uploads.
 The ledger binds one `portal_upload_staging` row to a collection, request, fixed
@@ -935,19 +937,17 @@ sanitized `jobs`; staff projections expose sanitized `uploadJobs` and counts.
 Request-wide active jobs remain visible when a newer collection exists, so
 Ready and manual/automatic reminders account for work admitted by an older
 collection. Runtime read failures are rendered unavailable, never as confirmed
-zero jobs. Four generic internal recursive document readers also opt into
-pruning `portal-<UUID>` children beneath canonical Site Visit materials folders;
-the focused five-suite source/callsite regression run passed (79 tests, one
-snapshot).
+zero jobs. Five generic internal recursive document readers also opt into
+pruning `portal-<UUID>` children beneath canonical Site Visit materials folders.
+The original four-reader regression run passed five suites (79 tests, one
+snapshot); the added Grant Reporting caller passed two suites (18 tests).
 
 Admission is gated by `SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY=on`,
 `SITE_VISIT_MATERIALS_BACKGROUND_ADMISSION_ENABLED=on`, and
 `VIRUS_SCAN_ENABLED` enabled. The schema gate must follow a successful
 migration-060 apply and physical readiness check; admission also requires the
 schema gate. If admission is off, the existing synchronous finalize path is
-used. These gates and the cron route are source-built on
-`codex/materials-background-processing`; migration 060, environment state,
-deployment, and live operation have not been verified.
+used. Production read-only verification on 2026-10-02 found migration 060 applied, schema readiness `on`, admission `off`, and virus scanning `true`. Ready deployment `dpl_HejNdRssKwXEZmjMpGuRXXZ3WBZb` serves commit `1ec1d93265fa19357372c5c75fa2dff9501e8406`; the 17:20 UTC worker run completed with an empty queue. No job was admitted. The bounded recovery and reader follow-ups remain planned; see `docs/plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md`.
 
 Terminal jobs expire after 30 days; rejected staging/blob cleanup uses the
 existing exact-path cleanup with a seven-day retention. `scripts/materials-upload-job.js`
