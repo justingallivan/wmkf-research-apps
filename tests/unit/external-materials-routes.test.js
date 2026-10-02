@@ -22,6 +22,7 @@ import { verifyMaterialsToken } from '../../lib/external/verify-materials-token'
 import { getUploadMaxMb } from '../../lib/services/site-visit-materials/upload-cap';
 import { buildContributorContext, finalizeMaterialUpload } from '../../lib/services/site-visit-materials/contributor-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
+import { acquireLargeUploadAdmission, releaseLargeUploadAdmission } from '../../lib/services/large-upload-admission';
 import * as staging from '../../lib/services/portal-upload-staging';
 import contextHandler from '../../pages/api/external/materials/[token]/context';
 import uploadTokenHandler from '../../pages/api/external/materials/[token]/upload-token';
@@ -102,6 +103,22 @@ test('finalize: claims by the ownership tuple, persists, completes the row with 
   const replay = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), replay);
   expect(replay.body).toEqual(body); expect(finalizeMaterialUpload).toHaveBeenCalledTimes(1);
   const bad = res(); await finalizeHandler(req('POST', { stagingId: 'x', slot: 'presentation_pdf' }), bad); expect(bad.statusCode).toBe(400); expect(staging.claimPortalUpload).toHaveBeenCalledTimes(2);
+});
+
+test('finalize returns retryable processing_busy before claiming or reading a staged upload', async () => {
+  const holder = acquireLargeUploadAdmission();
+  expect(holder).toBeTruthy();
+  try {
+    const response = res();
+    await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), response);
+    expect(response.statusCode).toBe(503);
+    expect(response.headers['Retry-After']).toBe('30');
+    expect(response.body).toMatchObject({ ok: false, reason: 'processing_busy', retryAfterSeconds: 30 });
+    expect(staging.claimPortalUpload).not.toHaveBeenCalled();
+    expect(staging.loadClaimedPortalImage).not.toHaveBeenCalled();
+  } finally {
+    releaseLargeUploadAdmission(holder.token);
+  }
 });
 
 test('finalize: permanent byte and validation failures reject the row; transient failures release it for retry', async () => {
