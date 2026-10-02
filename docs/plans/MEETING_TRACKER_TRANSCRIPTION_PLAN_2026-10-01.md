@@ -3,7 +3,7 @@ title: Meeting Tracker transcription integration
 domain: transcription
 kind: plan
 status: source-reviewed-disabled
-summary: "Shared transcription remains disabled. User-provided authenticated Safari and Chrome session JSON confirms sign-in on isolated Preview; a synthetic fixture rehearsal and the full Meeting Tracker flow remain unverified. No audio/provider test or release readiness is claimed."
+summary: "Shared transcription remains disabled. The bounded no-CRM synthetic speaker rehearsal is source-implemented, reviewed, and verified on isolated Preview: signed-in read/save/reload and TXT passed. VTT browser download and the full Tracker/release flow remain unverified."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -294,8 +294,92 @@ are verified. Scope checks include existing 060–062, post-presentation schema,
 private storage, provider controls and actual scheduler delivery. Schema
 readiness must gate select lists as well as routes so older environments still
 read legacy documents. Never enable the Admin pilot to activate Tracker.
-Production deployment, schema applies, feature enablement, real-recording tests
-and any newly metered service calls remain separately authorized operations.
+Shared/Production deployment, schema applies and feature enablement remain
+separately authorized. Migrations 063–064 are applied only to the dedicated
+Preview test Neon. No real-recording test or newly metered service call is
+authorized by this rehearsal.
+
+### Bounded no-CRM synthetic speaker rehearsal — scoped hosted read/save verified
+
+**[SCOPED HOSTED READ/SAVE/RELOAD AND TXT VERIFIED; VTT BROWSER DOWNLOAD UNVERIFIED.]**
+Fable's OAuth plan review session `44db0371-d76d-4bc2-8aef-a673ef714a0e`
+permits the bounded rehearsal under the following conditions. Root reports
+seven focused suites (39 tests), four fixture-operator tests, and the earlier
+61-test regression suite passing; scoped types, lint, and security gates pass.
+Sol's final source review found no material blocker. Final Fable first-party
+OAuth review session `d2152d34-e49d-428e-aa19-1ad201ced024` (`claude-fable-5-1`)
+returned **READY FOR SCOPED EXECUTION**, with no material defects (43 turns,
+387 seconds, Read/Grep only; no web, subagents, or permission denials). The earlier
+`3b5797da-1890-4149-8c1f-0338e23eb2e9` **NOT READY** result remains the history
+of the preceding plan revision; the conditions below address its blockers.
+Build/review approval and the synthetic seed are not evidence of hosted
+behavior or release readiness.
+
+Scope is synthetic speaker review/save only on the dedicated test Preview
+project. Permit only the narrow `MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY=on`,
+`MEETING_TRACKER_TRANSCRIPTION_ACCESS=test:37eea062-5888-44a5-b338-c6e6a14c783e`,
+and `MEETING_TRANSCRIPTION_REHEARSAL_ENABLED=on` controls needed for these
+read/save paths. Keep pilot and
+submission/provider flags and bundle readiness off; this does not enable
+processing or any provider entry point. Do not create CRM request/visit rows
+or invites. Do not call AssemblyAI, send email, write SharePoint, invoke an
+outbox, create tables, grants or Dynamics rekeys.
+
+#### Build invariants (conditions 1–7)
+
+| # | Invariant | Required enforcement / proof |
+|---|---|---|
+| 1 | Existing panel remains backward-compatible. | Add optional full `apiBasePath`; when omitted, existing full API paths and behavior are unchanged. Keep `reviewOnly` defaults unchanged. In rehearsal, hide and guard every mutating handler except speaker-save. |
+| 2 | Only the pinned authenticated staff identity can use the rehearsal. | Require trusted session Azure OID `893369cc-1925-40ec-bbc6-6f12b0684a31` and a fresh active, linked DB profile 1 check (`needs_linking=false`); apply `requireAuth` and `validateOrigin` for CSRF. |
+| 3 | The test route is exact and opt-in. | Limit static page/data/API policy to `/meeting-tracker/transcription-rehearsal` and `/api/meeting-transcription-rehearsal`; keep root redirect and sign-in callback through `/`. No wildcard route exemption. |
+| 4 | Page and API fail closed independently before data reads. | Each independently checks dedicated test project, Preview deployment, the exact schema-ready/test-access values above, and `MEETING_TRANSCRIPTION_REHEARSAL_ENABLED=on` before any DB/Blob read; these gates permit only the speaker read/save rehearsal, not processing. |
+| 5 | The rehearsal accepts only fixed synthetic row IDs. | Pin request `37eea062-5888-44a5-b338-c6e6a14c783e`, visit `70a3b1a6-4893-4ad4-911a-5a80c9bcbdbc`, and job `6f6f99ea-3d73-44a9-85e4-6fd6ec931f04`; reject any caller-selected alternative. |
+| 6 | Teardown removes only exact rehearsal-owned objects. | Expiry blocks access but does not perform deletion. Use explicit exact-ID/exact-path teardown; never broad, prefix, or shared cleanup. |
+| 7 | Storage target and capability are pinned at the API/operator boundary. | Require Neon host `ep-aged-dew-b7gtigyy-pooler.c-13.us-east-1.aws.neon.tech` and the private Blob token for store `store_G5ZrBn1kcxzaBkyI`; never use ambient or shared/production configuration. |
+
+The implemented static page is `/meeting-tracker/transcription-rehearsal`; the sole
+collection API is `/api/meeting-transcription-rehearsal`. Its method allowlist
+is GET collection/job/download (`txt` or `vtt`) and PATCH the fixed job's
+speakers only. There is no start, upload, queue, dispatch, or worker-claim
+route: request test-access can otherwise reach normal worker/provider claims
+independently of pilot flags, so the rehearsal must never invoke that path.
+Reuse the existing shared panel and runtime read/save helpers; do not
+introduce `meeting service.js` or `binding.js`. Fixture seeding is create-only
+and must not rewrite saved names or expiry. It must not create a provider job,
+audio object, or dispatch/outbox row.
+
+#### Execution gates (8–10; all before any fixture write)
+
+| # | Gate | Required evidence before execute |
+|---|---|---|
+| 8 | Ready-row SQL preflight and projection. | **[VERIFIED locally in dedicated Neon, no durable write]** Transaction explicitly rolled back; projector proved 18 safe keys and `contentAccessAllowed` against the real runtime. |
+| 9 | Normalized synthetic transcript. | **[VERIFIED in source/unit tests]** Fixed synthetic utterances/speaker IDs only; 419-byte content, no source recording/provider response/real transcript. |
+| 10 | Collection DTO contract. | **[VERIFIED in source/unit tests]** Only `jobs`, `candidates`, `candidateSources`, `publications[]`, `correctionDrafts[]`, `currentArtifact: null`, and `featureState: enabled` are projected; no CRM, email, Blob token/path, or provider data. |
+
+Gates 8–10 and final Fable review are verified. The exact fixed job seed and
+Blob output succeeded; idempotent rerun confirmed the exact Blob was reused,
+fixture version 2 and expiry were preserved, and the three saved labels were
+untouched. The source was committed as `13d727983`. Dedicated Preview
+deployment `dpl_Fyu3auFAgsDkGCtuPjzD1u1AVKmP` reached READY (48-second build);
+the stable alias
+[`https://wmkf-meeting-transcription-test.vercel.app/meeting-tracker/transcription-rehearsal`](https://wmkf-meeting-transcription-test.vercel.app/meeting-tracker/transcription-rehearsal)
+is assigned. Signed-in Chrome loaded the three synthetic speakers; a manual
+third-speaker label save survived full-page reload. TXT download contained all
+three labels and entries at 0:00, 1:00, and 2:00. Anonymous collection returned
+401; the normal Tracker dashboard and rehearsal-start POST returned 404. VTT
+download is not verified in-browser: Chrome showed `ERR_BLOCKED_BY_CLIENT`
+although the server log returned 200, and no local VTT file was obtained.
+Fresh Preview configuration readback confirms the narrow schema-ready, exact
+test-access, rehearsal, and exact-store Blob settings; pilot/submission flags
+remain false and bundle readiness remains off. The demo is left for the user
+until expiry `2026-10-09T20:02:10.993Z`; expiry blocks access but no scheduled
+deletion is claimed. Fable's
+non-blocking notes were accepted/deferred: retain canonical-origin handling
+for PATCH, repeat preflight immediately before seeding, retry an orphan Blob
+only through the same seed identity before exact teardown, and consider
+narrower mapping for malformed-name TypeErrors. These do not block scoped
+execution. The bounded rehearsal does not claim the broader
+Meeting Tracker flow, publication, transcript processing, or release readiness.
 
 ## Build and acceptance sequence
 
@@ -504,26 +588,37 @@ sign-in. The earlier Chrome `ERR_BLOCKED_BY_CLIENT` is no longer blocking; its
 cause remains unknown. This does not prove the full Meeting Tracker flow.
 
 The owner approved a synthetic sandbox request/visit and isolated sample
-transcript, but no fixture was created. Root and Luna ran
+transcript. At the earlier safety-census point no fixture had been created.
+Root and Luna ran
 `scripts/probe-meeting-transcription-fixture-safety.js` against the pinned
 sandbox with the write interlock on: its positive read-only census covered
 1,075 workflows and 82,539 plugin steps, not exhaustive automation coverage.
-Sol found omitted plural cloud-trigger/global-plugin coverage; Luna is
-repairing the probe. Active classic request-mail/invite/payment processes and
-synchronous create plugins were found; their side effects are unproven. Do not
-infer no other automation exists. The probe made no fixture, environment,
-grant, or deployment changes. No mail, provider, or SharePoint writes occurred.
-Root stopped before writes. Fable
-session `3b5797da-1890-4149-8c1f-0338e23eb2e9` returned **NOT READY** on the
-plan: exact-flag/target pins, missing `expertise_roster` for attendee choices,
-legacy profile-1 rekey/skip requiring all-FK review, literal request/job
-requirements, an unverified Next data-query assumption, and a no-email claim
-that does not cover platform flows. No implementation or final Fable review is
-done. A no-CRM-fixture isolated rehearsal still needs an owner decision.
+Sol found omitted plural cloud-trigger/global-plugin coverage. Luna repaired
+three probe-coverage gaps, and Sol reviewed closure with no new material
+blocker; the revised probe was not rerun live. Active classic
+request-mail/invite/payment processes and synchronous create plugins were
+found; their side effects are unproven. Do not infer no other automation
+exists. The probe made no fixture, environment, grant, or deployment changes;
+those are historical census results. Subsequent bounded operator execution
+seeded only the fixed synthetic job and exact Blob output described above. No
+mail, provider, or SharePoint writes occurred.
+Fable session `3b5797da-1890-4149-8c1f-0338e23eb2e9` returned **NOT READY** on
+the preceding plan revision, citing exact-flag/target pins, missing
+`expertise_roster` for attendee choices, legacy profile-1 rekey/skip requiring
+all-FK review, literal request/job requirements, an unverified Next data-query
+assumption, and a no-email claim that does not cover platform flows. The later
+Fable plan review `44db0371-d76d-4bc2-8aef-a673ef714a0e` permitted
+implementation after the bounded conditions were recorded. The rehearsal
+source is implemented and Sol-reviewed; focused local tests/gates pass. Final
+Fable returned READY FOR SCOPED EXECUTION. The fixed job seed, exact Blob,
+dedicated Preview deployment, signed-in read/save/reload, and TXT download are
+confirmed; VTT browser download and the full Tracker flow remain unverified.
 
-All transcription flags remain off. No audio or provider call, feature
-activation, or end-to-end Meeting Tracker test occurred; these deployment/auth
-checks do not establish release readiness.
+Only the narrow schema-ready, fixed-request access, and rehearsal controls are
+on in dedicated Preview; pilot/submission/provider and bundle controls remain
+off. No audio or provider call, broad transcription activation, or end-to-end
+Meeting Tracker test occurred; these deployment/auth checks do not establish
+release readiness.
 
 **[VERIFIED via first-party OAuth Max source review]** Fable session
 `f287cfdf-40ea-4f27-840c-4defee098bbf` (`claude-fable-5-1`) returned **Commit
@@ -539,9 +634,9 @@ correction, and cleanup gaps remain.
 Detailed bounded results and review limits are recorded in
 [the 2026-10-02 readiness check](evidence/MEETING_TRANSCRIPTION_READINESS_CHECK_2026-10-02.md).
 
-Next, resolve the owner decision for a no-CRM-fixture sandbox rehearsal and
-close Fable's plan findings before fixture writes. The earlier browser block
-is no longer blocking, but the full Meeting Tracker flow remains untested.
+Next, investigate the blocked VTT browser download if needed; do not infer
+success from the server's HTTP 200 log. The earlier sign-in browser block is no
+longer blocking, but VTT and the full Meeting Tracker flow remain untested.
 The fresh-schema bootstrap is separate from the old pilot and shared database;
 it does not prove hosted adapter behavior or release readiness. The sandbox
 generation key is exact/Active, but this does not authorize or prove an

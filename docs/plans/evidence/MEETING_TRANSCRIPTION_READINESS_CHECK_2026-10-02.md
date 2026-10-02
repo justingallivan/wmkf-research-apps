@@ -3,7 +3,7 @@ title: Meeting Tracker transcription readiness check
 domain: transcription
 kind: evidence
 status: isolated-preview-schema-ready-source-disabled-runtime-unverified
-summary: "Local PostgreSQL integration and isolated Preview test schema are verified. User-provided Safari and Chrome session JSON confirms sign-in; synthetic fixture rehearsal and the full Tracker flow remain unverified. Transcription remains off."
+summary: "Local PostgreSQL integration and isolated Preview schema are verified. The scoped synthetic rehearsal passed signed-in read/save/reload and TXT download on dedicated Preview. VTT browser download and the full Tracker flow remain unverified; transcription processing remains off."
 owner: product-engineering
 ---
 
@@ -47,8 +47,8 @@ owner: product-engineering
   private Blob store is `store_G5ZrBn1kcxzaBkyI`. The
   `scripts/bootstrap-meeting-transcription-test.js` execute initialized the
   fresh Neon schema; independent verify-only confirmed 61 tracked
-  migrations and 9 required tables. All nine Preview environment keys read
-  back as expected: sandbox/disabled flags, sandbox Dataverse target,
+  migrations and 9 required tables. At initial bootstrap, all nine Preview
+  environment keys read back as expected: sandbox/disabled flags, sandbox Dataverse target,
   interlock on, Production reads off, DAL enforcement on. The sign-in-only
   profile change is committed as `f58238774`; Sol approved it, and root reports
   96 tests plus scoped lint, API/context/lifecycle, and old-pilot isolation
@@ -83,8 +83,8 @@ owner: product-engineering
   authenticated session. Root removed the exact protected temporary
   `preview.env` and its empty parent directory; no source recording was touched.
 - **Sandbox fixture safety and plan review:** owner approved a synthetic
-  sandbox request/visit and isolated sample transcript, but no fixture was
-  created. Root and Luna ran
+  sandbox request/visit and isolated sample transcript. At the earlier safety
+  census no fixture had been created. Root and Luna ran
   `scripts/probe-meeting-transcription-fixture-safety.js` against the pinned
   sandbox with the write interlock on. Its positive read-only census covered
   1,075 workflows and 82,539 plugin steps; it is not exhaustive automation
@@ -93,16 +93,48 @@ owner: product-engineering
   no new material blocker. The revised probe was not rerun live. Active
   classic request-mail/invite/payment processes and synchronous create plugins
   were found, with side effects
-  unproven. Do not infer that no other automation exists. Root stopped before
-  fixture writes; no fixture, environment, grant, or deployment changed, and
-  no mail, provider, or SharePoint writes occurred. Fable first-party OAuth
-  session `3b5797da-1890-4149-8c1f-0338e23eb2e9` returned **NOT READY** on the
-  plan: exact flags/target pins, missing `expertise_roster` for attendee
-  choices, legacy profile-1 rekey/skip requiring all-FK review, literal
-  request/job requirements, an unverified Next data-query assumption, and a
-  no-email claim that excludes platform flows. No implementation or final
-  Fable review is complete; a no-CRM-fixture isolated rehearsal needs an owner
-  decision.
+  unproven. Do not infer that no other automation exists. The census itself
+  made no fixture, environment, grant, or deployment changes; subsequent
+  bounded operator execution seeded only the fixed synthetic job and exact
+  Blob output. No mail, provider, or SharePoint writes occurred. Fable first-party OAuth
+  session `3b5797da-1890-4149-8c1f-0338e23eb2e9` returned **NOT READY** on an
+  earlier plan revision. The revised no-CRM synthetic speaker read/save
+  rehearsal contract records its exact flags, fixed synthetic IDs, identity,
+  project, storage pins, and no-processing/no-side-effect boundary. Fable
+  first-party OAuth plan-review session
+  `44db0371-d76d-4bc2-8aef-a673ef714a0e` permitted implementation after those
+  conditions; this was not fixture-write approval or a final implementation
+  review. The page/API source is now implemented and Sol-reviewed. Root reports
+  seven focused suites (39 tests) and four fixture-operator tests passing, plus
+  the earlier 61-test regression suite; scoped type, lint, and security gates
+  pass. Final Fable first-party OAuth review session
+  `d2152d34-e49d-428e-aa19-1ad201ced024` (`claude-fable-5-1`) returned **READY
+  FOR SCOPED EXECUTION**, with no material defects (43 turns/387 seconds,
+  Read/Grep only, no web/subagents/permission denials). The dedicated Preview
+  rollback-only preflight passed; root then confirmed the fixed job seed and
+  exact Blob output succeeded. Narrow Preview settings are present: schema
+  readiness on, exact test-request access, rehearsal on, and exact-store Blob
+  token; pilot/submission flags are false and bundle readiness is off. App
+  source commit is `13d727983`. The clean Preview deployment
+  `dpl_Fyu3auFAgsDkGCtuPjzD1u1AVKmP` reached READY after a 48-second build; its
+  stable rehearsal alias is assigned. Signed-in Chrome loaded the three
+  synthetic speakers; manual label save survived a full-page reload and TXT
+  contained all three labels with entries at 0:00, 1:00, and 2:00. Anonymous
+  collection returned 401; normal Tracker dashboard and rehearsal-start POST
+  returned 404. VTT browser download remains unverified (`ERR_BLOCKED_BY_CLIENT`
+  despite HTTP 200 server log), with no local VTT file. Idempotent seed rerun
+  reused the exact Blob and preserved ready job version 2, labels, and expiry
+  `2026-10-09T20:02:10.993Z`; dispatch count is zero. No CRM/provider/SharePoint
+  write occurred. No scheduled deletion is claimed.
+
+- **Rehearsal preflight, projector, and DTO gates:** the dedicated Neon
+  `--preflight` transaction explicitly rolled back. The real runtime projector
+  proved 18 safe output keys and `contentAccessAllowed`; synthetic transcript
+  content was 419 bytes. Gates 8–10 are verified by this rollback-only
+  preflight and focused source/unit tests. The approved fixed synthetic job
+  and exact Blob were seeded in the dedicated Preview project. Hosted
+  read/save/reload and TXT were verified; VTT and the full Tracker flow remain
+  unverified.
 
 ## Review and remaining limits
 
@@ -112,7 +144,13 @@ assertions, and confirmed the amended tests and the older pilot test correction
 resolved its findings. Root reran the strengthened Tracker tests and reviewed
 the combined 23-test passing result. Scoped lint, migration-manifest, Atlas,
 document-currency, document-catalog, document-symbol, and Request Document
-writer checks passed, including available paired self-tests.
+writer checks passed, including available paired self-tests. For the rehearsal
+implementation, Sol's final source review found no material blocker; Fable's
+final review returned READY FOR SCOPED EXECUTION with no material defects.
+Root's
+seven focused suites/39 tests and four operator tests passed, as did the earlier
+61-test regression suite and scoped type/lint/security gates. These are source
+and local-test results only.
 
 First-party OAuth Max Fable session `f287cfdf-40ea-4f27-840c-4defee098bbf`
 (`claude-fable-5-1`) returned **Commit OK** for the isolated test bootstrap,
@@ -131,8 +169,9 @@ The live Wave 31 memo is exact on sandbox only; the bundle field's live
 application behavior remains unproved.
 
 Migrations were applied only to isolated test Neon, and Wave 31 only to
-sandbox. All transcription flags remain off. No audio/provider call,
-transcription feature activation, fixture creation, or end-to-end Meeting
-Tracker test occurred. Resolve the owner decision and Fable plan findings
-before fixture writes. These checks do not establish Meeting Tracker release
-readiness.
+sandbox. Dedicated Preview has only the narrow rehearsal/schema/test-access
+flags enabled; pilot/submission/provider and bundle flags remain off. No
+audio/provider call, broad transcription activation, or end-to-end Meeting
+Tracker test occurred. The scoped hosted read/save/reload and TXT checks passed;
+VTT browser download and full Tracker flow remain unverified. These checks do
+not establish Meeting Tracker release readiness.

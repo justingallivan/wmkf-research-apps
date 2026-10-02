@@ -186,6 +186,27 @@ For ordinary reconciliation, a verified receipt whose Request Document has
 been superseded is marked terminal `published` (with the superseded error
 code), and the newer current artifact remains unchanged.
 
+## Synthetic speaker rehearsal boundary
+
+An isolated Preview-only rehearsal is source-implemented and Sol/Fable-reviewed for fixed synthetic job
+`6f6f99ea-3d73-44a9-85e4-6fd6ec931f04`. It may read that ready job's transcript
+and private Blob output and save only the validated `speaker_names` overlay;
+the endpoint must not start, upload, queue, dispatch, or claim worker work.
+Access additionally requires the exact test request/visit binding, pinned
+staff identity, dedicated Preview project, and
+`MEETING_TRANSCRIPTION_REHEARSAL_ENABLED=on`. **[HOSTED SCOPED REHEARSAL VERIFIED]**
+Deployment `dpl_Fyu3auFAgsDkGCtuPjzD1u1AVKmP` from source `13d727983` is READY
+and the stable alias is assigned. Signed-in Chrome loaded three synthetic
+speakers; manual label save survived full-page reload, and TXT contained the
+three labels with entries at 0:00, 1:00, and 2:00. Anonymous collection
+returned 401; normal Tracker dashboard and rehearsal-start POST returned 404.
+VTT browser download remains unverified (`ERR_BLOCKED_BY_CLIENT`), despite an
+HTTP 200 server log. Only the fixed ready job, its 419-byte private Blob
+transcript, and label overlay were written; no CRM/provider/SharePoint write
+occurred. The demo remains for the user until expiry `2026-10-09T20:02:10.993Z`;
+expiry blocks access but no scheduled deletion is claimed. This adds no table
+and does not enable broader transcription or establish release readiness.
+
 ## Source evidence
 
 - Migrations: `lib/db/migrations/063_meeting_tracker_transcription.sql` and
