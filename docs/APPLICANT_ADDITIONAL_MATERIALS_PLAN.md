@@ -827,7 +827,7 @@ them in the Workbench without opening AkoyaGo.
   Synchronous portal uploads land in the same folders and appear too. [BUILT on the background
   processing branch; not enabled in Production] With the background schema flag on, the reader
   also merges current Ready registry links from staging-specific subfolders, suppresses known
-  superseded portal root items by exact drive/item identity. Separately, all four generic
+  superseded portal root items by exact drive/item identity. Separately, all five generic
   internal recursive document readers now opt into pruning `portal-<UUID>` children beneath
   canonical Site Visit materials folders, excluding uncommitted candidates and prior background
   copies. **[VERIFIED via source, four call sites, and focused regressions: five suites, 79 tests,
@@ -917,6 +917,6 @@ CI passed on prior head `837729b4e280317a3e20f93a377bf2947bd358a9` (1,199 suites
 19,110 tests, five snapshots; seven PostgreSQL suites, 114 tests). The L1 reader fix
 passed five focused suites (79 tests, one snapshot). L2/L3 shared recovery passed 95
 focused unit tests and 16 real-PostgreSQL tests through the actual loopback CLI.
-Fable's bounded review and full CI for the updated head remain pending, as recorded in
+Fable approved the L1/L2/L3 fixes; final-head CI remains required, as recorded in
 the linked plan. The production-recovery prerequisite remains separate; this is not a
 production-enabled capability.
