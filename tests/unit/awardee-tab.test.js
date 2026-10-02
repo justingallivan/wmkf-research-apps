@@ -244,6 +244,19 @@ afterEach(() => { if (global.fetch?.mockRestore) global.fetch.mockRestore(); });
 
 // Sending is now behind a confirm modal: the page button OPENS it, the modal
 // button commits. Tests that exercise a real send go through both.
+//
+// The page button is disabled until the subject and body have been seeded from
+// the email defaults, which commits in effects AFTER the abstract that
+// readyRender waits for. A synchronous click in that window is a no-op and no
+// dialog opens (CI flakes on PRs #398 and #409, ~2x slower test durations), so
+// wait for the button to be enabled before clicking it.
+async function openSendModal() {
+  const pageButton = screen.getByRole('button', { name: /send invitation/i });
+  await waitFor(() => expect(pageButton).toBeEnabled());
+  fireEvent.click(pageButton);
+  return screen.findByRole('dialog');
+}
+
 function confirmSendInModal() {
   const dialog = screen.getByRole('dialog');
   fireEvent.click(within(dialog).getByRole('button', { name: /send invitation/i }));
@@ -280,7 +293,7 @@ test('full flow: generate then send → status Invited + confirmation', async ()
   await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toBeInTheDocument());
 
   const sendBtn = screen.getByRole('button', { name: /send invitation/i });
-  expect(sendBtn).toBeEnabled();
+  await waitFor(() => expect(sendBtn).toBeEnabled());
   fireEvent.click(sendBtn);
   // The page button only opens the confirm step — nothing has been sent yet.
   expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/send-invite'))).toBe(false);
@@ -304,7 +317,7 @@ test('keeps the liaison copied when staff add an assistant for this invitation',
     target: { value: 'lorena.mclaren@emory.edu, assistant@emory.edu' },
   });
   expect(screen.getByRole('button', { name: /send invitation/i })).toBeEnabled();
-  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  await openSendModal();
   confirmSendInModal();
 
   await waitFor(() => expect(screen.getByText(/Sent for delivery/i)).toBeInTheDocument());
@@ -355,7 +368,7 @@ test('successful send reloads the recorded invite date into the status header', 
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Ready abstract.'));
 
-  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  await openSendModal();
   confirmSendInModal();
 
   await waitFor(() => expect(screen.getByText(/Sent for delivery/i)).toBeInTheDocument());
@@ -374,7 +387,7 @@ test('a failed post-send reload does not turn a successful send into an error', 
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Ready abstract.'));
 
-  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  await openSendModal();
   confirmSendInModal();
 
   await waitFor(() => expect(screen.getByText(/Sent for delivery/i)).toBeInTheDocument());
@@ -393,10 +406,10 @@ test('resolves grantee invite subject tokens in compose state and send payload',
   fireEvent.click(screen.getByRole('button', { name: /generate abstract/i }));
   await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toBeInTheDocument());
 
-  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  const dialog = await openSendModal();
   // The modal shows the RESOLVED subject before the PD commits, so what they
   // confirm is what actually goes out.
-  expect(within(screen.getByRole('dialog')).getByText('Legacy Quantum Widgets')).toBeInTheDocument();
+  expect(within(dialog).getByText('Legacy Quantum Widgets')).toBeInTheDocument();
   confirmSendInModal();
   await waitFor(() => expect(screen.getByText(/Sent for delivery/i)).toBeInTheDocument());
   const sendCall = global.fetch.mock.calls.find(([u]) => String(u).includes('/send-invite'));
@@ -847,7 +860,7 @@ test('one-send subject and body edits send once without changing saved defaults'
 
   fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'Only this email' } });
   fireEvent.change(screen.getByLabelText('Email body'), { target: { value: 'One-time message' } });
-  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  await openSendModal();
   confirmSendInModal();
   await waitFor(() => expect(screen.getByText(/Sent for delivery/i)).toBeInTheDocument());
   const sendCall = global.fetch.mock.calls.find(([u]) => String(u).includes('/send-invite'));
@@ -1587,7 +1600,7 @@ test('the sent receipt names the recipient and the estimated response date', asy
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Ready abstract.'));
 
-  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  await openSendModal();
   confirmSendInModal();
 
   await waitFor(() => expect(screen.getByText(/Sent for delivery/)).toBeInTheDocument());
@@ -1608,7 +1621,7 @@ test('a send failure remains visible in the modal with the recipient', async () 
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Ready abstract.'));
 
-  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  await openSendModal();
   confirmSendInModal();
 
   await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
@@ -1643,7 +1656,7 @@ test('the old top-of-pane sent banner is gone', async () => {
   render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await waitFor(() => expect(screen.getByLabelText('Formatted abstract')).toHaveValue('Ready abstract.'));
 
-  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  await openSendModal();
   confirmSendInModal();
   await waitFor(() => expect(screen.getByText(/Sent for delivery/)).toBeInTheDocument());
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /done/i }));
@@ -1920,7 +1933,7 @@ test('recipients load failure: alert with Retry, Send disabled until a retry loa
   expect(screen.queryByText(/recipients could not be loaded/i)).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: /send invitation/i })).toBeEnabled();
 
-  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  await openSendModal();
   confirmSendInModal();
   await waitFor(() => expect(screen.getByText(/Sent for delivery/i)).toBeInTheDocument());
   const call = global.fetch.mock.calls.find(([u, o]) => String(u).includes('/send-invite') && o?.method === 'POST');
@@ -2022,21 +2035,21 @@ test('T2 saveAbstract: request bytes are exact (PUT, headers, body)', async () =
 
 test('T2 send: malformed 2xx body produces the uncertain receipt (bare .json(), strict)', async () => {
   await readyRender({ send: async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('bad json'); } }) });
-  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  await openSendModal();
   confirmSendInModal();
   await waitFor(() => expect(screen.getByText(/could not confirm the result/i)).toBeInTheDocument());
 });
 
 test('T2 send: statusPersisted:false surfaces the partial-record message', async () => {
   await readyRender({ send: async () => ({ ok: true, status: 200, json: async () => ({ status: 100000001, statusPersisted: false }) }) });
-  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  await openSendModal();
   confirmSendInModal();
   await waitFor(() => expect(screen.getByText(/status could not be recorded/i)).toBeInTheDocument());
 });
 
 test('T2 send: non-2xx with outcome:"uncertain" keeps the uncertain step (body-flag branch)', async () => {
   await readyRender({ send: async () => ({ ok: false, status: 502, json: async () => ({ error: 'gateway hiccup', outcome: 'uncertain' }) }) });
-  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  await openSendModal();
   confirmSendInModal();
   await waitFor(() => expect(within(screen.getByRole('dialog')).getByText(/gateway hiccup/i)).toBeInTheDocument());
 });
@@ -2047,28 +2060,28 @@ test('T2 send: non-2xx with outcome:"uncertain" keeps the uncertain step (body-f
 // silently become a plain `failed` receipt.
 test('T2 send: non-2xx with an unparseable body (502 gateway page) keeps the uncertain receipt', async () => {
   await readyRender({ send: async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('Unexpected token <'); } }) });
-  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  await openSendModal();
   confirmSendInModal();
   await waitFor(() => expect(within(screen.getByRole('dialog')).getByText(/could not confirm the result/i)).toBeInTheDocument());
 });
 
 test('T2 send: plain non-2xx {error} without outcome is a failed receipt with the body message', async () => {
   await readyRender({ send: async () => ({ ok: false, status: 400, json: async () => ({ error: 'X' }) }) });
-  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  await openSendModal();
   confirmSendInModal();
   await waitFor(() => expect(within(screen.getByRole('dialog')).getByText('X')).toBeInTheDocument());
 });
 
 test('T2 send: plain non-2xx {} (parseable, no error field) is a failed receipt with the default message', async () => {
   await readyRender({ send: async () => ({ ok: false, status: 400, json: async () => ({}) }) });
-  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  await openSendModal();
   confirmSendInModal();
   await waitFor(() => expect(within(screen.getByRole('dialog')).getByText('The invitation was not sent.')).toBeInTheDocument());
 });
 
 test('T2 send: request bytes are exact (POST, headers, body)', async () => {
   await readyRender();
-  fireEvent.click(screen.getByRole('button', { name: /send invitation/i }));
+  await openSendModal();
   confirmSendInModal();
   await waitFor(() => expect(screen.getByText(/Sent for delivery/i)).toBeInTheDocument());
   const call = global.fetch.mock.calls.find(([u, o]) => String(u).includes('/send-invite') && o?.method === 'POST');
