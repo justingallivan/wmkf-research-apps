@@ -26,7 +26,7 @@ Sections 1–15 preserve the 2026-09-08 planning snapshot; §16 records subseque
 build and release status. Background processing is separately specified in
 [the 2026-10-01 plan](plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md).
 Its base code, schema and worker are deployed in Production, schema readiness is
-on, and admission remains off. Bounded recovery and older-file listing follow-ups are source-built in draft PR #404; final Fable OAuth review and CI are running. They are not Production-deployed, and this document does not authorize enabling admissions.
+on, and admission remains off. Bounded recovery and older-file listing follow-ups are source-built in draft PR #404; Fable approved the full runtime through `2bfa5f590` with no required fixes; verify current-head required CI on PR #404 before merge. They are not Production-deployed, and this document does not authorize enabling admissions.
 
 Build one **Site Visit Materials** workflow that collects applicant files, lets a Program
 Coordinator (PC) verify that the required files are present and render, and publishes selected
@@ -835,8 +835,8 @@ them in the Workbench without opening AkoyaGo.
   five suites (79 tests, one snapshot), and Grant Reporting passed two suites (18 tests).]** The
   follow-up exact-root filter is source-built on draft PR #404: it suppresses only exact
   same-request portal-produced Superseded drive/item identities, preserves current/manual files,
-  and fails closed on incomplete registry evidence. Eight focused suites (103 tests, one snapshot)
-  passed; Sol approved. Final Fable OAuth review and PR #404 CI are running; this follow-up is not
+  and fails closed on incomplete registry evidence. Eight focused suites (104 tests, one snapshot)
+  passed; Sol and parent approved. Fable approved the runtime through `2bfa5f590` with no required fixes. The behavior-preserving matcher extraction in `45fc84144` passed 26 focused suites (483 tests, one snapshot), including the previous CI import-failure suites and plain Node CLI; Sol approved the extraction; Fable's bounded follow-up review is pending. PR #404 remains draft pending current-head required CI verification; this follow-up is not
   Production-deployed. There are no counters or registry writes: a hand-placed file still does
   not count toward the collection summary or appear on the briefing page.
 - **Summary availability:** the PR #338 production baseline returned fail-open `null` on a
@@ -927,4 +927,4 @@ CI passed on prior head `837729b4e280317a3e20f93a377bf2947bd358a9` (1,199 suites
 19,110 tests, five snapshots; seven PostgreSQL suites, 114 tests). The L1 reader fix
 passed five focused suites (79 tests, one snapshot), with the added Grant Reporting caller
 passing two suites (18 tests). L2/L3 shared recovery passed 95 focused unit tests and 16
-real-PostgreSQL tests through the actual loopback CLI. Production recovery and older-root filtering follow-ups are source-built in draft PR #404. The 23 operator unit tests and 16 local PostgreSQL tests passed; the reader changes passed eight suites (103 tests, one snapshot). Sol approved both. Final Fable OAuth review and PR #404 CI are running. Neither change is deployed. This is not authorization to admit uploads or perform a Production recovery mutation.
+real-PostgreSQL tests through the actual loopback CLI. Production recovery and older-root filtering follow-ups are source-built in draft PR #404. The 26 operator unit tests and 16 local PostgreSQL tests passed; the reader changes passed eight suites (104 tests, one snapshot). Sol and parent approved the runtime; Fable approved it through `2bfa5f590` with no required fixes. The behavior-preserving matcher extraction in `45fc84144` passed 26 focused suites (483 tests, one snapshot), including the prior CI import-failure suites and the plain Node CLI; Sol approved the extraction; Fable's bounded follow-up review is pending. PR #404 remains draft until all required CI is verified on its current head. Neither change is deployed. This is not authorization to admit uploads or perform a Production recovery mutation.
