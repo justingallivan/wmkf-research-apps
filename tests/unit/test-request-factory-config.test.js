@@ -65,7 +65,7 @@ describe('messageFor', () => {
     expect(messageFor(apiError('factory_deadline_exceeded', 'x', 504))).toBe("There wasn't enough time left to start that safely, so nothing was started. Try again.");
     expect(messageFor(apiError('factory_source_not_found', 'x', 404))).toBe('No Request has that number. Check the number and try again.');
     expect(messageFor(apiError('status_change_replay'))).toBe(
-      "An earlier change to this status created, or may have created, a payment or status-tracking row. Repeating it needs the owner; it can't be done from this form.",
+      "An earlier change to this status created, or may have created, a payment or status-tracking row. Repeating it needs the command-line tool; it can't be done from this form.",
     );
   });
 
@@ -112,8 +112,25 @@ describe('labels for the run record and the source summary', () => {
   test('every needs-attention reason with its own copy is a real ledger reason code; others get the default', () => {
     for (const code of Object.keys(ATTENTION_COPY)) expect(LEDGER_REASON_CODES).toContain(code);
     const fallback = attentionCopyFor('file_copy_failed');
-    expect(fallback).toMatch(/^This step stopped\. Retrying picks the run up where it stopped/);
+    expect(fallback).toBe('This step stopped. Retrying never creates a second Request: the run checks where it stands first. If it stops here again, it needs to be resolved with the command-line tool.');
     expect(attentionCopyFor(null)).toBe(fallback);
     expect(attentionCopyFor('timeout (http 504)')).toBe(ATTENTION_COPY.timeout);
+  });
+});
+
+describe('needs-attention copy refinements', () => {
+  test('check-failed codes share one honest line; the readback mismatch is the unconfirmed line; the source fence line says what may have happened', () => {
+    const failed = 'A check on this step failed, and retrying will most likely stop here again. Nothing further was written. Inspect the run with the command-line tool.';
+    for (const code of ['preflight_identity_changed', 'meeting_date_readback_mismatch', 'request_readback_mismatch', 'verification_failed', 'observation_side_effects', 'manifest_digest_mismatch']) {
+      expect(attentionCopyFor(code)).toBe(failed);
+    }
+    expect(attentionCopyFor('location_readback_mismatch')).toBe(attentionCopyFor('file_journal_unverified'));
+    expect(attentionCopyFor('source_fence_failed')).toBe("The run couldn't confirm the source Request is unchanged: either it changed, or it couldn't be read. Nothing was created. Retry; if it stops here again, look up the source Request again and start a new run.");
+  });
+
+  test('no needs-attention or error copy points at "the owner", and the blip copy is verbatim', () => {
+    const texts = [...Object.values(ATTENTION_COPY), ...Object.values(ERROR_COPY).map((entry) => (typeof entry === 'function' ? entry('') : entry))];
+    for (const text of texts) expect(text).not.toMatch(/\bowner\b/i);
+    expect(BLIP_COPY).toBe("I'm having trouble reaching the server. This is usually a temporary blip. Please try again, and if the problem doesn't resolve, contact an administrator.");
   });
 });

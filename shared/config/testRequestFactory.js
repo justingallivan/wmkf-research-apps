@@ -22,7 +22,7 @@ export const BASIC_STEPS = Object.freeze([
 /** Run statuses (migration 054) with the words and chip tone the form shows. */
 export const RUN_STATUSES = Object.freeze({
   prepared: Object.freeze({ label: 'Reserved, not started', tone: 'gray' }),
-  creating: Object.freeze({ label: 'In progress', tone: 'blue' }),
+  creating: Object.freeze({ label: 'Started, not finished', tone: 'gray' }),
   ready: Object.freeze({ label: 'Ready', tone: 'green' }),
   needs_attention: Object.freeze({ label: 'Needs attention', tone: 'amber' }),
   retiring: Object.freeze({ label: 'Retiring', tone: 'gray' }),

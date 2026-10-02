@@ -10,7 +10,7 @@ import { SIZE_LIMITS } from '../../config/testRequestFactory';
 export const BLIP_COPY = "I'm having trouble reaching the server. This is usually a temporary blip. Please try again, and if the problem doesn't resolve, contact an administrator.";
 
 const SIZE_COPY = `This Request's documents are too large to clone here (limit ${SIZE_LIMITS.maxFileMb} MB per file, ${SIZE_LIMITS.maxTotalMb} MB in total, ${SIZE_LIMITS.maxFiles} files). Choose a smaller source Request. Nothing was created.`;
-const OWNER_REPLAY = "An earlier change to this status created, or may have created, a payment or status-tracking row. Repeating it needs the owner; it can't be done from this form.";
+const OWNER_REPLAY = "An earlier change to this status created, or may have created, a payment or status-tracking row. Repeating it needs the command-line tool; it can't be done from this form.";
 const FOUNDATION_COPY = "I couldn't confirm the Foundation's setup needed to clone this Request. This is usually a temporary blip. Please try again, and if the problem doesn't resolve, contact an administrator. Nothing was created.";
 const CONTACT = 'Contact an administrator.';
 
@@ -33,7 +33,7 @@ export const ERROR_COPY = Object.freeze({
   factory_run_not_found: "That run wasn't found, so nothing was changed. It may have been removed. Reload the list.",
   factory_run_not_production: "Only a production run can do that, so nothing was changed.",
   factory_run_not_ready: "That Request isn't ready yet, so its status wasn't changed. Finish creating it first.",
-  factory_recovery_required: "This run's saved files are missing, so it can't continue from here. Don't look up the source again. Ask the owner to recover it from the command line.",
+  factory_recovery_required: "This run's saved files are missing, so it can't continue from here. Don't look up the source again. Recovering the run needs the command-line tool; it can't be done from this form.",
   factory_artifacts_missing: "The saved files for this run are missing, so nothing was downloaded.",
   factory_artifact_digest_mismatch: `This run's saved files don't match their record, so nothing was advanced. ${CONTACT}`,
   factory_artifact_exists: "The files for this run were already saved, but the run wasn't reserved, so this draft can't be confirmed again. Look up the source Request again. Nothing was created.",
@@ -61,8 +61,8 @@ export const ERROR_COPY = Object.freeze({
   status_change_open: 'Another status change on this run is still open, so nothing new was sent. The journal has been reloaded; check that change first.',
   status_change_concurrent: 'Another caller moved this change on, so nothing new was sent. The journal has been reloaded.',
   status_change_conflict: 'The Request changed after it was read, so nothing was written. Reload the status and try again.',
-  status_change_resume: "The Request's current value doesn't match this change, so it wasn't sent again. Ask the owner to inspect it.",
-  status_change_effects: 'The change was written, but its emails, payments or jobs need a look. Check the journal and ask the owner to inspect it.',
+  status_change_resume: "The Request's current value doesn't match this change, so it wasn't sent again. Inspecting it needs the command-line tool; it can't be done from this form.",
+  status_change_effects: "The change was written, but its emails, payments or jobs need a look. Check the journal. Inspecting it further needs the command-line tool; it can't be done from this form.",
   status_change_edge: "That change isn't allowed from the Request's current status, so nothing was sent.",
   status_change_refused: (message) => message || "That status change wasn't allowed, so nothing was sent.",
   status_change_in_progress: "This change is being sent, or was sent and its result isn't known yet. Don't retry it.",
@@ -72,7 +72,8 @@ export const ERROR_COPY = Object.freeze({
 
 // Every line here was checked against the step that raises the code (run-runner.js): a retry never repeats a
 // write whose result is unknown. It re-reads, recovers if it can, and otherwise stops at the same place.
-const ATTENTION_DEFAULT = 'This step stopped. Retrying picks the run up where it stopped; it never creates a second Request.';
+const ATTENTION_DEFAULT = 'This step stopped. Retrying never creates a second Request: the run checks where it stands first. If it stops here again, it needs to be resolved with the command-line tool.';
+const ATTENTION_CHECK_FAILED = 'A check on this step failed, and retrying will most likely stop here again. Nothing further was written. Inspect the run with the command-line tool.';
 const ATTENTION_UNCONFIRMED = "An earlier attempt at this step may or may not have gone through, and the run can't tell which. Retrying won't repeat the write: the run checks again and stops here until the result is confirmed by hand. Inspect the run with the command-line tool before continuing.";
 const ATTENTION_WORKFLOW = 'A workflow that this step switches off and back on may not have been restored. Check it in Dynamics before continuing, and inspect the run with the command-line tool.';
 // Keyed by the run's stored needs-attention reason (a LEDGER_REASON_CODES token). Anything unlisted gets the default.
@@ -80,7 +81,14 @@ export const ATTENTION_COPY = Object.freeze({
   ambiguous_create_outcome: "The request to create the test Request was sent, but the new Request can't be found. Retrying is safe: the run looks for the Request again and never sends a second create. If it keeps stopping here, the run can't continue and needs to be resolved by hand with the command-line tool.",
   preallocated_request_present_not_owned: "A Request already exists under this run's reserved ID, and this run did not create it. Retrying will stop here again; the run can't continue.",
   location_preexisting: 'A document folder record already exists for this Request, and this run did not create it. Retrying will stop here again; the run needs to be resolved by hand.',
-  source_fence_failed: 'The source Request no longer matched what was read, so the run stopped at its first check. Look up the source Request again and start a new run.',
+  source_fence_failed: "The run couldn't confirm the source Request is unchanged: either it changed, or it couldn't be read. Nothing was created. Retry; if it stops here again, look up the source Request again and start a new run.",
+  location_readback_mismatch: ATTENTION_UNCONFIRMED,
+  preflight_identity_changed: ATTENTION_CHECK_FAILED,
+  meeting_date_readback_mismatch: ATTENTION_CHECK_FAILED,
+  request_readback_mismatch: ATTENTION_CHECK_FAILED,
+  verification_failed: ATTENTION_CHECK_FAILED,
+  observation_side_effects: ATTENTION_CHECK_FAILED,
+  manifest_digest_mismatch: ATTENTION_CHECK_FAILED,
   timeout: 'A service took too long to answer during this step. Retrying picks the run up where it stopped.',
   network: 'The connection dropped during this step. Retrying picks the run up where it stopped.',
   file_ambiguous_unrecovered: ATTENTION_UNCONFIRMED,

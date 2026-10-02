@@ -9,7 +9,7 @@ export const OUTLINE_BUTTON = 'min-h-11 rounded-lg border border-gray-300 bg-whi
 export const INPUT = 'mt-2 min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 font-normal text-gray-950 outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500';
 /** Props for a button that is the one primary action (marked for tests and assistive review) or an outline one. */
 export const buttonProps = (primary) => (primary ? { className: PRIMARY_BUTTON, 'data-primary': 'true' } : { className: OUTLINE_BUTTON });
-export const SUMMARY_CLASS = 'inline-flex min-h-11 cursor-pointer items-center text-sm font-semibold text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 rounded-lg';
+export const SUMMARY_CLASS = 'cursor-pointer py-3 text-sm font-semibold text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 rounded-lg';
 
 /** Moves focus to an element and keeps it in view (jsdom has no scrollIntoView). */
 export function focusAndShow(element) {

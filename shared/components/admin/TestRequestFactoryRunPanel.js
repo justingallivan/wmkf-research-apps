@@ -61,10 +61,10 @@ function recheckAdvisory(capturedIso, now = Date.now()) {
   const at = captured + HOUR_MS;
   if (at > now) {
     const minutes = Math.max(1, Math.ceil((at - now) / 60_000));
-    return `A recheck is meaningful after ${clock(at)} (in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}).`;
+    return `A recheck is useful after ${clock(at)} (in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}).`;
   }
   const sameDay = new Date(at).toDateString() === new Date(now).toDateString();
-  return `A recheck is meaningful since ${sameDay ? clock(at) : formatTime(at)}.`;
+  return `A recheck is useful since ${sameDay ? clock(at) : formatTime(at)}.`;
 }
 
 /**
@@ -95,12 +95,13 @@ export default function TestRequestFactoryRunPanel({
   })();
   const stepAt = Number.isInteger(run.stepIndex) ? run.stepIndex : 0;
   const progressLine = advancing
-    ? `${stepAt > 0 ? `Finished: ${BASIC_STEPS[stepAt - 1]?.label || ''}. ` : ''}Working on: ${stepName}. This can take a few minutes. Leave this page open.`
+    ? `${stepAt > 0 ? `Finished: ${BASIC_STEPS[stepAt - 1]?.label || ''}. ` : ''}Working on: ${stepName}.`
     : '';
   const advisory = production ? recheckAdvisory(view.foundationCapturedAt) : null;
   const attentionNote = note && note.kind === 'attention' ? note : null;
   const otherNote = note && note.kind !== 'attention' ? note : null;
   const resourceCount = view.resources?.length ?? 0;
+  const recordedReason = run.needsAttentionReason || run.lastError || '';
 
   return (
     <section aria-labelledby="factory-run-heading" className="space-y-6 border-t border-gray-300 pt-7">
@@ -118,7 +119,9 @@ export default function TestRequestFactoryRunPanel({
             </p>
           ) : null}
         </div>
-        <span className="shrink-0"><StatusChip tone={status.tone}>{status.label}</StatusChip></span>
+        <span className="shrink-0">
+          {advancing ? <StatusChip tone="blue">In progress</StatusChip> : <StatusChip tone={status.tone}>{status.label}</StatusChip>}
+        </span>
       </div>
 
       {view.state === 'error' ? <div role="alert" className={ERROR_BAND}>{view.text}</div> : null}
@@ -130,15 +133,18 @@ export default function TestRequestFactoryRunPanel({
       )}
 
       <div role="status" aria-live="polite" className="text-sm text-gray-700">{progressLine}</div>
+      {advancing ? <p className="text-sm text-gray-600">This can take a few minutes. Leave this page open.</p> : null}
 
       {attention ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+        <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
           <p className="font-semibold">Stopped at &quot;{stepName}&quot;.</p>
           <p className="mt-1">{attentionCopyFor(run.needsAttentionReason)}</p>
-          {attentionNote?.detail ? (
-            <details className="mt-2">
-              <summary className="cursor-pointer font-semibold">Technical detail</summary>
-              <p className="mt-1 break-words font-mono text-xs">{attentionNote.detail}</p>
+          {attentionNote?.detail || recordedReason ? (
+            <details className="mt-1">
+              <summary className={SUMMARY_CLASS}>Technical detail</summary>
+              {attentionNote?.detail
+                ? <p className="mb-1 break-words font-mono text-xs">{attentionNote.detail}</p>
+                : <p className="mb-1 break-words text-xs">Recorded reason: <code className="font-mono">{recordedReason}</code></p>}
             </details>
           ) : null}
         </div>
@@ -153,7 +159,9 @@ export default function TestRequestFactoryRunPanel({
       {advanceLabel ? (
         <div className="space-y-2">
           <p className="text-sm leading-6 text-gray-700">
-            Writes to {envName(run)} Dataverse and SharePoint: creates the test Request, sets its meeting date, makes its document folder and copies its documents.
+            {run.status === 'prepared'
+              ? `Writes to ${envName(run)} Dataverse and SharePoint: creates the test Request, sets its meeting date, makes its document folder and copies its documents.`
+              : `The remaining steps write to ${envName(run)} Dataverse and SharePoint.`}
           </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <button type="button" disabled={advanceDisabled} aria-describedby="factory-advance-reason" onClick={onAdvance} {...buttonProps(!attention)}>
@@ -193,7 +201,7 @@ export default function TestRequestFactoryRunPanel({
                   </tr>
                 );
               }) : (
-                <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-600">{view.resources ? 'No resources recorded yet.' : 'Loading resources…'}</td></tr>
+                <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-600">{view.resources ? 'No steps recorded yet.' : 'Loading resources…'}</td></tr>
               )}
             </tbody>
           </table>
@@ -209,7 +217,7 @@ export default function TestRequestFactoryRunPanel({
                 {recheck.busy ? 'Rechecking…' : 'Recheck the Foundation record'}
               </button>
               <p className="text-sm leading-6 text-gray-600">
-                Checks that creating the test Request did not change the Foundation&apos;s own account record. It is meaningful about an hour after the run started.
+                Checks that creating the test Request did not change the Foundation&apos;s own account record. It is useful about an hour after the run started.
               </p>
               {advisory ? <p className="text-sm leading-6 text-gray-600">{advisory}</p> : null}
               {recheck.error ? <div role="alert" className={ERROR_BAND}>{recheck.error}</div> : null}

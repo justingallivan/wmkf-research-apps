@@ -54,6 +54,10 @@ export default function TestRequestFactoryIntake({
   const [stoppedNotice, setStoppedNotice] = useState('');
   const summaryHeadingRef = useRef(null);
   const reservedRef = useRef(null);
+  const sourceInputRef = useRef(null);
+  const labelInputRef = useRef(null);
+  // Focus for actions whose own button unmounts: 'label' or 'source', applied after the next render.
+  const pendingFocusRef = useRef(null);
   const keyRef = useRef(null);
   const lookupControllerRef = useRef(null);
   const lookupSeqRef = useRef(0);
@@ -80,6 +84,16 @@ export default function TestRequestFactoryIntake({
   const hasDraft = Boolean(draft);
   useEffect(() => { if (hasDraft) focusAndShow(summaryHeadingRef.current); }, [hasDraft, draft]);
   useEffect(() => { if (reserved) focusAndShow(reservedRef.current); }, [reserved]);
+
+  useEffect(() => {
+    const target = pendingFocusRef.current;
+    if (!target) return;
+    const element = target === 'label' ? labelInputRef.current : sourceInputRef.current;
+    if (element) {
+      pendingFocusRef.current = null;
+      element.focus();
+    }
+  });
 
   const trimmedNumber = sourceNumber.trim();
   const lookupReason = (() => {
@@ -143,10 +157,12 @@ export default function TestRequestFactoryIntake({
     lookupControllerRef.current?.abort();
     setLooking(false);
     setStoppedNotice(STOPPED_COPY);
+    pendingFocusRef.current = 'source';
   }
 
   // A different source: forget the draft and reservation (and its key); the typed number stays for editing.
   function lookupDifferent() {
+    pendingFocusRef.current = 'source';
     lookupSeqRef.current += 1;
     lookupControllerRef.current?.abort();
     keyRef.current = null;
@@ -209,6 +225,7 @@ export default function TestRequestFactoryIntake({
   }
 
   function createAnother() {
+    pendingFocusRef.current = 'label';
     keyRef.current = mintKey();
     setKeyMissing(!keyRef.current);
     setReserved(null);
@@ -222,6 +239,7 @@ export default function TestRequestFactoryIntake({
   };
 
   const mismatch = reserved?.differs;
+  const documentCount = Array.isArray(summary?.documents) ? summary.documents.length : null;
   const reservedRun = reserved?.run;
 
   return (
@@ -229,7 +247,7 @@ export default function TestRequestFactoryIntake({
       {reserved ? (
         <div role="status" className="rounded-xl border border-green-200 bg-green-50 px-4 py-4 text-sm leading-6 text-green-900">
           <p ref={reservedRef} tabIndex={-1} className="font-semibold focus:outline-none">
-            {`Source Request ${summary?.requestNumber ?? reservedRun.sourceRequestNumber} · reserved as "${reservedRun.testLabel}" (fiscal year ${reservedRun.fiscalYear || 'not set'}, meeting ${String(reservedRun.meetingDate ?? '').slice(0, 10) || 'not set'})`}
+            {`Source Request ${summary?.requestNumber ?? reservedRun.sourceRequestNumber} · reserved as "${reservedRun.testLabel}" (fiscal year ${reservedRun.fiscalYear || 'not set'}, meeting ${String(reservedRun.meetingDate ?? '').slice(0, 10) || 'not set'}${documentCount === null ? '' : `, ${documentCount} ${documentCount === 1 ? 'document' : 'documents'}`})`}
           </p>
           <p className="mt-1">Nothing has been created in Dataverse yet. Start it from the run panel below.</p>
           {!reserved.selected ? <p className="mt-1">Select it in the run list to start it.</p> : null}
@@ -250,6 +268,7 @@ export default function TestRequestFactoryIntake({
           <div className="mt-3 flex flex-col gap-3 sm:flex-row">
             <input
               id="factory-source-number"
+              ref={sourceInputRef}
               aria-describedby="factory-source-help factory-lookup-reason"
               value={sourceNumber}
               onChange={(event) => { setSourceNumber(event.target.value); setLookupError(''); }}
@@ -266,10 +285,10 @@ export default function TestRequestFactoryIntake({
         </form>
       )}
 
-      <div role="status" aria-live="polite" className="text-sm text-gray-700">{looking ? elapsedText(elapsed) : ''}</div>
       {looking ? (
         <div className="space-y-2">
-          <p className="text-sm text-gray-700">Reading the source Request and checking its documents. This can take a few minutes.</p>
+          <p role="status" className="text-sm text-gray-700">Reading the source Request and checking its documents. This can take a few minutes.</p>
+          {elapsedText(elapsed) ? <p className="text-sm text-gray-600">{elapsedText(elapsed)}</p> : null}
           <button type="button" {...buttonProps(false)} onClick={stopWaiting}>Stop waiting</button>
         </div>
       ) : null}
@@ -281,7 +300,7 @@ export default function TestRequestFactoryIntake({
           <div>
             <h3 id="factory-summary-heading" ref={summaryHeadingRef} tabIndex={-1} className="text-base font-semibold text-gray-950 focus:outline-none">Source Request {summary.requestNumber}</h3>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-600">
-              {draft.source?.title || 'Untitled Request'} · {draft.source?.applicant || 'Applicant unavailable'}
+              {draft.source?.title || 'Title unavailable'} · {draft.source?.applicant || 'Applicant unavailable'}
             </p>
             <dl className="mt-2 grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
               <div className="flex gap-2"><dt className="text-gray-600">Fiscal year</dt><dd className="font-semibold text-gray-950">{summary.fiscalYear || 'Not set'}</dd></div>
@@ -316,16 +335,18 @@ export default function TestRequestFactoryIntake({
             <div className="grid gap-4 lg:grid-cols-3">
               <label className="block text-sm font-semibold text-gray-800">
                 Test label
-                <input value={form.label} onChange={(event) => update('label', event.target.value)} maxLength={LIMITS.labelMax} required className={INPUT} />
+                <input ref={labelInputRef} value={form.label} onChange={(event) => update('label', event.target.value)} maxLength={LIMITS.labelMax} required className={INPUT} />
               </label>
               <div>
                 <label className="block text-sm font-semibold text-gray-800">
                   Fiscal year
                   <input value={form.fiscalYear} onChange={(event) => update('fiscalYear', event.target.value)} maxLength={LIMITS.cycleFieldMax} required aria-describedby="factory-fy-hint" className={INPUT} />
                 </label>
-                <p id="factory-fy-hint" className="mt-1 text-sm text-gray-600">
-                  {draft.defaults?.fiscalYear ? `For example: ${draft.defaults.fiscalYear}` : "Use the same form as the source Request's fiscal year."}
-                </p>
+                {form.fiscalYear === '' ? (
+                  <p id="factory-fy-hint" className="mt-1 text-sm text-gray-600">
+                    {draft.defaults?.fiscalYear ? `For example: ${draft.defaults.fiscalYear}` : "Use the same form as the source Request's fiscal year."}
+                  </p>
+                ) : <span id="factory-fy-hint" />}
               </div>
               <label className="block text-sm font-semibold text-gray-800">
                 Meeting date
@@ -338,7 +359,7 @@ export default function TestRequestFactoryIntake({
             </label>
             {confirmError ? <div role="alert" className={ERROR_BAND}>{confirmError}</div> : null}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <button type="submit" disabled={Boolean(confirmReason)} aria-describedby="factory-confirm-reason" {...buttonProps(true)}>
+              <button type="submit" disabled={Boolean(confirmReason)} aria-describedby="factory-confirm-reason" {...buttonProps(!hasSelection)}>
                 {confirming ? 'Reserving…' : 'Confirm and reserve run'}
               </button>
               {confirmReason ? <Reason id="factory-confirm-reason">{confirmReason}</Reason> : <span id="factory-confirm-reason" />}

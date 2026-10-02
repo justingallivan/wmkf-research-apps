@@ -13,13 +13,13 @@ const EFFECT_PHRASES = { emails: 'send emails', tracking: 'create a status-track
 const effectsSentence = (effects) => {
   if (!Array.isArray(effects)) return 'It may send emails or create payment and tracking rows.';
   if (!effects.length) return 'No emails, payments or tracking rows are expected from this change.';
-  return `This change is expected to: ${effects.map((effect) => EFFECT_PHRASES[effect] || effect).join('; ')}.`;
+  return `This change may: ${effects.map((effect) => EFFECT_PHRASES[effect] || effect).join('; ')}.`;
 };
 // The server's own verdict for each option (`blocked`, from the status GET), in the owner's voice.
 const BLOCKED_COPY = {
   status_change_noop: 'That status is already set. Choose a different one.',
   status_change_edge: "This change can create a payment or a status-tracking row, and it isn't allowed from the Request's current Phase I and Phase II statuses.",
-  status_change_replay: "An earlier change to this status created, or may have created, a payment or status-tracking row. Repeating it needs the owner; it can't be done from this form.",
+  status_change_replay: "An earlier change to this status created, or may have created, a payment or status-tracking row. Repeating it needs the command-line tool; it can't be done from this form.",
   default: "This status isn't one the form can set.",
 };
 const RELOAD_CODES = new Set(['status_change_concurrent', 'status_change_open']);
@@ -73,6 +73,10 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
   const [copied, setCopied] = useState('');
   const mountedRef = useRef(true);
   const questionRef = useRef(null);
+  const resultRef = useRef(null);
+  const checkButtonRef = useRef(null);
+  // After an action whose button unmounts: 'result' (the result band) or 'check' (the "Check again" button).
+  const pendingFocusRef = useRef(null);
   const setButtonRef = useRef(null);
   const returnFocusRef = useRef(false);
   const base = `/api/admin/test-requests/runs/${run.runId}/status`;
@@ -86,6 +90,16 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
     const scope = getScope();
     return { signal: scope.signal, alive: () => mountedRef.current && scope.isCurrent() };
   };
+
+  useEffect(() => {
+    const target = pendingFocusRef.current;
+    if (!target) return;
+    const element = target === 'check' ? checkButtonRef.current : resultRef.current;
+    if (element) {
+      pendingFocusRef.current = null;
+      element.focus();
+    }
+  });
 
   // Focus the confirmation question when it opens; Cancel returns focus to "Set status".
   useEffect(() => {
@@ -146,6 +160,7 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
     try {
       const reply = await requestJson(base, { method: 'POST', body, signal: scope.signal, fallbackMessage: 'The status change could not be sent.' });
       if (!scope.alive()) return;
+      pendingFocusRef.current = reply.outcome === 'jobs_open' || reply.outcome === 'unconfirmed' ? 'check' : 'result';
       if (reply.outcome === 'complete') {
         setResult({
           tone: 'green',
@@ -164,6 +179,7 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
       await loadJournal(scope);
     } catch (error) {
       if (!scope.alive() || error?.name === 'AbortError') return;
+      pendingFocusRef.current = 'result';
       setResult({ tone: 'red', text: messageFor(error) });
       if (RELOAD_CODES.has(codeOf(error))) await loadJournal(scope);
     } finally {
@@ -185,7 +201,7 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
     if (!body) {
       setResult({
         tone: 'amber',
-        text: stillOpen ? "That change's status label is missing or ambiguous in the list, so it can't be checked from here. Ask the owner." : 'That change is no longer open. The status list has been reloaded.',
+        text: stillOpen ? "That change's status label is missing or ambiguous in the list, so it can't be checked from here. This needs the command-line tool; it can't be done from this form." : 'That change is no longer open. The status list has been reloaded.',
       });
       setBusy(false);
       return;
@@ -245,7 +261,7 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
   const checkReason = (() => {
     if (writeBlock) return writeBlock;
     if (busy) return 'Waiting for the last request to finish.';
-    if (!checkBody) return "The open change's status label is missing or ambiguous in the list, so it can't be checked from here. Ask the owner.";
+    if (!checkBody) return "The open change's status label is missing or ambiguous in the list, so it can't be checked from here. This needs the command-line tool; it can't be done from this form.";
     return '';
   })();
   const lastSent = changes.filter((change) => change.dispatchedAt).length;
@@ -327,7 +343,7 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
           <p className="font-semibold">{stuck.message}</p>
           {stuck.abandonCommand ? (
             <div className="mt-3">
-              <label htmlFor="factory-abandon-command" className="block font-semibold">Owner command to close it (run only after confirming no sender is still running)</label>
+              <label htmlFor="factory-abandon-command" className="block font-semibold">Command to close this change. Run it only after making sure nothing is still sending this change: no open form request and no command-line run.</label>
               <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                 <input id="factory-abandon-command" readOnly value={stuck.abandonCommand} className="min-h-11 flex-1 rounded-lg border border-amber-300 bg-white px-3 py-2 font-mono text-xs text-gray-950" />
                 <button type="button" {...buttonProps(false)} onClick={() => copyCommand(stuck.abandonCommand)}>Copy command</button>
@@ -340,19 +356,38 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
 
       {result ? (
         <div
+          ref={resultRef}
+          tabIndex={-1}
           role={result.tone === 'red' ? 'alert' : 'status'}
-          className={result.tone === 'red' ? ERROR_BAND : `rounded-lg border px-4 py-3 text-sm ${result.tone === 'green' ? 'border-green-200 bg-green-50 text-green-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}
+          className={`focus:outline-none ${result.tone === 'red' ? ERROR_BAND : `rounded-lg border px-4 py-3 text-sm ${result.tone === 'green' ? 'border-green-200 bg-green-50 text-green-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}`}
         >
           {result.text}
         </div>
       ) : null}
 
+      <div className="space-y-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <button type="button" {...buttonProps(false)} disabled={Boolean(recheckReason)} aria-describedby="factory-recheck-reason" onClick={recheckEffects}>
+            Recheck status effects
+          </button>
+          {recheckReason ? <Reason id="factory-recheck-reason">{recheckReason}</Reason> : null}
+        </div>
+        {recheck?.error ? <div role="alert" className={ERROR_BAND}>{recheck.error}</div> : null}
+        {recheck?.reply ? (
+          <div role="status" className={`rounded-lg border px-4 py-3 text-sm ${recheck.reply.ok ? 'border-green-200 bg-green-50 text-green-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+            {recheck.reply.ok
+              ? 'No late effects, and no open or failed background jobs.'
+              : `Late emails: ${recheck.reply.lateEffects?.emails ?? 0}, tracking rows: ${recheck.reply.lateEffects?.tracking ?? 0}, payments: ${recheck.reply.lateEffects?.payments ?? 0}. Open jobs: ${recheck.reply.openJobs}, failed jobs: ${recheck.reply.failedJobs}.`}
+          </div>
+        ) : null}
+      </div>
+
       {!open ? (
         <div className="space-y-3">
           {confirming && selected ? (
-            <div role="group" aria-label="Confirm the status change" aria-live="polite" className="rounded-xl border border-gray-300 bg-gray-50 px-4 py-4 text-sm leading-6 text-gray-900">
+            <div role="group" aria-label="Confirm the status change" className="rounded-xl border border-gray-300 bg-gray-50 px-4 py-4 text-sm leading-6 text-gray-900">
               <p ref={questionRef} tabIndex={-1} className="font-semibold focus:outline-none">
-                Change {requestName}: {fieldLabel} from {labelOf(data?.options?.[effectiveKey], current)} to {selected.label}?
+                Change {requestName}: {fieldLabel} from {labelOf(data?.options?.[effectiveKey], current)} to {selected.label} on Production?
               </p>
               <p className="mt-1">{effectsSentence(selected.effects)} {RISK_SENTENCE}</p>
               <div className="mt-3 flex flex-wrap gap-3">
@@ -375,7 +410,7 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
 
       {open && !stuckHere ? (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <button type="button" {...buttonProps(true)} disabled={Boolean(checkReason)} aria-describedby="factory-check-reason" onClick={checkAgain}>
+          <button ref={checkButtonRef} type="button" {...buttonProps(true)} disabled={Boolean(checkReason)} aria-describedby="factory-check-reason" onClick={checkAgain}>
             Check again
           </button>
           {checkReason ? <Reason id="factory-check-reason">{checkReason}</Reason> : null}
@@ -418,22 +453,6 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
             </table>
           </div>
 
-          <div className="space-y-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <button type="button" {...buttonProps(false)} disabled={Boolean(recheckReason)} aria-describedby="factory-recheck-reason" onClick={recheckEffects}>
-                Recheck status effects
-              </button>
-              {recheckReason ? <Reason id="factory-recheck-reason">{recheckReason}</Reason> : null}
-            </div>
-            {recheck?.error ? <div role="alert" className={ERROR_BAND}>{recheck.error}</div> : null}
-            {recheck?.reply ? (
-              <div role="status" className={`rounded-lg border px-4 py-3 text-sm ${recheck.reply.ok ? 'border-green-200 bg-green-50 text-green-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
-                {recheck.reply.ok
-                  ? 'No late effects, and no open or failed background jobs.'
-                  : `Late emails: ${recheck.reply.lateEffects?.emails ?? 0}, tracking rows: ${recheck.reply.lateEffects?.tracking ?? 0}, payments: ${recheck.reply.lateEffects?.payments ?? 0}. Open jobs: ${recheck.reply.openJobs}, failed jobs: ${recheck.reply.failedJobs}.`}
-              </div>
-            ) : null}
-          </div>
         </div>
       </details>
     </div>

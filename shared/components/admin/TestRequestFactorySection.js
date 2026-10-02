@@ -275,7 +275,9 @@ export default function TestRequestFactorySection({ onTarget }) {
               {list.target === 'production' ? 'Writes to production' : 'Writes to sandbox'}
             </StatusChip>
             <p className="max-w-3xl leading-6">
-              This panel changes real data on {list.target === 'production' ? 'Production' : 'the sandbox'}: it creates a test Request step by step and can change its Phase I or Phase II status.
+              {list.target === 'production'
+                ? 'This panel changes real data on Production: it creates a test Request step by step and can change its Phase I or Phase II status.'
+                : 'This panel changes real data on the sandbox: it creates a test Request step by step.'}
             </p>
           </div>
         </div>
@@ -315,7 +317,9 @@ export default function TestRequestFactorySection({ onTarget }) {
                     </td>
                     <td className="px-4 py-3 tabular-nums">{run.sourceRequestNumber}</td>
                     <td className="px-4 py-3 tabular-nums">{run.destinationRequestNumber || 'Not created yet'}</td>
-                    <td className="px-4 py-3"><StatusChip tone={status.tone}>{status.label}</StatusChip></td>
+                    <td className="px-4 py-3">
+                      {advancing && view?.run.runId === run.runId ? <StatusChip tone="blue">In progress</StatusChip> : <StatusChip tone={status.tone}>{status.label}</StatusChip>}
+                    </td>
                     <td className="px-4 py-3 text-gray-600">{formatTime(run.createdAt)}</td>
                   </tr>
                 );

@@ -190,7 +190,7 @@ describe('status control', () => {
     await screen.findByText(message);
     // The journal was reloaded, so the sent change is open and the selects are locked; still no retry.
     await waitFor(() => expect(screen.getByLabelText('New status').disabled).toBe(true));
-    const field = screen.getByLabelText(/Owner command to close it/);
+    const field = screen.getByLabelText(/Command to close this change/);
     expect(field.value).toBe(command);
     expect(field.readOnly).toBe(true);
     expect(screen.queryByRole('button', { name: 'Check again' })).toBeNull();
@@ -228,7 +228,7 @@ describe('status control', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
     server.on('POST', BASE, { status: 409, body: { error: 'raw', code: 'status_change_replay' } });
     fireEvent.click(screen.getByRole('button', { name: 'Yes, set this status' }));
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe("An earlier change to this status created, or may have created, a payment or status-tracking row. Repeating it needs the owner; it can't be done from this form."));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe("An earlier change to this status created, or may have created, a payment or status-tracking row. Repeating it needs the command-line tool; it can't be done from this form."));
     expect(server.count('POST', BASE)).toBe(1);
   });
 
@@ -397,7 +397,7 @@ describe('status choices and confirmation', () => {
 
   test.each([
     ['Recommended', [], 'No emails, payments or tracking rows are expected from this change. It changes a real status on the test Request.'],
-    ['Awarded', ['emails', 'tracking'], 'This change is expected to: send emails; create a status-tracking row. It changes a real status on the test Request.'],
+    ['Awarded', ['emails', 'tracking'], 'This change may: send emails; create a status-tracking row. It changes a real status on the test Request.'],
   ])('the confirmation for %s states the expected effects', async (label, effects, sentence) => {
     const server = makeServer().on('GET', BASE, withEffects({ [label]: effects }));
     await renderControl(server);
@@ -416,14 +416,14 @@ describe('status choices and confirmation', () => {
     expect(text).not.toContain(RUN_ID);
   });
 
-  test('opening the confirmation moves focus to its question; Cancel returns focus to Set status; the group is a polite live region', async () => {
+  test('opening the confirmation moves focus to its question; Cancel returns focus to Set status; the group is not a second live region', async () => {
     const server = makeServer().on('GET', BASE, statusBody());
     await renderControl(server);
     choose('phase2', 'Recommended');
     fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
     const group = screen.getByRole('group', { name: 'Confirm the status change' });
-    expect(group.getAttribute('aria-live')).toBe('polite');
-    await waitFor(() => expect(document.activeElement.textContent).toMatch(/^Change Request 1004000:/));
+    expect(group.hasAttribute('aria-live')).toBe(false);
+    await waitFor(() => expect(document.activeElement.textContent).toMatch(/^Change Request 1004000: .* on Production\?$/));
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Set status' })));
   });
@@ -516,7 +516,7 @@ describe('where the control appears', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Status run' }));
     await screen.findByRole('heading', { name: 'Status run' });
     await waitFor(() => expect(screen.getByLabelText('New status').disabled).toBe(true));
-    expect(screen.getByLabelText(/Owner command to close it/).value).toBe(command);
+    expect(screen.getByLabelText(/Command to close this change/).value).toBe(command);
     expect(screen.queryByRole('button', { name: 'Check again' })).toBeNull();
     expect(server.count('POST', BASE)).toBe(1);
   });
@@ -529,5 +529,69 @@ describe('where the control appears', () => {
     expect(screen.queryByText('Phase I and Phase II status')).toBeNull();
     expect(screen.queryByLabelText('Status field')).toBeNull();
     expect(server.count('GET', BASE)).toBe(0);
+  });
+});
+
+describe('status control refinements', () => {
+  test('after "Yes, set this status" focus lands on the result band; for a 202 that offers it, on "Check again"', async () => {
+    const server = makeServer().on('GET', BASE, statusBody());
+    await renderControl(server);
+    choose('phase2', 'Recommended');
+    fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
+    server.on('POST', BASE, { status: 200, body: { outcome: 'complete', emails: 0, tracking: 0, payments: 0, jobs: 0 } });
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, set this status' }));
+    const band = await screen.findByText(/^Status changed\./);
+    await waitFor(() => expect(document.activeElement).toBe(band));
+    expect(band.getAttribute('tabindex')).toBe('-1');
+  });
+
+  test('a jobs_open answer moves focus to Check again', async () => {
+    const server = makeServer().on('GET', BASE, statusBody());
+    await renderControl(server);
+    choose('phase2', 'Recommended');
+    fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
+    server.on('POST', BASE, { status: 202, body: { outcome: 'jobs_open', code: 'status_change_jobs_open', message: 'Still finishing.', changeId: CHANGE_ID } });
+    server.on('GET', BASE, statusBody([change({ status: 'applied', completedAt: null })]));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, set this status' }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Check again' })));
+  });
+
+  test('the confirmation says "may" and names Production; the in-progress banner uses plain wording', async () => {
+    const server = makeServer().on('GET', BASE, withEffects({ Awarded: ['emails', 'tracking'] }));
+    await renderControl(server);
+    choose('phase2', 'Awarded');
+    fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
+    const text = screen.getByRole('group', { name: 'Confirm the status change' }).textContent;
+    expect(text).toContain('This change may: send emails; create a status-tracking row.');
+    expect(text).toContain('to Awarded on Production?');
+  });
+
+  test('the in-progress command label says what to check first, without "sender" jargon', async () => {
+    const server = makeServer().on('GET', BASE, statusBody());
+    await renderControl(server);
+    choose('phase2', 'Recommended');
+    fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
+    server.on('GET', BASE, statusBody([change({ status: 'dispatched', completedAt: null })]));
+    server.on('POST', BASE, { status: 202, body: { outcome: 'in_progress', code: 'status_change_in_progress', message: 'Do not retry.', changeId: CHANGE_ID, abandonCommand: 'node x' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, set this status' }));
+    const label = await screen.findByText(/^Command to close this change\./);
+    expect(label.textContent).toBe('Command to close this change. Run it only after making sure nothing is still sending this change: no open form request and no command-line run.');
+  });
+
+  test('"Recheck status effects" sits outside the history disclosure, visible after a change; the journal stays inside', async () => {
+    const server = makeServer().on('GET', BASE, statusBody([change()]));
+    await renderControl(server);
+    const button = screen.getByRole('button', { name: 'Recheck status effects' });
+    expect(button.closest('details')).toBeNull();
+    expect(screen.getByText('Status change history (1)').closest('details').contains(screen.getByRole('table'))).toBe(true);
+  });
+
+  test('copy that pointed at "the owner" now names the command-line tool', async () => {
+    const server = makeServer().on('GET', BASE, { status: 200, body: { ...statusBody().body, options: { phase1: OPTIONS.phase1, phase2: OPTIONS.phase2.map((o) => (o.label === 'Recommended' ? { ...o, blocked: 'status_change_replay', effects: null } : o)) } } });
+    await renderControl(server);
+    fireEvent.change(screen.getByLabelText('Status field'), { target: { value: 'phase2' } });
+    const list = screen.getByText(/can't be set now/).closest('details');
+    expect(list.textContent).toContain('Repeating it needs the command-line tool');
+    expect(list.textContent).not.toMatch(/owner/i);
   });
 });
