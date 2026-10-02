@@ -110,6 +110,12 @@ describe('status control', () => {
     // The journal was reloaded and shows the change with labels, not numbers.
     await screen.findByText('Not invited to Recommended');
     expect(screen.getByText('Phase II status', { selector: 'td' })).toBeTruthy();
+    // The option just set is now the current one: no second change can be started for it (the server would refuse a no-op).
+    await screen.findByText('That status is already set. Choose a different one.');
+    expect(screen.getByRole('button', { name: 'Set status' }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
+    expect(screen.queryByRole('group', { name: 'Confirm the status change' })).toBeNull();
+    expect(server.count('POST', BASE)).toBe(1);
   });
 
   test('Cancel leaves nothing sent', async () => {

@@ -206,6 +206,8 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
     if (writeBlock) return writeBlock;
     if (busy) return 'Waiting for the last request to finish.';
     if (!selected) return 'Choose the status to set.';
+    // Mirrors the server's no-op refusal: the journal reload after a change makes the chosen option the current one.
+    if (selected.value === current) return 'That status is already set. Choose a different one.';
     return '';
   })();
   const checkReason = (() => {
