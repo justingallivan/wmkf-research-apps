@@ -2,8 +2,8 @@
 title: "Atlas: Meeting Tracker transcript publications (Postgres)"
 domain: postgres
 kind: state-page
-status: source-only-not-applied-source-reviewed-disabled
-summary: "Migrations 063–064 and the Meeting Tracker transcription flow are source-reviewed for disabled source. An isolated local PostgreSQL 16 schema test passed; no persistent database apply, release, or live feature is claimed."
+status: isolated-test-schema-ready-source-reviewed-disabled
+summary: "Fresh schema is applied and independently verified only in dedicated Preview test Neon; Meeting Tracker transcription remains disabled and unreleased. Local PostgreSQL integration passed; shared-database, deployment, and runtime behavior are not claimed."
 canonical: true
 cataloged: 2026-10-01
 owner: product-engineering
@@ -24,9 +24,12 @@ related:
 **[SOURCE-REVIEWED FOR DISABLED SOURCE; NOT RELEASED OR LIVE.]** Migration 063 adds
 request/Site Visit bindings to `transcription_jobs` and defines
 `meeting_transcript_publications`; migration 064 adds the optional
-`closed_by_profile_id` audit field. Neither migration has been applied or
-read back in a persistent shared or hosted database. **[VERIFIED via isolated
-local PostgreSQL 16 integration run, 2026-10-02]** a disposable test schema
+`closed_by_profile_id` audit field. **[VERIFIED via dedicated test-Neon
+bootstrap and independent verify-only, 2026-10-02]** fresh schema in the
+isolated `wmkf-meeting-transcription-test` Preview project contains all 61
+tracked migrations and 9 required tables; this is not a shared application
+database or the old pilot database. **[VERIFIED via isolated local PostgreSQL
+16 integration run, 2026-10-02]** a disposable test schema
 applied migrations 060–064; the four new Meeting Tracker tests and 19 existing
 pilot tests passed (23/23). The new tests cover binding/source constraints,
 competing publication and cleanup fencing, recovery lease fencing, and close
@@ -39,9 +42,10 @@ those historical claims are unchanged by these source migrations.
 
 The source now includes request-bound upload/job, review, publication,
 correction, download, explicit reconciliation, and a `SiteVisitEditor` consumer.
-The source remains disabled: migrations 063–064 are not applied to a persistent
-target, and the Meeting Tracker feature is not released or live. The local
-integration proof does not verify hosted schema or runtime behavior. The global active
+The source remains disabled and the Meeting Tracker feature is not released or
+live. The test-Neon schema is resource/bootstrap readiness, not deployment;
+the local integration proof does not verify hosted adapter or runtime
+behavior. The global active
 provider-slot limit remains unchanged. A valid text-only provider draft with
 no timed utterances remains readable and downloadable as TXT; publication
 fails with `meeting_transcript_timed_vtt_required` and does not invent cue

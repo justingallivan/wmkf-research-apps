@@ -3,7 +3,7 @@ title: Meeting Tracker transcription integration
 domain: transcription
 kind: plan
 status: source-reviewed-disabled
-summary: "Shared staff drafts, retained TXT/VTT/source, and explicit publication are source-reviewed and disabled. Local PostgreSQL migrations pass integration proof; sandbox readback finds the Wave 31 memo absent and the Wave 16 generation key active. Hosted provisioning and release proof remain pending."
+summary: "Shared staff drafts, retained TXT/VTT/source, and explicit publication remain disabled. Local PostgreSQL integration and isolated Preview test-Neon schema bootstrap are verified; sandbox Wave 31 memo and Wave 16 key are exact. Runtime, deployment, provider, audio, and release behavior remain unverified."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -458,31 +458,40 @@ consumer reads the durable ID and attempt through
 passed. This bounded evidence does not establish broader migration coverage
 or hosted behavior.
 
-The read-only Dataverse preflight on sandbox found the Wave 31
-`wmkf_transcriptbundlejson` memo absent, the Wave 16
-`wmkf_requestdocument_generation_key` over `wmkf_generationkey` exact and
-Active. The Wave 31 probe is
-`scripts/preflight-meeting-transcript-bundle-schema.mjs`; Wave 30 exactness
-was reported by `scripts/preflight-post-presentation-materials-schema.mjs`.
-No schema was applied. The shared Preview branch's `DYNAMICS_URL` resolved to
+The Wave 31 preflight first found the optional `wmkf_transcriptbundlejson`
+memo absent and the Wave 16 `wmkf_requestdocument_generation_key` over
+`wmkf_generationkey` exact and Active. After the separately approved
+sandbox-only apply, exact readback confirmed the memo and active key.
+Production was not probed or changed. Wave 30 exactness was reported by the
+separate `scripts/preflight-post-presentation-materials-schema.mjs`. The
+shared Preview branch's `DYNAMICS_URL` resolved to
 the Production host during configuration inspection. The CLI pulled the
 environment into a temporary file containing secret placeholders; only the
 target host and flags were parsed, then the file was removed. No environment
-was changed and no secret values were retained. A separate sandbox
-infrastructure test approval remains pending.
-Fable's final OAuth review returned **Commit OK**, with no substantive defect;
-it explicitly retains the hosted-adapter, quarantine/lease, correction, and
-cleanup gaps listed in its review evidence. No deployment, persistent database
-migration, Dataverse apply, feature enablement, provider call, or audio test
-occurred.
+was changed in the shared Preview project during that inspection, and no
+secret values were retained. Dedicated Neon and private
+Blob resources are connected only to Preview in the isolated
+`wmkf-meeting-transcription-test` project, separate from the shared app and old
+pilot. `scripts/bootstrap-meeting-transcription-test.js` execute and
+independent verify-only runs confirmed the fresh schema: 61 tracked
+migrations, 9 required tables. All nine Preview env keys were read back with
+sandbox/disabled flags, sandbox Dataverse target, interlock on, Production
+reads off, and DAL enforcement on. This is resource/schema readiness only;
+there was no deployment, feature enablement, provider call, or audio test.
+
+The earlier first-party Max Fable OAuth review returned **Commit OK** for the
+source then reviewed. The new post-bootstrap review was blocked by auto-review
+before execution while explicit paid/subscription-entitlement authorization
+is pending; it is not a failed review or a no-findings result. Hosted-adapter,
+quarantine/lease, correction, and cleanup gaps remain.
 
 Detailed bounded results and review limits are recorded in
 [the 2026-10-02 readiness check](evidence/MEETING_TRANSCRIPTION_READINESS_CHECK_2026-10-02.md).
 
-Before release, migrations 063 and 064 still require application and exact
-readback on an authorized persistent target. Wave 31 must be applied and read
-back before schema readiness can be enabled. The sandbox generation key is
-already exact/Active, but this does not authorize or prove an application
-write. Hosted end-to-end proof remains pending. Candidate files retained by
+Before release, prove the deployed runtime and authorized end-to-end flow on
+the dedicated test resources. The fresh-schema bootstrap is separate from the
+old pilot and shared database; it does not prove hosted adapter behavior or
+release readiness. The sandbox generation key is exact/Active, but this does
+not authorize or prove an application write. Candidate files retained by
 closed attempts are not registered final products; committed but unverifiable
 receipts remain attention-only.
