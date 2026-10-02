@@ -5,9 +5,19 @@ import {
 } from '../../lib/services/site-visit-materials/materials-upload-operator-target.js';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
+import {
+  inspectMaterialsUploadJob,
+  resolveMaterialsUploadJobFromOperator,
+} from '../../lib/services/site-visit-materials/materials-upload-operator-runtime.js';
+
+jest.mock('@vercel/postgres', () => ({
+  db: { connect: jest.fn(async () => { throw new Error('unexpected_default_connection'); }) },
+  sql: jest.fn(async () => { throw new Error('unexpected_sql_helper'); }),
+}));
 
 const EXPECTED_HOST = 'ep-frosty-credit-afovxswa-pooler.c-2.us-west-2.aws.neon.tech';
 const SECRET = 'fakepassword-for-test-only';
+const JOB_ID = '514a4377-e14a-448a-b44e-b203981e4f66';
 
 function environment(url, extra = {}) {
   return { MATERIALS_UPLOAD_PRODUCTION_DATABASE_URL: url, ...extra };
@@ -18,6 +28,40 @@ function url({ host = EXPECTED_HOST, database = 'neondb', sslmode = 'verify-full
 }
 
 describe('materials production operator target', () => {
+  function mockClient({ database = 'neondb', schema = 'public' } = {}) {
+    const events = [];
+    const client = {
+      events,
+      connect: jest.fn(async () => { events.push('CONNECT'); }),
+      end: jest.fn(async () => { events.push('END'); }),
+      query: jest.fn(async (query) => {
+        const normalized = String(query).replace(/\s+/g, ' ').trim();
+        events.push(normalized);
+        if (normalized.startsWith('SELECT current_database()')) {
+          return { rows: [{ database, schema }] };
+        }
+        if (normalized.includes('FROM materials_upload_jobs WHERE id = $1 FOR UPDATE')) {
+          return { rows: [{
+            id: JOB_ID, staging_id: 'stage-1', request_id: 'request-1', actor_binding: 'actor-1',
+            status: 'needs_attention', error_code: 'uncertain_write', lease_active: false,
+          }] };
+        }
+        if (normalized.includes('FROM portal_upload_staging WHERE id = $1 FOR UPDATE')) {
+          return { rows: [{
+            status: 'pending', background_job_id: JOB_ID, scope: 'site_visit_material',
+            resource_id: 'request-1', actor_binding: 'actor-1', lease_active: false,
+          }] };
+        }
+        if (normalized.startsWith('UPDATE materials_upload_jobs')) {
+          return { rows: [{ id: JOB_ID, status: 'queued', attempt_count: 0 }] };
+        }
+        if (normalized.startsWith('SELECT j.id')) return { rows: [{ id: JOB_ID, status: 'needs_attention' }] };
+        return { rows: [], rowCount: 1 };
+      }),
+    };
+    return client;
+  }
+
   test('builds explicit verified-TLS client configuration without URL-based driver fallbacks', () => {
     const target = productionMaterialsDatabaseConfig({
       env: environment(url()),
@@ -79,6 +123,47 @@ describe('materials production operator target', () => {
     await expect(assertMaterialsOperatorDatabaseIdentity({
       query: jest.fn().mockResolvedValue({ rows: [{ database: 'wrong', schema: 'public' }] }),
     }, 'neondb')).rejects.toMatchObject({ code: 'production_connected_identity_mismatch' });
+  });
+
+  test('production mutation checks identity inside the guarded resolver transaction', async () => {
+    const client = mockClient();
+    const result = await resolveMaterialsUploadJobFromOperator({
+      clientConfig: {}, jobId: JOB_ID, action: 'retry', production: true, expectedDatabase: 'neondb',
+      createClient: () => client,
+    });
+    expect(result).toMatchObject({ status: 'queued', attempt_count: 0 });
+    const begin = client.events.indexOf('BEGIN');
+    const identity = client.events.findIndex((event) => event.startsWith('SELECT current_database()'));
+    const selected = client.events.findIndex((event) => event.includes('FROM materials_upload_jobs WHERE id = $1 FOR UPDATE'));
+    expect(begin).toBeGreaterThanOrEqual(0);
+    expect(identity).toBeGreaterThan(begin);
+    expect(selected).toBeGreaterThan(identity);
+  });
+
+  test('production identity mismatch rolls back before any guarded job query or mutation', async () => {
+    const client = mockClient({ database: 'otherdb' });
+    await expect(resolveMaterialsUploadJobFromOperator({
+      clientConfig: {}, jobId: JOB_ID, action: 'retry', production: true, expectedDatabase: 'neondb',
+      createClient: () => client,
+    })).rejects.toMatchObject({ code: 'production_connected_identity_mismatch' });
+    expect(client.events).toContain('BEGIN');
+    expect(client.events.some((event) => event === 'ROLLBACK')).toBe(true);
+    expect(client.events.some((event) => event.includes('FROM materials_upload_jobs'))).toBe(false);
+    expect(client.events.some((event) => event.startsWith('UPDATE '))).toBe(false);
+  });
+
+  test('production inspect checks identity before selecting and uses a read-only transaction', async () => {
+    const client = mockClient();
+    await inspectMaterialsUploadJob({
+      clientConfig: {}, jobId: JOB_ID, production: true, expectedDatabase: 'neondb', createClient: () => client,
+    });
+    const begin = client.events.indexOf('BEGIN READ ONLY');
+    const identity = client.events.findIndex((event) => event.startsWith('SELECT current_database()'));
+    const selected = client.events.findIndex((event) => event.startsWith('SELECT j.id'));
+    expect(begin).toBeGreaterThanOrEqual(0);
+    expect(identity).toBeGreaterThan(begin);
+    expect(selected).toBeGreaterThan(identity);
+    expect(client.events).toContain('COMMIT');
   });
 
   test('the actual CLI refuses production mutations before opening a connection without exact confirmations', () => {

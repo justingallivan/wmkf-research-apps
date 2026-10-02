@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 /** Inspect or resolve one durable applicant materials job on an explicit database target. */
 import pg from 'pg';
-import { resolveMaterialsUploadJob } from '../lib/services/site-visit-materials/background-job-store.js';
 import {
-  assertMaterialsOperatorDatabaseIdentity,
+  inspectMaterialsUploadJob,
+  resolveMaterialsUploadJobFromOperator,
+} from '../lib/services/site-visit-materials/materials-upload-operator-runtime.js';
+import {
   productionMaterialsDatabaseConfig,
   productionMutationConfirmed,
 } from '../lib/services/site-visit-materials/materials-upload-operator-target.js';
@@ -46,53 +48,20 @@ function isLoopbackPostgresUrl(value) {
 }
 
 async function inspectJob(clientConfig, jobId, production = false, expectedDatabase = null) {
-  const client = new pg.Client(clientConfig);
-  try {
-    await client.connect();
-    if (production) {
-      await client.query('BEGIN READ ONLY');
-      await assertMaterialsOperatorDatabaseIdentity(client, expectedDatabase);
-    }
-    try {
-      const result = await client.query(
-        `SELECT j.id, j.status, j.slot, j.attempt_count, j.deadline_at, j.next_attempt_at,
-                j.locked_until, j.error_code, j.created_at, j.updated_at,
-                s.status AS staging_status, s.filename, s.expires_at,
-                (s.candidate_result IS NOT NULL) AS has_candidate,
-                (j.scan_checkpoint IS NOT NULL) AS has_clean_scan_checkpoint
-           FROM materials_upload_jobs j
-           JOIN portal_upload_staging s ON s.id = j.staging_id
-          WHERE j.id = $1`, [jobId],
-      );
-      if (!result.rows[0]) throw Object.assign(new Error('job_not_found'), { code: 'job_not_found' });
-      if (production) await client.query('COMMIT');
-      console.log(JSON.stringify(result.rows[0], null, 2));
-    } catch (error) {
-      if (production) await client.query('ROLLBACK').catch(() => {});
-      throw error;
-    }
-  } finally {
-    await client.end();
-  }
+  const result = await inspectMaterialsUploadJob({
+    clientConfig, jobId, production, expectedDatabase, createClient: (config) => new pg.Client(config),
+  });
+  console.log(JSON.stringify(result, null, 2));
 }
 
 async function resolveJob(clientConfig, jobId, action, production = false, expectedDatabase = null) {
-  const result = await resolveMaterialsUploadJob({
+  const result = await resolveMaterialsUploadJobFromOperator({
+    clientConfig,
     jobId,
     action,
-    connectionFactory: async () => {
-      const client = new pg.Client(clientConfig);
-      await client.connect();
-      if (production) {
-        try {
-          await assertMaterialsOperatorDatabaseIdentity(client, expectedDatabase);
-        } catch (error) {
-          await client.end().catch(() => {});
-          throw error;
-        }
-      }
-      return client;
-    },
+    production,
+    expectedDatabase,
+    createClient: (config) => new pg.Client(config),
   });
   console.log(JSON.stringify({ jobId, action, status: result.status, attemptCount: result.attempt_count }));
 }
