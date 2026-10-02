@@ -774,6 +774,23 @@ describe('XLSX package integrity mode (Basic recipe)', () => {
       expect(last.status).not.toBe('verified');
     });
 
+    test('slow reads end the retries: no second attempt starts outside the settle window', async () => {
+      let reads = 0;
+      let clock = 0;
+      const deps = settlingDependencies({
+        // Each destination metadata read costs 15 s on the fake clock, so attempt 1 alone outlasts the window.
+        metaFor: () => { reads += 1; clock += 15_000; return { cTag: `"c${reads}"` }; },
+        bytesFor: () => promotedXlsx,
+      });
+      deps.nowMs = () => clock;
+      const journal = jest.fn(async () => {});
+      await expect(copyBundleFiles(params(xlsxPlan()), deps, journal))
+        .rejects.toThrow('Created item Project Budget spreadsheet.xlsx did not settle after upload; its content was still changing.');
+      expect(deps.sleep).not.toHaveBeenCalled();
+      expect(deps.downloadFile.mock.calls.filter(([, itemId]) => itemId === 'new-xlsx')).toHaveLength(1);
+      expect(journal.mock.calls.at(-1)[0][0].status).toBe('failed');
+    });
+
     test('a comparison failure on the first attempt throws without retrying', async () => {
       const deps = settlingDependencies({ metaFor: () => ({}), bytesFor: () => tamperedXlsx });
       await expect(copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {}))).rejects.toThrow(/differs from the source/);
