@@ -979,6 +979,31 @@ describe('status setter journal (cast-and-status plan, slice C)', () => {
       .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
   });
 
+  it('dispatches only from planned: the single compare-and-set', async () => {
+    const { db, calls, queueRows } = createFakeDb();
+    queueRows([row({ status: 'dispatched' })]);
+    await createRunLedger(db).markStatusChangeDispatched({ changeId: CHANGE_ID });
+    expect(calls[0].text).toContain("WHERE change_id = $1::uuid AND status = 'planned'");
+    expect(calls[0].text).not.toContain("'planned', 'dispatched'");
+    const none = createFakeDb();
+    await expect(createRunLedger(none.db).markStatusChangeDispatched({ changeId: CHANGE_ID })).resolves.toBeNull();
+  });
+
+  it('needs_attention onlyIf is a parameterised status predicate and rejects other values', async () => {
+    const { db, calls, queueRows } = createFakeDb();
+    queueRows([row({ status: 'needs_attention' })]);
+    await createRunLedger(db).markStatusChangeNeedsAttention({ changeId: CHANGE_ID, error: 'x', onlyIf: 'dispatched' });
+    expect(calls[0].text).toContain('AND status = $4');
+    expect(calls[0].text).not.toContain("'planned', 'dispatched', 'applied'");
+    expect(calls[0].params[3]).toBe('dispatched');
+    const bad = createFakeDb();
+    await expect(createRunLedger(bad.db).markStatusChangeNeedsAttention({ changeId: CHANGE_ID, error: 'x', onlyIf: "complete" }))
+      .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+    await expect(createRunLedger(bad.db).markStatusChangeNeedsAttention({ changeId: CHANGE_ID, error: 'x', onlyIf: null }))
+      .rejects.toMatchObject({ code: 'test_request_ledger_unsafe_value' });
+    expect(bad.calls).toHaveLength(0);
+  });
+
   it('records needs_attention with sanitized error text from any open state', async () => {
     const { db, calls, queueRows } = createFakeDb();
     queueRows([row({ status: 'needs_attention' })]);

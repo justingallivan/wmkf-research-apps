@@ -9,6 +9,7 @@
  */
 import { jest } from '@jest/globals';
 import { createAdminRunService } from '../../lib/services/test-requests/admin-run-service.js';
+import { runStatusChange as realRunStatusChange } from '../../lib/services/test-requests/status-change-runner.js';
 import { deriveActorId, deriveRunIds } from '../../lib/services/test-requests/admin-run-identity.js';
 import { artifactDigest, draftPathname, runPathname } from '../../lib/services/test-requests/factory-artifact-store.js';
 import { SANDBOX_URL, PRODUCTION_URL, sha256 } from '../../lib/services/test-requests/basic-clone-steps.js';
@@ -31,6 +32,7 @@ const SOURCE_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const SITE_ID = 'appriver3651007194.sharepoint.com,48930e19-0000-4000-8000-000000000000,11111111-1111-4111-8111-111111111111';
 const DRIVE_ID = 'b!GQ6TSC-650adweD3-KAAAAAAAAAAAA';
 const HOUR = 3600_000;
+const CHANGE_ID = '9a9a9a9a-9a9a-4a9a-8a9a-9a9a9a9a9a9a';
 const PROFILE = 11;
 const KEY = 'draft-key-1';
 
@@ -54,7 +56,7 @@ function runRowFromInsert(p) {
 function fakeLedger({ failReserve = false } = {}) {
   const rows = new Map();
   const ends = { count: 0 };
-  const state = { failReserve };
+  const state = { failReserve, resources: [] };
   const db = {
     async query(text, params = []) {
       if (/INSERT INTO test_request_runs/.test(text)) {
@@ -68,6 +70,7 @@ function fakeLedger({ failReserve = false } = {}) {
         return { rows: [...rows.values()].filter((r) => r.actor_id === params[0] && r.idempotency_key === params[1]) };
       }
       if (/FROM test_request_runs WHERE run_id/.test(text)) return { rows: rows.has(params[0]) ? [rows.get(params[0])] : [] };
+      if (/FROM test_request_run_resources WHERE run_id/.test(text)) return { rows: state.resources.filter((r) => r.run_id === params[0]) };
       if (/FROM test_request_runs WHERE actor_id/.test(text)) return { rows: [...rows.values()].filter((r) => r.actor_id === params[0]) };
       return { rows: [] };
     },
@@ -168,7 +171,7 @@ function bundleAt(exportedAt) {
   });
 }
 
-function harness({ deployment = 'preview', env = {}, preflightTarget = null } = {}) {
+function harness({ deployment = 'preview', env = {}, preflightTarget = null, deps = {} } = {}) {
   const production = deployment === 'production';
   const ledger = fakeLedger();
   const blobs = fakeBlob();
@@ -184,6 +187,10 @@ function harness({ deployment = 'preview', env = {}, preflightTarget = null } = 
     advanceRun: jest.fn(async () => ({
       step: 'create_request', outcome: 'advanced', run: { status: 'creating', destinationRequestNumber: null }, errorMessage: null,
     })),
+    runStatusChange: jest.fn(async () => ({ changeId: CHANGE_ID, sequence: 1, field: 'wmkf_phaseiistatus', after: 100000002 })),
+    recheckStatusChange: jest.fn(async () => ({ sequence: 1, ok: true })),
+    readLiveOptions: jest.fn(async (_client, field) => [{ value: 1, label: `option of ${field}` }]),
+    readCurrentStatus: jest.fn(async () => ({ phase1: 100000001, phase2: null })),
   };
   const fullEnv = {
     TEST_REQUEST_FACTORY_FORM: 'on',
@@ -205,9 +212,15 @@ function harness({ deployment = 'preview', env = {}, preflightTarget = null } = 
     runPreflight: async () => preflightFor(preflightTarget ?? (production ? 'production' : 'sandbox')),
     now: () => clock.t,
     exportBundle: async ({ exportedAt }) => bundleAt(exportedAt),
+    readSourceDisplay: async () => ({ title: 'Source title', applicant: 'Live University' }),
     readCast: spies.readCast,
     resolveProgramDirector: spies.resolveProgramDirector,
     advanceRun: spies.advanceRun,
+    runStatusChange: spies.runStatusChange,
+    recheckStatusChange: spies.recheckStatusChange,
+    readLiveOptions: spies.readLiveOptions,
+    readCurrentStatus: spies.readCurrentStatus,
+    ...deps,
   });
   const actorId = deriveActorId(PROFILE);
   const target = production ? 'production' : 'sandbox';
@@ -465,7 +478,7 @@ describe('kill switch and isolation', () => {
       expect(await code(h.service.advance({ profileId: PROFILE, runId: '11111111-1111-4111-8111-111111111111' }))).toBe('factory_form_disabled');
       expect(h.blobs.calls.put).toHaveLength(0);
       expect(h.dbUrls).toHaveLength(0);
-      expect(await h.service.listRuns({ profileId: PROFILE })).toEqual([]);
+      expect(await h.service.listRuns({ profileId: PROFILE })).toEqual({ runs: [], formEnabled: false, target: 'sandbox' });
       const { runId } = ids(h.actorId);
       h.seedRun(runId, { status: 'ready' });
       expect((await h.service.inspectRun({ profileId: PROFILE, runId })).run.runId).toBe(runId);
@@ -512,7 +525,7 @@ describe('identity and ownership', () => {
     await h.confirm();
     const { runId } = ids(h.actorId);
     const other = 99;
-    expect(await h.service.listRuns({ profileId: other })).toEqual([]);
+    expect((await h.service.listRuns({ profileId: other })).runs).toEqual([]);
     for (const call of [
       () => h.service.inspectRun({ profileId: other, runId }),
       () => h.service.readArtifacts({ profileId: other, runId }),
@@ -537,7 +550,9 @@ describe('advance', () => {
     const { runId } = ids(h.actorId);
     h.seedRun(runId, { status: 'ready', current_step: 'verify', destination_request_number: '1004000' });
     const result = await h.service.advance({ profileId: PROFILE, runId });
-    expect(result).toMatchObject({ outcome: 'ready', status: 'ready', destinationRequestNumber: '1004000' });
+    expect(result).toMatchObject({
+      outcome: 'ready', status: 'ready', destinationRequestNumber: '1004000', currentStep: 'verify', stepIndex: 0,
+    });
     expect(h.blobs.calls.get).toHaveLength(0);
     expect(h.spies.advanceRun).not.toHaveBeenCalled();
     expect(h.createClientCalls).toHaveLength(0);
@@ -560,7 +575,7 @@ describe('advance', () => {
     const { runId } = ids(h.actorId);
     const result = await h.service.advance({ profileId: PROFILE, runId });
     expect(result).toEqual({
-      step: 'create_request', outcome: 'advanced', status: 'creating', destinationRequestNumber: null, errorMessage: null,
+      step: 'create_request', outcome: 'advanced', currentStep: null, stepIndex: null, status: 'creating', destinationRequestNumber: null, errorMessage: null,
     });
     expect(h.spies.advanceRun).toHaveBeenCalledTimes(1);
     const call = h.spies.advanceRun.mock.calls[0][0];
@@ -660,7 +675,8 @@ describe('exportSource / readArtifacts / recheck', () => {
   test('export stores the bundle under a minted draft path and never returns bundle text', async () => {
     const h = harness({ deployment: 'preview' });
     const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
-    expect(Object.keys(result).sort()).toEqual(['defaults', 'draftId', 'summary']);
+    expect(Object.keys(result).sort()).toEqual(['defaults', 'draftId', 'source', 'summary']);
+    expect(result.source).toEqual({ title: 'Source title', applicant: 'Live University' });
     expect(result.defaults).toEqual({ fiscalYear: 'December 2026', meetingDate: '2026-12-01' });
     expect(JSON.stringify(result)).not.toContain('Synthetic purpose');
     expect(h.blobs.objects.has(draftPathname('sandbox', h.actorId, result.draftId))).toBe(true);
@@ -683,5 +699,635 @@ describe('exportSource / readArtifacts / recheck', () => {
     const h = harness({ deployment: 'preview' });
     await h.confirm();
     expect(await code(h.service.recheck({ profileId: PROFILE, runId: ids(h.actorId).runId }))).toBe('factory_run_not_production');
+  });
+});
+
+// ---- slice 2: cooperative deadlines and recovery cases -----------------------
+
+describe('cooperative deadlines (slice 2)', () => {
+  const LOC_ID = '5a5a5a5a-5a5a-4a5a-8a5a-5a5a5a5a5a5a';
+  const PARENT_ID = '6b6b6b6b-6b6b-4b6b-8b6b-6b6b6b6b6b6b';
+  const DOC_COUNT = 7;
+
+  // The real default exporter with fakes, so the per-document hydrate checkpoint is exercised.
+  function sevenDocumentService() {
+    const sourceRow = {
+      akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
+      akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', versionnumber: 7,
+    };
+    const fakeClient = (resourceUrl) => ({
+      baseUrl: `${resourceUrl}/api/data/v9.2`,
+      async get(path) {
+        const ok = (body) => ({ ok: true, status: 200, body });
+        if (path.startsWith('/akoya_requests?')) return ok({ value: [sourceRow] });
+        if (path.startsWith(`/akoya_requests(${SOURCE_ID})`)) return ok({ akoya_requestid: SOURCE_ID, versionnumber: 7 });
+        if (path.startsWith('/sharepointdocumentlocations?')) {
+          return ok({ value: [{ sharepointdocumentlocationid: LOC_ID, relativeurl: '9000001_ROOT', _parentsiteorlocation_value: PARENT_ID }] });
+        }
+        if (path.startsWith(`/sharepointdocumentlocations(${PARENT_ID})`)) {
+          return ok({ sharepointdocumentlocationid: PARENT_ID, relativeurl: 'akoya_request' });
+        }
+        throw new Error(`unexpected Dataverse read ${path}`);
+      },
+    });
+    const pdf = Buffer.from('source-pdf');
+    const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    // The seven allowlisted source documents (admin-preview-service DOCUMENT_SPECS).
+    const items = [
+      ['Phase I', 'ProjectDescription.pdf'], ['Phase I', 'Biosketches.pdf'], ['Phase I', 'ProjectBudget.pdf'],
+      ['Phase I', 'Project Budget spreadsheet.xlsx'], ['Reviewer Materials', 'Proposal_9000001.pdf'],
+      ['AI Materials', 'ProposalNarrative_9000001.pdf'], ['AI Materials', 'ProposalBibliography_9000001.pdf'],
+    ].map(([sub, name], i) => ({
+      id: `item-${i + 1}`, sub, name, mimeType: name.endsWith('.xlsx') ? XLSX : 'application/pdf',
+    }));
+    expect(items).toHaveLength(DOC_COUNT);
+    const metaFor = (id) => {
+      const item = items.find((candidate) => candidate.id === id);
+      return {
+        id, name: item.name, size: pdf.length, mimeType: item.mimeType, eTag: `etag-${id}`, versionId: '1.0',
+      };
+    };
+    const clock = { t: Date.now() };
+    const downloads = [];
+    const ledger = fakeLedger();
+    const blobs = fakeBlob();
+    const sourceDependencies = {
+      getSharePointTargetInfo: () => ({ key: 'akoyago-shared', scope: 'shared', registered: true, hostname: 'appriver3651007194.sharepoint.com', pathname: '/sites/akoyago' }),
+      listFiles: async (library, folder) => {
+        if (library !== 'akoya_request') throw Object.assign(new Error('folder not found'), { code: 'graph_folder_not_found', status: 404 });
+        return items.map((item) => ({
+          id: item.id, name: item.name, folder: `${folder}/${item.sub}`, size: pdf.length, mimeType: item.mimeType, lastModified: '2026-09-20T10:00:00Z',
+        }));
+      },
+      getDriveId: async () => 'drive-1',
+      clearGraphCaches: () => {},
+      getFileMetadataById: async (_driveId, id) => metaFor(id),
+      downloadFile: async (_driveId, id) => {
+        downloads.push(id);
+        if (downloads.length === 4 && clock.deadlineAt != null) clock.t = clock.deadlineAt + 1; // time runs out during the 4th hydrate
+        return { buffer: pdf, filename: metaFor(id).name, mimeType: metaFor(id).mimeType, size: pdf.length };
+      },
+    };
+    const service = createAdminRunService({
+      env: { TEST_REQUEST_FACTORY_FORM: 'on', FACTORY_BLOB_RW_TOKEN: 't', TEST_REQUEST_SANDBOX_LEDGER_URL: SANDBOX_LEDGER },
+      deployment: 'preview',
+      ledgerDbFactory: () => ledger.db,
+      blob: blobs.blob,
+      createClient: ({ resourceUrl }) => fakeClient(resourceUrl),
+      getAccessToken: async () => 'fake-token',
+      sourceDependencies,
+      now: () => clock.t,
+    });
+    return { service, clock, downloads, blobs };
+  }
+
+  test('an export whose time runs out during the fourth hydrate is refused: no draft, later documents not hydrated', async () => {
+    const h = sevenDocumentService();
+    h.clock.deadlineAt = h.clock.t + 100_000;
+    const error = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001', deadlineAt: h.clock.deadlineAt }).catch((e) => e);
+    expect(error.httpStatus).toBe(504);
+    expect(error.code).toBe('factory_deadline_exceeded');
+    expect(error.message).toMatch(/Nothing was started/);
+    expect(h.downloads).toHaveLength(4);
+    expect(h.blobs.objects.size).toBe(0);
+    expect(h.blobs.calls.put).toHaveLength(0);
+  });
+
+  test('the same export within its deadline stores exactly one draft', async () => {
+    const h = sevenDocumentService();
+    const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001', deadlineAt: h.clock.t + 100_000 });
+    expect(h.downloads).toHaveLength(DOC_COUNT);
+    expect(h.blobs.objects.size).toBe(1);
+    expect(h.blobs.objects.has(draftPathname('sandbox', deriveActorId(PROFILE), result.draftId))).toBe(true);
+  });
+
+  test('export refuses before starting, and before the draft write, when the deadline has passed', async () => {
+    const h = harness({ deployment: 'preview' });
+    expect(await code(h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001', deadlineAt: h.clock.t - 1 }))).toBe('factory_deadline_exceeded');
+    expect(h.blobs.calls.put).toHaveLength(0);
+    // The injected exporter consumes the clock: the deadline passes after it returns, before the put.
+    const late = harness({ deployment: 'preview' });
+    const deadlineAt = late.clock.t + 1000;
+    const slow = createAdminRunService({
+      env: { TEST_REQUEST_FACTORY_FORM: 'on', FACTORY_BLOB_RW_TOKEN: 't', TEST_REQUEST_SANDBOX_LEDGER_URL: SANDBOX_LEDGER },
+      deployment: 'preview',
+      ledgerDbFactory: () => late.ledger.db,
+      blob: late.blobs.blob,
+      now: () => late.clock.t,
+      exportBundle: async ({ exportedAt }) => { late.clock.t += 5000; return bundleAt(exportedAt); },
+    });
+    expect(await code(slow.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001', deadlineAt }))).toBe('factory_deadline_exceeded');
+    expect(late.blobs.calls.put).toHaveLength(0);
+  });
+
+  test('advance with under 150 s left is refused before advanceRun and any lease; with enough time it advances', async () => {
+    const h = harness({ deployment: 'preview' });
+    await h.confirm();
+    const { runId } = ids(h.actorId);
+    const tooLate = await h.service.advance({ profileId: PROFILE, runId, deadlineAt: h.clock.t + 149_000 }).catch((e) => e);
+    expect(tooLate.httpStatus).toBe(504);
+    expect(tooLate.code).toBe('factory_deadline_exceeded');
+    expect(h.spies.advanceRun).not.toHaveBeenCalled();
+    const ok = await h.service.advance({ profileId: PROFILE, runId, deadlineAt: h.clock.t + 150_000 });
+    expect(ok.outcome).toBe('advanced');
+    expect(h.spies.advanceRun).toHaveBeenCalledTimes(1);
+  });
+
+  test('a ready run still answers when the deadline has passed (no step to start)', async () => {
+    const h = harness({ deployment: 'preview' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { status: 'ready' });
+    expect((await h.service.advance({ profileId: PROFILE, runId, deadlineAt: h.clock.t - 1 })).outcome).toBe('ready');
+  });
+
+  test('confirmRun past its deadline is refused before any run-path write', async () => {
+    const h = harness({ deployment: 'preview' });
+    const draftId = await h.exportDraft();
+    const putsBefore = h.blobs.calls.put.length;
+    const error = await h.service.confirmRun({ ...h.confirmArgs(draftId), deadlineAt: h.clock.t - 1 }).catch((e) => e);
+    expect(error.code).toBe('factory_deadline_exceeded');
+    expect(h.blobs.calls.put.slice(putsBefore).filter((c) => c.pathname.includes('/runs/'))).toHaveLength(0);
+    expect(h.blobs.calls.put).toHaveLength(putsBefore);
+    expect(h.ledger.rows.size).toBe(0);
+    expect(h.spies.schemaCheck).not.toHaveBeenCalled();
+  });
+
+  test('no deadlineAt leaves behaviour unchanged', async () => {
+    const h = harness({ deployment: 'preview' });
+    const result = await h.confirm();
+    expect(result.created).toBe(true);
+    const { runId } = ids(h.actorId);
+    expect((await h.service.advance({ profileId: PROFILE, runId })).outcome).toBe('advanced');
+  });
+});
+
+describe('slice 2 recovery cases', () => {
+  test('two overlapping Confirms with the same key reserve exactly one run and overwrite no artifact', async () => {
+    const h = harness({ deployment: 'preview' });
+    const draftId = await h.exportDraft();
+    const results = await Promise.allSettled([
+      h.service.confirmRun(h.confirmArgs(draftId)),
+      h.service.confirmRun(h.confirmArgs(draftId)),
+    ]);
+    expect(h.ledger.rows.size).toBe(1);
+    const winners = results.filter((r) => r.status === 'fulfilled' && r.value.created === true);
+    expect(winners).toHaveLength(1);
+    for (const loser of results.filter((r) => !winners.includes(r))) {
+      // The loser is refused at the create-only write, or is handed the winner's row.
+      if (loser.status === 'rejected') expect(loser.reason.code).toBe('factory_artifact_exists');
+      else expect(loser.value.created).toBe(false);
+    }
+    const { runId } = ids(h.actorId);
+    const runPuts = h.blobs.calls.put.filter((c) => c.pathname.includes(runId));
+    expect(runPuts.every((c) => !c.options.allowOverwrite)).toBe(true);
+    expect(h.blobs.calls.del).toHaveLength(0);
+  });
+
+  test('a lost COMMIT response with the row present: the retry returns the row and touches no artifact', async () => {
+    const h = harness({ deployment: 'preview' });
+    const draftId = await h.exportDraft();
+    await h.service.confirmRun(h.confirmArgs(draftId)); // committed; pretend the caller never saw the response
+    const putsBefore = h.blobs.calls.put.length;
+    const retry = await h.service.confirmRun(h.confirmArgs(draftId));
+    expect(retry.created).toBe(false);
+    expect(retry.run.runId).toBe(ids(h.actorId).runId);
+    expect(h.blobs.calls.put).toHaveLength(putsBefore);
+    expect(h.blobs.calls.del).toHaveLength(0);
+    expect(h.ledger.rows.size).toBe(1);
+  });
+
+  test('a second lookup of the same source mints a new draftId and a new draft path', async () => {
+    const h = harness({ deployment: 'preview' });
+    const first = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+    const second = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+    expect(second.draftId).not.toBe(first.draftId);
+    expect(h.blobs.objects.has(draftPathname('sandbox', h.actorId, first.draftId))).toBe(true);
+    expect(h.blobs.objects.has(draftPathname('sandbox', h.actorId, second.draftId))).toBe(true);
+    expect(h.blobs.objects.size).toBe(2);
+  });
+});
+
+// ---- slice 2b: status setter ---------------------------------------------------
+
+describe('status setter service (slice 2b)', () => {
+  const readyProduction = (extra = {}) => {
+    const h = harness({ deployment: 'production', ...extra });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { status: 'ready' });
+    return { h, runId };
+  };
+  const change = (h, runId, extra = {}) => h.service.changeStatus({
+    profileId: PROFILE, runId, field: 'phase2', optionLabel: 'Recommended', deadlineAt: h.clock.t + 280_000, ...extra,
+  });
+  const runnerError = (errorCode, message = 'upstream detail: secret-host.example', extra = {}) => Object.assign(new Error(message), { code: errorCode, changeId: CHANGE_ID, sequence: 1, ...extra });
+
+  test('statusOptions returns both fields live options, the journal and the run status, through a read client', async () => {
+    const { h, runId } = readyProduction();
+    const result = await h.service.statusOptions({ profileId: PROFILE, runId });
+    expect(result).toEqual({
+      runId,
+      runStatus: 'ready',
+      // Option 1 is not in the transition table, so the planner's verdict blocks it.
+      options: {
+        phase1: [{ value: 1, label: 'option of wmkf_phaseistatus', blocked: 'status_change_refused', effects: null }],
+        phase2: [{ value: 1, label: 'option of wmkf_phaseiistatus', blocked: 'status_change_refused', effects: null }],
+      },
+      current: { phase1: 100000001, phase2: null },
+      changes: [],
+    });
+    expect(h.spies.readCurrentStatus).toHaveBeenCalledWith(expect.anything(), '12121212-1212-4121-8121-121212121212');
+    expect(h.createClientCalls.every((c) => !c.allowTestRequestMarkerWrites)).toBe(true);
+  });
+
+  test('statusOptions marks each option with the planner verdict for the current pair', async () => {
+    const { h, runId } = readyProduction();
+    h.spies.readCurrentStatus.mockResolvedValueOnce({ phase1: 100000003, phase2: 100000003 }); // Invited / Approved
+    h.spies.readLiveOptions.mockImplementation(async (_client, field) => (field === 'wmkf_phaseiistatus'
+      ? [{ value: 100000003, label: 'Approved' }, { value: 100000004, label: 'Recommended' }, { value: 100000001, label: 'Declined' }]
+      : [{ value: 100000003, label: 'Invited' }]));
+    const { options } = await h.service.statusOptions({ profileId: PROFILE, runId });
+    const byLabel = Object.fromEntries(options.phase2.map((option) => [option.label, option.blocked]));
+    // Approved is the current value; Recommended would create a payment and is not allowed from Approved; Declined is allowed.
+    expect(byLabel).toEqual({ Approved: 'status_change_noop', Recommended: 'status_change_edge', Declined: null });
+    expect(options.phase1[0].blocked).toBe('status_change_noop');
+    // effects: null when blocked; an array of allowed classes (possibly empty) when not.
+    const effectsByLabel = Object.fromEntries(options.phase2.map((option) => [option.label, option.effects]));
+    expect(effectsByLabel.Approved).toBeNull();
+    expect(effectsByLabel.Recommended).toBeNull();
+    expect(Array.isArray(effectsByLabel.Declined)).toBe(true);
+    expect(effectsByLabel.Declined.every((c) => ['emails', 'tracking', 'payments'].includes(c))).toBe(true);
+  });
+
+  test('S2: a run that is not ready has effects null on every option', async () => {
+    const h = harness({ deployment: 'production' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { status: 'prepared' });
+    const { options } = await h.service.statusOptions({ profileId: PROFILE, runId });
+    expect([...options.phase1, ...options.phase2].every((o) => o.effects === null && o.blocked === null)).toBe(true);
+  });
+
+  test('F7: a run that is not ready answers options and journal with current null and reads no Request', async () => {
+    const h = harness({ deployment: 'production' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { status: 'prepared' });
+    const result = await h.service.statusOptions({ profileId: PROFILE, runId });
+    expect(result.current).toBeNull();
+    expect(result.runStatus).toBe('prepared');
+    expect(result.options.phase1).toHaveLength(1);
+    expect(result.changes).toEqual([]);
+    expect(h.spies.readCurrentStatus).not.toHaveBeenCalled();
+  });
+
+  test('changeStatus calls the runner once with the run, the mapped Dataverse field, label and a deadline-bound completion, never rerun', async () => {
+    const { h, runId } = readyProduction();
+    const deadlineAt = h.clock.t + 280_000;
+    const result = await change(h, runId, { deadlineAt });
+    expect(result).toMatchObject({ outcome: 'complete', changeId: CHANGE_ID, sequence: 1 });
+    expect(h.spies.runStatusChange).toHaveBeenCalledTimes(1);
+    const call = h.spies.runStatusChange.mock.calls[0][0];
+    expect(call).toMatchObject({ runId, field: 'wmkf_phaseiistatus', optionLabel: 'Recommended' });
+    expect(call.completion.deadlineAt).toBe(deadlineAt - 30_000);
+    expect(Object.hasOwn(call, 'rerun')).toBe(false);
+    expect(call.client.allowTestRequestMarkerWrites).toBeUndefined();
+  });
+
+  test.each([
+    ['status_change_jobs_open', 202, { outcome: 'jobs_open', code: 'status_change_jobs_open', message: 'The change was written. Background jobs on the Request are still finishing; check again.', changeId: CHANGE_ID }],
+  ])('runner %s becomes a returned value', async (errorCode, _status, expected) => {
+    const { h, runId } = readyProduction();
+    h.spies.runStatusChange.mockRejectedValueOnce(runnerError(errorCode));
+    expect(await change(h, runId)).toEqual(expected);
+  });
+
+  test('in progress returns the owner abandon command and no upstream text', async () => {
+    const { h, runId } = readyProduction();
+    h.spies.runStatusChange.mockRejectedValueOnce(runnerError('status_change_in_progress'));
+    const result = await change(h, runId);
+    expect(result).toEqual({
+      outcome: 'in_progress', code: 'status_change_in_progress',
+      message: 'This change is being sent, or was sent and its result is not yet known. Do not retry. If it never resolves, the owner closes it from the CLI after establishing that no sender is still running.',
+      changeId: CHANGE_ID,
+      abandonCommand: `node scripts/rehearse-test-request-sandbox.mjs --target=production --status-abandon=${runId} --change-id=${CHANGE_ID}`,
+    });
+  });
+
+  test('an ambiguous send is unconfirmed and never carries the upstream error text', async () => {
+    const { h, runId } = readyProduction();
+    h.spies.runStatusChange.mockRejectedValueOnce(runnerError('status_change_ambiguous', 'The status PATCH has no readable result (connect ECONNRESET secret-host.example)'));
+    const result = await change(h, runId);
+    expect(result).toEqual({
+      outcome: 'unconfirmed', code: 'status_change_ambiguous',
+      message: 'The change was sent but its result could not be read. Check again; do not start a different change.', changeId: CHANGE_ID,
+    });
+    expect(JSON.stringify(result)).not.toMatch(/ECONNRESET|secret-host/);
+  });
+
+  test.each([
+    'status_change_noop', 'status_change_open', 'status_change_conflict', 'status_change_resume', 'status_change_effects',
+    'status_change_edge', 'status_change_concurrent', 'status_change_refused',
+  ])('runner %s is a 409 with the runner code and message', async (errorCode) => {
+    const { h, runId } = readyProduction();
+    h.spies.runStatusChange.mockRejectedValueOnce(runnerError(errorCode, 'runner says no'));
+    const error = await change(h, runId).catch((e) => e);
+    expect(error).toMatchObject({ httpStatus: 409, code: errorCode, message: 'runner says no' });
+  });
+
+  test('a changeId makes the runner call resume-only; without one no resumeChangeId is passed; a malformed one is 400 before the runner', async () => {
+    const { h, runId } = readyProduction();
+    await change(h, runId, { changeId: CHANGE_ID.toUpperCase() });
+    expect(h.spies.runStatusChange.mock.calls[0][0].resumeChangeId).toBe(CHANGE_ID);
+    await change(h, runId);
+    expect(h.spies.runStatusChange.mock.calls[1][0]).not.toHaveProperty('resumeChangeId');
+    await expect(change(h, runId, { changeId: 'not-a-guid' })).rejects.toMatchObject({ httpStatus: 400, code: 'factory_invalid_input' });
+    expect(h.spies.runStatusChange).toHaveBeenCalledTimes(2);
+  });
+
+  test('a replay is a 409 pointing at the owner CLI', async () => {
+    const { h, runId } = readyProduction();
+    h.spies.runStatusChange.mockRejectedValueOnce(runnerError('status_change_replay', 'pass --rerun'));
+    const error = await change(h, runId).catch((e) => e);
+    expect(error).toMatchObject({ httpStatus: 409, code: 'status_change_replay' });
+    expect(error.message).toBe('An earlier change to this status created, or may have created, a payment or status-tracking row on this Request. Repeating it needs the owner CLI (`--set-status … --rerun`) after inspection.');
+  });
+
+  test('a Postgres unique violation from planning is a 409 status_change_open', async () => {
+    const { h, runId } = readyProduction();
+    h.spies.runStatusChange.mockRejectedValueOnce(Object.assign(new Error('duplicate key value violates unique constraint'), { code: '23505' }));
+    const error = await change(h, runId).catch((e) => e);
+    expect(error).toMatchObject({ httpStatus: 409, code: 'status_change_open', message: 'Another status change on this run is already open; reload.' });
+  });
+
+  test('an unlisted error is rethrown unchanged (the route answers a generic 500)', async () => {
+    const { h, runId } = readyProduction();
+    const boom = new Error('Request read failed');
+    h.spies.runStatusChange.mockRejectedValueOnce(boom);
+    await expect(change(h, runId)).rejects.toBe(boom);
+  });
+
+  test('write switch off: changeStatus and statusRecheck are 503, statusOptions still answers', async () => {
+    const { h, runId } = readyProduction({ env: { TEST_REQUEST_FACTORY_FORM: 'off' } });
+    expect(await code(change(h, runId))).toBe('factory_form_disabled');
+    expect(await code(h.service.statusRecheck({ profileId: PROFILE, runId }))).toBe('factory_form_disabled');
+    await expect(h.service.statusOptions({ profileId: PROFILE, runId })).resolves.toMatchObject({ runStatus: 'ready' });
+    expect(h.spies.runStatusChange).not.toHaveBeenCalled();
+    expect(h.spies.recheckStatusChange).not.toHaveBeenCalled();
+  });
+
+  test('isolation off on production: changeStatus is 503 before the runner', async () => {
+    const { h, runId } = readyProduction({ env: { TEST_REQUEST_ISOLATION: 'off' } });
+    expect(await code(change(h, runId))).toBe('factory_isolation_off');
+    expect(h.spies.runStatusChange).not.toHaveBeenCalled();
+  });
+
+  test("another actor's run is 404 on all three", async () => {
+    const { h, runId } = readyProduction();
+    for (const call of [
+      () => h.service.statusOptions({ profileId: 99, runId }),
+      () => change(h, runId, { profileId: 99 }),
+      () => h.service.statusRecheck({ profileId: 99, runId }),
+    ]) expect(await code(call())).toBe('factory_run_not_found');
+    expect(h.spies.runStatusChange).not.toHaveBeenCalled();
+    expect(h.spies.recheckStatusChange).not.toHaveBeenCalled();
+  });
+
+  test('a sandbox run is 409 on all three', async () => {
+    const h = harness({ deployment: 'preview' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { status: 'ready' });
+    for (const call of [
+      () => h.service.statusOptions({ profileId: PROFILE, runId }),
+      () => change(h, runId),
+      () => h.service.statusRecheck({ profileId: PROFILE, runId }),
+    ]) expect(await code(call())).toBe('factory_run_not_production');
+    expect(h.spies.runStatusChange).not.toHaveBeenCalled();
+  });
+
+  test('a run that is not ready is 409 before the runner is called', async () => {
+    const h = harness({ deployment: 'production' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { status: 'creating' });
+    expect(await code(change(h, runId))).toBe('factory_run_not_ready');
+    expect(h.spies.runStatusChange).not.toHaveBeenCalled();
+  });
+
+  test('under 150 s of route time left is a 504 and the runner is not called; exactly 150 s is allowed', async () => {
+    const { h, runId } = readyProduction();
+    expect(await code(change(h, runId, { deadlineAt: h.clock.t + 149_999 }))).toBe('factory_deadline_exceeded');
+    expect(h.spies.runStatusChange).not.toHaveBeenCalled();
+    await expect(change(h, runId, { deadlineAt: h.clock.t + 150_000 })).resolves.toMatchObject({ outcome: 'complete' });
+  });
+
+  test('field and label are validated before any ledger work', async () => {
+    const { h, runId } = readyProduction();
+    expect(await code(change(h, runId, { field: 'phase3' }))).toBe('factory_invalid_input');
+    expect(await code(change(h, runId, { optionLabel: '  ' }))).toBe('factory_invalid_input');
+    expect(h.spies.runStatusChange).not.toHaveBeenCalled();
+  });
+
+  test('statusRecheck passes through the runner result; a runner refusal is a 409', async () => {
+    const { h, runId } = readyProduction();
+    await expect(h.service.statusRecheck({ profileId: PROFILE, runId })).resolves.toEqual({ sequence: 1, ok: true });
+    h.spies.recheckStatusChange.mockRejectedValueOnce(runnerError('status_change_refused', 'This run has no status change to recheck.'));
+    expect(await h.service.statusRecheck({ profileId: PROFILE, runId }).catch((e) => ({ s: e.httpStatus, c: e.code }))).toEqual({ s: 409, c: 'status_change_refused' });
+  });
+
+  test('a second POST for a jobs_open change calls the runner again and the real runner sends no second PATCH', async () => {
+    const PHASE2 = 'wmkf_phaseiistatus';
+    const REQUEST_ID = '13131313-1313-4131-8131-131313131313';
+    const state = {
+      akoya_requestid: REQUEST_ID, wmkf_istestrequest: true, wmkf_testcreationrunid: null, wmkf_phaseistatus: null, wmkf_phaseiistatus: null,
+      _wmkf_grantprogram_value: PROGRAM_ID, akoya_requeststatus: 'Pending', '@odata.etag': 'W/"100"',
+    };
+    const patches = [];
+    let jobsDone = false;
+    const rows = [];
+    const move = (id, from, to, extra = {}) => {
+      const row = rows.find((r) => r.changeId === id);
+      if (!row || !from.includes(row.status)) return null;
+      Object.assign(row, { status: to }, extra);
+      return { ...row };
+    };
+    const memoryLedger = {
+      getRun: async (id) => ({ runId: id, status: 'ready', destinationEnvironment: 'production', destinationRequestId: REQUEST_ID, sourceRequestId: SOURCE_ID }),
+      listStatusChanges: async () => rows.map((r) => ({ ...r })),
+      planStatusChange: async (input) => { const row = { ...input, sequence: 1, status: 'planned', dispatchedAt: null, effects: null }; rows.push(row); return { ...row }; },
+      markStatusChangeDispatched: async ({ changeId }) => move(changeId, ['planned'], 'dispatched', { dispatchedAt: '2026-09-28T22:00:00Z' }),
+      markStatusChangeApplied: async ({ changeId }) => move(changeId, ['dispatched', 'applied'], 'applied'),
+      completeStatusChange: async ({ changeId, effects }) => move(changeId, ['applied'], 'complete', { effects }),
+      markStatusChangeNeedsAttention: async ({ changeId, onlyIf }) => move(changeId, onlyIf ? [onlyIf] : ['planned', 'dispatched', 'applied'], 'needs_attention'),
+    };
+    const ok = (body) => ({ ok: true, status: 200, body });
+    const client = {
+      baseUrl: `${PRODUCTION_URL}/api/data/v9.2`,
+      async get(raw) {
+        const path = decodeURIComponent(raw);
+        if (path.startsWith(`/akoya_requests(${REQUEST_ID})`)) return ok({ ...state, wmkf_testcreationrunid: currentRunId });
+        if (path.startsWith(`/wmkf_grantprograms(${PROGRAM_ID})`)) return ok({ wmkf_name: 'Research' });
+        if (path.includes(`LogicalName='${PHASE2}'`)) return ok({ GlobalOptionSet: { Options: [{ Value: 100000002, Label: { UserLocalizedLabel: { Label: 'Phase II Pending Committee Review' } } }] } });
+        if (path.startsWith('/asyncoperations')) {
+          return ok({ value: [{ asyncoperationid: '33333333-3333-4333-8333-333333333333', statecode: jobsDone ? 3 : 1, statuscode: jobsDone ? 30 : 10, createdon: '2026-09-28T22:00:05Z' }] });
+        }
+        if (/^\/(emails|akoya_goapplystatustrackings|akoya_requestpayments)/.test(path)) return ok({ value: [] });
+        throw new Error(`unexpected path ${path}`);
+      },
+      async patchWithOptions(path, body, headers) {
+        patches.push({ path, body, headers });
+        Object.assign(state, body, { '@odata.etag': 'W/"101"' });
+        return { ok: true, status: 204 };
+      },
+    };
+    let currentRunId;
+    let t = Date.now();
+    const { h, runId } = readyProduction({
+      deps: {
+        runStatusChange: (args) => { currentRunId = args.runId; return realRunStatusChange({ ...args, client, ledger: memoryLedger }); },
+        statusCompletion: { now: () => (t += 1000), sleep: async () => {}, pollMs: 1000, minQuietMs: 0 },
+      },
+    });
+    const deadlineAt = () => h.clock.t + 280_000;
+    const first = await change(h, runId, { deadlineAt: deadlineAt(), optionLabel: 'Phase II Pending Committee Review' });
+    expect(first).toMatchObject({ outcome: 'jobs_open', code: 'status_change_jobs_open' });
+    expect(patches).toHaveLength(1);
+    jobsDone = true;
+    h.clock.t = t; // the first wait used up its budget; the second POST arrives later with a fresh one
+    const second = await change(h, runId, { deadlineAt: deadlineAt(), optionLabel: 'Phase II Pending Committee Review' });
+    expect(second).toMatchObject({ outcome: 'complete', sequence: 1 });
+    expect(patches).toHaveLength(1);
+    expect(rows[0].status).toBe('complete');
+  });
+});
+
+// ---- slice 3 Part 0: contract fixes the form relies on -----------------------
+
+describe('slice 3 server contract', () => {
+  const exporterFor = (rows, extra = {}) => {
+    const ledger = fakeLedger();
+    const blobs = fakeBlob();
+    const service = createAdminRunService({
+      env: { TEST_REQUEST_FACTORY_FORM: 'on', FACTORY_BLOB_RW_TOKEN: 't', TEST_REQUEST_SANDBOX_LEDGER_URL: SANDBOX_LEDGER },
+      deployment: 'preview',
+      ledgerDbFactory: () => ledger.db,
+      blob: blobs.blob,
+      createClient: () => ({ baseUrl: 'x', async get() { return { ok: true, status: 200, body: { value: rows, ...extra } }; } }),
+      getAccessToken: async () => 'fake-token',
+    });
+    return service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+  };
+
+  test('0.1 a source number with no row is 404 factory_source_not_found, never the generic 500', async () => {
+    const error = await exporterFor([]).catch((e) => e);
+    expect(error.httpStatus).toBe(404);
+    expect(error.code).toBe('factory_source_not_found');
+    expect(error.message).toBe('No Request has that number.');
+  });
+
+  test('0.1 two rows, or a next link, is 409 factory_source_ambiguous', async () => {
+    const row = { akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001' };
+    const two = await exporterFor([row, { ...row, akoya_requestid: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }]).catch((e) => e);
+    expect([two.httpStatus, two.code]).toEqual([409, 'factory_source_ambiguous']);
+    const linked = await exporterFor([row], { '@odata.nextLink': 'https://x/next' }).catch((e) => e);
+    expect([linked.httpStatus, linked.code]).toEqual([409, 'factory_source_ambiguous']);
+  });
+
+  test('0.2 a source with no usable cycle and no admin-supplied cycle is 400 factory_invalid_input with the form copy', async () => {
+    const noCycle = (exportedAt) => buildSourceBundle({
+      sourceRow: {
+        akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
+        akoya_request: 5000, akoya_fiscalyear: null, wmkf_meetingdate: null, versionnumber: 1,
+      },
+      documents: [],
+      dataverseHost: PRODUCTION_HOSTS[0],
+      exportedAt: new Date(exportedAt),
+    });
+    const h = harness({ deployment: 'preview', deps: { exportBundle: async ({ exportedAt }) => noCycle(exportedAt) } });
+    const exported = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+    expect(exported.defaults).toEqual({ fiscalYear: null, meetingDate: null });
+    const error = await h.service.confirmRun(h.confirmArgs(exported.draftId)).catch((e) => e);
+    expect([error.httpStatus, error.code]).toEqual([400, 'factory_invalid_input']);
+    expect(error.message).toBe('A valid fiscal year and meeting date are required for this source.');
+    expect(h.ledger.rows.size).toBe(0);
+    const ok = await h.service.confirmRun(h.confirmArgs(exported.draftId, { fiscalYear: 'December 2026', meetingDate: '2026-12-01' }));
+    expect(ok.created).toBe(true);
+  });
+
+  test('0.3 listRuns reports formEnabled and target, and still answers with the switch off', async () => {
+    const on = harness({ deployment: 'production' });
+    expect(await on.service.listRuns({ profileId: PROFILE })).toEqual({ runs: [], formEnabled: true, target: 'production' });
+    const off = harness({ deployment: 'preview', env: { TEST_REQUEST_FACTORY_FORM: 'off' } });
+    expect(await off.service.listRuns({ profileId: PROFILE })).toEqual({ runs: [], formEnabled: false, target: 'sandbox' });
+  });
+
+  test('0.4 every advance return carries currentStep and stepIndex from the run after the step', async () => {
+    const h = harness({ deployment: 'preview' });
+    await h.confirm();
+    const { runId } = ids(h.actorId);
+    h.spies.advanceRun.mockResolvedValueOnce({
+      step: 'create_request', outcome: 'advanced', run: { status: 'creating', currentStep: 'correct_meeting_date', stepIndex: 2, destinationRequestNumber: null },
+    });
+    expect(await h.service.advance({ profileId: PROFILE, runId })).toMatchObject({ outcome: 'advanced', currentStep: 'correct_meeting_date', stepIndex: 2 });
+    h.seedRun(runId, { status: 'retired', current_step: 'verify', step_index: 6 });
+    expect(await h.service.advance({ profileId: PROFILE, runId })).toMatchObject({ outcome: 'not_advanced', currentStep: 'verify', stepIndex: 6 });
+  });
+
+  test('0.5 inspectRun returns foundationCapturedAt from the fence_source Foundation baseline, else null', async () => {
+    const h = harness({ deployment: 'production' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { status: 'creating' });
+    expect((await h.service.inspectRun({ profileId: PROFILE, runId })).foundationCapturedAt).toBeNull();
+    const resource = (step, kind, planned) => ({ run_id: runId, sequence: 1, step, resource_kind: kind, planned_identity: planned });
+    h.ledger.state.resources.push(
+      resource('verify', 'foundation_transition', { capturedAt: '2026-01-01T00:00:00.000Z' }),
+      resource('fence_source', 'foundation_transition', { capturedAt: '2026-10-01T12:00:00.000Z' }),
+    );
+    const result = await h.service.inspectRun({ profileId: PROFILE, runId });
+    expect(result.foundationCapturedAt).toBe('2026-10-01T12:00:00.000Z');
+    expect(result.resources).toHaveLength(2);
+  });
+});
+
+describe('S1: source display read', () => {
+  const display = (extra = {}) => harness({ deployment: 'preview', deps: extra });
+
+  test('exportSource returns the display title and applicant beside the summary, never in the stored bundle', async () => {
+    const h = display();
+    const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+    expect(result.source).toEqual({ title: 'Source title', applicant: 'Live University' });
+    const stored = [...h.blobs.objects.values()][0].text;
+    expect(stored).not.toContain('Live University');
+  });
+
+  test('a failed display read returns nulls and the lookup still succeeds', async () => {
+    const h = display({ readSourceDisplay: async () => { throw new Error('boom'); } });
+    const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+    expect(result.source).toEqual({ title: null, applicant: null });
+    expect(result.draftId).toBeTruthy();
+  });
+
+  test('the default read uses the production client with annotations and maps the formatted applicant', async () => {
+    const gets = [];
+    const h = display({
+      readSourceDisplay: undefined,
+      createClient: ({ resourceUrl }) => ({
+        baseUrl: resourceUrl,
+        async get(path, headers) {
+          gets.push({ resourceUrl, path, headers });
+          return { ok: true, status: 200, body: { akoya_title: 'A title', '_akoya_applicantid_value@OData.Community.Display.V1.FormattedValue': 'Some University' } };
+        },
+      }),
+    });
+    const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+    expect(result.source).toEqual({ title: 'A title', applicant: 'Some University' });
+    expect(gets).toHaveLength(1);
+    expect(gets[0].resourceUrl).toBe(PRODUCTION_URL);
+    expect(gets[0].path).toContain(`/akoya_requests(${SOURCE_ID})`);
+    expect(gets[0].headers.Prefer).toContain('include-annotations');
+  });
+
+  test('the default read answers nulls when the client read is not ok or throws', async () => {
+    for (const get of [async () => ({ ok: false, status: 500, body: {} }), async () => { throw new Error('x'); }]) {
+      const h = display({ readSourceDisplay: undefined, createClient: ({ resourceUrl }) => ({ baseUrl: resourceUrl, get }) });
+      const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+      expect(result.source).toEqual({ title: null, applicant: null });
+    }
   });
 });
