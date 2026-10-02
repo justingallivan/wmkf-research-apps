@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { getMeetingTranscriptionCandidates } from '../../lib/services/meeting-tracker-transcription/binding.js';
+import { getMeetingTranscriptionCandidates, loadMeetingTranscriptionBinding } from '../../lib/services/meeting-tracker-transcription/binding.js';
 import {
   buildMeetingTranscriptFiles, buildMeetingTranscriptManifest,
   parseVerifiedMeetingTranscriptSource, validateMeetingTranscriptManifest,
@@ -9,8 +9,8 @@ import {
   isMeetingTranscriptionSchemaReady, parseMeetingTranscriptionAccess,
 } from '../../lib/services/meeting-tracker-transcription/policy.js';
 
-const REQUEST = '11111111-1111-4111-8111-111111111111';
-const VISIT = '22222222-2222-4222-8222-222222222222';
+const REQUEST = '4236c2b3-b053-f111-bec7-6045bd015cb0';
+const VISIT = '29b0de0d-4ff7-ee11-a1fd-000d3a3621c7';
 const REVISION = '33333333-3333-4333-8333-333333333333';
 const OPERATION = '44444444-4444-4444-8444-444444444444';
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -26,6 +26,7 @@ describe('Meeting Tracker transcription rollout controls', () => {
   });
 
   it('limits test access to one request and permits all requests only in on mode', () => {
+    expect(parseMeetingTranscriptionAccess(`test:${REQUEST}`)).toEqual({ mode: 'test', requestId: REQUEST });
     expect(isMeetingTranscriptionRequestAllowed(REQUEST, `test:${REQUEST}`)).toBe(true);
     expect(isMeetingTranscriptionRequestAllowed(VISIT, `test:${REQUEST}`)).toBe(false);
     expect(isMeetingTranscriptionRequestAllowed(REQUEST, 'on')).toBe(true);
@@ -77,6 +78,13 @@ describe('Meeting Tracker generated transcript bundle', () => {
     }, { ...identity, requestId: VISIT })).toThrow('invalid_transcript_bundle');
   });
 
+  it('accepts canonical Dataverse GUIDs with non-RFC version/variant nibbles but keeps generated IDs strict', () => {
+    expect(() => buildMeetingTranscriptFiles({ content, speakerNames: {}, identity })).not.toThrow();
+    expect(() => buildMeetingTranscriptFiles({ content, speakerNames: {}, identity: {
+      ...identity, revisionId: '33333333-3333-f111-bec7-333333333333',
+    } })).toThrow('invalid_transcript_bundle');
+  });
+
   it('requires exactly three typed file descriptors with matching primary TXT identity', () => {
     const generated = buildMeetingTranscriptFiles({ content, speakerNames: {}, identity });
     const files = Object.fromEntries(Object.entries(generated.files).map(([role, file], index) => [role, ({
@@ -98,6 +106,16 @@ describe('Meeting Tracker generated transcript bundle', () => {
     expect(() => parseVerifiedMeetingTranscriptSource(bytes, { size: bytes.length, sha256: digest(bytes) }, identity))
       .toThrow('invalid_transcript_bundle');
   });
+});
+
+test('binding accepts canonical Dataverse request and Site Visit IDs with non-RFC GUID nibbles', async () => {
+  const result = await loadMeetingTranscriptionBinding(REQUEST, VISIT, {
+    getRequest: async () => ({ akoya_requestid: REQUEST, akoya_requeststatus: 'Phase II Pending',
+      wmkf_triagestatus: null, wmkf_meetingdate: '2026-12-11' }),
+    findActiveByRequest: async () => ({ records: [{ activityid: VISIT, _regardingobjectid_value: REQUEST }] }),
+  });
+  expect(result.requestId).toBe(REQUEST);
+  expect(result.siteVisitActivityId).toBe(VISIT);
 });
 
 test('speaker candidates include the saved organizer and reject email-only directory names', async () => {

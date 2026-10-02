@@ -30,6 +30,7 @@ jest.mock('../../lib/services/transcription-pilot/store.js', () => Object.fromEn
 ].map(name => [name, jest.fn()])));
 
 import * as store from '../../lib/services/transcription-pilot/store.js';
+import * as requestDocumentAdapter from '../../lib/dataverse/adapters/request-document.js';
 import * as binding from '../../lib/services/meeting-tracker-transcription/binding.js';
 import { publishMeetingTranscription, publishMeetingCorrection, startMeetingTranscription } from '../../lib/services/meeting-tracker-transcription/service.js';
 import { queueMeetingTranscription, projectMeetingTranscriptionJob } from '../../lib/services/transcription-pilot/runtime.js';
@@ -107,14 +108,14 @@ test('Start dispatches queued work immediately and reports a truthful pending st
   try {
     dispatchQueuedTranscriptionWorkflow.mockResolvedValueOnce({ accepted: true });
     const started = await startMeetingTranscription({ requestId, ownerProfileId: 8,
-      actingUserSystemId: '44444444-4444-4444-8444-444444444444', jobId,
+      actingUserSystemId: '29b0de0d-4ff7-ee11-a1fd-000d3a3621c7', jobId,
       body: { expectedVersion: 5, nonSensitiveAcknowledged: true } });
     expect(dispatchQueuedTranscriptionWorkflow).toHaveBeenCalledWith({ jobId });
     expect(started).toEqual({ job: { id: jobId, status: 'queued', version: 6 }, dispatchPending: false });
 
     dispatchQueuedTranscriptionWorkflow.mockRejectedValueOnce(new Error('outbox unavailable'));
     const retry = await startMeetingTranscription({ requestId, ownerProfileId: 8,
-      actingUserSystemId: '44444444-4444-4444-8444-444444444444', jobId,
+      actingUserSystemId: '29b0de0d-4ff7-ee11-a1fd-000d3a3621c7', jobId,
       body: { expectedVersion: 5, nonSensitiveAcknowledged: true } });
     expect(retry).toMatchObject({ job: { id: jobId, status: 'queued' }, dispatchPending: true });
   } finally {
@@ -122,5 +123,33 @@ test('Start dispatches queued work immediately and reports a truthful pending st
     else process.env.MEETING_TRACKER_TRANSCRIPTION_ACCESS = oldAccess;
     if (oldSchema === undefined) delete process.env.MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY;
     else process.env.MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY = oldSchema;
+  }
+});
+
+test('publication accepts a mapped Dataverse actor GUID with non-RFC version/variant nibbles', async () => {
+  const previous = {
+    access: process.env.MEETING_TRACKER_TRANSCRIPTION_ACCESS,
+    schema: process.env.MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY,
+    bundle: process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY,
+  };
+  process.env.MEETING_TRACKER_TRANSCRIPTION_ACCESS = 'on';
+  process.env.MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY = 'on';
+  process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = 'on';
+  binding.loadMeetingTranscriptionBinding.mockResolvedValue({ requestId, siteVisitActivityId: '29b0de0d-4ff7-ee11-a1fd-000d3a3621c7' });
+  store.getMeetingTranscriptionJob.mockResolvedValue(null);
+  requestDocumentAdapter.findByRequest.mockResolvedValue({ records: [] });
+  try {
+    await expect(publishMeetingTranscription({ requestId, ownerProfileId: 8,
+      actingUserSystemId: '29b0de0d-4ff7-ee11-a1fd-000d3a3621c7', jobId,
+      body: { expectedVersion: 1, expectedCurrentArtifactId: null, expectedCurrentFingerprint: null } }))
+      .rejects.toMatchObject({ code: 'job_changed', httpStatus: 409 });
+    expect(binding.loadMeetingTranscriptionBinding).toHaveBeenCalledWith(requestId);
+  } finally {
+    if (previous.access === undefined) delete process.env.MEETING_TRACKER_TRANSCRIPTION_ACCESS;
+    else process.env.MEETING_TRACKER_TRANSCRIPTION_ACCESS = previous.access;
+    if (previous.schema === undefined) delete process.env.MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY;
+    else process.env.MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY = previous.schema;
+    if (previous.bundle === undefined) delete process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+    else process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = previous.bundle;
   }
 });

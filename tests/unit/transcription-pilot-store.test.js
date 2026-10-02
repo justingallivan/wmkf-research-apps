@@ -4,6 +4,11 @@ import {
 } from '../../lib/services/transcription-pilot/model.js';
 import { createTranscriptionPilotStore } from '../../lib/services/transcription-pilot/store.js';
 
+const NON_RFC_REQUEST_ID = '4236c2b3-b053-f111-bec7-6045bd015cb0';
+const NON_RFC_SITE_VISIT_ID = '38bf47c0-c1aa-46fc-b9d0-167aa76ad962';
+const NON_RFC_ACTOR_ID = '29b0de0d-4ff7-ee11-a1fd-000d3a3621c7';
+const NON_RFC_DOCUMENT_ID = 'a923b5ed-60f4-f111-9b0d-6045bd015cb0';
+
 function fakeDatabase() {
   return {
     query: jest.fn(async () => ({ rows: [] })),
@@ -94,6 +99,53 @@ describe('transcription pilot persistence contract', () => {
     ]);
   });
 
+  it('accepts canonical Dataverse GUIDs with non-RFC nibbles but keeps internal UUIDs strict', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    const operationId = '00000000-0000-4000-8000-000000000001';
+
+    await store.getMeetingPublication({ operationId, requestId: NON_RFC_REQUEST_ID,
+      siteVisitActivityId: NON_RFC_SITE_VISIT_ID });
+    expect(db.query.mock.calls[0][1]).toEqual([operationId, NON_RFC_REQUEST_ID, NON_RFC_SITE_VISIT_ID]);
+    await expect(store.getMeetingPublication({ operationId: NON_RFC_REQUEST_ID,
+      requestId: NON_RFC_REQUEST_ID, siteVisitActivityId: NON_RFC_SITE_VISIT_ID }))
+      .rejects.toMatchObject({ code: 'transcription_invalid_value', httpStatus: 400 });
+    expect(db.query).toHaveBeenCalledTimes(1);
+
+    await store.createMeetingCorrectionDraft({ operationId, requestId: NON_RFC_REQUEST_ID,
+      siteVisitActivityId: NON_RFC_SITE_VISIT_ID, initiatorProfileId: 12,
+      sourceArtifactId: NON_RFC_DOCUMENT_ID, sourceRevisionId: '00000000-0000-4000-8000-000000000002',
+      expectedCurrentArtifactId: NON_RFC_DOCUMENT_ID, expectedCurrentFingerprint: 'a'.repeat(64),
+      speakerNames: {}, expiresAt: new Date() });
+    expect(db.query.mock.calls[1][1]).toEqual([
+      operationId, NON_RFC_REQUEST_ID, NON_RFC_SITE_VISIT_ID, 12, NON_RFC_DOCUMENT_ID,
+      '00000000-0000-4000-8000-000000000002', NON_RFC_DOCUMENT_ID, 'a'.repeat(64), '{}', expect.any(Date),
+    ]);
+
+    await store.transitionMeetingPublication({ operationId, requestId: NON_RFC_REQUEST_ID,
+      siteVisitActivityId: NON_RFC_SITE_VISIT_ID, expectedState: 'publishing', state: 'published',
+      resultingDocumentId: NON_RFC_DOCUMENT_ID });
+    expect(db.query.mock.calls[2][1][1]).toBe(NON_RFC_REQUEST_ID);
+    expect(db.query.mock.calls[2][1][2]).toBe(NON_RFC_SITE_VISIT_ID);
+    expect(db.query.mock.calls[2][1][6]).toBe(NON_RFC_DOCUMENT_ID);
+  });
+
+  it('stores non-RFC request and visit GUIDs on new Meeting Tracker jobs', async () => {
+    const db = fakeDatabase();
+    db.query.mockResolvedValueOnce({ rows: [{ id: '00000000-0000-4000-8000-000000000001' }] });
+    const store = createTranscriptionPilotStore(db);
+    await store.createMeetingJob({
+      id: '00000000-0000-4000-8000-000000000001', ownerProfileId: 7,
+      idempotencyKey: '00000000-0000-4000-8000-000000000002',
+      requestId: NON_RFC_REQUEST_ID, siteVisitActivityId: NON_RFC_SITE_VISIT_ID,
+      originalFilename: 'recording.m4a', declaredContentType: 'audio/mp4', declaredBytes: 100,
+      inputPathname: 'transcription-pilot/7/00000000-0000-4000-8000-000000000001/input.m4a',
+      requestedModel: 'universal-3-5-pro',
+    });
+    expect(db.query.mock.calls[0][1][3]).toBe(NON_RFC_REQUEST_ID);
+    expect(db.query.mock.calls[0][1][4]).toBe(NON_RFC_SITE_VISIT_ID);
+  });
+
   it('requires a frozen input hash and deterministic Tracker candidate paths before taking a job lease', async () => {
     const db = fakeDatabase();
     const store = createTranscriptionPilotStore(db);
@@ -117,10 +169,11 @@ describe('transcription pilot persistence contract', () => {
     await store.freezeMeetingPublicationFromJob({
       operationId: '00000000-0000-4000-8000-000000000001',
       jobId: '00000000-0000-4000-8000-000000000002',
-      requestId: '00000000-0000-4000-8000-000000000003',
-      siteVisitActivityId: '00000000-0000-4000-8000-000000000004',
+      requestId: NON_RFC_REQUEST_ID,
+      siteVisitActivityId: NON_RFC_SITE_VISIT_ID,
       initiatorProfileId: 12, publishedByProfileId: 12,
-      actingUserSystemId: '00000000-0000-4000-8000-000000000005', expectedVersion: 4,
+      actingUserSystemId: NON_RFC_ACTOR_ID, expectedVersion: 4,
+      expectedCurrentArtifactId: NON_RFC_DOCUMENT_ID, expectedCurrentFingerprint: 'b'.repeat(64),
       frozenInputSha256: 'a'.repeat(64), formatterVersion: '1', candidatePaths: {
         txt: `folder/00000000-0000-4000-8000-000000000001.txt`,
         vtt: `folder/00000000-0000-4000-8000-000000000001.vtt`,
