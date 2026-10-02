@@ -7,7 +7,7 @@ jest.mock('../../lib/services/site-visit-materials/contributor-service', () => (
 jest.mock('../../lib/services/portal-upload-staging', () => ({
   PORTAL_UPLOAD_SCOPES: { SITE_VISIT_MATERIAL: 'site_visit_material' },
   PORTAL_DOCUMENT_CONTENT_TYPES: ['application/pdf'],
-  PortalUploadStagingError: class PortalUploadStagingError extends Error { constructor(code, { httpStatus = 409 } = {}) { super(code); this.code = code; this.httpStatus = httpStatus; } },
+  PortalUploadStagingError: class PortalUploadStagingError extends Error { constructor(code, { httpStatus = 409, resultPayload = null } = {}) { super(code); this.code = code; this.httpStatus = httpStatus; this.resultPayload = resultPayload; } },
   createPortalUpload: jest.fn(),
   claimPortalUpload: jest.fn(),
   completePortalUpload: jest.fn(),
@@ -151,4 +151,34 @@ test('finalize: permanent byte and validation failures reject the row; transient
   const graph = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), graph);
   expect(graph.statusCode).toBe(503); expect(graph.body.reason).toBe('persist_failed'); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(6);
   expect(staging.completePortalUpload).not.toHaveBeenCalled();
+});
+
+test('scan rejection persists safe details and rejected replay returns a sanitized 422', async () => {
+  const scanRejection = { category: 'blocked_content', flags: ['embedded_macro'] };
+  finalizeMaterialUpload.mockRejectedValueOnce(new ServiceHttpError('safe', {
+    httpStatus: 422,
+    code: 'scan_infected',
+    body: { ok: false, reason: 'scan_infected', scanRejection, rawProviderText: 'secret' },
+  }));
+  const rejected = res();
+  await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), rejected);
+  expect(rejected.statusCode).toBe(422);
+  expect(rejected.body).toEqual({ ok: false, reason: 'scan_infected', scanRejection });
+  expect(staging.rejectPortalUpload).toHaveBeenCalledWith(expect.objectContaining({ resultCode: 'scan_infected' }));
+  expect(staging.rejectPortalUpload.mock.calls.at(-1)[0].resultPayload).toEqual({ ok: false, reason: 'scan_infected', scanRejection });
+
+  staging.claimPortalUpload.mockRejectedValueOnce(new staging.PortalUploadStagingError('scan_infected', {
+    httpStatus: 409,
+    resultPayload: { ok: false, reason: 'scan_infected', scanRejection },
+  }));
+  const replay = res();
+  await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), replay);
+  expect(replay.statusCode).toBe(422);
+  expect(replay.body).toEqual({ ok: false, reason: 'scan_infected', scanRejection });
+
+  staging.claimPortalUpload.mockRejectedValueOnce(new staging.PortalUploadStagingError('scan_infected', { httpStatus: 409 }));
+  const legacy = res();
+  await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), legacy);
+  expect(legacy.statusCode).toBe(422);
+  expect(legacy.body).toEqual({ ok: false, reason: 'scan_infected', scanRejection: { category: 'unspecified', flags: [] } });
 });

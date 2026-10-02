@@ -512,6 +512,22 @@ test('202 acceptance becomes durable queued status, keeps the prior receipt visi
   expect(contextCalls).toBe(2);
 });
 
+test('failed scanner diagnostic gives the applicant an explanation and coordinator contact', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, {
+      ...context,
+      checklist: [{ ...context.checklist[0], received: { filename: 'earlier.pdf', receivedAt: '2026-09-20T12:00:00Z' } }],
+      jobs: [{ jobId: 'job-failed', stagingId: STAGING_ID, slot: 'presentation_pdf', status: 'failed', errorCode: 'infected', scanRejection: { category: 'blocked_content', flags: ['embedded_macro'] } }],
+    });
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  render(<MaterialsContributorPage />);
+  expect(await screen.findByText(/The security scan rejected this file because it contains embedded macro/)).toBeInTheDocument();
+  expect(screen.getByText(/Remove the blocked content and upload a new copy/)).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'casey@wmkeck.org' })).toBeInTheDocument();
+  expect(screen.getByText(/Previously received .* earlier\.pdf/)).toBeInTheDocument();
+});
+
 test('a refreshed page restores active jobs from context and polls once per page every 15 seconds', async () => {
   const withJob = {
     ...context,

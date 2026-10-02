@@ -556,6 +556,23 @@ test('staff projection exposes sanitized cross-collection jobs and blocks Ready 
   expect(d.markReady).not.toHaveBeenCalled();
 });
 
+test('staff read path keeps sanitized scan details through both job projection layers', async () => {
+  const d = deps({
+    backgroundJobsSchemaReady: () => true,
+    listUploadJobsForRequest: jest.fn(async () => [
+      { job_id: 'infected-job', slot: 'other', status: 'failed', error_code: 'scan_infected', scan_rejection: { category: 'blocked_content', flags: ['embedded_macro'] } },
+      { job_id: 'legacy-job', slot: 'other', status: 'failed', error_code: 'scan_infected', scan_rejection: { category: 'blocked_content', flags: ['provider-secret'] } },
+    ]),
+  });
+  d.__setStored(openMaterialsRow());
+  const { collection: row } = await getMaterialsCollection({ requestId: REQUEST_ID }, d);
+  expect(row.uploadJobs).toEqual([
+    expect.objectContaining({ errorCode: 'infected', scanRejection: { category: 'blocked_content', flags: ['embedded_macro'] } }),
+    expect.objectContaining({ errorCode: 'infected', scanRejection: null }),
+  ]);
+  expect(JSON.stringify(row)).not.toContain('provider-secret');
+});
+
 test('new collection creation immediately exposes an active job held by its previous collection', async () => {
   const d = deps({
     backgroundJobsSchemaReady: () => true,

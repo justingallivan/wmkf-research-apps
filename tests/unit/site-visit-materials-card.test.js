@@ -158,3 +158,19 @@ test('needs-attention jobs remain visible after collection close and carry coord
   expect(screen.getByRole('link', { name: 'casey@wmkeck.org' })).toHaveAttribute('href', 'mailto:casey%40wmkeck.org');
   expect(screen.getByText('Closed. The contributor link has expired.')).toBeInTheDocument();
 });
+
+test('staff card shows safe scan reason alongside terminal and coordinator-attention states', async () => {
+  const diagnosed = collection({
+    programCoordinator: { name: 'Casey Coordinator', email: 'casey@wmkeck.org' },
+    uploadJobs: [
+      { jobId: 'failed', slot: 'presentation_pdf', status: 'failed', errorCode: 'infected', scanRejection: { category: 'blocked_content', flags: ['embedded_macro'] } },
+      { jobId: 'attention', slot: 'presentation_source', status: 'needs_attention', errorCode: 'infected', scanRejection: { category: 'signature_match', flags: [] } },
+    ],
+  });
+  global.fetch = jest.fn(async () => response({ success: true, collection: diagnosed }));
+  render(<SiteVisitMaterialsCard requestId={REQUEST_ID} requestNumber="1003222" />);
+
+  expect(await screen.findByText(/The security scan rejected this file because it contains embedded macro/)).toBeInTheDocument();
+  expect(screen.getByText(/Needs coordinator attention before replacement is safe/)).toBeInTheDocument();
+  expect(screen.getByText('The security scan identified a known threat.')).toBeInTheDocument();
+});
