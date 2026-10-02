@@ -20,7 +20,7 @@ function stepState(run, index, advancing) {
   if (index > at) return 'Pending';
   if (run.status === 'needs_attention') return 'Needs attention';
   if (advancing) return 'In progress';
-  return ADVANCE_LABELS[run.status] ? 'Up next' : 'Not run';
+  return 'Up next';
 }
 
 function ProgressList({ run, advancing }) {
@@ -79,7 +79,11 @@ export default function TestRequestFactoryRunPanel({
 
       {view.state === 'error' ? <div role="alert" className={ERROR_BAND}>{view.text}</div> : null}
 
-      <ProgressList run={run} advancing={advancing} />
+      {run.status === 'retiring' || run.status === 'retired' ? (
+        <p className="text-sm leading-6 text-gray-700">This run is {status.label.toLowerCase()}, so its steps are not shown.</p>
+      ) : (
+        <ProgressList run={run} advancing={advancing} />
+      )}
 
       {advancing ? (
         <p role="status" className="text-sm text-gray-700">Working on: {stepName}. This can take a few minutes. Leave this page open.</p>
@@ -166,7 +170,7 @@ export default function TestRequestFactoryRunPanel({
       {run.status === 'ready' && production ? (
         <section aria-labelledby="factory-status-heading" className="space-y-3 border-t border-gray-200 pt-5">
           <h4 id="factory-status-heading" className="text-base font-semibold text-gray-950">Phase I and Phase II status</h4>
-          <TestRequestStatusControl key={`${run.runId}:${epoch}`} run={run} formEnabled={!writeBlock} getScope={getScope} />
+          <TestRequestStatusControl key={`${run.runId}:${epoch}`} run={run} writeBlock={writeBlock} getScope={getScope} />
         </section>
       ) : null}
     </section>

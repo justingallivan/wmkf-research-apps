@@ -11,6 +11,7 @@ export const BLIP_COPY = "I'm having trouble reaching the server. This is usuall
 
 const SIZE_COPY = `This Request's documents are too large to clone here (limit ${SIZE_LIMITS.maxFileMb} MB per file, ${SIZE_LIMITS.maxTotalMb} MB in total, ${SIZE_LIMITS.maxFiles} files). Choose a smaller source Request. Nothing was created.`;
 const OWNER_REPLAY = "An earlier change to this status created, or may have created, a payment or status-tracking row. Repeating it needs the owner; it can't be done from this form.";
+const FOUNDATION_COPY = "I couldn't confirm the Foundation's setup needed to clone this Request. This is usually a temporary blip. Please try again, and if the problem doesn't resolve, contact an administrator. Nothing was created.";
 const CONTACT = 'Contact an administrator.';
 
 // A string is the copy. A function receives the server's message (possibly empty) and returns the copy.
@@ -35,7 +36,9 @@ export const ERROR_COPY = Object.freeze({
   factory_recovery_required: "This run's saved files are missing, so it can't continue from here. Don't look up the source again. Ask the owner to recover it from the command line.",
   factory_artifacts_missing: "The saved files for this run are missing, so nothing was downloaded.",
   factory_artifact_digest_mismatch: `This run's saved files don't match their record, so nothing was advanced. ${CONTACT}`,
-  factory_artifact_exists: `This run's files were already saved, so nothing new was written. Reload the list and check the run. ${CONTACT}`,
+  factory_artifact_exists: "The files for this run were already saved, but the run wasn't reserved, so this draft can't be confirmed again. Look up the source Request again. Nothing was created.",
+  test_request_foundation_unavailable: FOUNDATION_COPY,
+  test_request_grant_type_unavailable: FOUNDATION_COPY,
   factory_artifact_too_large: "This Request's saved files would be too large to store, so nothing was reserved. Choose a smaller source Request.",
   factory_artifact_invalid_id: `That reference wasn't valid, so nothing was changed. Look up the source Request again.`,
   factory_artifact_invalid_target: `The file store doesn't match this deployment, so nothing was changed. ${CONTACT}`,

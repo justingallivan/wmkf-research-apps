@@ -11,7 +11,7 @@ import {
 
 const BASE = '/api/admin/test-requests/runs';
 const FORM_OFF = 'Creating test Requests is switched off on this deployment. Existing runs can still be inspected.';
-const LEASE_COPY = 'Another process is advancing this run. Try again in a few minutes.';
+const LEASE_COPY = 'Another process is advancing this run. That can be a step you started a moment ago that is still finishing. Try again in a few minutes.';
 const stepLabel = (key) => BASIC_STEPS.find((step) => step.key === key)?.label || key;
 const IDLE_RECHECK = { busy: false, result: null, error: '' };
 const IDLE_ARTIFACTS = { busy: false, note: '', error: '' };
@@ -110,9 +110,13 @@ export default function TestRequestFactorySection({ onTarget }) {
     return scope;
   };
 
+  // A new scope always resets the panel, so no path can replace a scope and leave stale panel state.
   const scopeFor = (runId) => {
     const scope = scopeRef.current;
-    return scope && scope.runId === runId && !scope.controller.signal.aborted ? scope : openScope(runId);
+    if (scope && scope.runId === runId && !scope.controller.signal.aborted) return scope;
+    const fresh = openScope(runId);
+    resetPanel();
+    return fresh;
   };
 
   const handleFor = (runId) => {
@@ -135,6 +139,7 @@ export default function TestRequestFactorySection({ onTarget }) {
     scopeRef.current?.controller.abort();
     scopeRef.current = null;
     resetPanel();
+    setView(null); // the run stays in the list and the server finishes any step it had begun
   };
 
   async function refreshRun(scope) {
@@ -277,7 +282,7 @@ export default function TestRequestFactorySection({ onTarget }) {
                 return (
                   <tr key={run.runId} className={view?.run.runId === run.runId ? 'bg-gray-50' : ''}>
                     <td className="px-4 py-3">
-                      <button type="button" className="font-semibold text-gray-950 underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900" aria-pressed={view?.run.runId === run.runId} onClick={() => selectRun(run)}>
+                      <button type="button" className="inline-flex min-h-11 items-center font-semibold text-gray-950 underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900" aria-pressed={view?.run.runId === run.runId} onClick={() => selectRun(run)}>
                         {run.testLabel}
                       </button>
                     </td>

@@ -7,15 +7,31 @@ import {
   ERROR_BAND, INPUT, OUTLINE_BUTTON, PRIMARY_BUTTON, TABLE_WRAP, TH, formatTime,
 } from './test-request-factory-ui';
 
-const FORM_OFF_REASON = 'Creating test Requests is switched off on this deployment.';
 const RISK_SENTENCE = 'This changes a real status on the test Request and can send emails or create payment and tracking rows.';
 const RELOAD_CODES = new Set(['status_change_concurrent', 'status_change_open']);
 
 const fieldByColumn = (column) => STATUS_FIELDS.find((field) => field.column === column) || null;
+// Display only: never a bare number for a value the list no longer has.
 const labelOf = (options, value) => {
   if (value == null) return 'Not set';
-  return options?.find((option) => option.value === value)?.label ?? String(value);
+  return options?.find((option) => option.value === value)?.label ?? `${value} (no longer in the list)`;
 };
+
+/**
+ * The body "Check again" may send, built only from the journal's open change:
+ * exactly one option carries its target value and a non-empty label, and no
+ * other option in that list shares the label (case-insensitive). Else null.
+ */
+function strictCheckBody(data, change) {
+  const field = change ? fieldByColumn(change.field) : null;
+  if (!field) return null;
+  const list = data?.options?.[field.key] || [];
+  const matches = list.filter((option) => option.value === change.optionAfter && typeof option.label === 'string' && option.label.trim());
+  if (matches.length !== 1) return null;
+  const label = matches[0].label;
+  if (list.some((option) => option !== matches[0] && typeof option.label === 'string' && option.label.toLowerCase() === label.toLowerCase())) return null;
+  return { field: field.key, optionLabel: label };
+}
 
 function Reason({ id, children }) {
   return <p id={id} className="text-sm leading-6 text-gray-600">{children}</p>;
@@ -30,14 +46,13 @@ function Reason({ id, children }) {
  * await below checks it, and the component's own mounted flag, before it
  * touches state.
  */
-export default function TestRequestStatusControl({ run, formEnabled, getScope }) {
+export default function TestRequestStatusControl({ run, writeBlock, getScope }) {
   const [load, setLoad] = useState({ state: 'loading', data: null });
   const [fieldKey, setFieldKey] = useState('phase2');
   const [optionValue, setOptionValue] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
-  const [lastBody, setLastBody] = useState(null);
   const [stuck, setStuck] = useState(null);
   const [recheck, setRecheck] = useState(null);
   const [copied, setCopied] = useState('');
@@ -57,11 +72,13 @@ export default function TestRequestStatusControl({ run, formEnabled, getScope })
   const loadJournal = useCallback(async (scope) => {
     try {
       const data = await requestJson(base, { signal: scope.signal, fallbackMessage: 'The status could not be loaded.' });
-      if (!scope.alive()) return;
+      if (!scope.alive()) return null;
       setLoad({ state: 'ready', data });
+      return data;
     } catch (error) {
-      if (!scope.alive() || error?.name === 'AbortError') return;
+      if (!scope.alive() || error?.name === 'AbortError') return null;
       setLoad({ state: 'error', data: null, text: messageFor(error) });
+      return null;
     }
   }, [base]);
 
@@ -82,10 +99,9 @@ export default function TestRequestStatusControl({ run, formEnabled, getScope })
   const selectedValue = open ? String(open.optionAfter) : optionValue;
   const selected = options.find((option) => String(option.value) === selectedValue) || null;
   const fieldLabel = STATUS_FIELDS.find((field) => field.key === effectiveKey).label;
+  // The in-progress banner and the missing retry belong to the change that is still open, no other.
   const stuckHere = Boolean(open && stuck && stuck.changeId === open.changeId);
-  const checkBody = open
-    ? (lastBody || (openField && openLabel ? { field: openField.key, optionLabel: openLabel } : null))
-    : null;
+  const checkBody = open ? strictCheckBody(data, open) : null;
 
   async function send(body) {
     const scope = liveScope();
@@ -96,17 +112,14 @@ export default function TestRequestStatusControl({ run, formEnabled, getScope })
       const reply = await requestJson(base, { method: 'POST', body, signal: scope.signal, fallbackMessage: 'The status change could not be sent.' });
       if (!scope.alive()) return;
       if (reply.outcome === 'complete') {
-        setLastBody(null);
         setResult({
           tone: 'green',
           text: `Status changed. Emails: ${reply.emails}, tracking rows: ${reply.tracking}, payments: ${reply.payments}, background jobs: ${reply.jobs}.`,
         });
       } else if (reply.outcome === 'in_progress') {
-        setLastBody(null);
         setStuck({ changeId: reply.changeId, message: reply.message, abandonCommand: reply.abandonCommand || '' });
       } else {
-        // jobs_open and unconfirmed: the same body is what "Check again" repeats.
-        setLastBody(body);
+        // jobs_open and unconfirmed: "Check again" is built from the journal's open change.
         setResult({ tone: 'amber', text: reply.message });
       }
       // Reload after every answer so the journal shows the change (an in-progress change stays without a retry control).
@@ -118,6 +131,28 @@ export default function TestRequestStatusControl({ run, formEnabled, getScope })
     } finally {
       if (scope.alive()) setBusy(false);
     }
+  }
+
+  // Reload first; send only if the SAME change is still open, with the body built from the fresh journal.
+  async function checkAgain() {
+    const scope = liveScope();
+    const changeId = open.changeId;
+    setBusy(true);
+    setResult(null);
+    const fresh = await loadJournal(scope);
+    if (!scope.alive()) return;
+    const stillOpen = fresh?.changes?.find((change) => change.changeId === changeId && OPEN_CHANGE_STATUSES.includes(change.status));
+    const body = stillOpen ? strictCheckBody(fresh, stillOpen) : null;
+    if (!fresh) { setBusy(false); return; }
+    if (!body) {
+      setResult({
+        tone: 'amber',
+        text: stillOpen ? "That change's status label is missing or ambiguous in the list, so it can't be checked from here. Ask the owner." : 'That change is no longer open. The status list has been reloaded.',
+      });
+      setBusy(false);
+      return;
+    }
+    await send(body);
   }
 
   async function recheckEffects() {
@@ -157,20 +192,20 @@ export default function TestRequestStatusControl({ run, formEnabled, getScope })
   }
 
   const setReason = (() => {
-    if (!formEnabled) return FORM_OFF_REASON;
+    if (writeBlock) return writeBlock;
     if (busy) return 'Waiting for the last request to finish.';
     if (!selected) return 'Choose the status to set.';
     return '';
   })();
   const checkReason = (() => {
-    if (!formEnabled) return FORM_OFF_REASON;
+    if (writeBlock) return writeBlock;
     if (busy) return 'Waiting for the last request to finish.';
-    if (!checkBody) return "The open change's status label is no longer in the list, so it can't be checked from here. Ask the owner.";
+    if (!checkBody) return "The open change's status label is missing or ambiguous in the list, so it can't be checked from here. Ask the owner.";
     return '';
   })();
   const lastSent = changes.filter((change) => change.dispatchedAt).length;
   const recheckReason = (() => {
-    if (!formEnabled) return FORM_OFF_REASON;
+    if (writeBlock) return writeBlock;
     if (busy) return 'Waiting for the last request to finish.';
     if (!lastSent) return 'No status change has been sent yet, so there is nothing to recheck.';
     return '';
@@ -226,7 +261,7 @@ export default function TestRequestStatusControl({ run, formEnabled, getScope })
         </div>
       ) : null}
 
-      {stuck ? (
+      {stuckHere ? (
         <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-950">
           <p className="font-semibold">{stuck.message}</p>
           {stuck.abandonCommand ? (
@@ -279,7 +314,7 @@ export default function TestRequestStatusControl({ run, formEnabled, getScope })
 
       {open && !stuckHere ? (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <button type="button" className={PRIMARY_BUTTON} disabled={Boolean(checkReason)} aria-describedby="factory-check-reason" onClick={() => send(checkBody)}>
+          <button type="button" className={PRIMARY_BUTTON} disabled={Boolean(checkReason)} aria-describedby="factory-check-reason" onClick={checkAgain}>
             Check again
           </button>
           {checkReason ? <Reason id="factory-check-reason">{checkReason}</Reason> : null}

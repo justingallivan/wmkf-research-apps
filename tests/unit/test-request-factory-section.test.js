@@ -374,7 +374,7 @@ describe('advance loop', () => {
     server.on('POST', advancePath(), reply(outcome, { status: 'creating' }), reply('ready', { status: 'ready' }));
     server.on('GET', `${BASE}/${RUN_A}`, runBody(makeRun({ status: 'creating', stepIndex: 1 })));
     start();
-    await screen.findByText('Another process is advancing this run. Try again in a few minutes.');
+    await screen.findByText('Another process is advancing this run. That can be a step you started a moment ago that is still finishing. Try again in a few minutes.');
     await screen.findByRole('button', { name: 'Resume' });
     expect(server.count('POST', advancePath())).toBe(1);
   });
@@ -459,6 +459,8 @@ describe('advance loop', () => {
     await waitFor(() => expect(server.count('POST', advancePath())).toBe(1));
     await lookup(server);
     await screen.findByLabelText('Test label');
+    // The panel is gone (the run stays in the list); the late answer cannot revive it.
+    expect(screen.queryByRole('heading', { name: 'Run A' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Stop after this step' })).toBeNull();
     await act(async () => { gate.resolve(); });
     // Positive sentinel: the new draft's form is still there and usable after A's answer is released.
@@ -466,7 +468,84 @@ describe('advance loop', () => {
     expect(screen.getByLabelText('Test label').value).toBe('After');
     expect(screen.queryByRole('alert')).toBeNull();
     expect(server.count('POST', advancePath())).toBe(1);
+    expect(screen.queryByRole('heading', { name: 'Run A' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Run A' })).toBeTruthy(); // still in the list
+    // Reselecting loads it fresh, at rest.
+    fireEvent.click(screen.getByRole('button', { name: 'Run A' }));
+    await screen.findByRole('heading', { name: 'Run A' });
     expect(steps().getAllByText('Up next')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Stop after this step' })).toBeNull();
+  });
+
+  test('retiring and retired runs show a status line, not per-step states', async () => {
+    const server = await setup(makeRun({ status: 'retired', stepIndex: 2 }));
+    expect(screen.getByText('This run is retired, so its steps are not shown.')).toBeTruthy();
+    expect(screen.queryByRole('list', { name: 'Steps' })).toBeNull();
+    expect(server.count('POST', advancePath())).toBe(0);
+  });
+});
+
+describe('write reasons and reserved values', () => {
+  test('with the form off, the reason sits beside Look up source even before a number is typed', async () => {
+    const server = makeServer();
+    await renderSection(server, [], { formEnabled: false });
+    expect(screen.getByRole('button', { name: 'Look up source' }).disabled).toBe(true);
+    expect(document.getElementById('factory-lookup-reason').textContent).toMatch(/switched off on this deployment/);
+  });
+
+  test('a retry with edited values that returns the existing run (200, created false) shows the stored values and says so', async () => {
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(makeRun({ testLabel: 'My test' })));
+    await renderSection(server, []);
+    await lookup(server);
+    await screen.findByLabelText('Test label');
+    fillConfirm();
+    server.on('POST', BASE,
+      { status: 500, body: { error: 'The Test Request run could not be processed.' } },
+      { status: 200, body: { run: makeRun({ testLabel: 'My test', fiscalYear: 'December 2026', meetingDate: '2026-12-01' }), created: false } });
+    fireEvent.click(confirmButton());
+    await screen.findByRole('alert');
+    fireEvent.change(screen.getByLabelText('Meeting date'), { target: { value: '2026-12-15' } });
+    fireEvent.click(confirmButton());
+    await screen.findByText(/Meeting date 2026-12-01\./);
+    expect(screen.getByText('This run was already reserved by an earlier attempt, with the values shown here, not the ones you just entered. To use different values, choose Create another.')).toBeTruthy();
+    expect(server.bodies('POST', BASE).map((b) => b.idempotencyKey)).toEqual(['key-1', 'key-1']);
+  });
+
+  test('an unedited retry that returns the existing run shows no mismatch sentence', async () => {
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(makeRun({ testLabel: 'My test' })));
+    await renderSection(server, []);
+    await lookup(server);
+    await screen.findByLabelText('Test label');
+    fillConfirm();
+    server.on('POST', BASE, { status: 200, body: { run: makeRun({ testLabel: 'My test', fiscalYear: 'December 2026', meetingDate: '2026-12-01T00:00:00.000Z' }), created: false } });
+    fireEvent.click(confirmButton());
+    await screen.findByText(/Meeting date 2026-12-01\./);
+    expect(screen.queryByText(/already reserved by an earlier attempt/)).toBeNull();
+  });
+
+  test('Create another with no way to mint a key shows the error and keeps Confirm disabled with that reason', async () => {
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(makeRun({ testLabel: 'My test' })));
+    await renderSection(server, []);
+    await lookup(server);
+    await screen.findByLabelText('Test label');
+    fillConfirm();
+    server.on('POST', BASE, { status: 201, body: { run: makeRun({ testLabel: 'My test', fiscalYear: 'December 2026', meetingDate: '2026-12-01' }), created: true } });
+    fireEvent.click(confirmButton());
+    await screen.findByRole('button', { name: 'Create another' });
+    const original = globalThis.crypto;
+    Object.defineProperty(globalThis, 'crypto', { configurable: true, value: {} });
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Create another' }));
+      await screen.findByRole('alert');
+      fillConfirm({ label: 'Second' });
+      expect(confirmButton().disabled).toBe(true);
+      expect(document.getElementById('factory-confirm-reason').textContent).toMatch(/can't create the safe request key/);
+    } finally {
+      Object.defineProperty(globalThis, 'crypto', { configurable: true, value: original });
+    }
   });
 });
 

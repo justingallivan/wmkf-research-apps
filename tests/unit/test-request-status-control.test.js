@@ -61,10 +61,11 @@ function makeServer() {
   return server;
 }
 
+const FORM_OFF = 'Creating test Requests is switched off on this deployment.';
 const scope = () => ({ signal: new AbortController().signal, isCurrent: () => true });
 
-async function renderControl(server, { formEnabled = true, run = readyRun } = {}) {
-  const view = render(<TestRequestStatusControl run={run} formEnabled={formEnabled} getScope={scope} />);
+async function renderControl(server, { writeBlock = '', run = readyRun } = {}) {
+  const view = render(<TestRequestStatusControl run={run} writeBlock={writeBlock} getScope={scope} />);
   await screen.findByLabelText('Status field');
   return view;
 }
@@ -140,7 +141,7 @@ describe('status control', () => {
     expect(screen.getByLabelText('New status').value).toBe('100000002');
     expect(screen.queryByRole('button', { name: 'Set status' })).toBeNull();
     server.on('POST', BASE, { status: 200, body: { outcome: 'complete', emails: 0, tracking: 0, payments: 0, jobs: 1 } });
-    server.on('GET', BASE, statusBody([change()]));
+    server.on('GET', BASE, statusBody([change({ status: outcome === 'jobs_open' ? 'applied' : 'dispatched', completedAt: null })]), statusBody([change()]));
     fireEvent.click(check);
     await screen.findByText(/^Status changed\./);
     const bodies = server.bodies('POST', BASE);
@@ -211,10 +212,55 @@ describe('status control', () => {
     expect(screen.getByLabelText('Status field').disabled).toBe(true);
     expect(screen.queryByRole('button', { name: 'Set status' })).toBeNull();
     server.on('POST', BASE, { status: 200, body: { outcome: 'complete', emails: 0, tracking: 0, payments: 0, jobs: 0 } });
-    server.on('GET', BASE, statusBody([change()]));
+    server.on('GET', BASE, statusBody([change({ status: 'planned', completedAt: null, dispatchedAt: null })]), statusBody([change()]));
     fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
     await screen.findByText(/^Status changed\./);
     expect(server.bodies('POST', BASE)).toEqual([{ field: 'phase2', optionLabel: 'Recommended' }]);
+  });
+
+  describe('Check again is built only from the open change', () => {
+    const openChange = (extra = {}) => change({ status: 'applied', completedAt: null, ...extra });
+    const withOptions = (phase2) => ({ status: 200, body: { runId: RUN_ID, runStatus: 'ready', options: { ...OPTIONS, phase2 }, current: { phase1: 100000000, phase2: 100000001 }, changes: [openChange()] } });
+
+    test('a label missing from the list disables it with the reason, and sends nothing', async () => {
+      const server = makeServer().on('GET', BASE, withOptions([{ value: 100000001, label: 'Not invited' }]));
+      await renderControl(server);
+      const check = screen.getByRole('button', { name: 'Check again' });
+      expect(check.disabled).toBe(true);
+      expect(document.getElementById(check.getAttribute('aria-describedby')).textContent).toMatch(/missing or ambiguous/);
+      expect(screen.getAllByText(/100000002 \(no longer in the list\)/).length).toBeGreaterThan(0);
+      expect(server.count('POST', BASE)).toBe(0);
+    });
+
+    test('a duplicate label (any case) disables it too', async () => {
+      const server = makeServer().on('GET', BASE, withOptions([{ value: 100000001, label: 'Not invited' }, { value: 100000002, label: 'Recommended' }, { value: 100000003, label: 'recommended' }]));
+      await renderControl(server);
+      expect(screen.getByRole('button', { name: 'Check again' }).disabled).toBe(true);
+      expect(server.count('POST', BASE)).toBe(0);
+    });
+
+    test('a change closed elsewhere between load and click: one GET, zero POSTs, the message, the reloaded journal', async () => {
+      const server = makeServer().on('GET', BASE, statusBody([openChange()]), statusBody([change()]));
+      await renderControl(server);
+      fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
+      await screen.findByText('That change is no longer open. The status list has been reloaded.');
+      expect(server.count('GET', BASE)).toBe(2);
+      expect(server.count('POST', BASE)).toBe(0);
+      expect(screen.queryByRole('button', { name: 'Check again' })).toBeNull();
+      expect(screen.getByText('Complete')).toBeTruthy();
+    });
+
+    test('the normal path is one GET then one POST with the open change\'s field and label', async () => {
+      const server = makeServer().on('GET', BASE, statusBody([openChange()]));
+      await renderControl(server);
+      const before = server.count('GET', BASE);
+      server.on('POST', BASE, { status: 200, body: { outcome: 'complete', emails: 0, tracking: 0, payments: 0, jobs: 0 } });
+      fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
+      await screen.findByText(/^Status changed\./);
+      const order = server.calls.slice(before).map((c) => c.method);
+      expect(order.slice(0, 2)).toEqual(['GET', 'POST']);
+      expect(server.bodies('POST', BASE)).toEqual([{ field: 'phase2', optionLabel: 'Recommended' }]);
+    });
   });
 
   test('no control sends rerun, and none is named for it', async () => {
@@ -239,7 +285,7 @@ describe('status control', () => {
 
   test('with the form off, Set status, Check again and Recheck are disabled with the reason; the journal still loads', async () => {
     const server = makeServer().on('GET', BASE, statusBody([change()]));
-    await renderControl(server, { formEnabled: false });
+    await renderControl(server, { writeBlock: FORM_OFF });
     choose('phase2', 'Awarded');
     const set = screen.getByRole('button', { name: 'Set status' });
     expect(set.disabled).toBe(true);
@@ -252,7 +298,7 @@ describe('status control', () => {
 
   test('with the form off, an open change\'s Check again is disabled with the reason', async () => {
     const server = makeServer().on('GET', BASE, statusBody([change({ status: 'applied', completedAt: null })]));
-    await renderControl(server, { formEnabled: false });
+    await renderControl(server, { writeBlock: FORM_OFF });
     const check = screen.getByRole('button', { name: 'Check again' });
     expect(check.disabled).toBe(true);
     expect(document.getElementById(check.getAttribute('aria-describedby')).textContent).toMatch(/switched off/);
@@ -260,7 +306,7 @@ describe('status control', () => {
 
   test('a failed load says so and can be retried', async () => {
     const server = makeServer().on('GET', BASE, { status: 500, body: { error: 'x' } }, statusBody());
-    render(<TestRequestStatusControl run={readyRun} formEnabled getScope={scope} />);
+    render(<TestRequestStatusControl run={readyRun} writeBlock="" getScope={scope} />);
     await screen.findByRole('alert');
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     await screen.findByLabelText('Status field');
@@ -270,7 +316,7 @@ describe('status control', () => {
   test('a late answer after the scope is no longer current changes nothing', async () => {
     const server = makeServer().on('GET', BASE, statusBody());
     let live = true;
-    render(<TestRequestStatusControl run={readyRun} formEnabled getScope={() => ({ signal: new AbortController().signal, isCurrent: () => live })} />);
+    render(<TestRequestStatusControl run={readyRun} writeBlock="" getScope={() => ({ signal: new AbortController().signal, isCurrent: () => live })} />);
     await screen.findByLabelText('Status field');
     choose('phase2', 'Recommended');
     fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
@@ -314,6 +360,20 @@ describe('where the control appears', () => {
     const set = screen.getByRole('button', { name: 'Set status' });
     expect(set.disabled).toBe(true);
     expect(document.getElementById(set.getAttribute('aria-describedby')).textContent).toMatch(/switched off/);
+  });
+
+  test('with the run list failed to reload, the reason says so, never "switched off"', async () => {
+    const server = await openRun(base);
+    await screen.findByLabelText('Status field');
+    server.on('GET', RUNS, { status: 500, body: { error: 'x' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Reload list' }));
+    await screen.findByRole('alert');
+    choose('phase2', 'Awarded');
+    const set = screen.getByRole('button', { name: 'Set status' });
+    expect(set.disabled).toBe(true);
+    const reason = document.getElementById(set.getAttribute('aria-describedby')).textContent;
+    expect(reason).toMatch(/couldn't check whether this deployment allows/);
+    expect(reason).not.toMatch(/switched off/);
   });
 
   test.each([

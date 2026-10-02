@@ -933,6 +933,18 @@ describe('status setter service (slice 2b)', () => {
     expect(h.createClientCalls.every((c) => !c.allowTestRequestMarkerWrites)).toBe(true);
   });
 
+  test('F7: a run that is not ready answers options and journal with current null and reads no Request', async () => {
+    const h = harness({ deployment: 'production' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { status: 'prepared' });
+    const result = await h.service.statusOptions({ profileId: PROFILE, runId });
+    expect(result.current).toBeNull();
+    expect(result.runStatus).toBe('prepared');
+    expect(result.options.phase1).toHaveLength(1);
+    expect(result.changes).toEqual([]);
+    expect(h.spies.readCurrentStatus).not.toHaveBeenCalled();
+  });
+
   test('changeStatus calls the runner once with the run, the mapped Dataverse field, label and a deadline-bound completion, never rerun', async () => {
     const { h, runId } = readyProduction();
     const deadlineAt = h.clock.t + 280_000;
@@ -1189,7 +1201,7 @@ describe('slice 3 server contract', () => {
     expect(exported.defaults).toEqual({ fiscalYear: null, meetingDate: null });
     const error = await h.service.confirmRun(h.confirmArgs(exported.draftId)).catch((e) => e);
     expect([error.httpStatus, error.code]).toEqual([400, 'factory_invalid_input']);
-    expect(error.message).toBe('A fiscal year and a meeting date are required for this source.');
+    expect(error.message).toBe('A valid fiscal year and meeting date are required for this source.');
     expect(h.ledger.rows.size).toBe(0);
     const ok = await h.service.confirmRun(h.confirmArgs(exported.draftId, { fiscalYear: 'December 2026', meetingDate: '2026-12-01' }));
     expect(ok.created).toBe(true);

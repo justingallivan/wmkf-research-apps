@@ -62,6 +62,13 @@ describe('messageFor', () => {
     );
   });
 
+  test('artifact-exists and the Foundation setup codes have their copy', () => {
+    expect(messageFor(apiError('factory_artifact_exists'))).toBe("The files for this run were already saved, but the run wasn't reserved, so this draft can't be confirmed again. Look up the source Request again. Nothing was created.");
+    const foundation = "I couldn't confirm the Foundation's setup needed to clone this Request. This is usually a temporary blip. Please try again, and if the problem doesn't resolve, contact an administrator. Nothing was created.";
+    expect(messageFor(apiError('test_request_foundation_unavailable', 'x', 503))).toBe(foundation);
+    expect(messageFor(apiError('test_request_grant_type_unavailable', 'x', 503))).toBe(foundation);
+  });
+
   test('an unknown code shows the server message; no code is the blip copy; an abort is empty', () => {
     expect(messageFor(apiError('something_new', 'Server says this.'))).toBe('Server says this.');
     expect(messageFor(apiError('something_new', ''))).toBe(BLIP_COPY);
@@ -71,6 +78,6 @@ describe('messageFor', () => {
   });
 
   test('factory_invalid_input keeps the server message when there is one', () => {
-    expect(messageFor(apiError('factory_invalid_input', 'A fiscal year and a meeting date are required for this source.', 400))).toBe('A fiscal year and a meeting date are required for this source.');
+    expect(messageFor(apiError('factory_invalid_input', 'A valid fiscal year and meeting date are required for this source.', 400))).toBe('A valid fiscal year and meeting date are required for this source.');
   });
 });

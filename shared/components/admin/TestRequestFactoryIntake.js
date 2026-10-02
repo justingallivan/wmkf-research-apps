@@ -37,6 +37,7 @@ export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, on
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState('');
   const [reserved, setReserved] = useState(null);
+  const [keyMissing, setKeyMissing] = useState(false);
   const keyRef = useRef(null);
   const lookupControllerRef = useRef(null);
   const lookupSeqRef = useRef(0);
@@ -72,6 +73,7 @@ export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, on
     keyRef.current = null;
     setDraft(null);
     setReserved(null);
+    setKeyMissing(false);
     setConfirmError('');
     setLookupError('');
     setForm({ label: '', fiscalYear: '', meetingDate: '', typed: '' });
@@ -106,6 +108,7 @@ export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, on
   const label = form.label.trim();
   const confirmReason = (() => {
     if (writeBlock) return writeBlock;
+    if (keyMissing) return KEY_UNAVAILABLE;
     if (confirming) return 'Reserving the run…';
     if (!label) return 'Enter a test label.';
     if (label.length > LIMITS.labelMax) return `Keep the test label to ${LIMITS.labelMax} characters or fewer.`;
@@ -134,7 +137,11 @@ export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, on
         fallbackMessage: 'The run could not be reserved.',
       });
       if (!mountedRef.current) return;
-      setReserved(reply.run);
+      const sent = { label, fiscalYear: form.fiscalYear.trim(), meetingDate: form.meetingDate.trim() };
+      const day = (value) => String(value ?? '').slice(0, 10);
+      const differs = reply.created === false
+        && (reply.run.testLabel !== sent.label || reply.run.fiscalYear !== sent.fiscalYear || day(reply.run.meetingDate) !== day(sent.meetingDate));
+      setReserved({ run: reply.run, differs });
       onReserved?.(reply.run);
     } catch (error) {
       if (mountedRef.current && error?.name !== 'AbortError') setConfirmError(messageFor(error));
@@ -146,8 +153,9 @@ export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, on
 
   function createAnother() {
     keyRef.current = mintKey();
+    setKeyMissing(!keyRef.current);
     setReserved(null);
-    setConfirmError('');
+    setConfirmError(keyRef.current ? '' : KEY_UNAVAILABLE);
     setForm((current) => ({ ...current, label: '', typed: '' }));
   }
 
@@ -178,7 +186,7 @@ export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, on
             {looking ? 'Looking up…' : 'Look up source'}
           </button>
         </div>
-        {lookupReason && trimmedNumber ? <div className="mt-2"><Reason id="factory-lookup-reason">{lookupReason}</Reason></div> : <span id="factory-lookup-reason" />}
+        {writeBlock || (lookupReason && trimmedNumber) ? <div className="mt-2"><Reason id="factory-lookup-reason">{lookupReason}</Reason></div> : <span id="factory-lookup-reason" />}
       </form>
 
       {looking ? (
@@ -221,7 +229,11 @@ export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, on
 
           {reserved ? (
             <div role="status" className="rounded-xl border border-green-200 bg-green-50 px-4 py-4 text-sm leading-6 text-green-900">
-              <p className="font-semibold">The run is reserved: {reserved.testLabel}.</p>
+              <p className="font-semibold">The run is reserved: {reserved.run.testLabel}.</p>
+              <p className="mt-1">Fiscal year {reserved.run.fiscalYear || 'not set'}. Meeting date {String(reserved.run.meetingDate ?? '').slice(0, 10) || 'not set'}.</p>
+              {reserved.differs ? (
+                <p className="mt-1 font-semibold">This run was already reserved by an earlier attempt, with the values shown here, not the ones you just entered. To use different values, choose Create another.</p>
+              ) : null}
               <p className="mt-1">Nothing has been created in Dataverse yet. Start it from the run panel below.</p>
               <button type="button" className={`${OUTLINE_BUTTON} mt-3`} onClick={createAnother}>Create another</button>
             </div>
