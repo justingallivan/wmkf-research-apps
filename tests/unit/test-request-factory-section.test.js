@@ -44,15 +44,29 @@ function makeServer() {
     bodies(method, path) { return calls.filter((c) => c.method === method && c.path === path).map((c) => c.body); },
     count(method, path) { return calls.filter((c) => c.method === method && c.path === path).length; },
   };
-  global.fetch.mockImplementation(async (url, init = {}) => {
+  // Honours init.signal the way real fetch does: an abort rejects a pending request with an AbortError.
+  // A reply may carry `bodyGate`, a promise the body read waits on (headers received, body still streaming).
+  const abortable = (signal, promise) => new Promise((resolve, reject) => {
+    const fail = () => reject(new DOMException('Aborted', 'AbortError'));
+    if (signal?.aborted) { fail(); return; }
+    signal?.addEventListener('abort', fail, { once: true });
+    promise.then(resolve, reject);
+  });
+  global.fetch.mockImplementation((url, init = {}) => {
     const method = init.method || 'GET';
     const path = String(url);
     calls.push({ method, path, body: init.body ? JSON.parse(init.body) : undefined });
     const replies = routes.get(`${method} ${path}`);
-    if (!replies) throw new Error(`unrouted ${method} ${path}`);
+    if (!replies) return Promise.reject(new Error(`unrouted ${method} ${path}`));
     const next = replies.length > 1 ? replies.shift() : replies[0];
-    const value = typeof next === 'function' ? await next() : next;
-    return jsonResponse(value.status, value.body);
+    return abortable(init.signal, (async () => {
+      const value = typeof next === 'function' ? await next() : next;
+      return {
+        ok: value.status >= 200 && value.status < 300,
+        status: value.status,
+        json: async () => { if (value.bodyGate) await value.bodyGate; return value.body; },
+      };
+    })());
   });
   return server;
 }
@@ -397,34 +411,44 @@ describe('advance loop', () => {
     expect(server.count('POST', advancePath())).toBe(1);
   });
 
-  test('stale guard: selecting run B while A advances means A\'s late answer updates nothing and starts nothing', async () => {
-    const runA = makeRun();
-    const runB = makeRun({ runId: RUN_B, testLabel: 'Run B', status: 'creating', currentStep: 'provision_location', stepIndex: 3 });
-    const server = makeServer();
-    server.on('GET', `${BASE}/${RUN_A}`, runBody(runA));
-    server.on('GET', `${BASE}/${RUN_B}`, runBody(runB));
-    await renderSection(server, [runA, runB]);
-    await selectRun('Run A');
-    const gate = deferred();
-    let consumed = false;
-    server.on('POST', advancePath(RUN_A), async () => {
-      await gate.promise;
-      consumed = true;
-      return reply('advanced', { stepIndex: 5, currentStep: 'observe', status: 'creating' });
-    }, reply('ready', { status: 'ready' })); // only reachable if the loop wrongly continues
-    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
-    await waitFor(() => expect(server.count('POST', advancePath(RUN_A))).toBe(1));
-    await selectRun('Run B');
-    expect(steps().getAllByText('Done')).toHaveLength(3);
-    await act(async () => { gate.resolve(); });
-    await waitFor(() => expect(consumed).toBe(true));
-    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    // B's panel is unchanged, and no further advance was sent for A (or anything for B).
-    expect(screen.getByRole('heading', { name: 'Run B' })).toBeTruthy();
-    expect(steps().getAllByText('Done')).toHaveLength(3);
-    expect(screen.getByRole('button', { name: 'Resume' }).disabled).toBe(false);
-    expect(server.count('POST', advancePath(RUN_A))).toBe(1);
-    expect(server.count('POST', advancePath(RUN_B))).toBe(0);
+  describe.each([
+    ['the request is aborted while pending (catch path)', false],
+    ['the answer was already received and its body resolves after the abort (success path)', true],
+  ])('stale guard: selecting run B while A advances, where %s', (_name, bodyAfterAbort) => {
+    test('A\'s late answer updates nothing, shows no alert on B, and starts nothing', async () => {
+      const runA = makeRun();
+      const runB = makeRun({ runId: RUN_B, testLabel: 'Run B', status: 'creating', currentStep: 'provision_location', stepIndex: 3 });
+      const server = makeServer();
+      server.on('GET', `${BASE}/${RUN_A}`, runBody(runA));
+      server.on('GET', `${BASE}/${RUN_B}`, runBody(runB));
+      server.on('POST', `${BASE}/${RUN_B}/recheck`, { status: 200, body: { runId: RUN_B, status: 'creating', ok: true, outcome: 'unchanged', failures: [] } });
+      await renderSection(server, [runA, runB]);
+      await selectRun('Run A');
+      const gate = deferred();
+      let consumed = false;
+      const late = reply('advanced', { stepIndex: 5, currentStep: 'observe', status: 'creating' });
+      server.on('POST', advancePath(RUN_A), async () => {
+        if (bodyAfterAbort) return { ...late, bodyGate: gate.promise };
+        await gate.promise;
+        consumed = true;
+        return late;
+      }, reply('ready', { status: 'ready' })); // only reachable if the loop wrongly continues
+      fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+      await waitFor(() => expect(server.count('POST', advancePath(RUN_A))).toBe(1));
+      await selectRun('Run B');
+      expect(steps().getAllByText('Done')).toHaveLength(3);
+      await act(async () => { gate.resolve(); });
+      if (!bodyAfterAbort) await waitFor(() => expect(consumed).toBe(true));
+      // Positive sentinel: a request made for B after A's answer is released completes and shows.
+      fireEvent.click(screen.getByRole('button', { name: 'Recheck Foundation' }));
+      await screen.findByText('The Foundation records are as expected.');
+      expect(screen.getByRole('heading', { name: 'Run B' })).toBeTruthy();
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(steps().getAllByText('Done')).toHaveLength(3);
+      expect(screen.getByRole('button', { name: 'Resume' }).disabled).toBe(false);
+      expect(server.count('POST', advancePath(RUN_A))).toBe(1);
+      expect(server.count('POST', advancePath(RUN_B))).toBe(0);
+    });
   });
 
   test('starting a new lookup aborts the run in flight: its late answer changes nothing and the panel is at rest', async () => {
@@ -437,7 +461,10 @@ describe('advance loop', () => {
     await screen.findByLabelText('Test label');
     expect(screen.queryByRole('button', { name: 'Stop after this step' })).toBeNull();
     await act(async () => { gate.resolve(); });
-    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    // Positive sentinel: the new draft's form is still there and usable after A's answer is released.
+    fireEvent.change(screen.getByLabelText('Test label'), { target: { value: 'After' } });
+    expect(screen.getByLabelText('Test label').value).toBe('After');
+    expect(screen.queryByRole('alert')).toBeNull();
     expect(server.count('POST', advancePath())).toBe(1);
     expect(steps().getAllByText('Up next')).toHaveLength(1);
   });

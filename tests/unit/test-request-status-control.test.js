@@ -39,15 +39,24 @@ function makeServer() {
     bodies(method, path) { return calls.filter((c) => c.method === method && c.path === path).map((c) => c.body); },
     count(method, path) { return calls.filter((c) => c.method === method && c.path === path).length; },
   };
-  global.fetch.mockImplementation(async (url, init = {}) => {
+  // Honours init.signal the way real fetch does: an abort rejects a pending request with an AbortError.
+  const abortable = (signal, promise) => new Promise((resolve, reject) => {
+    const fail = () => reject(new DOMException('Aborted', 'AbortError'));
+    if (signal?.aborted) { fail(); return; }
+    signal?.addEventListener('abort', fail, { once: true });
+    promise.then(resolve, reject);
+  });
+  global.fetch.mockImplementation((url, init = {}) => {
     const method = init.method || 'GET';
     const path = String(url);
     calls.push({ method, path, body: init.body ? JSON.parse(init.body) : undefined });
     const replies = routes.get(`${method} ${path}`);
-    if (!replies) throw new Error(`unrouted ${method} ${path}`);
+    if (!replies) return Promise.reject(new Error(`unrouted ${method} ${path}`));
     const next = replies.length > 1 ? replies.shift() : replies[0];
-    const value = typeof next === 'function' ? await next() : next;
-    return jsonResponse(value.status, value.body);
+    return abortable(init.signal, (async () => {
+      const value = typeof next === 'function' ? await next() : next;
+      return jsonResponse(value.status, value.body);
+    })());
   });
   return server;
 }
