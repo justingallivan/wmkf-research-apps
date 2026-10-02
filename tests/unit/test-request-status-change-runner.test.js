@@ -319,24 +319,38 @@ describe('exactly one PATCH per change', () => {
     expect(ledger.rows[0].status).toBe('dispatched');
   });
 
-  test('a write the target interlock would deny is refused before the compare-and-set: the change stays planned and resumes later', async () => {
-    const saved = { mode: process.env.DATAVERSE_TARGET_INTERLOCK, ack: process.env.DATAVERSE_PROD_WRITE_ACK };
-    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
-    delete process.env.DATAVERSE_PROD_WRITE_ACK;
-    const client = fakeClient();
-    const ledger = memoryLedger(READY_RUN);
-    try {
+  describe('a write the target interlock would deny', () => {
+    const saved = {};
+    beforeEach(() => {
+      Object.assign(saved, { mode: process.env.DATAVERSE_TARGET_INTERLOCK, ack: process.env.DATAVERSE_PROD_WRITE_ACK });
+      process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+      delete process.env.DATAVERSE_PROD_WRITE_ACK;
+    });
+    const restore = () => {
+      if (saved.mode === undefined) delete process.env.DATAVERSE_TARGET_INTERLOCK; else process.env.DATAVERSE_TARGET_INTERLOCK = saved.mode;
+      if (saved.ack !== undefined) process.env.DATAVERSE_PROD_WRITE_ACK = saved.ack;
+    };
+    afterEach(restore);
+
+    test('a new change is refused before it is journaled: nothing is left open', async () => {
+      const client = fakeClient();
+      const ledger = memoryLedger(READY_RUN);
+      await expect(change(client, ledger)).rejects.toMatchObject({ code: 'status_change_refused', message: expect.stringContaining('nothing was sent') });
+      expect(client.patches).toHaveLength(0);
+      expect(ledger.rows).toHaveLength(0);
+    });
+
+    test('a planned change is refused before the compare-and-set, stays planned, and is sent once when the write is permitted', async () => {
+      const client = fakeClient();
+      const ledger = memoryLedger(READY_RUN, [journaled('planned')]);
       await expect(change(client, ledger)).rejects.toMatchObject({ code: 'status_change_refused', message: expect.stringContaining('still planned') });
       expect(client.patches).toHaveLength(0);
       expect(ledger.rows[0].status).toBe('planned');
-    } finally {
-      if (saved.mode === undefined) delete process.env.DATAVERSE_TARGET_INTERLOCK; else process.env.DATAVERSE_TARGET_INTERLOCK = saved.mode;
-      if (saved.ack !== undefined) process.env.DATAVERSE_PROD_WRITE_ACK = saved.ack;
-    }
-    // With the write permitted again, the same command sends the planned change once.
-    await expect(change(client, ledger)).resolves.toMatchObject({ sequence: 1 });
-    expect(client.patches).toHaveLength(1);
-    expect(ledger.rows[0].status).toBe('complete');
+      restore();
+      await expect(change(client, ledger)).resolves.toMatchObject({ sequence: 1 });
+      expect(client.patches).toHaveLength(1);
+      expect(ledger.rows[0].status).toBe('complete');
+    });
   });
 
   test('an applied tracking-producing change still resumes after the other phase field moves (no edge refusal on resume)', async () => {
