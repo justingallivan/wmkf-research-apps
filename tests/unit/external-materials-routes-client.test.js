@@ -298,6 +298,26 @@ test('a failed replacement Blob transfer keeps the earlier staging id and hides 
   expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
 });
 
+test('an unrecognized Blob transfer exception uses safe transfer copy instead of exposing its message', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, context);
+    if (url.endsWith('/upload-token')) return response(200, { ok: true, stagingId: STAGING_ID, pathname: 'private/path', clientToken: 'client', contentType: 'application/pdf' });
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  put.mockRejectedValueOnce(new TypeError('Load failed: internal fetch stack'));
+
+  render(<MaterialsContributorPage />);
+  fireEvent.change(await screen.findByLabelText('Presentation file'), {
+    target: { files: [new File(['%PDF'], 'deck.pdf', { type: 'application/pdf' })] },
+  });
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent('The file transfer did not finish. Please choose the file again to start a new upload.');
+  expect(alert).not.toHaveTextContent('internal fetch stack');
+  expect(alert).not.toHaveTextContent('no file was sent');
+  expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+  expect(global.fetch.mock.calls.some(([url]) => url.endsWith('/finalize'))).toBe(false);
+});
+
 test('a successful replacement transfer replaces the earlier staging id for Retry', async () => {
   const replacementId = '33333333-3333-4333-8333-333333333333';
   window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ stagingId: STAGING_ID, slot: 'presentation_pdf' }));
@@ -365,16 +385,38 @@ test('(b) context: a 2xx body with ok:false shows the mapped reason message (bod
   await screen.findByText(/This collection has closed/);
 });
 
-test('(c) upload-token: a network rejection surfaces the generic save-failure copy', async () => {
+test('(c) upload-token: a Safari-style transport failure explains that no file was sent', async () => {
   global.fetch = jest.fn(async (url) => {
     if (url.endsWith('/context')) return response(200, context);
-    if (url.endsWith('/upload-token')) throw new Error('network down');
+    if (url.endsWith('/upload-token')) throw new TypeError('Load failed');
     throw new Error(`unexpected fetch ${url}`);
   });
   render(<MaterialsContributorPage />);
   const input = await screen.findByLabelText('Presentation file');
   fireEvent.change(input, { target: { files: [new File(['%PDF'], 'deck.pdf', { type: 'application/pdf' })] } });
-  await screen.findByText('network down');
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent('We couldn’t connect to start the upload, so no file was sent');
+  expect(alert).toHaveTextContent('Check your connection and refresh the page to try again');
+  expect(alert).not.toHaveTextContent('Load failed');
+  expect(put).not.toHaveBeenCalled();
+  expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+  expect(global.fetch.mock.calls.some(([url]) => url.endsWith('/finalize'))).toBe(false);
+});
+
+test('(c) upload-token: known HTTP validation errors keep their specific mapped copy', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, context);
+    if (url.endsWith('/upload-token')) return response(422, { ok: false, reason: 'extension_not_allowed' });
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  render(<MaterialsContributorPage />);
+  fireEvent.change(await screen.findByLabelText('Presentation file'), {
+    target: { files: [new File(['%PDF'], 'deck.pdf', { type: 'application/pdf' })] },
+  });
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent('That file type is not accepted for this item.');
+  expect(alert).not.toHaveTextContent('no file was sent');
+  expect(put).not.toHaveBeenCalled();
 });
 
 test('(d)/(e) upload-token: a malformed non-2xx body is tolerated to {} and falls back to "could not start"', async () => {

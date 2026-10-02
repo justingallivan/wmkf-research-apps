@@ -291,6 +291,7 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
 
   const upload = async (file) => {
     if (!file) return;
+    let phase = 'upload_token';
     const currentLimit = validLimitMb(maxMb) ? maxMb : null;
     if (currentLimit !== null && file.size > currentLimit * MEBIBYTE) {
       setError({
@@ -315,6 +316,7 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
         },
       );
       if (!mountedRef.current) return;
+      phase = 'prepare_transfer';
       if (!tokenOk) {
         if (tokenData.reason === 'file_too_large') {
           const serverLimit = validLimitMb(tokenData.maxMb) ? tokenData.maxMb : null;
@@ -327,11 +329,16 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
           });
           return;
         }
-        throw new Error(UPLOAD_MESSAGE[tokenData.reason] || REASON_MESSAGE[tokenData.reason] || 'The upload could not start.');
+        const message = UPLOAD_MESSAGE[tokenData.reason] || REASON_MESSAGE[tokenData.reason] || 'The upload could not start.';
+        setError(pending
+          ? `${message} Your earlier upload remains available with Retry, or choose a different file.`
+          : message);
+        return;
       }
       setProgress('Uploading…');
       const { put } = await import('@vercel/blob/client');
       if (!mountedRef.current) return;
+      phase = 'blob_transfer';
       try {
         await put(tokenData.pathname, file, {
           access: 'private',
@@ -343,15 +350,29 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
         // The SDK error inherits Error without setting its name, so use its
         // stable SDK-owned message as a discriminator and never show it to users.
         const expired = blobError?.message === 'Vercel Blob: Client token has expired.';
-        throw new Error(UPLOAD_MESSAGE[expired ? 'blob_token_expired' : 'blob_upload_failed']);
+        const message = UPLOAD_MESSAGE[expired ? 'blob_token_expired' : 'blob_upload_failed'];
+        setError(pending
+          ? `${message} Your earlier upload remains available with Retry, or choose a different file.`
+          : message);
+        return;
       }
+      phase = 'after_blob_transfer';
       const nextPending = { stagingId: tokenData.stagingId, slot };
       writePendingUpload(token, slot, nextPending);
       if (!mountedRef.current) return;
       setPending(nextPending);
       await finalize(nextPending);
     } catch (uploadError) {
-      const message = uploadError instanceof Error ? uploadError.message : 'The upload could not start. Please try again.';
+      // Transport errors and module-loading exceptions can contain browser or
+      // bundler details (for example Safari's "Load failed"). Keep user copy
+      // tied to the upload phase and never render arbitrary exception text.
+      const message = phase === 'upload_token'
+        ? 'We couldn’t connect to start the upload, so no file was sent. Check your connection and refresh the page to try again.'
+        : phase === 'prepare_transfer'
+          ? 'We couldn’t prepare the secure upload. No file was sent. Please refresh the page and try again.'
+          : phase === 'blob_transfer'
+            ? UPLOAD_MESSAGE.blob_upload_failed
+            : 'Processing stopped before we could confirm this upload was saved. Wait a few minutes and press Retry.';
       if (mountedRef.current) {
         setError(pending
           ? `${message} Your earlier upload remains available with Retry, or choose a different file.`
