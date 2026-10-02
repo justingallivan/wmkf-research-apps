@@ -332,6 +332,49 @@ test('read joins the registry: state moves missing → received → ready; waive
   await expect(waiveMaterialsItem({ requestId: REQUEST_ID, key: 'nope', waived: true }, d)).rejects.toMatchObject({ code: 'site_visit_materials_item_unknown' });
 });
 
+test('reminder preview excludes a job-held required slot and its proof sends when another slot is missing', async () => {
+  const originalSecret = process.env.EXTERNAL_LINK_SECRET;
+  process.env.EXTERNAL_LINK_SECRET = 'materials-preview-test-secret-at-least-32-chars';
+  const emailTemplate = { subject: SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT, body: SITE_VISIT_MATERIALS_REMINDER_SEED_BODY };
+  const d = deps({
+    backgroundJobsSchemaReady: () => true,
+    listUploadJobsForRequest: jest.fn(async () => [
+      { job_id: 'job-held', slot: 'presentation_pdf', status: 'processing', filename: 'new.pdf', attempt_count: 1 },
+    ]),
+  });
+  const row = openMaterialsRow();
+  row.checklist[2].waived = true;
+  d.__setStored(row);
+
+  try {
+    const preview = await previewMaterialsEmail({ requestId: REQUEST_ID, action: 'remind', actorId: ACTOR, fromEmail: 'pc@wmkeck.org', emailTemplate }, d);
+    expect(preview.missingKeys).toEqual(['presentation_source']);
+    expect(preview.bodyText).toContain('Presentation source');
+    expect(preview.bodyText).not.toContain('Presentation (PDF)');
+
+    const preparedEmail = {
+      subject: preview.subject,
+      bodyText: preview.bodyText,
+      names: preview.names,
+      recipients: preview.allRecipients,
+      toRecipients: preview.recipients.map((person) => person.email),
+      ccRecipients: preview.ccRecipients.map((person) => person.email),
+      missingKeys: preview.missingKeys,
+      collectionId: preview.collectionId,
+      dueAt: preview.dueAt,
+      visitSnapshot: preview.visitSnapshot,
+      template: emailTemplate,
+    };
+    await remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org', emailTemplate, preparedEmail }, d);
+    expect(d.sendEmail).toHaveBeenCalledTimes(1);
+    expect(d.sendEmail.mock.calls[0][0].bodyText).toContain('Presentation source');
+    expect(d.sendEmail.mock.calls[0][0].bodyText).not.toContain('Presentation (PDF)');
+  } finally {
+    if (originalSecret === undefined) delete process.env.EXTERNAL_LINK_SECRET;
+    else process.env.EXTERNAL_LINK_SECRET = originalSecret;
+  }
+});
+
 test('manual reminder claims before sending (S507): claim order, 409 on a lost claim, and an email id attached only after a successful send', async () => {
   const d = deps();
   await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);

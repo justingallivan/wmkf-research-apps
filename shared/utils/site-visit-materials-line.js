@@ -15,6 +15,7 @@ function shortDate(iso) {
  */
 export function siteVisitMaterialsLine(summary) {
   if (!summary) return null;
+  if (summary.unavailable === true || summary.availability === 'unavailable') return null;
   const counts = `${summary.receivedCount} of ${summary.requiredCount} received`;
   const attentionCount = Number.isSafeInteger(summary.attentionCount) ? summary.attentionCount : 0;
   const processingCount = Number.isSafeInteger(summary.processingCount) ? summary.processingCount : 0;

@@ -9,6 +9,11 @@ test('no collection renders no line', () => {
   expect(siteVisitMaterialsLine(undefined)).toBeNull();
 });
 
+test('unavailable summary sentinels do not claim an invitation was not sent', () => {
+  expect(siteVisitMaterialsLine({ unavailable: true })).toBeNull();
+  expect(siteVisitMaterialsLine({ availability: 'unavailable' })).toBeNull();
+});
+
 test('counts plus due date while items are missing; overdue is called out', () => {
   expect(siteVisitMaterialsLine(base)).toBe(`Materials: 2 of 3 received · due ${due}.`);
   expect(siteVisitMaterialsLine({ ...base, overdue: true })).toBe(`Materials: 2 of 3 received · overdue (due ${due}).`);
