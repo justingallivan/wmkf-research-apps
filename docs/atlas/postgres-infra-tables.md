@@ -925,9 +925,9 @@ SharePoint remains the byte store and `wmkf_requestdocument` the published
 receipt; this table owns neither.
 
 The worker at `/api/cron/drain-materials-uploads` claims at most one job per
-invocation, checks the existing virus scanner, renews/fences the job lease,
-resumes from a hash-bound scan checkpoint, and calls the existing applicant
-materials finalizer. Transient failures use bounded exponential retry; terminal
+invocation, checks the existing virus scanner, fences writes with a fixed
+360-second lease (the worker does not renew it), resumes from a hash-bound scan
+checkpoint, and calls the existing applicant materials finalizer. Transient failures use bounded exponential retry; terminal
 failures that have a clean scan or SharePoint candidate become
 `needs_attention` for coordinator review. The cron is source-configured every
 minute with a five-minute function maximum. Public contributor context exposes
@@ -935,7 +935,10 @@ sanitized `jobs`; staff projections expose sanitized `uploadJobs` and counts.
 Request-wide active jobs remain visible when a newer collection exists, so
 Ready and manual/automatic reminders account for work admitted by an older
 collection. Runtime read failures are rendered unavailable, never as confirmed
-zero jobs.
+zero jobs. Four generic internal recursive document readers also opt into
+pruning `portal-<UUID>` children beneath canonical Site Visit materials folders;
+the focused five-suite source/callsite regression run passed (79 tests, one
+snapshot).
 
 Admission is gated by `SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY=on`,
 `SITE_VISIT_MATERIALS_BACKGROUND_ADMISSION_ENABLED=on`, and
@@ -948,7 +951,11 @@ deployment, and live operation have not been verified.
 
 Terminal jobs expire after 30 days; rejected staging/blob cleanup uses the
 existing exact-path cleanup with a seven-day retention. `scripts/materials-upload-job.js`
-is a loopback-database-only local inspection/cancel/retry tool. Retry requires
-unleased `needs_attention` state, unconsumed staging, and remaining automatic
-attempt allowance. This work authorizes no remote Production recovery path;
+is a loopback-database-only local inspection/cancel/retry tool. It delegates
+retry/cancel to the same guarded store transition exercised by PostgreSQL
+tests. Retry can reset an exhausted attempt count and start a fresh two-hour
+budget only for an unleased `needs_attention` job with a matching unleased,
+unconsumed staging owner and a non-infected failure. **[VERIFIED via
+`2c7d1f1c9`: actual loopback CLI and real PostgreSQL, 95 focused unit tests
+and 16 PG tests.]** This work authorizes no remote Production recovery path;
 separate authorization is required before one is introduced.

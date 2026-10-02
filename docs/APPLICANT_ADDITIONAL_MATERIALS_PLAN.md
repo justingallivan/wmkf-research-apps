@@ -827,9 +827,12 @@ them in the Workbench without opening AkoyaGo.
   Synchronous portal uploads land in the same folders and appear too. [BUILT on the background
   processing branch; not enabled in Production] With the background schema flag on, the reader
   also merges current Ready registry links from staging-specific subfolders, suppresses known
-  superseded portal root items by exact drive/item identity, and never recursively exposes
-  uncommitted candidates. There are no counters or registry writes: a hand-placed file still
-  does not count toward the collection summary or appear on the briefing page.
+  superseded portal root items by exact drive/item identity. Separately, all four generic
+  internal recursive document readers now opt into pruning `portal-<UUID>` children beneath
+  canonical Site Visit materials folders, excluding uncommitted candidates and prior background
+  copies. **[VERIFIED via source, four call sites, and focused regressions: five suites, 79 tests,
+  one snapshot passed.]** There are no counters or registry writes: a hand-placed file still does
+  not count toward the collection summary or appear on the briefing page.
 - **Summary availability:** the PR #338 production baseline returned fail-open `null` on a
   Workbench summary failure, which could show "materials not requested". [BUILT on the background
   processing branch; not enabled in Production] The reader now carries an explicit unavailable
@@ -896,7 +899,7 @@ approximately 76 seconds based on token/finalize request times, not a measured c
 These observations do not establish near-limit 500 MB provider support. That rehearsal
 remains pending. Production retains the 2048 MB memory tier.
 
-### 16.15 Background processing [SOURCE-BUILT; reviews approved; final-head CI required; not deployed]
+### 16.15 Background processing [SOURCE-BUILT; bounded follow-up fixes in progress; not deployed]
 
 The owner authorized reusing the durable reviewer-acceptance queue pattern to let applicants
 leave after private Blob transfer and committed Postgres admission. The bytes remain in
@@ -910,4 +913,10 @@ only after clean scanning and registry persistence. Existing synchronous scannin
 is unchanged; background admission requires enabled scanning.
 
 No migration, flag change, merge, deployment or provider test is performed by this build.
-Implementation, Sol review, parent review, Fable OAuth adversarial review and local validation are complete in PR #402. Initial CI passed; final-head CI is required after the bounded review fixes. The linked plan records validation and the separate production-recovery prerequisite; this is not a production-enabled capability.
+CI passed on prior head `837729b4e280317a3e20f93a377bf2947bd358a9` (1,199 suites,
+19,110 tests, five snapshots; seven PostgreSQL suites, 114 tests). The L1 reader fix
+passed five focused suites (79 tests, one snapshot). L2/L3 shared recovery passed 95
+focused unit tests and 16 real-PostgreSQL tests through the actual loopback CLI.
+Fable's bounded review and full CI for the updated head remain pending, as recorded in
+the linked plan. The production-recovery prerequisite remains separate; this is not a
+production-enabled capability.
