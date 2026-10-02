@@ -648,8 +648,12 @@ test('an aborted visibility poll cannot schedule a duplicate poll after the page
     act(() => document.dispatchEvent(new Event('visibilitychange')));
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
     await act(async () => { document.dispatchEvent(new Event('visibilitychange')); await Promise.resolve(); await Promise.resolve(); });
-    expect(contextCalls).toBe(3);
+    expect(contextCalls).toBe(2);
     await act(async () => { resolveAbortedPoll(); await Promise.resolve(); });
+    await act(async () => { await jest.advanceTimersByTimeAsync(14_999); });
+    expect(contextCalls).toBe(2);
+    await act(async () => { await jest.advanceTimersByTimeAsync(1); });
+    expect(contextCalls).toBe(3);
     await act(async () => { await jest.advanceTimersByTimeAsync(15_000); });
     expect(contextCalls).toBe(4);
   } finally {
@@ -657,6 +661,54 @@ test('an aborted visibility poll cannot schedule a duplicate poll after the page
     jest.useRealTimers();
     if (priorDescriptor) Object.defineProperty(document, 'visibilityState', priorDescriptor);
     else delete document.visibilityState;
+  }
+});
+
+test('an older same-token poll cannot overwrite a newer enqueue context', async () => {
+  const priorContext = {
+    ...context,
+    checklist: [
+      ...context.checklist,
+      { key: 'participant_bios', label: 'Participant bios', required: true, received: null },
+    ],
+    jobs: [{ jobId: 'job-old', stagingId: 'old-stage', slot: 'participant_bios', status: 'processing' }],
+  };
+  const refreshedContext = {
+    ...priorContext,
+    jobs: [
+      ...priorContext.jobs,
+      { jobId: 'job-new', stagingId: STAGING_ID, slot: 'presentation_pdf', status: 'queued', filename: 'new.pdf' },
+    ],
+  };
+  let contextCalls = 0;
+  let resolveOldPoll;
+  global.fetch = jest.fn((url) => {
+    if (url.endsWith('/context')) {
+      contextCalls += 1;
+      if (contextCalls === 1) return Promise.resolve(response(200, priorContext));
+      if (contextCalls === 2) return new Promise((resolve) => { resolveOldPoll = () => resolve(response(200, priorContext)); });
+      return Promise.resolve(response(200, refreshedContext));
+    }
+    if (url.endsWith('/upload-token')) return Promise.resolve(response(200, { ok: true, stagingId: STAGING_ID, pathname: 'private/path', clientToken: 'client', contentType: 'application/pdf' }));
+    if (url.endsWith('/finalize')) return Promise.resolve(response(202, { ok: true, jobId: 'job-new', stagingId: STAGING_ID, status: 'queued' }));
+    throw new Error(`unexpected fetch ${url}`);
+  });
+
+  jest.useFakeTimers();
+  const view = render(<MaterialsContributorPage />);
+  try {
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+    await act(async () => { await jest.advanceTimersByTimeAsync(15_000); });
+    expect(contextCalls).toBe(2);
+    fireEvent.change(screen.getByLabelText('Presentation file'), { target: { files: [new File(['%PDF'], 'new.pdf', { type: 'application/pdf' })] } });
+    await waitFor(() => expect(screen.queryByLabelText('Presentation file')).not.toBeInTheDocument());
+    expect(contextCalls).toBe(3);
+    await act(async () => { resolveOldPoll(); await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.getAllByText('Upload received. We’re checking and saving your file. You can close this page.')).toHaveLength(2);
+    expect(screen.queryByLabelText('Presentation file')).not.toBeInTheDocument();
+  } finally {
+    view.unmount();
+    jest.useRealTimers();
   }
 });
 

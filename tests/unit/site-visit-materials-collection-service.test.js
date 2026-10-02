@@ -513,6 +513,18 @@ test('staff projection exposes sanitized cross-collection jobs and blocks Ready 
   expect(d.markReady).not.toHaveBeenCalled();
 });
 
+test('new collection creation immediately exposes an active job held by its previous collection', async () => {
+  const d = deps({
+    backgroundJobsSchemaReady: () => true,
+    listUploadJobsForRequest: jest.fn(async () => [
+      { job_id: 'job-old', collection_id: 'old-collection', slot: 'presentation_pdf', status: 'processing', filename: 'replacement.pdf', attempt_count: 1 },
+    ]),
+  });
+  const result = await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  expect(result.collection).toMatchObject({ state: 'processing', processingCount: 1 });
+  expect(result.collection.uploadJobs).toEqual([expect.objectContaining({ jobId: 'job-old', status: 'processing' })]);
+});
+
 test('projectCollection reports a past closes_at as closed even while the row still says open (the sweep only makes that durable)', () => {
   const row = { id: 'c', request_id: REQUEST_ID, site_visit_activity_id: VISIT_ID, status: 'open', due_at: '2026-10-05T19:00:00Z', closes_at: '2026-10-14T19:00:00Z', checklist: [], contacts: {}, created_at: NOW };
   expect(projectCollection(row, { now: new Date('2026-10-15T00:00:00Z') }).state).toBe('closed');

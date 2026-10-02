@@ -430,10 +430,13 @@ export default function MaterialsContributorPage() {
     pageGenerationRef.current += 1;
   }
   const pageGeneration = pageGenerationRef.current;
+  const contextRequestSequenceRef = useRef(0);
+  const lastUploadStatusPollAtRef = useRef(null);
   const refreshControllerRef = useRef(null);
 
   const load = useCallback(async ({ signal, expectedToken = token, expectedGeneration = pageGeneration, background = false } = {}) => {
-    if (typeof expectedToken !== 'string' || !expectedToken) return null;
+    if (typeof expectedToken !== 'string' || !expectedToken || tokenRef.current !== expectedToken || pageGenerationRef.current !== expectedGeneration) return null;
+    const requestSequence = ++contextRequestSequenceRef.current;
     try {
       const envelope = await requestEnvelope(`/api/external/materials/${encodeURIComponent(expectedToken)}/context`, {
         signal,
@@ -445,7 +448,7 @@ export default function MaterialsContributorPage() {
       // tolerantly to `{}`), so a non-2xx unparseable body is mapped back to
       // the same fallback here via the recorded parseError.
       const data = envelope.error?.parseError ? { ok: false, reason: 'server_error' } : envelope.data;
-      if (signal?.aborted || tokenRef.current !== expectedToken || pageGenerationRef.current !== expectedGeneration) return null;
+      if (signal?.aborted || tokenRef.current !== expectedToken || pageGenerationRef.current !== expectedGeneration || contextRequestSequenceRef.current !== requestSequence) return null;
       if (data.ok) {
         setState({ status: 'ok', data, token: expectedToken, statusUnavailable: false });
         return data;
@@ -457,7 +460,7 @@ export default function MaterialsContributorPage() {
       setState({ status: 'error', reason: data.reason });
       return null;
     } catch {
-      if (signal?.aborted || tokenRef.current !== expectedToken || pageGenerationRef.current !== expectedGeneration) return null;
+      if (signal?.aborted || tokenRef.current !== expectedToken || pageGenerationRef.current !== expectedGeneration || contextRequestSequenceRef.current !== requestSequence) return null;
       if (background && stateRef.current.status === 'ok') {
         setState((current) => current.status === 'ok' ? { ...current, statusUnavailable: true } : current);
       } else {
@@ -497,6 +500,12 @@ export default function MaterialsContributorPage() {
     };
     const poll = async () => {
       if (cancelled || document.visibilityState === 'hidden') return;
+      const elapsed = lastUploadStatusPollAtRef.current === null ? UPLOAD_POLL_INTERVAL_MS : Date.now() - lastUploadStatusPollAtRef.current;
+      if (elapsed < UPLOAD_POLL_INTERVAL_MS) {
+        timer = window.setTimeout(() => { timer = null; void poll(); }, UPLOAD_POLL_INTERVAL_MS - elapsed);
+        return;
+      }
+      lastUploadStatusPollAtRef.current = Date.now();
       controller?.abort();
       const pollController = new AbortController();
       controller = pollController;
