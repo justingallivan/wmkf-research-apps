@@ -896,7 +896,7 @@ approximately 76 seconds based on token/finalize request times, not a measured c
 These observations do not establish near-limit 500 MB provider support. That rehearsal
 remains pending. Production retains the 2048 MB memory tier.
 
-### 16.15 Background processing [PLANNED; implementation in progress]
+### 16.15 Background processing [SOURCE-BUILT; reviews approved; final-head CI required; not deployed]
 
 The owner authorized reusing the durable reviewer-acceptance queue pattern to let applicants
 leave after private Blob transfer and committed Postgres admission. The bytes remain in
@@ -910,4 +910,4 @@ only after clean scanning and registry persistence. Existing synchronous scannin
 is unchanged; background admission requires enabled scanning.
 
 No migration, flag change, merge, deployment or provider test is performed by this build.
-Implementation completion and final adversarial review are still pending.
+Implementation, Sol review, parent review, Fable OAuth adversarial review and local validation are complete in PR #402. Initial CI passed; final-head CI is required after the bounded review fixes. The linked plan records validation and the separate production-recovery prerequisite; this is not a production-enabled capability.

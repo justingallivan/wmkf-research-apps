@@ -7,7 +7,7 @@ last_verified: 2026-10-01
 
 # Applicant materials background processing
 
-[SOURCE-BUILT; final adversarial review and full validation underway] Applicant Site Visit / Research Presentation uploads will return after the private Blob transfer and a durable Postgres admission transaction. A scheduled worker will scan and save the file. This branch does not authorize production migration, flag changes, merge, deployment, or provider rehearsal. Consultant Feedback and other upload workflows retain synchronous processing and the shared configurable 500 MB cap.
+[SOURCE-BUILT; Sol, parent and Fable approved; final-head CI required; not deployed] Applicant Site Visit / Research Presentation uploads will return after the private Blob transfer and a durable Postgres admission transaction. A scheduled worker will scan and save the file. This branch does not authorize production migration, flag changes, merge, deployment, or provider rehearsal. Consultant Feedback and other upload workflows retain synchronous processing and the shared configurable 500 MB cap.
 
 ## Evidence and review decisions
 
@@ -15,7 +15,7 @@ last_verified: 2026-10-01
 
 [VERIFIED via source] Materials finalization currently waits for Blob read, validation, scanning, SharePoint and registry persistence. Staging has actor/scope/request binding, candidate receipts and consumed replay. Cleanup previously selected expired rows before remote deletion, leaving a race with finalize. Checklist SharePoint replacement used the same canonical item before the registry write, risking changes to the previously received file on partial failure.
 
-Claude Fable reviewed the plan twice through the Claude Code OAuth/subscription session. The second verdict permits building after two corrections: preserve the existing synchronous scan-disabled contract, and protect Graph items referenced by registry rows in **any** lifecycle state. Sol additionally found the replacement-overwrite risk; the parent accepted separate per-staging folders for background uploads. No third cosmetic plan loop is required. Final implementation still requires Sol, parent and Fable adversarial review.
+Claude Fable reviewed the plan twice through the Claude Code OAuth/subscription session. The second verdict permits building after two corrections: preserve the existing synchronous scan-disabled contract, and protect Graph items referenced by registry rows in **any** lifecycle state. Sol additionally found the replacement-overwrite risk; the parent accepted separate per-staging folders for background uploads. No third cosmetic plan loop is required. Sol and parent implementation reviews are complete with no remaining material code blocker. Fable adversarial review found two bounded reader/reminder defects. Luna fixed both in `e50da1c3c`; Sol, parent and Fable approved that correction. The queue/ownership/scan/recovery core had no required change.
 
 ## User-visible contract
 
@@ -32,7 +32,7 @@ One page-level poll, at least 15 seconds apart, refreshes active work; hidden-pa
 - A partial unique index holds one active job per request/checklist slot across collections, including `needs_attention`. Optional Other files are not slot-serialized.
 - `SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY=on` enables schema-dependent queries. Off means no new-table/column query. `SITE_VISIT_MATERIALS_BACKGROUND_ADMISSION_ENABLED=on` separately enables new admissions and requires schema readiness plus enabled scanning. Existing jobs continue draining/status/cleanup when admission is off.
 - Admission locks the collection and exact claimed staging row, validates ownership/window/checklist, inserts or replays the job, extends staging retention, sets its owner, and releases the request lease atomically. It resets a Ready collection to open, clearing readiness, but never reopens a closed collection. Synchronous behavior remains unchanged when admission is off, except conflicts with active queued jobs are denied.
-- Deploy schema-capable code first; apply migration through `scripts/apply-migrations.js`; enable schema and verify the worker; then enable admission. These are future release steps, not performed in this build. Disable admission and drain/resolve all jobs before any rollback to code unaware of the ownership column.
+- Deploy schema-capable code first; apply migration through `scripts/apply-migrations.js`; enable schema and verify the worker; then enable admission. These are future release steps, not performed in this build. Treat schema readiness as one-way once any job exists: do not switch it off while ownership rows remain. Disable admission and drain/resolve all jobs before any rollback to code unaware of the ownership column.
 
 ## Worker and recovery
 
@@ -46,7 +46,7 @@ Background uploads use a staging-ID-specific subfolder beneath the existing slot
 
 Recover consumed staging receipts without rereading already-deleted Blob bytes. Preserve generation-key/candidate reconciliation; do not promise exactly-once SharePoint version creation across a crash before receipt persistence.
 
-Automatic processing is bounded to two hours and eight attempts. Deadline exhaustion with no clean checkpoint/candidate can fail safely; evidence of possible external writes holds `needs_attention`. An exact-job operator command supports inspect and guarded retry/cancel only without a live worker lease. Preserve candidate/generation identity and bounded retry. No live operator command is run during development. [BUILD LIMITATION] The operator CLI currently accepts loopback databases only and refuses retry of a consumed receipt. Automatic approval review rejected expanding it to remote mutations and removing that safeguard as outside the authorized local operational scope. A production recovery path therefore requires separate authorization before release; the build does not claim that operational prerequisite is complete.
+Automatic processing is bounded to two hours and eight attempts. Deadline exhaustion with no clean checkpoint/candidate can fail safely; evidence of possible external writes holds `needs_attention`. An exact-job operator command supports inspect and guarded retry/cancel only without a live worker lease. Preserve candidate/generation identity and bounded retry. No live operator command is run during development. [BUILD LIMITATION] The operator CLI currently accepts loopback databases only and refuses retry of a consumed receipt. Automatic approval review rejected expanding it to remote mutations and removing that safeguard as outside the authorized local operational scope. A production recovery path therefore requires separate authorization before release; the build does not claim that operational prerequisite is complete. This applies to every needs-attention job, including prolonged provider outages after a clean scan, not only malformed consumed receipts. Keep admission disabled until that path exists. A paused queue can also exceed its two-hour deadline; no new notification email is sent, so operator monitoring is a release requirement.
 
 ## Cleanup safeguards
 
@@ -73,3 +73,23 @@ Infected Blob bytes are rejected/deleted immediately. Failed clean bytes are ret
 Run focused unit/UI tests and real local PG16 tests, required CI integration job, relevant route/Atlas/migration/fact/writer gates and sequential self-tests. Run the 499 MiB local memory harness if shared byte loading changes. No project-provider credentials or remote data are used in local tests. Real 500 MB provider/browser rehearsal remains a release task.
 
 Parent orchestrates Luna builders, Sol review, parent final review and Fable adversarial OAuth review. After two substantive rounds, parent takes over small residual fixes to avoid review churn. Deliver a reviewed tested PR; do not merge while the owner is away.
+
+## Local validation — 2026-10-01
+
+[VERIFIED via local command results] Full Jest coverage run: 1,198 suites, 19,095 tests and five snapshots passed; seven suites / 112 tests skipped. The seven required PostgreSQL suites were run separately against a disposable loopback PostgreSQL 16 database and passed all 112 tests, including 14 materials queue ownership/race tests. An additional admission-route suite added afterward passed all 13 cases. No provider credentials were used by these tests.
+
+All 42 CI gate commands passed locally, with gate/self-test pairs run sequentially. Whole-repository lint passed with zero errors and 134 warnings. The production webpack build passed. The default local Turbopack build could not traverse this worktree's external node_modules symlink; CI with a normal dependency installation must verify the default build.
+
+The 499 MiB synthetic upload harness passed all seven byte/hash/range/scanner-framing scenarios. Optimized peak RSS was approximately 699 MiB for one upload, 704 MiB for a timeout/retry, and 1,209 MiB for two admitted uploads processed serially. This is local memory evidence, not a real provider/browser 500 MB rehearsal.
+
+Sol's final review found no remaining material code blocker; parent final review corrected optional-Other queue contention, safe error projection and staff status classification. Fable's first adversarial pass required a safe unavailable-status projection and matching held-slot reminder previews. Both were fixed in `e50da1c3c` and approved in the bounded second pass; Fable reran the two suites / 40 tests successfully. The feature remains disabled by default and no production migration, flags or deployment were changed.
+
+[VERIFIED via GitHub] Draft PR [#402](https://github.com/justingallivan/wmkf-research-apps/pull/402) contains this implementation. All CI checks passed on `d5fa504e9`, including the canonical production build and 1,199 suites / 19,108 tests / five snapshots. The PR is not merged; review fixes require a new-head check.
+
+## Final review disposition
+
+[VERIFIED via OAuth Fable review, Sol review and parent source inspection] Fable's final verdict is **APPROVE FOR PR**, conditional on green CI for the final head, explicitly not production activation approval. The staff status helper now suppresses unavailable summaries instead of falsely claiming an invitation was not sent. Reminder preview and send exclude the same active-job slots. No further runtime changes were requested.
+
+[VERIFIED via local PostgreSQL 16] Commit `16f17e5ab` adds real-helper proofs that cleanup preserves an expired attention-owned staging row without calling Blob deletion, and schema-off claim/candidate/release/complete/reject/cleanup works against migrations 031–044 without migration 060. The focused PG suite now passes 16 tests. The prior concurrency case is explicitly a cleanup-lock-wins interleaving, not a bidirectional race proof. Parent reviewed these tests; Fable's approval covers the runtime fixes, not this later test-only commit.
+
+No production capability was shipped in this build, so no DEVELOPMENT_LOG milestone entry was required. The feature handoff was appended to SESSION_PROMPT.md to preserve unrelated prior lane context.
