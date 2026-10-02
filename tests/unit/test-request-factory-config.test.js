@@ -112,7 +112,7 @@ describe('labels for the run record and the source summary', () => {
   test('every needs-attention reason with its own copy is a real ledger reason code; others get the default', () => {
     for (const code of Object.keys(ATTENTION_COPY)) expect(LEDGER_REASON_CODES).toContain(code);
     const fallback = attentionCopyFor('file_copy_failed');
-    expect(fallback).toMatch(/^This step stopped and needs a look before it is retried\. Retrying is safe/);
+    expect(fallback).toMatch(/^This step stopped\. Retrying picks the run up where it stopped/);
     expect(attentionCopyFor(null)).toBe(fallback);
     expect(attentionCopyFor('timeout (http 504)')).toBe(ATTENTION_COPY.timeout);
   });

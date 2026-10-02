@@ -70,21 +70,24 @@ export const ERROR_COPY = Object.freeze({
   status_change_ambiguous: "The change was sent but its result couldn't be read. Check again; don't start a different change.",
 });
 
-const ATTENTION_DEFAULT = 'This step stopped and needs a look before it is retried. Retrying is safe: the run picks up where it stopped and never creates a second Request.';
-const ATTENTION_OWNER = "This step's result could not be confirmed, so the form can't tell whether retrying is safe. Ask the owner before retrying.";
+// Every line here was checked against the step that raises the code (run-runner.js): a retry never repeats a
+// write whose result is unknown. It re-reads, recovers if it can, and otherwise stops at the same place.
+const ATTENTION_DEFAULT = 'This step stopped. Retrying picks the run up where it stopped; it never creates a second Request.';
+const ATTENTION_UNCONFIRMED = "An earlier attempt at this step may or may not have gone through, and the run can't tell which. Retrying won't repeat the write: the run checks again and stops here until the result is confirmed by hand. Inspect the run with the command-line tool before continuing.";
+const ATTENTION_WORKFLOW = 'A workflow that this step switches off and back on may not have been restored. Check it in Dynamics before continuing, and inspect the run with the command-line tool.';
 // Keyed by the run's stored needs-attention reason (a LEDGER_REASON_CODES token). Anything unlisted gets the default.
 export const ATTENTION_COPY = Object.freeze({
-  ambiguous_create_outcome: "The request to create the test Request was sent, but its result could not be confirmed. Don't retry; ask the owner to resolve it, because retrying could create a second Request.",
-  preallocated_request_present_not_owned: "A Request with this run's reserved identity already exists but this run did not create it. Don't retry; ask the owner.",
-  location_preexisting: "A document folder record for this Request already exists and this run did not create it. Don't retry; ask the owner.",
+  ambiguous_create_outcome: "The request to create the test Request was sent, but the new Request can't be found. Retrying is safe: the run looks for the Request again and never sends a second create. If it keeps stopping here, the run can't continue and needs to be resolved by hand with the command-line tool.",
+  preallocated_request_present_not_owned: "A Request already exists under this run's reserved ID, and this run did not create it. Retrying will stop here again; the run can't continue.",
+  location_preexisting: 'A document folder record already exists for this Request, and this run did not create it. Retrying will stop here again; the run needs to be resolved by hand.',
   source_fence_failed: 'The source Request no longer matched what was read, so the run stopped at its first check. Look up the source Request again and start a new run.',
-  timeout: 'A service took too long to answer during this step. Retrying is safe: the run picks up where it stopped.',
-  network: 'The connection dropped during this step. Retrying is safe: the run picks up where it stopped.',
-  file_ambiguous_unrecovered: ATTENTION_OWNER,
-  file_journal_unverified: ATTENTION_OWNER,
-  goverify_deactivation_uncertain: ATTENTION_OWNER,
-  goverify_restore_unverified: ATTENTION_OWNER,
-  goverify_restore_failed: ATTENTION_OWNER,
+  timeout: 'A service took too long to answer during this step. Retrying picks the run up where it stopped.',
+  network: 'The connection dropped during this step. Retrying picks the run up where it stopped.',
+  file_ambiguous_unrecovered: ATTENTION_UNCONFIRMED,
+  file_journal_unverified: ATTENTION_UNCONFIRMED,
+  goverify_deactivation_uncertain: ATTENTION_WORKFLOW,
+  goverify_restore_unverified: ATTENTION_WORKFLOW,
+  goverify_restore_failed: ATTENTION_WORKFLOW,
 });
 
 /** Plain copy for a needs-attention run, from its stored reason (an optional " (http 503)" suffix is ignored). */

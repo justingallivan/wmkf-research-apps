@@ -743,7 +743,7 @@ describe('needs attention, recorded steps and run tools', () => {
     server.on('POST', `${BASE}/${RUN_A}/advance`, { status: 200, body: { step: 'copy_file', outcome: 'needs_attention', currentStep: 'copy_file', stepIndex: 4, status: 'needs_attention', destinationRequestNumber: null, errorMessage: 'Graph said no' } });
     await renderSection(server, [run]);
     await selectRun('Run A');
-    expect(screen.getByText(/Don't retry; ask the owner to resolve it, because retrying could create a second Request\./)).toBeTruthy();
+    expect(screen.getByText(/Retrying is safe: the run looks for the Request again and never sends a second create\./)).toBeTruthy();
     const retry = screen.getByRole('button', { name: 'Retry step: Copy the documents (one per step)' });
     expect(retry.hasAttribute('data-primary')).toBe(false);
     fireEvent.click(retry);
@@ -759,7 +759,7 @@ describe('needs attention, recorded steps and run tools', () => {
     server.on('GET', `${BASE}/${RUN_A}`, runBody(run));
     await renderSection(server, [run]);
     await selectRun('Run A');
-    expect(screen.getByText('This step stopped and needs a look before it is retried. Retrying is safe: the run picks up where it stopped and never creates a second Request.')).toBeTruthy();
+    expect(screen.getByText('This step stopped. Retrying picks the run up where it stopped; it never creates a second Request.')).toBeTruthy();
   });
 
   test('details defaults: recorded steps open only for needs_attention; run tools and the count are always present', async () => {
