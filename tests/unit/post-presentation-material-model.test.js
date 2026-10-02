@@ -109,4 +109,17 @@ describe('backing and latest-only projection', () => {
     expect(projectPostPresentationDescriptors([eligible], REQUEST_ID, { includeStaffUrls: true }).materials[0])
       .toHaveProperty('externalUrl');
   });
+
+  test('does not project a populated transcript bundle manifest to material consumers', () => {
+    const transcript = row('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', {
+      wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT,
+      wmkf_externalurl: null,
+      wmkf_sharepointdriveid: 'drive', wmkf_sharepointitemid: 'item',
+      wmkf_transcriptbundlejson: JSON.stringify({ files: { source: { itemId: 'source-item' } } }),
+    });
+    const projected = projectPostPresentationDescriptors([transcript], REQUEST_ID);
+    expect(projected.materials).toHaveLength(1);
+    expect(JSON.stringify(projected)).not.toContain('wmkf_transcriptbundlejson');
+    expect(JSON.stringify(projected)).not.toContain('source-item');
+  });
 });

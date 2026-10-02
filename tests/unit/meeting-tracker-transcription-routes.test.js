@@ -1,0 +1,75 @@
+jest.mock('../../lib/utils/auth.js', () => ({ requireAppAccess: jest.fn() }));
+jest.mock('../../lib/dataverse/core/context.js', () => ({ withDalContext: (_name, fn) => fn() }));
+jest.mock('../../lib/services/transcription-pilot/runtime.js', () => ({
+  TranscriptionPilotError: class TranscriptionPilotError extends Error {},
+}));
+jest.mock('../../lib/services/meeting-tracker-transcription/service.js', () => ({
+  getMeetingTranscriptionOverview: jest.fn(async () => ({ featureState: 'enabled' })),
+  uploadMeetingTranscription: jest.fn(async () => ({ job: { id: 'j' }, upload: { token: 't' } })),
+  renameMeetingTranscriptionSpeakers: jest.fn(async () => ({ job: { id: 'j' } })),
+}));
+
+import { requireAppAccess } from '../../lib/utils/auth.js';
+import { getMeetingTranscriptionOverview, uploadMeetingTranscription, renameMeetingTranscriptionSpeakers } from '../../lib/services/meeting-tracker-transcription/service.js';
+import collection from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions.js';
+import speakers from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/[jobId]/speakers.js';
+
+const requestId = '11111111-1111-4111-8111-111111111111';
+const jobId = '22222222-2222-4222-8222-222222222222';
+function response() {
+  return { status: jest.fn(function status(value) { this.statusCode = value; return this; }),
+    json: jest.fn(function json(value) { this.body = value; return this; }),
+    send: jest.fn(function send(value) { this.body = value; return this; }), setHeader: jest.fn() };
+}
+
+beforeEach(() => { jest.clearAllMocks(); requireAppAccess.mockResolvedValue({ profileId: 9, session: { user: {} } }); });
+
+test('collection GET checks the app grant and uses the request-scoped service', async () => {
+  const res = response();
+  await collection({ method: 'GET', query: { requestId } }, res);
+  expect(requireAppAccess).toHaveBeenCalledWith(expect.anything(), res, 'meeting-tracker');
+  expect(getMeetingTranscriptionOverview).toHaveBeenCalledWith({ requestId, ownerProfileId: 9 });
+  expect(res.statusCode).toBe(200);
+});
+
+test('collection GET returns the explicit disabled DTO rather than a retryable failure', async () => {
+  getMeetingTranscriptionOverview.mockResolvedValueOnce({ featureState: 'disabled', jobs: [], candidates: [] });
+  const res = response();
+  await collection({ method: 'GET', query: { requestId } }, res);
+  expect(res.statusCode).toBe(200);
+  expect(res.body).toMatchObject({ featureState: 'disabled', jobs: [], candidates: [] });
+});
+
+test('collection POST rejects identity injection before service dispatch', async () => {
+  const res = response();
+  await collection({ method: 'POST', query: { requestId }, body: {
+    filename: 'meeting.m4a', contentType: 'audio/mp4', bytes: 1000,
+    idempotencyKey: 'valid-key-0001', providerRegion: 'us', profileId: 77,
+  } }, res);
+  expect(res.statusCode).toBe(400);
+  expect(uploadMeetingTranscription).not.toHaveBeenCalled();
+});
+
+test('auth-bypass profile absence is rejected on the actual route', async () => {
+  requireAppAccess.mockResolvedValue({ profileId: null, session: { user: {}, authBypassed: true } });
+  const res = response();
+  await collection({ method: 'GET', query: { requestId } }, res);
+  expect(res.statusCode).toBe(401);
+  expect(getMeetingTranscriptionOverview).not.toHaveBeenCalled();
+});
+
+test('speaker PATCH exposes only optimistic version and labels at the route boundary', async () => {
+  const res = response();
+  await speakers({ method: 'PATCH', query: { requestId, jobId }, body: {
+    expectedVersion: 4, speakerNames: { A: 'Chair' }, profileId: 77,
+  } }, res);
+  expect(res.statusCode).toBe(400);
+  expect(renameMeetingTranscriptionSpeakers).not.toHaveBeenCalled();
+  const accepted = response();
+  await speakers({ method: 'PATCH', query: { requestId, jobId }, body: {
+    expectedVersion: 4, speakerNames: { A: 'Chair' },
+  } }, accepted);
+  expect(renameMeetingTranscriptionSpeakers).toHaveBeenCalledWith({ requestId, ownerProfileId: 9, jobId,
+    body: { expectedVersion: 4, speakerNames: { A: 'Chair' } } });
+  expect(accepted.statusCode).toBe(200);
+});

@@ -30,3 +30,18 @@ test('non-Production environments may remain explicitly disabled', () => {
   expect(requestDocumentExplicitActorReadinessHealth({ VERCEL_ENV: 'preview' }))
     .toMatchObject({ status: 'skipped' });
 });
+
+test('Meeting Transcript manifest selection requires both opt-in and literal-on readiness', () => {
+  const { requestDocumentSelect } = require('../../lib/dataverse/adapters/request-document');
+  const original = process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+  try {
+    delete process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+    expect(requestDocumentSelect({ includeMeetingTranscriptBundle: true })).not.toContain('wmkf_transcriptbundlejson');
+    process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = 'on';
+    expect(requestDocumentSelect()).not.toContain('wmkf_transcriptbundlejson');
+    expect(requestDocumentSelect({ includeMeetingTranscriptBundle: true })).toContain('wmkf_transcriptbundlejson');
+  } finally {
+    if (original === undefined) delete process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+    else process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = original;
+  }
+});

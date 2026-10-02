@@ -193,6 +193,21 @@ test('keeps text-only transcripts readable and disables bundle publication witho
   expect(screen.queryByRole('link', { name: 'Download draft VTT' })).not.toBeInTheDocument();
 });
 
+test('blocks a new publication while any shared transcript receipt is unresolved', async () => {
+  global.fetch.mockImplementation(async (url) => {
+    if (String(url).endsWith('/transcriptions')) return response(collection({
+      publications: [{ operationId: OPERATION_ID, state: 'unknown', inputJobId: 'unrelated-job' }],
+    }));
+    if (String(url).endsWith(`/${JOB_ID}`)) return response({ job: job(), content, candidates: [] });
+    return response({});
+  });
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: /site-visit\.m4a/ }));
+  expect(await screen.findByRole('heading', { name: 'Detected speakers (2)' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Publish transcript' })).toBeDisabled();
+  expect(screen.getByText('Resolve the existing transcript publication before starting another publication.')).toBeInTheDocument();
+});
+
 test('creates, reviews, saves and publishes a label-only correction against the original artifact version', async () => {
   let correction = {
     operationId: OPERATION_ID, state: 'draft', version: 1, sourceArtifactId: ARTIFACT_ID,

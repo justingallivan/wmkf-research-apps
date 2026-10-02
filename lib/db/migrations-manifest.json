@@ -58,6 +58,7 @@
     "057_integrity_screening_reviews.sql",
     "060_transcription_jobs.sql",
     "061_transcription_workflow_dispatches.sql",
-    "062_transcription_speaker_names.sql"
+    "062_transcription_speaker_names.sql",
+    "063_meeting_tracker_transcription.sql"
   ]
 }

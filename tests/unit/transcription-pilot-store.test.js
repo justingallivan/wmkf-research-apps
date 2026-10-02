@@ -72,6 +72,79 @@ describe('transcription pilot persistence contract', () => {
     expect(params).toEqual(['00000000-0000-4000-8000-000000000001', 7, 8, '{"A":"Chair"}']);
   });
 
+  it('saves correction labels and the version predicate using distinct SQL parameter bindings', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    await store.updateMeetingCorrectionDraft({
+      operationId: '00000000-0000-4000-8000-000000000001',
+      requestId: '00000000-0000-4000-8000-000000000002',
+      siteVisitActivityId: '00000000-0000-4000-8000-000000000003',
+      actorProfileId: 12, expectedVersion: 3, speakerNames: { A: 'Chair' },
+    });
+    const [query, params] = db.query.mock.calls[0];
+    expect(query).toMatch(/WHERE operation_id = \$1 AND request_id = \$2 AND site_visit_activity_id = \$3/);
+    expect(query).toMatch(/state = 'draft' AND expires_at > NOW\(\)/);
+    expect(query).toMatch(/AND version = \$5 RETURNING/);
+    expect(query).toMatch(/SET speaker_names = \$4::jsonb/);
+    expect(query).not.toMatch(/initiator_profile_id =/);
+    expect(params).toEqual([
+      '00000000-0000-4000-8000-000000000001',
+      '00000000-0000-4000-8000-000000000002',
+      '00000000-0000-4000-8000-000000000003', '{"A":"Chair"}', 3,
+    ]);
+  });
+
+  it('requires a frozen input hash and deterministic Tracker candidate paths before taking a job lease', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    await expect(store.freezeMeetingPublicationFromJob({
+      operationId: '00000000-0000-4000-8000-000000000001',
+      jobId: '00000000-0000-4000-8000-000000000002',
+      requestId: '00000000-0000-4000-8000-000000000003',
+      siteVisitActivityId: '00000000-0000-4000-8000-000000000004',
+      initiatorProfileId: 12, publishedByProfileId: 12, expectedVersion: 4,
+      frozenInputSha256: 'A'.repeat(64), formatterVersion: '1', candidatePaths: {
+        txt: 'bad/path', vtt: 'bad/path', source: 'bad/path',
+      },
+    })).rejects.toMatchObject({ code: 'transcription_invalid_value', httpStatus: 400 });
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('serializes request publication freezes and rejects any unresolved receipt independently of job linkage', async () => {
+    const tx = { query: jest.fn(async () => ({ rows: [] })) };
+    const db = { query: jest.fn(async () => ({ rows: [] })), transaction: jest.fn(async fn => fn(tx)) };
+    const store = createTranscriptionPilotStore(db);
+    await store.freezeMeetingPublicationFromJob({
+      operationId: '00000000-0000-4000-8000-000000000001',
+      jobId: '00000000-0000-4000-8000-000000000002',
+      requestId: '00000000-0000-4000-8000-000000000003',
+      siteVisitActivityId: '00000000-0000-4000-8000-000000000004',
+      initiatorProfileId: 12, publishedByProfileId: 12,
+      actingUserSystemId: '00000000-0000-4000-8000-000000000005', expectedVersion: 4,
+      frozenInputSha256: 'a'.repeat(64), formatterVersion: '1', candidatePaths: {
+        txt: `folder/00000000-0000-4000-8000-000000000001.txt`,
+        vtt: `folder/00000000-0000-4000-8000-000000000001.vtt`,
+        source: `folder/00000000-0000-4000-8000-000000000001.json`,
+      },
+    });
+    expect(tx.query).toHaveBeenCalledTimes(2);
+    expect(tx.query.mock.calls[0][0]).toMatch(/pg_advisory_xact_lock/);
+    expect(tx.query.mock.calls[1][0]).toMatch(/NOT EXISTS[\s\S]*p\.request_id = \$3[\s\S]*'published_reconcile'/);
+  });
+
+  it('claims recovery only for a complete verified file set and binds the original fence', async () => {
+    const tx = { query: jest.fn(async () => ({ rows: [] })) };
+    const db = { query: jest.fn(async () => ({ rows: [] })), transaction: jest.fn(async fn => fn(tx)) };
+    const store = createTranscriptionPilotStore(db);
+    await store.claimMeetingPublicationForRecovery({
+      operationId: '00000000-0000-4000-8000-000000000001',
+      requestId: '00000000-0000-4000-8000-000000000002',
+      siteVisitActivityId: '00000000-0000-4000-8000-000000000003',
+    });
+    expect(tx.query.mock.calls[0][0]).toMatch(/verified_files \?& ARRAY\['source','txt','vtt'\]/);
+    expect(tx.query.mock.calls[0][0]).toMatch(/slot_fence_version IS NOT NULL/);
+  });
+
   it.each([
     null, ['not', 'a map'], { 'bad speaker': 'Name' }, { A: 'x'.repeat(81) }, { A: 'Name\nInjected' },
   ])('rejects malformed speaker overlays before SQL: %j', async (speakerNames) => {

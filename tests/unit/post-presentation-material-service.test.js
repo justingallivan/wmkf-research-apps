@@ -13,9 +13,12 @@ import {
   getPresentationMaterials,
   mintMp4Upload,
   mintTranscriptUpload,
+  prepareMeetingTranscriptBundlePublication,
+  publishMeetingTranscriptBundle,
   saveZoomRecording,
 } from '../../lib/services/post-presentation-materials/material-service.js';
 import { createHash } from 'node:crypto';
+import { buildMeetingTranscriptFiles } from '../../lib/services/meeting-tracker-transcription/bundle.js';
 import {
   REQUEST_DOCUMENT_ARTIFACT_TYPE,
   REQUEST_DOCUMENT_LIFECYCLE_STATE,
@@ -187,6 +190,315 @@ function deps(overrides = {}) {
     ...overrides,
   };
 }
+
+test('meeting transcript preparation freezes the exact real SharePoint destination before writes', async () => {
+  const d = deps();
+  const prepared = await prepareMeetingTranscriptBundlePublication({
+    requestId: REQUEST_ID, operationId: OPERATION_ID, siteVisitActivityId: VISIT_ID,
+  }, d);
+  expect(prepared.candidatePaths).toEqual({
+    txt: `1003220/Site Visit - Transcript/1003220-Transcript-${OPERATION_ID}.txt`,
+    vtt: `1003220/Site Visit - Transcript/1003220-Transcript-${OPERATION_ID}.vtt`,
+    source: `1003220/Site Visit - Transcript/1003220-Transcript-${OPERATION_ID}.json`,
+  });
+  expect(d.ensureFolderPath).not.toHaveBeenCalled();
+  expect(d.uploadFile).not.toHaveBeenCalled();
+});
+
+test('bundle writer refuses to upload without mandatory durable receipt callbacks', async () => {
+  const d = deps();
+  const prepared = await prepareMeetingTranscriptBundlePublication({
+    requestId: REQUEST_ID, operationId: OPERATION_ID, siteVisitActivityId: VISIT_ID,
+  }, d);
+  const prior = process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+  process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = 'on';
+  try {
+    await expect(publishMeetingTranscriptBundle({
+      requestId: REQUEST_ID, operationId: OPERATION_ID, actorProfileId: 1, actingUserSystemId: ACTOR_ID,
+      identity: { requestId: REQUEST_ID, siteVisitActivityId: VISIT_ID }, prepared,
+      candidatePaths: prepared.candidatePaths,
+      files: Object.fromEntries(['txt','vtt','source'].map(role => [role, { bytes: Buffer.from(role), sha256: createHash('sha256').update(role).digest('hex'), contentType: 'text/plain' }])),
+      frozenInputSha256: 'a'.repeat(64),
+    }, d)).rejects.toMatchObject({ code: 'meeting_transcript_receipt_required' });
+    expect(d.uploadFile).not.toHaveBeenCalled();
+  } finally {
+    if (prior === undefined) delete process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+    else process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = prior;
+  }
+});
+
+test('publishes all three byte-verified files only after each exact candidate is recorded in the receipt', async () => {
+  const stored = new Map();
+  let registered = null;
+  const d = deps({
+    findDocuments: jest.fn(async () => ({ records: registered ? [registered] : [] })),
+    acquireSlotLease: jest.fn(async () => ({ fence_version: 17 })),
+    renewSlotLease: jest.fn(async () => ({ fence_version: 17 })),
+    releaseSlotLease: jest.fn(async () => ({})),
+    reacquireSlotLease: jest.fn(async () => ({ fence_version: 17 })),
+    findMeetingTranscriptDocumentByGenerationKey: jest.fn(async () => ({ records: [] })),
+    uploadFile: jest.fn(async (_library, _folder, filename, bytes) => {
+      const role = filename.endsWith('.json') ? 'source' : filename.endsWith('.vtt') ? 'vtt' : 'txt';
+      const itemId = `item-${role}`;
+      const descriptor = { siteId: 'site', driveId: 'drive', id: itemId, name: filename,
+        size: bytes.length, versionId: 'version-1', eTag: `etag-${role}`, webUrl: `https://example.test/${filename}` };
+      stored.set(itemId, { descriptor, bytes });
+      return descriptor;
+    }),
+    getFileMetadataById: jest.fn(async (_driveId, itemId) => stored.get(itemId)?.descriptor || null),
+    downloadFile: jest.fn(async (_driveId, itemId, options) => {
+      expect(options).toEqual({ maxBytes: 4_000_000 });
+      return { buffer: stored.get(itemId).bytes };
+    }),
+    createDocument: jest.fn(async payload => {
+      registered = transcript(NEW_ID, 17, { ...payload, _wmkf_request_value: REQUEST_ID, wmkf_requestdocumentid: NEW_ID });
+      return registered;
+    }),
+  });
+  const prepared = await prepareMeetingTranscriptBundlePublication({ requestId: REQUEST_ID,
+    operationId: OPERATION_ID, siteVisitActivityId: VISIT_ID }, d);
+  const generated = buildMeetingTranscriptFiles({
+    content: { text: '', utterances: [{ speaker: 'A', start: 1000, end: 2000, text: 'Hello.' }] },
+    speakerNames: { A: 'Chair' },
+    identity: { requestId: REQUEST_ID, siteVisitActivityId: VISIT_ID,
+      revisionId: OPERATION_ID, operationId: OPERATION_ID, sourceRevisionId: null },
+  });
+  const receipt = [];
+  const recordCandidate = jest.fn(async (role, candidatePath, descriptor) => {
+    receipt.push({ role, candidatePath, descriptor });
+    return true;
+  });
+  const oldFlag = process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+  process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = 'on';
+  try {
+    const result = await publishMeetingTranscriptBundle({ requestId: REQUEST_ID, operationId: OPERATION_ID,
+      actorProfileId: 12, actingUserSystemId: ACTOR_ID,
+      identity: { requestId: REQUEST_ID, siteVisitActivityId: VISIT_ID, revisionId: OPERATION_ID,
+        operationId: OPERATION_ID, sourceRevisionId: null, formatterVersion: '1' },
+      files: generated.files, frozenInputSha256: generated.inputSha256,
+      expectedCurrentArtifactId: null, expectedCurrentFingerprint: null,
+      prepared, candidatePaths: prepared.candidatePaths,
+      callbacks: { renew: jest.fn(async () => true), bindSlotFence: jest.fn(async () => true), recordCandidate },
+    }, d);
+    expect(result).toMatchObject({ artifactId: NEW_ID, fingerprint: generated.inputSha256, bundleEditable: true });
+    expect(receipt.map(item => item.role)).toEqual(['txt','vtt','source']);
+    expect(receipt.map(item => item.candidatePath)).toEqual(['txt','vtt','source'].map(role => prepared.candidatePaths[role]));
+    expect(recordCandidate.mock.invocationCallOrder.at(-1)).toBeLessThan(d.createDocument.mock.invocationCallOrder[0]);
+    expect(d.uploadFile).toHaveBeenCalledTimes(3);
+    expect(d.downloadFile).toHaveBeenCalledTimes(3);
+    const generationKey = createHash('sha256').update([
+      'meeting-tracker-post-presentation', REQUEST_ID.toLowerCase(),
+      String(REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT), OPERATION_ID.toLowerCase(), generated.inputSha256,
+    ].join(':')).digest('hex');
+    expect(registered.wmkf_generationkey).toBe(generationKey);
+  } finally {
+    if (oldFlag === undefined) delete process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+    else process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = oldFlag;
+  }
+});
+
+test('a candidate that the durable receipt does not confirm prevents registry creation', async () => {
+  const stored = new Map();
+  const d = deps({
+    acquireSlotLease: jest.fn(async () => ({ fence_version: 17 })),
+    renewSlotLease: jest.fn(async () => ({ fence_version: 17 })),
+    uploadFile: jest.fn(async (_library, _folder, filename, bytes) => {
+      const role = filename.endsWith('.json') ? 'source' : filename.endsWith('.vtt') ? 'vtt' : 'txt';
+      const descriptor = { siteId: 'site', driveId: 'drive', id: `item-${role}`, name: filename,
+        size: bytes.length, versionId: 'version-1', eTag: `etag-${role}` };
+      stored.set(descriptor.id, { descriptor, bytes });
+      return descriptor;
+    }),
+    getFileMetadataById: jest.fn(async (_drive, id) => stored.get(id)?.descriptor || null),
+    downloadFile: jest.fn(async (_drive, id, options) => {
+      expect(options).toEqual({ maxBytes: 4_000_000 });
+      return { buffer: stored.get(id).bytes };
+    }),
+  });
+  const prepared = await prepareMeetingTranscriptBundlePublication({ requestId: REQUEST_ID,
+    operationId: OPERATION_ID, siteVisitActivityId: VISIT_ID }, d);
+  const generated = buildMeetingTranscriptFiles({
+    content: { text: '', utterances: [{ speaker: 'A', start: 1000, end: 2000, text: 'Hello.' }] },
+    speakerNames: { A: 'Chair' },
+    identity: { requestId: REQUEST_ID, siteVisitActivityId: VISIT_ID,
+      revisionId: OPERATION_ID, operationId: OPERATION_ID, sourceRevisionId: null },
+  });
+  const receipt = [];
+  const recordCandidate = jest.fn(async (role, candidatePath, descriptor) => {
+    if (role === 'vtt') return undefined;
+    receipt.push({ role, candidatePath, descriptor });
+    return true;
+  });
+  const prior = process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+  process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = 'on';
+  try {
+    await expect(publishMeetingTranscriptBundle({ requestId: REQUEST_ID, operationId: OPERATION_ID,
+      actorProfileId: 12, actingUserSystemId: ACTOR_ID,
+      identity: { requestId: REQUEST_ID, siteVisitActivityId: VISIT_ID, revisionId: OPERATION_ID,
+        operationId: OPERATION_ID, sourceRevisionId: null, formatterVersion: '1' },
+      files: generated.files, frozenInputSha256: generated.inputSha256, expectedCurrentArtifactId: null,
+      expectedCurrentFingerprint: null, prepared, candidatePaths: prepared.candidatePaths,
+      callbacks: { renew: jest.fn(async () => true), bindSlotFence: jest.fn(async () => true), recordCandidate },
+    }, d)).rejects.toMatchObject({ code: 'meeting_transcript_receipt_candidate_conflict' });
+    expect(receipt.map(item => item.role)).toEqual(['txt']);
+    expect(stored.size).toBe(2); // Remote files are retained for operator recovery.
+    expect(d.uploadFile).toHaveBeenCalledTimes(2);
+    expect(d.createDocument).not.toHaveBeenCalled();
+    expect(d.downloadFile).toHaveBeenCalledTimes(2);
+  } finally {
+    if (prior === undefined) delete process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+    else process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = prior;
+  }
+});
+
+test('a registry error after remote commit retains all receipt-bound files without deleting them', async () => {
+  const stored = new Map();
+  const receipt = [];
+  let remotelyCommitted = null;
+  const d = deps({
+    acquireSlotLease: jest.fn(async () => ({ fence_version: 17 })),
+    renewSlotLease: jest.fn(async () => ({ fence_version: 17 })),
+    findMeetingTranscriptDocumentByGenerationKey: jest.fn(async () => ({ records: [] })),
+    uploadFile: jest.fn(async (_library, _folder, filename, bytes) => {
+      const role = filename.endsWith('.json') ? 'source' : filename.endsWith('.vtt') ? 'vtt' : 'txt';
+      const descriptor = { siteId: 'site', driveId: 'drive', id: `item-${role}`, name: filename,
+        size: bytes.length, versionId: 'version-1', eTag: `etag-${role}` };
+      stored.set(descriptor.id, { descriptor, bytes });
+      return descriptor;
+    }),
+    getFileMetadataById: jest.fn(async (_drive, id) => stored.get(id)?.descriptor || null),
+    downloadFile: jest.fn(async (_drive, id, options) => {
+      expect(options).toEqual({ maxBytes: 4_000_000 });
+      return { buffer: stored.get(id).bytes };
+    }),
+    createDocument: jest.fn(async payload => {
+      remotelyCommitted = transcript(NEW_ID, 17, { ...payload,
+        _wmkf_request_value: REQUEST_ID, wmkf_requestdocumentid: NEW_ID });
+      const error = new Error('Response lost after remote registry commit');
+      error.code = 'remote_commit_response_lost';
+      throw error;
+    }),
+  });
+  const prepared = await prepareMeetingTranscriptBundlePublication({ requestId: REQUEST_ID,
+    operationId: OPERATION_ID, siteVisitActivityId: VISIT_ID }, d);
+  const generated = buildMeetingTranscriptFiles({
+    content: { text: '', utterances: [{ speaker: 'A', start: 1000, end: 2000, text: 'Hello.' }] },
+    speakerNames: { A: 'Chair' },
+    identity: { requestId: REQUEST_ID, siteVisitActivityId: VISIT_ID,
+      revisionId: OPERATION_ID, operationId: OPERATION_ID, sourceRevisionId: null },
+  });
+  const recordCandidate = jest.fn(async (role, candidatePath, descriptor) => {
+    receipt.push({ role, candidatePath, descriptor });
+    return true;
+  });
+  const prior = process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+  process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = 'on';
+  try {
+    await expect(publishMeetingTranscriptBundle({ requestId: REQUEST_ID, operationId: OPERATION_ID,
+      actorProfileId: 12, actingUserSystemId: ACTOR_ID,
+      identity: { requestId: REQUEST_ID, siteVisitActivityId: VISIT_ID, revisionId: OPERATION_ID,
+        operationId: OPERATION_ID, sourceRevisionId: null, formatterVersion: '1' },
+      files: generated.files, frozenInputSha256: generated.inputSha256, expectedCurrentArtifactId: null,
+      expectedCurrentFingerprint: null, prepared, candidatePaths: prepared.candidatePaths,
+      callbacks: { renew: jest.fn(async () => true), bindSlotFence: jest.fn(async () => true), recordCandidate },
+    }, d)).rejects.toMatchObject({ code: 'remote_commit_response_lost' });
+    expect(remotelyCommitted.wmkf_generationkey).toBe(createHash('sha256').update([
+      'meeting-tracker-post-presentation', REQUEST_ID.toLowerCase(),
+      String(REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT), OPERATION_ID.toLowerCase(), generated.inputSha256,
+    ].join(':')).digest('hex'));
+    expect(receipt.map(item => item.role)).toEqual(['txt', 'vtt', 'source']);
+    expect(d.downloadFile).toHaveBeenCalledTimes(3);
+    expect([...stored.keys()]).toEqual(['item-txt', 'item-vtt', 'item-source']);
+    expect([...stored.values()].map(({ bytes }) => bytes)).toEqual([
+      generated.files.txt.bytes, generated.files.vtt.bytes, generated.files.source.bytes,
+    ]);
+    expect(d.updateDocument).not.toHaveBeenCalled();
+  } finally {
+    if (prior === undefined) delete process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+    else process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = prior;
+  }
+});
+
+test('recovery denied at the original fence cannot replace or supersede a newer winner', async () => {
+  const newer = transcript(OLD_ID, 18, { wmkf_inputfingerprint: 'f'.repeat(64) });
+  const d = deps({
+    findDocuments: jest.fn(async () => ({ records: [newer] })),
+    reacquireSlotLease: jest.fn(async () => null),
+    uploadFile: jest.fn(),
+    updateDocument: jest.fn(),
+    createDocument: jest.fn(),
+  });
+  const prepared = await prepareMeetingTranscriptBundlePublication({ requestId: REQUEST_ID,
+    operationId: OPERATION_ID, siteVisitActivityId: VISIT_ID }, d);
+  const prior = process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+  process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = 'on';
+  try {
+    await expect(publishMeetingTranscriptBundle({ requestId: REQUEST_ID, operationId: OPERATION_ID,
+      actorProfileId: 12, actingUserSystemId: ACTOR_ID,
+      identity: { requestId: REQUEST_ID, siteVisitActivityId: VISIT_ID, revisionId: OPERATION_ID,
+        operationId: OPERATION_ID, sourceRevisionId: null, formatterVersion: '1' },
+      frozenInputSha256: 'a'.repeat(64), expectedCurrentArtifactId: OLD_ID,
+      expectedCurrentFingerprint: 'f'.repeat(64), prepared, candidatePaths: prepared.candidatePaths,
+      resumeVerifiedFiles: { txt: {}, vtt: {}, source: {} }, originalSlotFenceVersion: 17,
+      callbacks: { renew: jest.fn(async () => true) },
+    }, d)).rejects.toMatchObject({ code: 'meeting_transcript_original_fence_lost' });
+    expect(d.reacquireSlotLease).toHaveBeenCalledWith({ requestId: REQUEST_ID,
+      artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT, leaseToken: OPERATION_ID, fenceVersion: 17 });
+    expect(d.uploadFile).not.toHaveBeenCalled();
+    expect(d.createDocument).not.toHaveBeenCalled();
+    expect(d.updateDocument).not.toHaveBeenCalled();
+    expect(newer.wmkf_requestdocumentid).toBe(OLD_ID);
+  } finally {
+    if (prior === undefined) delete process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+    else process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = prior;
+  }
+});
+
+test.each(['versionId', 'eTag', 'siteId'])('bundle recovery rejects changed %s even when bytes are identical', async changedField => {
+  let registered = null;
+  const identity = { requestId: REQUEST_ID, siteVisitActivityId: VISIT_ID,
+    revisionId: OPERATION_ID, operationId: OPERATION_ID, sourceRevisionId: null };
+  const generated = buildMeetingTranscriptFiles({ identity,
+    content: { text: 'Synthetic.', utterances: [{ speaker: 'A', start: 0, end: 1000, text: 'Synthetic.' }] },
+    speakerNames: {} });
+  const d = deps({
+    findDocuments: jest.fn(async () => ({ records: registered ? [registered] : [] })),
+    reacquireSlotLease: jest.fn(async () => ({ fence_version: 17 })),
+    renewSlotLease: jest.fn(async () => ({ fence_version: 17 })),
+    findMeetingTranscriptDocumentByGenerationKey: jest.fn(async () => ({ records: [] })),
+    createDocument: jest.fn(async payload => {
+      registered = transcript(NEW_ID, 17, { ...payload, _wmkf_request_value: REQUEST_ID, wmkf_requestdocumentid: NEW_ID });
+      return registered;
+    }),
+  });
+  const prepared = await prepareMeetingTranscriptBundlePublication({ requestId: REQUEST_ID,
+    operationId: OPERATION_ID, siteVisitActivityId: VISIT_ID }, d);
+  const descriptors = Object.fromEntries(Object.entries(generated.files).map(([role, file]) => [role, {
+    siteId: 'site', driveId: 'drive', itemId: role, versionId: 'version-1', eTag: `etag-${role}`,
+    filename: prepared.filenames[role], contentType: file.contentType, size: file.bytes.length, sha256: file.sha256,
+  }]));
+  d.getFileMetadataById = jest.fn(async (_drive, role) => ({ ...descriptors[role],
+    id: role, name: descriptors[role].filename, ...(role === 'txt' ? { [changedField]: 'changed' } : {}) }));
+  d.downloadFile = jest.fn(async (_drive, role) => ({ buffer: generated.files[role].bytes }));
+  const prior = process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+  process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = 'on';
+  try {
+    await expect(publishMeetingTranscriptBundle({ requestId: REQUEST_ID, operationId: OPERATION_ID,
+      actorProfileId: 12, actingUserSystemId: ACTOR_ID, identity,
+      frozenInputSha256: generated.inputSha256, expectedCurrentArtifactId: null,
+      expectedCurrentFingerprint: null, prepared, candidatePaths: prepared.candidatePaths,
+      resumeVerifiedFiles: descriptors, originalSlotFenceVersion: 17,
+      callbacks: { renew: jest.fn(async () => true) },
+    }, d)).rejects.toMatchObject({ code: 'meeting_transcript_receipt_candidate_conflict' });
+    expect(d.downloadFile).toHaveBeenCalledWith('drive', 'txt', { maxBytes: 4_000_000 });
+    expect(d.createDocument).not.toHaveBeenCalled();
+    expect(d.updateDocument).not.toHaveBeenCalled();
+    expect(d.uploadFile).not.toHaveBeenCalled();
+  } finally {
+    if (prior === undefined) delete process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+    else process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = prior;
+  }
+});
 
 test('GET fails closed on readiness/access and requires exactly one active visit', async () => {
   await expect(getPresentationMaterials({ requestId: REQUEST_ID }, deps({ schemaReady: () => false })))

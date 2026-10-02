@@ -657,11 +657,13 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
   const currentArtifact = collection?.currentArtifact || null;
   const status = selectedJob?.status;
   const canReview = status === 'ready' && selectedJob?.contentAccessAllowed === true && Boolean(detail?.content);
+  const unresolvedPublication = (collection?.publications || []).find((publication) => ['publishing', 'retryable', 'unknown', 'published_reconcile'].includes(publication.state));
   const alreadyPublished = (collection?.publications || []).some((publication) => publication.inputJobId === selectedJob?.id && ['published', 'published_reconcile', 'unknown'].includes(publication.state));
   const hasText = typeof detail?.content?.text === 'string' && detail.content.text.trim().length > 0;
   const publishBlockedReason = !utterances.length
     ? 'Publishing requires timed speaker turns. This text-only result can still be read and downloaded as a temporary TXT.'
-    : dirtyNames ? 'Save speaker-name changes before publishing.'
+    : unresolvedPublication ? 'Resolve the existing transcript publication before starting another publication.'
+      : dirtyNames ? 'Save speaker-name changes before publishing.'
       : alreadyPublished ? 'This draft already has a publication. Reconcile it or review the published version before publishing again.'
         : status !== 'ready' ? 'Only a ready draft can be published.'
         : null;
