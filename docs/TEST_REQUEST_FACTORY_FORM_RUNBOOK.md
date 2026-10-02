@@ -128,6 +128,6 @@ With the form off, the run list, run detail and artifacts download still work.
 
 ## Known gaps
 
-- **First lookup refused once.** The first lookup of source 1002988 (Preview) and of source 1002860 (Production) was refused with "changed while its bytes were being verified" and passed on retry; the production log named an XLSX **[RUN]**. A later lookup of 1002988 passed first time. Cause not established. Retry the lookup.
+- **First lookup refused once.** The first lookup of source 1002988 (Preview) and of source 1002860 (Production) was refused with "changed while its bytes were being verified" and passed on retry; the production log named an XLSX **[RUN]**. A later lookup of 1002988 passed first time. Cause not established. Retry the lookup. Since S564 the refusal log line names each comparison that failed with its before → after values (metadata eTag/versionId/size, the download's metadata size, the content length) and the cTag, which moves only when the bytes change; read it from the function log (`admin test-request run refusal: 409 test_request_preview_source_changed …`) at the next occurrence.
 - **XLSX verification** is characterized for one SharePoint rewrite (`docProps/custom.xml`). A spreadsheet rewritten in another way, or one over the package limits, stops at `copy_file` after upload and cannot continue.
 - **Not checked in a browser:** long-label wrapping, the selected-row tint, a narrow window.
