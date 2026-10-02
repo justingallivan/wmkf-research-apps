@@ -1,4 +1,24 @@
-# Session 564 Prompt: Factory admin form is live; pick the next item
+# Session 565 Prompt: Materials upload closeout complete; preserve parallel lanes
+
+
+## Session 564 Summary — 2026-10-02 PT (Codex materials lane)
+
+[VERIFIED via GitHub merges, CI results, Production readback, and owner acceptance] Background uploads, progress reporting, scan diagnostics, and clear connection errors are shipped. PR #405 merged as `1df8a33e2` after all current-head CI checks passed; PR #413 merged as `81dad17e2`. Both are included in Ready Production deployment `dpl_7zi1no5HrxgrPbCQo18Lsi1NM5CZ` at commit `b223dad7d` (October 2 final deployment readback and Git ancestry checks).
+
+- Owner confirmed a PPTX finishes after closing the browser; first background job completed in about 2m44s on attempt 1, no error. Large PPTX and PDF uploads also succeeded before background activation.
+- The exact 500 MB live transfer remains unverified and parked, not a normal-use release blocker. The owner declined another simultaneous-large background test on October 2: the expected set is one large PPTX, a usually smaller PDF, and a text document. Reopen stress testing only if usage or failures warrant it.
+- The clean materials worktree was archived and is recoverable through Codex. No runtime change or merge remains for this lane. Staff Open file work belongs to the separate app-feature chat; verify its status there before acting.
+- Key references: `docs/plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md`, `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.15–16.16, and the materials milestone in `DEVELOPMENT_LOG.md`.
+- Commits: progress #410 `8fb8a6d83`; closeout #413 `81dad17e2`; connection errors #405 `1df8a33e2`. Final CI passed before merges. No new runtime tests were needed for this documentation-only stop.
+- Claim-evidence pilot report was unavailable because local observation state could not be read; no observation row was fabricated.
+
+## Materials next items
+
+**DONE:** Production activation, guarded read-only recovery inspection, browser-close completion, final merges/deployment verification, and worktree archive.
+**Parked:** Exact-cap live rehearsal; reopen only for a new requirement or relevant failure.
+**Do not reopen without a new decision:** Another simultaneous-large-file test is not required for this workflow. Continue normal operational monitoring; the worker sends no completion email.
+
+The Factory handoff below is retained as a separate lane. Its remaining carryovers require that lane's preflight; known merged fixes are annotated from main history.
 
 ## Session 563 Summary — 2026-10-01/02 PT (Factory admin form lane, Claude, home Mac)
 
@@ -28,12 +48,12 @@ The admin Test Request form is built, enabled in Production, and has produced on
 
 ### Verified Open
 
-1. **Form stop copy disagrees with the code.** Several stops point to a command-line resolution that no mode provides; the `timeout`/`network` copy holds only before a write; `bundle_stale` and `meeting_date_patch_failed` have no copy.
+1. **DONE via PR #411 (`45d8e6fd4`): form stop copy.** Historical finding: Several stops point to a command-line resolution that no mode provides; the `timeout`/`network` copy holds only before a write; `bundle_stale` and `meeting_date_patch_failed` have no copy.
    Evidence: `docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md` (*Known gaps*); `shared/components/admin/test-request-factory-copy.js` `ATTENTION_COPY`; delegated source trace 2026-10-02.
-   A small reviewed PR. `BLIP_COPY` is owner-set wording and stays verbatim.
-2. **First lookup of a source is refused once**, then passes ("changed while its bytes were being verified", an XLSX).
-   Evidence: Vercel log 2026-10-02 (`admin test-request run refusal: 409 test_request_preview_source_changed …`); `lib/services/test-requests/admin-preview-service.js` `hydrateSelectedDocument`. Cause not established; the refusal does not say which of its four comparisons failed.
-3. **Flaky `tests/unit/awardee-tab.test.js`** ("T2 send: non-2xx with an unparseable body"): failed once and passed on re-run on PRs #398 and #409. Not investigated.
+   The reviewed fix is merged. `BLIP_COPY` is owner-set wording and stays verbatim.
+2. **Diagnostic follow-up shipped via PR #412 (`cb84ee322`); root cause still requires investigation.** Historical observation: first lookup of a source is refused once, then passes ("changed while its bytes were being verified", an XLSX).
+   Evidence: Vercel log 2026-10-02 (`admin test-request run refusal: 409 test_request_preview_source_changed …`); `lib/services/test-requests/admin-preview-service.js` `hydrateSelectedDocument`. Cause not established; PR #412 now identifies the failing comparison.
+3. **DONE via PR #414 (`b223dad7d`): flaky `tests/unit/awardee-tab.test.js`** ("T2 send: non-2xx with an unparseable body"): failed once and passed on re-run on PRs #398 and #409. The fix waits for Send to become enabled before opening confirmation.
 4. **Artifact sweep not yet observed in Production.** It becomes active now that both variables are set; it will delete run `a5161f47`'s bundle and manifest and keep run `20407283`'s.
    Evidence: `lib/services/test-requests/factory-artifact-store.js` `sweepFactoryArtifacts`; `pages/api/cron/maintenance.js`.
 5. **Verify the test-request email fix in the browser on 1003303** (carried from the S561 handoff; PR #392 is MERGED [VERIFIED via GitHub]). Not done this session.
@@ -55,7 +75,7 @@ The admin Test Request form is built, enabled in Production, and has produced on
 1. **D2: retire the home Mac's local ledger copies** and scratch databases (carried from S560/S561). Destructive: list and confirm first; not revalidated this session.
 2. **Worktree and branch hygiene**: `/Users/gallivan/Code/WMKF_Apps-factory-form` is on merged branch `claude/factory-xlsx-package-verify`; remote branches `claude/factory-admin-form-slice1..3`, `-slice2b`, `claude/factory-form-stop-logging`, `claude/factory-xlsx-package-verify`, `claude/factory-status-already-set-copy`, `claude/factory-status-history-arrow` are merged. List and confirm before removing anything.
 3. Requests 1003301–1003303, 1003308 and 1003310 are tracked Factory runs in `managed-ledger/ledger_prod`, not cleanup residue.
-4. The materials lane section below was written by another session and was not revalidated here. `main` history shows PRs #404 and #407 merged since [VERIFIED via `git log`]; PR #405 is open.
+4. **DONE:** Materials lane validated and closed in Session 564; see the current summary above and detailed evidence below.
 
 ### Do Not Reopen Without New Decision
 
@@ -90,10 +110,10 @@ No claim-evidence observation row was added: the pilot report recorded no eligib
 
 ## Materials feature branch handoff — 2026-10-02 (separate lane)
 
-[VERIFIED via owner-authorized agent Production probes and deployment readback] PR #402 delivered the base Site Visit / Research Presentation background-upload feature. PR #404 (`a63747ca5dfa74954c208e23bd1f90f3b25b0eab`), #407 (`df7bb6ac3f90eba5b80d785f3119c96b8bd0f0e4`), and #410 (`8fb8a6d83684a9d49b8450b26ef5bbef382f9a32`) merged with all CI passing. Production deployment `dpl_2AacXcc5YQX9dNvJ4gMn4PpGtWWN` serves the #410 commit at `https://wmkfresearchapps-36g8ub7g7-justin-gallivans-projects.vercel.app`, aliased to `applications.wmkeck.org`. Migration 060 is applied and the Production schema-readiness and admission flags are `on`, and the scan flag is `true`.
+[VERIFIED via owner-authorized agent Production probes and deployment readback] PR #402 delivered the base Site Visit / Research Presentation background-upload feature. PR #404 (`a63747ca5dfa74954c208e23bd1f90f3b25b0eab`), #407 (`df7bb6ac3f90eba5b80d785f3119c96b8bd0f0e4`), and #410 (`8fb8a6d83684a9d49b8450b26ef5bbef382f9a32`) merged with all CI passing. The historical activation deployment `dpl_2AacXcc5YQX9dNvJ4gMn4PpGtWWN` serves the #410 commit at `https://wmkfresearchapps-36g8ub7g7-justin-gallivans-projects.vercel.app`, aliased to `applications.wmkeck.org`. Migration 060 is applied and the Production schema-readiness and admission flags are `on`, and the scan flag is `true`.
 
 [VERIFIED via source/tests and owner-authorized agent Production read-only probe] The guarded operator CLI requires the fixed local-shell `MATERIALS_UPLOAD_PRODUCTION_DATABASE_URL`, explicit target/host/database and exact job/action confirmations, verified TLS, read-only inspect, sanitized output, and connected database/public-schema checks inside the resolver transaction. The Production read-only command passed target/TLS checks and returned expected `job_not_found` for deliberately nonexistent UUID `00000000-0000-4000-8000-000000000000`; no recovery mutation was run.
 
 The exact-root recursive-reader filter and five callers are Production-deployed in PR #404; it suppresses exact same-request portal-produced Superseded drive/item identities beneath canonical Site Visit materials roots, preserves current/manual identities, and omits affected candidates with a sanitized error when registry/drive evidence is incomplete. PR #407 added scan-rejection diagnostics, and PR #410 added upload progress and verified rejection messages. All three PRs passed CI and merged.
 
-[VERIFIED via owner-authorized agent Production probes] The first real job `33630e07-4311-41b3-8aef-737a2962ce03` (`presentation_source`) was admitted at 21:36:35 UTC, started at 21:37:05, recorded a clean scan checkpoint at 21:38:23, and completed at 21:39:19 on attempt 1 with no error; staging was consumed. Admission-to-completion took about 2m44s. The owner closed/reopened the browser during processing and later confirmed Received after reopening. Worker invocations 21:44–21:48 UTC were healthy with an empty queue. Monitoring remains required; no automatic email is sent. PR #405 connection-copy follow-up remains open and is not merged or deployed. Its conflicts with main were resolved in `8081fca57`; verify current-head CI before merging. The real 300+ MB PPTX succeeded before background activation; an exact 500 MB live transfer and concurrent background-job exercise remain unverified; cap enforcement is unit-tested. Preserve unrelated Factory and reviewer-refactor context above; this handoff replaces only the previous materials-lane section.
+[VERIFIED via owner-authorized agent Production probes] The first real job `33630e07-4311-41b3-8aef-737a2962ce03` (`presentation_source`) was admitted at 21:36:35 UTC, started at 21:37:05, recorded a clean scan checkpoint at 21:38:23, and completed at 21:39:19 on attempt 1 with no error; staging was consumed. Admission-to-completion took about 2m44s. The owner closed/reopened the browser during processing and later confirmed Received after reopening. Worker invocations 21:44–21:48 UTC were healthy with an empty queue. Monitoring remains required; no automatic email is sent. PR #405 merged as `1df8a33e2` after all current-head CI checks passed; PR #413 merged as `81dad17e2`. Both are included in Ready Production deployment `dpl_7zi1no5HrxgrPbCQo18Lsi1NM5CZ` at commit `b223dad7d` (October 2 final deployment readback and Git ancestry checks). The exact 500 MB live transfer remains unverified and parked, not a normal-use release blocker. The owner declined another simultaneous-large background test on October 2: the expected set is one large PPTX, a usually smaller PDF, and a text document. Reopen stress testing only if usage or failures warrant it. Cap enforcement is unit-tested. Preserve unrelated Factory and reviewer-refactor context above; this handoff replaces only the previous materials-lane section.

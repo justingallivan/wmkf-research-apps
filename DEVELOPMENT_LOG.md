@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Applicant materials uploads finish in the background (Session 564)
+
+**Milestone:** Site Visit / Research Presentation applicants can leave after transfer and durable admission while scanning and SharePoint saving continue.
+**Sessions:** October 1–2 materials lane; Luna builds, Sol review, parent review, Claude Fable adversarial review through OAuth, and owner production acceptance.
+**Ship state:**
+- Shared admin-configured 500 MB cap, coordinator fallback guidance, real transfer progress, and clearer scan/connection errors shipped.
+- Migration 060 applied; schema readiness and background admission enabled with scanning on. Guarded recovery inspection passed without mutation.
+- First real background job finished on attempt 1 in about 2m44s; the owner closed the browser and confirmed Received after reopening. Large PPTX and PDF transfers also succeeded.
+- Final PRs #405 and #413 passed CI and merged; Ready Production `dpl_7zi1no5HrxgrPbCQo18Lsi1NM5CZ` at `b223dad7d` includes both. [VERIFIED via GitHub, deployment readback, and owner report]
+**Why it matters:** Applicants need not keep a tab open through security scanning and saving. Exact-cap live rehearsal is parked; another simultaneous-large-file test is not required by the owner.
+**Pointers:** `docs/plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md`; `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.15–16.16; #410 `8fb8a6d83`, #413 `81dad17e2`, #405 `1df8a33e2`.
+
 ## October 2026 — Test Request Factory admin form live in Production (Session 563)
 
 **Milestone:** A superuser can create a marked test Request from a source Request, and set its Phase I or II status, from Admin → Test Requests, without the command line.

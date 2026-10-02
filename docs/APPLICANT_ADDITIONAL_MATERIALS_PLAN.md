@@ -25,7 +25,7 @@ related:
 Sections 1–15 preserve the 2026-09-08 planning snapshot; §16 records subsequent
 build and release status. Background processing is separately specified in
 [the 2026-10-01 plan](plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md).
-Its base code, schema, worker and guarded activation follow-ups are Production-deployed. Schema readiness, admission, and virus scanning are enabled. The first real background job completed successfully on attempt 1; see §16.15 for deployment and lifecycle evidence. PR #405's connection-copy follow-up remains open and is not deployed. The exact 500 MB live transfer and concurrent background-job exercise remain unverified.
+Its base code, schema, worker and guarded activation follow-ups are Production-deployed. Schema readiness, admission, and virus scanning are enabled. The first real background job completed successfully on attempt 1; see §16.15 for deployment and lifecycle evidence. PR #405 merged as `1df8a33e2` after all current-head CI checks passed; PR #413 merged as `81dad17e2`. Both are included in Ready Production deployment `dpl_7zi1no5HrxgrPbCQo18Lsi1NM5CZ` at commit `b223dad7d` (October 2 final deployment readback and Git ancestry checks). The exact 500 MB live transfer remains unverified and parked, not a normal-use release blocker. The owner declined another simultaneous-large background test on October 2: the expected set is one large PPTX, a usually smaller PDF, and a text document. Reopen stress testing only if usage or failures warrant it.
 
 Build one **Site Visit Materials** workflow that collects applicant files, lets a Program
 Coordinator (PC) verify that the required files are present and render, and publishes selected
@@ -901,7 +901,7 @@ Request 1003302 successful after deployment. Correlated production logs measured
 server finalization; the highest logged RSS was 542,785,536 bytes. Browser transfer was
 approximately 76 seconds based on token/finalize request times, not a measured client timer.
 These observations do not establish near-limit 500 MB provider support. That rehearsal
-remains pending. Production retains the 2048 MB memory tier.
+is parked (see §16.15); normal-use acceptance is complete. Production retains the 2048 MB memory tier.
 
 ### 16.15 Background processing [PRODUCTION-LIVE; FIRST BACKGROUND JOB COMPLETED 2026-10-02]
 
@@ -921,7 +921,7 @@ is unchanged; background admission requires enabled scanning.
 readiness, admission, and virus scanning are all enabled. PR #404
 (`a63747ca5dfa74954c208e23bd1f90f3b25b0eab`), #407
 (`df7bb6ac3f90eba5b80d785f3119c96b8bd0f0e4`), and #410
-(`8fb8a6d83684a9d49b8450b26ef5bbef382f9a32`) merged with all CI passing. Ready deployment
+(`8fb8a6d83684a9d49b8450b26ef5bbef382f9a32`) merged with all CI passing. The historical activation deployment
 `dpl_2AacXcc5YQX9dNvJ4gMn4PpGtWWN` serves the #410 commit at
 `https://wmkfresearchapps-36g8ub7g7-justin-gallivans-projects.vercel.app`, aliased to
 `applications.wmkeck.org`.
@@ -936,10 +936,7 @@ Production CLI probe passed fixed-target/TLS checks and returned expected `job_n
 intentionally nonexistent UUID `00000000-0000-4000-8000-000000000000`; no recovery mutation
 was run. No automatic email is sent, so operational monitoring remains required.
 
-PR #405 (connection-copy follow-up) remains open and is not merged or deployed. Its conflicts
-with main were resolved in `8081fca57`; verify current-head CI before merging. The 500 MB configured cap is covered by
-tests, but the exact 500 MB live transfer and a concurrent background-job exercise remain
-unverified. The real 300+ MB PPTX upload succeeded before background activation (§16.14).
+PR #405 merged as `1df8a33e2` after all current-head CI checks passed; PR #413 merged as `81dad17e2`. Both are included in Ready Production deployment `dpl_7zi1no5HrxgrPbCQo18Lsi1NM5CZ` at commit `b223dad7d` (October 2 final deployment readback and Git ancestry checks). The configured cap is covered by tests. The exact 500 MB live transfer remains unverified and parked, not a normal-use release blocker. The owner declined another simultaneous-large background test on October 2: the expected set is one large PPTX, a usually smaller PDF, and a text document. Reopen stress testing only if usage or failures warrant it. The real 300+ MB PPTX upload succeeded before background activation (§16.14).
 
 ### 16.16 Security-scan rejection diagnostics [PRODUCTION-LIVE via PR #407/#410]
 
