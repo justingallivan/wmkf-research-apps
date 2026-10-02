@@ -212,6 +212,7 @@ function harness({ deployment = 'preview', env = {}, preflightTarget = null, dep
     runPreflight: async () => preflightFor(preflightTarget ?? (production ? 'production' : 'sandbox')),
     now: () => clock.t,
     exportBundle: async ({ exportedAt }) => bundleAt(exportedAt),
+    readSourceDisplay: async () => ({ title: 'Source title', applicant: 'Live University' }),
     readCast: spies.readCast,
     resolveProgramDirector: spies.resolveProgramDirector,
     advanceRun: spies.advanceRun,
@@ -674,7 +675,8 @@ describe('exportSource / readArtifacts / recheck', () => {
   test('export stores the bundle under a minted draft path and never returns bundle text', async () => {
     const h = harness({ deployment: 'preview' });
     const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
-    expect(Object.keys(result).sort()).toEqual(['defaults', 'draftId', 'summary']);
+    expect(Object.keys(result).sort()).toEqual(['defaults', 'draftId', 'source', 'summary']);
+    expect(result.source).toEqual({ title: 'Source title', applicant: 'Live University' });
     expect(result.defaults).toEqual({ fiscalYear: 'December 2026', meetingDate: '2026-12-01' });
     expect(JSON.stringify(result)).not.toContain('Synthetic purpose');
     expect(h.blobs.objects.has(draftPathname('sandbox', h.actorId, result.draftId))).toBe(true);
@@ -927,8 +929,8 @@ describe('status setter service (slice 2b)', () => {
       runStatus: 'ready',
       // Option 1 is not in the transition table, so the planner's verdict blocks it.
       options: {
-        phase1: [{ value: 1, label: 'option of wmkf_phaseistatus', blocked: 'status_change_refused' }],
-        phase2: [{ value: 1, label: 'option of wmkf_phaseiistatus', blocked: 'status_change_refused' }],
+        phase1: [{ value: 1, label: 'option of wmkf_phaseistatus', blocked: 'status_change_refused', effects: null }],
+        phase2: [{ value: 1, label: 'option of wmkf_phaseiistatus', blocked: 'status_change_refused', effects: null }],
       },
       current: { phase1: 100000001, phase2: null },
       changes: [],
@@ -948,6 +950,20 @@ describe('status setter service (slice 2b)', () => {
     // Approved is the current value; Recommended would create a payment and is not allowed from Approved; Declined is allowed.
     expect(byLabel).toEqual({ Approved: 'status_change_noop', Recommended: 'status_change_edge', Declined: null });
     expect(options.phase1[0].blocked).toBe('status_change_noop');
+    // effects: null when blocked; an array of allowed classes (possibly empty) when not.
+    const effectsByLabel = Object.fromEntries(options.phase2.map((option) => [option.label, option.effects]));
+    expect(effectsByLabel.Approved).toBeNull();
+    expect(effectsByLabel.Recommended).toBeNull();
+    expect(Array.isArray(effectsByLabel.Declined)).toBe(true);
+    expect(effectsByLabel.Declined.every((c) => ['emails', 'tracking', 'payments'].includes(c))).toBe(true);
+  });
+
+  test('S2: a run that is not ready has effects null on every option', async () => {
+    const h = harness({ deployment: 'production' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { status: 'prepared' });
+    const { options } = await h.service.statusOptions({ profileId: PROFILE, runId });
+    expect([...options.phase1, ...options.phase2].every((o) => o.effects === null && o.blocked === null)).toBe(true);
   });
 
   test('F7: a run that is not ready answers options and journal with current null and reads no Request', async () => {
@@ -1266,5 +1282,52 @@ describe('slice 3 server contract', () => {
     const result = await h.service.inspectRun({ profileId: PROFILE, runId });
     expect(result.foundationCapturedAt).toBe('2026-10-01T12:00:00.000Z');
     expect(result.resources).toHaveLength(2);
+  });
+});
+
+describe('S1: source display read', () => {
+  const display = (extra = {}) => harness({ deployment: 'preview', deps: extra });
+
+  test('exportSource returns the display title and applicant beside the summary, never in the stored bundle', async () => {
+    const h = display();
+    const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+    expect(result.source).toEqual({ title: 'Source title', applicant: 'Live University' });
+    const stored = [...h.blobs.objects.values()][0].text;
+    expect(stored).not.toContain('Live University');
+  });
+
+  test('a failed display read returns nulls and the lookup still succeeds', async () => {
+    const h = display({ readSourceDisplay: async () => { throw new Error('boom'); } });
+    const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+    expect(result.source).toEqual({ title: null, applicant: null });
+    expect(result.draftId).toBeTruthy();
+  });
+
+  test('the default read uses the production client with annotations and maps the formatted applicant', async () => {
+    const gets = [];
+    const h = display({
+      readSourceDisplay: undefined,
+      createClient: ({ resourceUrl }) => ({
+        baseUrl: resourceUrl,
+        async get(path, headers) {
+          gets.push({ resourceUrl, path, headers });
+          return { ok: true, status: 200, body: { akoya_title: 'A title', '_akoya_applicantid_value@OData.Community.Display.V1.FormattedValue': 'Some University' } };
+        },
+      }),
+    });
+    const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+    expect(result.source).toEqual({ title: 'A title', applicant: 'Some University' });
+    expect(gets).toHaveLength(1);
+    expect(gets[0].resourceUrl).toBe(PRODUCTION_URL);
+    expect(gets[0].path).toContain(`/akoya_requests(${SOURCE_ID})`);
+    expect(gets[0].headers.Prefer).toContain('include-annotations');
+  });
+
+  test('the default read answers nulls when the client read is not ok or throws', async () => {
+    for (const get of [async () => ({ ok: false, status: 500, body: {} }), async () => { throw new Error('x'); }]) {
+      const h = display({ readSourceDisplay: undefined, createClient: ({ resourceUrl }) => ({ baseUrl: resourceUrl, get }) });
+      const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+      expect(result.source).toEqual({ title: null, applicant: null });
+    }
   });
 });
