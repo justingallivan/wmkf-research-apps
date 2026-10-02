@@ -286,7 +286,7 @@ describe('exactly one PATCH per change', () => {
     const client = fakeClient({ request: { wmkf_phaseiistatus: 100000002, '@odata.etag': 'W/"101"' } });
     const ledger = memoryLedger(READY_RUN, [journaled('dispatched')]);
     ledger.listStatusChanges = async () => [journaled('planned')];
-    await expect(change(client, ledger)).rejects.toMatchObject({ code: 'status_change_in_progress' });
+    await expect(change(client, ledger)).rejects.toMatchObject({ code: 'status_change_concurrent' });
     expect(ledger.rows[0].status).toBe('dispatched');
     expect(client.patches).toHaveLength(0);
   });
@@ -310,11 +310,53 @@ describe('exactly one PATCH per change', () => {
   test('dispatched and unchanged stays in progress on repeated calls, whatever the clock', async () => {
     const client = fakeClient();
     const ledger = memoryLedger(READY_RUN, [DISPATCHED]);
+    const cas = jest.spyOn(ledger, 'markStatusChangeDispatched');
     for (let i = 0; i < 3; i += 1) {
       await expect(change(client, ledger, { completion: { ...fastCompletion(), now: () => T0 + 10 * 365 * 86_400_000 } })).rejects.toMatchObject({ code: 'status_change_in_progress' });
     }
     expect(client.patches).toHaveLength(0);
+    expect(cas).not.toHaveBeenCalled();
     expect(ledger.rows[0].status).toBe('dispatched');
+  });
+
+  test('a write the target interlock would deny is refused before the compare-and-set: the change stays planned and resumes later', async () => {
+    const saved = { mode: process.env.DATAVERSE_TARGET_INTERLOCK, ack: process.env.DATAVERSE_PROD_WRITE_ACK };
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    delete process.env.DATAVERSE_PROD_WRITE_ACK;
+    const client = fakeClient();
+    const ledger = memoryLedger(READY_RUN);
+    try {
+      await expect(change(client, ledger)).rejects.toMatchObject({ code: 'status_change_refused', message: expect.stringContaining('still planned') });
+      expect(client.patches).toHaveLength(0);
+      expect(ledger.rows[0].status).toBe('planned');
+    } finally {
+      if (saved.mode === undefined) delete process.env.DATAVERSE_TARGET_INTERLOCK; else process.env.DATAVERSE_TARGET_INTERLOCK = saved.mode;
+      if (saved.ack !== undefined) process.env.DATAVERSE_PROD_WRITE_ACK = saved.ack;
+    }
+    // With the write permitted again, the same command sends the planned change once.
+    await expect(change(client, ledger)).resolves.toMatchObject({ sequence: 1 });
+    expect(client.patches).toHaveLength(1);
+    expect(ledger.rows[0].status).toBe('complete');
+  });
+
+  test('an applied tracking-producing change still resumes after the other phase field moves (no edge refusal on resume)', async () => {
+    const running = [{ asyncoperationid: '33333333-3333-4333-8333-333333333333', statecode: 1, statuscode: 10, createdon: AFTER }];
+    const done = [{ ...running[0], statecode: 3, statuscode: 30 }];
+    let finished = false;
+    const client = fakeClient({
+      jobs: () => (finished ? done : running),
+      tracking: [{ akoya_goapplystatustrackingid: '44444444-4444-4444-8444-444444444444', createdon: AFTER }],
+    });
+    const ledger = memoryLedger(READY_RUN);
+    const invite = { field: PHASE1, optionLabel: 'Invited' };
+    await expect(change(client, ledger, invite)).rejects.toMatchObject({ code: 'status_change_jobs_open' });
+    expect(ledger.rows[0].status).toBe('applied');
+    // A workflow or a person sets Phase II: planning Invited from this pair would be refused (status_change_edge).
+    client.state.wmkf_phaseiistatus = 100000002;
+    finished = true;
+    await expect(change(client, ledger, invite)).resolves.toMatchObject({ sequence: 1, tracking: 1 });
+    expect(client.patches).toHaveLength(1);
+    expect(ledger.rows[0].status).toBe('complete');
   });
 
   test('dispatched with the target present is recovered and completes without a PATCH; the census reads from the original dispatch time', async () => {

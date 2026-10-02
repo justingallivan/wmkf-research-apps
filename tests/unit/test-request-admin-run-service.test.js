@@ -982,7 +982,7 @@ describe('status setter service (slice 2b)', () => {
     h.spies.runStatusChange.mockRejectedValueOnce(runnerError('status_change_replay', 'pass --rerun'));
     const error = await change(h, runId).catch((e) => e);
     expect(error).toMatchObject({ httpStatus: 409, code: 'status_change_replay' });
-    expect(error.message).toBe('This change already created a payment or status-tracking row on this Request. Repeating it needs the owner CLI (`--set-status … --rerun`) after inspection.');
+    expect(error.message).toBe('An earlier change to this status created, or may have created, a payment or status-tracking row on this Request. Repeating it needs the owner CLI (`--set-status … --rerun`) after inspection.');
   });
 
   test('a Postgres unique violation from planning is a 409 status_change_open', async () => {
