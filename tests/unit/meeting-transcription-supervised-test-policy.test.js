@@ -99,6 +99,15 @@ test('supervised route allowlist is request-bound, method-specific, and rejects 
   expect(decide('/api/auth/callback/azure-ad', 'GET', 'state=abc').allowed).toBe(true);
   expect(decide(`/api/meeting-tracker/visits/${REQUEST_ID}/transcriptions`, 'POST').allowed).toBe(true);
   expect(decide(`/api/meeting-tracker/visits/${REQUEST_ID}/transcriptions/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/start`, 'POST').allowed).toBe(true);
+  const publishedDocumentId = '599509e5-b9be-f111-aaad-70a8a5b1c1c6';
+  const publishedDownload = `/api/meeting-tracker/visits/${REQUEST_ID}/transcriptions/materials/${publishedDocumentId}/download`;
+  expect(decide(publishedDownload, 'GET', 'format=txt').allowed).toBe(true);
+  expect(decide(publishedDownload.replace(publishedDocumentId, '599509e5-b9be-x111-aaad-70a8a5b1c1c6'), 'GET', 'format=txt').allowed).toBe(false);
+  const jobPath = `/api/meeting-tracker/visits/${REQUEST_ID}/transcriptions/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa`;
+  expect(decide(jobPath, 'DELETE').allowed).toBe(true);
+  expect(decide(jobPath, 'DELETE', 'cleanup=1').allowed).toBe(false);
+  expect(decide(jobPath.replace(REQUEST_ID, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'), 'DELETE').allowed).toBe(false);
+  expect(decide(jobPath.replace('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'aaaaaaaa-aaaa-faaa-baaa-aaaaaaaaaaaa'), 'DELETE').allowed).toBe(false);
   expect(decide(`/api/workbench/site-visit/logistics`, 'GET', `requestId=${REQUEST_ID}`).allowed).toBe(true);
   for (const path of ['/api/user-profiles', '/api/app-access']) {
     expect(decide(path, 'GET').allowed).toBe(true);
