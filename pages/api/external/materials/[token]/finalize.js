@@ -11,6 +11,7 @@ import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/
 import { withDalContext } from '../../../../../lib/dataverse/core/context';
 import { isGuid } from '../../../../../lib/utils/guid';
 import { ServiceHttpError } from '../../../../../lib/services/service-http-error';
+import { sanitizeSiteVisitMaterialsScanRejection } from '../../../../../shared/utils/site-visit-materials-scan-rejection.js';
 import { finalizeMaterialUpload } from '../../../../../lib/services/site-visit-materials/contributor-service';
 import { isVirusScanEnabled } from '../../../../../lib/utils/virus-scan-config.js';
 import { SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED } from '../../../../../shared/config/siteVisitMaterials.js';
@@ -51,6 +52,11 @@ function queuedJobResponse(res, job, stagingId) {
   if (job.status === 'completed') return res.status(200).json(job.result_payload || { ok: true });
   if (['queued', 'processing', 'needs_attention'].includes(job.status)) {
     return res.status(202).json({ ok: true, jobId: job.id, stagingId, status: job.status });
+  }
+  if (job.status === 'failed' && job.error_code === 'scan_infected') {
+    const scanRejection = sanitizeSiteVisitMaterialsScanRejection(job.result_payload?.scanRejection)
+      || { category: 'unspecified', flags: [] };
+    return res.status(422).json({ ok: false, jobId: job.id, stagingId, status: job.status, reason: 'scan_infected', scanRejection });
   }
   return res.status(409).json({ ok: false, jobId: job.id, stagingId, status: job.status, reason: job.error_code || job.status });
 }
@@ -108,7 +114,14 @@ export default async function handler(req, res) {
       actorBinding: externalMaterialsActorBinding(token),
     });
   } catch (error) {
-    if (error instanceof PortalUploadStagingError) return res.status(error.httpStatus).json({ ok: false, reason: error.code });
+    if (error instanceof PortalUploadStagingError) {
+      if (error.code === 'scan_infected') {
+        const scanRejection = sanitizeSiteVisitMaterialsScanRejection(error.resultPayload?.scanRejection)
+          || { category: 'unspecified', flags: [] };
+        return res.status(422).json({ ok: false, reason: 'scan_infected', scanRejection });
+      }
+      return res.status(error.httpStatus).json({ ok: false, reason: error.code });
+    }
     throw error;
   }
   if (claim.state === 'consumed') return res.status(200).json(claim.result || { ok: true });
@@ -202,13 +215,30 @@ export default async function handler(req, res) {
   } catch (error) {
     if (error instanceof ServiceHttpError) {
       const code = error.code || error.body?.reason || 'persist_failed';
-      if (PERMANENT_RESULT_CODES.has(code)) await rejectPortalUpload({ stagingId, leaseToken: claim.leaseToken, resultCode: code });
+      if (PERMANENT_RESULT_CODES.has(code)) await rejectPortalUpload({
+        stagingId,
+        leaseToken: claim.leaseToken,
+        resultCode: code,
+        ...(code === 'scan_infected' ? {
+          resultPayload: {
+            ok: false,
+            reason: 'scan_infected',
+            scanRejection: sanitizeSiteVisitMaterialsScanRejection(error.body?.scanRejection)
+              || { category: 'unspecified', flags: [] },
+          },
+        } : {}),
+      });
       else if (!HOLD_STAGING_CODES.has(code)) await releasePortalUpload({ stagingId, leaseToken: claim.leaseToken });
       console.warn('[materials/finalize] stage failed', {
         stage, durationMs: Date.now() - finalizeStartedAt, totalDurationMs: Date.now() - startedAt,
         bytes: file.buffer.length, rssBytes: process.memoryUsage().rss,
         code, status: error.httpStatus,
       });
+      if (code === 'scan_infected') {
+        const scanRejection = sanitizeSiteVisitMaterialsScanRejection(error.body?.scanRejection)
+          || { category: 'unspecified', flags: [] };
+        return res.status(422).json({ ok: false, reason: 'scan_infected', scanRejection });
+      }
       return res.status(error.httpStatus).json(error.body ?? { ok: false, reason: code });
     }
     await releasePortalUpload({ stagingId, leaseToken: claim.leaseToken });

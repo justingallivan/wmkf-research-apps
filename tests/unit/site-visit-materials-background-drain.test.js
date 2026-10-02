@@ -153,11 +153,32 @@ test('the finalizer fence rechecks current collection authority, not only its or
 });
 
 test.each([false, true])('infected bytes are deleted immediately; prior candidate holds attention: %s', async (hasPriorCandidate) => {
-  const d = dependencies({ finalize: jest.fn(async () => { throw failure('scan_infected'); }),
+  const infected = Object.assign(failure('scan_infected'), { body: { scanRejection: { category: 'signature_match', flags: [] } } });
+  const d = dependencies({ finalize: jest.fn(async () => { throw infected; }),
     getCurrentSideEffects: jest.fn(async () => ({ scan_checkpoint: null, candidate_result: hasPriorCandidate ? { driveId: 'drive', itemId: 'candidate' } : null })) });
   expect(await drainOneMaterialsUpload(d)).toMatchObject({ status: hasPriorCandidate ? 'needs_attention' : 'failed' });
   expect(d.deleteStagedBlob).toHaveBeenCalledWith(STAGE.pathname);
+  expect(d.settleJob.mock.calls[0][0]).toMatchObject({ errorCode: 'scan_infected', resultPayload: { ok: false, scanRejection: { category: 'signature_match', flags: [] } } });
+  expect(d.settleJob.mock.calls[0][0].status).toBe(hasPriorCandidate ? 'needs_attention' : 'failed');
   if (hasPriorCandidate) expect(d.settleJob.mock.calls[0][0].clearStageOwner).not.toBe(true);
+});
+
+test('scan infection remains terminal when the deadline passes during the scanner call', async () => {
+  let current = NOW;
+  const infected = Object.assign(failure('scan_infected'), { body: { scanRejection: { category: 'unspecified', flags: [] } } });
+  const d = dependencies({
+    now: () => current,
+    finalize: jest.fn(async () => { current = new Date(new Date(JOB.deadline_at).getTime() + 1); throw infected; }),
+  });
+  expect(await drainOneMaterialsUpload(d)).toMatchObject({ status: 'failed', errorCode: 'scan_infected' });
+  expect(d.settleJob.mock.calls[0][0]).toMatchObject({ status: 'failed', errorCode: 'scan_infected' });
+});
+
+test('scan infection remains terminal on the last retry attempt', async () => {
+  const infected = Object.assign(failure('scan_infected'), { body: { scanRejection: { category: 'unspecified', flags: [] } } });
+  const d = dependencies({ claim: jest.fn(async () => ({ ...JOB, attempt_count: 8 })), finalize: jest.fn(async () => { throw infected; }) });
+  expect(await drainOneMaterialsUpload(d)).toMatchObject({ status: 'failed', errorCode: 'scan_infected' });
+  expect(d.settleJob.mock.calls[0][0]).toMatchObject({ status: 'failed', errorCode: 'scan_infected' });
 });
 
 test('unreadable owned staging records attention without loading or publishing', async () => {

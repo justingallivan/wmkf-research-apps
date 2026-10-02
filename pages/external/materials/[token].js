@@ -9,6 +9,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { requestEnvelope } from '../../../shared/utils/api-request';
 import { SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED } from '../../../shared/config/siteVisitMaterials';
+import { siteVisitMaterialsScanRejectionMessage } from '../../../shared/utils/site-visit-materials-scan-rejection';
 
 const REASON_MESSAGE = {
   no_token: 'This link is missing its access token.',
@@ -26,7 +27,7 @@ const UPLOAD_MESSAGE = {
   extension_not_allowed: 'That file type is not accepted for this item.',
   signature_mismatch: 'That file does not match its extension. Please export it again and retry.',
   empty_file: 'That file is empty.',
-  scan_infected: 'That file failed the malware scan and was not accepted.',
+  scan_infected: 'This file did not pass the security check, and the scanner did not provide a specific reason. Please choose a different file.',
   scan_timeout: 'The security scan did not finish in time, so this file has not been accepted yet. Please press Retry. If this keeps happening, contact the Foundation.',
   scan_busy: 'The security scanner is busy right now. Please wait a few minutes and press Retry. If this keeps happening, contact the Foundation.',
   scan_unavailable: 'The security scanner is temporarily unavailable. Please press Retry. If this keeps happening, contact the Foundation.',
@@ -117,6 +118,11 @@ function coordinatorContact(programCoordinator) {
   return { name, email };
 }
 
+function scanRejectionCopy(scanRejection, programCoordinator) {
+  const coordinator = coordinatorContact(programCoordinator);
+  return <>{siteVisitMaterialsScanRejectionMessage(scanRejection)} If you need help, contact your Program Coordinator{coordinator.name ? `, ${coordinator.name}` : ''}{coordinator.email ? <> at{' '}<a className="underline" href={`mailto:${encodeURIComponent(coordinator.email)}`}>{coordinator.email}</a></> : ''}.</>;
+}
+
 function jobMessage(job, programCoordinator) {
   const coordinator = coordinatorContact(programCoordinator);
   if (job?.status === 'queued' || job?.status === 'processing') {
@@ -127,8 +133,8 @@ function jobMessage(job, programCoordinator) {
   }
   if (job?.status === 'completed') return 'Your file was saved.';
   if (job?.status === 'failed') {
+    if (job.errorCode === 'infected') return scanRejectionCopy(job.scanRejection, programCoordinator);
     const failureCopy = {
-      infected: 'The security scan rejected this file. Choose a different file to continue.',
       invalid_file: 'This file did not pass validation. Please choose a different file.',
       size_limit: 'This file exceeded the upload limit. Choose a smaller file.',
       processing_deadline: 'This upload took too long to finish. Please try again with a different file or contact your Program Coordinator.',
@@ -249,7 +255,9 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
             if (serverLimit !== null) onCapChange?.(serverLimit);
             setError({ type: 'size_limit', maxMb: serverLimit });
           } else {
-            const message = UPLOAD_MESSAGE[result.reason] || REASON_MESSAGE[result.reason];
+            const message = result.reason === 'scan_infected'
+              ? scanRejectionCopy(result.scanRejection, programCoordinator)
+              : UPLOAD_MESSAGE[result.reason] || REASON_MESSAGE[result.reason];
             setError(message || (finalizeStatus >= 500
               ? 'Processing stopped before we could confirm this upload was saved. Wait a few minutes and press Retry.'
               : 'The file could not be saved.'));

@@ -568,7 +568,12 @@ applicant materials store the intended predecessor artifact id plus the Graph
 drive/item/version/filename. This lets an expired-lease retry recognize a
 committed response drop, retire only the recorded predecessor, or delete only
 an exact unreferenced candidate where that scope supports candidate cleanup.
-`result_payload` makes consumed retries idempotent.
+`result_payload` makes consumed retries idempotent. **[SOURCE-BUILT, NOT DEPLOYED:]
+For `site_visit_material` only, a terminal `scan_infected` rejection can also store
+the strict public `{ok:false, reason:'scan_infected', scanRejection:{category,flags}}`
+payload. Rejected-staging replay returns its safe diagnostic; an attention hold
+keeps staging pending and does not write that rejection payload. Other scopes
+retain their existing replay contract.**
 
 For `post_presentation_transcript` (migration 055), the candidate binds the
 request/generation identity and exact Graph drive/item/name/version/ETag.
@@ -624,8 +629,8 @@ Migration 060 adds the nullable `background_job_id` ownership marker used only
 by applicant materials background uploads. While present, staging cleanup and
 ordinary finalize claims must respect the exact job owner; the job ledger is
 coordination state and does not replace the staged pathname, Blob hash, or
-domain receipt. **[SOURCE-BUILT on `codex/materials-background-processing`; migration
-060 has not been applied or live-verified.]**
+domain receipt. **[PRODUCTION-VERIFIED 2026-10-02: migration 060 is applied and
+the column exists; background admission remained off at the recorded probe.]**
 
 ## Monitoring / observability
 
@@ -646,6 +651,11 @@ Cron-driven health checks (7 services), alert log, cron audit trail. `maintenanc
 mirror (auto at error/critical, opt-in via `operationalEvent` at any severity)
 and drain ingestion `lib/services/vercel-log-drain-ingest.js` via
 `/api/webhooks/vercel-log-drain` (HMAC-verified, `vercel:<log id>` dedup).
+**[SOURCE-BUILT, NOT DEPLOYED:]** Applicant materials `scan_infected`
+rejections also write a best-effort warning `site_visit_material_scan_rejected`
+at `virus_scan`, deduplicated by staging id. Entity references contain the
+request, collection, staging, and slot; metadata contains only the allowlisted
+`scanRejection` category and flags. The event does not send email.
 Recovery: `markRecovered`/`markSuperseded` (reviewer-acceptance drain
 completion/withdrawal edges; `AlertService.autoResolve` propagation).
 **Read paths:** `/api/admin/operational-events` → `OperationalEventsSection`
@@ -925,6 +935,15 @@ jobs. A replacement is written under a unique `portal-${stagingId}` SharePoint
 subfolder so prior bytes remain preserved until the new receipt is committed.
 SharePoint remains the byte store and `wmkf_requestdocument` the published
 receipt; this table owns neither.
+
+**[SOURCE-BUILT, NOT DEPLOYED:]** An infected verdict persists the sanitized
+`{ok:false, scanRejection:{category,flags}}` in existing job `result_payload`,
+including an infected `needs_attention` hold. The terminal failed path also
+rejects staging and persists its replay payload; a hold leaves staging pending.
+Applicant `jobs` expose this diagnostic only for failed infected jobs; staff
+`uploadJobs` expose it for failed or attention-held infected jobs. Legacy or
+invalid diagnostics fall back to an unspecified reason. No table or migration
+changes are needed.
 
 The worker at `/api/cron/drain-materials-uploads` claims at most one job per
 invocation, checks the existing virus scanner, fences writes with a fixed

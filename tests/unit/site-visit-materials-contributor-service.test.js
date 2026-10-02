@@ -74,6 +74,23 @@ test('context shows institution, title, dates, cap, and per-slot receipt; waived
   expect(closed.closed).toBe(true);
 });
 
+test('applicant context exposes safe diagnostics only for terminal infected jobs', async () => {
+  const d = deps({
+    backgroundJobsSchemaReady: () => true,
+    listBackgroundJobs: async () => [
+      { job_id: 'failed', staging_id: 's1', slot: 'presentation_pdf', status: 'failed', filename: 'deck.pdf', error_code: 'scan_infected', scan_rejection: { category: 'blocked_content', flags: ['embedded_macro'] } },
+      { job_id: 'attention', staging_id: 's2', slot: 'participant_bios', status: 'needs_attention', filename: 'bios.pdf', error_code: 'scan_infected', scan_rejection: { category: 'signature_match', flags: [] } },
+      { job_id: 'bad', staging_id: 's3', slot: 'other', status: 'failed', filename: 'x.pdf', error_code: 'scan_infected', scan_rejection: { category: 'blocked_content', flags: ['provider-secret'] } },
+    ],
+  });
+  const ctx = await buildContributorContext({ collection: collection() }, d);
+  expect(ctx.jobs[0]).toMatchObject({ errorCode: 'infected', scanRejection: { category: 'blocked_content', flags: ['embedded_macro'] } });
+  expect(ctx.jobs[1]).toMatchObject({ errorCode: 'coordinator_action_required' });
+  expect(ctx.jobs[1]).not.toHaveProperty('scanRejection');
+  expect(ctx.jobs[2]).toMatchObject({ errorCode: 'infected', scanRejection: null });
+  expect(JSON.stringify(ctx)).not.toContain('provider-secret');
+});
+
 describe('Program Coordinator context', () => {
   afterEach(() => jest.restoreAllMocks());
 
@@ -218,12 +235,28 @@ test('finalize refuses: waived slot, oversize, wrong bytes, infected scan, no ac
     body: { reason: 'file_too_large', maxMb: 1 },
   });
   await expect(finalizeMaterialUpload(finalizeArgs('presentation_pdf', { filename: 'a.pdf', buffer: ZIP }), d)).rejects.toMatchObject({ code: 'signature_mismatch', httpStatus: 422 });
-  const infected = deps({ scanBytes: async () => ({ scan_result: 'infected' }) });
+  const recordEvent = jest.fn(async () => undefined);
+  const infected = deps({ scanBytes: async () => ({
+    scan_result: 'infected', signatureDetected: false, contentFlags: ['embedded_macro'],
+    foundViruses: [{ fileName: 'https://private.example/secret.pdf', virusName: 'provider secret' }],
+    verifiedFileFormat: 'provider-format-secret',
+  }), recordEvent });
   const unknown = deps({ scanBytes: async () => ({}) });
   await expect(finalizeMaterialUpload(finalizeArgs(), unknown)).rejects.toMatchObject({ code: 'scan_unavailable', httpStatus: 503 });
   const errored = deps({ scanBytes: async () => ({ scan_result: 'error' }) });
   await expect(finalizeMaterialUpload(finalizeArgs(), errored)).rejects.toMatchObject({ code: 'scan_unavailable' });
-  await expect(finalizeMaterialUpload(finalizeArgs(), infected)).rejects.toMatchObject({ code: 'scan_infected' });
+  await expect(finalizeMaterialUpload(finalizeArgs(), infected)).rejects.toMatchObject({
+    code: 'scan_infected',
+    body: { scanRejection: { category: 'blocked_content', flags: ['embedded_macro'] } },
+  });
+  expect(infected.recordEvent).toHaveBeenCalledWith(expect.objectContaining({
+    eventType: 'site_visit_material_scan_rejected',
+    severity: 'warning',
+    entityRefs: expect.objectContaining({ stagingId: STAGING_ID, slot: 'presentation_pdf' }),
+    metadata: { scanRejection: { category: 'blocked_content', flags: ['embedded_macro'] } },
+    dedupeKey: `site_visit_material_scan_rejected:${STAGING_ID}`,
+  }));
+  expect(JSON.stringify(infected.recordEvent.mock.calls)).not.toMatch(/provider secret|provider-format-secret|virusName|https:\/\//i);
   const noBucket = deps({ getSharePointBuckets: async () => [{ library: 'Archive', folder: 'x', source: 'archive' }] });
   await expect(finalizeMaterialUpload(finalizeArgs(), noBucket)).rejects.toMatchObject({ code: 'folder_unavailable', httpStatus: 503 });
   for (const x of [d, tiny, infected, unknown, errored, noBucket]) { expect(x.uploadFile).not.toHaveBeenCalled(); expect(x.createDocument).not.toHaveBeenCalled(); }

@@ -11,6 +11,7 @@ import { requestEnvelope } from '../../utils/api-request';
 import { Button } from '../Layout';
 import EmailSendFeedback from '../EmailSendFeedback';
 import MaterialsEmailModal from './MaterialsEmailModal';
+import { siteVisitMaterialsScanRejectionMessage, siteVisitMaterialsScanRejectionReason } from '../../utils/site-visit-materials-scan-rejection';
 
 function formatDate(iso) {
   const date = new Date(iso || '');
@@ -49,9 +50,9 @@ function UploadJobNotice({ jobs, programCoordinator }) {
         if (job.status === 'needs_attention') {
           const name = typeof programCoordinator?.name === 'string' ? programCoordinator.name.trim() : '';
           const email = typeof programCoordinator?.email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(programCoordinator.email.trim()) ? programCoordinator.email.trim() : '';
-          return <p key={job.jobId} className="text-xs text-amber-900" role="alert">Needs coordinator attention before replacement is safe{name ? ` · ${name}` : ''}{email ? <> · <a className="underline" href={`mailto:${encodeURIComponent(email)}`}>{email}</a></> : ''}</p>;
+          return <div key={job.jobId} className="text-xs text-amber-900" role="alert"><p>Needs coordinator attention before replacement is safe{name ? ` · ${name}` : ''}{email ? <> · <a className="underline" href={`mailto:${encodeURIComponent(email)}`}>{email}</a></> : ''}</p>{job.errorCode === 'infected' && <p className="mt-1">{siteVisitMaterialsScanRejectionReason(job.scanRejection)}</p>}</div>;
         }
-        if (job.status === 'failed') return <p key={job.jobId} className="text-xs text-amber-900" role="status">The new upload could not be saved. The previously received file remains on record.</p>;
+        if (job.status === 'failed') return <div key={job.jobId} className="text-xs text-amber-900" role="status"><p>The new upload could not be saved. The previously received file remains on record.</p>{job.errorCode === 'infected' && <p className="mt-1">{siteVisitMaterialsScanRejectionMessage(job.scanRejection)}</p>}</div>;
         return null;
       })}
     </div>
