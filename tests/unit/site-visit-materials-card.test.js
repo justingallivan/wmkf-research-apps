@@ -174,3 +174,39 @@ test('staff card shows safe scan reason alongside terminal and coordinator-atten
   expect(screen.getByText(/Needs coordinator attention before replacement is safe/)).toBeInTheDocument();
   expect(screen.getByText('The security scan identified a known threat.')).toBeInTheDocument();
 });
+
+test.each(['missing', 'closed'])('received checklist and other files open in a new tab when collection is %s', async (state) => {
+  const data = collection({ state, other: [{ artifactId: 'other', filename: 'Supporting.pdf', receivedAt: '2026-10-01', webUrl: 'https://tenant.sharepoint.com/supporting.pdf' }] });
+  data.checklist[0].received.webUrl = 'https://tenant.sharepoint.com/presentation.pdf';
+  global.fetch = jest.fn(async () => response({ success: true, collection: data }));
+  render(<SiteVisitMaterialsCard requestId={REQUEST_ID} />);
+  const links = await screen.findAllByRole('link', { name: /^Open file:/ });
+  expect(links).toHaveLength(2);
+  expect(links[0]).toHaveAttribute('href', data.checklist[0].received.webUrl);
+  expect(links[1]).toHaveAttribute('href', data.other[0].webUrl);
+  for (const link of links) {
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(link).toHaveAccessibleName(/opens in a new tab/);
+  }
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+});
+
+test.each([undefined, '', 'not a URL', 'javascript:alert(1)', 'http://tenant.sharepoint.com/file', 'https://user:password@tenant.sharepoint.com/file'])('does not offer an unsafe or absent file URL: %s', async (webUrl) => {
+  const data = collection({ other: [{ artifactId: 'other', filename: 'Supporting.pdf', webUrl }] });
+  data.checklist[0].received.webUrl = webUrl;
+  global.fetch = jest.fn(async () => response({ success: true, collection: data }));
+  render(<SiteVisitMaterialsCard requestId={REQUEST_ID} />);
+  await screen.findByText(/1003222 Site Visit Presentation.pdf/);
+  expect(screen.queryByRole('link', { name: /^Open file:/ })).not.toBeInTheDocument();
+});
+
+test('pending replacement opens only the previous receipt and never the unfinished job', async () => {
+  const data = collection({ uploadJobs: [{ jobId: 'pending', slot: 'presentation_pdf', status: 'processing', webUrl: 'https://tenant.sharepoint.com/pending.pdf' }, { jobId: 'other-pending', slot: 'other', status: 'processing', filename: 'Unfinished.pdf', webUrl: 'https://tenant.sharepoint.com/unfinished.pdf' }] });
+  data.checklist[0].received.webUrl = 'https://tenant.sharepoint.com/previous.pdf';
+  global.fetch = jest.fn(async () => response({ success: true, collection: data }));
+  render(<SiteVisitMaterialsCard requestId={REQUEST_ID} />);
+  const link = await screen.findByRole('link', { name: /^Open file:/ });
+  expect(link).toHaveAttribute('href', 'https://tenant.sharepoint.com/previous.pdf');
+  expect(screen.getByText(/Previously received/)).toBeInTheDocument();
+});
