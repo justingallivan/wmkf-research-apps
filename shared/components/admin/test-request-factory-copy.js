@@ -70,6 +70,29 @@ export const ERROR_COPY = Object.freeze({
   status_change_ambiguous: "The change was sent but its result couldn't be read. Check again; don't start a different change.",
 });
 
+const ATTENTION_DEFAULT = 'This step stopped and needs a look before it is retried. Retrying is safe: the run picks up where it stopped and never creates a second Request.';
+const ATTENTION_OWNER = "This step's result could not be confirmed, so the form can't tell whether retrying is safe. Ask the owner before retrying.";
+// Keyed by the run's stored needs-attention reason (a LEDGER_REASON_CODES token). Anything unlisted gets the default.
+export const ATTENTION_COPY = Object.freeze({
+  ambiguous_create_outcome: "The request to create the test Request was sent, but its result could not be confirmed. Don't retry; ask the owner to resolve it, because retrying could create a second Request.",
+  preallocated_request_present_not_owned: "A Request with this run's reserved identity already exists but this run did not create it. Don't retry; ask the owner.",
+  location_preexisting: "A document folder record for this Request already exists and this run did not create it. Don't retry; ask the owner.",
+  source_fence_failed: 'The source Request no longer matched what was read, so the run stopped at its first check. Look up the source Request again and start a new run.',
+  timeout: 'A service took too long to answer during this step. Retrying is safe: the run picks up where it stopped.',
+  network: 'The connection dropped during this step. Retrying is safe: the run picks up where it stopped.',
+  file_ambiguous_unrecovered: ATTENTION_OWNER,
+  file_journal_unverified: ATTENTION_OWNER,
+  goverify_deactivation_uncertain: ATTENTION_OWNER,
+  goverify_restore_unverified: ATTENTION_OWNER,
+  goverify_restore_failed: ATTENTION_OWNER,
+});
+
+/** Plain copy for a needs-attention run, from its stored reason (an optional " (http 503)" suffix is ignored). */
+export function attentionCopyFor(reason) {
+  const token = typeof reason === 'string' ? reason.split(' ')[0] : '';
+  return ATTENTION_COPY[token] || ATTENTION_DEFAULT;
+}
+
 /** The code on an ApiRequestError payload (or a plain `code`), else null. */
 export function codeOf(error) {
   const code = error?.payload?.code ?? error?.code;

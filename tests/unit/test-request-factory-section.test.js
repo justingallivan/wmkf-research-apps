@@ -122,12 +122,12 @@ describe('on load', () => {
     // Look up (needs a valid number first so the reason is the form-off one)
     fireEvent.change(screen.getByLabelText('Source Request number'), { target: { value: '1001000' } });
     expect(screen.getByRole('button', { name: 'Look up source' }).disabled).toBe(true);
-    expect(screen.getAllByText(/switched off on this deployment/).length).toBeGreaterThan(1);
+    expect(screen.getAllByText(/switched off on this deployment/i).length).toBeGreaterThan(1);
     // Read control: opening a run still works; Start is disabled with a reason.
     await selectRun('Run A');
-    const start = screen.getByRole('button', { name: 'Start' });
+    const start = screen.getByRole('button', { name: 'Start production run' });
     expect(start.disabled).toBe(true);
-    expect(document.getElementById(start.getAttribute('aria-describedby')).textContent).toMatch(/switched off/);
+    expect(document.getElementById(start.getAttribute('aria-describedby')).textContent).toMatch(/switched off/i);
     expect(screen.getByRole('button', { name: 'Download run files' }).disabled).toBe(false);
   });
 
@@ -177,7 +177,7 @@ describe('source lookup', () => {
     ['test_request_preview_total_size_exceeded', 413, /limit 25 MB per file, 50 MB in total, 7 files/],
     ['test_request_preview_file_count_exceeded', 413, /limit 25 MB per file, 50 MB in total, 7 files/],
     ['factory_deadline_exceeded', 504, "There wasn't enough time left to start that safely, so nothing was started. Try again."],
-    ['factory_form_disabled', 503, /switched off on this deployment/],
+    ['factory_form_disabled', 503, /switched off on this deployment/i],
   ])('%s renders its copy, not the code', async (code, status, expected) => {
     const server = makeServer();
     await renderSection(server, []);
@@ -208,6 +208,9 @@ describe('confirm', () => {
     await lookup(server);
     await screen.findByLabelText('Test label');
     const reasonOf = () => document.getElementById(confirmButton().getAttribute('aria-describedby')).textContent;
+    // The label is pre-filled; clearing it shows the reason.
+    expect(screen.getByLabelText('Test label').value).toBe('Test clone of Request 1001000');
+    fireEvent.change(screen.getByLabelText('Test label'), { target: { value: '' } });
     expect(confirmButton().disabled).toBe(true);
     expect(reasonOf()).toBe('Enter a test label.');
     fireEvent.change(screen.getByLabelText('Test label'), { target: { value: 'My test' } });
@@ -275,7 +278,8 @@ describe('confirm', () => {
     expect(server.bodies('POST', BASE).at(-1).idempotencyKey).toBe('key-2');
 
     // A second lookup: a new key again.
-    fireEvent.click(screen.getByRole('button', { name: 'Look up source' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Look up a different source' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Look up source' }));
     await waitFor(() => expect(server.count('POST', `${BASE}/source`)).toBe(2));
     await screen.findByLabelText('Test label');
     fillConfirm({ label: 'Third' });
@@ -329,7 +333,7 @@ describe('advance loop', () => {
     await selectRun(run.testLabel);
     return server;
   };
-  const start = (name = 'Start') => fireEvent.click(screen.getByRole('button', { name }));
+  const start = (name = 'Start production run') => fireEvent.click(screen.getByRole('button', { name }));
   const steps = () => within(screen.getByRole('list', { name: 'Steps' }));
 
   test('advanced continues, updates progress from stepIndex, and ready stops with the number', async () => {
@@ -344,6 +348,7 @@ describe('advance loop', () => {
     // Mid-loop: step 1 is done (from stepIndex), step 2 is in progress.
     expect(steps().getAllByText('Done')).toHaveLength(1);
     expect(steps().getByText('In progress')).toBeTruthy();
+    expect(screen.getByText('Finished: Check the source Request. Working on: Create the test Request. This can take a few minutes. Leave this page open.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Stop after this step' })).toBeTruthy();
     await act(async () => { gate.resolve(); });
     await screen.findByText('The test Request is ready.');
@@ -359,9 +364,9 @@ describe('advance loop', () => {
     server.on('POST', advancePath(), reply('needs_attention', { step: 'copy_file', status: 'needs_attention', currentStep: 'copy_file', stepIndex: 4, errorMessage: 'Graph said no to file X' }));
     server.on('GET', `${BASE}/${RUN_A}`, runBody(makeRun({ status: 'needs_attention', currentStep: 'copy_file', stepIndex: 4 })));
     start();
-    await screen.findByText('Stopped at "Copy the documents (one per step)": this step needs attention.');
+    await screen.findByText('Stopped at "Copy the documents (one per step)".');
     expect(screen.getByText('Graph said no to file X')).toBeTruthy();
-    await screen.findByRole('button', { name: 'Resume' });
+    await screen.findByRole('button', { name: 'Retry step: Copy the documents (one per step)' });
     expect(steps().getByText('Needs attention')).toBeTruthy();
     expect(server.count('POST', advancePath())).toBe(1);
     expect(localStorage.length).toBe(0);
@@ -375,7 +380,7 @@ describe('advance loop', () => {
     server.on('GET', `${BASE}/${RUN_A}`, runBody(makeRun({ status: 'creating', stepIndex: 1 })));
     start();
     await screen.findByText('Another process is advancing this run. That can be a step you started a moment ago that is still finishing. Try again in a few minutes.');
-    await screen.findByRole('button', { name: 'Resume' });
+    await screen.findByRole('button', { name: 'Resume production run' });
     expect(server.count('POST', advancePath())).toBe(1);
   });
 
@@ -433,19 +438,19 @@ describe('advance loop', () => {
         consumed = true;
         return late;
       }, reply('ready', { status: 'ready' })); // only reachable if the loop wrongly continues
-      fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Start production run' }));
       await waitFor(() => expect(server.count('POST', advancePath(RUN_A))).toBe(1));
       await selectRun('Run B');
       expect(steps().getAllByText('Done')).toHaveLength(3);
       await act(async () => { gate.resolve(); });
       if (!bodyAfterAbort) await waitFor(() => expect(consumed).toBe(true));
       // Positive sentinel: a request made for B after A's answer is released completes and shows.
-      fireEvent.click(screen.getByRole('button', { name: 'Recheck Foundation' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Recheck the Foundation record' }));
       await screen.findByText('The Foundation records are as expected.');
       expect(screen.getByRole('heading', { name: 'Run B' })).toBeTruthy();
       expect(screen.queryByRole('alert')).toBeNull();
       expect(steps().getAllByText('Done')).toHaveLength(3);
-      expect(screen.getByRole('button', { name: 'Resume' }).disabled).toBe(false);
+      expect(screen.getByRole('button', { name: 'Resume production run' }).disabled).toBe(false);
       expect(server.count('POST', advancePath(RUN_A))).toBe(1);
       expect(server.count('POST', advancePath(RUN_B))).toBe(0);
     });
@@ -490,7 +495,7 @@ describe('write reasons and reserved values', () => {
     const server = makeServer();
     await renderSection(server, [], { formEnabled: false });
     expect(screen.getByRole('button', { name: 'Look up source' }).disabled).toBe(true);
-    expect(document.getElementById('factory-lookup-reason').textContent).toMatch(/switched off on this deployment/);
+    expect(document.getElementById('factory-lookup-reason').textContent).toMatch(/switched off on this deployment/i);
   });
 
   test('a retry with edited values that returns the existing run (200, created false) shows the stored values and says so', async () => {
@@ -507,7 +512,7 @@ describe('write reasons and reserved values', () => {
     await screen.findByRole('alert');
     fireEvent.change(screen.getByLabelText('Meeting date'), { target: { value: '2026-12-15' } });
     fireEvent.click(confirmButton());
-    await screen.findByText(/Meeting date 2026-12-01\./);
+    await screen.findByText(/meeting 2026-12-01\)/);
     expect(screen.getByText('This run was already reserved by an earlier attempt, with the values shown here, not the ones you just entered. To use different values, choose Create another.')).toBeTruthy();
     expect(server.bodies('POST', BASE).map((b) => b.idempotencyKey)).toEqual(['key-1', 'key-1']);
   });
@@ -533,7 +538,7 @@ describe('write reasons and reserved values', () => {
     // A is in the list; B's panel is still shown and B's scope was not aborted.
     await screen.findByRole('button', { name: 'My test' });
     expect(screen.getByRole('heading', { name: 'Run B' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Recheck Foundation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Recheck the Foundation record' }));
     await screen.findByText('The Foundation records are as expected.');
   });
 
@@ -559,7 +564,7 @@ describe('write reasons and reserved values', () => {
     fillConfirm();
     server.on('POST', BASE, { status: 200, body: { run: makeRun({ testLabel: 'My test', fiscalYear: 'December 2026', meetingDate: '2026-12-01T00:00:00.000Z' }), created: false } });
     fireEvent.click(confirmButton());
-    await screen.findByText(/Meeting date 2026-12-01\./);
+    await screen.findByText(/meeting 2026-12-01\)/);
     expect(screen.queryByText(/already reserved by an earlier attempt/)).toBeNull();
   });
 
@@ -588,7 +593,7 @@ describe('write reasons and reserved values', () => {
 });
 
 describe('inspect, recheck and files', () => {
-  test('selecting a run loads its resources; a production run offers Recheck Foundation with the advisory time; a sandbox run does not', async () => {
+  test('selecting a run loads its resources; a production run offers the Foundation recheck with the advisory time; a sandbox run does not', async () => {
     const prod = makeRun({ status: 'ready', currentStep: 'verify', stepIndex: 6, destinationRequestNumber: '1004000' });
     const sandbox = makeRun({ runId: RUN_B, testLabel: 'Sandbox run', destinationEnvironment: 'sandbox', status: 'retired' });
     const server = makeServer();
@@ -601,13 +606,13 @@ describe('inspect, recheck and files', () => {
     await renderSection(server, [prod, sandbox]);
     await selectRun('Run A');
     await screen.findByText('Create the test Request', { selector: 'td' });
-    expect(screen.getByText('created')).toBeTruthy();
-    expect(screen.getByText(/^A recheck is meaningful after /)).toBeTruthy();
+    expect(screen.getAllByText('Created').length).toBeGreaterThan(0); // unknown outcome: humanized fallback
+    expect(screen.getByText(/^A recheck is meaningful /)).toBeTruthy();
     server.on('POST', `${BASE}/${RUN_A}/recheck`, { status: 200, body: { runId: RUN_A, status: 'ready', ok: false, outcome: 'changed', failures: ['Foundation contacts changed'] } });
-    fireEvent.click(screen.getByRole('button', { name: 'Recheck Foundation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Recheck the Foundation record' }));
     await screen.findByText('Foundation contacts changed');
     await selectRun('Sandbox run');
-    expect(screen.queryByRole('button', { name: 'Recheck Foundation' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Recheck the Foundation record' })).toBeNull();
   });
 
   test('a recheck with no captured time shows no advisory line', async () => {
@@ -617,7 +622,7 @@ describe('inspect, recheck and files', () => {
     await renderSection(server, [prod]);
     await selectRun('Run A');
     expect(screen.queryByText(/A recheck is meaningful after/)).toBeNull();
-    expect(screen.getByRole('button', { name: 'Recheck Foundation' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Recheck the Foundation record' })).toBeTruthy();
   });
 
   test('Download run files downloads two JSON files; a cleaned-up run says its files were removed', async () => {
@@ -640,5 +645,261 @@ describe('inspect, recheck and files', () => {
     await screen.findByText('The run files were removed after the run finished, so there is nothing to download.');
     expect(createObjectURL).toHaveBeenCalledTimes(2);
     click.mockRestore();
+  });
+});
+
+// ---- design-critique refinements ---------------------------------------------
+
+const primaries = () => [...document.querySelectorAll('[data-primary="true"]')].filter((button) => !button.disabled);
+
+describe('write target and consequence', () => {
+  test.each([
+    ['production', 'Writes to production', 'Production'],
+    ['sandbox', 'Writes to sandbox', 'the sandbox'],
+  ])('the band for the %s target names it once the list has answered', async (target, chip, where) => {
+    const server = makeServer();
+    await renderSection(server, [], { target });
+    expect(screen.getByText(chip)).toBeTruthy();
+    expect(screen.getByText(`This panel changes real data on ${where}: it creates a test Request step by step and can change its Phase I or Phase II status.`)).toBeTruthy();
+  });
+
+  test('the band is not shown before the list answers, and the form-off banner replaces it', async () => {
+    const server = makeServer();
+    server.on('GET', BASE, { status: 500, body: { error: 'x' } });
+    render(<TestRequestFactorySection />);
+    await screen.findByRole('alert');
+    expect(screen.queryByText('Writes to production')).toBeNull();
+    const off = makeServer();
+    await renderSection(off, [], { formEnabled: false });
+    expect(screen.queryByText(/This panel changes real data/)).toBeNull();
+  });
+
+  test.each([
+    ['production', 'prepared', 'Start production run', 'Production'],
+    ['production', 'creating', 'Resume production run', 'Production'],
+    ['sandbox', 'prepared', 'Start sandbox run', 'Sandbox'],
+    ['sandbox', 'creating', 'Resume sandbox run', 'Sandbox'],
+  ])('a %s %s run: the button names the target and the line above it says what is written', async (env, status, label, where) => {
+    const run = makeRun({ destinationEnvironment: env, status, stepIndex: status === 'creating' ? 2 : 0 });
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(run));
+    await renderSection(server, [run]);
+    await selectRun('Run A');
+    expect(screen.getByRole('button', { name: label })).toBeTruthy();
+    expect(screen.getByText(`Writes to ${where} Dataverse and SharePoint: creates the test Request, sets its meeting date, makes its document folder and copies its documents.`)).toBeTruthy();
+  });
+
+  test('a ready sandbox run says status changes are production only; a ready production run links to the Workbench by its Request id', async () => {
+    const sandbox = makeRun({ destinationEnvironment: 'sandbox', status: 'ready', stepIndex: 6, destinationRequestNumber: '2000' });
+    const prod = makeRun({ runId: RUN_B, testLabel: 'Run P', status: 'ready', stepIndex: 6, destinationRequestNumber: '1004000', destinationRequestId: '44444444-4444-4444-8444-444444444444' });
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(sandbox));
+    server.on('GET', `${BASE}/${RUN_B}`, runBody(prod));
+    server.on('GET', `${BASE}/${RUN_B}/status`, { status: 200, body: { runId: RUN_B, runStatus: 'ready', options: { phase1: [], phase2: [] }, current: null, changes: [] } });
+    await renderSection(server, [sandbox, prod]);
+    await selectRun('Run A');
+    expect(screen.getByText('Status changes are available only for production test Requests.')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Open in the Workbench' })).toBeNull();
+    await selectRun('Run P');
+    expect(screen.getByRole('link', { name: 'Open in the Workbench' }).getAttribute('href')).toBe('/workbench/44444444-4444-4444-8444-444444444444');
+  });
+});
+
+describe('source identity', () => {
+  test('shows the title and applicant under the heading, human document labels, and the pre-filled label', async () => {
+    const server = makeServer();
+    await renderSection(server, []);
+    await lookup(server, '1001000', {
+      status: 200,
+      body: { draftId: DRAFT_ID, summary: SUMMARY, source: { title: 'Gene editing study', applicant: 'Live University' }, defaults: { fiscalYear: 'December 2026', meetingDate: '2026-12-01' } },
+    });
+    await screen.findByRole('heading', { name: 'Source Request 1001000' });
+    expect(screen.getByText('Gene editing study · Live University')).toBeTruthy();
+    expect(screen.getByText('Project Description', { selector: 'td' })).toBeTruthy();
+    expect(screen.getByLabelText('Test label').value).toBe('Test clone of Request 1001000');
+    expect(screen.getByText('For example: December 2026')).toBeTruthy();
+  });
+
+  test('falls back to "Untitled Request" and "Applicant unavailable", and shows an unknown kind raw', async () => {
+    const server = makeServer();
+    await renderSection(server, []);
+    await lookup(server, '1001000', {
+      status: 200,
+      body: { draftId: DRAFT_ID, summary: { ...SUMMARY, documents: [{ kind: 'somethingNew', name: 'X.pdf', size: 1, sha256Prefix: 'aa' }] }, source: { title: null, applicant: null }, defaults: { fiscalYear: null, meetingDate: null } },
+    });
+    await screen.findByText('Untitled Request · Applicant unavailable');
+    expect(screen.getByText('somethingNew', { selector: 'td' })).toBeTruthy();
+    expect(screen.queryByText(/^For example:/)).toBeNull();
+  });
+});
+
+describe('needs attention, recorded steps and run tools', () => {
+  const attention = (extra = {}) => makeRun({ status: 'needs_attention', currentStep: 'copy_file', stepIndex: 4, ...extra });
+
+  test('a mapped reason gets its plain copy; an unmapped one gets the default; the technical detail is a closed details; the action is an outline "Retry step"', async () => {
+    const run = attention({ needsAttentionReason: 'ambiguous_create_outcome' });
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(run));
+    server.on('POST', `${BASE}/${RUN_A}/advance`, { status: 200, body: { step: 'copy_file', outcome: 'needs_attention', currentStep: 'copy_file', stepIndex: 4, status: 'needs_attention', destinationRequestNumber: null, errorMessage: 'Graph said no' } });
+    await renderSection(server, [run]);
+    await selectRun('Run A');
+    expect(screen.getByText(/Don't retry; ask the owner to resolve it, because retrying could create a second Request\./)).toBeTruthy();
+    const retry = screen.getByRole('button', { name: 'Retry step: Copy the documents (one per step)' });
+    expect(retry.hasAttribute('data-primary')).toBe(false);
+    fireEvent.click(retry);
+    const summary = await screen.findByText('Technical detail');
+    const details = summary.closest('details');
+    expect(details.open).toBe(false);
+    expect(details.textContent).toContain('Graph said no');
+  });
+
+  test('an unmapped reason shows the default copy', async () => {
+    const run = attention({ needsAttentionReason: 'file_copy_failed (http 503)' });
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(run));
+    await renderSection(server, [run]);
+    await selectRun('Run A');
+    expect(screen.getByText('This step stopped and needs a look before it is retried. Retrying is safe: the run picks up where it stopped and never creates a second Request.')).toBeTruthy();
+  });
+
+  test('details defaults: recorded steps open only for needs_attention; run tools and the count are always present', async () => {
+    const att = attention();
+    const calm = makeRun({ runId: RUN_B, testLabel: 'Run B', status: 'creating', stepIndex: 2 });
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(att, { resources: [{ resourceId: 'x', step: 'create_request', resourceKind: 'dataverse_request', outcome: 'verified', error: null, sequence: 1 }] }));
+    server.on('GET', `${BASE}/${RUN_B}`, runBody(calm));
+    await renderSection(server, [att, calm]);
+    await selectRun('Run A');
+    expect((await screen.findByText('Recorded steps (1)')).closest('details').open).toBe(true);
+    expect(screen.getByText('Run tools').closest('details').open).toBe(false);
+    await selectRun('Run B');
+    expect((await screen.findByText('Recorded steps (0)')).closest('details').open).toBe(false);
+  });
+
+  test('resource labels: known kinds and outcomes in words, unknown ones humanized, the error code only inside <code> after "Error"', async () => {
+    const run = makeRun({ status: 'creating', stepIndex: 2 });
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(run, {
+      resources: [
+        { resourceId: '1', step: 'create_request', resourceKind: 'dataverse_request', outcome: 'verified', error: null, sequence: 1 },
+        { resourceId: '2', step: 'copy_file', resourceKind: 'brand_new_kind', outcome: 'half_done', error: { code: 'file_copy_failed' }, sequence: 2 },
+      ],
+    }));
+    await renderSection(server, [run]);
+    await selectRun('Run A');
+    expect(await screen.findByText('Test Request', { selector: 'td' })).toBeTruthy();
+    expect(screen.getByText('Verified', { selector: 'td' })).toBeTruthy();
+    expect(screen.getByText('Brand new kind', { selector: 'td' })).toBeTruthy();
+    expect(screen.getByText('Half done', { selector: 'td' })).toBeTruthy();
+    const code = screen.getByText('file_copy_failed');
+    expect(code.tagName).toBe('CODE');
+    expect(code.parentElement.textContent).toBe('Error file_copy_failed');
+  });
+
+  test('the Foundation recheck is described, and the advisory is a clock time with a relative phrase', async () => {
+    const run = makeRun({ status: 'creating', stepIndex: 2 });
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(run, { foundationCapturedAt: new Date(Date.now() - 25 * 60_000).toISOString() }));
+    await renderSection(server, [run]);
+    await selectRun('Run A');
+    expect(screen.getByText(/Checks that creating the test Request did not change the Foundation's own account record\. It is meaningful about an hour after the run started\./)).toBeTruthy();
+    expect(await screen.findByText(/^A recheck is meaningful after .+ \(in \d+ minutes\)\.$/)).toBeTruthy();
+  });
+});
+
+describe('focus, selection and primaries', () => {
+  test('selecting a run focuses its heading; aria-current and a visible "Selected" mark the row', async () => {
+    const run = makeRun();
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(run));
+    await renderSection(server, [run]);
+    const button = screen.getByRole('button', { name: 'Run A' });
+    expect(button.getAttribute('aria-current')).toBeNull();
+    await selectRun('Run A');
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Run A' })));
+    expect(screen.getByRole('button', { name: 'Run A' }).getAttribute('aria-current')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Run A' }).hasAttribute('aria-pressed')).toBe(false);
+    expect(screen.getByText('Selected')).toBeTruthy();
+  });
+
+  test('a lookup focuses the source heading, and reserving focuses the collapsed reserved line, which keeps both buttons', async () => {
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(makeRun({ testLabel: 'My test' })));
+    await renderSection(server, []);
+    await lookup(server);
+    const heading = await screen.findByRole('heading', { name: 'Source Request 1001000' });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+    fireEvent.change(screen.getByLabelText(/Type Request number/), { target: { value: '1001000' } });
+    server.on('POST', BASE, { status: 201, body: { run: makeRun({ testLabel: 'Test clone of Request 1001000', fiscalYear: 'December 2026', meetingDate: '2026-12-01' }), created: true } });
+    fireEvent.click(confirmButton());
+    const line = await screen.findByText('Source Request 1001000 · reserved as "Test clone of Request 1001000" (fiscal year December 2026, meeting 2026-12-01)');
+    await waitFor(() => expect(document.activeElement).toBe(line));
+    expect(screen.getByRole('button', { name: 'Create another' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Look up a different source' })).toBeTruthy();
+    expect(screen.queryByLabelText('Source Request number')).toBeNull();
+  });
+
+  test('exactly one enabled primary per state: typed number, unreserved draft, reserved resumable run', async () => {
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(makeRun({ testLabel: 'Test clone of Request 1001000' })));
+    await renderSection(server, []);
+    fireEvent.change(screen.getByLabelText('Source Request number'), { target: { value: '1001000' } });
+    expect(primaries().map((b) => b.textContent)).toEqual(['Look up source']);
+    await lookup(server);
+    await screen.findByLabelText('Test label');
+    fireEvent.change(screen.getByLabelText(/Type Request number/), { target: { value: '1001000' } });
+    expect(primaries().map((b) => b.textContent)).toEqual(['Confirm and reserve run']);
+    server.on('POST', BASE, { status: 201, body: { run: makeRun({ testLabel: 'Test clone of Request 1001000', fiscalYear: 'December 2026', meetingDate: '2026-12-01' }), created: true } });
+    fireEvent.click(confirmButton());
+    await screen.findByRole('button', { name: 'Start production run' });
+    expect(primaries().map((b) => b.textContent)).toEqual(['Start production run']);
+  });
+
+  test('a needs_attention run offers only an outline Retry: no primary at all', async () => {
+    const run = makeRun({ status: 'needs_attention', currentStep: 'copy_file', stepIndex: 4 });
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(run));
+    await renderSection(server, [run]);
+    await selectRun('Run A');
+    expect(primaries()).toHaveLength(0);
+    expect(screen.getByRole('button', { name: /^Retry step:/ }).disabled).toBe(false);
+  });
+
+  test('a creating run is blue and its running step is blue', async () => {
+    const run = makeRun({ status: 'creating', stepIndex: 2 });
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(run));
+    await renderSection(server, [run]);
+    await selectRun('Run A');
+    const chips = screen.getAllByText('In progress');
+    expect(chips.length).toBeGreaterThan(0);
+    expect(chips.every((chip) => chip.className.includes('bg-blue-50'))).toBe(true);
+  });
+});
+
+describe('lookup wait', () => {
+  test('shows elapsed time once a second in a live region, and Stop waiting aborts with the plain message; the timer ends', async () => {
+    const server = makeServer();
+    await renderSection(server, []);
+    const gate = deferred();
+    server.on('POST', `${BASE}/source`, async () => { await gate.promise; return { status: 200, body: { draftId: DRAFT_ID, summary: SUMMARY, source: { title: null, applicant: null }, defaults: {} } }; });
+    fireEvent.change(screen.getByLabelText('Source Request number'), { target: { value: '1001000' } });
+    const live = document.querySelector('[role="status"][aria-live="polite"]');
+    expect(live.textContent).toBe('');
+    jest.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Look up source' }));
+      await act(async () => { jest.advanceTimersByTime(1000); });
+      expect(screen.getByText('Started 1 s ago')).toBeTruthy();
+      await act(async () => { jest.advanceTimersByTime(79_000); });
+      expect(screen.getByText('Started 1 min 20 s ago')).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Stop waiting' }));
+      await screen.findByText("Stopped waiting. The lookup may still finish on the server; nothing was created. Look up the source again when you're ready.");
+      expect(jest.getTimerCount()).toBe(0);
+      expect(screen.queryByText(/^Started /)).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+    gate.resolve();
   });
 });

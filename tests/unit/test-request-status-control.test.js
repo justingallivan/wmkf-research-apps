@@ -82,6 +82,7 @@ describe('status control', () => {
   test('the option equal to the current value is disabled and says so', async () => {
     const server = makeServer().on('GET', BASE, statusBody());
     await renderControl(server);
+    fireEvent.change(screen.getByLabelText('Status field'), { target: { value: 'phase2' } });
     const already = within(screen.getByLabelText('New status')).getByRole('option', { name: 'Not invited (already set)' });
     expect(already.disabled).toBe(true);
     expect(within(screen.getByLabelText('New status')).getByRole('option', { name: 'Recommended' }).disabled).toBe(false);
@@ -94,13 +95,15 @@ describe('status control', () => {
     await renderControl(server);
     const setButton = screen.getByRole('button', { name: 'Set status' });
     expect(setButton.disabled).toBe(true);
+    expect(screen.getAllByText('Choose the field first.').length).toBeGreaterThan(0);
+    fireEvent.change(screen.getByLabelText('Status field'), { target: { value: 'phase2' } });
     expect(screen.getByText('Choose the status to set.')).toBeTruthy();
     choose('phase2', 'Recommended');
     fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
     const group = screen.getByRole('group', { name: 'Confirm the status change' });
     expect(group.textContent).toContain('Request 1004000');
     expect(group.textContent).toContain('Phase II status from Not invited to Recommended');
-    expect(group.textContent).toContain('This changes a real status on the test Request and can send emails or create payment and tracking rows.');
+    expect(group.textContent).toContain('It changes a real status on the test Request.');
     expect(server.count('POST', BASE)).toBe(0);
     server.on('POST', BASE, { status: 200, body: { outcome: 'complete', emails: 1, tracking: 2, payments: 0, jobs: 3 } });
     server.on('GET', BASE, statusBody([change()], { phase1: 100000000, phase2: 100000002 }));
@@ -111,7 +114,7 @@ describe('status control', () => {
     await screen.findByText('Not invited to Recommended');
     expect(screen.getByText('Phase II status', { selector: 'td' })).toBeTruthy();
     // The option just set is now the current one: no second change can be started for it (the server would refuse a no-op).
-    await screen.findByText('That status is already set. Choose a different one.');
+    await screen.findAllByText('That status is already set. Choose a different one.');
     expect(screen.getByRole('button', { name: 'Set status' }).disabled).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
     expect(screen.queryByRole('group', { name: 'Confirm the status change' })).toBeNull();
@@ -125,11 +128,12 @@ describe('status control', () => {
     };
     const server = makeServer().on('GET', BASE, { status: 200, body: { ...statusBody().body, options: blockedOptions } });
     await renderControl(server);
+    fireEvent.change(screen.getByLabelText('Status field'), { target: { value: 'phase2' } });
     const option = within(screen.getByLabelText('New status')).getByRole('option', { name: 'Recommended (not available now)' });
     expect(option.disabled).toBe(true);
     fireEvent.change(screen.getByLabelText('New status'), { target: { value: option.value } });
     expect(screen.getByRole('button', { name: 'Set status' }).disabled).toBe(true);
-    expect(screen.getByText(/isn't allowed from the Request's current Phase I and Phase II statuses/)).toBeTruthy();
+    expect(screen.getAllByText(/isn't allowed from the Request's current Phase I and Phase II statuses/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
     expect(screen.queryByRole('group', { name: 'Confirm the status change' })).toBeNull();
     expect(server.count('POST', BASE)).toBe(0);
@@ -313,7 +317,7 @@ describe('status control', () => {
     choose('phase2', 'Awarded');
     const set = screen.getByRole('button', { name: 'Set status' });
     expect(set.disabled).toBe(true);
-    expect(document.getElementById(set.getAttribute('aria-describedby')).textContent).toMatch(/switched off/);
+    expect(document.getElementById(set.getAttribute('aria-describedby')).textContent).toMatch(/switched off/i);
     const recheck = screen.getByRole('button', { name: 'Recheck status effects' });
     expect(recheck.disabled).toBe(true);
     expect(document.getElementById(recheck.getAttribute('aria-describedby')).textContent).toMatch(/switched off/);
@@ -356,6 +360,97 @@ describe('status control', () => {
   });
 });
 
+const primaries = () => [...document.querySelectorAll('[data-primary="true"]')].filter((button) => !button.disabled);
+const withEffects = (effects = {}) => ({
+  status: 200,
+  body: {
+    ...statusBody().body,
+    options: { phase1: OPTIONS.phase1, phase2: OPTIONS.phase2.map((option) => ({ ...option, blocked: null, effects: effects[option.label] ?? [] })) },
+  },
+});
+
+describe('status choices and confirmation', () => {
+  test('the field starts empty and the option select is disabled with the reason until a field is chosen', async () => {
+    const server = makeServer().on('GET', BASE, statusBody());
+    await renderControl(server);
+    expect(screen.getByLabelText('Status field').value).toBe('');
+    expect(screen.getByLabelText('New status').disabled).toBe(true);
+    expect(document.getElementById('factory-option-reason').textContent).toBe('Choose the field first.');
+    fireEvent.change(screen.getByLabelText('Status field'), { target: { value: 'phase2' } });
+    expect(screen.getByLabelText('New status').disabled).toBe(false);
+  });
+
+  test('blocked and already-set options are listed with their reasons in a details under the select', async () => {
+    const blocked = {
+      status: 200,
+      body: { ...statusBody().body, options: { phase1: OPTIONS.phase1, phase2: OPTIONS.phase2.map((o) => (o.label === 'Recommended' ? { ...o, blocked: 'status_change_edge', effects: null } : o)) } },
+    };
+    const server = makeServer().on('GET', BASE, blocked);
+    await renderControl(server);
+    fireEvent.change(screen.getByLabelText('Status field'), { target: { value: 'phase2' } });
+    const summary = screen.getByText("Why 2 statuses can't be set now");
+    expect(summary.closest('details').open).toBe(false);
+    const list = within(summary.closest('details'));
+    expect(list.getByText(/Recommended/).parentElement.textContent).toMatch(/can create a payment or a status-tracking row/);
+    expect(list.getByText(/Not invited/).parentElement.textContent).toMatch(/already set/);
+  });
+
+  test.each([
+    ['Recommended', [], 'No emails, payments or tracking rows are expected from this change. It changes a real status on the test Request.'],
+    ['Awarded', ['emails', 'tracking'], 'This change is expected to: send emails; create a status-tracking row. It changes a real status on the test Request.'],
+  ])('the confirmation for %s states the expected effects', async (label, effects, sentence) => {
+    const server = makeServer().on('GET', BASE, withEffects({ [label]: effects }));
+    await renderControl(server);
+    choose('phase2', label);
+    fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
+    expect(screen.getByRole('group', { name: 'Confirm the status change' }).textContent).toContain(sentence);
+  });
+
+  test('with no destination number the confirmation says "this test Request", never the run id', async () => {
+    const server = makeServer().on('GET', BASE, statusBody());
+    await renderControl(server, { run: { ...readyRun, destinationRequestNumber: null } });
+    choose('phase2', 'Recommended');
+    fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
+    const text = screen.getByRole('group', { name: 'Confirm the status change' }).textContent;
+    expect(text).toContain('Change this test Request:');
+    expect(text).not.toContain(RUN_ID);
+  });
+
+  test('opening the confirmation moves focus to its question; Cancel returns focus to Set status; the group is a polite live region', async () => {
+    const server = makeServer().on('GET', BASE, statusBody());
+    await renderControl(server);
+    choose('phase2', 'Recommended');
+    fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
+    const group = screen.getByRole('group', { name: 'Confirm the status change' });
+    expect(group.getAttribute('aria-live')).toBe('polite');
+    await waitFor(() => expect(document.activeElement.textContent).toMatch(/^Change Request 1004000:/));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Set status' })));
+  });
+
+  test('exactly one enabled primary: Set status once a choice is made, then only "Yes, set this status" while confirming', async () => {
+    const server = makeServer().on('GET', BASE, statusBody());
+    await renderControl(server);
+    expect(primaries()).toHaveLength(0);
+    choose('phase2', 'Recommended');
+    expect(primaries().map((b) => b.textContent)).toEqual(['Set status']);
+    fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
+    expect(primaries().map((b) => b.textContent)).toEqual(['Yes, set this status']);
+    expect(screen.getByRole('button', { name: 'Cancel' }).hasAttribute('data-primary')).toBe(false);
+  });
+
+  test('an open change makes Check again the one primary and opens the history; with none, the history is closed', async () => {
+    const closed = makeServer().on('GET', BASE, statusBody([change()]));
+    const first = await renderControl(closed);
+    expect(screen.getByText('Status change history (1)').closest('details').open).toBe(false);
+    first.unmount();
+    const server = makeServer().on('GET', BASE, statusBody([change({ status: 'applied', completedAt: null })]));
+    await renderControl(server);
+    expect(screen.getByText('Status change history (1)').closest('details').open).toBe(true);
+    expect(primaries().map((b) => b.textContent)).toEqual(['Check again']);
+  });
+});
+
 describe('where the control appears', () => {
   const RUNS = '/api/admin/test-requests/runs';
   async function openRun(run, { formEnabled = true } = {}) {
@@ -383,7 +478,7 @@ describe('where the control appears', () => {
     choose('phase2', 'Awarded');
     const set = screen.getByRole('button', { name: 'Set status' });
     expect(set.disabled).toBe(true);
-    expect(document.getElementById(set.getAttribute('aria-describedby')).textContent).toMatch(/switched off/);
+    expect(document.getElementById(set.getAttribute('aria-describedby')).textContent).toMatch(/switched off/i);
   });
 
   test('with the run list failed to reload, the reason says so, never "switched off"', async () => {
@@ -397,7 +492,7 @@ describe('where the control appears', () => {
     expect(set.disabled).toBe(true);
     const reason = document.getElementById(set.getAttribute('aria-describedby')).textContent;
     expect(reason).toMatch(/couldn't check whether this deployment allows/);
-    expect(reason).not.toMatch(/switched off/);
+    expect(reason).not.toMatch(/switched off/i);
   });
 
   test('G2: after in_progress, switching to another run and back keeps the no-retry state and the abandon command', async () => {

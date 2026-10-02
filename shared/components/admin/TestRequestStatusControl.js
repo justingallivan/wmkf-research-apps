@@ -4,10 +4,17 @@ import { CHANGE_STATUSES, OPEN_CHANGE_STATUSES, STATUS_FIELDS } from '../../conf
 import { StatusChip } from './AdminWorkspaceNavigation';
 import { codeOf, messageFor } from './test-request-factory-copy';
 import {
-  ERROR_BAND, INPUT, OUTLINE_BUTTON, PRIMARY_BUTTON, TABLE_WRAP, TH, formatTime,
+  ERROR_BAND, INPUT, SUMMARY_CLASS, TABLE_WRAP, TH, buttonProps, focusAndShow, formatTime,
 } from './test-request-factory-ui';
 
-const RISK_SENTENCE = 'This changes a real status on the test Request and can send emails or create payment and tracking rows.';
+const RISK_SENTENCE = 'It changes a real status on the test Request.';
+const EFFECT_PHRASES = { emails: 'send emails', tracking: 'create a status-tracking row', payments: 'create a payment row' };
+// What the planner expects a change to do: null effects (unknown) says only that it may do any of these.
+const effectsSentence = (effects) => {
+  if (!Array.isArray(effects)) return 'It may send emails or create payment and tracking rows.';
+  if (!effects.length) return 'No emails, payments or tracking rows are expected from this change.';
+  return `This change is expected to: ${effects.map((effect) => EFFECT_PHRASES[effect] || effect).join('; ')}.`;
+};
 // The server's own verdict for each option (`blocked`, from the status GET), in the owner's voice.
 const BLOCKED_COPY = {
   status_change_noop: 'That status is already set. Choose a different one.',
@@ -55,7 +62,7 @@ function Reason({ id, children }) {
  */
 export default function TestRequestStatusControl({ run, writeBlock, getScope, initialStuck = null, onStuck }) {
   const [load, setLoad] = useState({ state: 'loading', data: null });
-  const [fieldKey, setFieldKey] = useState('phase2');
+  const [fieldKey, setFieldKey] = useState('');
   const [optionValue, setOptionValue] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -65,6 +72,9 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
   const [recheck, setRecheck] = useState(null);
   const [copied, setCopied] = useState('');
   const mountedRef = useRef(true);
+  const questionRef = useRef(null);
+  const setButtonRef = useRef(null);
+  const returnFocusRef = useRef(false);
   const base = `/api/admin/test-requests/runs/${run.runId}/status`;
 
   useEffect(() => {
@@ -76,6 +86,15 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
     const scope = getScope();
     return { signal: scope.signal, alive: () => mountedRef.current && scope.isCurrent() };
   };
+
+  // Focus the confirmation question when it opens; Cancel returns focus to "Set status".
+  useEffect(() => {
+    if (confirming) focusAndShow(questionRef.current);
+    else if (returnFocusRef.current) {
+      returnFocusRef.current = false;
+      setButtonRef.current?.focus();
+    }
+  }, [confirming]);
 
   const loadJournal = useCallback(async (scope) => {
     try {
@@ -113,7 +132,8 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
   const openLabel = open && openField ? labelOf(data?.options?.[openField.key], open.optionAfter) : null;
   const selectedValue = open ? String(open.optionAfter) : optionValue;
   const selected = options.find((option) => String(option.value) === selectedValue) || null;
-  const fieldLabel = STATUS_FIELDS.find((field) => field.key === effectiveKey).label;
+  const fieldLabel = STATUS_FIELDS.find((field) => field.key === effectiveKey)?.label || '';
+  const requestName = run.destinationRequestNumber ? `Request ${run.destinationRequestNumber}` : 'this test Request';
   // The in-progress banner and the missing retry belong to the change that is still open, no other.
   const stuckHere = Boolean(open && stuck && stuck.changeId === open.changeId);
   const checkBody = open ? strictCheckBody(data, open) : null;
@@ -205,7 +225,7 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
     return (
       <div className="space-y-3">
         <div role="alert" className={ERROR_BAND}>{load.text}</div>
-        <button type="button" className={OUTLINE_BUTTON} onClick={() => { setLoad({ state: 'loading', data: null }); loadJournal(liveScope()); }}>Try again</button>
+        <button type="button" {...buttonProps(false)} onClick={() => { setLoad({ state: 'loading', data: null }); loadJournal(liveScope()); }}>Try again</button>
       </div>
     );
   }
@@ -213,12 +233,15 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
   const setReason = (() => {
     if (writeBlock) return writeBlock;
     if (busy) return 'Waiting for the last request to finish.';
+    if (!effectiveKey) return 'Choose the field first.';
     if (!selected) return 'Choose the status to set.';
     // Mirrors the server's no-op refusal: the journal reload after a change makes the chosen option the current one.
     if (selected.value === current) return BLOCKED_COPY.status_change_noop;
     if (selected.blocked) return BLOCKED_COPY[selected.blocked] || BLOCKED_COPY.default;
     return '';
   })();
+  const blockedOptions = options.filter((option) => option.value === current || option.blocked);
+  const blockedWhy = (option) => (option.value === current ? BLOCKED_COPY.status_change_noop : (BLOCKED_COPY[option.blocked] || BLOCKED_COPY.default));
   const checkReason = (() => {
     if (writeBlock) return writeBlock;
     if (busy) return 'Waiting for the last request to finish.';
@@ -245,34 +268,49 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
             onChange={(event) => { setFieldKey(event.target.value); setOptionValue(''); setConfirming(false); }}
             className={INPUT}
           >
+            <option value="">Choose a field</option>
             {STATUS_FIELDS.map((field) => <option key={field.key} value={field.key}>{field.label}</option>)}
           </select>
         </label>
-        <label htmlFor="factory-status-option" className="block text-sm font-semibold text-gray-800">
-          New status
-          <select
-            id="factory-status-option"
-            value={selectedValue}
-            disabled={Boolean(open) || busy}
-            onChange={(event) => { setOptionValue(event.target.value); setConfirming(false); }}
-            className={INPUT}
-          >
-            <option value="">{open ? '' : 'Choose a status'}</option>
-            {options.map((option) => {
-              const already = option.value === current;
-              const blocked = already || Boolean(option.blocked);
-              return (
-                <option key={option.value} value={String(option.value)} disabled={blocked}>
-                  {already ? `${option.label} (already set)` : (blocked ? `${option.label} (not available now)` : option.label)}
-                </option>
-              );
-            })}
-          </select>
-        </label>
+        <div>
+          <label htmlFor="factory-status-option" className="block text-sm font-semibold text-gray-800">
+            New status
+            <select
+              id="factory-status-option"
+              value={selectedValue}
+              disabled={Boolean(open) || busy || !effectiveKey}
+              aria-describedby="factory-option-reason"
+              onChange={(event) => { setOptionValue(event.target.value); setConfirming(false); }}
+              className={INPUT}
+            >
+              <option value="">{open ? '' : 'Choose a status'}</option>
+              {options.map((option) => {
+                const already = option.value === current;
+                const blocked = already || Boolean(option.blocked);
+                return (
+                  <option key={option.value} value={String(option.value)} disabled={blocked}>
+                    {already ? `${option.label} (already set)` : (blocked ? `${option.label} (not available now)` : option.label)}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+          {!effectiveKey && !open ? <p id="factory-option-reason" className="mt-1 text-sm text-gray-600">Choose the field first.</p> : <span id="factory-option-reason" />}
+        </div>
       </div>
-      <p className="text-sm text-gray-600">
-        {fieldLabel} now: <span className="font-semibold text-gray-950">{labelOf(data?.options?.[effectiveKey], current)}</span>
-      </p>
+      {effectiveKey ? (
+        <p className="text-sm text-gray-600">
+          {fieldLabel} now: <span className="font-semibold text-gray-950">{labelOf(data?.options?.[effectiveKey], current)}</span>
+        </p>
+      ) : null}
+      {blockedOptions.length ? (
+        <details className="text-sm">
+          <summary className={SUMMARY_CLASS}>{`Why ${blockedOptions.length} ${blockedOptions.length === 1 ? 'status' : 'statuses'} can't be set now`}</summary>
+          <ul className="mb-2 list-disc space-y-1 pl-5 leading-6 text-gray-700">
+            {blockedOptions.map((option) => <li key={option.value}><span className="font-semibold text-gray-950">{option.label}</span>: {blockedWhy(option)}</li>)}
+          </ul>
+        </details>
+      ) : null}
 
       {open ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-950">
@@ -292,7 +330,7 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
               <label htmlFor="factory-abandon-command" className="block font-semibold">Owner command to close it (run only after confirming no sender is still running)</label>
               <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                 <input id="factory-abandon-command" readOnly value={stuck.abandonCommand} className="min-h-11 flex-1 rounded-lg border border-amber-300 bg-white px-3 py-2 font-mono text-xs text-gray-950" />
-                <button type="button" className={OUTLINE_BUTTON} onClick={() => copyCommand(stuck.abandonCommand)}>Copy command</button>
+                <button type="button" {...buttonProps(false)} onClick={() => copyCommand(stuck.abandonCommand)}>Copy command</button>
               </div>
               {copied ? <p className="mt-2" role="status">{copied}</p> : null}
             </div>
@@ -312,21 +350,21 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
       {!open ? (
         <div className="space-y-3">
           {confirming && selected ? (
-            <div role="group" aria-label="Confirm the status change" className="rounded-xl border border-gray-300 bg-gray-50 px-4 py-4 text-sm leading-6 text-gray-900">
-              <p className="font-semibold">
-                Change Request {run.destinationRequestNumber || run.runId}: {fieldLabel} from {labelOf(data?.options?.[effectiveKey], current)} to {selected.label}?
+            <div role="group" aria-label="Confirm the status change" aria-live="polite" className="rounded-xl border border-gray-300 bg-gray-50 px-4 py-4 text-sm leading-6 text-gray-900">
+              <p ref={questionRef} tabIndex={-1} className="font-semibold focus:outline-none">
+                Change {requestName}: {fieldLabel} from {labelOf(data?.options?.[effectiveKey], current)} to {selected.label}?
               </p>
-              <p className="mt-1">{RISK_SENTENCE}</p>
+              <p className="mt-1">{effectsSentence(selected.effects)} {RISK_SENTENCE}</p>
               <div className="mt-3 flex flex-wrap gap-3">
-                <button type="button" className={PRIMARY_BUTTON} disabled={Boolean(setReason)} onClick={() => send({ field: effectiveKey, optionLabel: selected.label })}>
+                <button type="button" {...buttonProps(true)} disabled={Boolean(setReason)} onClick={() => send({ field: effectiveKey, optionLabel: selected.label })}>
                   Yes, set this status
                 </button>
-                <button type="button" className={OUTLINE_BUTTON} onClick={() => setConfirming(false)}>Cancel</button>
+                <button type="button" {...buttonProps(false)} onClick={() => { returnFocusRef.current = true; setConfirming(false); }}>Cancel</button>
               </div>
             </div>
           ) : (
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <button type="button" className={PRIMARY_BUTTON} disabled={Boolean(setReason)} aria-describedby="factory-set-reason" onClick={() => setConfirming(true)}>
+              <button ref={setButtonRef} type="button" {...buttonProps(true)} disabled={Boolean(setReason)} aria-describedby="factory-set-reason" onClick={() => setConfirming(true)}>
                 Set status
               </button>
               {setReason ? <Reason id="factory-set-reason">{setReason}</Reason> : null}
@@ -337,64 +375,67 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
 
       {open && !stuckHere ? (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <button type="button" className={PRIMARY_BUTTON} disabled={Boolean(checkReason)} aria-describedby="factory-check-reason" onClick={checkAgain}>
+          <button type="button" {...buttonProps(true)} disabled={Boolean(checkReason)} aria-describedby="factory-check-reason" onClick={checkAgain}>
             Check again
           </button>
           {checkReason ? <Reason id="factory-check-reason">{checkReason}</Reason> : null}
         </div>
       ) : null}
 
-      <section aria-labelledby="factory-status-journal-heading" className="border-t border-gray-200 pt-5">
-        <h4 id="factory-status-journal-heading" className="text-sm font-semibold text-gray-950">Status change journal</h4>
-        <div className={`mt-3 ${TABLE_WRAP}`}>
-          <table className="min-w-full divide-y divide-gray-200 text-left text-sm">
-            <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600">
-              <tr>
-                <th scope="col" className={TH}>No.</th>
-                <th scope="col" className={TH}>Field</th>
-                <th scope="col" className={TH}>Change</th>
-                <th scope="col" className={TH}>Status</th>
-                <th scope="col" className={TH}>Time</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
-              {changes.length ? changes.map((change) => {
-                const field = fieldByColumn(change.field);
-                const list = field ? data?.options?.[field.key] : null;
-                const known = CHANGE_STATUSES[change.status];
-                return (
-                  <tr key={change.changeId}>
-                    <td className="px-4 py-3 tabular-nums">{change.sequence}</td>
-                    <td className="px-4 py-3">{field?.label || change.field}</td>
-                    <td className="px-4 py-3">{labelOf(list, change.optionBefore)} to {labelOf(list, change.optionAfter)}</td>
-                    <td className="px-4 py-3"><StatusChip tone={known?.tone || 'gray'}>{known?.label || change.status}</StatusChip></td>
-                    <td className="px-4 py-3 text-gray-600">{formatTime(change.completedAt || change.dispatchedAt || change.createdAt)}</td>
-                  </tr>
-                );
-              }) : (
-                <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-600">No status change has been made on this Request.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <div className="space-y-3">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <button type="button" className={OUTLINE_BUTTON} disabled={Boolean(recheckReason)} aria-describedby="factory-recheck-reason" onClick={recheckEffects}>
-            Recheck status effects
-          </button>
-          {recheckReason ? <Reason id="factory-recheck-reason">{recheckReason}</Reason> : null}
-        </div>
-        {recheck?.error ? <div role="alert" className={ERROR_BAND}>{recheck.error}</div> : null}
-        {recheck?.reply ? (
-          <div role="status" className={`rounded-lg border px-4 py-3 text-sm ${recheck.reply.ok ? 'border-green-200 bg-green-50 text-green-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
-            {recheck.reply.ok
-              ? 'No late effects, and no open or failed background jobs.'
-              : `Late emails: ${recheck.reply.lateEffects?.emails ?? 0}, tracking rows: ${recheck.reply.lateEffects?.tracking ?? 0}, payments: ${recheck.reply.lateEffects?.payments ?? 0}. Open jobs: ${recheck.reply.openJobs}, failed jobs: ${recheck.reply.failedJobs}.`}
+      <details className="rounded-xl border border-gray-200 bg-white px-4" open={Boolean(open) || stuckHere}>
+        <summary className={SUMMARY_CLASS}>Status change history ({changes.length})</summary>
+        <div className="space-y-4 pb-4">
+          <div className={TABLE_WRAP}>
+            <table className="min-w-full divide-y divide-gray-200 text-left text-sm">
+              <caption className="sr-only">Status change history</caption>
+              <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600">
+                <tr>
+                  <th scope="col" className={TH}>No.</th>
+                  <th scope="col" className={TH}>Field</th>
+                  <th scope="col" className={TH}>Change</th>
+                  <th scope="col" className={TH}>Status</th>
+                  <th scope="col" className={TH}>Time</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {changes.length ? changes.map((change) => {
+                  const field = fieldByColumn(change.field);
+                  const list = field ? data?.options?.[field.key] : null;
+                  const known = CHANGE_STATUSES[change.status];
+                  return (
+                    <tr key={change.changeId}>
+                      <td className="px-4 py-3 tabular-nums">{change.sequence}</td>
+                      <td className="px-4 py-3">{field?.label || change.field}</td>
+                      <td className="px-4 py-3">{labelOf(list, change.optionBefore)} to {labelOf(list, change.optionAfter)}</td>
+                      <td className="px-4 py-3"><StatusChip tone={known?.tone || 'gray'}>{known?.label || change.status}</StatusChip></td>
+                      <td className="px-4 py-3 text-gray-600">{formatTime(change.completedAt || change.dispatchedAt || change.createdAt)}</td>
+                    </tr>
+                  );
+                }) : (
+                  <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-600">No status change has been made on this Request.</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
-        ) : null}
-      </div>
+
+          <div className="space-y-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <button type="button" {...buttonProps(false)} disabled={Boolean(recheckReason)} aria-describedby="factory-recheck-reason" onClick={recheckEffects}>
+                Recheck status effects
+              </button>
+              {recheckReason ? <Reason id="factory-recheck-reason">{recheckReason}</Reason> : null}
+            </div>
+            {recheck?.error ? <div role="alert" className={ERROR_BAND}>{recheck.error}</div> : null}
+            {recheck?.reply ? (
+              <div role="status" className={`rounded-lg border px-4 py-3 text-sm ${recheck.reply.ok ? 'border-green-200 bg-green-50 text-green-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+                {recheck.reply.ok
+                  ? 'No late effects, and no open or failed background jobs.'
+                  : `Late emails: ${recheck.reply.lateEffects?.emails ?? 0}, tracking rows: ${recheck.reply.lateEffects?.tracking ?? 0}, payments: ${recheck.reply.lateEffects?.payments ?? 0}. Open jobs: ${recheck.reply.openJobs}, failed jobs: ${recheck.reply.failedJobs}.`}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </details>
     </div>
   );
 }

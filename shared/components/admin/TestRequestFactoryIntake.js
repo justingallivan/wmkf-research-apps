@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { requestJson } from '../../utils/api-request';
-import { LIMITS } from '../../config/testRequestFactory';
+import { DOCUMENT_KIND_LABELS, LIMITS } from '../../config/testRequestFactory';
 import { messageFor } from './test-request-factory-copy';
 import {
-  ERROR_BAND, INPUT, OUTLINE_BUTTON, PRIMARY_BUTTON, TABLE_WRAP, TH, formatBytes,
+  ERROR_BAND, INPUT, TABLE_WRAP, TH, buttonProps, focusAndShow, formatBytes,
 } from './test-request-factory-ui';
 
 const NUMBER_PATTERN = /^\d{1,10}$/;
@@ -12,6 +12,15 @@ const KEY_UNAVAILABLE = "This browser can't create the safe request key a new Re
 function mintKey() {
   const crypto = globalThis.crypto;
   return typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : null;
+}
+
+const STOPPED_COPY = "Stopped waiting. The lookup may still finish on the server; nothing was created. Look up the source again when you're ready.";
+
+function elapsedText(seconds) {
+  if (seconds < 1) return '';
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return `Started ${minutes ? `${minutes} min ` : ''}${rest} s ago`;
 }
 
 function Reason({ id, children }) {
@@ -29,7 +38,9 @@ function Reason({ id, children }) {
  * `getSelectionToken()` is read when Confirm starts; `onReserved(run, token)` hands the run
  * back and returns true only if it was selected (false when the selection moved meanwhile).
  */
-export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, onReserved, getSelectionToken }) {
+export default function TestRequestFactoryIntake({
+  writeBlock, onLookupStart, onReserved, getSelectionToken, hasSelection = false,
+}) {
   const [sourceNumber, setSourceNumber] = useState('');
   const [looking, setLooking] = useState(false);
   const [lookupError, setLookupError] = useState('');
@@ -39,6 +50,10 @@ export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, on
   const [confirmError, setConfirmError] = useState('');
   const [reserved, setReserved] = useState(null);
   const [keyMissing, setKeyMissing] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [stoppedNotice, setStoppedNotice] = useState('');
+  const summaryHeadingRef = useRef(null);
+  const reservedRef = useRef(null);
   const keyRef = useRef(null);
   const lookupControllerRef = useRef(null);
   const lookupSeqRef = useRef(0);
@@ -52,6 +67,19 @@ export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, on
       lookupControllerRef.current?.abort();
     };
   }, []);
+
+  // Elapsed time while a lookup runs; the interval ends with the lookup and on unmount.
+  useEffect(() => {
+    if (!looking) return undefined;
+    const started = Date.now();
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => { clearInterval(timer); };
+  }, [looking]);
+
+  // Focus follows the step the operator just completed: the draft's summary, then the reserved line.
+  const hasDraft = Boolean(draft);
+  useEffect(() => { if (hasDraft) focusAndShow(summaryHeadingRef.current); }, [hasDraft, draft]);
+  useEffect(() => { if (reserved) focusAndShow(reservedRef.current); }, [reserved]);
 
   const trimmedNumber = sourceNumber.trim();
   const lookupReason = (() => {
@@ -78,6 +106,8 @@ export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, on
     setConfirmError('');
     setLookupError('');
     setForm({ label: '', fiscalYear: '', meetingDate: '', typed: '' });
+    setElapsed(0);
+    setStoppedNotice('');
     setLooking(true);
     try {
       const body = await requestJson('/api/admin/test-requests/runs/source', {
@@ -95,7 +125,10 @@ export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, on
       keyRef.current = key;
       setDraft(body);
       setForm({
-        label: '', fiscalYear: body.defaults?.fiscalYear ?? '', meetingDate: body.defaults?.meetingDate ?? '', typed: '',
+        label: `Test clone of Request ${body.summary?.requestNumber ?? trimmedNumber}`,
+        fiscalYear: body.defaults?.fiscalYear ?? '',
+        meetingDate: body.defaults?.meetingDate ?? '',
+        typed: '',
       });
     } catch (error) {
       if (controller.signal.aborted || seq !== lookupSeqRef.current || !mountedRef.current || error?.name === 'AbortError') return;
@@ -105,7 +138,29 @@ export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, on
     }
   }
 
+  function stopWaiting() {
+    lookupSeqRef.current += 1;
+    lookupControllerRef.current?.abort();
+    setLooking(false);
+    setStoppedNotice(STOPPED_COPY);
+  }
+
+  // A different source: forget the draft and reservation (and its key); the typed number stays for editing.
+  function lookupDifferent() {
+    lookupSeqRef.current += 1;
+    lookupControllerRef.current?.abort();
+    keyRef.current = null;
+    setDraft(null);
+    setReserved(null);
+    setKeyMissing(false);
+    setConfirmError('');
+    setLookupError('');
+    setStoppedNotice('');
+    setForm({ label: '', fiscalYear: '', meetingDate: '', typed: '' });
+  }
+
   const summary = draft?.summary || null;
+  const lookupPrimary = !draft && !hasSelection;
   const label = form.label.trim();
   const confirmReason = (() => {
     if (writeBlock) return writeBlock;
@@ -158,7 +213,7 @@ export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, on
     setKeyMissing(!keyRef.current);
     setReserved(null);
     setConfirmError(keyRef.current ? '' : KEY_UNAVAILABLE);
-    setForm((current) => ({ ...current, label: '', typed: '' }));
+    setForm((current) => ({ ...current, label: `Test clone of Request ${summary?.requestNumber ?? ''}`, typed: '' }));
   }
 
   const update = (field, value) => {
@@ -166,40 +221,68 @@ export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, on
     setConfirmError('');
   };
 
+  const mismatch = reserved?.differs;
+  const reservedRun = reserved?.run;
+
   return (
     <div className="space-y-6">
-      <form onSubmit={lookup} className="max-w-2xl">
-        <label htmlFor="factory-source-number" className="block text-sm font-semibold text-gray-950">Source Request number</label>
-        <p id="factory-source-help" className="mt-1 text-sm leading-6 text-gray-600">
-          The source Request is read and left unchanged. Its documents are checked before anything is reserved.
-        </p>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-          <input
-            id="factory-source-number"
-            aria-describedby="factory-source-help factory-lookup-reason"
-            value={sourceNumber}
-            onChange={(event) => { setSourceNumber(event.target.value); setLookupError(''); }}
-            inputMode="numeric"
-            autoComplete="off"
-            maxLength={LIMITS.requestNumberMax}
-            className={`${INPUT} mt-0 flex-1`}
-          />
-          <button type="submit" disabled={Boolean(lookupReason) || looking} className={PRIMARY_BUTTON}>
-            {looking ? 'Looking up…' : 'Look up source'}
-          </button>
+      {reserved ? (
+        <div role="status" className="rounded-xl border border-green-200 bg-green-50 px-4 py-4 text-sm leading-6 text-green-900">
+          <p ref={reservedRef} tabIndex={-1} className="font-semibold focus:outline-none">
+            {`Source Request ${summary?.requestNumber ?? reservedRun.sourceRequestNumber} · reserved as "${reservedRun.testLabel}" (fiscal year ${reservedRun.fiscalYear || 'not set'}, meeting ${String(reservedRun.meetingDate ?? '').slice(0, 10) || 'not set'})`}
+          </p>
+          <p className="mt-1">Nothing has been created in Dataverse yet. Start it from the run panel below.</p>
+          {!reserved.selected ? <p className="mt-1">Select it in the run list to start it.</p> : null}
+          {mismatch ? (
+            <p className="mt-1 font-semibold">This run was already reserved by an earlier attempt, with the values shown here, not the ones you just entered. To use different values, choose Create another.</p>
+          ) : null}
+          <div className="mt-3 flex flex-wrap gap-3">
+            <button type="button" {...buttonProps(false)} onClick={createAnother}>Create another</button>
+            <button type="button" {...buttonProps(false)} onClick={lookupDifferent}>Look up a different source</button>
+          </div>
         </div>
-        {writeBlock || (lookupReason && trimmedNumber) ? <div className="mt-2"><Reason id="factory-lookup-reason">{lookupReason}</Reason></div> : <span id="factory-lookup-reason" />}
-      </form>
+      ) : (
+        <form onSubmit={lookup} className="max-w-2xl">
+          <label htmlFor="factory-source-number" className="block text-sm font-semibold text-gray-950">Source Request number</label>
+          <p id="factory-source-help" className="mt-1 text-sm leading-6 text-gray-600">
+            The source Request is read and left unchanged. Its documents are checked before anything is reserved.
+          </p>
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+            <input
+              id="factory-source-number"
+              aria-describedby="factory-source-help factory-lookup-reason"
+              value={sourceNumber}
+              onChange={(event) => { setSourceNumber(event.target.value); setLookupError(''); }}
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={LIMITS.requestNumberMax}
+              className={`${INPUT} mt-0 flex-1`}
+            />
+            <button type="submit" disabled={Boolean(lookupReason) || looking} {...buttonProps(lookupPrimary)}>
+              {looking ? 'Looking up…' : 'Look up source'}
+            </button>
+          </div>
+          {writeBlock || (lookupReason && trimmedNumber) ? <div className="mt-2"><Reason id="factory-lookup-reason">{lookupReason}</Reason></div> : <span id="factory-lookup-reason" />}
+        </form>
+      )}
 
+      <div role="status" aria-live="polite" className="text-sm text-gray-700">{looking ? elapsedText(elapsed) : ''}</div>
       {looking ? (
-        <p role="status" className="text-sm text-gray-700">Reading the source Request and checking its documents. This can take a few minutes.</p>
+        <div className="space-y-2">
+          <p className="text-sm text-gray-700">Reading the source Request and checking its documents. This can take a few minutes.</p>
+          <button type="button" {...buttonProps(false)} onClick={stopWaiting}>Stop waiting</button>
+        </div>
       ) : null}
+      {stoppedNotice && !looking ? <p role="status" className="text-sm text-gray-700">{stoppedNotice}</p> : null}
       {lookupError ? <div role="alert" className={ERROR_BAND}>{lookupError}</div> : null}
 
-      {summary ? (
+      {summary && !reserved ? (
         <section aria-labelledby="factory-summary-heading" className="space-y-5 border-t border-gray-200 pt-6">
           <div>
-            <h3 id="factory-summary-heading" className="text-base font-semibold text-gray-950">Source Request {summary.requestNumber}</h3>
+            <h3 id="factory-summary-heading" ref={summaryHeadingRef} tabIndex={-1} className="text-base font-semibold text-gray-950 focus:outline-none">Source Request {summary.requestNumber}</h3>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-600">
+              {draft.source?.title || 'Untitled Request'} · {draft.source?.applicant || 'Applicant unavailable'}
+            </p>
             <dl className="mt-2 grid gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
               <div className="flex gap-2"><dt className="text-gray-600">Fiscal year</dt><dd className="font-semibold text-gray-950">{summary.fiscalYear || 'Not set'}</dd></div>
               <div className="flex gap-2"><dt className="text-gray-600">Meeting date</dt><dd className="font-semibold text-gray-950">{summary.meetingDate || 'Not set'}</dd></div>
@@ -218,7 +301,7 @@ export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, on
               <tbody className="divide-y divide-gray-200 bg-white">
                 {summary.documents?.length ? summary.documents.map((document) => (
                   <tr key={`${document.kind}-${document.name}-${document.sha256Prefix}`}>
-                    <td className="px-4 py-3">{document.kind}</td>
+                    <td className="px-4 py-3">{DOCUMENT_KIND_LABELS[document.kind] || document.kind}</td>
                     <td className="px-4 py-3 font-semibold text-gray-950">{document.name}</td>
                     <td className="px-4 py-3 tabular-nums text-gray-600">{formatBytes(document.size)}</td>
                   </tr>
@@ -229,49 +312,41 @@ export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, on
             </table>
           </div>
 
-          {reserved ? (
-            <div role="status" className="rounded-xl border border-green-200 bg-green-50 px-4 py-4 text-sm leading-6 text-green-900">
-              <p className="font-semibold">The run is reserved: {reserved.run.testLabel}.</p>
-              <p className="mt-1">Fiscal year {reserved.run.fiscalYear || 'not set'}. Meeting date {String(reserved.run.meetingDate ?? '').slice(0, 10) || 'not set'}.</p>
-              {!reserved.selected ? <p className="mt-1">Select it in the run list to start it.</p> : null}
-              {reserved.differs ? (
-                <p className="mt-1 font-semibold">This run was already reserved by an earlier attempt, with the values shown here, not the ones you just entered. To use different values, choose Create another.</p>
-              ) : null}
-              <p className="mt-1">Nothing has been created in Dataverse yet. Start it from the run panel below.</p>
-              <button type="button" className={`${OUTLINE_BUTTON} mt-3`} onClick={createAnother}>Create another</button>
-            </div>
-          ) : (
-            <form onSubmit={confirm} className="space-y-4">
-              <div className="grid gap-4 lg:grid-cols-3">
-                <label className="block text-sm font-semibold text-gray-800">
-                  Test label
-                  <input value={form.label} onChange={(event) => update('label', event.target.value)} maxLength={LIMITS.labelMax} required className={INPUT} />
-                </label>
+          <form onSubmit={confirm} className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-3">
+              <label className="block text-sm font-semibold text-gray-800">
+                Test label
+                <input value={form.label} onChange={(event) => update('label', event.target.value)} maxLength={LIMITS.labelMax} required className={INPUT} />
+              </label>
+              <div>
                 <label className="block text-sm font-semibold text-gray-800">
                   Fiscal year
-                  <input value={form.fiscalYear} onChange={(event) => update('fiscalYear', event.target.value)} maxLength={LIMITS.cycleFieldMax} required className={INPUT} />
+                  <input value={form.fiscalYear} onChange={(event) => update('fiscalYear', event.target.value)} maxLength={LIMITS.cycleFieldMax} required aria-describedby="factory-fy-hint" className={INPUT} />
                 </label>
-                <label className="block text-sm font-semibold text-gray-800">
-                  Meeting date
-                  <input type="date" value={form.meetingDate} onChange={(event) => update('meetingDate', event.target.value)} required className={INPUT} />
-                </label>
+                <p id="factory-fy-hint" className="mt-1 text-sm text-gray-600">
+                  {draft.defaults?.fiscalYear ? `For example: ${draft.defaults.fiscalYear}` : "Use the same form as the source Request's fiscal year."}
+                </p>
               </div>
-              <label className="block max-w-md text-sm font-semibold text-gray-800">
-                {`Type Request number ${summary.requestNumber} to confirm`}
-                <input value={form.typed} onChange={(event) => update('typed', event.target.value)} autoComplete="off" className={INPUT} />
+              <label className="block text-sm font-semibold text-gray-800">
+                Meeting date
+                <input type="date" value={form.meetingDate} onChange={(event) => update('meetingDate', event.target.value)} required className={INPUT} />
               </label>
-              {confirmError ? <div role="alert" className={ERROR_BAND}>{confirmError}</div> : null}
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <button type="submit" disabled={Boolean(confirmReason)} aria-describedby="factory-confirm-reason" className={PRIMARY_BUTTON}>
-                  {confirming ? 'Reserving…' : 'Confirm and reserve run'}
-                </button>
-                {confirmReason ? <Reason id="factory-confirm-reason">{confirmReason}</Reason> : <span id="factory-confirm-reason" />}
-              </div>
-              <p className="max-w-2xl text-sm leading-6 text-gray-600">
-                Confirm reserves the run and creates nothing in Dataverse yet. You start the run, step by step, from the run panel.
-              </p>
-            </form>
-          )}
+            </div>
+            <label className="block max-w-md text-sm font-semibold text-gray-800">
+              {`Type Request number ${summary.requestNumber} to confirm`}
+              <input value={form.typed} onChange={(event) => update('typed', event.target.value)} autoComplete="off" className={INPUT} />
+            </label>
+            {confirmError ? <div role="alert" className={ERROR_BAND}>{confirmError}</div> : null}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <button type="submit" disabled={Boolean(confirmReason)} aria-describedby="factory-confirm-reason" {...buttonProps(true)}>
+                {confirming ? 'Reserving…' : 'Confirm and reserve run'}
+              </button>
+              {confirmReason ? <Reason id="factory-confirm-reason">{confirmReason}</Reason> : <span id="factory-confirm-reason" />}
+            </div>
+            <p className="max-w-2xl text-sm leading-6 text-gray-600">
+              Confirm reserves the run and creates nothing in Dataverse yet. You start the run, step by step, from the run panel.
+            </p>
+          </form>
         </section>
       ) : null}
     </div>

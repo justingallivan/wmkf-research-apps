@@ -9,7 +9,14 @@ import { TEST_REQUEST_PREVIEW_READ_LIMITS } from '../../lib/services/test-reques
 import {
   ADVANCE_LABELS, BASIC_STEPS, RUN_STATUSES, SIZE_LIMITS, STATUS_FIELDS,
 } from '../../shared/config/testRequestFactory.js';
-import { BLIP_COPY, ERROR_COPY, messageFor } from '../../shared/components/admin/test-request-factory-copy.js';
+import {
+  DOCUMENT_KIND_LABELS, RESOURCE_KIND_LABELS, RESOURCE_OUTCOME_LABELS, humanize,
+} from '../../shared/config/testRequestFactory.js';
+import {
+  ATTENTION_COPY, BLIP_COPY, ERROR_COPY, attentionCopyFor, messageFor,
+} from '../../shared/components/admin/test-request-factory-copy.js';
+import { readFileSync } from 'node:fs';
+import { LEDGER_REASON_CODES, LEDGER_RESOURCE_KINDS } from '../../lib/services/test-requests/run-ledger.js';
 import { STATUS_FIELDS as SERVER_STATUS_FIELDS } from '../../lib/services/test-requests/status-transitions.js';
 
 const apiError = (code, message = 'server text', status = 409) => Object.assign(new Error(message), { status, payload: { code, error: message } });
@@ -79,5 +86,34 @@ describe('messageFor', () => {
 
   test('factory_invalid_input keeps the server message when there is one', () => {
     expect(messageFor(apiError('factory_invalid_input', 'A valid fiscal year and meeting date are required for this source.', 400))).toBe('A valid fiscal year and meeting date are required for this source.');
+  });
+});
+
+describe('labels for the run record and the source summary', () => {
+  test('DOCUMENT_KIND_LABELS equal the preview service document specs (keys and labels)', () => {
+    const source = readFileSync(new URL('../../lib/services/test-requests/admin-preview-service.js', import.meta.url), 'utf8');
+    const block = source.slice(source.indexOf('const DOCUMENT_SPECS'), source.indexOf('function previewError'));
+    const found = Object.fromEntries([...block.matchAll(/^\s{2}(\w+): Object\.freeze\(\{\s*\n\s*label: '([^']+)'/gm)].map((m) => [m[1], m[2]]));
+    expect(found).toEqual({ ...DOCUMENT_KIND_LABELS });
+  });
+
+  test('every labelled resource kind is a ledger kind, and the outcomes equal the ledger set', () => {
+    for (const kind of Object.keys(RESOURCE_KIND_LABELS)) expect(LEDGER_RESOURCE_KINDS).toContain(kind);
+    const source = readFileSync(new URL('../../lib/services/test-requests/run-ledger.js', import.meta.url), 'utf8');
+    const outcomes = /const RESOURCE_OUTCOMES = new Set\(\[([^\]]+)\]\)/.exec(source)[1].split(',').map((x) => x.trim().replace(/'/g, ''));
+    expect(Object.keys(RESOURCE_OUTCOME_LABELS).sort()).toEqual([...outcomes].sort());
+  });
+
+  test('humanize turns a code into sentence case', () => {
+    expect(humanize('half_done_thing')).toBe('Half done thing');
+    expect(humanize('')).toBe('');
+  });
+
+  test('every needs-attention reason with its own copy is a real ledger reason code; others get the default', () => {
+    for (const code of Object.keys(ATTENTION_COPY)) expect(LEDGER_REASON_CODES).toContain(code);
+    const fallback = attentionCopyFor('file_copy_failed');
+    expect(fallback).toMatch(/^This step stopped and needs a look before it is retried\. Retrying is safe/);
+    expect(attentionCopyFor(null)).toBe(fallback);
+    expect(attentionCopyFor('timeout (http 504)')).toBe(ATTENTION_COPY.timeout);
   });
 });

@@ -1,13 +1,19 @@
-import { ADVANCE_LABELS, BASIC_STEPS, RUN_STATUSES } from '../../config/testRequestFactory';
+import Link from 'next/link';
+import { useEffect, useRef } from 'react';
+import {
+  ADVANCE_LABELS, BASIC_STEPS, RESOURCE_KIND_LABELS, RESOURCE_OUTCOME_LABELS, RUN_STATUSES, labelFor,
+} from '../../config/testRequestFactory';
 import { StatusChip } from './AdminWorkspaceNavigation';
 import TestRequestStatusControl from './TestRequestStatusControl';
+import { attentionCopyFor } from './test-request-factory-copy';
 import {
-  ERROR_BAND, OUTLINE_BUTTON, PRIMARY_BUTTON, TABLE_WRAP, TH, formatTime,
+  ERROR_BAND, SUMMARY_CLASS, TABLE_WRAP, TH, buttonProps, focusAndShow, formatTime,
 } from './test-request-factory-ui';
 
 const HOUR_MS = 3_600_000;
 const stepLabel = (key) => BASIC_STEPS.find((step) => step.key === key)?.label || key;
 const errorCodeOf = (error) => (error && typeof error === 'object' ? error.code : error) || '';
+const envName = (run) => (run.destinationEnvironment === 'production' ? 'Production' : 'Sandbox');
 
 /**
  * Progress comes from the run's own stepIndex and status, never from the last
@@ -28,11 +34,11 @@ function ProgressList({ run, advancing }) {
     <ol className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200 bg-white" aria-label="Steps">
       {BASIC_STEPS.map((step, index) => {
         const state = stepState(run, index, advancing);
-        const tone = { Done: 'green', 'Needs attention': 'amber', 'In progress': 'amber' }[state] || 'gray';
+        const tone = { Done: 'green', 'Needs attention': 'amber', 'In progress': 'blue' }[state] || 'gray';
         return (
           <li key={step.key} className="flex items-center justify-between gap-4 px-4 py-3 text-sm" aria-current={state === 'In progress' || state === 'Up next' ? 'step' : undefined}>
-            <span className="text-gray-950">{index + 1}. {step.label}</span>
-            <StatusChip tone={tone}>{state}</StatusChip>
+            <span className="min-w-0 break-words text-gray-950">{index + 1}. {step.label}</span>
+            <span className="shrink-0"><StatusChip tone={tone}>{state}</StatusChip></span>
           </li>
         );
       })}
@@ -46,35 +52,73 @@ const NOTE_CLASSES = {
   gray: 'border-gray-200 bg-gray-50 text-gray-800',
 };
 
+const clock = (time) => new Date(time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+/** "Meaningful after 3:10 PM (in 35 minutes)" or "since 2:10 PM"; null when the baseline time is unknown. */
+function recheckAdvisory(capturedIso, now = Date.now()) {
+  const captured = capturedIso ? Date.parse(capturedIso) : NaN;
+  if (Number.isNaN(captured)) return null;
+  const at = captured + HOUR_MS;
+  if (at > now) {
+    const minutes = Math.max(1, Math.ceil((at - now) / 60_000));
+    return `A recheck is meaningful after ${clock(at)} (in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}).`;
+  }
+  const sameDay = new Date(at).toDateString() === new Date(now).toDateString();
+  return `A recheck is meaningful since ${sameDay ? clock(at) : formatTime(at)}.`;
+}
+
 /**
  * The selected run: status, progress, the one advance action, then the
- * read-only tools (resources, Foundation recheck, run files) and, for a ready
- * production run, the status control. Presentational: the section owns every
- * request and the stale guard.
+ * read-only tools (recorded steps, run tools) and, for a ready production run,
+ * the status control. Presentational: the section owns every request and the
+ * stale guard.
  */
 export default function TestRequestFactoryRunPanel({
   view, advancing, stopRequested, note, writeBlock, onAdvance, onStop, recheck, onRecheck, artifacts, onArtifacts, getScope, epoch, initialStuck, onStuck,
 }) {
   const { run } = view;
+  const headingRef = useRef(null);
+  const skipFocus = Boolean(view.skipFocus);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!skipFocus) focusAndShow(headingRef.current); }, [run.runId]);
+
   const status = RUN_STATUSES[run.status] || { label: run.status, tone: 'gray' };
   const advanceLabel = ADVANCE_LABELS[run.status];
   const production = run.destinationEnvironment === 'production';
-  const capturedAt = view.foundationCapturedAt ? Date.parse(view.foundationCapturedAt) : NaN;
-  const advanceDisabled = Boolean(writeBlock) || advancing;
+  const attention = run.status === 'needs_attention';
   const stepName = stepLabel(run.currentStep);
+  const advanceDisabled = Boolean(writeBlock) || advancing;
+  const buttonText = (() => {
+    if (advancing) return 'Running…';
+    if (attention) return `Retry step: ${stepName}`;
+    return `${advanceLabel} ${production ? 'production' : 'sandbox'} run`;
+  })();
+  const stepAt = Number.isInteger(run.stepIndex) ? run.stepIndex : 0;
+  const progressLine = advancing
+    ? `${stepAt > 0 ? `Finished: ${BASIC_STEPS[stepAt - 1]?.label || ''}. ` : ''}Working on: ${stepName}. This can take a few minutes. Leave this page open.`
+    : '';
+  const advisory = production ? recheckAdvisory(view.foundationCapturedAt) : null;
+  const attentionNote = note && note.kind === 'attention' ? note : null;
+  const otherNote = note && note.kind !== 'attention' ? note : null;
+  const resourceCount = view.resources?.length ?? 0;
 
   return (
     <section aria-labelledby="factory-run-heading" className="space-y-6 border-t border-gray-300 pt-7">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h3 id="factory-run-heading" className="text-xl font-semibold tracking-tight text-gray-950">{run.testLabel}</h3>
+        <div className="min-w-0">
+          <h3 id="factory-run-heading" ref={headingRef} tabIndex={-1} className="break-words text-xl font-semibold tracking-tight text-gray-950 focus:outline-none">{run.testLabel}</h3>
           <p className="mt-1 text-sm leading-6 text-gray-600">
             Source Request {run.sourceRequestNumber}
             {run.destinationRequestNumber ? ` · Test Request ${run.destinationRequestNumber}` : ' · Test Request not created yet'}
-            {` · ${run.destinationEnvironment === 'production' ? 'Production' : 'Sandbox'} run`}
+            {` · ${envName(run)} run`}
           </p>
+          {run.status === 'ready' && production && run.destinationRequestId ? (
+            <p className="mt-1 text-sm">
+              <Link href={`/workbench/${run.destinationRequestId}`} className="font-semibold text-gray-900 underline underline-offset-2">Open in the Workbench</Link>
+            </p>
+          ) : null}
         </div>
-        <StatusChip tone={status.tone}>{status.label}</StatusChip>
+        <span className="shrink-0"><StatusChip tone={status.tone}>{status.label}</StatusChip></span>
       </div>
 
       {view.state === 'error' ? <div role="alert" className={ERROR_BAND}>{view.text}</div> : null}
@@ -85,93 +129,119 @@ export default function TestRequestFactoryRunPanel({
         <ProgressList run={run} advancing={advancing} />
       )}
 
-      {advancing ? (
-        <p role="status" className="text-sm text-gray-700">Working on: {stepName}. This can take a few minutes. Leave this page open.</p>
+      <div role="status" aria-live="polite" className="text-sm text-gray-700">{progressLine}</div>
+
+      {attention ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+          <p className="font-semibold">Stopped at &quot;{stepName}&quot;.</p>
+          <p className="mt-1">{attentionCopyFor(run.needsAttentionReason)}</p>
+          {attentionNote?.detail ? (
+            <details className="mt-2">
+              <summary className="cursor-pointer font-semibold">Technical detail</summary>
+              <p className="mt-1 break-words font-mono text-xs">{attentionNote.detail}</p>
+            </details>
+          ) : null}
+        </div>
       ) : null}
-      {note ? (
-        <div role={note.tone === 'red' ? 'alert' : 'status'} className={note.tone === 'red' ? ERROR_BAND : `rounded-lg border px-4 py-3 text-sm ${NOTE_CLASSES[note.tone] || NOTE_CLASSES.gray}`}>
-          <p className="font-semibold">{note.text}</p>
-          {note.detail ? <p className="mt-1 break-words">{note.detail}</p> : null}
+      {otherNote ? (
+        <div role={otherNote.tone === 'red' ? 'alert' : 'status'} className={otherNote.tone === 'red' ? ERROR_BAND : `rounded-lg border px-4 py-3 text-sm ${NOTE_CLASSES[otherNote.tone] || NOTE_CLASSES.gray}`}>
+          <p className="font-semibold">{otherNote.text}</p>
+          {otherNote.detail ? <p className="mt-1 break-words">{otherNote.detail}</p> : null}
         </div>
       ) : null}
 
       {advanceLabel ? (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <button type="button" className={PRIMARY_BUTTON} disabled={advanceDisabled} aria-describedby="factory-advance-reason" onClick={onAdvance}>
-            {advancing ? 'Running…' : advanceLabel}
-          </button>
-          {advancing ? (
-            <button type="button" className={OUTLINE_BUTTON} disabled={stopRequested} onClick={onStop}>
-              {stopRequested ? 'Stopping after this step…' : 'Stop after this step'}
+        <div className="space-y-2">
+          <p className="text-sm leading-6 text-gray-700">
+            Writes to {envName(run)} Dataverse and SharePoint: creates the test Request, sets its meeting date, makes its document folder and copies its documents.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <button type="button" disabled={advanceDisabled} aria-describedby="factory-advance-reason" onClick={onAdvance} {...buttonProps(!attention)}>
+              {buttonText}
             </button>
-          ) : null}
-          {writeBlock ? <p id="factory-advance-reason" className="text-sm leading-6 text-gray-600">{writeBlock}</p> : <span id="factory-advance-reason" />}
+            {advancing ? (
+              <button type="button" {...buttonProps(false)} disabled={stopRequested} onClick={onStop}>
+                {stopRequested ? 'Stopping after this step…' : 'Stop after this step'}
+              </button>
+            ) : null}
+            {writeBlock ? <p id="factory-advance-reason" className="text-sm leading-6 text-gray-600">{writeBlock}</p> : <span id="factory-advance-reason" />}
+          </div>
         </div>
       ) : null}
 
-      <section aria-labelledby="factory-resources-heading" className="space-y-3">
-        <h4 id="factory-resources-heading" className="text-sm font-semibold text-gray-950">Recorded resources</h4>
-        <div className={TABLE_WRAP}>
+      <details className="rounded-xl border border-gray-200 bg-white px-4" open={attention}>
+        <summary className={SUMMARY_CLASS}>Recorded steps ({resourceCount})</summary>
+        <div className={`mb-4 ${TABLE_WRAP}`}>
           <table className="min-w-full divide-y divide-gray-200 text-left text-sm">
             <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600">
               <tr>
                 <th scope="col" className={TH}>Step</th>
-                <th scope="col" className={TH}>Kind</th>
-                <th scope="col" className={TH}>Outcome</th>
-                <th scope="col" className={TH}>Error code</th>
+                <th scope="col" className={TH}>What</th>
+                <th scope="col" className={TH}>Result</th>
+                <th scope="col" className={TH}>Error</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
-              {view.resources?.length ? view.resources.map((resource) => (
-                <tr key={resource.resourceId || `${resource.step}-${resource.sequence}`}>
-                  <td className="px-4 py-3">{stepLabel(resource.step)}</td>
-                  <td className="px-4 py-3">{resource.resourceKind}</td>
-                  <td className="px-4 py-3">{resource.outcome || 'Pending'}</td>
-                  <td className="px-4 py-3 text-gray-600">{errorCodeOf(resource.error) || 'None'}</td>
-                </tr>
-              )) : (
+              {view.resources?.length ? view.resources.map((resource) => {
+                const code = errorCodeOf(resource.error);
+                return (
+                  <tr key={resource.resourceId || `${resource.step}-${resource.sequence}`}>
+                    <td className="px-4 py-3">{stepLabel(resource.step)}</td>
+                    <td className="px-4 py-3">{labelFor(RESOURCE_KIND_LABELS, resource.resourceKind)}</td>
+                    <td className="px-4 py-3">{resource.outcome ? labelFor(RESOURCE_OUTCOME_LABELS, resource.outcome) : 'Pending'}</td>
+                    <td className="px-4 py-3 text-gray-600">{code ? <>Error <code className="font-mono text-xs">{code}</code></> : 'None'}</td>
+                  </tr>
+                );
+              }) : (
                 <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-600">{view.resources ? 'No resources recorded yet.' : 'Loading resources…'}</td></tr>
               )}
             </tbody>
           </table>
         </div>
-      </section>
+      </details>
 
-      <div className="flex flex-col gap-4 border-t border-gray-200 pt-5">
-        {production ? (
+      <details className="rounded-xl border border-gray-200 bg-white px-4">
+        <summary className={SUMMARY_CLASS}>Run tools</summary>
+        <div className="flex flex-col gap-5 pb-4">
+          {production ? (
+            <div className="space-y-2">
+              <button type="button" {...buttonProps(false)} disabled={recheck.busy} onClick={onRecheck}>
+                {recheck.busy ? 'Rechecking…' : 'Recheck the Foundation record'}
+              </button>
+              <p className="text-sm leading-6 text-gray-600">
+                Checks that creating the test Request did not change the Foundation&apos;s own account record. It is meaningful about an hour after the run started.
+              </p>
+              {advisory ? <p className="text-sm leading-6 text-gray-600">{advisory}</p> : null}
+              {recheck.error ? <div role="alert" className={ERROR_BAND}>{recheck.error}</div> : null}
+              {recheck.result ? (
+                <div role="status" className={`rounded-lg border px-4 py-3 text-sm ${recheck.result.ok ? NOTE_CLASSES.green : NOTE_CLASSES.amber}`}>
+                  <p className="font-semibold">{recheck.result.ok ? 'The Foundation records are as expected.' : 'The Foundation records need a look.'}</p>
+                  {recheck.result.failures?.length ? (
+                    <ul className="mt-1 list-disc pl-5">{recheck.result.failures.map((failure) => <li key={String(failure)}>{String(failure)}</li>)}</ul>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="space-y-2">
-            <button type="button" className={OUTLINE_BUTTON} disabled={recheck.busy} onClick={onRecheck}>
-              {recheck.busy ? 'Rechecking…' : 'Recheck Foundation'}
+            <button type="button" {...buttonProps(false)} disabled={artifacts.busy} onClick={onArtifacts}>
+              {artifacts.busy ? 'Preparing files…' : 'Download run files'}
             </button>
-            {Number.isNaN(capturedAt) ? null : (
-              <p className="text-sm leading-6 text-gray-600">A recheck is meaningful after {formatTime(capturedAt + HOUR_MS)}.</p>
-            )}
-            {recheck.error ? <div role="alert" className={ERROR_BAND}>{recheck.error}</div> : null}
-            {recheck.result ? (
-              <div role="status" className={`rounded-lg border px-4 py-3 text-sm ${recheck.result.ok ? NOTE_CLASSES.green : NOTE_CLASSES.amber}`}>
-                <p className="font-semibold">{recheck.result.ok ? 'The Foundation records are as expected.' : 'The Foundation records need a look.'}</p>
-                {recheck.result.failures?.length ? (
-                  <ul className="mt-1 list-disc pl-5">{recheck.result.failures.map((failure) => <li key={String(failure)}>{String(failure)}</li>)}</ul>
-                ) : null}
-              </div>
-            ) : null}
+            {artifacts.error ? <div role="alert" className={ERROR_BAND}>{artifacts.error}</div> : null}
+            {artifacts.note ? <p role="status" className="text-sm leading-6 text-gray-700">{artifacts.note}</p> : null}
           </div>
-        ) : null}
-
-        <div className="space-y-2">
-          <button type="button" className={OUTLINE_BUTTON} disabled={artifacts.busy} onClick={onArtifacts}>
-            {artifacts.busy ? 'Preparing files…' : 'Download run files'}
-          </button>
-          {artifacts.error ? <div role="alert" className={ERROR_BAND}>{artifacts.error}</div> : null}
-          {artifacts.note ? <p role="status" className="text-sm leading-6 text-gray-700">{artifacts.note}</p> : null}
         </div>
-      </div>
+      </details>
 
       {run.status === 'ready' && production ? (
         <section aria-labelledby="factory-status-heading" className="space-y-3 border-t border-gray-200 pt-5">
           <h4 id="factory-status-heading" className="text-base font-semibold text-gray-950">Phase I and Phase II status</h4>
           <TestRequestStatusControl key={`${run.runId}:${epoch}`} run={run} writeBlock={writeBlock} getScope={getScope} initialStuck={initialStuck} onStuck={onStuck} />
         </section>
+      ) : null}
+      {run.status === 'ready' && !production ? (
+        <p className="border-t border-gray-200 pt-5 text-sm leading-6 text-gray-700">Status changes are available only for production test Requests.</p>
       ) : null}
     </section>
   );

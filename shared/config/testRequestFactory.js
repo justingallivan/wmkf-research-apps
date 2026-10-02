@@ -22,7 +22,7 @@ export const BASIC_STEPS = Object.freeze([
 /** Run statuses (migration 054) with the words and chip tone the form shows. */
 export const RUN_STATUSES = Object.freeze({
   prepared: Object.freeze({ label: 'Reserved, not started', tone: 'gray' }),
-  creating: Object.freeze({ label: 'In progress', tone: 'amber' }),
+  creating: Object.freeze({ label: 'In progress', tone: 'blue' }),
   ready: Object.freeze({ label: 'Ready', tone: 'green' }),
   needs_attention: Object.freeze({ label: 'Needs attention', tone: 'amber' }),
   retiring: Object.freeze({ label: 'Retiring', tone: 'gray' }),
@@ -57,3 +57,46 @@ export const CHANGE_STATUSES = Object.freeze({
 
 /** Cycle fields are short strings on the server (32 characters). */
 export const LIMITS = Object.freeze({ labelMax: 120, cycleFieldMax: 32, requestNumberMax: 10 });
+
+/** Human labels for the document kinds in a source summary. Unknown kind: the raw kind. */
+export const DOCUMENT_KIND_LABELS = Object.freeze({
+  projectDescription: 'Project Description',
+  biosketches: 'Biosketches',
+  projectBudget: 'Project Budget',
+  projectBudgetSpreadsheet: 'Project Budget spreadsheet',
+  reviewerProposal: 'Reviewer proposal',
+  proposalNarrative: 'Proposal narrative',
+  proposalBibliography: 'Proposal bibliography',
+});
+
+/** The resource kinds and outcomes the run ledger can journal (run-ledger.js LEDGER_RESOURCE_KINDS / RESOURCE_OUTCOMES), in words. */
+export const RESOURCE_KIND_LABELS = Object.freeze({
+  dataverse_request: 'Test Request',
+  dataverse_request_patch: 'Request field update',
+  sharepoint_folder: 'Document folder',
+  dataverse_document_location: 'Document folder record',
+  sharepoint_file: 'Copied document',
+  workflow_bypass: 'Workflow bypass marker',
+  dataverse_request_document: 'Document record',
+  foundation_baseline: 'Foundation record baseline',
+  foundation_transition: 'Foundation record check',
+});
+
+export const RESOURCE_OUTCOME_LABELS = Object.freeze({
+  planned: 'Planned',
+  dispatched: 'Sent',
+  verified: 'Verified',
+  recovered: 'Recovered',
+  conflict: 'Conflict',
+  rejected: 'Rejected',
+  ambiguous: 'Result not confirmed',
+  failed: 'Failed',
+});
+
+/** Underscores to spaces, sentence case: the fallback for a code this config does not know. */
+export function humanize(code) {
+  const text = String(code ?? '').replace(/_/g, ' ').trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
+}
+
+export const labelFor = (map, code) => map[code] || humanize(code);

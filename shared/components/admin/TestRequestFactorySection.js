@@ -10,7 +10,9 @@ import {
 } from './test-request-factory-ui';
 
 const BASE = '/api/admin/test-requests/runs';
-const FORM_OFF = 'Creating test Requests is switched off on this deployment. Existing runs can still be inspected.';
+const FORM_OFF_FULL = 'Creating test Requests is switched off on this deployment. Existing runs can still be inspected.';
+// The per-control reason; the full sentence appears once, in the banner at the top.
+const FORM_OFF = 'Switched off on this deployment (see the note at the top).';
 const LEASE_COPY = 'Another process is advancing this run. That can be a step you started a moment ago that is still finishing. Try again in a few minutes.';
 const stepLabel = (key) => BASIC_STEPS.find((step) => step.key === key)?.label || key;
 const IDLE_RECHECK = { busy: false, result: null, error: '' };
@@ -22,7 +24,7 @@ function noteFor(reply) {
     case 'ready':
       return { tone: 'green', text: 'The test Request is ready.', detail: reply.destinationRequestNumber ? `Request ${reply.destinationRequestNumber}` : '' };
     case 'needs_attention':
-      return { tone: 'amber', text: `Stopped at "${stepLabel(reply.step)}": this step needs attention.`, detail: reply.errorMessage || '' };
+      return { kind: 'attention', tone: 'amber', text: `Stopped at "${stepLabel(reply.step)}".`, detail: reply.errorMessage || '' };
     case 'lease_unavailable':
     case 'lease_lost':
       return { tone: 'amber', text: LEASE_COPY, detail: '' };
@@ -151,21 +153,22 @@ export default function TestRequestFactorySection({ onTarget }) {
     try {
       const body = await requestJson(`${BASE}/${scope.runId}`, { signal: scope.controller.signal, fallbackMessage: 'The run could not be loaded.' });
       if (!isLive(scope)) return;
-      setView({
-        state: 'ready', run: body.run, resources: body.resources || [], foundationCapturedAt: body.foundationCapturedAt || null, text: '',
-      });
+      setView((current) => ({
+        state: 'ready', run: body.run, resources: body.resources || [], foundationCapturedAt: body.foundationCapturedAt || null, text: '', skipFocus: Boolean(current?.skipFocus && current.run.runId === body.run.runId),
+      }));
     } catch (error) {
       if (!isLive(scope) || error?.name === 'AbortError') return;
       setView((current) => (current && current.run.runId === scope.runId ? { ...current, state: 'error', text: messageFor(error) } : current));
     }
   }
 
-  function selectRun(run) {
+  // `skipFocus`: a run just reserved keeps focus on the intake's reserved line, not the panel heading.
+  function selectRun(run, { skipFocus = false } = {}) {
     selectionSeqRef.current += 1;
     const scope = openScope(run.runId);
     resetPanel();
     setView({
-      state: 'loading', run, resources: null, foundationCapturedAt: null, text: '',
+      state: 'loading', run, resources: null, foundationCapturedAt: null, text: '', skipFocus,
     });
     return refreshRun(scope);
   }
@@ -254,7 +257,7 @@ export default function TestRequestFactorySection({ onTarget }) {
   const onReserved = (run, token) => {
     loadList();
     if (token !== selectionSeqRef.current) return false;
-    selectRun(run);
+    selectRun(run, { skipFocus: true });
     return true;
   };
 
@@ -262,11 +265,23 @@ export default function TestRequestFactorySection({ onTarget }) {
     <div className="space-y-6">
       {list.state === 'ready' && !list.formEnabled ? (
         <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm font-semibold text-amber-950">
-          {FORM_OFF}
+          {FORM_OFF_FULL}
+        </div>
+      ) : null}
+      {list.state === 'ready' && list.formEnabled ? (
+        <div className="rounded-xl border border-gray-200 bg-white px-4 py-4 text-sm text-gray-900">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusChip tone={list.target === 'production' ? 'amber' : 'gray'}>
+              {list.target === 'production' ? 'Writes to production' : 'Writes to sandbox'}
+            </StatusChip>
+            <p className="max-w-3xl leading-6">
+              This panel changes real data on {list.target === 'production' ? 'Production' : 'the sandbox'}: it creates a test Request step by step and can change its Phase I or Phase II status.
+            </p>
+          </div>
         </div>
       ) : null}
 
-      <TestRequestFactoryIntake writeBlock={writeBlock} onLookupStart={abortActive} onReserved={onReserved} getSelectionToken={() => selectionSeqRef.current} />
+      <TestRequestFactoryIntake writeBlock={writeBlock} onLookupStart={abortActive} onReserved={onReserved} getSelectionToken={() => selectionSeqRef.current} hasSelection={Boolean(view)} />
 
       <section aria-labelledby="factory-runs-heading" className="space-y-3 border-t border-gray-200 pt-6">
         <div className="flex items-center justify-between gap-3">
@@ -289,11 +304,14 @@ export default function TestRequestFactorySection({ onTarget }) {
               {list.runs.length ? list.runs.map((run) => {
                 const status = RUN_STATUSES[run.status] || { label: run.status, tone: 'gray' };
                 return (
-                  <tr key={run.runId} className={view?.run.runId === run.runId ? 'bg-gray-50' : ''}>
+                  <tr key={run.runId} className={view?.run.runId === run.runId ? 'bg-gray-100' : ''}>
                     <td className="px-4 py-3">
-                      <button type="button" className="inline-flex min-h-11 items-center font-semibold text-gray-950 underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900" aria-pressed={view?.run.runId === run.runId} onClick={() => selectRun(run)}>
-                        {run.testLabel}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button type="button" title={run.testLabel} className="inline-flex min-h-11 max-w-xs items-center truncate font-semibold text-gray-950 underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900" aria-current={view?.run.runId === run.runId ? 'true' : undefined} onClick={() => selectRun(run)}>
+                          <span className="truncate">{run.testLabel}</span>
+                        </button>
+                        {view?.run.runId === run.runId ? <span className="shrink-0"><StatusChip tone="gray">Selected</StatusChip></span> : null}
+                      </div>
                     </td>
                     <td className="px-4 py-3 tabular-nums">{run.sourceRequestNumber}</td>
                     <td className="px-4 py-3 tabular-nums">{run.destinationRequestNumber || 'Not created yet'}</td>

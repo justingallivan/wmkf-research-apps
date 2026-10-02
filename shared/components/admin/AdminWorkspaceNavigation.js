@@ -186,6 +186,7 @@ const STATUS_CHIP_TONE_CLASSES = {
   green: 'bg-green-50 text-green-700 border-green-200',
   amber: 'bg-amber-50 text-amber-800 border-amber-200',
   red: 'bg-red-50 text-red-700 border-red-200',
+  blue: 'bg-blue-50 text-blue-800 border-blue-200',
   gray: 'bg-gray-100 text-gray-600 border-gray-200',
 };
 
