@@ -3,7 +3,7 @@ title: Meeting Tracker transcription integration
 domain: transcription
 kind: plan
 status: source-reviewed-disabled
-summary: "Shared staff drafts, retained TXT/VTT/source, and explicit publication remain disabled. Local PostgreSQL integration and isolated Preview test-Neon schema bootstrap are verified; sandbox Wave 31 memo and Wave 16 key are exact. Runtime, deployment, provider, audio, and release behavior remain unverified."
+summary: "Shared transcription remains disabled. The isolated sign-in-only Preview project is deployed and basic isolation checks pass; the OAuth callback updated the seeded profile, but browser session display and end-to-end Meeting Tracker behavior remain unverified. No audio/provider test or release readiness is claimed."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -476,8 +476,37 @@ pilot. `scripts/bootstrap-meeting-transcription-test.js` execute and
 independent verify-only runs confirmed the fresh schema: 61 tracked
 migrations, 9 required tables. All nine Preview env keys were read back with
 sandbox/disabled flags, sandbox Dataverse target, interlock on, Production
-reads off, and DAL enforcement on. This is resource/schema readiness only;
-there was no deployment, feature enablement, provider call, or audio test.
+reads off, and DAL enforcement on. The sign-in-only profile change is
+committed as `f58238774`; Sol approved it, and root reports 96 tests plus
+scoped lint, API/context/lifecycle, and old-pilot isolation gates passing.
+Fable's first-party OAuth review session
+`018a58ac-8e44-42e5-b0c1-d2cb79f21637` found no blockers (zero subagents, web
+calls, or permission denials).
+
+The first explicit Preview deployment attempt (`dpl_BAxHcsS83tgmVL79vEcST5pLz9Bi`)
+unexpectedly targeted Production. Root canceled it; Vercel confirmed
+`CANCELED` and `aliasAssigned=false`, and the Production app was not changed.
+Retrying with the staging target produced READY Preview deployment
+`dpl_5xaG9LpWycuHgUGm3RG25AzMy3Ay` (Node 24 / Next.js, approximately one-minute
+build) at
+[`https://wmkf-meeting-transcription-test-rblr9xc6d.vercel.app`](https://wmkf-meeting-transcription-test-rblr9xc6d.vercel.app),
+with [`https://wmkf-meeting-transcription-test.vercel.app`](https://wmkf-meeting-transcription-test.vercel.app)
+assigned and verified. The existing Azure app registration kept its nine old
+redirect URIs and gained only this Preview callback URI; delegated `User.Read`
+was verified. Preview auth settings were present with a unique
+`NEXTAUTH_SECRET`, exact `NEXTAUTH_URL`, `AUTH_REQUIRED=true`, emergency
+bypass false, and the test-project marker configured. The sign-in status
+endpoint returned enabled; an unrelated cron path returned bare 404; anonymous
+session returned `{}`. Chrome's sign-in flow reached a request to
+`/api/auth/session`, where the browser displayed `ERR_BLOCKED_BY_CLIENT`.
+Read-only DB verification found the one seeded profile active,
+`needs_linking=false`, and `last_login_at` populated, showing OAuth callback
+acceptance but not proving the browser established/displayed a session. The
+cause of that browser block is unknown.
+
+All transcription flags remain off. No audio or provider call, feature
+activation, full sign-in UI verification, or end-to-end Meeting Tracker test
+occurred; these deployment/auth checks do not establish release readiness.
 
 **[VERIFIED via first-party OAuth Max source review]** Fable session
 `f287cfdf-40ea-4f27-840c-4defee098bbf` (`claude-fable-5-1`) returned **Commit
@@ -493,10 +522,12 @@ correction, and cleanup gaps remain.
 Detailed bounded results and review limits are recorded in
 [the 2026-10-02 readiness check](evidence/MEETING_TRANSCRIPTION_READINESS_CHECK_2026-10-02.md).
 
-Before release, prove the deployed runtime and authorized end-to-end flow on
-the dedicated test resources. The fresh-schema bootstrap is separate from the
-old pilot and shared database; it does not prove hosted adapter behavior or
-release readiness. The sandbox generation key is exact/Active, but this does
-not authorize or prove an application write. Candidate files retained by
+Next, determine why the browser displayed `ERR_BLOCKED_BY_CLIENT` and verify
+the authenticated browser session, then test the authorized sign-in-only flow
+and scoped application behavior in Preview. Do not infer a cause for the
+browser block from current evidence. The fresh-schema bootstrap is separate
+from the old pilot and shared database; it does not prove hosted adapter
+behavior or release readiness. The sandbox generation key is exact/Active,
+but this does not authorize or prove an application write. Candidate files retained by
 closed attempts are not registered final products; committed but unverifiable
 receipts remain attention-only.

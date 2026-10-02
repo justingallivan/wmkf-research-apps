@@ -3,7 +3,7 @@ title: Meeting Tracker transcription readiness check
 domain: transcription
 kind: evidence
 status: isolated-preview-schema-ready-source-disabled-runtime-unverified
-summary: "Local PostgreSQL integration passed; isolated Preview test Neon schema and sandbox Wave 31 field are verified. Runtime, deployment, provider, audio, and release readiness remain unverified."
+summary: "Local PostgreSQL integration and isolated Preview test schema are verified. The sign-in-only Preview deployment is READY, but the OAuth browser session was not verified. Transcription remains off; provider, audio, end-to-end, and release readiness are unverified."
 owner: product-engineering
 ---
 
@@ -49,8 +49,38 @@ owner: product-engineering
   fresh Neon schema; independent verify-only confirmed 61 tracked
   migrations and 9 required tables. All nine Preview environment keys read
   back as expected: sandbox/disabled flags, sandbox Dataverse target,
-  interlock on, Production reads off, DAL enforcement on. This verifies
-  resources/schema configuration only, not deployment or application runtime.
+  interlock on, Production reads off, DAL enforcement on. The sign-in-only
+  profile change is committed as `f58238774`; Sol approved it, and root reports
+  96 tests plus scoped lint, API/context/lifecycle, and old-pilot isolation
+  gates passing. Fable's first-party OAuth review session
+  `018a58ac-8e44-42e5-b0c1-d2cb79f21637` found no blockers (zero subagents,
+  web calls, or permission denials).
+- **Preview deployment and bounded auth checks:** the first explicit Preview
+  attempt (`dpl_BAxHcsS83tgmVL79vEcST5pLz9Bi`) unexpectedly targeted Production;
+  root canceled it, Vercel confirmed `CANCELED` and `aliasAssigned=false`, and
+  the Production app was not changed. The staging-target retry produced READY
+  Preview deployment `dpl_5xaG9LpWycuHgUGm3RG25AzMy3Ay` (Node 24 / Next.js,
+  approximately one-minute build) at
+  [`https://wmkf-meeting-transcription-test-rblr9xc6d.vercel.app`](https://wmkf-meeting-transcription-test-rblr9xc6d.vercel.app);
+  the alias [`https://wmkf-meeting-transcription-test.vercel.app`](https://wmkf-meeting-transcription-test.vercel.app)
+  is assigned and verified. The existing Azure app registration retained its
+  nine old redirect URIs and gained only this Preview callback URI; delegated
+  `User.Read` was verified. Preview auth settings had a unique
+  `NEXTAUTH_SECRET`, exact `NEXTAUTH_URL`, `AUTH_REQUIRED=true`, emergency
+  bypass false, and the test-project marker configured. Sign-in status returned
+  enabled; an unrelated cron path returned bare 404; anonymous session
+  returned `{}`. Chrome's sign-in flow reached a request to
+  `/api/auth/session`, where the browser displayed `ERR_BLOCKED_BY_CLIENT`.
+  Read-only database verification found the sole seeded profile active,
+  `needs_linking=false`, and `last_login_at` populated, showing OAuth callback
+  acceptance but not proving the browser established or displayed a session.
+  The block's cause is unknown.
+- **Preview route probe:** `scripts/probe-meeting-transcription-test.js`
+  returned HTTP 200 for auth status, sign-in page, and anonymous session; it
+  returned 404 for cron, `meeting-tracker/visits`, the AssemblyAI webhook GET,
+  and `.well-known/workflow/v1/flow` GET. The anonymous 200 does not verify an
+  authenticated session. Root removed the exact protected temporary
+  `preview.env` and its empty parent directory; no source recording was touched.
 
 ## Review and remaining limits
 
@@ -78,7 +108,10 @@ renewal and close, correction CRUD, and successful cleanup remain unproved.
 The live Wave 31 memo is exact on sandbox only; the bundle field's live
 application behavior remains unproved.
 
-Migrations were applied only to the isolated test Neon, and Wave 31 only to
-sandbox. No deployment, feature enablement, provider call, or audio test
-occurred. These checks establish resource/schema readiness, not runtime or
-Meeting Tracker release readiness.
+Migrations were applied only to isolated test Neon, and Wave 31 only to
+sandbox. All transcription flags remain off. No audio/provider call,
+transcription feature activation, authenticated browser session, or end-to-end
+Meeting Tracker test is proven. The next bounded check is to resolve the
+browser's `ERR_BLOCKED_BY_CLIENT` result without assuming a cause, then verify
+the authenticated browser session and scoped Preview behavior. These checks
+do not establish Meeting Tracker release readiness.
