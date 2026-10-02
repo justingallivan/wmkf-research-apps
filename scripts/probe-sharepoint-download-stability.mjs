@@ -11,7 +11,13 @@
  *
  * Usage:
  *   node --env-file=/absolute/.env.local scripts/probe-sharepoint-download-stability.mjs \
- *     --drive-id=<driveId> --item-id=<sourceItemId> [--compare-item-id=<otherItemId>] [--repeats=3]
+ *     --drive-id=<driveId> --item-id=<sourceItemId> [--compare-item-id=<otherItemId>] [--repeats=3] [--attest]
+ *
+ * --attest (with --compare-item-id) also runs the Factory's source-baseline
+ * package attestation with the compare item as the destination and reports
+ * pass or its failure list, plus the custom-property names on each side
+ * (names only). Run once by the owner on 2026-10-02 against the same pair: the
+ * attestation passed; the copy had gained a `TaxKeyword` custom property.
  *
  * Written 2026-10-02 after production run 20407283 stopped at copy_file: the
  * uploaded copy of an .xlsx had the source's size but not its SHA-256. Run
@@ -23,17 +29,19 @@
 import crypto from 'crypto';
 import JSZip from 'jszip';
 import { GraphService } from '../lib/services/graph-service.js';
+import { attestDocxPackageAgainstSource } from '../lib/services/test-requests/docx-package-attestation.js';
 
 const ID = /^[A-Za-z0-9!_-]{10,120}$/;
 
 function parseArgs(argv) {
-  const parsed = { driveId: null, itemId: null, compareItemId: null, repeats: 3 };
+  const parsed = { driveId: null, itemId: null, compareItemId: null, repeats: 3, attest: false };
   for (const arg of argv) {
     const [key, value] = arg.split('=');
     if (key === '--drive-id' && ID.test(value || '')) parsed.driveId = value;
     else if (key === '--item-id' && ID.test(value || '')) parsed.itemId = value;
     else if (key === '--compare-item-id' && ID.test(value || '')) parsed.compareItemId = value;
     else if (key === '--repeats' && /^[1-9]$/.test(value || '')) parsed.repeats = Number(value);
+    else if (key === '--attest' && value === undefined) parsed.attest = true;
     else throw new Error(`Unrecognized or malformed argument: ${key}`);
   }
   if (!parsed.driveId || !parsed.itemId) throw new Error('--drive-id and --item-id are required.');
@@ -59,6 +67,19 @@ async function packageParts(buffer) {
     parts[name] = { size: content.length, sha256: sha256(content).slice(0, 16), date: entry.date?.toISOString() ?? null };
   }
   return parts;
+}
+
+/** Names of the custom properties in docProps/custom.xml (never their values). */
+async function customPropertyNames(buffer) {
+  try {
+    const zip = await JSZip.loadAsync(buffer);
+    const part = zip.files['docProps/custom.xml'];
+    if (!part) return null;
+    const xml = await part.async('string');
+    return [...xml.matchAll(/<property\b[^>]*\bname="([^"]{1,128})"/g)].map((match) => match[1]);
+  } catch {
+    return null;
+  }
 }
 
 function diffParts(left, right) {
@@ -132,6 +153,20 @@ async function main() {
       identicalBytes: first[0].report.sha256 === second[0].report.sha256,
       ...diffParts(firstParts, await packageParts(second[0].buffer)),
     };
+    if (args.attest) {
+      let attestation;
+      try {
+        const { normalizedParts } = await attestDocxPackageAgainstSource(second[0].buffer, first[0].buffer);
+        attestation = { passes: true, normalizedParts };
+      } catch (error) {
+        attestation = { passes: false, failures: error.failures ?? [error.message] };
+      }
+      output.sourceBaselineAttestation = {
+        ...attestation,
+        itemCustomPropertyNames: await customPropertyNames(first[0].buffer),
+        compareItemCustomPropertyNames: await customPropertyNames(second[0].buffer),
+      };
+    }
   }
   console.log(JSON.stringify(output, null, 2));
 }

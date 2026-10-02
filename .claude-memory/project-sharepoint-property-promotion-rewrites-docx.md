@@ -34,6 +34,21 @@ other customXml and rels parts stay byte-identical, and five `[trash]` entries
 appeared. The attestation accepts this for renders only
 (`validateSharePointRewrite`); an uploader-supplied source keeps byte identity.
 
+**Extension to XLSX (verified 2026-10-02, production run `20407283`, test Request
+1003308, and the owner-run `scripts/probe-sharepoint-download-stability.mjs`):**
+an XLSX copied within the `akoya_request` library is rewritten too. On the
+probed pair only `docProps/custom.xml` differed (402 to 519 bytes; a `TaxKeyword`
+property added beside `ContentTypeId`); the other 28 parts were byte-identical and
+the package size did not change, so a same-size readback is not evidence of
+identical bytes. The copy's eTag stayed at revision 1 while its cTag reached
+revision 3: content was revised after upload without an eTag change. Repeated
+downloads of the source, and of the copy, were each byte-stable. The existing
+source-baseline attestation accepts this pair unchanged; XLSX is routed to it
+since PR #406 (`06797abd0`), with a settle check on `size`/`eTag`/`cTag`/`versionId`
+before the copy is journaled. Not characterized: an XLSX that had never been
+promoted (its `xl/_rels/workbook.xml.rels` would change; the attestation fails
+closed), and PPTX.
+
 **How to apply:** never assert byte identity across a SharePoint upload
 round-trip; compare `word/` parts (governed hash) plus a characterized allowlist
 for everything else. If SharePoint's promotion shape changes, the attestation

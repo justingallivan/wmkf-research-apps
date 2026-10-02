@@ -9,6 +9,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { requestEnvelope } from '../../../shared/utils/api-request';
 import { SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED } from '../../../shared/config/siteVisitMaterials';
+import { siteVisitMaterialsScanRejectionMessage } from '../../../shared/utils/site-visit-materials-scan-rejection';
 
 const REASON_MESSAGE = {
   no_token: 'This link is missing its access token.',
@@ -26,7 +27,7 @@ const UPLOAD_MESSAGE = {
   extension_not_allowed: 'That file type is not accepted for this item.',
   signature_mismatch: 'That file does not match its extension. Please export it again and retry.',
   empty_file: 'That file is empty.',
-  scan_infected: 'That file failed the malware scan and was not accepted.',
+  scan_infected: 'This file did not pass the security check, and the scanner did not provide a specific reason. Please choose a different file.',
   scan_timeout: 'The security scan did not finish in time, so this file has not been accepted yet. Please press Retry. If this keeps happening, contact the Foundation.',
   scan_busy: 'The security scanner is busy right now. Please wait a few minutes and press Retry. If this keeps happening, contact the Foundation.',
   scan_unavailable: 'The security scanner is temporarily unavailable. Please press Retry. If this keeps happening, contact the Foundation.',
@@ -117,6 +118,11 @@ function coordinatorContact(programCoordinator) {
   return { name, email };
 }
 
+function scanRejectionCopy(scanRejection, programCoordinator) {
+  const coordinator = coordinatorContact(programCoordinator);
+  return <>{siteVisitMaterialsScanRejectionMessage(scanRejection)} If you need help, contact your Program Coordinator{coordinator.name ? `, ${coordinator.name}` : ''}{coordinator.email ? <> at{' '}<a className="underline" href={`mailto:${encodeURIComponent(coordinator.email)}`}>{coordinator.email}</a></> : ''}.</>;
+}
+
 function jobMessage(job, programCoordinator) {
   const coordinator = coordinatorContact(programCoordinator);
   if (job?.status === 'queued' || job?.status === 'processing') {
@@ -127,8 +133,8 @@ function jobMessage(job, programCoordinator) {
   }
   if (job?.status === 'completed') return 'Your file was saved.';
   if (job?.status === 'failed') {
+    if (job.errorCode === 'infected') return scanRejectionCopy(job.scanRejection, programCoordinator);
     const failureCopy = {
-      infected: 'The security scan rejected this file. Choose a different file to continue.',
       invalid_file: 'This file did not pass validation. Please choose a different file.',
       size_limit: 'This file exceeded the upload limit. Choose a smaller file.',
       processing_deadline: 'This upload took too long to finish. Please try again with a different file or contact your Program Coordinator.',
@@ -157,9 +163,11 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(null);
   const [pending, setPending] = useState(null);
   const [acceptedJob, setAcceptedJob] = useState(null);
   const mountedRef = useRef(true);
+  const uploadSequenceRef = useRef(0);
   const waitTimerRef = useRef(null);
   const waitResolverRef = useRef(null);
 
@@ -172,6 +180,7 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      uploadSequenceRef.current += 1;
       if (waitTimerRef.current !== null) window.clearTimeout(waitTimerRef.current);
       waitResolverRef.current?.(false);
       waitTimerRef.current = null;
@@ -249,7 +258,9 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
             if (serverLimit !== null) onCapChange?.(serverLimit);
             setError({ type: 'size_limit', maxMb: serverLimit });
           } else {
-            const message = UPLOAD_MESSAGE[result.reason] || REASON_MESSAGE[result.reason];
+            const message = result.reason === 'scan_infected'
+              ? scanRejectionCopy(result.scanRejection, programCoordinator)
+              : UPLOAD_MESSAGE[result.reason] || REASON_MESSAGE[result.reason];
             setError(message || (finalizeStatus >= 500
               ? 'Processing stopped before we could confirm this upload was saved. Wait a few minutes and press Retry.'
               : 'The file could not be saved.'));
@@ -304,7 +315,9 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
     }
     setBusy(true);
     setError(null);
+    setUploadProgress(null);
     setProgress('Preparing…');
+    const uploadSequence = ++uploadSequenceRef.current;
     try {
       const { ok: tokenOk, data: tokenData } = await requestEnvelope(
         `/api/external/materials/${encodeURIComponent(token)}/upload-token`,
@@ -335,19 +348,33 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
           : message);
         return;
       }
-      setProgress('Uploading…');
       const { put } = await import('@vercel/blob/client');
       if (!mountedRef.current) return;
       phase = 'blob_transfer';
+      setProgress('Uploading…');
+      setUploadProgress({ percentage: null });
       try {
         await put(tokenData.pathname, file, {
           access: 'private',
           token: tokenData.clientToken,
           contentType: tokenData.contentType,
           multipart: file.size > 60 * MEBIBYTE,
+          onUploadProgress: (event) => {
+            if (!mountedRef.current || uploadSequenceRef.current !== uploadSequence) return;
+            const total = event?.total;
+            const rawPercentage = event?.percentage;
+            if (typeof total !== 'number' || !Number.isFinite(total) || total <= 0
+              || typeof rawPercentage !== 'number' || !Number.isFinite(rawPercentage)) {
+              setUploadProgress({ percentage: null });
+              return;
+            }
+            setUploadProgress({ percentage: Math.round(Math.min(100, Math.max(0, rawPercentage))) });
+          },
         });
       } catch (blobError) {
         if (!mountedRef.current) return;
+        if (uploadSequenceRef.current === uploadSequence) uploadSequenceRef.current += 1;
+        if (mountedRef.current) setUploadProgress(null);
         // The SDK error inherits Error without setting its name, so use its
         // stable SDK-owned message as a discriminator and never show it to users.
         const expired = blobError?.message === 'Vercel Blob: Client token has expired.';
@@ -358,6 +385,8 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
         return;
       }
       phase = 'after_blob_transfer';
+      if (uploadSequenceRef.current === uploadSequence) uploadSequenceRef.current += 1;
+      if (mountedRef.current) setUploadProgress(null);
       const nextPending = { stagingId: tokenData.stagingId, slot };
       writePendingUpload(token, slot, nextPending);
       if (!mountedRef.current) return;
@@ -375,6 +404,8 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
             ? UPLOAD_MESSAGE.blob_upload_failed
             : 'Processing stopped before we could confirm this upload was saved. Wait a few minutes and press Retry.';
       if (mountedRef.current) {
+        uploadSequenceRef.current += 1;
+        setUploadProgress(null);
         setError(pending
           ? `${message} Your earlier upload remains available with Retry, or choose a different file.`
           : message);
@@ -383,6 +414,7 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
       if (mountedRef.current) {
         setBusy(false);
         setProgress(null);
+        setUploadProgress(null);
       }
     }
   };
@@ -401,6 +433,17 @@ function SlotUploader({ token, slot, label, required, received, jobs = [], maxMb
             </p>
           )}
           {progress && <p className="mt-1 text-sm text-blue-800" role="status">{progress}</p>}
+          {progress === 'Uploading…' && uploadProgress && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-blue-800">
+              <progress
+                aria-label="File transfer progress"
+                className="h-2 w-48 accent-blue-700"
+                max={100}
+                value={uploadProgress.percentage ?? undefined}
+              />
+              <span>{uploadProgress.percentage === null ? 'Uploading…' : `${uploadProgress.percentage}%`}</span>
+            </div>
+          )}
           {error && <p className="mt-1 text-sm text-red-700" role="alert">
             {error.type === 'size_limit'
               ? <SizeLimitError error={error} programCoordinator={programCoordinator} />

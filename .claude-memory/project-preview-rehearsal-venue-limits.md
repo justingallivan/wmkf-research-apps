@@ -47,3 +47,32 @@ a 200 in the server log and a clean console. Fix: set `mountedRef.current =
 true` in the effect body. Fixed 2026-09-20 in `ReleaseEmailModal`,
 `CampaignConfigModal`, `pages/dataverse-bulk-export.js` (`1ce5587c9`); a
 `React.StrictMode`-wrapped test is the discriminating pin.
+
+## Test Request Factory form rehearsal (2026-10-02)
+
+`[VERIFIED via owner click-through, vercel CLI and vercel logs]`
+
+- Branch-scoped Preview variables work: `vercel env add <NAME> preview <branch>`
+  (pipe the value on stdin; `!`-prefixed commands cannot answer prompts).
+  Removing them does not disarm a deployment already built with them; delete
+  that deployment too (`vercel remove <url> --yes`).
+- A branch pushed at a commit Vercel has already built produced no Preview
+  build. Push an empty commit to the branch after the variables are set.
+- Sign-in needs the registered alias: branch-scoped `NEXTAUTH_URL` set to the
+  alias origin, then `vercel alias set <deployment> wmkfresearchapps-preview.vercel.app`.
+  Record the alias's prior target first (`vercel inspect <alias>`) and restore it.
+- The form on Preview writes only to the sandbox org and the `ledger` database;
+  its source lookup reads production Dataverse, so it needs the owner-set
+  `DATAVERSE_ALLOW_PROD_READS=yes` on that branch. Preview's Dynamics
+  credentials can read production; Preview's interlock mode is `on`.
+- The sandbox refuses the create without the GoVerify bypass, which the form
+  never offers, so a Preview rehearsal ends at `create_request`. Steps 3-7 and
+  the status setter can only be exercised in Production.
+- Blob: create the store unconnected (Skip the connect dialog) and add the
+  token by hand under the name the code reads. Connecting under the default
+  prefix adds `BLOB_STORE_ID`/`BLOB_WEBHOOK_PUBLIC_KEY` to the project. The CLI
+  cannot delete a Blob store for an agent, and `vercel blob empty-store` takes
+  no store id (per its help text; never run here). Assume it targets the
+  store of the configured token, which locally is the shared store, and
+  empty a throwaway store from the dashboard instead.
+

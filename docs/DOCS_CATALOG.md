@@ -470,6 +470,12 @@ related:
 |---|---|---|---|---|---|
 | [PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md](PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md) | plan | active |  | Owner-gated plan for removing the audited personal and confidential data from public Git history without changing the approved current main tree. | 2026-07-27 |
 
+## test-request-factory
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [TEST_REQUEST_FACTORY_FORM_RUNBOOK.md](TEST_REQUEST_FACTORY_FORM_RUNBOOK.md) | runbook | active |  | Operating the admin Test Request form in Production: what it needs, what each stop means, what a retry does, and how to turn it off. | 2026-10-02 |
+
 ## testing
 
 | File | Kind | Status | Canonical | Summary | Cataloged |

@@ -135,6 +135,8 @@ describe('scanBytes — infected', () => {
     expect(out.foundViruses).toEqual([
       { fileName: 'eicar.com', virusName: 'EICAR-Test-Signature' },
     ]);
+    expect(out.signatureDetected).toBe(true);
+    expect(out.contentFlags).toEqual([]);
   });
 
   test('missing FoundViruses array still yields infected with []', async () => {
@@ -146,6 +148,8 @@ describe('scanBytes — infected', () => {
     expect(out.scan_result).toBe('infected');
     expect(out.foundViruses).toEqual([]);
     expect(out.detectedThreats).toEqual([]);
+    expect(out.signatureDetected).toBe(false);
+    expect(out.contentFlags).toEqual([]);
   });
 
   test('CleanResult=false + ContainsMacros=true → infected with synthesized foundViruses', async () => {
@@ -167,6 +171,8 @@ describe('scanBytes — infected', () => {
       { fileName: 'macro.docx', virusName: 'embedded macro' },
     ]);
     expect(out.detectedThreats).toEqual(['embedded macro']);
+    expect(out.signatureDetected).toBe(false);
+    expect(out.contentFlags).toEqual(['embedded_macro']);
     expect(out.verifiedFileFormat).toBe('docx');
   });
 
@@ -190,6 +196,7 @@ describe('scanBytes — infected', () => {
       { fileName: 'multi.docx', virusName: 'embedded executable' },
     ]);
     expect(out.detectedThreats).toEqual(['embedded executable', 'embedded macro', 'embedded script']);
+    expect(out.contentFlags).toEqual(['embedded_executable', 'embedded_macro', 'embedded_script']);
   });
 
   test('signature match wins precedence over Contains* synthesis', async () => {
@@ -211,6 +218,22 @@ describe('scanBytes — infected', () => {
       { fileName: 'eicar.com', virusName: 'EICAR-Test-Signature' },
     ]);
     expect(out.detectedThreats).toEqual(['embedded macro']);
+    expect(out.signatureDetected).toBe(true);
+    expect(out.contentFlags).toEqual(['embedded_macro']);
+  });
+
+  test('malformed signature rows do not count as native signatures; HTML is excluded from diagnostic flags', async () => {
+    mockFetchSequence([() => ({ status: 200, body: {
+      CleanResult: false,
+      FoundViruses: [{ FileName: 'secret-file.pdf', VirusName: { raw: 'provider detail' } }],
+      ContainsHtml: true,
+    } })]);
+    const { scanBytes } = await loadService();
+    const out = await scanBytes(Buffer.from('x'), 'safe.pdf');
+    expect(out.signatureDetected).toBe(false);
+    expect(out.contentFlags).toEqual([]);
+    expect(out.foundViruses).toEqual([{ fileName: 'secret-file.pdf', virusName: null }]);
+    expect(out.detectedThreats).toEqual(['embedded HTML']);
   });
 });
 

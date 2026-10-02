@@ -767,7 +767,7 @@ describe('needs attention, recorded steps and run tools', () => {
     server.on('GET', `${BASE}/${RUN_A}`, runBody(run));
     await renderSection(server, [run]);
     await selectRun('Run A');
-    expect(screen.getByText('This step stopped. Retrying never creates a second Request: the run checks where it stands first. If it stops here again, it needs to be resolved with the command-line tool.')).toBeTruthy();
+    expect(screen.getByText('This step stopped. Retrying never creates a second Request: the run checks where it stands first and, if nothing had been written, does the step again. If it keeps stopping here, find the cause in the technical detail or the function log and clear it before retrying again.')).toBeTruthy();
   });
 
   test('details defaults: recorded steps open only for needs_attention; run tools and the count are always present', async () => {

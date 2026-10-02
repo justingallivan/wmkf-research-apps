@@ -185,6 +185,8 @@ Slice 5a edits 054 in place on its parked branch (two steps, three reason codes,
 
 ### P7 — Admin form (after the CLI phase is proven)
 
+**Built and enabled in Production 2026-10-02 for the `basic` recipe and the status setter** (first complete run: test Request 1003310). Built state, limits and the owner decisions that changed this section's sketch are in `docs/plans/TEST_REQUEST_FACTORY_ADMIN_FORM_PLAN_2026-10-01.md`; operating notes are in `docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md`. The text below is the pre-build sketch.
+
 This is the designed lease-based step endpoint under `pages/api/admin/test-requests/`:
 - a superuser-only creation form with editable reviewer addresses and the program director;
 - resume and inspect;

@@ -34,6 +34,13 @@ function fileWithSize(size, name = 'deck.pdf') {
   return file;
 }
 
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   window.sessionStorage.clear();
@@ -230,6 +237,113 @@ test('client preflight accepts the exact cap and enables multipart upload for la
 
   await waitFor(() => expect(global.fetch.mock.calls.some(([url]) => url.endsWith('/finalize'))).toBe(true));
   expect(put).toHaveBeenCalledWith('private/path', expect.any(File), expect.objectContaining({ multipart: true }));
+});
+
+test.each([
+  ['single-part', 4, false],
+  ['multipart', 60 * 1024 * 1024 + 1, true],
+])('%s progress comes from put callbacks and does not imply the server saved the file', async (_label, size, multipart) => {
+  const putResult = deferred();
+  const finalizeResult = deferred();
+  let onUploadProgress;
+  put.mockImplementationOnce((_pathname, _file, options) => {
+    onUploadProgress = options.onUploadProgress;
+    return putResult.promise;
+  });
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, context);
+    if (url.endsWith('/upload-token')) return response(200, { ok: true, stagingId: STAGING_ID, pathname: 'private/path', clientToken: 'client', contentType: 'application/pdf' });
+    if (url.endsWith('/finalize')) return finalizeResult.promise;
+    throw new Error(`unexpected fetch ${url}`);
+  });
+
+  render(<MaterialsContributorPage />);
+  fireEvent.change(await screen.findByLabelText('Presentation file'), {
+    target: { files: [fileWithSize(size)] },
+  });
+  const transfer = await screen.findByRole('progressbar', { name: 'File transfer progress' });
+  expect(transfer).not.toHaveAttribute('value');
+  await act(async () => {
+    onUploadProgress({ loaded: 0, total: size, percentage: 0 });
+    onUploadProgress({ loaded: size, total: size, percentage: 100 });
+  });
+  expect(put.mock.calls[0][2].multipart).toBe(multipart);
+  expect(transfer).toHaveAttribute('value', '100');
+  expect(screen.getByText('100%')).toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('Uploading…');
+  expect(screen.queryByText(/Checking and saving your file/)).not.toBeInTheDocument();
+
+  await act(async () => { putResult.resolve(); });
+  expect(await screen.findByRole('status')).toHaveTextContent('Checking and saving your file.');
+  expect(screen.queryByRole('progressbar', { name: 'File transfer progress' })).not.toBeInTheDocument();
+  expect(screen.queryByText('100%')).not.toBeInTheDocument();
+  await act(async () => { onUploadProgress({ loaded: 1, total: size, percentage: 1 }); });
+  expect(screen.queryByRole('progressbar', { name: 'File transfer progress' })).not.toBeInTheDocument();
+  await act(async () => { finalizeResult.resolve(response(200, { ok: true, slot: 'presentation_pdf', filename: 'saved.pdf' })); });
+});
+
+test('unknown SDK totals show an indeterminate transfer bar without a percentage', async () => {
+  const putResult = deferred();
+  let onUploadProgress;
+  put.mockImplementationOnce((_pathname, _file, options) => {
+    onUploadProgress = options.onUploadProgress;
+    onUploadProgress({ loaded: 3, total: 0, percentage: Number.NaN });
+    return putResult.promise;
+  });
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, context);
+    if (url.endsWith('/upload-token')) return response(200, { ok: true, stagingId: STAGING_ID, pathname: 'private/path', clientToken: 'client', contentType: 'application/pdf' });
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  const { unmount } = render(<MaterialsContributorPage />);
+  fireEvent.change(await screen.findByLabelText('Presentation file'), { target: { files: [new File(['%PDF'], 'deck.pdf', { type: 'application/pdf' })] } });
+  const transfer = await screen.findByRole('progressbar', { name: 'File transfer progress' });
+  expect(transfer).not.toHaveAttribute('value');
+  expect(screen.getByRole('status')).toHaveTextContent('Uploading…');
+  unmount();
+  await act(async () => {
+    onUploadProgress({ loaded: 4, total: 4, percentage: 100 });
+    putResult.resolve();
+    await putResult.promise;
+  });
+});
+
+test('late progress after a failed attempt cannot revive the bar or overwrite a newer attempt', async () => {
+  const callbacks = [];
+  const secondPut = deferred();
+  put.mockImplementationOnce((_pathname, _file, options) => {
+    callbacks.push(options.onUploadProgress);
+    options.onUploadProgress({ loaded: 25, total: 100, percentage: 25 });
+    return Promise.reject(new Error('transfer failed'));
+  }).mockImplementationOnce((_pathname, _file, options) => {
+    callbacks.push(options.onUploadProgress);
+    options.onUploadProgress({ loaded: 40, total: 100, percentage: 40 });
+    return secondPut.promise;
+  });
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, context);
+    if (url.endsWith('/upload-token')) return response(200, { ok: true, stagingId: STAGING_ID, pathname: 'private/path', clientToken: 'client', contentType: 'application/pdf' });
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  const { unmount } = render(<MaterialsContributorPage />);
+  const input = await screen.findByLabelText('Presentation file');
+  fireEvent.change(input, { target: { files: [new File(['%PDF'], 'first.pdf', { type: 'application/pdf' })] } });
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent('The file transfer did not finish. Please choose the file again to start a new upload.');
+  expect(alert).not.toHaveTextContent('transfer failed');
+  expect(screen.queryByRole('progressbar', { name: 'File transfer progress' })).not.toBeInTheDocument();
+
+  fireEvent.change(input, { target: { files: [new File(['%PDF'], 'second.pdf', { type: 'application/pdf' })] } });
+  const transfer = await screen.findByRole('progressbar', { name: 'File transfer progress' });
+  expect(transfer).toHaveAttribute('value', '40');
+  await act(async () => { callbacks[0]({ loaded: 99, total: 100, percentage: 99 }); });
+  expect(screen.getByRole('progressbar', { name: 'File transfer progress' })).toHaveAttribute('value', '40');
+  unmount();
+  await act(async () => {
+    callbacks[1]({ loaded: 100, total: 100, percentage: 100 });
+    secondPut.reject(new Error('cleanup'));
+    await Promise.resolve();
+  });
 });
 
 test('preflight rejects one byte over cap without a request and links the assigned coordinator', async () => {
@@ -552,6 +666,22 @@ test('202 acceptance becomes durable queued status, keeps the prior receipt visi
   expect(screen.queryByLabelText('Presentation file')).not.toBeInTheDocument();
   expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull();
   expect(contextCalls).toBe(2);
+});
+
+test('failed scanner diagnostic gives the applicant an explanation and coordinator contact', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, {
+      ...context,
+      checklist: [{ ...context.checklist[0], received: { filename: 'earlier.pdf', receivedAt: '2026-09-20T12:00:00Z' } }],
+      jobs: [{ jobId: 'job-failed', stagingId: STAGING_ID, slot: 'presentation_pdf', status: 'failed', errorCode: 'infected', scanRejection: { category: 'blocked_content', flags: ['embedded_macro'] } }],
+    });
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  render(<MaterialsContributorPage />);
+  expect(await screen.findByText(/The security scan rejected this file because it contains embedded macro/)).toBeInTheDocument();
+  expect(screen.getByText(/Remove the blocked content and upload a new copy/)).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'casey@wmkeck.org' })).toBeInTheDocument();
+  expect(screen.getByText(/Previously received .* earlier\.pdf/)).toBeInTheDocument();
 });
 
 test('a refreshed page restores active jobs from context and polls once per page every 15 seconds', async () => {

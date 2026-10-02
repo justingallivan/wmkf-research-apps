@@ -26,6 +26,7 @@ const RELOAD_CODES = new Set(['status_change_concurrent', 'status_change_open'])
 
 const fieldByColumn = (column) => STATUS_FIELDS.find((field) => field.column === column) || null;
 // Display only: never a bare number for a value the list no longer has.
+// A before/after pair is joined with an arrow, never "to": "Not set to X" reads as "was not set to X".
 const labelOf = (options, value) => {
   if (value == null) return 'Not set';
   return options?.find((option) => option.value === value)?.label ?? `${value} (no longer in the list)`;
@@ -256,8 +257,10 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
     if (selected.blocked) return BLOCKED_COPY[selected.blocked] || BLOCKED_COPY.default;
     return '';
   })();
-  const blockedOptions = options.filter((option) => option.value === current || option.blocked);
-  const blockedWhy = (option) => (option.value === current ? BLOCKED_COPY.status_change_noop : (BLOCKED_COPY[option.blocked] || BLOCKED_COPY.default));
+  // The status already set is not a refusal: the menu marks it "(already set)" and the line below names it,
+  // so it stays out of this list. Right after a successful change it would otherwise read as a failure.
+  const blockedOptions = options.filter((option) => option.value !== current && option.blocked && option.blocked !== 'status_change_noop');
+  const blockedWhy = (option) => BLOCKED_COPY[option.blocked] || BLOCKED_COPY.default;
   const checkReason = (() => {
     if (writeBlock) return writeBlock;
     if (busy) return 'Waiting for the last request to finish.';
@@ -332,7 +335,7 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-950">
           <p className="font-semibold">A status change is still open.</p>
           <p className="mt-1">
-            Change {open.sequence} ({fieldLabel}: {labelOf(data?.options?.[effectiveKey], open.optionBefore)} to {openLabel}) is{' '}
+            Change {open.sequence} ({fieldLabel}: {labelOf(data?.options?.[effectiveKey], open.optionBefore)} → {openLabel}) is{' '}
             {CHANGE_STATUSES[open.status]?.label?.toLowerCase() || open.status}. Until it settles, only that change can be checked; no different change can be started.
           </p>
         </div>
@@ -441,7 +444,7 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
                     <tr key={change.changeId}>
                       <td className="px-4 py-3 tabular-nums">{change.sequence}</td>
                       <td className="px-4 py-3">{field?.label || change.field}</td>
-                      <td className="px-4 py-3">{labelOf(list, change.optionBefore)} to {labelOf(list, change.optionAfter)}</td>
+                      <td className="px-4 py-3">{labelOf(list, change.optionBefore)} → {labelOf(list, change.optionAfter)}</td>
                       <td className="px-4 py-3"><StatusChip tone={known?.tone || 'gray'}>{known?.label || change.status}</StatusChip></td>
                       <td className="px-4 py-3 text-gray-600">{formatTime(change.completedAt || change.dispatchedAt || change.createdAt)}</td>
                     </tr>

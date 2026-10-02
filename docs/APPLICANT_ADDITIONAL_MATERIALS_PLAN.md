@@ -928,3 +928,28 @@ CI passed on prior head `837729b4e280317a3e20f93a377bf2947bd358a9` (1,199 suites
 passed five focused suites (79 tests, one snapshot), with the added Grant Reporting caller
 passing two suites (18 tests). L2/L3 shared recovery passed 95 focused unit tests and 16
 real-PostgreSQL tests through the actual loopback CLI. Production recovery and older-root filtering follow-ups are source-built in PR #404. The 26 operator unit tests and 16 local PostgreSQL tests passed; the reader changes passed eight suites (104 tests, one snapshot). Sol and parent approved the runtime; Fable approved it through `2bfa5f590` with no required fixes. The behavior-preserving matcher extraction in `45fc84144` passed 26 focused suites (483 tests, one snapshot), including the prior CI import-failure suites and the plain Node CLI; Sol approved the extraction; Fable approved the bounded dependency fix in `45fc84144` with no required fixes; a later cleanup nit was deferred. PR #404 tracks final checks; verify required checks on its current head before merge. Neither change is deployed. This is not authorization to admit uploads or perform a Production recovery mutation.
+
+### 16.16 Security-scan rejection diagnostics [SOURCE-BUILT; NOT DEPLOYED]
+
+For applicant materials only, an infected scanner verdict still rejects the upload with
+`scan_infected`; scanning policy, clean/uncertain decisions, and provider calls are unchanged.
+The scanner adapter now distinguishes an actual nonempty virus signature from its own
+synthesized content-flag entries and returns closed content flags. The service projects the
+verdict to an allowlisted `scanRejection: { category, flags }`: `signature_match` takes
+precedence over `blocked_content`, then `invalid_or_protected_file`, then `unspecified`.
+The shared validator rejects extra keys, unknown flags, and inconsistent combinations;
+invalid or legacy diagnostics render the unspecified message. Raw provider names, messages,
+filenames, and URLs never enter this public diagnostic.
+
+The synchronous 422 response and rejected-staging replay return the safe diagnostic and
+`reason: scan_infected`. Background failure stores it in the existing job `result_payload`;
+only terminal rejection writes it to staging `result_payload`. An attention hold retains
+staging pending for guarded recovery. The applicant `jobs` projection exposes it only for
+failed infected jobs, while staff `uploadJobs` may also show it for an infected
+`needs_attention` hold. The applicant and staff screens render category-specific safe copy;
+an unspecified/legacy record never claims that a malware signature was found.
+
+Each infected verdict attempts one best-effort warning `operational_events` write,
+`site_visit_material_scan_rejected` at stage `virus_scan`, with request/collection/staging/slot
+references, staging-id deduplication, and only the allowlisted diagnostic in metadata. There is no notification email,
+new column, or migration. This branch has not been deployed or provider-rehearsed.

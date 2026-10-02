@@ -366,6 +366,119 @@ describeIf('applicant materials background-job store (live PostgreSQL)', () => {
     }
   });
 
+  test('infected failure persists the same sanitized diagnostic for safe staging replay', async () => {
+    const collection = await makeCollection();
+    const staging = await makeStaging({ requestId: collection.requestId });
+    const job = await admit({ collection, staging });
+    const claimed = await jobs.claimNextMaterialsUploadJob();
+    const diagnostic = {
+      category: 'blocked_content',
+      flags: ['embedded_macro', 'unsafe_archive'],
+    };
+    const jobPayload = { ok: false, scanRejection: diagnostic };
+    const replayPayload = { ok: false, reason: 'scan_infected', scanRejection: diagnostic };
+
+    const settled = await jobs.settleMaterialsUploadJob({
+      job: claimed,
+      status: 'failed',
+      errorCode: 'scan_infected',
+      resultPayload: jobPayload,
+      clearStageOwner: true,
+      rejectStage: true,
+    });
+
+    expect(settled).toMatchObject({ status: 'failed', error_code: 'scan_infected' });
+    expect(await row('SELECT status, error_code, result_payload FROM materials_upload_jobs WHERE id=$1', [job.id]))
+      .toMatchObject({
+        status: 'failed',
+        error_code: 'scan_infected',
+        result_payload: jobPayload,
+      });
+    expect(await row('SELECT status, result_code, result_payload, background_job_id FROM portal_upload_staging WHERE id=$1', [staging.id]))
+      .toMatchObject({ status: 'rejected', result_code: 'scan_infected', result_payload: replayPayload, background_job_id: null });
+
+    await expect(stagingStore.claimPortalUpload({
+      stagingId: staging.id,
+      scope: 'site_visit_material',
+      resourceId: collection.requestId,
+      actorBinding: staging.actorBinding,
+    })).rejects.toMatchObject({
+      code: 'scan_infected',
+      httpStatus: 409,
+      resultPayload: replayPayload,
+    });
+    await expect(stagingStore.claimPortalUpload({
+      stagingId: staging.id,
+      scope: 'site_visit_material',
+      resourceId: collection.requestId,
+      actorBinding: 'foreign-actor',
+    })).rejects.toMatchObject({ code: 'staging_not_found', httpStatus: 404 });
+  });
+
+  test('infected needs-attention keeps diagnostics on the job without stamping pending staging', async () => {
+    const collection = await makeCollection();
+    const staging = await makeStaging({ requestId: collection.requestId });
+    const job = await admit({ collection, staging });
+    const claimed = await jobs.claimNextMaterialsUploadJob();
+    const diagnostic = { category: 'invalid_or_protected_file', flags: ['password_protected_file'] };
+    const payload = { ok: false, scanRejection: diagnostic };
+    const candidateResult = { driveId: 'drive-kept-for-reconciliation', itemId: 'item-kept-for-reconciliation' };
+    await mockPoolRef.current.query(
+      'UPDATE portal_upload_staging SET candidate_result=$2::jsonb WHERE id=$1',
+      [staging.id, JSON.stringify(candidateResult)],
+    );
+
+    const settled = await jobs.settleMaterialsUploadJob({
+      job: claimed,
+      status: 'needs_attention',
+      errorCode: 'scan_infected',
+      resultPayload: payload,
+    });
+
+    expect(settled).toMatchObject({ status: 'needs_attention', error_code: 'scan_infected' });
+    expect(await row('SELECT status, error_code, result_payload FROM materials_upload_jobs WHERE id=$1', [job.id]))
+      .toMatchObject({ status: 'needs_attention', error_code: 'scan_infected', result_payload: payload });
+    expect(await row('SELECT status, result_code, result_payload, background_job_id, candidate_result FROM portal_upload_staging WHERE id=$1', [staging.id]))
+      .toMatchObject({
+        status: 'pending',
+        result_code: null,
+        result_payload: null,
+        background_job_id: job.id,
+        candidate_result: candidateResult,
+      });
+    await expect(stagingStore.claimPortalUpload({
+      stagingId: staging.id,
+      scope: 'site_visit_material',
+      resourceId: collection.requestId,
+      actorBinding: staging.actorBinding,
+    })).rejects.toMatchObject({ code: 'finalize_in_progress', httpStatus: 409 });
+  });
+
+  test('infected settlement never overwrites an already consumed staging receipt', async () => {
+    const collection = await makeCollection();
+    const staging = await makeStaging({ requestId: collection.requestId });
+    const job = await admit({ collection, staging });
+    const claimed = await jobs.claimNextMaterialsUploadJob();
+    const receipt = { ok: true, slot: 'presentation_pdf', filename: 'accepted.pdf', receivedAt: '2026-10-02T00:00:00.000Z' };
+    await mockPoolRef.current.query(
+      `UPDATE portal_upload_staging SET status='consumed',consumed_at=NOW(),result_code='ok',result_payload=$2::jsonb,
+         lease_token=NULL,lease_expires_at=NULL WHERE id=$1`, [staging.id, JSON.stringify(receipt)],
+    );
+    const diagnostic = { category: 'signature_match', flags: [] };
+
+    await jobs.settleMaterialsUploadJob({
+      job: claimed,
+      status: 'needs_attention',
+      errorCode: 'scan_infected',
+      resultPayload: { ok: false, scanRejection: diagnostic },
+    });
+
+    expect(await row('SELECT status, result_code, result_payload FROM portal_upload_staging WHERE id=$1', [staging.id]))
+      .toMatchObject({ status: 'consumed', result_code: 'ok', result_payload: receipt });
+    expect(await row('SELECT status, error_code, result_payload FROM materials_upload_jobs WHERE id=$1', [job.id]))
+      .toMatchObject({ status: 'needs_attention', error_code: 'scan_infected', result_payload: { ok: false, scanRejection: diagnostic } });
+  });
+
   test('operator retry resets an exhausted budget through the actual loopback CLI and retains evidence', async () => {
     const retryCollection = await makeCollection();
     const retryStage = await makeStaging({ requestId: retryCollection.requestId });

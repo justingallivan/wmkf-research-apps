@@ -1,60 +1,92 @@
-# Session 563 Prompt: choose the next work item; preserve the active Factory lane
+# Session 564 Prompt: Factory admin form is live; pick the next item
 
-## Session 562 Summary — 2026-10-01 PT (Codex refactor lane)
+## Session 563 Summary — 2026-10-01/02 PT (Factory admin form lane, Claude, home Mac)
 
-The reviewer duplicate-create-conflict cleanup is complete. [VERIFIED via GitHub PR #397] Owner-authorized squash merge `2cd1987dac6a7e35b0fe87a4c7df2d9ecbfbd7b5` landed on main after all CI checks passed. [OWNER CONFIRMED] Justin reported PR #397 in production. [VERIFIED via GitHub deployment status] Production deployment `6798624722` for that exact commit is successful. This is deployment evidence, not an independent functional production smoke test.
+This lane ran alongside the Codex refactor lane that closed as "Session 562"; the Factory plan documents written during it say "S562". It is numbered 563 here only to keep this file's sequence.
+
+The admin Test Request form is built, enabled in Production, and has produced one complete test Request with a status change. [VERIFIED via owner-run `--run-inspect` against `managed-ledger/ledger_prod`, GitHub PRs, and Vercel deployment status]
 
 ### What Was Completed
 
-1. **Reviewer conflict helper — PR #397.** A private `isSuggestionCreateConflict` now holds the exact shared expression used by `ensureApplicantRecommended` and `ensureStaffManualCandidate`. Recovery blocks, general-upsert classification, potential-reviewer classification, and PATCH retry logic remain unchanged. Thirty-five added caller-level cases cover classification and distinct recovery behavior. Root planned with ordinary Fable OAuth review; Luna built and tested; Sol, root, and Fable approved. No API-key agent usage or metered review substitute.
-2. **Earlier work in this chat is merged.** [VERIFIED via main history] Email placeholder extraction #391 (`9505d22b2`), partial reviewer-roster save/reload fix #393 (`abc1d0403`), and grantee-title provider deadline propagation #394 (`7bf0916ac`) are ancestors of main. Their plans contain scope and review records; do not rebuild them from the older survey.
-3. **Session close.** Owner directed closing docs to main. This is a Tier 0 documentation update. No new runtime code, provider calls, live Dataverse probes, or data mutations at close. No DEVELOPMENT_LOG milestone entry is required for this bounded maintenance/refactor close; no new capability, architecture, or cutover was introduced by #397.
+1. **Slices 2, 2b, 3 built and merged** (PRs #398 `baa4eeb46`, #399 `9a7f12c49`, #401 `b5eb97138`): eight superuser routes, the status setter with exactly one PATCH per change, the admin UI. Sonnet builds, Opus reviews, Codex adversarial rounds, an Impeccable critique of the UI.
+2. **Preview rehearsal** (owner click-through, branch `factory-form-rehearsal`, since deleted): sign-in, superuser gate, production source read, Confirm and `fence_source` worked; the sandbox refused the create, as anticipated. Rehearsal run `3de97783-6988-5c0c-b933-e7bccbc9da64`'s row is in `managed-ledger/ledger` with no Request behind it. All rehearsal configuration was removed.
+3. **Server-side logging of stops and refusals** (PR #403 `cd0d6ebe6`).
+4. **Production provisioning (owner)**: `TEST_REQUEST_FACTORY_FORM=on`, `TEST_REQUEST_LEDGER_URL`, `FACTORY_BLOB_RW_TOKEN` (store `wmkf-factory-private`). The form is **on in Production**.
+5. **First production run stopped**: run `20407283-c279-5e0c-b396-210ad6842482` (`managed-ledger/ledger_prod`), source 1002860, test Request **1003308**, `needs_attention` / `file_journal_unverified`. SharePoint rewrote `docProps/custom.xml` in the uploaded XLSX and only DOCX had a package comparison. Not resumable.
+6. **XLSX fix** (PR #406 `06797abd0`): XLSX verified by the existing package attestation at the destination, the Basic journal carries what `verify` needs, and a settle check before a package-mode copy is journaled. Opus approve-with-fixes; Codex three rounds, final approve.
+7. **Complete production run**: run `a5161f47-7b02-5ad3-8f20-3f645ec3c254` (`managed-ledger/ledger_prod`), source 1002988, test Request **1003310**, `ready`, seven documents verified including the XLSX. One status change through the form: Phase II status to "Phase II Pending Committee Review" (seen on the form and in the route log; `--run-inspect` does not list status changes).
+8. **Two display fixes** from that run (PRs #408 `c1b57d6e2`, #409 `e236a7e14`).
+9. **Slice 5 docs** (`dbac432f3`): `docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md`, Atlas, credentials runbook, older plans annotated, memory.
+10. **Two read-only probes**: `scripts/probe-test-request-source-document-sizes.mjs`, `scripts/probe-sharepoint-download-stability.mjs`.
 
-### Commits for the final refactor
+### Commits
 
-- `c6a6e00af` — initial plan.
-- `4cdf596fc` — Fable plan clarifications.
-- `850fa8895` — helper and characterization tests.
-- `b6890fffa` — review and validation record.
-- `2cd1987da` — squash merge of PR #397 to main.
+- PRs #398, #399, #401, #403, #406, #408, #409 (merge and squash commits above).
+- `e3f370163`, `4c7689e1b`, `fd12baee3` probes and run records; `a931c66ba`, `9557cf275` rehearsal record; `dbac432f3` slice 5 docs.
 
 ## Next Items
 
-### Verified Open — separate lane, do not duplicate
+### Verified Open
 
-1. **Factory admin routes: PR #398** (`claude/factory-admin-form-slice2`) is OPEN; **status setter: PR #399** (`claude/factory-admin-form-slice2b`) is OPEN. [VERIFIED via GitHub at close] The previous handoff's instruction to start slice 2 is superseded by these existing PRs. Coordinate with their owner and inspect current heads/reviews before doing anything. This stop did not review or authorize merging either PR.
+1. **Form stop copy disagrees with the code.** Several stops point to a command-line resolution that no mode provides; the `timeout`/`network` copy holds only before a write; `bundle_stale` and `meeting_date_patch_failed` have no copy.
+   Evidence: `docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md` (*Known gaps*); `shared/components/admin/test-request-factory-copy.js` `ATTENTION_COPY`; delegated source trace 2026-10-02.
+   A small reviewed PR. `BLIP_COPY` is owner-set wording and stays verbatim.
+2. **First lookup of a source is refused once**, then passes ("changed while its bytes were being verified", an XLSX).
+   Evidence: Vercel log 2026-10-02 (`admin test-request run refusal: 409 test_request_preview_source_changed …`); `lib/services/test-requests/admin-preview-service.js` `hydrateSelectedDocument`. Cause not established; the refusal does not say which of its four comparisons failed.
+3. **Flaky `tests/unit/awardee-tab.test.js`** ("T2 send: non-2xx with an unparseable body"): failed once and passed on re-run on PRs #398 and #409. Not investigated.
+4. **Artifact sweep not yet observed in Production.** It becomes active now that both variables are set; it will delete run `a5161f47`'s bundle and manifest and keep run `20407283`'s.
+   Evidence: `lib/services/test-requests/factory-artifact-store.js` `sweepFactoryArtifacts`; `pages/api/cron/maintenance.js`.
+5. **Verify the test-request email fix in the browser on 1003303** (carried from the S561 handoff; PR #392 is MERGED [VERIFIED via GitHub]). Not done this session.
+6. **Office Mac**: run `docs/plans/briefs/OFFICE_MAC_SYNC_BRIEF_2026-10-01.md`. Its `.env.local` now also needs `FACTORY_BLOB_RW_TOKEN` if the artifact download script is to run there. Not done this session.
 
 ### Owner Decision Needed
 
-1. Choose whether to resume refactor assessment later. PR #390, “docs: refresh remaining refactor candidate assessment,” is still OPEN but explicitly on hold by Justin. Do not merge it or treat its remaining-candidate list as current without a fresh source check and owner direction. No next refactor is selected or authorized.
+1. **Form v2 scope**: a way to abandon or resume a stuck run (none exists), status-setter `rerun`, bind-reviewer, slot PATCH, retire. Evidence: admin form plan, decision 7; runbook, *What "cannot continue" leaves behind*.
+2. **Request 1003308**: leave as a partly built marked test record, or clean up by hand. Its run cannot be resumed.
+3. **PR #390** (refactor survey) is OPEN and on hold by the owner [VERIFIED via GitHub]. No next refactor is selected.
+
+### Parked
+
+1. **Layout checks never done in a browser**: long-label wrapping, selected-row tint, narrow window. Re-open the next time the form is used.
+2. **Stray Production/Preview variables** `BLOB_STORE_ID` and `BLOB_WEBHOOK_PUBLIC_KEY` from connecting `wmkf-factory-private`; neither is read. Disconnecting the store should remove them (unverified).
 
 ### Verify Before Acting
 
-1. **Parallel Factory handoff:** read `4d5a32b40503a1031deab35c0139b8610d5b1948:SESSION_PROMPT.md` for the full S561 handoff, then reconcile with PRs #398/#399 and their current plan. Office-Mac sync, Preview/Production provisioning, browser email verification, parked features, and ledger retirement were not independently revalidated in this refactor close. They are carryover context, not a verified actionable queue.
-2. Preserve the prior warning that Requests 1003301–1003303 are tracked Factory runs in `managed-ledger/ledger_prod`, not presumed cleanup residue. Verify ledger and current callers before any destructive work. Do not remove old worktrees or databases merely because the previous handoff suggested cleanup.
-3. The claim-evidence observation report could not read local state in this Codex session. No observation count or zero-advisory row was invented, and the pilot directive was not edited.
+1. **D2: retire the home Mac's local ledger copies** and scratch databases (carried from S560/S561). Destructive: list and confirm first; not revalidated this session.
+2. **Worktree and branch hygiene**: `/Users/gallivan/Code/WMKF_Apps-factory-form` is on merged branch `claude/factory-xlsx-package-verify`; remote branches `claude/factory-admin-form-slice1..3`, `-slice2b`, `claude/factory-form-stop-logging`, `claude/factory-xlsx-package-verify`, `claude/factory-status-already-set-copy`, `claude/factory-status-history-arrow` are merged. List and confirm before removing anything.
+3. Requests 1003301–1003303, 1003308 and 1003310 are tracked Factory runs in `managed-ledger/ledger_prod`, not cleanup residue.
+4. The materials lane section below was written by another session and was not revalidated here. `main` history shows PRs #404 and #407 merged since [VERIFIED via `git log`]; PR #405 is open.
 
-### Do Not Reopen Without New Evidence or Owner Direction
+### Do Not Reopen Without New Decision
 
-1. PR #397's two-call-site scope and approvals are complete; no behavior change was intended. Do not consolidate the differing sibling classifiers.
-2. PR #390 stays on hold. Its older survey is excluded from this bounded close reconciliation by explicit owner instruction.
-3. The established delegated cadence is root/Fable planning, Luna build/reconnaissance, Sol review, root review, and ordinary OAuth-only Fable adversarial review. Bound iterations; root takes over minor churn. Runtime merges still require explicit owner authorization.
+1. The form never offers the GoVerify bypass; a Preview rehearsal therefore ends at `create_request`.
+2. A sent create is never re-sent, and an uploaded file is never re-uploaded, on retry.
+3. No message text in the ledger; stops are diagnosed from the function log.
+4. PR #397's scope is complete; PR #390 stays on hold (refactor lane).
+5. Delegated cadence for this lane: Fable orchestrates, Sonnet builds and reconnoiters, Opus reviews, Fable final review, Codex adversarial to satisfaction; no tail-chasing. Runtime merges need explicit owner authorization.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/plans/REVIEWER_CREATE_CONFLICT_HELPER_PLAN_2026-10-01.md` | Scope, characterization, approvals and production record |
-| `lib/dataverse/adapters/reviewer-suggestion.js` | Private helper and its two create-path callers |
-| `tests/unit/reviewer-suggestion-disposition.test.js` | Applicant conflict/recovery characterization |
-| `tests/unit/reviewer-adapters-writeback.test.js` | Staff-manual conflict/recovery characterization |
-| `docs/plans/TEST_REQUEST_FACTORY_ADMIN_FORM_PLAN_2026-10-01.md` | Separate Factory lane; inspect current PR versions before continuation |
+| `docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md` | Operating the form: needs, stops, retries, CLI limits, turning it off |
+| `docs/plans/TEST_REQUEST_FACTORY_ADMIN_FORM_PLAN_2026-10-01.md` | Plan, slice build records, rehearsal and slice 4 results |
+| `docs/atlas/postgres-test-request-runs.md` | Ledger ownership; the form as second writer; the artifact store |
+| `lib/services/test-requests/admin-run-service.js` | The form's service: lookup, Confirm, advance, status |
+| `lib/services/test-requests/bundle-file-copy.js` | Document copy, integrity modes, settle check |
+| `shared/components/admin/TestRequestFactorySection.js` | The form's UI entry point |
+| `scripts/probe-sharepoint-download-stability.mjs` | Owner-run: download stability and package diff of SharePoint files |
 
-## Validation
+## Testing
 
-[VERIFIED via Luna logs and review record] Focused four suites / 275 tests; full Jest 1,196 suites / 18,958 tests / five snapshots passed; six suites / 98 tests skipped. Types, canonical build and lint passed (zero errors; 124 warnings, none in changed files). Dataverse access layer, Dynamics context boundary, route/service boundary, API routes, Atlas, secret scan, doc currency, doc symbol refs, and build claim freshness gates plus available self-tests passed serially; docs catalog passed. PR #397 CI was green on reviewed head `b6890fffa1498f85e22dfe3cc88f222f170bb427` before merge.
+```bash
+npx jest --testPathPatterns "test-request|ledger|maintenance|rehearse|admin"
+npx jest --testPathPatterns "bundle-file-copy|run-runner|docx-package"
+# Owner-run, read-only, production ledger:
+node scripts/rehearse-test-request-sandbox.mjs --target=production --run-inspect=<runId>
+```
 
-[VERIFIED bounded Mode A reconciliation] Scope: #397 merge/deployment and closing handoff. GitHub/source establish the change; code persistence/consumer behavior is unchanged. Updated this handoff and the helper plan. The original survey remains excluded under the explicit hold; no whole-repo current-refactor-menu claim is made. Production functional behavior beyond the user's confirmation remains unprobed.
+No claim-evidence observation row was added: the pilot report recorded no eligible plan/design documentation edit for this session.
 
 ## Materials feature branch handoff — 2026-10-02 (separate lane)
 
