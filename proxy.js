@@ -33,6 +33,7 @@ import {
   isDedicatedTranscriptionAuthConfigured,
   isLegacyProxyPassThrough,
 } from './lib/services/transcription-pilot/deployment-policy';
+import { decideMeetingTranscriptionTestRequest } from './lib/services/meeting-tracker-transcription/test-deployment-policy';
 
 const SHAREPOINT_CANONICAL_ORIGIN = new URL(SHAREPOINT_CANONICAL_SITE_URL).origin;
 const GRAPH_UPLOAD_ORIGIN = 'https://*.up.1drv.com';
@@ -187,6 +188,24 @@ const sharedAuthProxy = withAuth(
 // paths internally, before invoking its callback. Do not move isolation into it.
 export default async function proxy(req, event) {
   const pathname = req.nextUrl?.pathname || '';
+  const testPolicy = decideMeetingTranscriptionTestRequest({
+    pathname, method: req.method, searchParams: req.nextUrl?.searchParams,
+  });
+  if (testPolicy.dedicated) {
+    if (!testPolicy.identityVerified || !testPolicy.enabled || !testPolicy.allowed) {
+      return new Response(null, { status: 404, headers: { 'Cache-Control': 'private, no-store' } });
+    }
+    if (testPolicy.auth === 'public' || testPolicy.auth === 'routeAuth') return NextResponse.next();
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    if (!token?.azureId || token.userType === 'applicant' || !token.lastActivity
+        || Date.now() - token.lastActivity > 2 * 60 * 60 * 1000) {
+      const destination = new URL('/auth/signin', req.nextUrl.origin);
+      destination.searchParams.set('callbackUrl', '/');
+      return NextResponse.redirect(destination);
+    }
+    if (testPolicy.redirectTo) return NextResponse.redirect(new URL(testPolicy.redirectTo, req.nextUrl.origin));
+    return NextResponse.next();
+  }
   const policy = decideTranscriptionPilotRequest({
     pathname, method: req.method, searchParams: req.nextUrl?.searchParams,
   });

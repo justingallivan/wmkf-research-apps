@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "env": {
+    "MEETING_TRANSCRIPTION_TEST_DEPLOYMENT_PROFILE": "meeting-transcription-test"
+  },
+  "build": {
+    "env": {
+      "MEETING_TRANSCRIPTION_TEST_DEPLOYMENT_PROFILE": "meeting-transcription-test"
+    }
+  },
+  "git": {
+    "deploymentEnabled": false
+  },
+  "crons": []
+}
