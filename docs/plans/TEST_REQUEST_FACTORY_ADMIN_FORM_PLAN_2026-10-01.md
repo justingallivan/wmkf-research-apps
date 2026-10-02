@@ -316,14 +316,14 @@ Round-3 rescue used local source only; Production/Preview Dataverse, Postgres, V
 - Whether `check:dynamics-context-boundary` flags a service that calls the raw client from a route context.
 - 50 MB bundle export within default function memory (streaming hashes assumed).
 - The per-step wiring of `fenceProductionClient`/`fenceProductionGraph` inside `advanceRun` (import verified; wiring taken from the production plan).
-- Whether a sandbox create succeeds without the GoVerify bypass: the design records the bypass on every proven sandbox create (1000338, 1000339 and the bundle rehearsal, `TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md:69`), and no sandbox create without it is recorded. If it fails, the Preview rehearsal stops at `create_request`.
-- Whether the Preview environment's Dynamics credentials are valid for a production read (the local CLI reads production with the owner Mac's credentials; Preview's are not inspected here).
-- Whether a Vercel Preview variable can be scoped to one branch's deployments (owner-stated; decision 10).
+- Whether a sandbox create succeeds without the GoVerify bypass: the design records the bypass on every proven sandbox create (1000338, 1000339 and the bundle rehearsal, `TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md:69`), and no sandbox create without it is recorded. If it fails, the Preview rehearsal stops at `create_request`. **2026-10-02: the Preview rehearsal's create was refused (4xx); the cause was not recorded.**
+- Whether the Preview environment's Dynamics credentials are valid for a production read (the local CLI reads production with the owner Mac's credentials; Preview's are not inspected here). **Settled 2026-10-02: see *Slice 3 build record*, Preview rehearsal.**
+- Whether a Vercel Preview variable can be scoped to one branch's deployments (owner-stated; decision 10). **Settled 2026-10-02: see *Slice 3 build record*, Preview rehearsal.**
 - How far a killed function's lease outlives it: the lease is claimed after the manifest checks and lasts `leaseSeconds`; the overlap with the next call is bounded, not measured.
-- The Preview environment's current `DATAVERSE_TARGET_INTERLOCK` mode and whether a `DATAVERSE_REHEARSAL_GRANT` is set there (names were listed for Production only).
+- The Preview environment's current `DATAVERSE_TARGET_INTERLOCK` mode and whether a `DATAVERSE_REHEARSAL_GRANT` is set there (names were listed for Production only). **2026-10-02: mode `on` (rehearsal log); the grant was not checked.**
 - How a superseded Vercel deployment's own URL is retired (deleted or protected) and whether it stays reachable after a promotion; the stop procedure names the step, the mechanism is the owner's platform knowledge (memory `feedback-verify-external-platform-claims`).
 - Whether Blob listing of `<target>/runs/` in bounded batches is cheap enough for the maintenance cron at the volumes expected (a few runs per month); assumed yes.
-- The wording of @vercel/blob's overwrite refusal: the SDK (2.6.1) surfaces it as a `BlobError` carrying the server message and no code, so `putCreateOnly` matches `/already exists/i`; the slice 3 Preview rehearsal must plant an object, retry Confirm, and record the real message (a miss costs a raw error instead of the 409).
+- The wording of @vercel/blob's overwrite refusal: the SDK (2.6.1) surfaces it as a `BlobError` carrying the server message and no code, so `putCreateOnly` matches `/already exists/i`; the slice 3 Preview rehearsal must plant an object, retry Confirm, and record the real message (a miss costs a raw error instead of the 409). **Settled 2026-10-02: see *Slice 3 build record*, Preview rehearsal.**
 - Reachability of the manifest size cap: the policy compiler bounds the source purpose and the label, so a v2 bundle cannot push the manifest past its cap in practice; `assertFits` before the first write stays as defensive ordering.
 
 ## Codex rounds
