@@ -174,6 +174,31 @@ describe.each(CASES)('$name', (c) => {
   }
 });
 
+describe('refusal logging', () => {
+  test('a refusal is logged with its status, code and message; a non-error status is not', async () => {
+    const warned = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      service.exportSource.mockRejectedValueOnce(new ServiceHttpError('Budget.docx changed while its bytes were being verified.', {
+        httpStatus: 409, code: 'test_request_preview_source_changed',
+      }));
+      const res = mockRes();
+      await sourceHandler({ method: 'POST', body: { sourceRequestNumber: '9000001' }, query: {} }, res);
+      expect(res.statusCode).toBe(409);
+      expect(warned.mock.calls).toEqual([[
+        'admin test-request run refusal:', 409, 'test_request_preview_source_changed', 'Budget.docx changed while its bytes were being verified.',
+      ]]);
+      warned.mockClear();
+      service.exportSource.mockRejectedValueOnce(new ServiceHttpError('Still working.', { httpStatus: 202, code: 'in_progress' }));
+      const accepted = mockRes();
+      await sourceHandler({ method: 'POST', body: { sourceRequestNumber: '9000001' }, query: {} }, accepted);
+      expect(accepted.statusCode).toBe(202);
+      expect(warned).not.toHaveBeenCalled();
+    } finally {
+      warned.mockRestore();
+    }
+  });
+});
+
 describe('body-less POST routes (advance, recheck)', () => {
   test.each([
     ['advance', advanceHandler], ['recheck', recheckHandler],

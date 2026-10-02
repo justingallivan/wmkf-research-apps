@@ -586,6 +586,29 @@ describe('advance', () => {
     expect(call.options.leaseSeconds).toBe(300);
   });
 
+  test('a stopped step logs its error text server-side; an advanced step logs nothing', async () => {
+    const logged = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const h = harness({ deployment: 'preview' });
+      await h.confirm();
+      const { runId } = ids(h.actorId);
+      await h.service.advance({ profileId: PROFILE, runId });
+      expect(logged).not.toHaveBeenCalled();
+      h.spies.advanceRun.mockResolvedValueOnce({
+        step: 'create_request', outcome: 'needs_attention', run: { status: 'needs_attention' },
+        errorMessage: 'single Request create failed (400): plugin said no',
+      });
+      const result = await h.service.advance({ profileId: PROFILE, runId });
+      expect(result.errorMessage).toBe('single Request create failed (400): plugin said no');
+      expect(logged).toHaveBeenCalledTimes(1);
+      expect(logged.mock.calls[0]).toEqual([
+        'admin test-request run step stopped:', runId, 'create_request', 'needs_attention', 'single Request create failed (400): plugin said no',
+      ]);
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
   test('a tampered stored bundle fails its digest check before advancing', async () => {
     const h = harness({ deployment: 'preview' });
     await h.confirm();
