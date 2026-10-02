@@ -28,6 +28,32 @@ function duplicateConflict() {
   e.status = 412;
   return e;
 }
+function createError(message, status) {
+  const error = new Error(message);
+  if (status !== undefined) error.status = status;
+  return error;
+}
+
+const CREATE_CONFLICT_ERRORS = [
+  ['numeric 409 with neutral message', createError('write conflict', 409)],
+  ['numeric 412 with neutral message', createError('write conflict', 412)],
+  ['duplicate text without status', createError('Duplicate reviewer request key')],
+  ['already-exists text without status', createError('record already exists')],
+  ['matching-key text without status', createError('matching key values')],
+  ['case-insensitive message with non-conflict status', createError('ALTERNATE KEY collision', 503)],
+];
+
+const NON_CONFLICT_CREATE_ERRORS = [
+  ['neutral 400', createError('request rejected', 400)],
+  ['neutral 403', createError('permission denied', 403)],
+  ['neutral 429', createError('throttled', 429)],
+  ['neutral 500', createError('server failure', 500)],
+  ['no status or message', createError('')],
+  ['string 409 status', createError('write conflict', '409')],
+  ['string 412 status', createError('write conflict', '412')],
+  ['Entity Key text alone', createError('Entity Key conflict', 400)],
+  ['Dataverse code text alone', createError('0x80060892', 400)],
+];
 
 const ENGAGEMENT_STAMP_RESET_PAYLOAD = {
   wmkf_accepted: false,
@@ -504,6 +530,80 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
       'wmkf_PotentialReviewer@odata.bind': '/wmkf_potentialreviewerses(pr-2)',
       'wmkf_Request@odata.bind': '/akoya_requests(req-2)',
     }), { actingUserSystemId: undefined });
+  });
+
+  test.each(CREATE_CONFLICT_ERRORS)('create conflict signal %s re-reads and reselects an ordinary winner', async (_label, error) => {
+    const query = jest.spyOn(DynamicsService, 'queryRecords')
+      .mockResolvedValueOnce({ records: [] })
+      .mockResolvedValueOnce({ records: [{
+        wmkf_appreviewersuggestionid: 'sug-race-winner',
+        _etag: 'W/"winner"',
+        wmkf_sources: 'pubmed',
+        wmkf_applicantdisposition: null,
+        wmkf_selected: false,
+      }] });
+    jest.spyOn(DynamicsService, 'createRecord').mockRejectedValue(error);
+    const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    const out = await ensureStaffManualCandidate({
+      potentialReviewerId: 'pr-race',
+      requestId: 'req-race',
+    }, { actingUserSystemId: 'u1' });
+
+    expect(out).toEqual({ id: 'sug-race-winner', created: false, selected: true });
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(patch).toHaveBeenCalledWith(
+      'wmkf_appreviewersuggestions',
+      'sug-race-winner',
+      expect.objectContaining({ wmkf_sources: 'pubmed,staff_manual', wmkf_selected: true }),
+      { actingUserSystemId: 'u1', ifMatch: 'W/"winner"' },
+    );
+  });
+
+  test.each(NON_CONFLICT_CREATE_ERRORS)('non-conflict create error %s preserves the original error and does not recover', async (_label, error) => {
+    const query = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
+    jest.spyOn(DynamicsService, 'createRecord').mockRejectedValue(error);
+    const patch = jest.spyOn(DynamicsService, 'updateRecord');
+
+    await expect(ensureStaffManualCandidate({
+      potentialReviewerId: 'pr-race',
+      requestId: 'req-race',
+    })).rejects.toBe(error);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(patch).not.toHaveBeenCalled();
+  });
+
+  test('recognized create conflict with no visible winner rethrows the same error after one recovery lookup', async () => {
+    const error = createError('precondition from competing create', 412);
+    const query = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
+    jest.spyOn(DynamicsService, 'createRecord').mockRejectedValue(error);
+    const patch = jest.spyOn(DynamicsService, 'updateRecord');
+
+    await expect(ensureStaffManualCandidate({
+      potentialReviewerId: 'pr-race',
+      requestId: 'req-race',
+    })).rejects.toBe(error);
+    expect(query).toHaveBeenCalledTimes(2); // initial lookup + recovery lookup
+    expect(patch).not.toHaveBeenCalled();
+  });
+
+  test('create-conflict recovery still skips an excluded winner', async () => {
+    const query = jest.spyOn(DynamicsService, 'queryRecords')
+      .mockResolvedValueOnce({ records: [] })
+      .mockResolvedValueOnce({ records: [{
+        wmkf_appreviewersuggestionid: 'sug-excluded-race',
+        wmkf_applicantdisposition: APPLICANT_DISPOSITION_EXCLUDED,
+        wmkf_sources: 'applicant',
+      }] });
+    jest.spyOn(DynamicsService, 'createRecord').mockRejectedValue(createError('write conflict', 409));
+    const patch = jest.spyOn(DynamicsService, 'updateRecord');
+
+    await expect(ensureStaffManualCandidate({
+      potentialReviewerId: 'pr-race',
+      requestId: 'req-race',
+    })).resolves.toEqual({ id: 'sug-excluded-race', created: false, selected: false, skippedExcluded: true });
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(patch).not.toHaveBeenCalled();
   });
 });
 
