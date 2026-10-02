@@ -201,3 +201,20 @@ test('multiple active request roots fail closed for canonical AI Materials displ
 
   expect(result.aiMaterials.every((item) => item.found === false)).toBe(true);
 });
+
+
+test('reports material-status uncertainty while retaining unrelated proposal files', async () => {
+  getRequestSharePointBuckets.mockResolvedValue([ACTIVE]);
+  const candidate = { id: 'uncertain', name: 'Presentation.pptx', folder: `${ROOT}/Site Visit - Slides` };
+  const proposal = { id: 'proposal', name: 'ProjectDescription.pdf', folder: `${ROOT}/Phase I` };
+  listFiles.mockResolvedValue([candidate, proposal]);
+  mockSiteVisitFilter.mockResolvedValueOnce({
+    files: [proposal], omittedFiles: [candidate],
+    error: { code: 'site_visit_materials_status_unavailable', message: 'Status unavailable.' },
+  });
+
+  const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'D26');
+
+  expect(result.errors).toEqual([{ library: ACTIVE.library, folder: ROOT }]);
+  expect(result.slots[0]).toMatchObject({ found: true, name: proposal.name });
+});

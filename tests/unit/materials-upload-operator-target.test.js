@@ -140,8 +140,9 @@ describe('materials production operator target', () => {
     expect(selected).toBeGreaterThan(identity);
   });
 
-  test('production identity mismatch rolls back before any guarded job query or mutation', async () => {
-    const client = mockClient({ database: 'otherdb' });
+  test.each([{ database: 'otherdb' }, { schema: 'other_schema' }])(
+    'production identity mismatch %j rolls back before any guarded job query or mutation', async (identity) => {
+    const client = mockClient(identity);
     await expect(resolveMaterialsUploadJobFromOperator({
       clientConfig: {}, jobId: JOB_ID, action: 'retry', production: true, expectedDatabase: 'neondb',
       createClient: () => client,
@@ -165,6 +166,20 @@ describe('materials production operator target', () => {
     expect(selected).toBeGreaterThan(identity);
     expect(client.events).toContain('COMMIT');
   });
+
+  test.each([{ database: 'otherdb' }, { schema: 'other_schema' }])(
+    'production inspect rejects identity mismatch %j without reading a job', async (identity) => {
+      const client = mockClient(identity);
+      await expect(inspectMaterialsUploadJob({
+        clientConfig: {}, jobId: JOB_ID, production: true, expectedDatabase: 'neondb', createClient: () => client,
+      })).rejects.toMatchObject({ code: 'production_connected_identity_mismatch' });
+      expect(client.events).toContain('BEGIN READ ONLY');
+      expect(client.events).toContain('ROLLBACK');
+      expect(client.events).not.toContain('COMMIT');
+      expect(client.events.some((event) => event.startsWith('SELECT j.id'))).toBe(false);
+      expect(client.events.at(-1)).toBe('END');
+    },
+  );
 
   test('the actual CLI refuses production mutations before opening a connection without exact confirmations', () => {
     const jobId = '514a4377-e14a-448a-b44e-b203981e4f66';
