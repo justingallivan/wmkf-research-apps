@@ -39,6 +39,22 @@ function uploadJobsForSlot(collection, slot) {
   return Array.isArray(collection?.uploadJobs) ? collection.uploadJobs.filter((job) => job?.slot === slot) : [];
 }
 
+function OpenFileLink({ file }) {
+  if (typeof file?.webUrl !== 'string') return null;
+  let url;
+  try {
+    url = new URL(file.webUrl);
+    if (url.protocol !== 'https:' || url.username || url.password) return null;
+  } catch { return null; }
+  return (
+    <a href={url.toString()} target="_blank" rel="noopener noreferrer"
+      aria-label={`Open file: ${file.filename} (opens in a new tab)`}
+      className="shrink-0 rounded px-2 py-2 text-sm font-semibold text-blue-700 underline underline-offset-4 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
+      Open file
+    </a>
+  );
+}
+
 function UploadJobNotice({ jobs, programCoordinator }) {
   if (!jobs.length) return null;
   return (
@@ -254,6 +270,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
                   </p>
                   <UploadJobNotice jobs={uploadJobsForSlot(collection, item.key)} programCoordinator={collection.programCoordinator} />
                 </div>
+                <OpenFileLink file={item.received} />
                 {collection.state !== 'closed' && !item.received && (
                   <button type="button" disabled={busy} onClick={() => act('waive', { key: item.key, waived: !item.waived })} className="text-xs font-semibold text-gray-600 underline underline-offset-4 hover:text-gray-900 disabled:opacity-50">
                     {item.waived ? 'Require again' : 'Waive'}
@@ -262,7 +279,10 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
               </li>
             ))}
             {collection.other.map((file) => (
-              <li key={file.artifactId} className="px-4 py-3 text-sm"><p className="font-medium text-gray-900">Other: {file.filename}</p><p className="text-xs text-gray-500">Received {formatDateTime(file.receivedAt)}</p></li>
+              <li key={file.artifactId} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
+                <div><p className="font-medium text-gray-900">Other: {file.filename}</p><p className="text-xs text-gray-500">Received {formatDateTime(file.receivedAt)}</p></div>
+                <OpenFileLink file={file} />
+              </li>
             ))}
             {uploadJobs.filter((job) => job.slot === 'other').map((job) => (
               <li key={job.jobId} className="px-4 py-3 text-sm">

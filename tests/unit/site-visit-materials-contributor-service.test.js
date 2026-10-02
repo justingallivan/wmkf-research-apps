@@ -555,3 +555,16 @@ test.each([
  expect(result.jobs[0]).toMatchObject({errorCode:expected});
  expect(JSON.stringify(result)).not.toContain('provider secret');
 });
+
+test('contributor context omits stored SharePoint URLs for checklist and other receipts', async () => {
+  const d = deps({ findDocumentsByRequest: jest.fn(async () => ({ records: [
+    { ...ROW_PDF, wmkf_sharepointweburl: 'https://tenant.sharepoint.com/presentation.pdf' },
+    { ...ROW_PDF, wmkf_requestdocumentid: 'other', wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.OTHER_APPLICANT_MATERIALS, wmkf_filename: 'Supporting.pdf', wmkf_sharepointweburl: 'https://tenant.sharepoint.com/supporting.pdf' },
+  ] })) });
+  const result = await buildContributorContext({ collection: collection() }, d);
+  expect(result.checklist[0].received.filename).toBe(ROW_PDF.wmkf_filename);
+  expect(result.other).toHaveLength(1);
+  expect(JSON.stringify(result)).not.toContain('sharepoint.com');
+  expect(result.checklist[0].received).not.toHaveProperty('webUrl');
+  expect(result.other[0]).not.toHaveProperty('webUrl');
+});

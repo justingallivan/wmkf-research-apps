@@ -26,6 +26,7 @@ import {
   summarizeCollection,
   waiveMaterialsItem,
 } from '../../lib/services/site-visit-materials/collection-service';
+import { REQUEST_DOCUMENT_LIFECYCLE_STATE, REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../shared/config/requestDocument';
 import { renderMaterialsEmailHtml } from '../../lib/external/site-visit-materials-email';
 import {
   SITE_VISIT_MATERIALS_INVITE_SEED_BODY,
@@ -682,4 +683,33 @@ describe('Liaison of record in the contacts snapshot', () => {
     await expect(prepareMaterialsReminderEmail({ row: d.__stored(), request: request(), visit: visit(), missing: [], actorId: ACTOR }, d))
       .rejects.toMatchObject({ code: 'site_visit_materials_recipients_required' });
   });
+});
+
+test('staff read and create responses link only the selected same-request receipts', async () => {
+  const rows = [
+    registryRow({ id: 'old', filename: '1003222 Site Visit Presentation.pdf', modifiedon: '2026-09-01', wmkf_sharepointweburl: 'https://tenant.sharepoint.com/old.pdf' }),
+    registryRow({ id: 'new', filename: '1003222 Site Visit Presentation.pdf', wmkf_sharepointweburl: 'https://tenant.sharepoint.com/current.pdf' }),
+    registryRow({ id: 'superseded', filename: '1003222 Site Visit Presentation.pdf', modifiedon: '2026-10-02', wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED, wmkf_sharepointweburl: 'https://tenant.sharepoint.com/superseded.pdf' }),
+    registryRow({ id: 'foreign', filename: '1003222 Site Visit Presentation.pdf', modifiedon: '2026-10-03', _wmkf_request_value: ACTOR, wmkf_sharepointweburl: 'https://tenant.sharepoint.com/foreign.pdf' }),
+    registryRow({ id: 'other', filename: 'Supporting.pdf', wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.OTHER_APPLICANT_MATERIALS, wmkf_sharepointweburl: 'https://tenant.sharepoint.com/supporting.pdf' }),
+  ];
+  const d = deps({ findDocumentsByRequest: jest.fn(async () => ({ records: rows })) });
+  const created = await runMaterialsAction('create', d);
+  const loaded = await getMaterialsCollection({ requestId: REQUEST_ID }, d);
+  for (const { collection } of [created, loaded]) {
+    expect(collection.checklist[0].received).toMatchObject({ artifactId: 'new', webUrl: 'https://tenant.sharepoint.com/current.pdf' });
+    expect(collection.other).toEqual([expect.objectContaining({ artifactId: 'other', webUrl: 'https://tenant.sharepoint.com/supporting.pdf' })]);
+    expect(collection.checklist[1].received).toBeNull();
+    expect(JSON.stringify(summarizeCollection(collection))).not.toContain('sharepoint.com');
+  }
+  expect(JSON.stringify(matchReceivedFiles(rows, REQUEST_ID, '1003222'))).not.toContain('sharepoint.com');
+  const waived = await waiveMaterialsItem({ requestId: REQUEST_ID, key: 'presentation_source', waived: true }, d);
+  expect(waived.collection.checklist[0].received.webUrl).toBe('https://tenant.sharepoint.com/current.pdf');
+});
+
+test.each([null, '', 'not a URL', 'javascript:alert(1)', 'http://tenant.sharepoint.com/file', 'https://user:password@tenant.sharepoint.com/file'])('staff receipt retains filename without a link for URL %s', async (webUrl) => {
+  const d = deps({ findDocumentsByRequest: jest.fn(async () => ({ records: [registryRow({ id: 'file', filename: '1003222 Site Visit Presentation.pdf', wmkf_sharepointweburl: webUrl })] })) });
+  d.__setStored(openMaterialsRow());
+  const { collection } = await getMaterialsCollection({ requestId: REQUEST_ID }, d);
+  expect(collection.checklist[0].received).toMatchObject({ filename: '1003222 Site Visit Presentation.pdf', webUrl: null });
 });
