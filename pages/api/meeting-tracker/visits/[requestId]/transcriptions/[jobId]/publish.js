@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     try { return res.status(200).json(await publishMeetingTranscription({ requestId, ownerProfileId: access.profileId,
       actingUserSystemId: actorRefFromSession(access.session), jobId, body })); }
     catch (error) {
-      const status = error instanceof ServiceHttpError ? error.httpStatus : Number(error?.status) || 500;
+      const status = error instanceof ServiceHttpError ? error.httpStatus : Number(error?.httpStatus) || 500;
       const code = error?.code || 'meeting_transcription_publication_failed';
       if (status >= 500) console.error('[meeting tracker transcription publish] failed:', code);
       return res.status(status).json(error?.body || { error: status >= 500 ? 'The transcript could not be published.' : error.message, code });

@@ -143,6 +143,157 @@ describe('transcription pilot persistence contract', () => {
     });
     expect(tx.query.mock.calls[0][0]).toMatch(/verified_files \?& ARRAY\['source','txt','vtt'\]/);
     expect(tx.query.mock.calls[0][0]).toMatch(/slot_fence_version IS NOT NULL/);
+    expect(tx.query.mock.calls[0][0]).toMatch(/quarantine_until = GREATEST\(quarantine_until, NOW\(\).*INTERVAL '10 minutes'/);
+  });
+
+  it('closes a zero-write publication only with no fence/files and releases the exact active job lease', async () => {
+    const publication = { operation_id: '00000000-0000-4000-8000-000000000001',
+      request_id: '00000000-0000-4000-8000-000000000003',
+      site_visit_activity_id: '00000000-0000-4000-8000-000000000004',
+      input_job_id: '00000000-0000-4000-8000-000000000002' };
+    const tx = { query: jest.fn()
+      .mockResolvedValueOnce({ rows: [publication] })
+      .mockResolvedValueOnce({ rows: [{ id: publication.input_job_id }] })
+      .mockResolvedValueOnce({ rows: [{ ...publication, state: 'closed', closed_by_profile_id: 12 }] }) };
+    const db = { query: jest.fn(), transaction: jest.fn(async fn => fn(tx)) };
+    const store = createTranscriptionPilotStore(db);
+    await expect(store.closeMeetingPublicationWithoutWrites({ operationId: publication.operation_id,
+      requestId: publication.request_id, siteVisitActivityId: publication.site_visit_activity_id,
+      leaseToken: publication.operation_id, actorProfileId: 12 })).resolves.toMatchObject({
+      state: 'closed', closed_by_profile_id: 12,
+    });
+    expect(tx.query.mock.calls[0][0]).toMatch(/state = 'publishing'.*slot_fence_version IS NULL/s);
+    expect(tx.query.mock.calls[0][0]).toMatch(/COALESCE\(verified_files, '\{\}'::jsonb\) = '\{\}'::jsonb/);
+    expect(tx.query.mock.calls[1][0]).toMatch(/publication_operation_id = \$4 AND lease_token = \$5 AND lease_expires_at > NOW\(\)/);
+    expect(tx.query.mock.calls[2][0]).toMatch(/closed_by_profile_id = \$5/);
+    expect(tx.query.mock.calls[2][0]).toMatch(/slot_fence_version IS NULL AND COALESCE\(verified_files/);
+  });
+
+  it('refuses zero-write closure when any candidate descriptor is already persisted', async () => {
+    const tx = { query: jest.fn(async () => ({ rows: [] })) };
+    const db = { query: jest.fn(), transaction: jest.fn(async fn => fn(tx)) };
+    const store = createTranscriptionPilotStore(db);
+    await expect(store.closeMeetingPublicationWithoutWrites({ operationId: '00000000-0000-4000-8000-000000000001',
+      requestId: '00000000-0000-4000-8000-000000000003',
+      siteVisitActivityId: '00000000-0000-4000-8000-000000000004',
+      leaseToken: '00000000-0000-4000-8000-000000000001', actorProfileId: 12 })).resolves.toBeNull();
+    expect(tx.query).toHaveBeenCalledTimes(1);
+  });
+
+  it('permits a later freeze after transactional zero-write closure of the prior receipt', async () => {
+    const op = '00000000-0000-4000-8000-000000000001';
+    const request = '00000000-0000-4000-8000-000000000003';
+    const visit = '00000000-0000-4000-8000-000000000004';
+    const jobId = '00000000-0000-4000-8000-000000000002';
+    const closeTx = { query: jest.fn()
+      .mockResolvedValueOnce({ rows: [{ operation_id: op, request_id: request, site_visit_activity_id: visit,
+        input_job_id: jobId }] })
+      .mockResolvedValueOnce({ rows: [{ id: jobId }] })
+      .mockResolvedValueOnce({ rows: [{ operation_id: op, state: 'closed' }] }) };
+    const freezeTx = { query: jest.fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: jobId, speaker_names: {} }] })
+      .mockResolvedValueOnce({ rows: [{ version: 12 }] })
+      .mockResolvedValueOnce({ rows: [{ operation_id: '99999999-9999-4999-8999-999999999999', state: 'publishing' }] }) };
+    const db = { query: jest.fn(), transaction: jest.fn()
+      .mockImplementationOnce(async fn => fn(closeTx))
+      .mockImplementationOnce(async fn => fn(freezeTx)) };
+    const store = createTranscriptionPilotStore(db);
+    await expect(store.closeMeetingPublicationWithoutWrites({ operationId: op, requestId: request, siteVisitActivityId: visit,
+      leaseToken: op, actorProfileId: 12 })).resolves.toMatchObject({ state: 'closed' });
+    await expect(store.freezeMeetingPublicationFromJob({ operationId: '99999999-9999-4999-8999-999999999999',
+      jobId, requestId: request, siteVisitActivityId: visit, initiatorProfileId: 12, publishedByProfileId: 12,
+      actingUserSystemId: '00000000-0000-4000-8000-000000000005', expectedVersion: 11,
+      frozenInputSha256: 'a'.repeat(64), formatterVersion: '1', candidatePaths: {
+        txt: `folder/${'99999999-9999-4999-8999-999999999999'}.txt`,
+        vtt: `folder/${'99999999-9999-4999-8999-999999999999'}.vtt`,
+        source: `folder/${'99999999-9999-4999-8999-999999999999'}.json`,
+      } })).resolves.toMatchObject({ jobLeaseToken: expect.any(String) });
+    expect(freezeTx.query.mock.calls[1][0]).toMatch(/p\.state IN \('publishing','retryable','unknown','published_reconcile'\)/);
+    expect(freezeTx.query.mock.calls[1][0]).not.toMatch(/p\.state IN \([^)]*'closed'/);
+    expect(freezeTx.query.mock.calls[3][0]).toMatch(/candidate_paths, quarantine_until/);
+    expect(freezeTx.query.mock.calls[3][0]).toMatch(/NOW\(\) \+ \(\$14 \|\| ' seconds'\)::interval \+ INTERVAL '10 minutes'/);
+  });
+
+  it('quarantine close is versioned, expiry-gated, and preserves candidate identities', async () => {
+    const receipt = { operation_id: '00000000-0000-4000-8000-000000000001',
+      request_id: '00000000-0000-4000-8000-000000000003',
+      site_visit_activity_id: '00000000-0000-4000-8000-000000000004',
+      input_job_id: '00000000-0000-4000-8000-000000000002', version: 9, lease_token: 'old-token',
+      candidate_paths: { txt: 'request/transcript.txt' }, verified_files: { txt: { itemId: 'retained' } } };
+    const tx = { query: jest.fn()
+      .mockResolvedValueOnce({ rows: [receipt] })
+      .mockResolvedValueOnce({ rows: [{ lease_token: 'different-manual-winner', active: true }] })
+      .mockResolvedValueOnce({ rows: [{ id: receipt.input_job_id, lease_token: 'old-token', quarantine_passed: true,
+        publication_operation_id: receipt.operation_id }] })
+      .mockResolvedValueOnce({ rows: [{ id: receipt.input_job_id }] })
+      .mockResolvedValueOnce({ rows: [{ ...receipt, state: 'closed', closed_by_profile_id: 12 }] }) };
+    const db = { query: jest.fn(), transaction: jest.fn(async fn => fn(tx)) };
+    const store = createTranscriptionPilotStore(db);
+    await expect(store.closeMeetingPublicationAfterQuarantine({ operationId: receipt.operation_id,
+      requestId: receipt.request_id, siteVisitActivityId: receipt.site_visit_activity_id,
+      expectedVersion: 9, actorProfileId: 12, artifactType: 100000006 })).resolves.toMatchObject({
+      state: 'closed', closed_by_profile_id: 12, candidate_paths: receipt.candidate_paths,
+      verified_files: receipt.verified_files,
+    });
+    expect(tx.query.mock.calls[0][0]).toMatch(/version = \$4 AND quarantine_until <= NOW\(\)/);
+    expect(tx.query.mock.calls[0][0]).toMatch(/lease_expires_at IS NULL OR lease_expires_at <= NOW\(\)/);
+    expect(tx.query.mock.calls[1][1]).toEqual([receipt.request_id, 100000006]);
+    expect(tx.query.mock.calls[2][0]).toMatch(/FOR UPDATE/);
+    expect(tx.query.mock.calls[3][0]).toMatch(/publication_operation_id = \$2 AND lease_token = \$3/);
+  });
+
+  it.each(['slot', 'job'])('refuses closure until the matching %s lease quarantine has passed', async (kind) => {
+    const op = '00000000-0000-4000-8000-000000000001';
+    const requestId = '00000000-0000-4000-8000-000000000003';
+    const siteVisitActivityId = '00000000-0000-4000-8000-000000000004';
+    const receipt = { operation_id: op, request_id: requestId, site_visit_activity_id: siteVisitActivityId,
+      input_job_id: '00000000-0000-4000-8000-000000000002', lease_token: 'original-token' };
+    const tx = { query: jest.fn().mockResolvedValueOnce({ rows: [receipt] })
+      .mockResolvedValueOnce({ rows: kind === 'slot' ? [{ lease_token: op, quarantine_passed: false }] : [] })
+      .mockResolvedValueOnce({ rows: [{ id: receipt.input_job_id, lease_token: 'original-token',
+        publication_operation_id: op, quarantine_passed: false }] }) };
+    const store = createTranscriptionPilotStore({ query: jest.fn(), transaction: async fn => fn(tx) });
+    await expect(store.closeMeetingPublicationAfterQuarantine({ operationId: op, requestId,
+      siteVisitActivityId, expectedVersion: 9, actorProfileId: 12, artifactType: 100000006 })).resolves.toBeNull();
+    expect(tx.query).toHaveBeenCalledTimes(kind === 'slot' ? 2 : 3);
+    expect(tx.query.mock.calls[1][0]).toMatch(/lease_expires_at \+ INTERVAL '10 minutes' <= NOW\(\)/);
+    if (kind === 'job') expect(tx.query.mock.calls[2][0]).toMatch(/lease_expires_at \+ INTERVAL '10 minutes' <= NOW\(\)/);
+  });
+
+  it('does not release an unrelated cleanup lease even when the job retains an old publication binding', async () => {
+    const op = '00000000-0000-4000-8000-000000000001';
+    const requestId = '00000000-0000-4000-8000-000000000003';
+    const siteVisitActivityId = '00000000-0000-4000-8000-000000000004';
+    const receipt = { operation_id: op, request_id: requestId, site_visit_activity_id: siteVisitActivityId,
+      input_job_id: '00000000-0000-4000-8000-000000000002', lease_token: 'original-token' };
+    const tx = { query: jest.fn().mockResolvedValueOnce({ rows: [receipt] }).mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: receipt.input_job_id, lease_token: 'cleanup-token',
+        publication_operation_id: op, quarantine_passed: false }] })
+      .mockResolvedValueOnce({ rows: [{ ...receipt, state: 'closed' }] }) };
+    const store = createTranscriptionPilotStore({ query: jest.fn(), transaction: async fn => fn(tx) });
+    await expect(store.closeMeetingPublicationAfterQuarantine({ operationId: op, requestId,
+      siteVisitActivityId, expectedVersion: 9, actorProfileId: 12, artifactType: 100000006 })).resolves.toMatchObject({ state: 'closed' });
+    expect(tx.query.mock.calls.some(([sql]) => /UPDATE transcription_jobs/.test(sql))).toBe(false);
+  });
+
+  it('persists crash-safe quarantine deadlines on correction freeze and every publication lease renewal', async () => {
+    const operationId = '00000000-0000-4000-8000-000000000001';
+    const requestId = '00000000-0000-4000-8000-000000000003';
+    const siteVisitActivityId = '00000000-0000-4000-8000-000000000004';
+    const tx = { query: jest.fn(async () => ({ rows: [{ version: 2 }] })) };
+    const db = { query: jest.fn(async () => ({ rows: [] })), transaction: async fn => fn(tx) };
+    const store = createTranscriptionPilotStore(db);
+    await store.freezeMeetingCorrectionDraft({ operationId, requestId, siteVisitActivityId, actorProfileId: 12,
+      actingUserSystemId: '00000000-0000-4000-8000-000000000005', expectedVersion: 1,
+      frozenInputSha256: 'a'.repeat(64), candidatePaths: {
+        txt: `folder/${operationId}.txt`, vtt: `folder/${operationId}.vtt`, source: `folder/${operationId}.json`,
+      } });
+    await store.renewMeetingPublicationJobLease({ operationId, jobId: requestId, leaseToken: operationId, expectedVersion: 1 });
+    await store.renewMeetingPublicationReceiptLease({ operationId, leaseToken: operationId });
+    for (const sql of [tx.query.mock.calls[0][0], tx.query.mock.calls[2][0], db.query.mock.calls[0][0]]) {
+      expect(sql).toMatch(/quarantine_until = GREATEST\(quarantine_until, NOW\(\).*INTERVAL '10 minutes'/);
+    }
   });
 
   it.each([

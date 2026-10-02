@@ -166,6 +166,7 @@ function TranscriptContent({ content, speakerNames }) {
 
 function MeetingTranscriptionPanelForRequest({ requestId }) {
   const [collection, setCollection] = useState(null);
+  const [collectionCheckedAt, setCollectionCheckedAt] = useState(0);
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [detail, setDetail] = useState(null);
   const [speakerNames, setSpeakerNames] = useState({});
@@ -183,6 +184,7 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [conflict, setConflict] = useState(false);
+  const [closeAcknowledgedId, setCloseAcknowledgedId] = useState(null);
   const generationRef = useRef(0);
   const detailSequenceRef = useRef(0);
   const controllerRef = useRef(null);
@@ -264,6 +266,7 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
       const body = await requestJson(basePath, { method: 'GET', fallbackMessage: 'Meeting transcription could not be loaded.' });
       if (!isCurrent(generation, expectedRequestId)) return;
       setCollection(body);
+      setCollectionCheckedAt(Date.now());
       setError(null);
       setConflict(false);
       if (!keepDetail && !body.jobs?.some((job) => job.id === selectedJobIdRef.current)) {
@@ -363,13 +366,26 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
       return result;
     } catch (actionError) {
       if (!current() || actionError?.name === 'AbortError') return null;
-      setConflict(actionError.status === 409);
-      setError(errorMessage(actionError, `${label} could not be completed.`));
+      let refreshFailed = false;
+      if (action === 'publish') {
+        await loadCollection({ keepDetail: true });
+        if (!current()) return null;
+        try {
+          const latest = await requestJson(`${basePath}/${encodeURIComponent(selectedJob.id)}`, {
+            method: 'GET', fallbackMessage: 'Reload the draft before trying again.',
+          });
+          if (current()) setDetail(latest);
+        } catch { refreshFailed = true; }
+      }
+      if (current()) {
+        setConflict(actionError.status === 409 || refreshFailed);
+        setError(errorMessage(actionError, `${label} could not be completed.`));
+      }
       return null;
     } finally {
       if (current()) setBusy(null);
     }
-  }, [basePath, isActiveJob, requestId, selectedJob]);
+  }, [basePath, isActiveJob, loadCollection, requestId, selectedJob]);
 
   const uploadAndStart = async () => {
     if (!selectedFile || uploadError || !acknowledged || busy || !requestId) return;
@@ -563,7 +579,8 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
     } catch (publishError) {
       if (current()) {
         setConflict(publishError?.status === 409);
-        setError(errorMessage(publishError, 'The correction could not be published.'));
+        await loadCollection({ keepDetail: true });
+        if (current()) setError(errorMessage(publishError, 'The correction could not be published.'));
       }
     } finally {
       if (current()) setBusy(null);
@@ -582,10 +599,12 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
       expectedCurrentArtifactId: currentArtifactExpected?.id || null,
       expectedCurrentFingerprint: currentArtifactExpected?.fingerprint || null,
     }, 'Publishing');
-    if (!isStillSelected() || !result?.publication) return;
+    if (!isStillSelected()) return;
+    if (!result?.publication) return;
     const publication = result.publication;
     if (result.currentArtifact) setCollection((state) => state ? { ...state, currentArtifact: result.currentArtifact } : state);
-    if (publication.state === 'published') setNotice('Transcript published. The finalized downloads are now available below.');
+    if (publication.state === 'published' && result.superseded) setNotice('This publication was verified, but a newer transcript is current. The newer transcript remains unchanged.');
+    else if (publication.state === 'published') setNotice('Transcript published. The finalized downloads are now available below.');
     else if (publication.state === 'published_reconcile') setNotice('Transcript is published, but finalization needs reconciliation. The published transcript remains available.');
     else if (publication.state === 'unknown') setNotice('The publication result is unknown. Reconcile this publication before trying again.');
     else setError(`Publication did not complete${publication.errorCode ? ` (${publication.errorCode})` : ''}. Review the draft and retry when ready.`);
@@ -630,10 +649,52 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
     try {
       const result = await requestJson(`${basePath}/publications/${encodeURIComponent(publication.operationId)}/reconcile`, { method: 'POST', body: {}, fallbackMessage: 'Publication reconciliation could not be completed.' });
       if (!current()) return;
-      setNotice(result.publication?.state === 'published' ? 'Publication reconciled. Finalized downloads are available.' : 'Reconciliation checked the saved publication receipt.');
+      setNotice(result.superseded
+        ? 'This publication was verified, but a newer transcript is current. The newer transcript remains unchanged.'
+        : result.requiresAttention
+          ? 'This attempt still needs attention. You can close it and retain its files after the waiting period.'
+          : result.publication?.state === 'published'
+            ? 'Publication reconciled. Finalized downloads are available.'
+            : 'Reconciliation checked the saved publication receipt.');
       await loadCollection({ keepDetail: true });
     } catch (reconcileError) {
       if (current()) setError(errorMessage(reconcileError, 'Publication reconciliation could not be completed.'));
+    } finally {
+      if (current()) setBusy(null);
+    }
+  };
+
+  const closePublication = async (publication) => {
+    if (!publication?.operationId || closeAcknowledgedId !== publication.operationId || busy) return;
+    const generation = generationRef.current;
+    const expectedRequestId = requestId;
+    const context = captureActiveContext();
+    const current = () => isActiveContext(generation, expectedRequestId, context);
+    setBusy(`close-${publication.operationId}`);
+    setError(null);
+    try {
+      const result = await requestJson(`${basePath}/publications/${encodeURIComponent(publication.operationId)}/close`, {
+        method: 'POST', body: { acknowledgeRetainedFiles: true },
+        fallbackMessage: 'The publication attempt could not be safely closed.',
+      });
+      if (!current()) return;
+      setCloseAcknowledgedId(null);
+      setNotice(result.closed
+        ? 'The attempt is closed. Candidate files, if any, remain in SharePoint and were not deleted.'
+        : result.superseded
+          ? 'The publication was verified, but a newer transcript is current. The newer transcript remains unchanged.'
+          : result.requiresAttention
+            ? 'The receipt still needs reconciliation. No candidate files were deleted.'
+            : 'The publication was reconciled.');
+      await loadCollection({ keepDetail: true });
+    } catch (closeError) {
+      if (current()) {
+        setCloseAcknowledgedId(null);
+        setConflict(closeError?.status === 409);
+        setError(errorMessage(closeError, 'The publication attempt could not be safely closed.'));
+        await loadCollection({ keepDetail: true });
+        if (current()) setError(errorMessage(closeError, 'The publication attempt could not be safely closed.'));
+      }
     } finally {
       if (current()) setBusy(null);
     }
@@ -706,7 +767,31 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
             ) : <p className="mt-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-4 text-sm leading-5 text-gray-700">No temporary drafts yet. Uploaded recordings appear here while processing and review.</p>}
           </div>
 
-          {!!(collection?.publications || []).length && <div><h3 className="text-sm font-semibold text-gray-900">Publication status</h3><ul className="mt-2 space-y-2">{collection.publications.map((publication) => <li key={publication.operationId} className="rounded-lg border border-amber-200 bg-amber-50 p-3"><p className="text-sm font-medium text-amber-950">{publication.state === 'published_reconcile' ? 'Published · reconciliation needed' : publication.state === 'unknown' ? 'Publication outcome unknown' : publication.state === 'retryable' ? 'Publication can be retried' : 'Publication status'}</p>{publication.errorCode && <p className="mt-1 text-xs text-amber-900">Reference: {publication.errorCode}</p>}{['published_reconcile', 'unknown', 'retryable'].includes(publication.state) && <button type="button" onClick={() => void reconcile(publication)} disabled={Boolean(busy)} className="mt-2 min-h-9 rounded-lg border border-amber-800 bg-white px-3 py-1.5 text-xs font-semibold text-amber-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-700">{busy === `reconcile-${publication.operationId}` ? 'Checking…' : 'Reconcile publication'}</button>}</li>)}</ul></div>}
+          {!!(collection?.publications || []).length && <div><h3 className="text-sm font-semibold text-gray-900">Publication status</h3><ul className="mt-2 space-y-2">{collection.publications.map((publication) => {
+            const unresolved = ['publishing', 'retryable', 'unknown', 'published_reconcile'].includes(publication.state);
+            const quarantinePassed = Boolean(publication.quarantineUntil) && new Date(publication.quarantineUntil).getTime() <= collectionCheckedAt
+              && (!publication.leaseExpiresAt || new Date(publication.leaseExpiresAt).getTime() <= collectionCheckedAt);
+            const label = publication.state === 'published' && publication.errorCode === 'publication_superseded'
+              ? 'Published · superseded by a newer transcript'
+              : publication.state === 'published' ? 'Published'
+                : publication.state === 'closed' ? 'Closed · candidate files retained'
+                  : publication.state === 'published_reconcile' ? 'Published · reconciliation needed'
+                    : publication.state === 'unknown' ? 'Publication outcome unknown'
+                      : publication.state === 'retryable' ? 'Publication can be retried'
+                        : publication.state === 'publishing' ? 'Publication may still be running' : 'Publication status';
+            return <li key={publication.operationId} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <p className="text-sm font-medium text-amber-950">{label}</p>
+              {publication.errorCode && <p className="mt-1 break-all text-xs text-amber-900">Reference: {publication.errorCode}</p>}
+              {unresolved && <div className="mt-2 flex flex-wrap gap-2">
+                <button type="button" onClick={() => void reconcile(publication)} disabled={Boolean(busy)} className="min-h-9 rounded-lg border border-amber-800 bg-white px-3 py-1.5 text-xs font-semibold text-amber-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 disabled:cursor-wait disabled:opacity-60">{busy === `reconcile-${publication.operationId}` ? 'Checking…' : 'Reconcile publication'}</button>
+                {quarantinePassed && <button type="button" onClick={() => void closePublication(publication)} disabled={Boolean(busy) || closeAcknowledgedId !== publication.operationId} className="min-h-9 rounded-lg border border-gray-500 bg-white px-3 py-1.5 text-xs font-semibold text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-700 disabled:cursor-not-allowed disabled:opacity-50">{busy === `close-${publication.operationId}` ? 'Closing…' : 'Close attempt — keep files'}</button>}
+              </div>}
+              {unresolved && quarantinePassed && <div className="mt-2">
+                <label className="flex items-start gap-2 text-xs leading-5 text-amber-950"><input type="checkbox" checked={closeAcknowledgedId === publication.operationId} disabled={Boolean(busy)} onChange={(event) => setCloseAcknowledgedId(event.target.checked ? publication.operationId : null)} className="mt-0.5 h-4 w-4 rounded border-amber-500 focus:ring-2 focus:ring-amber-700" /><span>Closing ends retries for this receipt. Any candidate SharePoint files will be retained, not deleted. The current transcript will not be changed.</span></label>
+              </div>}
+              {unresolved && !quarantinePassed && publication.quarantineUntil && <p className="mt-2 text-xs leading-5 text-amber-950">Close with files retained becomes available after {new Date(publication.quarantineUntil).toLocaleString()}, once its lease has expired.</p>}
+            </li>;
+          })}</ul></div>}
         </div>
 
         <div className="min-w-0">

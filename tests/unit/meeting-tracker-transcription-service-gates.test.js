@@ -1,5 +1,10 @@
 jest.mock('../../lib/dataverse/adapters/request-document.js', () => ({ findByRequest: jest.fn(), findByGenerationKey: jest.fn() }));
-jest.mock('../../lib/services/post-presentation-materials/material-service.js', () => ({ publishMeetingTranscriptBundle: jest.fn() }));
+jest.mock('../../lib/services/post-presentation-materials/material-service.js', () => ({
+  prepareMeetingTranscriptBundlePublication: jest.fn(), publishMeetingTranscriptBundle: jest.fn(),
+}));
+jest.mock('../../lib/services/post-presentation-materials/slot-lease-store.js', () => ({
+  getPresentationSlotLease: jest.fn(async () => null), releasePresentationSlotLease: jest.fn(async () => null),
+}));
 jest.mock('../../lib/services/meeting-tracker-transcription/binding.js', () => ({
   loadMeetingTranscriptionBinding: jest.fn(), getMeetingTranscriptionCandidates: jest.fn(),
 }));
@@ -14,6 +19,7 @@ jest.mock('../../lib/services/transcription-pilot/workflow-dispatch.js', () => (
 jest.mock('../../lib/services/transcription-pilot/store.js', () => Object.fromEntries([
   'getMeetingTranscriptionJob','listMeetingTranscriptionJobs','listMeetingTranscriptPublications',
   'getMeetingTranscriptPublication','freezeMeetingPublicationFromJob','closeMeetingPublicationJobLease',
+  'closeMeetingPublicationWithoutWrites','closeMeetingPublicationAfterQuarantine',
   'renewMeetingPublicationJobLease','renewMeetingPublicationReceiptLease','recordMeetingPublicationCandidate','recordMeetingPublicationSlotFence',
   'claimMeetingTranscriptPublicationForRecovery','markMeetingTranscriptPublicationChecked',
   'transitionMeetingTranscriptPublication','createMeetingTranscriptCorrectionDraft',
@@ -25,7 +31,7 @@ jest.mock('../../lib/services/transcription-pilot/store.js', () => Object.fromEn
 
 import * as store from '../../lib/services/transcription-pilot/store.js';
 import * as binding from '../../lib/services/meeting-tracker-transcription/binding.js';
-import { publishMeetingTranscription, startMeetingTranscription } from '../../lib/services/meeting-tracker-transcription/service.js';
+import { publishMeetingTranscription, publishMeetingCorrection, startMeetingTranscription } from '../../lib/services/meeting-tracker-transcription/service.js';
 import { queueMeetingTranscription, projectMeetingTranscriptionJob } from '../../lib/services/transcription-pilot/runtime.js';
 import { dispatchQueuedTranscriptionWorkflow } from '../../lib/services/transcription-pilot/workflow-dispatch.js';
 import { getMeetingTranscriptionOverview } from '../../lib/services/meeting-tracker-transcription/service.js';
@@ -53,6 +59,40 @@ test('a populated ready job cannot be read or published while the Meeting Tracke
     if (oldSchema === undefined) delete process.env.MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY;
     else process.env.MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY = oldSchema;
   }
+});
+
+test.each([
+  ['job publication rejects a missing mapped actor before freezing', () => publishMeetingTranscription({
+    requestId, ownerProfileId: 8, jobId, body: { expectedVersion: 5,
+      expectedCurrentArtifactId: null, expectedCurrentFingerprint: null },
+  })],
+  ['correction publication rejects a missing mapped actor before freezing', () => publishMeetingCorrection({
+    requestId, ownerProfileId: 8, operationId: jobId, body: { expectedVersion: 1 },
+  })],
+])('%s', async (_label, invoke) => {
+  process.env.MEETING_TRACKER_TRANSCRIPTION_ACCESS = 'on';
+  process.env.MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY = 'on';
+  process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = 'on';
+  await expect(invoke()).rejects.toMatchObject({ code: 'post_presentation_actor_required', httpStatus: 403 });
+  expect(store.freezeMeetingPublicationFromJob).not.toHaveBeenCalled();
+  expect(store.freezeMeetingTranscriptCorrectionDraft).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['job', () => publishMeetingTranscription({ requestId, ownerProfileId: 8,
+    actingUserSystemId: '44444444-4444-4444-8444-444444444444', jobId,
+    body: { expectedVersion: 5, expectedCurrentArtifactId: null, expectedCurrentFingerprint: null } })],
+  ['correction', () => publishMeetingCorrection({ requestId, ownerProfileId: 8,
+    actingUserSystemId: '44444444-4444-4444-8444-444444444444', operationId: jobId,
+    body: { expectedVersion: 1 } })],
+])('%s publication checks the bundle readiness gate before any freeze or binding read', async (_label, invoke) => {
+  process.env.MEETING_TRACKER_TRANSCRIPTION_ACCESS = 'on';
+  process.env.MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY = 'on';
+  delete process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+  await expect(invoke()).rejects.toMatchObject({ code: 'meeting_transcript_bundle_schema_not_ready', httpStatus: 503 });
+  expect(binding.loadMeetingTranscriptionBinding).not.toHaveBeenCalled();
+  expect(store.freezeMeetingPublicationFromJob).not.toHaveBeenCalled();
+  expect(store.freezeMeetingTranscriptCorrectionDraft).not.toHaveBeenCalled();
 });
 
 test('Start dispatches queued work immediately and reports a truthful pending state if dispatch fails', async () => {

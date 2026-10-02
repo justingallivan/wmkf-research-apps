@@ -7,12 +7,17 @@ jest.mock('../../lib/services/meeting-tracker-transcription/service.js', () => (
   getMeetingTranscriptionOverview: jest.fn(async () => ({ featureState: 'enabled' })),
   uploadMeetingTranscription: jest.fn(async () => ({ job: { id: 'j' }, upload: { token: 't' } })),
   renameMeetingTranscriptionSpeakers: jest.fn(async () => ({ job: { id: 'j' } })),
+  publishMeetingTranscription: jest.fn(async () => ({ publication: { state: 'published' } })),
+  closeMeetingTranscriptPublication: jest.fn(async () => ({ closed: true, retainedFiles: true })),
 }));
 
 import { requireAppAccess } from '../../lib/utils/auth.js';
-import { getMeetingTranscriptionOverview, uploadMeetingTranscription, renameMeetingTranscriptionSpeakers } from '../../lib/services/meeting-tracker-transcription/service.js';
+import { getMeetingTranscriptionOverview, uploadMeetingTranscription, renameMeetingTranscriptionSpeakers,
+  publishMeetingTranscription, closeMeetingTranscriptPublication } from '../../lib/services/meeting-tracker-transcription/service.js';
 import collection from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions.js';
 import speakers from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/[jobId]/speakers.js';
+import publish from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/[jobId]/publish.js';
+import closePublication from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/publications/[operationId]/close.js';
 
 const requestId = '11111111-1111-4111-8111-111111111111';
 const jobId = '22222222-2222-4222-8222-222222222222';
@@ -71,5 +76,31 @@ test('speaker PATCH exposes only optimistic version and labels at the route boun
   } }, accepted);
   expect(renameMeetingTranscriptionSpeakers).toHaveBeenCalledWith({ requestId, ownerProfileId: 9, jobId,
     body: { expectedVersion: 4, speakerNames: { A: 'Chair' } } });
+  expect(accepted.statusCode).toBe(200);
+});
+
+test('job publish route reports the service httpStatus for unmapped actor failures', async () => {
+  const error = Object.assign(new Error('mapped actor required'), { code: 'post_presentation_actor_required', httpStatus: 403 });
+  publishMeetingTranscription.mockRejectedValueOnce(error);
+  const res = response();
+  await publish({ method: 'POST', query: { requestId, jobId }, body: {
+    expectedVersion: 2, expectedCurrentArtifactId: null, expectedCurrentFingerprint: null,
+  } }, res);
+  expect(res.statusCode).toBe(403);
+});
+
+test('close route requires exact retained-file acknowledgement and supplies the authenticated profile', async () => {
+  const invalid = response();
+  await closePublication({ method: 'POST', query: { requestId, operationId: jobId }, body: {
+    acknowledgeRetainedFiles: true, operationId: 'attacker-choice',
+  } }, invalid);
+  expect(invalid.statusCode).toBe(400);
+  expect(closeMeetingTranscriptPublication).not.toHaveBeenCalled();
+  const accepted = response();
+  await closePublication({ method: 'POST', query: { requestId, operationId: jobId }, body: {
+    acknowledgeRetainedFiles: true,
+  } }, accepted);
+  expect(closeMeetingTranscriptPublication).toHaveBeenCalledWith({ requestId, operationId: jobId,
+    actorProfileId: 9, acknowledgeRetainedFiles: true });
   expect(accepted.statusCode).toBe(200);
 });

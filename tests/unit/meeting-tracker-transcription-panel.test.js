@@ -178,6 +178,73 @@ test('reviews a draft, saves names without candidate IDs, and publishes against 
   expectOnlyMeetingRequestPath();
 });
 
+test('reconciles crashed publishing receipts and requires acknowledgement before close-with-files-retained', async () => {
+  const publication = { operationId: OPERATION_ID, state: 'publishing', version: 3,
+    quarantineUntil: new Date(Date.now() - 1000).toISOString(), leaseExpiresAt: new Date(Date.now() - 1000).toISOString() };
+  let closeCalls = 0;
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const path = String(url);
+    if (path.endsWith('/transcriptions')) return response(collection({ publications: [
+      { ...publication, state: closeCalls ? 'closed' : 'unknown' },
+    ] }));
+    if (path.endsWith(`/publications/${OPERATION_ID}/reconcile`)) return response({
+      publication: { operationId: OPERATION_ID, state: 'unknown' }, requiresAttention: true,
+    });
+    if (path.endsWith(`/publications/${OPERATION_ID}/close`)) {
+      closeCalls += 1;
+      expect(options.method).toBe('POST');
+      expect(JSON.parse(options.body)).toEqual({ acknowledgeRetainedFiles: true });
+      return response({ closed: true, retainedFiles: true, publication: { operationId: OPERATION_ID, state: 'closed' } });
+    }
+    return response({});
+  });
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  expect(await screen.findByRole('button', { name: 'Reconcile publication' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Reconcile publication' }));
+  await waitFor(() => expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith(`/publications/${OPERATION_ID}/reconcile`))).toBe(true));
+  expect(screen.getByLabelText(/Closing ends retries for this receipt/)).not.toBeChecked();
+  const close = screen.getByRole('button', { name: 'Close attempt — keep files' });
+  expect(close).toBeDisabled();
+  fireEvent.click(screen.getByLabelText(/Closing ends retries for this receipt/));
+  fireEvent.click(close);
+  expect(await screen.findByText('The attempt is closed. Candidate files, if any, remain in SharePoint and were not deleted.')).toBeInTheDocument();
+  expect(closeCalls).toBe(1);
+});
+
+test('a failed job publish refreshes the selected version and the next attempt succeeds without navigation', async () => {
+  let collectionLoads = 0;
+  let version = 1;
+  const attemptedVersions = [];
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const path = String(url);
+    if (path.endsWith('/transcriptions')) {
+      collectionLoads += 1;
+      return response(collection({ jobs: [job({ version })] }));
+    }
+    if (path.endsWith(`/${JOB_ID}`) && options.method === 'GET') return response({ job: job({ version }), content, candidates: [] });
+    if (path.endsWith(`/${JOB_ID}/publish`)) {
+      attemptedVersions.push(JSON.parse(options.body).expectedVersion);
+      if (attemptedVersions.length === 1) {
+        version = 3;
+        return response({ error: 'temporary write failure', code: 'synthetic_failure' }, 503);
+      }
+      return response({ publication: { operationId: OPERATION_ID, state: 'published' }, currentArtifact });
+    }
+    return response({});
+  });
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: /site-visit\.m4a/ }));
+  const publishButton = await screen.findByRole('button', { name: 'Publish transcript' });
+  expect(publishButton).toBeEnabled();
+  fireEvent.click(publishButton);
+  await waitFor(() => expect(collectionLoads).toBeGreaterThanOrEqual(2));
+  expect(await screen.findByText('temporary write failure')).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Publish transcript' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: 'Publish transcript' }));
+  expect(await screen.findByText('Transcript published. The finalized downloads are now available below.')).toBeInTheDocument();
+  expect(attemptedVersions).toEqual([1, 3]);
+});
+
 test('keeps text-only transcripts readable and disables bundle publication without timed utterances', async () => {
   global.fetch.mockImplementation(async (url) => {
     if (String(url).endsWith('/transcriptions')) return response(collection());
