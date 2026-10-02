@@ -3,7 +3,7 @@ title: Meeting Tracker transcription readiness check
 domain: transcription
 kind: evidence
 status: isolated-preview-schema-ready-source-disabled-runtime-unverified
-summary: "Local PostgreSQL integration and isolated Preview test schema are verified. The sign-in-only Preview deployment is READY, but the OAuth browser session was not verified. Transcription remains off; provider, audio, end-to-end, and release readiness are unverified."
+summary: "Local PostgreSQL integration and isolated Preview test schema are verified. User-provided Safari and Chrome session JSON confirms sign-in; synthetic fixture rehearsal and the full Tracker flow remain unverified. Transcription remains off."
 owner: product-engineering
 ---
 
@@ -69,18 +69,40 @@ owner: product-engineering
   `NEXTAUTH_SECRET`, exact `NEXTAUTH_URL`, `AUTH_REQUIRED=true`, emergency
   bypass false, and the test-project marker configured. Sign-in status returned
   enabled; an unrelated cron path returned bare 404; anonymous session
-  returned `{}`. Chrome's sign-in flow reached a request to
-  `/api/auth/session`, where the browser displayed `ERR_BLOCKED_BY_CLIENT`.
-  Read-only database verification found the sole seeded profile active,
-  `needs_linking=false`, and `last_login_at` populated, showing OAuth callback
-  acceptance but not proving the browser established or displayed a session.
-  The block's cause is unknown.
+  returned `{}`. Read-only database verification found the sole seeded profile
+  active, `needs_linking=false`, and `last_login_at` populated. The user later
+  supplied authenticated session JSON from Safari and Chrome for the expected
+  Justin identity (Azure ID suffix `4a31`, profile ID 1, staff,
+  `needsLinking=false`), confirming browser sign-in. The earlier Chrome
+  `ERR_BLOCKED_BY_CLIENT` is no longer blocking; its cause remains unknown.
+  This does not verify the full Meeting Tracker flow.
 - **Preview route probe:** `scripts/probe-meeting-transcription-test.js`
   returned HTTP 200 for auth status, sign-in page, and anonymous session; it
   returned 404 for cron, `meeting-tracker/visits`, the AssemblyAI webhook GET,
   and `.well-known/workflow/v1/flow` GET. The anonymous 200 does not verify an
   authenticated session. Root removed the exact protected temporary
   `preview.env` and its empty parent directory; no source recording was touched.
+- **Sandbox fixture safety and plan review:** owner approved a synthetic
+  sandbox request/visit and isolated sample transcript, but no fixture was
+  created. Root and Luna ran
+  `scripts/probe-meeting-transcription-fixture-safety.js` against the pinned
+  sandbox with the write interlock on. Its positive read-only census covered
+  1,075 workflows and 82,539 plugin steps; it is not exhaustive automation
+  coverage. Sol found plural cloud-trigger/global-plugin coverage omitted;
+  Luna repaired three probe-coverage gaps, and Sol reviewed the closure with
+  no new material blocker. The revised probe was not rerun live. Active
+  classic request-mail/invite/payment processes and synchronous create plugins
+  were found, with side effects
+  unproven. Do not infer that no other automation exists. Root stopped before
+  fixture writes; no fixture, environment, grant, or deployment changed, and
+  no mail, provider, or SharePoint writes occurred. Fable first-party OAuth
+  session `3b5797da-1890-4149-8c1f-0338e23eb2e9` returned **NOT READY** on the
+  plan: exact flags/target pins, missing `expertise_roster` for attendee
+  choices, legacy profile-1 rekey/skip requiring all-FK review, literal
+  request/job requirements, an unverified Next data-query assumption, and a
+  no-email claim that excludes platform flows. No implementation or final
+  Fable review is complete; a no-CRM-fixture isolated rehearsal needs an owner
+  decision.
 
 ## Review and remaining limits
 
@@ -110,8 +132,7 @@ application behavior remains unproved.
 
 Migrations were applied only to isolated test Neon, and Wave 31 only to
 sandbox. All transcription flags remain off. No audio/provider call,
-transcription feature activation, authenticated browser session, or end-to-end
-Meeting Tracker test is proven. The next bounded check is to resolve the
-browser's `ERR_BLOCKED_BY_CLIENT` result without assuming a cause, then verify
-the authenticated browser session and scoped Preview behavior. These checks
-do not establish Meeting Tracker release readiness.
+transcription feature activation, fixture creation, or end-to-end Meeting
+Tracker test occurred. Resolve the owner decision and Fable plan findings
+before fixture writes. These checks do not establish Meeting Tracker release
+readiness.

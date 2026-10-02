@@ -3,7 +3,7 @@ title: Meeting Tracker transcription integration
 domain: transcription
 kind: plan
 status: source-reviewed-disabled
-summary: "Shared transcription remains disabled. The isolated sign-in-only Preview project is deployed and basic isolation checks pass; the OAuth callback updated the seeded profile, but browser session display and end-to-end Meeting Tracker behavior remain unverified. No audio/provider test or release readiness is claimed."
+summary: "Shared transcription remains disabled. User-provided authenticated Safari and Chrome session JSON confirms sign-in on isolated Preview; a synthetic fixture rehearsal and the full Meeting Tracker flow remain unverified. No audio/provider test or release readiness is claimed."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -497,16 +497,33 @@ was verified. Preview auth settings were present with a unique
 `NEXTAUTH_SECRET`, exact `NEXTAUTH_URL`, `AUTH_REQUIRED=true`, emergency
 bypass false, and the test-project marker configured. The sign-in status
 endpoint returned enabled; an unrelated cron path returned bare 404; anonymous
-session returned `{}`. Chrome's sign-in flow reached a request to
-`/api/auth/session`, where the browser displayed `ERR_BLOCKED_BY_CLIENT`.
-Read-only DB verification found the one seeded profile active,
-`needs_linking=false`, and `last_login_at` populated, showing OAuth callback
-acceptance but not proving the browser established/displayed a session. The
-cause of that browser block is unknown.
+session returned `{}`. The user later supplied authenticated session JSON
+from both Safari and Chrome identifying the expected Justin identity (Azure ID
+suffix `4a31`, profile ID 1, staff, `needsLinking=false`), confirming browser
+sign-in. The earlier Chrome `ERR_BLOCKED_BY_CLIENT` is no longer blocking; its
+cause remains unknown. This does not prove the full Meeting Tracker flow.
+
+The owner approved a synthetic sandbox request/visit and isolated sample
+transcript, but no fixture was created. Root and Luna ran
+`scripts/probe-meeting-transcription-fixture-safety.js` against the pinned
+sandbox with the write interlock on: its positive read-only census covered
+1,075 workflows and 82,539 plugin steps, not exhaustive automation coverage.
+Sol found omitted plural cloud-trigger/global-plugin coverage; Luna is
+repairing the probe. Active classic request-mail/invite/payment processes and
+synchronous create plugins were found; their side effects are unproven. Do not
+infer no other automation exists. The probe made no fixture, environment,
+grant, or deployment changes. No mail, provider, or SharePoint writes occurred.
+Root stopped before writes. Fable
+session `3b5797da-1890-4149-8c1f-0338e23eb2e9` returned **NOT READY** on the
+plan: exact-flag/target pins, missing `expertise_roster` for attendee choices,
+legacy profile-1 rekey/skip requiring all-FK review, literal request/job
+requirements, an unverified Next data-query assumption, and a no-email claim
+that does not cover platform flows. No implementation or final Fable review is
+done. A no-CRM-fixture isolated rehearsal still needs an owner decision.
 
 All transcription flags remain off. No audio or provider call, feature
-activation, full sign-in UI verification, or end-to-end Meeting Tracker test
-occurred; these deployment/auth checks do not establish release readiness.
+activation, or end-to-end Meeting Tracker test occurred; these deployment/auth
+checks do not establish release readiness.
 
 **[VERIFIED via first-party OAuth Max source review]** Fable session
 `f287cfdf-40ea-4f27-840c-4defee098bbf` (`claude-fable-5-1`) returned **Commit
@@ -522,12 +539,12 @@ correction, and cleanup gaps remain.
 Detailed bounded results and review limits are recorded in
 [the 2026-10-02 readiness check](evidence/MEETING_TRANSCRIPTION_READINESS_CHECK_2026-10-02.md).
 
-Next, determine why the browser displayed `ERR_BLOCKED_BY_CLIENT` and verify
-the authenticated browser session, then test the authorized sign-in-only flow
-and scoped application behavior in Preview. Do not infer a cause for the
-browser block from current evidence. The fresh-schema bootstrap is separate
-from the old pilot and shared database; it does not prove hosted adapter
-behavior or release readiness. The sandbox generation key is exact/Active,
-but this does not authorize or prove an application write. Candidate files retained by
+Next, resolve the owner decision for a no-CRM-fixture sandbox rehearsal and
+close Fable's plan findings before fixture writes. The earlier browser block
+is no longer blocking, but the full Meeting Tracker flow remains untested.
+The fresh-schema bootstrap is separate from the old pilot and shared database;
+it does not prove hosted adapter behavior or release readiness. The sandbox
+generation key is exact/Active, but this does not authorize or prove an
+application write. Candidate files retained by
 closed attempts are not registered final products; committed but unverifiable
 receipts remain attention-only.
