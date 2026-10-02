@@ -475,6 +475,7 @@ If you're touching a service or utility, read its header before this catalog. If
   `tests/unit/eslint-no-raw-fetch-ratchet.test.js`.
 - **`shared/utils/reviewer-send-skip-reasons.js`** — Stage 6D: `SEND_SKIP_REASON` (the complete `skipped[].reason` vocabulary emitted by `send-emails-service.js`, every literal replaced; a grep test forbids bare literals) and `SEND_SKIP_REASON_LABEL` (staff copy rendered by `ReleaseMaterialsModal` and `InviteEmailModal`). `check:status-enum-parity` entry #5 requires every produced reason to have a label.
 - **`shared/utils/site-visit-materials-status.js`** — Browser-safe total classifier used by the Meeting Tracker row pills, counts, and filters. It preserves closed/ready/unsent/received/missing precedence, distinguishes confirmed absence with and without a Site Visit, and sends unavailable or malformed input to the explicit `Status unavailable` bucket.
+- **`shared/utils/site-visit-materials-scan-rejection.js`** — Strictly validates the applicant-materials public `scanRejection` category/flag allowlist and renders safe applicant and staff reasons for infected scan failures. Extra or unknown provider fields fail closed to an unspecified reason. **[SOURCE-BUILT; NOT DEPLOYED.]**
 - **`shared/utils/reviewer-engagement-policy.js`** — Stage 2 (PR #155, `716bc558`, 2026-09-05): the
   one home for the duplicated invitation-correction policy. Exports three predicates over raw
   suggestion rows — `isClosedEngagementStatus(status)` (status-only), `isClosedEngagementRow(row)`
