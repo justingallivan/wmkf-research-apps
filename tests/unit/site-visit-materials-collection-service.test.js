@@ -73,6 +73,8 @@ function deps(overrides = {}) {
     findDocumentsByRequest: jest.fn(async () => ({ records: [] })),
     getOpenCollection: jest.fn(async () => stored),
     getLatestCollection: jest.fn(async () => stored),
+    backgroundJobsSchemaReady: () => false,
+    listUploadJobsForRequest: jest.fn(async () => []),
     insertCollection: jest.fn(async (row) => { stored = { id: row.id, request_id: row.requestId, site_visit_activity_id: row.siteVisitActivityId, status: 'open', due_at: row.dueAt, closes_at: row.closesAt, checklist: row.checklist, contacts: row.contacts, jti: row.jti, token_digest: row.tokenDigest, token_ciphertext: row.tokenCiphertext, created_by: row.createdBy, reminder_count: 0, created_at: NOW }; return stored; }),
     recordInvitation: jest.fn(async (id, emailId) => { stored = { ...stored, invited_at: NOW, invitation_email_id: emailId }; return stored; }),
     updateContacts: jest.fn(async (id, expected, contacts) => { stored = { ...stored, contacts }; return stored; }),
@@ -480,12 +482,35 @@ test('summarizeCollection keeps state, counts, and the window; drops the link, c
   expect(collection.contributorUrl).toMatch(/^https?:\/\/|^\/external\/materials\//);
   const summary = summarizeCollection(collection);
   expect(summary).toEqual({
-    state: 'missing', receivedCount: 1, requiredCount: 2, otherCount: 0,
+    state: 'missing', processingCount: 0, attentionCount: 0, receivedCount: 1, requiredCount: 2, otherCount: 0,
     dueAt: collection.dueAt, closesAt: collection.closesAt, overdue: false, invited: true,
   });
   expect(Object.keys(summary)).not.toEqual(expect.arrayContaining(['contributorUrl', 'contacts', 'checklist', 'id']));
   expect(summarizeCollection(null)).toBeNull();
   expect(missingRequiredItems({ checklist: collection.checklist }, { presentation_pdf: { artifactId: 'p' } }).map((item) => item.key)).toEqual(['presentation_source']);
+  expect(missingRequiredItems({ checklist: collection.checklist }, { presentation_pdf: { artifactId: 'p' } }, {
+    mode: 'reminder_actionable', activeJobSlots: new Set(['presentation_source']),
+  })).toEqual([]);
+});
+
+test('staff projection exposes sanitized cross-collection jobs and blocks Ready while an upload is active', async () => {
+  const d = deps({
+    backgroundJobsSchemaReady: () => true,
+    listUploadJobsForRequest: jest.fn(async () => [
+      { job_id: 'job-1', collection_id: 'old-collection', slot: 'presentation_pdf', status: 'processing', filename: 'new.pdf', attempt_count: 2, error_code: 'raw-storage-exception' },
+      { job_id: 'job-2', collection_id: 'old-collection', slot: 'participant_bios', status: 'needs_attention', filename: 'bios.pdf', attempt_count: 8, error_code: 'coordinator_action_required' },
+    ]),
+  });
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  const { collection } = await getMaterialsCollection({ requestId: REQUEST_ID }, d);
+  expect(d.listUploadJobsForRequest).toHaveBeenCalledWith(REQUEST_ID, { collectionIds: ['44444444-4444-4444-8444-444444444444'] });
+  expect(collection).toMatchObject({ state: 'needs_attention', processingCount: 1, attentionCount: 1 });
+  expect(collection.uploadJobs).toEqual([
+    expect.objectContaining({ jobId: 'job-1', status: 'processing', errorCode: null }),
+    expect.objectContaining({ jobId: 'job-2', status: 'needs_attention', errorCode: 'coordinator_action_required' }),
+  ]);
+  await expect(confirmMaterialsReady({ requestId: REQUEST_ID, actorId: ACTOR }, d)).rejects.toMatchObject({ code: 'site_visit_materials_uploads_incomplete' });
+  expect(d.markReady).not.toHaveBeenCalled();
 });
 
 test('projectCollection reports a past closes_at as closed even while the row still says open (the sweep only makes that durable)', () => {

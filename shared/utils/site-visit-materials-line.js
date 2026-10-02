@@ -16,8 +16,16 @@ function shortDate(iso) {
 export function siteVisitMaterialsLine(summary) {
   if (!summary) return null;
   const counts = `${summary.receivedCount} of ${summary.requiredCount} received`;
+  const attentionCount = Number.isSafeInteger(summary.attentionCount) ? summary.attentionCount : 0;
+  const processingCount = Number.isSafeInteger(summary.processingCount) ? summary.processingCount : 0;
+  const activity = [
+    attentionCount ? `${attentionCount} upload${attentionCount === 1 ? ' needs' : 's need'} coordinator attention` : '',
+    processingCount ? `${processingCount} upload${processingCount === 1 ? '' : 's'} processing` : '',
+  ].filter(Boolean).join(' · ');
+  if (summary.state === 'closed') return `Materials: closed, ${counts}${activity ? ` · ${activity}` : ''}.`;
+  if (summary.state === 'needs_attention' || attentionCount) return `Materials: ${counts} · ${activity || 'An upload needs coordinator attention'}.`;
+  if (summary.state === 'processing' || processingCount) return `Materials: ${counts} · ${activity || 'An upload is processing'}.`;
   if (summary.state === 'ready') return `Materials: ready (${counts}).`;
-  if (summary.state === 'closed') return `Materials: closed, ${counts}.`;
   if (!summary.invited) return `Materials: invitation not sent (${counts}).`;
   if (summary.state === 'received') return `Materials: ${counts}, awaiting confirmation.`;
   const due = shortDate(summary.dueAt);

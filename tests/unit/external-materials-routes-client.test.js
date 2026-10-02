@@ -481,3 +481,205 @@ test('the support-email footer shows a mailto link to the configured address whe
   expect(link.getAttribute('href')).toMatch(/^mailto:portalhelp@wmkeck\.org\?subject=/);
   expect(decodeURIComponent(link.getAttribute('href'))).toContain('Site visit materials — Neural dust');
 });
+
+test('202 acceptance becomes durable queued status, keeps the prior receipt visible, and clears the staged retry', async () => {
+  const previousContext = {
+    ...context,
+    checklist: [{ ...context.checklist[0], received: { filename: 'earlier.pdf', receivedAt: '2026-09-20T12:00:00Z' } }],
+  };
+  let contextCalls = 0;
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) {
+      contextCalls += 1;
+      return response(200, contextCalls === 1 ? previousContext : {
+        ...previousContext,
+        jobs: [{ jobId: 'job-1', stagingId: STAGING_ID, slot: 'presentation_pdf', status: 'queued', filename: 'new.pdf', createdAt: '2026-10-01T10:00:00Z' }],
+      });
+    }
+    if (url.endsWith('/upload-token')) return response(200, { ok: true, stagingId: STAGING_ID, pathname: 'private/path', clientToken: 'client', contentType: 'application/pdf' });
+    if (url.endsWith('/finalize')) return response(202, { ok: true, jobId: 'job-1', stagingId: STAGING_ID, status: 'queued' });
+    throw new Error(`unexpected fetch ${url}`);
+  });
+
+  render(<MaterialsContributorPage />);
+  fireEvent.change(await screen.findByLabelText('Presentation file'), { target: { files: [new File(['%PDF'], 'new.pdf', { type: 'application/pdf' })] } });
+
+  expect(await screen.findByText('Upload received. We’re checking and saving your file. You can close this page.')).toBeInTheDocument();
+  expect(screen.getByText(/Previously received .* earlier\.pdf/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Presentation file')).not.toBeInTheDocument();
+  expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+  expect(contextCalls).toBe(2);
+});
+
+test('a refreshed page restores active jobs from context and polls once per page every 15 seconds', async () => {
+  const withJob = {
+    ...context,
+    jobs: [{ jobId: 'job-1', stagingId: STAGING_ID, slot: 'presentation_pdf', status: 'processing', filename: 'new.pdf' }],
+  };
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, withJob);
+    throw new Error(`unexpected fetch ${url}`);
+  });
+
+  jest.useFakeTimers();
+  const { unmount } = render(<MaterialsContributorPage />);
+  try {
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.getByText('Upload received. We’re checking and saving your file. You can close this page.')).toBeInTheDocument();
+    expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+    await act(async () => { await jest.advanceTimersByTimeAsync(14_999); });
+    expect(global.fetch.mock.calls.filter(([url]) => url.endsWith('/context'))).toHaveLength(1);
+    await act(async () => { await jest.advanceTimersByTimeAsync(1); });
+    expect(global.fetch.mock.calls.filter(([url]) => url.endsWith('/context'))).toHaveLength(2);
+    expect(global.fetch.mock.calls.filter(([url]) => url.endsWith('/context'))[1][1].signal).toBeInstanceOf(AbortSignal);
+  } finally {
+    unmount();
+    jest.useRealTimers();
+  }
+});
+
+test('a context 429 backs off for 30 seconds while a job remains active', async () => {
+  const withJob = {
+    ...context,
+    jobs: [{ jobId: 'job-1', stagingId: STAGING_ID, slot: 'presentation_pdf', status: 'queued' }],
+  };
+  let contextCalls = 0;
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) {
+      contextCalls += 1;
+      return contextCalls === 2 ? response(429, { ok: false, reason: 'rate_limited' }) : response(200, withJob);
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+
+  jest.useFakeTimers();
+  const { unmount } = render(<MaterialsContributorPage />);
+  try {
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.getByText('Upload received. We’re checking and saving your file. You can close this page.')).toBeInTheDocument();
+    await act(async () => { await jest.advanceTimersByTimeAsync(15_000); });
+    expect(contextCalls).toBe(2);
+    expect(screen.getByText('Upload status could not be refreshed. We’ll try again shortly.')).toBeInTheDocument();
+    await act(async () => { await jest.advanceTimersByTimeAsync(29_999); });
+    expect(contextCalls).toBe(2);
+    await act(async () => { await jest.advanceTimersByTimeAsync(1); });
+    expect(contextCalls).toBe(3);
+  } finally {
+    unmount();
+    jest.useRealTimers();
+  }
+});
+
+test('a lost 202 response keeps its staging id when context cannot yet confirm admission', async () => {
+  let finalizeCalls = 0;
+  let contextCalls = 0;
+  const queuedContext = {
+    ...context,
+    jobs: [{ jobId: 'job-1', stagingId: STAGING_ID, slot: 'presentation_pdf', status: 'queued', filename: 'new.pdf' }],
+  };
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) {
+      contextCalls += 1;
+      return response(200, contextCalls <= 2 ? context : queuedContext);
+    }
+    if (url.endsWith('/upload-token')) return response(200, { ok: true, stagingId: STAGING_ID, pathname: 'private/path', clientToken: 'client', contentType: 'application/pdf' });
+    if (url.endsWith('/finalize')) {
+      finalizeCalls += 1;
+      if (finalizeCalls === 1) throw new Error('response lost after commit');
+      return response(202, { ok: true, jobId: 'job-1', stagingId: STAGING_ID, status: 'queued' });
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+
+  const first = render(<MaterialsContributorPage />);
+  fireEvent.change(await screen.findByLabelText('Presentation file'), { target: { files: [new File(['%PDF'], 'new.pdf', { type: 'application/pdf' })] } });
+  expect(await screen.findByRole('alert')).toHaveTextContent('Processing stopped before we could confirm this upload was saved');
+  expect(window.sessionStorage.getItem(STORAGE_KEY)).toBe(JSON.stringify({ stagingId: STAGING_ID, slot: 'presentation_pdf' }));
+  first.unmount();
+
+  render(<MaterialsContributorPage />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+  expect(await screen.findByText('Upload received. We’re checking and saving your file. You can close this page.')).toBeInTheDocument();
+  expect(finalizeCalls).toBe(2);
+  expect(put).toHaveBeenCalledTimes(1);
+  expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+});
+
+test('durable context clears a matching staged retry after a lost 202, including completed jobs', async () => {
+  window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ stagingId: STAGING_ID, slot: 'presentation_pdf' }));
+  const completed = {
+    ...context,
+    checklist: [{ ...context.checklist[0], received: { filename: 'saved.pdf', receivedAt: '2026-10-01T10:00:00Z' } }],
+    jobs: [{ jobId: 'job-1', stagingId: STAGING_ID, slot: 'presentation_pdf', status: 'completed', filename: 'saved.pdf' }],
+  };
+  global.fetch = jest.fn(async (url) => {
+    if (url.endsWith('/context')) return response(200, completed);
+    throw new Error(`unexpected fetch ${url}`);
+  });
+
+  render(<MaterialsContributorPage />);
+  expect(await screen.findByText('Your file was saved.')).toBeInTheDocument();
+  await waitFor(() => expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull());
+  expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+  expect(global.fetch.mock.calls.filter(([url]) => url.endsWith('/finalize'))).toHaveLength(0);
+});
+
+test('an aborted visibility poll cannot schedule a duplicate poll after the page becomes visible again', async () => {
+  const priorDescriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+  Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+  const active = { ...context, jobs: [{ jobId: 'job-1', stagingId: STAGING_ID, slot: 'presentation_pdf', status: 'processing' }] };
+  let contextCalls = 0;
+  let resolveAbortedPoll;
+  global.fetch = jest.fn((url) => {
+    if (!url.endsWith('/context')) throw new Error(`unexpected fetch ${url}`);
+    contextCalls += 1;
+    if (contextCalls === 2) return new Promise((resolve) => { resolveAbortedPoll = () => resolve(response(200, active)); });
+    return Promise.resolve(response(200, active));
+  });
+
+  jest.useFakeTimers();
+  const view = render(<MaterialsContributorPage />);
+  try {
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+    await act(async () => { await jest.advanceTimersByTimeAsync(15_000); });
+    expect(contextCalls).toBe(2);
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')); await Promise.resolve(); await Promise.resolve(); });
+    expect(contextCalls).toBe(3);
+    await act(async () => { resolveAbortedPoll(); await Promise.resolve(); });
+    await act(async () => { await jest.advanceTimersByTimeAsync(15_000); });
+    expect(contextCalls).toBe(4);
+  } finally {
+    view.unmount();
+    jest.useRealTimers();
+    if (priorDescriptor) Object.defineProperty(document, 'visibilityState', priorDescriptor);
+    else delete document.visibilityState;
+  }
+});
+
+test('late context success after token change cannot replace the new token context', async () => {
+  let resolveOld;
+  let jwtCalls = 0;
+  global.fetch = jest.fn((url) => {
+    if (url.endsWith('/context') && mockRouterToken === 'jwt') {
+      jwtCalls += 1;
+      if (jwtCalls === 1) return new Promise((resolve) => { resolveOld = resolve; });
+      return Promise.resolve(response(200, { ...context, institution: 'Returned institution' }));
+    }
+    if (url.endsWith('/context')) return Promise.resolve(response(200, { ...context, institution: 'New institution' }));
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  const view = render(<MaterialsContributorPage />);
+  mockRouterToken = 'new-jwt';
+  view.rerender(<MaterialsContributorPage />);
+  expect(await screen.findByRole('heading', { name: 'Site visit materials · New institution' })).toBeInTheDocument();
+  mockRouterToken = 'jwt';
+  view.rerender(<MaterialsContributorPage />);
+  expect(await screen.findByRole('heading', { name: 'Site visit materials · Returned institution' })).toBeInTheDocument();
+  await act(async () => { resolveOld(response(200, { ...context, institution: 'Stale institution' })); });
+  expect(screen.queryByText('Site visit materials · Stale institution')).not.toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Site visit materials · Returned institution' })).toBeInTheDocument();
+});
