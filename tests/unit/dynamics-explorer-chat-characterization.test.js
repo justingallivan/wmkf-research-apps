@@ -37,6 +37,8 @@ const mockFinalizeRequest = jest.fn(() => Promise.resolve(true));
 const mockListFiles = jest.fn();
 const mockSearchFiles = jest.fn();
 const mockGetRequestSharePointBuckets = jest.fn();
+const mockSiteVisitFilter = jest.fn();
+const mockCreateSiteVisitFilter = jest.fn();
 
 jest.mock('../../shared/api/middleware/rateLimiter', () => ({
   nextRateLimiter: () => jest.fn(() => Promise.resolve(true)),
@@ -127,6 +129,9 @@ jest.mock('../../lib/services/graph-service', () => ({
 jest.mock('../../lib/utils/sharepoint-buckets', () => ({
   getRequestSharePointBuckets: (...args) => mockGetRequestSharePointBuckets(...args),
 }));
+jest.mock('../../lib/services/site-visit-materials/recursive-reader-filter.js', () => ({
+  createSiteVisitMaterialsRecursiveReaderFilter: (...args) => mockCreateSiteVisitFilter(...args),
+}));
 
 jest.mock('../../lib/services/llm-client', () => ({
   LLMClient: jest.fn().mockImplementation(() => ({
@@ -155,6 +160,8 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
   beforeEach(() => {
     clearAppAccessCache();
     jest.clearAllMocks();
+    mockCreateSiteVisitFilter.mockReturnValue(mockSiteVisitFilter);
+    mockSiteVisitFilter.mockImplementation(async (_library, _folder, files) => ({ files, omittedFiles: [], error: null }));
     // jest.clearAllMocks() clears call history but NOT a queued
     // .mockResolvedValueOnce() chain or a .mockImplementation(); without an
     // explicit reset here, once-values a prior test scripted beyond what it
@@ -347,6 +354,8 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
       recursive: true,
       excludeApplicantMaterialsBackgroundUploads: true,
     }));
+    expect(mockCreateSiteVisitFilter).toHaveBeenCalledWith(expect.any(String), 'REQ-123');
+    expect(mockSiteVisitFilter).toHaveBeenCalledWith('akoya_request', 'REQ-123_ABCDE', expect.any(Array));
 
     const requestId = mockStartRequest.mock.calls[0][0].requestId;
     const blocks = parseSse(res);

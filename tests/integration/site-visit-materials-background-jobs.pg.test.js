@@ -508,7 +508,7 @@ describeIf('applicant materials background-job store (live PostgreSQL)', () => {
       '--database-url', redirectedUrl.toString(), '--job-id', retryJob.id, '--action', 'retry',
     ], { cwd: process.cwd(), encoding: 'utf8', timeout: 15_000 });
     expect(redirectedCli.status).toBe(2);
-    expect(redirectedCli.stderr).toContain('loopback Postgres URLs only');
+    expect(redirectedCli.stderr).toContain('loopback_postgres_url_required');
 
     const cancelCollection = await makeCollection();
     const cancelStage = await makeStaging({ requestId: cancelCollection.requestId });

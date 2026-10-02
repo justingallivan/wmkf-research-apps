@@ -6,7 +6,7 @@ status: active
 summary: "Canonical Site Visit-led plan for applicant material collection, staff follow-up, and a shared external briefing room."
 canonical: true
 cataloged: 2026-09-08
-last_verified: 2026-10-01
+last_verified: 2026-10-02
 owner: product-engineering
 related:
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
@@ -24,8 +24,9 @@ related:
 
 Sections 1–15 preserve the 2026-09-08 planning snapshot; §16 records subsequent
 build and release status. Background processing is separately specified in
-[the 2026-10-01 plan](plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md),
-currently under implementation and not enabled in Production. This document does not itself authorize new work.
+[the 2026-10-01 plan](plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md).
+Its base code, schema and worker are deployed in Production, schema readiness is
+on, and admission remains off. Bounded recovery and older-file listing follow-ups are source-built in PR #404; Fable approved the full runtime through `2bfa5f590` with no required fixes; verify current-head required CI on PR #404 before merge. They are not Production-deployed, and this document does not authorize enabling admissions.
 
 Build one **Site Visit Materials** workflow that collects applicant files, lets a Program
 Coordinator (PC) verify that the required files are present and render, and publishes selected
@@ -824,18 +825,23 @@ them in the Workbench without opening AkoyaGo.
   `lib/services/site-visit-materials/folder-files-service.js`. It lists the two folders,
   non-recursively, under the same active Dynamics bucket the portal writes to
   (`activeBucket` in `contributor-service.js`), and returns names and staff SharePoint `webUrl`s.
-  Synchronous portal uploads land in the same folders and appear too. [BUILT on the background
-  processing branch; not enabled in Production] With the background schema flag on, the reader
+  Synchronous portal uploads land in the same folders and appear too. **[PRODUCTION-LIVE via
+  PR #402; migration 060 and schema readiness verified 2026-10-02.]** With the background schema flag on, the reader
   also merges current Ready registry links from staging-specific subfolders, suppresses known
   superseded portal root items by exact drive/item identity. Separately, all five generic
   internal recursive document readers now opt into pruning `portal-<UUID>` children beneath
   canonical Site Visit materials folders, excluding uncommitted candidates and prior background
-  copies. **[VERIFIED via source, four call sites, and focused regressions: five suites, 79 tests,
-  one snapshot passed.]** There are no counters or registry writes: a hand-placed file still does
+  copies. **[VERIFIED via source and five call sites: the original four-reader regressions passed
+  five suites (79 tests, one snapshot), and Grant Reporting passed two suites (18 tests).]** The
+  follow-up exact-root filter is source-built on PR #404: it suppresses only exact
+  same-request portal-produced Superseded drive/item identities, preserves current/manual files,
+  and fails closed on incomplete registry evidence. Eight focused suites (104 tests, one snapshot)
+  passed; Sol and parent approved. Fable approved the runtime through `2bfa5f590` with no required fixes. The behavior-preserving matcher extraction in `45fc84144` passed 26 focused suites (483 tests, one snapshot), including the previous CI import-failure suites and plain Node CLI; Sol approved the extraction; Fable approved the bounded dependency fix in `45fc84144` with no required fixes; a later cleanup nit was deferred. PR #404 tracks final checks; verify required checks on its current head before merge; this follow-up is not
+  Production-deployed. There are no counters or registry writes: a hand-placed file still does
   not count toward the collection summary or appear on the briefing page.
 - **Summary availability:** the PR #338 production baseline returned fail-open `null` on a
-  Workbench summary failure, which could show "materials not requested". [BUILT on the background
-  processing branch; not enabled in Production] The reader now carries an explicit unavailable
+  Workbench summary failure, which could show "materials not requested". **[PRODUCTION-LIVE via
+  PR #402; migration 060 and schema readiness verified 2026-10-02.]** The reader now carries an explicit unavailable
   result through `/api/workbench/pre-site-visit` to the card; it no longer reports an outage as
   confirmed absence. File rows still use the separate folder read.
 - **Retire when** the portal is the only intake route. The card's status line and the registry
@@ -899,7 +905,7 @@ approximately 76 seconds based on token/finalize request times, not a measured c
 These observations do not establish near-limit 500 MB provider support. That rehearsal
 remains pending. Production retains the 2048 MB memory tier.
 
-### 16.15 Background processing [SOURCE-BUILT; bounded follow-up fixes in progress; not deployed]
+### 16.15 Background processing [PRODUCTION SCHEMA/WORKER DEPLOYED; admission off; activation follow-ups source-built, verification pending]
 
 The owner authorized reusing the durable reviewer-acceptance queue pattern to let applicants
 leave after private Blob transfer and committed Postgres admission. The bytes remain in
@@ -912,11 +918,13 @@ canonical filenames, retain the previous physical file through partial failures,
 only after clean scanning and registry persistence. Existing synchronous scanning-off policy
 is unchanged; background admission requires enabled scanning.
 
-No migration, flag change, merge, deployment or provider test is performed by this build.
+**[VERIFIED via read-only Production probes and deployment readback, 2026-10-02.]** Migration
+060 is applied; the physical job table and staging owner column exist. Production schema
+readiness is `on`, admission is `off`, and virus scanning is `true`. Deployment
+`dpl_HejNdRssKwXEZmjMpGuRXXZ3WBZb` serves `1ec1d93265fa19357372c5c75fa2dff9501e8406`;
+the 17:20 UTC worker run completed with an empty queue. No background job has been admitted.
 CI passed on prior head `837729b4e280317a3e20f93a377bf2947bd358a9` (1,199 suites,
 19,110 tests, five snapshots; seven PostgreSQL suites, 114 tests). The L1 reader fix
-passed five focused suites (79 tests, one snapshot). L2/L3 shared recovery passed 95
-focused unit tests and 16 real-PostgreSQL tests through the actual loopback CLI.
-Fable approved the L1/L2/L3 fixes; final-head CI remains required, as recorded in
-the linked plan. The production-recovery prerequisite remains separate; this is not a
-production-enabled capability.
+passed five focused suites (79 tests, one snapshot), with the added Grant Reporting caller
+passing two suites (18 tests). L2/L3 shared recovery passed 95 focused unit tests and 16
+real-PostgreSQL tests through the actual loopback CLI. Production recovery and older-root filtering follow-ups are source-built in PR #404. The 26 operator unit tests and 16 local PostgreSQL tests passed; the reader changes passed eight suites (104 tests, one snapshot). Sol and parent approved the runtime; Fable approved it through `2bfa5f590` with no required fixes. The behavior-preserving matcher extraction in `45fc84144` passed 26 focused suites (483 tests, one snapshot), including the prior CI import-failure suites and the plain Node CLI; Sol approved the extraction; Fable approved the bounded dependency fix in `45fc84144` with no required fixes; a later cleanup nit was deferred. PR #404 tracks final checks; verify required checks on its current head before merge. Neither change is deployed. This is not authorization to admit uploads or perform a Production recovery mutation.

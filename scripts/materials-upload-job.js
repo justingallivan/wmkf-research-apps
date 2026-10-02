@@ -1,21 +1,35 @@
 #!/usr/bin/env node
-/** Inspect or resolve one durable applicant materials job on a loopback Postgres instance. */
+/** Inspect or resolve one durable applicant materials job on an explicit database target. */
 import pg from 'pg';
-import { resolveMaterialsUploadJob } from '../lib/services/site-visit-materials/background-job-store.js';
+import {
+  inspectMaterialsUploadJob,
+  resolveMaterialsUploadJobFromOperator,
+} from '../lib/services/site-visit-materials/materials-upload-operator-runtime.js';
+import {
+  productionMaterialsDatabaseConfig,
+  productionMutationConfirmed,
+} from '../lib/services/site-visit-materials/materials-upload-operator-target.js';
 
 function usage() {
   console.error('Usage: node scripts/materials-upload-job.js --database-url postgres://...@127.0.0.1:PORT/DB --job-id UUID [--action inspect|cancel|retry]');
+  console.error('Production: MATERIALS_UPLOAD_PRODUCTION_DATABASE_URL=... node scripts/materials-upload-job.js --target production --expected-host HOST --expected-database DB --job-id UUID [--action inspect|cancel|retry]');
+  console.error('Production mutations also require --confirm-job UUID --confirm-action cancel|retry.');
   process.exitCode = 2;
 }
 
 function argsOf(argv) {
   const parsed = {};
+  const supported = new Set([
+    'database-url', 'job-id', 'action', 'target', 'expected-host', 'expected-database',
+    'confirm-job', 'confirm-action',
+  ]);
   for (let index = 0; index < argv.length; index += 1) {
     const key = argv[index];
     if (!key.startsWith('--')) return null;
     const value = argv[index + 1];
-    if (!value || value.startsWith('--')) return null;
-    parsed[key.slice(2)] = value;
+    const name = key.slice(2);
+    if (!supported.has(name) || Object.hasOwn(parsed, name) || !value || value.startsWith('--')) return null;
+    parsed[name] = value;
     index += 1;
   }
   return parsed;
@@ -33,63 +47,89 @@ function isLoopbackPostgresUrl(value) {
   }
 }
 
-async function inspectJob(connectionString, jobId) {
-  const client = new pg.Client({ connectionString, ssl: false });
-  try {
-    await client.connect();
-    const result = await client.query(
-      `SELECT j.id, j.status, j.slot, j.attempt_count, j.deadline_at, j.next_attempt_at,
-              j.locked_until, j.error_code, j.created_at, j.updated_at,
-              s.status AS staging_status, s.filename, s.expires_at,
-              (s.candidate_result IS NOT NULL) AS has_candidate,
-              (j.scan_checkpoint IS NOT NULL) AS has_clean_scan_checkpoint
-         FROM materials_upload_jobs j
-         JOIN portal_upload_staging s ON s.id = j.staging_id
-        WHERE j.id = $1`, [jobId],
-    );
-    if (!result.rows[0]) throw new Error('Job not found.');
-    console.log(JSON.stringify(result.rows[0], null, 2));
-  } finally {
-    await client.end();
-  }
+async function inspectJob(clientConfig, jobId, production = false, expectedDatabase = null) {
+  const result = await inspectMaterialsUploadJob({
+    clientConfig, jobId, production, expectedDatabase, createClient: (config) => new pg.Client(config),
+  });
+  console.log(JSON.stringify(result, null, 2));
 }
 
-async function resolveJob(connectionString, jobId, action) {
-  const result = await resolveMaterialsUploadJob({
+async function resolveJob(clientConfig, jobId, action, production = false, expectedDatabase = null) {
+  const result = await resolveMaterialsUploadJobFromOperator({
+    clientConfig,
     jobId,
     action,
-    connectionFactory: async () => {
-      const client = new pg.Client({ connectionString, ssl: false });
-      await client.connect();
-      return client;
-    },
+    production,
+    expectedDatabase,
+    createClient: (config) => new pg.Client(config),
   });
   console.log(JSON.stringify({ jobId, action, status: result.status, attemptCount: result.attempt_count }));
 }
 
 async function main() {
   const args = argsOf(process.argv.slice(2));
-  const connectionString = args?.['database-url'];
   const jobId = args?.['job-id'];
   const action = args?.action || 'inspect';
-  if (!args || !connectionString || !jobId || !['inspect', 'cancel', 'retry'].includes(action)
+  if (!args || !jobId || !['inspect', 'cancel', 'retry'].includes(action)
     || !/^[0-9a-f-]{36}$/i.test(jobId)) {
     usage();
     return;
   }
-  if (!isLoopbackPostgresUrl(connectionString)) {
-    console.error('Refusing to connect: this operator tool accepts loopback Postgres URLs only.');
-    process.exitCode = 2;
+
+  if (args.target === 'production') {
+    if (args['database-url']
+      || !args['expected-host'] || !args['expected-database']) {
+      console.error('production_target_confirmation_required');
+      process.exitCode = 2;
+      return;
+    }
+    if (action !== 'inspect' && !productionMutationConfirmed({
+      jobId,
+      action,
+      confirmJob: args['confirm-job'],
+      confirmAction: args['confirm-action'],
+    })) {
+      console.error('production_mutation_confirmation_required');
+      process.exitCode = 2;
+      return;
+    }
+    if (action === 'inspect' && (args['confirm-job'] || args['confirm-action'])) {
+      console.error('unexpected_production_confirmation');
+      process.exitCode = 2;
+      return;
+    }
+    const target = productionMaterialsDatabaseConfig({
+      expectedHost: args['expected-host'],
+      expectedDatabase: args['expected-database'],
+    });
+    if (action === 'inspect') await inspectJob(target.clientConfig, jobId, true, target.expectedDatabase);
+    else await resolveJob(target.clientConfig, jobId, action, true, target.expectedDatabase);
     return;
   }
 
-  if (action === 'inspect') await inspectJob(connectionString, jobId);
-  else await resolveJob(connectionString, jobId, action);
+  if (args.target || args['expected-host'] || args['expected-database']
+    || args['confirm-job'] || args['confirm-action']) {
+    console.error('unsupported_operator_target_arguments');
+    process.exitCode = 2;
+    return;
+  }
+  const connectionString = args['database-url'];
+  if (!connectionString || !isLoopbackPostgresUrl(connectionString)) {
+    console.error('loopback_postgres_url_required');
+    process.exitCode = 2;
+    return;
+  }
+  const clientConfig = { connectionString, ssl: false };
+  if (action === 'inspect') await inspectJob(clientConfig, jobId);
+  else await resolveJob(clientConfig, jobId, action);
 }
 
 try {
   await main();
 } catch (error) {
-  console.error(error?.code || error?.message || String(error));
+  const reason = typeof error?.code === 'string' && /^[a-zA-Z0-9_]{1,64}$/.test(error.code)
+    ? error.code
+    : 'materials_operator_failed';
+  console.error(reason);
   process.exitCode = 1;
 }
