@@ -2,8 +2,8 @@
 title: Meeting Tracker transcription integration
 domain: transcription
 kind: plan
-status: ready-for-disabled-implementation
-summary: "Owner-approved shared staff drafts and retained TXT/VTT, with explicit publication. Fable's conditional approval is incorporated; disabled implementation and separately authorized release remain pending."
+status: source-reviewed-disabled
+summary: "Shared staff drafts, retained TXT/VTT/source, and explicit publication are built and source-reviewed. Fable returned READY FOR DISABLED SOURCE; schemas remain unapplied and hosted release proof is still required."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -75,7 +75,7 @@ Production schema readiness or permission from source presence. The isolated
 pilot deployment intentionally excludes Meeting Tracker and Dataverse access;
 do not weaken that boundary or repurpose its database for shared records.
 
-## Proposed bounded workflow [PLANNED]
+## Accepted bounded workflow
 
 1. Open the existing Meeting Tracker Site Visit for a request. Upload approved
    M4A/MP3 audio (up to 50 MiB) and explicitly start paid transcription.
@@ -97,7 +97,7 @@ do not weaken that boundary or repurpose its database for shared records.
 5. Save names with version-conflict handling. Editing names does not call
    AssemblyAI again. Preserve job/request navigation guards for every awaited
    success and failure response.
-6. Proposed explicit Publish creates a stable final material through the
+6. Explicit Publish creates a stable final material through the
    existing governed SharePoint/Dataverse path. Freeze the selected job version
    and labels; retries reuse one publication identity. Do not overwrite an
    intervening newer transcript silently. Partial SharePoint/Dataverse success
@@ -108,7 +108,13 @@ do not weaken that boundary or repurpose its database for shared records.
    must never delete finalized SharePoint materials. Existing recipient and
    Workbench readers see only governed final materials, not pilot drafts.
 
-## Revision 2 implementation contract [PLANNED, NOT BUILT]
+## Accepted implementation contract
+
+The following is the acceptance contract, not proof of live behavior. The
+initial implementation is committed as `46ac68a62`, with the panel in
+`0f7639b5a` and bounded downloads in `abca28759`. The current review status and
+remaining release proof are recorded below; no physical schema or deployment
+claim follows from these source commits.
 
 ### Identity and access
 
@@ -291,7 +297,7 @@ read legacy documents. Never enable the Admin pilot to activate Tracker.
 Production deployment, schema applies, feature enablement, real-recording tests
 and any newly metered service calls remain separately authorized operations.
 
-## Build and acceptance sequence [PLANNED]
+## Build and acceptance sequence
 
 ### Contract guardrails
 
@@ -344,9 +350,9 @@ disclosure and owner approval, the OAuth-only Fable review was launched with
 read-only source tools and provider API-key variables removed. Fable completed
 as `claude-fable-5-1` with no permission denials. Its full findings are retained
 in [round 1 evidence](evidence/MEETING_TRANSCRIPTION_FABLE_R1_2026-10-01.md).
-Verdict: implementable as a bounded slice after blocking choices/contracts are
-recorded; not deployment approval. The requested final adversarial review has
-not occurred because implementation has not begun.
+Historical planning verdict: implementable as a bounded slice after blocking
+choices/contracts are recorded; not deployment approval. Implementation and
+its separate adversarial review subsequently began, as recorded below.
 
 Root dispositions:
 
@@ -389,9 +395,65 @@ transactional job lease, renewals and unresolved-publication delete guard.
 The small producer, hash mapping, opt-in manifest projection, correction-draft
 home and orphan-quarantine contracts are also incorporated above. Root added
 old-schema pilot isolation and bounded source reads to the build invariants.
-These are planned mechanisms, not tested implementation claims.
+That planning review did not itself test the implementation.
 
-Verdict: **READY FOR DISABLED IMPLEMENTATION.** Fable's named plan condition
-is incorporated; Sol, root and final adversarial Fable implementation reviews
-remain required. No schema apply, deployment, enablement or provider test is
-authorized by this verdict.
+Historical verdict: **READY FOR DISABLED IMPLEMENTATION.** Fable's named plan
+condition was incorporated. No schema apply, deployment, enablement or provider
+test was authorized by that verdict.
+
+## Implementation and source-review result
+
+**[VERIFIED via source commits and focused tests; NOT LIVE]** Luna built the
+request-bound flow and root completed the integrated review. Sol's capped
+passes found publication-race, dispatch, candidate-directory and recovery
+defects, which were fixed before the initial source commit. Root's integrated
+run passed twenty suites / 222 tests. Full evidence and the mock/database
+boundary are recorded in
+[Sol implementation review](evidence/MEETING_TRANSCRIPTION_SOL_REVIEW_2026-10-01.md).
+
+**[VERIFIED via OAuth-only source review]** Fable's implementation round 1
+found a substantive publication dead end: failures before any files were
+written could leave a request permanently blocked. Root accepted the finding;
+Luna built the bounded repair, Sol reviewed the closure contract and source,
+and root fixed the remaining crash/quarantine and retry-path issues. See
+[Fable implementation round 1](evidence/MEETING_TRANSCRIPTION_FABLE_IMPLEMENTATION_R1_2026-10-01.md).
+The source now includes pre-freeze actor/schema checks, atomic closure of
+provably zero-write failures, preserved lease/quarantine deadlines, explicit
+authorized closure retaining candidate files, and terminal reconciliation of
+verified superseded receipts. Quarantine is persisted when leases are created
+and renewed, not only when an error is caught, and closure checks ten minutes
+beyond matching job/slot lease expiry. A zero-write failed correction closes
+that attempt; a fresh correction is needed and its unpublished name edits are
+not promised retained. No candidate deletion is authorized or added.
+
+**[VERIFIED via OAuth-only round 2 review]** Fable returned **READY FOR DISABLED
+SOURCE**, with no remaining material finding in its bounded delta review.
+[Full round 2 evidence](evidence/MEETING_TRANSCRIPTION_FABLE_IMPLEMENTATION_R2_2026-10-01.md)
+records coverage and limitations. Root added Fable's requested job/correction
+catch-path tests, moved slot release after proven zero-write closure, and made
+failed Publish refresh the selected draft version without losing local edits
+or the error message. Sol's final exact-fix verification passed; these recovery
+changes are committed as `c8c90af9a`. The final focused run passes **20 suites / 251 tests**;
+the disabled Next.js build and scoped lint/security/migration/documentation
+gates pass. Build warnings remain in the unrelated pre-RP/pre-Site DOCX path
+tracing and Node localStorage behavior. No new provider/audio call occurred.
+
+The unrelated pre-existing changes in
+`tests/unit/research-presentation-materials-card.test.js` were left untouched
+and excluded from commits. Its added Workbench processing/attention cases
+currently fail against unchanged UI; the original HEAD cases pass. That is
+not a claim of a fully green whole-repository test run.
+
+**Current verdict: SOURCE-REVIEWED, DISABLED; NOT RELEASE-READY.** The feature remains disabled and
+source-only. Real PostgreSQL migration/concurrency verification, physical
+Dataverse field and generation-key readiness, and hosted end-to-end testing
+remain release gates, not properties proved by mocked tests. Production or
+Preview deployment, schema applies, feature enablement, and real-recording or
+provider tests require separate authorization.
+
+Release preparation must verify both migrations **063 and 064** before setting
+the schema readiness flag. The independent Dataverse bundle field and existing
+generation-key uniqueness also need physical readback. Candidate files retained
+by closed attempts are not registered final products; committed but unverifiable
+receipts remain attention-only. These operational limitations must be addressed
+in the supervised readiness exercise, not hidden by enabling the feature.

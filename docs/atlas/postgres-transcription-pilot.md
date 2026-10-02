@@ -13,6 +13,7 @@ related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_RUNBOOK_2026-09-30.md
   - lib/db/migrations/060_transcription_jobs.sql
   - lib/db/migrations/061_transcription_workflow_dispatches.sql
+  - lib/db/migrations/063_meeting_tracker_transcription.sql
   - lib/services/transcription-pilot/store.js
 ---
 
@@ -53,6 +54,34 @@ correlation/receipt fields, and bounded evaluation fields. Private Blob stores
 audio and transcript content. AssemblyAI owns the remote asynchronous job
 until completion or deletion. This table is not a transcript-content store,
 and it does not make a provider result authoritative until verified and saved.
+
+### Meeting Tracker extension — source-built, not applied or released
+
+**[SOURCE-REVIEWED FOR DISABLED SOURCE; MIGRATIONS NOT APPLIED; NOT RELEASED OR LIVE.]** Migration 063 adds
+nullable `request_id` and `site_visit_activity_id` UUID bindings to
+`transcription_jobs`; a CHECK requires both to be null or both non-null. These
+are Dataverse identities stored without Postgres foreign keys. It also adds
+nullable `publication_operation_id` and `updated_by_profile_id` (the latter
+references `user_profiles.id`) and a partial request/recent index. The existing
+dedicated pilot database and its deployed behavior remain as described above;
+no shared-database application or live schema readback is claimed here.
+The Meeting Tracker routes, services, and `SiteVisitEditor` consumer are now
+present in source, including the publication-receipt recovery flow. This does
+not change or extend the isolated pilot's deployed behavior, and the global
+active provider-slot limit remains shared and unchanged. See the separate
+[Meeting Tracker publication Atlas](postgres-meeting-transcript-publications.md)
+for source limits, the reviewed recovery contract, and the explicit
+quarantine/zero-row close path (closure waits until at least ten minutes after
+the receipt lease expires). Migration 064 adds close attribution to that
+source-only receipt schema.
+
+The shared application uses the same jobs table for request-bound work while
+the pilot remains owner-scoped and unbound. `store.js` treats a missing
+`request_id` column as unbound in pilot queries, preserving compatibility with
+the older pilot schema. Migration 063 does not change the global active
+provider-slot index from migration 060: submitting, processing, saving and
+submission-uncertain jobs still share the same single active slot across both
+scopes.
 
 Migration 061 adds `transcription_workflow_dispatches`, a transactional
 outbox keyed by job UUID. It records only dispatch state, bounded retry timing,
@@ -111,6 +140,8 @@ on the live one-job transcript.
 - Schema and bootstrap: `lib/db/migrations/060_transcription_jobs.sql`,
   `lib/db/migrations/061_transcription_workflow_dispatches.sql`,
   `lib/db/migrations/062_transcription_speaker_names.sql` (applied/read back in isolated Neon),
+  `lib/db/migrations/063_meeting_tracker_transcription.sql` and
+  `lib/db/migrations/064_meeting_transcript_close_attribution.sql` (source-only; neither applied),
   `lib/db/migrations-manifest.json`, and `scripts/setup-database.js`.
 - Persistence/model/formatters: `lib/services/transcription-pilot/store.js`,
   `model.js`, and `transcript-format.js`; the cron readiness-only mode is

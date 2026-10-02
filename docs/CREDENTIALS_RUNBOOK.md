@@ -96,8 +96,8 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 | `DOSSIER_BLOB_READ_WRITE_TOKEN` | Dedicated private Blob RW token for Cycle Dossier immutable inputs and Word/PDF artifacts | **[VERIFIED 2026-09-07]** Connected under the custom `DOSSIER_BLOB` prefix in Development, Preview, and Production for store `wmkf-cycle-dossier-private` (`store_W9WC1TLR7kpl9hty`); managed token authenticated in Development. Do not claim Preview/Production runtime authentication until rollout preflight proves it. |
 | `DOSSIER_BLOB_STORE_ID` | Managed store identity paired with the dedicated Cycle Dossier Blob token | **[VERIFIED 2026-09-07]** `store_W9WC1TLR7kpl9hty`; rollout preflight performs an authenticated read-only list and checks token/store identity. |
 | `CYCLE_DOSSIER_ENABLED` | Cycle Dossier pilot activation flag | **Source-built 2026-09-07; disabled until rollout.** Set literal `true` only after migration 045, private Blob token, and governed prompts are verified; cron remains inert otherwise. |
-| `TRANSCRIPTION_PILOT_ENABLED` | AssemblyAI transcription pilot route and worker interlock | **Source-built 2026-09-30; keep unset/off.** Literal `true` only after migration 060 is applied and reviewed, private Blob access and encryption/HMAC keys are verified, and operational readiness is approved. |
-| `TRANSCRIPTION_SUBMISSIONS_ENABLED` | AssemblyAI new-submission interlock | **Source-built 2026-09-30; keep unset/off.** Literal `true` only for an explicitly approved pilot window; recovery, polling, and cleanup remain available while new submissions are disabled. |
+| `TRANSCRIPTION_PILOT_ENABLED` | AssemblyAI transcription pilot route and worker interlock | **Shared-source rollout guidance: keep unset/off** until migration 060, private Blob access, encryption/HMAC keys, and operational readiness are verified. Separate scope: the isolated dedicated Production pilot has a dated 2026-10-01 checkpoint with this switch enabled; see [`postgres-transcription-pilot.md`](atlas/postgres-transcription-pilot.md). Do not infer configuration on the prior shared-project alias. |
+| `TRANSCRIPTION_SUBMISSIONS_ENABLED` | AssemblyAI new-submission interlock | **Shared-source rollout guidance: keep unset/off** except during an explicitly approved pilot window; recovery, polling, and cleanup remain available while new submissions are disabled. Separate scope: the isolated dedicated Production pilot checkpoint dated 2026-10-01 records new submissions disabled; see [`postgres-transcription-pilot.md`](atlas/postgres-transcription-pilot.md). Do not infer configuration on the prior shared-project alias. |
 | `ASSEMBLYAI_API_KEY` | AssemblyAI server-side API key for upload, submit, poll, and delete | Direct AssemblyAI account credential; server-only. Not provisioned or verified by this source build. Track as `assemblyai_api_key`; configure only after owner authorization and controlled readiness checks. |
 | `ASSEMBLYAI_WEBHOOK_SECRET` | AssemblyAI callback HMAC credential | Server-only shared secret; generate independently from the provider API key, at least 32 bytes. Track as `assemblyai_webhook_secret`; no webhook/provider call was made during build. |
 | `TRANSCRIPTION_REFERENCE_ENCRYPTION_KEY` | Encryption key for persisted AssemblyAI upload references | Server-only independent key, 32 bytes encoded as 64 hex characters. Track as `transcription_reference_encryption_key`; required before any submission can be safely reconciled. |
@@ -111,6 +111,26 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 | `REVIEW_PANEL_REQUEST_ALLOWLIST` | Server-owned comma-separated request IDs or request numbers admitted to the controlled cohort (readable config, not a secret) | **[VERIFIED 2026-09-13]** Four D26 request numbers in Production (owner's smoke subset). Parser trims whitespace; smoke mode admits at most four and requires exactly one selection per launch. |
 | `CYCLE_DOSSIER_OPERATOR_STOP` | Immediate process-level outer stop checked before paid calls and SharePoint writes | **Source-built 2026-09-07; unset by default.** The durable Postgres operator stop is the authoritative pause and settles queued/running runs. |
 | `NODE_ENV` | Environment flag | Auto-set (`production` on Vercel, `development` locally) |
+
+### Optional — Meeting Tracker transcription (source-only, disabled)
+
+These non-secret controls belong to the Meeting Tracker transcription source
+slice, not the separately hosted AssemblyAI `transcription-pilot` deployment
+and its `TRANSCRIPTION_PILOT_ENABLED` / `TRANSCRIPTION_SUBMISSIONS_ENABLED`
+switches. Routes, service, and UI integration are source-reviewed for disabled
+source, not released or live; Postgres binding schema and optional Dataverse
+memo remain unapplied. Keep these controls unset/off until the schema
+apply/readback and release checks are complete and separately approved.
+
+| Variable | Purpose | Contract |
+|----------|---------|----------|
+| `MEETING_TRACKER_TRANSCRIPTION_ACCESS` | Independent request-scoped rollout access for Meeting Tracker transcription | `on` allows eligible server-bound requests; exact `test:<request GUID>` allows only that matching request. Unset, malformed, or any other value resolves to off. This does not replace schema readiness. |
+| `MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY` | Meeting Tracker transcription schema interlock | Only literal `on` marks the required schema ready. The service fails closed unless this and the access control both allow the request. Set only after the approved schema apply and exact readback; readiness alone does not authorize a request. |
+| `MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY` | Optional Request Document transcript-manifest projection readiness | Only literal `on` permits the optional memo field to be selected, and only for a read explicitly opting into the transcript-bundle projection. It does not enable transcription or grant access. Set only after the optional Dataverse field is provisioned and read back exactly. |
+
+No additional credential is introduced by this source slice. The AssemblyAI
+provider credentials listed above remain a separate contract; this documentation
+does not claim they are provisioned for Meeting Tracker.
 
 ### Optional — Dynamics Explorer
 
