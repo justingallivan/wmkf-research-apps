@@ -170,7 +170,8 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
       setBusy(false);
       return;
     }
-    await send(body);
+    // The change id makes this resume-only on the server: if the change closed after the reload above, nothing new starts.
+    await send({ ...body, changeId });
   }
 
   async function recheckEffects() {

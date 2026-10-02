@@ -394,8 +394,20 @@ describe('status', () => {
   test('POST passes exactly field, a trimmed optionLabel and deadlineAt, never rerun', async () => {
     await statusHandler(post({ field: 'phase2', optionLabel: '  Recommended ' }), mockRes());
     expect(service.changeStatus.mock.calls[0][0]).toEqual({
-      profileId: PROFILE, runId: RUN_ID, field: 'phase2', optionLabel: 'Recommended', deadlineAt: expect.any(Number),
+      profileId: PROFILE, runId: RUN_ID, field: 'phase2', optionLabel: 'Recommended', changeId: null, deadlineAt: expect.any(Number),
     });
+  });
+
+  test('POST passes an exact-GUID changeId through (Check again is resume-only); a malformed one is 400 and the service is not called', async () => {
+    await statusHandler(post({ field: 'phase2', optionLabel: 'Recommended', changeId: DRAFT_ID }), mockRes());
+    expect(service.changeStatus.mock.calls[0][0].changeId).toBe(DRAFT_ID);
+    service.changeStatus.mockClear();
+    for (const bad of ['not-a-guid', ` ${DRAFT_ID}`, 7, null]) {
+      const res = mockRes();
+      await statusHandler(post({ field: 'phase2', optionLabel: 'Recommended', changeId: bad }), res);
+      expect(res.statusCode).toBe(400);
+    }
+    expect(service.changeStatus).not.toHaveBeenCalled();
   });
 
   test('a 200 is only for outcome complete; every other outcome is 202', async () => {

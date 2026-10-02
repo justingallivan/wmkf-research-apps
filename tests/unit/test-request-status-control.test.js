@@ -169,7 +169,8 @@ describe('status control', () => {
     await screen.findByText(/^Status changed\./);
     const bodies = server.bodies('POST', BASE);
     expect(bodies).toHaveLength(2);
-    expect(bodies[1]).toEqual(bodies[0]);
+    // Check again repeats the same field and label, and names the change so the server resumes it or refuses.
+    expect(bodies[1]).toEqual({ ...bodies[0], changeId: CHANGE_ID });
   });
 
   test('202 in_progress shows the message and the read-only command with Copy, and offers no retry', async () => {
@@ -238,7 +239,7 @@ describe('status control', () => {
     server.on('GET', BASE, statusBody([change({ status: 'planned', completedAt: null, dispatchedAt: null })]), statusBody([change()]));
     fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
     await screen.findByText(/^Status changed\./);
-    expect(server.bodies('POST', BASE)).toEqual([{ field: 'phase2', optionLabel: 'Recommended' }]);
+    expect(server.bodies('POST', BASE)).toEqual([{ field: 'phase2', optionLabel: 'Recommended', changeId: CHANGE_ID }]);
   });
 
   describe('Check again is built only from the open change', () => {
@@ -282,7 +283,7 @@ describe('status control', () => {
       await screen.findByText(/^Status changed\./);
       const order = server.calls.slice(before).map((c) => c.method);
       expect(order.slice(0, 2)).toEqual(['GET', 'POST']);
-      expect(server.bodies('POST', BASE)).toEqual([{ field: 'phase2', optionLabel: 'Recommended' }]);
+      expect(server.bodies('POST', BASE)).toEqual([{ field: 'phase2', optionLabel: 'Recommended', changeId: CHANGE_ID }]);
     });
   });
 

@@ -1016,6 +1016,16 @@ describe('status setter service (slice 2b)', () => {
     expect(error).toMatchObject({ httpStatus: 409, code: errorCode, message: 'runner says no' });
   });
 
+  test('a changeId makes the runner call resume-only; without one no resumeChangeId is passed; a malformed one is 400 before the runner', async () => {
+    const { h, runId } = readyProduction();
+    await change(h, runId, { changeId: CHANGE_ID.toUpperCase() });
+    expect(h.spies.runStatusChange.mock.calls[0][0].resumeChangeId).toBe(CHANGE_ID);
+    await change(h, runId);
+    expect(h.spies.runStatusChange.mock.calls[1][0]).not.toHaveProperty('resumeChangeId');
+    await expect(change(h, runId, { changeId: 'not-a-guid' })).rejects.toMatchObject({ httpStatus: 400, code: 'factory_invalid_input' });
+    expect(h.spies.runStatusChange).toHaveBeenCalledTimes(2);
+  });
+
   test('a replay is a 409 pointing at the owner CLI', async () => {
     const { h, runId } = readyProduction();
     h.spies.runStatusChange.mockRejectedValueOnce(runnerError('status_change_replay', 'pass --rerun'));
