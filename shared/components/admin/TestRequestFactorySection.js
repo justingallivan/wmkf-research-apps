@@ -63,6 +63,10 @@ export default function TestRequestFactorySection({ onTarget }) {
   const [epoch, setEpoch] = useState(0);
   const scopeRef = useRef(null);
   const stopRef = useRef(false);
+  // Bumped by every selection change (selectRun, abortActive); a late Confirm may select its run only if it is unchanged.
+  const selectionSeqRef = useRef(0);
+  // In-progress status records by run id, for the life of this mounted section (never stored in the browser).
+  const stuckMapRef = useRef(new Map());
   const listControllerRef = useRef(null);
   const mountedRef = useRef(true);
 
@@ -136,6 +140,7 @@ export default function TestRequestFactorySection({ onTarget }) {
 
   /** Aborts whatever run-scoped work is in flight and returns the panel to rest. */
   const abortActive = () => {
+    selectionSeqRef.current += 1;
     scopeRef.current?.controller.abort();
     scopeRef.current = null;
     resetPanel();
@@ -156,6 +161,7 @@ export default function TestRequestFactorySection({ onTarget }) {
   }
 
   function selectRun(run) {
+    selectionSeqRef.current += 1;
     const scope = openScope(run.runId);
     resetPanel();
     setView({
@@ -244,9 +250,12 @@ export default function TestRequestFactorySection({ onTarget }) {
     }
   }
 
-  const onReserved = (run) => {
+  // Returns true when the reserved run was selected; false when the operator changed selection meanwhile.
+  const onReserved = (run, token) => {
     loadList();
-    return selectRun(run);
+    if (token !== selectionSeqRef.current) return false;
+    selectRun(run);
+    return true;
   };
 
   return (
@@ -257,7 +266,7 @@ export default function TestRequestFactorySection({ onTarget }) {
         </div>
       ) : null}
 
-      <TestRequestFactoryIntake writeBlock={writeBlock} onLookupStart={abortActive} onReserved={onReserved} />
+      <TestRequestFactoryIntake writeBlock={writeBlock} onLookupStart={abortActive} onReserved={onReserved} getSelectionToken={() => selectionSeqRef.current} />
 
       <section aria-labelledby="factory-runs-heading" className="space-y-3 border-t border-gray-200 pt-6">
         <div className="flex items-center justify-between gap-3">
@@ -314,6 +323,8 @@ export default function TestRequestFactorySection({ onTarget }) {
           artifacts={artifacts}
           onArtifacts={() => downloadArtifacts(view.run.runId)}
           getScope={() => handleFor(view.run.runId)}
+          initialStuck={stuckMapRef.current.get(view.run.runId) || null}
+          onStuck={(record) => { if (record) stuckMapRef.current.set(view.run.runId, record); else stuckMapRef.current.delete(view.run.runId); }}
           epoch={epoch}
         />
       ) : null}

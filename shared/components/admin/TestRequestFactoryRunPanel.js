@@ -53,7 +53,7 @@ const NOTE_CLASSES = {
  * request and the stale guard.
  */
 export default function TestRequestFactoryRunPanel({
-  view, advancing, stopRequested, note, writeBlock, onAdvance, onStop, recheck, onRecheck, artifacts, onArtifacts, getScope, epoch,
+  view, advancing, stopRequested, note, writeBlock, onAdvance, onStop, recheck, onRecheck, artifacts, onArtifacts, getScope, epoch, initialStuck, onStuck,
 }) {
   const { run } = view;
   const status = RUN_STATUSES[run.status] || { label: run.status, tone: 'gray' };
@@ -170,7 +170,7 @@ export default function TestRequestFactoryRunPanel({
       {run.status === 'ready' && production ? (
         <section aria-labelledby="factory-status-heading" className="space-y-3 border-t border-gray-200 pt-5">
           <h4 id="factory-status-heading" className="text-base font-semibold text-gray-950">Phase I and Phase II status</h4>
-          <TestRequestStatusControl key={`${run.runId}:${epoch}`} run={run} writeBlock={writeBlock} getScope={getScope} />
+          <TestRequestStatusControl key={`${run.runId}:${epoch}`} run={run} writeBlock={writeBlock} getScope={getScope} initialStuck={initialStuck} onStuck={onStuck} />
         </section>
       ) : null}
     </section>

@@ -46,14 +46,15 @@ function Reason({ id, children }) {
  * await below checks it, and the component's own mounted flag, before it
  * touches state.
  */
-export default function TestRequestStatusControl({ run, writeBlock, getScope }) {
+export default function TestRequestStatusControl({ run, writeBlock, getScope, initialStuck = null, onStuck }) {
   const [load, setLoad] = useState({ state: 'loading', data: null });
   const [fieldKey, setFieldKey] = useState('phase2');
   const [optionValue, setOptionValue] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
-  const [stuck, setStuck] = useState(null);
+  const [stuck, setStuck] = useState(initialStuck);
+  const stuckRef = useRef(initialStuck);
   const [recheck, setRecheck] = useState(null);
   const [copied, setCopied] = useState('');
   const mountedRef = useRef(true);
@@ -74,6 +75,13 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope }) 
       const data = await requestJson(base, { signal: scope.signal, fallbackMessage: 'The status could not be loaded.' });
       if (!scope.alive()) return null;
       setLoad({ state: 'ready', data });
+      // The no-retry record ends only when its change is no longer the open one.
+      const held = stuckRef.current;
+      if (held && !(data.changes || []).some((change) => change.changeId === held.changeId && OPEN_CHANGE_STATUSES.includes(change.status))) {
+        stuckRef.current = null;
+        setStuck(null);
+        onStuck?.(null);
+      }
       return data;
     } catch (error) {
       if (!scope.alive() || error?.name === 'AbortError') return null;
@@ -117,7 +125,10 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope }) 
           text: `Status changed. Emails: ${reply.emails}, tracking rows: ${reply.tracking}, payments: ${reply.payments}, background jobs: ${reply.jobs}.`,
         });
       } else if (reply.outcome === 'in_progress') {
-        setStuck({ changeId: reply.changeId, message: reply.message, abandonCommand: reply.abandonCommand || '' });
+        const record = { changeId: reply.changeId, message: reply.message, abandonCommand: reply.abandonCommand || '' };
+        stuckRef.current = record;
+        setStuck(record);
+        onStuck?.(record);
       } else {
         // jobs_open and unconfirmed: "Check again" is built from the journal's open change.
         setResult({ tone: 'amber', text: reply.message });

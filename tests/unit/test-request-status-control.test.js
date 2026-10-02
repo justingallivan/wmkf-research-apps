@@ -376,6 +376,32 @@ describe('where the control appears', () => {
     expect(reason).not.toMatch(/switched off/);
   });
 
+  test('G2: after in_progress, switching to another run and back keeps the no-retry state and the abandon command', async () => {
+    const runB = { ...base, runId: '22222222-2222-4222-8222-222222222222', testLabel: 'Other run' };
+    const server = await openRun(base);
+    server.on('GET', RUNS, { status: 200, body: { runs: [base, runB], formEnabled: true, target: 'production' } });
+    server.on('GET', `${RUNS}/${runB.runId}`, { status: 200, body: { run: runB, resources: [], foundationCapturedAt: null } });
+    server.on('GET', `${RUNS}/${runB.runId}/status`, statusBody());
+    await screen.findByLabelText('Status field');
+    choose('phase2', 'Recommended');
+    fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
+    const command = `node scripts/rehearse-test-request-sandbox.mjs --target=production --status-abandon=${RUN_ID} --change-id=${CHANGE_ID}`;
+    server.on('GET', BASE, statusBody([change({ status: 'dispatched', completedAt: null })]));
+    server.on('POST', BASE, { status: 202, body: { outcome: 'in_progress', code: 'status_change_in_progress', message: 'Do not retry.', changeId: CHANGE_ID, abandonCommand: command } });
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, set this status' }));
+    await screen.findByText('Do not retry.');
+    fireEvent.click(screen.getByRole('button', { name: 'Reload list' }));
+    await screen.findByRole('button', { name: 'Other run' });
+    fireEvent.click(screen.getByRole('button', { name: 'Other run' }));
+    await screen.findByRole('heading', { name: 'Other run' });
+    fireEvent.click(screen.getByRole('button', { name: 'Status run' }));
+    await screen.findByRole('heading', { name: 'Status run' });
+    await waitFor(() => expect(screen.getByLabelText('New status').disabled).toBe(true));
+    expect(screen.getByLabelText(/Owner command to close it/).value).toBe(command);
+    expect(screen.queryByRole('button', { name: 'Check again' })).toBeNull();
+    expect(server.count('POST', BASE)).toBe(1);
+  });
+
   test.each([
     ['a ready sandbox run', { destinationEnvironment: 'sandbox' }],
     ['a production run that is not ready', { status: 'creating' }],

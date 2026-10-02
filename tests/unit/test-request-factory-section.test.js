@@ -512,6 +512,44 @@ describe('write reasons and reserved values', () => {
     expect(server.bodies('POST', BASE).map((b) => b.idempotencyKey)).toEqual(['key-1', 'key-1']);
   });
 
+  test('G1: a Confirm that resolves after the operator selected another run leaves that selection alone and says to select the new run', async () => {
+    const runB = makeRun({ runId: RUN_B, testLabel: 'Run B', status: 'creating', currentStep: 'provision_location', stepIndex: 3 });
+    const runA = makeRun({ testLabel: 'My test' });
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_B}`, runBody(runB));
+    server.on('POST', `${BASE}/${RUN_B}/recheck`, { status: 200, body: { runId: RUN_B, status: 'creating', ok: true, outcome: 'unchanged', failures: [] } });
+    await renderSection(server, [runB]);
+    await lookup(server);
+    await screen.findByLabelText('Test label');
+    fillConfirm();
+    const gate = deferred();
+    server.on('POST', BASE, async () => { await gate.promise; return { status: 201, body: { run: { ...runA, fiscalYear: 'December 2026', meetingDate: '2026-12-01' }, created: true } }; });
+    server.on('GET', BASE, listBody([runB, runA]));
+    fireEvent.click(confirmButton());
+    await waitFor(() => expect(server.count('POST', BASE)).toBe(1));
+    await selectRun('Run B');
+    await act(async () => { gate.resolve(); });
+    await screen.findByText('Select it in the run list to start it.');
+    // A is in the list; B's panel is still shown and B's scope was not aborted.
+    await screen.findByRole('button', { name: 'My test' });
+    expect(screen.getByRole('heading', { name: 'Run B' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Recheck Foundation' }));
+    await screen.findByText('The Foundation records are as expected.');
+  });
+
+  test('G1: with no selection change the reserved run is auto-selected, with no select-it sentence', async () => {
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(makeRun({ testLabel: 'My test' })));
+    await renderSection(server, []);
+    await lookup(server);
+    await screen.findByLabelText('Test label');
+    fillConfirm();
+    server.on('POST', BASE, { status: 201, body: { run: makeRun({ testLabel: 'My test', fiscalYear: 'December 2026', meetingDate: '2026-12-01' }), created: true } });
+    fireEvent.click(confirmButton());
+    await screen.findByRole('heading', { name: 'My test' });
+    expect(screen.queryByText('Select it in the run list to start it.')).toBeNull();
+  });
+
   test('an unedited retry that returns the existing run shows no mismatch sentence', async () => {
     const server = makeServer();
     server.on('GET', `${BASE}/${RUN_A}`, runBody(makeRun({ testLabel: 'My test' })));

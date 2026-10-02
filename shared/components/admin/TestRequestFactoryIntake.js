@@ -26,9 +26,10 @@ function Reason({ id, children }) {
  *
  * `writeBlock` is '' when writes are allowed, else the reason they are not.
  * `onLookupStart` lets the section abort whatever run work is in flight;
- * `onReserved(run)` hands the reserved run back to be selected.
+ * `getSelectionToken()` is read when Confirm starts; `onReserved(run, token)` hands the run
+ * back and returns true only if it was selected (false when the selection moved meanwhile).
  */
-export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, onReserved }) {
+export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, onReserved, getSelectionToken }) {
   const [sourceNumber, setSourceNumber] = useState('');
   const [looking, setLooking] = useState(false);
   const [lookupError, setLookupError] = useState('');
@@ -121,6 +122,7 @@ export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, on
     event.preventDefault();
     if (confirmReason || confirmingRef.current || !draft || !keyRef.current) return;
     confirmingRef.current = true;
+    const token = getSelectionToken?.();
     setConfirming(true);
     setConfirmError('');
     try {
@@ -141,8 +143,8 @@ export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, on
       const day = (value) => String(value ?? '').slice(0, 10);
       const differs = reply.created === false
         && (reply.run.testLabel !== sent.label || reply.run.fiscalYear !== sent.fiscalYear || day(reply.run.meetingDate) !== day(sent.meetingDate));
-      setReserved({ run: reply.run, differs });
-      onReserved?.(reply.run);
+      const selected = onReserved ? onReserved(reply.run, token) : true;
+      setReserved({ run: reply.run, differs, selected: selected !== false });
     } catch (error) {
       if (mountedRef.current && error?.name !== 'AbortError') setConfirmError(messageFor(error));
     } finally {
@@ -231,6 +233,7 @@ export default function TestRequestFactoryIntake({ writeBlock, onLookupStart, on
             <div role="status" className="rounded-xl border border-green-200 bg-green-50 px-4 py-4 text-sm leading-6 text-green-900">
               <p className="font-semibold">The run is reserved: {reserved.run.testLabel}.</p>
               <p className="mt-1">Fiscal year {reserved.run.fiscalYear || 'not set'}. Meeting date {String(reserved.run.meetingDate ?? '').slice(0, 10) || 'not set'}.</p>
+              {!reserved.selected ? <p className="mt-1">Select it in the run list to start it.</p> : null}
               {reserved.differs ? (
                 <p className="mt-1 font-semibold">This run was already reserved by an earlier attempt, with the values shown here, not the ones you just entered. To use different values, choose Create another.</p>
               ) : null}
