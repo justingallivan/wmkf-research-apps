@@ -547,6 +547,28 @@ test('a source version change during hashing returns a stale-source conflict', a
   });
 });
 
+test('a source that vanishes after download is still a stale-source conflict, not a generic failure', async () => {
+  const deps = dependencies();
+  const loaded = await loadTestRequestPreviewSource({ requestNumber: '1002001' }, deps);
+  const metadata = {
+    id: 'graph-item-1', name: 'ProjectDescription.pdf', size: Buffer.byteLength('preview-pdf'),
+    mimeType: 'application/pdf', eTag: 'etag-1', versionId: '1.0', cTag: 'ctag-1',
+  };
+  // getFileMetadataById answers null on a 404 (graph/files.js).
+  deps.getFileMetadataById.mockResolvedValueOnce(metadata).mockResolvedValueOnce(null);
+
+  const error = await buildTestRequestAdminPreview({
+    sourceRequestId: SOURCE_ID,
+    selectedDocumentIds: [loaded.documents[0].id],
+    testLabel: 'Preview fixture',
+    fiscalYear: 'December 2027',
+    meetingDate: '2027-12-03',
+  }, deps).catch((caught) => caught);
+
+  expect(error).toMatchObject({ httpStatus: 409, code: 'test_request_preview_source_changed' });
+  expect(error.message).toMatch(/metadata id graph-item-1 -> null; .*cTag ctag-1 -> null/);
+});
+
 test('the stale-source conflict names only the comparison that failed: a short download is a content-length difference, not a version change', async () => {
   const deps = dependencies();
   const loaded = await loadTestRequestPreviewSource({ requestNumber: '1002001' }, deps);
