@@ -36,11 +36,16 @@ const mockGraphListFiles = jest.fn();
 const mockGraphDownload = jest.fn();
 const mockSharePointBuckets = jest.fn();
 const mockGrantRequestGetById = jest.fn();
+const mockSiteVisitFilter = jest.fn();
+const mockCreateSiteVisitFilter = jest.fn();
 jest.mock('../../lib/services/graph-service', () => ({
   GraphService: {
     listFiles: (...args) => mockGraphListFiles(...args),
     downloadFileByPath: (...args) => mockGraphDownload(...args),
   },
+}));
+jest.mock('../../lib/services/site-visit-materials/recursive-reader-filter.js', () => ({
+  createSiteVisitMaterialsRecursiveReaderFilter: (...args) => mockCreateSiteVisitFilter(...args),
 }));
 jest.mock('../../lib/utils/sharepoint-buckets', () => ({
   getRequestSharePointBuckets: (...args) => mockSharePointBuckets(...args),
@@ -106,6 +111,8 @@ beforeEach(() => {
   fetchedBodies.length = 0;
   createdRunRows.length = 0;
   jest.clearAllMocks();
+  mockCreateSiteVisitFilter.mockReturnValue(mockSiteVisitFilter);
+  mockSiteVisitFilter.mockImplementation(async (_library, _folder, files) => ({ files, omittedFiles: [], error: null }));
   process.env.CLAUDE_API_KEY = 'sk-ant-test';
 });
 
@@ -185,6 +192,75 @@ describe('executePrompt — declarative payload boundary', () => {
       recursive: true,
       excludeApplicantMaterialsBackgroundUploads: true,
     }));
+    expect(mockCreateSiteVisitFilter).toHaveBeenCalledWith(requestId, '1002836');
+    expect(mockSiteVisitFilter).toHaveBeenCalledWith('akoya_request', '1002836_request', expect.any(Array));
+  });
+
+  test('optional SharePoint variable throws when an omitted uncertain candidate matches its pattern', async () => {
+    const requestId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    const candidate = { id: 'unknown', name: 'proposal.pdf', folder: '1002836_request/Site Visit - Slides' };
+    PROMPT_ROW = buildPromptRow({
+      variables: [{ name: 'proposal_text', source: { kind: 'sharepoint', pattern: 'proposal.pdf' }, required: false }],
+      promptBody: '{{proposal_text}}',
+    });
+    mockGrantRequestGetById.mockResolvedValue({ akoya_requestnum: '1002836' });
+    mockSharePointBuckets.mockResolvedValue([{ library: 'akoya_request', folder: '1002836_request', source: 'dynamics' }]);
+    mockGraphListFiles.mockResolvedValue([candidate]);
+    mockSiteVisitFilter.mockResolvedValueOnce({
+      files: [],
+      omittedFiles: [candidate],
+      error: { code: 'site_visit_materials_status_unavailable', message: 'status unavailable' },
+    });
+
+    await expect(executePrompt({ promptName: 'phase-i.summary', requestId, runSource: 'Vercel Test' }))
+      .rejects.toThrow('Could not verify whether a SharePoint file matching "proposal.pdf" is current');
+    expect(mockGraphDownload).not.toHaveBeenCalled();
+  });
+
+  test('unrelated uncertain candidates do not block a valid SharePoint match', async () => {
+    const requestId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    PROMPT_ROW = buildPromptRow({
+      variables: [{ name: 'proposal_text', source: { kind: 'sharepoint', pattern: 'proposal.pdf' }, required: false }],
+      promptBody: '{{proposal_text}}',
+    });
+    mockGrantRequestGetById.mockResolvedValue({ akoya_requestnum: '1002836' });
+    mockSharePointBuckets.mockResolvedValue([{ library: 'akoya_request', folder: '1002836_request', source: 'dynamics' }]);
+    mockGraphListFiles.mockResolvedValue([
+      { id: 'stale', name: 'old-presentation.pptx', folder: '1002836_request/Site Visit - Slides' },
+      { id: 'proposal', name: 'proposal.pdf', folder: '1002836_request/Phase I' },
+    ]);
+    mockSiteVisitFilter.mockResolvedValueOnce({
+      files: [{ id: 'proposal', name: 'proposal.pdf', folder: '1002836_request/Phase I' }],
+      omittedFiles: [{ id: 'stale', name: 'old-presentation.pptx' }],
+      error: { code: 'site_visit_materials_status_unavailable', message: 'status unavailable' },
+    });
+    mockGraphDownload.mockResolvedValue({
+      buffer: Buffer.from('document'),
+      filename: 'proposal.pdf',
+      mimeType: 'application/pdf',
+    });
+
+    await expect(executePrompt({ promptName: 'phase-i.summary', requestId, runSource: 'Vercel Test' }))
+      .resolves.toBeTruthy();
+    expect(mockGraphDownload).toHaveBeenCalledWith('akoya_request', '1002836_request/Phase I', 'proposal.pdf');
+  });
+
+  test('known superseded matches are skipped without being treated as unavailable', async () => {
+    const requestId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    PROMPT_ROW = buildPromptRow({
+      variables: [{ name: 'proposal_text', source: { kind: 'sharepoint', pattern: 'proposal.pdf' }, required: false }],
+      promptBody: '{{proposal_text}}',
+    });
+    mockGrantRequestGetById.mockResolvedValue({ akoya_requestnum: '1002836' });
+    mockSharePointBuckets.mockResolvedValue([{ library: 'akoya_request', folder: '1002836_request', source: 'dynamics' }]);
+    mockGraphListFiles.mockResolvedValue([
+      { id: 'stale', name: 'proposal.pdf', folder: '1002836_request/Site Visit - Slides' },
+    ]);
+    mockSiteVisitFilter.mockResolvedValueOnce({ files: [], omittedFiles: [], error: null });
+
+    await expect(executePrompt({ promptName: 'phase-i.summary', requestId, runSource: 'Vercel Test' }))
+      .resolves.toBeTruthy();
+    expect(mockGraphDownload).not.toHaveBeenCalled();
   });
 
   test('over-cap variable bounded: marker in prompt, no tail, metadata on result.meta', async () => {

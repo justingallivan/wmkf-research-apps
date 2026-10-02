@@ -16,6 +16,11 @@ jest.mock('../../lib/utils/sharepoint-buckets', () => ({
 jest.mock('../../lib/services/graph-service', () => ({
   GraphService: { listFiles: jest.fn() },
 }));
+const mockSiteVisitFilter = jest.fn();
+const mockCreateSiteVisitFilter = jest.fn();
+jest.mock('../../lib/services/site-visit-materials/recursive-reader-filter.js', () => ({
+  createSiteVisitMaterialsRecursiveReaderFilter: (...args) => mockCreateSiteVisitFilter(...args),
+}));
 
 import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
 import { getRequestSharePointBuckets } from '../../lib/utils/sharepoint-buckets';
@@ -28,6 +33,8 @@ const record = (over = {}) => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockCreateSiteVisitFilter.mockReturnValue(mockSiteVisitFilter);
+  mockSiteVisitFilter.mockImplementation(async (_library, _folder, files) => ({ files, omittedFiles: [], error: null }));
   getRequestSharePointBuckets.mockResolvedValue([]);
 });
 
@@ -75,6 +82,8 @@ describe('lookupGrant', () => {
     expect(r.documents.proposalBestGuess).toBe('akoya_request::F1/Final Report::Project Narrative.docx');
     expect(r.documents.reportBestGuess).toMatch(/::Annual Report\.pdf$/);
     expect(r.documents.libraries).toHaveLength(2);
+    expect(mockCreateSiteVisitFilter).toHaveBeenCalledWith('guid-1', '1002836');
+    expect(mockSiteVisitFilter).toHaveBeenCalledWith('akoya_request', 'F1', expect.any(Array));
   });
 
   it('bucket listing errors are tolerated per-bucket (error captured, other buckets still listed)', async () => {
@@ -89,6 +98,29 @@ describe('lookupGrant', () => {
     const r = await lookupGrant({ requestNumber: '1002836' });
     expect(r.documents.libraries.find((l) => l.library === 'akoya_request').error).toBe('404 folder');
     expect(r.documents.files).toHaveLength(1);
+  });
+
+  it('uses the filtered inventory and preserves a status warning alongside unrelated files', async () => {
+    grantRequestAdapter.findByRequestNumber.mockResolvedValue({ records: [record()] });
+    getRequestSharePointBuckets.mockResolvedValue([
+      { library: 'akoya_request', folder: 'F1', source: 'dynamics' },
+    ]);
+    const candidate = { id: 'old', name: 'Old presentation.pptx', folder: 'F1/Site Visit - Slides' };
+    const unrelated = { id: 'other', name: 'Annual Report.pdf', folder: 'F1', size: 2, mimeType: 'p' };
+    GraphService.listFiles.mockResolvedValue([candidate, unrelated]);
+    mockSiteVisitFilter.mockImplementationOnce(async () => ({
+      files: [unrelated],
+      omittedFiles: [candidate],
+      error: { code: 'site_visit_materials_status_unavailable', message: 'Some materials were omitted.' },
+    }));
+
+    const r = await lookupGrant({ requestNumber: '1002836' });
+    expect(r.documents.files).toEqual([expect.objectContaining({ name: 'Annual Report.pdf' })]);
+    expect(r.documents.libraries).toEqual([expect.objectContaining({
+      library: 'akoya_request',
+      count: 1,
+      error: 'Some materials were omitted.',
+    })]);
   });
 
   it('SharePoint discovery failure is non-fatal: found stays true, documents null, category error', async () => {

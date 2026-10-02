@@ -3,8 +3,13 @@
  */
 
 const listFiles = jest.fn();
+const mockSiteVisitFilter = jest.fn();
+const mockCreateSiteVisitFilter = jest.fn();
 jest.mock('../../lib/services/graph-service', () => ({
   GraphService: { listFiles: (...args) => listFiles(...args) },
+}));
+jest.mock('../../lib/services/site-visit-materials/recursive-reader-filter.js', () => ({
+  createSiteVisitMaterialsRecursiveReaderFilter: (...args) => mockCreateSiteVisitFilter(...args),
 }));
 
 const getRequestSharePointBuckets = jest.fn();
@@ -32,6 +37,12 @@ let consoleError;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockCreateSiteVisitFilter.mockReturnValue(mockSiteVisitFilter);
+  mockSiteVisitFilter.mockImplementation(async (_library, _folder, files) => ({
+    files,
+    omittedFiles: [],
+    error: null,
+  }));
   consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
   getRequestSharePointBuckets.mockResolvedValue([ACTIVE, ...ARCHIVES]);
   getProposalDocumentConfig.mockReturnValue({
@@ -68,6 +79,8 @@ test('surfaces only the two exact canonical AI Materials files and ignores expec
     recursive: true,
     excludeApplicantMaterialsBackgroundUploads: true,
   }));
+  expect(mockCreateSiteVisitFilter).toHaveBeenCalledWith(REQUEST_ID, REQUEST_NUMBER);
+  expect(mockSiteVisitFilter).toHaveBeenCalledWith('akoya_request', ROOT, expect.any(Array));
   expect(result.errors).toEqual([]);
   expect(result.slots[0]).toMatchObject({ found: true, name: 'ProjectDescription.pdf' });
   expect(result.phaseIIDocuments).toEqual([
