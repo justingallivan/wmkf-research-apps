@@ -25,8 +25,7 @@ related:
 Sections 1–15 preserve the 2026-09-08 planning snapshot; §16 records subsequent
 build and release status. Background processing is separately specified in
 [the 2026-10-01 plan](plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md).
-Its base code, schema and worker are deployed in Production, schema readiness is
-on, and admission remains off. Bounded recovery and older-file listing follow-ups are source-built in PR #404; Fable approved the full runtime through `2bfa5f590` with no required fixes; verify current-head required CI on PR #404 before merge. They are not Production-deployed, and this document does not authorize enabling admissions.
+Its base code, schema, worker and guarded activation follow-ups are Production-deployed. Schema readiness, admission, and virus scanning are enabled. The first real background job completed successfully on attempt 1; see §16.15 for deployment and lifecycle evidence. PR #405's connection-copy follow-up remains open and is not deployed. The exact 500 MB live transfer and concurrent background-job exercise remain unverified.
 
 Build one **Site Visit Materials** workflow that collects applicant files, lets a Program
 Coordinator (PC) verify that the required files are present and render, and publishes selected
@@ -833,11 +832,10 @@ them in the Workbench without opening AkoyaGo.
   canonical Site Visit materials folders, excluding uncommitted candidates and prior background
   copies. **[VERIFIED via source and five call sites: the original four-reader regressions passed
   five suites (79 tests, one snapshot), and Grant Reporting passed two suites (18 tests).]** The
-  follow-up exact-root filter is source-built on PR #404: it suppresses only exact
+  follow-up exact-root filter is Production-deployed via PR #404: it suppresses only exact
   same-request portal-produced Superseded drive/item identities, preserves current/manual files,
   and fails closed on incomplete registry evidence. Eight focused suites (104 tests, one snapshot)
-  passed; Sol and parent approved. Fable approved the runtime through `2bfa5f590` with no required fixes. The behavior-preserving matcher extraction in `45fc84144` passed 26 focused suites (483 tests, one snapshot), including the previous CI import-failure suites and plain Node CLI; Sol approved the extraction; Fable approved the bounded dependency fix in `45fc84144` with no required fixes; a later cleanup nit was deferred. PR #404 tracks final checks; verify required checks on its current head before merge; this follow-up is not
-  Production-deployed. There are no counters or registry writes: a hand-placed file still does
+  passed; the merged reader filter preserves current/manual files and fails closed on incomplete registry evidence. There are no counters or registry writes: a hand-placed file still does
   not count toward the collection summary or appear on the briefing page.
 - **Summary availability:** the PR #338 production baseline returned fail-open `null` on a
   Workbench summary failure, which could show "materials not requested". **[PRODUCTION-LIVE via
@@ -905,31 +903,45 @@ approximately 76 seconds based on token/finalize request times, not a measured c
 These observations do not establish near-limit 500 MB provider support. That rehearsal
 remains pending. Production retains the 2048 MB memory tier.
 
-### 16.15 Background processing [PRODUCTION SCHEMA/WORKER DEPLOYED; admission off; activation follow-ups source-built, verification pending]
+### 16.15 Background processing [PRODUCTION-LIVE; FIRST BACKGROUND JOB COMPLETED 2026-10-02]
 
 The owner authorized reusing the durable reviewer-acceptance queue pattern to let applicants
 leave after private Blob transfer and committed Postgres admission. The bytes remain in
 private Blob; Postgres stores ownership and processing state. The settled
 [background-processing plan](plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md)
 records the two OAuth Fable plan reviews, Sol's replacement-safety finding, invariant tests,
-and disabled-by-default rollout. It supersedes the synchronous wait and same-item replacement
+and rollout. It supersedes the synchronous wait and same-item replacement
 contract only for newly admitted background jobs: those jobs use per-staging subfolders with
 canonical filenames, retain the previous physical file through partial failures, and publish
 only after clean scanning and registry persistence. Existing synchronous scanning-off policy
 is unchanged; background admission requires enabled scanning.
 
-**[VERIFIED via read-only Production probes and deployment readback, 2026-10-02.]** Migration
+**[VERIFIED via Production probes and deployment readback, 2026-10-02.]** Migration
 060 is applied; the physical job table and staging owner column exist. Production schema
-readiness is `on`, admission is `off`, and virus scanning is `true`. Deployment
-`dpl_HejNdRssKwXEZmjMpGuRXXZ3WBZb` serves `1ec1d93265fa19357372c5c75fa2dff9501e8406`;
-the 17:20 UTC worker run completed with an empty queue. No background job has been admitted.
-CI passed on prior head `837729b4e280317a3e20f93a377bf2947bd358a9` (1,199 suites,
-19,110 tests, five snapshots; seven PostgreSQL suites, 114 tests). The L1 reader fix
-passed five focused suites (79 tests, one snapshot), with the added Grant Reporting caller
-passing two suites (18 tests). L2/L3 shared recovery passed 95 focused unit tests and 16
-real-PostgreSQL tests through the actual loopback CLI. Production recovery and older-root filtering follow-ups are source-built in PR #404. The 26 operator unit tests and 16 local PostgreSQL tests passed; the reader changes passed eight suites (104 tests, one snapshot). Sol and parent approved the runtime; Fable approved it through `2bfa5f590` with no required fixes. The behavior-preserving matcher extraction in `45fc84144` passed 26 focused suites (483 tests, one snapshot), including the prior CI import-failure suites and the plain Node CLI; Sol approved the extraction; Fable approved the bounded dependency fix in `45fc84144` with no required fixes; a later cleanup nit was deferred. PR #404 tracks final checks; verify required checks on its current head before merge. Neither change is deployed. This is not authorization to admit uploads or perform a Production recovery mutation.
+readiness, admission, and virus scanning are all enabled. PR #404
+(`a63747ca5dfa74954c208e23bd1f90f3b25b0eab`), #407
+(`df7bb6ac3f90eba5b80d785f3119c96b8bd0f0e4`), and #410
+(`8fb8a6d83684a9d49b8450b26ef5bbef382f9a32`) merged with all CI passing. Ready deployment
+`dpl_2AacXcc5YQX9dNvJ4gMn4PpGtWWN` serves the #410 commit at
+`https://wmkfresearchapps-36g8ub7g7-justin-gallivans-projects.vercel.app`, aliased to
+`applications.wmkeck.org`.
 
-### 16.16 Security-scan rejection diagnostics [SOURCE-BUILT; NOT DEPLOYED]
+The first real job `33630e07-4311-41b3-8aef-737a2962ce03` (`presentation_source`) was
+created at `2026-10-02T21:36:35.918Z`, started at `21:37:05.541Z`, reached a clean scan
+checkpoint at `21:38:23.439Z`, and completed at `21:39:19.482Z` on attempt 1 with no error;
+staging was consumed. Admission-to-completion took about 2m44s. The owner closed and reopened
+the browser during processing, then confirmed Received after reopening. Worker invocations
+21:44–21:48 UTC were healthy with an empty queue. The owner-authorized agent read-only
+Production CLI probe passed fixed-target/TLS checks and returned expected `job_not_found` for
+intentionally nonexistent UUID `00000000-0000-4000-8000-000000000000`; no recovery mutation
+was run. No automatic email is sent, so operational monitoring remains required.
+
+PR #405 (connection-copy follow-up) remains open at head `7fc6c109`; its branch conflicts
+with current main and is not merged or deployed. The 500 MB configured cap is covered by
+tests, but the exact 500 MB live transfer and a concurrent background-job exercise remain
+unverified. The real 300+ MB PPTX upload succeeded before background activation (§16.14).
+
+### 16.16 Security-scan rejection diagnostics [PRODUCTION-LIVE via PR #407/#410]
 
 For applicant materials only, an infected scanner verdict still rejects the upload with
 `scan_infected`; scanning policy, clean/uncertain decisions, and provider calls are unchanged.
@@ -952,4 +964,5 @@ an unspecified/legacy record never claims that a malware signature was found.
 Each infected verdict attempts one best-effort warning `operational_events` write,
 `site_visit_material_scan_rejected` at stage `virus_scan`, with request/collection/staging/slot
 references, staging-id deduplication, and only the allowlisted diagnostic in metadata. There is no notification email,
-new column, or migration. This branch has not been deployed or provider-rehearsed.
+new column, or migration. The diagnostic and applicant-facing progress/rejection copy are
+Production-deployed via PRs #407 and #410. Exact 500 MB live transfer remains unverified.

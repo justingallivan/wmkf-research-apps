@@ -922,7 +922,7 @@ the collection row and sealed contributor link are created only on explicit Send
 invitation/reminder subject and body defaults live in Dataverse `wmkf_appuserpreferences`, not in
 this Postgres row. One-off edits are not saved as defaults.
 
-### `materials_upload_jobs` (migration 060; Production schema and worker deployed; admission off)
+### `materials_upload_jobs` (migration 060; Production admission live; first job completed 2026-10-02)
 
 Owner: durable background processing for applicant Site Visit materials uploads.
 The ledger binds one `portal_upload_staging` row to a collection, request, fixed
@@ -936,7 +936,7 @@ subfolder so prior bytes remain preserved until the new receipt is committed.
 SharePoint remains the byte store and `wmkf_requestdocument` the published
 receipt; this table owns neither.
 
-**[SOURCE-BUILT, NOT DEPLOYED:]** An infected verdict persists the sanitized
+**[PRODUCTION-LIVE via PR #407/#410, 2026-10-02:]** An infected verdict persists the sanitized
 `{ok:false, scanRejection:{category,flags}}` in existing job `result_payload`,
 including an infected `needs_attention` hold. The terminal failed path also
 rejects staging and persists its replay payload; a hold leaves staging pending.
@@ -966,8 +966,17 @@ Admission is gated by `SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY=on`,
 `VIRUS_SCAN_ENABLED` enabled. The schema gate must follow a successful
 migration-060 apply and physical readiness check; admission also requires the
 schema gate. If admission is off, the existing synchronous finalize path is
-used. Production read-only verification on 2026-10-02 found migration 060 applied, schema readiness `on`, admission `off`, and virus scanning `true`. Ready deployment `dpl_HejNdRssKwXEZmjMpGuRXXZ3WBZb` serves commit `1ec1d93265fa19357372c5c75fa2dff9501e8406`; the 17:20 UTC worker run completed with an empty queue. No job was admitted. The recovery CLI and reader filter are source-built in PR #404; Sol and parent approved both; Fable approved the runtime through `2bfa5f590` with no required fixes. PR #404 tracks final checks; verify required checks on its current head before merge. Neither is Production-deployed; see `docs/plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md`.
+used. **Production verified 2026-10-02:** schema readiness and admission are `on`, and virus scanning is `true`. PRs #404,
+#407, and #410 are merged with all CI passing. Ready deployment
+`dpl_2AacXcc5YQX9dNvJ4gMn4PpGtWWN` serves commit
+`8fb8a6d83684a9d49b8450b26ef5bbef382f9a32` and the registered alias
+`applications.wmkeck.org`. The first real job
+`33630e07-4311-41b3-8aef-737a2962ce03` completed successfully on attempt 1,
+with a clean scan checkpoint and consumed staging receipt; later worker runs
+were healthy with an empty queue. See
+`docs/plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md` for exact times,
+the read-only operator probe, and remaining verification bounds.
 
 Terminal jobs expire after 30 days; rejected staging/blob cleanup uses the
 existing exact-path cleanup with a seven-day retention. `scripts/materials-upload-job.js`
-supports exact-job inspection and guarded retry/cancel on loopback Postgres. Its source-built Production mode uses the fixed local-shell `MATERIALS_UPLOAD_PRODUCTION_DATABASE_URL`, explicit target/host/database, verified TLS, and exact job/action confirmations; inspection is read-only and connected database/schema assertions run inside the transaction. Retry can reset an exhausted attempt count and start a fresh two-hour budget only for an unleased `needs_attention` job with a matching unleased, unconsumed staging owner and a non-infected failure. **[SOURCE-BUILT in `3fdd04686` and `e5837db5e`; 26 focused operator unit tests and 16 local PostgreSQL tests passed; Sol approved, Fable approved the full runtime through `2bfa5f590` with no required fixes; verify current-head required CI on PR #404 before merge. Not Production-deployed.]**
+supports exact-job inspection and guarded retry/cancel on loopback Postgres. Its Production mode uses the fixed local-shell `MATERIALS_UPLOAD_PRODUCTION_DATABASE_URL`, explicit target/host/database, verified TLS, and exact job/action confirmations; inspection is read-only and connected database/schema assertions run inside the transaction. Retry can reset an exhausted attempt count and start a fresh two-hour budget only for an unleased `needs_attention` job with a matching unleased, unconsumed staging owner and a non-infected failure. **[PRODUCTION SOURCE AND READ-ONLY PATH VERIFIED 2026-10-02.]** PR #404 is merged. The owner-authorized agent probe passed Production target/TLS checks and returned expected `job_not_found` for the deliberately nonexistent UUID `00000000-0000-4000-8000-000000000000`; no recovery mutation was performed.
