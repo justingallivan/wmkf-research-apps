@@ -164,7 +164,7 @@ function TranscriptContent({ content, speakerNames }) {
   return <p className="mt-4 rounded-lg bg-gray-50 px-4 py-3 text-sm text-gray-700">No transcript text or timed speaker turns are available.</p>;
 }
 
-function MeetingTranscriptionPanelForRequest({ requestId }) {
+function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnly = false }) {
   const [collection, setCollection] = useState(null);
   const [collectionCheckedAt, setCollectionCheckedAt] = useState(0);
   const [selectedJobId, setSelectedJobId] = useState(null);
@@ -205,7 +205,7 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
     setSelectedCorrectionId(operationId);
     setBusy(null);
   }, []);
-  const basePath = useMemo(() => `${API_PATH}/${encodeURIComponent(requestId || '')}/transcriptions`, [requestId]);
+  const basePath = useMemo(() => apiBasePath || `${API_PATH}/${encodeURIComponent(requestId || '')}/transcriptions`, [apiBasePath, requestId]);
   const jobs = collection?.jobs || [];
   const selectedJob = detail?.job?.id === selectedJobId
     ? detail.job
@@ -320,7 +320,7 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
   }, [basePath, isActiveJob, requestId, selectJob]);
 
   const loadCorrection = useCallback(async (operationId, { preserveDraft = false } = {}) => {
-    if (!requestId || !operationId) return;
+    if (reviewOnly || !requestId || !operationId) return;
     const generation = generationRef.current;
     const expectedRequestId = requestId;
     const sequence = ++detailSequenceRef.current;
@@ -345,10 +345,10 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
     } finally {
       if (current()) setBusy(null);
     }
-  }, [basePath, isActiveCorrection, requestId, selectCorrection]);
+  }, [basePath, isActiveCorrection, requestId, reviewOnly, selectCorrection]);
 
   const postJobAction = useCallback(async (action, body, label) => {
-    if (!selectedJob || !requestId) return null;
+    if (!selectedJob || !requestId || (reviewOnly && action !== 'speakers')) return null;
     const generation = generationRef.current;
     const expectedRequestId = requestId;
     const sequence = detailSequenceRef.current;
@@ -385,10 +385,10 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
     } finally {
       if (current()) setBusy(null);
     }
-  }, [basePath, isActiveJob, loadCollection, requestId, selectedJob]);
+  }, [basePath, isActiveJob, loadCollection, requestId, reviewOnly, selectedJob]);
 
   const uploadAndStart = async () => {
-    if (!selectedFile || uploadError || !acknowledged || busy || !requestId) return;
+    if (reviewOnly || !selectedFile || uploadError || !acknowledged || busy || !requestId) return;
     if (selectedFile.size < 1 || selectedFile.size > MAX_AUDIO_BYTES) {
       setError('Choose an audio recording no larger than 50 MiB.');
       return;
@@ -485,7 +485,7 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
   };
 
   const beginCorrection = async () => {
-    if (!currentArtifact?.bundleEditable || busy) return;
+    if (reviewOnly || !currentArtifact?.bundleEditable || busy) return;
     const generation = generationRef.current;
     const expectedRequestId = requestId;
     const context = captureActiveContext();
@@ -518,6 +518,7 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
   };
 
   const saveCorrection = async () => {
+    if (reviewOnly) return;
     const correction = correctionDetail?.correction;
     if (!correction || !dirtyCorrectionNames || busy) return;
     const generation = generationRef.current;
@@ -548,6 +549,7 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
   };
 
   const publishCorrection = async () => {
+    if (reviewOnly) return;
     const correction = correctionDetail?.correction;
     const artifact = correctionDetail?.currentArtifact;
     if (!correction || !artifact || dirtyCorrectionNames || !correctionSpeakerIds.length || correction.state !== 'draft' || busy) return;
@@ -588,7 +590,7 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
   };
 
   const publish = async () => {
-    if (!selectedJob || !collection || !detail || dirtyNames || !utterances.length || busy) return;
+    if (reviewOnly || !selectedJob || !collection || !detail || dirtyNames || !utterances.length || busy) return;
     const generation = generationRef.current;
     const expectedRequestId = requestId;
     const sequence = detailSequenceRef.current;
@@ -612,7 +614,7 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
   };
 
   const deleteDraft = async () => {
-    if (!selectedJob || busy || !globalThis.confirm?.('Delete this temporary transcription draft?')) return;
+    if (reviewOnly || !selectedJob || busy || !globalThis.confirm?.('Delete this temporary transcription draft?')) return;
     const generation = generationRef.current;
     const expectedRequestId = requestId;
     const sequence = detailSequenceRef.current;
@@ -639,7 +641,7 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
   };
 
   const reconcile = async (publication) => {
-    if (!publication?.operationId || busy) return;
+    if (reviewOnly || !publication?.operationId || busy) return;
     const generation = generationRef.current;
     const expectedRequestId = requestId;
     const context = captureActiveContext();
@@ -665,7 +667,7 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
   };
 
   const closePublication = async (publication) => {
-    if (!publication?.operationId || closeAcknowledgedId !== publication.operationId || busy) return;
+    if (reviewOnly || !publication?.operationId || closeAcknowledgedId !== publication.operationId || busy) return;
     const generation = generationRef.current;
     const expectedRequestId = requestId;
     const context = captureActiveContext();
@@ -715,7 +717,8 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
     </section>
   );
 
-  const currentArtifact = collection?.currentArtifact || null;
+  const currentArtifact = reviewOnly ? null : collection?.currentArtifact || null;
+  const visibleCorrectionDrafts = reviewOnly ? [] : collection?.correctionDrafts || [];
   const status = selectedJob?.status;
   const canReview = status === 'ready' && selectedJob?.contentAccessAllowed === true && Boolean(detail?.content);
   const unresolvedPublication = (collection?.publications || []).find((publication) => ['publishing', 'retryable', 'unknown', 'published_reconcile'].includes(publication.state));
@@ -734,7 +737,7 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 id="meeting-transcription-title" className="text-lg font-semibold text-gray-950">Meeting transcription</h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-700">Upload an M4A or MP3 recording, review the temporary draft, then publish the finalized transcript when it is ready.</p>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-700">{reviewOnly ? 'Review the synthetic transcript and save speaker display names.' : 'Upload an M4A or MP3 recording, review the temporary draft, then publish the finalized transcript when it is ready.'}</p>
         </div>
         <button type="button" onClick={() => void loadCollection({ keepDetail: true })} disabled={loading || Boolean(busy)} className="min-h-10 shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60">{loading ? 'Refreshing…' : 'Refresh status'}</button>
       </div>
@@ -743,7 +746,7 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
 
       <div className="mt-5 grid min-w-0 gap-5 lg:grid-cols-[minmax(16rem,0.8fr)_minmax(0,1.2fr)]">
         <div className="min-w-0 space-y-4">
-          <div>
+          {!reviewOnly && <div>
             <h3 className="text-sm font-semibold text-gray-900">Upload a recording</h3>
             <p className="mt-1 text-xs leading-5 text-gray-600">Maximum 50 MiB. The file uploads directly to private storage and is sent to AssemblyAI when you start transcription. Do not upload sensitive material.</p>
             <label htmlFor="meeting-transcription-file" className="mt-3 block text-xs font-medium text-gray-700">Audio file</label>
@@ -756,7 +759,7 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
             <label className="mt-3 flex items-start gap-2 text-xs leading-5 text-gray-800"><input type="checkbox" checked={acknowledged} disabled={Boolean(busy)} onChange={(event) => setAcknowledged(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-600" /><span>I confirm the recording is non-sensitive and approved for third-party processing. I understand starting transcription may consume paid credits.</span></label>
             {uploadProgress !== null && <div className="mt-3" aria-live="polite"><div className="flex justify-between text-xs text-gray-700"><span>{uploadProgress < 100 ? 'Uploading to private storage' : 'Upload complete'}</span><span>{uploadProgress}%</span></div><progress className="mt-1 h-2 w-full accent-gray-900" max="100" value={uploadProgress} aria-label="Private audio upload progress" /></div>}
             <button type="button" onClick={uploadAndStart} disabled={!selectedFile || Boolean(uploadError) || selectedFile.size < 1 || selectedFile.size > MAX_AUDIO_BYTES || !acknowledged || Boolean(busy)} className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700">{busy === 'upload' ? 'Uploading…' : busy === 'starting' ? 'Starting transcription…' : 'Upload and start transcription'}</button>
-          </div>
+          </div>}
 
           <div>
             <h3 className="text-sm font-semibold text-gray-900">Temporary drafts</h3>
@@ -767,7 +770,7 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
             ) : <p className="mt-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-4 text-sm leading-5 text-gray-700">No temporary drafts yet. Uploaded recordings appear here while processing and review.</p>}
           </div>
 
-          {!!(collection?.publications || []).length && <div><h3 className="text-sm font-semibold text-gray-900">Publication status</h3><ul className="mt-2 space-y-2">{collection.publications.map((publication) => {
+          {!reviewOnly && !!(collection?.publications || []).length && <div><h3 className="text-sm font-semibold text-gray-900">Publication status</h3><ul className="mt-2 space-y-2">{collection.publications.map((publication) => {
             const unresolved = ['publishing', 'retryable', 'unknown', 'published_reconcile'].includes(publication.state);
             const quarantinePassed = Boolean(publication.quarantineUntil) && new Date(publication.quarantineUntil).getTime() <= collectionCheckedAt
               && (!publication.leaseExpiresAt || new Date(publication.leaseExpiresAt).getTime() <= collectionCheckedAt);
@@ -795,8 +798,8 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
         </div>
 
         <div className="min-w-0">
-          {currentArtifact && <section className="rounded-lg border border-green-200 bg-green-50 p-4" aria-labelledby="meeting-transcription-published-title"><h3 id="meeting-transcription-published-title" className="text-sm font-semibold text-green-950">Current published transcript</h3><p className="mt-1 break-all text-xs text-green-900">Current version · {currentArtifact.id}</p><div className="mt-3 flex flex-wrap gap-2"><a className="inline-flex min-h-9 items-center rounded-lg border border-green-800 bg-white px-3 py-1.5 text-sm font-medium text-green-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-700" href={`${basePath}/materials/${encodeURIComponent(currentArtifact.id)}/download?format=txt`}>Download TXT</a><a className="inline-flex min-h-9 items-center rounded-lg border border-green-800 bg-white px-3 py-1.5 text-sm font-medium text-green-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-700" href={`${basePath}/materials/${encodeURIComponent(currentArtifact.id)}/download?format=vtt`}>Download VTT</a>{currentArtifact.bundleEditable && <button type="button" onClick={beginCorrection} disabled={Boolean(busy)} className="inline-flex min-h-9 items-center rounded-lg border border-green-800 bg-white px-3 py-1.5 text-sm font-medium text-green-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-700 disabled:opacity-50">{busy === 'create-correction' ? 'Creating correction…' : 'Correct transcript'}</button>}</div>{!currentArtifact.bundleEditable && <p className="mt-2 text-xs leading-5 text-green-950">This transcript can be downloaded but has no editable source bundle. A correction draft is not available.</p>}</section>}
-          {!!(collection?.correctionDrafts || []).length && <section className="mt-4" aria-labelledby="meeting-transcription-corrections-title"><h3 id="meeting-transcription-corrections-title" className="text-sm font-semibold text-gray-900">Correction drafts</h3><ul className="mt-2 divide-y divide-gray-200 rounded-lg border border-gray-200">{collection.correctionDrafts.map((correction) => <li key={correction.operationId}><button type="button" onClick={() => void loadCorrection(correction.operationId)} aria-current={correction.operationId === selectedCorrectionId ? 'true' : undefined} className={`flex min-h-12 w-full items-center justify-between gap-3 px-3 py-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-inset ${correction.operationId === selectedCorrectionId ? 'bg-gray-100' : 'hover:bg-gray-50'}`}><span className="break-all text-sm font-medium text-gray-900">Correction · {correction.sourceRevisionId || 'current transcript'}</span><span className="shrink-0 text-xs text-gray-600">{correction.state === 'draft' ? 'Draft' : correction.state === 'published_reconcile' ? 'Reconciliation needed' : correction.state}</span></button></li>)}</ul></section>}
+          {!reviewOnly && currentArtifact && <section className="rounded-lg border border-green-200 bg-green-50 p-4" aria-labelledby="meeting-transcription-published-title"><h3 id="meeting-transcription-published-title" className="text-sm font-semibold text-green-950">Current published transcript</h3><p className="mt-1 break-all text-xs text-green-900">Current version · {currentArtifact.id}</p><div className="mt-3 flex flex-wrap gap-2"><a className="inline-flex min-h-9 items-center rounded-lg border border-green-800 bg-white px-3 py-1.5 text-sm font-medium text-green-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-700" href={`${basePath}/materials/${encodeURIComponent(currentArtifact.id)}/download?format=txt`}>Download TXT</a><a className="inline-flex min-h-9 items-center rounded-lg border border-green-800 bg-white px-3 py-1.5 text-sm font-medium text-green-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-700" href={`${basePath}/materials/${encodeURIComponent(currentArtifact.id)}/download?format=vtt`}>Download VTT</a>{currentArtifact.bundleEditable && <button type="button" onClick={beginCorrection} disabled={Boolean(busy)} className="inline-flex min-h-9 items-center rounded-lg border border-green-800 bg-white px-3 py-1.5 text-sm font-medium text-green-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-700 disabled:opacity-50">{busy === 'create-correction' ? 'Creating correction…' : 'Correct transcript'}</button>}</div>{!currentArtifact.bundleEditable && <p className="mt-2 text-xs leading-5 text-green-950">This transcript can be downloaded but has no editable source bundle. A correction draft is not available.</p>}</section>}
+          {!!visibleCorrectionDrafts.length && <section className="mt-4" aria-labelledby="meeting-transcription-corrections-title"><h3 id="meeting-transcription-corrections-title" className="text-sm font-semibold text-gray-900">Correction drafts</h3><ul className="mt-2 divide-y divide-gray-200 rounded-lg border border-gray-200">{visibleCorrectionDrafts.map((correction) => <li key={correction.operationId}><button type="button" onClick={() => void loadCorrection(correction.operationId)} aria-current={correction.operationId === selectedCorrectionId ? 'true' : undefined} className={`flex min-h-12 w-full items-center justify-between gap-3 px-3 py-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-inset ${correction.operationId === selectedCorrectionId ? 'bg-gray-100' : 'hover:bg-gray-50'}`}><span className="break-all text-sm font-medium text-gray-900">Correction · {correction.sourceRevisionId || 'current transcript'}</span><span className="shrink-0 text-xs text-gray-600">{correction.state === 'draft' ? 'Draft' : correction.state === 'published_reconcile' ? 'Reconciliation needed' : correction.state}</span></button></li>)}</ul></section>}
           {!selectedJob && <div className="rounded-lg bg-gray-50 px-4 py-8 text-center text-sm leading-6 text-gray-700">Choose a draft to review its processing state and transcript.</div>}
           {selectedJob && <section className="mt-4 min-w-0 rounded-lg border border-gray-200 p-4" aria-labelledby="meeting-transcription-review-title">
             <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 id="meeting-transcription-review-title" className="break-words text-base font-semibold text-gray-950">{selectedJob.original_filename || 'Transcription draft'}</h3><p className="mt-1 text-sm text-gray-700">{JOB_STATE_LABELS[status] || selectedJob.label || 'Unknown status'}{selectedJob.needsAttention ? ' · Needs attention' : ''}</p></div><button type="button" onClick={() => void loadDetail(selectedJob.id, { preserveDraft: true })} disabled={Boolean(busy)} className="min-h-9 shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">Reload draft</button></div>
@@ -809,13 +812,13 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
               <p className="mt-3 text-xs text-gray-600">Temporary draft. It is not visible as a published Meeting Tracker material. {selectedJob.expires_at ? `Draft content expires ${new Date(selectedJob.expires_at).toLocaleString()}.` : ''}</p>
               <div className="mt-3 flex flex-wrap gap-2"><a className="inline-flex min-h-9 items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600" href={`${basePath}/${encodeURIComponent(selectedJob.id)}/download?format=txt`}>Download draft TXT</a>{utterances.length > 0 && <a className="inline-flex min-h-9 items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600" href={`${basePath}/${encodeURIComponent(selectedJob.id)}/download?format=vtt`}>Download draft VTT</a>}</div>
               <SpeakerEditor content={detail.content} candidates={sourceList} candidateSources={collection?.candidateSources} names={speakerNames} selectedSuggestions={selectedSuggestions} onSuggestionChange={(speaker, candidateId) => setSelectedSuggestions((current) => ({ ...current, [speaker]: candidateId }))} onNameChange={(speaker, name) => setSpeakerNames((current) => ({ ...current, [speaker]: name }))} disabled={Boolean(busy)} />
-              <div className="mt-3 flex flex-wrap items-center gap-2"><span className="mr-auto text-xs text-gray-600">{dirtyNames ? 'Unsaved speaker-name changes' : 'Speaker names saved'}</span><button type="button" onClick={saveSpeakerNames} disabled={!dirtyNames || Boolean(busy)} className="min-h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500">{busy === 'speakers' ? 'Saving names…' : 'Save names'}</button><button type="button" onClick={publish} disabled={Boolean(publishBlockedReason) || Boolean(busy)} className="min-h-10 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700">{busy === 'publish' ? 'Publishing…' : alreadyPublished ? 'Publication already started' : 'Publish transcript'}</button></div>
-              {publishBlockedReason && <p className="mt-2 text-xs leading-5 text-gray-600">{publishBlockedReason}</p>}
+              <div className="mt-3 flex flex-wrap items-center gap-2"><span className="mr-auto text-xs text-gray-600">{dirtyNames ? 'Unsaved speaker-name changes' : 'Speaker names saved'}</span><button type="button" onClick={saveSpeakerNames} disabled={!dirtyNames || Boolean(busy)} className="min-h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500">{busy === 'speakers' ? 'Saving names…' : 'Save names'}</button><button type="button" onClick={publish} hidden={reviewOnly} disabled={Boolean(publishBlockedReason) || Boolean(busy)} className="min-h-10 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700">{busy === 'publish' ? 'Publishing…' : alreadyPublished ? 'Publication already started' : 'Publish transcript'}</button></div>
+              {!reviewOnly && publishBlockedReason && <p className="mt-2 text-xs leading-5 text-gray-600">{publishBlockedReason}</p>}
               {hasText && <TranscriptContent content={detail.content} speakerNames={speakerNames} />}
             </>}
             {selectedJob.contentAccessAllowed === false && ['ready', 'failed', 'expired'].includes(status) && <p className="mt-4 text-sm text-gray-700">This temporary result is not currently readable.</p>}
             {!canReview && selectedJob.contentAccessAllowed !== false && !ACTIVE_STATUSES.has(status) && !['submission_uncertain', 'failed', 'expired'].includes(status) && <p className="mt-4 text-sm text-gray-700">Open this draft to load its current details.</p>}
-            {status === 'ready' && <button type="button" onClick={deleteDraft} disabled={Boolean(busy)} className="mt-4 min-h-9 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50">Delete temporary draft</button>}
+            {status === 'ready' && <button type="button" onClick={deleteDraft} hidden={reviewOnly} disabled={Boolean(busy)} className="mt-4 min-h-9 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50">Delete temporary draft</button>}
           </section>}
           {correctionDetail?.correction?.operationId === selectedCorrectionId && <section className="mt-4 min-w-0 rounded-lg border border-gray-200 p-4" aria-labelledby="meeting-transcription-correction-title">
             <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 id="meeting-transcription-correction-title" className="text-base font-semibold text-gray-950">Correct published transcript</h3><p className="mt-1 text-xs leading-5 text-gray-600">This draft keeps the original wording and timestamps. Changes here only update speaker display names.</p></div><button type="button" onClick={() => void loadCorrection(selectedCorrectionId, { preserveDraft: true })} disabled={Boolean(busy)} className="min-h-9 shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">Reload correction</button></div>
@@ -832,7 +835,7 @@ function MeetingTranscriptionPanelForRequest({ requestId }) {
   );
 }
 
-export default function MeetingTranscriptionPanel({ requestId }) {
+export default function MeetingTranscriptionPanel({ requestId, apiBasePath, reviewOnly = false }) {
   if (!requestId) return null;
-  return <MeetingTranscriptionPanelForRequest key={requestId} requestId={requestId} />;
+  return <MeetingTranscriptionPanelForRequest key={`${requestId}:${apiBasePath || ''}:${reviewOnly ? 'review' : 'full'}`} requestId={requestId} apiBasePath={apiBasePath} reviewOnly={reviewOnly} />;
 }

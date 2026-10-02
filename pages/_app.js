@@ -22,10 +22,13 @@ export default function App({ Component, pageProps: { session, ...pageProps } })
     router.pathname.startsWith('/external/') ||
     router.pathname.startsWith('/apply');
 
-  // The rehearsal page has a server-side Preview/development guard and its own
-  // inert ProfileContext. Keep the normal auth/session providers out of it so
-  // opening the page cannot initialize live profile or session requests.
-  if (router.pathname === '/meeting-tracker/materials-email-rehearsal' && pageProps.rehearsalEnabled === true) {
+  // These rehearsal pages have server-side enablement guards and no need for
+  // the normal profile/app-access providers or global suite analytics.
+  const isMaterialsEmailRehearsal = router.pathname === '/meeting-tracker/materials-email-rehearsal'
+    && pageProps.rehearsalEnabled === true;
+  const isTranscriptionRehearsal = router.pathname === '/meeting-tracker/transcription-rehearsal'
+    && pageProps.rehearsalEnabled === true;
+  if (isMaterialsEmailRehearsal || isTranscriptionRehearsal) {
     return (
       <>
         <Head>

@@ -422,3 +422,46 @@ test('does not let a stale request load replace the newly selected request', asy
   await waitFor(() => expect(screen.queryByText('stale.m4a')).not.toBeInTheDocument());
   expect(global.fetch.mock.calls.map(([url]) => String(url)).some((url) => url.includes(VISIT_ID))).toBe(false);
 });
+
+test('review-only rehearsal supports speaker labels while hiding other job and publication actions', async () => {
+  const rehearsalBase = '/api/meeting-transcription-rehearsal';
+  put.mockClear();
+  const savedJob = job({ original_filename: 'synthetic-rehearsal.json' });
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const path = String(url);
+    if (path === rehearsalBase) return response(collection({
+      jobs: [savedJob],
+      currentArtifact,
+      publications: [{ operationId: OPERATION_ID, state: 'unknown', inputJobId: JOB_ID }],
+      correctionDrafts: [{ operationId: OPERATION_ID, state: 'draft', sourceRevisionId: 'synthetic-revision' }],
+    }));
+    if (path === `${rehearsalBase}/${JOB_ID}/speakers`) {
+      expect(options.method).toBe('PATCH');
+      return response({ job: job({ speaker_names: { A: 'Synthetic PI' } }) });
+    }
+    if (path === `${rehearsalBase}/${JOB_ID}`) return response({ job: savedJob, content, candidates: collection().candidates });
+    return response({});
+  });
+
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} apiBasePath={rehearsalBase} reviewOnly />);
+  fireEvent.click(await screen.findByRole('button', { name: /synthetic-rehearsal\.json/ }));
+  expect(await screen.findByRole('heading', { name: 'Detected speakers (2)' })).toBeInTheDocument();
+  expect(screen.getByText('Review the synthetic transcript and save speaker display names.')).toBeInTheDocument();
+  expect(screen.queryByLabelText('Audio file')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Upload and start transcription' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Publish transcript' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Delete temporary draft' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Publication status' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Correction drafts' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Current published transcript' })).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Download draft TXT' })).toHaveAttribute('href', `${rehearsalBase}/${JOB_ID}/download?format=txt`);
+
+  fireEvent.change(screen.getByLabelText('Manual display name for Speaker A'), { target: { value: 'Synthetic PI' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save names' }));
+  await screen.findByText('Speaker names saved.');
+  const writes = global.fetch.mock.calls.filter(([, options]) => ['POST', 'PATCH', 'DELETE'].includes(options?.method));
+  expect(writes).toHaveLength(1);
+  expect(writes[0][0]).toBe(`${rehearsalBase}/${JOB_ID}/speakers`);
+  expect(JSON.parse(writes[0][1].body)).toEqual({ expectedVersion: 1, speakerNames: { A: 'Synthetic PI' } });
+  expect(put).not.toHaveBeenCalled();
+});
