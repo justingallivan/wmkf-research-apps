@@ -86,6 +86,8 @@ const nextConfig = {
   outputFileTracingIncludes: {
     '/api/review-manager/export-reviews': ['./shared/templates/reviews/*.docx'],
     '/api/cron/send-review-thankyous': ['./shared/templates/reviews/*.docx'],
+    // Only Confirm (POST /runs) reaches the ledger schema check, which reads these at runtime.
+    '/api/admin/test-requests/runs': ['./lib/db/ledger-schema-fingerprint.json', './lib/db/ledger-schema-ahead.json'],
   },
   async redirects() {
     return [

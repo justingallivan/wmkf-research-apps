@@ -685,3 +685,208 @@ describe('exportSource / readArtifacts / recheck', () => {
     expect(await code(h.service.recheck({ profileId: PROFILE, runId: ids(h.actorId).runId }))).toBe('factory_run_not_production');
   });
 });
+
+// ---- slice 2: cooperative deadlines and recovery cases -----------------------
+
+describe('cooperative deadlines (slice 2)', () => {
+  const LOC_ID = '5a5a5a5a-5a5a-4a5a-8a5a-5a5a5a5a5a5a';
+  const PARENT_ID = '6b6b6b6b-6b6b-4b6b-8b6b-6b6b6b6b6b6b';
+  const DOC_COUNT = 7;
+
+  // The real default exporter with fakes, so the per-document hydrate checkpoint is exercised.
+  function sevenDocumentService() {
+    const sourceRow = {
+      akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
+      akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', versionnumber: 7,
+    };
+    const fakeClient = (resourceUrl) => ({
+      baseUrl: `${resourceUrl}/api/data/v9.2`,
+      async get(path) {
+        const ok = (body) => ({ ok: true, status: 200, body });
+        if (path.startsWith('/akoya_requests?')) return ok({ value: [sourceRow] });
+        if (path.startsWith(`/akoya_requests(${SOURCE_ID})`)) return ok({ akoya_requestid: SOURCE_ID, versionnumber: 7 });
+        if (path.startsWith('/sharepointdocumentlocations?')) {
+          return ok({ value: [{ sharepointdocumentlocationid: LOC_ID, relativeurl: '9000001_ROOT', _parentsiteorlocation_value: PARENT_ID }] });
+        }
+        if (path.startsWith(`/sharepointdocumentlocations(${PARENT_ID})`)) {
+          return ok({ sharepointdocumentlocationid: PARENT_ID, relativeurl: 'akoya_request' });
+        }
+        throw new Error(`unexpected Dataverse read ${path}`);
+      },
+    });
+    const pdf = Buffer.from('source-pdf');
+    const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    // The seven allowlisted source documents (admin-preview-service DOCUMENT_SPECS).
+    const items = [
+      ['Phase I', 'ProjectDescription.pdf'], ['Phase I', 'Biosketches.pdf'], ['Phase I', 'ProjectBudget.pdf'],
+      ['Phase I', 'Project Budget spreadsheet.xlsx'], ['Reviewer Materials', 'Proposal_9000001.pdf'],
+      ['AI Materials', 'ProposalNarrative_9000001.pdf'], ['AI Materials', 'ProposalBibliography_9000001.pdf'],
+    ].map(([sub, name], i) => ({
+      id: `item-${i + 1}`, sub, name, mimeType: name.endsWith('.xlsx') ? XLSX : 'application/pdf',
+    }));
+    expect(items).toHaveLength(DOC_COUNT);
+    const metaFor = (id) => {
+      const item = items.find((candidate) => candidate.id === id);
+      return {
+        id, name: item.name, size: pdf.length, mimeType: item.mimeType, eTag: `etag-${id}`, versionId: '1.0',
+      };
+    };
+    const clock = { t: Date.now() };
+    const downloads = [];
+    const ledger = fakeLedger();
+    const blobs = fakeBlob();
+    const sourceDependencies = {
+      getSharePointTargetInfo: () => ({ key: 'akoyago-shared', scope: 'shared', registered: true, hostname: 'appriver3651007194.sharepoint.com', pathname: '/sites/akoyago' }),
+      listFiles: async (library, folder) => {
+        if (library !== 'akoya_request') throw Object.assign(new Error('folder not found'), { code: 'graph_folder_not_found', status: 404 });
+        return items.map((item) => ({
+          id: item.id, name: item.name, folder: `${folder}/${item.sub}`, size: pdf.length, mimeType: item.mimeType, lastModified: '2026-09-20T10:00:00Z',
+        }));
+      },
+      getDriveId: async () => 'drive-1',
+      clearGraphCaches: () => {},
+      getFileMetadataById: async (_driveId, id) => metaFor(id),
+      downloadFile: async (_driveId, id) => {
+        downloads.push(id);
+        if (downloads.length === 4 && clock.deadlineAt != null) clock.t = clock.deadlineAt + 1; // time runs out during the 4th hydrate
+        return { buffer: pdf, filename: metaFor(id).name, mimeType: metaFor(id).mimeType, size: pdf.length };
+      },
+    };
+    const service = createAdminRunService({
+      env: { TEST_REQUEST_FACTORY_FORM: 'on', FACTORY_BLOB_RW_TOKEN: 't', TEST_REQUEST_SANDBOX_LEDGER_URL: SANDBOX_LEDGER },
+      deployment: 'preview',
+      ledgerDbFactory: () => ledger.db,
+      blob: blobs.blob,
+      createClient: ({ resourceUrl }) => fakeClient(resourceUrl),
+      getAccessToken: async () => 'fake-token',
+      sourceDependencies,
+      now: () => clock.t,
+    });
+    return { service, clock, downloads, blobs };
+  }
+
+  test('an export whose time runs out during the fourth hydrate is refused: no draft, later documents not hydrated', async () => {
+    const h = sevenDocumentService();
+    h.clock.deadlineAt = h.clock.t + 100_000;
+    const error = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001', deadlineAt: h.clock.deadlineAt }).catch((e) => e);
+    expect(error.httpStatus).toBe(504);
+    expect(error.code).toBe('factory_deadline_exceeded');
+    expect(error.message).toMatch(/Nothing was started/);
+    expect(h.downloads).toHaveLength(4);
+    expect(h.blobs.objects.size).toBe(0);
+    expect(h.blobs.calls.put).toHaveLength(0);
+  });
+
+  test('the same export within its deadline stores exactly one draft', async () => {
+    const h = sevenDocumentService();
+    const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001', deadlineAt: h.clock.t + 100_000 });
+    expect(h.downloads).toHaveLength(DOC_COUNT);
+    expect(h.blobs.objects.size).toBe(1);
+    expect(h.blobs.objects.has(draftPathname('sandbox', deriveActorId(PROFILE), result.draftId))).toBe(true);
+  });
+
+  test('export refuses before starting, and before the draft write, when the deadline has passed', async () => {
+    const h = harness({ deployment: 'preview' });
+    expect(await code(h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001', deadlineAt: h.clock.t - 1 }))).toBe('factory_deadline_exceeded');
+    expect(h.blobs.calls.put).toHaveLength(0);
+    // The injected exporter consumes the clock: the deadline passes after it returns, before the put.
+    const late = harness({ deployment: 'preview' });
+    const deadlineAt = late.clock.t + 1000;
+    const slow = createAdminRunService({
+      env: { TEST_REQUEST_FACTORY_FORM: 'on', FACTORY_BLOB_RW_TOKEN: 't', TEST_REQUEST_SANDBOX_LEDGER_URL: SANDBOX_LEDGER },
+      deployment: 'preview',
+      ledgerDbFactory: () => late.ledger.db,
+      blob: late.blobs.blob,
+      now: () => late.clock.t,
+      exportBundle: async ({ exportedAt }) => { late.clock.t += 5000; return bundleAt(exportedAt); },
+    });
+    expect(await code(slow.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001', deadlineAt }))).toBe('factory_deadline_exceeded');
+    expect(late.blobs.calls.put).toHaveLength(0);
+  });
+
+  test('advance with under 150 s left is refused before advanceRun and any lease; with enough time it advances', async () => {
+    const h = harness({ deployment: 'preview' });
+    await h.confirm();
+    const { runId } = ids(h.actorId);
+    const tooLate = await h.service.advance({ profileId: PROFILE, runId, deadlineAt: h.clock.t + 149_000 }).catch((e) => e);
+    expect(tooLate.httpStatus).toBe(504);
+    expect(tooLate.code).toBe('factory_deadline_exceeded');
+    expect(h.spies.advanceRun).not.toHaveBeenCalled();
+    const ok = await h.service.advance({ profileId: PROFILE, runId, deadlineAt: h.clock.t + 150_000 });
+    expect(ok.outcome).toBe('advanced');
+    expect(h.spies.advanceRun).toHaveBeenCalledTimes(1);
+  });
+
+  test('a ready run still answers when the deadline has passed (no step to start)', async () => {
+    const h = harness({ deployment: 'preview' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { status: 'ready' });
+    expect((await h.service.advance({ profileId: PROFILE, runId, deadlineAt: h.clock.t - 1 })).outcome).toBe('ready');
+  });
+
+  test('confirmRun past its deadline is refused before any run-path write', async () => {
+    const h = harness({ deployment: 'preview' });
+    const draftId = await h.exportDraft();
+    const putsBefore = h.blobs.calls.put.length;
+    const error = await h.service.confirmRun({ ...h.confirmArgs(draftId), deadlineAt: h.clock.t - 1 }).catch((e) => e);
+    expect(error.code).toBe('factory_deadline_exceeded');
+    expect(h.blobs.calls.put.slice(putsBefore).filter((c) => c.pathname.includes('/runs/'))).toHaveLength(0);
+    expect(h.blobs.calls.put).toHaveLength(putsBefore);
+    expect(h.ledger.rows.size).toBe(0);
+    expect(h.spies.schemaCheck).not.toHaveBeenCalled();
+  });
+
+  test('no deadlineAt leaves behaviour unchanged', async () => {
+    const h = harness({ deployment: 'preview' });
+    const result = await h.confirm();
+    expect(result.created).toBe(true);
+    const { runId } = ids(h.actorId);
+    expect((await h.service.advance({ profileId: PROFILE, runId })).outcome).toBe('advanced');
+  });
+});
+
+describe('slice 2 recovery cases', () => {
+  test('two overlapping Confirms with the same key reserve exactly one run and overwrite no artifact', async () => {
+    const h = harness({ deployment: 'preview' });
+    const draftId = await h.exportDraft();
+    const results = await Promise.allSettled([
+      h.service.confirmRun(h.confirmArgs(draftId)),
+      h.service.confirmRun(h.confirmArgs(draftId)),
+    ]);
+    expect(h.ledger.rows.size).toBe(1);
+    const winners = results.filter((r) => r.status === 'fulfilled' && r.value.created === true);
+    expect(winners).toHaveLength(1);
+    for (const loser of results.filter((r) => !winners.includes(r))) {
+      // The loser is refused at the create-only write, or is handed the winner's row.
+      if (loser.status === 'rejected') expect(loser.reason.code).toBe('factory_artifact_exists');
+      else expect(loser.value.created).toBe(false);
+    }
+    const { runId } = ids(h.actorId);
+    const runPuts = h.blobs.calls.put.filter((c) => c.pathname.includes(runId));
+    expect(runPuts.every((c) => !c.options.allowOverwrite)).toBe(true);
+    expect(h.blobs.calls.del).toHaveLength(0);
+  });
+
+  test('a lost COMMIT response with the row present: the retry returns the row and touches no artifact', async () => {
+    const h = harness({ deployment: 'preview' });
+    const draftId = await h.exportDraft();
+    await h.service.confirmRun(h.confirmArgs(draftId)); // committed; pretend the caller never saw the response
+    const putsBefore = h.blobs.calls.put.length;
+    const retry = await h.service.confirmRun(h.confirmArgs(draftId));
+    expect(retry.created).toBe(false);
+    expect(retry.run.runId).toBe(ids(h.actorId).runId);
+    expect(h.blobs.calls.put).toHaveLength(putsBefore);
+    expect(h.blobs.calls.del).toHaveLength(0);
+    expect(h.ledger.rows.size).toBe(1);
+  });
+
+  test('a second lookup of the same source mints a new draftId and a new draft path', async () => {
+    const h = harness({ deployment: 'preview' });
+    const first = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+    const second = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+    expect(second.draftId).not.toBe(first.draftId);
+    expect(h.blobs.objects.has(draftPathname('sandbox', h.actorId, first.draftId))).toBe(true);
+    expect(h.blobs.objects.has(draftPathname('sandbox', h.actorId, second.draftId))).toBe(true);
+    expect(h.blobs.objects.size).toBe(2);
+  });
+});
