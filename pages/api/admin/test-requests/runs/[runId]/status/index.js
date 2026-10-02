@@ -11,7 +11,7 @@
 import { withDalContext } from '../../../../../../../lib/dataverse/core/context';
 import { createAdminRunService } from '../../../../../../../lib/services/test-requests/admin-run-service';
 import {
-  hasOnlyKeys, invalidInput, isEmptyBody, isRunId, routeDeadline, sendError,
+  hasOnlyKeys, invalidInput, isEmptyBody, isExactGuid, isRunId, routeDeadline, sendError,
 } from '../../../../../../../lib/services/test-requests/admin-run-route-helpers';
 import { requireSuperuser } from '../../../../../../../lib/utils/auth';
 
@@ -47,9 +47,11 @@ export default async function handler(req, res) {
   }
 
   const body = req.body;
-  if (isEmptyBody(body) || !hasOnlyKeys(body, ['field', 'optionLabel'])) {
-    return invalidInput(res, 'The body must be exactly { field, optionLabel }.');
+  if (isEmptyBody(body) || !hasOnlyKeys(body, ['field', 'optionLabel'], ['changeId'])) {
+    return invalidInput(res, 'The body must be { field, optionLabel } with an optional changeId.');
   }
+  // Present only for "Check again": the service then resumes that change or refuses, and never starts another.
+  if (body.changeId !== undefined && !isExactGuid(body.changeId)) return invalidInput(res, 'changeId must be a GUID.');
   if (!FIELDS.has(body.field)) return invalidInput(res, 'field must be phase1 or phase2.');
   if (typeof body.optionLabel !== 'string' || body.optionLabel.trim().length < 1 || body.optionLabel.trim().length > 200) {
     return invalidInput(res, 'optionLabel must be 1 to 200 characters.');
@@ -62,6 +64,7 @@ export default async function handler(req, res) {
         runId,
         field: body.field,
         optionLabel: body.optionLabel.trim(),
+        changeId: body.changeId ?? null,
         deadlineAt,
       });
       res.setHeader('Cache-Control', 'no-store');

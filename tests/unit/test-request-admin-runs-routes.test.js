@@ -100,7 +100,7 @@ beforeEach(() => {
   createAdminRunService.mockReturnValue(service);
   service.exportSource.mockResolvedValue({ draftId: DRAFT_ID, summary: {}, defaults: {} });
   service.confirmRun.mockResolvedValue({ run: { runId: RUN_ID }, created: true });
-  service.listRuns.mockResolvedValue([{ runId: RUN_ID }]);
+  service.listRuns.mockResolvedValue({ runs: [{ runId: RUN_ID }], formEnabled: true, target: 'production' });
   service.inspectRun.mockResolvedValue({ run: { runId: RUN_ID }, resources: [] });
   service.advance.mockResolvedValue({ step: 'x', outcome: 'advanced' });
   service.recheck.mockResolvedValue({ runId: RUN_ID, ok: true });
@@ -283,10 +283,10 @@ describe('runs POST (Confirm)', () => {
 });
 
 describe('runs GET', () => {
-  test('wraps the list as { runs }', async () => {
+  test('passes through { runs, formEnabled, target }', async () => {
     const res = mockRes();
     await runsHandler({ method: 'GET', query: {} }, res);
-    expect(res.body).toEqual({ runs: [{ runId: RUN_ID }] });
+    expect(res.body).toEqual({ runs: [{ runId: RUN_ID }], formEnabled: true, target: 'production' });
   });
 });
 
@@ -394,8 +394,20 @@ describe('status', () => {
   test('POST passes exactly field, a trimmed optionLabel and deadlineAt, never rerun', async () => {
     await statusHandler(post({ field: 'phase2', optionLabel: '  Recommended ' }), mockRes());
     expect(service.changeStatus.mock.calls[0][0]).toEqual({
-      profileId: PROFILE, runId: RUN_ID, field: 'phase2', optionLabel: 'Recommended', deadlineAt: expect.any(Number),
+      profileId: PROFILE, runId: RUN_ID, field: 'phase2', optionLabel: 'Recommended', changeId: null, deadlineAt: expect.any(Number),
     });
+  });
+
+  test('POST passes an exact-GUID changeId through (Check again is resume-only); a malformed one is 400 and the service is not called', async () => {
+    await statusHandler(post({ field: 'phase2', optionLabel: 'Recommended', changeId: DRAFT_ID }), mockRes());
+    expect(service.changeStatus.mock.calls[0][0].changeId).toBe(DRAFT_ID);
+    service.changeStatus.mockClear();
+    for (const bad of ['not-a-guid', ` ${DRAFT_ID}`, 7, null]) {
+      const res = mockRes();
+      await statusHandler(post({ field: 'phase2', optionLabel: 'Recommended', changeId: bad }), res);
+      expect(res.statusCode).toBe(400);
+    }
+    expect(service.changeStatus).not.toHaveBeenCalled();
   });
 
   test('a 200 is only for outcome complete; every other outcome is 202', async () => {

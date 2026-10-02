@@ -4,7 +4,7 @@
  * ledger and a fake Dataverse client.
  */
 import { jest } from '@jest/globals';
-import { recheckStatusChange, runStatusChange } from '../../lib/services/test-requests/status-change-runner.js';
+import { readCurrentStatus, recheckStatusChange, runStatusChange } from '../../lib/services/test-requests/status-change-runner.js';
 
 const RUN_ID = '7293496e-cbe2-4245-81b7-63f6136cb1af';
 const REQUEST_ID = '83162701-82da-4669-94f7-6648bc9abbd3';
@@ -307,6 +307,37 @@ describe('exactly one PATCH per change', () => {
     expect(client.patches).toHaveLength(0);
   });
 
+  describe('resume-only (the form\'s Check again names the change)', () => {
+    test('the change was closed after a 412 between the reload and the call: nothing is planned and nothing is sent', async () => {
+      const client = fakeClient();
+      const ledger = memoryLedger(READY_RUN, [journaled('needs_attention')]);
+      const plan = jest.spyOn(ledger, 'planStatusChange');
+      await expect(change(client, ledger, { resumeChangeId: 'c1' })).rejects.toMatchObject({ code: 'status_change_concurrent', changeId: 'c1' });
+      expect(plan).not.toHaveBeenCalled();
+      expect(ledger.rows).toHaveLength(1);
+      expect(client.patches).toHaveLength(0);
+      // Without the change id the same call is a new, operator-confirmed change: it plans and sends.
+      await expect(change(client, ledger)).resolves.toMatchObject({ sequence: 2 });
+      expect(client.patches).toHaveLength(1);
+    });
+
+    test('a different change is open: refused, nothing sent', async () => {
+      const client = fakeClient();
+      const ledger = memoryLedger(READY_RUN, [journaled('planned')]);
+      await expect(change(client, ledger, { resumeChangeId: 'another-change' })).rejects.toMatchObject({ code: 'status_change_concurrent' });
+      expect(client.patches).toHaveLength(0);
+      expect(ledger.rows[0].status).toBe('planned');
+    });
+
+    test('the named change is still open: it resumes as usual', async () => {
+      const client = fakeClient({ request: { wmkf_phaseiistatus: 100000002, '@odata.etag': 'W/"101"' } });
+      const ledger = memoryLedger(READY_RUN, [DISPATCHED]);
+      await expect(change(client, ledger, { resumeChangeId: 'c1' })).resolves.toMatchObject({ sequence: 1 });
+      expect(client.patches).toHaveLength(0);
+      expect(ledger.rows[0].status).toBe('complete');
+    });
+  });
+
   test('dispatched and unchanged stays in progress on repeated calls, whatever the clock', async () => {
     const client = fakeClient();
     const ledger = memoryLedger(READY_RUN, [DISPATCHED]);
@@ -478,5 +509,21 @@ describe('recheckStatusChange', () => {
     const client = fakeClient({ jobs: [[{ asyncoperationid: '55555555-5555-4555-8555-555555555555', statecode: 1, statuscode: 10, createdon: AFTER }]] });
     const ledger = memoryLedger(READY_RUN, [{ changeId: 'c1', sequence: 1, field: PHASE2, optionBefore: null, optionAfter: 100000002, etagBefore: 'W/"100"', status: 'complete', dispatchedAt: '2026-09-28T22:00:00Z', effects: {} }]);
     await expect(recheckStatusChange({ client, ledger, runId: RUN_ID })).resolves.toMatchObject({ ok: false, openJobs: 1, failedJobs: 0 });
+  });
+});
+
+describe('readCurrentStatus', () => {
+  test('reads both option values with one $select GET; unset values are null', async () => {
+    const get = jest.fn(async () => ({ ok: true, status: 200, body: { akoya_requestid: REQUEST_ID, [PHASE1]: 100000001 } }));
+    expect(await readCurrentStatus({ get }, REQUEST_ID)).toEqual({ phase1: 100000001, phase2: null });
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(get.mock.calls[0][0]).toBe(`/akoya_requests(${REQUEST_ID})?$select=akoya_requestid,${PHASE1},${PHASE2}`);
+  });
+
+  test('a different row, or a failed read, is an error', async () => {
+    const other = { get: async () => ({ ok: true, status: 200, body: { akoya_requestid: SOURCE_ID } }) };
+    await expect(readCurrentStatus(other, REQUEST_ID)).rejects.toThrow();
+    const failed = { get: async () => ({ ok: false, status: 500, body: {} }) };
+    await expect(readCurrentStatus(failed, REQUEST_ID)).rejects.toThrow();
   });
 });
