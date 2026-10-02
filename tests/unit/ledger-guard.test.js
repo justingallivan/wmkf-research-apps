@@ -64,7 +64,7 @@ const EXTRA_TABLE_SHAPE = TABLE_SHAPE();
 const UNAPPROVED_EXTRA_LIVE = { tables: { test_request_runs: TABLE_SHAPE(), test_request_extra: EXTRA_TABLE_SHAPE }, functions: [] };
 const APPROVED_AHEAD = [{ migration: '058.sql', tables: { test_request_extra: EXTRA_TABLE_SHAPE } }];
 
-const WRITE_MODES = ['reserve', 'advance', 'set-status', 'status-recheck', 'create-cast', 'bind-reviewer', 'run-recheck'];
+const WRITE_MODES = ['reserve', 'advance', 'set-status', 'status-recheck', 'status-abandon', 'create-cast', 'bind-reviewer', 'run-recheck'];
 const READ_ONLY_MODES = [...LEDGER_CHECK_READ_ONLY_MODES];
 
 describe('requireLedgerUrl (executed, not just grepped for)', () => {
