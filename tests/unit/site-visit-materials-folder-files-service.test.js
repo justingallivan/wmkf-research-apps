@@ -107,7 +107,7 @@ describe('background materials registry links', () => {
   const backgroundDeps = (rows = [oldRow, current], overrides = {}) => deps({
     backgroundSchemaReady: () => true,
     getDriveId: jest.fn(async () => 'drive'),
-    findDocumentsByRequest: jest.fn(async () => rows),
+    findDocumentsByRequest: jest.fn(async () => ({ records: rows })),
     listFiles: jest.fn(async (_library, folder) => folder.endsWith('Site Visit - Slides') ? [
       { id: 'old-item', name: oldRow.wmkf_filename, webUrl: oldRow.wmkf_sharepointweburl },
       { id: 'manual', name: 'Staff copy.pptx', webUrl: 'https://sp/manual' },
@@ -133,6 +133,10 @@ describe('background materials registry links', () => {
       const result = await listSiteVisitMaterialFolderFiles({ requestId: REQUEST_ID }, backgroundDeps([{ ...oldRow, ...mismatch }, current]));
       expect(result.slides.map((file) => file.webUrl)).toContain('https://sp/old');
     }
+  });
+  it('rejects a malformed registry page instead of inventing empty files', async () => {
+    const d = backgroundDeps([], { findDocumentsByRequest: jest.fn(async () => ({})) });
+    await expect(listSiteVisitMaterialFolderFiles({ requestId: REQUEST_ID }, d)).rejects.toMatchObject({ httpStatus: 502 });
   });
   it('schema off does not read registry or resolve the drive', async () => {
     const d = backgroundDeps([], { backgroundSchemaReady: () => false });
