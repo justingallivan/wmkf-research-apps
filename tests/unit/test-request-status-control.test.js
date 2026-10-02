@@ -279,9 +279,9 @@ describe('status control', () => {
 
 describe('where the control appears', () => {
   const RUNS = '/api/admin/test-requests/runs';
-  async function openRun(run) {
+  async function openRun(run, { formEnabled = true } = {}) {
     const server = makeServer();
-    server.on('GET', RUNS, { status: 200, body: { runs: [run], formEnabled: true, target: 'production' } });
+    server.on('GET', RUNS, { status: 200, body: { runs: [run], formEnabled, target: 'production' } });
     server.on('GET', `${RUNS}/${run.runId}`, { status: 200, body: { run, resources: [], foundationCapturedAt: null } });
     server.on('GET', `${RUNS}/${run.runId}/status`, statusBody());
     render(<TestRequestFactorySection />);
@@ -296,6 +296,15 @@ describe('where the control appears', () => {
     const server = await openRun(base);
     await screen.findByLabelText('Status field');
     expect(server.count('GET', BASE)).toBe(1);
+  });
+
+  test('with the form off, the section passes that on: Set status is disabled and the reason says switched off', async () => {
+    await openRun(base, { formEnabled: false });
+    await screen.findByLabelText('Status field');
+    choose('phase2', 'Awarded');
+    const set = screen.getByRole('button', { name: 'Set status' });
+    expect(set.disabled).toBe(true);
+    expect(document.getElementById(set.getAttribute('aria-describedby')).textContent).toMatch(/switched off/);
   });
 
   test.each([
