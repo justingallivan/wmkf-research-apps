@@ -62,11 +62,13 @@ the combined 23-test passing result. Scoped lint, migration-manifest, Atlas,
 document-currency, document-catalog, document-symbol, and Request Document
 writer checks passed, including available paired self-tests.
 
-The earlier first-party Max `claude-fable-5-1` OAuth session
-`9726c14e-3f5f-40d7-a382-d9d80a544eec` returned **Commit OK** for the source
-then reviewed. A new post-bootstrap Fable review was blocked by auto-review
-before execution pending explicit paid/subscription-entitlement authorization;
-it is not a failed or no-findings review. Sol's
+First-party OAuth Max Fable session `f287cfdf-40ea-4f27-840c-4defee098bbf`
+(`claude-fable-5-1`) returned **Commit OK** for the isolated test bootstrap,
+with no blockers. This was source-only: no execution or environment reads,
+subagents, web calls, or permission denials. Residual limits: host/project
+binding relies on external metadata; verify-only confirms presence/provenance,
+not exhaustive schema drift; after a post-commit failure, use verify-only and
+never rerun fresh execute. This is not hosted/runtime/release proof. Sol's
 [implementation review](MEETING_TRANSCRIPTION_SOL_REVIEW_2026-10-01.md) records
 the earlier source review. The earlier bounded review records that the opt-in
 PostgreSQL suite skips without its test

@@ -479,11 +479,16 @@ sandbox/disabled flags, sandbox Dataverse target, interlock on, Production
 reads off, and DAL enforcement on. This is resource/schema readiness only;
 there was no deployment, feature enablement, provider call, or audio test.
 
-The earlier first-party Max Fable OAuth review returned **Commit OK** for the
-source then reviewed. The new post-bootstrap review was blocked by auto-review
-before execution while explicit paid/subscription-entitlement authorization
-is pending; it is not a failed review or a no-findings result. Hosted-adapter,
-quarantine/lease, correction, and cleanup gaps remain.
+**[VERIFIED via first-party OAuth Max source review]** Fable session
+`f287cfdf-40ea-4f27-840c-4defee098bbf` (`claude-fable-5-1`) returned **Commit
+OK** for the isolated test bootstrap, with no blockers. The review was
+source-only: no execution or environment reads, subagents, web calls, or
+permission denials. Residual limits: host/project binding relies on external
+metadata; verify-only checks presence/provenance, not exhaustive schema drift;
+after a post-commit failure use verify-only, never rerun fresh execute. No
+hosted/runtime/release proof follows from this review. The earlier Fable
+source review remains historical; hosted-adapter, quarantine/lease,
+correction, and cleanup gaps remain.
 
 Detailed bounded results and review limits are recorded in
 [the 2026-10-02 readiness check](evidence/MEETING_TRANSCRIPTION_READINESS_CHECK_2026-10-02.md).
