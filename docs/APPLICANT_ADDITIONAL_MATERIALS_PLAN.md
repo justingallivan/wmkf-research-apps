@@ -26,8 +26,7 @@ Sections 1–15 preserve the 2026-09-08 planning snapshot; §16 records subseque
 build and release status. Background processing is separately specified in
 [the 2026-10-01 plan](plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md).
 Its base code, schema and worker are deployed in Production, schema readiness is
-on, and admission remains off. Bounded recovery and older-file listing
-follow-ups are planned; this document does not authorize enabling admissions.
+on, and admission remains off. Bounded recovery and older-file listing follow-ups are source-built in draft PR #404; final Fable OAuth review and CI are running. They are not Production-deployed, and this document does not authorize enabling admissions.
 
 Build one **Site Visit Materials** workflow that collects applicant files, lets a Program
 Coordinator (PC) verify that the required files are present and render, and publishes selected
@@ -833,7 +832,12 @@ them in the Workbench without opening AkoyaGo.
   internal recursive document readers now opt into pruning `portal-<UUID>` children beneath
   canonical Site Visit materials folders, excluding uncommitted candidates and prior background
   copies. **[VERIFIED via source and five call sites: the original four-reader regressions passed
-  five suites (79 tests, one snapshot), and Grant Reporting passed two suites (18 tests).]** There are no counters or registry writes: a hand-placed file still does
+  five suites (79 tests, one snapshot), and Grant Reporting passed two suites (18 tests).]** The
+  follow-up exact-root filter is source-built on draft PR #404: it suppresses only exact
+  same-request portal-produced Superseded drive/item identities, preserves current/manual files,
+  and fails closed on incomplete registry evidence. Eight focused suites (103 tests, one snapshot)
+  passed; Sol approved. Final Fable OAuth review and PR #404 CI are running; this follow-up is not
+  Production-deployed. There are no counters or registry writes: a hand-placed file still does
   not count toward the collection summary or appear on the briefing page.
 - **Summary availability:** the PR #338 production baseline returned fail-open `null` on a
   Workbench summary failure, which could show "materials not requested". **[PRODUCTION-LIVE via
@@ -901,7 +905,7 @@ approximately 76 seconds based on token/finalize request times, not a measured c
 These observations do not establish near-limit 500 MB provider support. That rehearsal
 remains pending. Production retains the 2048 MB memory tier.
 
-### 16.15 Background processing [PRODUCTION SCHEMA/WORKER DEPLOYED; admission off; activation follow-ups planned]
+### 16.15 Background processing [PRODUCTION SCHEMA/WORKER DEPLOYED; admission off; activation follow-ups source-built, verification pending]
 
 The owner authorized reusing the durable reviewer-acceptance queue pattern to let applicants
 leave after private Blob transfer and committed Postgres admission. The bytes remain in
@@ -923,6 +927,4 @@ CI passed on prior head `837729b4e280317a3e20f93a377bf2947bd358a9` (1,199 suites
 19,110 tests, five snapshots; seven PostgreSQL suites, 114 tests). The L1 reader fix
 passed five focused suites (79 tests, one snapshot), with the added Grant Reporting caller
 passing two suites (18 tests). L2/L3 shared recovery passed 95 focused unit tests and 16
-real-PostgreSQL tests through the actual loopback CLI. Production recovery and older-root
-filtering follow-ups are planned in the linked canonical plan; updated-head CI remains
-required. This is not authorization to admit uploads or perform remote recovery.
+real-PostgreSQL tests through the actual loopback CLI. Production recovery and older-root filtering follow-ups are source-built in draft PR #404. The 23 operator unit tests and 16 local PostgreSQL tests passed; the reader changes passed eight suites (103 tests, one snapshot). Sol approved both. Final Fable OAuth review and PR #404 CI are running. Neither change is deployed. This is not authorization to admit uploads or perform a Production recovery mutation.
