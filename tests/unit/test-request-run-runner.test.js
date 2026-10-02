@@ -6,6 +6,7 @@
  * dependency objects (basic-clone-steps.js is already fully dependency
  * injected, so no module mocking is needed to run it offline).
  */
+import crypto from 'node:crypto';
 import { jest } from '@jest/globals';
 import {
   advanceRun, nextStepFor, recipeIncludesStep, recipeLeaseSeconds, recordFoundationTransitionBaseline, RECIPE_STEP_ORDER,
@@ -18,6 +19,7 @@ import { assertLedgerReceipt, reviewerAddressSha256 } from '../../lib/services/t
 import { reviewFileCopyPolicyDigest } from '../../lib/services/test-requests/review-file-copy.js';
 import { buildSourceBundle } from '../../lib/services/test-requests/source-bundle.js';
 import { SANDBOX_REHEARSAL_COPY_POLICY, copyPolicyDigest } from '../../lib/services/test-requests/bundle-file-copy.js';
+import { XLSX_MIME, buildXlsxCopyFixtures } from '../helpers/minimal-xlsx-package.js';
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
@@ -556,13 +558,13 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       wmkf_programdirector: 'Lookup', wmkf_grantprogram: 'Lookup', wmkf_projectleader: 'Lookup', akoya_primarycontactid: 'Lookup', wmkf_researchleader: 'Lookup',
     };
 
-    function fixture({ step, account, requestRow = null }) {
+    function fixture({ step, account, requestRow = null, documents = [], expectedFiles = 0 }) {
       const bundle = buildSourceBundle({
         sourceRow: {
           akoya_requestid: SOURCE_ID, akoya_requestnum: '1003222', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
           akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', versionnumber: 42,
         },
-        documents: [], dataverseHost: 'wmkf.crm.dynamics.com', exportedAt: new Date(), reviewers: [],
+        documents, dataverseHost: 'wmkf.crm.dynamics.com', exportedAt: new Date(), reviewers: [],
       });
       const routes = (requestPath) => {
         if (requestPath === `/accounts(${ORG_ID})`) return ok(account());
@@ -598,7 +600,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
           ...baseManifest().values, programDirectorId: PD_ID, grantProgramId: PROGRAM_ID, testLabel: 'TEST fixture', fiscalYear: 'December 2026',
           piContactId: PI_ID, liaisonContactId: LIAISON_ID, researchLeaderContactId: RESEARCH_LEADER_ID,
         },
-        invariants: { expectedSharePointFiles: 0 },
+        invariants: { expectedSharePointFiles: expectedFiles },
       });
       const run = baseRun({
         currentStep: step, stepIndex: RECIPE_STEP_ORDER.basic.indexOf(step), bundleSha256: sha256(bundle),
@@ -696,7 +698,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       expect(getResources()).toHaveLength(0);
     });
 
-    function verifyFixture(accountAfter, requestOverrides = {}) {
+    function verifyFixture(accountAfter, requestOverrides = {}, fixtureOptions = {}) {
       const body = {
         akoya_requestid: REQUEST_ID, akoya_title: 'TEST: fixture', akoya_fiscalyear: 'December 2026', akoya_requesttype: 100000000,
         akoya_purpose: 'Synthetic purpose', akoya_request: 5000, akoya_requeststatus: 'Phase II Pending',
@@ -708,7 +710,7 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
         _wmkf_programdirector_value: PD_ID, _wmkf_grantprogram_value: PROGRAM_ID,
         _wmkf_projectleader_value: PI_ID, _akoya_primarycontactid_value: LIAISON_ID, _wmkf_researchleader_value: RESEARCH_LEADER_ID, ...requestOverrides,
       };
-      const withRequest = fixture({ step: 'verify', account: () => accountAfter, requestRow });
+      const withRequest = fixture({ step: 'verify', account: () => accountAfter, requestRow, ...fixtureOptions });
       withRequest.manifest.createBody = body;
       return withRequest;
     }
@@ -775,6 +777,124 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       const { result } = await verifyWith(foundation(), null);
       expect(result.outcome).toBe('needs_attention');
       expect(result.errorMessage).toMatch(/pre-create baseline is missing/);
+    });
+
+    // A Basic XLSX copy verifies by package comparison: SharePoint rewrites
+    // docProps/custom.xml on upload, so exact-hash verification (the PDF
+    // path) can never pass. The verify step rebuilds its entries from ledger
+    // rows alone, so the copy_file receipt must carry what package mode needs.
+    describe('Basic XLSX file copy (package integrity)', () => {
+      const SHEET_NAME = 'Project Budget spreadsheet.xlsx';
+      // Receipt-shaped Graph ids (the ledger validates them); the bundle's
+      // export-time drive id differs from the freshly resolved one.
+      const DRIVE = 'b!AAAAAAAAAAAAAAAAAAAAAA';
+      const SNAPSHOT_DRIVE = 'b!SNAPSHOTSNAPSHOT0000';
+      const SOURCE_ITEM = `01${'A'.repeat(32)}`;
+      const NEW_ITEM = `01${'B'.repeat(32)}`;
+      const SITE = { key: 'akoyago-shared', hostname: 'appriver3651007194.sharepoint.com', pathname: '/sites/akoyago' };
+      const sha = (buffer) => crypto.createHash('sha256').update(buffer).digest('hex');
+      const foundationAfter = () => foundation({ versionnumber: 140, akoya_goverifytrigger: nowIso(-30_000), akoya_dexempt: nowIso().slice(0, 10), akoya_countofrequests: 11 });
+      let xlsx;
+
+      beforeAll(async () => { xlsx = await buildXlsxCopyFixtures(); });
+
+      function xlsxFixture(step, mimeType = XLSX_MIME, sourceBytes = xlsx.source) {
+        const document = {
+          id: 'inv-xlsx', kind: 'projectBudgetSpreadsheet', library: 'akoya_request', folder: '1003222_E43AE6EA/Phase I', name: SHEET_NAME,
+          driveId: SNAPSHOT_DRIVE, graphItemId: SOURCE_ITEM, sharePointSite: SITE, size: sourceBytes.length, mimeType,
+          eTag: '"src"', versionId: '1.0', contentHash: sha(sourceBytes),
+        };
+        const options = { documents: [document], expectedFiles: 1 };
+        const setup = step === 'verify'
+          ? verifyFixture(foundationAfter(), {}, options)
+          : fixture({
+            step, account: () => foundation(), documents: options.documents, expectedFiles: 1,
+            requestRow: { akoya_requestid: REQUEST_ID, akoya_requestnum: REQUEST_NUMBER, wmkf_meetingdate: '2026-12-01', _akoya_applicantid_value: ORG_ID },
+          });
+        setup.run.expectedGraphDriveId = DRIVE;
+        setup.run.destinationRequestNumber = REQUEST_NUMBER; // the production fence needs the number
+        setup.manifest.expectedGraphDriveId = DRIVE;
+        return { ...setup, sourceBytes };
+      }
+
+      // A SharePoint that stores `uploadedBytes` in place of what was PUT.
+      function sharePointGraph(sourceBytes, uploadedBytes, mimeType) {
+        const destination = new Map();
+        const itemById = (itemId) => [...destination.values()].find((item) => item.id === itemId) ?? null;
+        const graph = fakeGraph({
+          clearGraphCaches: () => {},
+          getDriveId: async () => DRIVE,
+          configuredSharePointTarget: () => ({ ...SITE, registered: true }),
+          getFileMetadataById: async (driveId, itemId) => (itemId === SOURCE_ITEM
+            ? { id: SOURCE_ITEM, name: SHEET_NAME, size: sourceBytes.length, mimeType, eTag: '"src"', versionId: '1.0' }
+            : itemById(itemId)),
+          downloadFile: async (driveId, itemId) => {
+            if (itemId !== SOURCE_ITEM) return { buffer: itemById(itemId).buffer };
+            if (driveId !== DRIVE) throw new Error(`source item is not on drive ${driveId}`); // only the freshly resolved id reaches it
+            return { buffer: sourceBytes };
+          },
+          getFileMetadataByPath: async (library, folder, filename) => destination.get(`${folder}/${filename}`) ?? null,
+          uploadFile: async (library, folder, filename, content, contentType, options) => {
+            const item = { id: NEW_ITEM, name: filename, size: uploadedBytes.length, eTag: '"new"', versionId: '1.0', buffer: uploadedBytes, folder };
+            destination.set(`${folder}/${filename}`, item);
+            if (options?.onItemCreated) await options.onItemCreated({ id: item.id, name: filename, size: item.size, eTag: item.eTag });
+            return { id: item.id, name: filename, size: item.size, eTag: item.eTag, versionId: '1.0' };
+          },
+          listFiles: async () => [...destination.values()].map((item) => ({ id: item.id, name: item.name, size: item.size, folder: item.folder })),
+        });
+        return { graph, destination };
+      }
+
+      async function copyThenVerify({ uploadedBytes = xlsx.promoted, mimeType = XLSX_MIME, sourceBytes = xlsx.source } = {}) {
+        process.env.DYNAMICS_CLIENT_ID = APP_USER_ID.replace(/./, '0');
+        const copySetup = xlsxFixture('copy_file', mimeType, sourceBytes);
+        const { graph } = sharePointGraph(sourceBytes, uploadedBytes, mimeType);
+        const { ledger, getResources } = createFakeLedger(copySetup.run);
+        const copied = await advanceRun({
+          runId: RUN_ID, ledger, manifest: copySetup.manifest, bundle: copySetup.bundle, deps: { client: copySetup.client, graph, sharePointTarget: SP_TARGET },
+        });
+        // Resume: a fresh ledger holding only the persisted rows (JSON round
+        // trip, receipt-validated), so the verify step inflates from rows alone.
+        const rows = JSON.parse(JSON.stringify(getResources()));
+        for (const row of rows) if (row.readback) assertLedgerReceipt(row.readback);
+        const verifySetup = xlsxFixture('verify', mimeType, sourceBytes);
+        const resumed = createFakeLedger(verifySetup.run);
+        for (const row of rows) resumed.getResources().push(row);
+        await resumed.ledger.journalPlannedResource({ step: 'fence_source', resourceKind: 'foundation_transition', system: 'dataverse', plannedIdentity: baselineFor(foundation()) });
+        const verified = await advanceRun({
+          runId: RUN_ID, ledger: resumed.ledger, manifest: verifySetup.manifest, bundle: verifySetup.bundle, deps: { client: verifySetup.client, graph, sharePointTarget: SP_TARGET },
+        });
+        return { copied, verified, rows };
+      }
+
+      test('reaches verified at copy_file, journals the package-mode keys, and the verify step passes after a resume', async () => {
+        const { copied, verified, rows } = await copyThenVerify();
+        expect(copied.errorMessage).toBeUndefined();
+        const row = rows.find((r) => r.step === 'copy_file' && r.resourceKind === 'sharepoint_file');
+        expect(row.outcome).toBe('verified');
+        expect(row.readback).toMatchObject({
+          mimeType: XLSX_MIME, sourceDriveId: DRIVE, attestedDigest: sha(xlsx.promoted), itemSize: xlsx.promoted.length, size: xlsx.source.length,
+        });
+        expect(verified.errorMessage).toBeUndefined();
+        expect(verified.outcome).toBe('ready');
+      });
+
+      test('a copy whose worksheet changed stops at copy_file', async () => {
+        const { copied } = await copyThenVerify({ uploadedBytes: xlsx.tampered });
+        expect(copied.outcome).toBe('needs_attention');
+        expect(copied.errorMessage).toMatch(/Package \(DOCX\/XLSX\) differs from the source/);
+      });
+
+      test('a PDF file keeps its receipt: no mimeType, no attestedDigest, the bundle snapshot drive id, and the exact-hash verify passes', async () => {
+        const pdf = Buffer.from('%PDF-1.4 synthetic');
+        const { copied, verified, rows } = await copyThenVerify({ uploadedBytes: pdf, sourceBytes: pdf, mimeType: 'application/pdf' });
+        expect(copied.errorMessage).toBeUndefined();
+        const { readback } = rows.find((r) => r.step === 'copy_file' && r.resourceKind === 'sharepoint_file');
+        expect(readback).not.toHaveProperty('mimeType');
+        expect(readback).not.toHaveProperty('attestedDigest');
+        expect(readback.sourceDriveId).toBe(SNAPSHOT_DRIVE);
+        expect(verified.outcome).toBe('ready');
+      });
     });
   });
 });
