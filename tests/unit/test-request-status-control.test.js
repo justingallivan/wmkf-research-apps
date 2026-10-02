@@ -111,7 +111,7 @@ describe('status control', () => {
     await screen.findByText('Status changed. Emails: 1, tracking rows: 2, payments: 0, background jobs: 3.');
     expect(server.bodies('POST', BASE)).toEqual([{ field: 'phase2', optionLabel: 'Recommended' }]);
     // The journal was reloaded and shows the change with labels, not numbers.
-    await screen.findByText('Not invited to Recommended');
+    await screen.findByText('Not invited → Recommended');
     expect(screen.getByText('Phase II status', { selector: 'td' })).toBeTruthy();
     // The option just set is now the current one: no second change can be started for it (the server would refuse a no-op).
     await screen.findAllByText('That status is already set. Choose a different one.');
@@ -323,7 +323,14 @@ describe('status control', () => {
     const recheck = screen.getByRole('button', { name: 'Recheck status effects' });
     expect(recheck.disabled).toBe(true);
     expect(document.getElementById(recheck.getAttribute('aria-describedby')).textContent).toMatch(/switched off/);
-    expect(screen.getByText('Not invited to Recommended')).toBeTruthy();
+    expect(screen.getByText('Not invited → Recommended')).toBeTruthy();
+  });
+
+  test('a change from an empty status reads "Not set → new", never "Not set to new"', async () => {
+    const server = makeServer().on('GET', BASE, statusBody([change({ optionBefore: null })]));
+    await renderControl(server);
+    expect(screen.getByText('Not set → Recommended')).toBeTruthy();
+    expect(screen.queryByText(/Not set to/)).toBeNull();
   });
 
   test('with the form off, an open change\'s Check again is disabled with the reason', async () => {
