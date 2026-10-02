@@ -129,12 +129,12 @@ describe('decideResume', () => {
     expect(decideResume(change, { value: PHASE_II.PENDING_COMMITTEE_REVIEW, etag: 'W/"11"' })).toBe('recovered');
   });
 
-  test('the before-value at the same row version allows one re-dispatch', () => {
-    expect(decideResume(change, { value: null, etag: 'W/"10"' })).toBe('redispatch');
+  test('the before-value at the same row version is dispatch (the journal status decides whether anyone may send)', () => {
+    expect(decideResume(change, { value: null, etag: 'W/"10"' })).toBe('dispatch');
   });
 
-  test('anything else needs a person', () => {
-    expect(decideResume(change, { value: null, etag: 'W/"12"' })).toBe('needs_attention');
-    expect(decideResume(change, { value: PHASE_II.DECLINED, etag: 'W/"12"' })).toBe('needs_attention');
+  test('anything else is a mismatch', () => {
+    expect(decideResume(change, { value: null, etag: 'W/"12"' })).toBe('mismatch');
+    expect(decideResume(change, { value: PHASE_II.DECLINED, etag: 'W/"12"' })).toBe('mismatch');
   });
 });
