@@ -60,7 +60,8 @@ vercel logs --environment production --since 1h -q "admin test-request run" -x
 | any | `timeout`, `network`, `upstream_http`, `unknown_error` **before** the step's write was attempted | Re-attempts the step | Yes |
 | `fence_source` | `source_fence_failed`, `preflight_identity_changed`, `manifest_digest_mismatch`, `preallocated_request_present` | Re-reads; stops again unless the cause was a transient read failure | Only if it clears. Nothing was created; look up the source again and start a new run |
 | `create_request` | first stop after the create was sent and refused or lost; a refusal is recorded as `unknown_error` **[RUN: Preview]** | Looks for the Request by its reserved ID. Found and owned: recovered, continues. Not found: `ambiguous_create_outcome` | Only if the create actually landed |
-| `create_request` | `ambiguous_create_outcome` **[RUN: Preview]**, `preallocated_request_present_not_owned` | Stops again. Never sends a second create | No. Start a new run |
+| `create_request` | `ambiguous_create_outcome` **[RUN: Preview]** | Reads the reserved ID again; never sends a second create. Found and owned: recovered, continues. Still absent: stops again | Only if the create eventually landed. Otherwise start a new run |
+| `create_request` | `preallocated_request_present_not_owned` | Stops again. Never sends a second create | No. Start a new run |
 | `correct_meeting_date` | `meeting_date_readback_mismatch` | Production never writes the date; stops again | No |
 | `provision_location` | `location_preexisting` | Re-reads; stops again | No |
 | `provision_location` | `location_readback_mismatch` | Re-reads; never creates a second location. A late-appearing location this run owns is recorded as recovered and the run continues; otherwise it stops again | Only if the location appears |
