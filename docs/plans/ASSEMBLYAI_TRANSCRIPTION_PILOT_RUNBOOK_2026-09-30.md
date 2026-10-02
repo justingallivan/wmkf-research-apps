@@ -443,7 +443,10 @@ secret-entry process; this runbook does not replace its registry.
   and Preview delivery before enabling real transcription.
 - **Account privacy:** the owner's 2026-09-30 Data Controls screenshot shows
   model-improvement opt-out on and asynchronous TTL set to **one day**, not
-  zero retention. Project/key coverage, deletion lag, upload-only cleanup and
+  zero retention. **[VERIFIED via owner decision, 2026-10-01] One-day provider
+  retention is acceptable with training opt-out maintained; immediate zero
+  retention is not required.** This does not change local retention or verify
+  exact physical-deletion timing. Project/key coverage, deletion lag, upload-only cleanup and
   contractual guarantees remain unverified. The owner accepts these uncertainties
   for explicitly non-sensitive testing without sending vendor support emails;
   that decision does not approve confidential recordings or paid test calls.
