@@ -27,7 +27,7 @@
 
 - `shared/components/meeting-tracker/MeetingTranscriptionPanel.js`, `lib/services/meeting-tracker-transcription/` — request-bound review and publication.
 - `pages/api/cron/drain-transcriptions.js`, `vercel.json` — daily cleanup and hourly recovery/alerts.
-- `docs/plans/MEETING_TRACKER_TRANSCRIPTION_PLAN_2026-10-01.md`, `docs/atlas/postgres-meeting-transcript-publications.md` — contract and persistence.
+- `docs/plans/MEETING_TRACKER_TRANSCRIPTION_PLAN_2026-10-01.md`, `docs/atlas/postgres-meeting-transcript-publications.md` — contract and persistence. <!-- drain-table:ignore reason=Meeting Tracker transcript publication Atlas, not the retired reviewer publications table -->
 - Release verification: focused tests, deployment/API/documentation gates and sequential self-tests, final PR CI, and production browser acceptance. This stop is documentation-only; run doc-currency/Atlas checks for changed references.
 - Claim-evidence report could not read local observation state; no observation row was fabricated. The original checkout's unrelated dirty test file remains untouched.
 
