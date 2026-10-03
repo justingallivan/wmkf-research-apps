@@ -8,6 +8,9 @@ import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import { bypassDynamicsRestrictions } from '../../lib/services/dynamics-context.js';
 import { assertRequestEmailAllowed } from '../../lib/services/test-requests/request-test-state.js';
 import { processAnnotations } from '../../lib/services/dynamics/annotations.js';
+jest.mock('../../lib/services/external-token.js', () => ({ mintScopedToken: jest.fn() }));
+import { DEFAULT_DEPENDENCIES as materialsDependencies } from '../../lib/services/site-visit-materials/collection-service.js';
+import { classifyEmailDispatchError } from '../../shared/utils/email-send-outcome.js';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const RUN_ID = '22222222-2222-4222-8222-222222222222';
@@ -87,6 +90,27 @@ describe('createEmailActivity delivery seam', () => {
     await expect(DynamicsService.createAndSendEmail(EMAIL))
       .rejects.toMatchObject({ code: 'test_request_email_denied', dispatched: false });
     expect(send).not.toHaveBeenCalled();
+  }));
+
+  test('materials default sender classifies shared Request guard refusal as a definite non-send', ctx(async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    getRecord.mockRejectedValue(new Error('temporary Request read failure'));
+    let refusal;
+    try {
+      await materialsDependencies.sendEmail({
+        subject: 'Materials', bodyText: 'Upload', from: 'pd@example.org',
+        to: ['reviewer@example.org'], cc: [], regardingId: REQUEST_ID,
+        url: 'https://example.org/materials', buttonLabel: 'Upload',
+      });
+    } catch (error) {
+      refusal = error;
+    }
+    expect(refusal).toMatchObject({ code: 'test_request_email_denied', dispatched: false });
+    expect(classifyEmailDispatchError(refusal)).toMatchObject({ outcome: 'failed', retryable: true });
+    expect(getRecord).toHaveBeenCalledWith('akoya_requests', REQUEST_ID, {
+      select: 'wmkf_istestrequest,wmkf_testcreationrunid',
+    });
+    expect(writeFetch).not.toHaveBeenCalled();
   }));
 
   test('leaves email that is not about a request unchanged', ctx(async () => {

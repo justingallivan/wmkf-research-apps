@@ -69,6 +69,23 @@ test('claims before sending, names only the missing items, sends from the creati
   expect(result).toMatchObject({ scanned: 1, eligible: 1, sent: 1, sendFailed: 0, receiptFailed: 0, claimLost: 0, errors: [] });
 });
 
+test.each([
+  ['an invalid collection Request GUID', row({ request_id: 'bad-guid' }), REQUEST],
+  ['a fetched Request that does not match the collection', row({ request_id: 'cccccccc-0000-4000-8000-000000000003' }), REQUEST],
+])('automatic reminder fails closed for %s before document reads, preparation, or claim', async (_label, invalidRow, fetchedRequest) => {
+  const d = deps({
+    listDue: jest.fn(async () => [invalidRow]),
+    getRequest: jest.fn(async () => fetchedRequest),
+  });
+  const result = await sweepMaterialsReminders({}, d);
+  expect(result).toMatchObject({ scanned: 1, eligible: 0, sent: 0 });
+  expect(result.errors).toHaveLength(1);
+  expect(d.findDocumentsByRequest).not.toHaveBeenCalled();
+  expect(d.prepareReminder).not.toHaveBeenCalled();
+  expect(d.claim).not.toHaveBeenCalled();
+  expect(d.sendReminder).not.toHaveBeenCalled();
+});
+
 test('nothing missing, no sender mailbox, and a lost claim each skip without sending', async () => {
   const complete = deps({ findDocumentsByRequest: async () => ({ records: [PDF, { ...PDF, wmkf_requestdocumentid: 'd2', wmkf_filename: '1003222 Site Visit Presentation.pptx' }, { ...PDF, wmkf_requestdocumentid: 'd3', wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.OTHER_APPLICANT_MATERIALS, wmkf_filename: '1003222 Site Visit Participant Bios.pdf' }] }) });
   expect(await sweepMaterialsReminders({}, complete)).toMatchObject({ skippedNothingMissing: 1, sent: 0 });

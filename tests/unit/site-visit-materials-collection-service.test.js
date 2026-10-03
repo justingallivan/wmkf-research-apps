@@ -168,7 +168,9 @@ describe('Test Request recipient checks on manual materials sends', () => {
 
     expect(mockGetSettingStrict).toHaveBeenCalledWith('testRequestEmailAllowlist');
     expectMaterialsEffects(d, action, true);
-    expect(d.sendEmail.mock.calls[0][0]).toMatchObject({ to: ['PI@example.edu'], cc: ['liaison@example.edu'] });
+    expect(d.sendEmail.mock.calls[0][0]).toMatchObject({
+      to: ['PI@example.edu'], cc: ['liaison@example.edu'], regardingId: REQUEST_ID,
+    });
   });
 
   test.each(['create', 'invite', 'remind'])('%s refuses one non-allowlisted recipient before side effects', async (action) => {
@@ -247,6 +249,7 @@ test('create: advancing request + active visit → due two business days before 
   expect(email.cc).toEqual(['liaison@example.edu']);
   expect(email.from).toBe('pc@wmkeck.org');
   expect(email.actingUserSystemId).toBe(ACTOR);
+  expect(email.regardingId).toBe(REQUEST_ID);
   expect(email.correlationKey).toBe('wmkf-site-visit-materials-invite:44444444-4444-4444-8444-444444444444');
   expect(email.url).toContain('https://apps.test/external/materials/jwt-');
   expect(email.buttonLabel).toBe('Upload site visit materials');
@@ -318,6 +321,7 @@ test('read joins the registry: state moves missing → received → ready; waive
   expect(reminder.bodyText).not.toContain('https://apps.test/external/materials/');
   expect(reminder.url).toContain('https://apps.test/external/materials/');
   expect(reminder.buttonLabel).toBe('Upload the missing items');
+  expect(reminder.regardingId).toBe(REQUEST_ID);
   expect(reminder.subject).toBe('W.M. Keck Foundation Research Presentation Materials Request');
   expect(reminder.correlationKey).toBe('wmkf-site-visit-materials-reminder:44444444-4444-4444-8444-444444444444:1');
   expect(collection.reminderCount).toBe(1);
@@ -406,6 +410,35 @@ test('manual reminder claims before sending (S507): claim order, 409 on a lost c
     .rejects.toMatchObject({ code: 'site_visit_materials_send_unconfirmed', httpStatus: 202 });
   expect(d.attachReminderEmailId.mock.calls.length).toBe(attachCallsBefore);
   expect(d.__stored().reminder_count).toBe(reminderCountBefore + 1);
+});
+
+test('send actions refuse a fetched Request or collection bound to a different Request before side effects', async () => {
+  const otherRequestId = '99999999-9999-4999-8999-999999999999';
+  const mismatchedRequest = deps({ getRequest: jest.fn(async () => ({ ...request(), akoya_requestid: otherRequestId })) });
+  await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR }, mismatchedRequest))
+    .rejects.toMatchObject({ code: 'site_visit_materials_request_mismatch' });
+  expect(mismatchedRequest.mint).not.toHaveBeenCalled();
+  expect(mismatchedRequest.insertCollection).not.toHaveBeenCalled();
+  expect(mismatchedRequest.sendEmail).not.toHaveBeenCalled();
+
+  const wrongInsertedCollection = deps();
+  wrongInsertedCollection.insertCollection.mockImplementation(async (input) => ({
+    ...openMaterialsRow(), id: input.id, request_id: otherRequestId,
+  }));
+  const created = await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR }, wrongInsertedCollection);
+  expect(created.invitationSent).toBe(false);
+  expect(created.invitationOutcome).toBe('failed');
+  expect(wrongInsertedCollection.sendEmail).not.toHaveBeenCalled();
+
+  for (const action of [inviteMaterialsContributors, remindMaterialsContributors]) {
+    const mismatchedCollection = deps();
+    mismatchedCollection.__setStored({ ...openMaterialsRow(), request_id: otherRequestId });
+    await expect(action({ requestId: REQUEST_ID, actorId: ACTOR }, mismatchedCollection))
+      .rejects.toMatchObject({ code: 'site_visit_materials_request_mismatch' });
+    expect(mismatchedCollection.updateContacts).not.toHaveBeenCalled();
+    expect(mismatchedCollection.claimManualReminder).not.toHaveBeenCalled();
+    expect(mismatchedCollection.sendEmail).not.toHaveBeenCalled();
+  }
 });
 
 test('a collection past its close instant reads as closed even before the sweep marks it; the schema flag off is 503', async () => {
