@@ -1,4 +1,37 @@
-# Session 567 Prompt: Factory handoff items 1–3 closed; observe the sweep and the next refusal
+# Session 568 Prompt: Meeting Tracker transcription live; preserve non-sensitive-use boundary
+
+## Session 567 Summary — 2026-10-02 PT (Codex transcription lane)
+
+[VERIFIED via merged PRs, production configuration/deployment readback, authenticated browser, and exact cleanup receipts] Meeting Tracker transcription is enabled for authorized staff. The owner accepted completion and requested this closeout on `main`. Operational evidence stays private; do not copy recordings, transcript text, secrets, test-record identifiers, or detailed operational receipts into public documentation.
+
+### What Was Completed
+
+1. **Production release:** PR #416 integrated the request-bound flow; PR #418 added daily cleanup and hourly Workflow recovery through the existing operations-alert channel. No minute polling was added. Production access and both schema-readiness controls are on; the separate Admin pilot switches remain off in the shared application.
+2. **Acceptance:** An approved short synthetic recording passed private upload, `universal-3-5-pro`, detected-speaker naming, minute-grouped TXT, VTT download, governed publication, and Staff Deliberations projection. The test's temporary content and exact published files were removed; its document was soft-retired. Audit receipts and the late-upload safety watch remain intentionally; existing meeting details/materials were preserved.
+3. **Review/verification:** Luna built/reconnoitered, Sol reviewed, root verified, and Fable approved the bounded release through subscription OAuth only. Final PR checks passed. One unrelated Jest deadline flake passed on retry without changing or bypassing that test. Both maintenance modes returned 200 when triggered through the platform; the warning email was accepted for delivery, not inbox-verified.
+4. **Privacy:** Approved non-sensitive recordings only. Owner-confirmed training opt-out and one-day provider retention are accepted; true zero retention and blanket confidential-use clearance are not established.
+
+### Commits
+
+- `23667af9d` — merge PR #416, transcription integration and disabled-release preparation.
+- `1cc4302d7`, `302e9de27` — maintenance/alerts and scheduled-job census/reference corrections, merged in PR #418 as `aa7d5b0e1`.
+
+### Next Items
+
+- **DONE:** Agreed implementation, review, production enablement, bounded acceptance, and synthetic-content cleanup. Do not reopen infrastructure work without a new requirement or observed failure.
+- **Owner decision needed:** Broader confidential use requires separate privacy assurances and an explicit processing decision; do not relabel sensitive recordings as non-sensitive.
+- **Parked / not claimed:** Maximum-size live test, callback delivery, calendar-triggered maintenance observation, inbox receipt, and closure of the conservative late-upload watch. Manual platform delivery and content deletion are verified, not proof of those separate properties.
+- **Verify before acting:** Other lanes below are preserved historical handoffs, not revalidated worklists. Re-probe their state before acting; no unrelated cleanup is authorized by this closeout.
+
+### Key Files / Testing
+
+- `shared/components/meeting-tracker/MeetingTranscriptionPanel.js`, `lib/services/meeting-tracker-transcription/` — request-bound review and publication.
+- `pages/api/cron/drain-transcriptions.js`, `vercel.json` — daily cleanup and hourly recovery/alerts.
+- `docs/plans/MEETING_TRACKER_TRANSCRIPTION_PLAN_2026-10-01.md`, `docs/atlas/postgres-meeting-transcript-publications.md` — contract and persistence.
+- Release verification: focused tests, deployment/API/documentation gates and sequential self-tests, final PR CI, and production browser acceptance. This stop is documentation-only; run doc-currency/Atlas checks for changed references.
+- Claim-evidence report could not read local observation state; no observation row was fabricated. The original checkout's unrelated dirty test file remains untouched.
+
+## Prior-lane handoffs — historical; not revalidated in Session 567
 
 ## Session 566 Summary — 2026-10-02 PT (Factory follow-ups lane, Claude Fable, home Mac)
 

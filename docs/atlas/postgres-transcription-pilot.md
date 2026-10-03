@@ -2,8 +2,8 @@
 title: "Atlas: AssemblyAI transcription pilot (Postgres)"
 domain: postgres
 kind: state-page
-status: dedicated-project-review-enabled-one-ready-job-speaker-label-live
-summary: "Dedicated Production is in review-only mode (pilot on, new submissions off). One authorized hosted job is ready with transcript retained, input Blob absent, and provider API deletion verified. Migration 062 is applied in isolated Neon and the speaker-label UI is live; hosted save/reload and TXT/VTT were verified. Timer delivery and maximum-size processing remain unverified."
+status: meeting-tracker-production-staff-enabled; dedicated-pilot-review-enabled
+summary: "Meeting Tracker transcription is enabled for Production staff after shared-schema verification and bounded end-to-end acceptance. The separate dedicated pilot remains review-only. Cleanup/recovery schedules are registered; clock-driven delivery and untested recovery branches remain unverified."
 canonical: true
 cataloged: 2026-10-01
 owner: product-engineering
@@ -20,6 +20,20 @@ related:
 # Atlas: AssemblyAI transcription pilot (Postgres)
 
 ## Current status
+
+**[VERIFIED via Production migration readback, deployment configuration, and
+bounded staff acceptance, 2026-10-02]** The shared Meeting Tracker release is
+staff-enabled after migrations 060–064 were applied and the physical schema was
+read back. Acceptance used an approved non-sensitive recording and exercised upload, speaker naming, TXT/VTT download,
+publication, Workbench review, and exact cleanup of temporary test content. A
+private operational receipt retains the evidence without placing test or actor
+identifiers here. PR #416 delivered the integrated runtime; PR #418 registered
+hourly recovery and daily cleanup and connected operational alerts. Provider
+training is opted out and retention is one day; this is not zero-data-retention.
+Use remains limited to approved non-sensitive recordings; confidential use is not approved.
+The unexercised route branches and clock-driven schedule delivery remain
+unverified. These claims describe the shared Meeting Tracker release, not the
+separate dedicated pilot described below.
 
 **[VERIFIED via Vercel configuration, owner-scoped browser review, and read-only
 database check, 2026-10-01]** Dedicated project
@@ -55,9 +69,9 @@ audio and transcript content. AssemblyAI owns the remote asynchronous job
 until completion or deletion. This table is not a transcript-content store,
 and it does not make a provider result authoritative until verified and saved.
 
-### Meeting Tracker extension — source-built; schema applied, feature disabled
+### Meeting Tracker extension — Production staff-enabled (2026-10-02)
 
-**[SOURCE-REVIEWED; FEATURE DISABLED.]** Migration 063 adds
+**[SOURCE-REVIEWED; PRODUCTION STAFF-ENABLED.]** Migration 063 adds
 nullable `request_id` and `site_visit_activity_id` UUID bindings to
 `transcription_jobs`; a CHECK requires both to be null or both non-null. These
 are Dataverse identities stored without Postgres foreign keys. It also adds
@@ -69,10 +83,13 @@ the Meeting Tracker schema extension was applied to shared Production on
 entries with no missing/extra names and verified `transcription_jobs`
 (61 columns, 27 constraints, 10 indexes),
 `transcription_workflow_dispatches` (10/7/2), and
-`meeting_transcript_publications` (30/17/4); all three Production tables are
-empty. Meeting Tracker transcription and AssemblyAI pilot enablement flags
-were unset at readback. This was schema-only and does not enable or release
-the Meeting Tracker feature. See the dated [disabled release receipt](../plans/evidence/TRANSCRIPTION_DISABLED_RELEASE_2026-10-02.md).
+`meeting_transcript_publications` (30/17/4); the three Production tables were
+empty at that pre-acceptance schema probe. Meeting Tracker transcription and
+AssemblyAI pilot enablement flags
+were unset at the earlier disabled-release readback. That checkpoint preceded
+the staff activation recorded above; it was schema-only and did not itself
+enable the feature. See the dated [disabled release receipt](../plans/evidence/TRANSCRIPTION_DISABLED_RELEASE_2026-10-02.md)
+for that pre-activation boundary.
 The Meeting Tracker routes, services, and `SiteVisitEditor` consumer are now
 present in source, including the publication-receipt recovery flow. This does
 not change or extend the isolated pilot's deployed behavior, and the global
@@ -83,10 +100,11 @@ quarantine/zero-row close path (closure waits until at least ten minutes after
 the receipt lease expires). Migration 064 adds close attribution to that
 receipt schema.
 
-**Follow-up source changes; Sol/root/Fable reviewed.** At the 2026-10-02
-disabled-release checkpoint these changes were not enabled in Production; see
-the [dated release receipt](../plans/evidence/TRANSCRIPTION_DISABLED_RELEASE_2026-10-02.md)
-for the pre-merge boundary and final deployment pointer.
+**Follow-up source changes; Sol/root/Fable reviewed.** These changes were
+included in the shared Production staff release recorded above. At the earlier
+2026-10-02 disabled-release checkpoint they were not enabled; see the [dated
+release receipt](../plans/evidence/TRANSCRIPTION_DISABLED_RELEASE_2026-10-02.md)
+for that pre-activation boundary.
 The shared transcription worker now releases a matching `ready` job lease after
 save-time and daily cleanup attempts, including when deletion fails;
 the bounded daily drain excludes job IDs already attempted in that pass so an
@@ -210,8 +228,9 @@ tracker must be reconciled against that target with owner authorization, then
 physical schema readback must verify both tracker and actual
 table/index/constraint shape. The disabled candidate uses the initialized
 isolated Neon database through dedicated-project Production environment
-values. The shared Production database schema was separately extended and
-physically verified on 2026-10-02; no transcription enablement followed.
+values. The shared Production schema was physically verified before the
+Meeting Tracker staff activation recorded above; the dedicated pilot's
+database and runtime remain separate.
 The existing-database path is `node scripts/apply-migrations.js`; the
 fresh-install-only `scripts/setup-database.js` must not be used on a populated
 database. See the [pilot pre-enable runbook](../plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_RUNBOOK_2026-09-30.md).

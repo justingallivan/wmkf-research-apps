@@ -2,8 +2,8 @@
 title: "Atlas: Meeting Tracker transcript publications (Postgres)"
 domain: postgres
 kind: state-page
-status: production-schema-verified-feature-disabled
-summary: "Migrations 063–064 are applied and physically verified in Production and dedicated Preview test Neon. The three Production tables are empty and Meeting Tracker transcription enablement flags are unset; the feature remains disabled. Hosted application runtime behavior is not claimed."
+status: production-live-controlled-acceptance-passed
+summary: "Migrations 063–064 and Wave 31 schema are verified in Production. Controlled non-sensitive end-to-end acceptance passed and staff access is enabled. Synthetic content was removed; publication audit and late-upload watch remain. Scheduled-time delivery is unobserved; confidential use is not approved."
 canonical: true
 cataloged: 2026-10-01
 owner: product-engineering
@@ -21,7 +21,7 @@ related:
 
 ## Status
 
-**[SOURCE-REVIEWED; FEATURE DISABLED.]** Migration 063 adds
+**[PRODUCTION-LIVE AFTER CONTROLLED ACCEPTANCE — 2026-10-02 PT.]** Migration 063 adds
 request/Site Visit bindings to `transcription_jobs` and defines
 `meeting_transcript_publications`; migration 064 adds the optional
 `closed_by_profile_id` audit field. **[VERIFIED via dedicated test-Neon
@@ -40,29 +40,30 @@ Production migration apply and read-only physical readback, 2026-10-02]** The
 Production migration ledger matches all 64 manifest entries, with no missing
 or extra names. `transcription_jobs` is present with 61 columns, 27
 constraints and 10 indexes; `transcription_workflow_dispatches` has 10/7/2;
-`meeting_transcript_publications` has 30/17/4. All three tables have zero
-rows. The probe verified a read-only transaction and rollback. All Meeting
-Tracker transcription and AssemblyAI pilot enablement flags were unset; the
-separate post-presentation schema/access controls remained on. This is schema
-provisioning only; Production feature/runtime enablement is not claimed. See
-the dated [disabled release receipt](../plans/evidence/TRANSCRIPTION_DISABLED_RELEASE_2026-10-02.md).
+`meeting_transcript_publications` has 30/17/4. All three tables had zero
+rows in this read-only pre-acceptance probe, which used a read-only transaction
+and rollback. The disabled-release receipt linked below is a historical
+checkpoint, not the current Production state.
 The dedicated AssemblyAI pilot's deployment
 and isolated-Neon state are recorded separately in [the pilot Atlas](postgres-transcription-pilot.md);
 those historical claims are unchanged by these source migrations.
 
-The source now includes request-bound upload/job, review, publication,
-correction, download, explicit reconciliation, and a `SiteVisitEditor` consumer.
-The source-controlled feature remains disabled in Production as of the
-2026-10-02 probe. The
-test-Neon schema is resource/bootstrap readiness, not deployment;
-the local integration proof does not verify hosted adapter or runtime
-behavior. The global active
+Production schema readiness, bundle readiness, and broad staff access were
+enabled after controlled, non-sensitive acceptance on 2026-10-02 PT. The full
+hosted flow passed: audio upload, AssemblyAI transcription, speaker-label edit,
+TXT/VTT downloads, Request Document publication, and Workbench visibility.
+Synthetic content was removed and its published SharePoint files were verified
+absent. The registry record was soft-retired; the publication/audit receipt and
+late-upload safety watch remain by design. This does not authorize confidential
+recordings. The owner accepted provider training opt-out and one-day retention
+for non-sensitive use; this is not zero-data-retention. The global active
 provider-slot limit remains unchanged. A valid text-only provider draft with
 no timed utterances remains readable and downloadable as TXT; publication
 fails with `meeting_transcript_timed_vtt_required` and does not invent cue
-times or publish an empty VTT. The focused contract/UI tests cover this edge;
-they do not establish a released or enabled application flow. Production
-schema application/readback does not establish hosted application behavior.
+times or publish an empty VTT. Wall-clock delivery of the registered daily and
+hourly schedules remains unobserved despite successful platform-triggered
+checks. The incomplete-maintenance warning was accepted for delivery but not
+confirmed in the recipient inbox.
 
 ## Ownership and relationships
 
@@ -198,9 +199,9 @@ For ordinary reconciliation, a verified receipt whose Request Document has
 been superseded is marked terminal `published` (with the superseded error
 code), and the newer current artifact remains unchanged.
 
-## Follow-up source changes — reviewed; no Production enablement claimed
+## Deployed follow-up behavior and bounded verification
 
-The disabled source now supports Meeting Tracker bundle formatter/schema v2
+The deployed flow supports Meeting Tracker bundle formatter/schema v2
 with optional, validated word timings. When word spans align with the exact
 utterance text, readable TXT may split an utterance at timed minute boundaries
 without dropping its punctuation or changing speaker attribution; absent or
@@ -208,8 +209,9 @@ misaligned timings retain whole-utterance v1 behavior. VTT continues to use the
 original utterance cues. New publications use v2; recovery accepts explicit v1
 and v2 source/manifests and rebuilds using the receipt's frozen formatter
 version so legacy v1 hashes remain reproducible. Optional word data is omitted
-if needed to stay within the existing 4 MB bounds. This is source behavior,
-not a deployed or database-applied format change.
+if needed to stay within the existing 4 MB bounds. Formatter v2 was exercised
+in the Production acceptance flow; no additional database migration was
+required for this format change.
 The correction UI consumes the service's normalized speaker/start/end/words
 shape, including timed turns with empty top-level text. A worker retry also
 preserves an already-written legacy output only after an exact byte match;
@@ -224,13 +226,14 @@ limit. Cleanup state separately projects observed content deletion and a
 pending late-upload watch. It retains the exact input pathname and upload
 window until a verified closure condition exists; expiry or a successful
 delete/HEAD observation is not treated as proof that late writes are
-impossible. The UI makes no claim that an automatic cleanup worker is running.
-At the 2026-10-02 disabled-release checkpoint these follow-ups were not
-enabled in Production; the dedicated isolated pilot's historical hosted
-behavior is unchanged. See the [dated release receipt](../plans/evidence/TRANSCRIPTION_DISABLED_RELEASE_2026-10-02.md)
-for the pre-merge boundary and final deployment pointer.
+impossible. Daily/hourly schedules are registered and platform-triggered
+invocations succeeded; scheduled-time delivery remains unobserved. The
+2026-10-02 disabled-release checkpoint remains historical. The dedicated
+isolated pilot's separate hosted behavior is unchanged. See the [dated release
+receipt](../plans/evidence/TRANSCRIPTION_DISABLED_RELEASE_2026-10-02.md) for
+that pre-merge boundary.
 
-The builder reports five focused Jest suites (95 tests) and changed-source
+Historical implementation verification: the builder reported five focused Jest suites (95 tests) and changed-source
 ESLint passing. Root's in-memory PGlite SQL check verified ready-lease release
 with matching token/version and rejection of wrong-token or stale-version
 release, plus same-drain claim exclusions; it also verified that an existing
@@ -240,26 +243,22 @@ Root's synthetic desktop/mobile UI check showed the same long utterance split
 between 0:00 and 1:00 without overflow; it does not exercise a provider or live
 deployment.
 
-## Synthetic speaker rehearsal boundary
+## Historical synthetic Preview speaker rehearsal
 
-An isolated Preview-only rehearsal is source-implemented and Sol/Fable-reviewed for fixed synthetic job
-`6f6f99ea-3d73-44a9-85e4-6fd6ec931f04`. It may read that ready job's transcript
+An earlier isolated Preview-only rehearsal was source-implemented and Sol/Fable-reviewed for a fixed synthetic job. It could read that ready job's transcript
 and private Blob output and save only the validated `speaker_names` overlay;
 the endpoint must not start, upload, queue, dispatch, or claim worker work.
-Access additionally requires the exact test request/visit binding, pinned
+Access additionally required the exact test request/visit binding, pinned
 staff identity, dedicated Preview project, and
 `MEETING_TRANSCRIPTION_REHEARSAL_ENABLED=on`. **[HOSTED SCOPED REHEARSAL VERIFIED]**
-Deployment `dpl_Fyu3auFAgsDkGCtuPjzD1u1AVKmP` from source `13d727983` is READY
-and the stable alias is assigned. Signed-in Chrome loaded three synthetic
+The isolated Preview deployment was READY at the time. Signed-in Chrome loaded three synthetic
 speakers; manual label save survived full-page reload, and TXT contained the
 three labels with entries at 0:00, 1:00, and 2:00. Anonymous collection
 returned 401; normal Tracker dashboard and rehearsal-start POST returned 404.
-VTT browser download remains unverified (`ERR_BLOCKED_BY_CLIENT`), despite an
-HTTP 200 server log. Only the fixed ready job, its 419-byte private Blob
-transcript, and label overlay were written; no CRM/provider/SharePoint write
-occurred. The demo remains for the user until expiry `2026-10-09T20:02:10.993Z`;
-expiry blocks access but no scheduled deletion is claimed. This adds no table
-and does not enable broader transcription or establish release readiness.
+VTT browser download was unverified in that Preview rehearsal despite an HTTP
+200 server log. This is historical and distinct from the later successful
+Production provider/publication flow, which independently verified TXT/VTT.
+The rehearsal added no table and did not itself enable Production processing.
 
 ## Source evidence
 
@@ -275,5 +274,5 @@ and does not enable broader transcription or establish release readiness.
 The existing-database migration path is `node scripts/apply-migrations.js`;
 fresh-install-only `scripts/setup-database.js` must not be used on a populated
 database. Migrations 063–064 were applied to Production and physically
-verified on 2026-10-02; schema provisioning does not authorize feature
-enablement or establish shared-runtime release readiness.
+verified on 2026-10-02. Controlled acceptance subsequently enabled Production
+staff access; schema application alone was not release authorization.

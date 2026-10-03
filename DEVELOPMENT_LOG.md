@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Meeting Tracker transcription launched for Production staff (Session 567)
+
+**Milestone:** Staff can upload a Site Visit recording, name detected speakers, publish a verified TXT/VTT bundle, and review it in Workbench.
+**Sessions:** 567 (Production activation and bounded synthetic rehearsal).
+**Ship state:**
+- PR #416 (`23667af9d`) delivered the integrated runtime; PR #418 (`aa7d5b0e1`) enabled daily cleanup, hourly recovery, and operational alerts.
+- Production staff acceptance used an approved non-sensitive recording and passed upload, speaker naming, transcript publication, TXT/VTT download, and Workbench review; temporary test content was removed and a private operational receipt retained.
+- Use remains limited to approved non-sensitive recordings. Provider training is opted out; retention is one day, not zero-data-retention.
+**Why it matters:** Staff now have a governed, recoverable transcript workflow attached to Meeting Tracker Site Visits.
+**Pointers:** `docs/atlas/postgres-transcription-pilot.md`; `docs/API_ROUTE_SECURITY_MATRIX.md`; PRs #416 and #418.
+
 ## October 2026 — Open received applicant materials from Meeting Tracker (Session 565)
 
 **Milestone:** Staff can open uploaded applicant files directly from the Site Visit materials card.
