@@ -28,6 +28,7 @@ export const ERROR_COPY = Object.freeze({
   factory_source_not_grant: "That source isn't a Grant Request, so nothing was created. Choose a different source Request.",
   factory_draft_missing: 'The saved copy of the source is gone, so nothing was reserved. Look up the source Request again.',
   factory_draft_stale: 'The saved copy of the source is too old to use safely, so nothing was reserved. Look up the source Request again.',
+  factory_bundle_abstract_required: 'This saved source predates the abstract copy check, so nothing was reserved. Look up the source Request again to export a fresh copy.',
   factory_target_mismatch: `This run's plan doesn't match this deployment, so nothing was advanced. ${CONTACT}`,
   factory_manifest_unsupported: `This run's plan isn't one this form can advance, so nothing was advanced. ${CONTACT}`,
   factory_run_not_found: "That run wasn't found, so nothing was changed. It may have been removed. Reload the list.",

@@ -15,10 +15,10 @@
  * absolute path outside the repository and never printed. Stdout carries only
  * the summary (identities, counts, hash prefixes).
  *
- * Reviewer content (bundle v3, 6c-ii Stage A) is confidential -- answer text
+ * Reviewer content (when requested) is confidential -- answer text
  * and uploaded review files must only leave production when explicitly
- * asked. It is OFF by default (a plain export writes exactly the pre-Stage-A
- * v2 bundle). Pass `--with-reviewers` to include the `reviewers[]` section,
+ * asked. It is OFF by default (reviewers are omitted); every export carries
+ * the applicant abstract in bundle v5. Pass `--with-reviewers` to include the `reviewers[]` section,
  * and `--source-marker-column=present|absent` (required with
  * `--with-reviewers`; no default) to say whether the PRODUCTION host has
  * wave30's `wmkf_issyntheticreviewer` column applied -- this is deliberately
@@ -32,7 +32,7 @@
  *     --source-request-number=<number> --out=/absolute/private/bundle.json \
  *     --with-reviewers --source-marker-column=absent
  *
- * The Pre-Site section (bundle v4, slice 4a "Recipe 4") is likewise OFF by
+ * The Pre-Site section (slice 4a "Recipe 4") is likewise OFF by
  * default and requires `--with-reviewers` too (v4 extends v3). Pass
  * `--with-pre-site` to include the source's current Pre-Site draft (eight
  * section fields plus the parsed proposal-core envelope), its abstract, and
@@ -88,7 +88,7 @@ const SOURCE_BUNDLE_DEPENDENCIES = createStrictTestRequestSourceDependencies();
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE_SELECT = [
   'akoya_requestid', 'akoya_requestnum', 'akoya_requesttype', 'akoya_purpose',
-  'akoya_request', 'akoya_fiscalyear', 'wmkf_meetingdate', 'versionnumber',
+  'akoya_request', 'akoya_fiscalyear', 'wmkf_meetingdate', 'wmkf_abstract', 'versionnumber',
 ].join(',');
 
 export function parseArgs(argv) {
@@ -129,7 +129,7 @@ export function parseArgs(argv) {
   // Bundle v4 (slice 4a, Recipe 4): the Pre-Site section extends v3, never
   // stands alone (buildSourceBundle enforces this again, defensively).
   if (parsed.withPreSite && !parsed.withReviewers) {
-    throw new Error('--with-pre-site requires --with-reviewers (bundle v4 extends v3).');
+    throw new Error('--with-pre-site requires --with-reviewers.');
   }
   return parsed;
 }
@@ -293,9 +293,8 @@ async function listPreSiteDocuments(client, requestId) {
 /**
  * `null` (no Pre-Site dependencies) unless `--with-pre-site` was passed;
  * parseArgs already refused `--with-pre-site` without `--with-reviewers`.
- * `readAbstract` is a separate, equally narrow $select read (never through
- * `SOURCE_SELECT`, which the Basic create body/plan digest already bind to
- * -- P4 owner decision: `wmkf_abstract` must never enter that projection).
+ * The abstract is captured from the same source Request row as its revision
+ * for bundle v5; it is not a separate or browser-supplied read.
  */
 export function buildPreSiteDependencies(args, { client }) {
   if (!args.withPreSite) return null;
@@ -308,13 +307,6 @@ export function buildPreSiteDependencies(args, { client }) {
         getCoPIs: (requestId) => getCoPIsForPreSite(client, requestId),
       },
     ),
-    readAbstract: async (source) => {
-      const body = bodyOrThrow(
-        'source Request abstract read',
-        await client.get(`/akoya_requests(${source.akoya_requestid})?$select=akoya_requestid,wmkf_abstract`),
-      );
-      return body.wmkf_abstract ?? null;
-    },
   };
 }
 
@@ -324,9 +316,10 @@ async function main() {
     console.log('Usage: DATAVERSE_ALLOW_PROD_READS=yes node --env-file=/abs/.env.local '
       + 'scripts/export-test-request-source-bundle.mjs --source-request-number=<n> --out=/abs/bundle.json '
       + '[--with-reviewers --source-marker-column=present|absent]');
-    console.log('  --with-reviewers: include the confidential reviewers[] section (bundle v3). Off by default (writes the plain v2 bundle).');
+    console.log('  This export writes a v5 bundle with the applicant abstract.');
+    console.log('  --with-reviewers: include the confidential reviewers[] section. Off by default.');
     console.log('  --source-marker-column=present|absent: required with --with-reviewers, no default. Whether the PRODUCTION host has wave30\'s wmkf_issyntheticreviewer column -- NOT read from SYNTHETIC_REVIEWER_ISOLATION (that switch governs the app\'s own reads on whatever host this process points at; the exporter reads production while a later sandbox seeder may run against a sandbox with different schema state).');
-    console.log('  --with-pre-site: include the preSiteVisit section and abstract (bundle v4). Requires --with-reviewers (v4 extends v3). Off by default.');
+    console.log('  --with-pre-site: include the preSiteVisit section. Requires --with-reviewers. Off by default.');
     return;
   }
   const hostname = productionHost();
@@ -336,12 +329,12 @@ async function main() {
   // P2-C (Opus round 2, reversing round 1's "always wire the triad"):
   // reviewer content is confidential and is only read/exported when
   // --with-reviewers is explicitly passed. Without it, no reviewer
-  // dependencies are given to the exporter at all, so it writes exactly the
-  // pre-Stage-A v2 bundle (golden-digest-identical).
+  // dependencies are given to the exporter at all, so it omits the
+  // reviewers[] section while retaining the required v5 applicant abstract.
   const reviewerDeps = buildReviewerDependencies(args, { client, graph: SOURCE_BUNDLE_DEPENDENCIES });
   // Slice 4a: same posture for the Pre-Site section -- no dependencies at
   // all unless --with-pre-site was explicitly passed, so a plain or
-  // --with-reviewers-only export stays exactly v2/v3 (golden-digest-identical).
+  // --with-reviewers-only export has v5 plus reviewers, without Pre-Site data.
   const preSiteDeps = buildPreSiteDependencies(args, { client });
 
   const bundle = await withDalContext('export-test-request-source-bundle', () => (

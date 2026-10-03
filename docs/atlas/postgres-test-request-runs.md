@@ -161,6 +161,7 @@ the B4 plan forbids pointing that runner at them (cast plan, *Order* 6, §6).
 ### Factory artifact Blob store
 
 - **Store:** private Vercel Blob store `wmkf-factory-private` (`store_I7EbkXANJL0zeaby`), token `FACTORY_BLOB_RW_TOKEN` (Production only). The ledger holds no source text; the form keeps the source bundle and the run manifest here.
+- **Factory source bundle v5 (2026-10-03):** [SOURCE-BUILT on `codex/factory-abstract-fix`; not deployed or live-proved.] The private bundle includes the source Request's applicant `wmkf_abstract` for ordinary basic clones. The compiler copies it to the new Request and source fencing/readback verify it; only bundle/body digests enter the ledger. This does not include `wmkf_abstractformatted` or `wmkf_abstractapproved`.
 - **Pathnames** (minted only by `factory-artifact-store.js`): `<target>/drafts/<actorId>/<draftId>/bundle.json` at source lookup; `<target>/runs/<runId>/{bundle,manifest}.json` at Confirm, written create-only before the ledger row is reserved.
 - **Reader:** `advance` (manifest, and the bundle checked against the run's `bundleSha256`), the artifacts route, and the owner-run `scripts/factory-artifacts-download.mjs`.
 - **Deletion:** only `sweepFactoryArtifacts`, run by the daily maintenance cron (`pages/api/cron/maintenance.js`), and only when both `TEST_REQUEST_LEDGER_URL` and `FACTORY_BLOB_RW_TOKEN` are set, which is now true in Production. It deletes drafts older than 6 hours; a run's two objects when its ledger row is `ready`; and objects with no ledger row once all are older than 24 hours. It never deletes for a `prepared`, `creating` or `needs_attention` run, so the artifacts of a parked run (today: `20407283`) stay until someone removes them by hand. Caps: 1,000 objects scanned per prefix and 200 deletions per sweep. Not yet observed running in Production.
@@ -289,7 +290,7 @@ fallback. Owner decision P2 (design doc): the draft is copied from the
 source bundle's `preSiteVisit` section, never regenerated, so a correctly
 seeded row (FAILED, a factory-owned `wmkf_lasterrorcode` outside
 `UNCHANGED_RETRY_BLOCKED_CODES`, the stub run bound) never reaches
-`runProposalCore`. `--reserve --recipe=pre_site_visit` requires a bundle v4
+`runProposalCore`. `--reserve --recipe=pre_site_visit` requires a bundle v5
 `preSiteVisit` section (`assertBundleHasPreSiteSectionForRecipe`,
 `source-bundle.js`), refused before any Dataverse read; reviewer-address
 requirements are unchanged (`recipeSeedsReviewers(pre_site_visit)` is already

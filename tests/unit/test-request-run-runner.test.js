@@ -400,15 +400,24 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
         if (requestPath.includes('PicklistAttributeMetadata')) {
           return ok({ OptionSet: { Options: [{ Value: 100000000, Label: { UserLocalizedLabel: { Label: 'Grant' } } }] } });
         }
-        if (requestPath.includes('MoneyAttributeMetadata')) return ok({ MinValue: 0, MaxValue: 1 });
+        if (requestPath.includes('MoneyAttributeMetadata')) return ok({ MinValue: 0, MaxValue: 1_000_000_000 });
         if (requestPath.includes('StringAttributeMetadata') || requestPath.includes('MemoAttributeMetadata')) return ok({ MaxLength: 100 });
         if (requestPath.includes('EntityDefinitions')) {
           const names = [...requestPath.matchAll(/LogicalName eq '([a-z_]+)'/g)].map((m) => m[1]);
-          return ok({ value: names.map((field) => ({ LogicalName: field, AttributeType: 'String', IsValidForCreate: true, RequiredLevel: { Value: 'None' } })) });
+          const types = {
+            akoya_requestid: 'Uniqueidentifier', akoya_applicantid: 'Lookup', akoya_request: 'Money', akoya_requesttype: 'Picklist',
+            wmkf_meetingdate: 'DateOnly', wmkf_istestrequest: 'Boolean', wmkf_respondreminderenabled: 'Boolean',
+            wmkf_reviewduereminderenabled: 'Boolean', wmkf_programdirector: 'Lookup', wmkf_grantprogram: 'Lookup',
+            wmkf_projectleader: 'Lookup', akoya_primarycontactid: 'Lookup', wmkf_researchleader: 'Lookup',
+            akoya_purpose: 'Memo', wmkf_abstract: 'Memo',
+          };
+          return ok({ value: names.map((field) => ({ LogicalName: field, AttributeType: types[field] ?? 'String', IsValidForCreate: true, RequiredLevel: { Value: 'None' } })) });
         }
         if (requestPath.startsWith('/wmkf_grantprograms')) return ok({ value: [{ wmkf_grantprogramid: PROGRAM_ID, wmkf_name: 'Research' }] });
         if (requestPath.startsWith(`/akoya_requests(${REQUEST_ID})`)) return { ok: false, status: 404, body: null };
-        if (requestPath.startsWith(`/akoya_requests(${SOURCE_ID})`)) return ok({ akoya_requestid: SOURCE_ID, versionnumber: liveSourceVersion });
+        if (requestPath.startsWith(`/akoya_requests(${SOURCE_ID})`)) return ok({
+          akoya_requestid: SOURCE_ID, versionnumber: liveSourceVersion, wmkf_abstract: 'Applicant source abstract',
+        });
         if (requestPath.startsWith('/accounts')) return ok({ value: [{ accountid: ORG_ID, name: 'W. M. Keck Foundation', statecode: 0 }] });
         if (requestPath.startsWith('/sharepointsites')) return ok({ value: [{ sharepointsiteid: 'site-x', absoluteurl: 'https://example.sharepoint.com/sites/akoyago' }] });
         if (requestPath.startsWith('/sharepointdocumentlocations')) return ok({ value: [{ sharepointdocumentlocationid: 'parent-1', _parentsiteorlocation_value: 'site-x' }] });
@@ -421,16 +430,31 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
     };
   }
 
-  async function runProductionCreate({ body, liveSourceVersion = 42, castMembers = VERIFIED_CAST, castContactState = 0, castDrift = {} }) {
+  async function runProductionCreate({ body, liveSourceVersion = 42, castMembers = VERIFIED_CAST, castContactState = 0, castDrift = {}, applicantAbstract, step = 'create_request' }) {
+    const sourceRow = {
+      akoya_requestid: SOURCE_ID, akoya_requestnum: '1003222', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
+      akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', versionnumber: 42,
+      ...(applicantAbstract === undefined ? {} : { wmkf_abstract: applicantAbstract }),
+    };
     const bundle = buildSourceBundle({
-      sourceRow: {
-        akoya_requestid: SOURCE_ID, akoya_requestnum: '1003222', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
-        akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', versionnumber: 42,
-      },
+      sourceRow,
       documents: [], dataverseHost: 'wmkf.crm.dynamics.com', exportedAt: new Date(), reviewers: [],
+      ...(applicantAbstract === undefined ? {} : { applicantAbstract }),
     });
+    const postWithOptions = jest.fn();
+    const client = productionClient(postWithOptions, liveSourceVersion, null, castContactState, castDrift);
+    process.env.DYNAMICS_CLIENT_ID = APP_USER_ID.replace(/./, '0');
+    const values = {
+      ...baseManifest().values, testLabel: 'TEST: fence fixture', fiscalYear: 'December 2026',
+      programDirectorId: PD_ID, grantProgramId: PROGRAM_ID,
+      piContactId: PI_ID, liaisonContactId: LIAISON_ID, researchLeaderContactId: RESEARCH_LEADER_ID,
+    };
+    if (applicantAbstract !== undefined && body === undefined) {
+      const preflight = await runPreflight(client, fakeGraph(), () => ({ registered: true, key: 'akoyago-shared', siteUrl: 'https://example.sharepoint.com/sites/akoyago' }));
+      body = compileBody(preflight, values, bundle.source.request, bundle.abstract);
+    }
     const run = baseRun({
-      currentStep: 'create_request', stepIndex: 1, createBodySha256: sha256(body), bundleSha256: sha256(bundle),
+      currentStep: step, stepIndex: step === 'fence_source' ? 0 : 1, createBodySha256: sha256(body), bundleSha256: sha256(bundle),
       copyPolicyDigest: copyPolicyDigest(), sourceRevision: bundle.source.request.revision,
       destinationEnvironment: 'production', destinationDataverseHost: 'wmkf.crm.dynamics.com',
     });
@@ -442,15 +466,14 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
         dataverseHost: bundle.source.dataverseHost, exportedAt: bundle.exportedAt, requestNumber: '1003222',
       },
       copyPolicy: { version: SANDBOX_REHEARSAL_COPY_POLICY.version, digest: copyPolicyDigest() },
-      values: { ...baseManifest().values, programDirectorId: PD_ID, grantProgramId: PROGRAM_ID, piContactId: PI_ID, liaisonContactId: LIAISON_ID, researchLeaderContactId: RESEARCH_LEADER_ID },
+      values,
     });
     process.env.DYNAMICS_CLIENT_ID = APP_USER_ID.replace(/./, '0');
-    const postWithOptions = jest.fn();
     const result = await advanceRun({
       runId: RUN_ID, ledger, manifest, bundle,
-      deps: { client: productionClient(postWithOptions, liveSourceVersion, null, castContactState, castDrift), graph: fakeGraph(), sharePointTarget: () => ({ registered: true, key: 'akoyago-shared', siteUrl: 'https://example.sharepoint.com/sites/akoyago' }) },
+      deps: { client, graph: fakeGraph(), sharePointTarget: () => ({ registered: true, key: 'akoyago-shared', siteUrl: 'https://example.sharepoint.com/sites/akoyago' }) },
     });
-    return { result, postWithOptions };
+    return { result, postWithOptions, body };
   }
 
   const legitBody = { akoya_requestid: REQUEST_ID, akoya_title: 'TEST: fixture', akoya_purpose: 'Synthetic purpose', akoya_request: 5000 };
@@ -475,6 +498,19 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       body: { ...legitBody, 'wmkf_ProjectLeader@odata.bind': `/contacts(${PI_ID})`, 'akoya_primarycontactid@odata.bind': `/contacts(${LIAISON_ID})`, 'wmkf_ResearchLeader@odata.bind': `/contacts(${RESEARCH_LEADER_ID})` },
     });
     expect(postWithOptions).toHaveBeenCalledTimes(1);
+  });
+
+  test('v5 fence_source recompiles the exact abstract into the create body before advancing', async () => {
+    const applicantAbstract = 'Applicant source abstract';
+    const { result, postWithOptions, body } = await runProductionCreate({
+      applicantAbstract, step: 'fence_source',
+    });
+    expect(body.wmkf_abstract).toBe(applicantAbstract);
+    // The runner got past its freshly compiled body digest check; this fixture
+    // intentionally stops later because it does not seed the full transition baseline.
+    expect(result.errorMessage).toMatch(/Foundation account read returned a different row/);
+    expect(result.outcome).toBe('needs_attention');
+    expect(postWithOptions).not.toHaveBeenCalled();
   });
 
   describe('cast PI and Liaison (slice B)', () => {
@@ -912,7 +948,7 @@ describe('advanceRun: create_request resume rules', () => {
         return ok({
           value: [
             'akoya_requestid', 'akoya_applicantid', 'akoya_title', 'akoya_purpose', 'akoya_request',
-            'akoya_fiscalyear', 'akoya_requesttype', 'wmkf_meetingdate', 'wmkf_istestrequest',
+            'akoya_fiscalyear', 'akoya_requesttype', 'wmkf_meetingdate', 'wmkf_abstract', 'wmkf_istestrequest',
             'wmkf_testcreationrunid', 'wmkf_respondreminderenabled', 'wmkf_reviewduereminderenabled',
           ].map((field) => ({ LogicalName: field, AttributeType: 'String', IsValidForCreate: true, RequiredLevel: { Value: 'None' } })),
         });

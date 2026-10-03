@@ -108,7 +108,7 @@ describe('module source pins', () => {
 
   test('validateCloneManifest and fenceSource keep their v3/v4 provenance text', () => {
     expect(source).toContain('Only a source-bound v3 or bundle v4 manifest can execute a sandbox clone.');
-    expect(source).toContain('source = bundleSourceOf(manifest).request;');
+    expect(source).toContain('({ bundle: sourceBundle, request: source } = bundleSourceOf(manifest));');
     expect(source).toContain('await getSourceRequestById(client, manifest.source.requestId, requestOptions)');
     expect(source).toContain('bundleSourceOf(manifest, { allowStale: allowExpired })');
   });
@@ -130,6 +130,42 @@ describe('module source pins', () => {
 });
 
 describe('fenceSource / validateCloneManifest', () => {
+  test('v5 production source fence binds exact abstract before create', async () => {
+    const bundle = buildSourceBundle({
+      sourceRow: {
+        akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', akoya_requesttype: 100000000,
+        akoya_purpose: 'Synthetic purpose', akoya_request: 5000, versionnumber: 1,
+      },
+      documents: [], dataverseHost: PRODUCTION_HOSTS[0], exportedAt: new Date(), applicantAbstract: '  Original abstract\n',
+    });
+    const manifest = {
+      ...baseManifest({ target: 'https://wmkf.crm.dynamics.com', targetEnvironment: 'production' }),
+      kind: MANIFEST_V4,
+      targetEnvironment: 'production',
+      recipe: 'basic',
+      source: {
+        requestId: SOURCE_ID, requestNumber: '9000001', requestType: 100000000,
+        revision: bundle.source.request.revision, dataverseHost: bundle.source.dataverseHost,
+        exportedAt: bundle.exportedAt, bundleSha256: sha256(bundle),
+      },
+      bundle,
+      copyPolicy: { version: SANDBOX_REHEARSAL_COPY_POLICY.version, digest: copyPolicyDigest() },
+      createBody: { ...baseManifest().createBody, wmkf_abstract: bundle.abstract },
+    };
+    const client = { get: jest.fn(async () => ok({
+      akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', akoya_requesttype: 100000000,
+      akoya_purpose: 'Synthetic purpose', akoya_request: 5000, versionnumber: 1,
+      wmkf_abstract: '  Original abstract\n',
+    })) };
+    await expect(fenceSource(client, manifest, 100000000)).resolves.toMatchObject({ akoya_purpose: 'Synthetic purpose' });
+    const changedClient = { get: jest.fn(async () => ok({
+      akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', akoya_requesttype: 100000000,
+      akoya_purpose: 'Synthetic purpose', akoya_request: 5000, versionnumber: 1,
+      wmkf_abstract: 'Changed abstract',
+    })) };
+    await expect(fenceSource(changedClient, manifest, 100000000)).rejects.toThrow('Source Request abstract changed');
+  });
+
   test('v3 fenceSource re-reads the sandbox source and enforces copied-value fencing', async () => {
     const manifest = baseManifest();
     const client = { get: jest.fn(async () => ok(sourceRow())) };
