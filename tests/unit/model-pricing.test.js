@@ -216,3 +216,11 @@ describe('LAST_REVIEWED_AT', () => {
     expect(d.toString()).not.toBe('Invalid Date');
   });
 });
+
+describe('reviewed Opus 5.5 pricing', () => {
+  test('exact and dated IDs use $4/$20 with $0.20 cache reads', () => {
+    expect(lookupPricing('claude-opus-5-5-20260922')).toBe(MODEL_PRICING['claude-opus-5-5']);
+    expect(estimateCostCents('claude-opus-5-5', 1_000_000, 1_000_000, 1_000_000, 1_000_000, 1_000_000)).toBeCloseTo(3720, 6);
+    expect(estimateCostCents('claude-opus-5', 0, 0, 0, 1_000_000)).toBe(50);
+  });
+});

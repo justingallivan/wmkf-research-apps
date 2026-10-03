@@ -94,7 +94,7 @@ The Meeting Tracker routes, services, and `SiteVisitEditor` consumer are now
 present in source, including the publication-receipt recovery flow. This does
 not change or extend the isolated pilot's deployed behavior, and the global
 active provider-slot limit remains shared and unchanged. See the separate
-[Meeting Tracker publication Atlas](postgres-meeting-transcript-publications.md) <!-- drain-table:ignore reason=Meeting Tracker transcript publication Atlas, not the retired reviewer publications table -->
+[Meeting Tracker publication Atlas](postgres-meeting-transcript-publications.md) <!-- drain-table:ignore reason=transcription-atlas-filename-not-retired-table -->
 for source limits, the reviewed recovery contract, and the explicit
 quarantine/zero-row close path (closure waits until at least ten minutes after
 the receipt lease expires). Migration 064 adds close attribution to that

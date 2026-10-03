@@ -695,7 +695,23 @@ migration/schema readback, and two correlated smoke usage rows across rounds
 
 ### `model_pricing_audit` (S181, V032)
 **Source of truth:** Postgres-only.
-Append-only history written by `/api/cron/pricing-refresh` (monthly, 1st of month). One row per (model, token_type) probed: stores Anthropic's authoritative cost from `/v1/organizations/cost_report`, our summed `api_usage_log` token count for the same window, the derived per-MTok price, the local table's price, and the delta. `flagged = true` rows are >5% out of tolerance and have triggered an `ops` alert. Backstop for the manually-maintained `lib/utils/model-pricing.js` table — the cron alerts; humans edit the table; no auto-overwrite. Requires `ANTHROPIC_ADMIN_API_KEY`.
+Append-only history written by `/api/cron/pricing-refresh` (monthly, 1st of month).
+**[SOURCE-BUILT 2026-10-02 on `codex/admin-alert-remediation`; not deployed.]**
+The corrected writer joins Anthropic `/v1/organizations/cost_report` and
+`/v1/organizations/usage_report/messages` for the same 30-day window and exact
+UTC day, model, workspace, service tier, context window, and inference geography.
+`token_count` is the matched provider count, not app-local `api_usage_log` usage;
+5-minute and 1-hour cache creation remain separate. Each matched aggregate
+stores cost in cents, provider tokens, derived/local cents per million tokens,
+and delta. Unknown local pricing or >5% drift flags a row. Only a nonempty,
+complete comparison without flags resolves the standing `pricing:drift` alert;
+skipped or uncomparable billable rows preserve it. Report pagination errors
+abort before comparisons; inserts are awaited individually, so a failed write
+can leave partial audit history but cannot resolve the alert. The schema is
+unchanged and older audit rows retain their original app-local denominator.
+The cron alerts; humans review billing modifiers and edit
+`lib/utils/model-pricing.js`; no auto-overwrite. Requires `ANTHROPIC_ADMIN_API_KEY`.
+Corrected live provider reports have not been run for this branch.
 
 ### `external_rate_limit` (0 rows)
 **Source of truth:** Postgres-only. V031 migration / `010_external_rate_limit.sql` (S173, 2026-05-21, security audit A6).
