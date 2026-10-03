@@ -1,5 +1,34 @@
-# Session 566 Prompt: Uploaded-file opening shipped; preserve parallel lanes
+# Session 567 Prompt: Factory handoff items 1–3 closed; observe the sweep and the next refusal
 
+## Session 566 Summary — 2026-10-02 PT (Factory follow-ups lane, Claude Fable, home Mac)
+
+Numbered 566 because the materials (564) and app-feature (565) lanes closed first in this file; this lane ran alongside them from the S563 Factory handoff. Three handoff items closed, all merged to `main` and in Production [VERIFIED via GitHub deployments: Production built from `b223dad7d` at 23:10 UTC].
+
+### What Was Completed
+
+1. **Form stop copy** (PR #411 `45d8e6fd4`, runtime under `shared/components`, owner-authorized merge). Stops no longer send the operator to a CLI mode that does not exist; `timeout`/`network` say a retry re-checks first; `bundle_stale` and `meeting_date_patch_failed` have their own copy. Codex adversarial, three rounds: round 1 found `location_readback_mismatch` and the default fallback had been made terminal though both can recover on retry (`stepProvisionLocation` re-reads; the default covers `file_copy_failed`/`upstream_http`/`unknown_error`); round 2 found the runbook's `ambiguous_create_outcome` row said the same (the step recovers a late, owned Request); round 3 approve. Runbook stop table corrected for both.
+2. **Source-changed refusal diagnostic** (PR #412 `cb84ee322`, owner-authorized merge). `hydrateSelectedDocument` now names each failing comparison with before → after values (metadata eTag/versionId/size/name/mimeType, the download's own metadata size, the content length) and the `cTag`, which moves only when bytes change. Lands in the existing `admin test-request run refusal:` log line; the form still shows fixed copy. Codex round 1 caught a null-final-metadata TypeError (Graph 404 → 500 instead of 409); fixed with a regression test; round 2 approve. **Cause still not established.** Two hypotheses, both [ASSUMED]: SharePoint touches the XLSX on first read (deferred property promotion bumps eTag/versionId, cTag unchanged); or Graph serves inconsistent metadata across the three reads. The next refusal's cTag separates them.
+3. **Flaky `awardee-tab` test** (PR #414 `b223dad7d`, test-only, Tier 0). Cause [VERIFIED via the failing Jest job logs of runs 36943934734 and 37059489261, attempt 1]: not a `waitFor` timeout. The tests waited only for the abstract; the Send button is disabled until subject/body are seeded by effects that commit after it, so the synchronous click was a no-op and `getByRole('dialog')` threw. #398's flake was a different test with the same recipe. `openSendModal()` waits for the button to be enabled; 17 sites hardened.
+
+### Commits
+
+- `45d8e6fd4` (#411), `cb84ee322` (#412), `b223dad7d` (#414); branches deleted.
+
+### Session note
+
+A reproduction subagent asked to run the flaky test "under CPU pressure" launched ~38 concurrent Jest processes (load average ~160) and overheated the owner's laptop; it was killed. The CI logs alone had already established the cause. Recorded as memory `feedback-cap-subagent-load-in-reproduction-briefs`.
+
+### Next items for this lane
+
+**Verified open (owner-observable, deployed today):**
+1. **Artifact sweep in Production** — the maintenance cron should delete run `a5161f47`'s bundle and manifest and keep `20407283`'s (`managed-ledger/ledger_prod`). Read the function log.
+2. **Next `test_request_preview_source_changed` refusal** — the log line now names the failing comparison and cTag; that establishes or refutes the two hypotheses above. Optionally sooner: owner-run `scripts/probe-sharepoint-download-stability.mjs` against the 1002860 XLSX with `--repeats=10`.
+3. **Browser check of the email fix on 1003303** and the **Office Mac brief** — unchanged from S563, not done.
+4. **Memory router diet (debt):** `.claude-memory/MEMORY.md` is 8,238 bytes, just over the 8,192-byte routine-audit trigger after this session's one pointer. Run `docs/MEMORY_HYGIENE_RUNBOOK.md` §10 at the next quiet start.
+
+Everything else in the Factory section below (owner decisions, parked, verify-before-acting) stands as written; items 1–3 of its "Previously reported" list are the PRs above.
+
+## Prior-lane handoffs — retained for preflight, not revalidated in Session 566
 
 ## Session 565 Summary — 2026-10-02 PT (Codex app-feature lane)
 
@@ -23,8 +52,6 @@
 - `lib/services/site-visit-materials/collection-service.js` — staff-only safe URL enrichment.
 - `tests/unit/site-visit-materials-card.test.js`, `tests/unit/site-visit-materials-collection-service.test.js`, `tests/unit/site-visit-materials-contributor-service.test.js` — regression coverage.
 - `.impeccable/design.json`, `.claude/skills/start/SKILL.md` — reference/startup updates.
-
-## Prior-lane handoffs — retained for preflight, not revalidated in Session 565
 
 ## Session 564 Summary — 2026-10-02 PT (Codex materials lane)
 
