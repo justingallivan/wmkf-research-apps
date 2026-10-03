@@ -166,6 +166,7 @@ function analyzeSources(sources, options = {}) {
     inventory = {},
     movedOwners = {},
     delegates = {},
+    externalGraphImportExemptions = {},
   } = options;
   const errors = [];
   const asts = new Map();
@@ -183,7 +184,10 @@ function analyzeSources(sources, options = {}) {
     for (const edge of edges) {
       if (isGraphModule(file, graphDir) && edge.spec == null) errors.push(`nonliteral dependency: ${file}`);
       if (edge.target && isGraphModule(edge.target, graphDir) && file !== facade && !isGraphModule(file, graphDir)) {
-        errors.push(`external runtime import of Graph internals: ${file} -> ${edge.target}`);
+        const allowed = (externalGraphImportExemptions[file] || []).some((entry) => (
+          entry.specifier === edge.spec && entry.target === edge.target
+        ));
+        if (!allowed) errors.push(`external runtime import of Graph internals: ${file} -> ${edge.target}`);
       }
       if (isGraphModule(file, graphDir) && edge.target === facade) errors.push(`internal facade dependency: ${file} -> ${facade}`);
       if (isGraphModule(file, graphDir) && edge.target

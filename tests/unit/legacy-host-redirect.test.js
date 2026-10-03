@@ -3,6 +3,9 @@ const {
   LEGACY_HOST,
   shouldRedirectToCanonical,
 } = require('../../lib/utils/legacy-host-redirect');
+// The assertion surface is Next's config object. Keep the external Workflow
+// build wrapper at identity so Jest never parses its ESM package.
+jest.mock('workflow/next', () => ({ withWorkflow: config => config }));
 const nextConfig = require('../../next.config');
 const { getPathMatch } = require('next/dist/shared/lib/router/utils/path-match');
 const { prepareDestination } = require('next/dist/shared/lib/router/utils/prepare-destination');

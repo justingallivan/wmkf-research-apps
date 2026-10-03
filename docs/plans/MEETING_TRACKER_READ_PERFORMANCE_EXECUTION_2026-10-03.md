@@ -76,9 +76,9 @@ parity, Tracker route validation and caller opt-in, paged summary reads,
 schema-gated fields, duplicate selection, unresolved-request notices,
 materials degradation, the exact cap, and the unchanged Pre-Site Visit reader.
 
-Full Jest completed with 1,207 suites passing, 8 skipped, and 7 failing. The
+The initial full Jest run completed with 1,207 suites passing, 8 skipped, and 7 failing. The
 same seven suites and nine failing tests were reproduced against the clean
-`fb5d39fc907f80d294a55157f81726c6671f0204` archive, so they are baseline
+`fb5d39fc907f80d294a55157f81726c6671f0204` archive, establishing pre-existing baseline
 failures: Graph boundary inventory, clean-environment cron auth fixtures,
 request visibility and scheduled-job inventories, transcription fixture
 projection, and two workflow ESM/Jest parse failures. Full-run log:
@@ -113,14 +113,14 @@ adversarial review through the existing Claude Code subscription OAuth session,
 with API-key environment variables removed and read-only tools. It approved
 without requesting runtime changes. After reading both failing-test logs, its
 bounded final confirmation was **APPROVE TARGETED CHANGE** for a feature-branch
-commit, preserving the baseline failures as a release limitation. Full verbatim
+commit, preserving the then-unresolved baseline failures as a release limitation. Full verbatim
 Fable verdicts and fingerprints are in the linked review receipt below.
 
 Root additionally hashed all 4,467 tracked blobs in the baseline test archive
 against the starting Git tree: zero differences. This verifies the archived
 source revision rather than relying only on the directory name.
 
-The seven baseline-red suites are:
+The seven suites that failed in that initial run were:
 
 - `tests/unit/graph-service-boundary.test.js`
 - `tests/unit/maintenance-cron-handler.test.js`
@@ -130,12 +130,14 @@ The seven baseline-red suites are:
 - `tests/unit/legacy-host-redirect.test.js`
 - `tests/unit/security-headers.test.js`
 
-The source change is complete and reviewed; **the whole Jest suite is not green,
-and production promotion is not approved**. Resolve the baseline failures or
-obtain an explicit owner disposition before promotion, then perform normal staff
-rehearsal and deployment verification. No deployment, migration or live operation
-was performed during implementation. The original transcription checkout and its
-uncommitted test changes remain untouched.
+The source change is complete and reviewed. The user subsequently authorized
+repairing the seven baseline failures; current repair and verification evidence
+is maintained in [the follow-up execution record](BASELINE_TEST_REPAIRS_EXECUTION_2026-10-03.md).
+The failures above describe the original run, not the current branch status.
+**Production promotion remains unapproved**; normal staff rehearsal and deployment
+verification still apply. No deployment, migration or live operation was performed
+during implementation. The original transcription checkout and its uncommitted
+test changes remain untouched.
 
 Rollback: revert the targeted feature commit before promotion, or restore the
 prior deployed application if a later approved release needs rollback. No data

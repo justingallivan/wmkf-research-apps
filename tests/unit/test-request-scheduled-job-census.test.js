@@ -17,6 +17,11 @@ import path from 'path';
 const ROOT = path.resolve(__dirname, '../..');
 const GUARD = /createRequestTestStateLookup\(|resolveRequestTestState|resolveTestState\(|TEST_REQUEST_ORDINARY_OData_FILTER/;
 
+// Current source-derived inventory (2026-10-03): 24 cron route files and 23
+// scheduled path entries across 22 distinct routes. The design record's 23
+// routes / 21 scheduled jobs is the historical 2026-09-23 Stage 1c snapshot.
+// drain-transcriptions accounts for one route and two exact schedule paths.
+
 // route → { scheduled, class, guardFiles?, note }
 //   guarded     — acts on request-linked rows; skips test requests at selection
 //   allowed     — runs work a staff member launched on a chosen request (owner decision)
@@ -28,6 +33,12 @@ const RECORDED_CRONS = {
   'drain-review-panels': { scheduled: true, class: 'allowed', note: 'staff-launched AI panel on chosen requests' },
   'drain-review-syntheses': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/review-synthesis-drain.js'] },
   'drain-reviewer-acceptances': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/reviewer-acceptance-drain.js'] },
+  'drain-transcriptions': {
+    scheduled: true,
+    cronPaths: ['/api/cron/drain-transcriptions', '/api/cron/drain-transcriptions?recovery=1'],
+    class: 'allowed',
+    note: 'existing staff-launched transcription work, classified alongside review panels; normal and recovery schedules advance those jobs',
+  },
   'drain-submissions': { scheduled: true, class: 'n/a', note: 'creates new applicant requests; the app cannot write the marker' },
   'file-review-docx': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/review-documents/individual-file-service.js'] },
   'generate-grantee-titles': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/cron/generate-grantee-titles-service.js'] },
@@ -53,15 +64,21 @@ test('every cron route is recorded', () => {
     .filter((name) => name.endsWith('.js'))
     .map((name) => name.replace(/\.js$/, ''))
     .sort();
+  expect(routes).toHaveLength(24);
   expect(routes).toEqual(Object.keys(RECORDED_CRONS).sort());
 });
 
 test('the recorded schedule matches vercel.json', () => {
-  const scheduled = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8')).crons
-    .map((cron) => cron.path.replace(/^\/api\/cron\//, ''))
+  const actualPaths = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8')).crons
+    .map((cron) => cron.path)
     .sort();
-  const recorded = Object.entries(RECORDED_CRONS).filter(([, v]) => v.scheduled).map(([k]) => k).sort();
-  expect(scheduled).toEqual(recorded);
+  expect(actualPaths).toHaveLength(23);
+  expect(new Set(actualPaths.map((route) => route.split('?')[0])).size).toBe(22);
+  const recorded = Object.entries(RECORDED_CRONS)
+    .filter(([, v]) => v.scheduled)
+    .flatMap(([route, record]) => record.cronPaths || [`/api/cron/${route}`])
+    .sort();
+  expect(actualPaths).toEqual(recorded);
 });
 
 test.each(Object.entries(RECORDED_CRONS)

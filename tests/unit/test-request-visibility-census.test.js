@@ -5,6 +5,7 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { createTranscriptionPilotStore } from '../../lib/services/transcription-pilot/store.js';
 
 const ROOT = path.resolve(__dirname, '../..');
 const source = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
@@ -18,6 +19,10 @@ function walk(dir) {
 
 const REPORT_EXPORT_ROUTES = {
   'pages/api/admin/stats.js': { class: 'exclude', guard: 'excludeTestRequestSpendRows' },
+  'pages/api/admin/transcription-pilot/evaluation-export.js': {
+    class: 'n/a',
+    guard: 'listOwnerJobs',
+  },
   'pages/api/cron/drain-cycle-dossiers.js': { class: 'indirect', guard: 'drainCycleDossiers' },
   'pages/api/cycle-dossier/download.js': { class: 'indirect', guard: 'downloadCycleDossier' },
   'pages/api/cycle-dossier/index.js': { class: 'indirect', guard: 'cycleDossierAction' },
@@ -80,6 +85,19 @@ test('every report/export route is classified', () => {
 
 test.each(Object.entries(REPORT_EXPORT_ROUTES))('%s keeps its %s classification seam', (file, record) => {
   expect(source(file)).toContain(record.guard);
+});
+
+test('evaluation export owner-job query excludes every request-bound transcription row', async () => {
+  const database = {
+    query: jest.fn(async () => ({ rows: [] })),
+    transaction: jest.fn(async (fn) => fn({ query: jest.fn(async () => ({ rows: [] })) })),
+  };
+  const store = createTranscriptionPilotStore(database);
+  await store.listOwnerJobs({ ownerProfileId: 42, limit: 100 });
+
+  const [query, params] = database.query.mock.calls[0];
+  expect(query).toMatch(/WHERE owner_profile_id = \$1\s+AND COALESCE\(to_jsonb\(transcription_jobs\)->>'request_id', ''\) = ''/);
+  expect(params).toEqual([42, 100]);
 });
 
 test('every aggregate/count caller is classified', () => {

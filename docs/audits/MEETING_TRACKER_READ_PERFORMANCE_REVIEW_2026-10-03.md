@@ -3,7 +3,7 @@ title: Meeting Tracker Read Performance Review Receipt
 domain: meeting-tracker
 kind: audit
 status: complete
-summary: "Sol, root and OAuth-authenticated Claude Fable approved the targeted source change; seven pre-existing failing Jest suites remain a release limitation."
+summary: "Historical approval of the targeted source change by Sol, root and OAuth-authenticated Claude Fable; subsequent baseline-test repairs are recorded separately."
 canonical: false
 owner: product-engineering
 related:
@@ -15,6 +15,11 @@ related:
 Scope: source approval for two targeted read optimizations on
 `codex/tracker-read-performance`, based on
 `fb5d39fc907f80d294a55157f81726c6671f0204`. No production promotion is claimed.
+
+This is the historical performance-change review. Its verbatim verdicts below
+refer to the seven baseline failures present at that time. The user subsequently
+authorized their repair; see the [follow-up execution record](../plans/BASELINE_TEST_REPAIRS_EXECUTION_2026-10-03.md)
+for current verification. The original review text is preserved as evidence.
 
 ## Sol and root
 

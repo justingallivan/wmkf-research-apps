@@ -1,3 +1,6 @@
+// The assertion surface is Next's config object. Keep the external Workflow
+// build wrapper at identity so Jest never parses its ESM package.
+jest.mock('workflow/next', () => ({ withWorkflow: config => config }));
 const nextConfig = require('../../next.config');
 
 function toHeaderMap(headers) {
