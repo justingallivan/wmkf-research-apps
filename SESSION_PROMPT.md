@@ -1,13 +1,14 @@
-# Session 570 Prompt: targeted Meeting Tracker latency fixes; verify release state before new work
+# Session 570 Prompt: targeted Meeting Tracker latency fixes merged; live latency remains unmeasured
 
 ## Session 569 Summary — 2026-10-03 PT (Codex performance lane)
 
-[VERIFIED via source, isolated tests and review receipts] The targeted Meeting
-Tracker read optimization and seven baseline test repairs are complete. The owner
-requested push, CI, and merge if CI is clean. This handoff is prepared before
-that promotion; the PR for `codex/tracker-read-performance` is the authority for
-its final checks, merge and deployment status. Do not infer deployment from a
-local build or this document.
+[VERIFIED via GitHub PR/checks, remote main and deployment status] PR #422
+merged to `main` as `df55ad954` after all 12 checks passed. The targeted Meeting
+Tracker read optimization and seven baseline test repairs are complete. The
+owner authorized the merge conditional on clean CI and requested this final
+handoff on `main`. GitHub records a successful Production deployment for the
+merge commit (deployment `6830261304`). No authenticated production browser
+smoke or live latency measurement was performed in this lane.
 
 ### What Was Completed
 
@@ -23,9 +24,10 @@ local build or this document.
    was used. Review findings were closed in bounded rounds.
 4. Before integration with newer main, the local full suite passed 1,214 suites
    and 18,769 tests (8 suites / 72 tests skipped). Build, lint, types and 69
-   check scripts passed. Newer main is integrated before publication, retaining
-   its transcription maintenance and recovery behavior; final PR CI gates the
-   owner's merge authorization.
+   check scripts passed. Main integration retained its transcription maintenance
+   and recovery behavior. The integrated local full run passed 1,251 suites and
+   20,181 tests (11 suites / 142 tests skipped), with five snapshots passing.
+   Final PR CI, including canonical build and PostgreSQL integration, passed.
 
 After main integration, all seven repair suites passed (133 tests). Sol accepted
 the conflict resolutions with no material runtime change; current inventory is
@@ -37,6 +39,8 @@ Main's daily/hourly transcription controls and newer assertions are preserved.
 - `4b95863de` — targeted Tracker read optimization.
 - `170145c9c` — baseline repair and review records.
 - `3ffb20c46` — integrated main and reconciled verification contracts.
+- `f952b20db` — pre-merge handoff, preserving concurrent lane history.
+- `df55ad954` — PR #422 merge to `main`, after 12 passing checks.
 - `docs/plans/MEETING_TRACKER_READ_PERFORMANCE_EXECUTION_2026-10-03.md`
   and its linked review receipt — behavior, reduced-call evidence and rollback.
 - `docs/plans/BASELINE_TEST_REPAIRS_EXECUTION_2026-10-03.md`
@@ -44,12 +48,13 @@ Main's daily/hourly transcription controls and newer assertions are preserved.
 
 ### Next Items
 
-- **DONE:** Agreed targeted implementation and baseline repairs. No large
-  refactor or new caching layer is selected. Do not reopen those without a new
-  requirement or measured bottleneck.
-- **Verify before acting:** Read the feature PR's final-head checks and merge
-  state, then its deployment result. Source approval does not prove live latency;
-  no production browser timing improvement is claimed.
+- **DONE:** Agreed targeted implementation, baseline repairs, review, CI and
+  owner-authorized merge. No large refactor or new caching layer is selected.
+  Do not reopen those without a new requirement or measured bottleneck.
+- **Unverified / not claimed:** Authenticated production browser acceptance and
+  measured user-visible latency improvement. Deployment success does not prove
+  those properties. Any follow-up should begin with a concrete observed issue
+  or an explicitly requested measurement, not a new speculative refactor.
 - **Preserved:** The original transcription checkout's unrelated dirty test and
   untracked planning/audit documents are untouched. Other lanes below are
   historical handoffs, not newly validated worklists.
