@@ -17,6 +17,8 @@ const titles=()=>screen.getAllByRole('heading',{level:2}).map(x=>x.textContent);
 
 test('25 rows have exclusive stable counts; every normal filter retains source order without refetching',async()=>{
  render(<MeetingTrackerList/>);await screen.findByRole('button',{name:'All (25)'});
+ const dashboardUrl=String(global.fetch.mock.calls.find(([url])=>String(url).includes('/api/meeting-tracker/dashboard'))[0]);
+ expect(new URL(dashboardUrl,'https://example.org').searchParams.get('projection')).toBe('schedule');
  const calls=global.fetch.mock.calls.length;
  for(const [offset,label] of ['Not requested','Waiting','Late','Check files','Ready'].entries()){
   fireEvent.click(filter(`${label} (5)`));

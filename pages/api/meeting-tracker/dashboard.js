@@ -14,6 +14,10 @@ export default async function handler(req, res) {
 
   const access = await requireAppAccess(req, res, 'meeting-tracker');
   if (!access) return;
+  const { projection } = req.query;
+  if (Array.isArray(projection) || (projection && !['legacy', 'full', 'schedule'].includes(projection))) {
+    return res.status(400).json({ error: 'Projection must be a single supported value.' });
+  }
   // Authenticated callers only learn whether the tracker is enabled (review finding 6).
   if (!isMeetingTrackerSchemaReady()) {
     return res.status(503).json({
@@ -41,6 +45,7 @@ export default async function handler(req, res) {
         scope: req.query.scope === 'all' ? 'all' : 'my',
         includeSetAside: false,
         programId,
+        ...(projection ? { projection } : {}),
       });
       return res.status(200).json(body);
     } catch (error) {
