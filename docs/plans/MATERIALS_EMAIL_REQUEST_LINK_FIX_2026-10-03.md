@@ -2,8 +2,8 @@
 title: Site Visit materials email Request association
 domain: workbench
 kind: plan
-status: active
-summary: PR 424 deployed Request association for materials emails; the historical activity repair remains blocked pending sandbox proof.
+status: complete
+summary: PR 424 deployed Request association for materials emails; the owner closed the historical test-email repair as unnecessary after the runtime fix shipped.
 owner: product-engineering
 related:
   - docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md
@@ -52,19 +52,21 @@ Before any material/claim side effect, each send entry point must verify that it
 
 Complement check: the default email dependency must reject an absent ID, malformed ID, or incomplete association before calling the adapter; its entity type is fixed to `akoya_request`, so no caller-supplied alternate type exists. Each sending path must reject a malformed client/request row ID, a missing Request, or a mismatched fetched Request before any side effect. Generic read and preview paths keep their current `loadContext` semantics. No send branch may silently fall back to an unassociated email. The unrelated materials reader, contact resolution, template and email helper behavior stay outside scope.
 
-## Existing sent activity repair — authorized conditionally, blocked
+## Historical test activity — repair closed by owner
 
-[VERIFIED via read-only Production preflight] The exact historical activity is sent and unassociated. Its correlation, exact To/Cc/no Bcc, current allowlist and marked Request/run match the pinned repair. The owner authorized one regarding-only, ETag-fenced Production PATCH only after a successful sandbox characterization, with no resend.
+[OWNER DECISION, October 3] The owner closed this repair because the activity was only a test and the runtime fix is shipped. Do not resume repair experiments, change the historical activity or delete test records under this workstream.
+
+[VERIFIED via last read-only Production preflight] The exact historical activity is sent and unassociated. Its correlation, exact To/Cc/no Bcc, current allowlist and marked Request/run match the pinned repair. The owner authorized one regarding-only, ETag-fenced Production PATCH only after a successful sandbox characterization, with no resend.
 
 [VERIFIED via sandbox action/readback, October 3] The synthetic email draft created for this characterization automatically received an Owner activity party. A subsequent owner-authorized adjustment allowed only that exact role-9 party and rejected every sender/recipient role. Dataverse returned HTTP 400 to `SendEmail` with `IssueSend:false`. Readback confirmed draft (`statecode=0/statuscode=1`), no sent time, null regarding and one unchanged Owner party. The exact response body was not retained, so the particular rejection cause is unknown. No retry, send-for-delivery, association PATCH, deletion or extra test-record creation followed this refusal.
 
-The test therefore did not reach the stale-ETag or sent-regarding checks. Production remains gated: its one-record repair script was not executed. A suitable existing synthetic sent activity or a separately reviewed no-delivery fixture method is needed; do not waive the sandbox prerequisite or add recipients to rescue this test. All test records remain retained. The source fix is deployed independently of this historical-record repair.
+The test therefore did not reach the stale-ETag or sent-regarding checks. The conditional Production repair was never executed. The owner subsequently closed the repair rather than requesting another fixture or test method. All test records remain retained. The source fix is deployed independently of this historical-record repair.
 
-The prepared Production operation re-reads exact identity, sent state, correlation, recipient set/allowlist, Request marker/run and fresh ETag; it uses only `regardingobjectid_akoya_request@odata.bind`, keeps the normal write interlock enabled with a purpose/date acknowledgment, and verifies association type and unchanged sent state/recipients. An ambiguous response gets readback, never blind retry. Possible organization-specific automation effects are not exhaustively characterized by a sandbox fixture; do not infer inbox delivery from an association update.
+The unexecuted historical Production proposal would re-read exact identity, sent state, correlation, recipient set/allowlist, Request marker/run and fresh ETag; it uses only `regardingobjectid_akoya_request@odata.bind`, keeps the normal write interlock enabled with a purpose/date acknowledgment, and verifies association type and unchanged sent state/recipients. An ambiguous response gets readback, never blind retry. Possible organization-specific automation effects are not exhaustively characterized by a sandbox fixture; do not infer inbox delivery from an association update.
 
 ## Execution, release and limits
 
-This is Tier 2 email behavior under `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`. Luna built it, Sol and root reviewed it, and Claude Fable approved after bounded follow-up through subscription OAuth. Materials send paths, reminder paths, live-contract and shared test-Request guard tests passed; final PR CI passed before the owner-authorized merge. The runtime release is complete. Any existing-record repair is separately scoped below; no resend or broader production mutation is included.
+This is Tier 2 email behavior under `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`. Luna built it, Sol and root reviewed it, and Claude Fable approved after bounded follow-up through subscription OAuth. Materials send paths, reminder paths, live-contract and shared test-Request guard tests passed; final PR CI passed before the owner-authorized merge. The runtime release is complete. The historical test-record repair is closed by owner; no resend or broader production mutation is included.
 
 No new entity, field, migration, endpoint, route-security entry or API response shape is planned. The association is metadata on the already-created standard email activity. Existing accepted limitations remain: automatic reminders are at-most-once after claim, so a definite/uncertain send failure does not restore the claim; this change does not add resend deduplication or a durable repair queue.
 
@@ -76,4 +78,4 @@ No new entity, field, migration, endpoint, route-security entry or API response 
 - Async/stale state: no new awaits or background behavior; automatic sweep retains test-state skip before claim.
 - Helper extraction: N/A; no shared helper extraction or semantics change.
 - Durable surfaces: no schema, route, field, status, migration or catalog change.
-- Documentation reconciliation: this records the merged implementation and the separately scoped existing-activity repair; deployment does not establish inbox delivery or a new-send production smoke.
+- Documentation reconciliation: this records the merged implementation and the owner-closed historical activity repair; deployment does not establish inbox delivery or a new-send production smoke.

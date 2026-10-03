@@ -3,7 +3,7 @@ title: Test Request Factory v2 recovery and operations plan
 domain: test-request-factory
 kind: plan
 status: draft
-summary: "Plan-only roadmap for stopped-run diagnosis, safe readback-recovery feasibility, and separately gated Factory operations; retain Request 1003308."
+summary: "Read-only diagnosis recommended; explicit implementation confirmation pending after automatic approval review blocked the runtime edit. Retain Request 1003308."
 canonical: false
 cataloged: 2026-10-03
 owner: product-engineering
@@ -16,7 +16,7 @@ related:
 
 # Test Request Factory v2: recovery and operations
 
-**Status: PLAN ONLY.** The owner decision is to retain marked Request 1003308 and prepare a v2 plan. This document authorizes no runtime implementation, live recovery, retirement, cleanup, production write, deployment, or data deletion. Request 1003308 is explicitly out of bounds for a mutation rehearsal. Any later recovery requires a separately reviewed implementation and authorization.
+**Status: IMPLEMENTATION CONFIRMATION PENDING.** Root interpreted the owner's October 3 “go with your recommendation” as approval for the first read-only diagnosis slice. Automatic approval review rejected the runtime edit as outside the earlier plan-only scope. No code changed; explicit implementation confirmation has been requested. Later phases remain proposals. No live recovery, retirement, cleanup, production write, deployment or data deletion is authorized. Request 1003308 is explicitly out of bounds for a mutation rehearsal. Any later recovery requires a separately reviewed implementation and authorization.
 
 This plan supersedes the earlier draft of the same pathname on branch `codex/open-items-followup`. If that branch or PR #423 is integrated later, resolve the same-path overlap by keeping this plan as the current v2 plan; do not retain two competing versions or undo the decision to preserve Request 1003308.
 
@@ -80,4 +80,4 @@ This plan covers stopped-run diagnosis and future Factory operator workflow only
 
 **Contract-reconcile surface:** Admin run inspect/advance/status routes and CLI dispatch; managed Postgres run/resource/status journals; private Blob bundle/manifest; Dataverse Requests; SharePoint files; consumers are the Admin form, run-inspect, retry runner, maintenance sweep and status runner. Evidence read: remediation plan, Application State Atlas, Factory ledger Atlas, current Factory v1 design/production/admin plans and runbook, and the cited implementation modules/routes. CodeGraph is unavailable because this checkout has no `.codegraph/`; direct source inspection was used. A fresh read-only Production `--run-inspect` was run on 2026-10-03. No Dataverse/SharePoint probe, write, deployment, migration or code test was run for this plan. Broader Factory Atlas contradictions are out of scope here and remain for root's open-items work.
 
-Independent plan review: Sol reviewed and marked READY; Root and Fable approved after the freshness, typed-receipt and effectful-recheck clarifications above. Fable used subscription OAuth; its final follow-up reviewed the plan text, with source verification performed by Sol/root. Implementation: not authorized. Promotion: not applicable.
+Independent plan review: Sol reviewed and marked READY; Root and Fable approved after the freshness, typed-receipt and effectful-recheck clarifications above. Fable used subscription OAuth; its final follow-up reviewed the plan text, with source verification performed by Sol/root. Implementation: explicit confirmation for the first read-only diagnosis slice is pending after automatic approval review rejected the runtime edit; later phases are not authorized. Promotion requires a separate deliberate decision.
