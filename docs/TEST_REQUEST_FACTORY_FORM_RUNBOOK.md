@@ -6,7 +6,7 @@ status: active
 summary: "Operating the admin Test Request form in Production: what it needs, what each stop means, what a retry does, and how to turn it off."
 canonical: false
 cataloged: 2026-10-02
-last_verified: 2026-10-02
+last_verified: 2026-10-03
 owner: product-engineering
 related:
   - docs/plans/TEST_REQUEST_FACTORY_ADMIN_FORM_PLAN_2026-10-01.md
@@ -81,7 +81,9 @@ A request that outlives the 300-second lease is not recorded as a stop: the run 
 
 A run that cannot continue stays `needs_attention` in the ledger. Whatever it created stays in production as a marked test record: possibly a Request, its document location and folder, and some copied documents. Its two Blob objects are never swept. No mode of the command-line tool abandons, resets or force-advances a run, or resolves an unverified upload or an ambiguous create [SOURCE: the mode dispatch in `scripts/rehearse-test-request-sandbox.mjs`]. The practical path is a new run from a fresh lookup.
 
-Parked today **[RUN]**: run `20407283-c279-5e0c-b396-210ad6842482`, test Request 1003308, two PDFs verified, one XLSX uploaded and unverified.
+Owner decision 2026-10-03: retain this partly built marked test record; no cleanup or recovery is authorized by that decision. Factory v2 is a separate [proposal](plans/TEST_REQUEST_FACTORY_V2_PLAN_2026-10-03.md).
+
+Parked **[RUN]**: run `20407283-c279-5e0c-b396-210ad6842482`, test Request 1003308, two PDFs verified, one XLSX uploaded and unverified.
 
 ## Status changes
 
@@ -111,7 +113,9 @@ To get a form run's manifest and bundle: the run panel's artifacts download, or 
 
 ## Artifacts and the daily sweep
 
-The daily maintenance cron deletes Factory Blob objects (`sweepFactoryArtifacts`, `factory-artifact-store.js`) **[SOURCE; not yet seen running in Production]**: saved lookups older than 6 hours; a run's bundle and manifest once the run is `ready`; objects with no ledger row once older than 24 hours. It keeps everything for a run that is `prepared`, `creating` or `needs_attention`. Download a finished run's artifacts the same day if they will be wanted.
+The daily maintenance cron deletes Factory Blob objects (`sweepFactoryArtifacts`, `factory-artifact-store.js`) **[SOURCE; aggregate Production execution observed 2026-10-03]**: saved lookups older than 6 hours; a run's bundle and manifest once the run is `ready`; objects with no ledger row once older than 24 hours. It keeps everything for a run that is `prepared`, `creating` or `needs_attention`. Download a finished run's artifacts the same day if they will be wanted.
+
+[VERIFIED via read-only `maintenance_runs` record] The 2026-10-03 03:00 UTC daily pass completed with Factory totals of 4 deleted, 2 kept, 0 errors, and neither scan nor deletion truncated. These aggregate counts do not establish which exact objects were deleted or retained. See [follow-up evidence](audits/OPEN_ITEMS_FOLLOWUP_2026-10-03.md).
 
 ## Turning the form off
 
