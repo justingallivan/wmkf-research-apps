@@ -3,7 +3,7 @@ title: Ordered open-items follow-up
 domain: operations
 kind: report
 status: active
-summary: "October 3 read-only follow-up: source refusal unreproduced, Sonnet admission blocked, cleanup and Tracker observations, Factory v2 proposal, and remaining release prerequisites."
+summary: "October 3 follow-up: refusal safeguards built, reminder PR integrated, dependency PR repaired and duplicates closed; authorized test visit prepared; promotion and email send remain separate decisions."
 canonical: false
 owner: product-engineering
 related:
@@ -14,7 +14,7 @@ related:
 
 # Open-items follow-up — October 3, 2026
 
-Scope: investigate the intermittent Factory lookup first, then work through the
+Initial read-only scope (before the implementation and authorized test-record changes below): investigate the intermittent Factory lookup first, then work through the
 reported open list. Source baseline `d1eae6fd3`; isolated branch
 `codex/open-items-followup`. No production mutation, message send, provider
 inference, migration or model admission was performed. Original checkout changes
@@ -120,3 +120,19 @@ references, docs catalogue, secret scan, scaffolding and harness framing).
 Whitespace validation passed. The hydration script passed syntax checking and
 refused missing arguments before any live request. Its live read-only run and the
 extended operations probe both passed.
+
+
+## Subsequent execution — October 3
+
+[VERIFIED via source, local tests, independent reviews and GitHub] The owner asked to work through the next actions. These results supersede the initial checkpoint's open-PR and consumer-blocker status:
+
+- **PR #423**, runtime head `fa9d312a5`: explicit refusal handling across the affected legacy callers and signed-thinking preservation in Explorer are implemented; all checks passed on that head. The PR is ready for review and remains unmerged. Sonnet 5.5 is still excluded from automatic selection; this is prerequisite hardening, not model admission. Detailed validation is in `LLM_REFUSAL_HARDENING_2026-10-03.md`.
+- **PR #332**, head `4a68b7f39`: current main integrated, conflicts resolved, 17 focused suites / 345 tests passed, relevant gates/self-tests passed and a fresh source review found no material integration regressions. All GitHub checks passed. Main's test-request exclusion, exact manual test-recipient checks, and current `reviewAll` preference contract are preserved. The automatic reminder cron stays held. The Tier 2 rollback/deployment preparation and owner promotion decision remain.
+- **PR #417**, head `fac320fd4`: current main integrated with shipped security overrides retained. npm 10 generated the two missing nested Workflow lock entries, Chokidar 5.0.0 and Readdirp 5.1.1; the repair changes no other entry. Clean install with lifecycle scripts disabled, final lock validation, and 11 dependency-sensitive suites / 295 tests passed. Independent narrow lock review found no material findings. All GitHub checks passed. It remains unmerged.
+- **PRs #147, #148 and #212 closed as duplicates**: main already contains their exact proposed qs/side-channel, xmldom, and csv-parse lock entries (and the csv-parse manifest version). Their old red jobs were unrelated Awardees test failures or an old harness-framing failure. No extra runtime change was needed. PRs #328 and #390 remain on their existing holds.
+
+[VERIFIED via owner authorization, Factory ledger command and authenticated Production browser] The owner authorized preparing a visit/preview for marked Request 1003303, then separately authorized advancing it when scheduling was refused. The existing Factory status command verified ready run `e33fa857-4b00-4c60-94da-77d4406d4027` and changed Phase II from unset to **Phase II Pending Committee Review**. Change `a9324159-642a-4a6f-83b7-40d815450cc7` completed with request status **Phase II Pending**, two background jobs settled, and zero new emails, tracking rows or payments. The marked test Request and cast contacts were retained.
+
+The browser saved **TEST ONLY — Email preview check — #1003303**, Friday October 9, 2026, 10:00–10:30 America/Los_Angeles, organized by Justin Gallivan, with the existing Factory PI and liaison test attendees. The initial October 6 test date was moved to October 9 so the computed materials deadline would be in the future. This is a synthetic visit, not an actual meeting. The shared email template could not render its missing program-coordinator name; a clearly labeled one-send test draft removes that placeholder without saving a personal or shared default. No email has been sent. The final browser preview rendered successfully with Send enabled: from the signed-in PD mailbox, to the Factory PI test address, cc the Factory liaison test address, subject **TEST ONLY — Request 1003303 materials email check**, visit October 9 and upload deadline October 7. It states there is no actual meeting. The exact addresses and full message are visible in the retained browser preview; explicit send approval is still required.
+
+Remaining external prerequisites from the initial checkpoint (Office Mac access, intentional transcription watch, natural Factory refusal evidence, and separately authorized model replay/admission) are unchanged. Request 1003308 remains untouched.
