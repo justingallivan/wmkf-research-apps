@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const CONFIG_PATH = path.join(__dirname, '..', 'vercel.transcription-pilot.json');
+const SHARED_CONFIG_PATH = path.join(__dirname, '..', 'vercel.json');
 const PROFILE_MARKER = 'TRANSCRIPTION_PILOT_DEPLOYMENT_PROFILE';
 const PROFILE_VALUE = 'transcription-pilot';
 const ALLOWED_CONFIG_KEYS = new Set(['$schema', 'env', 'build', 'git', 'functions', 'crons']);
@@ -108,6 +109,19 @@ function validateConfig(config) {
   return errors;
 }
 
+function validateSharedConfig(config) {
+  if (!config || typeof config !== 'object' || Array.isArray(config) || !Array.isArray(config.crons)) {
+    return ['Standard Vercel config must define a crons array.'];
+  }
+  const transcriptionCrons = config.crons.filter((entry) => {
+    const pathOnly = typeof entry?.path === 'string' ? entry.path.split('?')[0] : '';
+    return pathOnly === '/api/cron/drain-transcriptions';
+  });
+  return transcriptionCrons.length
+    ? ['Standard Vercel config must not schedule the transcription drain; use the isolated pilot profile.']
+    : [];
+}
+
 function validateEnvironmentNames(environmentNames) {
   const errors = [];
   if (!Array.isArray(environmentNames)) {
@@ -168,6 +182,12 @@ function runCheck({ configPath = CONFIG_PATH, environmentNamesPath, artifactPath
   } catch {
     return ['Unable to read valid JSON from vercel.transcription-pilot.json.'];
   }
+  let sharedConfig;
+  try {
+    sharedConfig = JSON.parse(fs.readFileSync(SHARED_CONFIG_PATH, 'utf8'));
+  } catch {
+    return ['Unable to read valid JSON from standard vercel.json.'];
+  }
   let environmentNames;
   let artifactPaths;
   try {
@@ -181,7 +201,10 @@ function runCheck({ configPath = CONFIG_PATH, environmentNamesPath, artifactPath
     ...Object.keys(config.env || {}),
     ...Object.keys(config.build?.env || {}),
   ];
-  return validateDeploymentProfile({ config, environmentNames, artifactPaths });
+  return [
+    ...validateDeploymentProfile({ config, environmentNames, artifactPaths }),
+    ...validateSharedConfig(sharedConfig),
+  ];
 }
 
 function runSelfTest() {
@@ -192,6 +215,18 @@ function runSelfTest() {
   };
   if (validateDeploymentProfile({ config: good, environmentNames: [PROFILE_MARKER] }).length) {
     throw new Error('Approved dedicated manifest fixture should pass.');
+  }
+  const shared = JSON.parse(fs.readFileSync(SHARED_CONFIG_PATH, 'utf8'));
+  if (validateSharedConfig(shared).length) throw new Error('Standard config must keep transcription schedules isolated.');
+  const scheduledSharedConfig = {
+    ...shared,
+    crons: [...shared.crons,
+      { path: '/api/cron/drain-transcriptions', schedule: '0 3 * * *' },
+      { path: '/api/cron/drain-transcriptions?recovery=1', schedule: '0 * * * *' },
+    ],
+  };
+  if (!validateSharedConfig(scheduledSharedConfig).some((error) => /must not schedule/.test(error))) {
+    throw new Error('A transcription cron added to the standard config must be rejected.');
   }
   expectError({ config: { ...good, crons: [...good.crons, { path: '/api/cron/unrelated', schedule: '* * * * *' }] }, environmentNames: [PROFILE_MARKER] }, /exactly the two/, 'extra cron');
   expectError({ config: { ...good, git: { deploymentEnabled: true } }, environmentNames: [PROFILE_MARKER] }, /explicitly disabled/, 'Git automation');
@@ -251,5 +286,6 @@ module.exports = {
   validateArtifactPaths,
   validateConfig,
   validateDeploymentProfile,
+  validateSharedConfig,
   validateEnvironmentNames,
 };

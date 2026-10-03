@@ -25,6 +25,11 @@ jest.mock('../../lib/services/notification-service', () => ({
 jest.mock('../../lib/services/review-draft-service', () => ({
   deleteExpired: jest.fn(async () => 0),
 }));
+jest.mock('../../lib/services/meeting-tracker-transcription/service', () => ({
+  reconcileMeetingTranscriptPublicationsBatch: jest.fn(async () => ({
+    skipped: 'schema_not_ready', checked: 0, reconciled: 0, attention: 0,
+  })),
+}));
 jest.mock('../../lib/services/maintenance-service', () => ({
   __esModule: true,
   default: {
@@ -58,6 +63,7 @@ jest.mock('../../lib/services/maintenance-service', () => ({
     cleanupPresentationMaterialUploads: jest.fn(async () => ({
       scanned: 0, bound: 0, deleted: 0, abandoned: 0, refreshed: 0, retained: 0,
     })),
+    sweepFactoryArtifacts: jest.fn(async () => ({ skipped: 'unconfigured', deleted: 0 })),
     cleanupScheduledEmailMessages: jest.fn(async () => 0),
     closeExpiredSiteVisitMaterialCollections: jest.fn(async () => 0),
   },
@@ -66,6 +72,7 @@ jest.mock('../../lib/services/maintenance-service', () => ({
 import handler from '../../pages/api/cron/maintenance';
 import MaintenanceService from '../../lib/services/maintenance-service';
 import FeedbackService from '../../lib/services/feedback-service';
+import { reconcileMeetingTranscriptPublicationsBatch } from '../../lib/services/meeting-tracker-transcription/service';
 
 function makeRes() {
   return {
@@ -77,6 +84,17 @@ function makeRes() {
 }
 
 beforeEach(() => { jest.clearAllMocks(); });
+
+it('records the transcription publication reconciler schema-not-ready result without failing maintenance', async () => {
+  const res = makeRes();
+  await handler({ method: 'POST', headers: {} }, res);
+
+  expect(reconcileMeetingTranscriptPublicationsBatch).toHaveBeenCalledWith({ limit: 20 });
+  expect(res.body.results.meetingTranscriptPublications).toEqual({
+    skipped: 'schema_not_ready', checked: 0, reconciled: 0, attention: 0,
+  });
+  expect(res.body.ok).toBe(true);
+});
 
 describe('maintenance cron — maintenance_runs retention step wiring', () => {
   it('runs Dynamics feedback cleanup with the fixed 20-day ACK retention', async () => {
@@ -209,6 +227,32 @@ describe('maintenance cron — maintenance_runs retention step wiring', () => {
     expect(MaintenanceService.cleanupPresentationMaterialUploads).toHaveBeenCalledWith({});
     expect(res.body.results.presentationMaterialUploads).toEqual(expect.objectContaining({ deleted: 1, retained: 1 }));
     expect(res.body.totalDeleted).toBe(1);
+  });
+
+  it('wires the Factory artifact sweep: an unconfigured skip is not a failure, deletions fold into totalDeleted', async () => {
+    let res = makeRes();
+    await handler({ method: 'POST', headers: {} }, res);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.results.factoryArtifacts).toEqual({ skipped: 'unconfigured', deleted: 0 });
+
+    MaintenanceService.sweepFactoryArtifacts.mockResolvedValueOnce({ deleted: 4, kept: 2, errors: 0 });
+    res = makeRes();
+    await handler({ method: 'POST', headers: {} }, res);
+    expect(res.body.totalDeleted).toBe(4);
+  });
+
+  it('a thrown or error-counting Factory sweep is caught, surfaced and marks the run failed without skipping later tasks', async () => {
+    MaintenanceService.sweepFactoryArtifacts.mockRejectedValueOnce(new Error('blob down'));
+    let res = makeRes();
+    await handler({ method: 'POST', headers: {} }, res);
+    expect(res.body.ok).toBe(false);
+    expect(res.body.results.factoryArtifacts).toEqual({ error: 'blob down' });
+    expect(MaintenanceService.cleanupScheduledEmailMessages).toHaveBeenCalled();
+
+    MaintenanceService.sweepFactoryArtifacts.mockResolvedValueOnce({ deleted: 0, errors: 1 });
+    res = makeRes();
+    await handler({ method: 'POST', headers: {} }, res);
+    expect(res.body.ok).toBe(false);
   });
 
   it('prunes only terminal scheduled-email rows at the configured retention horizon', async () => {

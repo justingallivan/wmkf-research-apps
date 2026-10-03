@@ -2,6 +2,13 @@
 
 Utility scripts for database management, testing, and development setup.
 
+The read-only Akoya probes `probe-akoya-wmkf-type-misc.js`,
+`probe-akoya-wmkf-type-taxonomy.js`, and `probe-akoya-active-nodate.js` share
+their historical `.env.local` parser and client-credentials token request from
+`lib/akoya-readonly-probe-bootstrap.js`. The helper preserves their existing
+parser behavior; each probe keeps its own Dataverse GET, pagination, error, and
+reporting behavior.
+
 ## Database Setup & Migrations
 
 | Script | Description |

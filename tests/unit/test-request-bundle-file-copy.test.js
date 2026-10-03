@@ -17,6 +17,7 @@ import {
 import { TEST_REQUEST_PREVIEW_READ_LIMITS } from '../../lib/services/test-requests/admin-preview-service.js';
 import { renderInitialAssessmentDocx } from '../../lib/services/initial-assessment/template.js';
 import { SYNTHETIC_GENERATED } from '../../lib/services/test-requests/fixtures/initial-assessment-synthetic.js';
+import { XLSX_MIME, buildMinimalXlsx, buildXlsxCopyFixtures, customProperty, customPropertiesXml } from '../helpers/minimal-xlsx-package.js';
 
 const SITE = { key: 'akoyago-shared', hostname: 'appriver3651007194.sharepoint.com', pathname: '/sites/akoyago' };
 const TARGET = { ...SITE, registered: true };
@@ -628,4 +629,196 @@ describe('DOCX package integrity mode', () => {
       destination: { library: 'akoya_request', folder: 'Reviewer_Uploads/reviewer_abcd1234/attempt_' + '0'.repeat(32), filename: 'Review_1.docx' },
     }];
   }
+});
+
+// ── XLSX package integrity mode (Basic recipe) ────────────────────────────
+// SharePoint rewrites an uploaded XLSX's `docProps/custom.xml` (the
+// library's columns land there), so a Basic XLSX copy verifies by package
+// comparison like a DOCX does, while the SOURCE download stays exact-hash.
+// The package is built here from scratch; no production bytes are committed.
+describe('XLSX package integrity mode (Basic recipe)', () => {
+  const XLSX_FOLDER = '1003222_E43AE6EA/Phase I';
+
+  let sourceXlsx;
+  let promotedXlsx; // one property added to docProps/custom.xml, nothing else
+  let tamperedXlsx; // the same plus a changed worksheet
+
+  beforeAll(async () => {
+    ({ source: sourceXlsx, promoted: promotedXlsx, tampered: tamperedXlsx } = await buildXlsxCopyFixtures());
+  });
+
+  const xlsxDoc = () => doc({
+    id: 'inv-xlsx', kind: 'projectBudgetSpreadsheet', folder: XLSX_FOLDER, name: 'Project Budget spreadsheet.xlsx',
+    graphItemId: 'item-xlsx', mimeType: XLSX_MIME, size: sourceXlsx.length, contentHash: hash(sourceXlsx), eTag: '"src"', versionId: '1.0',
+  });
+  const xlsxPlan = () => planBundleFileCopies(bundle([xlsxDoc()]), { destinationRequestNumber: '1000400' });
+
+  function xlsxDependencies({ uploadedBytes = promotedXlsx } = {}) {
+    // The PDF fake serves item ids from `contents`; the XLSX source is added
+    // and the upload is replaced so the stored bytes differ from what was PUT.
+    const { deps, destination } = fakeDependencies();
+    const baseMetadata = deps.getFileMetadataById.getMockImplementation();
+    const baseDownload = deps.downloadFile.getMockImplementation();
+    deps.getFileMetadataById.mockImplementation(async (driveId, itemId) => (
+      itemId === 'item-xlsx'
+        ? { id: 'item-xlsx', name: 'Project Budget spreadsheet.xlsx', size: sourceXlsx.length, mimeType: XLSX_MIME, eTag: '"src"', versionId: '1.0' }
+        : baseMetadata(driveId, itemId)));
+    deps.downloadFile.mockImplementation(async (driveId, itemId) => (
+      itemId === 'item-xlsx' ? { buffer: sourceXlsx } : baseDownload(driveId, itemId)));
+    deps.uploadFile.mockImplementation(async (library, folder, filename, buffer, mimeType, options) => {
+      const item = { id: 'new-xlsx', name: filename, size: uploadedBytes.length, mimeType, eTag: '"new"', versionId: '1.0', buffer: uploadedBytes };
+      destination.set(`${folder}/${filename}`, item);
+      if (options?.onItemCreated) await options.onItemCreated({ id: item.id, name: filename, size: item.size, eTag: item.eTag });
+      return { id: item.id, name: filename, size: item.size, eTag: item.eTag, versionId: '1.0' };
+    });
+    return { deps, destination };
+  }
+
+  test('copyBundleFiles verifies an XLSX whose only change is one added docProps/custom.xml property, and journals attestedDigest', async () => {
+    const { deps } = xlsxDependencies();
+    const copies = await copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {}));
+    expect(copies[0].status).toBe('verified');
+    expect(copies[0].attestedDigest).toBe(hash(promotedXlsx));
+    expect(copies[0].item.size).toBe(promotedXlsx.length);
+    // Exact-hash equality would have refused these bytes.
+    expect(hash(promotedXlsx)).not.toBe(hash(sourceXlsx));
+  });
+
+  test('copyBundleFiles refuses an XLSX whose worksheet part changed, naming the package rather than a DOCX', async () => {
+    const { deps } = xlsxDependencies({ uploadedBytes: tamperedXlsx });
+    const error = await copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {})).catch((e) => e);
+    expect(error.message).toMatch(/Package \(DOCX\/XLSX\) differs from the source.*xl\/worksheets\/sheet1\.xml/);
+    expect(error.message).not.toMatch(/^DOCX package differs/);
+  });
+
+  test('the source download of an XLSX stays exact-hash against the bundle', async () => {
+    const { deps } = xlsxDependencies();
+    const plan = planBundleFileCopies(bundle([{ ...xlsxDoc(), contentHash: hash(promotedXlsx) }]), { destinationRequestNumber: '1000400' });
+    await expect(copyBundleFiles(params(plan), deps, jest.fn(async () => {}))).rejects.toThrow(/SHA-256/);
+    expect(deps.uploadFile).not.toHaveBeenCalled();
+  });
+
+  test('reverifyCopiedItems re-attests a copied XLSX against a fresh source download, and refuses a drifted one', async () => {
+    const { deps, destination } = xlsxDependencies();
+    const copies = await copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {}));
+    expect(await reverifyCopiedItems(copies, deps)).toEqual([]);
+    destination.get(`${copies[0].destination.folder}/${copies[0].destination.filename}`).buffer = tamperedXlsx;
+    expect((await reverifyCopiedItems(copies, deps))[0]).toMatch(/bytes changed since the copy step's attestation/);
+  });
+
+  test('reverifyCopiedItems refuses an XLSX whose journaled attestedDigest is for different bytes', async () => {
+    const { deps } = xlsxDependencies({ uploadedBytes: promotedXlsx });
+    const copies = await copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {}));
+    copies[0].attestedDigest = hash(sourceXlsx);
+    expect((await reverifyCopiedItems(copies, deps))[0]).toMatch(/bytes changed since the copy step's attestation/);
+  });
+
+  test('verifyCopiedFiles compares an XLSX listing to the journaled post-rewrite size, not the bundle size', async () => {
+    const { deps } = xlsxDependencies();
+    const copies = await copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {}));
+    const listing = (size) => [{ id: copies[0].item.id, name: copies[0].destination.filename, size, folder: copies[0].destination.folder }];
+    expect(verifyCopiedFiles(copies, listing(promotedXlsx.length))).toEqual([]);
+    expect(verifyCopiedFiles(copies, listing(sourceXlsx.length))).toEqual(['Project Budget spreadsheet.xlsx listing does not match the journaled copy']);
+  });
+
+  describe('settle check before journaling', () => {
+    // Serves the destination item's metadata from `metaFor(call)` and its bytes from `bytesFor(call)`
+    // (call = 1-based count of destination reads/downloads), leaving every other item alone.
+    function settlingDependencies({ metaFor, bytesFor }) {
+      const { deps } = xlsxDependencies();
+      const baseMetadata = deps.getFileMetadataById.getMockImplementation();
+      const baseDownload = deps.downloadFile.getMockImplementation();
+      let metaCalls = 0;
+      let downloads = 0;
+      deps.sleep = jest.fn(async () => {});
+      deps.getFileMetadataById.mockImplementation(async (driveId, itemId) => {
+        const metadata = await baseMetadata(driveId, itemId);
+        if (itemId !== 'new-xlsx') return metadata;
+        metaCalls += 1;
+        return { ...metadata, ...metaFor(metaCalls) };
+      });
+      deps.downloadFile.mockImplementation(async (driveId, itemId) => {
+        if (itemId !== 'new-xlsx') return baseDownload(driveId, itemId);
+        downloads += 1;
+        return { buffer: bytesFor(downloads) };
+      });
+      return deps;
+    }
+    let laterXlsx;
+    beforeAll(async () => {
+      laterXlsx = await buildMinimalXlsx({ custom: customPropertiesXml(customProperty('ContentTypeId', 2, '0x0101'), customProperty('TaxKeyword', 3, 'revised')) });
+    });
+
+    test('a content revision between the before and after reads is retried; the journal comes from the settled attempt', async () => {
+      // Reads: attempt 1 before/after (cTag moves), attempt 2 before/after (stable, new size).
+      const deps = settlingDependencies({
+        metaFor: (call) => (call === 1 ? { cTag: '"c1"' } : call === 2 ? { cTag: '"c2"' } : { cTag: '"c3"', size: laterXlsx.length }),
+        bytesFor: (call) => (call === 1 ? promotedXlsx : laterXlsx),
+      });
+      const copies = await copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {}));
+      expect(copies[0].status).toBe('verified');
+      expect(copies[0].attestedDigest).toBe(hash(laterXlsx));
+      expect(copies[0].item.size).toBe(laterXlsx.length);
+      expect(deps.sleep).toHaveBeenCalledTimes(1);
+    });
+
+    test('content that never settles stops after 3 attempts with a clear error and no verified entry', async () => {
+      let reads = 0;
+      const deps = settlingDependencies({ metaFor: () => { reads += 1; return { cTag: `"c${reads}"` }; }, bytesFor: () => promotedXlsx });
+      const journal = jest.fn(async () => {});
+      await expect(copyBundleFiles(params(xlsxPlan()), deps, journal))
+        .rejects.toThrow('Created item Project Budget spreadsheet.xlsx did not settle after upload; its content was still changing.');
+      expect(deps.sleep).toHaveBeenCalledTimes(2);
+      expect(deps.downloadFile.mock.calls.filter(([, itemId]) => itemId === 'new-xlsx')).toHaveLength(3);
+      const last = journal.mock.calls.at(-1)[0][0];
+      expect(last.status).not.toBe('verified');
+    });
+
+    test('slow reads end the retries: no second attempt starts outside the settle window', async () => {
+      let reads = 0;
+      let clock = 0;
+      const deps = settlingDependencies({
+        // Each destination metadata read costs 15 s on the fake clock, so attempt 1 alone outlasts the window.
+        metaFor: () => { reads += 1; clock += 15_000; return { cTag: `"c${reads}"` }; },
+        bytesFor: () => promotedXlsx,
+      });
+      deps.nowMs = () => clock;
+      const journal = jest.fn(async () => {});
+      await expect(copyBundleFiles(params(xlsxPlan()), deps, journal))
+        .rejects.toThrow('Created item Project Budget spreadsheet.xlsx did not settle after upload; its content was still changing.');
+      expect(deps.sleep).not.toHaveBeenCalled();
+      expect(deps.downloadFile.mock.calls.filter(([, itemId]) => itemId === 'new-xlsx')).toHaveLength(1);
+      expect(journal.mock.calls.at(-1)[0][0].status).toBe('failed');
+    });
+
+    test('a comparison failure on the first attempt throws without retrying', async () => {
+      const deps = settlingDependencies({ metaFor: () => ({}), bytesFor: () => tamperedXlsx });
+      await expect(copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {}))).rejects.toThrow(/differs from the source/);
+      expect(deps.sleep).not.toHaveBeenCalled();
+      expect(deps.downloadFile.mock.calls.filter(([, itemId]) => itemId === 'new-xlsx')).toHaveLength(1);
+    });
+  });
+
+  test('an XLSX whose workbook relationships were rewritten (an added customXml relationship and part) is refused in package mode', async () => {
+    const zip = await JSZip.loadAsync(promotedXlsx);
+    const rels = await zip.file('xl/_rels/workbook.xml.rels').async('string');
+    zip.file('xl/_rels/workbook.xml.rels', rels.replace('</Relationships>', '<Relationship Id="rId9" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="../customXml/item2.xml"/></Relationships>'));
+    zip.file('customXml/item2.xml', await zip.file('customXml/item1.xml').async('string'));
+    zip.file('customXml/itemProps2.xml', await zip.file('customXml/itemProps1.xml').async('string'));
+    zip.file('customXml/_rels/item2.xml.rels', (await zip.file('customXml/_rels/item1.xml.rels').async('string')).replace('itemProps1', 'itemProps2'));
+    const rewritten = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    const { deps } = xlsxDependencies({ uploadedBytes: rewritten });
+    await expect(copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {}))).rejects.toThrow(/differs from the source.*xl\/_rels\/workbook\.xml\.rels/);
+  });
+
+  test('a PDF copy is unchanged: exact hash, no attestedDigest, listing compared to the source size', async () => {
+    const { deps } = fakeDependencies();
+    const copies = await copyBundleFiles(params(planBundleFileCopies(bundle([doc()]), { destinationRequestNumber: '1000400' })), deps, jest.fn(async () => {}));
+    expect(copies[0].status).toBe('verified');
+    expect(copies[0].attestedDigest).toBeUndefined();
+    expect(deps.getFileMetadataById.mock.calls.filter(([, id]) => id === copies[0].item.id)).toHaveLength(1); // one readback, never a settle pair
+    expect(await reverifyCopiedItems(copies, deps)).toEqual([]);
+    const listing = [{ id: copies[0].item.id, name: copies[0].destination.filename, size: NARRATIVE.length, folder: copies[0].destination.folder }];
+    expect(verifyCopiedFiles(copies, listing)).toEqual([]);
+  });
 });

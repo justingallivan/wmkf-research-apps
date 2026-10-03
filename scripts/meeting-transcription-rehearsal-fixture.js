@@ -190,7 +190,8 @@ async function preflight(client, projectMeetingTranscriptionJob) {
       'id', 'status', 'version', 'created_at', 'updated_at', 'original_filename',
       'declared_content_type', 'declared_bytes', 'verified_content_type', 'verified_bytes',
       'audio_duration_ms', 'ready_at', 'expires_at', 'speaker_names', 'label',
-      'needsAttention', 'contentAccessAllowed', 'cleanupPending',
+      'needsAttention', 'contentAccessAllowed', 'contentDeletionObserved',
+      'lateUploadWatchPending', 'cleanupPending',
     ].sort();
     if (!projected || projected.id !== fixture.REHEARSAL_JOB_ID || projected.status !== 'ready'
       || projected.contentAccessAllowed !== true || JSON.stringify(projectedKeys) !== JSON.stringify(expectedKeys)

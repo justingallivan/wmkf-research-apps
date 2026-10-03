@@ -54,6 +54,35 @@ describe('mintAttachmentUpload', () => {
       .rejects.toMatchObject({ httpStatus: 400 });
   });
 
+  test('uses the shared 500 MB setting boundary while preserving a lower administrator override', async () => {
+    const atDefaultBoundary = baseDeps({ getUploadMaxMb: jest.fn(async () => ({ maxMb: 500 })) });
+    await mintAttachmentUpload({
+      requestId: REQUEST_ID,
+      actorProfileId: 7,
+      filename: 'x.pdf',
+      contentType: 'application/pdf',
+      size: 500 * 1024 * 1024,
+    }, atDefaultBoundary);
+    expect(atDefaultBoundary.createPortalUpload).toHaveBeenCalledWith(expect.objectContaining({ maxBytes: 500 * 1024 * 1024 }));
+    await expect(mintAttachmentUpload({
+      requestId: REQUEST_ID,
+      actorProfileId: 7,
+      filename: 'x.pdf',
+      contentType: 'application/pdf',
+      size: 500 * 1024 * 1024 + 1,
+    }, atDefaultBoundary)).rejects.toMatchObject({ code: 'file_too_large' });
+
+    const savedLowerCap = baseDeps({ getUploadMaxMb: jest.fn(async () => ({ maxMb: 25 })) });
+    await expect(mintAttachmentUpload({
+      requestId: REQUEST_ID,
+      actorProfileId: 7,
+      filename: 'x.pdf',
+      contentType: 'application/pdf',
+      size: 25 * 1024 * 1024 + 1,
+    }, savedLowerCap)).rejects.toMatchObject({ code: 'file_too_large' });
+    expect(savedLowerCap.createPortalUpload).not.toHaveBeenCalled();
+  });
+
   test('rejects a non-GUID requestId', async () => {
     await expect(mintAttachmentUpload({ requestId: 'not-a-guid', actorProfileId: 7, filename: 'x.pdf', contentType: 'application/pdf', size: 10 }, baseDeps()))
       .rejects.toMatchObject({ httpStatus: 400 });

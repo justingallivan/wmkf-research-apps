@@ -16,6 +16,11 @@ import { isGuid } from '../../../../lib/utils/guid';
 import { ServiceHttpError } from '../../../../lib/services/service-http-error';
 import { finalizeAttachmentUpload } from '../../../../lib/services/consultant-feedback-attachment-service';
 import {
+  acquireLargeUploadAdmission,
+  LARGE_UPLOAD_RETRY_AFTER_SECONDS,
+  releaseLargeUploadAdmission,
+} from '../../../../lib/services/large-upload-admission';
+import {
   PORTAL_UPLOAD_SCOPES,
   PortalUploadStagingError,
   claimPortalUpload,
@@ -54,6 +59,20 @@ export default async function handler(req, res) {
   if (!isGuid(requestId) || !isGuid(stagingId)) return res.status(400).json({ ok: false, reason: 'bad_request' });
   if (Boolean(entryId) === Boolean(newEntry)) return res.status(400).json({ ok: false, reason: 'invalid_bind_target' });
 
+  const admission = acquireLargeUploadAdmission();
+  if (!admission) {
+    res.setHeader('Retry-After', String(LARGE_UPLOAD_RETRY_AFTER_SECONDS));
+    return res.status(503).json({
+      ok: false,
+      reason: 'processing_busy',
+      retryAfterSeconds: LARGE_UPLOAD_RETRY_AFTER_SECONDS,
+      message: 'Another large upload is being processed. Please wait and try again.',
+    });
+  }
+
+  const startedAt = Date.now();
+  let stage = 'claim';
+  try {
   let claim;
   try {
     claim = await claimPortalUpload({
@@ -69,10 +88,24 @@ export default async function handler(req, res) {
   if (claim.state === 'consumed') return res.status(200).json(claim.result || { ok: true });
 
   let file;
+  stage = 'load';
+  const loadStartedAt = Date.now();
   try {
     file = await loadClaimedPortalImage({ row: claim.row, leaseToken: claim.leaseToken });
+    console.info('[consultant-feedback/finalize] stage complete', {
+      stage,
+      durationMs: Date.now() - loadStartedAt,
+      bytes: file.buffer.length,
+      rssBytes: process.memoryUsage().rss,
+    });
   } catch (error) {
     if (!(error instanceof PortalUploadStagingError)) throw error;
+    console.warn('[consultant-feedback/finalize] stage failed', {
+      stage,
+      durationMs: Date.now() - loadStartedAt,
+      code: error.code,
+      status: error.httpStatus,
+    });
     if (PERMANENT_BYTE_CODES.has(error.code)) await rejectPortalUpload({ stagingId, leaseToken: claim.leaseToken, resultCode: error.code });
     else await releasePortalUpload({ stagingId, leaseToken: claim.leaseToken });
     return res.status(error.httpStatus).json({ ok: false, reason: error.code });
@@ -83,6 +116,8 @@ export default async function handler(req, res) {
   // uploading over it silently.
   file.candidate = claim.row?.candidate_result || null;
 
+  stage = 'scan_upload_and_register';
+  const finalizeStartedAt = Date.now();
   try {
     const result = await withDalContext('workbench-consultant-feedback-finalize', () =>
       finalizeAttachmentUpload({
@@ -96,16 +131,47 @@ export default async function handler(req, res) {
       }));
     const body = { ok: true, ...result };
     await completePortalUpload({ stagingId, leaseToken: claim.leaseToken, resultCode: 'ok', resultPayload: body });
+    console.info('[consultant-feedback/finalize] stage complete', {
+      stage,
+      durationMs: Date.now() - finalizeStartedAt,
+      totalDurationMs: Date.now() - startedAt,
+      bytes: file.buffer.length,
+    });
     return res.status(200).json(body);
   } catch (error) {
     if (error instanceof ServiceHttpError) {
       const code = error.code || error.body?.reason || 'persist_failed';
       if (PERMANENT_RESULT_CODES.has(code)) await rejectPortalUpload({ stagingId, leaseToken: claim.leaseToken, resultCode: code });
       else await releasePortalUpload({ stagingId, leaseToken: claim.leaseToken });
+      console.warn('[consultant-feedback/finalize] stage failed', {
+        stage, durationMs: Date.now() - finalizeStartedAt, totalDurationMs: Date.now() - startedAt,
+        bytes: file.buffer.length, rssBytes: process.memoryUsage().rss,
+        code, status: error.httpStatus,
+      });
       return res.status(error.httpStatus).json(error.body ?? { ok: false, reason: code });
     }
     await releasePortalUpload({ stagingId, leaseToken: claim.leaseToken });
-    console.error('[consultant-feedback/finalize] failed:', error?.message || error);
+    console.error('[consultant-feedback/finalize] stage failed', {
+      stage,
+      durationMs: Date.now() - finalizeStartedAt,
+      totalDurationMs: Date.now() - startedAt,
+      code: 'persist_failed',
+      status: 503,
+      bytes: file.buffer.length,
+      rssBytes: process.memoryUsage().rss,
+    });
     return res.status(503).json({ ok: false, reason: 'persist_failed' });
+  }
+  } catch (error) {
+    console.error('[consultant-feedback/finalize] stage interrupted', {
+      stage,
+      totalDurationMs: Date.now() - startedAt,
+      code: typeof error?.code === 'string' ? error.code : 'unexpected_error',
+      status: Number.isInteger(error?.status) ? error.status : null,
+      rssBytes: process.memoryUsage().rss,
+    });
+    throw error;
+  } finally {
+    releaseLargeUploadAdmission(admission.token);
   }
 }

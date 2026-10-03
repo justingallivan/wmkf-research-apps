@@ -78,6 +78,7 @@ source_files:
   - pages/api/workbench/applicant-reviewers.js
   - pages/api/workbench/promote-applicant-reviewer.js
   - pages/api/workbench/reviewer-roster.js
+  - lib/services/workbench/reviewer-roster-service.js
   - pages/api/workbench/export-candidates.js
   - lib/services/workbench/reviewer-roster-projection-service.js
   - lib/services/reviewer-candidate-export.js
@@ -1185,7 +1186,9 @@ Exclude. The load-bearing ordering: these rows are EPHEMERAL (deliberately
 never recorded on `reviewer_find_roster`, S224) while the server
 `confirm_identity` action only updates an existing ACTIVE roster row, so
 `confirmIdentityContact` first POSTs the row to the roster (upsert;
-`preserveStoredRosterAuthority` makes a retry after partial failure safe),
+`preserveStoredRosterAuthority` in
+`lib/services/workbench/reviewer-roster-service.js` makes a retry after partial
+failure safe),
 then confirms, then moves it from the ephemeral `unverified` state into
 `rosterActive`, where the existing just-confirmed → selectable machinery
 applies. Keys are stamped with `withReviewerCandidateKey` when unverified

@@ -6,7 +6,7 @@ status: active
 summary: "Canonical Site Visit-led plan for applicant material collection, staff follow-up, and a shared external briefing room."
 canonical: true
 cataloged: 2026-09-08
-last_verified: 2026-09-17
+last_verified: 2026-10-02
 owner: product-engineering
 related:
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
@@ -22,8 +22,10 @@ related:
 
 ## 1. Status and recommendation
 
-This section preserves the 2026-09-08 planning snapshot; §16 records subsequent
-build and release status. This document does not itself authorize new work.
+Sections 1–15 preserve the 2026-09-08 planning snapshot; §16 records subsequent
+build and release status. Background processing is separately specified in
+[the 2026-10-01 plan](plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md).
+Its base code, schema, worker and guarded activation follow-ups are Production-deployed. Schema readiness, admission, and virus scanning are enabled. The first real background job completed successfully on attempt 1; see §16.15 for deployment and lifecycle evidence. PR #405 merged as `1df8a33e2` after all current-head CI checks passed; PR #413 merged as `81dad17e2`. Both are included in Ready Production deployment `dpl_7zi1no5HrxgrPbCQo18Lsi1NM5CZ` at commit `b223dad7d` (October 2 final deployment readback and Git ancestry checks). The exact 500 MB live transfer remains unverified and parked, not a normal-use release blocker. The owner declined another simultaneous-large background test on October 2: the expected set is one large PPTX, a usually smaller PDF, and a text document. Reopen stress testing only if usage or failures warrant it.
 
 Build one **Site Visit Materials** workflow that collects applicant files, lets a Program
 Coordinator (PC) verify that the required files are present and render, and publishes selected
@@ -496,7 +498,7 @@ needs no manifest and no viewer work; a finalized upload appears on the page on 
 |---|---|
 | M1 | Baseline checklist: **Presentation (PDF)**, **Presentation source (PPTX or Keynote)**, **Participant bios (PDF or Word)**. One cycle template; the PC may waive an item per request and applicants may add bounded "Other" files. |
 | M2 | Due date: **two business days before the site visit starts**, computed in the visit's IANA zone (`lib/utils/business-days.js`, weekends only; no holiday calendar this cycle). Contributor access closes seven days after the visit ends. This is independent of briefing-link expiry, which is 60 days from issuance under deliberation-briefing decision D17 revised 2026-09-15. |
-| M3 | Upload size cap: an **admin-editable setting** `site_visit_materials.upload_max_mb` (Admin › Site visits), **default 100 MB**. The briefing page serves files up to 50 MB and lists larger ones with a note (D19). |
+| M3 | Upload size cap: an **admin-editable setting** `site_visit_materials.upload_max_mb` (Admin › Site visits), **default 500 MB** (owner decision 2026-10-01). Saved administrator overrides remain effective within the supported 1–500 MB range. The briefing page serves files up to 50 MB and lists larger ones with a note (D19). |
 | M4 | SharePoint layout: **flat request-relative folders** `Site Visit - Slides`, `Site Visit - Participant Bios`, `Site Visit - Other`; no nested `Site Visit/Applicant Materials/…` form. Canonical filenames per §7.3. |
 | M5 | **Go for this cycle.** Reminders are PC-triggered in the first release; an automated reminder cron is a follow-up the owner has flagged to remember. *Follow-up closed 2026-09-17: the automatic cron is retired; staff monitor arrivals manually (§16.6 item 1).* |
 
@@ -569,7 +571,7 @@ merged and production-smoked (ZZTEST-03, 2026-09-10). PR 3 was built 2026-09-11 
   request-bound READY, non-superseded generation row and retires that recorded predecessor; a
   candidate with no generation row is redone from the top, while a superseded or mismatched row
   stays held for staff attention. Codex adversarial review (2026-09-10) also made
-  cap reads strict (only an absent setting uses the 100 MB default), requires the settings writer
+  cap reads strict (an absent, malformed, or out-of-range setting uses the current 500 MB default; a read outage returns 503 and never widens a configured cap), requires the settings writer
   to confirm success, classifies thrown scanner failures, retains the same staging id in browser
   session storage for transient finalize retry, and validates PPTX/DOCX through bounded exact ZIP
   central-directory entries rather than marker substrings.
@@ -610,13 +612,21 @@ Owner feedback after the first production smoke (ZZTEST-03). Four items, built o
    stays open past the meeting (`closes_at`, the token expiry, and the auto-close sweep are
    unchanged).
 3. A failed finalize now offers "Choose a different file" alongside "Retry" in `SlotUploader`,
-   clearing the abandoned pending staging key client-side and minting a fresh staging id. The
+   retaining the earlier pending staging key until a replacement transfer succeeds and minting a fresh staging id. The
    abandoned staging row itself is left alone: it is swept by the existing portal-upload-staging
    TTL sweep (60-minute row expiry, then pruned after the retention window) via the daily
    maintenance cron's "Private portal-upload staging cleanup" step — no new cleanup was added.
 4. The upload page shows a "Need help?" mailto footer using the `support` alert-recipients
    category's first configured address (`getSupportEmail()` in `contributor-service.js`; no
    fallback to `default`), surfaced as `supportEmail` on the context response.
+5. The contributor page checks the selected file's exact byte size against the current server
+   cap before minting an upload. Oversized files explain how to reduce the file or contact the
+   assigned, enabled Program Coordinator using a server-resolved name and validated email. A stale
+   context cap refreshes from the upload-token response. Failed replacements preserve the prior
+   pending upload for Retry; the new file becomes pending only after its Blob transfer succeeds.
+   Transfers above 60 MiB use the Blob SDK multipart option. This
+   multipart transfer reached finalization in the 2026-10-01 production test, but finalization
+   exhausted memory. Practical 500 MB end-to-end completion remains unverified; see §16.14.
 
 ### 16.5 2026-09-11 (S507): optional "other" upload hidden from applicants
 
@@ -814,13 +824,24 @@ them in the Workbench without opening AkoyaGo.
   `lib/services/site-visit-materials/folder-files-service.js`. It lists the two folders,
   non-recursively, under the same active Dynamics bucket the portal writes to
   (`activeBucket` in `contributor-service.js`), and returns names and staff SharePoint `webUrl`s.
-  Portal uploads land in the same folders and appear too. There are no counters and no registry
-  writes: a hand-placed file still does not count toward the collection summary or appear on the
-  briefing page.
-- **Residual risk:** the Workbench materials summary (`getMaterialsSummaryForRequest` on the
-  `/api/workbench/pre-site-visit` GET) is fail-open `null` with no availability signal. A failed
-  summary read therefore shows "materials not requested" for a scheduled presentation. The file
-  rows are unaffected because they come from the folder read.
+  Synchronous portal uploads land in the same folders and appear too. **[PRODUCTION-LIVE via
+  PR #402; migration 060 and schema readiness verified 2026-10-02.]** With the background schema flag on, the reader
+  also merges current Ready registry links from staging-specific subfolders, suppresses known
+  superseded portal root items by exact drive/item identity. Separately, all five generic
+  internal recursive document readers now opt into pruning `portal-<UUID>` children beneath
+  canonical Site Visit materials folders, excluding uncommitted candidates and prior background
+  copies. **[VERIFIED via source and five call sites: the original four-reader regressions passed
+  five suites (79 tests, one snapshot), and Grant Reporting passed two suites (18 tests).]** The
+  follow-up exact-root filter is Production-deployed via PR #404: it suppresses only exact
+  same-request portal-produced Superseded drive/item identities, preserves current/manual files,
+  and fails closed on incomplete registry evidence. Eight focused suites (104 tests, one snapshot)
+  passed; the merged reader filter preserves current/manual files and fails closed on incomplete registry evidence. There are no counters or registry writes: a hand-placed file still does
+  not count toward the collection summary or appear on the briefing page.
+- **Summary availability:** the PR #338 production baseline returned fail-open `null` on a
+  Workbench summary failure, which could show "materials not requested". **[PRODUCTION-LIVE via
+  PR #402; migration 060 and schema readiness verified 2026-10-02.]** The reader now carries an explicit unavailable
+  result through `/api/workbench/pre-site-visit` to the card; it no longer reports an outage as
+  confirmed absence. File rows still use the separate folder read.
 - **Retire when** the portal is the only intake route. The card's status line and the registry
   can then carry the links, and this route can go. A retirement needs its own caller check.
 
@@ -829,3 +850,116 @@ Production deployment `dpl_HCSqQTQartDj6QujF8j5RC3LFFzk` reached Ready and serve
 `applications.wmkeck.org`. The owner confirmed on Request 1002903 in local dev (production reads) that
 both rows link the hand-placed files. An unauthenticated production call to the route redirects to sign-in,
 the same as the sibling Workbench routes.
+
+
+### 16.14 2026-10-01: large-upload memory mitigation [DEPLOYED via PR #400; NEAR-LIMIT REHEARSAL PENDING]
+
+The owner retained the shared admin-editable 500 MB cap after a 300+ MB PPTX failed in
+production. Vercel logged an out-of-memory termination at 17:28:01 PDT for materials
+finalization. Read-only deployment inspection confirmed Node 22, 2048 MB memory, and a
+300-second duration for the deployed finalizer. The exact allocation/concurrency combination
+that caused that termination has not been reproduced locally.
+
+PR #400 (`499d9e29a3b217950e755ea41767c7dff8eba9e5`) reduces memory use without changing file
+ownership, private staging, scanning policy, or SharePoint/registry recovery:
+
+- The shared staging reader allocates one bounded buffer and hashes bytes incrementally.
+  Trusted-length overflow is rejected before copying; unknown-length responses reserve the
+  persisted cap and return only the filled view without another full-file copy. Allocation
+  failures remain retryable rather than permanently rejecting a valid file.
+- The shared scanner sends a fresh Web `ReadableStream` multipart body per attempt with an
+  exact Content-Length. All callers retain their advanced scan flags, timeout and retry
+  profiles. It no longer creates a whole-file Blob copy. Graph retains its chunked upload.
+- Applicant materials and staff Consultant Feedback finalization use a shared process-local
+  admission guard before claiming or loading staged bytes. A busy instance returns 503
+  `processing_busy` and Retry-After. The guard is not a distributed ownership lock; existing
+  database claims remain authoritative. Release checks the holder token. Six-minute stale
+  takeover assumes a holder beyond the 300-second invocation budget plus margin is no longer
+  active; that platform behavior remains unverified in the provider rehearsal.
+- Applicant processing uses the truthful combined status “Checking and saving your file.”
+  Busy retries are bounded and cancelled on request changes/unmount. A 429 keeps the staged
+  upload retryable. Unrecognized 5xx/network failures explain that saving was not confirmed
+  and advise waiting before Retry. Existing receipts are labelled “Previously received”
+  while a replacement is busy, pending, or has failed.
+- Safe stage logs record elapsed time and RSS around download, scan, and save, without file
+  contents, original filenames, bearer links, or storage URLs.
+
+`node --import ./scripts/lib/use-extensionless.mjs scripts/benchmark-materials-upload-memory.mjs`
+requires Node 22 and runs the real staging reader, PPTX validator, scanner request, and Graph
+large-upload helper with temporary synthetic ZIP/PPTX-shaped files and local-only network
+sinks. On Node 22.23.2 (macOS arm64), the nonzero 499 MiB fixture reached 721 MiB peak RSS
+through the revised path. The pre-fix timeout/retry case reached 2210.8 MiB; the revised retry
+case reached 703.1 MiB. These measurements support a possible failure mechanism, not proof of
+the exact production trigger. Each complete scanner file part and Graph upload matched the
+fixture hash. The benchmark also exercises concurrent requests and a small unknown-length response;
+unknown length can still reserve the entire cap even for a small file. Synthetic Office
+structure and local sinks do not establish acceptance by Cloudmersive or real SharePoint.
+
+**Release evidence boundary:** the owner reported the actual 300+ MB PowerPoint upload on
+Request 1003302 successful after deployment. Correlated production logs measured a
+326,914,310-byte file, 67,045 ms scanning, 61,531 ms SharePoint upload, and 142,803 ms
+server finalization; the highest logged RSS was 542,785,536 bytes. Browser transfer was
+approximately 76 seconds based on token/finalize request times, not a measured client timer.
+These observations do not establish near-limit 500 MB provider support. That rehearsal
+is parked (see §16.15); normal-use acceptance is complete. Production retains the 2048 MB memory tier.
+
+### 16.15 Background processing [PRODUCTION-LIVE; FIRST BACKGROUND JOB COMPLETED 2026-10-02]
+
+The owner authorized reusing the durable reviewer-acceptance queue pattern to let applicants
+leave after private Blob transfer and committed Postgres admission. The bytes remain in
+private Blob; Postgres stores ownership and processing state. The settled
+[background-processing plan](plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md)
+records the two OAuth Fable plan reviews, Sol's replacement-safety finding, invariant tests,
+and rollout. It supersedes the synchronous wait and same-item replacement
+contract only for newly admitted background jobs: those jobs use per-staging subfolders with
+canonical filenames, retain the previous physical file through partial failures, and publish
+only after clean scanning and registry persistence. Existing synchronous scanning-off policy
+is unchanged; background admission requires enabled scanning.
+
+**[VERIFIED via Production probes and deployment readback, 2026-10-02.]** Migration
+060 is applied; the physical job table and staging owner column exist. Production schema
+readiness, admission, and virus scanning are all enabled. PR #404
+(`a63747ca5dfa74954c208e23bd1f90f3b25b0eab`), #407
+(`df7bb6ac3f90eba5b80d785f3119c96b8bd0f0e4`), and #410
+(`8fb8a6d83684a9d49b8450b26ef5bbef382f9a32`) merged with all CI passing. The historical activation deployment
+`dpl_2AacXcc5YQX9dNvJ4gMn4PpGtWWN` serves the #410 commit at
+`https://wmkfresearchapps-36g8ub7g7-justin-gallivans-projects.vercel.app`, aliased to
+`applications.wmkeck.org`.
+
+The first real job `33630e07-4311-41b3-8aef-737a2962ce03` (`presentation_source`) was
+created at `2026-10-02T21:36:35.918Z`, started at `21:37:05.541Z`, reached a clean scan
+checkpoint at `21:38:23.439Z`, and completed at `21:39:19.482Z` on attempt 1 with no error;
+staging was consumed. Admission-to-completion took about 2m44s. The owner closed and reopened
+the browser during processing, then confirmed Received after reopening. Worker invocations
+21:44–21:48 UTC were healthy with an empty queue. The owner-authorized agent read-only
+Production CLI probe passed fixed-target/TLS checks and returned expected `job_not_found` for
+intentionally nonexistent UUID `00000000-0000-4000-8000-000000000000`; no recovery mutation
+was run. No automatic email is sent, so operational monitoring remains required.
+
+PR #405 merged as `1df8a33e2` after all current-head CI checks passed; PR #413 merged as `81dad17e2`. Both are included in Ready Production deployment `dpl_7zi1no5HrxgrPbCQo18Lsi1NM5CZ` at commit `b223dad7d` (October 2 final deployment readback and Git ancestry checks). The configured cap is covered by tests. The exact 500 MB live transfer remains unverified and parked, not a normal-use release blocker. The owner declined another simultaneous-large background test on October 2: the expected set is one large PPTX, a usually smaller PDF, and a text document. Reopen stress testing only if usage or failures warrant it. The real 300+ MB PPTX upload succeeded before background activation (§16.14).
+
+### 16.16 Security-scan rejection diagnostics [PRODUCTION-LIVE via PR #407/#410]
+
+For applicant materials only, an infected scanner verdict still rejects the upload with
+`scan_infected`; scanning policy, clean/uncertain decisions, and provider calls are unchanged.
+The scanner adapter now distinguishes an actual nonempty virus signature from its own
+synthesized content-flag entries and returns closed content flags. The service projects the
+verdict to an allowlisted `scanRejection: { category, flags }`: `signature_match` takes
+precedence over `blocked_content`, then `invalid_or_protected_file`, then `unspecified`.
+The shared validator rejects extra keys, unknown flags, and inconsistent combinations;
+invalid or legacy diagnostics render the unspecified message. Raw provider names, messages,
+filenames, and URLs never enter this public diagnostic.
+
+The synchronous 422 response and rejected-staging replay return the safe diagnostic and
+`reason: scan_infected`. Background failure stores it in the existing job `result_payload`;
+only terminal rejection writes it to staging `result_payload`. An attention hold retains
+staging pending for guarded recovery. The applicant `jobs` projection exposes it only for
+failed infected jobs, while staff `uploadJobs` may also show it for an infected
+`needs_attention` hold. The applicant and staff screens render category-specific safe copy;
+an unspecified/legacy record never claims that a malware signature was found.
+
+Each infected verdict attempts one best-effort warning `operational_events` write,
+`site_visit_material_scan_rejected` at stage `virus_scan`, with request/collection/staging/slot
+references, staging-id deduplication, and only the allowlisted diagnostic in metadata. There is no notification email,
+new column, or migration. The diagnostic and applicant-facing progress/rejection copy are
+Production-deployed via PRs #407 and #410. Exact 500 MB live transfer remains unverified.

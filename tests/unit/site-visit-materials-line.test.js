@@ -9,6 +9,11 @@ test('no collection renders no line', () => {
   expect(siteVisitMaterialsLine(undefined)).toBeNull();
 });
 
+test('unavailable summary sentinels do not claim an invitation was not sent', () => {
+  expect(siteVisitMaterialsLine({ unavailable: true })).toBeNull();
+  expect(siteVisitMaterialsLine({ availability: 'unavailable' })).toBeNull();
+});
+
 test('counts plus due date while items are missing; overdue is called out', () => {
   expect(siteVisitMaterialsLine(base)).toBe(`Materials: 2 of 3 received · due ${due}.`);
   expect(siteVisitMaterialsLine({ ...base, overdue: true })).toBe(`Materials: 2 of 3 received · overdue (due ${due}).`);
@@ -23,4 +28,10 @@ test('received, ready, closed, and not-invited states read distinctly', () => {
 
 test('every required item waived is 0 of 0, not a division or a blank', () => {
   expect(siteVisitMaterialsLine({ ...base, state: 'received', receivedCount: 0, requiredCount: 0 })).toBe('Materials: 0 of 0 received, awaiting confirmation.');
+});
+
+test('processing and coordinator attention are explicit, including on closed collections', () => {
+  expect(siteVisitMaterialsLine({ ...base, state: 'processing', processingCount: 2 })).toBe('Materials: 2 of 3 received · 2 uploads processing.');
+  expect(siteVisitMaterialsLine({ ...base, state: 'needs_attention', attentionCount: 1 })).toBe('Materials: 2 of 3 received · 1 upload needs coordinator attention.');
+  expect(siteVisitMaterialsLine({ ...base, state: 'closed', processingCount: 1, attentionCount: 1 })).toBe('Materials: closed, 2 of 3 received · 1 upload needs coordinator attention · 1 upload processing.');
 });

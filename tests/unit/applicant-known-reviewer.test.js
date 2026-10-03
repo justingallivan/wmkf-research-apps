@@ -4,9 +4,16 @@
 
 const getById = jest.fn();
 const findByEmailCandidates = jest.fn();
+const findAllByExactEmail = jest.fn();
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   getById: (...args) => getById(...args),
   findByEmailCandidates: (...args) => findByEmailCandidates(...args),
+  findAllByExactEmail: (...args) => findAllByExactEmail(...args),
+}));
+
+const resolveReviewerBindCapability = jest.fn();
+jest.mock('../../lib/services/test-requests/synthetic-reviewer-capability.js', () => ({
+  resolveReviewerBindCapability: (...args) => resolveReviewerBindCapability(...args),
 }));
 
 import {
@@ -45,6 +52,40 @@ beforeEach(() => {
     id: PERSON,
     row: person(),
   });
+  findAllByExactEmail.mockResolvedValue([person()]);
+});
+
+test('scoped cast hydration uses the exact bound person and includes its hidden email owner', async () => {
+  const requestId = '11111111-1111-4111-8111-111111111111';
+  const cast = person({ wmkf_issyntheticreviewer: true });
+  resolveReviewerBindCapability.mockResolvedValueOnce({ kind: 'synthetic', person: cast });
+  findAllByExactEmail.mockResolvedValueOnce([cast]);
+
+  const known = await loadApplicantKnownReviewer(PERSON, requestId);
+
+  expect(known).toMatchObject({ status: 'known', potentialReviewerId: PERSON });
+  expect(resolveReviewerBindCapability).toHaveBeenCalledWith({ personId: PERSON, requestId });
+  expect(findAllByExactEmail).toHaveBeenCalledWith('rotem@example.edu');
+  expect(findByEmailCandidates).not.toHaveBeenCalled();
+});
+
+test('scoped cast hydration refuses another exact email owner', async () => {
+  const requestId = '11111111-1111-4111-8111-111111111111';
+  const cast = person({ wmkf_issyntheticreviewer: true });
+  resolveReviewerBindCapability.mockResolvedValueOnce({ kind: 'synthetic', person: cast });
+  findAllByExactEmail.mockResolvedValueOnce([cast, person({ wmkf_potentialreviewersid: 'other' })]);
+  await expect(loadApplicantKnownReviewer(PERSON, requestId)).resolves.toMatchObject({ status: 'email_conflict' });
+});
+
+test('scoped hydration preserves inactive repair status when the binding gate refuses', async () => {
+  const requestId = '11111111-1111-4111-8111-111111111111';
+  resolveReviewerBindCapability.mockRejectedValueOnce(Object.assign(new Error('inactive'), {
+    code: 'reviewer_person_inactive',
+  }));
+  getById.mockResolvedValueOnce(person({ statecode: 1 }));
+  const known = await loadApplicantKnownReviewer(PERSON, requestId);
+  expect(known).toMatchObject({ status: 'inactive', code: 'person_inactive' });
+  expect(findByEmailCandidates).not.toHaveBeenCalled();
 });
 
 test('exact active owner with source-null email is known and quick_check', async () => {

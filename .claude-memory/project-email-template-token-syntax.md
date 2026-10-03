@@ -6,7 +6,7 @@ metadata:
   type: project
   status: active
   scope: dataverse
-  last_verified: 2026-07-22 via live resolver source; dual-syntax aliases remain
+  last_verified: 2026-10-01 via four server renderer sources; dual-syntax aliases remain; stored defaults not reprobed
   originSessionId: b4f727da-b275-4ffe-a50a-250fc68727a9
 ---
 
@@ -25,8 +25,11 @@ separate cleanup decision is made.
   (`respond.js`), withdraw (`reviewer-withdraw-email.js`), both reminders
   (`reviewer-reminder-email.js`), grantee invite + reminder (`grantee-invite-email.js`
   + the CLIENT-side composer `fillInviteBody`/`fillInviteSubject` in
-  `shared/config/granteeInviteEmail.js`). Each still has its own ad-hoc per-file
-  `applyPlaceholders` map (NOT the central resolver).
+  `shared/config/granteeInviteEmail.js`). Token dictionaries remain caller-owned.
+  The four server modules now share only the pure ordered replacement operation
+  in `lib/utils/email-placeholders.js`; this is not the central System A resolver
+  and does not change the client composer or token vocabulary. Source verified
+  2026-10-01; see `docs/plans/EMAIL_PLACEHOLDER_EXTRACTION_PLAN_2026-10-01.md`.
 
 ## What to know before touching email templates
 - **Resolvers are DUAL-SYNTAX (accept both `[x]` and `{{x}}`, longest-first order).**

@@ -19,6 +19,8 @@ const {
   validateReviewDocxRepairManifest,
   validateRepairScope,
 } = require('../../lib/services/review-documents/repair-service');
+const savedRelocationManifest = require('../fixtures/review-docx-repair-relocation-v2.json');
+const savedContentManifest = require('../fixtures/review-docx-repair-content-v2.json');
 
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
 const TARGET = {
@@ -87,6 +89,7 @@ test('builds a hash-bound one-item repair manifest without review content', asyn
     cycleCode: 'D26', requestNumber: '1002874', suggestionId: SUGGESTION_ID,
     observedAt: '2026-09-03T23:30:00.000Z',
   });
+  expect(JSON.stringify(manifest)).toMatchSnapshot('fixed-clock complete relocation manifest');
   expect(manifest).toMatchObject({
     artifactType: 'review_docx_sharepoint_repair_v2',
     schemaVersion: 2,
@@ -115,6 +118,7 @@ test('blocks a suggestion that resolves to a different request number', async ()
   planIndividualReviewFileCandidate.mockResolvedValue({ ...PLAN, requestNumber: '9999999' });
   const manifest = await buildReviewDocxRepairManifest({
     cycleCode: 'D26', requestNumber: '1002874', suggestionId: SUGGESTION_ID,
+    observedAt: '2026-09-03T23:30:00.000Z',
   });
   expect(manifest.summary).toEqual({ blocking: 1, eligibleRepairs: 0 });
   expect(manifest.candidate).toMatchObject({
@@ -148,6 +152,19 @@ test('rebuilds the source contract, preflights the exact row, and repairs withou
   });
 });
 
+test('consumes a pre-extraction saved relocation manifest through fresh revalidation', async () => {
+  expect(() => validateReviewDocxRepairManifest(savedRelocationManifest)).not.toThrow();
+  const report = await executeReviewDocxRepair(savedRelocationManifest);
+  expect(report.status).toBe('completed');
+  expect(preflightReviewDocxWrite).toHaveBeenCalledWith({
+    executionMode: 'backfill', suggestionIds: [SUGGESTION_ID],
+  });
+  expect(ensureIndividualReviewFile).toHaveBeenCalledWith(SUGGESTION_ID, expect.objectContaining({
+    expectedSourceFingerprint: PLAN.sourceFingerprint,
+    repairFromPointer: PLAN.priorPointer,
+  }));
+});
+
 test('rejects invalid scope and drift before write preflight', async () => {
   expect(() => validateRepairScope({
     cycleCode: 'd26', requestNumber: '1002874', suggestionId: SUGGESTION_ID,
@@ -173,7 +190,9 @@ test('binds an exact current-item content repair and retains the prior SharePoin
   });
   const manifest = await buildReviewDocxRepairManifest({
     cycleCode: 'D26', requestNumber: '1002874', suggestionId: SUGGESTION_ID,
+    observedAt: '2026-09-03T23:30:00.000Z',
   });
+  expect(JSON.stringify(manifest)).toMatchSnapshot('fixed-clock complete content-repair manifest');
   expect(manifest).toMatchObject({
     repairKind: 'content',
     summary: { blocking: 0, eligibleRepairs: 1 },
@@ -187,7 +206,8 @@ test('binds an exact current-item content repair and retains the prior SharePoin
     },
   });
 
-  const report = await executeReviewDocxRepair(manifest);
+  expect(() => validateReviewDocxRepairManifest(savedContentManifest)).not.toThrow();
+  const report = await executeReviewDocxRepair(savedContentManifest);
   expect(ensureIndividualReviewFile).toHaveBeenCalledWith(SUGGESTION_ID, {
     cycleCode: 'D26',
     executionMode: 'backfill',

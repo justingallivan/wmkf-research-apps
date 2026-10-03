@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { bootstrapFreshDatabase, readMigrationManifest } from '../../scripts/lib/fresh-database-bootstrap';
+import { stripOuterTxn } from '../../scripts/apply-migrations.js';
 import {
   LEDGER_RECIPES, LEDGER_REASON_CODES, LEDGER_RECEIPT_KEYS, LEDGER_RESOURCE_KINDS, LEDGER_STEPS,
 } from '../../lib/services/test-requests/run-ledger.js';
@@ -261,6 +263,8 @@ describe('migration 054 real SQL contains the load-bearing predicates the pure-J
       return sql.slice(start, end).replace(/\s+/g, ' ').trim();
     };
     expect(fnBody(setupSql)).toBe(fnBody(migration));
+    const slotMigration = fs.readFileSync(path.join(process.cwd(), 'lib/db/migrations/058_test_request_cast_slot_bindings.sql'), 'utf8');
+    expect(fnBody(slotMigration)).toBe(fnBody(migration));
     expect(fnBody(migration)).not.toContain('\\');
   });
 
@@ -282,7 +286,7 @@ describe('migration 054 real SQL contains the load-bearing predicates the pure-J
   });
 });
 
-describe('migrations manifest includes 054 in order and its setup-database.js mirror matches', () => {
+describe('migration 054 and the later migration manifest', () => {
   const manifest = JSON.parse(fs.readFileSync(
     path.join(process.cwd(), 'lib/db/migrations-manifest.json'),
     'utf8',
@@ -293,6 +297,35 @@ describe('migrations manifest includes 054 in order and its setup-database.js mi
     expect(ledgerIndex).toBeGreaterThan(0);
     expect(manifest.files[ledgerIndex - 1]).toBe('053_pre_site_distribution_review_bundle.sql');
     expect(manifest.files.indexOf('055_post_presentation_materials.sql')).toBeGreaterThan(ledgerIndex);
+    expect(manifest.files.indexOf('056_integrity_screenings_request_id.sql')).toBeGreaterThan(ledgerIndex);
+    expect(manifest.files.indexOf('057_integrity_screening_reviews.sql')).toBeGreaterThan(ledgerIndex);
+    expect(manifest.files.indexOf('058_test_request_cast_slot_bindings.sql')).toBeGreaterThan(ledgerIndex);
+  });
+
+  it('manifest-driven fresh install executes migrations 058 and 059 and records their filenames', async () => {
+    const migrationName = '058_test_request_cast_slot_bindings.sql';
+    const recipientMigrationName = '059_scheduled_email_recipient_generation.sql';
+    expect(readMigrationManifest()).toContain(migrationName);
+    expect(readMigrationManifest()).toContain(recipientMigrationName);
+    const migration058 = fs.readFileSync(path.join(process.cwd(), 'lib/db/migrations/058_test_request_cast_slot_bindings.sql'), 'utf8');
+    const migration059 = fs.readFileSync(path.join(process.cwd(), 'lib/db/migrations', recipientMigrationName), 'utf8');
+    const calls = [];
+    const client = { query: jest.fn(async (sql, params) => {
+      calls.push({ sql, params });
+      if (sql.includes('FROM pg_catalog.pg_tables')) return { rows: [] };
+      if (sql.includes('SELECT name FROM schema_migrations')) return { rows: [] };
+      if (sql.includes('FROM information_schema.tables')) return { rows: [] };
+      return { rows: [] };
+    }) };
+    await bootstrapFreshDatabase(client, { baseGroups: [], supplementalGroups: [] });
+    expect(calls.some(({ sql }) => sql === stripOuterTxn(migration058))).toBe(true);
+    expect(calls.some(({ sql }) => sql === stripOuterTxn(migration059))).toBe(true);
+    expect(calls).toContainEqual(expect.objectContaining({
+      params: [migrationName, 'setup-database.js (migration SQL executed)'],
+    }));
+    expect(calls).toContainEqual(expect.objectContaining({
+      params: [recipientMigrationName, 'setup-database.js (migration SQL executed)'],
+    }));
   });
 
   function normalize(sql) {

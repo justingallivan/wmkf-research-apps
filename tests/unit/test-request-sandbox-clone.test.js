@@ -203,11 +203,129 @@ describe('sandbox operator write boundary', () => {
     expect(script).toContain("verification.failures.push(...reverifyFailures.map((failure) => `final file check: ${failure}`))");
   });
 
-  test('ledger-driven modes refuse an unset or shared-production TEST_REQUEST_LEDGER_URL', () => {
-    expect(script).toContain("if (!url) {");
-    expect(script).toContain('TEST_REQUEST_LEDGER_URL is required for ledger-driven modes');
-    expect(script).toMatch(/neon\\?\.tech/);
-    expect(script).toContain('must not be the shared Production/Preview database');
+  test('ledger-driven modes are dispatched through the ledger guard (Codex round-1 Fix 1/4/7; Opus round-2 item 6)', () => {
+    // Opus round-2 item 6 (Codex round-2 #7): requireLedgerUrl and
+    // ledgerSchemaCheck moved to lib/db/ledger-guard.js so their SAFETY
+    // BEHAVIOR is executable and unit-tested (tests/unit/ledger-guard.test.js),
+    // not just their presence in this dispatch source — a literal-source
+    // check alone cannot catch a deleted throw inside those functions. The
+    // pins below stay here only for what still lives in THIS file: the
+    // import and the dispatch call placement.
+    expect(script).toContain("import { requireLedgerUrl, ledgerSchemaCheck } from '../lib/db/ledger-guard.js';");
+    expect(script).not.toContain('--strict-ledger-check');
+    // Zero no-argument calls left at HEAD (a future merge that reintroduces
+    // one, e.g. from B4, is a real regression, not a decorative one) —
+    // ledger-guard.js's own requireLedgerUrl fails closed on a missing
+    // target (tests/unit/ledger-guard.test.js), but this still pins that no
+    // call site in THIS script forgets to pass args.target.
+    expect((script.match(/requireLedgerUrl\(\)/g) || []).length).toBe(0);
+    // Block-bound: for each write/read-only ledger-driven dispatch, BOTH
+    // requireLedgerUrl(args.target) and ledgerSchemaCheck(..., { mode: '...'
+    // must occur strictly between this block's `if (args.X) {` and the next
+    // `if (args.` dispatch, not merely somewhere later in the file.
+    // Codex round-3 #7 (generic, name-independent): EVERY dispatch block in
+    // main() that creates a Dataverse client must first take a target-bound
+    // ledger and pass the schema check, in that order, before createClient(.
+    // A future block (e.g. B4's bindReviewerSlot) is caught whatever it is called.
+    const mainStart = script.indexOf('async function main(');
+    expect(mainStart).toBeGreaterThan(-1);
+    const blockRe = /\n  if \(args\.[^\n]*\) \{/g;
+    blockRe.lastIndex = mainStart;
+    const starts = [];
+    let m;
+    while ((m = blockRe.exec(script)) !== null) starts.push(m.index);
+    expect(starts.length).toBeGreaterThan(5);
+    let clientBlocks = 0;
+    for (let i = 0; i < starts.length; i++) {
+      const at = starts[i];
+      // A dispatch block ends at its own closing brace at two-space indent.
+      const end = script.indexOf('\n  }', at + 1);
+      expect(end).toBeGreaterThan(at);
+      const block = script.slice(at, end);
+      const create = block.indexOf('createClient(');
+      if (create === -1) continue;
+      clientBlocks += 1;
+      const guard = block.indexOf('requireLedgerUrl(args.target)');
+      const check = block.indexOf('ledgerSchemaCheck(ledgerUrl, {');
+      expect({ block: block.slice(0, 60), guardBeforeCheck: guard > -1 && guard < check, checkBeforeClient: check > -1 && check < create })
+        .toEqual({ block: block.slice(0, 60), guardBeforeCheck: true, checkBeforeClient: true });
+    }
+    expect(clientBlocks).toBe(3);
+    for (const mode of ['ledgerCheck', 'runInspect', 'setStatus || args.statusRecheck || args.statusAbandon', 'createCast || args.bindReviewer || args.bindReviewerSlot', 'runRecheck', 'reserve', 'advance']) {
+      const at = script.indexOf(`if (args.${mode}) {`);
+      expect(at).toBeGreaterThan(-1);
+      const nextDispatch = script.indexOf('\n  if (args.', at + 1);
+      const boundary = nextDispatch === -1 ? script.length : nextDispatch;
+      const requireAt = script.indexOf('requireLedgerUrl(args.target)', at);
+      const checkAt = script.indexOf('ledgerSchemaCheck(ledgerUrl, { mode:', at);
+      expect(requireAt).toBeGreaterThan(at);
+      expect(requireAt).toBeLessThan(boundary);
+      expect(checkAt).toBeGreaterThan(at);
+      expect(checkAt).toBeLessThan(boundary);
+    }
+    // Drift-always-throws and the approved-ahead extra rule (Codex round-1
+    // Fix 4) now live in lib/db/ledger-guard.js's ledgerSchemaCheck, covered
+    // executably by tests/unit/ledger-guard.test.js.
+  });
+
+  /**
+   * Opus round-3 L7: the block matcher above (`/\n  if \(args\.[^\n]*\) \{/g`)
+   * only recognizes a bare `if (args.` at two-space indent — a dispatch
+   * reachable only through `} else if (args.` or a trailing `} else {`
+   * would be invisible to it, and neither test above checks a block that
+   * reuses main()'s own SHARED, unconditional `const client =
+   * createClient(...)` (line ~1315) rather than creating its own. This test
+   * covers both gaps directly: an extended, name-independent block matcher
+   * that also recognizes else-if/else branches, and an assertion — for
+   * every such block found AFTER the shared client line that references
+   * `ledgerUrl` and uses the shared `client` — that requireLedgerUrl(args.target)
+   * and ledgerSchemaCheck( both precede the block's first use of `client`
+   * (today: reserve and advance).
+   *
+   * Proven by mutation on a scratch copy (not left as a repeatable CI step,
+   * since restoring a source mutation mid-suite is not deterministic): with
+   * `requireLedgerUrl(args.target)` deleted from the `reserve` block, this
+   * test failed with `guardBeforeClient: false` where `true` was expected;
+   * restoring the line byte-for-byte (diffed against a backup) made it pass
+   * again.
+   */
+  test('Opus round-3 L7: a dispatch block reusing the SHARED client (incl. else-if/else) still guards + schema-checks before using it', () => {
+    const mainStart = script.indexOf('async function main(');
+    expect(mainStart).toBeGreaterThan(-1);
+    const sharedClientIdx = script.indexOf('const client = createClient(', mainStart);
+    expect(sharedClientIdx).toBeGreaterThan(mainStart);
+
+    // Extended, name-independent matcher: a bare `if (args.`, an
+    // `} else if (args.`, or a trailing `} else {`, all at two-space indent
+    // (so nested blocks deeper in the file, e.g. --prepare's --bundle
+    // branch, are never mistaken for a top-level dispatch).
+    const blockRe = /\n  (?:\} else )?if \(args\.[^\n]*\) \{|\n  \} else \{/g;
+    blockRe.lastIndex = sharedClientIdx;
+    const starts = [];
+    let m;
+    while ((m = blockRe.exec(script)) !== null) starts.push(m.index);
+    expect(starts.length).toBeGreaterThan(0);
+
+    let ledgerUrlBlocksChecked = 0;
+    for (const at of starts) {
+      const end = script.indexOf('\n  }', at + 1);
+      const block = script.slice(at, end === -1 ? script.length : end);
+      if (!block.includes('ledgerUrl')) continue; // not a ledger-driven block
+      const firstClientUse = block.search(/\bclient\b/);
+      if (firstClientUse === -1) continue; // never actually uses the shared client
+      ledgerUrlBlocksChecked += 1;
+      const guardAt = block.indexOf('requireLedgerUrl(args.target)');
+      const checkAt = block.indexOf('ledgerSchemaCheck(ledgerUrl, {');
+      expect({
+        block: block.slice(0, 40),
+        guardBeforeClient: guardAt > -1 && guardAt < firstClientUse,
+        checkBeforeClient: checkAt > -1 && checkAt < firstClientUse,
+      }).toEqual({ block: block.slice(0, 40), guardBeforeClient: true, checkBeforeClient: true });
+    }
+    // reserve and advance are the two known-good cases today; a future
+    // else-if/else dispatch that reuses the shared client and references
+    // ledgerUrl is picked up by the loop above automatically.
+    expect(ledgerUrlBlocksChecked).toBe(2);
   });
 
   test('--advance enters the script-only trusted DAL context before advancing any step (Stage C round 2, P1-B)', () => {

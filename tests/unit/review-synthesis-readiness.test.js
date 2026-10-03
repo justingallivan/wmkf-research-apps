@@ -103,8 +103,13 @@ describe('evaluateReviewSynthesisReadiness', () => {
     ['malformed expiry', { wmkf_externaltokenexpires: 'not-a-date' }, 'malformed_token_expires_at'],
     ['unknown response type', { wmkf_responsetype: 999999999 }, 'unknown_response_type'],
     ['unknown review status', { wmkf_reviewstatus: 999999999 }, 'unknown_review_status'],
+    ['malformed review status', { wmkf_reviewstatus: 'released' }, 'unknown_review_status'],
+    ['malformed invited flag', { wmkf_invited: 'true', wmkf_accepted: true }, 'malformed_wmkf_invited'],
     ['malformed accepted flag', { wmkf_accepted: 'yes' }, 'malformed_wmkf_accepted'],
+    ['malformed declined flag', { wmkf_declined: 1 }, 'malformed_wmkf_declined'],
+    ['malformed token revoked flag', { wmkf_externaltokenrevoked: 'false' }, 'malformed_wmkf_externaltokenrevoked'],
     ['malformed receipt date', { wmkf_reviewreceivedat: 'not-a-date' }, 'malformed_review_received_at'],
+    ['malformed token hash', { wmkf_externaltokenhash: '   ' }, 'missing_current_token'],
   ])('fails closed for %s', (_label, patch, reason) => {
     const result = evaluateReviewSynthesisReadiness([
       row('submitted', {

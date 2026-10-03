@@ -1,0 +1,126 @@
+{
+  "sourceCommit": "40ab24f3e9da5af0259aa481014621cdd7837d37",
+  "testSuitesPassed": 45,
+  "testsPassed": 1712,
+  "testFiles": [
+    "tests/integration/enrich-recommended-route.test.js",
+    "tests/integration/reviewer-engagement-races.test.js",
+    "tests/integration/save-candidates-route.test.js",
+    "tests/unit/adapters-caller-id.test.js",
+    "tests/unit/applicant-known-reviewer.test.js",
+    "tests/unit/applicant-reviewers-endpoint.test.js",
+    "tests/unit/external-review-services.test.js",
+    "tests/unit/manual-reviewer-endpoint.test.js",
+    "tests/unit/migration-054-test-request-runs.test.js",
+    "tests/unit/my-candidates-partial-save-on-email-conflict.test.js",
+    "tests/unit/my-candidates-service.test.js",
+    "tests/unit/notification-trust-model-pushup.test.js",
+    "tests/unit/potential-reviewer-synthetic-isolation.test.js",
+    "tests/unit/promote-applicant-reviewer-contact.test.js",
+    "tests/unit/promote-applicant-reviewer-endpoint.test.js",
+    "tests/unit/rehearse-test-request-sandbox-cast-modes.test.js",
+    "tests/unit/reviewer-acceptance-drain-operational-events.test.js",
+    "tests/unit/reviewer-acceptance-drain.test.js",
+    "tests/unit/reviewer-acceptance-job-service.test.js",
+    "tests/unit/reviewer-adapters-writeback.test.js",
+    "tests/unit/reviewer-address-trust-service.test.js",
+    "tests/unit/reviewer-due-extension.test.js",
+    "tests/unit/reviewer-email-reconciler.test.js",
+    "tests/unit/reviewer-merge-adapters.test.js",
+    "tests/unit/reviewer-merge-service.test.js",
+    "tests/unit/reviewer-merge-synthetic-fence.test.js",
+    "tests/unit/reviewer-route-identity-gate.test.js",
+    "tests/unit/reviewer-search-save-contract.test.js",
+    "tests/unit/reviewer-suggestion-disposition.test.js",
+    "tests/unit/reviewer-suggestion-synthetic-binding-fence.test.js",
+    "tests/unit/save-candidates-service.test.js",
+    "tests/unit/save-to-database-identity-gate.test.js",
+    "tests/unit/send-emails-service.test.js",
+    "tests/unit/synthetic-reviewer-capability.test.js",
+    "tests/unit/terminal-transition-service.test.js",
+    "tests/unit/test-request-cast-slot-binding-runner.test.js",
+    "tests/unit/test-request-isolation.test.js",
+    "tests/unit/test-request-reviewer-directed-email.test.js",
+    "tests/unit/test-request-run-ledger.test.js",
+    "tests/unit/withdraw-sufficient-service-delegation.test.js",
+    "tests/unit/workbench-applicant-reviewers-service.test.js",
+    "tests/unit/workbench-enrich-recommended-service.test.js",
+    "tests/unit/workbench-manual-reviewer-service.test.js",
+    "tests/unit/workbench-promote-applicant-reviewer-service.test.js",
+    "tests/unit/workbench-applicant-reviewers-inactive.test.js"
+  ],
+  "commands": [
+    {
+      "command": "npm run check:dataverse-access-layer",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run check:dataverse-access-layer:self-test",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run check:odata-escape",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run check:odata-escape:self-test",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run check:dynamics-context-boundary",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run check:dynamics-context-boundary:self-test",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run check:route-service-boundary",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run check:route-service-boundary:self-test",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run check:reviewer-engagement-boundary",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run check:reviewer-engagement-boundary:self-test",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run check:script-suggestion-writers",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run check:script-suggestion-writers:self-test",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run check:trust-boundary-guid",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run check:trust-boundary-guid:self-test",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run check:status-enum-parity",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run check:status-enum-parity:self-test",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run check:types",
+      "exitCode": 0
+    },
+    {
+      "command": "npx eslint lib/dataverse/adapters/reviewer-suggestion.js lib/services/test-requests/synthetic-reviewer-capability.js lib/services/workbench/applicant-reviewers-service.js tests/unit/synthetic-reviewer-capability.test.js tests/unit/workbench-applicant-reviewers-inactive.test.js tests/unit/workbench-applicant-reviewers-service.test.js",
+      "exitCode": 0
+    }
+  ]
+}

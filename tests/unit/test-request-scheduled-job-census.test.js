@@ -24,7 +24,13 @@ const GUARD = /createRequestTestStateLookup\(|resolveRequestTestState|resolveTes
 //   n/a         — cannot reach a test request
 const RECORDED_CRONS = {
   'auth-bypass-check': { scheduled: true, class: 'operational' },
+  'drain-materials-uploads': { scheduled: true, class: 'allowed', note: 'continues an explicitly submitted token-authorized applicant upload; no request selection or email; materials background plan records this decision' },
   'drain-cycle-dossiers': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/cycle-dossier-service.js'], note: 'cycle-wide report: roster excludes test requests' },
+  'drain-transcriptions': {
+    scheduled: false,
+    class: 'allowed',
+    note: 'route exists but is not scheduled in the shared vercel.json; manual/recovery invocation continues persisted transcription jobs/outbox and exact-path cleanup; request-bound jobs enter only through staff-authorized request controls, and the worker rechecks request access before a new provider submission',
+  },
   'drain-review-panels': { scheduled: true, class: 'allowed', note: 'staff-launched AI panel on chosen requests' },
   'drain-review-syntheses': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/review-synthesis-drain.js'] },
   'drain-reviewer-acceptances': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/reviewer-acceptance-drain.js'] },
@@ -72,3 +78,36 @@ test.each(Object.entries(RECORDED_CRONS)
     expect(fs.readFileSync(path.join(ROOT, file), 'utf8')).toMatch(GUARD);
   },
 );
+
+test('transcription cron continues durable job work without bypassing request-bound start controls', () => {
+  const route = fs.readFileSync(path.join(ROOT, 'pages/api/cron/drain-transcriptions.js'), 'utf8');
+  expect(route).toContain('drainTranscriptionCleanup');
+  expect(route).toContain('drainTranscriptionWorkflowDispatches');
+  expect(route).not.toContain('drainTranscriptionPilot(');
+
+  const meetingRoute = fs.readFileSync(
+    path.join(ROOT, 'pages/api/meeting-tracker/visits/[requestId]/transcriptions/[jobId]/start.js'), 'utf8',
+  );
+  expect(meetingRoute).toContain("requireAppAccess(req, res, 'meeting-tracker')");
+  expect(meetingRoute).toContain('startMeetingTranscription');
+  const service = fs.readFileSync(path.join(ROOT, 'lib/services/meeting-tracker-transcription/service.js'), 'utf8');
+  const start = service.match(/export async function startMeetingTranscription\([\s\S]*?\n}/);
+  expect(start).not.toBeNull();
+  expect(start[0]).toContain('requireMeetingTranscriptionEnabled(requestId)');
+  expect(start[0]).toContain('queueMeetingTranscription');
+
+  const runtime = fs.readFileSync(path.join(ROOT, 'lib/services/transcription-pilot/runtime.js'), 'utf8');
+  const queue = runtime.match(/export async function queueMeetingTranscription\([\s\S]*?\n}/);
+  expect(queue).not.toBeNull();
+  expect(queue[0]).toContain('requireMeetingTranscriptionEnabled(requestId)');
+  expect(queue[0]).toContain('queueMeetingTranscriptionJob');
+  const store = fs.readFileSync(path.join(ROOT, 'lib/services/transcription-pilot/store.js'), 'utf8');
+  const boundQueue = store.match(/async function queueMeetingJob\([\s\S]*?\n  }/);
+  expect(boundQueue).not.toBeNull();
+  expect(boundQueue[0]).toContain('request_id = $2 AND site_visit_activity_id = $3');
+  expect(boundQueue[0]).toContain('INSERT INTO transcription_workflow_dispatches');
+
+  const worker = fs.readFileSync(path.join(ROOT, 'lib/services/transcription-pilot/worker.js'), 'utf8');
+  expect(worker).toContain('if (!jobSubmissionEnabled(job))');
+  expect(worker).toContain('isMeetingTranscriptionRequestAllowed(job.request_id');
+});

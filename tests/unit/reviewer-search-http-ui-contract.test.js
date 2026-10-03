@@ -53,7 +53,7 @@ afterEach(() => {
 test('ordinary pre-response network loss reconciles the roster but cannot confirm a saved non-suggestion key', async () => {
   let rosterGets = 0;
   const onSaved = jest.fn();
-  global.fetch = jest.fn((url) => {
+  global.fetch = jest.fn((url, options = {}) => {
     if (String(url).includes('/api/workbench/reviewer-roster?')) {
       rosterGets += 1;
       return Promise.resolve(response(rosterGets === 1 ? rosterEnvelope() : contract.rosterRecovery));
@@ -80,7 +80,7 @@ test('ordinary pre-response network loss reconciles the roster but cannot confir
 
 test('ordinary response JSON failure does not perform pre-response roster recovery', async () => {
   let rosterGets = 0;
-  global.fetch = jest.fn((url) => {
+  global.fetch = jest.fn((url, options = {}) => {
     if (String(url).includes('/api/workbench/reviewer-roster?')) {
       rosterGets += 1;
       return Promise.resolve(response(rosterEnvelope()));
@@ -404,7 +404,7 @@ test('expired verification with an unchanged token remains retryable without ros
     automatedIdentityAttestation: 'expired-token',
   };
   let rosterPosts = 0;
-  global.fetch = jest.fn((url) => {
+  global.fetch = jest.fn((url, options = {}) => {
     if (String(url).includes('/api/workbench/reviewer-roster?')) {
       return Promise.resolve(response(rosterEnvelope([expired])));
     }
@@ -427,7 +427,12 @@ test('expired verification with an unchanged token remains retryable without ros
     }
     if (url === '/api/workbench/reviewer-roster' ) {
       rosterPosts += 1;
-      return Promise.resolve(response({ success: true, recorded: 1 }));
+      const [posted] = JSON.parse(options.body).candidates;
+      return Promise.resolve(response({
+        success: true,
+        recorded: 1,
+        outcomes: [{ inputIndex: 0, candidateKey: posted.candidateKey, status: 'recorded' }],
+      }));
     }
     throw new Error('unexpected fetch ' + url);
   });
@@ -459,7 +464,7 @@ test('expired verification with recorded=0 stays retryable and does not auto-sav
     automatedIdentityAttestation: 'expired-token',
   };
   let rosterPosts = 0;
-  global.fetch = jest.fn((url) => {
+  global.fetch = jest.fn((url, options = {}) => {
     if (String(url).includes('/api/workbench/reviewer-roster?')) {
       return Promise.resolve(response(rosterEnvelope([expired])));
     }
@@ -482,7 +487,12 @@ test('expired verification with recorded=0 stays retryable and does not auto-sav
     }
     if (url === '/api/workbench/reviewer-roster') {
       rosterPosts += 1;
-      return Promise.resolve(response({ success: true, recorded: 0 }));
+      const [posted] = JSON.parse(options.body).candidates;
+      return Promise.resolve(response({
+        success: true,
+        recorded: 0,
+        outcomes: [{ inputIndex: 0, candidateKey: posted.candidateKey, status: 'unchanged' }],
+      }));
     }
     throw new Error('unexpected fetch ' + url);
   });
@@ -544,8 +554,14 @@ test('multi-row refresh keeps recorded=0 retryable while acknowledging recorded=
     }
     if (url === '/api/workbench/reviewer-roster') {
       const body = JSON.parse(options.body);
-      rosterPosts.push(body.candidates[0].candidateKey);
-      return Promise.resolve(response({ success: true, recorded: body.candidates[0].candidateKey === second.candidateKey ? 1 : 0 }));
+      const [posted] = body.candidates;
+      rosterPosts.push(posted.candidateKey);
+      const recorded = posted.candidateKey === second.candidateKey;
+      return Promise.resolve(response({
+        success: recorded,
+        recorded: recorded ? 1 : 0,
+        outcomes: [{ inputIndex: 0, candidateKey: posted.candidateKey, status: recorded ? 'recorded' : 'unchanged' }],
+      }));
     }
     throw new Error('unexpected fetch ' + url);
   });

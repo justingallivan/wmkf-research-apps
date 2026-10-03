@@ -6,7 +6,7 @@ const TONE = {
   danger: 'border-red-200 bg-red-50 text-red-800', warning: 'border-amber-200 bg-amber-50 text-amber-900',
   success: 'border-green-200 bg-green-50 text-green-800',
 };
-const ICONS = { unavailable: CircleHelp, no_visit: CalendarX2, not_requested: MinusCircle, waiting: Clock3, late: TriangleAlert, check_files: FileCheck2, ready: CheckCircle2, closed: Archive };
+const ICONS = { unavailable: CircleHelp, no_visit: CalendarX2, not_requested: MinusCircle, waiting: Clock3, processing: Clock3, needs_attention: TriangleAlert, late: TriangleAlert, check_files: FileCheck2, ready: CheckCircle2, closed: Archive };
 
 export default function MaterialsStatusPill({ summary, availability, hasSiteVisit, requestMaterialsHref }) {
   const status = classifySiteVisitMaterialsStatus(summary, { availability, hasSiteVisit });

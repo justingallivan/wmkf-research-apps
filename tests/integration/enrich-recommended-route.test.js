@@ -129,7 +129,7 @@ jest.mock('../../lib/services/reviewer-request-context', () => ({
   loadReviewerRequestContext: jest.fn(async () => ({})),
 }));
 
-jest.mock('../../shared/components/reviewers/reviewer-search-logic', () => ({
+jest.mock('../../shared/utils/reviewer-roster-projection', () => ({
   pruneCandidateForRoster: jest.fn((c) => c),
 }));
 
@@ -152,6 +152,7 @@ import { requireAppAccess } from '../../lib/utils/auth';
 const REQ = '11111111-1111-1111-1111-111111111111';
 const PR = '22222222-2222-2222-2222-222222222222';
 const SUG = '33333333-3333-3333-3333-333333333333';
+const originalReviewerIsolation = process.env.SYNTHETIC_REVIEWER_ISOLATION;
 
 function sseRes() {
   const res = {
@@ -184,13 +185,19 @@ const baseBody = (over = {}) => ({
 beforeEach(() => {
   jest.clearAllMocks();
   process.env.CLAUDE_API_KEY = 'test-key';
+  process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on';
   requireAppAccess.mockResolvedValue({ profileId: 7, session: { user: { dynamicsSystemuserId: 'u-1' } } });
   limiter.mockResolvedValue(true);
   getReviewerTimeBudgetSeconds.mockResolvedValue(600);
   findApplicantRecommendedByRequest.mockResolvedValue([
     { _wmkf_potentialreviewer_value: PR, _wmkf_potentialreviewer_value_formatted: 'Dr. Rec One', wmkf_appreviewersuggestionid: SUG },
   ]);
-  getPersonById.mockResolvedValue({ wmkf_primaryaffiliation: 'Rec University' });
+  getPersonById.mockResolvedValue({
+    wmkf_potentialreviewersid: PR,
+    wmkf_primaryaffiliation: 'Rec University',
+    wmkf_issyntheticreviewer: false,
+    statecode: 0,
+  });
   verifyClaudeSuggestions.mockImplementation(async (suggestions) => ({
     verified: suggestions.map((s) => ({ ...s, verified: true, publications: [], verificationConfidence: 0.9 })),
     unverified: [],
@@ -207,6 +214,11 @@ beforeEach(() => {
     })),
   }));
   upsertByPotentialReviewer.mockResolvedValue({});
+});
+
+afterAll(() => {
+  if (originalReviewerIsolation === undefined) delete process.env.SYNTHETIC_REVIEWER_ISOLATION;
+  else process.env.SYNTHETIC_REVIEWER_ISOLATION = originalReviewerIsolation;
 });
 
 describe('pre-stream gates (JSON, not SSE)', () => {

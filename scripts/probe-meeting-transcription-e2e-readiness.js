@@ -24,6 +24,27 @@ const TRANSCRIPT = 100000006;
 const RECORDING = 100000005;
 const PUBLICATION_METADATA_REQUEST = '4236c2b3-b053-f111-bec7-6045bd015cb0';
 const TEST_FOLDER_LABEL = 'TEST - Transcription Pilot';
+const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
+const GRAPH_READ_TIMEOUT_MS = 15_000;
+
+async function readGraphJson(url, headers) {
+  const parsed = new URL(url);
+  if (parsed.origin !== 'https://graph.microsoft.com' || !parsed.pathname.startsWith('/v1.0/')) {
+    throw new Error('Graph metadata lookup must use the registered Microsoft Graph v1.0 origin.');
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GRAPH_READ_TIMEOUT_MS);
+  try {
+    const response = await fetch(parsed, {
+      method: 'GET', headers, signal: controller.signal, redirect: 'error',
+    });
+    if (response.status === 404) return { found: false, status: 404 };
+    if (!response.ok) return { found: false, status: response.status };
+    return { found: true, status: response.status, body: await response.json() };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 function safeGraphMetadataFailure(error) {
   const status = Number(error?.status);
@@ -326,14 +347,7 @@ async function safetyMetadata(client) {
       const requestFolderPath = active[0].relativeurl;
       const encodedRequestFolder = requestFolderPath.split('/').filter(Boolean).map(encodeURIComponent).join('/');
       const graphToken = await GraphService.getAccessToken();
-      const { GRAPH_BASE } = await import('../lib/services/graph/constants.js');
-      const { fetchWithTimeout } = await import('../lib/services/graph/http.js');
-      const readJson = async (url) => {
-        const response = await fetchWithTimeout(url, { headers: GraphService.buildHeaders(graphToken) }, 15_000);
-        if (response.status === 404) return { found: false, status: 404 };
-        if (!response.ok) return { found: false, status: response.status };
-        return { found: true, status: response.status, body: await response.json() };
-      };
+      const readJson = (url) => readGraphJson(url, GraphService.buildHeaders(graphToken));
       const select = '?$select=id,folder,parentReference';
       const requestFolder = await readJson(`${GRAPH_BASE}/drives/${encodeURIComponent(driveId)}/root:/${encodedRequestFolder}${select}`);
       const testPath = `${encodedRequestFolder}/${encodeURIComponent(TEST_FOLDER_LABEL)}`;

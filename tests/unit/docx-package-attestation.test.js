@@ -771,3 +771,81 @@ describe('ZIP central-directory budget (fail-closed, Codex plan rounds 13-14)', 
     await expect(packagePartsBudgeted(bomb, TINY_BUDGET)).rejects.not.toThrow(/uncompressed data size mismatch/);
   });
 });
+
+describe('source DOCX without custom properties: exact SharePoint OPC additions', () => {
+  const REL_TYPE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties';
+  const CONTENT_TYPE = 'application/vnd.openxmlformats-officedocument.custom-properties+xml';
+  let source;
+  beforeAll(async () => {
+    source = await withParts(await renderInitialAssessmentDocx(ARGS), async (zip) => {
+      zip.remove('docProps/custom.xml');
+      zip.file('_rels/.rels', (await zip.file('_rels/.rels').async('string'))
+        .replace(/<Relationship\b[^>]*Type="[^"\n]*\/custom-properties"[^>]*\/>/g, ''));
+      zip.file('[Content_Types].xml', (await zip.file('[Content_Types].xml').async('string'))
+        .replace(/<Override\b[^>]*PartName="\/docProps\/custom.xml"[^>]*\/>/g, ''));
+    });
+  });
+  const promoted = (mutate) => withParts(source, async (zip) => {
+    zip.file('docProps/custom.xml', CUSTOM_OK);
+    zip.file('_rels/.rels', (await zip.file('_rels/.rels').async('string'))
+      .replace('</Relationships>', `<Relationship Id="spCustom" Type="${REL_TYPE}" Target="docProps/custom.xml"/></Relationships>`));
+    zip.file('[Content_Types].xml', (await zip.file('[Content_Types].xml').async('string'))
+      .replace('</Types>', `<Override PartName="/docProps/custom.xml" ContentType="${CONTENT_TYPE}"/></Types>`));
+    if (mutate) await mutate(zip);
+  });
+  it('accepts the added metadata part with its one exact internal relationship and content-type entry', async () => {
+    await expect(attestDocxPackageAgainstSource(await promoted(), source)).resolves.toBeTruthy();
+  });
+  it.each([
+    ['external link', 'Target="docProps/custom.xml"', 'Target="docProps/custom.xml" TargetMode="External"'],
+    ['different target', 'Target="docProps/custom.xml"', 'Target="docProps/app.xml"'],
+    ['different relationship type', REL_TYPE, REL_TYPE + '-foreign'],
+  ])('rejects %s', async (_label, before, after) => {
+    const stored = await promoted(async (zip) => zip.file('_rels/.rels', (await zip.file('_rels/.rels').async('string')).replace(before, after)));
+    await expect(attestDocxPackageAgainstSource(stored, source)).rejects.toThrow(/package relationship|custom properties/);
+  });
+  it('rejects changing an existing package relationship', async () => {
+    const stored = await promoted(async (zip) => zip.file('_rels/.rels', (await zip.file('_rels/.rels').async('string')).replace('Target="word/document.xml"', 'Target="word/styles.xml"')));
+    await expect(attestDocxPackageAgainstSource(stored, source)).rejects.toThrow(/_rels\/.rels differs from the source relationships/);
+  });
+  it('rejects the new part without a root relationship', async () => {
+    const stored = await promoted(async (zip) => zip.file('_rels/.rels', await (await JSZip.loadAsync(source)).file('_rels/.rels').async('string')));
+    await expect(attestDocxPackageAgainstSource(stored, source)).rejects.toThrow(/exactly one package relationship/);
+  });
+  it('rejects an incorrect custom-properties content type', async () => {
+    const stored = await promoted(async (zip) => zip.file('[Content_Types].xml', (await zip.file('[Content_Types].xml').async('string')).replace(CONTENT_TYPE, 'application/xml')));
+    await expect(attestDocxPackageAgainstSource(stored, source)).rejects.toThrow(/content-type override|custom properties/);
+  });
+  it('rejects two links to the added custom-properties part', async () => {
+    const stored = await promoted(async (zip) => zip.file('_rels/.rels', (await zip.file('_rels/.rels').async('string')).replace('</Relationships>', `<Relationship Id="spCustom2" Type="${REL_TYPE}" Target="docProps/custom.xml"/></Relationships>`)));
+    await expect(attestDocxPackageAgainstSource(stored, source)).rejects.toThrow(/exactly one package relationship/);
+  });
+  it('rejects word content edits even with permitted metadata links', async () => {
+    const stored = await promoted(async (zip) => zip.file('word/document.xml', '<changed/>'));
+    await expect(attestDocxPackageAgainstSource(stored, source)).rejects.toThrow(/word\/document.xml differs/);
+  });
+  it('rejects foreign hidden payloads even with permitted metadata links', async () => {
+    const stored = await promoted(async (zip) => zip.file('foreign.bin', Buffer.from('hidden')));
+    await expect(attestDocxPackageAgainstSource(stored, source)).rejects.toThrow(/unexpected part foreign.bin/);
+  });
+});
+
+test('source attestation rejects root attributes and oversized added IDs in custom-properties promotion', async () => {
+  const render = await renderInitialAssessmentDocx(ARGS);
+  const source = await withParts(render, async (zip) => {
+    zip.remove('docProps/custom.xml');
+    zip.file('_rels/.rels', (await zip.file('_rels/.rels').async('string')).replace(/<Relationship\b[^>]*Type="[^"\n]*\/custom-properties"[^>]*\/>/g, ''));
+    zip.file('[Content_Types].xml', (await zip.file('[Content_Types].xml').async('string')).replace(/<Override\b[^>]*PartName="\/docProps\/custom.xml"[^>]*\/>/g, ''));
+  });
+  for (const variant of ['attribute', 'oversized-id']) {
+    const stored = await withParts(source, async (zip) => {
+      zip.file('docProps/custom.xml', CUSTOM_OK);
+      const id = variant === 'oversized-id' ? 'x'.repeat(65) : 'spCustom';
+      let rels = (await zip.file('_rels/.rels').async('string')).replace('</Relationships>', `<Relationship Id="${id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties" Target="docProps/custom.xml"/></Relationships>`);
+      if (variant === 'attribute') rels = rels.replace('<Relationships ', '<Relationships payload="hidden" ');
+      zip.file('_rels/.rels', rels);
+      zip.file('[Content_Types].xml', (await zip.file('[Content_Types].xml').async('string')).replace('</Types>', '<Override PartName="/docProps/custom.xml" ContentType="application/vnd.openxmlformats-officedocument.custom-properties+xml"/></Types>'));
+    });
+    await expect(attestDocxPackageAgainstSource(stored, source)).rejects.toThrow(/unexpected attributes|package relationship/);
+  }
+});

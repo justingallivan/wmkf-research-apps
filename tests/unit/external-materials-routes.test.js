@@ -2,12 +2,12 @@
 jest.mock('../../lib/external/rate-limit', () => ({ checkRateLimit: jest.fn(), recordTokenOutcome: jest.fn() }));
 jest.mock('../../lib/external/verify-materials-token', () => ({ verifyMaterialsToken: jest.fn() }));
 jest.mock('../../lib/dataverse/core/context', () => ({ withDalContext: jest.fn((_label, fn) => Promise.resolve().then(fn)) }));
-jest.mock('../../lib/services/site-visit-materials/upload-cap', () => ({ getUploadMaxMb: jest.fn(async () => ({ maxMb: 100 })), uploadMaxBytes: (mb) => mb * 1024 * 1024 }));
+jest.mock('../../lib/services/site-visit-materials/upload-cap', () => ({ getUploadMaxMb: jest.fn(async () => ({ maxMb: 500 })), uploadMaxBytes: (mb) => mb * 1024 * 1024 }));
 jest.mock('../../lib/services/site-visit-materials/contributor-service', () => ({ buildContributorContext: jest.fn(), finalizeMaterialUpload: jest.fn() }));
 jest.mock('../../lib/services/portal-upload-staging', () => ({
   PORTAL_UPLOAD_SCOPES: { SITE_VISIT_MATERIAL: 'site_visit_material' },
   PORTAL_DOCUMENT_CONTENT_TYPES: ['application/pdf'],
-  PortalUploadStagingError: class PortalUploadStagingError extends Error { constructor(code, { httpStatus = 409 } = {}) { super(code); this.code = code; this.httpStatus = httpStatus; } },
+  PortalUploadStagingError: class PortalUploadStagingError extends Error { constructor(code, { httpStatus = 409, resultPayload = null } = {}) { super(code); this.code = code; this.httpStatus = httpStatus; this.resultPayload = resultPayload; } },
   createPortalUpload: jest.fn(),
   claimPortalUpload: jest.fn(),
   completePortalUpload: jest.fn(),
@@ -22,6 +22,7 @@ import { verifyMaterialsToken } from '../../lib/external/verify-materials-token'
 import { getUploadMaxMb } from '../../lib/services/site-visit-materials/upload-cap';
 import { buildContributorContext, finalizeMaterialUpload } from '../../lib/services/site-visit-materials/contributor-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
+import { acquireLargeUploadAdmission, releaseLargeUploadAdmission } from '../../lib/services/large-upload-admission';
 import * as staging from '../../lib/services/portal-upload-staging';
 import contextHandler from '../../pages/api/external/materials/[token]/context';
 import uploadTokenHandler from '../../pages/api/external/materials/[token]/upload-token';
@@ -62,18 +63,24 @@ test('context: method, rate limit, then verify; invalid links map to 401/404; a 
 
 test('upload-token: server derives scope, resource, binding, and cap; waived or unknown slots, bad extensions, and oversize declarations are refused', async () => {
   const ok = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', contentType: 'application/pdf', size: 1234 }), ok);
-  expect(staging.createPortalUpload).toHaveBeenCalledWith({ scope: 'site_visit_material', resourceId: REQUEST_ID, actorBinding: 'materials:hash', filename: 'deck.pdf', contentType: 'application/pdf', maxBytes: 100 * 1024 * 1024, allowedContentTypes: ['application/pdf'] });
+  expect(staging.createPortalUpload).toHaveBeenCalledWith({ scope: 'site_visit_material', resourceId: REQUEST_ID, actorBinding: 'materials:hash', filename: 'deck.pdf', contentType: 'application/pdf', maxBytes: 500 * 1024 * 1024, allowedContentTypes: ['application/pdf'] });
   expect(ok.body).toMatchObject({ ok: true, slot: 'presentation_pdf', stagingId: STAGING_ID, clientToken: 'ct' });
+  const boundary = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', contentType: 'application/pdf', size: 500 * 1024 * 1024 }), boundary);
+  expect(boundary.statusCode).toBe(200);
+  getUploadMaxMb.mockResolvedValueOnce({ maxMb: 50 });
+  const staleCap = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', size: 51 * 1024 * 1024 }), staleCap);
+  expect(staleCap.statusCode).toBe(400);
+  expect(staleCap.body).toEqual({ ok: false, reason: 'file_too_large', maxMb: 50 });
   const waived = res(); await uploadTokenHandler(req('POST', { slot: 'participant_bios', filename: 'b.pdf', size: 10 }), waived); expect(waived.statusCode).toBe(400);
   const unknown = res(); await uploadTokenHandler(req('POST', { slot: 'nope', filename: 'b.pdf', size: 10 }), unknown); expect(unknown.statusCode).toBe(400);
   const ext = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pptx', size: 10 }), ext); expect(ext.statusCode).toBe(422); expect(ext.body.reason).toBe('extension_not_allowed');
-  const big = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', size: 101 * 1024 * 1024 }), big); expect(big.statusCode).toBe(400); expect(big.body).toEqual({ ok: false, reason: 'file_too_large', maxMb: 100 });
+  const big = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', size: 501 * 1024 * 1024 }), big); expect(big.statusCode).toBe(400); expect(big.body).toEqual({ ok: false, reason: 'file_too_large', maxMb: 500 });
   // The optional "other" slot is hidden from applicants (SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED=false): mint refuses it before any staging row exists.
   const other = res(); await uploadTokenHandler(req('POST', { slot: 'other', filename: 'map.docx', size: 10 }), other); expect(other.statusCode).toBe(400);
-  expect(staging.createPortalUpload).toHaveBeenCalledTimes(1);
+  expect(staging.createPortalUpload).toHaveBeenCalledTimes(2);
   getUploadMaxMb.mockRejectedValueOnce(new ServiceHttpError('cap', { httpStatus: 503, code: 'site_visit_materials_cap_unavailable', body: { ok: false, reason: 'cap_unavailable' } }));
   const capDown = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', size: 10 }), capDown);
-  expect(capDown.statusCode).toBe(503); expect(capDown.body.reason).toBe('cap_unavailable'); expect(staging.createPortalUpload).toHaveBeenCalledTimes(1);
+  expect(capDown.statusCode).toBe(503); expect(capDown.body.reason).toBe('cap_unavailable'); expect(staging.createPortalUpload).toHaveBeenCalledTimes(2);
   verifyMaterialsToken.mockResolvedValueOnce({ ok: false, reason: 'closed' });
   const closed = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', size: 10 }), closed); expect(closed.statusCode).toBe(401);
 });
@@ -98,6 +105,22 @@ test('finalize: claims by the ownership tuple, persists, completes the row with 
   const bad = res(); await finalizeHandler(req('POST', { stagingId: 'x', slot: 'presentation_pdf' }), bad); expect(bad.statusCode).toBe(400); expect(staging.claimPortalUpload).toHaveBeenCalledTimes(2);
 });
 
+test('finalize returns retryable processing_busy before claiming or reading a staged upload', async () => {
+  const holder = acquireLargeUploadAdmission();
+  expect(holder).toBeTruthy();
+  try {
+    const response = res();
+    await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), response);
+    expect(response.statusCode).toBe(503);
+    expect(response.headers['Retry-After']).toBe('30');
+    expect(response.body).toMatchObject({ ok: false, reason: 'processing_busy', retryAfterSeconds: 30 });
+    expect(staging.claimPortalUpload).not.toHaveBeenCalled();
+    expect(staging.loadClaimedPortalImage).not.toHaveBeenCalled();
+  } finally {
+    releaseLargeUploadAdmission(holder.token);
+  }
+});
+
 test('finalize: permanent byte and validation failures reject the row; transient failures release it for retry', async () => {
   staging.loadClaimedPortalImage.mockRejectedValueOnce(new staging.PortalUploadStagingError('image_too_large', { httpStatus: 413 }));
   const big = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), big);
@@ -109,17 +132,53 @@ test('finalize: permanent byte and validation failures reject the row; transient
   finalizeMaterialUpload.mockRejectedValueOnce(new ServiceHttpError('scan', { httpStatus: 503, code: 'scan_unavailable', body: { ok: false, reason: 'scan_unavailable' } }));
   const scan = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), scan);
   expect(scan.statusCode).toBe(503); expect(staging.releasePortalUpload).toHaveBeenCalledWith({ stagingId: STAGING_ID, leaseToken: 'lease' });
+  for (const code of ['scan_timeout', 'scan_busy']) {
+    finalizeMaterialUpload.mockRejectedValueOnce(new ServiceHttpError(code, { httpStatus: 503, code, body: { ok: false, reason: code } }));
+    const unavailable = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), unavailable);
+    expect(unavailable.statusCode).toBe(503); expect(unavailable.body.reason).toBe(code);
+    expect(staging.releasePortalUpload).toHaveBeenCalledTimes(code === 'scan_timeout' ? 2 : 3);
+  }
   finalizeMaterialUpload.mockRejectedValueOnce(new ServiceHttpError('scan config', { httpStatus: 500, code: 'scan_misconfigured', body: { ok: false, reason: 'scan_misconfigured' } }));
   const scanConfig = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), scanConfig);
-  expect(scanConfig.statusCode).toBe(500); expect(scanConfig.body.reason).toBe('scan_misconfigured'); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(2);
+  expect(scanConfig.statusCode).toBe(500); expect(scanConfig.body.reason).toBe('scan_misconfigured'); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(4);
   finalizeMaterialUpload.mockRejectedValueOnce(new ServiceHttpError('busy', { httpStatus: 409, code: 'slot_busy', body: { ok: false, reason: 'slot_busy' } }));
   const busy = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), busy);
-  expect(busy.statusCode).toBe(409); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(3);
+  expect(busy.statusCode).toBe(409); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(5);
   finalizeMaterialUpload.mockRejectedValueOnce(new ServiceHttpError('ambiguous', { httpStatus: 409, code: 'replay_ambiguous', body: { ok: false, reason: 'replay_ambiguous' } }));
   const ambiguous = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), ambiguous);
-  expect(ambiguous.statusCode).toBe(409); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(3);
+  expect(ambiguous.statusCode).toBe(409); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(5);
   finalizeMaterialUpload.mockRejectedValueOnce(new Error('graph down'));
   const graph = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), graph);
-  expect(graph.statusCode).toBe(503); expect(graph.body.reason).toBe('persist_failed'); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(4);
+  expect(graph.statusCode).toBe(503); expect(graph.body.reason).toBe('persist_failed'); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(6);
   expect(staging.completePortalUpload).not.toHaveBeenCalled();
+});
+
+test('scan rejection persists safe details and rejected replay returns a sanitized 422', async () => {
+  const scanRejection = { category: 'blocked_content', flags: ['embedded_macro'] };
+  finalizeMaterialUpload.mockRejectedValueOnce(new ServiceHttpError('safe', {
+    httpStatus: 422,
+    code: 'scan_infected',
+    body: { ok: false, reason: 'scan_infected', scanRejection, rawProviderText: 'secret' },
+  }));
+  const rejected = res();
+  await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), rejected);
+  expect(rejected.statusCode).toBe(422);
+  expect(rejected.body).toEqual({ ok: false, reason: 'scan_infected', scanRejection });
+  expect(staging.rejectPortalUpload).toHaveBeenCalledWith(expect.objectContaining({ resultCode: 'scan_infected' }));
+  expect(staging.rejectPortalUpload.mock.calls.at(-1)[0].resultPayload).toEqual({ ok: false, reason: 'scan_infected', scanRejection });
+
+  staging.claimPortalUpload.mockRejectedValueOnce(new staging.PortalUploadStagingError('scan_infected', {
+    httpStatus: 409,
+    resultPayload: { ok: false, reason: 'scan_infected', scanRejection },
+  }));
+  const replay = res();
+  await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), replay);
+  expect(replay.statusCode).toBe(422);
+  expect(replay.body).toEqual({ ok: false, reason: 'scan_infected', scanRejection });
+
+  staging.claimPortalUpload.mockRejectedValueOnce(new staging.PortalUploadStagingError('scan_infected', { httpStatus: 409 }));
+  const legacy = res();
+  await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), legacy);
+  expect(legacy.statusCode).toBe(422);
+  expect(legacy.body).toEqual({ ok: false, reason: 'scan_infected', scanRejection: { category: 'unspecified', flags: [] } });
 });

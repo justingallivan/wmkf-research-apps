@@ -437,7 +437,7 @@ Acceptance:
 
 ### Slice 5: Durable Lead Storage
 
-**Status: IMPLEMENTED (S267).** `pruneContactLeads` (in `reviewer-search-logic.js`) produces a
+**Status: IMPLEMENTED (S267).** `pruneContactLeads` (in `shared/utils/reviewer-roster-projection.js`) produces a
 compact, bounded (max 8), payload-free leads array (drops `warnings`/`evidence`, caps string
 lengths, re-asserts `persistable:false`); `pruneCandidateForRoster` includes it in the
 `contactEnrichment` subset, so both server write paths (`workbench/reviewer-roster`,

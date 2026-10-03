@@ -17,6 +17,7 @@ import DataverseFieldInfoButton, {
   appSystemSettingPattern,
 } from '../shared/components/admin/DataverseFieldInfoButton';
 import AdminOverviewSection from '../shared/components/admin/AdminOverviewSection';
+import TestRequestFactorySection from '../shared/components/admin/TestRequestFactorySection';
 import TestRequestPreviewSection from '../shared/components/admin/TestRequestPreviewSection';
 import TestRequestEmailAllowlistSection from '../shared/components/admin/TestRequestEmailAllowlistSection';
 import {
@@ -111,7 +112,7 @@ const SITE_VISIT_MATERIALS_DEFAULTS_DATAVERSE_FIELDS = [
   appSystemSettingField(
     'Applicant materials upload cap',
     'site_visit_materials.upload_max_mb',
-    'Whole number of megabytes (1–500). Unset reads as the 100 MB default. The briefing page opens files up to 50 MB and lists larger ones with a note.',
+    'Whole number of megabytes (1–500). Unset reads as the 500 MB default. The briefing page opens files up to 50 MB and lists larger ones with a note.',
   ),
 ];
 
@@ -3431,6 +3432,9 @@ export function AiWorkspace({ view }) {
 }
 
 function TestRequestsWorkspace() {
+  // The Factory section learns the deployment's target from its own runs request.
+  const [factoryTarget, setFactoryTarget] = useState(null);
+  const factoryScope = factoryTarget ? `${factoryTarget === 'production' ? 'Production' : 'Sandbox'} data · Writes` : 'Writes';
   return (
     <div className="space-y-6">
       <AdminEditorPanel
@@ -3449,6 +3453,14 @@ function TestRequestsWorkspace() {
         scope="Sandbox data · Shared files · Read-only"
       >
         <TestRequestPreviewSection />
+      </AdminEditorPanel>
+      <AdminEditorPanel
+        id="test-request-factory"
+        title="Create a test Request"
+        description="Clone one production Request into a labelled test Request, step by step, then set its Phase I or Phase II status. Each step writes real data, so every control says why it is off."
+        scope={factoryScope}
+      >
+        <TestRequestFactorySection onTarget={setFactoryTarget} />
       </AdminEditorPanel>
     </div>
   );

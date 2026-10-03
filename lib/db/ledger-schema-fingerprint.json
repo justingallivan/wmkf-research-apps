@@ -1,0 +1,1448 @@
+{
+  "generatedFrom": [
+    "054_test_request_runs.sql",
+    "058_test_request_cast_slot_bindings.sql"
+  ],
+  "fingerprint": {
+    "tables": {
+      "test_request_cast_bindings": {
+        "relkind": "r",
+        "relpersistence": "p",
+        "rowSecurity": {
+          "enabled": false,
+          "forced": false
+        },
+        "columns": [
+          {
+            "name": "binding_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "run_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "member_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "status",
+            "type": "text",
+            "nullable": false,
+            "default": "'planned'::text"
+          },
+          {
+            "name": "dispatched_at",
+            "type": "timestamp with time zone",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "readback",
+            "type": "jsonb",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "error",
+            "type": "text",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp with time zone",
+            "nullable": false,
+            "default": "now()"
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamp with time zone",
+            "nullable": false,
+            "default": "now()"
+          },
+          {
+            "name": "verified_at",
+            "type": "timestamp with time zone",
+            "nullable": true,
+            "default": null
+          }
+        ],
+        "constraints": [
+          {
+            "name": "test_request_cast_bindings_error_check",
+            "type": "c",
+            "definition": "CHECK (((error IS NULL) OR (length(error) <= 2000)))"
+          },
+          {
+            "name": "test_request_cast_bindings_member_id_fkey",
+            "type": "f",
+            "definition": "FOREIGN KEY (member_id) REFERENCES test_request_cast_members(member_id)"
+          },
+          {
+            "name": "test_request_cast_bindings_one_per_run",
+            "type": "u",
+            "definition": "UNIQUE (run_id, member_id)"
+          },
+          {
+            "name": "test_request_cast_bindings_pkey",
+            "type": "p",
+            "definition": "PRIMARY KEY (binding_id)"
+          },
+          {
+            "name": "test_request_cast_bindings_readback_check",
+            "type": "c",
+            "definition": "CHECK (test_request_receipt_ok(readback))"
+          },
+          {
+            "name": "test_request_cast_bindings_run_id_fkey",
+            "type": "f",
+            "definition": "FOREIGN KEY (run_id) REFERENCES test_request_runs(run_id)"
+          },
+          {
+            "name": "test_request_cast_bindings_status_check",
+            "type": "c",
+            "definition": "CHECK ((status = ANY (ARRAY['planned'::text, 'dispatched'::text, 'verified'::text, 'needs_attention'::text])))"
+          }
+        ],
+        "indexes": [
+          {
+            "name": "test_request_cast_bindings_one_per_run",
+            "unique": true,
+            "primary": false,
+            "definition": "CREATE UNIQUE INDEX test_request_cast_bindings_one_per_run ON test_request_cast_bindings USING btree (run_id, member_id)"
+          },
+          {
+            "name": "test_request_cast_bindings_pkey",
+            "unique": true,
+            "primary": true,
+            "definition": "CREATE UNIQUE INDEX test_request_cast_bindings_pkey ON test_request_cast_bindings USING btree (binding_id)"
+          }
+        ],
+        "triggers": [],
+        "policies": []
+      },
+      "test_request_cast_members": {
+        "relkind": "r",
+        "relpersistence": "p",
+        "rowSecurity": {
+          "enabled": false,
+          "forced": false
+        },
+        "columns": [
+          {
+            "name": "member_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "environment",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "role",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "entity",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "first_name",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "last_name",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "address_sha256",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "status",
+            "type": "text",
+            "nullable": false,
+            "default": "'planned'::text"
+          },
+          {
+            "name": "dispatched_at",
+            "type": "timestamp with time zone",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "readback",
+            "type": "jsonb",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "error",
+            "type": "text",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp with time zone",
+            "nullable": false,
+            "default": "now()"
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamp with time zone",
+            "nullable": false,
+            "default": "now()"
+          },
+          {
+            "name": "verified_at",
+            "type": "timestamp with time zone",
+            "nullable": true,
+            "default": null
+          }
+        ],
+        "constraints": [
+          {
+            "name": "test_request_cast_members_address_sha256_check",
+            "type": "c",
+            "definition": "CHECK ((address_sha256 ~ '^[0-9a-f]{64}$'::text))"
+          },
+          {
+            "name": "test_request_cast_members_entity_check",
+            "type": "c",
+            "definition": "CHECK ((entity = ANY (ARRAY['contact'::text, 'wmkf_potentialreviewers'::text])))"
+          },
+          {
+            "name": "test_request_cast_members_environment_check",
+            "type": "c",
+            "definition": "CHECK ((environment = ANY (ARRAY['sandbox'::text, 'production'::text])))"
+          },
+          {
+            "name": "test_request_cast_members_error_check",
+            "type": "c",
+            "definition": "CHECK (((error IS NULL) OR (length(error) <= 2000)))"
+          },
+          {
+            "name": "test_request_cast_members_first_name_check",
+            "type": "c",
+            "definition": "CHECK ((((length(first_name) >= 1) AND (length(first_name) <= 50)) AND (first_name !~ '[[:cntrl:]]'::text)))"
+          },
+          {
+            "name": "test_request_cast_members_last_name_check",
+            "type": "c",
+            "definition": "CHECK ((((length(last_name) >= 1) AND (length(last_name) <= 50)) AND (last_name !~ '[[:cntrl:]]'::text)))"
+          },
+          {
+            "name": "test_request_cast_members_one_per_role",
+            "type": "u",
+            "definition": "UNIQUE (environment, role)"
+          },
+          {
+            "name": "test_request_cast_members_pkey",
+            "type": "p",
+            "definition": "PRIMARY KEY (member_id)"
+          },
+          {
+            "name": "test_request_cast_members_readback_check",
+            "type": "c",
+            "definition": "CHECK (test_request_receipt_ok(readback))"
+          },
+          {
+            "name": "test_request_cast_members_role_check",
+            "type": "c",
+            "definition": "CHECK ((role = ANY (ARRAY['pi'::text, 'liaison'::text, 'suggested_reviewer'::text, 'org_leader'::text, 'research_leader'::text])))"
+          },
+          {
+            "name": "test_request_cast_members_role_entity",
+            "type": "c",
+            "definition": "CHECK (((role = 'suggested_reviewer'::text) = (entity = 'wmkf_potentialreviewers'::text)))"
+          },
+          {
+            "name": "test_request_cast_members_status_check",
+            "type": "c",
+            "definition": "CHECK ((status = ANY (ARRAY['planned'::text, 'dispatched'::text, 'verified'::text, 'needs_attention'::text])))"
+          }
+        ],
+        "indexes": [
+          {
+            "name": "test_request_cast_members_one_per_role",
+            "unique": true,
+            "primary": false,
+            "definition": "CREATE UNIQUE INDEX test_request_cast_members_one_per_role ON test_request_cast_members USING btree (environment, role)"
+          },
+          {
+            "name": "test_request_cast_members_pkey",
+            "unique": true,
+            "primary": true,
+            "definition": "CREATE UNIQUE INDEX test_request_cast_members_pkey ON test_request_cast_members USING btree (member_id)"
+          }
+        ],
+        "triggers": [],
+        "policies": []
+      },
+      "test_request_cast_slot_bindings": {
+        "relkind": "r",
+        "relpersistence": "p",
+        "rowSecurity": {
+          "enabled": false,
+          "forced": false
+        },
+        "columns": [
+          {
+            "name": "run_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "member_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "expected_request_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "expected_person_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "status",
+            "type": "text",
+            "nullable": false,
+            "default": "'planned'::text"
+          },
+          {
+            "name": "before_etag",
+            "type": "text",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "snapshot_at",
+            "type": "timestamp with time zone",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "slot1_before",
+            "type": "uuid",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "slot2_before",
+            "type": "uuid",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "slot3_before",
+            "type": "uuid",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "slot4_before",
+            "type": "uuid",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "slot5_before",
+            "type": "uuid",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "dispatched_at",
+            "type": "timestamp with time zone",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "verified_at",
+            "type": "timestamp with time zone",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "provenance",
+            "type": "text",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "failure_code",
+            "type": "text",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "error",
+            "type": "text",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "readback_at",
+            "type": "timestamp with time zone",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "after_etag",
+            "type": "text",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "after_marker",
+            "type": "boolean",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "after_run_id",
+            "type": "uuid",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "slot1_after",
+            "type": "uuid",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "slot2_after",
+            "type": "uuid",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "slot3_after",
+            "type": "uuid",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "slot4_after",
+            "type": "uuid",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "slot5_after",
+            "type": "uuid",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp with time zone",
+            "nullable": false,
+            "default": "now()"
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamp with time zone",
+            "nullable": false,
+            "default": "now()"
+          }
+        ],
+        "constraints": [
+          {
+            "name": "test_request_cast_slot_bindings_after_etag_check",
+            "type": "c",
+            "definition": "CHECK (((after_etag IS NULL) OR (after_etag ~ '^W/\"[0-9]{1,20}\"$'::text)))"
+          },
+          {
+            "name": "test_request_cast_slot_bindings_before_etag_check",
+            "type": "c",
+            "definition": "CHECK (((before_etag IS NULL) OR (before_etag ~ '^W/\"[0-9]{1,20}\"$'::text)))"
+          },
+          {
+            "name": "test_request_cast_slot_bindings_dispatched",
+            "type": "c",
+            "definition": "CHECK (((status <> 'dispatched'::text) OR (dispatched_at IS NOT NULL)))"
+          },
+          {
+            "name": "test_request_cast_slot_bindings_error_check",
+            "type": "c",
+            "definition": "CHECK (((error IS NULL) OR ((length(error) <= 500) AND (error !~ '(://|[[:cntrl:]])'::text))))"
+          },
+          {
+            "name": "test_request_cast_slot_bindings_expected_pair",
+            "type": "c",
+            "definition": "CHECK ((expected_person_id = member_id))"
+          },
+          {
+            "name": "test_request_cast_slot_bindings_failure",
+            "type": "c",
+            "definition": "CHECK (((status <> 'needs_attention'::text) OR (failure_code IS NOT NULL)))"
+          },
+          {
+            "name": "test_request_cast_slot_bindings_failure_code_check",
+            "type": "c",
+            "definition": "CHECK ((failure_code = ANY (ARRAY['occupied_slot'::text, 'etag_conflict'::text, 'readback_mismatch'::text, 'ambiguous_dispatch'::text, 'request_drift'::text, 'metadata_unavailable'::text, 'ledger_conflict'::text])))"
+          },
+          {
+            "name": "test_request_cast_slot_bindings_pkey",
+            "type": "p",
+            "definition": "PRIMARY KEY (run_id, member_id)"
+          },
+          {
+            "name": "test_request_cast_slot_bindings_provenance_check",
+            "type": "c",
+            "definition": "CHECK ((provenance = ANY (ARRAY['confirmed_patch'::text, 'observed_preexisting'::text, 'observed_after_conflict'::text, 'observed_after_ambiguous_dispatch'::text])))"
+          },
+          {
+            "name": "test_request_cast_slot_bindings_snapshot",
+            "type": "c",
+            "definition": "CHECK ((((snapshot_at IS NULL) AND (before_etag IS NULL) AND (status = ANY (ARRAY['planned'::text, 'needs_attention'::text]))) OR ((snapshot_at IS NOT NULL) AND (before_etag IS NOT NULL))))"
+          },
+          {
+            "name": "test_request_cast_slot_bindings_status_check",
+            "type": "c",
+            "definition": "CHECK ((status = ANY (ARRAY['planned'::text, 'dispatched'::text, 'verified'::text, 'needs_attention'::text])))"
+          },
+          {
+            "name": "test_request_cast_slot_bindings_suggestion_fk",
+            "type": "f",
+            "definition": "FOREIGN KEY (run_id, member_id) REFERENCES test_request_cast_bindings(run_id, member_id)"
+          },
+          {
+            "name": "test_request_cast_slot_bindings_verified",
+            "type": "c",
+            "definition": "CHECK (((status <> 'verified'::text) OR ((verified_at IS NOT NULL) AND (provenance IS NOT NULL) AND (readback_at IS NOT NULL) AND (after_marker IS TRUE) AND (after_run_id = run_id) AND (slot1_after = member_id) AND (after_etag IS NOT NULL))))"
+          }
+        ],
+        "indexes": [
+          {
+            "name": "test_request_cast_slot_bindings_pkey",
+            "unique": true,
+            "primary": true,
+            "definition": "CREATE UNIQUE INDEX test_request_cast_slot_bindings_pkey ON test_request_cast_slot_bindings USING btree (run_id, member_id)"
+          }
+        ],
+        "triggers": [],
+        "policies": []
+      },
+      "test_request_run_resources": {
+        "relkind": "r",
+        "relpersistence": "p",
+        "rowSecurity": {
+          "enabled": false,
+          "forced": false
+        },
+        "columns": [
+          {
+            "name": "resource_id",
+            "type": "bigint",
+            "nullable": false,
+            "default": "nextval('test_request_run_resources_resource_id_seq'::regclass)"
+          },
+          {
+            "name": "run_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "sequence",
+            "type": "integer",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "step",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "resource_kind",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "system",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "planned_identity",
+            "type": "jsonb",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "source_provenance",
+            "type": "jsonb",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "dispatched_at",
+            "type": "timestamp with time zone",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "response_status",
+            "type": "integer",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "readback",
+            "type": "jsonb",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "outcome",
+            "type": "text",
+            "nullable": false,
+            "default": "'planned'::text"
+          },
+          {
+            "name": "error",
+            "type": "text",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp with time zone",
+            "nullable": false,
+            "default": "now()"
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamp with time zone",
+            "nullable": false,
+            "default": "now()"
+          }
+        ],
+        "constraints": [
+          {
+            "name": "test_request_run_resources_error_code",
+            "type": "c",
+            "definition": "CHECK (((error IS NULL) OR (regexp_replace(error, ' [(]http [0-9]{3}[)]$'::text, ''::text) = ANY (ARRAY['test_request_run_fenced'::text, 'test_request_run_not_found'::text, 'test_request_run_conflict'::text, 'test_request_run_invalid_status'::text, 'test_request_run_invalid_request_number'::text, 'test_request_ledger_unsafe_value'::text, 'upstream_http'::text, 'timeout'::text, 'network'::text, 'unknown_error'::text, 'lease_unavailable'::text, 'step_failed'::text, 'operator_stop'::text, 'preflight_identity_changed'::text, 'manifest_digest_mismatch'::text, 'bundle_stale'::text, 'source_fence_failed'::text, 'source_changed'::text, 'preallocated_request_present_not_owned'::text, 'preallocated_request_recovered'::text, 'ambiguous_create_outcome'::text, 'create_rejected'::text, 'goverify_deactivation_uncertain'::text, 'goverify_restore_unverified'::text, 'goverify_restore_failed'::text, 'meeting_date_patch_failed'::text, 'meeting_date_readback_mismatch'::text, 'location_preexisting'::text, 'location_readback_mismatch'::text, 'folder_create_failed'::text, 'file_conflict'::text, 'file_rejected'::text, 'file_ambiguous_unrecovered'::text, 'file_source_changed'::text, 'file_verification_failed'::text, 'file_copy_failed'::text, 'observation_side_effects'::text, 'verification_failed'::text, 'request_readback_mismatch'::text, 'preallocated_request_present'::text, 'file_journal_unverified'::text, 'ia_claim_lost'::text, 'ia_pointer_mismatch'::text, 'ia_upload_ambiguous'::text, 'ia_snapshot_stale'::text, 'ia_verification_failed'::text, 'recipe_step_not_built'::text, 'reviewer_person_not_synthetic'::text, 'reviewer_person_conflict'::text, 'reviewer_person_provenance_mismatch'::text, 'reviewer_person_projection_drift'::text, 'synthetic_reviewer_not_bindable'::text, 'reviewer_suggestion_present_not_owned'::text, 'reviewer_answers_ambiguous'::text, 'reviewer_source_changed'::text, 'reviews_verification_failed'::text, 'presite_claim_lost'::text, 'presite_pointer_mismatch'::text, 'presite_upload_ambiguous'::text, 'presite_snapshot_stale'::text, 'presite_verification_failed'::text, 'presite_promotion_uncharacterized'::text, 'presite_ai_run_ambiguous'::text]))))"
+          },
+          {
+            "name": "test_request_run_resources_outcome_check",
+            "type": "c",
+            "definition": "CHECK ((outcome = ANY (ARRAY['planned'::text, 'dispatched'::text, 'verified'::text, 'recovered'::text, 'conflict'::text, 'rejected'::text, 'ambiguous'::text, 'failed'::text])))"
+          },
+          {
+            "name": "test_request_run_resources_pkey",
+            "type": "p",
+            "definition": "PRIMARY KEY (resource_id)"
+          },
+          {
+            "name": "test_request_run_resources_planned_identity_check",
+            "type": "c",
+            "definition": "CHECK (test_request_receipt_ok(planned_identity))"
+          },
+          {
+            "name": "test_request_run_resources_readback_check",
+            "type": "c",
+            "definition": "CHECK (test_request_receipt_ok(readback))"
+          },
+          {
+            "name": "test_request_run_resources_resource_kind_check",
+            "type": "c",
+            "definition": "CHECK ((resource_kind = ANY (ARRAY['dataverse_request'::text, 'dataverse_request_patch'::text, 'sharepoint_folder'::text, 'dataverse_document_location'::text, 'sharepoint_file'::text, 'workflow_bypass'::text, 'dataverse_request_document'::text, 'foundation_baseline'::text, 'foundation_transition'::text, 'dataverse_potential_reviewer'::text, 'dataverse_reviewer_suggestion'::text, 'dataverse_review_answer_set'::text, 'dataverse_ai_run'::text])))"
+          },
+          {
+            "name": "test_request_run_resources_run_id_fkey",
+            "type": "f",
+            "definition": "FOREIGN KEY (run_id) REFERENCES test_request_runs(run_id)"
+          },
+          {
+            "name": "test_request_run_resources_run_sequence",
+            "type": "u",
+            "definition": "UNIQUE (run_id, sequence)"
+          },
+          {
+            "name": "test_request_run_resources_source_provenance_check",
+            "type": "c",
+            "definition": "CHECK (test_request_receipt_ok(source_provenance))"
+          },
+          {
+            "name": "test_request_run_resources_step_enum",
+            "type": "c",
+            "definition": "CHECK ((step = ANY (ARRAY['fence_source'::text, 'create_request'::text, 'correct_meeting_date'::text, 'provision_location'::text, 'copy_file'::text, 'observe'::text, 'verify'::text, 'ready'::text, 'seed_initial_assessment'::text, 'seed_initial_assessment_snapshot'::text, 'verify_initial_assessment'::text, 'seed_reviewers'::text, 'copy_review_file'::text, 'seed_review_answers'::text, 'verify_reviews'::text, 'seed_presite_ai_run'::text, 'seed_presite_draft'::text, 'render_presite'::text, 'verify_presite'::text])))"
+          },
+          {
+            "name": "test_request_run_resources_system_check",
+            "type": "c",
+            "definition": "CHECK ((system = ANY (ARRAY['dataverse'::text, 'sharepoint'::text])))"
+          }
+        ],
+        "indexes": [
+          {
+            "name": "test_request_run_resources_one_baseline_idx",
+            "unique": true,
+            "primary": false,
+            "definition": "CREATE UNIQUE INDEX test_request_run_resources_one_baseline_idx ON test_request_run_resources USING btree (run_id) WHERE (resource_kind = 'foundation_baseline'::text)"
+          },
+          {
+            "name": "test_request_run_resources_pkey",
+            "unique": true,
+            "primary": true,
+            "definition": "CREATE UNIQUE INDEX test_request_run_resources_pkey ON test_request_run_resources USING btree (resource_id)"
+          },
+          {
+            "name": "test_request_run_resources_run_sequence",
+            "unique": true,
+            "primary": false,
+            "definition": "CREATE UNIQUE INDEX test_request_run_resources_run_sequence ON test_request_run_resources USING btree (run_id, sequence)"
+          },
+          {
+            "name": "test_request_run_resources_run_step_idx",
+            "unique": false,
+            "primary": false,
+            "definition": "CREATE INDEX test_request_run_resources_run_step_idx ON test_request_run_resources USING btree (run_id, step)"
+          }
+        ],
+        "triggers": [],
+        "policies": []
+      },
+      "test_request_run_reviewer_assignments": {
+        "relkind": "r",
+        "relpersistence": "p",
+        "rowSecurity": {
+          "enabled": false,
+          "forced": false
+        },
+        "columns": [
+          {
+            "name": "assignment_id",
+            "type": "bigint",
+            "nullable": false,
+            "default": "nextval('test_request_run_reviewer_assignments_assignment_id_seq'::regclass)"
+          },
+          {
+            "name": "run_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "sequence",
+            "type": "integer",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "source_person_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "destination_person_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "reused",
+            "type": "boolean",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "address",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "address_sha256",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp with time zone",
+            "nullable": false,
+            "default": "now()"
+          }
+        ],
+        "constraints": [
+          {
+            "name": "test_request_run_reviewer_assignments_address_shape",
+            "type": "c",
+            "definition": "CHECK ((((length(address) >= 1) AND (length(address) <= 320)) AND (address !~ '[[:cntrl:][:space:]]'::text) AND (address = lower(address)) AND (address ~ '^[^[:space:]@]{1,64}@[^[:space:]@]{1,255}[.][^[:space:]@]{1,24}$'::text) AND (address !~* '(gh[pousr]_|github_pat_|sk-|xox[abprs]-|akia[0-9a-z]{16}|eyj[a-z0-9_-]{8}|glpat-|aiza|bearer_|https?://|//)'::text)))"
+          },
+          {
+            "name": "test_request_run_reviewer_assignments_digest_matches_address",
+            "type": "c",
+            "definition": "CHECK ((address_sha256 = encode(sha256(convert_to(address, 'UTF8'::name)), 'hex'::text)))"
+          },
+          {
+            "name": "test_request_run_reviewer_assignments_digest_shape",
+            "type": "c",
+            "definition": "CHECK ((address_sha256 ~ '^[0-9a-f]{64}$'::text))"
+          },
+          {
+            "name": "test_request_run_reviewer_assignments_pkey",
+            "type": "p",
+            "definition": "PRIMARY KEY (assignment_id)"
+          },
+          {
+            "name": "test_request_run_reviewer_assignments_run_address",
+            "type": "u",
+            "definition": "UNIQUE (run_id, address)"
+          },
+          {
+            "name": "test_request_run_reviewer_assignments_run_id_fkey",
+            "type": "f",
+            "definition": "FOREIGN KEY (run_id) REFERENCES test_request_runs(run_id)"
+          },
+          {
+            "name": "test_request_run_reviewer_assignments_run_sequence",
+            "type": "u",
+            "definition": "UNIQUE (run_id, sequence)"
+          },
+          {
+            "name": "test_request_run_reviewer_assignments_run_source",
+            "type": "u",
+            "definition": "UNIQUE (run_id, source_person_id)"
+          }
+        ],
+        "indexes": [
+          {
+            "name": "test_request_run_reviewer_assignments_pkey",
+            "unique": true,
+            "primary": true,
+            "definition": "CREATE UNIQUE INDEX test_request_run_reviewer_assignments_pkey ON test_request_run_reviewer_assignments USING btree (assignment_id)"
+          },
+          {
+            "name": "test_request_run_reviewer_assignments_run_address",
+            "unique": true,
+            "primary": false,
+            "definition": "CREATE UNIQUE INDEX test_request_run_reviewer_assignments_run_address ON test_request_run_reviewer_assignments USING btree (run_id, address)"
+          },
+          {
+            "name": "test_request_run_reviewer_assignments_run_sequence",
+            "unique": true,
+            "primary": false,
+            "definition": "CREATE UNIQUE INDEX test_request_run_reviewer_assignments_run_sequence ON test_request_run_reviewer_assignments USING btree (run_id, sequence)"
+          },
+          {
+            "name": "test_request_run_reviewer_assignments_run_source",
+            "unique": true,
+            "primary": false,
+            "definition": "CREATE UNIQUE INDEX test_request_run_reviewer_assignments_run_source ON test_request_run_reviewer_assignments USING btree (run_id, source_person_id)"
+          }
+        ],
+        "triggers": [],
+        "policies": []
+      },
+      "test_request_runs": {
+        "relkind": "r",
+        "relpersistence": "p",
+        "rowSecurity": {
+          "enabled": false,
+          "forced": false
+        },
+        "columns": [
+          {
+            "name": "run_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "actor_id",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "idempotency_key",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "status",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "current_step",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "step_index",
+            "type": "integer",
+            "nullable": false,
+            "default": "0"
+          },
+          {
+            "name": "recipe",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "source_dataverse_host",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "source_request_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "source_request_number",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "source_revision",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "bundle_sha256",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "bundle_exported_at",
+            "type": "timestamp with time zone",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "copy_policy_version",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "copy_policy_digest",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "plan_digest",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "create_body_sha256",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "destination_environment",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "destination_dataverse_host",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "destination_request_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "destination_location_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "destination_request_number",
+            "type": "text",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "expected_app_user_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "expected_organization_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "expected_graph_site_id",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "expected_graph_drive_id",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "fiscal_year",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "meeting_date",
+            "type": "date",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "test_label",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "version",
+            "type": "integer",
+            "nullable": false,
+            "default": "1"
+          },
+          {
+            "name": "lease_token",
+            "type": "uuid",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "lease_generation",
+            "type": "integer",
+            "nullable": false,
+            "default": "0"
+          },
+          {
+            "name": "locked_until",
+            "type": "timestamp with time zone",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "attempt_count",
+            "type": "integer",
+            "nullable": false,
+            "default": "0"
+          },
+          {
+            "name": "needs_attention_reason",
+            "type": "text",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "last_error",
+            "type": "text",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp with time zone",
+            "nullable": false,
+            "default": "now()"
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamp with time zone",
+            "nullable": false,
+            "default": "now()"
+          },
+          {
+            "name": "completed_at",
+            "type": "timestamp with time zone",
+            "nullable": true,
+            "default": null
+          }
+        ],
+        "constraints": [
+          {
+            "name": "test_request_runs_actor_id_shape",
+            "type": "c",
+            "definition": "CHECK ((actor_id ~ '^(cli:[0-9a-f]{16}|(admin|user):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$'::text))"
+          },
+          {
+            "name": "test_request_runs_actor_idempotency_key",
+            "type": "u",
+            "definition": "UNIQUE (actor_id, idempotency_key)"
+          },
+          {
+            "name": "test_request_runs_completed_at_coherence",
+            "type": "c",
+            "definition": "CHECK ((((status = 'ready'::text) AND (completed_at IS NOT NULL)) OR ((status = ANY (ARRAY['prepared'::text, 'creating'::text, 'needs_attention'::text])) AND (completed_at IS NULL)) OR (status = ANY (ARRAY['retiring'::text, 'retired'::text]))))"
+          },
+          {
+            "name": "test_request_runs_current_step_enum",
+            "type": "c",
+            "definition": "CHECK ((current_step = ANY (ARRAY['fence_source'::text, 'create_request'::text, 'correct_meeting_date'::text, 'provision_location'::text, 'copy_file'::text, 'observe'::text, 'verify'::text, 'ready'::text, 'seed_initial_assessment'::text, 'seed_initial_assessment_snapshot'::text, 'verify_initial_assessment'::text, 'seed_reviewers'::text, 'copy_review_file'::text, 'seed_review_answers'::text, 'verify_reviews'::text, 'seed_presite_ai_run'::text, 'seed_presite_draft'::text, 'render_presite'::text, 'verify_presite'::text])))"
+          },
+          {
+            "name": "test_request_runs_destination_environment_check",
+            "type": "c",
+            "definition": "CHECK ((destination_environment = ANY (ARRAY['sandbox'::text, 'production'::text])))"
+          },
+          {
+            "name": "test_request_runs_destination_location_id_key",
+            "type": "u",
+            "definition": "UNIQUE (destination_location_id)"
+          },
+          {
+            "name": "test_request_runs_destination_request_id_key",
+            "type": "u",
+            "definition": "UNIQUE (destination_request_id)"
+          },
+          {
+            "name": "test_request_runs_digest_shapes",
+            "type": "c",
+            "definition": "CHECK (((bundle_sha256 ~ '^[0-9a-f]{64}$'::text) AND (copy_policy_digest ~ '^[0-9a-f]{64}$'::text) AND (plan_digest ~ '^[0-9a-f]{64}$'::text) AND (create_body_sha256 ~ '^[0-9a-f]{64}$'::text) AND (copy_policy_version ~ '^[a-z0-9][a-z0-9.-]{0,59}$'::text)))"
+          },
+          {
+            "name": "test_request_runs_fiscal_year_shape",
+            "type": "c",
+            "definition": "CHECK ((fiscal_year ~ '^([0-9]{4}-[0-9]{2}-[0-9]{2}|(January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4})$'::text))"
+          },
+          {
+            "name": "test_request_runs_graph_identity_shapes",
+            "type": "c",
+            "definition": "CHECK (((expected_graph_site_id ~* '^[a-z0-9.-]+[.]sharepoint[.]com,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12},[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'::text) AND (expected_graph_drive_id ~ '^b![A-Za-z0-9_-]{16,120}$'::text) AND (expected_graph_drive_id !~ '(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'::text) AND (expected_graph_site_id !~ '(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'::text)))"
+          },
+          {
+            "name": "test_request_runs_host_shapes",
+            "type": "c",
+            "definition": "CHECK (((source_dataverse_host ~ '^[a-z0-9][a-z0-9.-]{1,253}$'::text) AND (destination_dataverse_host ~ '^[a-z0-9][a-z0-9.-]{1,253}$'::text)))"
+          },
+          {
+            "name": "test_request_runs_idempotency_key_digest",
+            "type": "c",
+            "definition": "CHECK ((idempotency_key ~ '^[0-9a-f]{64}$'::text))"
+          },
+          {
+            "name": "test_request_runs_needs_attention_reason_coherence",
+            "type": "c",
+            "definition": "CHECK ((((status = 'needs_attention'::text) AND (needs_attention_reason IS NOT NULL)) OR ((status <> 'needs_attention'::text) AND (needs_attention_reason IS NULL))))"
+          },
+          {
+            "name": "test_request_runs_pkey",
+            "type": "p",
+            "definition": "PRIMARY KEY (run_id)"
+          },
+          {
+            "name": "test_request_runs_ready_request_number",
+            "type": "c",
+            "definition": "CHECK (((status <> 'ready'::text) OR ((destination_request_number IS NOT NULL) AND (destination_request_number ~ '^[0-9]{1,10}$'::text))))"
+          },
+          {
+            "name": "test_request_runs_reason_codes",
+            "type": "c",
+            "definition": "CHECK ((((needs_attention_reason IS NULL) OR (regexp_replace(needs_attention_reason, ' [(]http [0-9]{3}[)]$'::text, ''::text) = ANY (ARRAY['test_request_run_fenced'::text, 'test_request_run_not_found'::text, 'test_request_run_conflict'::text, 'test_request_run_invalid_status'::text, 'test_request_run_invalid_request_number'::text, 'test_request_ledger_unsafe_value'::text, 'upstream_http'::text, 'timeout'::text, 'network'::text, 'unknown_error'::text, 'lease_unavailable'::text, 'step_failed'::text, 'operator_stop'::text, 'preflight_identity_changed'::text, 'manifest_digest_mismatch'::text, 'bundle_stale'::text, 'source_fence_failed'::text, 'source_changed'::text, 'preallocated_request_present_not_owned'::text, 'preallocated_request_recovered'::text, 'ambiguous_create_outcome'::text, 'create_rejected'::text, 'goverify_deactivation_uncertain'::text, 'goverify_restore_unverified'::text, 'goverify_restore_failed'::text, 'meeting_date_patch_failed'::text, 'meeting_date_readback_mismatch'::text, 'location_preexisting'::text, 'location_readback_mismatch'::text, 'folder_create_failed'::text, 'file_conflict'::text, 'file_rejected'::text, 'file_ambiguous_unrecovered'::text, 'file_source_changed'::text, 'file_verification_failed'::text, 'file_copy_failed'::text, 'observation_side_effects'::text, 'verification_failed'::text, 'request_readback_mismatch'::text, 'preallocated_request_present'::text, 'file_journal_unverified'::text, 'ia_claim_lost'::text, 'ia_pointer_mismatch'::text, 'ia_upload_ambiguous'::text, 'ia_snapshot_stale'::text, 'ia_verification_failed'::text, 'recipe_step_not_built'::text, 'reviewer_person_not_synthetic'::text, 'reviewer_person_conflict'::text, 'reviewer_person_provenance_mismatch'::text, 'reviewer_person_projection_drift'::text, 'synthetic_reviewer_not_bindable'::text, 'reviewer_suggestion_present_not_owned'::text, 'reviewer_answers_ambiguous'::text, 'reviewer_source_changed'::text, 'reviews_verification_failed'::text, 'presite_claim_lost'::text, 'presite_pointer_mismatch'::text, 'presite_upload_ambiguous'::text, 'presite_snapshot_stale'::text, 'presite_verification_failed'::text, 'presite_promotion_uncharacterized'::text, 'presite_ai_run_ambiguous'::text]))) AND ((last_error IS NULL) OR (regexp_replace(last_error, ' [(]http [0-9]{3}[)]$'::text, ''::text) = ANY (ARRAY['test_request_run_fenced'::text, 'test_request_run_not_found'::text, 'test_request_run_conflict'::text, 'test_request_run_invalid_status'::text, 'test_request_run_invalid_request_number'::text, 'test_request_ledger_unsafe_value'::text, 'upstream_http'::text, 'timeout'::text, 'network'::text, 'unknown_error'::text, 'lease_unavailable'::text, 'step_failed'::text, 'operator_stop'::text, 'preflight_identity_changed'::text, 'manifest_digest_mismatch'::text, 'bundle_stale'::text, 'source_fence_failed'::text, 'source_changed'::text, 'preallocated_request_present_not_owned'::text, 'preallocated_request_recovered'::text, 'ambiguous_create_outcome'::text, 'create_rejected'::text, 'goverify_deactivation_uncertain'::text, 'goverify_restore_unverified'::text, 'goverify_restore_failed'::text, 'meeting_date_patch_failed'::text, 'meeting_date_readback_mismatch'::text, 'location_preexisting'::text, 'location_readback_mismatch'::text, 'folder_create_failed'::text, 'file_conflict'::text, 'file_rejected'::text, 'file_ambiguous_unrecovered'::text, 'file_source_changed'::text, 'file_verification_failed'::text, 'file_copy_failed'::text, 'observation_side_effects'::text, 'verification_failed'::text, 'request_readback_mismatch'::text, 'preallocated_request_present'::text, 'file_journal_unverified'::text, 'ia_claim_lost'::text, 'ia_pointer_mismatch'::text, 'ia_upload_ambiguous'::text, 'ia_snapshot_stale'::text, 'ia_verification_failed'::text, 'recipe_step_not_built'::text, 'reviewer_person_not_synthetic'::text, 'reviewer_person_conflict'::text, 'reviewer_person_provenance_mismatch'::text, 'reviewer_person_projection_drift'::text, 'synthetic_reviewer_not_bindable'::text, 'reviewer_suggestion_present_not_owned'::text, 'reviewer_answers_ambiguous'::text, 'reviewer_source_changed'::text, 'reviews_verification_failed'::text, 'presite_claim_lost'::text, 'presite_pointer_mismatch'::text, 'presite_upload_ambiguous'::text, 'presite_snapshot_stale'::text, 'presite_verification_failed'::text, 'presite_promotion_uncharacterized'::text, 'presite_ai_run_ambiguous'::text])))))"
+          },
+          {
+            "name": "test_request_runs_recipe_enum",
+            "type": "c",
+            "definition": "CHECK ((recipe = ANY (ARRAY['basic'::text, 'initial_assessment'::text, 'reviews'::text, 'pre_site_visit'::text, 'final_writeup'::text, 'site_visit_materials'::text])))"
+          },
+          {
+            "name": "test_request_runs_request_number_shape",
+            "type": "c",
+            "definition": "CHECK (((destination_request_number IS NULL) OR (destination_request_number ~ '^[0-9]{1,10}$'::text)))"
+          },
+          {
+            "name": "test_request_runs_source_shapes",
+            "type": "c",
+            "definition": "CHECK (((source_request_number ~ '^[0-9]{1,10}$'::text) AND (source_revision ~ '^(W/)?\"?[0-9A-Za-z-]{1,80}\"?$'::text)))"
+          },
+          {
+            "name": "test_request_runs_status_check",
+            "type": "c",
+            "definition": "CHECK ((status = ANY (ARRAY['prepared'::text, 'creating'::text, 'ready'::text, 'needs_attention'::text, 'retiring'::text, 'retired'::text])))"
+          },
+          {
+            "name": "test_request_runs_test_label_derived",
+            "type": "c",
+            "definition": "CHECK ((test_label ~ '^TEST [a-z][a-z0-9_-]{0,39} clone of [0-9]{1,10} run [0-9a-f]{8}$'::text))"
+          }
+        ],
+        "indexes": [
+          {
+            "name": "test_request_runs_actor_created_idx",
+            "unique": false,
+            "primary": false,
+            "definition": "CREATE INDEX test_request_runs_actor_created_idx ON test_request_runs USING btree (actor_id, created_at DESC)"
+          },
+          {
+            "name": "test_request_runs_actor_idempotency_key",
+            "unique": true,
+            "primary": false,
+            "definition": "CREATE UNIQUE INDEX test_request_runs_actor_idempotency_key ON test_request_runs USING btree (actor_id, idempotency_key)"
+          },
+          {
+            "name": "test_request_runs_destination_location_id_key",
+            "unique": true,
+            "primary": false,
+            "definition": "CREATE UNIQUE INDEX test_request_runs_destination_location_id_key ON test_request_runs USING btree (destination_location_id)"
+          },
+          {
+            "name": "test_request_runs_destination_request_id_key",
+            "unique": true,
+            "primary": false,
+            "definition": "CREATE UNIQUE INDEX test_request_runs_destination_request_id_key ON test_request_runs USING btree (destination_request_id)"
+          },
+          {
+            "name": "test_request_runs_pkey",
+            "unique": true,
+            "primary": true,
+            "definition": "CREATE UNIQUE INDEX test_request_runs_pkey ON test_request_runs USING btree (run_id)"
+          },
+          {
+            "name": "test_request_runs_status_idx",
+            "unique": false,
+            "primary": false,
+            "definition": "CREATE INDEX test_request_runs_status_idx ON test_request_runs USING btree (status)"
+          }
+        ],
+        "triggers": [],
+        "policies": []
+      },
+      "test_request_status_changes": {
+        "relkind": "r",
+        "relpersistence": "p",
+        "rowSecurity": {
+          "enabled": false,
+          "forced": false
+        },
+        "columns": [
+          {
+            "name": "change_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "run_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "sequence",
+            "type": "integer",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "field",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "option_before",
+            "type": "integer",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "option_after",
+            "type": "integer",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "etag_before",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "status",
+            "type": "text",
+            "nullable": false,
+            "default": "'planned'::text"
+          },
+          {
+            "name": "rerun",
+            "type": "boolean",
+            "nullable": false,
+            "default": "false"
+          },
+          {
+            "name": "dispatched_at",
+            "type": "timestamp with time zone",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "effects",
+            "type": "jsonb",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "error",
+            "type": "text",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp with time zone",
+            "nullable": false,
+            "default": "now()"
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamp with time zone",
+            "nullable": false,
+            "default": "now()"
+          },
+          {
+            "name": "completed_at",
+            "type": "timestamp with time zone",
+            "nullable": true,
+            "default": null
+          }
+        ],
+        "constraints": [
+          {
+            "name": "test_request_status_changes_distinct",
+            "type": "c",
+            "definition": "CHECK (((option_before IS NULL) OR (option_before <> option_after)))"
+          },
+          {
+            "name": "test_request_status_changes_effects_check",
+            "type": "c",
+            "definition": "CHECK (test_request_receipt_ok(effects))"
+          },
+          {
+            "name": "test_request_status_changes_error_check",
+            "type": "c",
+            "definition": "CHECK (((error IS NULL) OR (length(error) <= 2000)))"
+          },
+          {
+            "name": "test_request_status_changes_etag_before_check",
+            "type": "c",
+            "definition": "CHECK ((etag_before ~ '^W/\"[0-9]{1,20}\"$'::text))"
+          },
+          {
+            "name": "test_request_status_changes_field_check",
+            "type": "c",
+            "definition": "CHECK ((field = ANY (ARRAY['wmkf_phaseistatus'::text, 'wmkf_phaseiistatus'::text])))"
+          },
+          {
+            "name": "test_request_status_changes_pkey",
+            "type": "p",
+            "definition": "PRIMARY KEY (change_id)"
+          },
+          {
+            "name": "test_request_status_changes_run_id_fkey",
+            "type": "f",
+            "definition": "FOREIGN KEY (run_id) REFERENCES test_request_runs(run_id)"
+          },
+          {
+            "name": "test_request_status_changes_run_sequence",
+            "type": "u",
+            "definition": "UNIQUE (run_id, sequence)"
+          },
+          {
+            "name": "test_request_status_changes_status_check",
+            "type": "c",
+            "definition": "CHECK ((status = ANY (ARRAY['planned'::text, 'dispatched'::text, 'applied'::text, 'complete'::text, 'needs_attention'::text])))"
+          }
+        ],
+        "indexes": [
+          {
+            "name": "test_request_status_changes_one_open_idx",
+            "unique": true,
+            "primary": false,
+            "definition": "CREATE UNIQUE INDEX test_request_status_changes_one_open_idx ON test_request_status_changes USING btree (run_id) WHERE (status = ANY (ARRAY['planned'::text, 'dispatched'::text, 'applied'::text]))"
+          },
+          {
+            "name": "test_request_status_changes_pkey",
+            "unique": true,
+            "primary": true,
+            "definition": "CREATE UNIQUE INDEX test_request_status_changes_pkey ON test_request_status_changes USING btree (change_id)"
+          },
+          {
+            "name": "test_request_status_changes_run_sequence",
+            "unique": true,
+            "primary": false,
+            "definition": "CREATE UNIQUE INDEX test_request_status_changes_run_sequence ON test_request_status_changes USING btree (run_id, sequence)"
+          }
+        ],
+        "triggers": [],
+        "policies": []
+      }
+    },
+    "functions": [
+      {
+        "signature": "test_request_receipt_ok(receipt jsonb)",
+        "returnType": "boolean",
+        "language": "sql",
+        "volatile": "i",
+        "bodyHash": "f2d697a6a73d1c96fa4955f78379d1f639942cb5f3735c4fe2b44a895f405449"
+      }
+    ]
+  }
+}

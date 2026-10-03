@@ -52,6 +52,10 @@ beforeEach(() => {
         status: 200,
         json: async () => ({
           success: true,
+          ineligible: [],
+          blocked: [],
+          handled: [],
+          savedKeys: [],
           active: activeCandidates,
           excluded: [],
           allNames: [APPLICANT_MISMATCH.name, SEARCH_MISMATCH.name],

@@ -21,19 +21,40 @@ const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential
 const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 
 describe('saveToDatabase — identity gate on the email-keyed side path', () => {
+  const originalSwitch = process.env.SYNTHETIC_REVIEWER_ISOLATION;
   beforeEach(() => {
     jest.clearAllMocks();
-    potentialReviewerAdapter.getByEmail.mockResolvedValue({ wmkf_potentialreviewersid: 'PID-1' });
+    process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on';
+    potentialReviewerAdapter.getByEmail.mockResolvedValue({ wmkf_potentialreviewersid: 'PID-1', wmkf_issyntheticreviewer: false });
     potentialReviewerAdapter.upsertByEmail.mockResolvedValue({ id: 'PID-1' });
     researcherAdapter.upsertByPotentialReviewer.mockResolvedValue({ id: 'PID-1' });
     researcherAdapter.writeIdentityDecision.mockResolvedValue(undefined);
     researcherAdapter.clearIdentityFields.mockResolvedValue(undefined);
+  });
+  afterAll(() => {
+    if (originalSwitch === undefined) delete process.env.SYNTHETIC_REVIEWER_ISOLATION;
+    else process.env.SYNTHETIC_REVIEWER_ISOLATION = originalSwitch;
   });
 
   const enrichment = (identity) => ({
     email: 'x@mit.edu', emailSource: 'orcid', orcidId: '0000-0001', orcidUrl: 'https://orcid.org/0000-0001',
     googleScholarUrl: 'https://scholar.google.com/citations?user=ABC',
     tierResults: {}, identity,
+  });
+
+  test.each(['off', '', 'invalid'])('reviewer isolation %s stops email-keyed person and researcher writes', async (value) => {
+    process.env.SYNTHETIC_REVIEWER_ISOLATION = value;
+    await ContactEnrichmentService.saveToDatabase({ name: 'Dr X', affiliation: 'MIT' }, enrichment(null));
+    expect(potentialReviewerAdapter.getByEmail).not.toHaveBeenCalled();
+    expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+    expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
+  });
+
+  test('a cast or unknown marker cannot enter the email-keyed enrichment write path', async () => {
+    potentialReviewerAdapter.getByEmail.mockResolvedValueOnce({ wmkf_potentialreviewersid: 'PID-CAST', wmkf_issyntheticreviewer: true });
+    await ContactEnrichmentService.saveToDatabase({ name: 'Dr X', affiliation: 'MIT' }, enrichment(null));
+    expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+    expect(researcherAdapter.upsertByPotentialReviewer).not.toHaveBeenCalled();
   });
 
   test('unresolved verdict → ORCID + Scholar URL NOT written; decision written; stale fields cleared', async () => {

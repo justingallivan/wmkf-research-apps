@@ -128,6 +128,16 @@ test.each(Object.entries(RECORDED_SENDERS).flatMap(([file, v]) => v.early.map((f
   },
 );
 
+test.each([
+  ['lib/services/site-visit-materials/collection-service.js', 'createMaterialsCollection'],
+  ['lib/services/site-visit-materials/collection-service.js', 'inviteMaterialsContributors'],
+  ['lib/services/site-visit-materials/collection-service.js', 'remindMaterialsContributors'],
+  ['lib/services/workbench/grantee-deliverables/send-invite-service.js', 'sendGranteeInvite'],
+])('%s passes recipients to the early test-request check', (file, fn) => {
+  const body = exportedFunctionBodies(fs.readFileSync(path.join(ROOT, file), 'utf8'))[fn];
+  expect(body).toMatch(/assertRequestEmailAllowed\(requestId,\s*\{\s*recipients:/);
+});
+
 test('the delivery seam still guards both email creation and dispatch', () => {
   const seam = fs.readFileSync(path.join(ROOT, 'lib/services/dynamics/email.js'), 'utf8');
   // S546: both calls now pass a recipients loader for the test-Request allowlist;

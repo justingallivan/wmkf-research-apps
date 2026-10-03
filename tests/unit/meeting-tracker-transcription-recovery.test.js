@@ -278,6 +278,15 @@ test('a verified committed receipt superseded by a newer winner becomes terminal
   }));
 });
 
+test('daily reconciliation skips before touching publication tables when schema is unavailable', async () => {
+  process.env.MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY = 'off';
+  await expect(reconcileMeetingTranscriptPublicationsBatch({ limit: 20 })).resolves.toEqual({
+    skipped: 'schema_not_ready', checked: 0, reconciled: 0, attention: 0,
+  });
+  expect(store.expireMeetingTranscriptCorrectionDrafts).not.toHaveBeenCalled();
+  expect(store.listUnresolvedMeetingTranscriptPublications).not.toHaveBeenCalled();
+});
+
 test('daily checks rotate twenty persistent-attention receipts so the twenty-first is not starved', async () => {
   const base = fixture();
   const receipts = Array.from({ length: 21 }, (_, index) => ({ ...base, order: index,

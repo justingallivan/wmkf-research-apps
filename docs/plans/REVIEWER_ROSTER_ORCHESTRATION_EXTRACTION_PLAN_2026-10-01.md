@@ -1,0 +1,139 @@
+---
+title: Reviewer roster orchestration extraction — C2
+kind: plan
+domain: reviewers
+status: approved
+canonical: false
+owner: product-engineering
+summary: Behavior-preserving C2 extraction of roster orchestration into a Workbench service, with characterization, trust-boundary invariants, separate defect leads, and Tier 2 release gates.
+---
+
+# C2: reviewer roster orchestration extraction
+
+## Scope and evidence
+
+This is a plan for review, not authorization to implement or promote runtime changes. The current task changes only this document. [VERIFIED via Git] Source baseline is `855d00dce1ded3be11e84ab69e5b79f933e3024c` on `main`, which includes C1 (PR #386) and C4 (PR #385). The isolated planning branch is `codex/c2-roster-orchestration-plan`. No live database, provider, or deployment probe was performed.
+
+[PLANNED] Extract the orchestration currently in `pages/api/workbench/reviewer-roster.js` into **one** `lib/services/workbench/reviewer-roster-service.js`. Preserve observable HTTP responses, auth order, validation order, call arguments, candidate projections, trust decisions, logging, DAL scope, awaited work and persistence semantics. Keep the existing store and engagement projection service unchanged. C1's neutral `shared/utils/reviewer-roster-projection.js` remains the candidate projection implementation.
+
+[VERIFIED via the complete route and store methods] This is a separation of ownership, not a remedy for a failing route-service gate. The existing route already calls services rather than adapters directly. [PLANNED] Treat implementation as Tier 2 because this crosses the HTTP/service boundary around durable roster mutations; planning alone is Tier 0. The original survey's 16-hour estimate is a rough implementation/review envelope, excluding live rehearsal and release waits.
+
+[VERIFIED via source reads] The contract review followed the five client hooks named below through the route, `reviewer-roster-store`, `reviewer-roster-projection-service`, and the returned roster consumers. It also consulted the roster Atlas, API security matrix, service catalog, remediation rules, release strategy, session handoff, queue, and full `.claude-memory/project-reviewer-find-roster.md`. No `.codegraph/` directory exists in this isolated checkout; source inspection was used without creating an index.
+
+### Source/document disagreements to keep explicit
+
+[VERIFIED via `docs/API_ROUTE_SECURITY_MATRIX.md` roster row versus the complete route at the pinned baseline] The matrix describes `mode=cached` / `mode=reconciled`, snapshot tokens and stricter canonical identity confirmation that this route does not implement. The actual GET ignores mode and token fields. Non-applicant `confirm_identity` prunes submitted identity, separately reads a stored candidate for the author check, and submits the former to the store; it does not replace all submitted identity with the stored row. The memory's status list also omits `blocked`, which the store and Atlas include. These are pre-existing documentation disagreements, not permission to recreate an older architecture or claim stronger trust checks.
+
+[PLANNED] Base parity on executable source plus characterization. At implementation kickoff, re-fetch `main`, inspect this route/store/callers and active ownership, and reconcile any overlapping changes before moving code. If another workstream is changing these behaviors, rebase and revise this plan first. Do not silently adopt matrix-only behavior. The implementation's documentation pass must correct the in-scope roster row and symbol ownership against the final source, preserving historical incident records. This planning document records the discrepancies without claiming a repository-wide reconciliation or changing unrelated documentation.
+
+## Chosen boundary
+
+[PLANNED] The HTTP shell retains:
+
+- `config.api.bodyParser.sizeLimit = '2mb'` and the default handler.
+- `requireAppAccess(req, res, 'reviewer-finder', 'reviewers')`, before method dispatch and outside the existing `try`. Denied auth invokes no service; unsupported methods still authenticate before 405. A thrown auth error must not be newly swallowed by the roster's catch.
+- GET query versus POST/PATCH body extraction; identical GUID check without trimming/coercion; POST array validation and 100-candidate bound, in their current order. PATCH validates requestId before any action validation.
+- Derivation of the two actor fields solely from authenticated `access`, preserving `|| null` behavior. Never pass the request, response, session, or browser actor fields into the service.
+- HTTP status/body emission, the unchanged generic 500 body and `reviewer-roster error:` log, and the exact 405 body.
+
+[PLANNED] The service exports three operations: `getReviewerRoster({ requestId })`, `recordReviewerRosterCandidates({ requestId, candidates })`, and `mutateReviewerRoster({ requestId, action, candidate, candidateKey, updates, candidateRefs, actor })`. These names are proposed, not existing symbols. Inputs have the shell's request-scope validation; action-level validation, including the applicant POST rejection, moves with the domain branch. Construct the PATCH input explicitly; never spread the browser body over the trusted actor. Document that this is a post-auth service, not a new authorization bypass for arbitrary callers. Pass the body candidate verbatim. Preserve separate raw and pruned values: applicant-shape tests, applicant anchor lookup and exact key equality, the optional confirm-identity stored-row lookup key, manual contact inputs and confirm-identity measurement key all use the raw submitted candidate. Initial pruning still executes in its existing position, but must not replace those raw inputs; an applicant branch subsequently replaces its store payload with the pruned authoritative stored row.
+
+[PLANNED] Each operation returns the exact existing success body, including spread order and omitted properties. The service owns private helpers, receipt verification, authoritative applicant lookup, stored-authority preservation, proposal-author checks, measurement and existing action dispatch. Do not expose private helpers or split every PATCH branch into an exported command merely to make smaller files.
+
+[PLANNED] Expected service rejections use a service-local exported `ReviewerRosterError` subclass of the existing `ServiceHttpError`, with an explicit exact body and status. The shell catches **only this roster-specific class**, then uses the unchanged unknown-error 500 path. This prevents an unrelated dependency's `ServiceHttpError` from accidentally acquiring a new public response. Convert only the route's explicit rejection returns; preserve the narrow existing `invalid_contact_draft` store-error translation inside that action. Do not add broad error-code/status duck typing, retries, or a common error-framework refactor.
+
+[PLANNED] Move the three existing `withDalContext` wrappers with their operations, retaining their exact labels and scopes: `workbench-reviewer-roster-get`, `workbench-reviewer-roster-promote`, and `workbench-reviewer-roster-confirm-author-check`. The service calls them only after the shell authenticates and validates request scope. Do not wrap the entire handler/service in one broad context: current list/store/repair/measurement operations are outside these three narrow callbacks. Within the author callback, PI resolution remains awaited before Co-PI lookup.
+
+## Contract inventory and sequencing
+
+Every current-state statement in this table is [VERIFIED via `pages/api/workbench/reviewer-roster.js` and the named store/projection methods at the pinned baseline]. Every preservation requirement is [PLANNED]. The existing complete route is the literal oracle for error messages and object spread precedence; tests must assert exact bodies rather than reconstruct them from the new implementation.
+
+| Operation | Order and contract that must survive |
+|---|---|
+| GET | Valid scope → `listForRequest` → engagement reconciliation in the GET DAL context → collect visible active/excluded/ineligible/blocked keys → repair lookup. Reconciliation failure returns generic 500; only repair lookup failure degrades to 200 with `repairRequests: []` and `repairRequestsUnavailable: true`. Preserve reconciled `handled`, saved keys, names, bucket ordering and spread precedence. No new modes, snapshot tokens or Dataverse reads. |
+| POST | Validate scope/array/cap → reject any server-managed applicant-shaped input before pruning → concurrent candidate map. Within each candidate: prune → strip staff authority → skip missing name → identity receipt verification → institution receipt verification → eligibility decision → server key binding → receipt/projection construction. Preserve `Promise.all` across candidates and sequential receipt checks within each candidate. Then restore stored authority in one bounded lookup → await `recordSurfaced` → 200 `{ success: true, recorded }`. Empty arrays and filtered unnamed candidates keep current behavior. |
+| PATCH exclude | Require candidate name → prune/strip client authority and institution evidence → applicant anchor lookup using the raw candidate and exact raw submitted/stored key equality, or ordinary stored-authority restoration of the pruned payload → await `setExcluded` → awaited best-effort measurement → 200. Missing/stale applicant yields exact 409. Anchor lookup must continue accepting a matching placeholder key; no canonical-key-only substitution. Store upsert/no-op behavior stays unchanged. |
+| PATCH promote | Truthy candidateKey check (do not strengthen its type rule) → exact stored-key lookup → excluded-status precheck → authoritative engagement validation in its DAL context → guarded store promote → measurement → 200 with returned candidate. Preserve both precheck and post-write-null 409s, and full denied-engagement body including `allowed`, `code`, optional `stage`. This is restoring an excluded roster row, distinct from saving to Dataverse. |
+| PATCH saved | Always exact 409 `server_owned_transition` after requestId validation. Do not inspect candidate authority or call stores. |
+| PATCH confirm_identity | Require submitted name/email → prune/strip → applicant authoritative lookup using the raw candidate plus exact known-person hydration check (422 `applicant_hydration_required`) → optional raw submitted-key stored lookup → check both submitted/authoritative and stored names against server-derived PI/Co-PIs (422 `proposal_author_candidate` on a match) → construct manual contact from raw submitted contact fields → prune → store confirmation using server-derived actor IDs → null-result 409 or awaited measurement and exact 200 body. Preserve source behavior despite the stricter matrix prose; no identity-policy redesign. |
+| PATCH update_contact_draft | Preserve validation order: string/nonblank/trimmed-length key ≤1024; own update keys only website/affiliation; strings/null; trim contact values; website length ≤500; HTTP(S), parseability and non-document checks; affiliation length ≤500. Preserve omitted versus explicit null/empty fields and pass original key to store. Only the store call's `invalid_contact_draft` error becomes the existing 400. Guarded stale/missing store result is exact 409; success measurement then candidate response. |
+| PATCH remove_previous_results | Require 1–300 key/timestamp refs; nonempty string keys; timestamp string nonempty and ≤80; no added per-key length cap. Pass original refs unchanged. Store keeps exact request/key/timestamp active-only deletion and source/COI exclusions, and returns its single-statement refreshed roster. Do not replace it with GET reconciliation, add Dataverse reads, or turn it into a whole-roster deletion. |
+| Unknown PATCH / unexpected failure | Preserve requestId validation before unknown action 400. Unexpected dependency Error objects remain generic 500 with the existing log, even if they carry HTTP-looking fields. Preserve the existing catch verbatim: it reads `error.message`, so null/undefined rejection can itself throw instead of returning 500; defensive error normalization is not part of C2. Existing local best-effort catches remain local. |
+
+[VERIFIED via private route helpers] Stored authority restoration prefers valid fresh receipts over reusable stored ones, revalidates receipt bindings, preserves stored-true address blocks and the stored identity-review marker, and restores valid staff confirmation/manual contact without accepting forged browser flags. [PLANNED] Move these helpers mechanically; preserve projection placement and all top-level/nested flag precedence. Do not simplify seemingly redundant receipt or applicant checks.
+
+[VERIFIED via store] Durable state remains in `reviewer_find_roster`, keyed by `(request_id, candidate_key)`. `recordSurfaced` catches individual row SQL failures, enforces its cap afterward, and awaits owned measurements via `Promise.allSettled`; the cap helper catches and logs its own DELETE failure, so that failure still returns the recorded count and HTTP 200, potentially leaving the roster over cap. `updateContactDraft` uses a timestamp guard; `confirmIdentity` requires an active row but is not a new compare-and-swap operation; `setExcluded` is an upsert with an ineligible guard. [PLANNED] No store implementation, SQL, schema, migration, DTO, status, receipt format or transaction change.
+
+[VERIFIED via `measureRosterAction`] Its `measurementEnabled()` check occurs before its `try`; enabled lookup/record failures are swallowed inside the `try`. [PLANNED] Preserve even this catch boundary, the required-status check for exclusion, and each action's known-candidate argument. Do not fire-and-forget, batch, move measurement before persistence, or broaden failure suppression. A flag-function throw must retain the old failure behavior.
+
+## Caller and partial-success audit
+
+[VERIFIED via source search and reads] Literal runtime consumers of this endpoint are five hooks under `shared/components/reviewers/search/`:
+
+| Consumer | Response and async contract |
+|---|---|
+| `useReviewerRoster.js` | GET accepts only successful envelopes, applies all roster buckets/handled/savedKeys/names and repair state; checks generation after awaiting before applying. |
+| `useReviewerDiscovery.js` | Awaits POST, ignores `recorded`, checks generation, merges all submitted candidates and names locally; stays busy until the write settles. |
+| `useReviewerRosterActions.js` | Optimistic excludes have distinct rollback for normal versus ephemeral candidates; promote uses specific 409 codes to reload; removal consumes returned roster/removedKeys. Generation guards prevent stale completion from replacing another search's state. |
+| `useReviewerContactActions.js` | Draft edit consumes authoritative candidate. Unverified rescue first POSTs, checks HTTP/success but not count, then confirms identity; after committed confirmation it retains server truth even if the following address verification fails. |
+| `useReviewerPromotion.js` | Refresh POSTs one candidate at a time and requires `recorded === 1`; zero remains retryable. It checks generation before and after each write. |
+
+[PLANNED] Leave these hooks and the API request utilities unchanged. Retain their tests as consumer coverage; no new cancellation, local optimistic behavior or request generation scheme.
+
+**Separate defect lead, not an extraction fix.** [VERIFIED via store → route → discovery/rescue/promotion trace] A row failure may be hidden behind 200/success and a short count. Zero also legitimately occurs for protected existing curation. Discovery treats it as durably saved; promotion refresh does not. [ASSUMED] This can make discovery's local roster/dedup claim disagree with a subsequent reload. The cap helper's swallowed DELETE failure is a separate partial-success surface: a successful response does not prove the retention cap was enforced. No live DB reproduction or claim about production frequency is made.
+
+[PLANNED] Characterize the current outcome before extraction, clearly naming the tests as legacy partial-success behavior. Include SQL row rejection, mixed success, zero from curation conflict, and cap DELETE failure after earlier writes (count still returned, HTTP 200); distinguish route/store/consumer assertions. Inject cap DELETE rejection at the SQL/store boundary rather than mocking `recordSurfaced` to reject. Do not convert a short count into an error, add per-item identifiers, make a new transaction, or fix rescue in C2. A separate bug task must design per-item acknowledgements and fault-injected route/store/client recovery together. Discovery and rescue need examination; promotion's existing exact-count acknowledgement must remain intact. This explicit disposition satisfies the prerequisite investigation without silently mixing changed behavior into refactoring.
+
+## Implementation sequence and review ownership
+
+All steps below are [PLANNED], conditional on future implementation authorization.
+
+1. **Luna reconnaissance and characterization.** Re-fetch/recheck source, ownership, branch cleanliness and credential-free test setup. Record baseline SHA and current failures. Extend endpoint characterization before moving code; commit the passing baseline tests separately. Use real handler with mocked dependencies. Keep response fixtures/expected calls independent of the future service. Run store fault cases with SQL mocked and consumer cases with HTTP mocked; do not call live systems to prove this extraction.
+2. **Luna extraction.** Move private helpers and the three operations into the one service, keeping branch bodies, awaits and local catches in order. Replace response writes with the selected exact-body return/error contract; retain shell auth/validation/HTTP handling. Add direct service tests only where they add evidence (actor provenance, scope/order/fault behavior), while keeping endpoint tests exercising the actual service rather than mocking it away. Commit working extraction after focused checks.
+3. **Sol review.** Independently compare the base and final route/service behavior across every inventory row and caller. Require exact response tests, dependency ordering and no-write-before-rejection evidence. Luna corrects substantive findings and runs affected checks. After two substantive review rounds, the orchestrator takes over remaining bounded work instead of repeated cosmetic cycles. Neither reviewer may broaden scope to the separated defects.
+4. **Orchestrator final review.** Inspect the complete diff, test independence, changed import graph, actor construction, error-class isolation, DAL callback boundaries, and durable documentation. Confirm no new runtime caller or unrelated modification. Use contract-reconcile again against the final implementation, including client partial-success behavior.
+5. **Claude Fable adversarial review.** Use the user's interactive OAuth/subscription session only; on macOS verify auth and run outside the Codex sandbox for Keychain access, stripping API-key auth variables. No direct model API and no Ultrareview/metered substitute. Give Fable the exact branch/base, plan, diff and validation evidence. Evaluate findings against source; fix supported substantive issues using Luna/Sol, or take over bounded residuals. Obtain a final explicit approval of the final reviewed implementation, not just this plan. A failed review mechanism is reported, never substituted silently.
+6. **Delivery and release.** Publish a reviewable PR with test/review evidence and residual limits. Implementation remains unmerged until the Tier 2 release conditions below and an explicit owner merge decision. Plan approval alone authorizes neither runtime changes nor production actions.
+
+## Acceptance and verification
+
+[VERIFIED via baseline run at `855d00dce`] The following six existing suites passed: **134 tests, 6 suites**, no snapshots. This is pre-extraction evidence, not proof that new characterization or implementation has passed:
+
+```bash
+npx jest tests/unit/reviewer-roster-endpoint.test.js \
+  tests/unit/reviewer-roster-store.test.js \
+  tests/unit/workbench-reviewer-roster-projection-service.test.js \
+  tests/unit/reviewer-search-roster-contract.test.js \
+  tests/unit/reviewer-search-save-contract.test.js \
+  tests/unit/reviewer-search-history-controls.test.js --runInBand --silent
+```
+
+[VERIFIED via a second baseline run] Five additional consumer suites passed: `use-reviewer-contact-actions`, `use-reviewer-roster-actions`, `use-reviewer-promotion-t4-matrix`, `use-reviewer-discovery-t4-matrix`, and `reviewer-search-promotion-reconciliation`: **42 tests, 5 suites**. Total planning baseline: **176 tests, 11 suites**. The unverified-rescue suite is included in future verification, not claimed as run here.
+
+[PLANNED] Add only missing meaningful characterization, first proving it on the untouched route:
+
+- Auth denial across methods; auth throw; authenticated unsupported method; invalid query/body scope and validation precedence; no dependency invocation on invalid inputs.
+- Exact status/body for every explicit error branch and successful action; receipt/key/eligibility/staff/institution authority fixtures already in the endpoint suite remain intact. Exercise malformed values at the current acceptance boundary without strengthening validation.
+- Ordered traces of store/receipt/DAL/measurement calls; preserved DAL labels and exact callback membership. For POST, deferred promises prove all candidates can start while each candidate's identity check precedes its institution check and persistence waits for all candidate processing.
+- GET repair failure versus primary reconciliation failure; promotion rejected before write versus lost-race null after validation; applicant anchor placeholder success versus mismatched, absent or whitespace-padded raw submitted key (all three rejected even if pruning could supply or trim a matching key); renamed candidate author check using the stored name; body-supplied actor spoof ignored and both authenticated actor IDs propagated.
+- Draft own-property null/empty semantics; unexpected error versus locally translated `invalid_contact_draft`; measurement disabled, enabled rejection, exclusion status mismatch, and `measurementEnabled` throw; cap SQL failure after partial writes still returning the count/200.
+- Isolated error mapping: an unrelated `ServiceHttpError` or plain object with a code/status from a mocked dependency still follows the old 500 path. Only explicit roster rejections get their mapped exact bodies.
+- Store short-count distinctions plus discovery/rescue versus promotion consumer behavior; retain slow-response generation and search/removal serialization coverage. No production DB/provider credentials in these tests.
+
+[PLANNED] After extraction run the six suites above plus the new service/characterization tests, C1 `reviewer-roster-projection.test.js`, `reviewer-search-stage0-lifecycle.test.js`, and `use-reviewer-roster-t4-matrix.test.js`; include `use-reviewer-contact-actions.test.js`, `reviewer-search-unverified-rescue.test.js`, `use-reviewer-promotion-t4-matrix.test.js`, `use-reviewer-discovery-t4-matrix.test.js`, `use-reviewer-roster-actions.test.js`, and `reviewer-search-promotion-reconciliation.test.js`. Run targeted ESLint, `check:types` with `--incremental false`, and canonical `npm run build`. Inspect prebuild's migration-manifest diff rather than committing incidental changes. Use the documented host-build fallback only for sandbox/Turbopack infrastructure failures.
+
+[PLANNED] Run `check:api-routes`, `check:route-lifecycle-auth`, `check:trust-boundary-guid`, `check:route-service-boundary`, `check:dynamics-context-boundary`, `check:dataverse-access-layer`, `check:reviewer-engagement-boundary`, and their existing self-tests. Each gate precedes its self-test sequentially; do not weaken law gates or add exemptions. Run documentation gates (`check:doc-symbol-refs`, `check:build-claim-freshness`, `check:docs-catalog`, `check:harness-framing`), `check:secret-scan`, and `git diff --check`. Required CI, including the full unit suite and applicable browser checks, must pass on the final PR head. A relevant red check blocks completion.
+
+[PLANNED] The scoped durable-fact change on implementation is orchestration ownership, plus the explicitly identified roster matrix mismatch. Search route path and moved helper names across docs, Atlas, memory, wiki, tests and source comments; read each affected document fully before editing. Update current ownership pointers and inaccurate in-scope behavior statements, retain clearly historical records, then rerun the search. Add the domain service to the service catalog without claiming new product behavior. No schema/enum fan-out is introduced; no broad unrelated documentation audit.
+
+## Tier 2 promotion and rollback
+
+[PLANNED per `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` §4] Before runtime merge, record an integrated local/preview build in an approved data mode and staff rehearsal of load, exclude/restore, identity confirmation, draft editing, discovery persistence and previous-results removal. Route-mocked browser rehearsal can safely verify UI response handling but does not prove real persistence. If live integration is needed, choose an authorized sandbox or explicitly allowlisted controlled-production rehearsal; never infer authorization from Preview or a shared database URL. This staff-only extraction does not add an external-user flow.
+
+[PLANNED] Record last-known-good production deployment, tested SHA, rehearsal environment/target, evidence, remaining accepted defects, owner merge decision and rollback steps. Rollback is reverting the extraction's runtime commit(s) and redeploying the recorded previous good version; there is no schema/data migration to reverse. Do not delete roster data as rollback. If rehearsal or deployment facts are unavailable, report them as outstanding release conditions rather than claiming production readiness. Existing Dataverse target/write interlocks stay in force.
+
+## Planning review record
+
+Round 1: Claude Fable (`claude-fable-5-1`) reviewed through the verified `claude.ai` OAuth session, with no API-key authentication or permission denials. Verdict: changes required. Two source-backed corrections were accepted: cap enforcement catches its own SQL failures, and applicant PATCH authority checks must use raw submitted keys rather than projector-derived keys. Both are corrected above with distinguishing characterization cases. Optional exact 422 labels and existing hook-suite names were also added; the pre-existing nullish-error catch limitation is explicit. Round 2: **APPROVED** on 2026-10-01, with no remaining consequential blocker. Fable verified both corrections against the pinned source. The reviewed revision had SHA-256 `833015909f1ecf053bda7370235b334cd869616628a52ad5c31db83a195c468b`; subsequent edits only record this verdict and verification receipt and update plan status. The reviewer accepted the additional test-run count on the orchestrator's report, without claiming to execute tests in the read-only review. Approval covers the substantive plan only. Approval will mean that the bounded plan is acceptable for implementation consideration, not that implementation, live rehearsal or production promotion has occurred.
+
+[VERIFIED via local planning checks] `check:doc-symbol-refs`, `check:build-claim-freshness`, `check:docs-catalog`, `check:harness-framing`, `check:secret-scan`, and `git diff --check` passed. The symbol, build-claim and harness self-tests also passed sequentially after their gates. These checks do not prove every plan citation or future implementation; source review and Fable review supply the bounded additional evidence.

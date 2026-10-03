@@ -1,0 +1,21 @@
+{
+  "observedAt": "2026-09-30T17:25:35.997266+00:00",
+  "deploymentId": "dpl_ACf94iMngDpDoh1kzq7MR9NazTBY",
+  "url": "https://wmkfresearchapps-q9lxfphqq-justin-gallivans-projects.vercel.app",
+  "state": "READY",
+  "target": "preview",
+  "targetEvidence": "vercel inspect reports preview; deployment API target is null",
+  "sourceCommit": "1a86c10da92b779acaade0bb99ce4fcc2203db24",
+  "branch": "codex/factory-reviewer-b4-runtime",
+  "pr": 369,
+  "capturedSwitches": {
+    "TEST_REQUEST_ISOLATION": "unknown",
+    "SYNTHETIC_REVIEWER_ISOLATION": "unknown"
+  },
+  "capturedSwitchesVerified": false,
+  "verification": "read-only deployment API; no environment values retained except on/off result",
+  "envPullLimitation": "CLI 61.1.0 env pull --id rejected READY deployment: expected INITIALIZING; all private empty temp files deleted",
+  "runtimeSourceUnchangedFrom": "92ccbd0bd052c3ae49666c8776d3642d26dd53ce",
+  "liveJobDrainRun": false,
+  "buildSkipped": false
+}

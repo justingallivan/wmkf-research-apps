@@ -36,7 +36,10 @@ const candidate = (name, email, over = {}) => ({
 });
 
 function response(body, ok = true, status = ok ? 200 : 422) {
-  return { ok, status, json: async () => body };
+  const payload = body?.success === true && ('active' in body || 'allNames' in body)
+    ? { active: [], excluded: [], ineligible: [], blocked: [], handled: [], savedKeys: [], allNames: [], ...body }
+    : body;
+  return { ok, status, json: async () => payload };
 }
 
 afterEach(() => {

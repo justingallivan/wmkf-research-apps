@@ -72,6 +72,50 @@ test.each(['organic_results_state', 'news_results_state'])('documented successfu
   await expect(IntegrityService.serpSearch('fixture', 'fixture', 10, news ? 'google_news' : 'google', strict)).resolves.toEqual([]);
 });
 
+const recordedEmpty = require('../fixtures/serpapi/zero-result-2026-10-01.json');
+const serve = (body) => global.fetch.mockResolvedValue({ ok: true, json: async () => body });
+
+describe.each(['google', 'google_news'])('recorded live %s zero-result response', (engine) => {
+  const recorded = () => JSON.parse(JSON.stringify(recordedEmpty[engine]));
+  const stateField = engine === 'google_news' ? 'news_results_state' : 'organic_results_state';
+  const search = () => IntegrityService.serpSearch('fixture', 'fixture', 10, engine, strict);
+
+  test('is a complete empty search', async () => {
+    serve(recorded());
+    await expect(search()).resolves.toEqual([]);
+  });
+
+  test('stays empty when the vendor rewords the message', async () => {
+    serve({ ...recorded(), error: 'No results were found for this query.' });
+    await expect(search()).resolves.toEqual([]);
+  });
+
+  test('stays empty when the vendor drops the structured state but keeps the message', async () => {
+    const body = recorded();
+    delete body.search_information[stateField];
+    serve(body);
+    await expect(search()).resolves.toEqual([]);
+  });
+
+  test('fails closed when both empty signals are gone', async () => {
+    const body = recorded();
+    delete body.search_information[stateField];
+    serve({ ...body, error: 'No results were found for this query.' });
+    await expect(search()).rejects.toThrow();
+  });
+
+  test('fails closed on an error that comes with results', async () => {
+    const field = engine === 'google_news' ? 'news_results' : 'organic_results';
+    serve({ ...recorded(), [field]: [{ title: 'Hit', link: 'https://example.org/hit' }] });
+    await expect(search()).rejects.toThrow();
+  });
+
+  test('fails closed when the search itself did not succeed', async () => {
+    serve({ ...recorded(), search_metadata: { status: 'Error' }, error: 'Your account has run out of searches.' });
+    await expect(search()).rejects.toThrow();
+  });
+});
+
 test.each(['google', 'google_news'])('wrong-engine results cannot confirm %s source coverage', async (engine) => {
   const wrongField = engine === 'google' ? 'news_results' : 'organic_results';
   global.fetch.mockResolvedValue({ ok: true, json: async () => ({ search_metadata: { status: 'Success' }, [wrongField]: [] }) });

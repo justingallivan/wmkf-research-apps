@@ -417,7 +417,7 @@ producer is implemented and parity-tested.
 `lib/services/contact-enrichment/page-email.js`
 (`attachEmailFromResolvedPage`, `selectGroundedEmailWithEvidence`) ·
 `lib/utils/contact-parser.js` (`extractEmailsFromHtml`) ·
-`shared/components/reviewers/reviewer-search-logic.js` (`pruneEmailEvidence`) ·
+`shared/utils/reviewer-roster-projection.js` (`pruneEmailEvidence`) ·
 `shared/components/reviewers/ReviewerSearchSection.js` (`CandidateCard`). The related
 verified-domain guard remains in the contact-enrichment finalization path. Audit:
 `tests/unit/resolved-page-email-grounding.test.js`, `tests/unit/resolved-page-email-tier-service.test.js`.

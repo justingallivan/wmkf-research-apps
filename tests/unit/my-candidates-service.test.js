@@ -50,6 +50,10 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   update: jest.fn(async () => {}),
   clearEmailForEdit: jest.fn(async () => ({ cleared: true })),
   findByEmailCandidates: jest.fn(),
+  findAllByExactEmail: jest.fn(async () => []),
+}));
+jest.mock('../../lib/services/test-requests/synthetic-reviewer-capability.js', () => ({
+  resolveReviewerBindCapability: jest.fn(async () => ({ kind: 'ordinary' })),
 }));
 jest.mock('../../lib/dataverse/adapters/researcher', () => ({
   __esModule: true,
@@ -71,6 +75,7 @@ const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential
 const researcherAdapter = require('../../lib/dataverse/adapters/researcher');
 const { ensureToken } = require('../../lib/external/token-lifecycle');
 const { translateDuplicateKeyError } = require('../../lib/dataverse/duplicate-key');
+const { resolveReviewerBindCapability } = require('../../lib/services/test-requests/synthetic-reviewer-capability.js');
 const {
   getMyCandidates,
   patchMyCandidates,
@@ -936,6 +941,7 @@ describe('Stage 1D generic invitation/response corrections', () => {
     potentialReviewerAdapter.update.mockReset().mockResolvedValue(undefined);
     researcherAdapter.updateById.mockReset().mockResolvedValue(undefined);
     ensureToken.mockReset().mockResolvedValue(undefined);
+    resolveReviewerBindCapability.mockReset().mockResolvedValue({ kind: 'ordinary' });
   });
   function noWrites() {
     expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
@@ -943,6 +949,14 @@ describe('Stage 1D generic invitation/response corrections', () => {
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
     expect(researcherAdapter.updateById).not.toHaveBeenCalled();
   }
+
+  test.each(['off', 'unset', 'invalid', 'cast'])('a %s identity gate blocks a mixed lifecycle, person and email edit before writes', async (caseName) => {
+    resolveReviewerBindCapability.mockRejectedValueOnce(new Error(caseName));
+    await expect(correct({ accepted: true, name: 'New name', email: 'new@example.org' }))
+      .rejects.toMatchObject({ httpStatus: 409, body: { code: 'reviewer_identity_edit_blocked' } });
+    noWrites();
+    expect(potentialReviewerAdapter.findAllByExactEmail).not.toHaveBeenCalled();
+  });
 
   describe.each([100000004, 100000005, 100000006])('closed source %s', (status) => {
     test.each(fields)('rejects defined %s=%s before mixed person edits', async (field, value) => {
@@ -1004,7 +1018,7 @@ describe('Stage 1D generic invitation/response corrections', () => {
     suggestionAdapter.updateLifecycle.mockRejectedValue(Object.assign(new Error('precondition failed'), { status: 412 }));
     await expect(correct({ accepted: true, name: 'Must not save' }))
       .rejects.toMatchObject({ httpStatus: 409, body: { code: 'correction_conflict' } });
-    expect(suggestionAdapter.findById).toHaveBeenCalledTimes(1);
+    expect(suggestionAdapter.findById).toHaveBeenCalledTimes(2);
     expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledTimes(1);
     expect(ensureToken).not.toHaveBeenCalled();
     expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();

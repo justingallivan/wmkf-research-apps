@@ -315,7 +315,7 @@ test('drops a late PubMed diagnostic after the request context changes', async (
   });
 });
 
-test('confirming an unverified suggestion records it on the roster BEFORE confirm_identity, then renders it as a confirmed active card', async () => {
+test('confirming an unverified suggestion adopts the acknowledged server candidate key', async () => {
   const calls = [];
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
@@ -325,13 +325,16 @@ test('confirming an unverified suggestion records it on the roster BEFORE confir
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
       const body = JSON.parse(options.body);
       calls.push({ kind: 'record', body });
-      return Promise.resolve(response({ success: true, recorded: 1 }));
+      return Promise.resolve(response({
+        success: true,
+        recorded: 1,
+        outcomes: [{ inputIndex: 0, candidateKey: 'candidate:server-bound-yamuna', status: 'recorded' }],
+      }));
     }
     if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
       const body = JSON.parse(options.body);
       calls.push({ kind: body.action, body });
-      // Echo the submitted candidate as the server-authoritative confirmed row
-      // (same candidateKey), as the real store does.
+      // Echo the submitted candidate as the server-authoritative confirmed row.
       return Promise.resolve(response({
         success: true,
         confirmationId: 'conf-1',
@@ -372,16 +375,47 @@ test('confirming an unverified suggestion records it on the roster BEFORE confir
   await waitFor(() => expect(screen.getByLabelText('Select Yamuna Krishnan')).toBeInTheDocument());
   expect(screen.queryByText(/Unverified suggestions/)).not.toBeInTheDocument();
 
-  // Ordering contract: the roster record write lands BEFORE confirm_identity,
-  // and both use ONE stable candidate key (survives the contact edits).
+  // The server may rebind a browser-only key after pruning. The exact key from
+  // the singleton acknowledgment is carried through confirm_identity.
   const kinds = calls.map((call) => call.kind);
   expect(kinds.indexOf('record')).toBeGreaterThanOrEqual(0);
   expect(kinds.indexOf('record')).toBeLessThan(kinds.indexOf('confirm_identity'));
   const recorded = calls.find((call) => call.kind === 'record').body.candidates[0];
   const confirmed = calls.find((call) => call.kind === 'confirm_identity').body.candidate;
   expect(recorded.candidateKey).toBeTruthy();
-  expect(confirmed.candidateKey).toBe(recorded.candidateKey);
+  expect(recorded.candidateKey).not.toBe('candidate:server-bound-yamuna');
+  expect(confirmed.candidateKey).toBe('candidate:server-bound-yamuna');
   expect(confirmed.email).toBe('krishnan@uchicago.edu');
+});
+
+test('confirm_identity is blocked when the roster POST acknowledges zero changed rows', async () => {
+  const patchActions = [];
+  global.fetch = jest.fn((url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/api/workbench/reviewer-roster?')) return Promise.resolve(emptyRoster());
+    if (target === '/api/reviewer-finder/analyze') return Promise.resolve(response({}));
+    if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
+      return Promise.resolve(response({
+        success: true,
+        recorded: 0,
+        outcomes: [{ inputIndex: 0, candidateKey: 'candidate:existing-row', status: 'unchanged' }],
+      }));
+    }
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
+      patchActions.push(JSON.parse(options.body).action);
+      return Promise.resolve(response({ success: true }));
+    }
+    throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
+  });
+  mockSearchStreams();
+
+  await runSearchToUnverified();
+  await submitConfirmModal('krishnan@uchicago.edu');
+
+  await waitFor(() => expect(screen.getByText(/Could not confirm this suggestion in the request roster/)).toBeInTheDocument());
+  expect(patchActions).not.toContain('confirm_identity');
+  expect(screen.getByText(/Unverified suggestions \(1\)/)).toBeInTheDocument();
 });
 
 test('a failed roster record write blocks confirm_identity and keeps the card rescuable', async () => {

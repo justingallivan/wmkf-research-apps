@@ -26,7 +26,10 @@ function deferred() {
 }
 
 function response(body, ok = true, status = ok ? 200 : 500) {
-  return { ok, status, json: async () => body, body: {} };
+  const payload = body?.success === true && ('active' in body || 'allNames' in body)
+    ? { active: [], excluded: [], ineligible: [], blocked: [], handled: [], savedKeys: [], allNames: [], ...body }
+    : body;
+  return { ok, status, json: async () => payload, body: {} };
 }
 
 function candidate(name, candidateKey, overrides = {}) {
@@ -138,7 +141,7 @@ test('a pending roster GET cannot write after the workspace unmounts', async () 
   unmount();
 
   await act(async () => {
-    pendingRoster.resolve(response(unmountedSnapshot));
+    pendingRoster.resolve({ ok: true, status: 200, json: async () => unmountedSnapshot });
     await pendingRoster.promise;
   });
 
@@ -273,7 +276,12 @@ test('failed exclusion of a transient active result restores the pruned row to r
     if (target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/enrich-contacts') return Promise.resolve(response({}));
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
-      return Promise.resolve(response({ error: 'store unavailable' }, false));
+      const [posted] = JSON.parse(options.body).candidates;
+      return Promise.resolve(response({
+        success: false,
+        recorded: 0,
+        outcomes: [{ inputIndex: 0, candidateKey: posted.candidateKey, status: 'failed' }],
+      }));
     }
     if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') return exclusion.promise;
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
