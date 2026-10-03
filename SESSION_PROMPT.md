@@ -1,5 +1,30 @@
-# Session 565 Prompt: Materials upload closeout complete; preserve parallel lanes
+# Session 566 Prompt: Uploaded-file opening shipped; preserve parallel lanes
 
+
+## Session 565 Summary — 2026-10-02 PT (Codex app-feature lane)
+
+[VERIFIED via PR #415 merge, CI, Vercel status, and authenticated production browser] Staff can now open received applicant materials from Meeting Tracker / Site Visit. PR #415 merged as `f5725544a` and deployed successfully.
+
+- **DONE:** Checklist and additional-file rows show **Open file** for a valid saved HTTPS SharePoint URL. Links open in a new tab; missing/unsafe URLs have no link. Request/artifact matching stays scoped to the staff response; applicant response shape is unchanged.
+- **DONE:** Production request 1003221 showed received PDF and PowerPoint links. Clicking the PowerPoint opened the uploaded presentation in SharePoint and loaded slide content (1 of 66). No records or files were edited during this check.
+- **DONE:** Refreshed `.impeccable/design.json` sample labels and chip typography to the current design specification; added the factory-ledger startup check to the start skill.
+- Validation: 141 targeted tests in six suites, type checking, relevant DAL/document-writer gates and self-tests, independent review, and all PR CI checks passed. ESLint had zero errors and two existing warnings. Preview browser sign-in was blocked by an unregistered Entra callback; the production opening flow was subsequently verified.
+- Commits before squash: `8eb2449dd` (startup check), `4daaaa87f` (file opening), `9c252bca4` (design reference). Shipped together in #415 / `f5725544a`.
+- Claim-evidence pilot report was unavailable because local observation state could not be read; no observation row was fabricated.
+
+### Next items for this lane
+
+**DONE:** Implementation, review, merge, deployment, and production file-opening verification. No remaining feature work identified.
+**Verify before acting:** Other lanes below are retained historical handoffs, not newly verified worklists. Recheck their source, owner decisions, and current state before continuing them.
+
+### Key files
+
+- `shared/components/meeting-tracker/SiteVisitMaterialsCard.js` — staff file-opening links.
+- `lib/services/site-visit-materials/collection-service.js` — staff-only safe URL enrichment.
+- `tests/unit/site-visit-materials-card.test.js`, `tests/unit/site-visit-materials-collection-service.test.js`, `tests/unit/site-visit-materials-contributor-service.test.js` — regression coverage.
+- `.impeccable/design.json`, `.claude/skills/start/SKILL.md` — reference/startup updates.
+
+## Prior-lane handoffs — retained for preflight, not revalidated in Session 565
 
 ## Session 564 Summary — 2026-10-02 PT (Codex materials lane)
 
@@ -7,7 +32,7 @@
 
 - Owner confirmed a PPTX finishes after closing the browser; first background job completed in about 2m44s on attempt 1, no error. Large PPTX and PDF uploads also succeeded before background activation.
 - The exact 500 MB live transfer remains unverified and parked, not a normal-use release blocker. The owner declined another simultaneous-large background test on October 2: the expected set is one large PPTX, a usually smaller PDF, and a text document. Reopen stress testing only if usage or failures warrant it.
-- The clean materials worktree was archived and is recoverable through Codex. No runtime change or merge remains for this lane. Staff Open file work belongs to the separate app-feature chat; verify its status there before acting.
+- The clean materials worktree was archived and is recoverable through Codex. No runtime change or merge remains for this lane. Staff Open file work is now DONE in Session 565: PR #415 deployed and production opening verified (see above).
 - Key references: `docs/plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md`, `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.15–16.16, and the materials milestone in `DEVELOPMENT_LOG.md`.
 - Commits: progress #410 `8fb8a6d83`; closeout #413 `81dad17e2`; connection errors #405 `1df8a33e2`. Final CI passed before merges. No new runtime tests were needed for this documentation-only stop.
 - Claim-evidence pilot report was unavailable because local observation state could not be read; no observation row was fabricated.
@@ -46,7 +71,7 @@ The admin Test Request form is built, enabled in Production, and has produced on
 
 ## Next Items
 
-### Verified Open
+### Previously reported items — verify before acting
 
 1. **DONE via PR #411 (`45d8e6fd4`): form stop copy.** Historical finding: Several stops point to a command-line resolution that no mode provides; the `timeout`/`network` copy holds only before a write; `bundle_stale` and `meeting_date_patch_failed` have no copy.
    Evidence: `docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md` (*Known gaps*); `shared/components/admin/test-request-factory-copy.js` `ATTENTION_COPY`; delegated source trace 2026-10-02.

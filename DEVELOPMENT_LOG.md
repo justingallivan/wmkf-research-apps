@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Open received applicant materials from Meeting Tracker (Session 565)
+
+**Milestone:** Staff can open uploaded applicant files directly from the Site Visit materials card.
+**Sessions:** 565 (Codex app-feature lane, October 2).
+**Ship state:**
+- Checklist and additional-file rows link to safe saved HTTPS URLs in a new tab; staff enrichment preserves request/artifact matching and the applicant response contract.
+- PR #415 merged as `f5725544a`; all CI checks, independent review, and 141 targeted tests passed.
+- Production click-through opened the uploaded PowerPoint in SharePoint and loaded its slide content. [VERIFIED via authenticated browser, GitHub, and Vercel status]
+**Why it matters:** Staff can review received materials from the same page that tracks receipt and readiness.
+**Pointers:** `shared/components/meeting-tracker/SiteVisitMaterialsCard.js`; `lib/services/site-visit-materials/collection-service.js`; PR #415 / `f5725544a`.
+
 ## October 2026 — Applicant materials uploads finish in the background (Session 564)
 
 **Milestone:** Site Visit / Research Presentation applicants can leave after transfer and durable admission while scanning and SharePoint saving continue.
