@@ -6,7 +6,7 @@ status: active
 summary: "Active policy: model registry, validation, request shaping, retry, canary, and replay shipped; future model changes still use this runbook."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-08-23
+last_verified: 2026-10-02
 owner: product-engineering
 related:
   - lib/services/llm-client.js
@@ -23,15 +23,22 @@ deprecated-parameter retry, discovery canary, Admin Models status, and replay ar
 This document remains active because each future model change still needs its review,
 validation, rollout, and replay procedure.
 
-**Current registry state (verified 2026-08-23):** Production tier overrides resolve
-`sonnet` to `claude-sonnet-5` and `opus` to `claude-opus-5`. Both exact ids are covered
-by the reviewed capability and pricing registries; the degraded-path tier fallbacks now
-use the same generation. `reviewer-finder` still has a concrete `claude-opus-4-8`
-source fallback in `shared/config/baseConfig.js`, while its live Dataverse override uses
-the `opus` tier. Opus 5 is priced at $5/$25 per million input/output tokens. Sonnet 5's
-launch price of $2/$10 is permanent; Anthropic cancelled the previously announced
-September increase. The pricing canary auto-resolves its unknown-model alert after a
-run finds no unpriced usage ids.
+**Registry/remediation source state [VERIFIED via source, 2026-10-02]:**
+On `codex/admin-alert-remediation`, Opus 5.5 has explicit reviewed capability
+and pricing entries ($4/$20 per million input/output tokens; cache reads
+0.05× input). Automatic tier resolution chooses the newest discovered family
+candidate only when both registries cover its exact id or dated snapshot;
+ancestor-only coverage is insufficient. Original degraded fallback ids remain
+unchanged. The global capability discovery cutoff stays 2026-09-12 deliberately,
+so adding this model does not silence other newer unreviewed ids. **These changes
+are source-built, not deployed; production effective models have not been
+re-probed in this remediation.**
+
+**Historical production baseline (2026-08-23):** tier overrides resolved
+`sonnet` to `claude-sonnet-5` and `opus` to `claude-opus-5`; the source
+`reviewer-finder` fallback was `claude-opus-4-8`. This dated observation does not
+establish the current production resolution. The source still prices Opus 5
+at $5/$25 and Sonnet 5 at $2/$10.
 
 **Enforcement boundary (verified 2026-07-26):** `check:model-registry` and its
 self-test are registered package checks and part of the `/start` battery, but
@@ -153,15 +160,17 @@ deployment configuration and still rely on the pre-deploy registry/pricing check
 2. **Consistency by construction.** Capability lookup happens **after** resolution, on
    the concrete id that will actually be sent (and again for the fallback id on a 529
    swap). One helper resolves `{ resolvedId, capabilities }`; `_buildBody` shapes the
-   request from it. Tier tracking then cannot advance past capability knowledge, because
-   an unknown resolved id is rejected.
+   request from it. The source-built 2026-10-02 resolver filters automatic candidates for exact
+   or dated coverage in both capability and pricing registries before selection;
+   concrete ids still pass through to the caller's validation boundary.
 
 3. **Tier-vs-pin policy.** Tier keys are the default; **pin a concrete id for high-risk
    workflows** (expensive, user-visible, long-running, quality-sensitive — e.g. reviewer
    origination) until the new model passes the pre-flip checklist (§4). The
    `reviewer-finder` source fallback remains the reviewed `claude-opus-4-8` pin, while
-   the live Dataverse override intentionally tracks the reviewed `opus` tier (currently
-   `claude-opus-5`). Changing either policy still requires the replay checklist.
+   the 2026-08-23 live Dataverse observation selected the `opus` tier
+   (`claude-opus-5` at that checkpoint; current production resolution requires
+   a fresh probe). Changing either policy still requires the replay checklist.
 
 4. **Explicit first, narrow self-healing second.** The registry + gate are the primary
    defense. `LLMClient` now has a **narrow** runtime retry-once safety net for
