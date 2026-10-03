@@ -1,4 +1,65 @@
-# Session 570 Prompt: targeted Meeting Tracker latency fixes merged; live latency remains unmeasured
+# Session 571 Prompt: dependency security closeout; two upstream alerts remain
+
+## Session 570 Summary — 2026-10-03 PT (Codex dependency-security lane)
+
+[VERIFIED via PR #419 merge, GitHub alerts and Production deployment status]
+The narrow dependency security fix is merged and deployed. Eight alerts are fixed;
+two remain open without a patched release at the October 3 checkpoint. The owner
+requested this documentation handoff on `main`; no additional runtime work is
+authorized by this closeout.
+
+### What Was Completed
+
+1. Scoped `@workflow/core` overrides select `devalue` 5.9.3 and `nanoid` 5.1.16.
+   Workflow remains 5.0.0; unrelated dependency resolutions were preserved.
+2. Luna built, Sol reviewed, root verified, and Claude Fable approved through
+   subscription OAuth only. No direct model API or metered review substitute was
+   used. Clean installation, production build, lint, 67 focused tests and relevant
+   gates passed; all final-head PR checks passed before owner-authorized merge.
+3. Compatibility coverage includes a real older serializer fixture decoded by
+   the current Workflow error codec. This is bounded evidence, not exhaustive
+   persisted-state compatibility. Shared-memory rejection is a safety invariant
+   that also passed before the patch, not proof of a newly fixed exploit.
+4. Merge `bf3ab8e17` received successful Production deployment status (GitHub
+   deployment 6830197259); the production sign-in page returned HTTP 200. No new
+   authenticated business-workflow or provider test is claimed for this patch.
+
+### Commits / Key Files
+
+- `b31b584a2` — scoped security dependency overrides and compatibility tests.
+- `0b75d4265` — main integration preserving concurrent documentation corrections.
+- `bf3ab8e17` — merged [PR #419](https://github.com/justingallivan/wmkf-research-apps/pull/419).
+- `package.json`, `package-lock.json`,
+  `tests/unit/dependency-security-compat.test.js` — complete final PR surface.
+
+### Next Items
+
+- **DONE:** Reviewed fix, final CI, owner-authorized merge and deployment check.
+  GitHub readback confirms alerts #65 and #108–114 fixed.
+- **Verified open / upstream-blocked:**
+  [#115](https://github.com/justingallivan/wmkf-research-apps/security/dependabot/115)
+  (`braces` 3.0.3, GHSA-vfj7-8cjw-p6xm) and
+  [#116](https://github.com/justingallivan/wmkf-research-apps/security/dependabot/116)
+  (`http-cache-semantics` 4.2.0, GHSA-ch52-4w7c-c8xp). No patched release was
+  available at this checkpoint. Both were traced to tooling dependencies; no
+  direct first-party application imports or production file-trace inclusion was
+  found. That does not make the packages safe. Keep alerts open; reassess when an
+  upstream fix appears or new application exposure is found. No automatic
+  follow-up monitor was created.
+- **Known limitation:** Overrides do not rewrite bundled serializer copies in
+  Workflow artifacts, including its developer observability UI. The inspected
+  application runtime uses external patched `devalue`; an upstream Workflow
+  release is needed to refresh bundled copies. Do not claim every embedded copy
+  or all dependency vulnerabilities are fixed.
+- **Verify before acting:** Other lanes below are historical handoffs, not
+  revalidated worklists. Their release state and authorization need fresh checks.
+- **Milestone decision:** Routine dependency maintenance, not a new capability,
+  cutover or architecture; no DEVELOPMENT_LOG entry required. No CLAUDE.md or
+  memory-router change was needed. Original checkout changes remain untouched.
+- Claim-evidence report could not read local observation state; no row was
+  fabricated. This stop changes documentation only; documentation gates apply.
+
+## Prior-lane handoffs — historical; not revalidated in Session 570
 
 ## Session 569 Summary — 2026-10-03 PT (Codex performance lane)
 
