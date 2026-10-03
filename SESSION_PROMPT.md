@@ -27,7 +27,7 @@
 
 - `shared/components/meeting-tracker/MeetingTranscriptionPanel.js`, `lib/services/meeting-tracker-transcription/` — request-bound review and publication.
 - `pages/api/cron/drain-transcriptions.js`, `vercel.json` — daily cleanup and hourly recovery/alerts.
-- `docs/plans/MEETING_TRACKER_TRANSCRIPTION_PLAN_2026-10-01.md`, `docs/atlas/postgres-meeting-transcript-publications.md` — contract and persistence.
+- `docs/plans/MEETING_TRACKER_TRANSCRIPTION_PLAN_2026-10-01.md`, `docs/atlas/postgres-meeting-transcript-publications.md` — contract and persistence. <!-- drain-table:ignore reason=transcription-atlas-filename-not-retired-table -->
 - Release verification: focused tests, deployment/API/documentation gates and sequential self-tests, final PR CI, and production browser acceptance. This stop is documentation-only; run doc-currency/Atlas checks for changed references.
 - Claim-evidence report could not read local observation state; no observation row was fabricated. The original checkout's unrelated dirty test file remains untouched.
 
@@ -202,3 +202,26 @@ No claim-evidence observation row was added: the pilot report recorded no eligib
 The exact-root recursive-reader filter and five callers are Production-deployed in PR #404; it suppresses exact same-request portal-produced Superseded drive/item identities beneath canonical Site Visit materials roots, preserves current/manual identities, and omits affected candidates with a sanitized error when registry/drive evidence is incomplete. PR #407 added scan-rejection diagnostics, and PR #410 added upload progress and verified rejection messages. All three PRs passed CI and merged.
 
 [VERIFIED via owner-authorized agent Production probes] The first real job `33630e07-4311-41b3-8aef-737a2962ce03` (`presentation_source`) was admitted at 21:36:35 UTC, started at 21:37:05, recorded a clean scan checkpoint at 21:38:23, and completed at 21:39:19 on attempt 1 with no error; staging was consumed. Admission-to-completion took about 2m44s. The owner closed/reopened the browser during processing and later confirmed Received after reopening. Worker invocations 21:44–21:48 UTC were healthy with an empty queue. Monitoring remains required; no automatic email is sent. PR #405 merged as `1df8a33e2` after all current-head CI checks passed; PR #413 merged as `81dad17e2`. Both are included in Ready Production deployment `dpl_7zi1no5HrxgrPbCQo18Lsi1NM5CZ` at commit `b223dad7d` (October 2 final deployment readback and Git ancestry checks). The exact 500 MB live transfer remains unverified and parked, not a normal-use release blocker. The owner declined another simultaneous-large background test on October 2: the expected set is one large PPTX, a usually smaller PDF, and a text document. Reopen stress testing only if usage or failures warrant it. Cap enforcement is unit-tested. Preserve unrelated Factory and reviewer-refactor context above; this handoff replaces only the previous materials-lane section.
+
+
+## Admin alert remediation branch handoff — 2026-10-02
+
+[VERIFIED via branch source, focused tests and read-only operations probe]
+`codex/admin-alert-remediation` isolates the owner's alert work from the dirty
+transcription checkout. Pricing refresh now compares provider costs with matched
+provider token cohorts; Opus 5.5 has reviewed pricing/capabilities; automatic tiers
+exclude ancestor-only registry coverage. The intentional late-upload cleanup watch
+remains. See `docs/audits/ADMIN_ALERT_REMEDIATION_2026-10-02.md` for evidence,
+validation and deployment limitations. No production alerts were manually cleared.
+
+- **DONE:** Source fixes, fresh review, 118 focused tests, scoped gates/self-tests,
+  changed-file lint and webpack build. Canonical Turbopack build needs CI because
+  the isolated worktree uses a shared dependency symlink.
+- **Owner decision needed:** Merge/push to main is production promotion under the
+  campaign release strategy; review the PR and current-head CI before deciding.
+- **Verified open:** Corrected provider report run and canary/alert readback in the
+  protected production runtime after promotion. Sensitive Admin credentials were
+  unavailable locally, so corrected live comparisons are unknown.
+- **Parked:** Conservative transcription-watch closure and calendar-triggered
+  maintenance observation, consistent with the existing transcription handoff.
+- No production milestone shipped; no DEVELOPMENT_LOG entry required.

@@ -3,8 +3,8 @@
  *
  * Monthly drift check against the authoritative Anthropic cost report.
  * Pulls the last 30 days from `/v1/organizations/cost_report` grouped by
- * description, sums our `api_usage_log` tokens for the same window per
- * (model, token_type), divides cost by tokens to derive the per-MTok rate,
+ * description and workspace, joins the provider Messages usage report for
+ * the same daily billing dimensions, divides cost by those provider tokens,
  * and compares to `lib/utils/model-pricing.js`.
  *
  * Writes one row per (model, token_type) probed to `model_pricing_audit` for
@@ -28,52 +28,98 @@ import NotificationService from '../../../lib/services/notification-service';
 import AlertService from '../../../lib/services/alert-service';
 import MaintenanceService from '../../../lib/services/maintenance-service';
 import { lookupPricing, CACHE_MULTIPLIERS } from '../../../lib/utils/model-pricing';
-import { getCostReport, isAdminKeyConfigured } from '../../../lib/services/anthropic-admin';
+import { getCostReport, getMessagesUsageReport, isAdminKeyConfigured } from '../../../lib/services/anthropic-admin';
 
 const DRIFT_THRESHOLD_PCT = 0.05;  // 5%
 const ALERT_KEY = 'pricing:drift';
 
-// Maps Anthropic cost_report token_type values to (a) the local-pricing
-// dimension we should compare against and (b) the api_usage_log column to
-// sum tokens from. `cache_creation.ephemeral_5m_input_tokens` and the 1h
-// variant both write to cache_creation_tokens in our schema today — we
-// don't differentiate at the log level, so they get summed together for
-// derivation purposes. Local price for 5m vs 1h derives from the input
-// price × the respective multiplier in CACHE_MULTIPLIERS.
+// Keep cache lifetimes separate in the provider report; app usage logging
+// aggregates cache writes and cannot serve as the cost report's denominator.
 const TOKEN_TYPE_MAP = {
-  uncached_input_tokens: {
-    dimension: 'input',
-    column: 'input_tokens',
-    multiplier: 1,
-  },
-  output_tokens: {
-    dimension: 'output',
-    column: 'output_tokens',
-    multiplier: 1,
-  },
-  cache_read_input_tokens: {
-    dimension: 'input',
-    column: 'cache_read_tokens',
-    multiplier: CACHE_MULTIPLIERS.read,
-  },
-  'cache_creation.ephemeral_5m_input_tokens': {
-    dimension: 'input',
-    column: 'cache_creation_tokens',
-    multiplier: CACHE_MULTIPLIERS.write5m,
-  },
-  'cache_creation.ephemeral_1h_input_tokens': {
-    dimension: 'input',
-    column: 'cache_creation_tokens',
-    multiplier: CACHE_MULTIPLIERS.write1h,
-    // S181 round-2 (Codex MOD B): `api_usage_log.cache_creation_tokens`
-    // blends 5m + 1h writes today — `logUsage()` doesn't accept a separate
-    // 1h field. If both token types appear in cost_report, the derived
-    // 1h price would compare authoritative-1h-cost against the blended
-    // denominator, producing spurious drift. We currently never use 1h
-    // caching; if that changes, split the column rather than the math.
-    skipDriftWhileBlended: true,
-  },
+  uncached_input_tokens: { dimension: 'input', multiplier: 1, path: ['uncached_input_tokens'] },
+  output_tokens: { dimension: 'output', multiplier: 1, path: ['output_tokens'] },
+  cache_read_input_tokens: { dimension: 'input', multiplier: CACHE_MULTIPLIERS.read, path: ['cache_read_input_tokens'] },
+  'cache_creation.ephemeral_5m_input_tokens': { dimension: 'input', multiplier: CACHE_MULTIPLIERS.write5m, path: ['cache_creation', 'ephemeral_5m_input_tokens'] },
+  'cache_creation.ephemeral_1h_input_tokens': { dimension: 'input', multiplier: CACHE_MULTIPLIERS.write1h, path: ['cache_creation', 'ephemeral_1h_input_tokens'] },
 };
+
+// A cohort includes its day and every billing dimension exposed by both APIs.
+// Null is the provider's default-workspace value, not a wildcard.
+function cohortKey(bucket, row) {
+  return JSON.stringify([bucket.starting_at, bucket.ending_at, row.model,
+    row.service_tier, row.context_window, row.inference_geo, row.workspace_id ?? null]);
+}
+
+export function buildPricingAuditRows(costBuckets, usageBuckets) {
+  const usage = new Map();
+  for (const bucket of usageBuckets) {
+    for (const row of bucket.results || []) {
+      const key = cohortKey(bucket, row);
+      const prior = usage.get(key) || {};
+      for (const [tokenType, map] of Object.entries(TOKEN_TYPE_MAP)) {
+        const count = map.path.reduce((value, field) => value?.[field], row);
+        if (!Number.isSafeInteger(count) || count < 0) {
+          prior[tokenType] = NaN;
+        } else {
+          prior[tokenType] = (prior[tokenType] ?? 0) + count;
+        }
+      }
+      usage.set(key, prior);
+    }
+  }
+
+  const totals = new Map();
+  let skippedCount = 0;
+  // Combine costs inside a cohort before using its denominator once.
+  const costs = new Map();
+  for (const bucket of costBuckets) {
+    for (const row of bucket.results || []) {
+      if (row.cost_type !== 'tokens') continue;
+      const tokenType = row.token_type;
+      const costCents = Number(row.amount);
+      // Baseline prices do not describe batch/flex, regional premiums, or fast
+      // mode. Preserve a standing alert if any billable row is uncomparable.
+      if (!row.model || !TOKEN_TYPE_MAP[tokenType] || row.currency !== 'USD'
+          || row.amount == null || row.amount === '' || !Number.isFinite(costCents) || costCents < 0
+          || row.service_tier !== 'standard'
+          || !['global', 'not_available'].includes(row.inference_geo)
+          || row.context_window !== '0-200k'
+          || (row.speed && row.speed !== 'standard') || /fast/i.test(row.description || '')) {
+        skippedCount++;
+        continue;
+      }
+      const key = JSON.stringify([cohortKey(bucket, row), tokenType]);
+      const prior = costs.get(key) || { cohort: cohortKey(bucket, row), model: row.model, tokenType, costCents: 0 };
+      prior.costCents += costCents;
+      costs.set(key, prior);
+    }
+  }
+  for (const row of costs.values()) {
+    const tokenCount = usage.get(row.cohort)?.[row.tokenType];
+    if (!Number.isSafeInteger(tokenCount) || tokenCount <= 0) {
+      if (row.costCents > 0) skippedCount++;
+      continue;
+    }
+    const key = JSON.stringify([row.model, row.tokenType]);
+    const prior = totals.get(key) || { model: row.model, providerTokenType: row.tokenType, anthropicCostCents: 0, tokenCount: 0 };
+    prior.anthropicCostCents += row.costCents;
+    prior.tokenCount += tokenCount;
+    totals.set(key, prior);
+  }
+  const auditRows = [...totals.values()].map(row => {
+    const map = TOKEN_TYPE_MAP[row.providerTokenType];
+    const pricing = lookupPricing(row.model);
+    const multiplier = row.providerTokenType === 'cache_read_input_tokens'
+      ? pricing?.cacheReadMultiplier ?? map.multiplier : map.multiplier;
+    const localCentsPerMtok = pricing ? pricing[map.dimension] * multiplier : null;
+    const derivedCentsPerMtok = row.anthropicCostCents * 1_000_000 / row.tokenCount;
+    const deltaPct = localCentsPerMtok > 0 ? (derivedCentsPerMtok - localCentsPerMtok) / localCentsPerMtok : null;
+    return { ...row, tokenType: mapToOurTokenType(row.providerTokenType),
+      localCentsPerMtok, derivedCentsPerMtok, deltaPct,
+      flagged: localCentsPerMtok == null || Math.abs(deltaPct) > DRIFT_THRESHOLD_PCT };
+  });
+  return { auditRows, skippedCount };
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -121,93 +167,16 @@ async function refresh() {
   const endingAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const startingAt = new Date(endingAt.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const buckets = await getCostReport({
-    startingAt: startingAt.toISOString(),
-    endingAt: endingAt.toISOString(),
-    groupBy: ['description'],
-  });
-
-  // Flatten cost rows: aggregate across buckets into (model, token_type) totals.
-  const totals = new Map();  // key = `${model}\u0000${tokenType}` → { costCents, tokens, anthropicCostUsd }
-  for (const bucket of buckets) {
-    for (const result of bucket.results || []) {
-      if (result.cost_type !== 'tokens') continue;  // skip web_search / code_execution
-      const model = result.model;
-      const tokenType = result.token_type;
-      if (!model || !tokenType) continue;
-      const key = `${model}\u0000${tokenType}`;
-      const prior = totals.get(key) || { costCents: 0 };
-      // Anthropic returns `amount` as a decimal string in the currency's
-      // LOWEST UNITS — i.e. cents, per the docs. The example "123.45" USD =
-      // $1.23. Verified 2026-05-23 via a live probe: a single-day window
-      // with ~$0.20-0.30 of actual spend returned "amount":"0.2706".
-      // S181 round-2: original code multiplied by 100 (treated as dollars),
-      // which would have inflated derived prices by 100× and tripped
-      // phantom-drift alerts on the very first run. Codex caught.
-      const cents = Number(result.amount);
-      if (Number.isFinite(cents)) prior.costCents = prior.costCents + cents;
-      totals.set(key, prior);
-    }
-  }
-
-  // For each (model, token_type) totaled above, look up the matching token
-  // sum in api_usage_log over the same window.
+  const window = { startingAt: startingAt.toISOString(), endingAt: endingAt.toISOString() };
+  const [costBuckets, usageBuckets] = await Promise.all([
+    getCostReport({ ...window, groupBy: ['description', 'workspace_id'] }),
+    getMessagesUsageReport(window),
+  ]);
+  const { auditRows, skippedCount } = buildPricingAuditRows(costBuckets, usageBuckets);
+  const flagged = auditRows.filter(row => row.flagged);
   const runDate = new Date().toISOString().slice(0, 10);
-  const auditRows = [];
-  const flagged = [];
 
-  for (const [key, val] of totals.entries()) {
-    const [model, tokenType] = key.split('\u0000');
-    const map = TOKEN_TYPE_MAP[tokenType];
-    if (!map) continue;  // unknown token_type from Anthropic — skip silently
-
-    const tokensRow = await sumTokens(model, map.column, startingAt, endingAt);
-    const tokenCount = tokensRow || 0;
-
-    let derivedCentsPerMtok = null;
-    if (tokenCount > 0) {
-      derivedCentsPerMtok = (val.costCents * 1_000_000) / tokenCount;
-    }
-
-    const localPricing = lookupPricing(model);
-    const localInputPrice = localPricing ? localPricing[map.dimension] : null;
-    const localCentsPerMtok = localInputPrice != null
-      ? localInputPrice * map.multiplier
-      : null;
-
-    let deltaPct = null;
-    let shouldFlag = false;
-    if (map.skipDriftWhileBlended) {
-      // Audit history still gets written (so we can see if/when 1h tokens
-      // show up), but the comparison is meaningless until we split the
-      // local column. Don't flag.
-      console.log(
-        `[pricing-refresh] 1h cache write tokens present for ${model} — ` +
-        `drift comparison skipped (local schema blends 5m+1h).`,
-      );
-    } else if (derivedCentsPerMtok != null && localCentsPerMtok != null && localCentsPerMtok > 0) {
-      deltaPct = (derivedCentsPerMtok - localCentsPerMtok) / localCentsPerMtok;
-      shouldFlag = Math.abs(deltaPct) > DRIFT_THRESHOLD_PCT;
-    } else if (derivedCentsPerMtok != null && localCentsPerMtok == null) {
-      // Anthropic billed for a model we don't price locally.
-      shouldFlag = true;
-    }
-
-    const ourTokenType = mapToOurTokenType(tokenType);
-    auditRows.push({
-      model,
-      tokenType: ourTokenType,
-      anthropicCostCents: val.costCents,
-      tokenCount,
-      derivedCentsPerMtok,
-      localCentsPerMtok,
-      deltaPct,
-      flagged: shouldFlag,
-    });
-    if (shouldFlag) flagged.push({ model, tokenType: ourTokenType, derivedCentsPerMtok, localCentsPerMtok, deltaPct });
-  }
-
-  // Persist audit history. Single transaction across all rows.
+  // Persist matched provider comparisons; a failed insert prevents alert resolution.
   for (const row of auditRows) {
     await sql`
       INSERT INTO model_pricing_audit
@@ -224,6 +193,9 @@ async function refresh() {
   }
 
   // Alert (or auto-resolve) based on flagged count.
+  if (flagged.length === 0 && (skippedCount > 0 || auditRows.length === 0)) {
+    return { status: 'incomplete', auditRowCount: auditRows.length, skippedCount, flaggedCount: 0 };
+  }
   if (flagged.length === 0) {
     // S181 round-2 (Codex MOD C): use AlertService.autoResolve directly,
     // not notify() with severity:'info' + autoResolveKey — the latter
@@ -235,10 +207,10 @@ async function refresh() {
   const summary = flagged
     .map((f) => {
       if (f.localCentsPerMtok == null) {
-        return `${f.model}/${f.tokenType}: UNPRICED LOCALLY — derived ${(f.derivedCentsPerMtok / 100).toFixed(4)} ¢/Mtok`;
+        return `${f.model}/${f.tokenType}: UNPRICED LOCALLY — derived ${(f.derivedCentsPerMtok / 100).toFixed(4)} $/MTok`;
       }
       const pct = (f.deltaPct * 100).toFixed(1);
-      return `${f.model}/${f.tokenType}: local ${(f.localCentsPerMtok / 100).toFixed(4)} ¢/Mtok vs derived ${(f.derivedCentsPerMtok / 100).toFixed(4)} ¢/Mtok (${pct >= 0 ? '+' : ''}${pct}%)`;
+      return `${f.model}/${f.tokenType}: local ${(f.localCentsPerMtok / 100).toFixed(4)} $/MTok vs derived ${(f.derivedCentsPerMtok / 100).toFixed(4)} $/MTok (${pct >= 0 ? '+' : ''}${pct}%)`;
     })
     .join('\n');
 
@@ -248,30 +220,15 @@ async function refresh() {
     title: `Pricing drift: ${flagged.length} row(s) exceed ${(DRIFT_THRESHOLD_PCT * 100).toFixed(0)}% tolerance`,
     message:
       `lib/utils/model-pricing.js disagrees with Anthropic's authoritative ` +
-      `cost_report over the last 30 days. Review and update the table:\n\n${summary}`,
-    metadata: { flagged },
+      `cost_report and matching provider usage over the last 30 days. ` +
+      `Investigate billing modifiers and review the table before changing rates:\n\n${summary}`,
+    metadata: { flagged, skippedCount, tokenSource: 'anthropic_usage_report' },
     source: 'cron/pricing-refresh',
     autoResolveKey: ALERT_KEY,
     category: 'ops',
   });
 
-  return { status: 'alerting', auditRowCount: auditRows.length, flaggedCount: flagged.length, flagged };
-}
-
-async function sumTokens(model, column, startingAt, endingAt) {
-  // Direct column interpolation is required (sql tag rejects identifiers).
-  // `column` is from a hardcoded whitelist in TOKEN_TYPE_MAP so this is safe.
-  const allowed = new Set(['input_tokens', 'output_tokens', 'cache_creation_tokens', 'cache_read_tokens']);
-  if (!allowed.has(column)) throw new Error(`unsafe column: ${column}`);
-  const q = `
-    SELECT COALESCE(SUM(${column}), 0)::bigint AS total
-    FROM api_usage_log
-    WHERE model = $1
-      AND created_at >= $2
-      AND created_at < $3
-  `;
-  const r = await sql.query(q, [model, startingAt.toISOString(), endingAt.toISOString()]);
-  return Number(r.rows[0]?.total || 0);
+  return { status: 'alerting', auditRowCount: auditRows.length, skippedCount, flaggedCount: flagged.length, flagged };
 }
 
 // Normalize Anthropic's verbose token_type strings to the shorter form we
