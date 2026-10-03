@@ -1,4 +1,71 @@
-# Session 568 Prompt: Meeting Tracker transcription live; preserve non-sensitive-use boundary
+# Session 569 Prompt: Admin alert remediation shipped; remaining warnings need separate review
+
+## Session 568 Summary — 2026-10-02/03 PT (Codex admin-alert lane)
+
+[VERIFIED via source, PR CI/merges, Vercel deployment and protected Production
+maintenance/alert readback] Pricing remediation and reviewed Opus 5.5 coverage
+are shipped. The owner authorized merge after CI and requested this closeout on
+`main`. Evidence remains bounded; no private operational data or credentials
+belong in the handoff.
+
+### What Was Completed
+
+1. **Pricing:** Replaced the app-local token denominator with matching provider
+   cost/usage cohorts, separated cache lifetimes, preserved alerts on incomplete
+   reports and corrected displayed dollar units. The protected Production check
+   completed 15 comparisons without drift and auto-resolved the pricing alert.
+2. **Model selection:** Reviewed Opus 5.5 pricing/capabilities, including its cache
+   read override. Automatic tiers require specific coverage in both registries.
+   The canary now flags Sonnet 5.5, which remains excluded from automatic tiers.
+3. **Transcription:** Read-only inspection found no processing backlog at the
+   October 2 checkpoint. One expired job retains a conservative late-upload safety
+   watch. The October 3 email supplied by the owner bears the October 2 8:51 PM
+   Pacific timestamp, before this release; it is consistent with that warning,
+   not new evidence of a processing failure. No new October 3 live probe occurred.
+4. **Verification:** Fresh independent review, 118 focused tests, scoped gates and
+   full PR CI passed. Runtime PR #420 and evidence PR #421 are merged. The local
+   dependency-symlink Turbopack limitation was covered by the canonical CI build.
+
+### Commits
+
+- `bbf6457a8` — provider pricing audit scope and reviewed model selection; merged
+  via PR #420 as `a829ba94c`.
+- `5cb14b859` — verified production evidence and milestone; merged via PR #421
+  as `43de4bf2c`.
+
+### Next Items
+
+- **DONE:** Agreed pricing fix, Opus review, selection guard, CI, owner-authorized
+  production release and pricing/model check readback. No further runtime work is
+  authorized by this documentation closeout.
+- **Verified open at October 2 checkpoint:** Sonnet 5.5 review. Source entries are
+  absent and the canary reports ancestor coverage; do not advance the global
+  review date or enable it automatically without a specific review.
+- **Parked:** Transcription-watch closure and calendar-triggered cleanup
+  observation. Preserve the safety watch; new relevant failures or an explicit
+  owner request are the reopen triggers.
+- **Known limitation:** Keyed alert deduplication retains the first payload, so
+  the open model card can still name Opus while the latest canary identifies
+  Sonnet. Verify fresh run details before using the card as current evidence.
+- **Verify before acting:** Older lane handoffs below are historical, not current
+  worklists. Their live state and owner authorization require a fresh preflight.
+
+### Key Files / Handoff
+
+- `docs/audits/ADMIN_ALERT_REMEDIATION_2026-10-02.md` — source contract, validation,
+  deployment outcome and rollback baseline.
+- `pages/api/cron/pricing-refresh.js`, `lib/services/anthropic-admin.js` — matched
+  provider reports; `scripts/probe-admin-alert-operations.js` — content-free,
+  explicitly scoped read-only Postgres probe.
+- `lib/services/model-resolver.js`, `lib/services/model-capabilities.js`,
+  `lib/utils/model-pricing.js` — reviewed selection and Opus coverage.
+- Production milestone is already recorded in DEVELOPMENT_LOG.md; this stop
+  needs no second milestone entry or mutable script catalogue in CLAUDE.md.
+- Claim-evidence observation report could not read local state; no observation
+  row was fabricated. The original transcription checkout's unrelated changes
+  remain untouched.
+
+## Prior-lane handoffs — historical; not revalidated at Session 568 closeout
 
 ## Session 567 Summary — 2026-10-02 PT (Codex transcription lane)
 
