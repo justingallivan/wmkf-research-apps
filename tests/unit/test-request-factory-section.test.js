@@ -78,7 +78,13 @@ const deferred = () => {
 };
 
 const listBody = (runs, extra = {}) => ({ status: 200, body: { runs, formEnabled: true, target: 'production', ...extra } });
-const runBody = (run, extra = {}) => ({ status: 200, body: { run, resources: [], foundationCapturedAt: null, ...extra } });
+const runBody = (run, extra = {}) => ({ status: 200, body: {
+  run, resources: [], foundationCapturedAt: null,
+  diagnosis: run.status === 'needs_attention'
+    ? { nextAction: 'operator_review', message: 'The run stopped on an outcome this diagnosis cannot classify safely.' }
+    : { nextAction: 'retry', message: 'An existing runner retry may be attempted.' },
+  ...extra,
+} });
 
 let uuidCounter = 0;
 beforeAll(() => {
@@ -97,6 +103,8 @@ async function renderSection(server, runs = [makeRun()], extra = {}) {
 const selectRun = async (label) => {
   fireEvent.click(screen.getByRole('button', { name: label }));
   await screen.findByRole('heading', { name: label });
+  // The selected heading renders before the actor-owned inspection GET completes.
+  await waitFor(() => expect(screen.queryByText('Loading resources…')).toBeNull());
 };
 
 async function lookup(server, number = '1001000', response = { status: 200, body: { draftId: DRAFT_ID, summary: SUMMARY, defaults: { fiscalYear: 'December 2026', meetingDate: '2026-12-01' } } }) {
@@ -359,14 +367,15 @@ describe('advance loop', () => {
     expect(server.count('GET', `${BASE}/${RUN_A}`)).toBeGreaterThanOrEqual(2);
   });
 
-  test('needs_attention stops, shows the step and the error text, and offers Resume; the text is kept nowhere', async () => {
+  test('needs_attention stops, shows the step and error text, and follows the server diagnosis; the text is kept nowhere', async () => {
     const server = await setup();
     server.on('POST', advancePath(), reply('needs_attention', { step: 'copy_file', status: 'needs_attention', currentStep: 'copy_file', stepIndex: 4, errorMessage: 'Graph said no to file X' }));
     server.on('GET', `${BASE}/${RUN_A}`, runBody(makeRun({ status: 'needs_attention', currentStep: 'copy_file', stepIndex: 4 })));
     start();
     await screen.findByText('Stopped at "Copy the documents (one per step)".');
     expect(screen.getByText('Graph said no to file X')).toBeTruthy();
-    await screen.findByRole('button', { name: 'Retry step: Copy the documents (one per step)' });
+    const retry = await screen.findByRole('button', { name: 'Retry step: Copy the documents (one per step)' });
+    expect(retry.disabled).toBe(true);
     expect(steps().getByText('Needs attention')).toBeTruthy();
     expect(server.count('POST', advancePath())).toBe(1);
     expect(localStorage.length).toBe(0);
@@ -744,30 +753,32 @@ describe('source identity', () => {
 describe('needs attention, recorded steps and run tools', () => {
   const attention = (extra = {}) => makeRun({ status: 'needs_attention', currentStep: 'copy_file', stepIndex: 4, ...extra });
 
-  test('a mapped reason gets its plain copy; an unmapped one gets the default; the technical detail is a closed details; the action is an outline "Retry step"', async () => {
+  test('the server diagnosis overrides stale retry copy; technical detail stays closed and the retry action is disabled', async () => {
     const run = attention({ needsAttentionReason: 'ambiguous_create_outcome' });
     const server = makeServer();
     server.on('GET', `${BASE}/${RUN_A}`, runBody(run));
     server.on('POST', `${BASE}/${RUN_A}/advance`, { status: 200, body: { step: 'copy_file', outcome: 'needs_attention', currentStep: 'copy_file', stepIndex: 4, status: 'needs_attention', destinationRequestNumber: null, errorMessage: 'Graph said no' } });
     await renderSection(server, [run]);
     await selectRun('Run A');
-    expect(screen.getByText(/Retrying is safe: the run looks for the Request again and never sends a second create\./)).toBeTruthy();
+    expect(screen.getByText('The run stopped on an outcome this diagnosis cannot classify safely.')).toBeTruthy();
     const retry = screen.getByRole('button', { name: 'Retry step: Copy the documents (one per step)' });
     expect(retry.hasAttribute('data-primary')).toBe(false);
-    fireEvent.click(retry);
+    expect(retry.disabled).toBe(true);
+    expect(retry.getAttribute('aria-describedby')).toBe('factory-run-diagnosis');
+    expect(screen.getByText(/does not read saved run files or live Dataverse or SharePoint state/)).toBeTruthy();
     const summary = await screen.findByText('Technical detail');
     const details = summary.closest('details');
     expect(details.open).toBe(false);
-    expect(details.textContent).toContain('Graph said no');
+    expect(details.textContent).toContain('ambiguous_create_outcome');
   });
 
-  test('an unmapped reason shows the default copy', async () => {
+  test('the ledger diagnosis stays authoritative for an unmapped reason', async () => {
     const run = attention({ needsAttentionReason: 'file_copy_failed (http 503)' });
     const server = makeServer();
     server.on('GET', `${BASE}/${RUN_A}`, runBody(run));
     await renderSection(server, [run]);
     await selectRun('Run A');
-    expect(screen.getByText('This step stopped. Retrying never creates a second Request: the run checks where it stands first and, if nothing had been written, does the step again. If it keeps stopping here, find the cause in the technical detail or the function log and clear it before retrying again.')).toBeTruthy();
+    expect(screen.getByText('The run stopped on an outcome this diagnosis cannot classify safely.')).toBeTruthy();
   });
 
   test('details defaults: recorded steps open only for needs_attention; run tools and the count are always present', async () => {
@@ -863,14 +874,48 @@ describe('focus, selection and primaries', () => {
     expect(primaries().map((b) => b.textContent)).toEqual(['Start production run']);
   });
 
-  test('a needs_attention run offers only an outline Retry: no primary at all', async () => {
+  test('a needs_attention run keeps Retry as an outline action and disables it when diagnosis blocks continuation', async () => {
     const run = makeRun({ status: 'needs_attention', currentStep: 'copy_file', stepIndex: 4 });
     const server = makeServer();
     server.on('GET', `${BASE}/${RUN_A}`, runBody(run));
     await renderSection(server, [run]);
     await selectRun('Run A');
     expect(primaries()).toHaveLength(0);
+    expect(screen.getByRole('button', { name: /^Retry step:/ }).disabled).toBe(true);
+  });
+
+  test('a server-approved transient retry remains available', async () => {
+    const run = makeRun({ status: 'needs_attention', currentStep: 'fence_source', stepIndex: 0, needsAttentionReason: 'timeout' });
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(run, {
+      diagnosis: { nextAction: 'retry', message: 'The failed step has no unresolved resource receipt. An existing runner retry may be attempted.' },
+    }));
+    await renderSection(server, [run]);
+    await selectRun('Run A');
     expect(screen.getByRole('button', { name: /^Retry step:/ }).disabled).toBe(false);
+    expect(screen.getByText(/no unresolved resource receipt/)).toBeTruthy();
+  });
+
+  test('a missing diagnosis fails closed, while an unassessed recipe keeps its existing advance behavior', async () => {
+    const blocked = makeRun({ status: 'creating', currentStep: 'create_request', stepIndex: 1 });
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(blocked, { diagnosis: null }));
+    await renderSection(server, [blocked]);
+    await selectRun('Run A');
+    expect(screen.getByRole('button', { name: 'Resume production run' }).disabled).toBe(true);
+    expect(screen.getByText(/run diagnosis is unavailable/i)).toBeTruthy();
+  });
+
+  test('diagnosis does not change Advance behavior for a known non-Basic recipe', async () => {
+    const run = makeRun({ status: 'needs_attention', recipe: 'reviews', currentStep: 'copy_review_file', stepIndex: 11 });
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(run, {
+      diagnosis: { nextAction: 'not_assessed', message: 'This read-only diagnosis covers Basic runs only. The existing runner remains available and will apply its usual checks.' },
+    }));
+    await renderSection(server, [run]);
+    await selectRun('Run A');
+    expect(screen.getByRole('button', { name: /^Retry step:/ }).disabled).toBe(false);
+    expect(screen.getByText(/covers Basic runs only/)).toBeTruthy();
   });
 
   test('a started run is a gray "Started, not finished" at rest; blue "In progress" appears only while its loop runs', async () => {

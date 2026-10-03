@@ -8,7 +8,7 @@
  * @jest-environment node
  */
 import { jest } from '@jest/globals';
-import { createAdminRunService } from '../../lib/services/test-requests/admin-run-service.js';
+import { createAdminRunService, diagnoseFactoryRun } from '../../lib/services/test-requests/admin-run-service.js';
 import { runStatusChange as realRunStatusChange } from '../../lib/services/test-requests/status-change-runner.js';
 import { deriveActorId, deriveRunIds } from '../../lib/services/test-requests/admin-run-identity.js';
 import { artifactDigest, draftPathname, runPathname } from '../../lib/services/test-requests/factory-artifact-store.js';
@@ -1353,6 +1353,192 @@ describe('slice 3 server contract', () => {
     const result = await h.service.inspectRun({ profileId: PROFILE, runId });
     expect(result.foundationCapturedAt).toBe('2026-10-01T12:00:00.000Z');
     expect(result.resources).toHaveLength(2);
+  });
+
+  test('inspectRun reports a stale copy_file run as blocked/new-run using ledger evidence only', async () => {
+    const h = harness({ deployment: 'production' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, {
+      status: 'needs_attention', current_step: 'copy_file', step_index: 4,
+      needs_attention_reason: 'file_journal_unverified',
+      bundle_exported_at: new Date(h.clock.t - 7 * HOUR).toISOString(),
+    });
+    h.ledger.state.resources.push({
+      run_id: runId, sequence: 1, step: 'copy_file', resource_kind: 'sharepoint_file',
+      outcome: 'failed', readback: { itemId: 'journaled-item' },
+    });
+
+    const result = await h.service.inspectRun({ profileId: PROFILE, runId });
+    expect(result.diagnosis).toMatchObject({
+      evidenceSource: 'run_ledger', currentStep: 'copy_file', bundleFreshness: 'expired',
+      nextAction: 'new_run', unresolvedResourceCount: 1,
+    });
+    expect(result.diagnosis.message).toMatch(/do not retry/i);
+    expect(result.diagnosis.message).toMatch(/does not repair or remove any partial Request/i);
+    expect(JSON.stringify(result.diagnosis)).not.toContain('journaled-item');
+    expect(h.blobs.calls.get).toHaveLength(0);
+    expect(h.createClientCalls).toHaveLength(0);
+    expect(h.spies.advanceRun).not.toHaveBeenCalled();
+  });
+
+  test('inspectRun waits for a live lease before interpreting stale bundle state', async () => {
+    const h = harness({ deployment: 'production' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, {
+      status: 'creating', current_step: 'copy_file', step_index: 4,
+      locked_until: new Date(h.clock.t + HOUR).toISOString(),
+      bundle_exported_at: new Date(h.clock.t - 7 * HOUR).toISOString(),
+    });
+    const result = await h.service.inspectRun({ profileId: PROFILE, runId });
+    expect(result.diagnosis).toMatchObject({ nextAction: 'wait', lease: 'active', bundleFreshness: 'unknown' });
+    expect(h.blobs.calls.get).toHaveLength(0);
+  });
+
+  test('inspectRun offers readback evaluation for the exact journaled item only while the source window is fresh', async () => {
+    const h = harness({ deployment: 'production' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, {
+      status: 'needs_attention', current_step: 'copy_file', step_index: 4,
+      needs_attention_reason: 'file_journal_unverified',
+      bundle_exported_at: new Date(h.clock.t - HOUR).toISOString(),
+    });
+    h.ledger.state.resources.push({
+      run_id: runId, sequence: 1, step: 'copy_file', resource_kind: 'sharepoint_file',
+      outcome: 'failed', readback: { itemId: 'journaled-item' },
+    });
+    const result = await h.service.inspectRun({ profileId: PROFILE, runId });
+    expect(result.diagnosis).toMatchObject({ nextAction: 'readback_review', bundleFreshness: 'within_six_hour_window' });
+    expect(result.diagnosis.message).toMatch(/Do not retry the upload/);
+    expect(h.blobs.calls.get).toHaveLength(0);
+    expect(h.createClientCalls).toHaveLength(0);
+  });
+
+  test('diagnosis recommends retry only for a fresh, unlocked Basic run with no dispatch marker', async () => {
+    const h = harness({ deployment: 'production' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { status: 'creating', current_step: 'create_request', step_index: 1 });
+    h.ledger.state.resources.push({
+      run_id: runId, sequence: 1, step: 'create_request', resource_kind: 'dataverse_request',
+      outcome: 'planned', dispatched_at: null, readback: {},
+    });
+    const result = await h.service.inspectRun({ profileId: PROFILE, runId });
+    expect(result.diagnosis.nextAction).toBe('retry');
+    expect(result.diagnosis.message).toMatch(/independently check the saved artifacts/);
+    expect(h.blobs.calls.get).toHaveLength(0);
+    expect(h.createClientCalls).toHaveLength(0);
+  });
+});
+
+describe('diagnoseFactoryRun fail-closed inputs', () => {
+  const run = (extra = {}) => ({
+    status: 'prepared', currentStep: 'fence_source', stepIndex: 0, recipe: 'basic',
+    lockedUntil: null, bundleExportedAt: '2026-10-03T12:00:00.000Z', ...extra,
+  });
+
+  test('missing resource collection and non-finite clock never recommend retry', () => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    expect(diagnoseFactoryRun(run(), null, at).nextAction).toBe('operator_review');
+    expect(diagnoseFactoryRun(run(), [], NaN).nextAction).toBe('operator_review');
+  });
+
+  test('unsupported recipes are not assessed and unknown recipes fail closed', () => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    expect(diagnoseFactoryRun(run({ recipe: 'reviews' }), [], at).nextAction).toBe('not_assessed');
+    expect(diagnoseFactoryRun(run({ recipe: 'future_unknown_recipe' }), [], at).nextAction).toBe('operator_review');
+  });
+
+  test.each([
+    ['upload attempt timestamp', { readback: { uploadAttemptedAt: '2026-10-03T12:01:00.000Z' } }],
+    ['recorded item identity', { readback: { itemId: 'existing-item' } }],
+    ['response status', { responseStatus: 204 }],
+  ])('planned receipt carrying %s blocks retry even when dispatchedAt is null', (_label, extra) => {
+    const result = diagnoseFactoryRun(run({ status: 'creating', currentStep: 'create_request', stepIndex: 1 }), [{
+      outcome: 'planned', step: 'create_request', resourceKind: 'dataverse_request', dispatchedAt: null, ...extra,
+    }], Date.parse('2026-10-03T12:02:00.000Z'));
+    expect(result.nextAction).toBe('operator_review');
+  });
+
+  test('a reserved two-hour-old bundle remains inside the six-hour source window', () => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    const result = diagnoseFactoryRun(run({ bundleExportedAt: new Date(at - 2 * HOUR).toISOString() }), [], at);
+    expect(result).toMatchObject({ nextAction: 'retry', bundleFreshness: 'within_six_hour_window' });
+  });
+
+  test.each(['timeout', 'network', 'upstream_http (http 429)', 'upstream_http (http 503)'])(
+    'known transient %s may retry with no write receipt left unresolved', (reason) => {
+      const at = Date.parse('2026-10-03T12:02:00.000Z');
+      const result = diagnoseFactoryRun(run({ status: 'needs_attention', needsAttentionReason: reason }), [], at);
+      expect(result.nextAction).toBe('retry');
+    },
+  );
+
+  test('known transient failure may retry with an undispatched planned receipt', () => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    const result = diagnoseFactoryRun(run({ status: 'needs_attention', needsAttentionReason: 'timeout' }), [{
+      outcome: 'planned', step: 'fence_source', resourceKind: 'foundation_transition', dispatchedAt: null, responseStatus: null, readback: {},
+    }], at);
+    expect(result.nextAction).toBe('retry');
+  });
+
+  test.each([
+    ['upstream_http (http 400)', []],
+    ['timeout', [{ outcome: 'planned', step: 'fence_source', resourceKind: 'foundation_transition', dispatchedAt: null, readback: { createAttemptedAt: '2026-10-03T12:01:00.000Z' } }]],
+  ])('unknown or write-adjacent transient %s remains blocked', (reason, resources) => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    const result = diagnoseFactoryRun(run({ status: 'needs_attention', needsAttentionReason: reason }), resources, at);
+    expect(result.nextAction).toBe('operator_review');
+  });
+
+  test('completed prior-step receipts, including an old dispatch marker, do not block the current step', () => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    const result = diagnoseFactoryRun(run({ status: 'creating', currentStep: 'correct_meeting_date', stepIndex: 2 }), [{
+      step: 'create_request', resourceKind: 'dataverse_request', outcome: 'recovered',
+      readback: { createAttemptedAt: '2026-10-03T12:01:00.000Z' },
+    }], at);
+    expect(result).toMatchObject({ nextAction: 'retry', unresolvedResourceCount: 0 });
+  });
+
+  test.each([
+    ['Request GUID readback', { status: 'needs_attention', currentStep: 'create_request', stepIndex: 1, needsAttentionReason: 'ambiguous_create_outcome' }, 'dataverse_request', { createAttemptedAt: '2026-10-03T12:01:00.000Z' }, /read the reserved Request GUID first/],
+    ['expired-lease Request GUID readback', { status: 'creating', currentStep: 'create_request', stepIndex: 1 }, 'dataverse_request', { createAttemptedAt: '2026-10-03T12:01:00.000Z' }, /read the reserved Request GUID first/],
+    ['document-location readback', { status: 'needs_attention', currentStep: 'provision_location', stepIndex: 3, needsAttentionReason: 'location_readback_mismatch' }, 'dataverse_document_location', { locationCreateAttemptedAt: '2026-10-03T12:01:00.000Z' }, /read the Request locations first/],
+  ])('%s remains eligible for its existing readback-first runner retry', (_label, runChanges, resourceKind, readback, message) => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    const result = diagnoseFactoryRun(run(runChanges), [{
+      step: runChanges.currentStep, resourceKind, outcome: 'planned', readback,
+    }], at);
+    expect(result.nextAction).toBe('retry');
+    expect(result.message).toMatch(message);
+  });
+
+  test('Basic verification failure may re-enter its read-only checks before ready', () => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    const result = diagnoseFactoryRun(run({
+      status: 'needs_attention', currentStep: 'verify', stepIndex: 6, needsAttentionReason: 'verification_failed',
+    }), [{ step: 'verify', resourceKind: 'foundation_baseline', outcome: 'failed', readback: {} }], at);
+    expect(result.nextAction).toBe('retry');
+    expect(result.message).toMatch(/repeat its read-only source, Request and file checks/);
+  });
+
+  test('a create dispatch marker does not override an unrelated stopped reason', () => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    const result = diagnoseFactoryRun(run({
+      status: 'needs_attention', currentStep: 'create_request', stepIndex: 1, needsAttentionReason: 'manifest_digest_mismatch',
+    }), [{
+      step: 'create_request', resourceKind: 'dataverse_request', outcome: 'planned',
+      readback: { createAttemptedAt: '2026-10-03T12:01:00.000Z' },
+    }], at);
+    expect(result.nextAction).toBe('operator_review');
+  });
+
+  test.each([
+    ['unknown step', { step: 'future_step', resourceKind: 'dataverse_request', outcome: 'planned' }],
+    ['future step', { step: 'verify', resourceKind: 'foundation_baseline', outcome: 'planned' }],
+    ['unknown current-step kind', { step: 'create_request', resourceKind: 'future_kind', outcome: 'planned' }],
+  ])('blocks %s evidence', (_label, receipt) => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    const result = diagnoseFactoryRun(run({ status: 'creating', currentStep: 'create_request', stepIndex: 1 }), [receipt], at);
+    expect(result.nextAction).toBe('operator_review');
   });
 });
 

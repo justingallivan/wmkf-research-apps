@@ -1,0 +1,98 @@
+{
+  "date": "2026-10-03",
+  "branch": "codex/factory-run-diagnosis",
+  "status": "local implementation reviewed; not deployed",
+  "reviews": {
+    "builder": "Luna",
+    "sol": "approved",
+    "root": "approved",
+    "fable": {
+      "authentication": "subscription OAuth; no API credentials",
+      "is_error": false,
+      "permission_denials": [],
+      "verdict": "**Approve.** The corrections close both prior findings, and I found no remaining material issue in the revised helper, its tests or the doc sections. I read source only; I did not run the suites.\n\n- **Current-step scoping (prior finding 2):** `unresolved` is now built from current-step rows only (`admin-run-service.js:160-167`), so a superseded prior-step receipt no longer blocks later steps. Unknown or future steps, and unexpected current-step kinds, fail closed (`:153-164`). The kind map matches what the runner journals (`run-runner.js:607`, `:1107`, `:1133`).\n- **Create re-entry (`:201-206`):** allowed only for `creating` or the exact `ambiguous_create_outcome` reason, with a `createAttemptedAt` row and nothing else dispatched. The runner reads the reserved GUID first and never posts again once an attempt is journaled (`run-runner.js:688-725`). A bypass row with deactivation markers still blocks.\n- **Location re-entry (`:207-212`):** allowed only for `creating` or `location_readback_mismatch` with `locationCreateAttemptedAt`. The runner recovers an owned location or stops without a second create (`run-runner.js:868-898`).\n- **Verify re-entry (`:227-230`):** Basic `verify` repeats reads and writes only fenced ledger readiness (`run-runner.js:1020-1086`). The freshness gate still runs first, so a stale run gets `new_run`.\n- **Still blocked:** ambiguous or unverified file uploads, unknown errors, manifest and source failures, and pre-upload copy failures.\n- **Tests (`test-request-admin-run-service.test.js:1492-1542`):** cover prior-step history, both readback-first retries, verify re-entry, the unrelated-reason override, and unknown/future/wrong-kind evidence.\n- **Docs (prior finding 1):** the runbook now says the table describes the backend runner, not the form (line 56), and line 92 states the form is deliberately more conservative and qualifies non-Basic availability by successful inspection. The plan carries the matching backend-versus-form wording (lines 79, 87).\n\nLimits carried forward, none blocking:\n- **Create stop recorded as `unknown_error`:** a first stop after the create was sent stays disabled in the form, though the runner could recover it. Runbook line 92 covers it.\n- **Timestamp types:** the diagnosis tests still feed ISO strings where `pg` returns `Date` objects.\n- **Not verified:** artifacts and live systems, as scoped."
+    }
+  },
+  "validation": {
+    "initial_service_route_ui_tests": 368,
+    "final_affected_service_ui_tests": 182,
+    "type_check": "passed",
+    "lint": "zero errors; one preexisting unused-disable warning",
+    "gates": [
+      {
+        "check": "check:doc-currency",
+        "exit": 0
+      },
+      {
+        "check": "check:doc-currency:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:fact-consistency",
+        "exit": 0
+      },
+      {
+        "check": "check:fact-consistency:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:doc-symbol-refs",
+        "exit": 0
+      },
+      {
+        "check": "check:doc-symbol-refs:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:docs-catalog",
+        "exit": 0
+      },
+      {
+        "check": "check:secret-scan",
+        "exit": 0
+      },
+      {
+        "check": "check:secret-scan:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:scaffolding-tokens",
+        "exit": 0
+      },
+      {
+        "check": "check:scaffolding-tokens:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:status-enum-parity",
+        "exit": 0
+      },
+      {
+        "check": "check:status-enum-parity:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:trust-boundary-guid",
+        "exit": 0
+      },
+      {
+        "check": "check:trust-boundary-guid:self-test",
+        "exit": 0
+      }
+    ]
+  },
+  "sha256": {
+    "lib/services/test-requests/admin-run-service.js": "4afc90f8167f075e001b24d4f542f1f5216d9b9610dc518b6785d58e38451cc0",
+    "shared/components/admin/TestRequestFactoryRunPanel.js": "fd3f52e6780b031da5e71a9fecda4e665db8cb8b06b05e963aa6311bb727e258",
+    "shared/components/admin/TestRequestFactorySection.js": "a7c045d2352be7c779ae4e6ff354a0ee58c7dd226855deece86171ca5219f0e5",
+    "tests/unit/test-request-admin-run-service.test.js": "9769332f99ba998f6663c0df200bf58c2a0d48842501de26c31f975cce550bae",
+    "tests/unit/test-request-factory-section.test.js": "8373f83341b436d006fbb168fc25935c42569825b1a56c9995c43a9d4317d5ef"
+  },
+  "limits": [
+    "No live external-system or artifact verification",
+    "No browser rehearsal or deployment",
+    "No email, clone, production record repair or deletion",
+    "Unknown Basic failures remain conservatively blocked in the form",
+    "Diagnosis timestamp tests use ISO strings rather than PostgreSQL Date objects"
+  ]
+}

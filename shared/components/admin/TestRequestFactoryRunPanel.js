@@ -5,7 +5,6 @@ import {
 } from '../../config/testRequestFactory';
 import { StatusChip } from './AdminWorkspaceNavigation';
 import TestRequestStatusControl from './TestRequestStatusControl';
-import { attentionCopyFor } from './test-request-factory-copy';
 import {
   ERROR_BAND, SUMMARY_CLASS, TABLE_WRAP, TH, buttonProps, focusAndShow, formatTime,
 } from './test-request-factory-ui';
@@ -87,7 +86,11 @@ export default function TestRequestFactoryRunPanel({
   const production = run.destinationEnvironment === 'production';
   const attention = run.status === 'needs_attention';
   const stepName = stepLabel(run.currentStep);
-  const advanceDisabled = Boolean(writeBlock) || advancing;
+  const diagnosis = view.diagnosis;
+  const diagnosisMessage = diagnosis?.message || 'The run diagnosis is unavailable. Inspect the run again before continuing.';
+  const diagnosisAllowsExistingAdvance = diagnosis?.nextAction === 'retry'
+    || (diagnosis?.nextAction === 'not_assessed' && run.recipe !== 'basic');
+  const advanceDisabled = Boolean(writeBlock) || advancing || !diagnosisAllowsExistingAdvance;
   const buttonText = (() => {
     if (advancing) return 'Running…';
     if (attention) return `Retry step: ${stepName}`;
@@ -138,7 +141,8 @@ export default function TestRequestFactoryRunPanel({
       {attention ? (
         <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
           <p className="font-semibold">Stopped at &quot;{stepName}&quot;.</p>
-          <p className="mt-1">{attentionCopyFor(run.needsAttentionReason)}</p>
+          <p id="factory-run-diagnosis" className="mt-1">{diagnosisMessage}</p>
+          <p className="mt-1 text-xs">This guidance uses the run ledger only. It does not read saved run files or live Dataverse or SharePoint state.</p>
           {attentionNote?.detail || recordedReason ? (
             <details className="mt-1">
               <summary className={SUMMARY_CLASS}>Technical detail</summary>
@@ -147,6 +151,13 @@ export default function TestRequestFactoryRunPanel({
                 : <p className="mb-1 break-words text-xs">Recorded reason: <code className="font-mono">{recordedReason}</code></p>}
             </details>
           ) : null}
+        </div>
+      ) : null}
+      {!attention ? (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm leading-6 text-gray-800" aria-label="Run diagnosis">
+          <p className="font-semibold">Suggested next step</p>
+          <p id="factory-run-diagnosis" className="mt-1">{diagnosisMessage}</p>
+          <p className="mt-1 text-xs text-gray-600">Based on run status, lease and recorded receipts. Saved run files and live Dataverse or SharePoint state were not checked.</p>
         </div>
       ) : null}
       {otherNote ? (
@@ -164,7 +175,7 @@ export default function TestRequestFactoryRunPanel({
               : `The remaining steps write to ${envName(run)} Dataverse and SharePoint.`}
           </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <button type="button" disabled={advanceDisabled} aria-describedby="factory-advance-reason" onClick={onAdvance} {...buttonProps(!attention)}>
+            <button type="button" disabled={advanceDisabled} aria-describedby={writeBlock ? 'factory-advance-reason' : (!diagnosisAllowsExistingAdvance ? 'factory-run-diagnosis' : undefined)} onClick={onAdvance} {...buttonProps(!attention)}>
               {buttonText}
             </button>
             {advancing ? (
@@ -172,7 +183,9 @@ export default function TestRequestFactoryRunPanel({
                 {stopRequested ? 'Stopping after this step…' : 'Stop after this step'}
               </button>
             ) : null}
-            {writeBlock ? <p id="factory-advance-reason" className="text-sm leading-6 text-gray-600">{writeBlock}</p> : <span id="factory-advance-reason" />}
+            {writeBlock ? (
+              <p id="factory-advance-reason" className="text-sm leading-6 text-gray-600">{writeBlock}</p>
+            ) : <span id="factory-advance-reason" />}
           </div>
         </div>
       ) : null}
