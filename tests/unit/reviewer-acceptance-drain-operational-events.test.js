@@ -25,6 +25,15 @@ import OperationalEventService from '../../lib/services/operational-event-servic
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
 const REVIEWER_ID = '33333333-3333-4333-8333-333333333333';
+const priorReviewerSwitch = process.env.SYNTHETIC_REVIEWER_ISOLATION;
+const priorRequestSwitch = process.env.TEST_REQUEST_ISOLATION;
+
+afterAll(() => {
+  if (priorReviewerSwitch === undefined) delete process.env.SYNTHETIC_REVIEWER_ISOLATION;
+  else process.env.SYNTHETIC_REVIEWER_ISOLATION = priorReviewerSwitch;
+  if (priorRequestSwitch === undefined) delete process.env.TEST_REQUEST_ISOLATION;
+  else process.env.TEST_REQUEST_ISOLATION = priorRequestSwitch;
+});
 
 function acceptedSuggestion(overrides = {}) {
   return {
@@ -67,6 +76,7 @@ function job() {
 
 function deps(currentSuggestion = acceptedSuggestion()) {
   return {
+    resolveTestState: jest.fn(async () => ({ kind: 'ordinary' })),
     suggestions: { getForAcceptanceDrain: jest.fn(async () => currentSuggestion) },
     potentialReviewers: {
       getById: jest.fn(async () => ({ wmkf_potentialreviewersid: REVIEWER_ID })),
@@ -95,6 +105,8 @@ function deps(currentSuggestion = acceptedSuggestion()) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on';
+  process.env.TEST_REQUEST_ISOLATION = 'on';
 });
 
 test('honorarium failure sends operationalEvent enrichment through notify()', async () => {

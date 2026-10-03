@@ -55,12 +55,11 @@ export const PREFERENCE_KEYS = {
   GRANTEE_INVITE_SUBJECT: 'grantee_invite_subject',
   SITE_VISIT_MATERIALS_INVITATION_TEMPLATE: 'site_visit_materials_invitation_template',
   SITE_VISIT_MATERIALS_REMINDER_TEMPLATE: 'site_visit_materials_reminder_template',
-  // Explicit per-PD choice for automatic outbound email handling:
-  //   { mode: 'automatic' }
-  //   { mode: 'review', leadDays: 1..14 }
-  // Absent means the PD has not made a rollout choice yet. Writes use the
-  // dedicated /api/email-automation-preferences route so mode/day validation
-  // cannot be bypassed through the generic preference endpoint.
+  // Per-PD scheduled-email review-all override: { reviewAll: boolean }
+  // (contract in shared/config/emailAutomation.js). Absent means the default,
+  // VIP-only review. Writes use the dedicated /api/email-automation-preferences
+  // route so validation cannot be bypassed through the generic preference
+  // endpoint.
   EMAIL_AUTOMATION: 'email_automation',
 };
 

@@ -1,4 +1,15 @@
 /** @jest-environment node */
+const mockGetById = jest.fn();
+jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/grant-request.js'),
+  getById: (...args) => mockGetById(...args),
+}));
+
+const mockGetSettingStrict = jest.fn();
+jest.mock('../../lib/services/settings-service.js', () => ({
+  ...jest.requireActual('../../lib/services/settings-service.js'),
+  getSettingStrict: (...args) => mockGetSettingStrict(...args),
+}));
 import {
   canonicalFilename,
   confirmMaterialsReady,
@@ -15,6 +26,7 @@ import {
   summarizeCollection,
   waiveMaterialsItem,
 } from '../../lib/services/site-visit-materials/collection-service';
+import { REQUEST_DOCUMENT_LIFECYCLE_STATE, REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../shared/config/requestDocument';
 import { renderMaterialsEmailHtml } from '../../lib/external/site-visit-materials-email';
 import {
   SITE_VISIT_MATERIALS_INVITE_SEED_BODY,
@@ -62,6 +74,8 @@ function deps(overrides = {}) {
     findDocumentsByRequest: jest.fn(async () => ({ records: [] })),
     getOpenCollection: jest.fn(async () => stored),
     getLatestCollection: jest.fn(async () => stored),
+    backgroundJobsSchemaReady: () => false,
+    listUploadJobsForRequest: jest.fn(async () => []),
     insertCollection: jest.fn(async (row) => { stored = { id: row.id, request_id: row.requestId, site_visit_activity_id: row.siteVisitActivityId, status: 'open', due_at: row.dueAt, closes_at: row.closesAt, checklist: row.checklist, contacts: row.contacts, jti: row.jti, token_digest: row.tokenDigest, token_ciphertext: row.tokenCiphertext, created_by: row.createdBy, reminder_count: 0, created_at: NOW }; return stored; }),
     recordInvitation: jest.fn(async (id, emailId) => { stored = { ...stored, invited_at: NOW, invitation_email_id: emailId }; return stored; }),
     updateContacts: jest.fn(async (id, expected, contacts) => { stored = { ...stored, contacts }; return stored; }),
@@ -85,6 +99,112 @@ function deps(overrides = {}) {
   d.__setStored = (row) => { stored = row; };
   return d;
 }
+
+beforeEach(() => {
+  mockGetById.mockClear();
+  mockGetSettingStrict.mockClear();
+  mockGetById.mockResolvedValue({ wmkf_istestrequest: null, wmkf_testcreationrunid: null });
+  mockGetSettingStrict.mockResolvedValue({ found: false, value: null });
+  delete process.env.TEST_REQUEST_ISOLATION;
+});
+
+const MATERIALS_CONTACTS = {
+  pi: { role: 'pi', name: 'Pat Investigator', email: 'PI@example.edu' },
+  liaison: { role: 'liaison', name: 'Lee Liaison', email: 'liaison@example.edu' },
+  liaisonStatus: 'found',
+};
+const MATERIALS_RECIPIENTS = ['PI@example.edu', 'liaison@example.edu'];
+const MATERIALS_PREPARED_EMAIL = {
+  subject: 'Materials request', bodyText: 'Please send the materials.',
+  recipients: MATERIALS_RECIPIENTS,
+  toRecipients: ['PI@example.edu'], ccRecipients: ['liaison@example.edu'],
+};
+
+function openMaterialsRow() {
+  return {
+    id: 'collection-1', request_id: REQUEST_ID, status: 'open',
+    due_at: new Date('2026-10-05T16:00:00.000Z'),
+    closes_at: new Date('2026-10-14T19:00:00.000Z'), created_at: NOW,
+    checklist: [
+      { key: 'presentation_pdf', label: 'Presentation (PDF)', required: true, waived: false },
+      { key: 'presentation_source', label: 'Presentation source', required: true, waived: false },
+      { key: 'participant_bios', label: 'Participant bios', required: true, waived: false },
+    ],
+    contacts: MATERIALS_CONTACTS, token_ciphertext: 'sealed:existing-token', reminder_count: 0,
+  };
+}
+
+async function runMaterialsAction(action, d) {
+  if (action === 'create') {
+    return createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org', preparedEmail: MATERIALS_PREPARED_EMAIL }, d);
+  }
+  d.__setStored(openMaterialsRow());
+  if (action === 'invite') {
+    return inviteMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org', preparedEmail: MATERIALS_PREPARED_EMAIL }, d);
+  }
+  return remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org', preparedEmail: MATERIALS_PREPARED_EMAIL }, d);
+}
+
+function expectMaterialsEffects(d, action, happened) {
+  const calls = action === 'create'
+    ? [d.mint, d.insertCollection, d.sendEmail]
+    : action === 'invite'
+      ? [d.updateContacts, d.sendEmail]
+      : [d.claimManualReminder, d.sendEmail, d.attachReminderEmailId];
+  for (const call of calls) happened ? expect(call).toHaveBeenCalled() : expect(call).not.toHaveBeenCalled();
+}
+
+describe('Test Request recipient checks on manual materials sends', () => {
+  const synthetic = { wmkf_istestrequest: true, wmkf_testcreationrunid: '22222222-2222-4222-8222-222222222222' };
+  const allowlisted = { found: true, value: JSON.stringify({ addresses: ['pi@example.edu', 'liaison@example.edu'] }) };
+
+  test.each(['create', 'invite', 'remind'])('%s sends when every current recipient is allowlisted', async (action) => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    mockGetById.mockResolvedValue(synthetic);
+    mockGetSettingStrict.mockResolvedValue(allowlisted);
+    const d = deps({ resolveRecipients: jest.fn(async () => MATERIALS_CONTACTS) });
+
+    await runMaterialsAction(action, d);
+
+    expect(mockGetSettingStrict).toHaveBeenCalledWith('testRequestEmailAllowlist');
+    expectMaterialsEffects(d, action, true);
+    expect(d.sendEmail.mock.calls[0][0]).toMatchObject({ to: ['PI@example.edu'], cc: ['liaison@example.edu'] });
+  });
+
+  test.each(['create', 'invite', 'remind'])('%s refuses one non-allowlisted recipient before side effects', async (action) => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    mockGetById.mockResolvedValue(synthetic);
+    mockGetSettingStrict.mockResolvedValue({ found: true, value: JSON.stringify({ addresses: ['pi@example.edu'] }) });
+    const d = deps({ resolveRecipients: jest.fn(async () => MATERIALS_CONTACTS) });
+
+    await expect(runMaterialsAction(action, d)).rejects.toMatchObject({ code: 'test_request_email_denied', httpStatus: 409 });
+
+    expect(mockGetSettingStrict).toHaveBeenCalledWith('testRequestEmailAllowlist');
+    expectMaterialsEffects(d, action, false);
+  });
+
+  test.each(['create', 'invite', 'remind'])('%s keeps ordinary Requests working without reading the allowlist', async (action) => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    mockGetById.mockResolvedValue({ wmkf_istestrequest: null, wmkf_testcreationrunid: null });
+    const d = deps({ resolveRecipients: jest.fn(async () => MATERIALS_CONTACTS) });
+
+    await runMaterialsAction(action, d);
+
+    expect(mockGetSettingStrict).not.toHaveBeenCalled();
+    expectMaterialsEffects(d, action, true);
+  });
+
+  test.each(['create', 'invite', 'remind'])('%s fails closed when Request state is unknown', async (action) => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    mockGetById.mockRejectedValue(new Error('state read failed'));
+    const d = deps({ resolveRecipients: jest.fn(async () => MATERIALS_CONTACTS) });
+
+    await expect(runMaterialsAction(action, d)).rejects.toMatchObject({ code: 'test_request_email_denied', httpStatus: 409 });
+
+    expect(mockGetSettingStrict).not.toHaveBeenCalled();
+    expectMaterialsEffects(d, action, false);
+  });
+});
 
 test('canonical filenames follow §7.3 and the registry match is by artifact type + canonical name, newest first', () => {
   expect(canonicalFilename('1003222', 'presentation_pdf', 'pdf')).toBe('1003222 Site Visit Presentation.pdf');
@@ -211,6 +331,49 @@ test('read joins the registry: state moves missing → received → ready; waive
   expect(collection.state).toBe('ready');
   expect(d.markReady).toHaveBeenCalledWith('44444444-4444-4444-8444-444444444444', ACTOR);
   await expect(waiveMaterialsItem({ requestId: REQUEST_ID, key: 'nope', waived: true }, d)).rejects.toMatchObject({ code: 'site_visit_materials_item_unknown' });
+});
+
+test('reminder preview excludes a job-held required slot and its proof sends when another slot is missing', async () => {
+  const originalSecret = process.env.EXTERNAL_LINK_SECRET;
+  process.env.EXTERNAL_LINK_SECRET = 'materials-preview-test-secret-at-least-32-chars';
+  const emailTemplate = { subject: SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT, body: SITE_VISIT_MATERIALS_REMINDER_SEED_BODY };
+  const d = deps({
+    backgroundJobsSchemaReady: () => true,
+    listUploadJobsForRequest: jest.fn(async () => [
+      { job_id: 'job-held', slot: 'presentation_pdf', status: 'processing', filename: 'new.pdf', attempt_count: 1 },
+    ]),
+  });
+  const row = openMaterialsRow();
+  row.checklist[2].waived = true;
+  d.__setStored(row);
+
+  try {
+    const preview = await previewMaterialsEmail({ requestId: REQUEST_ID, action: 'remind', actorId: ACTOR, fromEmail: 'pc@wmkeck.org', emailTemplate }, d);
+    expect(preview.missingKeys).toEqual(['presentation_source']);
+    expect(preview.bodyText).toContain('Presentation source');
+    expect(preview.bodyText).not.toContain('Presentation (PDF)');
+
+    const preparedEmail = {
+      subject: preview.subject,
+      bodyText: preview.bodyText,
+      names: preview.names,
+      recipients: preview.allRecipients,
+      toRecipients: preview.recipients.map((person) => person.email),
+      ccRecipients: preview.ccRecipients.map((person) => person.email),
+      missingKeys: preview.missingKeys,
+      collectionId: preview.collectionId,
+      dueAt: preview.dueAt,
+      visitSnapshot: preview.visitSnapshot,
+      template: emailTemplate,
+    };
+    await remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org', emailTemplate, preparedEmail }, d);
+    expect(d.sendEmail).toHaveBeenCalledTimes(1);
+    expect(d.sendEmail.mock.calls[0][0].bodyText).toContain('Presentation source');
+    expect(d.sendEmail.mock.calls[0][0].bodyText).not.toContain('Presentation (PDF)');
+  } finally {
+    if (originalSecret === undefined) delete process.env.EXTERNAL_LINK_SECRET;
+    else process.env.EXTERNAL_LINK_SECRET = originalSecret;
+  }
 });
 
 test('manual reminder claims before sending (S507): claim order, 409 on a lost claim, and an email id attached only after a successful send', async () => {
@@ -363,12 +526,77 @@ test('summarizeCollection keeps state, counts, and the window; drops the link, c
   expect(collection.contributorUrl).toMatch(/^https?:\/\/|^\/external\/materials\//);
   const summary = summarizeCollection(collection);
   expect(summary).toEqual({
-    state: 'missing', receivedCount: 1, requiredCount: 2, otherCount: 0,
+    state: 'missing', processingCount: 0, attentionCount: 0, receivedCount: 1, requiredCount: 2, otherCount: 0,
     dueAt: collection.dueAt, closesAt: collection.closesAt, overdue: false, invited: true,
   });
   expect(Object.keys(summary)).not.toEqual(expect.arrayContaining(['contributorUrl', 'contacts', 'checklist', 'id']));
   expect(summarizeCollection(null)).toBeNull();
   expect(missingRequiredItems({ checklist: collection.checklist }, { presentation_pdf: { artifactId: 'p' } }).map((item) => item.key)).toEqual(['presentation_source']);
+  expect(missingRequiredItems({ checklist: collection.checklist }, { presentation_pdf: { artifactId: 'p' } }, {
+    mode: 'reminder_actionable', activeJobSlots: new Set(['presentation_source']),
+  })).toEqual([]);
+});
+
+test('staff projection exposes sanitized cross-collection jobs and blocks Ready while an upload is active', async () => {
+  const d = deps({
+    backgroundJobsSchemaReady: () => true,
+    listUploadJobsForRequest: jest.fn(async () => [
+      { job_id: 'job-1', collection_id: 'old-collection', slot: 'presentation_pdf', status: 'processing', filename: 'new.pdf', attempt_count: 2, error_code: 'raw-storage-exception' },
+      { job_id: 'job-2', collection_id: 'old-collection', slot: 'participant_bios', status: 'needs_attention', filename: 'bios.pdf', attempt_count: 8, error_code: 'coordinator_action_required' },
+    ]),
+  });
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  const { collection } = await getMaterialsCollection({ requestId: REQUEST_ID }, d);
+  expect(d.listUploadJobsForRequest).toHaveBeenCalledWith(REQUEST_ID, { collectionIds: ['44444444-4444-4444-8444-444444444444'] });
+  expect(collection).toMatchObject({ state: 'needs_attention', processingCount: 1, attentionCount: 1 });
+  expect(collection.uploadJobs).toEqual([
+    expect.objectContaining({ jobId: 'job-1', status: 'processing', errorCode: null }),
+    expect.objectContaining({ jobId: 'job-2', status: 'needs_attention', errorCode: 'coordinator_action_required' }),
+  ]);
+  await expect(confirmMaterialsReady({ requestId: REQUEST_ID, actorId: ACTOR }, d)).rejects.toMatchObject({ code: 'site_visit_materials_uploads_incomplete' });
+  expect(d.markReady).not.toHaveBeenCalled();
+});
+
+test('staff read path keeps sanitized scan details through both job projection layers', async () => {
+  const d = deps({
+    backgroundJobsSchemaReady: () => true,
+    listUploadJobsForRequest: jest.fn(async () => [
+      { job_id: 'infected-job', slot: 'other', status: 'failed', error_code: 'scan_infected', scan_rejection: { category: 'blocked_content', flags: ['embedded_macro'] } },
+      { job_id: 'legacy-job', slot: 'other', status: 'failed', error_code: 'scan_infected', scan_rejection: { category: 'blocked_content', flags: ['provider-secret'] } },
+    ]),
+  });
+  d.__setStored(openMaterialsRow());
+  const { collection: row } = await getMaterialsCollection({ requestId: REQUEST_ID }, d);
+  expect(row.uploadJobs).toEqual([
+    expect.objectContaining({ errorCode: 'infected', scanRejection: { category: 'blocked_content', flags: ['embedded_macro'] } }),
+    expect.objectContaining({ errorCode: 'infected', scanRejection: null }),
+  ]);
+  expect(JSON.stringify(row)).not.toContain('provider-secret');
+});
+
+test('new collection creation immediately exposes an active job held by its previous collection', async () => {
+  const d = deps({
+    backgroundJobsSchemaReady: () => true,
+    listUploadJobsForRequest: jest.fn(async () => [
+      { job_id: 'job-old', collection_id: 'old-collection', slot: 'presentation_pdf', status: 'processing', filename: 'replacement.pdf', attempt_count: 1 },
+    ]),
+  });
+  const result = await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  expect(result.collection).toMatchObject({ state: 'processing', processingCount: 1 });
+  expect(result.collection.uploadJobs).toEqual([expect.objectContaining({ jobId: 'job-old', status: 'processing' })]);
+});
+
+test('job status read failure after invitation preserves successful collection creation and marks status unavailable', async () => {
+  const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+  const d = deps({
+    backgroundJobsSchemaReady: () => true,
+    listUploadJobsForRequest: jest.fn(async () => { throw new Error('ledger unavailable'); }),
+  });
+  const result = await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  expect(result.invitationSent).toBe(true);
+  expect(result.collection).toMatchObject({ uploadJobs: [], uploadStatusUnavailable: true });
+  expect(log).toHaveBeenCalled();
+  log.mockRestore();
 });
 
 test('projectCollection reports a past closes_at as closed even while the row still says open (the sweep only makes that durable)', () => {
@@ -455,4 +683,33 @@ describe('Liaison of record in the contacts snapshot', () => {
     await expect(prepareMaterialsReminderEmail({ row: d.__stored(), request: request(), visit: visit(), missing: [], actorId: ACTOR }, d))
       .rejects.toMatchObject({ code: 'site_visit_materials_recipients_required' });
   });
+});
+
+test('staff read and create responses link only the selected same-request receipts', async () => {
+  const rows = [
+    registryRow({ id: 'old', filename: '1003222 Site Visit Presentation.pdf', modifiedon: '2026-09-01', wmkf_sharepointweburl: 'https://tenant.sharepoint.com/old.pdf' }),
+    registryRow({ id: 'new', filename: '1003222 Site Visit Presentation.pdf', wmkf_sharepointweburl: 'https://tenant.sharepoint.com/current.pdf' }),
+    registryRow({ id: 'superseded', filename: '1003222 Site Visit Presentation.pdf', modifiedon: '2026-10-02', wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED, wmkf_sharepointweburl: 'https://tenant.sharepoint.com/superseded.pdf' }),
+    registryRow({ id: 'foreign', filename: '1003222 Site Visit Presentation.pdf', modifiedon: '2026-10-03', _wmkf_request_value: ACTOR, wmkf_sharepointweburl: 'https://tenant.sharepoint.com/foreign.pdf' }),
+    registryRow({ id: 'other', filename: 'Supporting.pdf', wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.OTHER_APPLICANT_MATERIALS, wmkf_sharepointweburl: 'https://tenant.sharepoint.com/supporting.pdf' }),
+  ];
+  const d = deps({ findDocumentsByRequest: jest.fn(async () => ({ records: rows })) });
+  const created = await runMaterialsAction('create', d);
+  const loaded = await getMaterialsCollection({ requestId: REQUEST_ID }, d);
+  for (const { collection } of [created, loaded]) {
+    expect(collection.checklist[0].received).toMatchObject({ artifactId: 'new', webUrl: 'https://tenant.sharepoint.com/current.pdf' });
+    expect(collection.other).toEqual([expect.objectContaining({ artifactId: 'other', webUrl: 'https://tenant.sharepoint.com/supporting.pdf' })]);
+    expect(collection.checklist[1].received).toBeNull();
+    expect(JSON.stringify(summarizeCollection(collection))).not.toContain('sharepoint.com');
+  }
+  expect(JSON.stringify(matchReceivedFiles(rows, REQUEST_ID, '1003222'))).not.toContain('sharepoint.com');
+  const waived = await waiveMaterialsItem({ requestId: REQUEST_ID, key: 'presentation_source', waived: true }, d);
+  expect(waived.collection.checklist[0].received.webUrl).toBe('https://tenant.sharepoint.com/current.pdf');
+});
+
+test.each([null, '', 'not a URL', 'javascript:alert(1)', 'http://tenant.sharepoint.com/file', 'https://user:password@tenant.sharepoint.com/file'])('staff receipt retains filename without a link for URL %s', async (webUrl) => {
+  const d = deps({ findDocumentsByRequest: jest.fn(async () => ({ records: [registryRow({ id: 'file', filename: '1003222 Site Visit Presentation.pdf', wmkf_sharepointweburl: webUrl })] })) });
+  d.__setStored(openMaterialsRow());
+  const { collection } = await getMaterialsCollection({ requestId: REQUEST_ID }, d);
+  expect(collection.checklist[0].received).toMatchObject({ filename: '1003222 Site Visit Presentation.pdf', webUrl: null });
 });

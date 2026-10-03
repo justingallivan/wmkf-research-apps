@@ -4,7 +4,7 @@ Read-only review through verified claude.ai OAuth subscription, explicitly autho
 
 # Fable planning review: Meeting Tracker transcription plan (2026-10-01)
 
-**Verdict: implementable as one bounded slice once the three blocking decisions below are recorded in the plan. This is not live-deployment approval.** 
+**Verdict: implementable as one bounded slice once the three blocking decisions below are recorded in the plan. This is not live-deployment approval.**
 
 This was a read-only source review: nothing was run, and no audio, transcripts, secrets or live systems were touched. I could not save this to the plan file because the session has no write tool, so the review exists only in this message.
 

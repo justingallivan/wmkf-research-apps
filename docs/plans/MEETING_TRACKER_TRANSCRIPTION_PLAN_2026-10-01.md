@@ -2,8 +2,8 @@
 title: Meeting Tracker transcription integration
 domain: transcription
 kind: plan
-status: source-reviewed-disabled
-summary: "Shared transcription remains disabled. The bounded no-CRM synthetic speaker rehearsal is source-implemented, reviewed, and verified on isolated Preview: signed-in read/save/reload and TXT passed. VTT browser download and the full Tracker/release flow remain unverified."
+status: production-live-non-sensitive-use
+summary: "Meeting Tracker transcription is enabled for authorized staff after production acceptance of private upload, speaker naming, TXT/VTT downloads, governed publication and Staff Deliberations projection. Production schema is verified; daily cleanup and hourly recovery are registered and manually invoked successfully. Synthetic content was cleaned up; audit receipts and late-upload watch remain. Confidential use and timer delivery are not established."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -12,6 +12,12 @@ related:
 ---
 
 # Meeting Tracker transcription integration
+
+## Current release — 2026-10-02 PT
+
+**[VERIFIED via PR #416/#418 merges, production configuration and deployment readback, authenticated browser, and cleanup receipts]** The shared application is live for authorized Meeting Tracker staff. `MEETING_TRACKER_TRANSCRIPTION_ACCESS`, `MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY`, and `MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY` are `on`; shared Admin pilot switches remain off. The approved synthetic production test passed upload → `universal-3-5-pro` → saved speaker name → minute TXT/precise VTT → governed publication → Staff Deliberations. Temporary content was purged, the exact synthetic published files removed, and its registry row retired. Audit receipts and the conservative late-upload watch remain; this is not whole-receipt erasure.
+
+Daily cleanup and hourly recovery are registered and returned 200 through platform-triggered invocation. An operations warning email was accepted for delivery; calendar delivery and inbox receipt are not claimed. Use approved non-sensitive recordings only, with owner-confirmed training opt-out and accepted one-day provider retention—not verified ZDR. No further infrastructure work is required for the accepted bounded workflow. Operational receipts remain private at the owner's request. The rehearsal/source-review sections below preserve dated evidence, not current deployment gates.
 
 ## Owner decisions
 
@@ -69,7 +75,7 @@ material risks cannot be relabeled as polish to obtain completion.
 | Site Visit attendee maps resolve organizer/required/optional invitees; PI/co-PI data has separate readers | `lib/services/site-visit/logistics-service.js`; `lib/services/proposal-pi-identity.js`; `lib/services/proposal-participants.js` | Use saved invitation context, not mailbox scraping. Co-PI name readers are not sufficient identity references by themselves. |
 | Current formatting is a validated label overlay, not a rewrite of provider content | `lib/services/transcription-pilot/transcript-format.js`; migration 062 | Reuse the formatter and bounds. Never infer speaker identities automatically. |
 
-**[UNKNOWN live state]** Existing post-presentation documentation records
+**[Historical reconnaissance uncertainty, resolved for the accepted production flow above]** Existing post-presentation documentation recorded
 bounded Preview proof and separate Production rollout gates. Do not infer
 Production schema readiness or permission from source presence. The isolated
 pilot deployment intentionally excludes Meeting Tracker and Dataverse access;
@@ -286,20 +292,11 @@ deletion is added in this slice; existing records policy remains authoritative.
 
 ### Release boundary
 
-Build disabled on `codex/transcription-pilot`; no shared deployment merely to
-test the UI. Proposed runtime home is the shared application, not the isolated
-pilot. New Postgres migration(s) and an additive Dataverse wave are source-only
-until numbering, physical schema, target configuration and owner-approved apply
-are verified. Scope checks include existing 060–062, post-presentation schema,
-private storage, provider controls and actual scheduler delivery. Schema
-readiness must gate select lists as well as routes so older environments still
-read legacy documents. Never enable the Admin pilot to activate Tracker.
-Shared/Production deployment, schema applies and feature enablement remain
-separately authorized. Migrations 063–064 are applied only to the dedicated
-Preview test Neon. No real-recording test or newly metered service call is
-authorized by this rehearsal.
+The runtime home is the shared application, not the isolated pilot. Owner-authorized migrations 060–064 and the optional Wave 31 bundle field/Active generation key are verified in Production. PR #416 merged the base flow; PR #418 (`aa7d5b0e1`) deployed daily/hourly maintenance and operations alerts. After separately authorized synthetic acceptance, the owner-authorized staff rollout enabled the three Tracker access/schema controls. The earlier empty tables and unset controls in the [disabled-release receipt](evidence/TRANSCRIPTION_DISABLED_RELEASE_2026-10-02.md) are historical pre-activation evidence, not current state.
 
-### Bounded no-CRM synthetic speaker rehearsal — scoped hosted read/save verified
+Schema readiness continues to gate select lists as well as routes for older environments. Never enable the Admin pilot to activate Tracker. Dedicated Preview/pilot resources stay separate; this release does not authorize arbitrary real recordings or confidential use. Calendar-triggered delivery remains unobserved; registered schedules and platform-triggered 200 responses are the bounded maintenance evidence.
+
+### Historical bounded no-CRM synthetic speaker rehearsal — scoped hosted read/save verified
 
 **[SCOPED HOSTED READ/SAVE/RELOAD AND TXT VERIFIED; VTT BROWSER DOWNLOAD UNVERIFIED.]**
 Fable's OAuth plan review session `44db0371-d76d-4bc2-8aef-a673ef714a0e`
@@ -485,7 +482,7 @@ Historical verdict: **READY FOR DISABLED IMPLEMENTATION.** Fable's named plan
 condition was incorporated. No schema apply, deployment, enablement or provider
 test was authorized by that verdict.
 
-## Implementation and source-review result
+## Historical implementation and source-review checkpoints
 
 **[VERIFIED via source commits and focused tests; NOT LIVE]** Luna built the
 request-bound flow and root completed the integrated review. Sol's capped
@@ -528,7 +525,7 @@ and excluded from commits. Its added Workbench processing/attention cases
 currently fail against unchanged UI; the original HEAD cases pass. That is
 not a claim of a fully green whole-repository test run.
 
-**Current verdict: SOURCE-REVIEWED, DISABLED; NOT RELEASE-READY.** On
+**Historical pre-release verdict: SOURCE-REVIEWED, DISABLED; NOT RELEASE-READY.** On
 2026-10-02, an isolated local PostgreSQL 16 schema applied migrations 060–064
 and passed all 23 integration tests: 4 Meeting Tracker publication tests and
 19 existing pilot tests. The four new tests cover migration constraints,
@@ -546,7 +543,9 @@ The Wave 31 preflight first found the optional `wmkf_transcriptbundlejson`
 memo absent and the Wave 16 `wmkf_requestdocument_generation_key` over
 `wmkf_generationkey` exact and Active. After the separately approved
 sandbox-only apply, exact readback confirmed the memo and active key.
-Production was not probed or changed. Wave 30 exactness was reported by the
+Production Dataverse was not probed or changed at that Wave 31 checkpoint.
+The later Production Postgres migration apply is recorded in the disabled-
+release receipt; no Dataverse change is implied. Wave 30 exactness was reported by the
 separate `scripts/preflight-post-presentation-materials-schema.mjs`. The
 shared Preview branch's `DYNAMICS_URL` resolved to
 the Production host during configuration inspection. The CLI pulled the
@@ -634,9 +633,7 @@ correction, and cleanup gaps remain.
 Detailed bounded results and review limits are recorded in
 [the 2026-10-02 readiness check](evidence/MEETING_TRANSCRIPTION_READINESS_CHECK_2026-10-02.md).
 
-Next, investigate the blocked VTT browser download if needed; do not infer
-success from the server's HTTP 200 log. The earlier sign-in browser block is no
-longer blocking, but VTT and the full Meeting Tracker flow remain untested.
+At that historical checkpoint, VTT browser download and the full Meeting Tracker flow were untested. Both were subsequently verified in the production acceptance above; do not carry the old browser investigation forward as a current release blocker. A server HTTP 200 alone still is not download proof.
 The fresh-schema bootstrap is separate from the old pilot and shared database;
 it does not prove hosted adapter behavior or release readiness. The sandbox
 generation key is exact/Active, but this does not authorize or prove an

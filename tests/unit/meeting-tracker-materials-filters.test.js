@@ -24,7 +24,7 @@ test('25 rows have exclusive stable counts; every normal filter retains source o
   fireEvent.click(filter(`${label} (5)`));
   expect(titles()).toEqual(Array.from({length:5},(_,i)=>`#${offset+1+i*5}`));
   expect(filter(`${label} (5)`)).toHaveAttribute('aria-pressed','true');
-  expect(within(filters()).getAllByRole('button').map(b=>b.textContent)).toEqual(['All (25)','Not requested (5)','Waiting (5)','Late (5)','Check files (5)','Ready (5)']);
+  expect(within(filters()).getAllByRole('button').map(b=>b.textContent)).toEqual(['All (25)','Not requested (5)','Waiting (5)','Saving files (0)','Needs attention (0)','Late (5)','Check files (5)','Ready (5)']);
  }
  expect(global.fetch).toHaveBeenCalledTimes(calls);
  fireEvent.click(filter('All (25)'));expect(titles()).toHaveLength(25);
@@ -103,4 +103,17 @@ test.each(['reject','cancel'])('scope navigation %s offers recovery instead of r
  expect(await screen.findByRole('alert')).toHaveTextContent('The view could not be changed');
  expect(screen.queryByText('Loading the cycle schedule…')).not.toBeInTheDocument();
  expect(screen.queryByRole('heading',{name:'#1',exact:true})).not.toBeInTheDocument();
+});
+
+
+test('processing and attention filters include active work after collection closure', async () => {
+ rows = [
+  { ...fixtures()[0], materials: summary('processing', { processingCount:1 }) },
+  { ...fixtures()[1], materials: summary('closed', { attentionCount:1 }) },
+  { ...fixtures()[2], materials: summary('closed') },
+ ];
+ render(<MeetingTrackerList/>); await screen.findByRole('button', {name:'All (3)'});
+ fireEvent.click(filter('Saving files (1)')); expect(titles()).toEqual(['#1']);
+ fireEvent.click(filter('Needs attention (1)')); expect(titles()).toEqual(['#2']);
+ fireEvent.click(filter('Closed (1)')); expect(titles()).toEqual(['#3']);
 });

@@ -11,6 +11,12 @@
  */
 
 const findApplicantRecommendedByRequest = jest.fn();
+jest.mock('../../lib/services/test-requests/synthetic-reviewer-capability', () => ({
+  resolveReviewerBindCapability: jest.fn(async ({ personId }) => ({
+    kind: 'ordinary',
+    person: await require('../../lib/dataverse/adapters/potential-reviewer').getById(personId),
+  })),
+}));
 const setMatchReason = jest.fn(async () => {});
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findApplicantRecommendedByRequest: (...a) => findApplicantRecommendedByRequest(...a),
@@ -116,7 +122,7 @@ jest.mock('../../lib/services/reviewer-request-context', () => ({
   loadReviewerRequestContext: jest.fn(async () => ({})),
 }));
 
-jest.mock('../../shared/components/reviewers/reviewer-search-logic', () => ({
+jest.mock('../../shared/utils/reviewer-roster-projection', () => ({
   APPLICANT_ENRICHMENT_CACHE_VERSION: 4,
   pruneCandidateForRoster: jest.fn((c) => c),
 }));
@@ -128,7 +134,7 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   findCandidateBySuggestion: (...a) => findCandidateBySuggestion(...a),
 }));
 
-jest.mock('../../lib/utils/safe-fetch', () => ({ safeFetch: jest.fn() }));
+jest.mock('../../lib/utils/public-blob-fetch', () => ({ fetchPublicBlob: jest.fn() }));
 jest.mock('../../lib/utils/contact-parser', () => ({
   ContactParser: { isNameConsistentEmail: jest.fn(() => true) },
 }));

@@ -12,6 +12,11 @@ jest.mock('../../lib/utils/auth', () => ({
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (_label, fn) => fn(),
 }));
+jest.mock('../../lib/services/test-requests/synthetic-reviewer-capability', () => ({
+  resolveReviewerBindCapability: jest.fn(async ({ personId }) => ({
+    kind: 'ordinary', person: await require('../../lib/dataverse/adapters/potential-reviewer').getById(personId),
+  })),
+}));
 
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   findCandidateBySuggestion: jest.fn(async () => null),

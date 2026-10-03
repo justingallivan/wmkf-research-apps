@@ -17,11 +17,6 @@ import path from 'path';
 const ROOT = path.resolve(__dirname, '../..');
 const GUARD = /createRequestTestStateLookup\(|resolveRequestTestState|resolveTestState\(|TEST_REQUEST_ORDINARY_OData_FILTER/;
 
-// Current source-derived inventory (2026-10-03): 24 cron route files and 23
-// scheduled path entries across 22 distinct routes. The design record's 23
-// routes / 21 scheduled jobs is the historical 2026-09-23 Stage 1c snapshot.
-// drain-transcriptions accounts for one route and two exact schedule paths.
-
 // route → { scheduled, class, guardFiles?, note }
 //   guarded     — acts on request-linked rows; skips test requests at selection
 //   allowed     — runs work a staff member launched on a chosen request (owner decision)
@@ -29,16 +24,20 @@ const GUARD = /createRequestTestStateLookup\(|resolveRequestTestState|resolveTes
 //   n/a         — cannot reach a test request
 const RECORDED_CRONS = {
   'auth-bypass-check': { scheduled: true, class: 'operational' },
+  'drain-materials-uploads': { scheduled: true, class: 'allowed', note: 'continues an explicitly submitted token-authorized applicant upload; no request selection or email; materials background plan records this decision' },
   'drain-cycle-dossiers': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/cycle-dossier-service.js'], note: 'cycle-wide report: roster excludes test requests' },
+  'drain-transcriptions': {
+    scheduled: true,
+    scheduleEntries: [
+      { path: '/api/cron/drain-transcriptions', schedule: '0 3 * * *' },
+      { path: '/api/cron/drain-transcriptions?recovery=1', schedule: '0 * * * *' },
+    ],
+    class: 'allowed',
+    note: 'daily pass performs bounded cleanup and lease recovery; hourly query mode performs bounded workflow recovery; request-bound jobs enter only through staff-authorized request controls, and the worker rechecks request access before a new provider submission',
+  },
   'drain-review-panels': { scheduled: true, class: 'allowed', note: 'staff-launched AI panel on chosen requests' },
   'drain-review-syntheses': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/review-synthesis-drain.js'] },
   'drain-reviewer-acceptances': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/reviewer-acceptance-drain.js'] },
-  'drain-transcriptions': {
-    scheduled: true,
-    cronPaths: ['/api/cron/drain-transcriptions', '/api/cron/drain-transcriptions?recovery=1'],
-    class: 'allowed',
-    note: 'existing staff-launched transcription work, classified alongside review panels; normal and recovery schedules advance those jobs',
-  },
   'drain-submissions': { scheduled: true, class: 'n/a', note: 'creates new applicant requests; the app cannot write the marker' },
   'file-review-docx': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/review-documents/individual-file-service.js'] },
   'generate-grantee-titles': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/cron/generate-grantee-titles-service.js'] },
@@ -64,21 +63,30 @@ test('every cron route is recorded', () => {
     .filter((name) => name.endsWith('.js'))
     .map((name) => name.replace(/\.js$/, ''))
     .sort();
-  expect(routes).toHaveLength(24);
+  expect(routes).toHaveLength(25);
   expect(routes).toEqual(Object.keys(RECORDED_CRONS).sort());
 });
 
 test('the recorded schedule matches vercel.json', () => {
-  const actualPaths = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8')).crons
-    .map((cron) => cron.path)
+  const crons = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8')).crons;
+  expect(crons).toHaveLength(24);
+  expect(new Set(crons.map(({ path: cronPath }) => cronPath.split('?')[0])).size).toBe(23);
+  const transcriptionCrons = crons.filter((cron) =>
+    typeof cron.path === 'string' && cron.path.split('?')[0] === '/api/cron/drain-transcriptions'
+  ).map(({ path: cronPath, schedule }) => ({ path: cronPath, schedule })).sort((a, b) => a.path.localeCompare(b.path));
+  const expectedTranscriptionCrons = RECORDED_CRONS['drain-transcriptions'].scheduleEntries
+    .slice().sort((a, b) => a.path.localeCompare(b.path));
+  expect(transcriptionCrons).toEqual(expectedTranscriptionCrons);
+
+  const scheduled = crons
+    .filter((cron) => !(typeof cron.path === 'string' && cron.path.split('?')[0] === '/api/cron/drain-transcriptions'))
+    .map((cron) => cron.path.replace(/^\/api\/cron\//, ''))
     .sort();
-  expect(actualPaths).toHaveLength(23);
-  expect(new Set(actualPaths.map((route) => route.split('?')[0])).size).toBe(22);
   const recorded = Object.entries(RECORDED_CRONS)
-    .filter(([, v]) => v.scheduled)
-    .flatMap(([route, record]) => record.cronPaths || [`/api/cron/${route}`])
+    .filter(([route, value]) => value.scheduled && route !== 'drain-transcriptions')
+    .map(([route]) => route)
     .sort();
-  expect(actualPaths).toEqual(recorded);
+  expect(scheduled).toEqual(recorded);
 });
 
 test.each(Object.entries(RECORDED_CRONS)
@@ -89,3 +97,36 @@ test.each(Object.entries(RECORDED_CRONS)
     expect(fs.readFileSync(path.join(ROOT, file), 'utf8')).toMatch(GUARD);
   },
 );
+
+test('transcription cron continues durable job work without bypassing request-bound start controls', () => {
+  const route = fs.readFileSync(path.join(ROOT, 'pages/api/cron/drain-transcriptions.js'), 'utf8');
+  expect(route).toContain('drainTranscriptionCleanup');
+  expect(route).toContain('drainTranscriptionWorkflowDispatches');
+  expect(route).not.toContain('drainTranscriptionPilot(');
+
+  const meetingRoute = fs.readFileSync(
+    path.join(ROOT, 'pages/api/meeting-tracker/visits/[requestId]/transcriptions/[jobId]/start.js'), 'utf8',
+  );
+  expect(meetingRoute).toContain("requireAppAccess(req, res, 'meeting-tracker')");
+  expect(meetingRoute).toContain('startMeetingTranscription');
+  const service = fs.readFileSync(path.join(ROOT, 'lib/services/meeting-tracker-transcription/service.js'), 'utf8');
+  const start = service.match(/export async function startMeetingTranscription\([\s\S]*?\n}/);
+  expect(start).not.toBeNull();
+  expect(start[0]).toContain('requireMeetingTranscriptionEnabled(requestId)');
+  expect(start[0]).toContain('queueMeetingTranscription');
+
+  const runtime = fs.readFileSync(path.join(ROOT, 'lib/services/transcription-pilot/runtime.js'), 'utf8');
+  const queue = runtime.match(/export async function queueMeetingTranscription\([\s\S]*?\n}/);
+  expect(queue).not.toBeNull();
+  expect(queue[0]).toContain('requireMeetingTranscriptionEnabled(requestId)');
+  expect(queue[0]).toContain('queueMeetingTranscriptionJob');
+  const store = fs.readFileSync(path.join(ROOT, 'lib/services/transcription-pilot/store.js'), 'utf8');
+  const boundQueue = store.match(/async function queueMeetingJob\([\s\S]*?\n  }/);
+  expect(boundQueue).not.toBeNull();
+  expect(boundQueue[0]).toContain('request_id = $2 AND site_visit_activity_id = $3');
+  expect(boundQueue[0]).toContain('INSERT INTO transcription_workflow_dispatches');
+
+  const worker = fs.readFileSync(path.join(ROOT, 'lib/services/transcription-pilot/worker.js'), 'utf8');
+  expect(worker).toContain('if (!jobSubmissionEnabled(job))');
+  expect(worker).toContain('isMeetingTranscriptionRequestAllowed(job.request_id');
+});

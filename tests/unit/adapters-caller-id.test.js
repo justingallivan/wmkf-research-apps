@@ -36,6 +36,7 @@ function lastCallOpts(mockFn) {
 }
 
 beforeEach(() => {
+  process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on';
   original = {
     queryRecords: DynamicsService.queryRecords,
     getRecord: DynamicsService.getRecord,
@@ -43,7 +44,9 @@ beforeEach(() => {
     updateRecord: DynamicsService.updateRecord,
   };
   DynamicsService.queryRecords = jest.fn().mockResolvedValue({ records: [] });
-  DynamicsService.getRecord = jest.fn().mockResolvedValue(null);
+  DynamicsService.getRecord = jest.fn().mockResolvedValue({
+    wmkf_potentialreviewersid: PR_ID, statecode: 0, wmkf_issyntheticreviewer: false,
+  });
   DynamicsService.createRecord = jest.fn().mockResolvedValue({});
   DynamicsService.updateRecord = jest.fn().mockResolvedValue({});
 
@@ -52,6 +55,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  delete process.env.SYNTHETIC_REVIEWER_ISOLATION;
   DynamicsService.queryRecords = original.queryRecords;
   DynamicsService.getRecord = original.getRecord;
   DynamicsService.createRecord = original.createRecord;

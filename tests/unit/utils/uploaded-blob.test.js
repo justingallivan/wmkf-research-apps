@@ -7,16 +7,16 @@
  */
 
 jest.mock('@vercel/blob', () => ({ get: jest.fn() }));
-jest.mock('../../../lib/utils/safe-fetch', () => ({ safeFetch: jest.fn() }));
+jest.mock('../../../lib/utils/public-blob-fetch', () => ({ fetchPublicBlob: jest.fn() }));
 
 import { get as getBlob } from '@vercel/blob';
-import { safeFetch } from '../../../lib/utils/safe-fetch';
+import { fetchPublicBlob } from '../../../lib/utils/public-blob-fetch';
 import { readUploadedBlobBuffer } from '../../../lib/utils/uploaded-blob';
 
 const ORIGINAL_TOKEN = process.env.UPLOADS_BLOB_RW_TOKEN;
 beforeEach(() => {
   getBlob.mockReset();
-  safeFetch.mockReset();
+  fetchPublicBlob.mockReset();
   process.env.UPLOADS_BLOB_RW_TOKEN = 'vercel_blob_rw_test';
 });
 afterAll(() => {
@@ -34,7 +34,7 @@ describe('readUploadedBlobBuffer', () => {
       access: 'private',
       token: 'vercel_blob_rw_test',
     });
-    expect(safeFetch).not.toHaveBeenCalled();
+    expect(fetchPublicBlob).not.toHaveBeenCalled();
     expect(Buffer.isBuffer(buf)).toBe(true);
     expect([...buf]).toEqual([1, 2, 3]);
   });
@@ -45,23 +45,23 @@ describe('readUploadedBlobBuffer', () => {
       readUploadedBlobBuffer({ access: 'private', pathname: 'private/expense-reporter/r.pdf' }),
     ).rejects.toThrow('UPLOADS_BLOB_RW_TOKEN is not set');
     expect(getBlob).not.toHaveBeenCalled();
-    expect(safeFetch).not.toHaveBeenCalled();
+    expect(fetchPublicBlob).not.toHaveBeenCalled();
   });
 
-  test('legacy/public reference (no access) fetches the public url via safeFetch', async () => {
-    safeFetch.mockResolvedValue({ ok: true, arrayBuffer: async () => new Uint8Array([4, 5, 6]).buffer });
+  test('legacy/public reference (no access) fetches the public url via fetchPublicBlob', async () => {
+    fetchPublicBlob.mockResolvedValue({ ok: true, arrayBuffer: async () => new Uint8Array([4, 5, 6]).buffer });
 
     const buf = await readUploadedBlobBuffer({ url: 'https://x.public.blob.vercel-storage.com/r.pdf', filename: 'r.pdf' });
 
-    expect(safeFetch).toHaveBeenCalledWith('https://x.public.blob.vercel-storage.com/r.pdf');
+    expect(fetchPublicBlob).toHaveBeenCalledWith('https://x.public.blob.vercel-storage.com/r.pdf');
     expect(getBlob).not.toHaveBeenCalled();
     expect([...buf]).toEqual([4, 5, 6]);
   });
 
-  test('explicit public access also uses safeFetch (not get)', async () => {
-    safeFetch.mockResolvedValue({ ok: true, arrayBuffer: async () => new Uint8Array([7]).buffer });
+  test('explicit public access also uses fetchPublicBlob (not get)', async () => {
+    fetchPublicBlob.mockResolvedValue({ ok: true, arrayBuffer: async () => new Uint8Array([7]).buffer });
     await readUploadedBlobBuffer({ access: 'public', url: 'https://x.public.blob.vercel-storage.com/a.png', pathname: 'a.png' });
-    expect(safeFetch).toHaveBeenCalled();
+    expect(fetchPublicBlob).toHaveBeenCalled();
     expect(getBlob).not.toHaveBeenCalled();
   });
 
@@ -80,7 +80,7 @@ describe('readUploadedBlobBuffer', () => {
   });
 
   test('public fetch non-ok throws', async () => {
-    safeFetch.mockResolvedValue({ ok: false, status: 404 });
+    fetchPublicBlob.mockResolvedValue({ ok: false, status: 404 });
     await expect(readUploadedBlobBuffer({ url: 'https://x.public.blob.vercel-storage.com/missing.pdf' })).rejects.toThrow('failed to fetch');
   });
 

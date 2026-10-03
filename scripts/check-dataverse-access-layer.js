@@ -96,6 +96,13 @@ const EXEMPT_FILES = new Set([
   // sandbox-only wmkf_ai_runs write for the stub run (never
   // DynamicsService/logAiRun/writeRunRow); no entity adapter can exist for it.
   'lib/services/test-requests/presite-sandbox-deps.js',
+  // Test Request Factory admin form service (slice 1, docs/plans/
+  // TEST_REQUEST_FACTORY_ADMIN_FORM_PLAN_2026-10-01.md): the one place the
+  // deployed app builds the raw client.js client, bound to the deployment's
+  // single Factory target (createClient with allowTestRequestMarkerWrites and
+  // an explicit TARGET_URLS host, never process.env.DYNAMICS_URL) and driven
+  // only through the fenced runner; no entity adapter can exist for it.
+  'lib/services/test-requests/admin-run-service.js',
 ]);
 
 const EXEMPT_DIRS = [

@@ -45,6 +45,33 @@ const REQUEST_ID = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
 const PR_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const SUGGESTION_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
+function createError(message, status) {
+  const error = new Error(message);
+  if (status !== undefined) error.status = status;
+  return error;
+}
+
+const CREATE_CONFLICT_ERRORS = [
+  ['numeric 409 with neutral message', createError('write conflict', 409)],
+  ['numeric 412 with neutral message', createError('write conflict', 412)],
+  ['duplicate text without status', createError('Duplicate reviewer request key')],
+  ['already-exists text without status', createError('record already exists')],
+  ['matching-key text without status', createError('matching key values')],
+  ['case-insensitive message with non-conflict status', createError('ALTERNATE KEY collision', 503)],
+];
+
+const NON_CONFLICT_CREATE_ERRORS = [
+  ['neutral 400', createError('request rejected', 400)],
+  ['neutral 403', createError('permission denied', 403)],
+  ['neutral 429', createError('throttled', 429)],
+  ['neutral 500', createError('server failure', 500)],
+  ['no status or message', createError('')],
+  ['string 409 status', createError('write conflict', '409')],
+  ['string 412 status', createError('write conflict', '412')],
+  ['Entity Key text alone', createError('Entity Key conflict', 400)],
+  ['Dataverse code text alone', createError('0x80060892', 400)],
+];
+
 const ENGAGEMENT_STAMP_RESET_PAYLOAD = {
   wmkf_accepted: false,
   wmkf_declined: false,
@@ -67,6 +94,15 @@ const ENGAGEMENT_STAMP_RESET_PAYLOAD = {
   wmkf_reviewduedateoverride: null,
 };
 
+function setOrdinaryBindFixture() {
+  process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on';
+  DynamicsService.getRecord.mockResolvedValue({
+    wmkf_potentialreviewersid: PR_ID,
+    wmkf_issyntheticreviewer: false,
+    statecode: 0,
+  });
+}
+
 let original;
 beforeEach(() => {
   original = {
@@ -81,6 +117,7 @@ beforeEach(() => {
   DynamicsService.updateRecord = jest.fn().mockResolvedValue({});
 });
 afterEach(() => {
+  delete process.env.SYNTHETIC_REVIEWER_ISOLATION;
   DynamicsService.queryRecords = original.queryRecords;
   DynamicsService.getRecord = original.getRecord;
   DynamicsService.createRecord = original.createRecord;
@@ -726,6 +763,7 @@ describe('updateLifecycle fails closed on excluded rows for EVERY write', () => 
 });
 
 describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
+  beforeEach(setOrdinaryBindFixture);
   test('creates a recommended, unselected, applicant-sourced row when none exists', async () => {
     DynamicsService.queryRecords.mockResolvedValue({ records: [] });
 
@@ -988,9 +1026,98 @@ describe('ensureApplicantRecommended (Phase 3 ingestion)', () => {
     // Must not refetch-and-converge on a non-conflict failure.
     expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
   });
+
+  test.each(CREATE_CONFLICT_ERRORS)('create conflict signal %s re-reads and converges', async (_label, error) => {
+    DynamicsService.queryRecords
+      .mockResolvedValueOnce({ records: [] })
+      .mockResolvedValueOnce({ records: [{
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        wmkf_applicantdisposition: null,
+        wmkf_sources: 'claude',
+        wmkf_selected: false,
+      }] });
+    DynamicsService.createRecord.mockRejectedValue(error);
+
+    const result = await ensureApplicantRecommended({ potentialReviewerId: PR_ID, requestId: REQUEST_ID });
+
+    expect(result).toMatchObject({ id: SUGGESTION_ID, created: false, selected: false });
+    expect(DynamicsService.queryRecords).toHaveBeenCalledTimes(2);
+    expect(DynamicsService.updateRecord).toHaveBeenCalledTimes(1);
+    expect(DynamicsService.updateRecord.mock.calls[0][2]).toMatchObject({
+      wmkf_sources: 'claude,applicant',
+      wmkf_applicantdisposition: APPLICANT_DISPOSITION_MAP.recommended,
+    });
+    expect(DynamicsService.updateRecord.mock.calls[0][2]).not.toHaveProperty('wmkf_selected');
+  });
+
+  test.each(NON_CONFLICT_CREATE_ERRORS)('non-conflict create error %s preserves the original error and does not recover', async (_label, error) => {
+    DynamicsService.queryRecords.mockResolvedValue({ records: [] });
+    DynamicsService.createRecord.mockRejectedValue(error);
+
+    await expect(ensureApplicantRecommended({ potentialReviewerId: PR_ID, requestId: REQUEST_ID }))
+      .rejects.toBe(error);
+    expect(DynamicsService.queryRecords).toHaveBeenCalledTimes(1);
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('recognized create conflict with no visible winner rethrows the same error after one recovery lookup', async () => {
+    const error = createError('precondition from competing create', 412);
+    DynamicsService.queryRecords.mockResolvedValue({ records: [] });
+    DynamicsService.createRecord.mockRejectedValue(error);
+
+    await expect(ensureApplicantRecommended({ potentialReviewerId: PR_ID, requestId: REQUEST_ID }))
+      .rejects.toBe(error);
+    expect(DynamicsService.queryRecords).toHaveBeenCalledTimes(2); // initial lookup + recovery lookup
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('create-conflict recovery still skips an excluded winner', async () => {
+    DynamicsService.queryRecords
+      .mockResolvedValueOnce({ records: [] })
+      .mockResolvedValueOnce({ records: [{
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        wmkf_applicantdisposition: APPLICANT_DISPOSITION_EXCLUDED,
+        wmkf_sources: 'applicant',
+      }] });
+    DynamicsService.createRecord.mockRejectedValue(createError('write conflict', 409));
+
+    await expect(ensureApplicantRecommended({ potentialReviewerId: PR_ID, requestId: REQUEST_ID }))
+      .resolves.toEqual({ id: SUGGESTION_ID, created: false, selected: false, skippedExcluded: true });
+    expect(DynamicsService.queryRecords).toHaveBeenCalledTimes(2);
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('requireEtag create-conflict recovery patches the winner with its fresh ETag', async () => {
+    DynamicsService.queryRecords
+      .mockResolvedValueOnce({ records: [] })
+      .mockResolvedValueOnce({ records: [{
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        _etag: 'W/"winner"',
+        wmkf_applicantdisposition: null,
+        wmkf_sources: 'claude',
+        wmkf_selected: true,
+      }] });
+    DynamicsService.createRecord.mockRejectedValue(createError('write conflict', 412));
+
+    await ensureApplicantRecommended(
+      { potentialReviewerId: PR_ID, requestId: REQUEST_ID },
+      { requireEtag: true, actingUserSystemId: 'user-1' },
+    );
+    expect(DynamicsService.queryRecords).toHaveBeenCalledTimes(2);
+    expect(DynamicsService.updateRecord).toHaveBeenCalledWith(
+      'wmkf_appreviewersuggestions',
+      SUGGESTION_ID,
+      expect.objectContaining({
+        wmkf_sources: 'claude,applicant',
+        wmkf_applicantdisposition: APPLICANT_DISPOSITION_MAP.recommended,
+      }),
+      { actingUserSystemId: 'user-1', ifMatch: 'W/"winner"' },
+    );
+  });
 });
 
 describe('upsert never converts an excluded row into a candidate', () => {
+  beforeEach(setOrdinaryBindFixture);
   test('skips mutation and flags skippedExcluded when an excluded row already exists', async () => {
     // findByPotentialReviewerAndRequest (queryRecords) returns the existing
     // excluded engagement row.
@@ -1082,6 +1209,7 @@ describe('upsert never converts an excluded row into a candidate', () => {
 });
 
 describe('upsert relevance-score range guard', () => {
+  beforeEach(setOrdinaryBindFixture);
   test('0-100 relevance scores reach Dataverse unchanged', async () => {
     DynamicsService.queryRecords.mockResolvedValue({ records: [] });
 

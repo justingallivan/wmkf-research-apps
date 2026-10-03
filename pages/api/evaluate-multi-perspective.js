@@ -30,7 +30,7 @@ import { requireAppAccess } from '../../lib/utils/auth';
 import { logUsage } from '../../lib/utils/usage-logger';
 import { LLMClient } from '../../lib/services/llm-client';
 import { nextRateLimiter } from '../../shared/api/middleware/rateLimiter';
-import { safeFetch } from '../../lib/utils/safe-fetch';
+import { fetchPublicBlob } from '../../lib/utils/public-blob-fetch';
 import { validateAiJson } from '../../lib/utils/ai-output-schema';
 import {
   INITIAL_ANALYSIS_SCHEMA,
@@ -132,7 +132,7 @@ export default async function handler(req, res) {
         sendProgress(res, 0, `Loading ${file.filename}...`);
 
         // Fetch file from blob URL
-        const fileResponse = await safeFetch(file.url);
+        const fileResponse = await fetchPublicBlob(file.url);
         if (!fileResponse.ok) {
           throw new Error(`Failed to fetch file: ${fileResponse.statusText}`);
         }

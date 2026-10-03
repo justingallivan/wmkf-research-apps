@@ -3,15 +3,22 @@ const {
   LEGACY_HOST,
   shouldRedirectToCanonical,
 } = require('../../lib/utils/legacy-host-redirect');
-// The assertion surface is Next's config object. Keep the external Workflow
-// build wrapper at identity so Jest never parses its ESM package.
-jest.mock('workflow/next', () => ({ withWorkflow: config => config }));
-const nextConfig = require('../../next.config');
+const { execFileSync } = require('child_process');
+const path = require('path');
+// Evaluate the real async Workflow-wrapped config in Node, not Jest's CJS
+// transformer. Server phase avoids generating workflow files during this test.
+const redirects = JSON.parse(execFileSync(process.execPath, ['-e', `
+  (async () => {
+    const exported = require('./next.config');
+    const config = typeof exported === 'function'
+      ? await exported('phase-production-server', {}) : exported;
+    process.stdout.write(JSON.stringify(await config.redirects()));
+  })().catch(error => { console.error(error); process.exit(1); });
+`], { cwd: path.resolve(__dirname, '../..'), encoding: 'utf8', timeout: 30000 }));
 const { getPathMatch } = require('next/dist/shared/lib/router/utils/path-match');
 const { prepareDestination } = require('next/dist/shared/lib/router/utils/prepare-destination');
 
 async function getLegacyRedirectRule() {
-  const redirects = await nextConfig.redirects();
   return redirects.find(rule => (
     rule.has?.some(condition => (
       condition.type === 'host'

@@ -5,6 +5,13 @@
  */
 
 jest.mock('@vercel/postgres', () => ({ sql: jest.fn() }));
+jest.mock('../../lib/services/test-requests/synthetic-reviewer-capability', () => ({
+  assertReviewerIsolationReady: jest.fn(),
+  resolveReviewerBindCapability: jest.fn(async ({ personId }) => ({
+    kind: 'ordinary',
+    person: await require('../../lib/dataverse/adapters/potential-reviewer').getById(personId),
+  })),
+}));
 
 jest.mock('../../lib/dataverse/core/context', () => ({
   withDalContext: jest.fn((_label, fn) => fn()),
@@ -18,6 +25,7 @@ jest.mock('../../lib/utils/auth', () => ({
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   upsertByEmail: jest.fn(async () => ({ id: 'PERSON-1' })),
   getById: jest.fn(async () => ({
+    wmkf_potentialreviewersid: 'PERSON-1',
     wmkf_primaryaffiliation: 'Example University',
     wmkf_emailaddress: 'applicant@example.edu',
     wmkf_emailsource: 'scholarly_multi',
@@ -33,6 +41,7 @@ jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
     id: 'PERSON-1',
     row: { wmkf_potentialreviewersid: 'PERSON-1', statecode: 0 },
   })),
+  findAllByExactEmail: jest.fn(async () => []),
 }));
 jest.mock('../../lib/dataverse/adapters/contact', () => ({
   getInstitutionById: jest.fn(async () => null),
@@ -85,6 +94,7 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   }))),
   listForRequest: jest.fn(async () => ({
     active: [], excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [],
+    handled: [],
   })),
   findCandidateBySuggestion: jest.fn(async () => ({
     candidateKey: 'roster:applicant',

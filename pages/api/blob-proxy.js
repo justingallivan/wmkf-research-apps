@@ -21,9 +21,7 @@
  */
 
 import { requireAuth } from '../../lib/utils/auth';
-
-// Valid Vercel Blob hostname pattern
-const BLOB_HOST_PATTERN = /^[a-z0-9]+\.public\.blob\.vercel-storage\.com$/;
+import { fetchPublicBlob, isPublicBlobUrl } from '../../lib/utils/public-blob-fetch';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -41,19 +39,18 @@ export default async function handler(req, res) {
   }
 
   // Validate the URL is a legitimate Vercel Blob URL
-  let parsedUrl;
   try {
-    parsedUrl = new URL(url);
+    new URL(url);
   } catch {
     return res.status(400).json({ error: 'Invalid URL' });
   }
 
-  if (parsedUrl.protocol !== 'https:' || !BLOB_HOST_PATTERN.test(parsedUrl.hostname)) {
+  if (!isPublicBlobUrl(url)) {
     return res.status(400).json({ error: 'URL is not a valid Vercel Blob URL' });
   }
 
   try {
-    const blobResponse = await fetch(url);
+    const blobResponse = await fetchPublicBlob(url);
 
     if (!blobResponse.ok) {
       return res.status(blobResponse.status).json({

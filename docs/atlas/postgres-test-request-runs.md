@@ -3,17 +3,25 @@ title: Test Request Factory Run Ledger
 domain: test-request-factory
 kind: atlas
 status: active
-summary: "Durable operation ledger for owner-run test request clones; local ledger recorded for cast creation, 054 applied to shared Production (Preview unverified)."
+summary: "Durable test Request ledger, written by the owner-run CLI and, since 2026-10-02, by the deployed admin form in Production. Current copy: managed Neon ledger (054 + 058, operational data loaded 2026-09-30) behind a tracked host registry and schema fingerprint check. Shared Production app DB has 054 + 058 tables (empty; never the ledger); Preview unverified."
 canonical: false
 cataloged: 2026-09-23
-last_verified: 2026-09-29
+last_verified: 2026-10-02
 owner: product-engineering
 related:
   - docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md
   - lib/db/migrations/054_test_request_runs.sql
+  - lib/db/migrations/058_test_request_cast_slot_bindings.sql
 ---
 
-# Atlas: `test_request_runs` / `test_request_run_resources` / `test_request_run_reviewer_assignments` / `test_request_status_changes` / `test_request_cast_members` / `test_request_cast_bindings` (Postgres)
+# Atlas: Test Request Factory Postgres ledger
+
+Tables: `test_request_runs`, `test_request_run_resources`,
+`test_request_run_reviewer_assignments`, `test_request_status_changes`,
+`test_request_cast_members`, `test_request_cast_bindings`, and
+`test_request_cast_slot_bindings`.
+
+**Where the ledger lives (2026-09-30, S553; `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`).** The operational ledger for production test Requests has lived only in `ledger_prod` inside the `wmkf-ledger-pg` Docker container on the owner's home Mac (sandbox counterpart `ledger`), hand-built and never dumped [VERIFIED S553: the office Mac holds no `ledger_prod`]. Owner decision D1 moved it to Neon project `wmkf-factory-ledger` (Vercel Marketplace, connected to no Vercel project, us-east-1), databases `ledger_prod` and `ledger`, with 054 + 058 applied and the local tracker `ledger_schema_migrations` recording 054; the home-Mac operational data was loaded into both on 2026-09-30 and the managed ledger is now the current copy [VERIFIED via `docs/plans/evidence/test-request-factory/ledger-snapshot-2026-09-30.md`]. Merged in PR #374: `lib/db/ledger-registry.js` is the tracked host allowlist the CLI's `requireLedgerUrl(target)` enforces (managed host requires `ledger_prod` for `--target=production`, `ledger` otherwise; the app's `POSTGRES_URL` is always refused), `lib/db/ledger-schema.js` + `lib/db/ledger-schema-fingerprint.json` are the structural schema check every ledger-driven CLI mode runs first (`check:factory-ledger` gate, `--ledger-check`), and `scripts/apply-ledger-migrations.js` is the ledger's own migration runner. Connection strings are `.env.local` variables for the CLI; since 2026-10-02 the production URL is also a hand-set Vercel Production variable for the admin form (`docs/CREDENTIALS_RUNBOOK.md`; see *Second writer: the deployed admin form*).
 
 **[VERIFIED via source, 2026-09-29]** Migration 054 and its fresh-install
 mirror (scripts/setup-database.js, V55) define the durable run ledger for
@@ -48,7 +56,7 @@ the B4 plan forbids pointing that runner at them (cast plan, *Order* 6, §6).
   called by the bounded resumable runner
   `lib/services/test-requests/run-runner.js` (`advanceRun`, one step per
   call) through the CLI modes `--reserve` / `--advance` / `--run-inspect`
-  (and the production `--set-status` / `--status-recheck`, `--create-cast` /
+  (and the production `--set-status` / `--status-recheck` / `--status-abandon`, `--create-cast` /
   `--bind-reviewer` and `--run-recheck` modes, which use the same ledger URL
   check [VERIFIED via `scripts/rehearse-test-request-sandbox.mjs:1283-1341`])
   of `scripts/rehearse-test-request-sandbox.mjs`, which connect only to
@@ -139,6 +147,24 @@ the B4 plan forbids pointing that runner at them (cast plan, *Order* 6, §6).
   is `refreshed` or `not_refreshed`. Sandbox runs write neither row. The
   read-only CLI mode `--target=production --run-recheck=<runId>` re-reads the
   account and evaluates it against the same baseline (no ledger write).
+
+## Second writer: the deployed admin form (2026-10-02)
+
+**[VERIFIED via `lib/services/test-requests/admin-run-service.js`, `lib/services/test-requests/factory-artifact-store.js`, `pages/api/cron/maintenance.js`, `vercel env ls production` (names only) and owner-run `--run-inspect`, 2026-10-02]**
+
+- **Writer:** `createAdminRunService` (`lib/services/test-requests/admin-run-service.js`), behind the eight superuser routes under `pages/api/admin/test-requests/runs/`. It calls the same `createRunLedger`, `advanceRun` and status runner as the CLI: `confirmRun` reserves a run, `advance` advances one step per request, `changeStatus` / `statusRecheck` journal status changes. Recipe: `basic` only.
+- **Which ledger:** the deployment picks the target (`targetFromDeployment`): Vercel Production opens `ledger_prod` through `TEST_REQUEST_LEDGER_URL`; any other deployment opens `ledger` through `TEST_REQUEST_SANDBOX_LEDGER_URL` and never falls back to the production variable (`ledgerUrlFor`). Both go through `requireLedgerUrl`, so the registry and the "never the app database" rule apply unchanged. Production holds only the production URL. Preview holds neither as a standing variable; the 2026-10-02 rehearsal set the sandbox URL branch-scoped and removed it.
+- **Actor:** `admin:<UUIDv5 of the staff profile>`; a run is visible only to the actor that reserved it. A CLI run reserved under a different actor (`cli:<digest>` by default, or `user:<guid>`) is not listed by the form. The CLI's `--advance` takes the manifest and bundle as local files (`--manifest`, `--bundle`), so advancing a form run from the CLI needs them downloaded first (below).
+- **Switch:** `TEST_REQUEST_FACTORY_FORM=on` gates source lookup, Confirm, advance, status change and status recheck (`requireWritable`); list, detail, artifacts, Foundation recheck and status options are not gated. On in Production since 2026-10-02.
+- **Production runs through the form so far:** `20407283-c279-5e0c-b396-210ad6842482` (Request 1003308, `needs_attention`, `file_journal_unverified`, not resumable) and `a5161f47-7b02-5ad3-8f20-3f645ec3c254` (Request 1003310, `ready`, one status change).
+
+### Factory artifact Blob store
+
+- **Store:** private Vercel Blob store `wmkf-factory-private` (`store_I7EbkXANJL0zeaby`), token `FACTORY_BLOB_RW_TOKEN` (Production only). The ledger holds no source text; the form keeps the source bundle and the run manifest here.
+- **Pathnames** (minted only by `factory-artifact-store.js`): `<target>/drafts/<actorId>/<draftId>/bundle.json` at source lookup; `<target>/runs/<runId>/{bundle,manifest}.json` at Confirm, written create-only before the ledger row is reserved.
+- **Reader:** `advance` (manifest, and the bundle checked against the run's `bundleSha256`), the artifacts route, and the owner-run `scripts/factory-artifacts-download.mjs`.
+- **Deletion:** only `sweepFactoryArtifacts`, run by the daily maintenance cron (`pages/api/cron/maintenance.js`), and only when both `TEST_REQUEST_LEDGER_URL` and `FACTORY_BLOB_RW_TOKEN` are set, which is now true in Production. It deletes drafts older than 6 hours; a run's two objects when its ledger row is `ready`; and objects with no ledger row once all are older than 24 hours. It never deletes for a `prepared`, `creating` or `needs_attention` run, so the artifacts of a parked run (today: `20407283`) stay until someone removes them by hand. Caps: 1,000 objects scanned per prefix and 200 deletions per sweep. Not yet observed running in Production.
+- **Consequence:** once a `ready` run's artifacts are swept, its manifest and bundle exist nowhere unless the owner downloaded them first.
 
 ## `test_request_run_reviewer_assignments` (slice 6c-i, D-R2 owner decision, 2026-09-25)
 
@@ -279,8 +305,8 @@ claim about rendered content fidelity.
 **[VERIFIED via lib/db/migrations/054_test_request_runs.sql and lib/services/test-requests/run-ledger.js, 2026-09-28]**
 A fourth table, added in place to migration 054 (and its `scripts/setup-database.js` V55 mirror): one row per Phase I or Phase II Status change the Factory makes on a ready production test Request (`docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`, slice C).
 
-- **Columns:** `change_id` (the CLI's own GUID), `run_id`, per-run `sequence`, `field` (`wmkf_phaseistatus` or `wmkf_phaseiistatus`), `option_before`, `option_after`, `etag_before` (the row version the PATCH's `If-Match` carried), `status` (`planned` → `dispatched` → `applied` → `complete`, or `needs_attention`), `rerun`, `dispatched_at`, `effects` (a receipt under `test_request_receipt_ok`: effect IDs, a digest of the Request Status readback, counts), `error` (sanitized), timestamps.
-- **Writer:** `createRunLedger(db)` `planStatusChange`, `markStatusChangeDispatched`, `markStatusChangeApplied`, `completeStatusChange`, `markStatusChangeNeedsAttention`. No lease: the CLI is owner-run, and a partial unique index (`status IN ('planned','dispatched','applied')`) admits one open change per run.
+- **Columns:** `change_id` (a GUID minted by the runner), `run_id`, per-run `sequence`, `field` (`wmkf_phaseistatus` or `wmkf_phaseiistatus`), `option_before`, `option_after`, `etag_before` (the row version the PATCH's `If-Match` carried), `status` (`planned` → `dispatched` → `applied` → `complete`, or `needs_attention`), `rerun`, `dispatched_at`, `effects` (a receipt under `test_request_receipt_ok`: effect IDs, a digest of the Request Status readback, counts), `error` (sanitized), timestamps.
+- **Writer:** `createRunLedger(db)` `planStatusChange`, `markStatusChangeDispatched`, `markStatusChangeApplied`, `completeStatusChange`, `markStatusChangeNeedsAttention`, `recordLateStatusChangeEffects`. Callers: the status runner (`lib/services/test-requests/status-change-runner.js`), reached from the CLI `--set-status` / `--status-recheck` and, since the admin form's slice 2b (2026-10-01; enabled in Production 2026-10-02, first change that day on Request 1003310), from `admin-run-service.js` `changeStatus` / `statusRecheck`; and the CLI `--status-abandon`, which only closes a `dispatched` change. No lease: a partial unique index (`status IN ('planned','dispatched','applied')`) admits one open change per run, and exactly one PATCH per change is enforced by `markStatusChangeDispatched` being a `planned` → `dispatched` compare-and-set (only the caller that gets the row back sends). A `dispatched` change is never re-sent; `markStatusChangeNeedsAttention` takes an `onlyIf` status so no caller closes a change another caller has moved on. **[VERIFIED via lib/services/test-requests/run-ledger.js and status-change-runner.js, 2026-10-01, S562]**
 - **Reader:** `listStatusChanges(runId)` (the runner's replay and resume checks; `--run-inspect`).
 - **Dataverse reads by the runner** (`lib/services/test-requests/status-change-runner.js`, read-only): `asyncoperations` regarding the Request (completion waits until every job since the write is terminal), `akoya_goapplystatustrackings` by `_akoya_request_value`, regarding `emails`, `akoya_requestpayments`, and the Request's own status fields. Its one write is the fenced `akoya_requests` status PATCH.
 
@@ -294,33 +320,35 @@ Two tables added in place to migration 054 (and the V55 mirror) for the cast pla
 - **Writer:** `createRunLedger(db)` `planCastMember`, `markCastMemberDispatched`, `markCastMemberVerified`, `markCastMemberNeedsAttention`, `planCastBinding`, `markCastBindingDispatched`, `markCastBindingVerified`, `markCastBindingNeedsAttention`. Owner-run CLI, no lease; the unique constraints refuse a second plan.
 - **Reader:** `listCastMembers({ environment })`, `getCastBinding({ runId, memberId })`.
 
+## `test_request_cast_slot_bindings` (B4 branch build, 2026-09-29)
+
+**[VERIFIED via branch source and disposable PostgreSQL test]** Migration 058 adds a separate typed journal for Potential Reviewer 1, one row per `(run_id, member_id)` with a composite foreign key to the verified suggestion's binding row. The row stores the expected Request/person GUIDs, a five-slot occupancy snapshot and concrete pre-PATCH ETag, dispatch and verification timestamps, constrained provenance and failure codes, and typed readback fields. A planned row can stop with `needs_attention` before a snapshot if the Request marker drifts; this is a journaled refusal, with no PATCH. Migration 058 restores the current cast tables and `test_request_receipt_ok` function when an earlier applied 054 lacks them; it repairs the earlier three-role cast-member CHECK and, on explicit replay, the stricter snapshot CHECK from the first B4 draft. It refuses conflicting table columns and required constraints. `scripts/setup-database.js` V57 mirrors the new table for fresh installs, after V56's post-presentation materials. The disposable PostgreSQL test applies current, earlier, and three-role 054→058, reruns 058 after recreating the old snapshot CHECK, verifies the pre-snapshot refusal and compares the installed receipt function with 054. Ledger state for 058: the managed Neon ledgers `ledger_prod` and `ledger` had 054 + 058 applied by hand on 2026-09-30 [VERIFIED S553, `check:factory-ledger` matches the 054 + 058 fingerprint]; the home Mac's local `ledger_prod`/`ledger` have not (`docs/plans/briefs/FACTORY_LEDGER_SNAPSHOT_BRIEF_2026-09-30.md`); the shared Production/Preview database has 054 only.
+
+**[VERIFIED via branch source and disposable PostgreSQL test]** `createRunLedger` exposes `planCastSlotBinding`, snapshot, dispatch, verification, attention and read methods. `runCastSlotBinding` reads the ready run, verified suggestion and exact marked person; observes an already matching slot without a PATCH; otherwise records occupancy and ETag before one fenced PATCH, then reads back all five slots and the marker/run ID. A metadata read failure leaves the planned row retriable; no PATCH was dispatched. A dispatched row resumes by readback without resending. Unit and PostgreSQL tests cover the journal transitions, hand-set slot, occupancy, concrete ETag, response loss and 412 outcomes. Automatic approval review rejected silently extending the production-capable `--bind-reviewer` command with the live slot write. That command remains suggestion-only. A separate `--bind-reviewer-slot=<runId>` command previews the target and occupants read-only; only `--confirm-slot-request=<the previewed Request GUID>` calls the slot runner. This branch has not run a production slot PATCH.
+
 ## Limits
 
 - The owner-run CLI refuses a ledger URL matching the configured shared
-  Production/Preview URLs or a neon.tech host for every ledger-driven mode [VERIFIED via
-  `scripts/rehearse-test-request-sandbox.mjs:750-760,1283-1341`]; the local
+  Production/Preview URLs or any host outside `lib/db/ledger-registry.js` for every
+  ledger-driven mode (the blanket neon.tech refusal was replaced by the registry in PR #374); the local
   `ledger_prod` is recorded for the production cast creation (cast plan,
   *Order* 4). Which local ledger the 1003303 clone and binding used is not
   recorded (see the header). Shared Production has 054 applied (2026-09-26
-  06:54Z, `codex-feature-request-2026-09-26`) [VERIFIED via an owner-run
-  read-only `schema_migrations` query, S552]; Preview's database is unverified.
-- Slice B4 plans a **separate** Potential Reviewer 1 operation table in new
-  migration 058, with a new V57 fresh-install mirror after V56 (S552: 055 and
-  V56 are taken by the unmerged `codex/feature-request`, whose 055 is already
-  applied to shared Production; Integrity claims 056–057). Typed columns
-  hold the slot snapshot and readback without changing the receipt grammar.
-  Migration 058 must reconcile earlier applied 054 shapes before adding its
-  composite foreign key; each target's schema remains unverified. On the
-  operational local `ledger_prod` and `ledger` it is applied by an owner-run
-  `psql -f` after a read-only shape preflight, with a recorded application,
-  never by `apply-migrations.js`. On shared Production/Preview it only keeps
-  the tracked migrations consistent and is not a B4 runtime prerequisite. It
-  is not built or applied [PLANNED via the cast plan, *Order* 6 revision 3,
-  §6].
-- `test_request_run_resources.readback`/`source_provenance` are JSONB and
-  the schema cannot itself forbid a caller from stuffing prohibited content
-  (document bodies, tokens) into them — that discipline lives in the
-  run-ledger.js call sites once the execution service (design-doc stage 3+)
-  is built, and is not enforced by a database constraint.
+  06:54Z, `codex-feature-request-2026-09-26`, early shape: `test_request_runs`
+  and `test_request_run_resources` only) and 058 applied 2026-10-01 01:56Z by
+  the owner's `npm run apply:migrations`, which added the three cast tables to
+  clear the `migration_drift` alert. `test_request_run_reviewer_assignments` and
+  `test_request_status_changes` remain absent there; all tables are empty and
+  the CLI never uses that database [VERIFIED via owner-authorized read-only
+  queries, 2026-09-30/10-01]. Preview's database is unverified.
+- The owner-run `ledger_prod` and `ledger` need read-only schema preflight,
+  explicit 058 application by the owner, and a recorded receipt before the
+  slot operation can use them. `apply-migrations.js` must not target these
+  local ledgers. Shared Production/Preview Postgres migration consistency is
+  not a prerequisite for the owner-run local slot journal.
+- The JSONB resource receipts are checked by `test_request_receipt_ok` in
+  PostgreSQL and by `assertLedgerReceipt` in JavaScript. They accept only
+  bounded allowlisted keys and values; a writer bypassing JavaScript still
+  cannot store arbitrary bodies or tokens in those columns.
 - No cleanup/retention policy exists yet; row growth is unbounded until the
   design doc's stage 5 retirement/retention work lands.

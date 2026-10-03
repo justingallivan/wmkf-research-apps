@@ -18,6 +18,7 @@ jest.mock('../../lib/services/scheduled-email-store', () => ({
 jest.mock('../../lib/services/scheduled-email-service', () => ({
   projectScheduledEmail: jest.fn((row) => row ? ({ id: row.id, version: row.version, status: row.status }) : null),
   deliverScheduledEmail: jest.fn(),
+  RECIPIENTS_CHANGED_COPY: "Recipients changed: the institution's Liaison changed. Review and send again.",
 }));
 
 import listHandler from '../../pages/api/scheduled-emails/index';
@@ -88,6 +89,21 @@ test('send-now action cannot escape PD scope and uses the viewed version', async
   expect(res.body.message.status).toBe('sent');
 });
 
+test('Part B: a send-now held for changed recipients returns 409 with the re-addressed row and the plan copy', async () => {
+  const held = { id: ID, version: 3, status: 'scheduled' };
+  deliverScheduledEmail.mockResolvedValueOnce({ approvalPending: true, reason: 'recipients_changed', message: held });
+  const res = mockRes();
+  await actionHandler({
+    method: 'PATCH', query: { id: ID }, body: { action: 'send_now', version: 2 },
+  }, res);
+  expect(res.statusCode).toBe(409);
+  expect(res.body).toEqual({
+    error: "Recipients changed: the institution's Liaison changed. Review and send again.",
+    outcome: 'failed',
+    message: held,
+  });
+});
+
 test('an uncertain send-now result returns 202 and blocks blind retry language', async () => {
   deliverScheduledEmail.mockRejectedValueOnce(Object.assign(new Error('connection ended'), {
     emailOutcome: 'uncertain',
@@ -116,4 +132,56 @@ test('a stale version returns conflict without mutating the row', async () => {
     method: 'PATCH', query: { id: ID }, body: { action: 'approve', version: 1 },
   }, res);
   expect(res.statusCode).toBe(409);
+});
+
+describe('Part A guards (shared helper, mirrored by the page)', () => {
+  test.each([
+    ['unconfirmed', { last_error_code: 'scheduled_email_send_unconfirmed', send_requested_at: '2026-09-01T00:00:00Z', dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' }],
+    ['activity missing', { last_error_code: 'scheduled_email_activity_missing', dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' }],
+    ['activity forbidden', { last_error_code: 'scheduled_email_activity_forbidden', dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' }],
+  ])('%s: edit, approve and send-now are refused with 409; stop still works', async (_label, fields) => {
+    store.getScheduledEmailForPd.mockResolvedValue({ ...row, status: 'failed', ...fields });
+    for (const action of ['edit', 'approve', 'send_now']) {
+      const res = mockRes();
+      await actionHandler({
+        method: 'PATCH', query: { id: ID }, body: { action, version: 2, subject: 'S', bodyText: 'Body long enough' },
+      }, res);
+      expect(res.statusCode).toBe(409);
+      expect(res.body.attentionReason).toBeTruthy();
+    }
+    expect(store.updateScheduledEmailDraft).not.toHaveBeenCalled();
+    expect(store.approveScheduledEmail).not.toHaveBeenCalled();
+    expect(deliverScheduledEmail).not.toHaveBeenCalled();
+    const res = mockRes();
+    await actionHandler({ method: 'PATCH', query: { id: ID }, body: { action: 'stop', version: 2 } }, res);
+    expect(res.statusCode).toBe(200);
+    expect(store.stopScheduledEmail).toHaveBeenCalledTimes(1);
+  });
+
+  test('A4: a row that already has a Dynamics activity refuses edit and approve, but send-now may still reconcile it', async () => {
+    store.getScheduledEmailForPd.mockResolvedValue({ ...row, dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' });
+    for (const action of ['edit', 'approve']) {
+      const res = mockRes();
+      await actionHandler({
+        method: 'PATCH', query: { id: ID }, body: { action, version: 2, subject: 'S', bodyText: 'Body long enough' },
+      }, res);
+      expect(res.statusCode).toBe(409);
+      expect(res.body.error).toMatch(/already has a Dynamics email/);
+      expect(res.body.attentionReason).toBeNull();
+    }
+    expect(store.updateScheduledEmailDraft).not.toHaveBeenCalled();
+    expect(store.approveScheduledEmail).not.toHaveBeenCalled();
+    const res = mockRes();
+    await actionHandler({ method: 'PATCH', query: { id: ID }, body: { action: 'send_now', version: 2 } }, res);
+    expect(res.statusCode).toBe(200);
+    expect(deliverScheduledEmail).toHaveBeenCalledTimes(1);
+  });
+
+  test('a row with send intent but no marker still refuses send-now (transport guard is independent of the display marker)', async () => {
+    store.getScheduledEmailForPd.mockResolvedValue({ ...row, status: 'failed', send_requested_at: '2026-09-01T00:00:00Z', dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff', last_error_code: null });
+    const res = mockRes();
+    await actionHandler({ method: 'PATCH', query: { id: ID }, body: { action: 'send_now', version: 2 } }, res);
+    expect(res.statusCode).toBe(409);
+    expect(deliverScheduledEmail).not.toHaveBeenCalled();
+  });
 });

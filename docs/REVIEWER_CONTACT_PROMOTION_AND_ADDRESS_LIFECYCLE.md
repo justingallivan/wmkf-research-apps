@@ -24,6 +24,7 @@ related:
   - lib/bill/honorarium-onboard-orchestrator.js
   - lib/services/workbench/manual-reviewer-service.js
   - pages/api/workbench/reviewer-roster.js
+  - lib/services/workbench/reviewer-roster-service.js
   - shared/components/reviewers/CandidateEditModal.js
   - shared/components/reviewers/ReviewerSearchSection.js
 ---
@@ -153,7 +154,7 @@ an unchanged field is an explicit 'use this'" (`CandidateEditModal.js:134-150`).
 The client then stamps `emailSource: 'manual'`
 (`confirmIdentityContact` in `shared/components/reviewers/search/useReviewerContactActions.js`), and the server independently forces the same
 on the authoritative candidate before persisting
-(`pages/api/workbench/reviewer-roster.js:293-310`, field at `:296`).
+(`lib/services/workbench/reviewer-roster-service.js`, `confirm_identity`).
 
 `manual` is a `quick_check` source (`reviewer-invite.js:88`); `ready` is only
 `orcid`, `institution_page`, `scholarly_multi` (`reviewer-invite.js:82`). So the

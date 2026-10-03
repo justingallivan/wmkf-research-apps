@@ -1,13 +1,26 @@
 /** @jest-environment node */
-import { buildContributorContext, finalizeMaterialUpload, outOfSync } from '../../lib/services/site-visit-materials/contributor-service';
+import { createHash } from 'node:crypto';
+import { buildContributorContext, finalizeMaterialUpload, outOfSync, MATERIAL_SCAN_POLICY_VERSION } from '../../lib/services/site-visit-materials/contributor-service';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE, REQUEST_DOCUMENT_LIFECYCLE_STATE, REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument';
 import { SITE_VISIT_MATERIALS_CHECKLIST } from '../../shared/config/siteVisitMaterials';
 import AlertRecipients from '../../lib/services/alert-recipients';
+import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request';
+import * as systemUserAdapter from '../../lib/dataverse/adapters/system-user';
+
+jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/grant-request'),
+  getById: jest.fn(),
+}));
+jest.mock('../../lib/dataverse/adapters/system-user', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/system-user'),
+  getByIdWithSelect: jest.fn(),
+}));
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const COLLECTION_ID = '22222222-2222-4222-8222-222222222222';
 const STAGING_ID = '33333333-3333-4333-8333-333333333333';
 const STAGING_LEASE = '44444444-4444-4444-8444-444444444444';
+const COORDINATOR_ID = '55555555-5555-4555-8555-555555555555';
 const PDF = Buffer.from('%PDF-1.7\n%âãÏÓ\n1 0 obj');
 const ZIP = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(64, 1)]);
 const REQUEST = { akoya_requestid: REQUEST_ID, akoya_requestnum: '1003222', akoya_title: 'Neural dust', wmkf_meetingdate: '2026-12-08T00:00:00Z', _akoya_applicantid_value_formatted: 'Caltech' };
@@ -33,7 +46,7 @@ function deps(overrides = {}) {
     supersedeDocument: jest.fn(async () => ({})),
     scanEnabled: () => true,
     scanBytes: jest.fn(async () => ({ scan_result: 'clean' })),
-    getUploadMaxMb: jest.fn(async () => ({ maxMb: 100 })),
+    getUploadMaxMb: jest.fn(async () => ({ maxMb: 500 })),
     getSupportEmail: jest.fn(async () => null),
     acquireSlotLease: jest.fn(async () => ({ leaseToken: 'slot-lease', expiresAt: new Date('2026-11-21T09:05:00Z') })),
     releaseSlotLease: jest.fn(async () => true),
@@ -51,7 +64,7 @@ test('context shows institution, title, dates, cap, and per-slot receipt; waived
   const ctx = await buildContributorContext({ collection: col }, d);
   expect(ctx.institution).toBe('Caltech');
   expect(ctx.proposalTitle).toBe('Neural dust');
-  expect(ctx.maxMb).toBe(100);
+  expect(ctx.maxMb).toBe(500);
   expect(ctx.closed).toBe(false);
   expect(ctx.checklist.map((i) => i.key)).toEqual(['presentation_pdf', 'presentation_source']);
   expect(ctx.checklist[0].received).toEqual({ filename: '1003222 Site Visit Presentation.pdf', receivedAt: '2026-11-20T10:00:00Z' });
@@ -59,6 +72,68 @@ test('context shows institution, title, dates, cap, and per-slot receipt; waived
   expect(JSON.stringify(ctx)).not.toContain('drive');
   const closed = await buildContributorContext({ collection: collection({ closes_at: '2026-11-01T00:00:00Z' }) }, d);
   expect(closed.closed).toBe(true);
+});
+
+test('applicant context exposes safe diagnostics only for terminal infected jobs', async () => {
+  const d = deps({
+    backgroundJobsSchemaReady: () => true,
+    listBackgroundJobs: async () => [
+      { job_id: 'failed', staging_id: 's1', slot: 'presentation_pdf', status: 'failed', filename: 'deck.pdf', error_code: 'scan_infected', scan_rejection: { category: 'blocked_content', flags: ['embedded_macro'] } },
+      { job_id: 'attention', staging_id: 's2', slot: 'participant_bios', status: 'needs_attention', filename: 'bios.pdf', error_code: 'scan_infected', scan_rejection: { category: 'signature_match', flags: [] } },
+      { job_id: 'bad', staging_id: 's3', slot: 'other', status: 'failed', filename: 'x.pdf', error_code: 'scan_infected', scan_rejection: { category: 'blocked_content', flags: ['provider-secret'] } },
+    ],
+  });
+  const ctx = await buildContributorContext({ collection: collection() }, d);
+  expect(ctx.jobs[0]).toMatchObject({ errorCode: 'infected', scanRejection: { category: 'blocked_content', flags: ['embedded_macro'] } });
+  expect(ctx.jobs[1]).toMatchObject({ errorCode: 'coordinator_action_required' });
+  expect(ctx.jobs[1]).not.toHaveProperty('scanRejection');
+  expect(ctx.jobs[2]).toMatchObject({ errorCode: 'infected', scanRejection: null });
+  expect(JSON.stringify(ctx)).not.toContain('provider-secret');
+});
+
+describe('Program Coordinator context', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  test('returns only the enabled assigned coordinator name and validated email', async () => {
+    systemUserAdapter.getByIdWithSelect.mockResolvedValue({
+      systemuserid: COORDINATOR_ID,
+      fullname: ' Casey Coordinator ',
+      internalemailaddress: 'casey@wmkeck.org',
+      isdisabled: false,
+    });
+    const { DEFAULT_DEPENDENCIES } = await import('../../lib/services/site-visit-materials/contributor-service');
+    await expect(DEFAULT_DEPENDENCIES.getProgramCoordinator({ _wmkf_programcoordinator_value: COORDINATOR_ID }))
+      .resolves.toEqual({ name: 'Casey Coordinator', email: 'casey@wmkeck.org' });
+    expect(systemUserAdapter.getByIdWithSelect).toHaveBeenCalledWith(COORDINATOR_ID, 'systemuserid,fullname,internalemailaddress,isdisabled');
+  });
+
+  test('request projection includes the assigned coordinator lookup', async () => {
+    grantRequestAdapter.getById.mockResolvedValue(REQUEST);
+    const { DEFAULT_DEPENDENCIES } = await import('../../lib/services/site-visit-materials/contributor-service');
+    await DEFAULT_DEPENDENCIES.getRequest(REQUEST_ID);
+    expect(grantRequestAdapter.getById.mock.calls[0][1].select).toContain('_wmkf_programcoordinator_value');
+  });
+
+  test.each([
+    ['disabled', { fullname: 'Casey', internalemailaddress: 'casey@wmkeck.org', isdisabled: true }, null],
+    ['missing email', { fullname: 'Casey', internalemailaddress: '', isdisabled: false }, { name: 'Casey', email: null }],
+    ['invalid email', { fullname: 'Casey', internalemailaddress: 'not-an-email', isdisabled: false }, { name: 'Casey', email: null }],
+    ['missing name and email', { fullname: '', internalemailaddress: '', isdisabled: false }, null],
+  ])('handles %s without exposing the lookup record', async (_label, record, expected) => {
+    systemUserAdapter.getByIdWithSelect.mockResolvedValue({ systemuserid: COORDINATOR_ID, ...record });
+    const { DEFAULT_DEPENDENCIES } = await import('../../lib/services/site-visit-materials/contributor-service');
+    await expect(DEFAULT_DEPENDENCIES.getProgramCoordinator({ _wmkf_programcoordinator_value: COORDINATOR_ID }))
+      .resolves.toEqual(expected);
+  });
+
+  test('lookup failure does not prevent building the upload context', async () => {
+    const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const d = deps({ getProgramCoordinator: async () => { throw new Error('lookup failed'); } });
+    const ctx = await buildContributorContext({ collection: collection() }, d);
+    expect(ctx.ok).toBe(true);
+    expect(ctx.programCoordinator).toBeNull();
+    expect(log).toHaveBeenCalledWith('[site-visit-materials] Program Coordinator lookup failed.');
+  });
 });
 
 describe('supportEmail', () => {
@@ -110,7 +185,7 @@ test('outOfSync flags PDF and source received more than an hour apart', () => {
 test('finalize validates, scans, uploads under the canonical name with replace, registers a READY/DRAFT row, and supersedes the prior slot row', async () => {
   const d = deps({ findDocumentsByRequest: async () => ({ records: [ROW_PDF] }) });
   const result = await finalizeMaterialUpload(finalizeArgs('presentation_pdf', { filename: 'Our Deck v3.pdf', buffer: PDF }), d);
-  expect(d.scanBytes).toHaveBeenCalledWith(PDF, 'Our Deck v3.pdf');
+  expect(d.scanBytes).toHaveBeenCalledWith(PDF, 'Our Deck v3.pdf', { timeoutMs: 90_000, maxAttempts: 2 });
   expect(d.ensureFolderPath).toHaveBeenCalledWith('akoya_request', 'Neural dust_ABC123/Site Visit - Slides');
   expect(d.uploadFile).toHaveBeenCalledWith('akoya_request', 'Neural dust_ABC123/Site Visit - Slides', '1003222 Site Visit Presentation.pdf', PDF, 'application/pdf', { conflictBehavior: 'replace' });
   const [payload, options] = d.createDocument.mock.calls[0];
@@ -155,14 +230,33 @@ test('finalize refuses: waived slot, oversize, wrong bytes, infected scan, no ac
   const waived = collection(); waived.checklist[0].waived = true;
   await expect(finalizeMaterialUpload(finalizeArgs('presentation_pdf', { filename: 'a.pdf', buffer: PDF }, { collection: waived }), d)).rejects.toMatchObject({ code: 'slot_not_open', httpStatus: 400 });
   const tiny = deps({ getUploadMaxMb: async () => ({ maxMb: 1 }) });
-  await expect(finalizeMaterialUpload(finalizeArgs('presentation_pdf', { filename: 'a.pdf', buffer: Buffer.alloc(1024 * 1024 + 1) }), tiny)).rejects.toMatchObject({ code: 'file_too_large' });
+  await expect(finalizeMaterialUpload(finalizeArgs('presentation_pdf', { filename: 'a.pdf', buffer: Buffer.alloc(1024 * 1024 + 1) }), tiny)).rejects.toMatchObject({
+    code: 'file_too_large',
+    body: { reason: 'file_too_large', maxMb: 1 },
+  });
   await expect(finalizeMaterialUpload(finalizeArgs('presentation_pdf', { filename: 'a.pdf', buffer: ZIP }), d)).rejects.toMatchObject({ code: 'signature_mismatch', httpStatus: 422 });
-  const infected = deps({ scanBytes: async () => ({ scan_result: 'infected' }) });
+  const recordEvent = jest.fn(async () => undefined);
+  const infected = deps({ scanBytes: async () => ({
+    scan_result: 'infected', signatureDetected: false, contentFlags: ['embedded_macro'],
+    foundViruses: [{ fileName: 'https://private.example/secret.pdf', virusName: 'provider secret' }],
+    verifiedFileFormat: 'provider-format-secret',
+  }), recordEvent });
   const unknown = deps({ scanBytes: async () => ({}) });
   await expect(finalizeMaterialUpload(finalizeArgs(), unknown)).rejects.toMatchObject({ code: 'scan_unavailable', httpStatus: 503 });
   const errored = deps({ scanBytes: async () => ({ scan_result: 'error' }) });
   await expect(finalizeMaterialUpload(finalizeArgs(), errored)).rejects.toMatchObject({ code: 'scan_unavailable' });
-  await expect(finalizeMaterialUpload(finalizeArgs(), infected)).rejects.toMatchObject({ code: 'scan_infected' });
+  await expect(finalizeMaterialUpload(finalizeArgs(), infected)).rejects.toMatchObject({
+    code: 'scan_infected',
+    body: { scanRejection: { category: 'blocked_content', flags: ['embedded_macro'] } },
+  });
+  expect(infected.recordEvent).toHaveBeenCalledWith(expect.objectContaining({
+    eventType: 'site_visit_material_scan_rejected',
+    severity: 'warning',
+    entityRefs: expect.objectContaining({ stagingId: STAGING_ID, slot: 'presentation_pdf' }),
+    metadata: { scanRejection: { category: 'blocked_content', flags: ['embedded_macro'] } },
+    dedupeKey: `site_visit_material_scan_rejected:${STAGING_ID}`,
+  }));
+  expect(JSON.stringify(infected.recordEvent.mock.calls)).not.toMatch(/provider secret|provider-format-secret|virusName|https:\/\//i);
   const noBucket = deps({ getSharePointBuckets: async () => [{ library: 'Archive', folder: 'x', source: 'archive' }] });
   await expect(finalizeMaterialUpload(finalizeArgs(), noBucket)).rejects.toMatchObject({ code: 'folder_unavailable', httpStatus: 503 });
   for (const x of [d, tiny, infected, unknown, errored, noBucket]) { expect(x.uploadFile).not.toHaveBeenCalled(); expect(x.createDocument).not.toHaveBeenCalled(); }
@@ -276,14 +370,33 @@ test('slot contention returns retryable 409 before any registry or SharePoint re
   expect(d.uploadFile).not.toHaveBeenCalled();
 });
 
-test('thrown scanner failures are sanitized into unavailable or misconfigured errors', async () => {
+test('thrown scanner failures map to specific safe reasons and log null status as null', async () => {
   const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
   const unavailable = deps({ scanBytes: async () => { throw Object.assign(new Error('socket secret'), { serviceName: 'cloudmersive', status: 503, isTransient: true }); } });
-  await expect(finalizeMaterialUpload(finalizeArgs(), unavailable)).rejects.toMatchObject({ code: 'scan_unavailable', httpStatus: 503 });
+  await expect(finalizeMaterialUpload(finalizeArgs(), unavailable)).rejects.toMatchObject({
+    code: 'scan_unavailable', httpStatus: 503, body: { error: expect.not.stringContaining('socket secret') },
+  });
+  const timeout = deps({ scanBytes: async () => { throw Object.assign(new Error('timeout secret'), { serviceName: 'cloudmersive', status: null, noResponse: true, isTransient: true, causeKind: 'abort' }); } });
+  await expect(finalizeMaterialUpload(finalizeArgs(), timeout)).rejects.toMatchObject({
+    code: 'scan_timeout', httpStatus: 503, body: { error: expect.not.stringContaining('timeout secret') },
+  });
+  const busy = deps({ scanBytes: async () => { throw Object.assign(new Error('provider body secret'), { serviceName: 'cloudmersive', status: 429, isTransient: true }); } });
+  await expect(finalizeMaterialUpload(finalizeArgs(), busy)).rejects.toMatchObject({
+    code: 'scan_busy', httpStatus: 503, body: { error: expect.not.stringContaining('provider body secret') },
+  });
   const misconfigured = deps({ scanBytes: async () => { throw Object.assign(new Error('bad key secret'), { serviceName: 'cloudmersive', status: 401, isTransient: false }); } });
-  await expect(finalizeMaterialUpload(finalizeArgs(), misconfigured)).rejects.toMatchObject({ code: 'scan_misconfigured', httpStatus: 500 });
+  await expect(finalizeMaterialUpload(finalizeArgs(), misconfigured)).rejects.toMatchObject({
+    code: 'scan_misconfigured', httpStatus: 500, body: { error: expect.not.stringContaining('bad key secret') },
+  });
+  for (const failedScan of [unavailable, timeout, busy, misconfigured]) {
+    expect(failedScan.acquireSlotLease).not.toHaveBeenCalled();
+    expect(failedScan.uploadFile).not.toHaveBeenCalled();
+    expect(failedScan.createDocument).not.toHaveBeenCalled();
+  }
   expect(log.mock.calls).toEqual([
     ['[site-visit-materials] malware scan failed', { serviceName: 'cloudmersive', status: 503, isTransient: true, causeKind: null }],
+    ['[site-visit-materials] malware scan failed', { serviceName: 'cloudmersive', status: null, isTransient: true, causeKind: 'abort' }],
+    ['[site-visit-materials] malware scan failed', { serviceName: 'cloudmersive', status: 429, isTransient: true, causeKind: null }],
     ['[site-visit-materials] malware scan failed', { serviceName: 'cloudmersive', status: 401, isTransient: false, causeKind: null }],
   ]);
   log.mockRestore();
@@ -331,4 +444,127 @@ test('replay_ambiguous records one durable staff event keyed on the staging id; 
     candidateResult: { requestId: REQUEST_ID, slot: 'presentation_pdf', generationKey: 'stale' },
   }), broken)).rejects.toMatchObject({ code: 'replay_ambiguous', httpStatus: 409 });
   log.mockRestore();
+});
+
+
+describe('background finalization preserves scan and replacement contracts', () => {
+  const sha256 = createHash('sha256').update(PDF).digest('hex');
+  const backgroundJob = { jobId: 'durable-job', leaseToken: STAGING_LEASE,
+    lockedUntil: '2026-11-21T09:06:00Z', scanCheckpoint: null };
+  const args = (job = backgroundJob) => finalizeArgs('presentation_pdf', { filename: 'a.pdf', buffer: PDF, sha256 }, { backgroundJob: job });
+  const backgroundDeps = (overrides = {}) => deps({
+    assertBackgroundJobLease: jest.fn(async () => true), recordBackgroundScan: jest.fn(async () => true), ...overrides,
+  });
+
+  test('clean checkpoint commits before any Graph mutation and exact candidate receipt precedes registry publication', async () => {
+    const d = backgroundDeps();
+    await finalizeMaterialUpload(args(), d);
+    expect(d.recordBackgroundScan).toHaveBeenCalledWith(expect.objectContaining({ jobId: backgroundJob.jobId, sha256, policyVersion: MATERIAL_SCAN_POLICY_VERSION }));
+    expect(d.recordBackgroundScan.mock.invocationCallOrder[0]).toBeLessThan(d.ensureFolderPath.mock.invocationCallOrder[0]);
+    expect(d.recordPortalUploadCandidate.mock.invocationCallOrder[0]).toBeLessThan(d.createDocument.mock.invocationCallOrder[0]);
+    expect(d.recordPortalUploadCandidate).toHaveBeenCalledWith(expect.objectContaining({ backgroundJobId: backgroundJob.jobId, candidate: expect.objectContaining({ driveId: 'drive', itemId: 'item-1', eTag: '"1"' }) }));
+  });
+
+  test('only a matching clean hash and scan policy checkpoint skips the scanner', async () => {
+    const d = backgroundDeps();
+    await finalizeMaterialUpload(args({ ...backgroundJob, scanCheckpoint: { clean: true, sha256, policyVersion: MATERIAL_SCAN_POLICY_VERSION } }), d);
+    expect(d.scanBytes).not.toHaveBeenCalled();
+    expect(d.recordBackgroundScan).not.toHaveBeenCalled();
+    expect(d.createDocument).toHaveBeenCalledTimes(1);
+    expect(d.assertBackgroundJobLease).toHaveBeenCalled();
+  });
+
+  test.each([
+    { clean: true, sha256: 'different-bytes', policyVersion: MATERIAL_SCAN_POLICY_VERSION },
+    { clean: true, sha256, policyVersion: 'obsolete-policy' },
+    { clean: false, sha256, policyVersion: MATERIAL_SCAN_POLICY_VERSION },
+  ])('a mismatched checkpoint triggers a new scan: %j', async (scanCheckpoint) => {
+    const d = backgroundDeps();
+    await finalizeMaterialUpload(args({ ...backgroundJob, scanCheckpoint }), d);
+    expect(d.scanBytes).toHaveBeenCalledWith(PDF, 'a.pdf', expect.any(Object));
+    expect(d.recordBackgroundScan).toHaveBeenCalled();
+  });
+
+  test.each(['infected', 'unknown'])('%s verdict cannot checkpoint or publish', async (scan_result) => {
+    const d = backgroundDeps({ scanBytes: jest.fn(async () => ({ scan_result })) });
+    await expect(finalizeMaterialUpload(args(), d)).rejects.toMatchObject({ code: scan_result === 'infected' ? 'scan_infected' : 'scan_unavailable' });
+    expect(d.recordBackgroundScan).not.toHaveBeenCalled();
+    expect(d.ensureFolderPath).not.toHaveBeenCalled();
+    expect(d.uploadFile).not.toHaveBeenCalled();
+    expect(d.createDocument).not.toHaveBeenCalled();
+  });
+
+  test('background cannot use the synchronous scanner-disabled exemption', async () => {
+    const d = backgroundDeps({ scanEnabled: () => false });
+    await expect(finalizeMaterialUpload(args(), d)).rejects.toMatchObject({ code: 'scan_paused' });
+    expect(d.uploadFile).not.toHaveBeenCalled();
+    expect(d.createDocument).not.toHaveBeenCalled();
+  });
+
+  test('checkpoint persistence failure stops before creating a SharePoint folder or file', async () => {
+    const d = backgroundDeps({ recordBackgroundScan: jest.fn(async () => false) });
+    await expect(finalizeMaterialUpload(args(), d)).rejects.toMatchObject({ code: 'background_lease_lost' });
+    expect(d.ensureFolderPath).not.toHaveBeenCalled();
+    expect(d.uploadFile).not.toHaveBeenCalled();
+  });
+
+  test('failed replacement writes only its staging-specific folder, leaving the prior item and registry row intact', async () => {
+    const d = backgroundDeps({ findDocumentsByRequest: jest.fn(async () => ({ records: [ROW_PDF] })),
+      createDocument: jest.fn(async () => { throw new Error('registry unavailable'); }) });
+    await expect(finalizeMaterialUpload(args(), d)).rejects.toThrow('registry unavailable');
+    expect(d.uploadFile).toHaveBeenCalledWith('akoya_request', `Neural dust_ABC123/Site Visit - Slides/portal-${STAGING_ID}`,
+      '1003222 Site Visit Presentation.pdf', PDF, 'application/pdf', { conflictBehavior: 'replace' });
+    expect(d.recordPortalUploadCandidate).toHaveBeenCalledWith(expect.objectContaining({ candidate: expect.objectContaining({ predecessorArtifactId: ROW_PDF.wmkf_requestdocumentid }) }));
+    expect(d.supersedeDocument).not.toHaveBeenCalled();
+    expect(d.releaseSlotLease).toHaveBeenCalled();
+  });
+
+  test('successful background registry links identify the isolated canonical file', async () => {
+    const d = backgroundDeps();
+    await finalizeMaterialUpload(args(), d);
+    expect(d.createDocument).toHaveBeenCalledWith(expect.objectContaining({
+      wmkf_sharepointfolderpath: `Neural dust_ABC123/Site Visit - Slides/portal-${STAGING_ID}`,
+      wmkf_filename: '1003222 Site Visit Presentation.pdf', wmkf_sharepointweburl: 'https://sp/x',
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    }), expect.any(Object));
+    expect(d.acquireSlotLease).toHaveBeenCalledWith(expect.objectContaining({ backgroundJobId: backgroundJob.jobId, expiresAt: backgroundJob.lockedUntil }));
+  });
+
+  test('lost authority after Graph returns cannot publish a candidate or registry row', async () => {
+    const d = backgroundDeps();
+    d.uploadFile.mockImplementation(async () => {
+      d.assertBackgroundJobLease.mockResolvedValue(false);
+      return { driveId: 'drive', id: 'new-unpublished-item' };
+    });
+    await expect(finalizeMaterialUpload(args(), d)).rejects.toMatchObject({ code: 'background_lease_lost' });
+    expect(d.recordPortalUploadCandidate).not.toHaveBeenCalled();
+    expect(d.createDocument).not.toHaveBeenCalled();
+    expect(d.supersedeDocument).not.toHaveBeenCalled();
+  });
+});
+
+
+test.each([
+ ['invalid_file','invalid_file'], ['size_limit','size_limit'], ['retry_limit','processing_deadline'],
+ ['storage_unavailable','storage_unavailable'], ['scan_infected','infected'],
+])('context carries the worker reason %s as safe user-facing %s', async (error_code, expected) => {
+ const d=deps({ backgroundJobsSchemaReady:()=>true, listBackgroundJobs:async()=>[
+  {job_id:'job',staging_id:STAGING_ID,slot:'presentation_pdf',status:'failed',error_code, private_diagnostic:'provider secret'},
+ ] });
+ const result=await buildContributorContext({collection:collection()},d);
+ expect(result.jobs[0]).toMatchObject({errorCode:expected});
+ expect(JSON.stringify(result)).not.toContain('provider secret');
+});
+
+test('contributor context omits stored SharePoint URLs for checklist and other receipts', async () => {
+  const d = deps({ findDocumentsByRequest: jest.fn(async () => ({ records: [
+    { ...ROW_PDF, wmkf_sharepointweburl: 'https://tenant.sharepoint.com/presentation.pdf' },
+    { ...ROW_PDF, wmkf_requestdocumentid: 'other', wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.OTHER_APPLICANT_MATERIALS, wmkf_filename: 'Supporting.pdf', wmkf_sharepointweburl: 'https://tenant.sharepoint.com/supporting.pdf' },
+  ] })) });
+  const result = await buildContributorContext({ collection: collection() }, d);
+  expect(result.checklist[0].received.filename).toBe(ROW_PDF.wmkf_filename);
+  expect(result.other).toHaveLength(1);
+  expect(JSON.stringify(result)).not.toContain('sharepoint.com');
+  expect(result.checklist[0].received).not.toHaveProperty('webUrl');
+  expect(result.other[0]).not.toHaveProperty('webUrl');
 });

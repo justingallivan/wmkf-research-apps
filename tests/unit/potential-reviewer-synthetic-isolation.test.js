@@ -13,6 +13,7 @@
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import {
   findByEmailCandidates,
+  findAllByExactEmail,
   findByOrcidCandidates,
   searchByName,
   upsertByEmail,
@@ -92,6 +93,19 @@ describe('switch ON — (a) exclude marker-true rows unconditionally', () => {
     const result = await findByEmailCandidates('ada@example.edu');
     expect(result.one).toBe(true);
     expect(result.id).toBe(ORDINARY_ID);
+  });
+
+  it('exact ownership scans all pages and still exposes a cast owner after three ordinary rows', async () => {
+    const ordinary = [1, 2, 3].map((n) => ordinaryRow({ wmkf_potentialreviewersid: `44444444-4444-4444-8444-44444444444${n}` }));
+    const spy = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: [...ordinary, syntheticRow()], capped: false,
+    });
+    const rows = await findAllByExactEmail('ada@example.edu');
+    expect(rows).toHaveLength(4);
+    expect(rows.at(-1).wmkf_issyntheticreviewer).toBe(true);
+    expect(spy.mock.calls[0][1].filter).not.toMatch(/wmkf_issyntheticreviewer/);
+    spy.mockResolvedValueOnce({ records: ordinary, capped: true });
+    await expect(findAllByExactEmail('ada@example.edu')).rejects.toThrow(/incomplete/);
   });
 
   it('findByOrcidCandidates excludes a marker-true row that WOULD match on ORCID', async () => {

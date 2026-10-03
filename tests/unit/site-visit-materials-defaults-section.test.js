@@ -24,10 +24,10 @@ describe('SiteVisitMaterialsDefaultsSection', () => {
 
   describe('GET /api/admin/site-visit-materials-defaults (load)', () => {
     test('(a) 2xx populates the field from the default', async () => {
-      global.fetch.mockResolvedValueOnce(jsonResponse(200, { maxMb: 75, limits: { min: 1, max: 500 }, defaultMb: 100, source: 'default' }));
+      global.fetch.mockResolvedValueOnce(jsonResponse(200, { maxMb: 500, limits: { min: 1, max: 500 }, defaultMb: 500, source: 'default' }));
       render(<SiteVisitMaterialsDefaultsSection />);
-      expect(await screen.findByLabelText('Upload cap (MB)')).toHaveValue(75);
-      expect(screen.getByText(/Using the default of 100 MB/)).toBeInTheDocument();
+      expect(await screen.findByLabelText('Upload cap (MB)')).toHaveValue(500);
+      expect(screen.getByText(/Using the default of 500 MB/)).toBeInTheDocument();
       expect(global.fetch.mock.calls[0][0]).toBe('/api/admin/site-visit-materials-defaults');
     });
 
@@ -60,7 +60,7 @@ describe('SiteVisitMaterialsDefaultsSection', () => {
 
   describe('PUT /api/admin/site-visit-materials-defaults (save)', () => {
     async function setup() {
-      global.fetch.mockResolvedValueOnce(jsonResponse(200, { maxMb: 75, limits: { min: 1, max: 500 }, defaultMb: 100, source: 'default' }));
+      global.fetch.mockResolvedValueOnce(jsonResponse(200, { maxMb: 500, limits: { min: 1, max: 500 }, defaultMb: 500, source: 'default' }));
       render(<SiteVisitMaterialsDefaultsSection />);
       await screen.findByLabelText('Upload cap (MB)');
       fireEvent.change(screen.getByLabelText('Upload cap (MB)'), { target: { value: '80' } });

@@ -1,0 +1,22 @@
+{
+  "observedAt": "2026-09-30T19:00:55.391Z",
+  "ownerAuthorization": "Restore shared .env.local symlink in this worktree",
+  "localEnvSymlink": true,
+  "relativeTarget": "../WMKF_Apps/.env.local",
+  "targetUnmodified": true,
+  "keys": {
+    "TEST_REQUEST_LEDGER_URL": true,
+    "TEST_REQUEST_SANDBOX_LEDGER_URL": true
+  },
+  "switches": {
+    "TEST_REQUEST_ISOLATION": "off",
+    "SYNTHETIC_REVIEWER_ISOLATION": "off"
+  },
+  "liveDatabaseOrDataverseCalls": false,
+  "loadersVerified": [
+    "Factory CLI loadEnvLocal",
+    "Next.js development loadEnvConfig"
+  ],
+  "documentationGateCommandsPassed": 20,
+  "secretAndWhitespaceChecksPassed": true
+}

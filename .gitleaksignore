@@ -2,3 +2,10 @@
 b5b59ef11e1ce397449f905f6f459adc187f6a25:tests/unit/verify-briefing-token.test.js:generic-api-key:10
 # Historical synthetic test-secret in the retired presentation media proof test.
 c4c071eacab233172e345da82c3aad4db5796e13:tests/unit/presentation-media-proof-service.test.js:generic-api-key:19
+# Fixed Blob token prefix in the read-only transcription preflight; it identifies the dedicated store, not a credential.
+78a3d5595e7045680f28eaf00bd0b462c53c73df:lib/services/transcription-pilot/preflight.js:generic-api-key:5
+# Synthetic _fixture values in focused dedicated-preflight tests; no live credentials are present.
+b9f2385d595af0c16eb9d593a8d31e0dbb029f0b:tests/unit/transcription-pilot-dedicated-preflight.test.js:generic-api-key:15
+78a3d5595e7045680f28eaf00bd0b462c53c73df:tests/unit/transcription-pilot-preflight.test.js:generic-api-key:11
+# Fixed Blob token prefix in the local preview-storage check; it identifies the expected store, not a credential.
+78a3d5595e7045680f28eaf00bd0b462c53c73df:scripts/check-transcription-preview-storage.js:generic-api-key:16

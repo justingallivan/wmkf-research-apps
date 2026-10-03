@@ -17,7 +17,7 @@
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { BASE_CONFIG } from '../../../shared/config/baseConfig';
-import { safeFetch } from '../../../lib/utils/safe-fetch';
+import { fetchPublicBlob } from '../../../lib/utils/public-blob-fetch';
 import { ClaudeReviewerService } from '../../../lib/services/claude-reviewer-service';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 import { DEFAULT_REVIEWER_COUNT } from '../../../shared/config/reviewerFinderPreferences';
@@ -107,7 +107,7 @@ export default async function handler(req, res) {
       sendEvent('progress', { stage: 'upload', message: 'Fetching uploaded file...' });
 
       // Fetch from Vercel Blob
-      const blobResponse = await safeFetch(blobUrl);
+      const blobResponse = await fetchPublicBlob(blobUrl);
       if (!blobResponse.ok) {
         throw new Error('Failed to fetch uploaded file');
       }

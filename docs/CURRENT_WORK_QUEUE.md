@@ -99,6 +99,7 @@ sequence.
   authorized; both source branches were already gone from origin). Seven Web
   redirect URIs remain, including three older deployment-hash callbacks that
   were not part of that directive.
+- **Dependabot triage 2026-09-30 (S553).** PR #378 (merge `361fbcdfd`) closed all five open alerts: Next 16.3.5 → 16.3.8 (critical next/og RCE; `next/og` is not imported in this repo), dompurify 3.4.13 → 3.4.16 (low), and the vendored brace-expansion shim's upstream pin 5.0.9 → 5.0.12 in both the root and `vendor/brace-expansion-compat` package.json (two high, one medium). `npm audit` reported 0 vulnerabilities; the alert count on `main` was 0 after the merge.
 - **Dependabot triage 2026-09-12 (S509).** Patch bumps (Next 16.3.5, xmldom 0.8.15,
   sharp 0.35.4, qs 6.16.0, js-yaml 3.15.2/4.3.2) and csv-parse 7.0.2 (a mistaken major
   with no breaking changes) shipped in S509. At that time, the IRS BMF importer's

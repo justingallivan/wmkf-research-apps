@@ -264,6 +264,23 @@ test('data.outcome === "uncertain" on "Send now" shows the uncertain feedback re
   expect(status).toHaveTextContent('Timed out. Check the recipient before trying again.');
 });
 
+test('Part B: a "Send now" refused for changed recipients shows the new Cc and version and keeps the warning visible', async () => {
+  const copy = "Recipients changed: the institution's Liaison changed. Review and send again.";
+  await renderWithMessage([[/\/api\/scheduled-emails\/m1$/, async () => response(409, {
+    error: copy,
+    outcome: 'failed',
+    message: { ...MESSAGE, version: 2, ccRecipients: ['new.liaison@example.edu'], approvalRequired: true },
+  })]]);
+  fireEvent.click(screen.getByRole('button', { name: 'Send now' }));
+  await screen.findByText('new.liaison@example.edu');
+  const status = await screen.findByRole('status');
+  expect(status).toHaveAttribute('data-status', 'failed');
+  expect(status).toHaveTextContent(copy);
+  // Effects keyed on the new version have settled; the warning is still there.
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+  expect(screen.getByRole('status')).toHaveTextContent(copy);
+});
+
 test('(c) a network rejection on "Send now" shows the uncertain feedback', async () => {
   await renderWithMessage([[/\/api\/scheduled-emails\/m1$/, async () => { throw new Error('network down'); }]]);
   fireEvent.click(screen.getByRole('button', { name: 'Send now' }));
@@ -276,4 +293,60 @@ test('(d)/(e) a malformed action-PATCH body (today\'s `.catch(() => ({}))`) fall
   await renderWithMessage([[/\/api\/scheduled-emails\/m1$/, async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('bad'); } })]]);
   fireEvent.click(screen.getByRole('button', { name: 'Stop this message' }));
   await screen.findByText('The scheduled email could not be updated.');
+});
+
+// --- Part A: attention rows and the A4 lock go through the shared helper ---
+describe('Part A attention and lock gating (mirrors the route guard)', () => {
+  function renderWith(message) {
+    mockFetch([
+      ['/api/email-automation-preferences', async () => response(200, {})],
+      ['/api/scheduled-emails/vip-flags', async () => response(200, {})],
+      ['/api/scheduled-emails', async () => response(200, { messages: [message] })],
+    ]);
+    render(<ScheduledEmailsPage />);
+  }
+
+  test('an unconfirmed row shows the uncertain copy, disables edit/approve/send-now, keeps Stop', async () => {
+    renderWith({
+      ...MESSAGE, status: 'failed', hasActivity: true, sendRequestedAt: '2026-09-01T00:00:00Z',
+      lastErrorCode: 'scheduled_email_send_unconfirmed', attentionReason: 'unconfirmed',
+    });
+    await waitFor(() => expect(screen.getByDisplayValue('Hi')).toBeInTheDocument());
+    expect(screen.getAllByText('Send status is uncertain').length).toBeGreaterThan(0);
+    expect(screen.getByRole('status')).toHaveTextContent('Check the email history before trying again');
+    expect(screen.getByDisplayValue('Hi')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Looks good' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Send now' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Stop this message' })).toBeEnabled();
+  });
+
+  test.each([
+    ['activity missing', 'scheduled_email_activity_missing', 'activity_missing', /Dynamics email not found/],
+    ['activity forbidden', 'scheduled_email_activity_forbidden', 'activity_forbidden', /could not be read/],
+  ])('%s: listed as needing attention with only Stop available', async (_label, code, reason, label) => {
+    renderWith({ ...MESSAGE, status: 'failed', hasActivity: true, lastErrorCode: code, attentionReason: reason });
+    await waitFor(() => expect(screen.getByDisplayValue('Hi')).toBeInTheDocument());
+    expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Looks good' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Send now' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Stop this message' })).toBeEnabled();
+  });
+
+  test('A4: a scheduled row with a Dynamics activity locks editing with the reason; send-now stays available', async () => {
+    renderWith({ ...MESSAGE, hasActivity: true, attentionReason: null, lastErrorCode: null });
+    await waitFor(() => expect(screen.getByDisplayValue('Hi')).toBeInTheDocument());
+    expect(screen.getByDisplayValue('Hi')).toBeDisabled();
+    expect(screen.getByRole('status')).toHaveTextContent('already has a Dynamics email');
+    expect(screen.getByRole('button', { name: 'Looks good' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Send now' })).toBeEnabled();
+  });
+
+  test('an ordinary scheduled row is fully editable (no regression)', async () => {
+    renderWith({ ...MESSAGE, hasActivity: false, attentionReason: null });
+    await waitFor(() => expect(screen.getByDisplayValue('Hi')).toBeInTheDocument());
+    expect(screen.getByDisplayValue('Hi')).toBeEnabled();
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Looks good' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Send now' })).toBeEnabled();
+  });
 });

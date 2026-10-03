@@ -1,0 +1,48 @@
+{
+  "pr": 369,
+  "url": "https://github.com/justingallivan/wmkf-research-apps/pull/369",
+  "head": "e17b93685b2a367d5da3a7016c366baec3b30d4d",
+  "base": "570f53086325e7988ebf95f4e6f4a1f86cfe7676",
+  "branch": "codex/factory-reviewer-b4-runtime",
+  "diffSha256": "0066e8f20869ab53531e278f7b734968fa6c4c0c088f9952e04344f6f00e647b",
+  "authMethod": "claude.ai",
+  "subscriptionType": "max",
+  "requestedModel": "opus",
+  "apiKeysRemovedFromChildEnvironment": true,
+  "reviewMode": "read-only",
+  "tools": [
+    "Read",
+    "Grep",
+    "Glob"
+  ],
+  "resolvedModel": "claude-opus-5-5",
+  "elapsedSeconds": 539,
+  "readOperations": 94,
+  "resultSubtype": "success",
+  "exitCode": 0,
+  "permissionDenials": [],
+  "modelUsageNames": [
+    "claude-opus-5-5"
+  ],
+  "completedAt": "2026-09-30T18:02:58.550526+00:00",
+  "usageCostAuthorizedByOwner": true,
+  "rawReviewSha256": "26bac6876e238e9eb241fe610652a16d98edd404fa8db8bae0927c2715abd826",
+  "reproductionSha256": "2a7718b235b6a4e9814ed6375b3066a2cc5468f35ebd485494b8af27c5b668b5",
+  "rootConfirmation": {
+    "method": "real capability and ingestion service; mocked Dataverse/exclusion/hydration seams",
+    "testSuitesPassed": 1,
+    "testsPassed": 2,
+    "inactiveOrdinaryFailedOnRetry": true,
+    "inactiveHydrationCalled": false,
+    "activeOrdinaryControlReachedHydration": true,
+    "liveDataverseCalls": false
+  },
+  "verdict": "changes_required",
+  "findings": {
+    "P0": 0,
+    "P1": 0,
+    "P2": 1
+  },
+  "runtimeChangesMade": false,
+  "githubCommentPosted": false
+}

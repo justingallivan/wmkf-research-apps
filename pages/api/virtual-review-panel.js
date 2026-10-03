@@ -12,7 +12,7 @@
 import { loadModelOverrides } from '../../lib/services/model-override-loader';
 import { requireAppAccess } from '../../lib/utils/auth';
 import { nextRateLimiter } from '../../shared/api/middleware/rateLimiter';
-import { safeFetch } from '../../lib/utils/safe-fetch';
+import { fetchPublicBlob } from '../../lib/utils/public-blob-fetch';
 import { MultiLLMService } from '../../lib/services/multi-llm-service';
 import { PanelReviewService } from '../../lib/services/panel-review-service';
 import { resolveAllowedProviders } from '../../lib/utils/vrp-providers';
@@ -137,7 +137,7 @@ export default async function handler(req, res) {
     const file = files[0];
     sendEvent('progress', { message: `Extracting text from ${file.filename}...` });
 
-    const fileResponse = await safeFetch(file.url);
+    const fileResponse = await fetchPublicBlob(file.url);
     if (!fileResponse.ok) {
       throw new Error(`Failed to fetch file: ${fileResponse.statusText}`);
     }

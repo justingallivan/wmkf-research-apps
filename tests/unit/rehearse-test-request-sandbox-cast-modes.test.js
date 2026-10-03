@@ -26,6 +26,11 @@ describe('cast mode parsing', () => {
       castOrgLeader: 'orgleader@example.test', castResearchLeader: 'researchleader@example.test', confirm: true,
     });
     expect(parseArgs(argv('--target=production', `--bind-reviewer=${RUN}`)).bindReviewer).toBe(RUN);
+    expect(parseArgs(argv('--target=production', `--bind-reviewer-slot=${RUN}`))).toMatchObject({
+      bindReviewerSlot: RUN, confirmSlotRequest: null,
+    });
+    expect(parseArgs(argv('--target=production', `--bind-reviewer-slot=${RUN}`, `--confirm-slot-request=${RUN}`)))
+      .toMatchObject({ bindReviewerSlot: RUN, confirmSlotRequest: RUN });
   });
 
   test.each([
@@ -36,6 +41,10 @@ describe('cast mode parsing', () => {
     ['a cast address without --create-cast', ['--target=production', '--cast-pi=pi@example.test']],
     ['a non-GUID run', ['--target=production', '--bind-reviewer=1003302']],
     ['two modes', ['--target=production', ...castArgs, `--bind-reviewer=${RUN}`]],
+    ['a slot confirmation without slot mode', ['--target=production', `--confirm-slot-request=${RUN}`]],
+    ['a slot confirmation without a Request GUID', ['--target=production', `--bind-reviewer-slot=${RUN}`, '--confirm-slot-request=1003303']],
+    ['a slot command in sandbox', [`--bind-reviewer-slot=${RUN}`]],
+    ['both reviewer modes', ['--target=production', `--bind-reviewer=${RUN}`, `--bind-reviewer-slot=${RUN}`]],
   ])('refuses %s', (_label, args) => {
     expect(() => parseArgs(argv(...args))).toThrow();
   });
@@ -72,4 +81,20 @@ describe('--create-cast plan-only', () => {
     await expect(runCastMode(client, args, ledgerUrl)).rejects.toMatchObject({ code: 'cast_address_not_allowlisted' });
     expect(client.post).not.toHaveBeenCalled();
   });
+});
+
+test('slot confirmation requires the current production write acknowledgment before ledger or Dataverse reads', async () => {
+  const priorAck = process.env.DATAVERSE_PROD_WRITE_ACK;
+  delete process.env.DATAVERSE_PROD_WRITE_ACK;
+  const client = { get: jest.fn(), patchWithOptions: jest.fn() };
+  try {
+    await expect(runCastMode(client, {
+      bindReviewerSlot: RUN, confirmSlotRequest: RUN,
+    }, 'postgres://nobody@127.0.0.1:1/unused')).rejects.toThrow(/DATAVERSE_PROD_WRITE_ACK/);
+    expect(client.get).not.toHaveBeenCalled();
+    expect(client.patchWithOptions).not.toHaveBeenCalled();
+  } finally {
+    if (priorAck === undefined) delete process.env.DATAVERSE_PROD_WRITE_ACK;
+    else process.env.DATAVERSE_PROD_WRITE_ACK = priorAck;
+  }
 });

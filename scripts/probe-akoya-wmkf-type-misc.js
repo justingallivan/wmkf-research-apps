@@ -8,32 +8,8 @@
  * Only POST is the OAuth token; every Dataverse call is a GET.
  */
 
-const fs = require('fs');
-const path = require('path');
-
-const envPath = path.join(__dirname, '..', '.env.local');
-if (fs.existsSync(envPath)) {
-  for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
-    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (!m) continue;
-    let [, k, v] = m;
-    v = v.trim().replace(/^"(.*)"$/, '$1');
-    if (!process.env[k]) process.env[k] = v;
-  }
-}
-
-async function getToken() {
-  const r = await fetch(`https://login.microsoftonline.com/${process.env.DYNAMICS_TENANT_ID}/oauth2/v2.0/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials', client_id: process.env.DYNAMICS_CLIENT_ID,
-      client_secret: process.env.DYNAMICS_CLIENT_SECRET, scope: `${process.env.DYNAMICS_URL}/.default`,
-    }),
-  });
-  if (!r.ok) throw new Error(`Token: ${r.status} ${await r.text()}`);
-  return (await r.json()).access_token;
-}
+const { loadProbeEnvLocal, getToken } = require('./lib/akoya-readonly-probe-bootstrap');
+loadProbeEnvLocal();
 
 async function get(token, urlPath) {
   let next = `${process.env.DYNAMICS_URL}/api/data/v9.2${urlPath}`;

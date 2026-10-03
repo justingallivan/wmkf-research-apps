@@ -1,5 +1,6 @@
 /** @jest-environment node */
 import { listSiteVisitMaterialFolderFiles } from '../../lib/services/site-visit-materials/folder-files-service';
+import { REQUEST_DOCUMENT_ARTIFACT_TYPE, REQUEST_DOCUMENT_OPERATION_STATUS, REQUEST_DOCUMENT_LIFECYCLE_STATE } from '../../shared/config/requestDocument';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -85,5 +86,66 @@ describe('listSiteVisitMaterialFolderFiles', () => {
       expect(error).toBeInstanceOf(ServiceHttpError);
       expect(error.httpStatus).toBe(404);
     }
+  });
+});
+
+
+describe('background materials registry links', () => {
+  const oldRow = {
+    _wmkf_request_value: REQUEST_ID, wmkf_requestdocumentid: 'old',
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED,
+    wmkf_producer: 'site-visit-materials-portal',
+    wmkf_filename: '1002903 Site Visit Presentation.pptx',
+    wmkf_sharepointdriveid: 'drive', wmkf_sharepointitemid: 'old-item',
+    wmkf_sharepointweburl: 'https://sp/old',
+  };
+  const current = { ...oldRow, wmkf_requestdocumentid: 'new', wmkf_lifecyclestate: null,
+    wmkf_sharepointitemid: 'new-item', wmkf_sharepointweburl: 'https://sp/job/new',
+    wmkf_sharepointfolderpath: `${ROOT}/Site Visit - Slides/job-id`, modifiedon: '2026-10-01' };
+  const backgroundDeps = (rows = [oldRow, current], overrides = {}) => deps({
+    backgroundSchemaReady: () => true,
+    getDriveId: jest.fn(async () => 'drive'),
+    findDocumentsByRequest: jest.fn(async () => ({ records: rows })),
+    listFiles: jest.fn(async (_library, folder) => folder.endsWith('Site Visit - Slides') ? [
+      { id: 'old-item', name: oldRow.wmkf_filename, webUrl: oldRow.wmkf_sharepointweburl },
+      { id: 'manual', name: 'Staff copy.pptx', webUrl: 'https://sp/manual' },
+    ] : []), ...overrides,
+  });
+  it('merges only published current links, hides superseded portal root files and preserves manual files', async () => {
+    const d = backgroundDeps([oldRow, current, { ...current, wmkf_requestdocumentid: 'unready',
+      wmkf_operationstatus: -1, wmkf_sharepointweburl: 'https://sp/uncommitted', modifiedon: '2027' }]);
+    const result = await listSiteVisitMaterialFolderFiles({ requestId: REQUEST_ID }, d);
+    expect(result.slides.map((file) => file.webUrl)).toEqual(['https://sp/job/new', 'https://sp/manual']);
+    expect(d.listFiles).toHaveBeenCalledTimes(2);
+    expect(d.listFiles.mock.calls.every(([, folder]) => !folder.includes('job-id'))).toBe(true);
+  });
+  it('keeps the prior item when replacement is not registered', async () => {
+    const result = await listSiteVisitMaterialFolderFiles({ requestId: REQUEST_ID }, backgroundDeps([
+      { ...oldRow, wmkf_lifecyclestate: null },
+    ]));
+    expect(result.slides.map((file) => file.webUrl)).toContain('https://sp/old');
+    expect(result.slides.filter((file) => file.webUrl === 'https://sp/old')).toHaveLength(1);
+  });
+  it('never hides root files for a different request or drive identity', async () => {
+    for (const mismatch of [{ _wmkf_request_value: 'other' }, { wmkf_sharepointdriveid: 'other' }]) {
+      const result = await listSiteVisitMaterialFolderFiles({ requestId: REQUEST_ID }, backgroundDeps([{ ...oldRow, ...mismatch }, current]));
+      expect(result.slides.map((file) => file.webUrl)).toContain('https://sp/old');
+    }
+  });
+  it('rejects a malformed registry page instead of inventing empty files', async () => {
+    const d = backgroundDeps([], { findDocumentsByRequest: jest.fn(async () => ({})) });
+    await expect(listSiteVisitMaterialFolderFiles({ requestId: REQUEST_ID }, d)).rejects.toMatchObject({ httpStatus: 502 });
+  });
+  it('schema off does not read registry or resolve the drive', async () => {
+    const d = backgroundDeps([], { backgroundSchemaReady: () => false });
+    await listSiteVisitMaterialFolderFiles({ requestId: REQUEST_ID }, d);
+    expect(d.findDocumentsByRequest).not.toHaveBeenCalled();
+    expect(d.getDriveId).not.toHaveBeenCalled();
+  });
+  it('does not fabricate an empty success if the registry is unavailable', async () => {
+    const d = backgroundDeps([], { findDocumentsByRequest: jest.fn(async () => { throw new Error('private details'); }) });
+    await expect(listSiteVisitMaterialFolderFiles({ requestId: REQUEST_ID }, d)).rejects.toMatchObject({ httpStatus: 502 });
   });
 });

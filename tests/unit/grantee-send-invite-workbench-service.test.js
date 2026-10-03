@@ -20,6 +20,12 @@ jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   SELECT_PROFILES: { IDENTITY: ['akoya_requestid', 'akoya_requestnum'] },
 }));
 
+const getSettingStrict = jest.fn();
+jest.mock('../../lib/services/settings-service.js', () => ({
+  ...jest.requireActual('../../lib/services/settings-service.js'),
+  getSettingStrict: (...args) => getSettingStrict(...args),
+}));
+
 const getInviteRecipientById = jest.fn();
 jest.mock('../../lib/dataverse/adapters/contact.js', () => ({
   getInviteRecipientById: (...a) => getInviteRecipientById(...a),
@@ -74,6 +80,7 @@ const institution = (primaryContact) => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  getSettingStrict.mockResolvedValue({ found: false, value: null });
   getById.mockResolvedValue({
     akoya_requestid: GUID,
     akoya_requestnum: '1002794',
@@ -156,19 +163,58 @@ test('non-downgrade: re-send while Invited sends but never writes status; empty 
 describe('Test Request isolation (Stage 1b)', () => {
   afterEach(() => { delete process.env.TEST_REQUEST_ISOLATION; });
 
-  test('a test request is refused before any deliverable write, mint or send', async () => {
+  test('a test request with a disallowed Cc is refused before any deliverable write, mint or send', async () => {
     process.env.TEST_REQUEST_ISOLATION = 'on';
     getById.mockImplementation(async (_id, { select } = {}) => (
       Array.isArray(select) && select.includes('wmkf_istestrequest')
         ? { wmkf_istestrequest: true, wmkf_testcreationrunid: '22222222-2222-4222-8222-222222222222' }
         : { akoya_requestid: GUID, akoya_requestnum: '1002794' }
     ));
-    const err = await sendGranteeInvite(args()).catch((e) => e);
+    getSettingStrict.mockResolvedValue({ found: true, value: JSON.stringify({ addresses: ['pi@x.edu', 'li@x.edu'] }) });
+    const err = await sendGranteeInvite(args({ ccEmail: ['li@x.edu', 'blocked@outside.edu'] })).catch((e) => e);
     expect(err).toBeInstanceOf(ServiceHttpError);
     expect(err).toMatchObject({ httpStatus: 409, code: 'test_request_email_denied' });
+    expect(getSettingStrict).toHaveBeenCalledWith('testRequestEmailAllowlist');
     expect(ensureDeliverableForRequest).not.toHaveBeenCalled();
     expect(mintForRequest).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a marked test Request sends when To and array Cc are allowlisted', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    getById.mockImplementation(async (_id, { select } = {}) => (
+      Array.isArray(select) && select.includes('wmkf_istestrequest')
+        ? { wmkf_istestrequest: true, wmkf_testcreationrunid: '22222222-2222-4222-8222-222222222222' }
+        : { akoya_requestid: GUID, akoya_requestnum: '1002794', _akoya_programid_value: RESEARCH_PROGRAM_IDS[1], _akoya_applicantid_value: ACCOUNT, _akoya_primarycontactid_value: OTHER }
+    ));
+    getSettingStrict.mockResolvedValue({ found: true, value: JSON.stringify({ addresses: ['pi@x.edu', 'li@x.edu', 'assistant@x.edu'] }) });
+
+    await sendGranteeInvite(args({ ccEmail: ['li@x.edu', 'assistant@x.edu'] }));
+
+    expect(getSettingStrict).toHaveBeenCalledWith('testRequestEmailAllowlist');
+    expect(ensureDeliverableForRequest).toHaveBeenCalled();
+    expect(mintForRequest).toHaveBeenCalled();
+    expect(createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'pi@x.edu', cc: ['li@x.edu', 'assistant@x.edu'] }));
+  });
+
+  test.each([
+    ['string Cc', 'li@x.edu', ['pi@x.edu', 'li@x.edu'], 'li@x.edu'],
+    ['absent Cc', '', ['pi@x.edu'], undefined],
+  ])('a marked test Request sends when To and %s are allowlisted', async (_label, ccEmail, addresses, expectedCc) => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    getById.mockImplementation(async (_id, { select } = {}) => (
+      Array.isArray(select) && select.includes('wmkf_istestrequest')
+        ? { wmkf_istestrequest: true, wmkf_testcreationrunid: '22222222-2222-4222-8222-222222222222' }
+        : { akoya_requestid: GUID, akoya_requestnum: '1002794', _akoya_programid_value: RESEARCH_PROGRAM_IDS[1], _akoya_applicantid_value: ACCOUNT, _akoya_primarycontactid_value: OTHER }
+    ));
+    getSettingStrict.mockResolvedValue({ found: true, value: JSON.stringify({ addresses }) });
+
+    await sendGranteeInvite(args({ ccEmail }));
+
+    expect(getSettingStrict).toHaveBeenCalledWith('testRequestEmailAllowlist');
+    expect(ensureDeliverableForRequest).toHaveBeenCalled();
+    expect(mintForRequest).toHaveBeenCalled();
+    expect(createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'pi@x.edu', cc: expectedCc }));
   });
 
   test('an ordinary legacy-null request still sends with the switch on', async () => {
@@ -187,6 +233,23 @@ describe('Test Request isolation (Stage 1b)', () => {
     await sendGranteeInvite(args());
     expect(mintForRequest).toHaveBeenCalled();
     expect(createAndSendEmail).toHaveBeenCalled();
+    expect(getSettingStrict).not.toHaveBeenCalled();
+  });
+
+  test('an unknown Request state fails closed before a deliverable write, mint or send', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    getById.mockImplementation(async (_id, { select } = {}) => {
+      if (Array.isArray(select) && select.includes('wmkf_istestrequest')) throw new Error('state read failed');
+      return { akoya_requestid: GUID, akoya_requestnum: '1002794', _akoya_programid_value: RESEARCH_PROGRAM_IDS[1], _akoya_applicantid_value: ACCOUNT, _akoya_primarycontactid_value: OTHER };
+    });
+
+    const err = await sendGranteeInvite(args()).catch((e) => e);
+
+    expect(err).toMatchObject({ httpStatus: 409, code: 'test_request_email_denied' });
+    expect(getSettingStrict).not.toHaveBeenCalled();
+    expect(ensureDeliverableForRequest).not.toHaveBeenCalled();
+    expect(mintForRequest).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 });
 

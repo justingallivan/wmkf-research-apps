@@ -91,6 +91,21 @@ test('nothing missing, no sender mailbox, and a lost claim each skip without sen
   expect(lost.sendReminder).not.toHaveBeenCalled();
 });
 
+test('automatic reminders do not nudge applicants for slots already processing or awaiting coordinator action', async () => {
+  const d = deps({
+    backgroundJobsSchemaReady: () => true,
+    listUploadJobsForRequest: jest.fn(async () => [
+      { slot: 'presentation_source', status: 'processing' },
+      { slot: 'participant_bios', status: 'needs_attention' },
+    ]),
+  });
+  const result = await sweepMaterialsReminders({}, d);
+  expect(d.listUploadJobsForRequest).toHaveBeenCalledWith(R1, { collectionIds: ['c1'] });
+  expect(result).toMatchObject({ skippedNothingMissing: 1, eligible: 0, sent: 0 });
+  expect(d.prepareReminder).not.toHaveBeenCalled();
+  expect(d.claim).not.toHaveBeenCalled();
+});
+
 test('dryRun reports eligibility and never claims or sends; readiness off skips everything; maxBatch bounds the scan', async () => {
   const d = deps();
   expect(await sweepMaterialsReminders({ dryRun: true }, d)).toMatchObject({ dryRun: true, eligibilityIsProvisional: true, eligible: 1, sent: 0 });

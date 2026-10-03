@@ -85,6 +85,12 @@ and claims participation, not sole causation. Either run the router diet now
 
    If unsure whether something is milestone-worthy, default to NOT writing an entry. Skipping is the right answer most weeks.
 
+   **Ledger identity requirement (docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md, Phase 0):**
+   any handoff or evidence line that records a Test Request Factory run, cast
+   change or status change names the ledger it was written to (host label from
+   `lib/db/ledger-registry.js` plus database, e.g. `managed-ledger/ledger_prod`
+   or `wmkf-ledger-pg/ledger_prod`) beside the run id.
+
    **Handoff requirement:** Before completing the handoff, make an explicit
    milestone determination. If the session shipped a new production capability,
    production cutover, new architecture, strategic pivot, incident outcome, or

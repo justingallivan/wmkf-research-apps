@@ -6,9 +6,20 @@ import {
   isLegacyProxyPassThrough,
   DEDICATED_TRANSCRIPTION_PROJECT_REGISTRY,
 } from '../../lib/services/transcription-pilot/deployment-policy';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 
 const registry = [{ projectId: 'prj_test_only', authOrigin: 'https://pilot.example.test' }];
 const env = { VERCEL_PROJECT_ID: 'prj_test_only', TRANSCRIPTION_PILOT_DEPLOYMENT_PROFILE: 'transcription-pilot' };
+
+test('shared project registers daily transcription drain and hourly workflow recovery only', () => {
+  const vercel = JSON.parse(readFileSync(path.join(process.cwd(), 'vercel.json'), 'utf8'));
+  expect(vercel.crons).toEqual(expect.arrayContaining([
+    { path: '/api/cron/drain-transcriptions', schedule: '0 3 * * *' },
+    { path: '/api/cron/drain-transcriptions?recovery=1', schedule: '0 * * * *' },
+  ]));
+  expect(vercel.crons.some(({ path: route }) => route.includes('preflight=') || route.includes('workflow_probe='))).toBe(false);
+});
 
 test('verified isolated project stays isolated even without its marker', () => {
   expect(DEDICATED_TRANSCRIPTION_PROJECT_REGISTRY).toEqual([{

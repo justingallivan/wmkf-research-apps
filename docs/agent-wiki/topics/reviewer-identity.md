@@ -35,6 +35,7 @@ source_files:
   - pages/api/reviewer-finder/discover.js
   - pages/api/reviewer-finder/save-candidates.js
   - pages/api/workbench/reviewer-roster.js
+  - lib/services/workbench/reviewer-roster-service.js
   - pages/api/reviewer-finder/my-candidates.js
   - pages/api/review-manager/send-emails.js
   - pages/api/review-manager/render-emails.js
@@ -65,6 +66,7 @@ watch_paths:
   - lib/services/reviewer-email-reconciler.js
   - lib/services/ror-institution-*.js
   - pages/api/workbench/reviewer-roster.js
+  - lib/services/workbench/reviewer-roster-service.js
   - pages/api/review-manager/send-emails.js
   - docs/atlas/dataverse-wmkf-potentialreviewers.md
   - docs/atlas/dataverse-wmkf-appreviewersuggestion.md

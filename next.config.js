@@ -142,6 +142,8 @@ const nextConfig = {
       './node_modules/uint8array-extras/**/*',
       './node_modules/win-guid/**/*',
     ],
+    // Only Confirm (POST /runs) reaches the ledger schema check, which reads these at runtime.
+    '/api/admin/test-requests/runs': ['./lib/db/ledger-schema-fingerprint.json', './lib/db/ledger-schema-ahead.json'],
   },
   async redirects() {
     return [

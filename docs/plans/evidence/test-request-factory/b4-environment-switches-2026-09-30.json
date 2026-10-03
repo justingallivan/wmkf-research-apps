@@ -1,0 +1,45 @@
+{
+  "projectName": "wmkf_research_apps",
+  "projectId": "prj_56SJKzNer1aV38kKVoP8tl3X0lf3",
+  "projectEvidence": "PR 369 Vercel status URL and authenticated vercel project inspect",
+  "rows": [
+    {
+      "environment": "local",
+      "observedAt": "2026-09-30T16:16:17.597Z",
+      "switches": {
+        "TEST_REQUEST_ISOLATION": "off",
+        "SYNTHETIC_REVIEWER_ISOLATION": "off"
+      }
+    },
+    {
+      "environment": "development",
+      "observedAt": "2026-09-30T16:16:18.491Z",
+      "switches": {
+        "TEST_REQUEST_ISOLATION": "off",
+        "SYNTHETIC_REVIEWER_ISOLATION": "off"
+      },
+      "temporaryFileMode": "0600",
+      "temporaryFileDeleted": true
+    },
+    {
+      "environment": "preview",
+      "observedAt": "2026-09-30T16:16:19.362Z",
+      "switches": {
+        "TEST_REQUEST_ISOLATION": "off",
+        "SYNTHETIC_REVIEWER_ISOLATION": "off"
+      },
+      "temporaryFileMode": "0600",
+      "temporaryFileDeleted": true
+    },
+    {
+      "environment": "production",
+      "observedAt": "2026-09-30T16:16:20.163Z",
+      "switches": {
+        "TEST_REQUEST_ISOLATION": "on",
+        "SYNTHETIC_REVIEWER_ISOLATION": "on"
+      },
+      "temporaryFileMode": "0600",
+      "temporaryFileDeleted": true
+    }
+  ]
+}

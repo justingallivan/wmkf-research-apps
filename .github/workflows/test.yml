@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run lint
@@ -73,12 +73,12 @@ jobs:
       - run: npm run test:ci
 
   ledger-postgres:
-    # Live PostgreSQL proof for the Test Request Factory run ledger (and the
-    # site-visit materials automatic-reminder claim's contacts compare). The unit
+    # Live PostgreSQL proofs for the Test Request Factory run ledger, the
+    # site-visit materials reminder claim, and background-job ownership. The unit
     # fake cannot see SQL grammar or parameter typing (an aggregate FOR UPDATE
     # once passed it), so this suite is REQUIRED here: it fails, not skips,
     # when the connection URL is missing (TEST_REQUEST_LEDGER_REQUIRE=1).
-    name: Run ledger (PostgreSQL 16)
+    name: Postgres integration (PostgreSQL 16)
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -96,10 +96,10 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx jest tests/integration/test-request-run-ledger.pg.test.js tests/integration/test-request-run-runner.pg.test.js tests/integration/site-visit-materials-claim.pg.test.js tests/integration/integrity-screening-reviews.pg.test.js
+      - run: npx jest tests/integration/test-request-run-ledger.pg.test.js tests/integration/test-request-run-runner.pg.test.js tests/integration/site-visit-materials-claim.pg.test.js tests/integration/site-visit-materials-background-jobs.pg.test.js tests/integration/integrity-screening-reviews.pg.test.js tests/integration/factory-ledger-fingerprint.pg.test.js tests/integration/scheduled-email-engine.pg.test.js
         env:
           TEST_REQUEST_LEDGER_TEST_URL: postgres://postgres:ledger@127.0.0.1:5432/ledger
           TEST_REQUEST_LEDGER_REQUIRE: '1'

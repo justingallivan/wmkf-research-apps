@@ -40,7 +40,20 @@ function deferred() {
 }
 
 function response(body, ok = true, status = ok ? 200 : 500) {
-  return { ok, status, json: async () => body, body: {} };
+  const payload = body?.success === true && ('active' in body || 'allNames' in body)
+    ? { active: [], excluded: [], ineligible: [], blocked: [], handled: [], savedKeys: [], allNames: [], ...body }
+    : body;
+  return { ok, status, json: async () => payload, body: {} };
+}
+
+function recordedReceipt(candidates) {
+  return response({
+    success: true,
+    recorded: candidates.length,
+    outcomes: candidates.map((candidate, inputIndex) => ({
+      inputIndex, candidateKey: candidate.candidateKey, status: 'recorded',
+    })),
+  });
 }
 
 function rosterSnapshot(active = [], extra = {}) {
@@ -233,6 +246,7 @@ test('applicant enrichment and discovery remain independent pending streams', as
   const discoveryStream = deferred();
   const enrichmentStream = deferred();
   const handlers = [];
+  let persistedRows = [];
   readSseStream.mockImplementation(async (_res, onEvent) => {
     const stream = [applicantStream, analysisStream, discoveryStream, enrichmentStream][handlers.length];
     handlers.push(onEvent);
@@ -242,12 +256,16 @@ test('applicant enrichment and discovery remain independent pending streams', as
   const discovered = readyCandidate('Discovered while applicant runs', 'candidate:parallel');
   global.fetch = jest.fn((url, options = {}) => {
     const target = String(url);
-    if (target.includes('/api/workbench/reviewer-roster?')) return Promise.resolve(rosterSnapshot([]));
+    if (target.includes('/api/workbench/reviewer-roster?')) return Promise.resolve(rosterSnapshot(persistedRows));
     if (target === '/api/workbench/enrich-recommended' && options.method === 'POST') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/analyze' && options.method === 'POST') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/discover' && options.method === 'POST') return Promise.resolve(response({}));
     if (target === '/api/reviewer-finder/enrich-contacts' && options.method === 'POST') return Promise.resolve(response({}));
-    if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') return Promise.resolve(response({ success: true }));
+    if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
+      const candidates = JSON.parse(options.body).candidates;
+      persistedRows = candidates;
+      return Promise.resolve(recordedReceipt(candidates));
+    }
     throw new Error(`unexpected fetch ${target} ${options.method || 'GET'}`);
   });
 
@@ -454,8 +472,9 @@ test('confirmation remains visible and retryable when the committed confirmation
     if (target.includes('/api/workbench/reviewer-roster?')) return Promise.resolve(rosterSnapshot([]));
     if (target === '/api/reviewer-finder/analyze' || target === '/api/reviewer-finder/discover') return Promise.resolve(response({}));
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
-      calls.push({ action: 'record' });
-      return Promise.resolve(response({ success: true, recorded: 1 }));
+      const candidates = JSON.parse(options.body).candidates;
+      calls.push({ action: 'record', candidateKey: candidates[0]?.candidateKey });
+      return Promise.resolve(recordedReceipt(candidates));
     }
     if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
       const body = JSON.parse(options.body);
@@ -533,8 +552,9 @@ function configureUnverifiedFlow({ unverified, rosterForRequest, recordResponse,
       return Promise.resolve(response({}));
     }
     if (target === '/api/workbench/reviewer-roster' && options.method === 'POST') {
-      calls.push({ action: 'record' });
-      return recordResponse?.promise || Promise.resolve(recordResponse || response({ success: true, recorded: 1 }));
+      const candidates = JSON.parse(options.body).candidates;
+      calls.push({ action: 'record', candidateKey: candidates[0]?.candidateKey });
+      return recordResponse?.promise || Promise.resolve(recordResponse || recordedReceipt(candidates));
     }
     if (target === '/api/workbench/reviewer-roster' && options.method === 'PATCH') {
       const body = JSON.parse(options.body);
@@ -589,7 +609,7 @@ test('a stale ephemeral record cannot confirm identity after request replacement
   rerender(<ReviewerSearchSection requestId={REQUEST_B} blobUrl="blob-b" proposalKey="proposal-b" />);
   expect(await screen.findByLabelText(`Select ${candidateB.name}`)).toBeInTheDocument();
   await act(async () => {
-    record.resolve(response({ success: true, recorded: 1 }));
+    record.resolve(recordedReceipt([{ candidateKey: calls[0].candidateKey }]));
     await record.promise;
   });
   expect(calls.map(({ action }) => action)).toEqual(['record']);

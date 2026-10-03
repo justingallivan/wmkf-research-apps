@@ -240,10 +240,11 @@ export default function useReviewerSearchController({
     setExcludedRemoved,
     setExportError,
     setBlockedReferredSeeds,
-    setRosterActive,
     setRosterIneligible,
-    setRosterNames,
     setRosterNote,
+    reloadRoster,
+    setRosterLoaded,
+    setRosterLoadFailed,
   });
 
   const {

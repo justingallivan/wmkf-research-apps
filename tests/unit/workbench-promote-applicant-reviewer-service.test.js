@@ -76,6 +76,10 @@ const loadApplicantKnownReviewerContext = jest.fn();
 jest.mock('../../lib/services/workbench/applicant-known-reviewer-service', () => ({
   loadApplicantKnownReviewerContext: (...a) => loadApplicantKnownReviewerContext(...a),
 }));
+const resolveReviewerBindCapability = jest.fn();
+jest.mock('../../lib/services/test-requests/synthetic-reviewer-capability.js', () => ({
+  resolveReviewerBindCapability: (...a) => resolveReviewerBindCapability(...a),
+}));
 
 import { promoteApplicantReviewer } from '../../lib/services/workbench/promote-applicant-reviewer-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
@@ -90,8 +94,33 @@ const PERSON = '22222222-2222-2222-2222-222222222222';
 
 const args = (over = {}) => ({ requestId: REQ, suggestionId: SUG, contact: undefined, actingUserSystemId: 'u-1', ...over });
 
+test('cast promotion selects the suggestion without editing person or researcher identity', async () => {
+  resolveReviewerBindCapability.mockResolvedValue({
+    kind: 'synthetic',
+    person: { wmkf_potentialreviewersid: PERSON, wmkf_emailaddress: 'existing@example.edu' },
+  });
+  const result = await promoteApplicantReviewer(args());
+  expect(result.success).toBe(true);
+  expect(selectIfUnengaged).toHaveBeenCalled();
+  expect(update).not.toHaveBeenCalled();
+  expect(updateById).not.toHaveBeenCalled();
+});
+
+test('cast promotion refuses hand-corrections before person writes', async () => {
+  resolveReviewerBindCapability.mockResolvedValue({
+    kind: 'synthetic',
+    person: { wmkf_potentialreviewersid: PERSON, wmkf_emailaddress: 'existing@example.edu' },
+  });
+  await expect(promoteApplicantReviewer(args({ contact: { affiliation: 'Other Institute' } })))
+    .rejects.toMatchObject({ body: expect.objectContaining({ code: 'synthetic_reviewer_identity_immutable' }) });
+  expect(update).not.toHaveBeenCalled();
+  expect(updateById).not.toHaveBeenCalled();
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
+});
+
 beforeEach(() => {
   jest.clearAllMocks();
+  resolveReviewerBindCapability.mockResolvedValue({ kind: 'ordinary' });
   findById.mockResolvedValue({
     wmkf_appreviewersuggestionid: SUG,
     _wmkf_request_value: REQ,
@@ -488,6 +517,17 @@ test.each([
   expect(err.body).toMatchObject({ code });
   expect(updateLifecycle).not.toHaveBeenCalled();
   expect(update).not.toHaveBeenCalled();
+});
+
+test('an inactive-person binding refusal retains the repairable promotion result', async () => {
+  resolveReviewerBindCapability.mockRejectedValueOnce(Object.assign(new Error('inactive'), {
+    code: 'reviewer_person_inactive',
+  }));
+  const err = await promoteApplicantReviewer(args()).catch((error) => error);
+  expect(err).toBeInstanceOf(ServiceHttpError);
+  expect(err.httpStatus).toBe(422);
+  expect(err.body).toMatchObject({ code: 'person_inactive' });
+  expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
 test('known exact person with no stored or vetted email remains in Find', async () => {
