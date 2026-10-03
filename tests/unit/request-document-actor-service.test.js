@@ -2,6 +2,7 @@
 
 import {
   explicitActorCreateFields,
+  isActorNotCaptured,
   recordRequestDocumentActorNotCaptured,
   REQUEST_DOCUMENT_ACTOR_POLICY,
   resolveRequestDocumentActor,
@@ -70,6 +71,25 @@ test('readiness off preserves the existing path without touching systemuser', as
     reason: 'schema-not-ready',
   });
   expect(deps.getSystemUser).not.toHaveBeenCalled();
+});
+
+test('sandbox-rehearsal policy resolves with no actor and reads no systemuser (Round 2 P1-D)', async () => {
+  const deps = dependencies();
+  await expect(resolveRequestDocumentActor({
+    actingUserSystemId: ACTOR_ID, // even if a caller mistakenly supplied one
+    policy: REQUEST_DOCUMENT_ACTOR_POLICY.SANDBOX_REHEARSAL,
+  }, deps)).resolves.toEqual({ schemaReady: true, actorId: null, reason: 'sandbox-rehearsal' });
+  expect(deps.getSystemUser).not.toHaveBeenCalled();
+});
+
+test('isActorNotCaptured excludes sandbox-rehearsal and external-contributor, but flags every other missing-actor reason', () => {
+  expect(isActorNotCaptured({ schemaReady: true, actorId: null, reason: 'sandbox-rehearsal' })).toBe(false);
+  expect(isActorNotCaptured({ schemaReady: true, actorId: null, reason: 'external-contributor' })).toBe(false);
+  expect(isActorNotCaptured({ schemaReady: true, actorId: null, reason: 'missing' })).toBe(true);
+  expect(isActorNotCaptured({ schemaReady: true, actorId: null, reason: 'stale' })).toBe(true);
+  expect(isActorNotCaptured({ schemaReady: true, actorId: null, reason: 'disabled' })).toBe(true);
+  expect(isActorNotCaptured({ schemaReady: false, actorId: null, reason: 'schema-not-ready' })).toBe(false);
+  expect(isActorNotCaptured({ schemaReady: true, actorId: ACTOR_ID, reason: null })).toBe(false);
 });
 
 test('unknown policy fails closed before any identity read', async () => {

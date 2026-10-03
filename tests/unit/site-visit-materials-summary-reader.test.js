@@ -30,6 +30,8 @@ function deps(overrides = {}) {
     listLatestCollections: jest.fn(async () => [row()]),
     findDocumentsByCycle: jest.fn(async () => [doc(R1, '1003222 Site Visit Presentation.pdf'), doc(R1, '1003222 Site Visit Presentation.pptx'), doc(R2, '1003223 Site Visit Presentation.pdf')]),
     findDocumentsByRequest: jest.fn(async () => []),
+    backgroundJobsSchemaReady: () => false,
+    listUploadJobsForRequest: jest.fn(async () => []),
     now: () => NOW,
     ...overrides,
   };
@@ -42,7 +44,7 @@ test('cycle read: two registry calls feed every request; a request without a col
   expect(d.findDocumentsByRequest).not.toHaveBeenCalled();
   expect(map.get(R2)).toBeNull();
   expect(map.get(R1)).toEqual({
-    state: 'missing', receivedCount: 2, requiredCount: 3, otherCount: 0,
+    state: 'missing', processingCount: 0, attentionCount: 0, receivedCount: 2, requiredCount: 3, otherCount: 0,
     dueAt: '2026-10-05T19:00:00.000Z', closesAt: '2026-10-14T19:00:00.000Z', overdue: true, invited: true,
   });
   expect(JSON.stringify(map.get(R1))).not.toMatch(/sealed|example\.edu|contributorUrl|contacts/);
@@ -55,6 +57,19 @@ test('without a cycle, one registry read per request that has a collection; waiv
   expect(d.findDocumentsByRequest).toHaveBeenCalledTimes(1);
   expect(d.findDocumentsByCycle).not.toHaveBeenCalled();
   expect(map.get(R1)).toMatchObject({ state: 'received', receivedCount: 2, requiredCount: 2, overdue: false });
+});
+
+test('summary projection includes active jobs from older collections and gives attention precedence', async () => {
+  const d = deps({
+    backgroundJobsSchemaReady: () => true,
+    listUploadJobsForRequest: jest.fn(async () => [
+      { job_id: 'j1', collection_id: 'old', slot: 'presentation_pdf', status: 'processing', filename: 'presentation.pdf', attempt_count: 1 },
+      { job_id: 'j2', collection_id: 'old', slot: 'participant_bios', status: 'needs_attention', filename: 'bios.pdf', attempt_count: 2 },
+    ]),
+  });
+  const map = await getMaterialsSummaryByRequests({ requestIds: [R1], requestNumbers: NUMBERS }, d);
+  expect(d.listUploadJobsForRequest).toHaveBeenCalledWith(R1, { collectionIds: ['c1'] });
+  expect(map.get(R1)).toMatchObject({ state: 'needs_attention', processingCount: 1, attentionCount: 1 });
 });
 
 test('fail-open: readiness off, an empty id list, or any throw returns the complete all-null map without a registry read', async () => {
@@ -84,11 +99,11 @@ test('availability distinguishes a confirmed empty read from a failed read', asy
 test('single request: projects the tracker read down; readiness 503 and other failures are null', async () => {
   const collection = { id: 'c1', state: 'ready', checklist: [{ key: 'presentation_pdf', required: true, waived: false, received: { artifactId: 'x' } }], other: [{ artifactId: 'o' }], dueAt: 'd', closesAt: 'c', overdue: false, invitedAt: 'i', contributorUrl: 'https://secret', contacts: { pi: { email: 'pi@example.edu' } } };
   const summary = await getMaterialsSummaryForRequest({ requestId: R1 }, { getCollection: async () => ({ collection }) });
-  expect(summary).toEqual({ state: 'ready', receivedCount: 1, requiredCount: 1, otherCount: 1, dueAt: 'd', closesAt: 'c', overdue: false, invited: true });
+  expect(summary).toEqual({ state: 'ready', processingCount: 0, attentionCount: 0, receivedCount: 1, requiredCount: 1, otherCount: 1, dueAt: 'd', closesAt: 'c', overdue: false, invited: true });
   expect(await getMaterialsSummaryForRequest({ requestId: R1 }, { getCollection: async () => ({ collection: null }) })).toBeNull();
   expect(await getMaterialsSummaryForRequest({ requestId: R1 }, { getCollection: async () => { throw Object.assign(new Error('off'), { code: 'site_visit_materials_schema_not_ready' }); } })).toBeNull();
   const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
-  expect(await getMaterialsSummaryForRequest({ requestId: R1 }, { getCollection: async () => { throw new Error('db'); } })).toBeNull();
+  expect(await getMaterialsSummaryForRequest({ requestId: R1 }, { getCollection: async () => { throw new Error('db'); } })).toEqual({ unavailable: true, availability: 'unavailable' });
   expect(log).toHaveBeenCalled();
   log.mockRestore();
 });

@@ -470,7 +470,10 @@ function makeAcceptanceJob({ isAcceptRepeat = true } = {}) {
 }
 
 function makeAcceptanceDrainDeps(overrides = {}) {
+  process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on';
+  process.env.TEST_REQUEST_ISOLATION = 'on';
   return {
+    resolveTestState: jest.fn().mockResolvedValue({ kind: 'ordinary' }),
     suggestions: {
       getForAcceptanceDrain: jest.fn().mockResolvedValue({
         wmkf_appreviewersuggestionid: SUGGESTION_ID,
@@ -1201,6 +1204,25 @@ describe('notification trust-model Stage 2 pushed-up wrappers', () => {
     );
   });
 
+  test('drain cron marks an isolation-switch pause as a visible maintenance failure', async () => {
+    mockDrainReviewerAcceptanceJobs.mockResolvedValue({
+      claimed: 0, completed: 0, cancelled: 0, failed: 0, leaseLost: 0,
+      configurationPaused: true, errors: [],
+    });
+    jest.spyOn(MaintenanceService, 'startRun').mockResolvedValue('run-paused');
+    jest.spyOn(MaintenanceService, 'completeRun').mockResolvedValue(undefined);
+
+    const res = makeRes();
+    await drainHandler({ method: 'GET', headers: {}, query: {} }, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ ok: true, configurationPaused: true });
+    expect(MaintenanceService.completeRun).toHaveBeenCalledWith('run-paused', expect.objectContaining({
+      status: 'failed',
+      errorMessage: 'Reviewer acceptance jobs paused: isolation switches are not both on',
+    }));
+  });
+
   test('site 11 - grantee deliverable reminder default alert inherits grantee-deliverable-reminders-cron context', async () => {
     // Form A: drive the REAL cron handler so the wrap it establishes is what
     // provides the context — this guards the handler's own withDalContext, not
@@ -1305,7 +1327,10 @@ describe('notification trust-model already-covered characterization sites', () =
       },
       steps: {},
     };
+    process.env.SYNTHETIC_REVIEWER_ISOLATION = 'on';
+    process.env.TEST_REQUEST_ISOLATION = 'on';
     const deps = {
+      resolveTestState: jest.fn().mockResolvedValue({ kind: 'ordinary' }),
       suggestions: {
         getForAcceptanceDrain: jest.fn().mockResolvedValue({
           wmkf_appreviewersuggestionid: SUGGESTION_ID,

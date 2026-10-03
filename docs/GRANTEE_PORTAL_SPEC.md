@@ -81,9 +81,13 @@ Per grantee, exactly:
 - **D5 — Scope = RESEARCH only; recipients = TWO contacts (owner-confirmed S268).** The portal runs
   on research grants only (the deliverable is a research output), so there is NO program-family
   branching. The invite addresses the **PI** (`akoya_request.wmkf_projectleader` → `contact`) in **`To`**
-  and **Cc's the liaison** (`akoya_request.akoya_primarycontactid` → `contact` — the institution's WMKF
-  foundation liaison / grant steward, NOT the PI). Both are auto-resolved (`emailaddress1` + name); staff
-  confirm/override and preview the email before send. The earlier program-aware SoCal/Discretionary
+  and **Cc's the liaison** — the Liaison of record, the applicant institution's Primary Contact
+  (`account.primarycontactid` via `akoya_applicantid` → `contact`; the institution's WMKF foundation
+  liaison / grant steward, NOT the PI). The Request's `akoya_primarycontactid` copy is not used (owner
+  decision 2026-09-29, `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md`); with no institution
+  Primary Contact the invite goes to the PI with no Liaison Cc. Both are auto-resolved (`emailaddress1` +
+  name); staff confirm/override and preview the email before send, and the send refuses if the Liaison
+  changed since the preview. The earlier program-aware SoCal/Discretionary
   mapping is superseded. (`docs/atlas/dataverse-akoya-request.md:135-160`.)
 - **D6 — Schema home: split text from package state.** `akoya_request` retains the two abstract
   fields. A one-per-request `wmkf_granteedeliverable` child row owns package state and evidence,
@@ -122,19 +126,28 @@ Per grantee, exactly:
    Review, replace the image or caption through the package's separate ETag-conditional path. The GET
    returns response-only sanitized HTML for both Markdown-backed editors/displays; no HTML is persisted.
 8. **Cadence:** the established recipient send remains day 12 after the first
-   `wmkf_inviteddate`, with a day-14 COB response deadline. **[SOURCE-BUILT
-   2026-08-25; migration 036 not applied]** an assigned PD may explicitly choose
-   automatic send or an earlier 1–14 day review window. The lead days move only
-   the internal notification/review time; silence preserves the day-12 send.
-   Configured PDs receive an exact frozen draft in `/scheduled-emails`, may edit
-   subject/body, approve, stop, or send now, and are told that inaction will send
-   as shown. Recipients and sender remain server-owned. The recipient email begins
-   with a personalized automated/on-behalf/reply-routing notice; the secure portal
-   token is minted only at real send. Postgres stores the Dynamics activity/send
-   receipt, then the service stamps Reminder Sent + `wmkf_remindeddate`; a separate
-   pass repairs that final Dataverse write without re-sending. A PD with no saved
-   preference stays on the existing claim-before-send automatic path until the
-   owner selects the rollout default.
+   `wmkf_inviteddate`, with a day-14 COB response deadline. **[DEPLOYED
+   2026-08-26 (`4a743d63a`); Part A hardening (#373) and Part B send-time
+   re-check (#384) deployed 2026-09-30; first Production row 2026-10-01; real
+   send not yet live-proved. Design: `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md`.]**
+   Every Invited deliverable gets one frozen `scheduled_email_messages` row on
+   the cron's first sight, To the PI with the institution Liaison of record Cc'd
+   when one exists.
+   Sends are automatic by default. A row requires PD approval only when the
+   assigned PD has the review-all override on or has VIP-flagged the PI or
+   Liaison contact; the due-send claim refuses an unapproved approval-required
+   row, and the PD's own send-now is the only bypass. The per-PD
+   daily digest is the only notification surface. In `/scheduled-emails` the PD
+   may edit subject/body (which clears any approval), approve, stop, or send now.
+   Recipients and sender remain server-owned. At send time Part B re-reads the
+   Liaison and the PD's review posture: a changed Liaison rewrites the Cc, newly
+   required approval (or a changed Cc on a PD send-now) holds the row for
+   approval, and relaxation never loosens it. The recipient
+   email begins with a personalized automated/on-behalf/reply-routing notice; the
+   secure portal token is minted only at real send. Postgres stores the Dynamics
+   activity/send receipt, then the service stamps Reminder Sent +
+   `wmkf_remindeddate`; a separate pass repairs that final Dataverse write
+   without re-sending. Storage and state detail: `docs/atlas/postgres-infra-tables.md`.
 
 ## Reuse — shared primitives vs parallel grantee variant
 
@@ -320,7 +333,8 @@ validation, and waiver evidence are closed by the as-built contract above:
 The original reminder policy is implemented and deployed. The deployed Vercel configuration registers
 `/api/cron/grantee-deliverable-reminders` at `0 8 * * *` (08:00 UTC). The
 route accepts only a valid cron secret, and the service implements the day-12
-send/day-14 deadline. **[SOURCE-BUILT 2026-08-26; NOT DEPLOYED]** the
+send/day-14 deadline. **[DEPLOYED 2026-08-26 (`4a743d63a`); first Production
+row 2026-10-01; real send not yet live-proved]** the
 personalized scheduling extension (VIP/digest decision layer per
 `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md`) adds migration 036's
 `scheduled_email_messages` ledger and `scheduled_email_vip_flags` table, the

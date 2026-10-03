@@ -64,6 +64,20 @@ sequence.
   `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
 
 ## Audit follow-ups — verified open, not silently prioritized
+- **Hard-coded late-2026 `expiresAt` dates in unit-test fixtures (2026-09-27, S546).**
+  `reviewer-roster-endpoint.test.js` failed on `main` when its fixed
+  `2026-09-28T00:00Z` expiry passed; fixed in `5ced59d3b` (far-future date).
+  Seven more files hard-code `expiresAt` dates in late 2026 and may fail the
+  same way when those dates pass: `pre-site-distribution-panel` (10-08, 12-17),
+  `reviewer-institution-evidence-attestation` (09-28, 10-14; uses fake timers),
+  `external-briefing-page` (10-08), `workbench-briefing-link-route` (10-08),
+  `reviewer-institution-auto-resolution-policy` (09-28, 09-29; passed on
+  09-28 UTC, so it may not compare against the clock),
+  `pre-site-distribution-service` (10-08, 11-14, 12-18) and
+  `meeting-tracker-session-service` (12-18), all under `tests/unit/`. Not
+  checked whether each value is compared with the current time. Next: per file,
+  confirm clock dependence; replace clock-compared values with a far-future
+  date or a fake clock. Earliest risk date: 2026-10-08.
 - **Preview CSRF origin check rejects alias-hosted POSTs (2026-09-19, integration
   smoke).** `lib/utils/auth.js validateOrigin` derives the Preview allowed origin from
   `VERCEL_URL` (the immutable deployment host), so any state-changing request made
@@ -85,6 +99,7 @@ sequence.
   authorized; both source branches were already gone from origin). Seven Web
   redirect URIs remain, including three older deployment-hash callbacks that
   were not part of that directive.
+- **Dependabot triage 2026-09-30 (S553).** PR #378 (merge `361fbcdfd`) closed all five open alerts: Next 16.3.5 → 16.3.8 (critical next/og RCE; `next/og` is not imported in this repo), dompurify 3.4.13 → 3.4.16 (low), and the vendored brace-expansion shim's upstream pin 5.0.9 → 5.0.12 in both the root and `vendor/brace-expansion-compat` package.json (two high, one medium). `npm audit` reported 0 vulnerabilities; the alert count on `main` was 0 after the merge.
 - **Dependabot triage 2026-09-12 (S509).** Patch bumps (Next 16.3.5, xmldom 0.8.15,
   sharp 0.35.4, qs 6.16.0, js-yaml 3.15.2/4.3.2) and csv-parse 7.0.2 (a mistaken major
   with no breaking changes) shipped in S509. At that time, the IRS BMF importer's
@@ -662,6 +677,40 @@ review questions, reviewer search timeout controls, service decompositions, rout
 consolidation, OData/chunk consolidation, prompt migrations, grantee portal construction, and
 honorarium portal construction are implementation history or current operating references. They do
 not become current work merely because their document status remains `active`.
+
+- **Integrity Screener in the Workbench, with PD approval (2026-09-26/27).**
+  [LIVE since 2026-09-30: PR #366 merged as `fdaec0b1f`, Production deploy
+  `dpl_EbiwNNbuRgPGaAswWNGK7DsYyn7p`; migrations 056 and 057 applied and
+  schema-verified; read-only production smoke passed (S552)] It adds:
+  - a gated Integrity tab that screens the request's PI and Co-PIs automatically;
+  - request-linked screening history;
+  - an append-only PD approval/hold audit (`approved` means a complete screen plus the
+    lead PD's approval for the current roster).
+  
+  Evidence and PD decisions stay in Postgres. Luna implemented, Sol reviewed, and Codex
+  adjudicated the Claude Opus findings. Validation and residual limits are in
+  `docs/plans/INTEGRITY_WORKBENCH_TAB_BUILD_BRIEF_2026-09-26.md` (on `main` since #366).
+  
+  **Open, not built:** one informational Dataverse flag, **Integrity review complete**
+  (`wmkf_integrityreviewcomplete`), meaning a complete screen plus PD approval for the
+  current roster; a screen alone is not enough. The investigation and a read-only
+  metadata probe are on `main` (`docs/plans/INTEGRITY_DATAVERSE_FLAG_INVESTIGATION_2026-09-26.md`, `scripts/probe-request-integrity-metadata.js`):
+  - production metadata checked, no existing equivalent column found by keyword;
+  - sandbox metadata not checked.
+  
+  Next design work must cover invalidation after replacement screens, holds and roster
+  changes (including edits made outside our apps), and durable retries when Dataverse sync
+  fails.
+  
+  **Release record (S552):** two review rounds (Claude code review, then Codex
+  adversarial gpt-5.6-sol); all fixed except finding 6 (strict SerpApi empty-result
+  wording, needs a real zero-result response) and finding 9 (repeated Dataverse/SQL
+  reads, performance only), both deferred. The owner chose not to restrict who may
+  re-screen an approved request. Migration numbering: 055 post-presentation (#365),
+  056–057 Integrity, 058 B4, 059 scheduled-email Part A.
+  
+  **Deferred:** the hard board-readiness gate waits for the staff recommendation/readiness
+  workflow. Screening normally covers only applicants staff recommend for funding.
 
 ## Queue maintenance rule
 

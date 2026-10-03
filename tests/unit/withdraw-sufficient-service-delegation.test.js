@@ -47,6 +47,10 @@ const withdrawPendingInvitation = jest.fn();
 jest.mock('../../lib/services/reviewer-engagement/withdraw-pending-invitation', () => ({
   withdrawPendingInvitation: (...a) => withdrawPendingInvitation(...a),
 }));
+const assertReviewerDirectedEmailBound = jest.fn();
+jest.mock('../../lib/services/test-requests/reviewer-directed-email', () => ({
+  assertReviewerDirectedEmailBound: (...a) => assertReviewerDirectedEmailBound(...a),
+}));
 
 const REQ = '11111111-1111-4111-8111-111111111111';
 const SUG = '22222222-2222-4222-8222-222222222222';
@@ -71,6 +75,7 @@ function pendingRow(over = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  assertReviewerDirectedEmailBound.mockResolvedValue({ kind: 'ordinary' });
   getRequestById.mockResolvedValue({
     akoya_requestid: REQ, akoya_title: 'A Proposal', _wmkf_programdirector_value: 'pd-1',
   });
@@ -85,6 +90,19 @@ beforeEach(() => {
       'email.reviewer_withdraw.body': 'Body tpl',
     },
   });
+});
+
+test('a failed exact email binding preserves withdrawal and blocks the courtesy email', async () => {
+  findById.mockResolvedValue(pendingRow());
+  withdrawPendingInvitation.mockResolvedValueOnce(undefined);
+  assertReviewerDirectedEmailBound.mockRejectedValueOnce(new Error('unbound'));
+  const out = await withdrawSufficient(ARGS);
+  expect(withdrawPendingInvitation).toHaveBeenCalledTimes(1);
+  expect(assertReviewerDirectedEmailBound).toHaveBeenCalledWith({
+    suggestionId: SUG, requestId: REQ, recipients: ['rev@example.org'],
+  });
+  expect(createAndSendEmail).not.toHaveBeenCalled();
+  expect(out.results[0]).toMatchObject({ status: 'withdrawn_email_failed' });
 });
 
 const ARGS = { requestId: REQ, suggestionIds: [SUG], actingUserSystemId: 'u-1' };

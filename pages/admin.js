@@ -17,6 +17,9 @@ import DataverseFieldInfoButton, {
   appSystemSettingPattern,
 } from '../shared/components/admin/DataverseFieldInfoButton';
 import AdminOverviewSection from '../shared/components/admin/AdminOverviewSection';
+import TestRequestFactorySection from '../shared/components/admin/TestRequestFactorySection';
+import TestRequestPreviewSection from '../shared/components/admin/TestRequestPreviewSection';
+import TestRequestEmailAllowlistSection from '../shared/components/admin/TestRequestEmailAllowlistSection';
 import {
   AdminEditorPanel,
   AdminViewNavigation,
@@ -90,6 +93,14 @@ const ALERT_RECIPIENT_DATAVERSE_FIELDS = [
   ),
 ];
 
+const TEST_REQUEST_EMAIL_ALLOWLIST_DATAVERSE_FIELDS = [
+  appSystemSettingField(
+    'Test-request email allowlist',
+    'testRequestEmailAllowlist',
+    'JSON { addresses: [...] }. @wmkeck.org is always allowed in code and is not stored here.',
+  ),
+];
+
 const MEETING_TRACKER_DEFAULTS_DATAVERSE_FIELDS = [
   appSystemSettingField(
     'Default deliberation attendees',
@@ -101,7 +112,7 @@ const SITE_VISIT_MATERIALS_DEFAULTS_DATAVERSE_FIELDS = [
   appSystemSettingField(
     'Applicant materials upload cap',
     'site_visit_materials.upload_max_mb',
-    'Whole number of megabytes (1–500). Unset reads as the 100 MB default. The briefing page opens files up to 50 MB and lists larger ones with a note.',
+    'Whole number of megabytes (1–500). Unset reads as the 500 MB default. The briefing page opens files up to 50 MB and lists larger ones with a note.',
   ),
 ];
 
@@ -1127,6 +1138,19 @@ function UsageSection() {
               {stats.reviewPanel.unknownCount > 0 && (
                 <div className="text-xs text-red-700 mb-3">
                   Cost total withheld: {stats.reviewPanel.unknownCount} attempt(s) with unknown outcome are not counted toward the figure above.
+                </div>
+              )}
+              {stats.reviewPanel.isolation?.available === true && (
+                <div className="text-xs text-gray-600 mb-3">
+                  Test requests (not included above): {stats.reviewPanel.isolation.testSpend.attemptCount} attempt(s),{' '}
+                  {stats.reviewPanel.isolation.testSpend.unknownCount > 0
+                    ? 'cost withheld'
+                    : formatCost(stats.reviewPanel.isolation.testSpend.knownCostCents)}
+                </div>
+              )}
+              {stats.reviewPanel.isolation?.available === false && (
+                <div className="text-xs text-amber-700 mb-3">
+                  Test-request spend could not be separated, so the figures above include it.
                 </div>
               )}
               {stats.reviewPanel.byState?.length > 0 && (
@@ -3407,6 +3431,41 @@ export function AiWorkspace({ view }) {
   }
 }
 
+function TestRequestsWorkspace() {
+  // The Factory section learns the deployment's target from its own runs request.
+  const [factoryTarget, setFactoryTarget] = useState(null);
+  const factoryScope = factoryTarget ? `${factoryTarget === 'production' ? 'Production' : 'Sandbox'} data · Writes` : 'Writes';
+  return (
+    <div className="space-y-6">
+      <AdminEditorPanel
+        id="test-request-email-allowlist"
+        title="Test-request email allowlist"
+        description="Who may receive email about a test request, for testing and training. Everyone else is refused."
+        scope="Global setting"
+        dataverseFields={TEST_REQUEST_EMAIL_ALLOWLIST_DATAVERSE_FIELDS}
+      >
+        <TestRequestEmailAllowlistSection />
+      </AdminEditorPanel>
+      <AdminEditorPanel
+        id="test-request-preview"
+        title="Basic Request clone preview"
+        description="Resolve one sandbox Request, choose proposal files, and inspect the server-controlled field and filename plan. This panel has no create or copy action."
+        scope="Sandbox data · Shared files · Read-only"
+      >
+        <TestRequestPreviewSection />
+      </AdminEditorPanel>
+      <AdminEditorPanel
+        id="test-request-factory"
+        title="Create a test Request"
+        description="Clone one production Request into a labelled test Request, step by step, then set its Phase I or Phase II status. Each step writes real data, so every control says why it is off."
+        scope={factoryScope}
+      >
+        <TestRequestFactorySection onTarget={setFactoryTarget} />
+      </AdminEditorPanel>
+    </div>
+  );
+}
+
 export function PeopleWorkspace({ view }) {
   switch (view) {
     case 'app-access':
@@ -3474,6 +3533,8 @@ function WorkspaceContent({ workspace, view }) {
       return <OperationsWorkspace view={view} />;
     case 'workflows':
       return <WorkflowsWorkspace view={view} />;
+    case 'test-requests':
+      return <TestRequestsWorkspace />;
     case 'ai':
       return <AiWorkspace view={view} />;
     case 'people':

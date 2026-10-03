@@ -148,6 +148,18 @@ describe('compile() — every §3b invariant, bound not re-derived', () => {
     expect(appliedRules.join(' ')).toMatch(/Option B/);
   });
 
+  test('Stage 1d marker exclusion is opt-in and identical in data/count FetchXML', () => {
+    const off = compile(validSpec());
+    expect(off.fetchXml).not.toContain('wmkf_istestrequest');
+    expect(off.countFetchXml).not.toContain('wmkf_testcreationrunid');
+
+    const on = compile(validSpec(), { excludeMarkedTestRequests: true });
+    for (const xml of [on.fetchXml, on.countFetchXml]) {
+      expect(xml).toContain('attribute="wmkf_istestrequest"');
+      expect(xml).toContain('attribute="wmkf_testcreationrunid"');
+    }
+  });
+
   test('amount fan-out maps `which` → the explicit field (no bare "$")', () => {
     const mk = (which) => {
       const s = validSpec();
@@ -469,6 +481,12 @@ describe('Disclosure golden — mixed era / program / declined-with-nulls', () =
     expect(p).toMatch(/USER-ATTESTED S159/);
     expect(p).toMatch(/probe-akoya-decline-by-program\.js/);
     expect(summary.primaryContactCaption).toMatch(/NOT the\s+PI/);
+    // Liaison plan reader 7: the column is the Request's copy, not the
+    // Research Liaison of record (the institution's Primary Contact).
+    expect(summary.primaryContactCaption).toMatch(/^Request Primary Contact \(copy\)/);
+    expect(summary.primaryContactCaption).toMatch(/Research programs the\s+Liaison of record is the applicant institution's Primary Contact/);
+    expect(p).toMatch(/Request Primary Contact \(copy\) is the Request's own akoya_primarycontactid/);
+    expect(p).not.toMatch(/foundation liaison/);
   });
 });
 
@@ -679,12 +697,30 @@ describe('result-token — the stateless preview→run confirm gate', () => {
   });
 
   test('mint → verify round-trips and binds the exact spec', async () => {
-    const { token, expiresInSec } = await mintResultToken(spec(), { trueTotal: 42 });
+    const { token, expiresInSec } = await mintResultToken(
+      spec(),
+      { trueTotal: 42 },
+      { markedIsolation: true },
+    );
     expect(expiresInSec).toBe(3600);
     const v = await verifyResultToken(token);
     expect(v.valid).toBe(true);
     expect(v.spec).toEqual(spec());
     expect(v.meta.trueTotal).toBe(42);
+    expect(v.policy).toEqual({ markedIsolation: true });
+  });
+
+  test('a token without a policy claim is treated as isolation-off', async () => {
+    const legacy = await new SignJWT({ typ: 'dvx-preview', spec: spec(), meta: {} })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime(Math.floor(Date.now() / 1000) + 600)
+      .sign(new TextEncoder().encode(process.env.NEXTAUTH_SECRET));
+    const verified = await verifyResultToken(legacy);
+    expect(verified).toEqual(expect.objectContaining({
+      valid: true,
+      policy: { markedIsolation: false },
+    }));
   });
 
   test('a tampered token ⇒ invalid_signature (cannot run an unforged spec)', async () => {

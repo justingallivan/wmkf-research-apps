@@ -50,6 +50,14 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   claimThankYou: jest.fn((id, sentAtIso, opts) => updateRecord('wmkf_appreviewersuggestions', id, { wmkf_thankyousentat: sentAtIso }, opts)),
 }));
 
+// Stage 1c: the per-run test-state lookup is replaced so each test chooses a
+// request's state; the lookup itself is covered in test-request-state.test.js.
+const mockRequestTestState = jest.fn(async () => ({ kind: 'ordinary', reason: 'test' }));
+jest.mock('../../lib/services/test-requests/request-test-state', () => ({
+  ...jest.requireActual('../../lib/services/test-requests/request-test-state'),
+  createRequestTestStateLookup: () => (requestId) => mockRequestTestState(requestId),
+}));
+
 const { sweepReviewThankYous } = require('../../lib/services/reviewer-thankyou-sweep');
 const { claimThankYou } = require('../../lib/dataverse/adapters/reviewer-suggestion');
 
@@ -92,6 +100,7 @@ function candidate(over = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockRequestTestState.mockImplementation(async () => ({ kind: 'ordinary', reason: 'test' }));
   readRequiredEmailDefaults.mockResolvedValue({
     ok: true,
     values: { [SUBJECT_KEY]: SUBJECT, [BODY_KEY]: BODY },
@@ -336,5 +345,22 @@ describe('sweepReviewThankYous', () => {
       expect(updateRecord).not.toHaveBeenCalled();
       expect(createAndSendEmail).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('Test Request isolation (Stage 1c)', () => {
+  test.each([
+    ['a test request', 'synthetic', 'skippedTestRequest'],
+    ['an unreadable marker', 'unknown', 'testStateUnknown'],
+  ])('skips %s before any request read, claim or send', async (_label, kind, counter) => {
+    mockRequestTestState.mockImplementation(async () => ({ kind, reason: 'x' }));
+    queryAllRecords.mockResolvedValue({ records: [candidate()] });
+    installReads();
+    const r = await sweepReviewThankYous();
+    expect(mockRequestTestState).toHaveBeenCalledWith(REQ);
+    expect(r[counter]).toBe(1);
+    expect(getRecord).not.toHaveBeenCalled();
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 });

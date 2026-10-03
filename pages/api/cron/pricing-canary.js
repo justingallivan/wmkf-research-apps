@@ -23,6 +23,7 @@
  * Auth: Vercel CRON_SECRET (dev mode bypasses).
  */
 
+import { classifyRegistryCoverage } from '../../../lib/services/model-resolver';
 import { sql } from '@vercel/postgres';
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
 import NotificationService from '../../../lib/services/notification-service';
@@ -234,17 +235,7 @@ export function findUnreviewedLiveClaudeModels(models, { reviewedAt = LAST_CAPAB
     .filter((model) => !isCoverageReviewed(model.capabilityCoverage) || !isCoverageReviewed(model.pricingCoverage));
 }
 
-export function classifyRegistryCoverage(modelId, registry) {
-  const keys = Object.keys(registry || {}).sort((a, b) => b.length - a.length);
-  for (const key of keys) {
-    if (modelId !== key && !modelId.startsWith(`${key}-`)) continue;
-    const suffix = modelId.slice(key.length);
-    if (!suffix) return { status: 'reviewed_exact', matchedKey: key };
-    if (/^-\d{8}$/.test(suffix)) return { status: 'reviewed_dated', matchedKey: key };
-    return { status: 'ancestor_match', matchedKey: key, suffix };
-  }
-  return { status: 'missing', matchedKey: null };
-}
+export { classifyRegistryCoverage };
 
 function isCoverageReviewed(coverage) {
   return coverage.status === 'reviewed_exact' || coverage.status === 'reviewed_dated';

@@ -40,8 +40,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
 import PreSiteDistributionPanel from './PreSiteDistributionPanel';
 import useSiteVisitContext from './useSiteVisitContext';
+import ResearchPresentationFollowUp from './ResearchPresentationFollowUp';
 import DeliberationStageRail from './DeliberationStageRail';
 import OverflowMenu from './OverflowMenu';
+import ResearchPresentationMaterialsCard from './ResearchPresentationMaterialsCard';
 import {
   DELIBERATION_STAGE_DEFAULT_LABELS,
   deliberationSessionLine,
@@ -992,6 +994,18 @@ export default function StaffDeliberationsTab({
   // once a collection exists, since the files matter through the visit.
   const materialsLine = !beyondDeliberations && stage !== 'final' ? siteVisitMaterialsLine(materials) : null;
 
+  // Research Presentation Materials sits above Email history when the
+  // distribution panel shows it (owner 2026-09-25), otherwise after the cards.
+  const showDistributionPanel = Boolean(briefReadyFile && (briefDraftReady || briefShared));
+  const materialsCardInPanel = showDistributionPanel && Boolean(briefShared);
+  const materialsCard = (
+    <ResearchPresentationMaterialsCard
+      requestId={requestId}
+      siteVisitContext={siteVisitContext}
+      materialsSummary={materials}
+    />
+  );
+
   const briefMoreItems = [
     briefReadyFile && !beyondDeliberations && {
       key: 'download', label: 'Download', href: briefDownloadUrl, download: briefReadyFile.name || true, title: briefReadyFile.name || undefined,
@@ -1109,6 +1123,13 @@ export default function StaffDeliberationsTab({
           </div>
         )}
       </Card>
+
+      {siteVisitContext?.presentationMaterialsStatus === 'loaded' && (
+        <ResearchPresentationFollowUp
+          status="loaded"
+          materials={siteVisitContext.presentationMaterials || EMPTY_LIST}
+        />
+      )}
 
       <Card hover={false}>
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1333,7 +1354,7 @@ export default function StaffDeliberationsTab({
         )}
       </Card>
 
-      {briefReadyFile && (briefDraftReady || briefShared) && (
+      {showDistributionPanel && (
         <PreSiteDistributionPanel
           // Codex adversarial review finding 3 (2026-09-16 round 2): the
           // panel's own history-load effect only re-runs on a `requestId`
@@ -1358,8 +1379,11 @@ export default function StaffDeliberationsTab({
           beforePrepare={briefDraftReady ? lockBriefForShare : null}
           needsLock={briefDraftReady}
           record={briefShared}
+          beforeHistory={materialsCardInPanel ? materialsCard : null}
         />
       )}
+
+      {!materialsCardInPanel && materialsCard}
 
       {isSuperuser && (preSiteShared || reopenHistory.length > 0) && (
         <Card hover={false}>

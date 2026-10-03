@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { classifySiteVisitMaterialsStatus } from '../../utils/site-visit-materials-status';
 import { Archive, CalendarX2, CheckCircle2, CircleHelp, Clock3, FileCheck2, MinusCircle, TriangleAlert } from 'lucide-react';
 
@@ -7,7 +6,7 @@ const TONE = {
   danger: 'border-red-200 bg-red-50 text-red-800', warning: 'border-amber-200 bg-amber-50 text-amber-900',
   success: 'border-green-200 bg-green-50 text-green-800',
 };
-const ICONS = { unavailable: CircleHelp, no_visit: CalendarX2, not_requested: MinusCircle, waiting: Clock3, late: TriangleAlert, check_files: FileCheck2, ready: CheckCircle2, closed: Archive };
+const ICONS = { unavailable: CircleHelp, no_visit: CalendarX2, not_requested: MinusCircle, waiting: Clock3, processing: Clock3, needs_attention: TriangleAlert, late: TriangleAlert, check_files: FileCheck2, ready: CheckCircle2, closed: Archive };
 
 export default function MaterialsStatusPill({ summary, availability, hasSiteVisit, requestMaterialsHref }) {
   const status = classifySiteVisitMaterialsStatus(summary, { availability, hasSiteVisit });
@@ -29,10 +28,10 @@ export default function MaterialsStatusPill({ summary, availability, hasSiteVisi
         {status.label}
       </span>
       {status.key === 'not_requested' && !summary && requestMaterialsHref ? (
-        <Link href={requestMaterialsHref} className="rounded text-blue-700 underline underline-offset-2 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Request materials</Link>
+        <a href={requestMaterialsHref} data-full-page-navigation="true" className="rounded text-blue-700 underline underline-offset-2 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Request materials</a>
       ) : detail && <span className="text-gray-600">{detail}</span>}
       {status.key === 'check_files' && hasSiteVisit && requestMaterialsHref && (
-        <Link href={requestMaterialsHref} className="rounded text-blue-700 underline underline-offset-2 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Review materials</Link>
+        <a href={requestMaterialsHref} data-full-page-navigation="true" className="rounded text-blue-700 underline underline-offset-2 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Review materials</a>
       )}
     </div>
   );

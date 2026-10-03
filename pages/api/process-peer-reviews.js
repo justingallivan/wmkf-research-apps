@@ -11,7 +11,7 @@ import { requireAppAccess } from '../../lib/utils/auth';
 import { executePrompt } from '../../lib/services/execute-prompt';
 import { logUsage } from '../../lib/utils/usage-logger';
 import { nextRateLimiter } from '../../shared/api/middleware/rateLimiter';
-import { safeFetch } from '../../lib/utils/safe-fetch';
+import { fetchPublicBlob } from '../../lib/utils/public-blob-fetch';
 import {
   DATA_CLASSES,
   PEER_REVIEW_TEXT_MAX_CHARS,
@@ -77,7 +77,7 @@ export default async function handler(req, res) {
           buffer = Buffer.from(fileInfo.content, 'base64');
         } else if (fileInfo.url) {
           // File is provided as URL (Vercel Blob)
-          const response = await safeFetch(fileInfo.url);
+          const response = await fetchPublicBlob(fileInfo.url);
           if (!response.ok) {
             throw new Error(`Failed to fetch file: ${response.status}`);
           }

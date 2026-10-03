@@ -161,6 +161,61 @@ describe('Dynamics Explorer SSE terminal state', () => {
     ).not.toBeInTheDocument();
   });
 
+  test('isolation on removes the page-local CSV action from every assistant table', async () => {
+    fetch.mockResolvedValueOnce(streamResponse([
+      sse('response', { content: '| Name | Value |\n| --- | --- |\n| One | 1 |' }),
+      sse('complete', { rounds: 1, testRequestIsolation: true }),
+      EOF,
+    ]));
+    render(<DynamicsExplorerPage />);
+
+    submitQuestion();
+
+    expect(await screen.findByText('One')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Export CSV' })).not.toBeInTheDocument();
+  });
+
+  test('isolation off preserves the page-local CSV action for an unmarked table', async () => {
+    fetch.mockResolvedValueOnce(streamResponse([
+      sse('response', { content: '| Name | Value |\n| --- | --- |\n| One | 1 |' }),
+      sse('complete', { rounds: 1, testRequestIsolation: false }),
+      EOF,
+    ]));
+    render(<DynamicsExplorerPage />);
+
+    submitQuestion();
+
+    expect(await screen.findByRole('button', { name: 'Export CSV' })).toBeInTheDocument();
+  });
+
+  test('missing server isolation metadata fails closed for page-local CSV', async () => {
+    fetch.mockResolvedValueOnce(streamResponse([
+      sse('response', { content: '| Name | Value |\n| --- | --- |\n| One | 1 |' }),
+      sse('complete', { rounds: 1 }),
+      EOF,
+    ]));
+    render(<DynamicsExplorerPage />);
+
+    submitQuestion();
+
+    expect(await screen.findByText('One')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Export CSV' })).not.toBeInTheDocument();
+  });
+
+  test('isolation off preserves the existing marker-column CSV suppression', async () => {
+    fetch.mockResolvedValueOnce(streamResponse([
+      sse('response', { content: '| Name | Is Test Request |\n| --- | --- |\n| One | false |' }),
+      sse('complete', { rounds: 1, testRequestIsolation: false }),
+      EOF,
+    ]));
+    render(<DynamicsExplorerPage />);
+
+    submitQuestion();
+
+    expect(await screen.findByText('Type')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Export CSV' })).not.toBeInTheDocument();
+  });
+
   test('text_delta followed by error finalizes the partial message before appending the error', async () => {
     fetch.mockResolvedValueOnce(streamResponse([
       sse('text_delta', { text: 'Partial answer' }),

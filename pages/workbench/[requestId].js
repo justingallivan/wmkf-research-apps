@@ -22,12 +22,14 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import Layout, { Card } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
+import TestRequestBadge from '../../shared/components/TestRequestBadge';
 import { useAppAccess } from '../../shared/context/AppAccessContext';
 import { useProfile } from '../../shared/context/ProfileContext';
 import { readEmailSignaturePreference } from '../../shared/config/reviewerFinderPreferences';
 import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
 import ReviewsTab from '../../shared/components/workbench/ReviewsTab';
 import ProposalTab from '../../shared/components/workbench/ProposalTab';
+import IntegrityTab from '../../shared/components/workbench/IntegrityTab';
 import OverviewTab from '../../shared/components/workbench/OverviewTab';
 import StatusTab from '../../shared/components/workbench/StatusTab';
 import AwardeeTab from '../../shared/components/workbench/AwardeeTab';
@@ -48,6 +50,7 @@ import { classifyTarget } from '../../lib/dataverse/core/interlock';
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'proposal', label: 'Proposal' },
+  { key: 'integrity', label: 'Integrity', gate: 'integrity-screener' },
   { key: 'initial-writeup', label: 'Initial Assessment' },
   { key: 'reviewers', label: 'Reviewers' },
   { key: 'reviews', label: 'Reviews' },
@@ -189,9 +192,12 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
       </div>
 
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
-          {visibleContext?.requestNumber ? `Request #${visibleContext.requestNumber}` : (requestNumber ? `Request #${requestNumber}` : 'Request Workbench')}
-        </h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900">
+            {visibleContext?.requestNumber ? `Request #${visibleContext.requestNumber}` : (requestNumber ? `Request #${requestNumber}` : 'Request Workbench')}
+          </h1>
+          <TestRequestBadge isTestRequest={visibleContext?.isTestRequest} />
+        </div>
         {visibleContext?.title && <p className="text-gray-600 mt-1">{visibleContext.title}</p>}
         {visibleContext && (
           <p className="text-sm text-gray-500 mt-1">
@@ -252,6 +258,8 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
         />
       ) : activeTab === 'proposal' ? (
         <ProposalTab key={routeRequestId || ''} context={visibleContext} requestId={routeRequestId || ''} />
+      ) : activeTab === 'integrity' ? (
+        <IntegrityTab key={routeRequestId || ''} requestId={routeRequestId || ''} />
       ) : activeTab === 'initial-writeup' ? (
         <InitialAssessmentTab
           key={typeof requestId === 'string' ? requestId : ''}

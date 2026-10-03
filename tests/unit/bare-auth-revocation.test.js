@@ -77,7 +77,9 @@ describe('bare requireAuth revocation — /api/blob-proxy', () => {
 
     await blobProxyHandler(req, res);
 
-    expect(mockFetch).toHaveBeenCalledWith('https://abc123.public.blob.vercel-storage.com/x');
+    expect(mockFetch).toHaveBeenCalledWith('https://abc123.public.blob.vercel-storage.com/x', {
+      method: 'GET', redirect: 'manual', credentials: 'omit',
+    });
     expect(res.status).not.toHaveBeenCalledWith(403);
   });
 });

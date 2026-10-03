@@ -83,7 +83,7 @@ jest.mock('../../lib/services/settings-service', () => ({
 }));
 jest.mock('../../lib/services/grant-cycles-dataverse', () => ({ findByShortCode: jest.fn(async () => CYCLE_CONFIG) }));
 jest.mock('../../lib/utils/cycle-code', () => ({ meetingDateToCycleCode: jest.fn(() => CYCLE_CODE) }));
-jest.mock('../../lib/utils/safe-fetch', () => ({ safeFetch: jest.fn(), isAllowedUrl: jest.fn(() => false) }));
+jest.mock('../../lib/utils/public-blob-fetch', () => ({ fetchPublicBlob: jest.fn(), isPublicBlobUrl: jest.fn(() => false) }));
 // Private cycle-materials path: a 'cycle-materials/…' pathname is read from the blob
 // store, producing a real material attachment — this is how the materials tests below
 // populate sharedAttachments so the strip gate is actually exercised.

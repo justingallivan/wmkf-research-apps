@@ -1,6 +1,6 @@
 # Atlas: Postgres infrastructure tables (compact)
 
-**Last verified (schema sources):** 2026-09-14. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`, except the distribution ledger proof below. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
+**Last verified (schema sources and Production read-only probe):** 2026-10-02. Migration 060 and the `materials_upload_jobs` table plus `portal_upload_staging.background_job_id` were verified in Production; see the dated section below. No Production SQL mutation was performed for that readback. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`, except the distribution ledger and explicitly dated migration readbacks below. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
 
 Compact summary for the Postgres tables outside the reviewer-finder domain. Promote any of these to its own page on next significant touch.
 
@@ -118,6 +118,54 @@ future-cycle reconciliation; see the roster Contact-link plan F5.
 ### `integrity_screenings` (41 rows), `screening_dismissals` (0 rows)
 **Source of truth:** Postgres.
 Per-applicant screening history. `retractions` (68,248 rows) is the Retraction Watch dataset (org-wide).
+**Request linkage/history:** Migration 056 adds nullable `request_id UUID` plus
+the `idx_integrity_screenings_request_latest` partial index for newest-first
+lookup. The Workbench integrity service reads the request's PI/Co-PI identities
+from Dataverse and saves completed runs with this request ID. GET returns the
+latest linked run plus newest-first history pages of 20, with an optional
+request-scoped `beforeRunId` cursor. Each history row includes append-only PD
+review decisions from `integrity_screening_reviews`. **[LIVE since 2026-09-30: PR #366 merged as `fdaec0b1f` and deployed to Production; migrations 056–057 applied and schema-verified the same day; production read-only smoke passed (S552)]**
+Existing standalone/manual runs remain
+request-unlinked. The standalone screener's history, detail, status-update and
+dismiss paths (`lib/services/integrity-service.js`) filter to
+`request_id IS NULL`, so Workbench runs are reviewed only through
+`integrity_screening_reviews`. These filters make migration 056 a prerequisite
+for the standalone screener as well as the Workbench routes. The fresh-install
+schema includes both migrations.
+
+**Blocking release order for PR #366:** before this branch is deployed,
+migrations 056 and 057 must be applied in order to the shared Postgres database
+with `node scripts/apply-migrations.js`, then verified with a read-only schema
+probe. The probe must confirm both `schema_migrations` tracker rows and the
+physical schema: nullable UUID `integrity_screenings.request_id`,
+`idx_integrity_screenings_request_latest`, the
+`integrity_screening_reviews` table with its foreign keys and decision/notes
+constraints, and both review-history indexes. Do not deploy on tracker rows
+alone, and do not add runtime column detection or a legacy-query fallback; the
+schema probe is the release gate. **Gate passed 2026-09-30 (S552):** 056 and 057
+were applied by the owner (`applied_by` `owner-s552-pr366`), and a read-only
+probe confirmed both tracker rows, the nullable UUID column, all three indexes,
+and the review table's primary key, both foreign keys and three CHECK
+constraints. `tests/integration/integrity-screening-reviews.pg.test.js` proves
+the same constraints in a scratch schema.
+
+### `integrity_screening_reviews` — LIVE (migration 057 applied 2026-09-30; 0 rows at apply)
+**Source of truth:** Postgres append-only review history, keyed to one
+`integrity_screenings` run and its Dataverse request GUID. Migration 057 stores
+server-resolved reviewer profile and Dynamics user identity, decision
+(`approved` or `hold`), notes (maximum 2,000 characters; hold requires a
+non-empty note), and creation time. The request ID is stored for request-scoped
+history; the service verifies request ownership before appending and reading
+decisions. Indexes support newest-first request and screening reads.
+
+**Write/read paths:** `pages/api/workbench/integrity/[requestId]/review` appends
+through `lib/services/workbench/integrity-service.js`; only the request's lead
+Program Director or a fresh-role superuser can submit. The GET context returns
+the latest review summary and per-screen historical decisions. Only the latest
+screen is actionable. Approval requires the latest screened roster to match
+the live request roster and source coverage version 1 with all sources searched
+and no errors. A recorded approval means the integrity review is complete; it
+does not authorize funding or gate later workflow progression. **[LIVE since 2026-09-30: PR #366 merged as `fdaec0b1f` and deployed; migration 057 applied and schema-verified (S552)]**
 
 ### `retractions` (68,248 rows)
 **Source of truth:** Postgres (manually refreshed via script — no live cron).
@@ -332,20 +380,21 @@ applied/tracked and the Meeting Tracker readiness flag is exact-on. The agenda
 transport itself has not been independently production-smoked, so no live-send
 claim is made.
 
-### `scheduled_email_messages` — MIGRATION 036 APPLIED 2026-08-26; CODE NOT DEPLOYED
+### `scheduled_email_messages` — MIGRATION 036 APPLIED 2026-08-26; LIVE IN PRODUCTION
 
 **Source of truth:** Postgres coordination and audit ledger for personalized
 scheduled email; Dataverse remains workflow authority and Dynamics remains
 email-activity/transport authority. Migration
 `036_scheduled_email_messages.sql` is mirrored in the fresh-install setup.
-**[VERIFIED IN SOURCE + FOCUSED TESTS; LIVE-PROBED 2026-08-26: migration 036 applied to the shared Neon database (tracker row + table exist per read-only information_schema probe); the branch code that writes it is not yet deployed, so the table is empty in production.]**
+**[VERIFIED IN SOURCE + FOCUSED TESTS; LIVE-PROBED 2026-08-26: migration 036 applied to the shared Neon database (tracker row + table exist per read-only information_schema probe); the writer code merged to `main` the same day (`4a743d63a`). A read-only Production read on 2026-10-01 (S560) found the table's only row, created by the 10/01 08:00 UTC `grantee-deliverable-reminders` run and then stopped by the owner; no row has reached a real send yet.]**
 
 The first allowlisted workflow is `grantee_abstract_reminder`. One source
 deliverable can own one row, created on the cron's first sight of an Invited
 deliverable. The row freezes the exact server-derived PD, recipients,
 recipient contact GUIDs, subject/body/signature, established day-12 send
-time, and `approval_required` (computed once at creation from the PD's
-review-all override plus VIP flags). It records optimistic versions and PD
+time, and `approval_required` (computed at creation from the PD's
+review-all override plus VIP flags; re-checked at send time by Part B,
+tightening only). It records optimistic versions and PD
 edit/approve/stop attribution; the digest FYI receipt (`digest_fyi_at`);
 recipient Dynamics activity identity, send intent, acceptance receipt, retry
 lease/error; and the final Dataverse repair timestamp. Preview uses a visibly
@@ -376,6 +425,64 @@ owned by a different PD. [RECHECKED after lib/services/scheduled-email-store.js 
 [RECHECKED after lib/services/scheduled-email-service.js change: sendScheduledEmailDigest rewritten onto the run ledger 2026-08-26]
 [RECHECKED after lib/services/cron/grantee-deliverable-reminders-service.js change: drift rebuild + reassigned counter added 2026-08-26]
 
+**Part A engine hardening (PR #373, merged 2026-09-30, S553) [VERIFIED: migration
+059 applied to shared Production (tracker `claude-part-a-2026-09-30`, read-only
+query 2026-09-30)]:** migration
+`059_scheduled_email_recipient_generation.sql` (fresh-install block V58) adds
+`recipient_generation INTEGER NOT NULL DEFAULT 0`, the only new column. Per
+`docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md` A1–A7:
+`send_requested_at IS NOT NULL` is the durable no-resend predicate — the
+ordinary claim and due query refuse such rows in SQL, any failure after send
+intent stamps `last_error_code = 'scheduled_email_send_unconfirmed'` at once
+(status `failed`, lease released), and a separate 25-row reconciliation query
+(`listScheduledEmailReconciliationCandidates`, `updated_at ASC`) plus
+`claimScheduledEmailReconciliation` only read the stored activity back
+(accepted → `sent` + finalized; otherwise released with the marker kept). A
+stored activity read is classified: 404 →
+`scheduled_email_activity_missing` (excluded from automatic delivery and
+reconciliation; manual recovery), 403 → `scheduled_email_activity_forbidden`
+(excluded from the due query, retried read-only through the same lane via
+`claimScheduledEmailActivityRead`/`clearScheduledEmailActivityCode`), other
+errors → transient failure; absence is never inferred from a failed read.
+Edit/approve additionally require `dynamics_email_id IS NULL AND
+send_requested_at IS NULL`. `reassignScheduledEmail` is one version-fenced
+atomic reset (also accepts `sending` with an expired lease) that returns the
+row to `scheduled`, clears the lease and increments `recipient_generation`;
+the recipient correlation key is `wmkf-scheduled-recipient:<id>` at generation
+0 and `…:<id>:g<n>` after. `cancelScheduledEmailForSource` is lease-fenced
+inside a delivery attempt. Stopped rows with send intent are read back for 7
+days (`listStoppedScheduledEmailsWithSendIntent`,
+`recordStoppedScheduledEmailSent`): stopped wins unless Dynamics proves the
+send. The digest query is a per-PD `ROW_NUMBER()` window (100 rows per PD,
+`pd_total` for cap warnings) with a **Needs attention** section decided by
+`shared/utils/scheduled-email-attention.js`, the single display/guard helper
+also used by the action route and `pages/scheduled-emails.js`. Proof:
+`tests/integration/scheduled-email-engine.pg.test.js` (CI ledger job).
+
+**Part B send-time recipient and posture re-check (PR #384, merged 2026-10-01,
+`3b5002d95`; no migration) [VERIFIED: live-Postgres suite, plus a browser
+rehearsal against a Neon branch of the app database]:** per plan B1–B5,
+`deliverScheduledEmail` re-reads a transport-pristine row's current Liaison
+(`resolveRequestLiaison` + contact) and review posture (review-all + VIP flags
+for `[PI, Liaison?]`) after the claim and before any activity lookup. Any read
+failure is a retryable `scheduled_email_recipient_read_failed`.
+`reconcileScheduledEmailRecipients` is the single transition, fenced on
+`lease_token`, `version`, `status = 'sending'` and both transport fields null:
+- **Recipient drift** (Liaison contact id or normalized email, including a
+  Liaison gained or dropped) rewrites `cc_recipients` and the ordered
+  `recipient_contact_ids` and increments `recipient_generation`.
+- **Posture-only tightening** sets `approval_required = true`.
+- **Every transition** clears `approved_at` and increments `version`.
+- **When approval is required** (always for recipient drift on a forced
+  send-now) the row returns to `scheduled` with the lease released and
+  `last_error_code` `scheduled_email_recipients_changed` or
+  `scheduled_email_approval_now_required`. Those codes are not attention
+  codes, so the row sits under approval-pending. Otherwise delivery continues
+  under the same lease with the returned row.
+
+Relaxation changes nothing. A saved activity without send intent is sent as
+created and only counted (`savedActivityNotReaddressed`; owner decision B-2).
+
 **Retention:** daily maintenance defaults to 365 days and deletes only rows
 that are both `sent` and Dataverse-finalized, or explicitly `stopped`. Pending,
 failed, sending, and sent-but-unfinalized rows are ineligible so cleanup cannot
@@ -389,7 +496,7 @@ as single interface, and PD onboarding as a rollout precondition (no
 unconfigured runtime state; the legacy direct claim-before-send path is
 deleted).
 
-### `scheduled_email_vip_flags` — MIGRATION 036 APPLIED 2026-08-26; CODE NOT DEPLOYED
+### `scheduled_email_vip_flags` — MIGRATION 036 APPLIED 2026-08-26; CODE DEPLOYED
 
 **Source of truth:** Postgres. Per-(PD, contact) VIP review flags
 (`pd_systemuser_id`, `contact_id`, `created_at`; primary key on the pair).
@@ -397,12 +504,13 @@ Deliberately per-PD, never global — the flag does not transfer on request
 handoff. Written/read via `lib/services/scheduled-email-store.js` from the
 profile-owned `/api/scheduled-emails/vip-flags` route (toggles render on the
 Workbench Awardee tab and the `/scheduled-emails` inbox) and read by the
-reminders cron to freeze `approval_required` at ledger-row creation; any
-flagged recipient contact (PI or liaison) requires approval. **[VERIFIED
+reminders cron to set `approval_required` at ledger-row creation (re-checked at
+send time by Part B, tightening only); any flagged recipient contact (PI or
+liaison) requires approval. **[VERIFIED
 2026-08-26 via migration 036 and scheduled-email-store.js on branch
-`codex/scheduled-email-review-p0`; LIVE-PROBED 2026-08-26: table exists in the shared Neon database, empty until the branch deploys.]**
+`codex/scheduled-email-review-p0`; LIVE-PROBED 2026-08-26: table exists in the shared Neon database, empty at probe time; the code deployed the same day (`4a743d63a`).]**
 
-### `scheduled_email_digest_runs` — MIGRATION 036 APPLIED 2026-08-26; CODE NOT DEPLOYED
+### `scheduled_email_digest_runs` — MIGRATION 036 APPLIED 2026-08-26; CODE DEPLOYED
 
 **Source of truth:** Postgres. Per-(PD, UTC day) digest run ledger added
 2026-08-26 after the branch adversarial review. The primary key
@@ -419,9 +527,9 @@ consumed by `sendScheduledEmailDigest`. **Retention:** deliberately
 unbounded — ≤6 PDs × ≤366 rows/PD/year; revisit only if PD count grows
 materially. **[VERIFIED 2026-08-26 via migration 036,
 scheduled-email-store.js, and the digest tests in
-tests/unit/scheduled-email-service.test.js; LIVE-PROBED 2026-08-26: table exists in the shared Neon database, empty until the branch deploys.]**
+tests/unit/scheduled-email-service.test.js; LIVE-PROBED 2026-08-26: table exists in the shared Neon database, empty at probe time; the code deployed the same day (`4a743d63a`).]**
 
-### `scheduled_email_reviewer_vip_flags` — SOURCE-BUILT (branch); MIGRATION 037 APPLIED
+### `scheduled_email_reviewer_vip_flags` — MIGRATION 037 APPLIED 2026-08-26; CODE DEPLOYED
 
 **Source of truth:** Postgres. Per-(lead PD, reviewer person) VIP flags for
 reviewer invitation sends, added by migration `037_reviewer_vip_flags.sql`
@@ -440,11 +548,13 @@ handfuls of people). **[VERIFIED 2026-08-26 via migration 037,
 scheduled-email-store.js, and the reviewer-vip-flags route/panel/modal
 suites; APPLIED to the shared Neon database 2026-08-26 (owner-run
 apply-migrations); LIVE-PROBED same day: tracker row present, three
-expected columns, 0 rows — empty until the branch merges.]**
+expected columns, 0 rows at probe time; the code merged to `main` 2026-08-27 (`dc46fa183`).]**
 
 ## Portal upload staging
 
-### `portal_upload_staging` (migrations 031, 043, 049)
+### `portal_upload_staging` (migrations 031, 043, 049, 055, 060)
+
+**[PRODUCTION-VERIFIED 2026-10-02 via owner-run read-only probe: migration 060 applied at `2026-10-02T17:08:20.197Z`; `background_job_id` is present in `public`; no migrations pending.]**
 **Source of truth:** Postgres coordination ledger; published abstract/caption/image
 authority remains Dataverse + SharePoint.
 
@@ -458,7 +568,37 @@ applicant materials store the intended predecessor artifact id plus the Graph
 drive/item/version/filename. This lets an expired-lease retry recognize a
 committed response drop, retire only the recorded predecessor, or delete only
 an exact unreferenced candidate where that scope supports candidate cleanup.
-`result_payload` makes consumed retries idempotent.
+`result_payload` makes consumed retries idempotent. **[SOURCE-BUILT, NOT DEPLOYED:]
+For `site_visit_material` only, a terminal `scan_infected` rejection can also store
+the strict public `{ok:false, reason:'scan_infected', scanRejection:{category,flags}}`
+payload. Rejected-staging replay returns its safe diagnostic; an attention hold
+keeps staging pending and does not write that rejection payload. Other scopes
+retain their existing replay contract.**
+
+For `post_presentation_transcript` (migration 055), the candidate binds the
+request/generation identity and exact Graph drive/item/name/version/ETag.
+**[PRODUCTION-LIVE via PRs #375 and #379 on 2026-09-30; DOCX/VTT accepted via owner report on request 1002903:]**
+DOCX finalization attests the stored package against the staged source using
+`attestDocxPackageAgainstSource`, accepting only its characterized SharePoint
+metadata changes. Candidate `sourceSha256`/`sourceSize` identify the original
+staged input; `sha256`/`size` identify the actual stored package for exact-byte
+cleanup. `registrySize` retains the size fenced immediately before a registry
+create so later metadata-only repacks can replay that row. Legacy receipts are
+upgraded using the original staged bytes. A stable DOCX that fails attestation
+also retains its exact stored-byte receipt under the staging lease before
+permanent rejection on fresh/conflict uploads, so the existing zero-row/exact-byte
+expiry cleanup can identify the orphan. Rejected recorded retries keep the
+prior receipt instead of authorizing deletion of edited bytes. Receipt persistence failure retains staging; successful
+attestation remains required before registry publication. PDF/TXT/VTT retain
+exact raw-byte checks. No columns or status values change. See
+`docs/plans/evidence/post-presentation/docx-transcript-fix-2026-09-30.md` for
+initial characterization and failure handling, and
+`docs/plans/evidence/post-presentation/transcript-package-and-blob-read-2026-09-30.md`
+for the completed release and owner acceptance. The shared private loader now
+reads bounded decoded bytes when wire length is absent or compressed, while
+known uncompressed length, source cap, actual hash and lease fences remain
+enforced. Only exact newly promoted DOCX custom-properties OPC links are
+tolerated; source content and existing relationships remain protected.
 
 Write/read paths: `lib/services/portal-upload-staging.js`; external grantee mint
 and submit routes; staff replacement mint and finalize routes; external
@@ -485,6 +625,13 @@ Private-store prerequisite is covered by
 `scripts/probe-private-blob-client-access.mjs`: public-mode PUT must fail, private
 PUT must succeed, and anonymous HEAD must return 403.
 
+Migration 060 adds the nullable `background_job_id` ownership marker used only
+by applicant materials background uploads. While present, staging cleanup and
+ordinary finalize claims must respect the exact job owner; the job ledger is
+coordination state and does not replace the staged pathname, Blob hash, or
+domain receipt. **[PRODUCTION-VERIFIED 2026-10-02: migration 060 is applied and
+the column exists; background admission remained off at the recorded probe.]**
+
 ## Monitoring / observability
 
 ### `health_check_history` (2,964 rows), `system_alerts` (150 rows), `maintenance_runs` (1,498 rows)
@@ -504,6 +651,11 @@ Cron-driven health checks (7 services), alert log, cron audit trail. `maintenanc
 mirror (auto at error/critical, opt-in via `operationalEvent` at any severity)
 and drain ingestion `lib/services/vercel-log-drain-ingest.js` via
 `/api/webhooks/vercel-log-drain` (HMAC-verified, `vercel:<log id>` dedup).
+**[SOURCE-BUILT, NOT DEPLOYED:]** Applicant materials `scan_infected`
+rejections also write a best-effort warning `site_visit_material_scan_rejected`
+at `virus_scan`, deduplicated by staging id. Entity references contain the
+request, collection, staging, and slot; metadata contains only the allowlisted
+`scanRejection` category and flags. The event does not send email.
 Recovery: `markRecovered`/`markSuperseded` (reviewer-acceptance drain
 completion/withdrawal edges; `AlertService.autoResolve` propagation).
 **Read paths:** `/api/admin/operational-events` → `OperationalEventsSection`
@@ -543,7 +695,23 @@ migration/schema readback, and two correlated smoke usage rows across rounds
 
 ### `model_pricing_audit` (S181, V032)
 **Source of truth:** Postgres-only.
-Append-only history written by `/api/cron/pricing-refresh` (monthly, 1st of month). One row per (model, token_type) probed: stores Anthropic's authoritative cost from `/v1/organizations/cost_report`, our summed `api_usage_log` token count for the same window, the derived per-MTok price, the local table's price, and the delta. `flagged = true` rows are >5% out of tolerance and have triggered an `ops` alert. Backstop for the manually-maintained `lib/utils/model-pricing.js` table — the cron alerts; humans edit the table; no auto-overwrite. Requires `ANTHROPIC_ADMIN_API_KEY`.
+Append-only history written by `/api/cron/pricing-refresh` (monthly, 1st of month).
+**[SOURCE-BUILT 2026-10-02 on `codex/admin-alert-remediation`; not deployed.]**
+The corrected writer joins Anthropic `/v1/organizations/cost_report` and
+`/v1/organizations/usage_report/messages` for the same 30-day window and exact
+UTC day, model, workspace, service tier, context window, and inference geography.
+`token_count` is the matched provider count, not app-local `api_usage_log` usage;
+5-minute and 1-hour cache creation remain separate. Each matched aggregate
+stores cost in cents, provider tokens, derived/local cents per million tokens,
+and delta. Unknown local pricing or >5% drift flags a row. Only a nonempty,
+complete comparison without flags resolves the standing `pricing:drift` alert;
+skipped or uncomparable billable rows preserve it. Report pagination errors
+abort before comparisons; inserts are awaited individually, so a failed write
+can leave partial audit history but cannot resolve the alert. The schema is
+unchanged and older audit rows retain their original app-local denominator.
+The cron alerts; humans review billing modifiers and edit
+`lib/utils/model-pricing.js`; no auto-overwrite. Requires `ANTHROPIC_ADMIN_API_KEY`.
+Corrected live provider reports have not been run for this branch.
 
 ### `external_rate_limit` (0 rows)
 **Source of truth:** Postgres-only. V031 migration / `010_external_rate_limit.sql` (S173, 2026-05-21, security audit A6).
@@ -584,6 +752,68 @@ is pinned by the latest `sent` `pre_site_distribution_attempts` row,
 reviews resolve live from `wmkf_appreviewersuggestion`, and the proposal
 narrative resolves by governed path. Cleanup: none scheduled; revoked and expired
 rows stay as audit history (bounded by one live row per request).
+
+### Post-presentation material ledgers — SHARED-SCHEMA LIVE; BOUNDED BRANCH PREVIEW ACCEPTED AND CLOSED
+
+**[VERIFIED via source, canonical migration runner, and shared-Neon readback 2026-09-26 on
+`codex/feature-request`.]** Migration
+`055_post_presentation_materials.sql`, mirrored by fresh-install V56, defines
+three additive tables for the post-research-presentation feature. Under explicit owner
+authorization, the canonical runner applied 055 to the shared Preview/Production Neon database
+at 2026-09-26T06:54:20Z. Exact readback found all three tables, all four named indexes, the
+expected constraints, and zero rows; a second runner invocation was an idempotent no-op. Only
+`codex/feature-request` Preview configuration is schema-ready and limited to approved sandbox
+Request `4236c2b3-b053-f111-bec7-6045bd015cb0`; corrected registered-alias deployment
+`dpl_BZbtW5D2UHhrQpcQhMio2kT19tXr` is Ready and passed signed-in Chrome readiness/link issuance.
+Exact readback found one live link row for the approved Request and zero upload/lease rows.
+After Safari acceptance, exact cleanup restored the registered Preview alias to prior Factory
+deployment `dpl_8hUghEjVqCG1CHK7AjRJH8NXPvjr` and reset this branch's presentation access to
+literal `off`; the link row, retained recording, and schema were not deleted. Production runtime
+configuration remains unchanged and destructive cleanup remains off. Slice 3's
+transcript producer, Slice 4's browser-direct MP4 intent/status/finalize routes, and Slice 5's
+independent 60-day link lifecycle plus token-verified materials-only consumer are source-built
+and offline-tested only on `codex/feature-request`.
+
+- `presentation_material_links` stores one non-revoked materials-only link per
+  Request: UUID/JTI, unique SHA-256 token digest, sealed token ciphertext,
+  expiry, creator/time, and revocation/supersession evidence. Raw tokens are
+  absent from the schema. `presentation-link-service.js` reuses one readable
+  live row, atomically replaces expired/unreadable state, and compare-and-swap
+  reissues only the inspected presentation row. `verify-presentation-token.js`
+  rechecks the distinct `presentation-materials` audience, request rollout,
+  digest, revocation, and expiry before every external context/media action.
+- `presentation_material_uploads` stores one actor/request/active-Site-Visit
+  bound browser-direct Graph intent before any preauthenticated URL is returned.
+  It records the bounded file fingerprint, code-owned path/generation identity,
+  lifecycle/lease/review-after state, the upload URL only as ciphertext, exact
+  Graph candidate facts, and the finalized Request Document identity. Stored
+  Graph expiry is advisory; independently authorized resume refreshes it from
+  live Graph state and it is not deletion authority. Daily maintenance claims
+  eligible rows and, unless both general access and the separate destructive
+  cleanup permission are literal `on`, remains inspect/refresh/record/alert-only.
+  Staff Cancel and terminal-session Retry share the intent lease with finalize and
+  cleanup. Cancel abandons only after confirmed session termination and an absent
+  exact path; Retry retains the same intent/path/generation and starts a newly
+  confirmed terminal session from byte zero. A candidate rejected by MP4 signature
+  or Graph malware validation remains a terminal `failed` intent and is omitted
+  from staff's unfinished-upload actions; status and finalize refuse replay.
+  Its exact item remains for the existing lease-fenced cleanup review, which
+  deletes an unbound item only under the separate general-access and
+  destructive-cleanup gates. If an exact Request Document was already created
+  before a later validation rejection, cleanup retains and alerts instead of
+  relabeling the rejected intent as finalized.
+- `presentation_material_slot_leases` is keyed by Request + Recording,
+  Transcript, or Transcript Summary artifact type and stores a paired
+  token/expiry plus a positive fence capped at 2,147,483,647.
+
+The same migration and every fresh-install definition enumerate the complete
+five-scope `portal_upload_staging` allowlist, adding
+`post_presentation_transcript` without removing the four live scopes. Exact shared-database
+readback confirmed that constraint. Slice 3's source-built cleanup reconciler recognizes the
+transcript candidate shape, but disabled destructive-cleanup controls provide no new deletion
+authority. The local acceptance finalized intent
+`e7236795-42d8-4018-8ee8-cdc66b953e9b` and retained its registry-bound SharePoint item; that
+disposable database/container is test evidence, not a deployed state store.
 
 ### `consultant_feedback` — PRODUCTION-LIVE Consultant Feedback slices 1–3 (migrations 048-049 applied; fresh-install v50-v51; 2026-09-14)
 
@@ -669,13 +899,18 @@ never here: accepted uploads are SharePoint items registered in `wmkf_requestdoc
 service reads back by artifact type and canonical filename. Migration 044 adds `slot_leases JSONB
 NOT NULL DEFAULT '{}'::jsonb`: one server-owned token/expiry object per canonical checklist slot.
 **[PRODUCTION-LIVE 2026-09-24 via PR #335 / `407ca908d`:]** manual email previews
-read the current Project Leader and liaison emails without writing this row. A blank Request
-Primary Contact uses the applicant Account's Org Primary Contact for the liaison. Send requires both roles,
-revalidates the reviewed To/Cc recipients, and refreshes `contacts` from the Request: an existing
-invitation uses a conditional contact update before transport; a manual reminder updates contacts
-in the same conditional UPDATE that claims the reminder. The automatic sweep uses the stored
-snapshot and skips rows lacking either role. A corrected Request contact therefore takes effect
-on a fresh manual preview and Send, without a migration.
+read the current Project Leader and liaison emails without writing this row. The liaison is the
+Liaison of record (`lib/services/contacts/request-liaison.js`): for Research the applicant
+Account's Primary Contact only; other programs keep the Request Primary Contact, falling back to
+the Account's when blank. `contacts` also records `liaisonStatus`: `'none'` (a successful read found
+no Liaison) sends to the PI only; `'found'` without an email refuses (409); a legacy snapshot
+without a status still requires both roles. Send revalidates the reviewed To/Cc recipients and
+refreshes `contacts`: an existing invitation uses a conditional contact update before transport;
+a manual reminder updates contacts in the same conditional UPDATE that claims the reminder. The
+automatic sweep re-resolves contacts before preparing, and `claimAutomaticReminder` compares the
+snapshot it read and saves the refreshed one in its claim UPDATE (a changed snapshot loses the
+claim; nothing is sent). A corrected contact therefore takes effect on the next preview, Send or
+automatic reminder, without a migration.
 `collection-store.js` acquires an absent or expired entry with one conditional UPDATE before the
 finalize re-read and removes only the matching token afterward; the five-minute expiry recovers a
 crashed holder while live contention returns `slot_busy`. Readiness flag
@@ -702,3 +937,62 @@ registry, malformed-result, or thrown dependency failures and render those rows 
 the collection row and sealed contributor link are created only on explicit Send. A user's
 invitation/reminder subject and body defaults live in Dataverse `wmkf_appuserpreferences`, not in
 this Postgres row. One-off edits are not saved as defaults.
+
+### `materials_upload_jobs` (migration 060; Production admission live; first job completed 2026-10-02)
+
+Owner: durable background processing for applicant Site Visit materials uploads.
+The ledger binds one `portal_upload_staging` row to a collection, request, fixed
+checklist slot, actor binding, and token digest. It records queued/processing and
+terminal status, bounded attempt count, retry time, worker lease, processing
+deadline, clean malware-scan checkpoint, sanitized error code, and the exact
+finalize receipt needed for replay. An active required-slot job is unique across
+collections for the request; optional `other` uploads may have multiple active
+jobs. A replacement is written under a unique `portal-${stagingId}` SharePoint
+subfolder so prior bytes remain preserved until the new receipt is committed.
+SharePoint remains the byte store and `wmkf_requestdocument` the published
+receipt; this table owns neither.
+
+**[PRODUCTION-LIVE via PR #407/#410, 2026-10-02:]** An infected verdict persists the sanitized
+`{ok:false, scanRejection:{category,flags}}` in existing job `result_payload`,
+including an infected `needs_attention` hold. The terminal failed path also
+rejects staging and persists its replay payload; a hold leaves staging pending.
+Applicant `jobs` expose this diagnostic only for failed infected jobs; staff
+`uploadJobs` expose it for failed or attention-held infected jobs. Legacy or
+invalid diagnostics fall back to an unspecified reason. No table or migration
+changes are needed.
+
+The worker at `/api/cron/drain-materials-uploads` claims at most one job per
+invocation, checks the existing virus scanner, fences writes with a fixed
+360-second lease (the worker does not renew it), resumes from a hash-bound scan
+checkpoint, and calls the existing applicant materials finalizer. Transient failures use bounded exponential retry; terminal
+failures that have a clean scan or SharePoint candidate become
+`needs_attention` for coordinator review. The cron is source-configured every
+minute with a five-minute function maximum. Public contributor context exposes
+sanitized `jobs`; staff projections expose sanitized `uploadJobs` and counts.
+Request-wide active jobs remain visible when a newer collection exists, so
+Ready and manual/automatic reminders account for work admitted by an older
+collection. Runtime read failures are rendered unavailable, never as confirmed
+zero jobs. Five generic internal recursive document readers also opt into
+pruning `portal-<UUID>` children beneath canonical Site Visit materials folders.
+The original four-reader regression run passed five suites (79 tests, one
+snapshot); the added Grant Reporting caller passed two suites (18 tests).
+
+Admission is gated by `SITE_VISIT_MATERIALS_BACKGROUND_SCHEMA_READY=on`,
+`SITE_VISIT_MATERIALS_BACKGROUND_ADMISSION_ENABLED=on`, and
+`VIRUS_SCAN_ENABLED` enabled. The schema gate must follow a successful
+migration-060 apply and physical readiness check; admission also requires the
+schema gate. If admission is off, the existing synchronous finalize path is
+used. **Production verified 2026-10-02:** schema readiness and admission are `on`, and virus scanning is `true`. PRs #404,
+#407, and #410 are merged with all CI passing. Ready deployment
+`dpl_2AacXcc5YQX9dNvJ4gMn4PpGtWWN` serves commit
+`8fb8a6d83684a9d49b8450b26ef5bbef382f9a32` and the registered alias
+`applications.wmkeck.org`. The first real job
+`33630e07-4311-41b3-8aef-737a2962ce03` completed successfully on attempt 1,
+with a clean scan checkpoint and consumed staging receipt; later worker runs
+were healthy with an empty queue. See
+`docs/plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md` for exact times,
+the read-only operator probe, and remaining verification bounds.
+
+Terminal jobs expire after 30 days; rejected staging/blob cleanup uses the
+existing exact-path cleanup with a seven-day retention. `scripts/materials-upload-job.js`
+supports exact-job inspection and guarded retry/cancel on loopback Postgres. Its Production mode uses the fixed local-shell `MATERIALS_UPLOAD_PRODUCTION_DATABASE_URL`, explicit target/host/database, verified TLS, and exact job/action confirmations; inspection is read-only and connected database/schema assertions run inside the transaction. Retry can reset an exhausted attempt count and start a fresh two-hour budget only for an unleased `needs_attention` job with a matching unleased, unconsumed staging owner and a non-infected failure. **[PRODUCTION SOURCE AND READ-ONLY PATH VERIFIED 2026-10-02.]** PR #404 is merged. The owner-authorized agent probe passed Production target/TLS checks and returned expected `job_not_found` for the deliberately nonexistent UUID `00000000-0000-4000-8000-000000000000`; no recovery mutation was performed.

@@ -263,6 +263,7 @@ export default function ReviewerSearchSection({
           repairRequestsByCandidateKey={repairRequestsByCandidateKey}
           repairRequestsUnavailable={repairRequestsUnavailable}
           retryRosterLoad={retryRosterLoad}
+          rosterLoadFailed={rosterLoadFailed}
           requestAddressRepair={requestAddressRepair}
           reviewAddressConflict={reviewAddressConflict}
           retryAddressCheck={retryAddressCheck}

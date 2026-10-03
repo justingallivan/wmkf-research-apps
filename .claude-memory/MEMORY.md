@@ -17,22 +17,27 @@
 - Evidence / reconciliation: ../.claude/skills/sweep/SKILL.md; ../.claude/skills/contract-reconcile/SKILL.md; ../.claude/rules/durable-docs.md
 - Red gates / test trust: ../docs/CI_GATES_REFERENCE.md; feedback-red-gates-are-p0.md; feedback-run-harness-framing-before-handoff-commit.md; feedback-one-session-runs-gates-per-worktree.md
 - External systems / literals: feedback-verify-external-platform-claims.md; feedback-no-fabricated-placeholder-values.md
-- Delegated work: ../docs/AGENT_COLLABORATION_PLAN.md; ../docs/agent-wiki/topics/dev-environment.md (Durable Memory); feedback-codex-model-gpt56-sol.md; feedback-codex-worktree-owner-runs-it.md
+- Delegated work: ../docs/AGENT_COLLABORATION_PLAN.md; ../docs/agent-wiki/topics/dev-environment.md (Durable Memory); feedback-codex-model-gpt56-sol.md; feedback-codex-worktree-owner-runs-it.md; feedback-cap-subagent-load-in-reproduction-briefs.md
 - Environment / deployment / Vercel env+logs / require(esm) hazard: ../docs/agent-wiki/topics/dev-environment.md (Durable Memory); feedback-verify-deploy-is-the-merge-build.md; project-vercel-node22-no-require-esm.md; project-preview-rehearsal-venue-limits.md
 - Production data access: feedback-never-self-authorize-prod-dataverse-reads.md
 - Production smoke residue / cleanup scope: project-test-residue-cleanup-is-for-data-mining.md
 - Sandbox rehearsal --bypass-goverify per-machine allow rule: project-sandbox-rehearsal-bypass-allow-rule.md
-- Local containers / ledger Postgres: project-local-docker-is-colima.md
+- Local containers / ledger Postgres / URL hazards: project-local-docker-is-colima.md; feedback-postgres-url-handling-hazards.md
+- Factory ledger location / owner-run durable state: feedback-operational-state-must-be-reachable-from-every-workstation.md; ../docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md
 
 ## Working Norms
 - Performance/caching/refactor plans: feedback-latency-plan-scope-accretion-postmortem.md
+- Multi-session features / MVP drift: feedback-anchor-multisession-features-to-the-original-ask.md
 - Git / releases: ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md; feedback-verify-branch-before-git-action.md; feedback-scope-git-stash-in-shared-worktrees.md; feedback-feature-branch-handoff-lands-on-main.md
+- Migration numbers / schema_migrations / branch-applied migrations: project-migration-numbers-claimed-off-main.md
 - Action affordances / UI gating: feedback-ui-gates-must-mirror-server-guards.md
 - Tunables / mutable parameters: feedback-mutable-parameters-not-in-code.md
+- Test Request Factory safety vs fidelity / rehearsal venue: feedback-factory-safe-not-full-fidelity.md; feedback-question-the-rehearsal-venue.md
 - Reviewer product decisions: ../docs/agent-wiki/topics/reviewer-identity.md (Durable Memory); feedback-prioritize-contact-recall-over-identity-precision.md
 - Audits / completion: feedback-vacuous-clean-results-print-the-denominator.md; feedback-apply-measurement-artifacts-in-both-directions.md; feedback-briefs-are-snapshots-not-ship-state.md
+- Delegated builds / review cadence: feedback-orchestrator-checks-builds-before-review.md
 - Review posture: feedback-read-the-implementation-not-the-callers-docblock.md; feedback-weigh-the-risks-you-name.md; feedback-corrections-decay-unless-mechanized.md; feedback-consistency-over-preview-rationale.md; feedback-reviewer-differs-from-author.md
-- Test teeth / mutation checks: feedback-mutation-test-with-the-discriminating-fixture.md; feedback-mocked-sql-hides-parameter-typing.md
+- Test teeth / mutation checks: feedback-mutation-test-with-the-discriminating-fixture.md; feedback-mocked-sql-hides-parameter-typing.md; feedback-fixtures-return-raw-transport-shape.md
 - Tone / user context: feedback-no-performative-contrition.md; feedback-user-facing-error-copy-voice.md
 - Legacy labels / interim trims on surfaces with a decided target: feedback-skip-legacy-fixes-that-the-target-state-removes.md
 - Search / schema language: feedback-grep-general-codebase-terms.md; feedback-human-legibility-schema-principle.md
@@ -50,6 +55,7 @@
 - External reviewer portal / accept / forms / SharePoint: ../docs/agent-wiki/topics/external-reviewer-portal.md; ../docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md
 - Review-form multiselect: ../docs/REVIEW_FORM_MULTISELECT_BUILD_PLAN.md
 - Dataverse / Dynamics / Explorer / CRM facts: ../docs/agent-wiki/topics/dataverse-dynamics.md
+- SharePoint upload round-trips / DOCX and XLSX byte identity: project-sharepoint-property-promotion-rewrites-docx.md
 - Dynamics Explorer behavior campaign / SoCal vernacular / Explorer telemetry+eval: ../docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md; project-dynamics-explorer-socal-campaign.md
 - Prompt / Executor / document processing: ../docs/agent-wiki/topics/prompt-executor.md; project-prompt-governance.md; project-executor-thinking-budget-truncation.md
 - Initial Assessment registry/controls and Final Writeup lineage/review: ../docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md; ../docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md; project-j27-doc-capture-evolution.md; project-reviewer-apps-redesign-direction.md

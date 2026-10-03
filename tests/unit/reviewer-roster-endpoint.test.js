@@ -34,7 +34,18 @@ jest.mock('../../lib/services/proposal-participants', () => ({
 }));
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   listForRequest: jest.fn(async () => ({ active: [], excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [] })),
-  recordSurfaced: jest.fn(async () => 0),
+  recordSurfaced: jest.fn(async (_requestId, candidates, options = {}) => (
+    options.includeOutcomes
+      ? {
+          recorded: 0,
+          outcomes: candidates.map((candidate, inputIndex) => ({
+            inputIndex,
+            candidateKey: candidate?.candidateKey || null,
+            status: 'unchanged',
+          })),
+        }
+      : 0
+  )),
   setExcluded: jest.fn(async () => {}),
   promote: jest.fn(async () => ({ name: 'Bob Roe' })),
   confirmIdentity: jest.fn(async () => ({ confirmationId: 'confirm-1', candidate: { name: 'Ann Lee' } })),
@@ -237,6 +248,42 @@ describe('POST recordSurfaced', () => {
     );
   });
 
+  it('returns one ordered outcome per original input and only final server candidate keys', async () => {
+    store.recordSurfaced.mockImplementationOnce(async (_requestId, passed, options) => {
+      expect(options.includeOutcomes).toBe(true);
+      return {
+        recorded: 1,
+        outcomes: [
+          { inputIndex: 0, candidateKey: passed[0].candidateKey, status: 'recorded' },
+          { inputIndex: 1, candidateKey: passed[1].candidateKey, status: 'failed' },
+        ],
+      };
+    });
+    const duplicate = {
+      name: 'Same Reviewer',
+      email: 'same@example.edu',
+      candidateKey: 'candidate:existing-victim',
+    };
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [
+      { name: '' }, duplicate, duplicate,
+    ] } }, r);
+
+    expect(r.statusCode).toBe(200);
+    expect(r.body).toMatchObject({ success: false, recorded: 1 });
+    expect(r.body.outcomes).toHaveLength(3);
+    expect(r.body.outcomes.map(({ inputIndex, status }) => [inputIndex, status])).toEqual([
+      [0, 'invalid'], [1, 'recorded'], [2, 'failed'],
+    ]);
+    const [, passed] = store.recordSurfaced.mock.calls[0];
+    expect(passed).toHaveLength(2);
+    expect(r.body.outcomes.slice(1).map(({ candidateKey }) => candidateKey)).toEqual([
+      passed[0].candidateKey,
+      passed[1].candidateKey,
+    ]);
+    expect(r.body.outcomes[1].candidateKey).not.toBe('candidate:existing-victim');
+  });
+
   it('preserves a receipt-bound immutable roster candidate key', async () => {
     verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
       valid: true,
@@ -272,7 +319,7 @@ describe('POST recordSurfaced', () => {
     verifyInstitutionEvidenceAttestation.mockResolvedValueOnce({
       valid: true,
       candidateKey,
-      expiresAt: '2026-09-28T00:00:00.000Z',
+      expiresAt: '2099-12-31T00:00:00.000Z',
     });
 
     const r = res();
@@ -289,7 +336,7 @@ describe('POST recordSurfaced', () => {
     verifyInstitutionEvidenceAttestation.mockResolvedValueOnce({
       valid: true,
       candidateKey: 'candidate:existing-victim',
-      expiresAt: '2026-09-28T00:00:00.000Z',
+      expiresAt: '2099-12-31T00:00:00.000Z',
     });
     const r = res();
     await handler({ method: 'POST', body: { requestId: REQ, candidates: [{
@@ -331,7 +378,7 @@ describe('POST recordSurfaced', () => {
     stored.serverInstitutionEvidenceReceipt = createServerInstitutionEvidenceReceipt({
       requestId: REQ,
       candidate: stored,
-      expiresAt: '2026-09-28T00:00:00.000Z',
+      expiresAt: '2099-12-31T00:00:00.000Z',
     });
     store.findCandidatesByKeys.mockResolvedValueOnce([stored]);
 

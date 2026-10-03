@@ -71,6 +71,38 @@ const EXEMPT_FILES = new Set([
   // lib/services/dynamics-explorer/chat-session.js (exempt dir); its one raw
   // call is a resolveLogicalName metadata lookup (S329 tail 3).
   'lib/services/dynamics-explorer-taxonomy.js',
+  // Test Request Factory sandbox lineage-commit deps (slice 6b, Stage A item
+  // 2, docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md): the ONE place
+  // that builds a sandbox-bound (never process.env.DYNAMICS_URL) svc for
+  // executeChangeset, reusing dynamics/write-core.js's _withCallerId/
+  // _writeFetch so the sandbox transport shares the same interlock-checked
+  // write path as the production singleton. No entity adapter can exist for
+  // a deliberately org-bound service.
+  'lib/services/test-requests/ia-sandbox-deps.js',
+  // Test Request Factory bundle-v3 reviewer exporter deps (6c-ii Stage A,
+  // Opus round 2 P3): raw client.get(path) reads (suggestion/answer/person)
+  // for the read-only, production-only source-bundle export, which runs
+  // outside a restriction context like the rest of the exporter script; no
+  // entity adapter is used by design (see the module's own doc comment).
+  'lib/services/test-requests/source-bundle-reviewers.js',
+  // Test Request Factory `reviews` recipe sandbox deps (6c-ii Stage B): the
+  // same deliberately org-bound sandbox service pattern as ia-sandbox-deps.js
+  // (raw client.js reads/writes bound to one explicit sandbox host, never
+  // process.env.DYNAMICS_URL); no entity adapter can exist for it.
+  'lib/services/test-requests/reviews-sandbox-deps.js',
+  // Test Request Factory `pre_site_visit` recipe sandbox deps (slice 4b):
+  // the same deliberately org-bound sandbox service pattern as
+  // ia-sandbox-deps.js/reviews-sandbox-deps.js, including a named
+  // sandbox-only wmkf_ai_runs write for the stub run (never
+  // DynamicsService/logAiRun/writeRunRow); no entity adapter can exist for it.
+  'lib/services/test-requests/presite-sandbox-deps.js',
+  // Test Request Factory admin form service (slice 1, docs/plans/
+  // TEST_REQUEST_FACTORY_ADMIN_FORM_PLAN_2026-10-01.md): the one place the
+  // deployed app builds the raw client.js client, bound to the deployment's
+  // single Factory target (createClient with allowTestRequestMarkerWrites and
+  // an explicit TARGET_URLS host, never process.env.DYNAMICS_URL) and driven
+  // only through the fenced runner; no entity adapter can exist for it.
+  'lib/services/test-requests/admin-run-service.js',
 ]);
 
 const EXEMPT_DIRS = [

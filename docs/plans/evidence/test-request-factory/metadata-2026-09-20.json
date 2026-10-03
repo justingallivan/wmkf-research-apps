@@ -1,0 +1,688 @@
+{
+  "checkedAt": "2026-09-20T00:14:15.838Z",
+  "mode": "METADATA_GET_ONLY",
+  "targets": [
+    {
+      "hostname": "wmkf.crm.dynamics.com",
+      "status": 200,
+      "paginationIncomplete": false,
+      "candidates": [
+        {
+          "MetadataId": "119251e7-21ae-49ee-8c51-1fef8a798533",
+          "AttributeType": "Uniqueidentifier",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_requestid",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": false,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "6dbf8214-86fc-4117-a848-f3570419647e",
+          "AttributeType": "String",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_requestnum",
+          "RequiredLevel": {
+            "Value": "None",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "ef4bea7a-a3e8-4a3b-9a8b-7096fc64e330",
+          "AttributeType": "String",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_title",
+          "RequiredLevel": {
+            "Value": "Recommended",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "LogicalName": "akoya_name",
+          "missing": true
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.MoneyAttributeMetadata",
+          "MetadataId": "0ceb708b-9ede-48b2-9b14-7b35ae63bb5e",
+          "AttributeType": "Money",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_request",
+          "RequiredLevel": {
+            "Value": "None",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.MemoAttributeMetadata",
+          "MetadataId": "700339df-6bb0-42d8-9a37-f9f70e5b3cfb",
+          "AttributeType": "Memo",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_purpose",
+          "RequiredLevel": {
+            "Value": "None",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.LookupAttributeMetadata",
+          "MetadataId": "0fd78db2-4570-4ed1-98bf-c87ea6c42baf",
+          "AttributeType": "Lookup",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_applicantid",
+          "RequiredLevel": {
+            "Value": "ApplicationRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "LogicalName": "akoya_account",
+          "missing": true
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.LookupAttributeMetadata",
+          "MetadataId": "7a5cbba3-a818-4595-8c7a-bd29aa655c30",
+          "AttributeType": "Lookup",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_programid",
+          "RequiredLevel": {
+            "Value": "Recommended",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.LookupAttributeMetadata",
+          "MetadataId": "23033a89-3dcf-48fa-b844-6b2631854798",
+          "AttributeType": "Lookup",
+          "IsValidForCreate": true,
+          "LogicalName": "wmkf_grantprogram",
+          "RequiredLevel": {
+            "Value": "None",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.LookupAttributeMetadata",
+          "MetadataId": "17aeb8bb-c07a-4168-9b6b-3c16fbeb804d",
+          "AttributeType": "Lookup",
+          "IsValidForCreate": true,
+          "LogicalName": "wmkf_type",
+          "RequiredLevel": {
+            "Value": "None",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.DateTimeAttributeMetadata",
+          "MetadataId": "94a02ea2-5391-ee11-be37-000d3a341e8f",
+          "AttributeType": "DateTime",
+          "IsValidForCreate": true,
+          "LogicalName": "wmkf_meetingdate",
+          "RequiredLevel": {
+            "Value": "Recommended",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "f24ea180-256c-4bad-baf1-97f23f2f777c",
+          "AttributeType": "String",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_requeststatus",
+          "RequiredLevel": {
+            "Value": "None",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.PicklistAttributeMetadata",
+          "MetadataId": "950319cc-2769-f111-a826-000d3a306da2",
+          "AttributeType": "Picklist",
+          "IsValidForCreate": true,
+          "LogicalName": "wmkf_triagestatus",
+          "RequiredLevel": {
+            "Value": "None",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "LogicalName": "wmkf_istestrequest",
+          "missing": true
+        },
+        {
+          "LogicalName": "wmkf_testcreationrunid",
+          "missing": true
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.BooleanAttributeMetadata",
+          "MetadataId": "572988b7-f66d-f111-ab0d-000d3a306da2",
+          "AttributeType": "Boolean",
+          "IsValidForCreate": true,
+          "LogicalName": "wmkf_respondreminderenabled",
+          "RequiredLevel": {
+            "Value": "None",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.BooleanAttributeMetadata",
+          "MetadataId": "c9c3d1c1-f66d-f111-ab0d-000d3a3064b7",
+          "AttributeType": "Boolean",
+          "IsValidForCreate": true,
+          "LogicalName": "wmkf_reviewduereminderenabled",
+          "RequiredLevel": {
+            "Value": "None",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        }
+      ],
+      "required": [
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.LookupAttributeMetadata",
+          "MetadataId": "0fd78db2-4570-4ed1-98bf-c87ea6c42baf",
+          "AttributeType": "Lookup",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_applicantid",
+          "RequiredLevel": {
+            "Value": "ApplicationRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "c843c60f-e85c-4c1e-a771-09547f23e46e",
+          "AttributeType": "String",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_fiscalyear",
+          "RequiredLevel": {
+            "Value": "ApplicationRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "MetadataId": "119251e7-21ae-49ee-8c51-1fef8a798533",
+          "AttributeType": "Uniqueidentifier",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_requestid",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": false,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "014fd5a9-e4ae-45f8-bc23-e51e80db1658",
+          "AttributeType": "String",
+          "IsValidForCreate": false,
+          "LogicalName": "createdbyyominame",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "52c3e0e6-a2a3-49f0-8162-5cb5fd9e0167",
+          "AttributeType": "String",
+          "IsValidForCreate": false,
+          "LogicalName": "createdonbehalfbyyominame",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "ce647999-b0f4-49cc-9710-2347ea3dda21",
+          "AttributeType": "String",
+          "IsValidForCreate": false,
+          "LogicalName": "modifiedbyyominame",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "4dc10f48-f7b6-4f66-91bd-a219607b5114",
+          "AttributeType": "String",
+          "IsValidForCreate": false,
+          "LogicalName": "modifiedonbehalfbyyominame",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.LookupAttributeMetadata",
+          "MetadataId": "0e856418-d058-4956-a692-419f115daafb",
+          "AttributeType": "Owner",
+          "IsValidForCreate": true,
+          "LogicalName": "ownerid",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "8c423aaa-b0bb-442d-a3f0-4823d4750f50",
+          "AttributeType": "String",
+          "IsValidForCreate": false,
+          "LogicalName": "owneridname",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.EntityNameAttributeMetadata",
+          "MetadataId": "dc89af53-2607-4ad6-af67-e1d20092a602",
+          "AttributeType": "EntityName",
+          "IsValidForCreate": true,
+          "LogicalName": "owneridtype",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "94bb1118-5e85-ee11-8179-000d3a341e8f",
+          "AttributeType": "String",
+          "IsValidForCreate": false,
+          "LogicalName": "owneridyominame",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "3db579ff-6111-4ef5-8731-82076d7b0bf0",
+          "AttributeType": "String",
+          "IsValidForCreate": false,
+          "LogicalName": "owningbusinessunitname",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StateAttributeMetadata",
+          "MetadataId": "d4082972-742c-443e-8ea0-d75db8d1cfdf",
+          "AttributeType": "State",
+          "IsValidForCreate": false,
+          "LogicalName": "statecode",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        }
+      ]
+    },
+    {
+      "hostname": "orgd9e66399.crm.dynamics.com",
+      "status": 200,
+      "paginationIncomplete": false,
+      "candidates": [
+        {
+          "MetadataId": "119251e7-21ae-49ee-8c51-1fef8a798533",
+          "AttributeType": "Uniqueidentifier",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_requestid",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": false,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "6dbf8214-86fc-4117-a848-f3570419647e",
+          "AttributeType": "String",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_requestnum",
+          "RequiredLevel": {
+            "Value": "None",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "ef4bea7a-a3e8-4a3b-9a8b-7096fc64e330",
+          "AttributeType": "String",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_title",
+          "RequiredLevel": {
+            "Value": "Recommended",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "LogicalName": "akoya_name",
+          "missing": true
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.MoneyAttributeMetadata",
+          "MetadataId": "0ceb708b-9ede-48b2-9b14-7b35ae63bb5e",
+          "AttributeType": "Money",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_request",
+          "RequiredLevel": {
+            "Value": "None",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.MemoAttributeMetadata",
+          "MetadataId": "700339df-6bb0-42d8-9a37-f9f70e5b3cfb",
+          "AttributeType": "Memo",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_purpose",
+          "RequiredLevel": {
+            "Value": "None",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.LookupAttributeMetadata",
+          "MetadataId": "0fd78db2-4570-4ed1-98bf-c87ea6c42baf",
+          "AttributeType": "Lookup",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_applicantid",
+          "RequiredLevel": {
+            "Value": "ApplicationRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "LogicalName": "akoya_account",
+          "missing": true
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.LookupAttributeMetadata",
+          "MetadataId": "7a5cbba3-a818-4595-8c7a-bd29aa655c30",
+          "AttributeType": "Lookup",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_programid",
+          "RequiredLevel": {
+            "Value": "Recommended",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.LookupAttributeMetadata",
+          "MetadataId": "23033a89-3dcf-48fa-b844-6b2631854798",
+          "AttributeType": "Lookup",
+          "IsValidForCreate": true,
+          "LogicalName": "wmkf_grantprogram",
+          "RequiredLevel": {
+            "Value": "None",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.LookupAttributeMetadata",
+          "MetadataId": "17aeb8bb-c07a-4168-9b6b-3c16fbeb804d",
+          "AttributeType": "Lookup",
+          "IsValidForCreate": true,
+          "LogicalName": "wmkf_type",
+          "RequiredLevel": {
+            "Value": "None",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.DateTimeAttributeMetadata",
+          "MetadataId": "94a02ea2-5391-ee11-be37-000d3a341e8f",
+          "AttributeType": "DateTime",
+          "IsValidForCreate": true,
+          "LogicalName": "wmkf_meetingdate",
+          "RequiredLevel": {
+            "Value": "ApplicationRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "f24ea180-256c-4bad-baf1-97f23f2f777c",
+          "AttributeType": "String",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_requeststatus",
+          "RequiredLevel": {
+            "Value": "None",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "LogicalName": "wmkf_triagestatus",
+          "missing": true
+        },
+        {
+          "LogicalName": "wmkf_istestrequest",
+          "missing": true
+        },
+        {
+          "LogicalName": "wmkf_testcreationrunid",
+          "missing": true
+        },
+        {
+          "LogicalName": "wmkf_respondreminderenabled",
+          "missing": true
+        },
+        {
+          "LogicalName": "wmkf_reviewduereminderenabled",
+          "missing": true
+        }
+      ],
+      "required": [
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.LookupAttributeMetadata",
+          "MetadataId": "0fd78db2-4570-4ed1-98bf-c87ea6c42baf",
+          "AttributeType": "Lookup",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_applicantid",
+          "RequiredLevel": {
+            "Value": "ApplicationRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "MetadataId": "119251e7-21ae-49ee-8c51-1fef8a798533",
+          "AttributeType": "Uniqueidentifier",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_requestid",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": false,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.PicklistAttributeMetadata",
+          "MetadataId": "73426ce9-8688-4c77-9b32-3075a6973d41",
+          "AttributeType": "Picklist",
+          "IsValidForCreate": true,
+          "LogicalName": "akoya_requesttype",
+          "RequiredLevel": {
+            "Value": "ApplicationRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "014fd5a9-e4ae-45f8-bc23-e51e80db1658",
+          "AttributeType": "String",
+          "IsValidForCreate": false,
+          "LogicalName": "createdbyyominame",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "52c3e0e6-a2a3-49f0-8162-5cb5fd9e0167",
+          "AttributeType": "String",
+          "IsValidForCreate": false,
+          "LogicalName": "createdonbehalfbyyominame",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "ce647999-b0f4-49cc-9710-2347ea3dda21",
+          "AttributeType": "String",
+          "IsValidForCreate": false,
+          "LogicalName": "modifiedbyyominame",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "4dc10f48-f7b6-4f66-91bd-a219607b5114",
+          "AttributeType": "String",
+          "IsValidForCreate": false,
+          "LogicalName": "modifiedonbehalfbyyominame",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.LookupAttributeMetadata",
+          "MetadataId": "0e856418-d058-4956-a692-419f115daafb",
+          "AttributeType": "Owner",
+          "IsValidForCreate": true,
+          "LogicalName": "ownerid",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "8c423aaa-b0bb-442d-a3f0-4823d4750f50",
+          "AttributeType": "String",
+          "IsValidForCreate": false,
+          "LogicalName": "owneridname",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.EntityNameAttributeMetadata",
+          "MetadataId": "dc89af53-2607-4ad6-af67-e1d20092a602",
+          "AttributeType": "EntityName",
+          "IsValidForCreate": true,
+          "LogicalName": "owneridtype",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "94bb1118-5e85-ee11-8179-000d3a341e8f",
+          "AttributeType": "String",
+          "IsValidForCreate": false,
+          "LogicalName": "owneridyominame",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StringAttributeMetadata",
+          "MetadataId": "3db579ff-6111-4ef5-8731-82076d7b0bf0",
+          "AttributeType": "String",
+          "IsValidForCreate": false,
+          "LogicalName": "owningbusinessunitname",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.StateAttributeMetadata",
+          "MetadataId": "d4082972-742c-443e-8ea0-d75db8d1cfdf",
+          "AttributeType": "State",
+          "IsValidForCreate": false,
+          "LogicalName": "statecode",
+          "RequiredLevel": {
+            "Value": "SystemRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        },
+        {
+          "@odata.type": "#Microsoft.Dynamics.CRM.DateTimeAttributeMetadata",
+          "MetadataId": "94a02ea2-5391-ee11-be37-000d3a341e8f",
+          "AttributeType": "DateTime",
+          "IsValidForCreate": true,
+          "LogicalName": "wmkf_meetingdate",
+          "RequiredLevel": {
+            "Value": "ApplicationRequired",
+            "CanBeChanged": true,
+            "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+          }
+        }
+      ]
+    }
+  ]
+}

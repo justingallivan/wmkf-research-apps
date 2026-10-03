@@ -429,6 +429,8 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
 
   test('contact→requests searches PI and co-PI roles, not only primary contact', async () => {
     const contactId = '304bf67c-ce8f-ee11-8179-000d3a341e8f';
+    // Institution Liaison discovery (accounts led by this contact): none here.
+    mockQueryAllRecords.mockResolvedValueOnce({ records: [], totalCount: 0, capped: false });
     mockQueryRecords.mockResolvedValueOnce({
       records: [
         {

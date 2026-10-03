@@ -28,7 +28,7 @@ function message(overrides = {}) {
     signature_text: 'Jean Kim\nW. M. Keck Foundation',
     scheduled_send_at: '2026-08-30T08:00:00.000Z',
     approval_required: false,
-    recipient_contact_ids: ['11111111-1111-4111-8111-111111111111'],
+    recipient_contact_ids: ['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222'],
     status: 'scheduled',
     version: 1,
     lease_token: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
@@ -44,6 +44,13 @@ function dependencies(base = message()) {
   const finalized = { ...sent, finalized_at: '2026-08-25T00:00:02.000Z' };
   return {
     claimSend: jest.fn(async () => claimed),
+    // Part B default: the current Liaison and posture match the row (no drift).
+    readCurrentRecipients: jest.fn(async (row) => ({
+      piContactId: '11111111-1111-4111-8111-111111111111',
+      liaison: { contactId: '22222222-2222-4222-8222-222222222222', email: 'liaison@example.edu' },
+      approvalRequiredNow: row.approval_required === true,
+    })),
+    reconcileRecipients: jest.fn(async () => null),
     getDeliverable: jest.fn(async () => ({
       _etag: 'W/"1"',
       wmkf_deliverablestatus: GRANTEE_DELIVERABLE_STATUS.INVITED,
@@ -131,7 +138,7 @@ test('a transient eligibility read failure keeps the row retryable instead of st
   expect(deps.sendEmail).not.toHaveBeenCalled();
 });
 
-test('an ambiguous send error keeps the durable send intent for reconciliation instead of marking retryable failure', async () => {
+test('an ambiguous send error marks the row unconfirmed immediately (A2): send intent kept, lease released, never retryable', async () => {
   const deps = dependencies();
   deps.sendEmail.mockRejectedValueOnce(new Error('connection ended during SendEmail'));
 
@@ -139,8 +146,12 @@ test('an ambiguous send error keeps the durable send intent for reconciliation i
 
   expect(error).toMatchObject({ emailOutcome: 'uncertain', retryable: false });
   expect(deps.recordSendRequested).toHaveBeenCalledTimes(1);
-  expect(deps.recordFailure).not.toHaveBeenCalled();
+  // The row does not sit in `sending` with a live lease until the next claim:
+  // it is failed with the unconfirmed marker now, so the digest lists it.
+  expect(deps.recordFailure).toHaveBeenCalledTimes(1);
+  expect(deps.recordFailure.mock.calls[0][2]).toBe('scheduled_email_send_unconfirmed');
   expect(deps.recordSent).not.toHaveBeenCalled();
+  expect(deps.sendEmail).toHaveBeenCalledTimes(1);
 });
 
 test('a confirmed-deleted source (404) is stopped, not retried', async () => {
@@ -368,7 +379,12 @@ test('the digest-run claim SQL freezes membership and the reassign SQL guards at
     store.indexOf('/* --------------------------- digest run ledger'),
   );
   expect(reassignSection).toContain('pd_systemuser_id <> ${input.pdSystemUserId}');
-  expect(reassignSection).toContain("status IN ('scheduled', 'failed')");
+  // A5: a `sending` row whose lease expired (the crash-between-create-and-
+  // persist shape) is also reset; the lease predicate below excludes live ones.
+  expect(reassignSection).toContain("status IN ('scheduled', 'failed', 'sending')");
+  expect(reassignSection).toContain('recipient_generation = recipient_generation + 1');
+  expect(reassignSection).toContain('version = ${expectedVersion}');
+  expect(reassignSection).toContain('lease_token = NULL');
   expect(reassignSection).toContain('dynamics_email_id IS NULL');
   expect(reassignSection).toContain('send_requested_at IS NULL');
   expect(reassignSection).toContain('(locked_until IS NULL OR locked_until < NOW())');
@@ -388,4 +404,337 @@ test('reviewer VIP flag SQL keys on potential_reviewer_id, never contact_id', ()
   expect(section).toContain('scheduled_email_reviewer_vip_flags');
   expect(section).toContain('potential_reviewer_id');
   expect(section).not.toContain('contact_id');
+});
+
+describe('Test Request isolation (Stage 1b)', () => {
+  function isolated(kind) {
+    return {
+      ...dependencies(),
+      isolationEnabled: () => true,
+      getMessage: jest.fn(async () => message()),
+      resolveTestState: jest.fn(async () => ({ kind, reason: 'x' })),
+    };
+  }
+
+  test('a test request row is stopped before any claim, mint, recovery or send', async () => {
+    const deps = isolated('synthetic');
+    const result = await deliverScheduledEmail(message().id, {}, deps);
+    expect(result.stopped).toBe(true);
+    expect(deps.resolveTestState).toHaveBeenCalledWith(message().request_id);
+    expect(deps.cancelForSource).toHaveBeenCalledWith(message().id, 'test_request');
+    expect(deps.claimSend).not.toHaveBeenCalled();
+    expect(deps.mintForRequest).not.toHaveBeenCalled();
+    expect(deps.findEmailByCorrelation).not.toHaveBeenCalled();
+    expect(deps.createEmailActivity).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('an already accepted test-request activity is receipted and finalized without resend', async () => {
+    const pending = message({
+      status: 'sending',
+      dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      send_requested_at: '2026-08-25T00:00:00.000Z',
+    });
+    const deps = {
+      ...isolated('synthetic'),
+      getMessage: jest.fn(async () => pending),
+    };
+    deps.getEmailActivity.mockResolvedValue({
+      activityid: pending.dynamics_email_id,
+      statuscode: 6,
+      statecode: 1,
+      senton: '2026-08-25T00:00:01.000Z',
+    });
+
+    const result = await deliverScheduledEmail(pending.id, {}, deps);
+
+    expect(result.sent).toBe(true);
+    expect(deps.recordSent).toHaveBeenCalledWith(pending, expect.objectContaining({ statuscode: 6 }));
+    expect(deps.recordFinalized).toHaveBeenCalledWith(pending.id);
+    expect(deps.cancelForSource).not.toHaveBeenCalled();
+    expect(deps.claimSend).not.toHaveBeenCalled();
+    expect(deps.mintForRequest).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('an unreadable pre-claim activity performs no write and never resends', async () => {
+    const pending = message({
+      status: 'sending',
+      dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      send_requested_at: '2026-08-25T00:00:00.000Z',
+    });
+    const deps = {
+      ...isolated('synthetic'),
+      getMessage: jest.fn(async () => pending),
+    };
+    deps.getEmailActivity.mockRejectedValue(new Error('Dataverse activity read failed'));
+
+    await expect(deliverScheduledEmail(pending.id, {}, deps)).rejects.toMatchObject({
+      code: 'scheduled_email_activity_state_unknown',
+    });
+    expect(deps.cancelForSource).not.toHaveBeenCalled();
+    expect(deps.claimSend).not.toHaveBeenCalled();
+    expect(deps.recordSent).not.toHaveBeenCalled();
+    expect(deps.recordFinalized).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('an unaccepted activity with a recorded send intent stays untouched for later reconciliation', async () => {
+    const pending = message({
+      status: 'sending',
+      dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      send_requested_at: '2026-08-25T00:00:00.000Z',
+    });
+    const deps = {
+      ...isolated('synthetic'),
+      getMessage: jest.fn(async () => pending),
+    };
+    deps.getEmailActivity.mockResolvedValue({
+      activityid: pending.dynamics_email_id,
+      statuscode: 1,
+      statecode: 0,
+    });
+
+    await expect(deliverScheduledEmail(pending.id, {}, deps)).rejects.toMatchObject({
+      code: 'scheduled_email_activity_state_unknown',
+    });
+    expect(deps.cancelForSource).not.toHaveBeenCalled();
+    expect(deps.claimSend).not.toHaveBeenCalled();
+    expect(deps.recordSent).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('a readable draft activity with no send intent uses the one pre-claim cancel write', async () => {
+    const pending = message({
+      status: 'sending',
+      dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      send_requested_at: null,
+    });
+    const stopped = { ...pending, status: 'stopped', stopped_at: '2026-08-25T00:00:00.000Z' };
+    const deps = {
+      ...isolated('synthetic'),
+      getMessage: jest.fn(async () => pending),
+    };
+    deps.cancelForSource.mockResolvedValue(stopped);
+    deps.getEmailActivity.mockResolvedValue({
+      activityid: pending.dynamics_email_id,
+      statuscode: 1,
+      statecode: 0,
+    });
+
+    const result = await deliverScheduledEmail(pending.id, {}, deps);
+
+    expect(result.stopped).toBe(true);
+    expect(deps.cancelForSource).toHaveBeenCalledTimes(1);
+    expect(deps.cancelForSource).toHaveBeenCalledWith(pending.id, 'test_request');
+    expect(deps.claimSend).not.toHaveBeenCalled();
+    expect(deps.recordSent).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('an unreadable marker throws with no durable write, so a later run retries', async () => {
+    const deps = isolated('unknown');
+    await expect(deliverScheduledEmail(message().id, {}, deps)).rejects.toMatchObject({ code: 'test_request_state_unknown' });
+    expect(deps.claimSend).not.toHaveBeenCalled();
+    expect(deps.cancelForSource).not.toHaveBeenCalled();
+    expect(deps.recordFailure).not.toHaveBeenCalled();
+    expect(deps.mintForRequest).not.toHaveBeenCalled();
+  });
+
+  test('a verified ordinary row is claimed after the check', async () => {
+    const deps = isolated('ordinary');
+    await deliverScheduledEmail(message().id, {}, deps);
+    expect(deps.claimSend).toHaveBeenCalled();
+    expect(deps.cancelForSource).not.toHaveBeenCalled();
+  });
+
+  test('send-now by the owning PD matches the stored GUID case-insensitively', async () => {
+    const deps = isolated('ordinary');
+    const owner = message().pd_systemuser_id;
+    expect(owner).toMatch(/[a-f]/);
+    await deliverScheduledEmail(message().id, { force: true, pdSystemUserId: owner.toUpperCase() }, deps);
+    expect(deps.claimSend).toHaveBeenCalled();
+  });
+
+  test('send-now by a PD who does not own the row does not stop it', async () => {
+    const deps = isolated('synthetic');
+    const result = await deliverScheduledEmail(message().id, { force: true, pdSystemUserId: 'someone-else' }, deps);
+    expect(result).toEqual({ skipped: true });
+    expect(deps.cancelForSource).not.toHaveBeenCalled();
+    expect(deps.claimSend).not.toHaveBeenCalled();
+  });
+});
+
+describe('Part B: send-time recipient and posture re-check', () => {
+  const PI = '11111111-1111-4111-8111-111111111111';
+  const LIAISON = '22222222-2222-4222-8222-222222222222';
+  const OTHER = '33333333-3333-4333-8333-333333333333';
+  // Mirrors reconcileScheduledEmailRecipients' SET list (the SQL itself is
+  // proven against live Postgres in scheduled-email-engine.pg.test.js).
+  const applyTransition = (row, t) => ({
+    ...row,
+    cc_recipients: t.recipientDrift ? t.ccRecipients : row.cc_recipients,
+    recipient_contact_ids: t.recipientDrift ? t.recipientContactIds : row.recipient_contact_ids,
+    recipient_generation: (Number(row.recipient_generation) || 0) + (t.recipientDrift ? 1 : 0),
+    approval_required: t.approvalRequired === true,
+    approved_at: null,
+    version: row.version + 1,
+    status: t.holdForApproval ? 'scheduled' : row.status,
+    lease_token: t.holdForApproval ? null : row.lease_token,
+    last_error_code: t.holdForApproval ? t.reasonCode : row.last_error_code,
+  });
+  function partB({ row = message(), current = {}, force = false } = {}) {
+    const deps = dependencies(row);
+    deps.readCurrentRecipients.mockResolvedValue({
+      piContactId: PI,
+      liaison: { contactId: LIAISON, email: 'liaison@example.edu' },
+      approvalRequiredNow: false,
+      ...current,
+    });
+    deps.reconcileRecipients.mockImplementation(async (claimed, t) => applyTransition(claimed, t));
+    return { deps, run: () => deliverScheduledEmail(row.id, force ? { force: true, pdSystemUserId: row.pd_systemuser_id, expectedVersion: row.version } : {}, deps) };
+  }
+
+  test('changed email on the same contact re-addresses, bumps generation and sends under the returned row', async () => {
+    const { deps, run } = partB({ current: { liaison: { contactId: LIAISON, email: 'new.liaison@example.edu' } } });
+    const result = await run();
+    expect(deps.reconcileRecipients).toHaveBeenCalledWith(expect.objectContaining({ status: 'sending' }), expect.objectContaining({
+      recipientDrift: true, ccRecipients: ['new.liaison@example.edu'], recipientContactIds: [PI, LIAISON],
+      approvalRequired: false, holdForApproval: false,
+    }));
+    // B3: the created activity uses the RETURNED row's generation key and Cc.
+    expect(deps.createEmailActivity).toHaveBeenCalledWith(expect.objectContaining({
+      cc: ['new.liaison@example.edu'], correlationKey: `wmkf-scheduled-recipient:${message().id}:g1`,
+    }));
+    expect(result).toMatchObject({ sent: true, readdressed: true });
+  });
+
+  test('the same normalized email on a different contact still drifts', async () => {
+    const { deps, run } = partB({ current: { liaison: { contactId: OTHER, email: '  Liaison@Example.edu ' } } });
+    await run();
+    expect(deps.reconcileRecipients).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      recipientDrift: true, recipientContactIds: [PI, OTHER],
+    }));
+  });
+
+  test('a case/whitespace-only email difference on the same contact is not drift', async () => {
+    const { deps, run } = partB({ current: { liaison: { contactId: LIAISON.toUpperCase(), email: ' LIAISON@example.edu' } } });
+    await run();
+    expect(deps.reconcileRecipients).not.toHaveBeenCalled();
+    expect(deps.sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  test('a Liaison dropped to none re-addresses with no Cc', async () => {
+    const { deps, run } = partB({ current: { liaison: null } });
+    await run();
+    expect(deps.reconcileRecipients).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      recipientDrift: true, ccRecipients: [], recipientContactIds: [PI],
+    }));
+  });
+
+  test('an approved row that still needs approval is re-addressed into approval-pending without any activity work', async () => {
+    const { deps, run } = partB({
+      row: message({ approval_required: true, approved_at: '2026-08-20T00:00:00.000Z' }),
+      current: { liaison: { contactId: OTHER, email: 'other@example.edu' }, approvalRequiredNow: true },
+    });
+    const result = await run();
+    expect(deps.reconcileRecipients).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      recipientDrift: true, approvalRequired: true, holdForApproval: true, reasonCode: 'scheduled_email_recipients_changed',
+    }));
+    expect(result).toMatchObject({ approvalPending: true, reason: 'recipients_changed' });
+    expect(result.message).toMatchObject({ status: 'scheduled', approvalRequired: true, approvedAt: null, recipientGeneration: 1 });
+    expect(deps.findEmailByCorrelation).not.toHaveBeenCalled();
+    expect(deps.createEmailActivity).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('an approved approval-required row that no longer needs approval clears approval and keeps sending under the same lease', async () => {
+    const row = message({ approval_required: true, approved_at: '2026-08-20T00:00:00.000Z' });
+    const { deps, run } = partB({ row, current: { liaison: { contactId: OTHER, email: 'other@example.edu' } } });
+    const result = await run();
+    const [, transition] = deps.reconcileRecipients.mock.calls[0];
+    expect(transition).toMatchObject({ recipientDrift: true, approvalRequired: false, holdForApproval: false });
+    expect(deps.recordEmailActivity.mock.calls[0][0]).toMatchObject({ lease_token: row.lease_token, approved_at: null, approval_required: false });
+    expect(result.sent).toBe(true);
+  });
+
+  test('a recipient read failure is a retryable failure: no transition, no activity, no send', async () => {
+    const { deps, run } = partB();
+    deps.readCurrentRecipients.mockRejectedValue(Object.assign(new Error('Could not confirm the current recipients: timeout'), {
+      code: 'scheduled_email_recipient_read_failed', retryable: true,
+    }));
+    await expect(run()).rejects.toMatchObject({ code: 'scheduled_email_recipient_read_failed', retryable: true });
+    expect(deps.recordFailure).toHaveBeenCalledWith(expect.objectContaining({ status: 'sending' }), expect.anything(), 'scheduled_email_recipient_read_failed');
+    expect(deps.reconcileRecipients).not.toHaveBeenCalled();
+    expect(deps.findEmailByCorrelation).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['review-all turned on', { approvalRequiredNow: true }],
+    ['an existing recipient became VIP', { approvalRequiredNow: true }],
+  ])('posture-only tightening (%s) holds an ordinary claim without touching recipients or generation', async (_label, current) => {
+    const row = message({ approval_required: false, approved_at: '2026-08-20T00:00:00.000Z' });
+    const { deps, run } = partB({ row, current });
+    const result = await run();
+    const [, transition] = deps.reconcileRecipients.mock.calls[0];
+    expect(transition).toEqual({
+      approvalRequired: true, holdForApproval: true,
+      reasonCode: 'scheduled_email_approval_now_required', reasonMessage: expect.any(String),
+    });
+    expect(result).toMatchObject({ approvalPending: true, reason: 'approval_required' });
+    expect(result.message).toMatchObject({ approvalRequired: true, approvedAt: null, recipientGeneration: 0 });
+    expect(deps.findEmailByCorrelation).not.toHaveBeenCalled();
+  });
+
+  test('relaxation (review-all off on an approved row) changes nothing and sends as approved', async () => {
+    const { deps, run } = partB({
+      row: message({ approval_required: true, approved_at: '2026-08-20T00:00:00.000Z' }),
+      current: { approvalRequiredNow: false },
+    });
+    const result = await run();
+    expect(deps.reconcileRecipients).not.toHaveBeenCalled();
+    expect(result.sent).toBe(true);
+  });
+
+  test('a lost lease/version fence aborts before any activity lookup', async () => {
+    const { deps, run } = partB({ current: { liaison: { contactId: OTHER, email: 'other@example.edu' } } });
+    deps.reconcileRecipients.mockResolvedValue(null);
+    await expect(run()).resolves.toEqual({ skipped: true });
+    expect(deps.findEmailByCorrelation).not.toHaveBeenCalled();
+    expect(deps.createEmailActivity).not.toHaveBeenCalled();
+    expect(deps.recordFailure).not.toHaveBeenCalled();
+  });
+
+  test('send-now: posture-only tightening is skipped (the PD action is the approval) and it sends', async () => {
+    const { deps, run } = partB({ current: { approvalRequiredNow: true }, force: true });
+    const result = await run();
+    expect(deps.reconcileRecipients).not.toHaveBeenCalled();
+    expect(result.sent).toBe(true);
+  });
+
+  test('send-now: recipient drift re-addresses into approval-pending and does not send, even with no approval otherwise required', async () => {
+    const { deps, run } = partB({ current: { liaison: { contactId: OTHER, email: 'other@example.edu' } }, force: true });
+    const result = await run();
+    expect(deps.reconcileRecipients).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      recipientDrift: true, approvalRequired: true, holdForApproval: true,
+    }));
+    expect(result).toMatchObject({ approvalPending: true, reason: 'recipients_changed' });
+    expect(deps.createEmailActivity).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('B5: a saved activity without send intent is sent as created, flagged, and never re-checked', async () => {
+    const row = message({ dynamics_email_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff' });
+    const { deps, run } = partB({ row, current: { liaison: { contactId: OTHER, email: 'other@example.edu' } } });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const result = await run();
+    expect(deps.readCurrentRecipients).not.toHaveBeenCalled();
+    expect(deps.reconcileRecipients).not.toHaveBeenCalled();
+    expect(deps.createEmailActivity).not.toHaveBeenCalled();
+    expect(deps.sendEmail).toHaveBeenCalledWith('ffffffff-ffff-4fff-8fff-ffffffffffff', expect.anything());
+    expect(result).toMatchObject({ sent: true, savedActivityNotReaddressed: true });
+    expect(warn.mock.calls.some(([, payload]) => String(payload).includes('scheduled_email_saved_activity_not_readdressed'))).toBe(true);
+    warn.mockRestore();
+  });
 });

@@ -1,0 +1,217 @@
+{
+  "kind": "test-request-sandbox-rehearsal-receipt/v1",
+  "startedAt": "2026-09-24T04:40:13.304Z",
+  "target": "https://orgd9e66399.crm.dynamics.com",
+  "requestId": "5d54abc5-7f74-4d23-b4be-39599147e674",
+  "locationId": "98a7e0e3-c122-4d65-9484-56b562477882",
+  "runId": "74887604-c27b-46f2-9c73-2eca9aa343ca",
+  "sourceRequestId": "e43ae6ea-698f-f111-8076-6045bd018a07",
+  "sourceRevision": "W/\"98622844\"",
+  "createAttempted": true,
+  "createResponseStatus": 201,
+  "goverifyBypass": {
+    "workflowId": "a5d850ee-e5b4-409c-a7e5-65ac82ff9ceb",
+    "workflowName": "GOverify- check Publication 78 on create of a request record",
+    "originalVersionNumber": 56413119,
+    "deactivationAttemptedAt": "2026-09-24T04:40:17.082Z",
+    "restored": true,
+    "restoreVerified": true,
+    "deactivationPatchAttemptedAt": "2026-09-24T04:40:17.089Z",
+    "deactivatedAt": "2026-09-24T04:40:30.875Z",
+    "deactivatedVersionNumber": 56920621,
+    "restoreAttemptedAt": "2026-09-24T04:40:46.955Z",
+    "restoredAt": "2026-09-24T04:40:54.577Z",
+    "restoredVersionNumber": 56920688
+  },
+  "createAttemptedAt": "2026-09-24T04:40:30.883Z",
+  "createResponseReceivedAt": "2026-09-24T04:40:46.948Z",
+  "meetingDateCorrection": {
+    "desired": "2026-12-11",
+    "before": "2024-12-13T00:00:00Z",
+    "patchAttempted": true,
+    "patchAttemptedAt": "2026-09-24T04:40:54.761Z",
+    "patchResponseStatus": 204,
+    "patchResponseReceivedAt": "2026-09-24T04:40:56.508Z",
+    "after": "2026-12-11T00:00:00Z",
+    "readbackAt": "2026-09-24T04:40:56.706Z"
+  },
+  "locationProvision": {
+    "parentId": "c8117abb-dab0-ee11-a569-000d3a341e8f",
+    "folder": "1000340_5D54ABC57F744D23B4BE39599147E674",
+    "graphFolderAttempted": true,
+    "graphFolderAttemptedAt": "2026-09-24T04:40:57.411Z",
+    "graphFolder": {
+      "siteId": "appriver3651007194.sharepoint.com,48930e19-ba2f-46e7-9dc1-e0f7f8ade852,270ae82a-6903-42ec-99d1-4079863f002d",
+      "driveId": "b!GQ6TSC-650adweD3-K3oUiroCicDaexCmdFAeYY_AC0LfwP99I31QY_tw5hNNRkY",
+      "id": "01G4GVMS7BQO6RUAZ66NDYQJDBQW5JESDU",
+      "path": "1000340_5D54ABC57F744D23B4BE39599147E674"
+    },
+    "graphFolderReadyAt": "2026-09-24T04:40:58.874Z",
+    "locationCreateAttempted": true,
+    "locationCreateAttemptedAt": "2026-09-24T04:40:58.881Z",
+    "createResponseStatus": 201,
+    "createResponseReceivedAt": "2026-09-24T04:41:00.138Z",
+    "locationId": "98a7e0e3-c122-4d65-9484-56b562477882"
+  },
+  "fileCopyStartedAt": "2026-09-24T04:41:00.319Z",
+  "fileCopies": [
+    {
+      "index": 0,
+      "kind": "proposalNarrative",
+      "status": "verified",
+      "source": {
+        "id": "T65qFLB2QMJr9o-vH5NrEq1vZGef2BZHIS_8_Vw4ZGw",
+        "library": "akoya_request",
+        "folder": "AI Materials",
+        "name": "ProposalNarrative_1003222.pdf",
+        "graphItemId": "01G4GVMS6VWJCHBNSW5RC2RNTRDMXGO7IK",
+        "snapshotDriveId": "b!GQ6TSC-650adweD3-K3oUiroCicDaexCmdFAeYY_AC0LfwP99I31QY_tw5hNNRkY",
+        "size": 287771,
+        "mimeType": "application/pdf",
+        "eTag": "\"{7044B2D5-56B6-45EC-A8B6-711B2E677D0A},1\"",
+        "versionId": "1.0",
+        "contentHash": "813a7a6e64b260328e49d45faab967c7c8b4adf7e98c5058daa505f71a69b6a1"
+      },
+      "destination": {
+        "library": "akoya_request",
+        "folder": "1000340_5D54ABC57F744D23B4BE39599147E674/AI Materials",
+        "filename": "ProposalNarrative_1000340.pdf"
+      },
+      "startedAt": "2026-09-24T04:41:00.334Z",
+      "siteId": "appriver3651007194.sharepoint.com,48930e19-ba2f-46e7-9dc1-e0f7f8ade852,270ae82a-6903-42ec-99d1-4079863f002d",
+      "sourceDriveId": "b!GQ6TSC-650adweD3-K3oUiroCicDaexCmdFAeYY_AC0LfwP99I31QY_tw5hNNRkY",
+      "destinationDriveId": "b!GQ6TSC-650adweD3-K3oUiroCicDaexCmdFAeYY_AC0LfwP99I31QY_tw5hNNRkY",
+      "sourceVerifiedAt": "2026-09-24T04:41:02.253Z",
+      "folderEnsureAttemptedAt": "2026-09-24T04:41:02.263Z",
+      "folderItemId": "01G4GVMSZMURDSCNOVWVGL7SWXPGC4INKD",
+      "destinationAbsentCheckedAt": "2026-09-24T04:41:03.399Z",
+      "uploadAttempted": true,
+      "uploadAttemptedAt": "2026-09-24T04:41:03.410Z",
+      "item": {
+        "id": "01G4GVMS34H6SGDJZCGNF2NLBTIUMXWRAW",
+        "name": "ProposalNarrative_1000340.pdf",
+        "size": 287771,
+        "eTag": "\"{61A43F7C-22A7-4B33-A6AC-3345197B4416},1\"",
+        "versionId": "1.0"
+      },
+      "outcome": "created",
+      "itemJournaledAt": "2026-09-24T04:41:08.857Z",
+      "uploadResponseReceivedAt": "2026-09-24T04:41:09.506Z",
+      "verifiedAt": "2026-09-24T04:41:10.662Z"
+    },
+    {
+      "index": 1,
+      "kind": "reviewerProposal",
+      "status": "verified",
+      "source": {
+        "id": "gYGj_WYbeMP4pxqy8u8hAG_gz7DziXTFM1Z2BVTpoKY",
+        "library": "akoya_request",
+        "folder": "Reviewer Materials",
+        "name": "Proposal_1003222.pdf",
+        "graphItemId": "01G4GVMSZPFEDQHTS3H5EKJDM5KHJET7FM",
+        "snapshotDriveId": "b!GQ6TSC-650adweD3-K3oUiroCicDaexCmdFAeYY_AC0LfwP99I31QY_tw5hNNRkY",
+        "size": 2841448,
+        "mimeType": "application/pdf",
+        "eTag": "\"{0307292F-5BCE-483F-A48D-9D51D249FCAC},1\"",
+        "versionId": "1.0",
+        "contentHash": "65b4395d7d10734311c894461e33011a726a6ec645631b939498208c84b87583"
+      },
+      "destination": {
+        "library": "akoya_request",
+        "folder": "1000340_5D54ABC57F744D23B4BE39599147E674/Reviewer Materials",
+        "filename": "Proposal_1000340.pdf"
+      },
+      "startedAt": "2026-09-24T04:41:10.671Z",
+      "siteId": "appriver3651007194.sharepoint.com,48930e19-ba2f-46e7-9dc1-e0f7f8ade852,270ae82a-6903-42ec-99d1-4079863f002d",
+      "sourceDriveId": "b!GQ6TSC-650adweD3-K3oUiroCicDaexCmdFAeYY_AC0LfwP99I31QY_tw5hNNRkY",
+      "destinationDriveId": "b!GQ6TSC-650adweD3-K3oUiroCicDaexCmdFAeYY_AC0LfwP99I31QY_tw5hNNRkY",
+      "sourceVerifiedAt": "2026-09-24T04:41:13.231Z",
+      "folderEnsureAttemptedAt": "2026-09-24T04:41:13.237Z",
+      "folderItemId": "01G4GVMS2THA5E2M3RQBA243OIKBIIBL5P",
+      "destinationAbsentCheckedAt": "2026-09-24T04:41:14.563Z",
+      "uploadAttempted": true,
+      "uploadAttemptedAt": "2026-09-24T04:41:14.572Z",
+      "item": {
+        "id": "01G4GVMS6NXN2G3W7ZKZHKAWXU5NS6DEZG",
+        "name": "Proposal_1000340.pdf",
+        "size": 2841448,
+        "eTag": "\"{6D74BBCD-F9DB-4E56-A05A-F4EB65E19326},1\"",
+        "versionId": "1.0"
+      },
+      "outcome": "created",
+      "itemJournaledAt": "2026-09-24T04:42:08.361Z",
+      "uploadResponseReceivedAt": "2026-09-24T04:42:08.831Z",
+      "verifiedAt": "2026-09-24T04:42:10.928Z"
+    }
+  ],
+  "fileCopyCompletedAt": "2026-09-24T04:42:10.934Z",
+  "observationStartedAt": "2026-09-24T04:42:10.940Z",
+  "fileCopyFinalVerification": {
+    "checkedAt": "2026-09-24T04:43:15.998Z",
+    "failures": []
+  },
+  "completedAt": "2026-09-24T04:43:15.998Z",
+  "request": {
+    "akoya_requestid": "5d54abc5-7f74-4d23-b4be-39599147e674",
+    "akoya_requestnum": "1000340",
+    "akoya_title": "TEST: Codex sandbox request factory rehearsal 2026-09-24 74887604",
+    "akoya_requesttype": 100000000,
+    "_akoya_applicantid_value": "537e3b60-c18f-ee11-8179-000d3a341e8f",
+    "_createdby_value": "79913eac-7f3e-f111-88b4-6045bd015cb0",
+    "_ownerid_value": "79913eac-7f3e-f111-88b4-6045bd015cb0",
+    "wmkf_istestrequest": true,
+    "wmkf_testcreationrunid": "74887604-c27b-46f2-9c73-2eca9aa343ca"
+  },
+  "dynamicsLocations": [
+    {
+      "@odata.etag": "W/\"56920792\"",
+      "absoluteurl": null,
+      "relativeurl": "1000340_5D54ABC57F744D23B4BE39599147E674",
+      "name": "Documents on Default Site 1",
+      "_parentsiteorlocation_value": "c8117abb-dab0-ee11-a569-000d3a341e8f",
+      "createdon": "2026-09-24T04:40:59Z",
+      "sharepointdocumentlocationid": "98a7e0e3-c122-4d65-9484-56b562477882",
+      "_createdby_value": "79913eac-7f3e-f111-88b4-6045bd015cb0",
+      "_ownerid_value": "79913eac-7f3e-f111-88b4-6045bd015cb0"
+    }
+  ],
+  "locationParents": [
+    {
+      "@odata.context": "https://orgd9e66399.crm.dynamics.com/api/data/v9.2/$metadata#sharepointdocumentlocations(sharepointdocumentlocationid,name,relativeurl,absoluteurl,_parentsiteorlocation_value)/$entity",
+      "@odata.etag": "W/\"9304999\"",
+      "absoluteurl": null,
+      "relativeurl": "akoya_request",
+      "name": "Documents on Default Site 1",
+      "_parentsiteorlocation_value": "8ba18e9e-d3b0-ee11-a569-000d3a341fd9",
+      "sharepointdocumentlocationid": "c8117abb-dab0-ee11-a569-000d3a341e8f"
+    }
+  ],
+  "sharePointFiles": [
+    {
+      "name": "ProposalNarrative_1000340.pdf",
+      "size": 287771,
+      "lastModified": "2026-09-24T04:41:08Z",
+      "mimeType": "application/pdf",
+      "webUrl": "https://appriver3651007194.sharepoint.com/sites/akoyaGO/akoya_request/1000340_5D54ABC57F744D23B4BE39599147E674/AI%20Materials/ProposalNarrative_1000340.pdf",
+      "id": "01G4GVMS34H6SGDJZCGNF2NLBTIUMXWRAW",
+      "folder": "1000340_5D54ABC57F744D23B4BE39599147E674/AI Materials"
+    },
+    {
+      "name": "Proposal_1000340.pdf",
+      "size": 2841448,
+      "lastModified": "2026-09-24T04:42:08Z",
+      "mimeType": "application/pdf",
+      "webUrl": "https://appriver3651007194.sharepoint.com/sites/akoyaGO/akoya_request/1000340_5D54ABC57F744D23B4BE39599147E674/Reviewer%20Materials/Proposal_1000340.pdf",
+      "id": "01G4GVMS6NXN2G3W7ZKZHKAWXU5NS6DEZG",
+      "folder": "1000340_5D54ABC57F744D23B4BE39599147E674/Reviewer Materials"
+    }
+  ],
+  "paymentRows": [],
+  "regardingEmails": [],
+  "verification": {
+    "ok": true,
+    "failures": [],
+    "accountChanges": [],
+    "contactChanges": []
+  }
+}

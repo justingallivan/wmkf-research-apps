@@ -1,0 +1,166 @@
+{
+  "section": 13,
+  "target": "https://wmkf.crm.dynamics.com",
+  "generatedAt": "2026-09-29T23:47:05.267Z",
+  "complete": false,
+  "incompleteReasons": [],
+  "dispositionRequired": [
+    "manual API-connection trigger in Request/slot-mentioning flow requires owner classification: GOapply Add Request to Review Group (Deprecated) / manual",
+    "manual API-connection trigger in Request/slot-mentioning flow requires owner classification: Bill.com - Push Payments / manual",
+    "flow mentions Request or slot without a classified Request trigger: GOapply AutoFill Next Phase (Deprecated)"
+  ],
+  "auditing": {
+    "entity": true,
+    "wmkf_potentialreviewer1": false,
+    "wmkf_potentialreviewer2": false,
+    "wmkf_potentialreviewer3": false,
+    "wmkf_potentialreviewer4": false,
+    "wmkf_potentialreviewer5": false
+  },
+  "workflows": [],
+  "steps": [
+    {
+      "name": "ObjectModel Implementation",
+      "message": "Update",
+      "type": "Microsoft.Crm.Extensibility.InternalOperationPlugin",
+      "stage": 30,
+      "mode": 0,
+      "hidden": true,
+      "firesOn": "ANY column"
+    },
+    {
+      "name": "ObjectModel Implementation",
+      "message": "Update",
+      "type": "Microsoft.Crm.Extensibility.InternalOperationPlugin",
+      "stage": 30,
+      "mode": 0,
+      "hidden": true,
+      "firesOn": "ANY column"
+    },
+    {
+      "name": "ObjectModel Implementation",
+      "message": "UpdateMultiple",
+      "type": "Microsoft.Crm.Extensibility.InternalOperationPlugin",
+      "stage": 30,
+      "mode": 0,
+      "hidden": true,
+      "firesOn": "ANY column"
+    },
+    {
+      "name": "ObjectModel Implementation",
+      "message": "UpdateMultiple",
+      "type": "Microsoft.Crm.Extensibility.InternalOperationPlugin",
+      "stage": 30,
+      "mode": 0,
+      "hidden": true,
+      "firesOn": "ANY column"
+    },
+    {
+      "name": "RollupTriggerPlugin_Update_akoya_request",
+      "message": "Update",
+      "type": "Microsoft.Crm.Rollup.RollupTriggerPlugin",
+      "stage": 35,
+      "mode": 0,
+      "hidden": true,
+      "firesOn": "ANY column"
+    },
+    {
+      "name": "AkoyaGo.CalculatedFieldsAsync: Update of akoya_request",
+      "message": "Update",
+      "type": "AkoyaGo.CalculatedFieldsAsync",
+      "stage": 40,
+      "mode": 1,
+      "hidden": false,
+      "firesOn": "ANY column"
+    },
+    {
+      "name": "AkoyaGo.RequestPreOperation: Update of akoya_request",
+      "message": "Update",
+      "type": "AkoyaGo.RequestPreOperation",
+      "stage": 20,
+      "mode": 0,
+      "hidden": false,
+      "firesOn": "ANY entity/column"
+    },
+    {
+      "name": "AkoyaGo.RequestPaymentFundAnonymity: Update of akoya_requestpayment",
+      "message": "Update",
+      "type": "AkoyaGo.RequestPaymentFundAnonymity",
+      "stage": 20,
+      "mode": 0,
+      "hidden": false,
+      "firesOn": "ANY entity/column"
+    },
+    {
+      "name": "AkoyaGo.RequestPostOperation: Update of akoya_request",
+      "message": "Update",
+      "type": "AkoyaGo.RequestPostOperation",
+      "stage": 40,
+      "mode": 0,
+      "hidden": false,
+      "firesOn": "ANY entity/column"
+    }
+  ],
+  "flows": [],
+  "flowMentions": [
+    {
+      "name": "GOapply Add Request to Review Group (Deprecated)",
+      "readable": true,
+      "recognizedRequestTriggers": 0,
+      "unclassifiedRequestTriggers": 0,
+      "manualApiConnectionTriggers": 1
+    },
+    {
+      "name": "Bill.com - Push Payments",
+      "readable": true,
+      "recognizedRequestTriggers": 0,
+      "unclassifiedRequestTriggers": 0,
+      "manualApiConnectionTriggers": 1
+    },
+    {
+      "name": "GOapply AutoFill Next Phase (Deprecated)",
+      "readable": true,
+      "recognizedRequestTriggers": 0,
+      "unclassifiedRequestTriggers": 0,
+      "manualApiConnectionTriggers": 0
+    }
+  ],
+  "unclassifiedFlowTriggers": [
+    {
+      "name": "GOapply Add Request to Review Group (Deprecated)",
+      "trigger": "manual",
+      "reason": "manual API-connection trigger without Dataverse subscription"
+    },
+    {
+      "name": "Bill.com - Push Payments",
+      "trigger": "manual",
+      "reason": "manual API-connection trigger without Dataverse subscription"
+    },
+    {
+      "name": "GOapply AutoFill Next Phase (Deprecated)",
+      "trigger": "(none)",
+      "reason": "mention without classified Request trigger"
+    }
+  ],
+  "counts": {
+    "activatedWorkflowsAndRules": 68,
+    "updateTriggeredWorkflows": 20,
+    "slotTriggeredWorkflows": 0,
+    "unreadableWorkflowsAndRules": 0,
+    "allEnabledSlotWriteSteps": 11090,
+    "allEnabledUpdateMultipleSteps": 3997,
+    "allEnabledUpsertSteps": 706,
+    "allEnabledUpsertMultipleSteps": 531,
+    "requestSlotWriteSteps": 34,
+    "globalSlotWriteSteps": 1227,
+    "hiddenGlobalSlotWriteSteps": 1224,
+    "hiddenMicrosoftPlatformSlotWriteSteps": 1224,
+    "flowsRead": 14,
+    "flowsMentioningRequestOrSlot": 3,
+    "requestUpdateTriggers": 0,
+    "requestNonUpdateTriggers": 0,
+    "manualApiConnectionTriggers": 2,
+    "unclassifiedFlowTriggers": 3,
+    "unreadableFlows": 0
+  }
+}

@@ -17,9 +17,11 @@ const KNOWN_GUARDS = [
   'verifyCronSecret',
   'verifyDossierCronSecret',
   'verifyReviewPanelCronSecret',
+  'verifyTranscriptionCronSecret',
   'verifySuggestionToken',
   'verifyGranteeToken',
   'verifyBriefingToken',
+  'verifyPresentationToken',
   'getServerSession',
   'NextAuth',
 ];
@@ -32,6 +34,7 @@ const HMAC_GUARDS = [
   'verifyInternalCall', // lib/bill/internal-call-auth.js — internal same-deployment HMAC
   'verifyBillWebhook',  // lib/bill — BILL.com webhook HMAC-SHA256
   'verifyVercelLogDrainSignature', // pages/api/webhooks/vercel-log-drain.js — Vercel Log Drain HMAC-SHA1
+  'verifyAssemblyAIWebhook', // pages/api/webhooks/assemblyai.js — per-attempt HMAC-SHA256 shared secret
 ];
 
 function walk(dir) {

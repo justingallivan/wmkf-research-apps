@@ -1,0 +1,18 @@
+{
+  "kind": "test-request-meetingdate-patch-proof/v1",
+  "target": "https://orgd9e66399.crm.dynamics.com",
+  "requestId": "63dab4af-178f-4bbc-b24d-3ccbaf74cbfc",
+  "runId": "06dadd69-c5d7-4159-b690-2cc8e5a61af9",
+  "desired": "2099-12-01",
+  "old": "2024-12-13T00:00:00Z",
+  "attemptedAt": "2026-09-23T02:48:11.304Z",
+  "patchAttempted": true,
+  "patchStatus": 204,
+  "readbackAt": "2026-09-23T02:48:13.140Z",
+  "newMeetingDate": "2099-12-01T00:00:00Z",
+  "markerPreserved": true,
+  "ownerPreserved": true,
+  "paymentCount": 0,
+  "emailCount": 0,
+  "ok": true
+}

@@ -24,6 +24,13 @@ condition = "AND"
 regexes = ['''^CYCLE_DOSSIER_ENABLED=true$''']
 paths = ['''^docs/CYCLE_DOSSIER_PILOT_DESIGN\.md$''']
 
+[[rules.allowlists]]
+description = "Test Request Factory live-proof run inspections: SHA-256 digests (idempotency-key digest, Initial Assessment generation keys, bundle/plan/body/file digests) the ledger stores instead of any caller text; never credentials."
+condition = "AND"
+regexTarget = "line"
+regexes = ['''^\s*"(idempotencyKey|generationKey|[A-Za-z]*[Ss]ha256|contentHash|planDigest|copyPolicyDigest|attestedDigest|reviewFilePolicyDigest)": "[0-9a-f]{64}",?$''']
+paths = ['''^docs/plans/evidence/test-request-factory/[a-z0-9-]+-run-inspect-[0-9-]+\.json$''']
+
 [[allowlists]]
 description = "Fixture EXTERNAL_LINK_SECRET values in focused external-token verifier unit tests (never real; set on process.env inside the test)."
 targetRules = ["generic-api-key"]

@@ -17,11 +17,12 @@ jest.mock('next/link', () => ({
   default: ({ href, children, scroll: _scroll, ...props }) => <a href={href} {...props}>{children}</a>,
 }));
 
-test('exposes the five confirmed admin workspaces in the confirmed order', () => {
+test('exposes the confirmed admin workspaces in the confirmed order', () => {
   expect(ADMIN_WORKSPACES.map((workspace) => workspace.key)).toEqual([
     'overview',
     'operations',
     'workflows',
+    'test-requests',
     'ai',
     'people',
   ]);
@@ -60,6 +61,13 @@ test('workspace and view navigation are URL-addressable and announce the active 
     'href',
     adminHref('workflows', 'site-visits'),
   );
+});
+
+test('Transcription Pilot links to its dedicated Admin route and marks the active page', () => {
+  render(<AdminWorkspaceNavigation activeWorkspace="transcription-pilot" />);
+
+  expect(screen.getByRole('link', { name: 'Transcription Pilot' })).toHaveAttribute('href', '/admin/transcription-pilot');
+  expect(screen.getByRole('link', { name: 'Transcription Pilot' })).toHaveAttribute('aria-current', 'page');
 });
 
 test('a collapsible editor panel starts closed when asked, keeps its heading visible, and opens on the header', () => {

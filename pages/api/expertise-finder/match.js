@@ -21,7 +21,7 @@ import { loadModelOverrides } from '../../../lib/services/model-override-loader'
 import { buildCacheableSystemPrompt, buildUserPrompt } from '../../../shared/config/prompts/expertise-finder';
 import { logUsage, estimateCostCents } from '../../../lib/utils/usage-logger';
 import { LLMClient } from '../../../lib/services/llm-client';
-import { safeFetch } from '../../../lib/utils/safe-fetch';
+import { fetchPublicBlob } from '../../../lib/utils/public-blob-fetch';
 import { createHash } from 'crypto';
 import {
   DATA_CLASSES,
@@ -55,7 +55,7 @@ export default async function handler(req, res) {
     }
 
     // Fetch and extract text from PDF
-    const fileResponse = await safeFetch(file.url);
+    const fileResponse = await fetchPublicBlob(file.url);
     if (!fileResponse.ok) {
       return res.status(400).json({ error: `Failed to fetch uploaded file: ${fileResponse.statusText}` });
     }

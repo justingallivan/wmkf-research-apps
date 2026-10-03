@@ -14,10 +14,14 @@ jest.mock('../../lib/services/sharepoint-cleanup', () => ({ cleanupSharePointIte
 
 import { sql } from '@vercel/postgres';
 import { del } from '@vercel/blob';
+import { createHash } from 'node:crypto';
 import {
+  DEFAULT_CLEANUP_DEPENDENCIES,
   PORTAL_UPLOAD_SCOPES,
   cleanupExpiredPortalUploads,
 } from '../../lib/services/portal-upload-staging';
+import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../shared/config/requestDocument';
+import { GraphService } from '../../lib/services/graph-service';
 
 const REGISTRY_ID = '33333333-3333-4333-8333-333333333333';
 
@@ -37,7 +41,10 @@ function makeDependencies(overrides = {}) {
     discardCandidate: jest.fn().mockResolvedValue(true),
     isConsultantFeedbackBound: jest.fn().mockResolvedValue(false),
     getGranteeDeliverable: jest.fn().mockResolvedValue({ wmkf_imagefileref: null }),
-    isSiteVisitMaterialSlotCurrent: jest.fn().mockResolvedValue(false),
+    findSiteVisitMaterialReferences: jest.fn().mockResolvedValue({ records: [] }),
+    deleteSiteVisitMaterialCandidate: jest.fn().mockResolvedValue(204),
+    verifyPostPresentationTranscriptCandidateUnchanged: jest.fn(async (candidate) => candidate),
+    discardPostPresentationTranscriptCandidate: jest.fn().mockResolvedValue(true),
     ...overrides,
   };
 }
@@ -52,9 +59,19 @@ beforeEach(() => {
 function mockSql(rows) {
   sql.mockReset();
   sql.mockResolvedValueOnce({ rows }); // eligible-row select
-  // Every subsequent tagged-template call (clear-candidate / expire UPDATE / prune) resolves empty.
-  sql.mockResolvedValue({ rows: [], rowCount: 0 });
+  // Simulate successful atomic cleanup claim and candidate-clear CAS. Other
+  // calls (including prune) do not return rows.
+  sql.mockImplementation(async (strings, ...values) => strings.join('').includes('RETURNING id')
+    ? { rows: [{ id: values[0] }], rowCount: 1 }
+    : { rows: [], rowCount: 0 });
 }
+
+test('cleanup selection excludes a finalizing row while its claim lease is live', async () => {
+  mockSql([]);
+  await cleanupExpiredPortalUploads({}, makeDependencies());
+  const selection = sql.mock.calls[0][0].join('');
+  expect(selection).toContain("NOT (status = 'finalizing' AND lease_expires_at >= NOW())");
+});
 
 describe('consultant_feedback scope', () => {
   test('an ambiguous generation-key match (more than one registry row) is retained, never discarded', async () => {
@@ -144,65 +161,88 @@ describe('consultant_feedback scope', () => {
 });
 
 describe('site_visit_material scope', () => {
-  test('bound (registry row exists AND is the current slot holder): row expires, nothing discarded', async () => {
-    const candidate = { generationKey: 'sv-gk-1', slot: 'presentation_pdf' };
-    mockSql([candidateRow({ scope: PORTAL_UPLOAD_SCOPES.SITE_VISIT_MATERIAL, candidate })]);
-    const deps = makeDependencies({
-      findDocumentByGenerationKey: jest.fn().mockResolvedValue({ records: [{ wmkf_requestdocumentid: REGISTRY_ID }] }),
-      isSiteVisitMaterialSlotCurrent: jest.fn().mockResolvedValue(true),
-    });
-    const result = await cleanupExpiredPortalUploads({}, deps);
-    expect(deps.isSiteVisitMaterialSlotCurrent).toHaveBeenCalledWith({ requestId: 'resource-1', slot: 'presentation_pdf', artifactId: REGISTRY_ID });
+  const candidate = { generationKey: 'sv-gk', slot: 'presentation_pdf', driveId: 'drive', itemId: 'item', eTag: 'saved-etag' };
+  const setup = (value = candidate) => mockSql([candidateRow({ scope: PORTAL_UPLOAD_SCOPES.SITE_VISIT_MATERIAL, candidate: value })]);
+
+  test.each(['Ready', 'Draft', 'Superseded'])('any own-generation %s row protects the item', async (state) => {
+    setup();
+    const deps = makeDependencies({ findDocumentByGenerationKey: jest.fn().mockResolvedValue({ records: [{ wmkf_requestdocumentid: REGISTRY_ID, wmkf_lifecyclestate: state }] }) });
+    expect((await cleanupExpiredPortalUploads({}, deps)).retained).toBe(0);
+    expect(deps.deleteSiteVisitMaterialCandidate).not.toHaveBeenCalled();
     expect(deps.discardCandidate).not.toHaveBeenCalled();
     expect(del).toHaveBeenCalled();
-    expect(result.retained).toBe(0);
   });
 
-  test('unbound (registry row exists but a LATER upload now holds the slot): the candidate is discarded', async () => {
-    const candidate = { generationKey: 'sv-gk-1b', slot: 'presentation_pdf' };
-    mockSql([candidateRow({ scope: PORTAL_UPLOAD_SCOPES.SITE_VISIT_MATERIAL, candidate })]);
-    const deps = makeDependencies({
-      findDocumentByGenerationKey: jest.fn().mockResolvedValue({ records: [{ wmkf_requestdocumentid: REGISTRY_ID }] }),
-      isSiteVisitMaterialSlotCurrent: jest.fn().mockResolvedValue(false),
-    });
-    const result = await cleanupExpiredPortalUploads({}, deps);
-    expect(deps.discardCandidate).toHaveBeenCalledWith(candidate);
-    expect(result.retained).toBe(0);
-  });
-
-  test('uncommitted (no registry row): discards the candidate with no slot-currency check', async () => {
-    const candidate = { generationKey: 'sv-gk-2', slot: 'presentation_pdf' };
-    mockSql([candidateRow({ scope: PORTAL_UPLOAD_SCOPES.SITE_VISIT_MATERIAL, candidate })]);
-    const deps = makeDependencies({
-      findDocumentByGenerationKey: jest.fn().mockResolvedValue({ records: [] }),
-    });
-    const result = await cleanupExpiredPortalUploads({}, deps);
-    expect(deps.isSiteVisitMaterialSlotCurrent).not.toHaveBeenCalled();
-    expect(deps.discardCandidate).toHaveBeenCalledWith(candidate);
-    expect(result.retained).toBe(0);
-  });
-
-  test('a slot-currency dependency failure retains the row', async () => {
-    const candidate = { generationKey: 'sv-gk-3', slot: 'presentation_pdf' };
-    mockSql([candidateRow({ scope: PORTAL_UPLOAD_SCOPES.SITE_VISIT_MATERIAL, candidate })]);
-    const deps = makeDependencies({
-      findDocumentByGenerationKey: jest.fn().mockResolvedValue({ records: [{ wmkf_requestdocumentid: REGISTRY_ID }] }),
-      isSiteVisitMaterialSlotCurrent: jest.fn().mockRejectedValue(new Error('dataverse down')),
-    });
-    const result = await cleanupExpiredPortalUploads({}, deps);
-    expect(deps.discardCandidate).not.toHaveBeenCalled();
-    expect(del).not.toHaveBeenCalled();
-    expect(result.retained).toBe(1);
-  });
-
-  test('an unrecognised candidate shape (missing slot) is retained, never discarded', async () => {
-    const candidate = { generationKey: 'sv-gk-4' };
-    mockSql([candidateRow({ scope: PORTAL_UPLOAD_SCOPES.SITE_VISIT_MATERIAL, candidate })]);
+  test('a predecessor protects the old bytes without relying on current slot status', async () => {
+    setup({ ...candidate, predecessorArtifactId: REGISTRY_ID });
     const deps = makeDependencies();
-    const result = await cleanupExpiredPortalUploads({}, deps);
-    expect(deps.discardCandidate).not.toHaveBeenCalled();
+    await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.deleteSiteVisitMaterialCandidate).not.toHaveBeenCalled();
     expect(deps.findDocumentByGenerationKey).not.toHaveBeenCalled();
-    expect(result.retained).toBe(1);
+    expect(sqlCalledWith('candidate_result = NULL')).toBe(true);
+  });
+
+  test('a different superseded generation referencing the exact drive/item protects it', async () => {
+    setup();
+    const deps = makeDependencies({ findSiteVisitMaterialReferences: jest.fn().mockResolvedValue({ records: [{ wmkf_generationkey: 'older', wmkf_lifecyclestate: 999, wmkf_sharepointdriveid: 'drive', wmkf_sharepointitemid: 'item' }] }) });
+    await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.findSiteVisitMaterialReferences).toHaveBeenCalledWith('resource-1');
+    expect(deps.deleteSiteVisitMaterialCandidate).not.toHaveBeenCalled();
+    expect(del).toHaveBeenCalled();
+  });
+
+  test.each([204, 404, 412])('exact unreferenced orphan reconciles delete status %s', async (status) => {
+    setup();
+    const deps = makeDependencies({ deleteSiteVisitMaterialCandidate: jest.fn().mockResolvedValue(status) });
+    expect((await cleanupExpiredPortalUploads({}, deps)).retained).toBe(0);
+    expect(deps.deleteSiteVisitMaterialCandidate).toHaveBeenCalledWith(candidate);
+    expect(deps.discardCandidate).not.toHaveBeenCalled();
+    expect(sqlCalledWith('candidate_result = NULL')).toBe(true);
+  });
+
+  test('a different drive with the same item id does not establish a registry reference', async () => {
+    setup();
+    const deps = makeDependencies({ findSiteVisitMaterialReferences: jest.fn().mockResolvedValue({ records: [{ wmkf_sharepointdriveid: 'other-drive', wmkf_sharepointitemid: 'item' }] }) });
+    await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.deleteSiteVisitMaterialCandidate).toHaveBeenCalledWith(candidate);
+  });
+
+  test('missing ETag retains SharePoint bytes but clears the receipt', async () => {
+    setup({ ...candidate, eTag: null });
+    const deps = makeDependencies();
+    await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.deleteSiteVisitMaterialCandidate).not.toHaveBeenCalled();
+    expect(sqlCalledWith('candidate_result = NULL')).toBe(true);
+  });
+
+  test.each(['generation outage', 'reference outage', 'malformed generation', 'malformed references', 'capped references', 'delete unavailable'])('%s retains the receipt for recovery', async (failure) => {
+    setup();
+    const deps = makeDependencies();
+    if (failure === 'generation outage') deps.findDocumentByGenerationKey.mockRejectedValue(new Error('unavailable'));
+    if (failure === 'reference outage') deps.findSiteVisitMaterialReferences.mockRejectedValue(new Error('unavailable'));
+    if (failure === 'malformed generation') deps.findDocumentByGenerationKey.mockResolvedValue({});
+    if (failure === 'malformed references') deps.findSiteVisitMaterialReferences.mockResolvedValue({});
+    if (failure === 'capped references') deps.findSiteVisitMaterialReferences.mockResolvedValue({ records: [], capped: true });
+    if (failure === 'delete unavailable') deps.deleteSiteVisitMaterialCandidate.mockResolvedValue(503);
+    expect((await cleanupExpiredPortalUploads({}, deps)).retained).toBe(1);
+    expect(sqlCalledWith('candidate_result = NULL')).toBe(false);
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  test('an unrecognized candidate shape remains untouched', async () => {
+    setup({ generationKey: 'sv-gk' });
+    const deps = makeDependencies();
+    expect((await cleanupExpiredPortalUploads({}, deps)).retained).toBe(1);
+    expect(deps.deleteSiteVisitMaterialCandidate).not.toHaveBeenCalled();
+    expect(deps.findDocumentByGenerationKey).not.toHaveBeenCalled();
+  });
+
+  test('default deletion passes only persisted identity and exact ETag to Graph', async () => {
+    const spy = jest.spyOn(GraphService, 'deleteFileWithEtag').mockResolvedValue(204);
+    try {
+      await expect(DEFAULT_CLEANUP_DEPENDENCIES.deleteSiteVisitMaterialCandidate(candidate)).resolves.toBe(204);
+      expect(spy).toHaveBeenCalledWith('drive', 'item', 'saved-etag');
+    } finally { spy.mockRestore(); }
   });
 });
 
@@ -256,6 +296,148 @@ describe('grantee_image / staff_grantee_image scopes', () => {
     const deps = makeDependencies({ getGranteeDeliverable: jest.fn().mockResolvedValue({ wmkf_imagefileref: 'ref-2' }) });
     const result = await cleanupExpiredPortalUploads({}, deps);
     expect(result.retained).toBe(0);
+  });
+});
+
+describe('post_presentation_transcript scope', () => {
+  const candidate = {
+    requestId: '11111111-1111-4111-8111-111111111111',
+    generationKey: 'transcript-gk',
+    driveId: 'drive',
+    itemId: 'item',
+    filename: '1003220-Transcript-upload.pdf',
+    size: 8,
+    eTag: 'etag',
+    sha256: '64-character-test-hash-not-used-by-injected-verifier-00000000000000',
+  };
+
+  test('an exact Request Document match retains bytes even when the row is Superseded', async () => {
+    mockSql([candidateRow({
+      scope: PORTAL_UPLOAD_SCOPES.POST_PRESENTATION_TRANSCRIPT,
+      candidate,
+      resourceId: candidate.requestId,
+    })]);
+    const deps = makeDependencies({
+      findDocumentByGenerationKey: jest.fn().mockResolvedValue({ records: [{
+        wmkf_requestdocumentid: REGISTRY_ID,
+        _wmkf_request_value: candidate.requestId,
+        wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT,
+        wmkf_producer: 'meeting-tracker-post-presentation',
+        wmkf_generationkey: candidate.generationKey,
+        wmkf_sharepointdriveid: candidate.driveId,
+        wmkf_sharepointitemid: candidate.itemId,
+        wmkf_lifecyclestate: 999999,
+      }] }),
+    });
+    const result = await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.discardCandidate).not.toHaveBeenCalled();
+    expect(sqlCalledWith('candidate_result = NULL')).toBe(true);
+    expect(result.retained).toBe(0);
+  });
+
+  test('a rejected DOCX receipt stays available to exact orphan cleanup after the source Blob is deleted', async () => {
+    const rejected = {
+      ...candidate, contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      filename: '1003220-Transcript-upload.docx',
+      sourceSha256: 'a'.repeat(64), sourceSize: 10, sha256: 'b'.repeat(64), size: 20,
+    };
+    mockSql([candidateRow({
+      scope: PORTAL_UPLOAD_SCOPES.POST_PRESENTATION_TRANSCRIPT, status: 'rejected',
+      candidate: rejected, resourceId: rejected.requestId,
+    })]);
+    const deps = makeDependencies();
+    const result = await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.findDocumentByGenerationKey).toHaveBeenCalledWith(rejected.generationKey);
+    expect(deps.verifyPostPresentationTranscriptCandidateUnchanged).toHaveBeenCalledWith(rejected);
+    expect(deps.discardPostPresentationTranscriptCandidate).toHaveBeenCalledWith(rejected);
+    expect(deps.verifyPostPresentationTranscriptCandidateUnchanged.mock.invocationCallOrder[0])
+      .toBeLessThan(deps.discardPostPresentationTranscriptCandidate.mock.invocationCallOrder[0]);
+    expect(sqlCalledWith('candidate_result = NULL')).toBe(true);
+    expect(result.retained).toBe(0);
+  });
+
+  test('a proven zero-row generation lookup deletes only the exact persisted candidate', async () => {
+    mockSql([candidateRow({
+      scope: PORTAL_UPLOAD_SCOPES.POST_PRESENTATION_TRANSCRIPT,
+      candidate,
+      resourceId: candidate.requestId,
+    })]);
+    const deps = makeDependencies({
+      findDocumentByGenerationKey: jest.fn().mockResolvedValue({ records: [] }),
+    });
+    const result = await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.discardPostPresentationTranscriptCandidate).toHaveBeenCalledWith(candidate);
+    expect(result.retained).toBe(0);
+  });
+
+  test('a proven zero-row lookup still retains a candidate whose stable item changed', async () => {
+    mockSql([candidateRow({
+      scope: PORTAL_UPLOAD_SCOPES.POST_PRESENTATION_TRANSCRIPT,
+      candidate,
+      resourceId: candidate.requestId,
+    })]);
+    const deps = makeDependencies({
+      findDocumentByGenerationKey: jest.fn().mockResolvedValue({ records: [] }),
+      verifyPostPresentationTranscriptCandidateUnchanged: jest.fn().mockResolvedValue(null),
+    });
+    const result = await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.discardPostPresentationTranscriptCandidate).not.toHaveBeenCalled();
+    expect(del).not.toHaveBeenCalled();
+    expect(result.retained).toBe(1);
+  });
+
+  test.each([
+    ['ambiguous', { records: [{}, {}] }],
+    ['identity mismatch', { records: [{
+      _wmkf_request_value: candidate.requestId,
+      wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT,
+      wmkf_producer: 'meeting-tracker-post-presentation',
+      wmkf_generationkey: candidate.generationKey,
+      wmkf_sharepointdriveid: candidate.driveId,
+      wmkf_sharepointitemid: 'different-item',
+    }] }],
+  ])('%s registry state retains the candidate', async (_label, registry) => {
+    mockSql([candidateRow({
+      scope: PORTAL_UPLOAD_SCOPES.POST_PRESENTATION_TRANSCRIPT,
+      candidate,
+      resourceId: candidate.requestId,
+    })]);
+    const deps = makeDependencies({
+      findDocumentByGenerationKey: jest.fn().mockResolvedValue(registry),
+    });
+    const result = await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.discardCandidate).not.toHaveBeenCalled();
+    expect(del).not.toHaveBeenCalled();
+    expect(result.retained).toBe(1);
+  });
+
+  test('default proof hash-verifies metadata drift and deletes only with the refreshed ETag', async () => {
+    const bytes = Buffer.from('%PDF-1.7');
+    const exact = {
+      ...candidate,
+      size: bytes.length,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+      eTag: 'old-etag',
+      versionId: '1.0',
+    };
+    const metadata = {
+      siteId: 'site', driveId: exact.driveId, id: exact.itemId, name: exact.filename,
+      size: exact.size, eTag: 'new-etag', versionId: '2.0',
+    };
+    const metadataSpy = jest.spyOn(GraphService, 'getFileMetadataById')
+      .mockResolvedValueOnce(metadata)
+      .mockResolvedValueOnce(metadata);
+    const downloadSpy = jest.spyOn(GraphService, 'downloadFile').mockResolvedValue({ buffer: bytes });
+    const deleteSpy = jest.spyOn(GraphService, 'deleteFileWithEtag').mockResolvedValue(204);
+    const verified = await DEFAULT_CLEANUP_DEPENDENCIES
+      .verifyPostPresentationTranscriptCandidateUnchanged(exact);
+    expect(verified).toMatchObject({ eTag: 'new-etag', versionId: '2.0' });
+    await expect(DEFAULT_CLEANUP_DEPENDENCIES.discardPostPresentationTranscriptCandidate(verified))
+      .resolves.toBe(true);
+    expect(deleteSpy).toHaveBeenCalledWith(exact.driveId, exact.itemId, 'new-etag');
+    metadataSpy.mockRestore();
+    downloadSpy.mockRestore();
+    deleteSpy.mockRestore();
   });
 });
 
@@ -317,4 +499,42 @@ describe('null candidate (existing behavior unaffected)', () => {
     expect(result.deleted).toBe(1);
     expect(result.retained).toBe(0);
   });
+});
+
+
+describe('DOCX transcript cleanup uses stored bytes, never the source attestation exemption', () => {
+  test.each([true, false])('exact stored-byte digest matches: %s', async (matches) => {
+    const source = Buffer.from('original DOCX package');
+    const stored = Buffer.from('promoted DOCX package');
+    const candidate = {
+      driveId: 'drive', itemId: 'item', filename: 'transcript.docx',
+      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      sourceSha256: createHash('sha256').update(source).digest('hex'), sourceSize: source.length,
+      sha256: createHash('sha256').update(matches ? stored : source).digest('hex'), size: stored.length,
+      registrySize: source.length, eTag: 'old-etag', versionId: '1.0',
+    };
+    const metadata = { driveId: 'drive', id: 'item', name: candidate.filename, size: stored.length, eTag: 'new-etag', versionId: '2.0' };
+    const metadataSpy = jest.spyOn(GraphService, 'getFileMetadataById').mockResolvedValue(metadata);
+    const downloadSpy = jest.spyOn(GraphService, 'downloadFile').mockResolvedValue({ buffer: stored });
+    try {
+      const proof = await DEFAULT_CLEANUP_DEPENDENCIES.verifyPostPresentationTranscriptCandidateUnchanged(candidate);
+      if (matches) expect(proof).toMatchObject({ sha256: candidate.sha256, eTag: 'new-etag' });
+      else expect(proof).toBeNull();
+    } finally {
+      metadataSpy.mockRestore(); downloadSpy.mockRestore();
+    }
+  });
+});
+
+
+test('a cleanup claim lost to admission performs no remote work', async () => {
+  const candidate = { generationKey: 'sv-gk', slot: 'presentation_pdf', driveId: 'd', itemId: 'i', eTag: 'e' };
+  sql.mockReset();
+  sql.mockResolvedValueOnce({ rows: [candidateRow({ scope: PORTAL_UPLOAD_SCOPES.SITE_VISIT_MATERIAL, candidate })] });
+  sql.mockResolvedValue({ rows: [], rowCount: 0 });
+  const deps = makeDependencies();
+  expect(await cleanupExpiredPortalUploads({}, deps)).toEqual({ deleted: 0, retained: 0, errors: 0, pruned: 0 });
+  expect(deps.findDocumentByGenerationKey).not.toHaveBeenCalled();
+  expect(deps.deleteSiteVisitMaterialCandidate).not.toHaveBeenCalled();
+  expect(del).not.toHaveBeenCalled();
 });

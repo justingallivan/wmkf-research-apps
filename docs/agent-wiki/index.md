@@ -1,7 +1,7 @@
 ---
 agent_wiki: index
 status: active
-last_verified: 2026-09-11
+last_verified: 2026-10-01
 stale_after_days: 90
 owner: agent-operations
 source_files:
@@ -40,6 +40,7 @@ reviewing. It is subordinate to source, Atlas, and live probes.
 | Reviewer workbench, roster, lifecycle, referral, address collection | [Reviewer Workbench & Lifecycle](topics/reviewer-workbench-lifecycle.md) | `docs/APPLICATION_STATE_ATLAS.md`, reviewer app routes/services |
 | External reviewer portal, accept/decline, tokens, E2E harness, SharePoint files | [External Reviewer Portal](topics/external-reviewer-portal.md) | `docs/EXTERNAL_REVIEWER_INTAKE_PLAN.md`, `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`, `tests/e2e/README.md` |
 | Intake portal, draft capture, submit, attachments, blob token, virus scan, institution match | [Intake Portal](topics/intake-portal.md) | `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md`, `docs/atlas/dataverse-akoya-request.md` |
+| Applicant Site Visit materials, contributor uploads, background jobs, Ready, reminders | `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16 | `docs/plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md`, `docs/atlas/postgres-infra-tables.md` (`site_visit_material_collections`, `materials_upload_jobs`), source headers in `lib/services/site-visit-materials/` |
 | Dataverse / Dynamics, schema deploy, OData, probes, Explorer, Power Tools, grant lifecycle fields | [Dataverse & Dynamics](topics/dataverse-dynamics.md) | `docs/APPLICATION_STATE_ATLAS.md`, `docs/atlas/`, `docs/DYNAMICS_SCHEMA_ANNOTATION.md` |
 | Prompt storage, shared Executor, PDF/document processing | [Prompt & Executor](topics/prompt-executor.md) | `docs/EXECUTOR_CONTRACT.md`, prompt resolver/composer/source files |
 | BILL, honoraria, payment fields, no-banking constraints | [Finance & Honoraria](topics/finance-honoraria.md) | `docs/APPLICATION_STATE_ATLAS.md`, payment/honorarium docs |

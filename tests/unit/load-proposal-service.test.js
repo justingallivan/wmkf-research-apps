@@ -27,12 +27,17 @@ jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   SELECT_PROFILES: { IDENTITY: ['akoya_requestid', 'akoya_requestnum'] },
 }));
 const listFiles = jest.fn();
+const mockSiteVisitFilter = jest.fn();
+const mockCreateSiteVisitFilter = jest.fn();
 const downloadFileByPath = jest.fn();
 jest.mock('../../lib/services/graph-service', () => ({
   GraphService: {
     listFiles: (...a) => listFiles(...a),
     downloadFileByPath: (...a) => downloadFileByPath(...a),
   },
+}));
+jest.mock('../../lib/services/site-visit-materials/recursive-reader-filter.js', () => ({
+  createSiteVisitMaterialsRecursiveReaderFilter: (...args) => mockCreateSiteVisitFilter(...args),
 }));
 jest.mock('../../lib/utils/sharepoint-buckets', () => ({
   getRequestSharePointBuckets: jest.fn(),
@@ -70,6 +75,12 @@ function file(name, over = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockCreateSiteVisitFilter.mockReturnValue(mockSiteVisitFilter);
+  mockSiteVisitFilter.mockImplementation(async (_library, _folder, files) => ({
+    files,
+    omittedFiles: [],
+    error: null,
+  }));
   grantRequestAdapter.getById.mockResolvedValue({ akoya_requestid: REQ, akoya_requestnum: '1002836' });
   getRequestSharePointBuckets.mockResolvedValue([
     { library: 'akoya_request', folder: 'F', source: 'dynamics' },
@@ -151,6 +162,12 @@ test('default prefers the exact active canonical proposal over the Phase I fallb
   ]);
   const out = await loadProposal({ requestId: REQ });
   expect(out.picked).toBe('akoya_request::F/Reviewer Materials::Proposal_1002836.pdf');
+  expect(listFiles).toHaveBeenCalledWith('akoya_request', 'F', expect.objectContaining({
+    recursive: true,
+    excludeApplicantMaterialsBackgroundUploads: true,
+  }));
+  expect(mockCreateSiteVisitFilter).toHaveBeenCalledWith(REQ, '1002836');
+  expect(mockSiteVisitFilter).toHaveBeenCalledWith('akoya_request', 'F', expect.any(Array));
 });
 
 test('default fails closed and returns the picker list when neither automatic path exists', async () => {
@@ -165,6 +182,21 @@ test('default fails closed and returns the picker list when neither automatic pa
   expect(err.body.allFiles).toHaveLength(1);
   expect(downloadFileByPath).not.toHaveBeenCalled();
   expect(put).not.toHaveBeenCalled();
+});
+
+test('uses filtered files so a superseded Site Visit root item is not offered in the all-files error body', async () => {
+  const oldPresentation = file('1002836 Site Visit Presentation.pptx', { folder: 'F/Site Visit - Slides' });
+  const unrelated = file('Project Narrative.pdf', { folder: 'F/Phase I' });
+  listFiles.mockResolvedValue([oldPresentation, unrelated]);
+  mockSiteVisitFilter.mockImplementationOnce(async (_library, _folder, files) => ({
+    files: files.filter((candidate) => candidate !== oldPresentation),
+    omittedFiles: [],
+    error: null,
+  }));
+
+  const error = await loadProposal({ requestId: REQ }).catch((e) => e);
+  expect(error.httpStatus).toBe(404);
+  expect(error.body.allFiles.map((candidate) => candidate.name)).toEqual(['Project Narrative.pdf']);
 });
 
 test('fallback excludes archive, wrong-folder, and wrong-case lookalikes', async () => {

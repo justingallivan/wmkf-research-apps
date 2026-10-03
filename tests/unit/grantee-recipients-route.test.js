@@ -1,6 +1,8 @@
 /**
  * GET /api/workbench/grantee-deliverables/recipients — chunk 3b.
- * Resolves PI (wmkf_projectleader) + liaison (akoya_primarycontactid) contacts.
+ * Resolves PI (wmkf_projectleader) + liaison contacts. The Request row here has
+ * a blank program, so the Liaison is the Request copy (akoya_primarycontactid);
+ * the Research institution rule is covered in grantee-recipients-workbench-service.
  *
  * @jest-environment node
  */
@@ -32,7 +34,13 @@ beforeEach(() => {
 function wireContacts({ piEmail = 'monika.raj@emory.edu', liaisonId = 'li-1' } = {}) {
   DynamicsService.getRecord.mockImplementation((entity, id) => {
     if (entity === 'akoya_requests') {
-      return Promise.resolve({ akoya_requestid: GUID, _wmkf_projectleader_value: 'pi-1', _akoya_primarycontactid_value: liaisonId });
+      return Promise.resolve({
+        akoya_requestid: GUID,
+        _wmkf_projectleader_value: 'pi-1',
+        _akoya_programid_value: null,
+        _akoya_applicantid_value: null,
+        _akoya_primarycontactid_value: liaisonId,
+      });
     }
     if (entity === 'contacts' && id === 'pi-1') {
       return Promise.resolve({ contactid: 'pi-1', fullname: 'Monika Raj', emailaddress1: piEmail });

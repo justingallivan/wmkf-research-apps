@@ -4,6 +4,9 @@
  * VIP/digest decision layer (docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md): every
  * Invited row becomes a durable ledger entry on first sight; the cron never
  * sends recipient mail directly; digests are the only notification surface.
+ * Default fixtures have a blank program (Request-copy Liaison); the Research
+ * institution-Liaison cases are in the 'Liaison of record' block
+ * (docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md reader 2).
  *
  * @jest-environment node
  */
@@ -14,6 +17,7 @@ jest.mock('../../lib/services/dynamics-context', () => ({
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {
     queryAllRecords: jest.fn(),
+    queryRecords: jest.fn(),
     getRecord: jest.fn(),
     updateRecord: jest.fn(),
     createAndSendEmail: jest.fn(),
@@ -43,6 +47,8 @@ jest.mock('../../lib/services/scheduled-email-store', () => ({
   listScheduledEmailDigestRows: jest.fn(async () => []),
   listDueScheduledEmails: jest.fn(async () => []),
   listUnfinalizedScheduledEmails: jest.fn(async () => []),
+  listScheduledEmailReconciliationCandidates: jest.fn(async () => []),
+  listStoppedScheduledEmailsWithSendIntent: jest.fn(async () => []),
 }));
 jest.mock('../../lib/services/scheduled-email-service', () => ({
   scheduledSendAtForInvitation: jest.fn((value) => new Date(new Date(value).getTime() + 12 * 86400000)),
@@ -50,6 +56,8 @@ jest.mock('../../lib/services/scheduled-email-service', () => ({
   sendScheduledEmailDigest: jest.fn(),
   deliverScheduledEmail: jest.fn(),
   finalizeScheduledEmail: jest.fn(),
+  reconcileScheduledEmailCandidate: jest.fn(),
+  reconcileStoppedScheduledEmail: jest.fn(),
 }));
 
 import { verifyCronSecret } from '../../lib/utils/cron-auth';
@@ -64,8 +72,11 @@ import {
   finalizeScheduledEmail,
   groupDigestRowsByPd,
   sendScheduledEmailDigest,
+  reconcileScheduledEmailCandidate,
+  reconcileStoppedScheduledEmail,
 } from '../../lib/services/scheduled-email-service';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
+import { RESEARCH_PROGRAM_IDS } from '../../shared/config/researchPrograms';
 import handler from '../../pages/api/cron/grantee-deliverable-reminders';
 
 function mockRes() {
@@ -99,6 +110,8 @@ const requestRow = (n, over = {}) => ({
   _wmkf_projectleader_value: `pi${n}`,
   _akoya_primarycontactid_value: `liaison${n}`,
   _wmkf_programdirector_value: `pd${n}`,
+  _akoya_programid_value: null,
+  _akoya_applicantid_value: null,
   ...over,
 });
 const contactRow = (id) => ({
@@ -123,6 +136,7 @@ beforeEach(() => {
   });
   NotificationService.notify.mockClear().mockResolvedValue({ id: 1 });
   DynamicsService.queryAllRecords.mockReset().mockResolvedValue({ records: [], totalCount: 0, capped: false });
+  DynamicsService.queryRecords.mockReset().mockRejectedValue(new Error('unexpected account read'));
   DynamicsService.updateRecord.mockReset().mockResolvedValue({});
   DynamicsService.createAndSendEmail.mockReset().mockResolvedValue({ emailId: 'email-1' });
   resolveSignatureForRequest.mockClear();
@@ -135,6 +149,10 @@ beforeEach(() => {
   scheduledEmailStore.listScheduledEmailDigestRows.mockReset().mockResolvedValue([]);
   scheduledEmailStore.listDueScheduledEmails.mockReset().mockResolvedValue([]);
   scheduledEmailStore.listUnfinalizedScheduledEmails.mockReset().mockResolvedValue([]);
+  scheduledEmailStore.listScheduledEmailReconciliationCandidates.mockReset().mockResolvedValue([]);
+  scheduledEmailStore.listStoppedScheduledEmailsWithSendIntent.mockReset().mockResolvedValue([]);
+  reconcileScheduledEmailCandidate.mockReset();
+  reconcileStoppedScheduledEmail.mockReset();
   groupDigestRowsByPd.mockReset().mockReturnValue([]);
   sendScheduledEmailDigest.mockReset();
   deliverScheduledEmail.mockReset();
@@ -150,6 +168,7 @@ beforeEach(() => {
 
 afterEach(() => {
   Date.now.mockRestore();
+  delete process.env.TEST_REQUEST_ISOLATION;
 });
 
 test('selection scans all Invited rows with an invite date', async () => {
@@ -314,6 +333,72 @@ test('due sends and digests: per-item failures are isolated and counted', async 
   expect(res.body.digestsSent).toBe(1);
 });
 
+test('the reconciliation pass runs from its own 25-row query after delivery and never sends (A2/A7)', async () => {
+  scheduledEmailStore.listScheduledEmailReconciliationCandidates.mockResolvedValue([
+    { id: 'intent-1', send_requested_at: '2026-09-01T00:00:00Z' },
+    { id: 'intent-2', send_requested_at: '2026-09-01T00:00:00Z' },
+    { id: 'forbidden-1', send_requested_at: null },
+    { id: 'skipped-1', send_requested_at: null },
+    { id: 'boom-1', send_requested_at: null },
+  ]);
+  reconcileScheduledEmailCandidate
+    .mockResolvedValueOnce({ sent: true })
+    .mockResolvedValueOnce({ unresolved: true, reason: 'not_accepted' })
+    .mockResolvedValueOnce({ cleared: true })
+    .mockResolvedValueOnce({ skipped: true })
+    .mockRejectedValueOnce(new Error('ledger down'));
+  const res = mockRes();
+  await handler(req(), res);
+  expect(scheduledEmailStore.listScheduledEmailReconciliationCandidates).toHaveBeenCalledWith({ limit: 25 });
+  expect(res.body).toMatchObject({
+    reconciled: 3,
+    reconciledSent: 1,
+    reconcileUnresolved: 1,
+    activityReadCleared: 1,
+    reconcileFailed: 1,
+    reminded: 0,
+  });
+  expect(res.body.failures).toEqual([{ requestNum: null, reason: 'scheduled reconcile failed for boom-1: ledger down' }]);
+  expect(deliverScheduledEmail).not.toHaveBeenCalled();
+  // Order: ordinary delivery is listed before reconciliation candidates.
+  const dueOrder = scheduledEmailStore.listDueScheduledEmails.mock.invocationCallOrder[0];
+  const reconcileOrder = scheduledEmailStore.listScheduledEmailReconciliationCandidates.mock.invocationCallOrder[0];
+  expect(dueOrder).toBeLessThan(reconcileOrder);
+});
+
+test('stopped rows with send intent are read back for seven days; late acceptance is counted (A2)', async () => {
+  scheduledEmailStore.listStoppedScheduledEmailsWithSendIntent.mockResolvedValue([
+    { id: 'stopped-1', status: 'stopped' },
+    { id: 'stopped-2', status: 'stopped' },
+  ]);
+  reconcileStoppedScheduledEmail
+    .mockResolvedValueOnce({ sent: true })
+    .mockResolvedValueOnce({ unresolved: true, reason: 'not_accepted' });
+  const res = mockRes();
+  await handler(req(), res);
+  expect(scheduledEmailStore.listStoppedScheduledEmailsWithSendIntent).toHaveBeenCalledWith({ days: 7 });
+  expect(res.body.stoppedLateAccepted).toBe(1);
+  expect(deliverScheduledEmail).not.toHaveBeenCalled();
+});
+
+test('a PD whose eligible digest rows exceed the per-PD window is counted and warned (A7)', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  scheduledEmailStore.listScheduledEmailDigestRows.mockResolvedValue([{ id: 'r1' }]);
+  groupDigestRowsByPd.mockReturnValue([
+    { pdSystemUserId: 'pd-big', sentFyi: [], total: 140, capped: true },
+    { pdSystemUserId: 'pd-small', sentFyi: [], total: 3, capped: false },
+  ]);
+  sendScheduledEmailDigest.mockResolvedValue({ sent: true });
+  const res = mockRes();
+  await handler(req(), res);
+  expect(scheduledEmailStore.listScheduledEmailDigestRows).toHaveBeenCalledWith({ perPdLimit: 100 });
+  expect(groupDigestRowsByPd).toHaveBeenCalledWith([{ id: 'r1' }], { perPdLimit: 100 });
+  expect(res.body.digestPdCapped).toBe(1);
+  expect(res.body.digestsSent).toBe(2);
+  expect(warn).toHaveBeenCalledWith(expect.stringContaining('digest capped for PD pd-big: 140 eligible rows, 100 shown'));
+  warn.mockRestore();
+});
+
 test('unfinalized sent rows are repaired without another send', async () => {
   scheduledEmailStore.listUnfinalizedScheduledEmails.mockResolvedValue([{ id: 'sent-1', status: 'sent' }]);
   const res = mockRes();
@@ -396,17 +481,197 @@ test('200 summary envelope pinned exactly', async () => {
     skippedNoPd: 0,
     skippedNoRecipient: 0,
     skippedMisconfigured: 0,
+    skippedTestRequest: 0,
+    testStateUnknown: 0,
     claimFailed: 0,
     sendFailed: 0,
     scheduled: 1,
     reassigned: 0,
+    readdressed: 0,
+    readdressHeld: 0,
+    postureTightened: 0,
+    savedActivityNotReaddressed: 0,
     digestsSent: 0,
     digestFailed: 0,
+    digestPdCapped: 0,
+    reconciled: 0,
+    reconciledSent: 0,
+    reconcileUnresolved: 0,
+    reconcileFailed: 0,
+    activityReadCleared: 0,
+    stoppedLateAccepted: 0,
     stoppedNoLongerEligible: 0,
     preferenceFailed: 0,
     finalizeFailed: 0,
     capped: false,
     deferred: 0,
     failures: [],
+  });
+});
+
+describe('Test Request isolation', () => {
+  const REQ = '11111111-1111-4111-8111-111111111111';
+  const RUN = '22222222-2222-4222-8222-222222222222';
+  const markers = { test: { wmkf_istestrequest: true, wmkf_testcreationrunid: RUN }, ordinary: { wmkf_istestrequest: null, wmkf_testcreationrunid: null } };
+
+  function withRequest(marker) {
+    DynamicsService.queryAllRecords.mockResolvedValue({
+      records: [{ ...deliv(1), _wmkf_request_value: REQ }], totalCount: 1, capped: false,
+    });
+    DynamicsService.getRecord.mockImplementation((entitySet, id, opts) => {
+      if (entitySet === 'akoya_requests') {
+        if (String(opts?.select).includes('wmkf_istestrequest')) {
+          return marker instanceof Error ? Promise.reject(marker) : Promise.resolve(marker);
+        }
+        return Promise.resolve(requestRow(1));
+      }
+      if (entitySet === 'contacts') return Promise.resolve(contactRow(id));
+      if (entitySet === 'systemusers') return Promise.resolve(pdRow(id));
+      return Promise.reject(new Error(`unexpected ${entitySet}`));
+    });
+  }
+
+  test('a test request is skipped before any recipient read or ledger write', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    withRequest(markers.test);
+    const res = mockRes();
+    await handler(req(), res);
+    expect(res.body.skippedTestRequest).toBe(1);
+    expect(scheduledEmailStore.createOrGetScheduledEmail).not.toHaveBeenCalled();
+    expect(DynamicsService.getRecord.mock.calls.filter(([set]) => set === 'contacts')).toHaveLength(0);
+  });
+
+  test('an unreadable marker skips this run and is reported', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    withRequest(new Error('timeout'));
+    const res = mockRes();
+    await handler(req(), res);
+    expect(res.body.testStateUnknown).toBe(1);
+    expect(scheduledEmailStore.createOrGetScheduledEmail).not.toHaveBeenCalled();
+  });
+
+  test('a verified ordinary request is scheduled as before', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    withRequest(markers.ordinary);
+    const res = mockRes();
+    await handler(req(), res);
+    expect(res.body.scheduled).toBe(1);
+  });
+
+  test('the switch off reads no marker', async () => {
+    withRequest(markers.test);
+    const res = mockRes();
+    await handler(req(), res);
+    expect(res.body.scheduled).toBe(1);
+    expect(DynamicsService.getRecord.mock.calls.some(([, , o]) => String(o?.select).includes('wmkf_istestrequest'))).toBe(false);
+  });
+});
+
+describe('Liaison of record (Research)', () => {
+  const ACCOUNT = '22222222-2222-2222-2222-222222222222';
+  const research = (over = {}) => requestRow(1, {
+    _akoya_programid_value: RESEARCH_PROGRAM_IDS[0],
+    _akoya_applicantid_value: ACCOUNT,
+    _akoya_primarycontactid_value: 'liaison-copy',
+    ...over,
+  });
+  function wire({ request = research(), primaryContact = 'liaison-inst', contact = contactRow } = {}) {
+    DynamicsService.queryAllRecords.mockResolvedValue({ records: [deliv(1)], totalCount: 1, capped: false });
+    DynamicsService.queryRecords.mockImplementation(async () => ({
+      records: [{ accountid: ACCOUNT, _primarycontactid_value: primaryContact }], totalCount: 1, hasMore: false,
+    }));
+    DynamicsService.getRecord.mockImplementation((entitySet, id) => {
+      if (entitySet === 'akoya_requests') return Promise.resolve(request);
+      if (entitySet === 'contacts') return contact(id);
+      if (entitySet === 'systemusers') return Promise.resolve(pdRow(id));
+      return Promise.reject(new Error(`unexpected ${entitySet}`));
+    });
+  }
+
+  test('the Request read selects every Liaison helper input', async () => {
+    wire();
+    await handler(req(), mockRes());
+    const select = DynamicsService.getRecord.mock.calls.find(([e]) => e === 'akoya_requests')[2].select.split(',');
+    expect(select).toEqual(expect.arrayContaining(['_akoya_programid_value', '_akoya_applicantid_value', '_akoya_primarycontactid_value']));
+  });
+
+  test('a new row is Cc the institution Primary Contact, never a differing Request copy', async () => {
+    wire();
+    const res = mockRes();
+    await handler(req(), res);
+    expect(res.body.scheduled).toBe(1);
+    expect(scheduledEmailStore.createOrGetScheduledEmail).toHaveBeenCalledWith(expect.objectContaining({
+      toRecipients: ['pi1@example.edu'],
+      ccRecipients: ['liaison-inst@example.edu'],
+      recipientContactIds: ['pi1', 'liaison-inst'],
+    }));
+    expect(DynamicsService.getRecord).not.toHaveBeenCalledWith('contacts', 'liaison-copy', expect.anything());
+  });
+
+  test('none → a new PI-only row with no Cc', async () => {
+    wire({ primaryContact: null });
+    const res = mockRes();
+    await handler(req(), res);
+    expect(res.body.scheduled).toBe(1);
+    expect(scheduledEmailStore.createOrGetScheduledEmail).toHaveBeenCalledWith(expect.objectContaining({
+      toRecipients: ['pi1@example.edu'],
+      ccRecipients: [],
+      recipientContactIds: ['pi1'],
+    }));
+  });
+
+  test.each([
+    ['the account read throws', { primaryContact: 'liaison-inst' }, () => DynamicsService.queryRecords.mockRejectedValue(new Error('dataverse 503'))],
+    ['the Liaison contact read throws', {
+      contact: (id) => (id === 'liaison-inst' ? Promise.reject(new Error('403')) : Promise.resolve(contactRow(id))),
+    }, () => {}],
+    ['the found Liaison has no email', {
+      contact: (id) => Promise.resolve(id === 'liaison-inst' ? { ...contactRow(id), emailaddress1: null } : contactRow(id)),
+    }, () => {}],
+  ])('%s → the row is skipped this run, never created PI-only', async (_label, options, arrange) => {
+    wire(options);
+    arrange();
+    const res = mockRes();
+    await handler(req(), res);
+    expect(res.body.skippedNoRecipient).toBe(1);
+    expect(res.body.scheduled).toBe(0);
+    expect(scheduledEmailStore.createOrGetScheduledEmail).not.toHaveBeenCalled();
+  });
+
+  test('an account row missing its Primary Contact lookup skips the row, never PI-only', async () => {
+    wire();
+    DynamicsService.queryRecords.mockResolvedValue({ records: [{ accountid: ACCOUNT }], totalCount: 1, hasMore: false });
+    const res = mockRes();
+    await handler(req(), res);
+    expect(res.body.skippedNoRecipient).toBe(1);
+    expect(scheduledEmailStore.createOrGetScheduledEmail).not.toHaveBeenCalled();
+  });
+
+  test('an existing row with the same PD keeps its stored recipients (the documented gap)', async () => {
+    wire();
+    scheduledEmailStore.createOrGetScheduledEmail.mockResolvedValue({
+      id: 'scheduled-1', pd_systemuser_id: 'pd1', status: 'scheduled', cc_recipients: ['liaison-copy@example.edu'],
+    });
+    await handler(req(), mockRes());
+    expect(scheduledEmailStore.reassignScheduledEmail).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['the institution Liaison', 'liaison-inst', ['liaison-inst@example.edu']],
+    ['no Cc for none', null, []],
+  ])('a former PD\'s unsent row is rebuilt by the handoff with %s', async (_label, primaryContact, cc) => {
+    wire({ primaryContact });
+    scheduledEmailStore.createOrGetScheduledEmail.mockResolvedValue({ id: 'scheduled-1', pd_systemuser_id: 'pd-former', status: 'scheduled', version: 4 });
+    scheduledEmailStore.reassignScheduledEmail.mockResolvedValue({ id: 'scheduled-1' });
+    const res = mockRes();
+    await handler(req(), res);
+    expect(res.body.reassigned).toBe(1);
+    expect(scheduledEmailStore.reassignScheduledEmail).toHaveBeenCalledWith(expect.objectContaining({
+      pdSystemUserId: 'pd1',
+      toRecipients: ['pi1@example.edu'],
+      ccRecipients: cc,
+      // A5: fenced on the version the cron just read.
+      expectedVersion: 4,
+    }));
   });
 });

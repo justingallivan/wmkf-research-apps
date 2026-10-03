@@ -1,0 +1,43 @@
+{
+  "kind": "test-request-sandbox-rehearsal-manifest/v1",
+  "preparedAt": "2026-09-21T22:05:02.361Z",
+  "expiresAt": "2026-09-21T23:05:02.361Z",
+  "target": "https://orgd9e66399.crm.dynamics.com",
+  "values": {
+    "requestId": "46ff3ea9-8933-4f5d-91a9-3ee8ac54dad5",
+    "runId": "a62e6ed6-d794-4539-89c1-9723732d1d8d",
+    "testLabel": "Codex sandbox request factory rehearsal 2026-09-21 a62e6ed6",
+    "fiscalYear": "December 2099",
+    "meetingDate": "2099-12-01"
+  },
+  "expectedOrganization": {
+    "accountid": "537e3b60-c18f-ee11-8179-000d3a341e8f",
+    "name": "W. M. Keck Foundation"
+  },
+  "expectedRequestType": {
+    "label": "Grant",
+    "value": 100000000
+  },
+  "createBody": {
+    "akoya_requestid": "46ff3ea9-8933-4f5d-91a9-3ee8ac54dad5",
+    "akoya_applicantid@odata.bind": "/accounts(537e3b60-c18f-ee11-8179-000d3a341e8f)",
+    "akoya_title": "TEST: Codex sandbox request factory rehearsal 2026-09-21 a62e6ed6",
+    "akoya_fiscalyear": "December 2099",
+    "akoya_requesttype": 100000000,
+    "wmkf_meetingdate": "2099-12-01",
+    "wmkf_istestrequest": true,
+    "wmkf_testcreationrunid": "a62e6ed6-d794-4539-89c1-9723732d1d8d",
+    "wmkf_respondreminderenabled": false,
+    "wmkf_reviewduereminderenabled": false
+  },
+  "createBodySha256": "9a26cf4502a8cc7d89f12bde74635590c725161f4e7921189daf856dbd9484f0",
+  "invariants": {
+    "exactlyOneCreate": true,
+    "retryOnAmbiguousCreate": false,
+    "deleteOrReset": false,
+    "expectedPayments": 0,
+    "expectedRegardingEmails": 0,
+    "expectedDynamicsLocations": 1,
+    "expectedSharePointFiles": 0
+  }
+}

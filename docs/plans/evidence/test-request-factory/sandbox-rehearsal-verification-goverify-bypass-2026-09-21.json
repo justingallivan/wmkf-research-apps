@@ -1,0 +1,70 @@
+{
+  "kind": "test-request-sandbox-rehearsal-verification/v1",
+  "target": "https://orgd9e66399.crm.dynamics.com",
+  "verifiedAt": "2026-09-21T22:18:07Z",
+  "manifest": "sandbox-rehearsal-manifest-goverify-bypass-2026-09-21.json",
+  "rawCreateReceipt": "sandbox-rehearsal-create-receipt-goverify-bypass-2026-09-21.json",
+  "request": {
+    "requestId": "46ff3ea9-8933-4f5d-91a9-3ee8ac54dad5",
+    "requestNumber": "1000338",
+    "runId": "a62e6ed6-d794-4539-89c1-9723732d1d8d",
+    "createHttpStatus": 201,
+    "exists": true,
+    "title": "TEST: Codex sandbox request factory rehearsal 2026-09-21 a62e6ed6",
+    "applicantId": "537e3b60-c18f-ee11-8179-000d3a341e8f",
+    "payeeId": "537e3b60-c18f-ee11-8179-000d3a341e8f",
+    "isTestRequest": true,
+    "respondReminderEnabled": false,
+    "reviewDueReminderEnabled": false,
+    "phaseIIStatus": null,
+    "recommendedAmount": null,
+    "originalGrantAmount": null,
+    "requestedMeetingDate": "2099-12-01",
+    "readbackMeetingDate": "2024-12-13T00:00:00Z",
+    "requestedFiscalYear": "December 2099",
+    "readbackFiscalYear": "December 2099"
+  },
+  "goverifyBypass": {
+    "definitionId": "a5d850ee-e5b4-409c-a7e5-65ac82ff9ceb",
+    "name": "GOverify- check Publication 78 on create of a request record",
+    "temporarilyDeactivated": true,
+    "restored": true,
+    "restoredDefinitionStateCode": 1,
+    "restoredDefinitionStatusCode": 2,
+    "activeActivationCount": 1,
+    "inactiveHistoricalActivationCount": 1,
+    "note": "The raw receipt stopped before setting restored=true because its first post-restore assertion expected one total activation row. Read-only follow-up proved one current active activation plus the deactivated historical activation."
+  },
+  "sideEffectReadback": {
+    "sharePointDocumentLocationCount": 0,
+    "sharePointFilesInspected": false,
+    "paymentRowCount": 0,
+    "regardingEmailCount": 0,
+    "foundationAccountVersionUnchanged": true,
+    "foundationChildContactVersionsUnchanged": true
+  },
+  "sandboxBackgroundProcessing": {
+    "enabled": false,
+    "evidence": "Async operations created in the bounded attempt window were canceled with friendlymessage: The async operation was skipped because the org is in Disable Background Processing mode.",
+    "canceledRequestWorkflowsObserved": [
+      "WMKF_Update CA FTB Status on Org",
+      "wmkf_set Write Up Type on Create",
+      "WMKF_Set Request Status for Discretionary",
+      "WMKF_Set Co-PI Field on Contact",
+      "WMKF_Research Application Received Email Flow"
+    ]
+  },
+  "conclusions": [
+    "The app principal can create a marked sandbox Request and receive a server-assigned request number when GoVerify is bypassed.",
+    "The synchronous Copy Applicant to Payee workflow completed far enough to populate the payee with the Foundation account; it was not independently proven broken by the earlier rollback.",
+    "No payment, regarding email, Foundation account mutation, or Foundation child Contact mutation was observed.",
+    "The marker, run ID, fiscal year, request type, and both false reminder flags survived create readback.",
+    "The requested meeting date did not survive create processing and requires workflow or platform-owner explanation before a deterministic recipe can rely on it.",
+    "No Dynamics SharePoint document location appeared. Disabled sandbox background processing prevents this rehearsal from validating the expected asynchronous document/folder workflow, but does not by itself identify the location provisioner."
+  ],
+  "writes": [
+    "Temporarily deactivated and restored only the sandbox GoVerify workflow definition.",
+    "Created exactly one sandbox akoya_request row from the manifest.",
+    "No retry, delete, reset, email, payment, SharePoint file write, or production write was performed."
+  ]
+}

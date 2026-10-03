@@ -1,0 +1,222 @@
+{
+  "checkedAt": "2026-09-20T00:50:10.080Z",
+  "mode": "READ_ONLY_SYSTEM_METADATA",
+  "scope": "Derived activated request Create workflow registered owners only; not confirmation of current operator or suppression.",
+  "probe": "scripts/probe-test-request-platform.js",
+  "targets": [
+    {
+      "hostname": "wmkf.crm.dynamics.com",
+      "workflowStatus": 200,
+      "workflowComplete": true,
+      "workflows": [
+        {
+          "id": "be7c672e-6d74-ef11-a671-000d3a31a7f3",
+          "name": "WMKF_Set Payee Payment Contact from Request",
+          "registeredOwnerId": "e642f92d-3d99-ee11-be37-000d3a341fd9",
+          "registeredOwnerName": "Connor Noda",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        },
+        {
+          "id": "53058fb0-3c0d-ef11-9f89-000d3a32c1ae",
+          "name": "WMKF_Update Payment Contact from Org",
+          "registeredOwnerId": "ba8a6c09-cf7a-ee11-8179-00224802aaea",
+          "registeredOwnerName": "Bromelkamp Admin",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        },
+        {
+          "id": "441ef45a-e601-ef11-a1fd-000d3a32c1ae",
+          "name": "WMKF_Set Request Status for Discretionary",
+          "registeredOwnerId": "ba8a6c09-cf7a-ee11-8179-00224802aaea",
+          "registeredOwnerName": "Bromelkamp Admin",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        },
+        {
+          "id": "f850c8da-6cd9-ee11-904c-000d3a341fd9",
+          "name": "WMKF_Set Co-PI Field on Contact",
+          "registeredOwnerId": "ba8a6c09-cf7a-ee11-8179-00224802aaea",
+          "registeredOwnerName": "Bromelkamp Admin",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        },
+        {
+          "id": "aefffea8-93f6-472e-8904-4547603ee5ea",
+          "name": "Default a Request Title",
+          "registeredOwnerId": "0b877e9d-3283-ee11-8179-000d3a341e8f",
+          "registeredOwnerName": "# BCO akoyaGO Integration",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        },
+        {
+          "id": "8d12bcbf-5e5e-ef11-bfe3-6045bd06fb97",
+          "name": "WMKF_Create SoCal draft Phase II Ack",
+          "registeredOwnerId": "e642f92d-3d99-ee11-be37-000d3a341fd9",
+          "registeredOwnerName": "Connor Noda",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        },
+        {
+          "id": "6f8970a6-2c42-ef11-8409-6045bd0a120d",
+          "name": "WMK_Set Type for Roll up Field",
+          "registeredOwnerId": "ba8a6c09-cf7a-ee11-8179-00224802aaea",
+          "registeredOwnerName": "Bromelkamp Admin",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        },
+        {
+          "id": "e5182242-ebca-40f4-b936-a600248399bc",
+          "name": "Set GOapply Settings on Request",
+          "registeredOwnerId": "0b877e9d-3283-ee11-8179-000d3a341e8f",
+          "registeredOwnerName": "# BCO akoyaGO Integration",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        }
+      ]
+    },
+    {
+      "hostname": "orgd9e66399.crm.dynamics.com",
+      "workflowStatus": 200,
+      "workflowComplete": true,
+      "workflows": [
+        {
+          "id": "53058fb0-3c0d-ef11-9f89-000d3a32c1ae",
+          "name": "WMKF_Update Payment Contact from Org",
+          "registeredOwnerId": "ba8a6c09-cf7a-ee11-8179-00224802aaea",
+          "registeredOwnerName": "Bromelkamp Admin",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        },
+        {
+          "id": "441ef45a-e601-ef11-a1fd-000d3a32c1ae",
+          "name": "WMKF_Set Request Status for Discretionary",
+          "registeredOwnerId": "ba8a6c09-cf7a-ee11-8179-00224802aaea",
+          "registeredOwnerName": "Bromelkamp Admin",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        },
+        {
+          "id": "f850c8da-6cd9-ee11-904c-000d3a341fd9",
+          "name": "WMKF_Set Co-PI Field on Contact",
+          "registeredOwnerId": "ba8a6c09-cf7a-ee11-8179-00224802aaea",
+          "registeredOwnerName": "Bromelkamp Admin",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        },
+        {
+          "id": "18dc9f0c-3ada-ee11-904c-000d3a341fd9",
+          "name": "WMKF_Update CA FTB Status on Org",
+          "registeredOwnerId": "ba8a6c09-cf7a-ee11-8179-00224802aaea",
+          "registeredOwnerName": "Bromelkamp Admin",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        },
+        {
+          "id": "4f948fce-abb4-ee11-a569-000d3a341fd9",
+          "name": "WMKF_Research Application Received Email Flow",
+          "registeredOwnerId": "ba8a6c09-cf7a-ee11-8179-00224802aaea",
+          "registeredOwnerName": "Bromelkamp Admin",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        },
+        {
+          "id": "5d3b312c-f6f8-ee11-a1fd-000d3a3621c7",
+          "name": "wmkf_set Write Up Type on Create",
+          "registeredOwnerId": "ba8a6c09-cf7a-ee11-8179-00224802aaea",
+          "registeredOwnerName": "Bromelkamp Admin",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        },
+        {
+          "id": "aefffea8-93f6-472e-8904-4547603ee5ea",
+          "name": "Default a Request Title",
+          "registeredOwnerId": "0b877e9d-3283-ee11-8179-000d3a341e8f",
+          "registeredOwnerName": "# BCO akoyaGO Integration",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        },
+        {
+          "id": "a5d850ee-e5b4-409c-a7e5-65ac82ff9ceb",
+          "name": "GOverify- check Publication 78 on create of a request record",
+          "registeredOwnerId": "0b877e9d-3283-ee11-8179-000d3a341e8f",
+          "registeredOwnerName": "# BCO akoyaGO Integration",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        },
+        {
+          "id": "e5182242-ebca-40f4-b936-a600248399bc",
+          "name": "Set GOapply Settings on Request",
+          "registeredOwnerId": "0b877e9d-3283-ee11-8179-000d3a341e8f",
+          "registeredOwnerName": "# BCO akoyaGO Integration",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        },
+        {
+          "id": "0365b073-0a39-47b2-a6cf-ab5c0d7a1870",
+          "name": "Clear autopopulated high school and college fields",
+          "registeredOwnerId": "0b877e9d-3283-ee11-8179-000d3a341e8f",
+          "registeredOwnerName": "# BCO akoyaGO Integration",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        },
+        {
+          "id": "d2ba1503-67ae-4cbd-830d-b60c2c3fac6f",
+          "name": "Copy Applicant to Payee when Grant is Entered",
+          "registeredOwnerId": "0b877e9d-3283-ee11-8179-000d3a341e8f",
+          "registeredOwnerName": "# BCO akoyaGO Integration",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        },
+        {
+          "id": "49452247-fdfe-4f64-8348-fe47dad63bda",
+          "name": "Assign Budget FY per selected Budget",
+          "registeredOwnerId": "0b877e9d-3283-ee11-8179-000d3a341e8f",
+          "registeredOwnerName": "# BCO akoyaGO Integration",
+          "category": 0,
+          "state": 1,
+          "primaryentity": "akoya_request",
+          "triggeroncreate": true
+        }
+      ]
+    }
+  ]
+}

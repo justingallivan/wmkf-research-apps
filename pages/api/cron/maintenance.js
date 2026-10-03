@@ -227,6 +227,47 @@ export default async function handler(req, res) {
       results.portalUploadStaging = { error: error.message };
     }
 
+    // 7.6a. Durable presentation MP4 intents. Off/test rollout modes inspect,
+    // refresh, persist exact candidates, and alert only; destructive cleanup
+    // is possible only after access is deliberately set to on.
+    try {
+      results.presentationMaterialUploads = await withDalContext(
+        'maintenance-presentation-material-uploads',
+        () => MaintenanceService.cleanupPresentationMaterialUploads({}),
+      );
+      if (typeof results.presentationMaterialUploads?.deleted === 'number') {
+        totalDeleted += results.presentationMaterialUploads.deleted;
+      }
+    } catch (error) {
+      results.presentationMaterialUploads = { error: error.message };
+    }
+
+    // 7.6b. Reconcile known Meeting Tracker transcript publication receipts
+    // on the existing daily cadence. Exact identities only; no candidate
+    // deletion is attempted by this bounded verification pass.
+    try {
+      const { reconcileMeetingTranscriptPublicationsBatch } = await import(
+        '../../../lib/services/meeting-tracker-transcription/service'
+      );
+      results.meetingTranscriptPublications = await withDalContext(
+        'maintenance-meeting-transcript-publications',
+        () => reconcileMeetingTranscriptPublicationsBatch({ limit: 20 }),
+      );
+    } catch (error) {
+      results.meetingTranscriptPublications = { error: error.code || 'publication_reconcile_failed' };
+    }
+
+    // 7.6b. Test Request Factory artifact store (admin form): ready-run and
+    // unreserved artifacts and stale drafts only; never a resumable run's.
+    try {
+      results.factoryArtifacts = await MaintenanceService.sweepFactoryArtifacts();
+      if (typeof results.factoryArtifacts?.deleted === 'number') {
+        totalDeleted += results.factoryArtifacts.deleted;
+      }
+    } catch (error) {
+      results.factoryArtifacts = { error: error.message };
+    }
+
     // 7.7. Personalized scheduled-email audit/recovery ledger. Delete only
     // fully finalized sends and explicit stops; unresolved work is retained.
     try {

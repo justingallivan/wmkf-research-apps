@@ -31,6 +31,10 @@ import NotificationService from '../../../lib/services/notification-service';
 import { grantApps } from '../../../lib/services/app-access-service';
 import { reconcileProfile } from '../../../lib/services/dynamics-identity-service';
 import { withDalContext } from '../../../lib/dataverse/core/context';
+import {
+  getMeetingTranscriptionTestDeploymentProfile,
+  isMeetingTranscriptionTestStaffIdentity,
+} from '../../../lib/services/meeting-tracker-transcription/test-deployment-policy';
 
 // Entra External ID tenant uses the CIAM endpoint family, not the regular
 // `login.microsoftonline.com` family. The well-known doc anchors discovery
@@ -103,6 +107,28 @@ export const authOptions = {
      * otherwise match the disabled row and mint a live session).
      */
     async signIn({ user, account, profile }) {
+      const testDeployment = getMeetingTranscriptionTestDeploymentProfile(process.env);
+      if (testDeployment.dedicated) {
+        if (!testDeployment.enabled || !testDeployment.identityVerified) return false;
+        const azureId = isMeetingTranscriptionTestStaffIdentity({ account, profile, user });
+        if (!azureId) return false;
+        try {
+          const existing = await sql`
+            SELECT id, is_active FROM user_profiles WHERE azure_id = ${azureId} LIMIT 2
+          `;
+          if (existing.rows.length !== 1 || existing.rows[0].is_active !== true) return false;
+          const updated = await sql`
+            UPDATE user_profiles SET last_login_at = CURRENT_TIMESTAMP, last_used_at = CURRENT_TIMESTAMP
+            WHERE id = ${existing.rows[0].id} AND is_active = true
+            RETURNING id
+          `;
+          return updated.rows.length === 1;
+        } catch {
+          // The isolated profile never provisions, notifies, or reconciles identities.
+          return false;
+        }
+      }
+
       if (account?.provider === 'entra-external') {
         // Applicants: no provisioning step. The external tenant has already
         // verified identity (OTP); we just accept the result.

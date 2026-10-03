@@ -1,0 +1,20 @@
+{
+  "kind": "test-request-sandbox-rehearsal-receipt/v1",
+  "startedAt": "2026-09-21T22:07:51.806Z",
+  "target": "https://orgd9e66399.crm.dynamics.com",
+  "requestId": "46ff3ea9-8933-4f5d-91a9-3ee8ac54dad5",
+  "runId": "a62e6ed6-d794-4539-89c1-9723732d1d8d",
+  "createAttempted": true,
+  "createResponseStatus": 201,
+  "goverifyBypass": {
+    "workflowId": "a5d850ee-e5b4-409c-a7e5-65ac82ff9ceb",
+    "workflowName": "GOverify- check Publication 78 on create of a request record",
+    "originalVersionNumber": 5994021,
+    "deactivationAttemptedAt": "2026-09-21T22:07:53.870Z",
+    "restored": false,
+    "deactivatedAt": "2026-09-21T22:08:03.423Z",
+    "deactivatedVersionNumber": 56365899
+  },
+  "completedAt": "2026-09-21T22:08:13.444Z",
+  "error": "Expected one active GoVerify activation; found 1 active of 2."
+}

@@ -13,8 +13,10 @@ import {
 } from '../reviewer-search-logic';
 import { rankByRelevance } from '../../../../lib/utils/relevance-score';
 import { withReviewerProvenance } from '../../../../lib/utils/reviewer-provenance';
+import { normalizeReviewerName } from '../../../../lib/utils/reviewer-name-match';
 import { dedupeByName } from './candidateKeys';
-import { requestJson } from '../../../utils/api-request';
+import { readRosterSaveReceipt } from './rosterSaveReceipt';
+import { requestEnvelope } from '../../../utils/api-request';
 
 export default function useReviewerDiscovery({
   blobUrl,
@@ -47,10 +49,11 @@ export default function useReviewerDiscovery({
   setExcludedRemoved,
   setExportError,
   setBlockedReferredSeeds,
-  setRosterActive,
   setRosterIneligible,
-  setRosterNames,
   setRosterNote,
+  reloadRoster,
+  setRosterLoaded,
+  setRosterLoadFailed,
 }) {
   const runSearch = useCallback(async () => {
     const myGen = genRef.current;
@@ -245,10 +248,12 @@ export default function useReviewerDiscovery({
       ));
 
       setCandidates(eligibleCandidates);
-      setRosterIneligible((prev) => dedupeByName([
-        ...deceasedCandidates.map(pruneCandidateForRoster),
-        ...prev,
-      ]));
+      if (!requestId) {
+        setRosterIneligible((prev) => dedupeByName([
+          ...deceasedCandidates.map(pruneCandidateForRoster),
+          ...prev,
+        ]));
+      }
       // Stamp the stable candidate key NOW (like keyedKept above): the rescue
       // flow records the row on the roster and then confirms identity with
       // possibly-edited contact fields, and only a carried stamp keeps both
@@ -259,35 +264,110 @@ export default function useReviewerDiscovery({
         setEnrichNote('Contact lookup was incomplete — some cards may be missing emails or citation metrics.');
       }
 
-      // Durably record the surfaced candidates so they persist + dedup future
-      // runs. AWAIT it (don't fire-and-forget) and re-check genRef before trusting
-      // it as deduped — a slow POST must not clobber a newer search's roster
-      // (S224). Verified (Claude) + database discoveries only; unverified stay
-      // ephemeral. A failure degrades to "no dedup this run", never a broken panel.
+      // Record verified discoveries, then reload the retained roster. Indexed
+      // acknowledgments correlate inputs; only GET determines durable buckets
+      // and future search exclusions. Unverified suggestions stay ephemeral.
+      // Both awaits are generation-guarded so an older run cannot replace a new
+      // proposal's state; uncertain outcomes use read recovery, never POST replay.
       if (dedupedEnriched.length > 0 && requestId) {
+        const pruned = dedupedEnriched.map(pruneCandidateForRoster);
+        let postResponse = null;
         try {
-          const pruned = dedupedEnriched.map(pruneCandidateForRoster);
-          const prunedEligible = pruned.filter((candidate) => candidate.eligibilityStatus !== 'deceased');
-          const prunedIneligible = pruned.filter((candidate) => candidate.eligibilityStatus === 'deceased');
-          await requestJson('/api/workbench/reviewer-roster', {
+          postResponse = await requestEnvelope('/api/workbench/reviewer-roster', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ requestId, candidates: pruned }),
+            body: { requestId, candidates: pruned },
             tolerantBody: true,
             fallbackMessage: 'reviewer-roster save failed',
           });
-          if (genRef.current !== myGen) return; // newer search started — don't touch roster state
-          // Merge into the existing active roster (prior runs persist), pruned
-          // DTOs deduped by normalized name.
-          setRosterActive((prev) => dedupeByName([...prunedEligible, ...prev]));
-          setRosterIneligible((prev) => dedupeByName([...prunedIneligible, ...prev]));
-          setRosterNames((prev) => Array.from(new Set([...prev, ...dedupedEnriched.map((c) => c.name)])));
-          setRosterNote(null);
-        } catch {
-          if (genRef.current === myGen) setRosterNote("Couldn't save this search to the request — these candidates may re-appear on a future search.");
+        } catch { /* a transport failure has an unknown write outcome; reconcile below */ }
+        if (genRef.current !== myGen) return;
+
+        const receipt = postResponse?.ok === true
+          ? readRosterSaveReceipt(postResponse.data, pruned.length)
+          : null;
+        let rosterSnapshot = null;
+        try {
+          rosterSnapshot = await reloadRoster(myGen);
+        } catch { /* stale/failed read is reported below */ }
+        if (genRef.current !== myGen) return;
+
+        if (!rosterSnapshot) {
+          setRosterLoaded(false);
+          setRosterLoadFailed(true);
+          setCandidates([]);
+          setSelected(new Set());
+          setRosterNote('Could not confirm all search saves because reviewer state could not be reloaded. Retry reviewer state before searching.');
+        } else {
+          setRosterLoaded(true);
+          setRosterLoadFailed(false);
+          const rowsByKey = new Map();
+          const rowsInOtherBuckets = new Set();
+          for (const bucket of ['active', 'excluded', 'ineligible', 'blocked', 'handled']) {
+            for (const row of Array.isArray(rosterSnapshot[bucket]) ? rosterSnapshot[bucket] : []) {
+              const key = row?.candidateKey;
+              if (typeof key !== 'string' || !key) continue;
+              if (bucket === 'active') rowsByKey.set(key, row);
+              else rowsInOtherBuckets.add(key);
+            }
+          }
+          for (const key of Array.isArray(rosterSnapshot.savedKeys) ? rosterSnapshot.savedKeys : []) {
+            if (typeof key === 'string' && key) rowsInOtherBuckets.add(key);
+          }
+          const allNames = new Set((Array.isArray(rosterSnapshot.allNames) ? rosterSnapshot.allNames : [])
+            .map(normalizeReviewerName).filter(Boolean));
+          const candidatesForCurrentRun = [];
+          const warnings = new Set();
+
+          if (!receipt) {
+            // No trustworthy input-to-key mapping exists. The authoritative GET
+            // still replaces saved state, but no fresh card can shadow it.
+            setCandidates([]);
+            setSelected(new Set());
+            setRosterNote('Could not confirm all search saves. Reviewer state was reloaded; run a new search to continue.');
+          } else {
+            for (let inputIndex = 0; inputIndex < dedupedEnriched.length; inputIndex += 1) {
+              const candidate = dedupedEnriched[inputIndex];
+              const outcome = receipt.outcomes[inputIndex];
+              const key = outcome.candidateKey;
+              const isDeceased = deceasedCandidates.includes(candidate);
+              if (outcome.status === 'failed' || outcome.status === 'invalid') warnings.add(inputIndex);
+              const activeRow = key ? rowsByKey.get(key) : null;
+              if (activeRow) {
+                if (!isDeceased) candidatesForCurrentRun.push(activeRow);
+                else warnings.add(inputIndex);
+                continue;
+              }
+              if (key && rowsInOtherBuckets.has(key)) continue;
+
+              const normalizedName = normalizeReviewerName(candidate?.name);
+              const nameAlreadySurfaced = normalizedName && allNames.has(normalizedName);
+              if (nameAlreadySurfaced) {
+                if (outcome.status === 'recorded' || outcome.status === 'unchanged') warnings.add(inputIndex);
+                continue;
+              }
+
+              if (outcome.status === 'failed' && !isDeceased && key) {
+                // Keep a new failed row as an ephemeral card. The key is the
+                // server's correlation key, while saved state remains GET-only.
+                candidatesForCurrentRun.push({ ...candidate, candidateKey: key });
+                warnings.add(inputIndex);
+                continue;
+              }
+              if (isDeceased || outcome.status === 'recorded' || outcome.status === 'unchanged') {
+                warnings.add(inputIndex);
+              }
+            }
+            setCandidates(candidatesForCurrentRun);
+            if (warnings.size > 0) {
+              setRosterNote(`${warnings.size} search result${warnings.size === 1 ? '' : 's'} could not be confirmed in the request roster. Run another search to rediscover unsaved candidates.`);
+            } else {
+              setRosterNote(null);
+            }
+          }
         }
       }
-      // Keep `phase` busy until the roster write settles. Otherwise a user can
+      // Keep `phase` busy until the roster write and readback settle. Otherwise a user can
       // remove prior results while this POST is still in flight, and the two
       // operations can replace client roster state with competing snapshots.
       if (genRef.current !== myGen) return;
@@ -305,7 +385,7 @@ export default function useReviewerDiscovery({
     } finally {
       if (runningRef.current === myGen) runningRef.current = null;
     }
-  }, [blobUrl, requestId, excludeText, rosterNames, savedPoolNames, rosterLoaded, removingPrevious, searchSources, noSourcesSelected, reviewerCount, additionalNotes, referredSeedsText, referredBy, runningRef, genRef, pushProgress, setPhase, setError, setErrorMeta, setProgress, setCandidates, setUnverified, setIdentityComparison, setSelected, setPromotionNotice, setEnrichNote, setAnalysis, setExcludedRemoved, setExportError, setBlockedReferredSeeds, setRosterActive, setRosterIneligible, setRosterNames, setRosterNote]);
+  }, [blobUrl, requestId, excludeText, rosterNames, savedPoolNames, rosterLoaded, removingPrevious, searchSources, noSourcesSelected, reviewerCount, additionalNotes, referredSeedsText, referredBy, runningRef, genRef, pushProgress, setPhase, setError, setErrorMeta, setProgress, setCandidates, setUnverified, setIdentityComparison, setSelected, setPromotionNotice, setEnrichNote, setAnalysis, setExcludedRemoved, setExportError, setBlockedReferredSeeds, setRosterIneligible, setRosterNote, setRosterLoaded, setRosterLoadFailed, reloadRoster]);
 
   return { runSearch };
 }

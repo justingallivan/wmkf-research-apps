@@ -1,0 +1,11 @@
+{
+  "kind": "test-request-sandbox-rehearsal-receipt/v1",
+  "startedAt": "2026-09-21T21:34:42.624Z",
+  "target": "https://orgd9e66399.crm.dynamics.com",
+  "requestId": "235c3354-945d-4c14-988e-81fa3ff4ca7c",
+  "runId": "2709893a-11b6-48ec-8a04-2af3a7c87a07",
+  "createAttempted": true,
+  "createResponseStatus": 400,
+  "completedAt": "2026-09-21T21:35:02.804Z",
+  "error": "single Request create failed (400): {\"error\":{\"code\":\"0x80040265\",\"message\":\"The remote server returned an error: (500) Internal Server Error.\"}}"
+}

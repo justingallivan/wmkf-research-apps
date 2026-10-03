@@ -7,6 +7,7 @@ import ToolbarSelect from '../ToolbarSelect';
 import ScopeSegment from '../workbench/ScopeSegment';
 import MaterialsStatusPill from './MaterialsStatusPill';
 import { classifySiteVisitMaterialsStatus, MATERIALS_STATUS_FILTERS } from '../../utils/site-visit-materials-status';
+import TestRequestBadge from '../TestRequestBadge';
 
 const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
   weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
@@ -46,6 +47,7 @@ export function MeetingTrackerRequestRow({ proposal, cycleCode, programId }) {
         <div className="min-w-0 w-full sm:w-auto sm:flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold text-gray-900">#{proposal.requestNumber}</h2>
+            <TestRequestBadge isTestRequest={proposal.isTestRequest} />
             {proposal.needsScheduling && (
               <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">Needs scheduling</span>
             )}
@@ -60,9 +62,9 @@ export function MeetingTrackerRequestRow({ proposal, cycleCode, programId }) {
           <Link href={sessionHref} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
             {proposal.deliberation ? 'Open session' : 'Schedule session'}
           </Link>
-          <Link href={visitHref} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
+          <a href={visitHref} data-full-page-navigation="true" className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
             {proposal.siteVisit ? 'Edit visit' : 'Schedule visit'}
-          </Link>
+          </a>
         </div>
       </div>
 
@@ -130,11 +132,12 @@ export default function MeetingTrackerList() {
     setNotices([]);
     try {
       const query = new URLSearchParams();
+      query.set('projection', 'schedule');
       if (selectedProgramId) query.set('programId', selectedProgramId);
       if (selectedCycleCode) query.set('cycleCode', selectedCycleCode);
       if (selectedScope === 'all') query.set('scope', 'all');
       const needsPicker = Boolean(selectedCycleCode) && cyclesRef.current.length === 0;
-      const pickerQuery = new URLSearchParams();
+      const pickerQuery = new URLSearchParams({ projection: 'schedule' });
       if (selectedProgramId) pickerQuery.set('programId', selectedProgramId);
       const [dashboardEnvelope, sessionsEnvelope, pickerEnvelope] = await Promise.all([
         requestEnvelope(`/api/meeting-tracker/dashboard${query.size ? `?${query}` : ''}`, { tolerantBody: true }),

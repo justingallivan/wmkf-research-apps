@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { requestJson } from '../../utils/api-request';
 import { Card } from '../Layout';
 import ArtifactFileMetadata from './ArtifactFileMetadata';
+import TestRequestBadge from '../TestRequestBadge';
 
 export const INITIAL_ASSESSMENTS_EXCLUDED_CYCLE = 'D26';
 
@@ -85,6 +86,7 @@ export default function InitialAssessmentsPanel({ cycleCode, loadingCycles }) {
                     {artifact.requestNumber ? `#${artifact.requestNumber}` : artifact.requestId}
                     {artifact.title ? ` — ${artifact.title}` : ''}
                   </Link>
+                  <TestRequestBadge isTestRequest={artifact.isTestRequest} className="ml-2" />
                   {artifact.institution && <p className="text-sm text-gray-600 mt-1">{artifact.institution}</p>}
                   {artifact.programDirector && <p className="text-xs text-gray-500 mt-1">PD: {artifact.programDirector}</p>}
                 </div>

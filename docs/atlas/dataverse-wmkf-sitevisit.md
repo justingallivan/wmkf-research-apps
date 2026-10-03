@@ -4,7 +4,7 @@ domain: dataverse
 kind: source-of-truth
 status: canonical
 owner: product-engineering
-last_verified: 2026-09-14
+last_verified: 2026-09-29
 related:
   - docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md
   - docs/API_ROUTE_SECURITY_MATRIX.md
@@ -63,17 +63,31 @@ fallback.
 
 - **[PRODUCTION-LIVE 2026-09-24 via PR #335 / `407ca908d`:]** Meeting Tracker's
   visit GET offers read-only applicant attendee suggestions from the Request Project Leader and
-  liaison (Request Primary Contact, or applicant Account Org Primary Contact when blank).
+  liaison. For Research the liaison is the Liaison of record, the applicant Account's Primary
+  Contact only (`lib/services/contacts/request-liaison.js`; the Request copy is not used); other
+  programs keep the Request Primary Contact, or the Account's Primary Contact when it is blank.
   `SiteVisitEditor` fills distinct missing attendees on new-visit forms; saved visits instead show
   missing applicants as one-click Add suggestions and preserve recorded attendees. The Activity
   and its parties change only when staff click Save. The Tracker GET explicitly opts into these
   contact reads; the Workbench logistics GET continues to return only visit and materials data.
-- **[VERIFIED IN SOURCE 2026-09-10 on `codex/meeting-tracker`.]** The Meeting
-  Tracker cycle list is a read-only consumer. Its dashboard service calls
-  `site-visit.js::findActiveByRequests(requestIds)` for the bounded cycle join,
-  rejects duplicate active visits, and reads each selected activity through the
-  existing adapter to display date, time, format, and location. Slice 2 does not
-  add a Site Visit writer; that editor remains the separately scoped slice 2b.
+- **[SOURCE-BUILT / OFFLINE-TESTED 2026-10-02; NOT DEPLOYED.]** The Meeting
+  Tracker dashboard retains its legacy default and `projection=full` / `legacy`
+  aliases: those call `findActiveByRequests(requestIds)` and hydrate each
+  selected activity through `getById`, while keeping the Workbench reviewer
+  rollup in the response. The cycle list and Session Editor opt into
+  `projection=schedule`, which uses the shared Workbench eligibility selection
+  without calculating reviewer progress, then calls the additive
+  `findActiveSummariesByRequests(requestIds)` adapter. That reader deduplicates
+  request GUIDs case-insensitively, chunks them at 25, follows every Dataverse
+  page via `queryAllRecords`, and selects only activity/request IDs, start/end,
+  and schema-ready format/location fields. It never expands ActivityParty.
+  Duplicate rows still choose the earliest scheduled end and retain the
+  reconciliation notice; no per-visit `getById` follows the summary read.
+  A capped summary result (including the exact 5,000-row boundary) returns 503
+  in schedule mode rather than treating missing rows as no visit. The existing
+  `findActiveByRequests` behavior remains in use by this consumer's legacy path
+  and the Staff Deliberations cycle view below. Slice 2 does not add a Site
+  Visit writer; that editor remains the separately scoped slice 2b.
 - `listPreSiteVisitDrafts` (`lib/services/pre-site-visit/cycle-list-service.js`,
   PC Meeting Tracker slice 3, 2026-09-09) is a READ-ONLY multi-request
   consumer for the Staff Deliberations cycle view: `site-visit.js::

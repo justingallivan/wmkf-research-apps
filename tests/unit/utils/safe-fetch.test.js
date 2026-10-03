@@ -43,6 +43,8 @@ describe('safeFetch', () => {
     'https://serpapi.com/search',
     'https://chemrxiv.org/engage/api-gateway/chemrxiv/items',
     'https://api.vercel.com/v1/projects',
+    'https://api.assemblyai.com/v2/transcript',
+    'https://api.eu.assemblyai.com/v2/transcript',
     'https://api.nsf.gov/services/v1/awards.json',
     'https://api.reporter.nih.gov/v2/projects/search',
     'https://appriver3651007194.sharepoint.com/sites/akoyaGO',
@@ -51,6 +53,13 @@ describe('safeFetch', () => {
   it.each(allowedUrls)('allows %s', async (url) => {
     await safeFetch(url);
     expect(fetch).toHaveBeenCalledWith(url, { redirect: 'manual' });
+  });
+
+  it('fetches the canonical URL object href after validating the parsed host', async () => {
+    await safeFetch('https://api.anthropic.com/v1/messages path');
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.anthropic.com/v1/messages%20path', { redirect: 'manual' },
+    );
   });
 
   // -- Blocked hosts --
@@ -62,6 +71,7 @@ describe('safeFetch', () => {
     ['arbitrary external', 'https://evil.com/steal'],
     ['similar-sounding host', 'https://not-api.anthropic.com/v1/messages'],
     ['subdomain attack', 'https://api.anthropic.com.evil.com/v1/messages'],
+    ['AssemblyAI sibling host', 'https://foo.api.assemblyai.com/v2/transcript'],
   ];
 
   it.each(blockedUrls)('blocks %s (%s)', async (_label, url) => {
@@ -78,6 +88,38 @@ describe('safeFetch', () => {
   it('rejects invalid URLs', async () => {
     await expect(safeFetch('not-a-url')).rejects.toThrow();
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects URL credentials even when the hostname is allowlisted', async () => {
+    await expect(safeFetch('https://user:pass@api.anthropic.com/v1/messages'))
+      .rejects.toThrow('URL credentials are not allowed');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-default HTTPS ports even when the hostname is allowlisted', async () => {
+    await expect(safeFetch('https://api.anthropic.com:8443/v1/messages'))
+      .rejects.toThrow('HTTPS port 443 required');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('accepts an explicit default HTTPS port and fetches its canonical URL', async () => {
+    await safeFetch('https://api.anthropic.com:443/v1/messages');
+    expect(fetch).toHaveBeenCalledWith('https://api.anthropic.com/v1/messages', { redirect: 'manual' });
+  });
+
+  it('does not forward an authenticated request body across an allowed-host redirect', async () => {
+    fetch
+      .mockResolvedValueOnce(mockRedirect(307, 'https://api.openai.com/v1/chat/completions'))
+      .mockResolvedValueOnce({ ok: true, status: 200 });
+
+    await expect(safeFetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST', headers: { authorization: 'Bearer secret', 'x-api-key': 'secret' }, body: 'prompt',
+    })).rejects.toThrow('cross-origin redirect not allowed');
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith('https://api.anthropic.com/v1/messages', expect.objectContaining({
+      method: 'POST', body: 'prompt', redirect: 'manual',
+    }));
   });
 
   // -- Options pass-through --
@@ -100,6 +142,34 @@ describe('safeFetch', () => {
 
     expect(res.status).toBe(200);
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('follows a relative redirect on the same origin', async () => {
+    fetch
+      .mockResolvedValueOnce(mockRedirect(302, '/v1.0/users'))
+      .mockResolvedValueOnce({ ok: true, status: 200 });
+    await safeFetch('https://graph.microsoft.com/v1.0/me');
+    expect(fetch).toHaveBeenNthCalledWith(2, 'https://graph.microsoft.com/v1.0/users', { redirect: 'manual' });
+  });
+
+  it('rejects an unauthenticated cross-origin GET redirect', async () => {
+    fetch.mockResolvedValueOnce(mockRedirect(302, 'https://appriver3651007194.sharepoint.com/file'));
+    await expect(safeFetch('https://graph.microsoft.com/v1.0/content'))
+      .rejects.toThrow('cross-origin redirect not allowed');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('validates credentials and ports on redirect targets before following them', async () => {
+    fetch.mockResolvedValueOnce(mockRedirect(302, 'https://user:pass@api.anthropic.com/next'));
+    await expect(safeFetch('https://api.anthropic.com/start'))
+      .rejects.toThrow('URL credentials are not allowed');
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    fetch.mockReset();
+    fetch.mockResolvedValueOnce(mockRedirect(302, 'https://api.anthropic.com:8443/next'));
+    await expect(safeFetch('https://api.anthropic.com/start'))
+      .rejects.toThrow('HTTPS port 443 required');
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it('blocks redirects to non-allowed hosts', async () => {
@@ -147,6 +217,18 @@ describe('safeFetch', () => {
     const res = await safeFetch('https://graph.microsoft.com/v1.0/me');
     expect(res.status).toBe(302);
   });
+
+  it('returns a redirect without following it when failOnRedirect is true', async () => {
+    fetch.mockResolvedValueOnce(mockRedirect(307, 'https://api.assemblyai.com/v2/steal'));
+    const response = await safeFetch('https://api.assemblyai.com/v2/transcript', {
+      method: 'POST', headers: { authorization: 'secret' }, body: '{}', failOnRedirect: true,
+    });
+    expect(response.status).toBe(307);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledWith('https://api.assemblyai.com/v2/transcript', {
+      method: 'POST', headers: { authorization: 'secret' }, body: '{}', redirect: 'manual',
+    });
+  });
 });
 
 describe('isAllowedUrl', () => {
@@ -162,6 +244,11 @@ describe('isAllowedUrl', () => {
 
   it('returns false for HTTP', () => {
     expect(isAllowedUrl('http://api.anthropic.com/v1/messages')).toBe(false);
+  });
+
+  it('returns false for credentials and non-default HTTPS ports', () => {
+    expect(isAllowedUrl('https://user:pass@api.anthropic.com/v1/messages')).toBe(false);
+    expect(isAllowedUrl('https://api.anthropic.com:8443/v1/messages')).toBe(false);
   });
 
   it('returns false for malformed URLs', () => {

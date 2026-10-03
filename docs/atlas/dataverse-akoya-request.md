@@ -28,6 +28,19 @@ after two HTTP 400 / `0x80040216` attempts, which left the view unchanged and
 did not call `PublishXml`. This is platform configuration metadata, not
 application-owned request state.
 
+**Related automation metadata entities:** `workflows` and
+`sdkmessageprocessingsteps` are read-only inputs to
+`scripts/probe-test-request-platform.js`. [VERIFIED via complete bounded
+Production/sandbox metadata census 2026-09-20 and the controlled sandbox
+rehearsals 2026-09-21] They inventory visible classic/cloud process definitions
+and registered request/location plug-in steps; they are not runtime application
+state. Runtime application code does not write them. The bounded rehearsal
+operator temporarily changed only the sandbox GoVerify workflow definition's
+state around one authorized Request POST and restored it. The first create
+rolled back in GoVerify; the bypassed create produced Request 1000338 and a
+server number, but no document location while sandbox background processing was
+disabled. See `docs/plans/CONNOR_TEST_REQUEST_FACTORY_HANDOFF_2026-09-19.md`.
+
 ## Key fields (live, sample-probed 2026-05-07)
 
 Identity / status:
@@ -52,7 +65,7 @@ Money / dates:
 People (lookups):
 - `akoya_applicantid` → `accounts`
 - `akoya_payee` → `accounts`
-- `akoya_primarycontactid` → `contacts`
+- `akoya_primarycontactid` → `contacts` (the Request's own copy of the Primary Contact; for Research the Liaison of record is the applicant account's `primarycontactid`, resolved by `lib/services/contacts/request-liaison.js`)
 - `wmkf_projectleader`, `wmkf_researchleader`, `wmkf_ceo` → `contacts`
 - `wmkf_copi1..5` → `contacts` (legacy 5-slot Co-PI roster — superseded by `wmkf_apprequestperson` junction since S139; intake portal pilot will extend that junction with `wmkf_effortpct` / `wmkf_biosketchurl` / `wmkf_lineorder` and expand `wmkf_role` to PI / Co-PI / Senior Personnel / Key Personnel / Other per 2026-05-14 schema review)
 - `wmkf_potentialreviewer1..5` → `wmkf_potentialreviewers` (legacy slots — actual reviewer state lives in `wmkf_appreviewersuggestion`; the slots remain a read-only source of prior-request recognition context for an exact server-resolved reviewer)

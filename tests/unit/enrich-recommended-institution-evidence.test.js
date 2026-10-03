@@ -60,7 +60,7 @@ jest.mock('../../lib/services/reviewer-time-budget', () => ({
 jest.mock('../../lib/services/reviewer-request-context', () => ({
   loadReviewerRequestContext: jest.fn(),
 }));
-jest.mock('../../shared/components/reviewers/reviewer-search-logic', () => ({
+jest.mock('../../shared/utils/reviewer-roster-projection', () => ({
   APPLICANT_ENRICHMENT_CACHE_VERSION: 4, pruneCandidateForRoster: jest.fn(),
 }));
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
@@ -69,7 +69,7 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
 jest.mock('../../lib/services/workbench/applicant-known-reviewer-service', () => ({
   loadApplicantKnownReviewerContext: jest.fn(),
 }));
-jest.mock('../../lib/utils/safe-fetch', () => ({ safeFetch: jest.fn() }));
+jest.mock('../../lib/utils/public-blob-fetch', () => ({ fetchPublicBlob: jest.fn() }));
 
 import {
   institutionEvidenceConnectsIdentity,

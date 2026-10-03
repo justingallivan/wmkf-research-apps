@@ -19,8 +19,9 @@
  */
 
 // withAuth(fn, options) → expose both for direct invocation.
+jest.mock('next-auth/jwt', () => ({ getToken: jest.fn() }));
 jest.mock('next-auth/middleware', () => ({
-  withAuth: (proxyFn, options) => ({ proxyFn, options }),
+  withAuth: jest.fn((proxyFn, options) => Object.assign(jest.fn(proxyFn), { proxyFn, options })),
 }));
 
 // NextResponse.next({ request: { headers } }) → a captureable response object.
@@ -34,11 +35,16 @@ jest.mock('next/server', () => ({
   },
 }));
 
-import proxyExport from '../../proxy';
+import { withAuth } from 'next-auth/middleware';
+import { config as proxyConfig } from '../../proxy';
 import { _resetWarningsForTests } from '../../lib/utils/auth-policy';
 
-const { proxyFn, options } = proxyExport;
+const { proxyFn, options } = withAuth.mock.results[0].value;
 const authorized = options.callbacks.authorized;
+
+test('outer proxy covers every path before applying profile-specific exceptions', () => {
+  expect(proxyConfig.matcher).toEqual(['/:path*']);
+});
 
 // jest.setup.js replaces global.crypto with an encryption-only mock that lacks
 // getRandomValues (the Web Crypto primitive proxy.js uses for the nonce).
@@ -54,12 +60,15 @@ beforeAll(() => {
 });
 
 const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
+const ORIGINAL_VERCEL_ENV = process.env.VERCEL_ENV;
 beforeEach(() => {
   nextCalls.length = 0;
   _resetWarningsForTests();
 });
 afterEach(() => {
   process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+  if (ORIGINAL_VERCEL_ENV === undefined) delete process.env.VERCEL_ENV;
+  else process.env.VERCEL_ENV = ORIGINAL_VERCEL_ENV;
 });
 
 // A request whose headers Next would clone. The CSP fn reads req.headers via
@@ -152,6 +161,63 @@ describe('proxy CSP function', () => {
     const styleSrc = res.headers.get('Content-Security-Policy')
       .split('; ').find(d => d.startsWith('style-src'));
     expect(styleSrc).toContain("'unsafe-inline'");
+  });
+
+  test('the exact production Meeting Tracker visit page can connect to Microsoft upload origins', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'production';
+    const requestId = '11111111-1111-4111-8111-111111111111';
+    const upload = proxyFn(makeReq({}, `https://applications.example/meeting-tracker/visits/${requestId}`));
+    const connectSrc = upload.headers.get('Content-Security-Policy')
+      .split('; ').find(d => d.startsWith('connect-src'));
+    expect(connectSrc).toContain('https://*.up.1drv.com');
+    expect(connectSrc).toContain('https://appriver3651007194.sharepoint.com');
+
+    for (const url of [
+      `https://applications.example/meeting-tracker/visits/${requestId}/extra`,
+      'https://applications.example/meeting-tracker/visits/',
+      'https://applications.example/meeting-tracker',
+    ]) {
+      const sibling = proxyFn(makeReq({}, url));
+      expect(sibling.headers.get('Content-Security-Policy')).not.toContain('up.1drv.com');
+    }
+  });
+
+  test('the exact materials-only presentation page can load Microsoft media in every deployment', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'production';
+    const page = proxyFn(makeReq({}, 'https://applications.example/external/presentation/token'));
+    const mediaSrc = page.headers.get('Content-Security-Policy')
+      .split('; ').find(d => d.startsWith('media-src'));
+    expect(mediaSrc).toBe("media-src 'self' https://appriver3651007194.sharepoint.com");
+    for (const url of [
+      'https://applications.example/external/presentation/',
+      'https://applications.example/external/presentation/token/extra',
+      'https://applications.example/external/presentationish/token',
+    ]) {
+      expect(proxyFn(makeReq({}, url)).headers.get('Content-Security-Policy')).not.toContain('media-src');
+    }
+  });
+
+  test('retired proof paths receive no Microsoft CSP exception in Preview', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'preview';
+
+    const uploadProof = proxyFn(makeReq(
+      {},
+      'https://preview.example/meeting-tracker/presentation-media-proof',
+    ));
+    const uploadCsp = uploadProof.headers.get('Content-Security-Policy');
+    expect(uploadCsp).not.toContain('https://*.up.1drv.com');
+    expect(uploadCsp).not.toContain('https://appriver3651007194.sharepoint.com');
+
+    const playbackProof = proxyFn(makeReq(
+      {},
+      'https://preview.example/external/presentation-media-proof/token',
+    ));
+    const playbackCsp = playbackProof.headers.get('Content-Security-Policy');
+    expect(playbackCsp).not.toContain('media-src');
+    expect(playbackCsp).not.toContain('https://appriver3651007194.sharepoint.com');
   });
 
   test('successive requests get distinct nonces', () => {

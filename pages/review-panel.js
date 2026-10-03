@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Layout, { Button, Card, PageHeader } from '../shared/components/Layout';
 import RequireAuth from '../shared/components/RequireAuth';
+import TestRequestBadge from '../shared/components/TestRequestBadge';
 
 import {
   EMPTY_ARRAY, POLL_MS, toId, asSet, launchSelectionSignature, makeIdempotencyKey, deriveLaunchState,
@@ -227,7 +228,10 @@ export function ReviewPanelWorkspace() {
                 {candidates.map((candidate) => (
                   <li key={candidate.requestId} className="flex items-center gap-3 py-2">
                     <input type="checkbox" aria-label={`Include request ${candidate.requestNumber}`} checked={selectedIds.has(toId(candidate.requestId))} onChange={() => toggleIncluded(toId(candidate.requestId))} className="h-4 w-4" />
-                    <span className="flex-1 text-sm text-gray-800">#{candidate.requestNumber} — {candidate.title}</span>
+                    <span className="flex flex-1 flex-wrap items-center gap-2 text-sm text-gray-800">
+                      <span>#{candidate.requestNumber} — {candidate.title}</span>
+                      <TestRequestBadge isTestRequest={candidate.isTestRequest} />
+                    </span>
                   </li>
                 ))}
               </ul>

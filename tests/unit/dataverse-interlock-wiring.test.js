@@ -191,4 +191,47 @@ describe('dataverse/client.js call()', () => {
     await expect(client.post('/contacts', { name: 'x' })).resolves.toMatchObject({ dryRun: true, ok: true });
     expect(global.fetch).not.toHaveBeenCalled();
   });
+
+  test('opt-in request options pass an abort signal and await fetch settlement', async () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'off';
+    const controller = new AbortController();
+    let fetchSignal;
+    global.fetch = jest.fn((_url, options) => {
+      fetchSignal = options.signal;
+      return new Promise((_resolve, reject) => {
+        fetchSignal.addEventListener('abort', () => reject(fetchSignal.reason), { once: true });
+      });
+    });
+    const client = createClient({ resourceUrl: 'https://someorg.crm.dynamics.com', token: 't' });
+    const pending = client.postWithOptions('/contacts', { name: 'fixture' }, {}, {
+      signal: controller.signal,
+      timeoutMs: 5_000,
+    });
+    await Promise.resolve();
+    controller.abort(new Error('test cancellation'));
+
+    await expect(pending).rejects.toThrow('test cancellation');
+    expect(fetchSignal.aborted).toBe(true);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('opt-in timeout cancels fetch while existing methods keep no timeout signal by default', async () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'off';
+    let capturedOptions;
+    global.fetch = jest.fn(async (_url, options) => {
+      capturedOptions = options;
+      if (options.signal) {
+        return new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true });
+        });
+      }
+      return { ok: true, status: 204, text: async () => '' };
+    });
+    const client = createClient({ resourceUrl: 'https://someorg.crm.dynamics.com', token: 't' });
+
+    await expect(client.postWithOptions('/contacts', { name: 'fixture' }, {}, { timeoutMs: 15 }))
+      .rejects.toHaveProperty('name', 'TimeoutError');
+    await client.post('/contacts', { name: 'fixture' });
+    expect(capturedOptions).not.toHaveProperty('signal');
+  });
 });

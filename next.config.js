@@ -2,6 +2,7 @@ const {
   LEGACY_HOST,
   CANONICAL_HOST,
 } = require('./lib/utils/legacy-host-redirect');
+const { withWorkflow } = require('workflow/next');
 
 const securityHeaders = [
   {
@@ -86,6 +87,63 @@ const nextConfig = {
   outputFileTracingIncludes: {
     '/api/review-manager/export-reviews': ['./shared/templates/reviews/*.docx'],
     '/api/cron/send-review-thankyous': ['./shared/templates/reviews/*.docx'],
+    // music-metadata is loaded by a Worker whose entrypoint is resolved at
+    // runtime, so NFT cannot discover this dependency graph from route imports.
+    // Include the worker entry and its dynamic parser dependencies in both
+    // transcription routes that perform inspection/processing.
+    '/api/admin/transcription-pilot/jobs/*': [
+      './lib/services/transcription-pilot/audio-inspector-worker.js',
+      './node_modules/music-metadata/**/*',
+      './node_modules/@borewit/text-codec/**/*',
+      './node_modules/@tokenizer/**/*',
+      './node_modules/content-type/**/*',
+      './node_modules/debug/**/*',
+      './node_modules/ms/**/*',
+      './node_modules/file-type/**/*',
+      './node_modules/media-typer/**/*',
+      './node_modules/strtok3/**/*',
+      './node_modules/token-types/**/*',
+      './node_modules/ieee754/**/*',
+      './node_modules/uint8array-extras/**/*',
+      './node_modules/win-guid/**/*',
+    ],
+    '/api/cron/drain-transcriptions': [
+      './lib/services/transcription-pilot/audio-inspector-worker.js',
+      './node_modules/music-metadata/**/*',
+      './node_modules/@borewit/text-codec/**/*',
+      './node_modules/@tokenizer/**/*',
+      './node_modules/content-type/**/*',
+      './node_modules/debug/**/*',
+      './node_modules/ms/**/*',
+      './node_modules/file-type/**/*',
+      './node_modules/media-typer/**/*',
+      './node_modules/strtok3/**/*',
+      './node_modules/token-types/**/*',
+      './node_modules/ieee754/**/*',
+      './node_modules/uint8array-extras/**/*',
+      './node_modules/win-guid/**/*',
+    ],
+    // The generated Workflow flow route executes durable media-inspection
+    // steps, whose worker/parser imports are resolved at runtime.
+    '/.well-known/workflow/v1/flow': [
+      './lib/services/transcription-pilot/audio-inspector-worker.js',
+      './tests/fixtures/transcription/synthetic-aac.m4a',
+      './node_modules/music-metadata/**/*',
+      './node_modules/@borewit/text-codec/**/*',
+      './node_modules/@tokenizer/**/*',
+      './node_modules/content-type/**/*',
+      './node_modules/debug/**/*',
+      './node_modules/ms/**/*',
+      './node_modules/file-type/**/*',
+      './node_modules/media-typer/**/*',
+      './node_modules/strtok3/**/*',
+      './node_modules/token-types/**/*',
+      './node_modules/ieee754/**/*',
+      './node_modules/uint8array-extras/**/*',
+      './node_modules/win-guid/**/*',
+    ],
+    // Only Confirm (POST /runs) reaches the ledger schema check, which reads these at runtime.
+    '/api/admin/test-requests/runs': ['./lib/db/ledger-schema-fingerprint.json', './lib/db/ledger-schema-ahead.json'],
   },
   async redirects() {
     return [
@@ -129,6 +187,32 @@ const nextConfig = {
         ],
       },
       {
+        source: '/external/presentation/:path*',
+        headers: [
+          {
+            key: 'Referrer-Policy',
+            value: 'no-referrer',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'private, no-store, max-age=0',
+          },
+        ],
+      },
+      {
+        source: '/api/external/presentation/:path*',
+        headers: [
+          {
+            key: 'Referrer-Policy',
+            value: 'no-referrer',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'private, no-store, max-age=0',
+          },
+        ],
+      },
+      {
         // The Cycle Dossier page previews an edition PDF in a same-origin
         // iframe; the global DENY would blank it. Later rules override
         // earlier ones for the same header key. Still no cross-site framing.
@@ -144,4 +228,4 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig
+module.exports = withWorkflow(nextConfig)

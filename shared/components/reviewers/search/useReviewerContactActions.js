@@ -9,6 +9,7 @@ import {
   pruneCandidateForRoster,
 } from '../reviewer-search-logic';
 import { candKey, dedupeByName } from './candidateKeys';
+import { readRosterSaveReceipt } from './rosterSaveReceipt';
 import { requestEnvelope } from '../../../utils/api-request';
 
 export default function useReviewerContactActions({
@@ -83,9 +84,10 @@ export default function useReviewerContactActions({
     setRosterActive((prev) => prev.map(apply));
   }, [setCandidates, setRecCandidates, setRosterActive]);
 
-  const applyAuthoritativeRosterCandidate = useCallback((key, candidate) => {
+  const applyAuthoritativeRosterCandidate = useCallback((key, candidate, aliases = []) => {
     if (!key || !candidate) return;
-    const replace = (current) => (candKey(current) === key ? candidate : current);
+    const keys = new Set([key, ...aliases].filter(Boolean));
+    const replace = (current) => (keys.has(candKey(current)) ? candidate : current);
     setCandidates((prev) => prev.map(replace));
     setRecCandidates((prev) => prev.map(replace));
     setRosterActive((prev) => prev.map(replace));
@@ -302,8 +304,9 @@ export default function useReviewerContactActions({
     // An unverified Claude suggestion is ephemeral — it was never recorded on
     // the durable roster (S224), but confirm_identity only updates an existing
     // ACTIVE roster row. Record it first so the attestation has a row to bind
-    // to; recordSurfaced upserts, so a re-run after a partial failure is safe.
+    // to; require an exact server acknowledgment before the identity PATCH.
     const wasUnverified = unverified.some((u) => candKey(u) === key);
+    let rosterCandidateKey = key;
     if (wasUnverified) {
       const { ok: recordOk, data: recordData } = await requestEnvelope('/api/workbench/reviewer-roster', {
         method: 'POST',
@@ -311,14 +314,21 @@ export default function useReviewerContactActions({
         body: JSON.stringify({ requestId, candidates: [pruneCandidateForRoster(cand)] }),
         tolerantBody: true,
       });
-      if (!recordOk || !recordData.success) {
-        throw new Error(recordData.error || 'Could not add this suggestion to the request roster. Please retry.');
-      }
       if (genRef.current !== myGen) return false;
+      const receipt = readRosterSaveReceipt(recordData, 1);
+      const outcome = receipt?.outcomes[0];
+      if (!recordOk || !receipt?.success || receipt.recorded !== 1
+        || outcome?.status !== 'recorded' || !outcome.candidateKey) {
+        throw new Error(recordData?.error || 'Could not confirm this suggestion in the request roster. Please retry.');
+      }
+      // Server-side pruning can legitimately rebind a key when browser-only
+      // anchors were stripped. Use only the exact key returned for this singleton.
+      rosterCandidateKey = outcome.candidateKey;
     }
     const confirmedCandidate = {
       ...cand,
       ...updates,
+      candidateKey: rosterCandidateKey,
       emailSource: 'manual',
       websiteSource: updates.website ? 'manual' : null,
       affiliationSource: 'staff_manual',
@@ -336,10 +346,10 @@ export default function useReviewerContactActions({
       body: JSON.stringify({ requestId, action: 'confirm_identity', candidate: confirmedCandidate }),
       tolerantBody: true,
     });
+    if (genRef.current !== myGen) return false;
     if (!ok || !data.success || !data.confirmationId) {
       throw new Error(data.error || 'Could not record identity confirmation. Please retry.');
     }
-    if (genRef.current !== myGen) return false;
     const authoritativeConfirmed = data.candidate || confirmedCandidate;
     // The confirmation write has already committed. Keep that server truth in
     // the card even if the following address-evidence write fails and the modal
@@ -349,9 +359,12 @@ export default function useReviewerContactActions({
       // ephemeral Unverified section so the confirmed card renders (and stays
       // rescuable through the normal needs-identity-review machinery).
       setUnverified((prev) => prev.filter((u) => candKey(u) !== key));
-      setRosterActive((prev) => dedupeByName([authoritativeConfirmed, ...prev]));
+      setRosterActive((prev) => dedupeByName([
+        authoritativeConfirmed,
+        ...prev.filter((candidate) => ![key, rosterCandidateKey].includes(candKey(candidate))),
+      ]));
     }
-    applyAuthoritativeRosterCandidate(key, authoritativeConfirmed);
+    applyAuthoritativeRosterCandidate(rosterCandidateKey, authoritativeConfirmed, [key]);
     return verifyAddressContact(authoritativeConfirmed, updates, evidence);
   }, [requestId, genRef, unverified, verifyAddressContact, applyAuthoritativeRosterCandidate, setUnverified, setRosterActive]);
   return {

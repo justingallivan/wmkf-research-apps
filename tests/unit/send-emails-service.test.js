@@ -76,7 +76,7 @@ jest.mock('../../lib/services/grant-cycles-dataverse', () => ({
   findByShortCode: (...a) => findByShortCode(...a),
 }));
 jest.mock('../../lib/utils/cycle-code', () => ({ meetingDateToCycleCode: jest.fn(() => CYCLE_CODE) }));
-jest.mock('../../lib/utils/safe-fetch', () => ({ safeFetch: jest.fn(), isAllowedUrl: jest.fn(() => false) }));
+jest.mock('../../lib/utils/public-blob-fetch', () => ({ fetchPublicBlob: jest.fn(), isPublicBlobUrl: jest.fn(() => false) }));
 jest.mock('../../lib/utils/uploaded-blob', () => ({ readUploadedBlobBuffer: jest.fn(async () => Buffer.from('PDF')) }));
 jest.mock('../../lib/utils/cycle-material-ref', () => ({
   isPrivateCycleMaterialPathname: (p) => typeof p === 'string' && p.startsWith('cycle-materials/'),
@@ -1600,5 +1600,53 @@ describe('send-emails-service — Stage 6D draft fingerprint', () => {
     expect(getPersonById).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
       select: expect.stringContaining('wmkf_organizationname'),
     }));
+  });
+});
+
+describe('send-emails-service — Test Request isolation (Stage 1b)', () => {
+  afterEach(() => { delete process.env.TEST_REQUEST_ISOLATION; });
+
+  test('with the switch on, a reviewer email whose request cannot be resolved is refused, not sent unlinked', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    REQUEST = { ...REQUEST, akoya_requestid: null };
+    const emitted = await run({ drafts: [followupDraft(SUG_OK)], templateType: 'followup' });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(resultOf(emitted).failed).toEqual([
+      expect.objectContaining({
+        suggestionId: SUG_OK,
+        error: 'The request for this reviewer could not be resolved, so the email was not sent.',
+      }),
+    ]);
+  });
+
+  test('with the switch on, a test request is refused before any reviewer-token mint', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    REQUEST = { ...REQUEST, wmkf_istestrequest: true, wmkf_testcreationrunid: '22222222-2222-4222-8222-222222222222' };
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(resultOf(emitted).failed).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, code: 'test_request_reviewer_email_unbound' }),
+    ]);
+  });
+
+  test('a Request changing at the send-time binding check is a definite non-send', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    mintAndStore.mockImplementationOnce(async () => {
+      REQUEST = { ...REQUEST, wmkf_istestrequest: true, wmkf_testcreationrunid: '22222222-2222-4222-8222-222222222222' };
+      return { jwt: 'aaa.bbb.ccc' };
+    });
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'invitation' });
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(resultOf(emitted).unconfirmed).toEqual([]);
+    expect(resultOf(emitted).failed).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, code: 'test_request_reviewer_email_unbound' }),
+    ]);
+  });
+
+  test('with the switch off, behavior is unchanged', async () => {
+    REQUEST = { ...REQUEST, akoya_requestid: null };
+    await run({ drafts: [followupDraft(SUG_OK)], templateType: 'followup' });
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
   });
 });

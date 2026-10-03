@@ -65,6 +65,23 @@ describe('getRequestSharePointBuckets (golden path)', () => {
     )).rejects.toThrow(/Unable to verify the request SharePoint parent library/);
   });
 
+  test('strict snapshot mode rejects more request locations than the bounded page', async () => {
+    jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({
+      records: Array.from({ length: 10 }, (_, index) => ({
+        relativeurl: `Proposals/R-1000-${index}`,
+        _parentsiteorlocation_value: `parent-${index}`,
+      })),
+      totalCount: 11,
+      hasMore: true,
+    });
+
+    await expect(getRequestSharePointBuckets(
+      REQUEST_ID,
+      REQUEST_NUM,
+      { requireResolvedParents: true, requireCompleteResults: true },
+    )).rejects.toThrow(/more than 10 rows/);
+  });
+
   test('missing requestId throws', async () => {
     await expect(getRequestSharePointBuckets(null, REQUEST_NUM)).rejects.toThrow('requestId is required');
   });

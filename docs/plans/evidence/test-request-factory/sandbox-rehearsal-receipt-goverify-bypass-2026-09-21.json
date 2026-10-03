@@ -1,0 +1,21 @@
+{
+  "kind": "test-request-sandbox-rehearsal-receipt/v1",
+  "startedAt": "2026-09-21T22:05:23.414Z",
+  "target": "https://orgd9e66399.crm.dynamics.com",
+  "requestId": "46ff3ea9-8933-4f5d-91a9-3ee8ac54dad5",
+  "runId": "a62e6ed6-d794-4539-89c1-9723732d1d8d",
+  "createAttempted": false,
+  "createResponseStatus": null,
+  "goverifyBypass": {
+    "workflowId": "efc7d476-6985-ee11-8179-000d3a341b5a",
+    "workflowName": "GOverify- check Publication 78 on create of a request record",
+    "originalVersionNumber": 5993991,
+    "deactivationAttemptedAt": "2026-09-21T22:05:25.956Z",
+    "restored": true,
+    "restoreWasAlreadyActive": true,
+    "restoredAt": "2026-09-21T22:05:28.052Z",
+    "restoredVersionNumber": 5993991
+  },
+  "completedAt": "2026-09-21T22:05:28.052Z",
+  "error": "GoVerify workflow state change failed (400): {\"error\":{\"code\":\"0x80045003\",\"message\":\"Cannot update a workflow activation.\"}}"
+}

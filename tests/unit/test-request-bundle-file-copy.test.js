@@ -1,0 +1,824 @@
+/** @jest-environment node */
+import crypto from 'node:crypto';
+import JSZip from 'jszip';
+import { jest } from '@jest/globals';
+import {
+  BUNDLE_MAX_AGE_MS,
+  SANDBOX_REHEARSAL_COPY_POLICY,
+  assertBundleFresh,
+  classifyUploadError,
+  copyBundleFiles,
+  copyPolicyDigest,
+  planBundleFileCopies,
+  reconcileJournaledCopies,
+  reverifyCopiedItems,
+  verifyCopiedFiles,
+} from '../../lib/services/test-requests/bundle-file-copy.js';
+import { TEST_REQUEST_PREVIEW_READ_LIMITS } from '../../lib/services/test-requests/admin-preview-service.js';
+import { renderInitialAssessmentDocx } from '../../lib/services/initial-assessment/template.js';
+import { SYNTHETIC_GENERATED } from '../../lib/services/test-requests/fixtures/initial-assessment-synthetic.js';
+import { XLSX_MIME, buildMinimalXlsx, buildXlsxCopyFixtures, customProperty, customPropertiesXml } from '../helpers/minimal-xlsx-package.js';
+
+const SITE = { key: 'akoyago-shared', hostname: 'appriver3651007194.sharepoint.com', pathname: '/sites/akoyago' };
+const TARGET = { ...SITE, registered: true };
+const SITE_ID = 'site-1';
+const REQUEST_DRIVE = 'drive-request';
+const ARCHIVE_DRIVE = 'drive-archive';
+const REQUEST_FOLDER = '1000400_AAAAAAAAAAAA4AAA8AAAAAAAAAAAAAAA';
+
+const bytes = (text) => Buffer.from(text);
+const hash = (buffer) => crypto.createHash('sha256').update(buffer).digest('hex');
+const NARRATIVE = bytes('narrative bytes');
+const PROPOSAL = bytes('proposal bytes');
+
+function doc(over = {}) {
+  return {
+    id: 'inv-1',
+    kind: 'proposalNarrative',
+    library: 'akoya_request',
+    folder: '1003222_E43AE6EA/AI Materials',
+    name: 'ProposalNarrative_1003222.pdf',
+    driveId: 'stale-drive',
+    graphItemId: 'item-1',
+    sharePointSite: SITE,
+    size: NARRATIVE.length,
+    mimeType: 'application/pdf',
+    eTag: '"etag-1"',
+    versionId: '3.0',
+    contentHash: hash(NARRATIVE),
+    ...over,
+  };
+}
+const proposalDoc = () => doc({
+  id: 'inv-2', kind: 'reviewerProposal', folder: '1003222_E43AE6EA/Reviewer Materials',
+  name: 'Proposal_1003222.pdf', graphItemId: 'item-2', size: PROPOSAL.length,
+  eTag: '"etag-2"', versionId: null, contentHash: hash(PROPOSAL), library: 'wmkf_archive',
+});
+const bundle = (documents = [doc(), proposalDoc()]) => ({
+  source: { request: { akoya_requestnum: '1003222' } },
+  documents,
+});
+
+function fakeDependencies(overrides = {}) {
+  const contents = { 'item-1': NARRATIVE, 'item-2': PROPOSAL };
+  const destination = new Map(); // "folder/filename" -> item
+  const calls = [];
+  const deps = {
+    clearGraphCaches: jest.fn(() => calls.push('clear')),
+    configuredSharePointTarget: jest.fn(() => TARGET),
+    getSiteId: jest.fn(async () => SITE_ID),
+    getDriveId: jest.fn(async (library) => (library === 'akoya_request' ? REQUEST_DRIVE : ARCHIVE_DRIVE)),
+    getFileMetadataById: jest.fn(async (driveId, itemId) => {
+      if (itemId === 'item-1') return { id: 'item-1', name: 'ProposalNarrative_1003222.pdf', size: NARRATIVE.length, mimeType: 'application/pdf', eTag: '"etag-1"', versionId: '3.0' };
+      if (itemId === 'item-2') return { id: 'item-2', name: 'Proposal_1003222.pdf', size: PROPOSAL.length, mimeType: 'application/pdf', eTag: '"etag-2"', versionId: '1.0' };
+      for (const item of destination.values()) if (item.id === itemId) return item;
+      return null;
+    }),
+    downloadFile: jest.fn(async (driveId, itemId) => {
+      if (contents[itemId]) return { buffer: contents[itemId] };
+      for (const item of destination.values()) if (item.id === itemId) return { buffer: item.buffer };
+      throw new Error('missing');
+    }),
+    getFileMetadataByPath: jest.fn(async (library, folder, filename) => destination.get(`${folder}/${filename}`) ?? null),
+    ensureFolderPath: jest.fn(async (library, folder) => { calls.push(`folder:${folder}`); return { id: `folder:${folder}` }; }),
+    // Production-shaped: the PUT commits, the created identity is handed to
+    // onItemCreated, then the Graph layer performs its own metadata read-back
+    // (which `readbackFailure` can make throw after the create committed).
+    uploadFile: jest.fn(async (library, folder, filename, buffer, mimeType, options) => {
+      calls.push(`upload:${folder}/${filename}`);
+      const item = { id: `new-${filename}`, name: filename, size: buffer.length, mimeType, eTag: '"new"', versionId: '1.0', buffer };
+      destination.set(`${folder}/${filename}`, item);
+      if (options?.onItemCreated) await options.onItemCreated({ id: item.id, name: filename, size: buffer.length, eTag: item.eTag });
+      calls.push(`upload-readback:${filename}`);
+      if (deps.readbackFailure) throw deps.readbackFailure;
+      return { id: item.id, name: filename, size: buffer.length, eTag: item.eTag, versionId: '1.0' };
+    }),
+    ...overrides,
+  };
+  return { deps, destination, calls };
+}
+
+const params = (plannedFiles) => ({
+  plannedFiles, requestFolder: REQUEST_FOLDER, expectedSiteId: SITE_ID, expectedDestinationDriveId: REQUEST_DRIVE,
+});
+
+describe('planBundleFileCopies', () => {
+  test('keeps numbered destinations as templates until the request number is known', () => {
+    const plan = planBundleFileCopies(bundle());
+    expect(plan.map((file) => file.destination)).toEqual([
+      { library: 'akoya_request', folder: 'AI Materials', filename: null, filenameTemplate: 'ProposalNarrative_{new-request-number}.pdf' },
+      { library: 'akoya_request', folder: 'Reviewer Materials', filename: null, filenameTemplate: 'Proposal_{new-request-number}.pdf' },
+    ]);
+    expect(plan[0].source.graphItemId).toBe('item-1');
+    expect(plan[0].source.sharePointSite).toEqual(SITE);
+  });
+
+  test('resolves numbered filenames to the destination request number', () => {
+    const plan = planBundleFileCopies(bundle(), { destinationRequestNumber: '1000400' });
+    expect(plan.map((file) => file.destination.filename)).toEqual(['ProposalNarrative_1000400.pdf', 'Proposal_1000400.pdf']);
+  });
+
+  test('refuses a document whose name does not match its kind', () => {
+    expect(() => planBundleFileCopies(bundle([doc({ name: 'Other.pdf' })]))).toThrow(/blocked/);
+  });
+});
+
+describe('sandbox rehearsal copy policy and bundle freshness', () => {
+  test('is a named executor policy, not the preview read ceilings object, with a stable digest', () => {
+    expect(SANDBOX_REHEARSAL_COPY_POLICY).not.toBe(TEST_REQUEST_PREVIEW_READ_LIMITS);
+    expect(SANDBOX_REHEARSAL_COPY_POLICY.version).toBe('sandbox-rehearsal-2026-09-23');
+    expect(Object.isFrozen(SANDBOX_REHEARSAL_COPY_POLICY)).toBe(true);
+    expect(copyPolicyDigest()).toMatch(/^[0-9a-f]{64}$/);
+    expect(copyPolicyDigest({ ...SANDBOX_REHEARSAL_COPY_POLICY, maxFiles: 8 })).not.toBe(copyPolicyDigest());
+  });
+
+  test('rejects a document the policy does not admit', () => {
+    expect(() => planBundleFileCopies(bundle([doc({ size: SANDBOX_REHEARSAL_COPY_POLICY.maxFileBytes + 1 })]))).toThrow(/FILE_SIZE_EXCEEDED/);
+    expect(() => planBundleFileCopies(bundle([doc({ mimeType: 'image/png' })]))).toThrow(/FILE_TYPE_UNSUPPORTED/);
+  });
+
+  // Codex adversarial round 1: a `proposalNarrative` document carrying a
+  // DOCX-shaped MIME type under its ordinary `.pdf`-named destination must
+  // still be refused -- proving the DOCX/msword MIME widening this policy
+  // briefly carried (with no kind<->extension<->MIME binding or magic-byte
+  // check) is fully reverted, not just its version string.
+  test('a proposalNarrative document with a DOCX MIME type under a .pdf destination is refused (Codex round 1 probe)', () => {
+    expect(() => planBundleFileCopies(bundle([doc({
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    })]))).toThrow(/FILE_TYPE_UNSUPPORTED/);
+    expect(() => planBundleFileCopies(bundle([doc({ mimeType: 'application/msword' })]))).toThrow(/FILE_TYPE_UNSUPPORTED/);
+    expect(SANDBOX_REHEARSAL_COPY_POLICY.allowedMimeTypes).not.toContain('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    expect(SANDBOX_REHEARSAL_COPY_POLICY.allowedMimeTypes).not.toContain('application/msword');
+  });
+
+  test('accepts a recent export and rejects stale or future-dated bundles', () => {
+    const now = Date.parse('2026-09-24T04:00:00Z');
+    expect(assertBundleFresh({ exportedAt: '2026-09-24T03:30:00Z' }, now)).toBe(Date.parse('2026-09-24T03:30:00Z') + BUNDLE_MAX_AGE_MS);
+    expect(() => assertBundleFresh({ exportedAt: new Date(now - BUNDLE_MAX_AGE_MS - 1000).toISOString() }, now)).toThrow(/older than/);
+    expect(() => assertBundleFresh({ exportedAt: new Date(now + 10 * 60 * 1000).toISOString() }, now)).toThrow(/in the future/);
+    expect(() => assertBundleFresh({ exportedAt: 'nope' }, now)).toThrow(/invalid/);
+  });
+});
+
+describe('classifyUploadError', () => {
+  test.each([
+    [{ status: 409 }, 'conflict'],
+    [{ status: 400 }, 'rejected'],
+    [{ status: 403 }, 'rejected'],
+    [{ status: 408 }, 'ambiguous'],
+    [{ status: 429 }, 'ambiguous'],
+    [{ status: 503 }, 'ambiguous'],
+    [{ name: 'AbortError' }, 'ambiguous'],
+  ])('%o -> %s', (error, expected) => {
+    expect(classifyUploadError(error)).toBe(expected);
+  });
+});
+
+describe('copyBundleFiles', () => {
+  test('copies each file create-only after journaling, re-resolving drives and verifying bytes', async () => {
+    const { deps, calls } = fakeDependencies();
+    const journal = jest.fn(async (copies) => calls.push(`journal:${copies.map((c) => `${c.status}:${c.outcome ?? '-'}:${c.uploadAttempted ? 'u' : ''}`).join(',')}`));
+    const plan = planBundleFileCopies(bundle(), { destinationRequestNumber: '1000400' });
+    const copies = await copyBundleFiles(params(plan), deps, journal);
+
+    expect(copies.map((c) => [c.status, c.outcome, c.destination.folder, c.destination.filename])).toEqual([
+      ['verified', 'created', `${REQUEST_FOLDER}/AI Materials`, 'ProposalNarrative_1000400.pdf'],
+      ['verified', 'created', `${REQUEST_FOLDER}/Reviewer Materials`, 'Proposal_1000400.pdf'],
+    ]);
+    expect(copies[0].item.id).toBe('new-ProposalNarrative_1000400.pdf');
+    expect(copies[1].sourceDriveId).toBe(ARCHIVE_DRIVE);
+    expect(copies[1].destinationDriveId).toBe(REQUEST_DRIVE);
+    expect(copies[0]).not.toHaveProperty('file');
+
+    // Destination journaled before any Graph write; upload attempt journaled before each PUT.
+    const firstUpload = calls.indexOf(`upload:${REQUEST_FOLDER}/AI Materials/ProposalNarrative_1000400.pdf`);
+    const firstFolder = calls.indexOf(`folder:${REQUEST_FOLDER}/AI Materials`);
+    expect(calls[0]).toMatch(/^journal:planned:-:,planned:-:$/);
+    expect(firstFolder).toBeGreaterThan(0);
+    expect(calls.slice(0, firstFolder).filter((c) => c.startsWith('journal')).length).toBeGreaterThanOrEqual(3);
+    expect(calls[firstUpload - 1]).toMatch(/^journal:planned:-:u,/);
+    expect(deps.uploadFile).toHaveBeenCalledTimes(2);
+    for (const call of deps.uploadFile.mock.calls) {
+      expect(call[5]).toEqual({
+        conflictBehavior: 'fail', siteId: SITE_ID, driveId: REQUEST_DRIVE, onItemCreated: expect.any(Function),
+      });
+    }
+    expect(deps.clearGraphCaches).toHaveBeenCalledTimes(2);
+    expect(deps.getDriveId).toHaveBeenCalledWith('wmkf_archive', { siteId: SITE_ID });
+    // Source bytes and destination bytes were both downloaded and hashed.
+    expect(deps.downloadFile).toHaveBeenCalledTimes(4);
+  });
+
+  test('refuses on source eTag drift without writing', async () => {
+    const { deps } = fakeDependencies();
+    const base = deps.getFileMetadataById;
+    deps.getFileMetadataById = jest.fn(async (driveId, itemId) => ({ ...(await base(driveId, itemId)), eTag: '"changed"' }));
+    const plan = planBundleFileCopies(bundle([doc()]), { destinationRequestNumber: '1000400' });
+    const journal = jest.fn(async () => {});
+    await expect(copyBundleFiles(params(plan), deps, journal)).rejects.toThrow(/changed since export \(eTag\)/);
+    expect(deps.uploadFile).not.toHaveBeenCalled();
+    expect(deps.ensureFolderPath).not.toHaveBeenCalled();
+    expect(journal.mock.calls.at(-1)[0][0].status).toBe('failed');
+  });
+
+  test('refuses on source SHA-256 mismatch without writing', async () => {
+    const { deps } = fakeDependencies();
+    deps.downloadFile = jest.fn(async () => ({ buffer: bytes('different but same length') }));
+    const plan = planBundleFileCopies(bundle([doc({ size: 'different but same length'.length })]), { destinationRequestNumber: '1000400' });
+    const base = deps.getFileMetadataById;
+    deps.getFileMetadataById = jest.fn(async (d, i) => ({ ...(await base(d, i)), size: 'different but same length'.length }));
+    await expect(copyBundleFiles(params(plan), deps, jest.fn(async () => {}))).rejects.toThrow(/SHA-256 does not match/);
+    expect(deps.uploadFile).not.toHaveBeenCalled();
+  });
+
+  test('refuses when the site or drive is not the preflight identity', async () => {
+    const plan = planBundleFileCopies(bundle([doc()]), { destinationRequestNumber: '1000400' });
+    const other = fakeDependencies({ getSiteId: jest.fn(async () => 'site-other') });
+    await expect(copyBundleFiles(params(plan), other.deps, jest.fn(async () => {}))).rejects.toThrow(/site identity changed/);
+    const drive = fakeDependencies({ getDriveId: jest.fn(async () => 'drive-other') });
+    await expect(copyBundleFiles(params(plan), drive.deps, jest.fn(async () => {}))).rejects.toThrow(/Destination drive identity changed/);
+    const site = fakeDependencies({ configuredSharePointTarget: jest.fn(() => ({ ...TARGET, pathname: '/sites/other' })) });
+    await expect(copyBundleFiles(params(plan), site.deps, jest.fn(async () => {}))).rejects.toThrow(/registered akoyaGO site/);
+    expect(other.deps.uploadFile).not.toHaveBeenCalled();
+    expect(drive.deps.uploadFile).not.toHaveBeenCalled();
+    expect(site.deps.uploadFile).not.toHaveBeenCalled();
+  });
+
+  test('refuses a preexisting destination before uploading', async () => {
+    const { deps, destination } = fakeDependencies();
+    destination.set(`${REQUEST_FOLDER}/AI Materials/ProposalNarrative_1000400.pdf`, { id: 'stranger', size: 1, eTag: '"x"' });
+    const plan = planBundleFileCopies(bundle([doc()]), { destinationRequestNumber: '1000400' });
+    const journal = jest.fn(async () => {});
+    await expect(copyBundleFiles(params(plan), deps, journal)).rejects.toThrow(/already exists; refusing/);
+    expect(deps.uploadFile).not.toHaveBeenCalled();
+    expect(journal.mock.calls.at(-1)[0][0]).toMatchObject({ status: 'failed', outcome: 'conflict', recoveryItem: { id: 'stranger' } });
+  });
+
+  test('a receipt failure right before the PUT blocks the upload', async () => {
+    const { deps } = fakeDependencies();
+    const plan = planBundleFileCopies(bundle([doc()]), { destinationRequestNumber: '1000400' });
+    const journal = jest.fn(async (copies) => {
+      if (copies[0].uploadAttempted) throw new Error('disk full');
+    });
+    await expect(copyBundleFiles(params(plan), deps, journal)).rejects.toThrow(/disk full/);
+    expect(deps.uploadFile).not.toHaveBeenCalled();
+  });
+
+  test('a 409 conflict refuses and never retries', async () => {
+    const { deps } = fakeDependencies();
+    deps.uploadFile = jest.fn(async () => { throw Object.assign(new Error('graph failed (409)'), { status: 409 }); });
+    const plan = planBundleFileCopies(bundle([doc()]), { destinationRequestNumber: '1000400' });
+    const journal = jest.fn(async () => {});
+    await expect(copyBundleFiles(params(plan), deps, journal)).rejects.toThrow(/409/);
+    expect(deps.uploadFile).toHaveBeenCalledTimes(1);
+    expect(journal.mock.calls.at(-1)[0][0]).toMatchObject({ status: 'failed', outcome: 'conflict', uploadErrorStatus: 409 });
+  });
+
+  test('an ambiguous upload is recovered only by exact item with matching bytes', async () => {
+    const { deps, destination } = fakeDependencies();
+    deps.uploadFile = jest.fn(async (library, folder, filename, buffer) => {
+      destination.set(`${folder}/${filename}`, { id: 'server-side', name: filename, size: buffer.length, eTag: '"s"', versionId: '1.0', buffer });
+      throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+    });
+    const plan = planBundleFileCopies(bundle([doc()]), { destinationRequestNumber: '1000400' });
+    const journal = jest.fn(async () => {});
+    const copies = await copyBundleFiles(params(plan), deps, journal);
+    expect(copies[0]).toMatchObject({ status: 'verified', outcome: 'recovered', recoveredByExactItem: true, item: { id: 'server-side' } });
+    expect(deps.uploadFile).toHaveBeenCalledTimes(1);
+  });
+
+  test('an ambiguous upload with a size-mismatched item is not recovered and not retried', async () => {
+    const { deps, destination } = fakeDependencies();
+    deps.uploadFile = jest.fn(async (library, folder, filename) => {
+      destination.set(`${folder}/${filename}`, { id: 'partial', name: filename, size: 3, eTag: '"p"', buffer: bytes('abc') });
+      throw Object.assign(new Error('graph failed (503)'), { status: 503 });
+    });
+    const plan = planBundleFileCopies(bundle([doc()]), { destinationRequestNumber: '1000400' });
+    const journal = jest.fn(async () => {});
+    await expect(copyBundleFiles(params(plan), deps, journal)).rejects.toThrow(/ambiguous outcome and no matching item/);
+    expect(deps.uploadFile).toHaveBeenCalledTimes(1);
+    expect(journal.mock.calls.at(-1)[0][0]).toMatchObject({ status: 'failed', outcome: 'ambiguous-unrecovered', recoveryItem: { id: 'partial', size: 3 } });
+  });
+
+  test('an ambiguous upload with nothing at the path is not retried', async () => {
+    const { deps } = fakeDependencies();
+    deps.uploadFile = jest.fn(async () => { throw new Error('socket hang up'); });
+    const plan = planBundleFileCopies(bundle([doc()]), { destinationRequestNumber: '1000400' });
+    await expect(copyBundleFiles(params(plan), deps, jest.fn(async () => {}))).rejects.toThrow(/do not retry/);
+    expect(deps.uploadFile).toHaveBeenCalledTimes(1);
+  });
+
+  test('stops at the first failure and leaves later files planned', async () => {
+    const { deps } = fakeDependencies();
+    deps.uploadFile = jest.fn(async () => { throw Object.assign(new Error('forbidden'), { status: 403 }); });
+    const plan = planBundleFileCopies(bundle(), { destinationRequestNumber: '1000400' });
+    const journal = jest.fn(async () => {});
+    await expect(copyBundleFiles(params(plan), deps, journal)).rejects.toThrow(/rejected \(403\)/);
+    const last = journal.mock.calls.at(-1)[0];
+    expect(last.map((c) => c.status)).toEqual(['failed', 'planned']);
+    expect(deps.uploadFile).toHaveBeenCalledTimes(1);
+  });
+
+  test('journals the exact item identity right after the PUT, before readback can fail', async () => {
+    const { deps } = fakeDependencies();
+    const base = deps.getFileMetadataById;
+    deps.getFileMetadataById = jest.fn(async (driveId, itemId) => {
+      if (itemId.startsWith('new-')) throw new Error('readback outage');
+      return base(driveId, itemId);
+    });
+    const plan = planBundleFileCopies(bundle([doc()]), { destinationRequestNumber: '1000400' });
+    const journal = jest.fn(async () => {});
+    await expect(copyBundleFiles(params(plan), deps, journal)).rejects.toThrow(/readback outage/);
+    const snapshots = journal.mock.calls.map((call) => JSON.parse(JSON.stringify(call[0][0])));
+    const firstWithItem = snapshots.find((entry) => entry.item?.id);
+    expect(firstWithItem).toMatchObject({ status: 'created-unverified', outcome: 'created', item: { id: 'new-ProposalNarrative_1000400.pdf' } });
+    // That journal write happened before the failing readback call.
+    expect(deps.getFileMetadataById.mock.calls.filter(([, id]) => id.startsWith('new-'))).toHaveLength(1);
+    const last = snapshots.at(-1);
+    expect(last).toMatchObject({ status: 'failed', item: { id: 'new-ProposalNarrative_1000400.pdf' } });
+    expect(deps.uploadFile).toHaveBeenCalledTimes(1);
+    expect(verifyCopiedFiles([last], [])).toEqual(['1 planned file(s) not verified']);
+  });
+
+  test('journals the identity inside the PUT, before the Graph read-back; a read-back failure verifies by exact ID with no second PUT', async () => {
+    const { deps, calls } = fakeDependencies();
+    deps.readbackFailure = Object.assign(new Error('read-back timed out'), { name: 'AbortError' });
+    const plan = planBundleFileCopies(bundle([doc()]), { destinationRequestNumber: '1000400' });
+    const journal = jest.fn(async (copies) => { if (copies[0].item?.id) calls.push('journal-with-item'); });
+    const copies = await copyBundleFiles(params(plan), deps, journal);
+    expect(copies[0]).toMatchObject({
+      status: 'verified',
+      outcome: 'created',
+      uploadReadbackError: 'read-back timed out',
+      item: { id: 'new-ProposalNarrative_1000400.pdf', versionId: '1.0' },
+    });
+    expect(copies[0].itemJournaledAt).toBeTruthy();
+    // The receipt held the stable ID before the upload's internal read-back ran.
+    expect(calls.indexOf('journal-with-item')).toBeGreaterThan(-1);
+    expect(calls.indexOf('journal-with-item')).toBeLessThan(calls.indexOf('upload-readback:ProposalNarrative_1000400.pdf'));
+    expect(deps.uploadFile).toHaveBeenCalledTimes(1);
+    expect(deps.getFileMetadataByPath).toHaveBeenCalledTimes(1); // only the pre-upload absence check, no path recovery
+  });
+
+  test('a failed receipt write after the PUT makes no network call and retries persisting the captured ID', async () => {
+    const { deps } = fakeDependencies();
+    const plan = planBundleFileCopies(bundle([doc()]), { destinationRequestNumber: '1000400' });
+    let failedOnce = false;
+    const journal = jest.fn(async (copies) => {
+      if (copies[0].item?.id && !failedOnce) { failedOnce = true; throw new Error('receipt disk full'); }
+    });
+    await expect(copyBundleFiles(params(plan), deps, journal)).rejects.toThrow(/Receipt write failed after .* was created \(item new-ProposalNarrative_1000400.pdf\)/);
+    // No metadata read or download of the created item happened while its ID was not durable.
+    expect(deps.getFileMetadataById.mock.calls.filter(([, id]) => id.startsWith('new-'))).toHaveLength(0);
+    expect(deps.downloadFile.mock.calls.filter(([, id]) => id.startsWith('new-'))).toHaveLength(0);
+    expect(deps.uploadFile).toHaveBeenCalledTimes(1);
+    // The failure path persisted the captured identity.
+    const last = journal.mock.calls.at(-1)[0][0];
+    expect(last).toMatchObject({ status: 'failed', outcome: 'created-unjournaled', item: { id: 'new-ProposalNarrative_1000400.pdf' } });
+    expect(last.itemJournaledAt).toBeUndefined();
+  });
+
+  test('reconcileJournaledCopies verifies journaled stable IDs read-only', async () => {
+    const { deps, destination } = fakeDependencies();
+    destination.set('x', { id: 'new-1', name: 'ProposalNarrative_1000400.pdf', size: NARRATIVE.length, buffer: NARRATIVE });
+    destination.set('y', { id: 'partial', name: 'Proposal_1000400.pdf', size: 3, buffer: bytes('abc') });
+    const copies = [
+      { index: 0, status: 'created-unverified', outcome: 'created', destinationDriveId: REQUEST_DRIVE, item: { id: 'new-1' }, destination: { folder: 'f', filename: 'ProposalNarrative_1000400.pdf' }, source: { size: NARRATIVE.length, contentHash: hash(NARRATIVE) } },
+      { index: 1, status: 'failed', outcome: 'ambiguous-unrecovered', destinationDriveId: REQUEST_DRIVE, recoveryItem: { id: 'partial' }, destination: { folder: 'f', filename: 'Proposal_1000400.pdf' }, source: { size: PROPOSAL.length, contentHash: hash(PROPOSAL) } },
+      { index: 2, status: 'planned', destination: { folder: 'f', filename: 'Other.pdf' }, source: { size: 1, contentHash: 'x' } },
+      { index: 3, status: 'failed', destinationDriveId: REQUEST_DRIVE, item: { id: 'gone' }, destination: { folder: 'f', filename: 'Gone.pdf' }, source: { size: 1, contentHash: 'x' } },
+    ];
+    const report = await reconcileJournaledCopies(copies, deps);
+    expect(report.map(({ index, itemId, exists, sizeMatches, hashMatches }) => [index, itemId, exists, sizeMatches, hashMatches])).toEqual([
+      [0, 'new-1', true, true, true],
+      [1, 'partial', true, false, false],
+      [2, null, null, null, null],
+      [3, 'gone', false, null, null],
+    ]);
+    expect(deps.uploadFile).not.toHaveBeenCalled();
+    expect(deps.ensureFolderPath).not.toHaveBeenCalled();
+  });
+
+  test('requires resolved destinations and a well-formed request folder', async () => {
+    const { deps } = fakeDependencies();
+    const unresolved = planBundleFileCopies(bundle([doc()]));
+    await expect(copyBundleFiles(params(unresolved), deps, jest.fn())).rejects.toThrow(/unresolved/);
+    const plan = planBundleFileCopies(bundle([doc()]), { destinationRequestNumber: '1000400' });
+    await expect(copyBundleFiles({ ...params(plan), requestFolder: '../etc' }, deps, jest.fn())).rejects.toThrow(/request folder is invalid/);
+    expect(deps.uploadFile).not.toHaveBeenCalled();
+  });
+});
+
+describe('reverifyCopiedItems', () => {
+  const entry = (over = {}) => ({
+    index: 0, status: 'verified', destinationDriveId: REQUEST_DRIVE,
+    item: { id: 'new-1', eTag: '"v1"', versionId: '1.0' },
+    destination: { folder: 'f', filename: 'ProposalNarrative_1000400.pdf' },
+    source: { size: NARRATIVE.length, contentHash: hash(NARRATIVE) },
+    ...over,
+  });
+  const metadata = (over = {}) => ({ id: 'new-1', name: 'ProposalNarrative_1000400.pdf', size: NARRATIVE.length, eTag: '"v1"', versionId: '1.0', ...over });
+
+  test('passes when metadata is unchanged around a download that hashes to the bundle', async () => {
+    const deps = { getFileMetadataById: jest.fn(async () => metadata()), downloadFile: jest.fn(async () => ({ buffer: NARRATIVE })) };
+    expect(await reverifyCopiedItems([entry()], deps)).toEqual([]);
+    expect(deps.getFileMetadataById).toHaveBeenCalledTimes(2);
+  });
+
+  test('fails on same-size different bytes, on eTag drift, on disappearance, and on unverified entries', async () => {
+    const sameSize = Buffer.from('narrative bytez');
+    expect(await reverifyCopiedItems([entry()], { getFileMetadataById: async () => metadata(), downloadFile: async () => ({ buffer: sameSize }) }))
+      .toEqual(['ProposalNarrative_1000400.pdf bytes no longer match the bundle SHA-256']);
+    expect(await reverifyCopiedItems([entry()], { getFileMetadataById: async () => metadata({ eTag: '"v2"' }), downloadFile: async () => ({ buffer: NARRATIVE }) }))
+      .toEqual(['ProposalNarrative_1000400.pdf metadata changed after verification']);
+    let reads = 0;
+    expect(await reverifyCopiedItems([entry()], { getFileMetadataById: async () => (reads++ === 0 ? metadata() : metadata({ versionId: '2.0' })), downloadFile: async () => ({ buffer: NARRATIVE }) }))
+      .toEqual(['ProposalNarrative_1000400.pdf changed during final verification']);
+    expect(await reverifyCopiedItems([entry()], { getFileMetadataById: async () => null, downloadFile: async () => ({ buffer: NARRATIVE }) }))
+      .toEqual(['ProposalNarrative_1000400.pdf no longer exists']);
+    expect(await reverifyCopiedItems([entry({ status: 'created-unverified' })], {})).toEqual(['ProposalNarrative_1000400.pdf was not verified during copy']);
+  });
+});
+
+describe('verifyCopiedFiles', () => {
+  const verifiedCopies = [
+    { status: 'verified', item: { id: 'a' }, destination: { folder: `${REQUEST_FOLDER}/AI Materials`, filename: 'ProposalNarrative_1000400.pdf' }, source: { size: 10 } },
+    { status: 'verified', item: { id: 'b' }, destination: { folder: `${REQUEST_FOLDER}/Reviewer Materials`, filename: 'Proposal_1000400.pdf' }, source: { size: 20 } },
+  ];
+  const listing = [
+    { id: 'a', name: 'ProposalNarrative_1000400.pdf', size: 10, folder: `${REQUEST_FOLDER}/AI Materials` },
+    { id: 'b', name: 'Proposal_1000400.pdf', size: 20, folder: `${REQUEST_FOLDER}/Reviewer Materials` },
+  ];
+
+  test('passes when the listing is exactly the verified copies', () => {
+    expect(verifyCopiedFiles(verifiedCopies, listing)).toEqual([]);
+  });
+
+  test('fails on missing, extra, drifted or unverified files', () => {
+    expect(verifyCopiedFiles(verifiedCopies, listing.slice(0, 1))).toEqual(['Proposal_1000400.pdf not present in the destination folder']);
+    expect(verifyCopiedFiles(verifiedCopies, [...listing, { id: 'c', name: 'x', size: 1, folder: REQUEST_FOLDER }])).toEqual(['1 unexpected file(s) in the destination folder']);
+    expect(verifyCopiedFiles(verifiedCopies, [{ ...listing[0], size: 11 }, listing[1]])).toEqual(['ProposalNarrative_1000400.pdf listing does not match the journaled copy']);
+    expect(verifyCopiedFiles([{ ...verifiedCopies[0], status: 'failed' }], [])).toEqual(['1 planned file(s) not verified']);
+    expect(verifyCopiedFiles(verifiedCopies, null)).toEqual(['SharePoint folder could not be inspected']);
+  });
+});
+
+// ── DOCX package integrity mode (slice 6c-ii Stage C) ─────────────────────
+// Unlike the exact-hash arm exercised throughout copyBundleFiles above, a
+// DOCX destination legitimately differs from its source (SharePoint's
+// property promotion), so the copy step's readback, ambiguous recovery,
+// final reverification and inspection all switch to package attestation
+// instead of raw hash/size equality -- derived purely from mimeType, so the
+// Basic recipe's PDF/XLSX-only files are provably unaffected (proven above:
+// all 34 existing cases still pass unmodified).
+describe('DOCX package integrity mode', () => {
+  const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  let sourceDocx;
+  let promotedDocx; // simulates SharePoint's characterized property promotion
+  let tamperedDocx; // a word/ part changed -- must fail attestation
+
+  beforeAll(async () => {
+    sourceDocx = await renderInitialAssessmentDocx({
+      requestNumber: '1000400', title: 'TEST: reviewer upload', institution: 'Synthetic University', generated: SYNTHETIC_GENERATED,
+    });
+    const zip = await JSZip.loadAsync(sourceDocx);
+    zip.file('docProps/core.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>rewritten by SharePoint</dc:title><cp:lastModifiedBy>Un-named</cp:lastModifiedBy><cp:revision>1</cp:revision><dcterms:modified xsi:type="dcterms:W3CDTF">2026-09-25T03:32:30Z</dcterms:modified></cp:coreProperties>'); // SharePoint rewrites this
+    promotedDocx = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+
+    const tampered = await JSZip.loadAsync(sourceDocx);
+    const body = await tampered.file('word/document.xml').async('string');
+    tampered.file('word/document.xml', body.replace('</w:body>', '<w:p/></w:body>'));
+    tamperedDocx = await tampered.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  });
+
+  function docxDoc(over = {}) {
+    return doc({
+      id: 'inv-docx', kind: 'reviewerUpload', name: 'Review_1.docx', graphItemId: 'item-docx',
+      mimeType: DOCX_MIME, size: sourceDocx.length, contentHash: hash(sourceDocx),
+      eTag: '"src"', versionId: '1.0', ...over,
+    });
+  }
+
+  function fakeDocxDependencies({ uploadedBytes = promotedDocx } = {}) {
+    const destination = new Map();
+    const deps = {
+      clearGraphCaches: jest.fn(),
+      configuredSharePointTarget: jest.fn(() => TARGET),
+      getSiteId: jest.fn(async () => SITE_ID),
+      getDriveId: jest.fn(async () => REQUEST_DRIVE),
+      // P3-3 (Opus round 2): a reviewerUpload copy refuses without the byte
+      // sniff hook, so the engine-level DOCX tests supply a passing one.
+      validateBytes: jest.fn(() => ({ ok: true })),
+      getFileMetadataById: jest.fn(async (driveId, itemId) => {
+        if (itemId === 'item-docx') return { id: 'item-docx', name: 'Review_1.docx', size: sourceDocx.length, mimeType: DOCX_MIME, eTag: '"src"', versionId: '1.0' };
+        for (const item of destination.values()) if (item.id === itemId) return item;
+        return null;
+      }),
+      downloadFile: jest.fn(async (driveId, itemId) => {
+        if (itemId === 'item-docx') return { buffer: sourceDocx };
+        for (const item of destination.values()) if (item.id === itemId) return { buffer: item.buffer };
+        throw new Error('missing');
+      }),
+      getFileMetadataByPath: jest.fn(async (library, folder, filename) => destination.get(`${folder}/${filename}`) ?? null),
+      ensureFolderPath: jest.fn(async () => ({ id: 'folder' })),
+      uploadFile: jest.fn(async (library, folder, filename, buffer, mimeType, options) => {
+        // Simulates SharePoint: the bytes actually stored differ from what
+        // was PUT (uploadedBytes), exactly like real property promotion.
+        const item = { id: 'new-docx', name: filename, size: uploadedBytes.length, mimeType, eTag: '"new"', versionId: '1.0', buffer: uploadedBytes };
+        destination.set(`${folder}/${filename}`, item);
+        if (options?.onItemCreated) await options.onItemCreated({ id: item.id, name: filename, size: uploadedBytes.length, eTag: item.eTag });
+        return { id: item.id, name: filename, size: uploadedBytes.length, eTag: item.eTag, versionId: '1.0' };
+      }),
+    };
+    return { deps, destination };
+  }
+
+  test('accepts a destination whose bytes differ from the source only by SharePoint property promotion', async () => {
+    const { deps } = fakeDocxDependencies({ uploadedBytes: promotedDocx });
+    const plan = planReviewFileCopiesForTest(docxDoc());
+    const journal = jest.fn(async () => {});
+    const copies = await copyBundleFiles(params(plan), deps, journal);
+    expect(copies[0].status).toBe('verified');
+    expect(copies[0].attestedDigest).toBe(hash(promotedDocx));
+    // Exact-hash equality would have failed (promoted bytes differ) --
+    // proving the docx-package arm, not the exact-hash arm, is what passed.
+    expect(hash(promotedDocx)).not.toBe(hash(sourceDocx));
+  });
+
+  test('rejects a destination whose word/ content was tampered with, beyond SharePoint promotion', async () => {
+    const { deps } = fakeDocxDependencies({ uploadedBytes: tamperedDocx });
+    const plan = planReviewFileCopiesForTest(docxDoc());
+    await expect(copyBundleFiles(params(plan), deps, jest.fn(async () => {}))).rejects.toThrow(/differs from the source/);
+  });
+
+  test('reverifyCopiedItems re-attests a verified DOCX copy against a fresh source download', async () => {
+    const { deps } = fakeDocxDependencies({ uploadedBytes: promotedDocx });
+    const plan = planReviewFileCopiesForTest(docxDoc());
+    const copies = await copyBundleFiles(params(plan), deps, jest.fn(async () => {}));
+    expect(await reverifyCopiedItems(copies, deps)).toEqual([]);
+  });
+
+  test('reverifyCopiedItems fails when the destination package no longer attests against a fresh source download', async () => {
+    const { deps, destination } = fakeDocxDependencies({ uploadedBytes: promotedDocx });
+    const plan = planReviewFileCopiesForTest(docxDoc());
+    const copies = await copyBundleFiles(params(plan), deps, jest.fn(async () => {}));
+    // Mutate the stored destination bytes after copy, simulating drift.
+    const item = destination.get(`${copies[0].destination.folder}/${copies[0].destination.filename}`);
+    item.buffer = tamperedDocx;
+    const failures = await reverifyCopiedItems(copies, deps);
+    expect(failures[0]).toMatch(/package attestation failed|bytes changed since the copy step's attestation/);
+  });
+
+  test('reverifyCopiedItems refuses (P3-e, Opus round 1) a DOCX copy with no journaled attestedDigest, rather than silently passing', async () => {
+    const { deps } = fakeDocxDependencies({ uploadedBytes: promotedDocx });
+    const plan = planReviewFileCopiesForTest(docxDoc());
+    const copies = await copyBundleFiles(params(plan), deps, jest.fn(async () => {}));
+    delete copies[0].attestedDigest;
+    const failures = await reverifyCopiedItems(copies, deps);
+    expect(failures).toEqual([`${copies[0].destination.filename} has no journaled attestedDigest to re-verify against`]);
+  });
+
+  test('verifyCopiedFiles census compares against the post-promotion size, not the bundle source size', async () => {
+    const { deps } = fakeDocxDependencies({ uploadedBytes: promotedDocx });
+    const plan = planReviewFileCopiesForTest(docxDoc());
+    const copies = await copyBundleFiles(params(plan), deps, jest.fn(async () => {}));
+    const listing = [{ id: copies[0].item.id, name: copies[0].destination.filename, size: promotedDocx.length, folder: copies[0].destination.folder }];
+    expect(verifyCopiedFiles(copies, listing)).toEqual([]);
+  });
+
+  test('verifyCopiedFiles refuses a DOCX whose listed size differs from the journaled post-promotion size (P3-2, Opus round 2)', async () => {
+    const { deps } = fakeDocxDependencies({ uploadedBytes: promotedDocx });
+    const plan = planReviewFileCopiesForTest(docxDoc());
+    const copies = await copyBundleFiles(params(plan), deps, jest.fn(async () => {}));
+    const listing = [{ id: copies[0].item.id, name: copies[0].destination.filename, size: promotedDocx.length + 1, folder: copies[0].destination.folder }];
+    expect(verifyCopiedFiles(copies, listing)).toEqual(['Review_1.docx listing does not match the journaled copy']);
+  });
+
+  test('verifyCopiedFiles refuses a DOCX copy with no journaled post-promotion size rather than passing (P3-2, Opus round 2)', async () => {
+    const { deps } = fakeDocxDependencies({ uploadedBytes: promotedDocx });
+    const plan = planReviewFileCopiesForTest(docxDoc());
+    const copies = await copyBundleFiles(params(plan), deps, jest.fn(async () => {}));
+    const listing = [{ id: copies[0].item.id, name: copies[0].destination.filename, size: promotedDocx.length, folder: copies[0].destination.folder }];
+    const withoutSize = [{ ...copies[0], item: { ...copies[0].item, size: undefined } }];
+    expect(verifyCopiedFiles(withoutSize, listing)).toEqual(['Review_1.docx has no journaled post-promotion size to verify against']);
+  });
+
+  test('a reviewerUpload copy with no validateBytes hook is refused before any write (P3-3, Opus round 2)', async () => {
+    const { deps } = fakeDocxDependencies({ uploadedBytes: promotedDocx });
+    delete deps.validateBytes;
+    const plan = planReviewFileCopiesForTest(docxDoc());
+    await expect(copyBundleFiles(params(plan), deps, jest.fn(async () => {})))
+      .rejects.toMatchObject({ code: 'file_rejected' });
+    expect(deps.ensureFolderPath ?? jest.fn()).not.toHaveBeenCalled?.();
+    expect(deps.uploadFile).not.toHaveBeenCalled();
+  });
+
+  test('mutation: the exact-hash arm would wrongly reject a legitimately-promoted DOCX (proves the branch matters)', async () => {
+    // A raw byte/size comparison (the Basic recipe's own rule) must NOT be
+    // satisfied by promoted bytes -- if it were, the docx-package branch
+    // would not be exercising anything real.
+    expect(promotedDocx.length).not.toBe(sourceDocx.length);
+    expect(hash(promotedDocx)).not.toBe(hash(sourceDocx));
+  });
+
+  /** Builds a one-file plan directly (bypassing the Basic-only planBundleFileCopies), matching the shape copyBundleFiles expects. */
+  function planReviewFileCopiesForTest(sourceDocument) {
+    return [{
+      kind: 'reviewerUpload',
+      source: { ...sourceDocument },
+      destination: { library: 'akoya_request', folder: 'Reviewer_Uploads/reviewer_abcd1234/attempt_' + '0'.repeat(32), filename: 'Review_1.docx' },
+    }];
+  }
+});
+
+// ── XLSX package integrity mode (Basic recipe) ────────────────────────────
+// SharePoint rewrites an uploaded XLSX's `docProps/custom.xml` (the
+// library's columns land there), so a Basic XLSX copy verifies by package
+// comparison like a DOCX does, while the SOURCE download stays exact-hash.
+// The package is built here from scratch; no production bytes are committed.
+describe('XLSX package integrity mode (Basic recipe)', () => {
+  const XLSX_FOLDER = '1003222_E43AE6EA/Phase I';
+
+  let sourceXlsx;
+  let promotedXlsx; // one property added to docProps/custom.xml, nothing else
+  let tamperedXlsx; // the same plus a changed worksheet
+
+  beforeAll(async () => {
+    ({ source: sourceXlsx, promoted: promotedXlsx, tampered: tamperedXlsx } = await buildXlsxCopyFixtures());
+  });
+
+  const xlsxDoc = () => doc({
+    id: 'inv-xlsx', kind: 'projectBudgetSpreadsheet', folder: XLSX_FOLDER, name: 'Project Budget spreadsheet.xlsx',
+    graphItemId: 'item-xlsx', mimeType: XLSX_MIME, size: sourceXlsx.length, contentHash: hash(sourceXlsx), eTag: '"src"', versionId: '1.0',
+  });
+  const xlsxPlan = () => planBundleFileCopies(bundle([xlsxDoc()]), { destinationRequestNumber: '1000400' });
+
+  function xlsxDependencies({ uploadedBytes = promotedXlsx } = {}) {
+    // The PDF fake serves item ids from `contents`; the XLSX source is added
+    // and the upload is replaced so the stored bytes differ from what was PUT.
+    const { deps, destination } = fakeDependencies();
+    const baseMetadata = deps.getFileMetadataById.getMockImplementation();
+    const baseDownload = deps.downloadFile.getMockImplementation();
+    deps.getFileMetadataById.mockImplementation(async (driveId, itemId) => (
+      itemId === 'item-xlsx'
+        ? { id: 'item-xlsx', name: 'Project Budget spreadsheet.xlsx', size: sourceXlsx.length, mimeType: XLSX_MIME, eTag: '"src"', versionId: '1.0' }
+        : baseMetadata(driveId, itemId)));
+    deps.downloadFile.mockImplementation(async (driveId, itemId) => (
+      itemId === 'item-xlsx' ? { buffer: sourceXlsx } : baseDownload(driveId, itemId)));
+    deps.uploadFile.mockImplementation(async (library, folder, filename, buffer, mimeType, options) => {
+      const item = { id: 'new-xlsx', name: filename, size: uploadedBytes.length, mimeType, eTag: '"new"', versionId: '1.0', buffer: uploadedBytes };
+      destination.set(`${folder}/${filename}`, item);
+      if (options?.onItemCreated) await options.onItemCreated({ id: item.id, name: filename, size: item.size, eTag: item.eTag });
+      return { id: item.id, name: filename, size: item.size, eTag: item.eTag, versionId: '1.0' };
+    });
+    return { deps, destination };
+  }
+
+  test('copyBundleFiles verifies an XLSX whose only change is one added docProps/custom.xml property, and journals attestedDigest', async () => {
+    const { deps } = xlsxDependencies();
+    const copies = await copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {}));
+    expect(copies[0].status).toBe('verified');
+    expect(copies[0].attestedDigest).toBe(hash(promotedXlsx));
+    expect(copies[0].item.size).toBe(promotedXlsx.length);
+    // Exact-hash equality would have refused these bytes.
+    expect(hash(promotedXlsx)).not.toBe(hash(sourceXlsx));
+  });
+
+  test('copyBundleFiles refuses an XLSX whose worksheet part changed, naming the package rather than a DOCX', async () => {
+    const { deps } = xlsxDependencies({ uploadedBytes: tamperedXlsx });
+    const error = await copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {})).catch((e) => e);
+    expect(error.message).toMatch(/Package \(DOCX\/XLSX\) differs from the source.*xl\/worksheets\/sheet1\.xml/);
+    expect(error.message).not.toMatch(/^DOCX package differs/);
+  });
+
+  test('the source download of an XLSX stays exact-hash against the bundle', async () => {
+    const { deps } = xlsxDependencies();
+    const plan = planBundleFileCopies(bundle([{ ...xlsxDoc(), contentHash: hash(promotedXlsx) }]), { destinationRequestNumber: '1000400' });
+    await expect(copyBundleFiles(params(plan), deps, jest.fn(async () => {}))).rejects.toThrow(/SHA-256/);
+    expect(deps.uploadFile).not.toHaveBeenCalled();
+  });
+
+  test('reverifyCopiedItems re-attests a copied XLSX against a fresh source download, and refuses a drifted one', async () => {
+    const { deps, destination } = xlsxDependencies();
+    const copies = await copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {}));
+    expect(await reverifyCopiedItems(copies, deps)).toEqual([]);
+    destination.get(`${copies[0].destination.folder}/${copies[0].destination.filename}`).buffer = tamperedXlsx;
+    expect((await reverifyCopiedItems(copies, deps))[0]).toMatch(/bytes changed since the copy step's attestation/);
+  });
+
+  test('reverifyCopiedItems refuses an XLSX whose journaled attestedDigest is for different bytes', async () => {
+    const { deps } = xlsxDependencies({ uploadedBytes: promotedXlsx });
+    const copies = await copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {}));
+    copies[0].attestedDigest = hash(sourceXlsx);
+    expect((await reverifyCopiedItems(copies, deps))[0]).toMatch(/bytes changed since the copy step's attestation/);
+  });
+
+  test('verifyCopiedFiles compares an XLSX listing to the journaled post-rewrite size, not the bundle size', async () => {
+    const { deps } = xlsxDependencies();
+    const copies = await copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {}));
+    const listing = (size) => [{ id: copies[0].item.id, name: copies[0].destination.filename, size, folder: copies[0].destination.folder }];
+    expect(verifyCopiedFiles(copies, listing(promotedXlsx.length))).toEqual([]);
+    expect(verifyCopiedFiles(copies, listing(sourceXlsx.length))).toEqual(['Project Budget spreadsheet.xlsx listing does not match the journaled copy']);
+  });
+
+  describe('settle check before journaling', () => {
+    // Serves the destination item's metadata from `metaFor(call)` and its bytes from `bytesFor(call)`
+    // (call = 1-based count of destination reads/downloads), leaving every other item alone.
+    function settlingDependencies({ metaFor, bytesFor }) {
+      const { deps } = xlsxDependencies();
+      const baseMetadata = deps.getFileMetadataById.getMockImplementation();
+      const baseDownload = deps.downloadFile.getMockImplementation();
+      let metaCalls = 0;
+      let downloads = 0;
+      deps.sleep = jest.fn(async () => {});
+      deps.getFileMetadataById.mockImplementation(async (driveId, itemId) => {
+        const metadata = await baseMetadata(driveId, itemId);
+        if (itemId !== 'new-xlsx') return metadata;
+        metaCalls += 1;
+        return { ...metadata, ...metaFor(metaCalls) };
+      });
+      deps.downloadFile.mockImplementation(async (driveId, itemId) => {
+        if (itemId !== 'new-xlsx') return baseDownload(driveId, itemId);
+        downloads += 1;
+        return { buffer: bytesFor(downloads) };
+      });
+      return deps;
+    }
+    let laterXlsx;
+    beforeAll(async () => {
+      laterXlsx = await buildMinimalXlsx({ custom: customPropertiesXml(customProperty('ContentTypeId', 2, '0x0101'), customProperty('TaxKeyword', 3, 'revised')) });
+    });
+
+    test('a content revision between the before and after reads is retried; the journal comes from the settled attempt', async () => {
+      // Reads: attempt 1 before/after (cTag moves), attempt 2 before/after (stable, new size).
+      const deps = settlingDependencies({
+        metaFor: (call) => (call === 1 ? { cTag: '"c1"' } : call === 2 ? { cTag: '"c2"' } : { cTag: '"c3"', size: laterXlsx.length }),
+        bytesFor: (call) => (call === 1 ? promotedXlsx : laterXlsx),
+      });
+      const copies = await copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {}));
+      expect(copies[0].status).toBe('verified');
+      expect(copies[0].attestedDigest).toBe(hash(laterXlsx));
+      expect(copies[0].item.size).toBe(laterXlsx.length);
+      expect(deps.sleep).toHaveBeenCalledTimes(1);
+    });
+
+    test('content that never settles stops after 3 attempts with a clear error and no verified entry', async () => {
+      let reads = 0;
+      const deps = settlingDependencies({ metaFor: () => { reads += 1; return { cTag: `"c${reads}"` }; }, bytesFor: () => promotedXlsx });
+      const journal = jest.fn(async () => {});
+      await expect(copyBundleFiles(params(xlsxPlan()), deps, journal))
+        .rejects.toThrow('Created item Project Budget spreadsheet.xlsx did not settle after upload; its content was still changing.');
+      expect(deps.sleep).toHaveBeenCalledTimes(2);
+      expect(deps.downloadFile.mock.calls.filter(([, itemId]) => itemId === 'new-xlsx')).toHaveLength(3);
+      const last = journal.mock.calls.at(-1)[0][0];
+      expect(last.status).not.toBe('verified');
+    });
+
+    test('slow reads end the retries: no second attempt starts outside the settle window', async () => {
+      let reads = 0;
+      let clock = 0;
+      const deps = settlingDependencies({
+        // Each destination metadata read costs 15 s on the fake clock, so attempt 1 alone outlasts the window.
+        metaFor: () => { reads += 1; clock += 15_000; return { cTag: `"c${reads}"` }; },
+        bytesFor: () => promotedXlsx,
+      });
+      deps.nowMs = () => clock;
+      const journal = jest.fn(async () => {});
+      await expect(copyBundleFiles(params(xlsxPlan()), deps, journal))
+        .rejects.toThrow('Created item Project Budget spreadsheet.xlsx did not settle after upload; its content was still changing.');
+      expect(deps.sleep).not.toHaveBeenCalled();
+      expect(deps.downloadFile.mock.calls.filter(([, itemId]) => itemId === 'new-xlsx')).toHaveLength(1);
+      expect(journal.mock.calls.at(-1)[0][0].status).toBe('failed');
+    });
+
+    test('a comparison failure on the first attempt throws without retrying', async () => {
+      const deps = settlingDependencies({ metaFor: () => ({}), bytesFor: () => tamperedXlsx });
+      await expect(copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {}))).rejects.toThrow(/differs from the source/);
+      expect(deps.sleep).not.toHaveBeenCalled();
+      expect(deps.downloadFile.mock.calls.filter(([, itemId]) => itemId === 'new-xlsx')).toHaveLength(1);
+    });
+  });
+
+  test('an XLSX whose workbook relationships were rewritten (an added customXml relationship and part) is refused in package mode', async () => {
+    const zip = await JSZip.loadAsync(promotedXlsx);
+    const rels = await zip.file('xl/_rels/workbook.xml.rels').async('string');
+    zip.file('xl/_rels/workbook.xml.rels', rels.replace('</Relationships>', '<Relationship Id="rId9" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="../customXml/item2.xml"/></Relationships>'));
+    zip.file('customXml/item2.xml', await zip.file('customXml/item1.xml').async('string'));
+    zip.file('customXml/itemProps2.xml', await zip.file('customXml/itemProps1.xml').async('string'));
+    zip.file('customXml/_rels/item2.xml.rels', (await zip.file('customXml/_rels/item1.xml.rels').async('string')).replace('itemProps1', 'itemProps2'));
+    const rewritten = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    const { deps } = xlsxDependencies({ uploadedBytes: rewritten });
+    await expect(copyBundleFiles(params(xlsxPlan()), deps, jest.fn(async () => {}))).rejects.toThrow(/differs from the source.*xl\/_rels\/workbook\.xml\.rels/);
+  });
+
+  test('a PDF copy is unchanged: exact hash, no attestedDigest, listing compared to the source size', async () => {
+    const { deps } = fakeDependencies();
+    const copies = await copyBundleFiles(params(planBundleFileCopies(bundle([doc()]), { destinationRequestNumber: '1000400' })), deps, jest.fn(async () => {}));
+    expect(copies[0].status).toBe('verified');
+    expect(copies[0].attestedDigest).toBeUndefined();
+    expect(deps.getFileMetadataById.mock.calls.filter(([, id]) => id === copies[0].item.id)).toHaveLength(1); // one readback, never a settle pair
+    expect(await reverifyCopiedItems(copies, deps)).toEqual([]);
+    const listing = [{ id: copies[0].item.id, name: copies[0].destination.filename, size: NARRATIVE.length, folder: copies[0].destination.folder }];
+    expect(verifyCopiedFiles(copies, listing)).toEqual([]);
+  });
+});

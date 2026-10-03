@@ -11,8 +11,12 @@
     "lint:fix": "eslint . --fix",
     "apply:migrations": "node scripts/apply-migrations.js",
     "check:migrations-manifest": "node scripts/check-migrations-manifest.js",
+    "check:factory-ledger": "node scripts/check-factory-ledger.js",
+    "ledger:apply": "node scripts/apply-ledger-migrations.js",
     "check:reviewer-reminder-hold": "node scripts/check-reviewer-reminder-hold.js",
     "check:reviewer-reminder-hold:self-test": "node scripts/check-reviewer-reminder-hold-self-test.js",
+    "check:transcription-pilot-deployment": "node scripts/check-transcription-pilot-deployment.js",
+    "check:transcription-pilot-deployment:self-test": "node scripts/check-transcription-pilot-deployment.js --self-test",
     "check:agent-invariants": "node scripts/check-agent-invariants.js",
     "check:agent-invariants:ci": "node scripts/check-agent-invariants.js --tracked-only",
     "check:instruction-architecture": "node scripts/check-instruction-architecture.js",
@@ -121,12 +125,12 @@
     "@vercel/postgres": "^0.10.0",
     "balanced-match": "^1.0.2",
     "brace-expansion": "file:vendor/brace-expansion-compat",
-    "brace-expansion-upstream": "npm:brace-expansion@5.0.9",
+    "brace-expansion-upstream": "npm:brace-expansion@5.0.12",
     "busboy": "^1.6.0",
     "cors": "^2.8.6",
     "csv-parse": "^7.0.2",
     "docx": "^9.7.1",
-    "dompurify": "^3.4.13",
+    "dompurify": "^3.4.16",
     "exceljs": "^4.4.0",
     "express-rate-limit": "^8.6.1",
     "formidable": "^3.5.4",
@@ -138,7 +142,8 @@
     "lucide-react": "^0.577.0",
     "mammoth": "^1.12.0",
     "marked": "^12.0.2",
-    "next": "^16.2.12",
+    "music-metadata": "^11.16.1",
+    "next": "^16.3.8",
     "next-auth": "^4.24.15",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^1.1.1",
@@ -153,6 +158,7 @@
     "string-similarity": "^4.0.4",
     "tailwindcss": "^3.4.17",
     "uuid": "11.1.1",
+    "workflow": "5.0.0",
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
@@ -172,6 +178,10 @@
   },
   "overrides": {
     "brace-expansion": "$brace-expansion",
+    "@workflow/core": {
+      "devalue": "5.9.3",
+      "nanoid": "5.1.16"
+    },
     "sharp": "0.35.4",
     "uuid": "11.1.1"
   }

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { readMigrationManifest, RETIRED_MIGRATIONS } from '../../scripts/lib/fresh-database-bootstrap';
 
 const ROOT = process.cwd();
 const migration = fs.readFileSync(path.join(ROOT, 'lib/db/migrations/044_site_visit_material_slot_leases.sql'), 'utf8');
@@ -11,6 +12,7 @@ test('migration 044 and fresh install add the same non-null empty-object slot le
     expect(source).toContain("ADD COLUMN IF NOT EXISTS slot_leases JSONB NOT NULL DEFAULT '{}'::jsonb");
   }
   expect(setup).toContain('const v45Statements = [');
-  expect(setup).toContain('Applying v45 schema updates - Applicant material slot leases');
+  expect(readMigrationManifest()).toContain('044_site_visit_material_slot_leases.sql');
+  expect(Object.keys(RETIRED_MIGRATIONS)).not.toContain('044_site_visit_material_slot_leases.sql');
   expect(fs.readFileSync(path.join(ROOT, 'lib/db/migrations-manifest.json'), 'utf8')).toContain('044_site_visit_material_slot_leases.sql');
 });

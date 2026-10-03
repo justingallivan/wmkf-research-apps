@@ -26,9 +26,20 @@ import { exportGranteeCycle } from '../../lib/services/workbench/grantee-deliver
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 
 beforeEach(() => {
+  delete process.env.TEST_REQUEST_ISOLATION;
   jest.clearAllMocks();
   queryAllRequests.mockResolvedValue({ records: [{ akoya_requestid: 'a' }, { akoya_requestid: 'b' }], totalCount: 2, capped: false });
   assembleGranteeDocument.mockResolvedValue({ institution: 'X' });
+});
+
+afterEach(() => { delete process.env.TEST_REQUEST_ISOLATION; });
+
+test('Stage 1d: cycle export filters name marker fields only when enabled', async () => {
+  await exportGranteeCycle({ cycleCode: 'J26' });
+  expect(queryAllRequests.mock.calls[0][0].filter).not.toContain('wmkf_istestrequest');
+  process.env.TEST_REQUEST_ISOLATION = 'on';
+  await exportGranteeCycle({ cycleCode: 'J26' });
+  expect(queryAllRequests.mock.calls[1][0].filter).toContain('wmkf_istestrequest');
 });
 
 test('query failure → typed 503 with the { error, cycleCode } body', async () => {

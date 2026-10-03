@@ -4,7 +4,7 @@
  */
 
 export const SITE_VISIT_MATERIALS_UPLOAD_MAX_MB_SETTING = 'site_visit_materials.upload_max_mb';
-export const SITE_VISIT_MATERIALS_UPLOAD_MAX_MB_DEFAULT = 100;
+export const SITE_VISIT_MATERIALS_UPLOAD_MAX_MB_DEFAULT = 500;
 export const SITE_VISIT_MATERIALS_UPLOAD_MAX_MB_LIMITS = Object.freeze({ min: 1, max: 500 });
 
 export const SITE_VISIT_MATERIALS_AUDIENCE = 'materials';

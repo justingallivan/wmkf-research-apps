@@ -1,0 +1,25 @@
+{
+  "name": "wmkf_requestdocument-post-presentation-materials",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_requestdocument",
+  "_comment": "Additive external-URL and slot-fence fields for post-presentation materials. Runtime must not select or write them until exact preflight, explicit apply, and POST_PRESENTATION_MATERIALS_SCHEMA_READY=on. Readiness alone does not authorize feature access; POST_PRESENTATION_MATERIALS_ACCESS remains separate and defaults off.",
+  "attributes": [
+    {
+      "type": "String",
+      "schemaName": "wmkf_ExternalUrl",
+      "displayName": "External URL",
+      "description": "Governed server-written external URL for a post-presentation material, including a Zoom recording link. Never project this field directly to external clients.",
+      "format": "Url",
+      "maxLength": 2000
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_SlotVersion",
+      "displayName": "Slot Version",
+      "description": "Positive monotonic fence for the request and post-presentation artifact slot.",
+      "minValue": 1,
+      "maxValue": 2147483647
+    }
+  ],
+  "relationships": []
+}

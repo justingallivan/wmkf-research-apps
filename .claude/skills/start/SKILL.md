@@ -86,6 +86,8 @@ Before reading any session context, run the project's CI gates to surface rubric
 Run **every** `check:*` gate, not a subset. Run each gate and its `:self-test` **sequentially, never in parallel** — the self-tests write synthetic fixtures into paths the main gate scans (CLAUDE.md "Operating rules"). The `&&` below pairs each gate with its self-test so a red gate skips its own self-test but the next gate still runs:
 ```bash
 npm run check:migrations-manifest                                              # migrations-manifest ↔ on-disk .sql files
+npm run check:factory-ledger                                                   # Factory ledger contract
+npm run check:factory-ledger -- --allow-unreachable                           # Factory ledger schema vs lib/db/ledger-schema-fingerprint.json (prints 'skipped' when no TEST_REQUEST_*LEDGER_URL is set; --allow-unreachable makes a still-unreachable-after-retries managed ledger advisory at session start — a refused URL or schema drift still fails red)
 npm run check:reviewer-reminder-hold && npm run check:reviewer-reminder-hold:self-test # automatic reviewer reminder hold
 npm run check:agent-invariants                                                # local symlinks for CLAUDE/AGENTS and Codex skills
 npm run check:agent-invariants:ci                                             # tracked symlink invariant for CI

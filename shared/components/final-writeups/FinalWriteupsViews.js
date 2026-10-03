@@ -22,6 +22,7 @@ import ToolbarSelect, { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../ToolbarSelect';
 import { buildWorkbenchHref } from '../workbench/workbench-location';
 import { useUrlMirroredInput } from '../workbench/useUrlMirroredInput';
 import ViewFilterInput from '../workbench/ViewFilterInput';
+import TestRequestBadge from '../TestRequestBadge';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -160,6 +161,7 @@ function WriteupRow({ row }) {
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <span className="font-semibold tabular-nums text-gray-900">#{row.requestNumber || '—'}</span>
+            <TestRequestBadge isTestRequest={row.isTestRequest} />
             <StateChip state={row.personalState} />
             <span className="text-xs font-medium text-gray-500">{row.stage.label}</span>
           </div>
@@ -294,6 +296,7 @@ function MatrixTable({ group, search, pd }) {
                   >
                     <span className="tabular-nums">#{row.requestNumber || '—'}</span> {row.title || 'Untitled request'}
                   </Link>
+                  <TestRequestBadge isTestRequest={row.isTestRequest} className="ml-2" />
                   <span className="mt-1 block text-xs font-normal leading-5 text-gray-500">
                     {[row.responsibleProgramDirector?.name && `PD: ${row.responsibleProgramDirector.name}`, row.stage?.label]
                       .filter(Boolean)
@@ -382,6 +385,7 @@ function CoordinatorMatrix({ matrix, search, pd }) {
                 >
                   #{row.requestNumber || '—'} {row.title || 'Untitled request'}
                 </Link>
+                <TestRequestBadge isTestRequest={row.isTestRequest} className="ml-2" />
                 <span className="text-amber-800">{row.grantProgramName || 'No Grant Program'}</span>
               </li>
             ))}
@@ -874,6 +878,7 @@ function FocusedHeader({ writeup, cycles }) {
     <header className="border-b border-gray-200 pb-6">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold tabular-nums text-gray-700">Request #{writeup.requestNumber || '—'}</span>
+        <TestRequestBadge isTestRequest={writeup.isTestRequest} />
         {cycleLabel && <span className="text-xs font-medium text-gray-500">{cycleLabel}</span>}
         <StateChip state={writeup.personalState} />
         <span className="text-xs font-medium text-gray-500">{writeup.stage.label}</span>

@@ -16,9 +16,16 @@ jest.mock('@vercel/postgres', () => {
   return { sql: sqlTag };
 });
 jest.mock('../../lib/utils/auth', () => ({ requireSuperuser: jest.fn(async () => ({ profileId: 7 })) }));
+jest.mock('../../lib/services/test-requests/spend-isolation.js', () => ({
+  excludeTestRequestSpendRows: jest.fn(async (rows) => ({
+    rows: rows.filter((row) => row.request_id === 'ordinary'),
+    isolation: { available: true, testSpend: { attemptCount: 3, knownCostCents: 40, unknownCount: 1 } },
+  })),
+}));
 
 const { sql } = require('@vercel/postgres');
 const { ATTEMPT_COST_UNKNOWN_SQL } = require('../../lib/services/review-panel-store');
+const { excludeTestRequestSpendRows } = require('../../lib/services/test-requests/spend-isolation.js');
 const handler = require('../../pages/api/admin/stats').default;
 
 function response() {
@@ -29,7 +36,32 @@ function mockPanelRows(rows) {
   sql.query.mockResolvedValueOnce({ rows });
 }
 
-beforeEach(() => { jest.clearAllMocks(); sql.mockResolvedValue({ rows: [] }); });
+beforeEach(() => {
+  jest.clearAllMocks();
+  delete process.env.TEST_REQUEST_ISOLATION;
+  sql.mockResolvedValue({ rows: [] });
+});
+
+afterEach(() => { delete process.env.TEST_REQUEST_ISOLATION; });
+
+test('isolation on groups spend by request, reports test spend as one separate line, and records unattributable API usage', async () => {
+  process.env.TEST_REQUEST_ISOLATION = 'on';
+  mockPanelRows([
+    { state: 'completed', request_id: 'ordinary', attempt_count: 2, known_cost_cents: '25', unknown_count: 0 },
+    { state: 'completed', request_id: 'test', attempt_count: 3, known_cost_cents: '40', unknown_count: 1 },
+  ]);
+  const res = response();
+  await handler({ method: 'GET', query: {} }, res);
+
+  expect(sql.query.mock.calls[0][0]).toContain('JOIN review_panel_entries e ON e.id = a.entry_id');
+  expect(excludeTestRequestSpendRows).toHaveBeenCalled();
+  expect(res.body.reviewPanel).toMatchObject({
+    knownCostCents: 25,
+    unknownCount: 0,
+    isolation: { available: true, testSpend: { attemptCount: 3, knownCostCents: 40 } },
+  });
+  expect(res.body.usageAttribution).toEqual({ apiUsageLog: 'unattributable' });
+});
 
 test('the panel query text embeds the SAME unified unknown-cost predicate as review-panel-store.js — this fails if the predicate is ever deleted or diverges', async () => {
   mockPanelRows([]);

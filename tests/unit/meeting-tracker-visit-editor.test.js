@@ -12,6 +12,10 @@ jest.mock('../../shared/components/Layout', () => ({
   default: ({ children }) => <div>{children}</div>,
   Button: ({ children, loading, ...props }) => <button {...props}>{children}</button>,
 }));
+jest.mock('../../shared/components/meeting-tracker/MeetingTranscriptionPanel', () => ({
+  __esModule: true,
+  default: ({ requestId }) => <div data-testid="meeting-transcription-in-editor">{requestId}</div>,
+}));
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const recipients = {
@@ -58,6 +62,7 @@ test('existing visit offers a missing applicant as one-click Add and includes th
     return response({ success: true, siteVisit: visit, applicantAttendees: [{ kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' }] });
   });
   render(<SiteVisitEditor />);
+  expect(await screen.findByTestId('meeting-transcription-in-editor')).toHaveTextContent(REQUEST_ID);
   fireEvent.click(await screen.findByRole('button', { name: 'Add Franklin Cat (franklin@example.edu)' }));
   expect(screen.getByText(/Franklin Cat · franklin@example.edu/)).toBeInTheDocument();
   expect(screen.getByText(/Justin · justin@example.edu/)).toBeInTheDocument();
@@ -157,6 +162,7 @@ test('an existing visit: the form loads it, sends activityId + etag, and a write
   global.fetch = jest.fn(async (url, options = {}) => {
     const target = String(url);
     if (target.includes('/recipients')) return response(recipients);
+    if (target.endsWith('/presentation-materials')) return response({ error: 'not enabled' }, 503);
     if (target.endsWith('/materials')) return response({ error: 'not enabled' }, 503);
     if (options.method === 'PATCH') return response({ error: 'The Site Visit changed or a different activity is active. Reload before saving.', code: 'site_visit_write_conflict' }, 409);
     gets += 1;

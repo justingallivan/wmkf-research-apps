@@ -33,11 +33,14 @@ const RECORD = {
 };
 
 beforeEach(() => {
+  delete process.env.TEST_REQUEST_ISOLATION;
   jest.clearAllMocks();
   getById.mockResolvedValue(RECORD);
   findByRequestNumber.mockResolvedValue({ records: [RECORD] });
   fetchCoPIs.mockResolvedValue([]);
 });
+
+afterEach(() => { delete process.env.TEST_REQUEST_ISOLATION; });
 
 test('GUID path: adapter getById, DTO projected', async () => {
   const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
@@ -52,6 +55,23 @@ test('number path: findByRequestNumber with top 1', async () => {
   expect(findByRequestNumber).toHaveBeenCalledWith('1002794', expect.objectContaining({ top: 1 }));
   expect(getById).not.toHaveBeenCalled();
   expect(body.requestNumber).toBe('1002794');
+});
+
+test('Stage 1d: header DTO selects and emits only a derived badge when on', async () => {
+  const off = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+  expect(getById.mock.calls[0][1].select).not.toContain('wmkf_istestrequest');
+  expect(off).not.toHaveProperty('isTestRequest');
+
+  process.env.TEST_REQUEST_ISOLATION = 'on';
+  getById.mockResolvedValue({
+    ...RECORD,
+    wmkf_istestrequest: true,
+    wmkf_testcreationrunid: '22222222-2222-4222-8222-222222222222',
+  });
+  const on = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+  expect(getById.mock.calls[1][1].select).toContain('wmkf_istestrequest,wmkf_testcreationrunid');
+  expect(on.isTestRequest).toBe(true);
+  expect(on).not.toHaveProperty('wmkf_istestrequest');
 });
 
 test('GUID miss → 404 with GUID in message; number miss → 404 with "number N"', async () => {

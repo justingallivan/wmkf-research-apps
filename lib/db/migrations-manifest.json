@@ -51,6 +51,18 @@
     "050_expertise_roster_contact_link.sql",
     "051_reviewer_institution_measurement_events.sql",
     "052_pre_site_distribution_brief_inputs.sql",
-    "053_pre_site_distribution_review_bundle.sql"
+    "053_pre_site_distribution_review_bundle.sql",
+    "054_test_request_runs.sql",
+    "055_post_presentation_materials.sql",
+    "056_integrity_screenings_request_id.sql",
+    "057_integrity_screening_reviews.sql",
+    "058_test_request_cast_slot_bindings.sql",
+    "059_scheduled_email_recipient_generation.sql",
+    "060_materials_background_jobs.sql",
+    "060_transcription_jobs.sql",
+    "061_transcription_workflow_dispatches.sql",
+    "062_transcription_speaker_names.sql",
+    "063_meeting_tracker_transcription.sql",
+    "064_meeting_transcript_close_attribution.sql"
   ]
 }

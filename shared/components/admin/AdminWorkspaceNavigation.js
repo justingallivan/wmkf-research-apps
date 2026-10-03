@@ -43,6 +43,14 @@ export const ADMIN_WORKSPACES = Object.freeze([
     ],
   },
   {
+    key: 'test-requests',
+    label: 'Test Requests',
+    title: 'Test Request preparation',
+    description: 'Preview a clone read-only, then create a test Request and set its status. Creating and status changes write real data and are switched on per deployment.',
+    defaultView: 'preview',
+    views: [{ key: 'preview', label: 'Preview' }],
+  },
+  {
     key: 'ai',
     label: 'AI',
     title: 'AI administration',
@@ -96,8 +104,8 @@ export function adminHref(workspaceKey, viewKey) {
 
 export function AdminWorkspaceNavigation({ activeWorkspace }) {
   return (
-    <nav aria-label="Admin workspaces" className="border-b border-gray-200">
-      <div className="flex min-w-max gap-6 overflow-x-auto">
+    <nav aria-label="Admin workspaces" className="overflow-x-auto border-b border-gray-200">
+      <div className="flex min-w-max gap-6">
         {ADMIN_WORKSPACES.map((workspace) => {
           const active = workspace.key === activeWorkspace;
           return (
@@ -116,6 +124,17 @@ export function AdminWorkspaceNavigation({ activeWorkspace }) {
             </Link>
           );
         })}
+        <Link
+          href="/admin/transcription-pilot"
+          aria-current={activeWorkspace === 'transcription-pilot' ? 'page' : undefined}
+          className={`min-h-11 border-b-2 px-1 py-3 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 ${
+            activeWorkspace === 'transcription-pilot'
+              ? 'border-gray-900 text-gray-950'
+              : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-900'
+          }`}
+        >
+          Transcription Pilot
+        </Link>
       </div>
     </nav>
   );
@@ -178,6 +197,7 @@ const STATUS_CHIP_TONE_CLASSES = {
   green: 'bg-green-50 text-green-700 border-green-200',
   amber: 'bg-amber-50 text-amber-800 border-amber-200',
   red: 'bg-red-50 text-red-700 border-red-200',
+  blue: 'bg-blue-50 text-blue-800 border-blue-200',
   gray: 'bg-gray-100 text-gray-600 border-gray-200',
 };
 

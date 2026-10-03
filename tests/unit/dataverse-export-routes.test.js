@@ -232,6 +232,60 @@ describe('preview', () => {
     expect(res.body.resultToken).toBeUndefined();
   });
 
+  test('isolation on: marked Test Requests are their own counted waterfall step', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    try {
+      fetchXmlAggregateCount
+        .mockResolvedValueOnce(25)  // exported (full spec, marker + legacy test)
+        .mockResolvedValueOnce(47)  // matched (no operational/test/marker)
+        .mockResolvedValueOnce(29)  // afterOperational (no marker)
+        .mockResolvedValueOnce(20)  // migrated
+        .mockResolvedValueOnce(5)   // native
+        .mockResolvedValueOnce(27); // afterMarked (+ marker, legacy test off)
+      const res = mockRes();
+      await previewHandler({ method: 'POST', body: { querySpec: baseSpec() } }, res);
+      expect(res.statusCode).toBe(200);
+      expect(res.body.composition).toEqual(expect.objectContaining({
+        matched: 47,
+        excludedOperational: 18,
+        excludedMarkedTestRequests: 2,
+        markedTestRequestsApplied: true,
+        excludedTestRecords: 2,
+        exported: 25,
+      }));
+      const xml = fetchXmlAggregateCount.mock.calls.map((call) => call[1]);
+      expect(xml[1]).not.toContain('wmkf_istestrequest');
+      expect(xml[2]).not.toContain('wmkf_istestrequest');
+      expect(xml[5]).toContain('wmkf_istestrequest');
+      expect(xml[0]).toContain('wmkf_istestrequest');
+    } finally {
+      delete process.env.TEST_REQUEST_ISOLATION;
+    }
+  });
+
+  test('isolation on: afterMarked below exported fails loud', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    try {
+      fetchXmlAggregateCount
+        .mockResolvedValueOnce(25).mockResolvedValueOnce(47).mockResolvedValueOnce(29)
+        .mockResolvedValueOnce(20).mockResolvedValueOnce(5).mockResolvedValueOnce(24);
+      const res = mockRes();
+      await previewHandler({ method: 'POST', body: { querySpec: baseSpec() } }, res);
+      expect(res.statusCode).toBeGreaterThanOrEqual(500);
+      expect(res.body.resultToken).toBeUndefined();
+    } finally {
+      delete process.env.TEST_REQUEST_ISOLATION;
+    }
+  });
+
+  test('isolation off: composition carries no marked-test keys', async () => {
+    const res = mockRes();
+    await previewHandler({ method: 'POST', body: { querySpec: baseSpec() } }, res);
+    expect(res.body.composition).not.toHaveProperty('excludedMarkedTestRequests');
+    expect(res.body.composition).not.toHaveProperty('markedTestRequestsApplied');
+    expect(fetchXmlAggregateCount).toHaveBeenCalledTimes(5);
+  });
+
   test('waterfall: exclusions OFF ⇒ matched == exported, applied flags false', async () => {
     fetchXmlAggregateCount.mockResolvedValue(12);
     const res = mockRes();
@@ -261,6 +315,65 @@ describe('run — the stateless confirm gate', () => {
     await runHandler({ method: 'POST', body: { resultToken: 'not.a.jwt' } }, res);
     expect(res.statusCode).toBe(403);
     expect(res.chunks).toHaveLength(0);
+  });
+
+  test('isolation on at preview and off at run → 409 re-preview before SSE or Blob', async () => {
+    const { token } = await mintResultToken(
+      baseSpec(),
+      { trueTotal: 3 },
+      { markedIsolation: true },
+    );
+    const res = mockRes();
+    await runHandler({ method: 'POST', body: { resultToken: token } }, res);
+    expect(res.statusCode).toBe(409);
+    expect(res.body).toEqual(expect.objectContaining({
+      error: 'PREVIEW_POLICY_CHANGED',
+      message: expect.stringMatching(/Re-preview/),
+    }));
+    expect(fetchLiveTaxonomy).not.toHaveBeenCalled();
+    expect(res.headers['Content-Type']).toBeUndefined();
+    expect(res.chunks).toHaveLength(0);
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  test('isolation off at preview and on at run → 409 re-preview before SSE or Blob', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    try {
+      const { token } = await mintResultToken(
+        baseSpec(),
+        { trueTotal: 3 },
+        { markedIsolation: false },
+      );
+      const res = mockRes();
+      await runHandler({ method: 'POST', body: { resultToken: token } }, res);
+      expect(res.statusCode).toBe(409);
+      expect(res.body.error).toBe('PREVIEW_POLICY_CHANGED');
+      expect(fetchLiveTaxonomy).not.toHaveBeenCalled();
+      expect(res.headers['Content-Type']).toBeUndefined();
+      expect(res.chunks).toHaveLength(0);
+      expect(put).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.TEST_REQUEST_ISOLATION;
+    }
+  });
+
+  test('matching isolation-on preview policy runs with marked-request exclusion', async () => {
+    process.env.TEST_REQUEST_ISOLATION = 'on';
+    try {
+      const { token } = await mintResultToken(
+        baseSpec(),
+        { trueTotal: 3 },
+        { markedIsolation: true },
+      );
+      const res = mockRes();
+      await runHandler({ method: 'POST', body: { resultToken: token } }, res);
+      expect(fetchXmlAll).toHaveBeenCalled();
+      expect(fetchXmlAll.mock.calls[0][1]).toContain('wmkf_istestrequest');
+      expect(sseEvents(res).find((event) => event.event === 'ready')).toBeTruthy();
+      expect(put).toHaveBeenCalledTimes(1);
+    } finally {
+      delete process.env.TEST_REQUEST_ISOLATION;
+    }
   });
 
   test('honors the TOKEN spec, never a mismatched body spec (Codex P2 #11)', async () => {

@@ -10,6 +10,212 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Pricing alert reconciliation and reviewed model selection (Session 568)
+
+**Milestone:** Corrected the provider pricing comparison and deployed reviewed Opus 5.5 coverage.
+**Sessions:** 568 (admin-alert remediation, October 2).
+**Ship state:**
+- Owner-authorized PR #420 merged as `a829ba94c`; all CI checks passed and Production is READY.
+- Protected pricing refresh matched provider costs/tokens, completed 15 comparisons with no drift, and auto-resolved the misleading standing pricing alert. [VERIFIED via maintenance and alert receipts]
+- Automatic tier selection excludes models without specific capability/pricing coverage. The canary now identifies Sonnet 5.5 for separate review; the conservative transcription cleanup watch remains intact.
+**Why it matters:** Operators can distinguish actual rate drift from mismatched usage scopes, and newer models require review before automatic selection.
+**Pointers:** `docs/audits/ADMIN_ALERT_REMEDIATION_2026-10-02.md`; `docs/MODEL_CHANGE_STRATEGY.md`; PR #420.
+
+## October 2026 — Meeting Tracker transcription launched for Production staff (Session 567)
+
+**Milestone:** Staff can upload a Site Visit recording, name detected speakers, publish a verified TXT/VTT bundle, and review it in Workbench.
+**Sessions:** 567 (Production activation and bounded synthetic rehearsal).
+**Ship state:**
+- PR #416 (`23667af9d`) delivered the integrated runtime; PR #418 (`aa7d5b0e1`) enabled daily cleanup, hourly recovery, and operational alerts.
+- Production staff acceptance used an approved non-sensitive recording and passed upload, speaker naming, transcript publication, TXT/VTT download, and Workbench review; temporary test content was removed and a private operational receipt retained.
+- Use remains limited to approved non-sensitive recordings. Provider training is opted out; retention is one day, not zero-data-retention.
+**Why it matters:** Staff now have a governed, recoverable transcript workflow attached to Meeting Tracker Site Visits.
+**Pointers:** `docs/atlas/postgres-transcription-pilot.md`; `docs/API_ROUTE_SECURITY_MATRIX.md`; PRs #416 and #418.
+
+## October 2026 — Open received applicant materials from Meeting Tracker (Session 565)
+
+**Milestone:** Staff can open uploaded applicant files directly from the Site Visit materials card.
+**Sessions:** 565 (Codex app-feature lane, October 2).
+**Ship state:**
+- Checklist and additional-file rows link to safe saved HTTPS URLs in a new tab; staff enrichment preserves request/artifact matching and the applicant response contract.
+- PR #415 merged as `f5725544a`; all CI checks, independent review, and 141 targeted tests passed.
+- Production click-through opened the uploaded PowerPoint in SharePoint and loaded its slide content. [VERIFIED via authenticated browser, GitHub, and Vercel status]
+**Why it matters:** Staff can review received materials from the same page that tracks receipt and readiness.
+**Pointers:** `shared/components/meeting-tracker/SiteVisitMaterialsCard.js`; `lib/services/site-visit-materials/collection-service.js`; PR #415 / `f5725544a`.
+
+## October 2026 — Applicant materials uploads finish in the background (Session 564)
+
+**Milestone:** Site Visit / Research Presentation applicants can leave after transfer and durable admission while scanning and SharePoint saving continue.
+**Sessions:** October 1–2 materials lane; Luna builds, Sol review, parent review, Claude Fable adversarial review through OAuth, and owner production acceptance.
+**Ship state:**
+- Shared admin-configured 500 MB cap, coordinator fallback guidance, real transfer progress, and clearer scan/connection errors shipped.
+- Migration 060 applied; schema readiness and background admission enabled with scanning on. Guarded recovery inspection passed without mutation.
+- First real background job finished on attempt 1 in about 2m44s; the owner closed the browser and confirmed Received after reopening. Large PPTX and PDF transfers also succeeded.
+- Final PRs #405 and #413 passed CI and merged; Ready Production `dpl_7zi1no5HrxgrPbCQo18Lsi1NM5CZ` at `b223dad7d` includes both. [VERIFIED via GitHub, deployment readback, and owner report]
+**Why it matters:** Applicants need not keep a tab open through security scanning and saving. Exact-cap live rehearsal is parked; another simultaneous-large-file test is not required by the owner.
+**Pointers:** `docs/plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md`; `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.15–16.16; #410 `8fb8a6d83`, #413 `81dad17e2`, #405 `1df8a33e2`.
+
+## October 2026 — Test Request Factory admin form live in Production (Session 563)
+
+**Milestone:** A superuser can create a marked test Request from a source Request, and set its Phase I or II status, from Admin → Test Requests, without the command line.
+**Sessions:** 563 (Claude, home Mac, 2026-10-01/02 PT; recorded as S562 in the Factory plan documents), Sonnet builds, Opus reviews, Codex adversarial rounds, owner click-through rehearsal and production runs.
+**Ship state:**
+- Slices 2, 2b, 3 merged (PRs #398, #399, #401); stop logging (#403); XLSX package verification with a settle check (#406); two display fixes (#408, #409).
+- Enabled in Production 2026-10-02: `TEST_REQUEST_FACTORY_FORM=on`, `TEST_REQUEST_LEDGER_URL` and `FACTORY_BLOB_RW_TOKEN` (store `wmkf-factory-private`) are now Vercel Production variables.
+- First complete run: `a5161f47-7b02-5ad3-8f20-3f645ec3c254` in `managed-ledger/ledger_prod`, test Request 1003310 from 1002988, seven documents, one status change. An earlier run (`20407283-c279-5e0c-b396-210ad6842482`, same ledger, Request 1003308) stopped on an XLSX and is not resumable.
+- Limits: `basic` recipe only; no way to abandon or resume a stuck run; a Preview rehearsal ends at the create.
+**Why it matters:** Staff can produce realistic test Requests in the production org on demand, with every write fenced to marked test records and journaled.
+**Pointers:** `docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md`; `docs/plans/TEST_REQUEST_FACTORY_ADMIN_FORM_PLAN_2026-10-01.md`; `docs/atlas/postgres-test-request-runs.md`; PRs #398, #399, #401, #403, #406, #408, #409.
+
+## September 2026 — Scheduled-email Liaison re-check live; Factory ledger on Neon; app Postgres rotated (Session 559)
+
+**Milestone:** Queued grantee materials reminders now re-check the institution's current Liaison and the PD's review posture before sending (scheduled-email Part B). The Factory's operational data now lives in the managed Neon ledger, and the app Postgres password was rotated.
+**Sessions:** 559 (Claude, home Mac, 2026-09-30 evening PT / 2026-10-01 UTC), with Codex adversarial review in two rounds and an owner-authorized Claude in Chrome rehearsal.
+**Ship state:**
+- PR #384 (`3b5002d95`, Production Ready): lease/version-fenced re-address or approval hold before any Dynamics activity. Send-now with a changed Liaison returns 409 "Recipients changed…". Live-Postgres 28/28; browser rehearsal on a Neon branch with request 1003220.
+- Both home-Mac ledgers loaded data-only into `managed-ledger/ledger_prod` and `managed-ledger/ledger` (counts match; `check:factory-ledger` green); migration 058 applied to the Production app DB, which cleared the active `migration_drift` alert.
+- PR #382 (`186052034`) and PR #383 (`f00e2259c`) closed integrity review findings 6 (SerpApi empty-result signal) and 9 (repeated reads).
+- `neondb_owner` rotated after an accidental transcript print; the Neon integration re-synced Vercel; the owner chose to leave the variables readable (option A) while Preview acceptance uses the shared DB.
+**Why it matters:** A reminder can no longer Cc a former Liaison or skip an approval the PD now requires; both Macs share one durable Factory ledger.
+**Pointers:** `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`; `docs/plans/evidence/test-request-factory/ledger-snapshot-2026-09-30.md`; `docs/CREDENTIALS_RUNBOOK.md` (Postgres rotation); PRs #382–#384.
+
+## September 2026 — DOCX and VTT transcript upload incident resolved (Session 558)
+
+**Milestone:** Site Visit transcript uploads now tolerate characterized SharePoint DOCX metadata promotion and nonempty private Blob streams without an uncompressed Content-Length.
+**Sessions:** Parallel Codex transcript diagnosis, OAuth Opus review, two owner-authorized releases, and Production acceptance on 2026-09-30.
+**Ship state:**
+
+- PR #375 (`2eaa07670`) introduced strict DOCX source/stored attestation and safe retry receipts; PR #379 (`ebbbc1307`, source `90ea3f0a5`) completed custom-properties OPC links and bounded decoded-stream sizing.
+- 589 tests / 19 suites, production build and scoped gates passed for the follow-up; Opus approved through subscription OAuth with API-key source none.
+- At release, deployment `dpl_D9bz5jCdvAYuf2iPqmUxseT3mcTC` was Ready on the branded domains; sign-in/Meeting Tracker smoke passed. [VERIFIED via GitHub and Vercel]
+- The owner confirmed DOCX and VTT both worked after reselecting/uploading on request 1002903; PDF also worked. [VERIFIED via owner report] No agent upload, migration or registry repair ran.
+
+**Why it matters:** Staff can finish the originally failing transcript uploads; successful Production tests close the incident.
+**Pointers:** `docs/plans/evidence/post-presentation/transcript-package-and-blob-read-2026-09-30.md`; `docs/plans/evidence/post-presentation/docx-transcript-fix-2026-09-30.md`; PRs #375 and #379.
+
+## September 2026 — Managed Factory ledger with registry-guarded runner; scheduled-email engine hardening (Session 553)
+
+**Milestone:** The Test Request Factory's operational ledger moved from one Mac's Docker to a managed Neon project (`wmkf-factory-ledger`: `ledger_prod`, `ledger`), and every ledger-driven CLI mode now passes a registry guard (host/database/TLS/shared-DB fence), a semantic schema fingerprint gate, and a prefix-classifying migration runner before it touches Dataverse. Separately, scheduled personalized emails got a no-resend send intent, an unconfirmed-send marker, classified Dynamics reads and a recipient-generation correlation key (migration 059).
+**Sessions:** 553 (plan, Neon provisioning, build, four Codex adversarial rounds + three Opus rounds, Codex-rescue fixes, merges); Codex's parallel B4 (#369) supplied migration 058.
+**Ship state:**
+- PR #374 (`66dd0974b`) merged after B4; `npm run ledger:apply` adopted 058 on both managed ledgers; `check:factory-ledger` is a `/start` gate and both ledgers match the tracked fingerprint.
+- PR #373 (`9d0119d4d`) merged with 059 applied to shared Production first (tracker `claude-part-a-2026-09-30`); Production tracker: 054–057, 059 (058 deliberately not applied to the app DB).
+- PR #378 (`361fbcdfd`) closed all five Dependabot alerts (next 16.3.8, dompurify 3.4.16, brace-expansion 5.0.12).
+**Why it matters:** The Factory can be run safely from either Mac against one durable ledger, and the runner refuses to write to a ledger whose shape it cannot prove; scheduled emails can no longer be double-sent or silently lost on an uncertain Dynamics response.
+**Pointers:** `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`; `docs/plans/briefs/FACTORY_LEDGER_SNAPSHOT_BRIEF_2026-09-30.md`; `docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`; PRs #373, #374, #378.
+
+## September 2026 — Factory reviewer B4 runtime promoted (Session 558-B4)
+
+**Milestone:** Marked synthetic reviewers can use the Request reviewer workflow under exact binding and recipient guards; switch-off binds fail closed and all acceptance jobs pause.
+**Sessions:** B4 implementation and OAuth Opus review, inactive ordinary slot repair, 2026-09-30 owner-directed promotion and stop.
+**Ship state:**
+- PR #369 merged as `a18882a0b7`; Production `dpl_9dLJN7TZ6nDU234PCNYwMKTf9Va5` Ready. All candidate and post-merge CI checks passed; signed-in staff home/Workbench-list smoke passed.
+- Production configuration read on/on before merge. Captured runtime switch values and live job resumption remain unverified.
+- Migration 058/V57 and the one-write slot runner shipped as source; no agent migration or slot PATCH ran. Local ledger restore/schema/digest evidence and Local literal-on checks remain pending; owner explicitly chose deployment with those checks outstanding.
+**Why it matters:** Staff reviewer workflows now admit the synthetic cast only for its verified marked Request, while ordinary inactive applicant slots remain visible for repair.
+**Pointers:** `40ab24f3e`; PR #369; `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`; `docs/plans/evidence/test-request-factory/b4-production-promotion-2026-09-30.md` (evidence limits and rollback).
+
+## September 2026 — Staff site-visit video released in Production (parallel Codex session during 553)
+
+**Milestone:** Staff can add a Zoom recording link or upload an MP4 after a Site Visit in Meeting Tracker, then watch the current recording from Staff Deliberations; a separate 60-day materials-only link is available for Board sharing.
+**Sessions:** Codex feature build and bounded Preview acceptance, then 2026-09-29 Production release and staff check.
+**Ship state:**
+- PR #365 merged the compatible runtime; Production Dataverse Wave 30 and migration 055 were verified. PR #368 fixed a playback status message.
+- Marked TEST Request #1003302 passed synthetic MP4 upload, replacement, Safari Watch/long-seek/Download integrity, private-window materials link, and signed-in staff Watch playback. The first replacement finalize needed one manual **Finish saving** retry.
+- Production schema readiness and general access read `on`; deployment `dpl_Gw8dTzcA1JaUc2ifQjbzbBe7wCoT` was Ready on both branded domains at release check. PRs #370 and #371 merged the acceptance and release records. The older full-briefing live audience was not tested and is not a staff-release gate.
+**Why it matters:** Staff can keep the Site Visit recording with the Request and open the current video from their normal deliberation workflow.
+**Pointers:** `docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`; `docs/plans/evidence/post-presentation/production-bounded-2026-09-29.md`; PRs #365, #368, #370, #371.
+
+## September 2026 — Integrity Screener in the Request Workbench (Session 552)
+
+**Milestone:** The Request Workbench has an Integrity tab. It screens a request's PI and Co-PIs (from Dataverse) against Retraction Watch, PubPeer and news, keeps request-linked screening history, and records an append-only lead-PD approval or hold.
+**Sessions:** Codex build (2026-09-26/27); 552 (merge with `main`, Claude code review and fixes, Codex adversarial round and fixes, migrations, release).
+**Ship state:**
+- PR #366 (`fdaec0b1f`), deployed to Production as `dpl_EbiwNNbuRgPGaAswWNGK7DsYyn7p`. Migrations 056 (`integrity_screenings.request_id`) and 057 (`integrity_screening_reviews`) were applied by the owner on 2026-09-30 and schema-verified. A read-only production smoke of the standalone screener and the tab passed.
+- The routes require both `reviewers` and `integrity-screener`. Strict screens stop before paid calls when the corpus is unavailable, and run under one 240s deadline. Deleted contacts block screening and approval. The standalone screener no longer sees Workbench runs.
+- PR #367 (`4d482d958`): the standalone screener's dismiss route is scoped to the caller's own screenings.
+- Deferred: finding 6 (SerpApi empty-result wording) and finding 9 (repeated reads). The Dataverse "Integrity review complete" flag is not built.
+**Why it matters:** PDs can screen and approve a request's investigators from the Workbench, with a durable audit of who approved which roster.
+**Pointers:** PR #366 description (both review rounds); `docs/atlas/postgres-infra-tables.md`; `docs/plans/INTEGRITY_WORKBENCH_TAB_BUILD_BRIEF_2026-09-26.md`.
+
+## September 2026 — Research Liaison of record comes from the applicant institution (Session 550)
+
+**Milestone:** For Research Requests, every app reader of the Liaison (the invitation, new grantee reminders, the Awardees list, site-visit materials and contacts, and Dynamics Explorer) now uses the applicant institution's Primary Contact instead of the stale Request copy. The Dataverse export relabels the copy.
+**Sessions:** 549 (owner decision with the AkoyaGO platform owner, measurement, six Codex plan rounds), 550 (build, Codex implementation review, release).
+**Ship state:**
+- PR #361 (`61dafcb81`), live via `9f408590e`: helper `lib/services/contacts/request-liaison.js` (fail-closed found/none), a stale-Liaison 409 at invitation send, PI-only only for a confirmed none, and a compare-and-swap on the materials automatic reminder claim with a live-Postgres proof in CI.
+- The owner's production check on 997125 showed the institution Liaison as the invitation Cc.
+- Not shipped: re-addressing reminders queued before the switch (`docs/plans/SCHEDULED_EMAIL_READDRESS_PLAN_2026-09-29.md`, draft).
+**Why it matters:** the Liaison recipient changes on 27 active awards and 35 upcoming Requests; staff stop emailing former Liaisons.
+**Pointers:** `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md` (*Build record*).
+
+## September 2026 — Test Request Factory: synthetic cast bound to production clones (Sessions 548–549)
+
+**Milestone:** Production test Requests now carry a reused synthetic cast — PI, Liaison and Research Leader contacts under the Foundation, plus a WMKF Org Leader on the Foundation — so staff can exercise PI/Liaison email workflows on a clone without touching real people.
+**Sessions:** 548 (build, one Codex round), 549 (first cast-bound clone, merge).
+**Ship state:**
+- PR #357 (`75d58e331`): cast ledger and `--create-cast`, create-body binds with per-lookup fences, Foundation transition contract journaling the cast contacts, `--bind-reviewer`.
+- First cast-bound clone: run `e33fa857`, Request 1003303, `ready`, one-hour recheck clean; PI and Liaison confirmed on the Awardee tab.
+- Not shipped: the suggested reviewer is not usable in the app (the Find tab reads the Request's Potential Reviewer slots, and the synthetic fence refuses the person); slice B4 is in plan revision.
+**Why it matters:** clones are now realistic for contact-driven workflows; testing the reviewer workflow waits on B4.
+**Pointers:** `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md` (*Order* 4–6); `lib/services/test-requests/cast-runner.js`, `cast-binding-runner.js`.
+
+## September 2026 — Test Request Factory: first production clone verified; status setter live (Session 547)
+
+**Milestone:** The Factory produced its first verified production test Request (1003302), checked against a Foundation-account transition contract at creation and an hour later, and gained a status setter that moves a test Request's Phase I/II Status with the platform's reactions recorded; its first change made the clone visible in Workbench.
+**Sessions:** 547 (Opus; one Codex adversarial round per slice; owner decided every finding; two owner-run production runs).
+**Ship state:**
+- PR #352, #354: pre-create Foundation baseline and transition contract in `verify`, read-only `--run-recheck`; the first run (1003301) stopped on two explained causes (create plug-in sets `Pending`; all 15 rollups recalculate together).
+- Second run 1003302 `ready`, one-hour recheck passed; MVP item 5 complete.
+- PR #355 (`466b23fb9`): `--set-status` / `--status-recheck` with a transition table from the workflow definitions, `If-Match` fence, quiet completion, replay guard; first production change confirmed Request Status follows on API updates.
+**Why it matters:** a staff-usable production test Request now exists end to end; the next step, a synthetic PI/Liaison/suggested reviewer, waits only on the platform owner's Business Central answer.
+**Pointers:** `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md`; `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`; `lib/services/test-requests/foundation-transition.js`, `status-change-runner.js`.
+
+## September 2026 — Test Request Factory production enablement: MVP scope, write fence, email allowlist; isolation live (Session 546)
+
+**Milestone:** After eight days of sandbox-first hardening, the owner cut item 7 to a production MVP (a basic clone that lands before reviewer invite, the cloning admin as program director, an email recipient allowlist) and production enablement shipped: wave29 applied in production and `TEST_REQUEST_ISOLATION=on` live.
+**Sessions:** 546 (Opus; one Codex adversarial round per slice; owner decided every finding).
+**Ship state:**
+- PR #349 (`9ba8692a2`): pinned `--target=production`; production clone lands Phase II Pending in the Research program with the cloning admin as PD; GoVerify bypass, legacy execute and non-basic recipes refused; meeting date never re-written.
+- PR #350 (`fe71c846f`): run-scoped production write fence (closed POST shapes, destination-only Graph writes, source refused) and live source-revision checks.
+- PR #351 (`3738af3f0`): test-Request email allowlist (`@wmkeck.org` + admin-edited list) at create and dispatch; dispatch-gap residual risk accepted.
+- Production: wave29 applied (owner-run) and isolation on (redeploy `abv0745vo`); no production clone created yet.
+**Why it matters:** the first usable result of the Factory is one owner-run command away; scope is now anchored to the original ask (memory `feedback-anchor-multisession-features-to-the-original-ask`).
+**Pointers:** `docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md` (*Owner decisions*, *MVP build list*); `lib/services/test-requests/production-write-fence.js`, `email-allowlist.js`.
+
+## September 2026 — Test Request Factory: synthetic reviewers and reviews recipe promoted and live-proven (Session 543)
+
+**Milestone:** A cloned test Request can now carry synthetic reviewers and their reviews copied from the source: marker-isolated synthetic person rows (`wmkf_issyntheticreviewer`, wave30), suggestions, answer rows and received stamps, with review files copied and DOCX packages attested against SharePoint's characterized property promotion, and a terminal verifier that marks the run ready.
+**Sessions:** 543 (Fable orchestrating; Sonnet builds; Opus stage reviews; three Codex adversarial rounds on the slice plus an owner-directed Codex loop over the Fable-authored closures, ending in approve; owner acceptance; live proof).
+**Ship state:**
+- PR #337 (`39f641bac`, marker-guard hardening), #341 (`f54f5d5cf`, slice 6c-ii) and #342 (`df733dbc6`, live-proof fixes) merged and deployed; `SYNTHETIC_REVIEWER_ISOLATION` unset in production (off); wave30 applied to the sandbox only; migration 054 still unapplied on every shared database.
+- Live proof: sandbox Request 1000343 reached `ready` through eighteen steps; two live-only facts fixed (Dataverse derives a reviewer's primary name from first/last on create and update; a Boolean's platform default is not a live value).
+- Not exercised live: the uploaded-review branch (copy, DOCX attestation, `Reviewer_Uploads` census) — unit-proven, live-pending until a source with an uploaded review is cloned.
+**Why it matters:** reviewer-facing staff workflows can be exercised on a test Request whose reviewers are synthetic and invisible to ordinary reviewer lookups, with every write journaled before dispatch and every normalized DOCX part held to a byte ceiling and a shape.
+**Pointers:** `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md` (slice 6c-i/6c-ii records); `docs/plans/evidence/test-request-factory/reviews-recipe-live-proof-2026-09-26.md`; `docs/agent-wiki/topics/dataverse-dynamics.md` (name-derivation correction).
+
+## September 2026 — Staff Deliberations shows applicant presentation materials (Session 543-UI)
+
+**Milestone:** The Workbench Staff Deliberations tab links an applicant's slides and participant bios straight from the request's SharePoint folders, with a presentation/materials status line, so staff no longer open AkoyaGo to find them.
+**Sessions:** 543-UI (parallel `claude/ui-work` worktree; Opus; owner check on Request 1002903).
+**Ship state:**
+- PR #338 merged `98cc433ad`; production `dpl_HCSqQTQartDj6QujF8j5RC3LFFzk` Ready on `applications.wmkeck.org`.
+- New read-only route `/api/workbench/site-visit/material-files` lists `Site Visit - Slides` / `Site Visit - Participant Bios`. It is interim while the upload portal is in testing and files are placed by hand.
+- The card sits above Email history once the brief is shared. The Site Visit read now reports a failure instead of looking like "not scheduled".
+**Why it matters:** the files the Board and staff deliberate on are one click from the request, whether they came through the portal or not.
+**Pointers:** `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.13; `98cc433ad`.
+
+## September 2026 — Test Request Factory promoted: ledger-driven runner and the Initial Assessment recipe (Sessions 536–542)
+
+**Milestone:** Disposable, realistic test Requests can now be manufactured from a production source bundle into the Dataverse sandbox through a durable run ledger and a bounded, resumable runner, and the first later-stage recipe seeds a synthetic Initial Assessment plus Board snapshot through the unmodified production lineage functions.
+**Sessions:** 536–542; Fable orchestrating, Sonnet builds, Opus stage reviews, Codex adversarial rounds (eight findings closed), owner decisions, live sandbox proof, owner acceptance.
+**Ship state:**
+- PR #336 merged `b63803951`; production `dpl_F3XxWLs9Kcg8feoXVgzbkmcpHdfJ` Ready on `applications.wmkeck.org`. Migration 054 on `main`, unapplied until build-order item 7.
+- Live proof: sandbox Request 1000342 reached `ready` through eleven journal-before-dispatch steps; two live-only findings fixed (GoVerify bypass bound 60 s; SharePoint property promotion handled by `docx-package-attestation.js`).
+- Recipes remaining: synthetic reviewers/reviews, site-visit materials, Pre-Site, Pre-RP/Final Writeup; then the admin form and production release (item 7).
+**Why it matters:** staff workflows can be exercised end to end on requests that never touch a real applicant, with every sandbox write journaled before dispatch and verified after.
+**Pointers:** `docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md`; `docs/plans/evidence/test-request-factory/ia-recipe-live-proof-2026-09-24.md`; `b63803951`, `d26382155`.
+
 ## September 2026 — Meeting Tracker materials workflow and visual status tracking (Session 529)
 
 **Milestone:** Program coordinators can personalize materials invitations/reminders, save their own defaults, and scan or filter requests by materials status with direct request/review links.

@@ -1,3 +1,7 @@
+/** @jest-environment node */
+
+import { fetch as undiciFetch, FormData as UndiciFormData, Request as UndiciRequest } from 'undici';
+
 /**
  * cloudmersive-scan.test.js
  *
@@ -17,6 +21,19 @@
 
 const originalFetch = global.fetch;
 const originalKey = process.env.CLOUDMERSIVE_API_KEY;
+
+function parseMultipartBody(body, contentType) {
+  const boundary = contentType.match(/boundary=([^;]+)/)?.[1];
+  if (!boundary) throw new Error('multipart boundary is missing');
+  const headerEnd = body.indexOf(Buffer.from('\r\n\r\n'));
+  const headers = body.subarray(0, headerEnd).toString('utf8');
+  const filename = headers.match(/filename="([^"]*)"/)?.[1];
+  const payloadStart = headerEnd + 4;
+  const terminator = Buffer.from(`\r\n--${boundary}--\r\n`);
+  const payloadEnd = body.lastIndexOf(terminator);
+  if (headerEnd < 0 || !filename || payloadEnd < payloadStart) throw new Error('multipart body is malformed');
+  return { headers, filename, payload: body.subarray(payloadStart, payloadEnd) };
+}
 
 let fetchCalls = [];
 
@@ -118,6 +135,8 @@ describe('scanBytes — infected', () => {
     expect(out.foundViruses).toEqual([
       { fileName: 'eicar.com', virusName: 'EICAR-Test-Signature' },
     ]);
+    expect(out.signatureDetected).toBe(true);
+    expect(out.contentFlags).toEqual([]);
   });
 
   test('missing FoundViruses array still yields infected with []', async () => {
@@ -129,6 +148,8 @@ describe('scanBytes — infected', () => {
     expect(out.scan_result).toBe('infected');
     expect(out.foundViruses).toEqual([]);
     expect(out.detectedThreats).toEqual([]);
+    expect(out.signatureDetected).toBe(false);
+    expect(out.contentFlags).toEqual([]);
   });
 
   test('CleanResult=false + ContainsMacros=true → infected with synthesized foundViruses', async () => {
@@ -150,6 +171,8 @@ describe('scanBytes — infected', () => {
       { fileName: 'macro.docx', virusName: 'embedded macro' },
     ]);
     expect(out.detectedThreats).toEqual(['embedded macro']);
+    expect(out.signatureDetected).toBe(false);
+    expect(out.contentFlags).toEqual(['embedded_macro']);
     expect(out.verifiedFileFormat).toBe('docx');
   });
 
@@ -173,6 +196,7 @@ describe('scanBytes — infected', () => {
       { fileName: 'multi.docx', virusName: 'embedded executable' },
     ]);
     expect(out.detectedThreats).toEqual(['embedded executable', 'embedded macro', 'embedded script']);
+    expect(out.contentFlags).toEqual(['embedded_executable', 'embedded_macro', 'embedded_script']);
   });
 
   test('signature match wins precedence over Contains* synthesis', async () => {
@@ -194,6 +218,22 @@ describe('scanBytes — infected', () => {
       { fileName: 'eicar.com', virusName: 'EICAR-Test-Signature' },
     ]);
     expect(out.detectedThreats).toEqual(['embedded macro']);
+    expect(out.signatureDetected).toBe(true);
+    expect(out.contentFlags).toEqual(['embedded_macro']);
+  });
+
+  test('malformed signature rows do not count as native signatures; HTML is excluded from diagnostic flags', async () => {
+    mockFetchSequence([() => ({ status: 200, body: {
+      CleanResult: false,
+      FoundViruses: [{ FileName: 'secret-file.pdf', VirusName: { raw: 'provider detail' } }],
+      ContainsHtml: true,
+    } })]);
+    const { scanBytes } = await loadService();
+    const out = await scanBytes(Buffer.from('x'), 'safe.pdf');
+    expect(out.signatureDetected).toBe(false);
+    expect(out.contentFlags).toEqual([]);
+    expect(out.foundViruses).toEqual([{ fileName: 'secret-file.pdf', virusName: null }]);
+    expect(out.detectedThreats).toEqual(['embedded HTML']);
   });
 });
 
@@ -240,6 +280,265 @@ describe('scanBytes — transient retry', () => {
       causeKind: 'socket',
     });
     expect(fetchCalls).toHaveLength(3);
+  });
+
+  test('a 429 followed by an abort reports the final timeout cause', async () => {
+    jest.useFakeTimers();
+    const random = jest.spyOn(Math, 'random').mockReturnValue(0);
+    global.fetch = jest.fn(async (_url, init) => {
+      fetchCalls.push({ url: _url, init });
+      if (fetchCalls.length === 1) {
+        return { ok: false, status: 429, text: async () => 'busy' };
+      }
+      return new Promise((_resolve, reject) => {
+        init.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })), { once: true });
+      });
+    });
+    try {
+      const { scanBytes } = await loadService();
+      const pending = scanBytes(Buffer.from('x'), 'x.txt', { timeoutMs: 10, maxAttempts: 2 });
+      const outcome = pending.catch((error) => error);
+      await jest.advanceTimersByTimeAsync(500);
+      await jest.advanceTimersByTimeAsync(10);
+      expect(await outcome).toMatchObject({ status: null, noResponse: true, causeKind: 'abort', isTransient: true });
+      expect(fetchCalls).toHaveLength(2);
+    } finally {
+      random.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+});
+
+describe('scanBytes — streamed multipart protocol', () => {
+  test('posts exact multipart bytes and retries the complete body after 503', async () => {
+    const http = await import('node:http');
+    const requests = [];
+    const server = http.createServer((req, res) => {
+      const chunks = [];
+      req.on('data', (chunk) => chunks.push(chunk));
+      req.on('end', () => {
+        requests.push({
+          method: req.method,
+          headers: req.headers,
+          body: Buffer.concat(chunks),
+        });
+        if (requests.length === 1) {
+          res.writeHead(503, { 'Content-Type': 'text/plain' });
+          res.end('try again');
+        } else {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ CleanResult: true, FoundViruses: [] }));
+        }
+      });
+    });
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address();
+    global.fetch = (_url, init) => undiciFetch(`http://127.0.0.1:${port}/scan`, init);
+    const bytes = Buffer.from([0, 1, 2, 13, 10, 255]);
+    const filename = 'proposal "final"\r\n雪.pptx';
+    const referenceForm = new UndiciFormData();
+    referenceForm.append('inputFile', new Blob([bytes]), filename);
+    const referenceRequest = new UndiciRequest('http://unit.test/scan', { method: 'POST', body: referenceForm });
+    const expected = parseMultipartBody(Buffer.from(await referenceRequest.arrayBuffer()), referenceRequest.headers.get('content-type'));
+
+    try {
+      const { scanBytes } = await loadService();
+      const result = await scanBytes(bytes, filename, { timeoutMs: 5_000, maxAttempts: 2 });
+      expect(result.scan_result).toBe('clean');
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+
+    expect(requests).toHaveLength(2);
+    for (const request of requests) {
+      expect(request.method).toBe('POST');
+      expect(request.headers['transfer-encoding']).toBeUndefined();
+      expect(Number(request.headers['content-length'])).toBe(request.body.length);
+      const parsed = parseMultipartBody(request.body, request.headers['content-type']);
+      expect(parsed.headers).toContain('name="inputFile"');
+      expect(parsed.headers).toContain('Content-Type: application/octet-stream');
+      expect(parsed.filename).toBe(expected.filename);
+      expect(parsed.payload).toEqual(expected.payload);
+    }
+  });
+
+  test('an abort during a backpressured streamed request remains a timeout error', async () => {
+    const http = await import('node:http');
+    let bytesReceived = 0;
+    const sockets = new Set();
+    const server = http.createServer((req) => {
+      req.on('data', (chunk) => {
+        bytesReceived += chunk.length;
+        req.pause();
+      });
+    });
+    server.on('connection', (socket) => {
+      sockets.add(socket);
+      socket.on('close', () => sockets.delete(socket));
+    });
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address();
+    global.fetch = (_url, init) => undiciFetch(`http://127.0.0.1:${port}/scan`, init);
+
+    try {
+      const { scanBytes } = await loadService();
+      await expect(scanBytes(Buffer.alloc(32 * 1024 * 1024), 'slow.pptx', { timeoutMs: 200, maxAttempts: 1 }))
+        .rejects.toMatchObject({ serviceName: 'cloudmersive', noResponse: true, causeKind: 'abort', isTransient: true });
+      expect(bytesReceived).toBeGreaterThan(0);
+    } finally {
+      // The deliberately paused request may still be open after the client
+      // aborts. Destroy accepted sockets so server.close cannot hang on it.
+      for (const socket of sockets) socket.destroy();
+      await new Promise((resolve) => server.close(resolve));
+    }
+  });
+});
+
+describe('scanBytes — bounded per-call options and full response deadline', () => {
+  test('defaults remain 30 seconds and three attempts; caller can choose a smaller retry budget', async () => {
+    mockFetchSequence([() => ({ status: 503, body: 'temporary' })]);
+    const { scanBytes, TIMEOUT_MS, MAX_ATTEMPTS } = await loadService();
+    expect(TIMEOUT_MS).toBe(30_000);
+    expect(MAX_ATTEMPTS).toBe(3);
+    await expect(scanBytes(Buffer.from('x'), 'x.txt', { timeoutMs: 90_000, maxAttempts: 1 }))
+      .rejects.toMatchObject({ status: 503, serviceName: 'cloudmersive' });
+    expect(fetchCalls).toHaveLength(1);
+  });
+
+  test.each([
+    { timeoutMs: 0, maxAttempts: 1 },
+    { timeoutMs: 90_001, maxAttempts: 1 },
+    { timeoutMs: 1.5, maxAttempts: 1 },
+    { timeoutMs: 90_000, maxAttempts: 0 },
+    { timeoutMs: 90_000, maxAttempts: 4 },
+    { timeoutMs: 90_000, maxAttempts: 1.5 },
+  ])('invalid scanner options are non-transient configuration errors: %j', async (options) => {
+    global.fetch = jest.fn();
+    const { scanBytes } = await loadService();
+    await expect(scanBytes(Buffer.from('x'), 'x.txt', options)).rejects.toMatchObject({
+      serviceName: 'cloudmersive', status: 500, isTransient: false,
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test('default deadline still aborts a request after 30 seconds', async () => {
+    jest.useFakeTimers();
+    global.fetch = jest.fn(async (_url, init) => {
+      fetchCalls.push({ url: _url, init });
+      return new Promise((_resolve, reject) => {
+        init.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })), { once: true });
+      });
+    });
+    try {
+      const { scanBytes } = await loadService();
+      const pending = scanBytes(Buffer.from('x'), 'x.txt', { maxAttempts: 1 });
+      const outcome = pending.catch((error) => error);
+      await jest.advanceTimersByTimeAsync(29_999);
+      expect(fetchCalls).toHaveLength(1);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(await outcome).toMatchObject({ causeKind: 'abort', noResponse: true });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('site-visit timeout profile can accept a slow scan after the old 30-second default', async () => {
+    jest.useFakeTimers();
+    global.fetch = jest.fn(async (_url, init) => {
+      fetchCalls.push({ url: _url, init });
+      return new Promise((resolve, reject) => {
+        const abort = () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+        init.signal.addEventListener('abort', abort, { once: true });
+        setTimeout(() => {
+          init.signal.removeEventListener('abort', abort);
+          resolve({ ok: true, status: 200, json: async () => ({ CleanResult: true }) });
+        }, 45_000);
+      });
+    });
+    try {
+      const { scanBytes } = await loadService();
+      const pending = scanBytes(Buffer.from('x'), 'x.pptx', { timeoutMs: 90_000, maxAttempts: 2 });
+      const outcome = pending.then((value) => value, (error) => error);
+      await jest.advanceTimersByTimeAsync(45_000);
+      expect(await outcome).toMatchObject({ scan_result: 'clean' });
+      expect(fetchCalls).toHaveLength(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('site-visit timeout profile exhausts after exactly two 90-second attempts', async () => {
+    jest.useFakeTimers();
+    const random = jest.spyOn(Math, 'random').mockReturnValue(0);
+    global.fetch = jest.fn(async (_url, init) => {
+      fetchCalls.push({ url: _url, init });
+      return new Promise((_resolve, reject) => {
+        init.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })), { once: true });
+      });
+    });
+    try {
+      const { scanBytes } = await loadService();
+      const pending = scanBytes(Buffer.from('x'), 'x.pptx', { timeoutMs: 90_000, maxAttempts: 2 });
+      const outcome = pending.catch((error) => error);
+      await jest.advanceTimersByTimeAsync(90_000);
+      expect(fetchCalls).toHaveLength(1);
+      await jest.advanceTimersByTimeAsync(500);
+      expect(fetchCalls).toHaveLength(2);
+      await jest.advanceTimersByTimeAsync(90_000);
+      expect(await outcome).toMatchObject({ causeKind: 'abort', noResponse: true });
+      expect(fetchCalls).toHaveLength(2);
+    } finally {
+      random.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
+  test('timeout includes a successful response body read', async () => {
+    jest.useFakeTimers();
+    global.fetch = jest.fn(async (_url, init) => {
+      fetchCalls.push({ url: _url, init });
+      return {
+        ok: true,
+        status: 200,
+        json: () => new Promise((_resolve, reject) => {
+          init.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })), { once: true });
+        }),
+      };
+    });
+    try {
+      const { scanBytes } = await loadService();
+      const pending = scanBytes(Buffer.from('x'), 'x.txt', { timeoutMs: 10, maxAttempts: 1 });
+      const outcome = pending.catch((error) => error);
+      await jest.advanceTimersByTimeAsync(10);
+      expect(await outcome).toMatchObject({ status: null, noResponse: true, causeKind: 'abort' });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('an HTTP error status remains structured if reading its body reaches the deadline', async () => {
+    jest.useFakeTimers();
+    global.fetch = jest.fn(async (_url, init) => {
+      fetchCalls.push({ url: _url, init });
+      return {
+        ok: false,
+        status: 500,
+        text: () => new Promise((_resolve, reject) => {
+          init.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })), { once: true });
+        }),
+      };
+    });
+    try {
+      const { scanBytes } = await loadService();
+      const pending = scanBytes(Buffer.from('x'), 'x.txt', { timeoutMs: 10, maxAttempts: 1 });
+      const outcome = pending.catch((error) => error);
+      await jest.advanceTimersByTimeAsync(10);
+      const error = await outcome;
+      expect(error).toMatchObject({ serviceName: 'cloudmersive', status: 500, isTransient: true });
+      expect(error).not.toHaveProperty('noResponse');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

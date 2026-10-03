@@ -1,0 +1,26 @@
+{
+  "name": "akoya_request-test-request-reminder-controls",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_request",
+  "_comment": "Sandbox parity subset of the existing wave7 reviewer-engagement contract. Add only the two reminder-disable controls required for a synthetic Request create. Creation-only and idempotent; do not copy the rest of wave7 or change an existing attribute.",
+  "attributes": [
+    {
+      "type": "Boolean",
+      "schemaName": "wmkf_RespondReminderEnabled",
+      "displayName": "Respond Reminder Enabled",
+      "default": true,
+      "trueLabel": "Enabled",
+      "falseLabel": "Disabled",
+      "description": "Campaign config: whether the respond-by reminder fires for this request (Phase 3). Default Enabled. Synthetic requests explicitly write false at create."
+    },
+    {
+      "type": "Boolean",
+      "schemaName": "wmkf_ReviewDueReminderEnabled",
+      "displayName": "Review Due Reminder Enabled",
+      "default": true,
+      "trueLabel": "Enabled",
+      "falseLabel": "Disabled",
+      "description": "Campaign config: whether the review-due reminder fires for this request (Phase 3). Default Enabled. Synthetic requests explicitly write false at create."
+    }
+  ]
+}

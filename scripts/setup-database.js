@@ -5,48 +5,33 @@
  *   node scripts/setup-database.js
  *
  * Prerequisites:
- * 1. Create Vercel Postgres database in Vercel Dashboard
- * 2. Pull environment variables: vercel env pull .env.local
- * 3. Run this script
+ * 1. Create a new, empty database.
+ * 2. Provide POSTGRES_URL (preferred) or DATABASE_URL; when neither is set,
+ *    missing values may be read from .env.local without overriding the process.
+ * 3. Run this script. Existing environments use apply-migrations.js.
  *
  * FRESH DATABASES ONLY. Existing environments must use:
  *   node scripts/apply-migrations.js
  *
- * The script refuses to run when the public schema already contains tables.
+ * The helper calls assertFreshDatabase and refuses when public already has tables.
  * A deliberate bootstrap recovery may set ALLOW_POPULATED_DATABASE_SETUP=true,
  * but routine schema changes must never use that override.
  */
 
 const fs = require('fs');
 const path = require('path');
-const { assertFreshDatabase } = require('./lib/database-bootstrap-guard');
+const { resolveDatabaseUrl } = require('./lib/fresh-database-bootstrap');
 
-// Load environment variables from .env.local
-const envPath = path.join(__dirname, '..', '.env.local');
-if (fs.existsSync(envPath)) {
-  const envContent = fs.readFileSync(envPath, 'utf8');
-  envContent.split('\n').forEach(line => {
-    const trimmed = line.trim();
-    if (trimmed && !trimmed.startsWith('#')) {
-      const [key, ...valueParts] = trimmed.split('=');
-      if (key && valueParts.length > 0) {
-        let value = valueParts.join('=');
-        // Remove surrounding quotes if present
-        if ((value.startsWith('"') && value.endsWith('"')) ||
-            (value.startsWith("'") && value.endsWith("'"))) {
-          value = value.slice(1, -1);
-        }
-        process.env[key] = value;
-      }
-    }
-  });
-  console.log('Loaded environment variables from .env.local');
-} else {
-  console.error('No .env.local file found. Run: vercel env pull .env.local');
-  process.exit(1);
+// The target is captured before dotenv is read so a repo-local fallback can
+// never replace an explicitly injected database URL.
+function loadDatabaseUrl() {
+  const envPath = path.join(__dirname, '..', '.env.local');
+  const dotenvText = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : null;
+  if (dotenvText !== null) {
+    console.log('Loaded environment variables from .env.local');
+  }
+  return resolveDatabaseUrl({ env: process.env, dotenvText });
 }
-
-const { sql } = require('@vercel/postgres');
 
 // Define SQL statements explicitly for reliable execution
 const statements = [
@@ -159,7 +144,22 @@ const v13Statements = [
     status VARCHAR(50) DEFAULT 'pending',
     reviewed_at TIMESTAMP,
     notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    request_id UUID
+  )`,
+
+  // Append-only lead Program Director/superuser dispositions for workbench screens.
+  `CREATE TABLE IF NOT EXISTS integrity_screening_reviews (
+    id SERIAL PRIMARY KEY,
+    screening_id INTEGER NOT NULL REFERENCES integrity_screenings(id),
+    request_id UUID NOT NULL,
+    reviewer_profile_id INTEGER NOT NULL REFERENCES user_profiles(id),
+    reviewer_systemuser_id UUID NOT NULL,
+    decision VARCHAR(16) NOT NULL CHECK (decision IN ('approved', 'hold')),
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT integrity_screening_reviews_notes_length CHECK (char_length(notes) <= 2000),
+    CONSTRAINT integrity_screening_reviews_hold_notes CHECK (decision <> 'hold' OR length(trim(notes)) > 0)
   )`,
 
   // Table: screening_dismissals (false positive tracking)
@@ -183,6 +183,9 @@ const v13Statements = [
   `CREATE INDEX IF NOT EXISTS idx_integrity_screenings_user ON integrity_screenings(user_profile_id)`,
   `CREATE INDEX IF NOT EXISTS idx_integrity_screenings_status ON integrity_screenings(status)`,
   `CREATE INDEX IF NOT EXISTS idx_integrity_screenings_created ON integrity_screenings(created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_integrity_screenings_request_latest ON integrity_screenings(request_id, created_at DESC, id DESC) WHERE request_id IS NOT NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_integrity_screening_reviews_request_created ON integrity_screening_reviews(request_id, created_at DESC, id DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_integrity_screening_reviews_screening_created ON integrity_screening_reviews(screening_id, created_at DESC, id DESC)`,
 
   // Indexes for screening_dismissals
   `CREATE INDEX IF NOT EXISTS idx_screening_dismissals_screening ON screening_dismissals(screening_id)`,
@@ -683,7 +686,7 @@ const v38Statements = [
 const v39Statements = [
   `CREATE TABLE IF NOT EXISTS portal_upload_staging (
     id UUID PRIMARY KEY,
-    scope TEXT NOT NULL CONSTRAINT portal_upload_staging_scope_check CHECK (scope IN ('grantee_image', 'staff_grantee_image', 'site_visit_material', 'consultant_feedback')),
+    scope TEXT NOT NULL CONSTRAINT portal_upload_staging_scope_check CHECK (scope IN ('grantee_image', 'staff_grantee_image', 'site_visit_material', 'consultant_feedback', 'post_presentation_transcript')),
     resource_id UUID NOT NULL,
     actor_binding TEXT NOT NULL,
     pathname TEXT NOT NULL UNIQUE,
@@ -1141,13 +1144,14 @@ const v50Statements = [
 ];
 
 // V51: Consultant Feedback slice 2 (mirrors migration 049) — widen the shared
-// portal_upload_staging scope allowlist to add 'consultant_feedback'.
+// portal_upload_staging scope allowlist. Fresh installs include the complete
+// post-presentation transcript scope added by migration 055.
 const v51Statements = [
   `ALTER TABLE portal_upload_staging
      DROP CONSTRAINT IF EXISTS portal_upload_staging_scope_check`,
   `ALTER TABLE portal_upload_staging
      ADD CONSTRAINT portal_upload_staging_scope_check
-     CHECK (scope IN ('grantee_image', 'staff_grantee_image', 'site_visit_material', 'consultant_feedback'))`,
+     CHECK (scope IN ('grantee_image', 'staff_grantee_image', 'site_visit_material', 'consultant_feedback', 'post_presentation_transcript'))`,
 ];
 
 // V52: non-authoritative reviewer institution measurement. Mirrors migration 051.
@@ -1219,6 +1223,312 @@ const v53Statements = [
      )`,
 ];
 
+// V55: Test Request Factory run ledger. Mirrors migration 054.
+const v55Statements = [
+  `CREATE OR REPLACE FUNCTION test_request_receipt_ok(receipt JSONB) RETURNS BOOLEAN
+LANGUAGE sql IMMUTABLE AS $receipt$
+  SELECT receipt IS NULL OR (
+    jsonb_typeof(receipt) = 'object'
+    AND (SELECT count(*) FROM jsonb_object_keys(receipt)) <= 40
+    AND NOT EXISTS (
+      SELECT 1
+        FROM jsonb_each(receipt) AS e(key, value)
+        CROSS JOIN LATERAL (SELECT e.value #>> '{}' AS v, jsonb_typeof(e.value) AS t) AS s
+       WHERE NOT (
+         (e.key IN ('size', 'itemSize', 'statusCode', 'responseStatus', 'sequence', 'index', 'count', 'versionNumber', 'answerCount', 'assignmentSequence', 'promptVersion') AND s.t = 'number')
+         OR (e.key IN ('sha256Match', 'sizeMatch', 'recovered', 'recoveredByExactItem', 'restored', 'restoreVerified', 'restoreWasAlreadyActive', 'manualRecheckRequired', 'matched', 'exists', 'ok') AND s.t = 'boolean')
+         OR (e.key IN ('requestIds', 'locationIds', 'emailIds', 'trackingIds', 'paymentIds', 'jobIds') AND s.t = 'array' AND NOT EXISTS (
+              SELECT 1 FROM jsonb_array_elements(e.value) AS a WHERE jsonb_typeof(a) <> 'string' OR (a #>> '{}') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'))
+         OR (e.key = 'primaryContactId' AND s.t = 'null')
+         OR (e.key = 'itemIds' AND s.t = 'array' AND NOT EXISTS (
+              SELECT 1 FROM jsonb_array_elements(e.value) AS a WHERE jsonb_typeof(a) <> 'string' OR (a #>> '{}') !~ '^01[A-Z2-7]{32}$'))
+         OR (e.key = 'resourceIds' AND s.t = 'array' AND NOT EXISTS (
+              SELECT 1 FROM jsonb_array_elements(e.value) AS a WHERE jsonb_typeof(a) <> 'string' OR (a #>> '{}') !~ '^[0-9]{1,20}$'))
+         OR (
+           s.t = 'string'
+           AND length(s.v) BETWEEN 1 AND 200
+           AND s.v !~ '(://|[[:cntrl:]])'
+           AND s.v !~ '(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'
+           AND CASE
+             WHEN e.key IN ('requestId', 'runId', 'locationId', 'parentLocationId', 'workflowId', 'ownerId', 'createdById', 'expectedAppUserId', 'applicantId', 'organizationId', 'requestDocumentId', 'sourcePersonId', 'destinationPersonId', 'suggestionId', 'promptId', 'confirmedRunId', 'primaryContactId', 'liaisonContactId', 'piContactId', 'researchLeaderContactId') THEN s.v ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+             WHEN e.key = 'requestNumber' THEN s.v ~ '^[0-9]{1,10}$'
+             WHEN e.key IN ('itemId', 'folderItemId', 'graphItemId', 'sourceGraphItemId') THEN s.v ~ '^01[A-Z2-7]{32}$'
+             WHEN e.key IN ('driveId', 'sourceDriveId') THEN s.v ~ '^b![A-Za-z0-9_-]{16,120}$'
+             WHEN e.key = 'siteId' THEN s.v ~* '^[a-z0-9.-]+[.]sharepoint[.]com,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12},[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+             WHEN e.key = 'library' THEN s.v ~ '^[a-z][a-z0-9_]{1,60}$'
+             WHEN e.key IN ('folder', 'relativeUrl') THEN s.v ~ '^([0-9]{1,10}_[0-9A-F]{32}(/(Phase I|AI Materials|Reviewer Materials|Artifacts/Initial Assessment(/Board Milestones)?|Reviewer_Uploads/([A-Za-z0-9]{1,30}_)?[0-9a-f]{8}/attempt_[0-9a-f]{32}))?|(Phase I|AI Materials|Reviewer Materials|Artifacts/Initial Assessment(/Board Milestones)?|Reviewer_Uploads/([A-Za-z0-9]{1,30}_)?[0-9a-f]{8}/attempt_[0-9a-f]{32}))$'
+             WHEN e.key IN ('filename', 'name') THEN s.v ~ '^((Proposal|ProposalNarrative|ProposalBibliography)_[0-9]{1,10}[.]pdf|(ProjectDescription|Biosketches|ProjectBudget)[.]pdf|Project Budget spreadsheet[.]xlsx|[0-9]{1,10} Initial Assessment [0-9a-f]{8}-[0-9a-f]{8}[.]docx|[0-9]{1,10} Initial Assessment Board v[0-9A-Za-z._-]{1,40} [0-9a-f]{8}[.]docx|Review_[1-5][.](pdf|docx|doc))$'
+             WHEN e.key = 'mimeType' THEN s.v ~ '^[a-z]+/[a-z0-9.+-]{1,80}$'
+             WHEN e.key IN ('eTag', 'eTagBefore', 'eTagAfter') THEN s.v ~ '^(W/)?"[{]?[0-9A-Za-z-]{1,40}[}]?(,[0-9]{1,9})?"$'
+             WHEN e.key IN ('versionId', 'sourceVersionId') THEN s.v ~ '^([0-9]{1,6}[.][0-9]{1,6}|[0-9]{1,12}|[0-9A-Za-z]{1,40})$'
+             WHEN e.key IN ('versionNumber', 'versionNumberBefore', 'versionNumberAfter') THEN s.v ~ '^[0-9]{1,20}$'
+             WHEN e.key IN ('contentHash', 'generationKey', 'claimTokenSha256', 'foundationBaselineSha256', 'foundationProjectionSha256', 'foundationGoverifyResultSha256', 'foundationGuidestarSha256', 'foundationContactsSha256', 'requestStatusSha256', 'bytesSha256', 'addressSha256', 'attestedDigest', 'inputFingerprint', 'renderInputFingerprint') THEN s.v ~ '^[0-9a-f]{64}$'
+             WHEN e.key IN ('outcome', 'kind') THEN s.v ~ '^[a-z][a-z0-9_-]{0,39}$'
+             WHEN e.key = 'reviewForm' THEN s.v ~ '^(uploaded|received_no_file|unreceived)$'
+             WHEN e.key = 'field' THEN s.v ~ '^[a-z][a-z0-9_]{0,63}$'
+             WHEN e.key IN ('expectedValue', 'actualValue', 'valueBefore', 'valueAfter', 'fiscalYear', 'meetingDate') THEN s.v ~ '^([0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2}([.][0-9]{1,3})?)?Z?)?|(January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4})$'
+             WHEN e.key ~ '^[a-z][A-Za-z0-9]{0,40}At$' AND e.key !~* 'body|content|purpose|token|secret|download|narrative|bytes|title|text|note|message' THEN s.v ~ '^([0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}(:[0-9]{2}([.][0-9]{1,3})?)?Z?)?|(January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4})$'
+             ELSE FALSE
+           END
+         )
+       )
+    )
+  )
+$receipt$`,
+  `CREATE TABLE IF NOT EXISTS test_request_runs (
+    run_id UUID PRIMARY KEY, actor_id TEXT NOT NULL, idempotency_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN (
+      'prepared', 'creating', 'ready', 'needs_attention', 'retiring', 'retired'
+    )),
+    current_step TEXT NOT NULL, step_index INTEGER NOT NULL DEFAULT 0, recipe TEXT NOT NULL,
+    source_dataverse_host TEXT NOT NULL, source_request_id UUID NOT NULL,
+    source_request_number TEXT NOT NULL, source_revision TEXT NOT NULL,
+    bundle_sha256 TEXT NOT NULL, bundle_exported_at TIMESTAMPTZ NOT NULL,
+    copy_policy_version TEXT NOT NULL, copy_policy_digest TEXT NOT NULL,
+    plan_digest TEXT NOT NULL, create_body_sha256 TEXT NOT NULL,
+    destination_environment TEXT NOT NULL CHECK (destination_environment IN ('sandbox', 'production')),
+    destination_dataverse_host TEXT NOT NULL,
+    destination_request_id UUID NOT NULL UNIQUE, destination_location_id UUID NOT NULL UNIQUE,
+    destination_request_number TEXT NULL,
+    expected_app_user_id UUID NOT NULL, expected_organization_id UUID NOT NULL,
+    expected_graph_site_id TEXT NOT NULL, expected_graph_drive_id TEXT NOT NULL,
+    fiscal_year TEXT NOT NULL, meeting_date DATE NOT NULL, test_label TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1, lease_token UUID NULL,
+    lease_generation INTEGER NOT NULL DEFAULT 0, locked_until TIMESTAMPTZ NULL,
+    attempt_count INTEGER NOT NULL DEFAULT 0, needs_attention_reason TEXT NULL, last_error TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    completed_at TIMESTAMPTZ NULL,
+    CONSTRAINT test_request_runs_actor_idempotency_key UNIQUE (actor_id, idempotency_key),
+    CONSTRAINT test_request_runs_needs_attention_reason_coherence CHECK (
+      (status = 'needs_attention' AND needs_attention_reason IS NOT NULL)
+      OR (status <> 'needs_attention' AND needs_attention_reason IS NULL)
+    ),
+    CONSTRAINT test_request_runs_completed_at_coherence CHECK (
+      (status = 'ready' AND completed_at IS NOT NULL)
+      OR (status IN ('prepared', 'creating', 'needs_attention') AND completed_at IS NULL)
+      OR status IN ('retiring', 'retired')
+    ),
+    CONSTRAINT test_request_runs_request_number_shape CHECK (
+      destination_request_number IS NULL OR destination_request_number ~ '^[0-9]{1,10}$'
+    ),
+    CONSTRAINT test_request_runs_ready_request_number CHECK (
+      status <> 'ready' OR (destination_request_number IS NOT NULL AND destination_request_number ~ '^[0-9]{1,10}$')
+    ),
+    CONSTRAINT test_request_runs_actor_id_shape CHECK (
+      actor_id ~ '^(cli:[0-9a-f]{16}|(admin|user):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$'
+    ),
+    CONSTRAINT test_request_runs_idempotency_key_digest CHECK (idempotency_key ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT test_request_runs_current_step_enum CHECK (current_step IN (
+      'fence_source', 'create_request', 'correct_meeting_date', 'provision_location',
+      'copy_file', 'observe', 'verify', 'ready',
+      'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment',
+      'seed_reviewers', 'copy_review_file', 'seed_review_answers', 'verify_reviews',
+    'seed_presite_ai_run', 'seed_presite_draft', 'render_presite', 'verify_presite'
+    )),
+    CONSTRAINT test_request_runs_recipe_enum CHECK (recipe IN (
+      'basic', 'initial_assessment', 'reviews', 'pre_site_visit', 'final_writeup', 'site_visit_materials'
+    )),
+    CONSTRAINT test_request_runs_host_shapes CHECK (
+      source_dataverse_host ~ '^[a-z0-9][a-z0-9.-]{1,253}$'
+      AND destination_dataverse_host ~ '^[a-z0-9][a-z0-9.-]{1,253}$'
+    ),
+    CONSTRAINT test_request_runs_source_shapes CHECK (
+      source_request_number ~ '^[0-9]{1,10}$'
+      AND source_revision ~ '^(W/)?"?[0-9A-Za-z-]{1,80}"?$'
+    ),
+    CONSTRAINT test_request_runs_digest_shapes CHECK (
+      bundle_sha256 ~ '^[0-9a-f]{64}$' AND copy_policy_digest ~ '^[0-9a-f]{64}$'
+      AND plan_digest ~ '^[0-9a-f]{64}$' AND create_body_sha256 ~ '^[0-9a-f]{64}$'
+      AND copy_policy_version ~ '^[a-z0-9][a-z0-9.-]{0,59}$'
+    ),
+    CONSTRAINT test_request_runs_graph_identity_shapes CHECK (
+      expected_graph_site_id ~* '^[a-z0-9.-]+[.]sharepoint[.]com,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12},[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      AND expected_graph_drive_id ~ '^b![A-Za-z0-9_-]{16,120}$'
+      AND expected_graph_drive_id !~ '(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'
+      AND expected_graph_site_id !~ '(gh[pousr]_|github_pat_|sk-|xox[abprs]-|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{8}|glpat-|AIza|Bearer_)'
+    ),
+    CONSTRAINT test_request_runs_fiscal_year_shape CHECK (
+      fiscal_year ~ '^([0-9]{4}-[0-9]{2}-[0-9]{2}|(January|February|March|April|May|June|July|August|September|October|November|December) [0-9]{4})$'
+    ),
+    CONSTRAINT test_request_runs_test_label_derived CHECK (
+      test_label ~ '^TEST [a-z][a-z0-9_-]{0,39} clone of [0-9]{1,10} run [0-9a-f]{8}$'
+    ),
+    CONSTRAINT test_request_runs_reason_codes CHECK (
+      (needs_attention_reason IS NULL OR regexp_replace(needs_attention_reason, ' [(]http [0-9]{3}[)]$', '') IN (
+        'test_request_run_fenced', 'test_request_run_not_found', 'test_request_run_conflict',
+        'test_request_run_invalid_status', 'test_request_run_invalid_request_number', 'test_request_ledger_unsafe_value',
+        'upstream_http', 'timeout', 'network',
+        'unknown_error', 'lease_unavailable', 'step_failed',
+        'operator_stop', 'preflight_identity_changed', 'manifest_digest_mismatch',
+        'bundle_stale', 'source_fence_failed', 'source_changed',
+        'preallocated_request_present_not_owned', 'preallocated_request_recovered', 'ambiguous_create_outcome',
+        'create_rejected', 'goverify_deactivation_uncertain', 'goverify_restore_unverified',
+        'goverify_restore_failed', 'meeting_date_patch_failed', 'meeting_date_readback_mismatch',
+        'location_preexisting', 'location_readback_mismatch', 'folder_create_failed',
+        'file_conflict', 'file_rejected', 'file_ambiguous_unrecovered',
+        'file_source_changed', 'file_verification_failed', 'file_copy_failed',
+        'observation_side_effects', 'verification_failed', 'request_readback_mismatch',
+        'preallocated_request_present', 'file_journal_unverified',
+        'ia_claim_lost', 'ia_pointer_mismatch', 'ia_upload_ambiguous', 'ia_snapshot_stale', 'ia_verification_failed',
+        'recipe_step_not_built',
+        'reviewer_person_not_synthetic', 'reviewer_person_conflict', 'reviewer_person_provenance_mismatch',
+        'reviewer_person_projection_drift', 'synthetic_reviewer_not_bindable', 'reviewer_suggestion_present_not_owned',
+        'reviewer_answers_ambiguous', 'reviewer_source_changed', 'reviews_verification_failed',
+      'presite_claim_lost', 'presite_pointer_mismatch', 'presite_upload_ambiguous',
+      'presite_snapshot_stale', 'presite_verification_failed', 'presite_promotion_uncharacterized',
+      'presite_ai_run_ambiguous'
+      ))
+      AND (last_error IS NULL OR regexp_replace(last_error, ' [(]http [0-9]{3}[)]$', '') IN (
+        'test_request_run_fenced', 'test_request_run_not_found', 'test_request_run_conflict',
+        'test_request_run_invalid_status', 'test_request_run_invalid_request_number', 'test_request_ledger_unsafe_value',
+        'upstream_http', 'timeout', 'network',
+        'unknown_error', 'lease_unavailable', 'step_failed',
+        'operator_stop', 'preflight_identity_changed', 'manifest_digest_mismatch',
+        'bundle_stale', 'source_fence_failed', 'source_changed',
+        'preallocated_request_present_not_owned', 'preallocated_request_recovered', 'ambiguous_create_outcome',
+        'create_rejected', 'goverify_deactivation_uncertain', 'goverify_restore_unverified',
+        'goverify_restore_failed', 'meeting_date_patch_failed', 'meeting_date_readback_mismatch',
+        'location_preexisting', 'location_readback_mismatch', 'folder_create_failed',
+        'file_conflict', 'file_rejected', 'file_ambiguous_unrecovered',
+        'file_source_changed', 'file_verification_failed', 'file_copy_failed',
+        'observation_side_effects', 'verification_failed', 'request_readback_mismatch',
+        'preallocated_request_present', 'file_journal_unverified',
+        'ia_claim_lost', 'ia_pointer_mismatch', 'ia_upload_ambiguous', 'ia_snapshot_stale', 'ia_verification_failed',
+        'recipe_step_not_built',
+        'reviewer_person_not_synthetic', 'reviewer_person_conflict', 'reviewer_person_provenance_mismatch',
+        'reviewer_person_projection_drift', 'synthetic_reviewer_not_bindable', 'reviewer_suggestion_present_not_owned',
+        'reviewer_answers_ambiguous', 'reviewer_source_changed', 'reviews_verification_failed',
+      'presite_claim_lost', 'presite_pointer_mismatch', 'presite_upload_ambiguous',
+      'presite_snapshot_stale', 'presite_verification_failed', 'presite_promotion_uncharacterized',
+      'presite_ai_run_ambiguous'
+      ))
+    )
+  )`,
+  `CREATE INDEX IF NOT EXISTS test_request_runs_status_idx ON test_request_runs (status)`,
+  `CREATE INDEX IF NOT EXISTS test_request_runs_actor_created_idx ON test_request_runs (actor_id, created_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS test_request_run_resources (
+    resource_id BIGSERIAL PRIMARY KEY, run_id UUID NOT NULL REFERENCES test_request_runs (run_id),
+    sequence INTEGER NOT NULL, step TEXT NOT NULL,
+    resource_kind TEXT NOT NULL CHECK (resource_kind IN (
+      'dataverse_request', 'dataverse_request_patch', 'sharepoint_folder',
+      'dataverse_document_location', 'sharepoint_file', 'workflow_bypass', 'dataverse_request_document',
+      'foundation_baseline', 'foundation_transition',
+      'dataverse_potential_reviewer', 'dataverse_reviewer_suggestion', 'dataverse_review_answer_set',
+      'dataverse_ai_run'
+    )),
+    system TEXT NOT NULL CHECK (system IN ('dataverse', 'sharepoint')),
+    planned_identity JSONB NOT NULL CHECK (test_request_receipt_ok(planned_identity)),
+    source_provenance JSONB NULL CHECK (test_request_receipt_ok(source_provenance)),
+    dispatched_at TIMESTAMPTZ NULL, response_status INTEGER NULL, readback JSONB NULL CHECK (test_request_receipt_ok(readback)),
+    outcome TEXT NOT NULL DEFAULT 'planned' CHECK (outcome IN (
+      'planned', 'dispatched', 'verified', 'recovered', 'conflict', 'rejected', 'ambiguous', 'failed'
+    )),
+    error TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT test_request_run_resources_run_sequence UNIQUE (run_id, sequence),
+    CONSTRAINT test_request_run_resources_step_enum CHECK (step IN (
+      'fence_source', 'create_request', 'correct_meeting_date', 'provision_location',
+      'copy_file', 'observe', 'verify', 'ready',
+      'seed_initial_assessment', 'seed_initial_assessment_snapshot', 'verify_initial_assessment',
+      'seed_reviewers', 'copy_review_file', 'seed_review_answers', 'verify_reviews',
+    'seed_presite_ai_run', 'seed_presite_draft', 'render_presite', 'verify_presite'
+    )),
+    CONSTRAINT test_request_run_resources_error_code CHECK (
+      error IS NULL OR regexp_replace(error, ' [(]http [0-9]{3}[)]$', '') IN (
+        'test_request_run_fenced', 'test_request_run_not_found', 'test_request_run_conflict',
+        'test_request_run_invalid_status', 'test_request_run_invalid_request_number', 'test_request_ledger_unsafe_value',
+        'upstream_http', 'timeout', 'network',
+        'unknown_error', 'lease_unavailable', 'step_failed',
+        'operator_stop', 'preflight_identity_changed', 'manifest_digest_mismatch',
+        'bundle_stale', 'source_fence_failed', 'source_changed',
+        'preallocated_request_present_not_owned', 'preallocated_request_recovered', 'ambiguous_create_outcome',
+        'create_rejected', 'goverify_deactivation_uncertain', 'goverify_restore_unverified',
+        'goverify_restore_failed', 'meeting_date_patch_failed', 'meeting_date_readback_mismatch',
+        'location_preexisting', 'location_readback_mismatch', 'folder_create_failed',
+        'file_conflict', 'file_rejected', 'file_ambiguous_unrecovered',
+        'file_source_changed', 'file_verification_failed', 'file_copy_failed',
+        'observation_side_effects', 'verification_failed', 'request_readback_mismatch',
+        'preallocated_request_present', 'file_journal_unverified',
+        'ia_claim_lost', 'ia_pointer_mismatch', 'ia_upload_ambiguous', 'ia_snapshot_stale', 'ia_verification_failed',
+        'recipe_step_not_built',
+        'reviewer_person_not_synthetic', 'reviewer_person_conflict', 'reviewer_person_provenance_mismatch',
+        'reviewer_person_projection_drift', 'synthetic_reviewer_not_bindable', 'reviewer_suggestion_present_not_owned',
+        'reviewer_answers_ambiguous', 'reviewer_source_changed', 'reviews_verification_failed',
+      'presite_claim_lost', 'presite_pointer_mismatch', 'presite_upload_ambiguous',
+      'presite_snapshot_stale', 'presite_verification_failed', 'presite_promotion_uncharacterized',
+      'presite_ai_run_ambiguous'
+      )
+    )
+  )`,
+  `CREATE INDEX IF NOT EXISTS test_request_run_resources_run_step_idx ON test_request_run_resources (run_id, step)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS test_request_run_resources_one_baseline_idx ON test_request_run_resources (run_id) WHERE resource_kind = 'foundation_baseline'`,
+  `CREATE TABLE IF NOT EXISTS test_request_run_reviewer_assignments (
+    assignment_id BIGSERIAL PRIMARY KEY, run_id UUID NOT NULL REFERENCES test_request_runs (run_id),
+    sequence INTEGER NOT NULL,
+    source_person_id UUID NOT NULL, destination_person_id UUID NOT NULL,
+    reused BOOLEAN NOT NULL, address TEXT NOT NULL, address_sha256 TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT test_request_run_reviewer_assignments_run_sequence UNIQUE (run_id, sequence),
+    CONSTRAINT test_request_run_reviewer_assignments_run_source UNIQUE (run_id, source_person_id),
+    CONSTRAINT test_request_run_reviewer_assignments_run_address UNIQUE (run_id, address),
+    CONSTRAINT test_request_run_reviewer_assignments_address_shape CHECK (
+      length(address) BETWEEN 1 AND 320 AND address !~ '[[:cntrl:][:space:]]' AND address = lower(address)
+      AND address ~ '^[^[:space:]@]{1,64}@[^[:space:]@]{1,255}[.][^[:space:]@]{1,24}$'
+      AND address !~* '(gh[pousr]_|github_pat_|sk-|xox[abprs]-|akia[0-9a-z]{16}|eyj[a-z0-9_-]{8}|glpat-|aiza|bearer_|https?://|//)'
+    ),
+    CONSTRAINT test_request_run_reviewer_assignments_digest_shape CHECK ( address_sha256 ~ '^[0-9a-f]{64}$' ),
+    CONSTRAINT test_request_run_reviewer_assignments_digest_matches_address CHECK (
+      address_sha256 = encode(sha256(convert_to(address, 'UTF8')), 'hex')
+    )
+  )`,
+  `CREATE TABLE IF NOT EXISTS test_request_status_changes (
+    change_id UUID PRIMARY KEY, run_id UUID NOT NULL REFERENCES test_request_runs (run_id),
+    sequence INTEGER NOT NULL,
+    field TEXT NOT NULL CHECK (field IN ('wmkf_phaseistatus', 'wmkf_phaseiistatus')),
+    option_before INTEGER NULL, option_after INTEGER NOT NULL,
+    etag_before TEXT NOT NULL CHECK (etag_before ~ '^W/"[0-9]{1,20}"$'),
+    status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'dispatched', 'applied', 'complete', 'needs_attention')),
+    rerun BOOLEAN NOT NULL DEFAULT FALSE, dispatched_at TIMESTAMPTZ NULL,
+    effects JSONB NULL CHECK (test_request_receipt_ok(effects)),
+    error TEXT NULL CHECK (error IS NULL OR length(error) <= 2000),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), completed_at TIMESTAMPTZ NULL,
+    CONSTRAINT test_request_status_changes_run_sequence UNIQUE (run_id, sequence),
+    CONSTRAINT test_request_status_changes_distinct CHECK (option_before IS NULL OR option_before <> option_after)
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS test_request_status_changes_one_open_idx ON test_request_status_changes (run_id) WHERE status IN ('planned', 'dispatched', 'applied')`,
+  `CREATE TABLE IF NOT EXISTS test_request_cast_members (
+  member_id      UUID PRIMARY KEY,
+  environment    TEXT NOT NULL CHECK (environment IN ('sandbox', 'production')),
+  role           TEXT NOT NULL CHECK (role IN ('pi', 'liaison', 'suggested_reviewer', 'org_leader', 'research_leader')),
+  entity         TEXT NOT NULL CHECK (entity IN ('contact', 'wmkf_potentialreviewers')),
+  first_name     TEXT NOT NULL CHECK (length(first_name) BETWEEN 1 AND 50 AND first_name !~ '[[:cntrl:]]'),
+  last_name      TEXT NOT NULL CHECK (length(last_name) BETWEEN 1 AND 50 AND last_name !~ '[[:cntrl:]]'),
+  address_sha256 TEXT NOT NULL CHECK (address_sha256 ~ '^[0-9a-f]{64}$'),
+  status         TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'dispatched', 'verified', 'needs_attention')),
+  dispatched_at  TIMESTAMPTZ NULL,
+  readback       JSONB NULL CHECK (test_request_receipt_ok(readback)),
+  error          TEXT NULL CHECK (error IS NULL OR length(error) <= 2000),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  verified_at    TIMESTAMPTZ NULL,
+  CONSTRAINT test_request_cast_members_one_per_role UNIQUE (environment, role),
+  CONSTRAINT test_request_cast_members_role_entity CHECK ((role = 'suggested_reviewer') = (entity = 'wmkf_potentialreviewers'))
+)`,
+  `CREATE TABLE IF NOT EXISTS test_request_cast_bindings (
+  binding_id     UUID PRIMARY KEY,
+  run_id         UUID NOT NULL REFERENCES test_request_runs (run_id),
+  member_id      UUID NOT NULL REFERENCES test_request_cast_members (member_id),
+  status         TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'dispatched', 'verified', 'needs_attention')),
+  dispatched_at  TIMESTAMPTZ NULL,
+  readback       JSONB NULL CHECK (test_request_receipt_ok(readback)),
+  error          TEXT NULL CHECK (error IS NULL OR length(error) <= 2000),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  verified_at    TIMESTAMPTZ NULL,
+  CONSTRAINT test_request_cast_bindings_one_per_run UNIQUE (run_id, member_id)
+)`,
+];
+
 // V54: review bundle PDF retention (plan §11, Step C1). Ten nullable
 // columns on pre_site_distribution_attempts. Mirrors migration 053.
 const v54Statements = [
@@ -1264,6 +1574,170 @@ const v54Statements = [
        )
      )`,
 ];
+
+// V56: Post-presentation materials durable schema/readiness foundation.
+// Mirrors migration 055. Runtime authorization remains independently off.
+const v56Statements = [
+  `CREATE TABLE IF NOT EXISTS presentation_material_links (
+    id UUID PRIMARY KEY,
+    request_id UUID NOT NULL,
+    jti TEXT NOT NULL UNIQUE,
+    token_digest CHAR(64) NOT NULL UNIQUE,
+    token_ciphertext TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_by UUID NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    revoked_at TIMESTAMPTZ,
+    revoked_by UUID,
+    superseded_by UUID,
+    CONSTRAINT presentation_material_links_digest_shape CHECK (token_digest ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT presentation_material_links_ciphertext_shape CHECK (
+      char_length(token_ciphertext) >= 44
+      AND token_ciphertext ~ '^[A-Za-z0-9+/]+={0,2}$'
+    ),
+    CONSTRAINT presentation_material_links_revocation_shape CHECK (
+      (revoked_at IS NULL AND revoked_by IS NULL AND superseded_by IS NULL)
+      OR revoked_at IS NOT NULL
+    ),
+    CONSTRAINT presentation_material_links_expiry_shape CHECK (expires_at > created_at)
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_presentation_material_links_live_request
+     ON presentation_material_links (request_id)
+     WHERE revoked_at IS NULL`,
+  `CREATE TABLE IF NOT EXISTS presentation_material_uploads (
+    id UUID PRIMARY KEY,
+    request_id UUID NOT NULL,
+    site_visit_id UUID NOT NULL,
+    actor_id UUID NOT NULL,
+    artifact_type INTEGER NOT NULL,
+    original_display_filename TEXT NOT NULL,
+    validated_mime_type TEXT NOT NULL,
+    declared_size BIGINT NOT NULL,
+    client_resume_fingerprint CHAR(64) NOT NULL,
+    library_name TEXT NOT NULL,
+    folder_path TEXT NOT NULL,
+    physical_filename TEXT NOT NULL,
+    generation_key CHAR(64) NOT NULL UNIQUE,
+    state TEXT NOT NULL DEFAULT 'initiated',
+    upload_url_ciphertext TEXT,
+    upload_session_expires_at TIMESTAMPTZ,
+    intent_expires_at TIMESTAMPTZ NOT NULL,
+    lease_token UUID,
+    lease_expires_at TIMESTAMPTZ,
+    last_error TEXT,
+    candidate_site_id TEXT,
+    candidate_drive_id TEXT,
+    candidate_item_id TEXT,
+    candidate_version_id TEXT,
+    candidate_etag TEXT,
+    candidate_size BIGINT,
+    request_document_id UUID,
+    finalized_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT presentation_material_uploads_artifact_type_check CHECK (
+      artifact_type IN (100000005, 100000006, 100000007)
+    ),
+    CONSTRAINT presentation_material_uploads_size_check CHECK (
+      declared_size > 0 AND declared_size <= 2000000000
+      AND (candidate_size IS NULL OR candidate_size = declared_size)
+    ),
+    CONSTRAINT presentation_material_uploads_fingerprint_shape CHECK (
+      client_resume_fingerprint ~ '^[0-9a-f]{64}$'
+      AND generation_key ~ '^[0-9a-f]{64}$'
+    ),
+    CONSTRAINT presentation_material_uploads_ciphertext_shape CHECK (
+      upload_url_ciphertext IS NULL
+      OR (
+        char_length(upload_url_ciphertext) >= 44
+        AND upload_url_ciphertext ~ '^[A-Za-z0-9+/]+={0,2}$'
+      )
+    ),
+    CONSTRAINT presentation_material_uploads_state_check CHECK (
+      state IN ('initiated', 'uploaded', 'finalizing', 'finalized', 'failed', 'abandoned')
+    ),
+    CONSTRAINT presentation_material_uploads_lease_shape CHECK (
+      (lease_token IS NULL AND lease_expires_at IS NULL)
+      OR (lease_token IS NOT NULL AND lease_expires_at IS NOT NULL)
+    ),
+    CONSTRAINT presentation_material_uploads_error_bound CHECK (
+      last_error IS NULL OR char_length(last_error) <= 2000
+    ),
+    CONSTRAINT presentation_material_uploads_candidate_shape CHECK (
+      (
+        candidate_site_id IS NULL
+        AND candidate_drive_id IS NULL
+        AND candidate_item_id IS NULL
+        AND candidate_version_id IS NULL
+        AND candidate_etag IS NULL
+        AND candidate_size IS NULL
+      )
+      OR (
+        candidate_site_id IS NOT NULL
+        AND candidate_drive_id IS NOT NULL
+        AND candidate_item_id IS NOT NULL
+        AND candidate_version_id IS NOT NULL
+        AND candidate_etag IS NOT NULL
+        AND candidate_size IS NOT NULL
+      )
+    ),
+    CONSTRAINT presentation_material_uploads_finalized_shape CHECK (
+      state <> 'finalized'
+      OR (
+        request_document_id IS NOT NULL
+        AND finalized_at IS NOT NULL
+        AND upload_url_ciphertext IS NULL
+        AND candidate_item_id IS NOT NULL
+        AND lease_token IS NULL
+        AND lease_expires_at IS NULL
+      )
+    )
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_presentation_material_uploads_path
+     ON presentation_material_uploads (library_name, folder_path, physical_filename)`,
+  `CREATE INDEX IF NOT EXISTS idx_presentation_material_uploads_actor_request
+     ON presentation_material_uploads (actor_id, request_id, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_presentation_material_uploads_review
+     ON presentation_material_uploads (intent_expires_at, state, lease_expires_at)
+     WHERE state <> 'finalized'`,
+  `CREATE TABLE IF NOT EXISTS presentation_material_slot_leases (
+    request_id UUID NOT NULL,
+    artifact_type INTEGER NOT NULL,
+    lease_token UUID,
+    lease_expires_at TIMESTAMPTZ,
+    fence_version INTEGER NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (request_id, artifact_type),
+    CONSTRAINT presentation_material_slot_leases_artifact_type_check CHECK (
+      artifact_type IN (100000005, 100000006, 100000007)
+    ),
+    CONSTRAINT presentation_material_slot_leases_lease_shape CHECK (
+      (lease_token IS NULL AND lease_expires_at IS NULL)
+      OR (lease_token IS NOT NULL AND lease_expires_at IS NOT NULL)
+    ),
+    CONSTRAINT presentation_material_slot_leases_fence_check CHECK (
+      fence_version >= 1 AND fence_version <= 2147483647
+    )
+  )`,
+  `ALTER TABLE portal_upload_staging
+     DROP CONSTRAINT IF EXISTS portal_upload_staging_scope_check`,
+  `ALTER TABLE portal_upload_staging
+     ADD CONSTRAINT portal_upload_staging_scope_check
+     CHECK (scope IN (
+       'grantee_image',
+       'staff_grantee_image',
+       'site_visit_material',
+       'consultant_feedback',
+       'post_presentation_transcript'
+     ))`,
+];
+
+// V60: transcription pilot fresh-install shape is sourced directly from its
+// append-only migration so the bootstrap cannot silently drift from it.
+const v60Statements = fs.readFileSync(
+  path.join(__dirname, '..', 'lib/db/migrations/060_transcription_jobs.sql'),
+  'utf8',
+).split(';').map(statement => statement.trim()).filter(Boolean);
 
 // V43: deliberation briefing links (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md).
 // One expiring, revocable link per request for the read-only briefing page;
@@ -1609,860 +2083,65 @@ const v24Statements = [
   `CREATE INDEX IF NOT EXISTS idx_panel_review_items_provider ON panel_review_items(llm_provider, stage)`,
 ];
 
+// These legacy numbered groups provide only the prerequisite schema that the
+// checked-in migrations build on. Keep the complete historical declarations
+// above as parity fixtures; the runtime strips effects owned by later SQL
+// migrations so those migrations execute for real on a fresh install.
+const baseV13Statements = v13Statements
+  .filter((statement) => !/integrity_screening_reviews|idx_integrity_screenings_request_latest/i.test(statement))
+  .map((statement) => statement.replace(/,\s*request_id UUID(?=\s*\))/i, ''));
+const baseV14Statements = v14Statements
+  .filter((statement) => !/dynamics_explorer_requests|idx_dynamics_query_log_request_round/i.test(statement))
+  .map((statement) => statement.replace(/,\s*request_id UUID,\s*request_round SMALLINT/i, ''));
+const baseV15Statements = v15Statements
+  .filter((statement) => !/idx_api_usage_request_round/i.test(statement))
+  .map((statement) => statement.replace(/,\s*stop_reason VARCHAR\(50\),\s*request_id UUID,\s*request_round SMALLINT/i, ''));
+const baseV23bStatements = v23bStatements
+  .filter((statement) => !/idx_dynamics_feedback_request/i.test(statement))
+  .map((statement) => statement.replace(/,\s*request_id UUID REFERENCES dynamics_explorer_requests\(request_id\) ON DELETE SET NULL/i, ''));
+
+function getBootstrapGroups() {
+  return {
+    baseGroups: [
+      statements,
+      v7Statements,
+      v10Statements,
+      v11Alterations,
+      baseV13Statements,
+      baseV14Statements,
+      baseV15Statements,
+      v19Statements,
+      baseV23bStatements,
+    ],
+    // These additions have no checked-in migration: preserve the operational
+    // alerts/telemetry and model-pricing schema not owned by numbered SQL.
+    supplementalGroups: [v20Alterations, v21Alterations, v27Alterations, v32Statements],
+  };
+}
+
 async function runMigration() {
+  const connectionString = loadDatabaseUrl();
+  const { Client } = require('pg');
+  const { bootstrapFreshDatabase } = require('./lib/fresh-database-bootstrap');
+  const client = new Client({ connectionString });
+  await client.connect();
+
   try {
-    const existingTables = await sql`
-      SELECT tablename
-      FROM pg_catalog.pg_tables
-      WHERE schemaname = 'public'
-      ORDER BY tablename
-      LIMIT 10
-    `;
-    assertFreshDatabase(
-      existingTables.rows.map((row) => row.tablename),
-      process.env.ALLOW_POPULATED_DATABASE_SETUP === 'true'
-    );
-
-    console.log('Starting fresh-install database bootstrap...');
-    console.log(`Executing ${statements.length} SQL statements...\n`);
-
-    // Run main table/index creation
-    for (let i = 0; i < statements.length; i++) {
-      const statement = statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[${i + 1}/${statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[${i + 1}/${statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[${i + 1}/${statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V7 table creation (grant_cycles)
-    console.log(`\nApplying v7 schema updates - grant cycles table (${v7Statements.length} statements)...`);
-    for (let i = 0; i < v7Statements.length; i++) {
-      const statement = v7Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v7-${i + 1}/${v7Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v7-${i + 1}/${v7Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v7-${i + 1}/${v7Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V10 table creation (user profiles and preferences)
-    console.log(`\nApplying v10 schema updates - user profiles table (${v10Statements.length} statements)...`);
-    for (let i = 0; i < v10Statements.length; i++) {
-      const statement = v10Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v10-${i + 1}/${v10Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v10-${i + 1}/${v10Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v10-${i + 1}/${v10Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V11 column additions (Azure AD authentication)
-    console.log(`\nApplying v11 schema updates - Azure AD authentication (${v11Alterations.length} alterations)...`);
-    for (let i = 0; i < v11Alterations.length; i++) {
-      const statement = v11Alterations[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v11-${i + 1}/${v11Alterations.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists') || error.message.includes('duplicate column')) {
-          console.log(`[v11-${i + 1}/${v11Alterations.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v11-${i + 1}/${v11Alterations.length}] ✗ Error: ${error.message}`);
-        }
-      }
-    }
-
-    // Run V13 table creation (Applicant Integrity Screener)
-    console.log(`\nApplying v13 schema updates - Integrity Screener tables (${v13Statements.length} statements)...`);
-    for (let i = 0; i < v13Statements.length; i++) {
-      const statement = v13Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v13-${i + 1}/${v13Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v13-${i + 1}/${v13Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v13-${i + 1}/${v13Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V14 table creation (Dynamics Explorer)
-    console.log(`\nApplying v14 schema updates - Dynamics Explorer tables (${v14Statements.length} statements)...`);
-    for (let i = 0; i < v14Statements.length; i++) {
-      const statement = v14Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v14-${i + 1}/${v14Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v14-${i + 1}/${v14Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v14-${i + 1}/${v14Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V15 table creation (API usage logging)
-    console.log(`\nApplying v15 schema updates - API usage logging (${v15Statements.length} statements)...`);
-    for (let i = 0; i < v15Statements.length; i++) {
-      const statement = v15Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v15-${i + 1}/${v15Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v15-${i + 1}/${v15Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v15-${i + 1}/${v15Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // V16 (user_app_access) and V17 (system_settings) were migrated to
-    // Dataverse in Wave 1; both Postgres tables dropped 2026-05-12.
-    // See migration 007_drop_wave1_tables.sql.
-
-    // Run V19 table creation (System alerts, health history, maintenance runs)
-    console.log(`\nApplying v19 schema updates - Alerts & monitoring (${v19Statements.length} statements)...`);
-    for (let i = 0; i < v19Statements.length; i++) {
-      const statement = v19Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v19-${i + 1}/${v19Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v19-${i + 1}/${v19Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v19-${i + 1}/${v19Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V20 alterations (Dynamics restriction violation logging)
-    console.log(`\nApplying v20 schema updates - Dynamics denial logging (${v20Alterations.length} statements)...`);
-    for (let i = 0; i < v20Alterations.length; i++) {
-      const statement = v20Alterations[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v20-${i + 1}/${v20Alterations.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v20-${i + 1}/${v20Alterations.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v20-${i + 1}/${v20Alterations.length}] ✗ Error: ${error.message}`);
-        }
-      }
-    }
-
-    // Run V21 alterations (Prompt cache token tracking)
-    console.log(`\nApplying v21 schema updates - Prompt cache tokens (${v21Alterations.length} statements)...`);
-    for (let i = 0; i < v21Alterations.length; i++) {
-      const statement = v21Alterations[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v21-${i + 1}/${v21Alterations.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists') || error.message.includes('duplicate column')) {
-          console.log(`[v21-${i + 1}/${v21Alterations.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v21-${i + 1}/${v21Alterations.length}] ✗ Error: ${error.message}`);
-        }
-      }
-    }
-
-    // V22 (rename on user_app_access) no longer applies — table dropped from
-    // Postgres in Wave 1. Equivalent rename was applied in Dataverse directly.
-
-    // Run V23b table creation (Dynamics feedback)
-    console.log(`\nApplying v23b schema updates - Dynamics feedback (${v23bStatements.length} statements)...`);
-    for (let i = 0; i < v23bStatements.length; i++) {
-      const statement = v23bStatements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v23b-${i + 1}/${v23bStatements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v23b-${i + 1}/${v23bStatements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v23b-${i + 1}/${v23bStatements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V24 table creation (Virtual Review Panel)
-    console.log(`\nApplying v24 schema updates - Virtual Review Panel (${v24Statements.length} statements)...`);
-    for (let i = 0; i < v24Statements.length; i++) {
-      const statement = v24Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v24-${i + 1}/${v24Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v24-${i + 1}/${v24Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v24-${i + 1}/${v24Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V25 table creation (Expertise Finder)
-    console.log(`\nApplying v25 schema updates - Expertise Finder (${v25Statements.length} statements)...`);
-    for (let i = 0; i < v25Statements.length; i++) {
-      const statement = v25Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v25-${i + 1}/${v25Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v25-${i + 1}/${v25Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v25-${i + 1}/${v25Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V26 table creation (Intake Portal)
-    console.log(`\nApplying v26 schema updates - Intake Portal (${v26Statements.length} statements)...`);
-    for (let i = 0; i < v26Statements.length; i++) {
-      const statement = v26Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v26-${i + 1}/${v26Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v26-${i + 1}/${v26Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v26-${i + 1}/${v26Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V27 alterations (Dynamics identity reconciliation)
-    console.log(`\nApplying v27 schema updates - Dynamics identity reconciliation (${v27Alterations.length} statements)...`);
-    for (let i = 0; i < v27Alterations.length; i++) {
-      const statement = v27Alterations[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v27-${i + 1}/${v27Alterations.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists') || error.message.includes('duplicate column')) {
-          console.log(`[v27-${i + 1}/${v27Alterations.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v27-${i + 1}/${v27Alterations.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V28 table creation (Policy publish audit)
-    console.log(`\nApplying v28 schema updates - Policy publish audit (${v28Statements.length} statements)...`);
-    for (let i = 0; i < v28Statements.length; i++) {
-      const statement = v28Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v28-${i + 1}/${v28Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v28-${i + 1}/${v28Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v28-${i + 1}/${v28Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V34 table creation (Prompt publish audit)
-    console.log(`\nApplying v34 schema updates - Prompt publish audit (${v34Statements.length} statements)...`);
-    for (let i = 0; i < v34Statements.length; i++) {
-      const statement = v34Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v34-${i + 1}/${v34Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v34-${i + 1}/${v34Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v34-${i + 1}/${v34Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V29 table creation (IRS BMF reference data)
-    console.log(`\nApplying v29 schema updates - IRS BMF reference data (${v29Statements.length} statements)...`);
-    for (let i = 0; i < v29Statements.length; i++) {
-      const statement = v29Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v29-${i + 1}/${v29Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v29-${i + 1}/${v29Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v29-${i + 1}/${v29Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V30 table creation (Intake Portal submission jobs queue)
-    console.log(`\nApplying v30 schema updates - Intake submission jobs queue (${v30Statements.length} statements)...`);
-    for (let i = 0; i < v30Statements.length; i++) {
-      const statement = v30Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v30-${i + 1}/${v30Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v30-${i + 1}/${v30Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v30-${i + 1}/${v30Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V31 table creation (external-reviewer rate limiting — security audit A6)
-    console.log(`\nApplying v31 schema updates - External-reviewer rate limiting (${v31Statements.length} statements)...`);
-    for (let i = 0; i < v31Statements.length; i++) {
-      const statement = v31Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v31-${i + 1}/${v31Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v31-${i + 1}/${v31Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v31-${i + 1}/${v31Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V35 table creation (Reviewer acceptance follow-up jobs)
-    console.log(`\nApplying v35 schema updates - Reviewer acceptance follow-up jobs (${v35Statements.length} statements)...`);
-    for (let i = 0; i < v35Statements.length; i++) {
-      const statement = v35Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-
-      try {
-        await sql.query(statement);
-        console.log(`[v35-${i + 1}/${v35Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v35-${i + 1}/${v35Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v35-${i + 1}/${v35Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V32 table creation (S181: model pricing audit history)
-    console.log(`\nApplying v32 schema updates - Model pricing audit (${v32Statements.length} statements)...`);
-    for (let i = 0; i < v32Statements.length; i++) {
-      const statement = v32Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v32-${i + 1}/${v32Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v32-${i + 1}/${v32Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v32-${i + 1}/${v32Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V36 table creation (reviewer identity shadow comparison log)
-    console.log(`\nApplying v36 schema updates - Reviewer identity shadow log (${v36Statements.length} statements)...`);
-    for (let i = 0; i < v36Statements.length; i++) {
-      const statement = v36Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v36-${i + 1}/${v36Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v36-${i + 1}/${v36Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v36-${i + 1}/${v36Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V37 table creation (review synthesis generation ledger)
-    console.log(`\nApplying v37 schema updates - Review synthesis jobs (${v37Statements.length} statements)...`);
-    for (let i = 0; i < v37Statements.length; i++) {
-      const statement = v37Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v37-${i + 1}/${v37Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v37-${i + 1}/${v37Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v37-${i + 1}/${v37Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V38 table creation (durable operational events)
-    console.log(`\nApplying v38 schema updates - Operational events (${v38Statements.length} statements)...`);
-    for (let i = 0; i < v38Statements.length; i++) {
-      const statement = v38Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v38-${i + 1}/${v38Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v38-${i + 1}/${v38Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v38-${i + 1}/${v38Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V39 table creation (private portal upload staging ledger)
-    console.log(`\nApplying v39 schema updates - Portal upload staging (${v39Statements.length} statements)...`);
-    for (let i = 0; i < v39Statements.length; i++) {
-      const statement = v39Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v39-${i + 1}/${v39Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v39-${i + 1}/${v39Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v39-${i + 1}/${v39Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V40 table creation (frozen Pre-Site distribution ledger)
-    console.log(`\nApplying v40 schema updates - Pre-Site distribution attempts (${v40Statements.length} statements)...`);
-    for (let i = 0; i < v40Statements.length; i++) {
-      const statement = v40Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v40-${i + 1}/${v40Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v40-${i + 1}/${v40Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v40-${i + 1}/${v40Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V41 table creation (scheduled personalized email review ledger)
-    console.log(`\nApplying v41 schema updates - Scheduled email messages (${v41Statements.length} statements)...`);
-    for (let i = 0; i < v41Statements.length; i++) {
-      const statement = v41Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v41-${i + 1}/${v41Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v41-${i + 1}/${v41Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v41-${i + 1}/${v41Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V42 table creation (per-PD reviewer-person VIP flags)
-    console.log(`\nApplying v42 schema updates - Reviewer VIP flags (${v42Statements.length} statements)...`);
-    for (let i = 0; i < v42Statements.length; i++) {
-      const statement = v42Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v42-${i + 1}/${v42Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v42-${i + 1}/${v42Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v42-${i + 1}/${v42Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V43 table creation (deliberation briefing links)
-    console.log(`\nApplying v43 schema updates - Deliberation briefing links (${v43Statements.length} statements)...`);
-    for (let i = 0; i < v43Statements.length; i++) {
-      const statement = v43Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v43-${i + 1}/${v43Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v43-${i + 1}/${v43Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v43-${i + 1}/${v43Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V44 table creation (applicant materials collections)
-    console.log(`\nApplying v44 schema updates - Applicant materials collections (${v44Statements.length} statements)...`);
-    for (let i = 0; i < v44Statements.length; i++) {
-      const statement = v44Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v44-${i + 1}/${v44Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v44-${i + 1}/${v44Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v44-${i + 1}/${v44Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V45 column addition (per-slot applicant-material finalize leases)
-    console.log(`\nApplying v45 schema updates - Applicant material slot leases (${v45Statements.length} statements)...`);
-    for (let i = 0; i < v45Statements.length; i++) {
-      const statement = v45Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v45-${i + 1}/${v45Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v45-${i + 1}/${v45Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v45-${i + 1}/${v45Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V46 table creation (deliberation session agenda send ledger)
-    console.log(`\nApplying v46 schema updates - Deliberation agenda sends (${v46Statements.length} statements)...`);
-    for (let i = 0; i < v46Statements.length; i++) {
-      const statement = v46Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v46-${i + 1}/${v46Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v46-${i + 1}/${v46Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v46-${i + 1}/${v46Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V47 table creation (Cycle Dossier pilot)
-    console.log(`\nApplying v47 schema updates - Cycle Dossier pilot (${v47Statements.length} statements)...`);
-    for (let i = 0; i < v47Statements.length; i++) {
-      const statement = v47Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v47-${i + 1}/${v47Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v47-${i + 1}/${v47Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v47-${i + 1}/${v47Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V48 column addition (Cycle Dossier per-request revision; mirrors migration 046)
-    console.log(`\nApplying v48 schema updates - Cycle Dossier request revision (${v48Statements.length} statements)...`);
-    for (let i = 0; i < v48Statements.length; i++) {
-      const statement = v48Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v48-${i + 1}/${v48Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v48-${i + 1}/${v48Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v48-${i + 1}/${v48Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V49 schema updates (Virtual Review Panel Phase A foundation; mirrors migration 047)
-    console.log(`\nApplying v49 schema updates - Review Panel foundation (${v49Statements.length} statements)...`);
-    for (let i = 0; i < v49Statements.length; i++) {
-      const statement = v49Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v49-${i + 1}/${v49Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v49-${i + 1}/${v49Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v49-${i + 1}/${v49Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V50 schema updates (Consultant Feedback slice 1; mirrors migration 048)
-    console.log(`\nApplying v50 schema updates - Consultant Feedback (${v50Statements.length} statements)...`);
-    for (let i = 0; i < v50Statements.length; i++) {
-      const statement = v50Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v50-${i + 1}/${v50Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v50-${i + 1}/${v50Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v50-${i + 1}/${v50Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V51 schema updates (Consultant Feedback slice 2; mirrors migration 049)
-    console.log(`\nApplying v51 schema updates - Consultant Feedback attachments (${v51Statements.length} statements)...`);
-    for (let i = 0; i < v51Statements.length; i++) {
-      const statement = v51Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v51-${i + 1}/${v51Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v51-${i + 1}/${v51Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v51-${i + 1}/${v51Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V52 schema updates (reviewer institution measurement; mirrors migration 051)
-    console.log(`\nApplying v52 schema updates - reviewer institution measurement (${v52Statements.length} statements)...`);
-    for (let i = 0; i < v52Statements.length; i++) {
-      const statement = v52Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v52-${i + 1}/${v52Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v52-${i + 1}/${v52Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v52-${i + 1}/${v52Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V53 schema updates (Pre-RP Brief prepare-time drift audit columns; mirrors migration 052)
-    console.log(`\nApplying v53 schema updates - Pre-RP Brief prepare-time drift audit (${v53Statements.length} statements)...`);
-    for (let i = 0; i < v53Statements.length; i++) {
-      const statement = v53Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v53-${i + 1}/${v53Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v53-${i + 1}/${v53Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v53-${i + 1}/${v53Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    // Run V54 schema updates (review bundle PDF retention; mirrors migration 053)
-    console.log(`\nApplying v54 schema updates - review bundle PDF retention (${v54Statements.length} statements)...`);
-    for (let i = 0; i < v54Statements.length; i++) {
-      const statement = v54Statements[i];
-      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
-      try {
-        await sql.query(statement);
-        console.log(`[v54-${i + 1}/${v54Statements.length}] ✓ ${preview}...`);
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log(`[v54-${i + 1}/${v54Statements.length}] ○ Already exists: ${preview}...`);
-        } else {
-          console.error(`[v54-${i + 1}/${v54Statements.length}] ✗ Error: ${error.message}`);
-          throw error;
-        }
-      }
-    }
-
-    console.log('\n✓ Database migration completed successfully!');
-    console.log('\nTables created/updated:');
-    console.log('  • search_cache (API search result caching)');
-    console.log('\nV7 new table: grant_cycles');
-    console.log('  • grant_cycles (id, name, short_code, program_name, review_deadline,');
-    console.log('    summary_pages, review_template_blob_url, additional_attachments,');
-    console.log('    custom_fields, is_active, created_at, updated_at)');
-    console.log('\nV10 new table: user_profiles');
-    console.log('  • user_profiles (id, name, display_name, avatar_color, is_default,');
-    console.log('    is_active, created_at, last_used_at)');
-    console.log('\nV11 column additions (Azure AD authentication):');
-    console.log('  • user_profiles.azure_id (unique)');
-    console.log('  • user_profiles.azure_email');
-    console.log('  • user_profiles.last_login_at');
-    console.log('  • user_profiles.needs_linking');
-    console.log('\nV13 new tables (Integrity Screener):');
-    console.log('  • retractions (Retraction Watch data storage)');
-    console.log('  • integrity_screenings (screening history)');
-    console.log('  • screening_dismissals (false positive tracking)');
-    console.log('\nV14 new tables (Dynamics Explorer):');
-    console.log('  • dynamics_user_roles (user role assignments)');
-    console.log('  • dynamics_restrictions (table/field access restrictions)');
-    console.log('  • dynamics_query_log (audit trail)');
-    console.log('\nV15 new table (API usage logging):');
-    console.log('  • api_usage_log (user_profile_id, app_name, model, input_tokens,');
-    console.log('    output_tokens, estimated_cost_cents, latency_ms, request_status)');
-    console.log('\nV19 new tables (Alerts & monitoring):');
-    console.log('  • system_alerts (alert_type, severity, title, message, metadata,');
-    console.log('    source, status, auto_resolve_key, acknowledged_by/at, resolved_by/at)');
-    console.log('  • health_check_history (overall_status, services, response_time_ms, triggered_by)');
-    console.log('  • maintenance_runs (job_name, status, records_processed, records_deleted,');
-    console.log('    details, error_message, started_at, completed_at, duration_ms)');
-    console.log('\nV20 column additions (Dynamics denial logging):');
-    console.log('  • dynamics_query_log.was_denied');
-    console.log('  • dynamics_query_log.denial_reason');
-    console.log('\nV21 column additions (Prompt cache tracking):');
-    console.log('  • api_usage_log.cache_creation_tokens');
-    console.log('  • api_usage_log.cache_read_tokens');
-    console.log('\nV24 new tables (Virtual Review Panel):');
-    console.log('  • panel_reviews (multi-LLM review sessions)');
-    console.log('  • panel_review_items (individual LLM reviews per stage)');
-    console.log('\nV25 new tables (Expertise Finder):');
-    console.log('  • expertise_roster (internal reviewer/consultant/board roster)');
-    console.log('  • expertise_matches (AI matching history)');
-    console.log('\nV26 new tables (Intake Portal):');
-    console.log('  • intake_drafts (applicant draft staging — Postgres only, cleared on submit)');
-    console.log('  • intake_audit (state-changing portal action audit trail)');
-    console.log('\nV27 column additions (Dynamics identity reconciliation):');
-    console.log('  • user_profiles.dynamics_systemuser_id');
-    console.log('  • user_profiles.dynamics_reconciled_at');
-    console.log('\nV30 new tables (Intake Portal submission jobs queue):');
-    console.log('  • submission_jobs (async submission queue — idempotency-keyed, drained by cron)');
-    console.log('\nV35 new tables (Reviewer acceptance follow-up jobs):');
-    console.log('  • reviewer_acceptance_jobs (post-accept side-effect queue — drained by cron)');
-    console.log('\nV37 new tables (Review synthesis generation jobs):');
-    console.log('  • review_synthesis_jobs (automatic/manual generation ledger — drained by cron)');
-    console.log('\nV39 new table (Private portal upload staging):');
-    console.log('  • portal_upload_staging (actor-bound private Blob staging + finalize idempotency)');
-    console.log('\nV40 new table (Frozen Pre-Site distribution):');
-    console.log('  • pre_site_distribution_attempts (exact preview + Dynamics send recovery ledger)');
-    console.log('\nV41 new table (Scheduled personalized email review):');
-    console.log('  • scheduled_email_messages (PD review windows + exact draft/send recovery ledger)');
-    console.log('  • deliberation_briefing_links (expiring, revocable briefing-page links; sealed token, digest, revocation)');
-    console.log('\nV46 new table (Deliberation session agenda email):');
-    console.log('  • deliberation_agenda_sends (frozen session agenda + Dynamics send recovery ledger)');
-    console.log('\nV47 new tables (Cycle Dossier pilot):');
-    console.log('  • cycle_dossiers, cycle_dossier_previews, cycle_dossier_entries,');
-    console.log('    cycle_dossier_runs, cycle_dossier_control, cycle_dossier_editions (private state/checkpoints; bytes in private Blob)');
-    console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35, 4 added in V37, 3 added in V39, 3 added in V40, 2 added in V44, 2 added in V47)');
-
-  } catch (error) {
-    console.error('\n✗ Migration failed:', error.message);
-    process.exit(1);
+    await bootstrapFreshDatabase(client, {
+      ...getBootstrapGroups(),
+      allowPopulatedSetup: process.env.ALLOW_POPULATED_DATABASE_SETUP === 'true',
+    });
+    console.log('Fresh-install database bootstrap completed successfully.');
+  } finally {
+    await client.end();
   }
 }
 
-// Run migration
-runMigration();
+if (require.main === module) {
+  runMigration().catch((error) => {
+    console.error('Database bootstrap failed:', error.message);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { getBootstrapGroups, loadDatabaseUrl, runMigration };

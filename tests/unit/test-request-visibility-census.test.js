@@ -1,0 +1,181 @@
+/** @jest-environment node */
+/**
+ * Mechanized Stage 1d census. New report/export routes, request-scoped
+ * transcript downloads, request aggregates or staff list components must be
+ * classified here before they can land.
+ */
+import fs from 'fs';
+import path from 'path';
+import { createTranscriptionPilotStore } from '../../lib/services/transcription-pilot/store.js';
+
+const ROOT = path.resolve(__dirname, '../..');
+const source = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+
+function walk(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const target = path.join(dir, entry.name);
+    return entry.isDirectory() ? walk(target) : [target];
+  });
+}
+
+const REPORT_EXPORT_ROUTES = {
+  'pages/api/admin/stats.js': { class: 'exclude', guard: 'excludeTestRequestSpendRows' },
+  // These legacy-pilot surfaces are owner-scoped to request-unbound jobs only.
+  'pages/api/admin/transcription-pilot/evaluation-export.js': { class: 'exclude', guard: 'listOwnerJobs' },
+  'pages/api/admin/transcription-pilot/jobs/[id]/download.js': { class: 'exclude', guard: 'getOwnerJobContent' },
+  'pages/api/cron/drain-cycle-dossiers.js': { class: 'indirect', guard: 'drainCycleDossiers' },
+  'pages/api/cycle-dossier/download.js': { class: 'indirect', guard: 'downloadCycleDossier' },
+  'pages/api/cycle-dossier/index.js': { class: 'indirect', guard: 'cycleDossierAction' },
+  'pages/api/dataverse-export/download.js': { class: 'indirect', guard: 'verifyDownloadToken' },
+  'pages/api/dataverse-export/metadata.js': { class: 'n/a', guard: 'fetchLiveTaxonomy' },
+  'pages/api/dataverse-export/preview.js': { class: 'exclude', guard: 'excludeMarkedTestRequests' },
+  'pages/api/dataverse-export/run.js': { class: 'exclude', guard: 'excludeMarkedTestRequests' },
+  // Single-request actions stay available for test requests (owner decision 2026-09-23).
+  'pages/api/grant-reporting/extract.js': { class: 'single-request', guard: 'handleFullExtract' },
+  'pages/api/grant-reporting/lookup-grant.js': { class: 'single-request', guard: 'lookupGrant' },
+  // Tracker downloads are one staff-authorized, request/visit-bound read, not a corpus export.
+  'pages/api/meeting-tracker/visits/[requestId]/transcriptions/[jobId]/download.js': {
+    class: 'single-request', guard: 'downloadMeetingTranscriptionJob',
+  },
+  'pages/api/meeting-tracker/visits/[requestId]/transcriptions/materials/[artifactId]/download.js': {
+    class: 'single-request', guard: 'downloadMeetingTranscript',
+  },
+  'pages/api/review-manager/export-reviews.js': { class: 'exclude', guard: 'exportCombinedReviews' },
+  'pages/api/workbench/export-candidates.js': { class: 'exclude', guard: 'exportCandidates' },
+  'pages/api/workbench/grantee-deliverables/awardees.js': { class: 'exclude', guard: 'listGranteeAwardees' },
+  'pages/api/workbench/grantee-deliverables/cycle-export.js': { class: 'exclude', guard: 'exportGranteeCycle' },
+};
+
+const AGGREGATE_CALLERS = {
+  'lib/services/dataverse-export/fetch-client.js': 'primitive',
+  'lib/services/dynamics-explorer/tool-executor.js': 'exclude',
+  'lib/services/dynamics-service.js': 'primitive',
+  'lib/services/dynamics/read-ops.js': 'primitive',
+  // Cycle/status filter options are navigation and include test requests.
+  'lib/services/workbench/request-search-service.js': 'navigation',
+  'pages/api/dataverse-export/preview.js': 'exclude',
+  'pages/api/dataverse-export/run.js': 'exclude',
+};
+
+const REPORT_SERVICE_CALLERS = {
+  'lib/services/dynamics-explorer/tools/composite.js': 'ordinaryTestRequestODataFilterForNavigation',
+  'lib/services/dynamics-explorer/tools/get-related.js': 'ordinaryTestRequestODataFilterForNavigation',
+};
+
+const BADGE_COMPONENTS = [
+  'pages/dynamics-explorer.js',
+  'pages/expertise-finder.js',
+  'pages/review-panel.js',
+  'pages/workbench/[requestId].js',
+  'shared/components/admin/TestRequestPreviewSection.js',
+  'shared/components/final-writeups/FinalWriteupsViews.js',
+  'shared/components/meeting-tracker/MeetingTrackerList.js',
+  'shared/components/meeting-tracker/SessionEditor.js',
+  'shared/components/workbench/InitialAssessmentsPanel.js',
+  'shared/components/workbench/RequestListPanel.js',
+  'shared/components/workbench/RequestLocator.js',
+  'shared/components/workbench/ReviewerFollowUpPanel.js',
+  'shared/components/workbench/StaffDeliberationsPanel.js',
+];
+
+test('every report/export route is classified', () => {
+  const routes = walk(path.join(ROOT, 'pages/api'))
+    .map((file) => path.relative(ROOT, file))
+    .filter((file) => file.endsWith('.js'))
+    .filter((file) => /(^|\/)([^/]*(export|report|stats|dossier|awardee)[^/]*)\.js$/.test(file)
+      || file.startsWith('pages/api/dataverse-export/')
+      || file.startsWith('pages/api/grant-reporting/')
+      || file.startsWith('pages/api/cycle-dossier/')
+      || file === 'pages/api/admin/transcription-pilot/jobs/[id]/download.js'
+      || file === 'pages/api/meeting-tracker/visits/[requestId]/transcriptions/[jobId]/download.js'
+      || file === 'pages/api/meeting-tracker/visits/[requestId]/transcriptions/materials/[artifactId]/download.js')
+    .sort();
+  expect(routes).toEqual(Object.keys(REPORT_EXPORT_ROUTES).sort());
+});
+
+test.each(Object.entries(REPORT_EXPORT_ROUTES))('%s keeps its %s classification seam', (file, record) => {
+  expect(source(file)).toContain(record.guard);
+});
+
+test('transcription evaluation export receives only unbound pilot jobs', () => {
+  const store = source('lib/services/transcription-pilot/store.js');
+  const ownerList = store.match(/async function listOwnerJobs\([\s\S]*?\n  }/);
+  expect(ownerList).not.toBeNull();
+  expect(ownerList[0]).toContain("COALESCE(to_jsonb(transcription_jobs)->>'request_id', '') = ''");
+  expect(source('pages/api/admin/transcription-pilot/evaluation-export.js')).toContain('listOwnerJobs');
+});
+
+test('evaluation export executes the owner-job query with its blank-request discriminator', async () => {
+  const database = {
+    query: jest.fn(async () => ({ rows: [] })),
+    transaction: jest.fn(async (fn) => fn({ query: jest.fn(async () => ({ rows: [] })) })),
+  };
+  const store = createTranscriptionPilotStore(database);
+  await store.listOwnerJobs({ ownerProfileId: 42, limit: 100 });
+
+  const [query, params] = database.query.mock.calls[0];
+  expect(query).toMatch(/WHERE owner_profile_id = \$1\s+AND COALESCE\(to_jsonb\(transcription_jobs\)->>'request_id', ''\) = ''/);
+  expect(params).toEqual([42, 100]);
+});
+
+test('legacy pilot transcript download excludes request-bound Meeting Tracker jobs', () => {
+  const store = source('lib/services/transcription-pilot/store.js');
+  const ownerRead = store.match(/async function getOwnerJob\([\s\S]*?\n  }/);
+  expect(ownerRead).not.toBeNull();
+  expect(ownerRead[0]).toContain('owner_profile_id = $2');
+  expect(ownerRead[0]).toContain("COALESCE(to_jsonb(transcription_jobs)->>'request_id', '') = ''");
+  expect(source('lib/services/transcription-pilot/runtime.js')).toContain('getOwnerJobContent');
+});
+
+test('Meeting Tracker transcript download remains a staff-authorized bound read', () => {
+  const route = source('pages/api/meeting-tracker/visits/[requestId]/transcriptions/[jobId]/download.js');
+  expect(route).toContain("requireAppAccess(req, res, 'meeting-tracker')");
+  expect(route).toContain('downloadMeetingTranscriptionJob({ requestId, jobId, format })');
+  const service = source('lib/services/meeting-tracker-transcription/service.js');
+  const download = service.match(/export async function downloadMeetingTranscriptionJob\([\s\S]*?\n}/);
+  expect(download).not.toBeNull();
+  expect(download[0]).toContain('requireMeetingTranscriptionEnabled(requestId)');
+  expect(download[0]).toContain('loadMeetingTranscriptionBinding(requestId)');
+  expect(download[0]).toContain('getMeetingTranscriptionJobContent({ requestId: binding.requestId');
+});
+
+test('published transcript download is current-artifact and request/visit bound', () => {
+  const route = source('pages/api/meeting-tracker/visits/[requestId]/transcriptions/materials/[artifactId]/download.js');
+  expect(route).toContain("requireAppAccess(req, res, 'meeting-tracker')");
+  expect(route).toContain('downloadMeetingTranscript({ requestId, artifactId, format })');
+  const service = source('lib/services/meeting-tracker-transcription/service.js');
+  const download = service.match(/export async function downloadMeetingTranscript\([\s\S]*?\n}/);
+  expect(download).not.toBeNull();
+  expect(download[0]).toContain('requireMeetingTranscriptionEnabled(requestId)');
+  expect(download[0]).toContain('loadMeetingTranscriptionBinding(requestId)');
+  expect(download[0]).toContain('inspectCurrent(result?.records || [], binding)');
+  expect(download[0]).toContain('meeting_transcript_not_current');
+});
+
+test('every aggregate/count caller is classified', () => {
+  const pattern = /aggregateRequests\(|aggregateMeetingDateCycles\(|aggregateStatusesByGrantProgram\(|aggregateRecords\(|countRecords\(|fetchXmlAggregateCount\(/;
+  const files = [path.join(ROOT, 'lib/services'), path.join(ROOT, 'pages/api')]
+    .flatMap(walk)
+    .filter((file) => file.endsWith('.js') && pattern.test(fs.readFileSync(file, 'utf8')))
+    .map((file) => path.relative(ROOT, file))
+    .sort();
+  expect(files).toEqual(Object.keys(AGGREGATE_CALLERS).sort());
+});
+
+test.each(Object.entries(REPORT_SERVICE_CALLERS))('%s keeps its report exclusion seam', (file, guard) => {
+  expect(source(file)).toContain(guard);
+});
+
+test.each(BADGE_COMPONENTS)('%s uses the shared TEST badge', (file) => {
+  const contents = source(file);
+  expect(contents).toMatch(/import TestRequestBadge from ['"][^'"]*TestRequestBadge['"]/);
+  expect(contents).toMatch(/<TestRequestBadge\b/);
+});
+
+test('Dynamics Explorer uses server isolation state to suppress every local page-only CSV', () => {
+  const contents = source('pages/dynamics-explorer.js');
+  expect(contents).toContain('testRequestIsolation={message.testRequestIsolation}');
+  expect(contents).toContain('testRequestIsolation === false');
+  expect(contents).toContain('downloadCsv(headers, rows');
+  expect(source('lib/services/dynamics-explorer/chat-session.js')).toContain('testRequestIsolationEnabled()');
+});

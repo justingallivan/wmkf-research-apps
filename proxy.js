@@ -15,7 +15,8 @@
  * `NODE_ENV !== 'production'`; production-mode runtimes (including Vercel
  * Preview and Production) additionally require
  * `EMERGENCY_AUTH_BYPASS=true`.
- * NextAuth's own routes (/api/auth/*) are excluded so the login flow works.
+ * Shared deployments preserve their existing pass-through routes. A dedicated
+ * pilot profile is checked first, including auth, assets and Workflow paths.
  *
  * Uses withAuth from next-auth/middleware (uses jose instead of Node.js crypto).
  * Proxy defaults to the Node.js runtime in Next 16; all primitives used here
@@ -24,10 +25,25 @@
 
 import { NextResponse } from 'next/server';
 import { withAuth } from 'next-auth/middleware';
+import { getToken } from 'next-auth/jwt';
 import { isAuthRequired } from './lib/utils/auth-policy';
+import { SHAREPOINT_CANONICAL_SITE_URL } from './lib/services/graph/constants';
+import {
+  decideTranscriptionPilotRequest,
+  isDedicatedTranscriptionAuthConfigured,
+  isLegacyProxyPassThrough,
+} from './lib/services/transcription-pilot/deployment-policy';
+import { decideMeetingTranscriptionTestRequest } from './lib/services/meeting-tracker-transcription/test-deployment-policy';
 
-export default withAuth(
-  function proxy(req) {
+const SHAREPOINT_CANONICAL_ORIGIN = new URL(SHAREPOINT_CANONICAL_SITE_URL).origin;
+const GRAPH_UPLOAD_ORIGIN = 'https://*.up.1drv.com';
+const PRESENTATION_UPLOAD_PAGE = /^\/meeting-tracker\/visits\/[^/]+\/?$/;
+const TRANSCRIPTION_PILOT_PAGE = /^\/admin\/transcription-pilot(?:\/|$)/;
+const PRESENTATION_MATERIALS_PAGE = /^\/external\/presentation\/[^/]+\/?$/;
+
+const sharedAuthProxy = withAuth(
+  function applyCsp(req) {
+    const pathname = req.nextUrl?.pathname || '';
     // Generate a unique nonce for this request
     const nonceBytes = new Uint8Array(16);
     crypto.getRandomValues(nonceBytes);
@@ -36,6 +52,9 @@ export default withAuth(
     const hostname = req.nextUrl?.hostname;
     const isLoopbackHttp = req.nextUrl?.protocol === 'http:'
       && ['localhost', '127.0.0.1', '::1', '[::1]'].includes(hostname);
+    const isPresentationUploadPage = PRESENTATION_UPLOAD_PAGE.test(pathname);
+    const isTranscriptionPilotPage = TRANSCRIPTION_PILOT_PAGE.test(pathname);
+    const isPresentationMaterialsPage = PRESENTATION_MATERIALS_PAGE.test(pathname);
 
     // Build CSP directives
     // Dev: Turbopack injects inline scripts without nonces, needs unsafe-inline + unsafe-eval.
@@ -53,10 +72,21 @@ export default withAuth(
     // avoids edge cases with framework-injected styles on SSG pages.
     const styleSrc = `'self' 'unsafe-inline'`;
 
-    const connectSrc = isDev
+    let connectSrc = isDev
       ? `'self' https://*.public.blob.vercel-storage.com https://vercel.com https://*.vercel-insights.com ws://localhost:3000 ws://127.0.0.1:3000`
       : `'self' https://vercel.com https://*.vercel-insights.com`;
-
+    if (isPresentationUploadPage) {
+      // Graph upload sessions currently resolve to signed *.up.1drv.com URLs;
+      // keep that egress capability confined to authenticated upload pages.
+      // The canonical tenant origin is included because Microsoft may issue a
+      // tenant-hosted session URL for the governed SharePoint drive.
+      connectSrc += ` ${GRAPH_UPLOAD_ORIGIN} ${SHAREPOINT_CANONICAL_ORIGIN}`;
+    }
+    if (isTranscriptionPilotPage) {
+      // Browser-direct private Blob uploads are scoped to this authenticated
+      // Admin surface and use short-lived single-path client tokens.
+      connectSrc += ` https://*.blob.vercel-storage.com`;
+    }
     const directives = [
       `default-src 'self'`,
       `script-src ${scriptSrc}`,
@@ -66,6 +96,12 @@ export default withAuth(
       `connect-src ${connectSrc}`,
       `frame-ancestors 'none'`,
     ];
+
+    if (isPresentationMaterialsPage) {
+      // Graph's short-lived download URL for this governed drive is hosted on
+      // the canonical tenant. Other pages retain default-src 'self'.
+      directives.push(`media-src 'self' ${SHAREPOINT_CANONICAL_ORIGIN}`);
+    }
 
     // Production deployments must upgrade insecure requests. A production build
     // exercised through `next start` on an HTTP loopback address is the sole
@@ -97,9 +133,7 @@ export default withAuth(
         const pathname = req.nextUrl.pathname;
         if (pathname?.startsWith('/auth/')) return true;
         // External-party paths (reviewer magic-link, etc.) authenticate at the
-        // route level via a signed token in the URL — see lib/services/external-token.js.
-        // We bypass NextAuth here so the page/API can run without an AzureAD session,
-        // but stay inside the proxy function so CSP headers are still applied.
+        // route level via a signed token in the URL.
         if (pathname?.startsWith('/external/') || pathname?.startsWith('/api/external/')) return true;
         // Single source of truth shared with API routes — fails closed in
         // production if AUTH_REQUIRED is missing or credentials are absent.
@@ -149,30 +183,63 @@ export default withAuth(
   }
 );
 
+// This gate MUST precede withAuth: that wrapper skips sign-in, auth and Next
+// paths internally, before invoking its callback. Do not move isolation into it.
+export default async function proxy(req, event) {
+  const pathname = req.nextUrl?.pathname || '';
+  const testPolicy = decideMeetingTranscriptionTestRequest({
+    pathname, method: req.method, searchParams: req.nextUrl?.searchParams, origin: req.nextUrl?.origin,
+  });
+  if (testPolicy.dedicated) {
+    if (!testPolicy.identityVerified || !testPolicy.enabled || !testPolicy.allowed) {
+      return new Response(null, { status: 404, headers: { 'Cache-Control': 'private, no-store' } });
+    }
+    if (testPolicy.auth === 'public' || testPolicy.auth === 'routeAuth') return NextResponse.next();
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    if (!token?.azureId || token.userType === 'applicant' || !token.lastActivity
+        || Date.now() - token.lastActivity > 2 * 60 * 60 * 1000) {
+      const destination = new URL('/auth/signin', req.nextUrl.origin);
+      destination.searchParams.set('callbackUrl', '/');
+      return NextResponse.redirect(destination);
+    }
+    if (testPolicy.redirectTo) return NextResponse.redirect(new URL(testPolicy.redirectTo, req.nextUrl.origin));
+    return NextResponse.next();
+  }
+  const policy = decideTranscriptionPilotRequest({
+    pathname, method: req.method, searchParams: req.nextUrl?.searchParams,
+  });
+  if (!policy.dedicated) {
+    if (isLegacyProxyPassThrough(pathname)) return NextResponse.next();
+    return sharedAuthProxy(req, event);
+  }
+  if (!policy.identityVerified || !policy.allowed
+      || process.env.VERCEL_ENV !== 'production'
+      || !isDedicatedTranscriptionAuthConfigured(process.env)) {
+    return new Response(null, { status: 404, headers: { 'Cache-Control': 'private, no-store' } });
+  }
+  if (policy.auth === 'public' || policy.auth === 'routeAuth') return NextResponse.next();
+
+  // Explicit validation avoids withAuth's /_next exemption on page-data URLs.
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  if (!token?.azureId || token.userType === 'applicant' || !token.lastActivity
+      || Date.now() - token.lastActivity > 2 * 60 * 60 * 1000) {
+    const destination = new URL('/auth/signin', req.nextUrl.origin);
+    destination.searchParams.set('callbackUrl', '/admin/transcription-pilot');
+    return NextResponse.redirect(destination);
+  }
+  if (policy.redirectTo) return NextResponse.redirect(new URL(policy.redirectTo, req.nextUrl.origin));
+  // Staff page/API handlers still perform their existing fresh authorization.
+  return sharedAuthProxy(req, event);
+}
+
 export const config = {
   matcher: [
     /*
-     * Match all request paths EXCEPT:
-     * - _next/static (static files)
-     * - _next/image (image optimization)
-     * - favicon.ico (browser icon)
-     * - apple-touch-icon* (iOS home screen icons)
-     * - /api/auth/* (NextAuth routes must be accessible for login flow)
-     * - /api/cron/* (Vercel cron jobs authenticate via CRON_SECRET, not JWT)
-     * - /api/irs/* (PowerAutomate authenticates via IRS_VERIFY_SECRET header, not JWT)
-     * - /api/webhooks/bill (BILL.com x-bill-sha-signature HMAC). Exact
-     *   match anchored with `$` — `/api/webhooks/billing` or
-     *   `/api/webhooks/bill/sub-route` would NOT be exempted, forcing
-     *   any future webhook route to be added here explicitly with its
-     *   own per-route auth review.
-     * - /api/bill/onboard-reviewer (internal HMAC; called by respond.js
-     *   server-side, which has no staff NextAuth session). Same anchored-
-     *   match safety as the webhook; auth is HMAC-of-body via
-     *   BILL_INTEGRATION_SECRET. See lib/bill/internal-call-auth.js.
-     * - /api/webhooks/vercel-log-drain (Vercel Log Drain x-vercel-signature
-     *   HMAC-SHA1 of raw body via VERCEL_LOG_DRAIN_SECRET). Exact anchored
-     *   match, same safety rationale as the BILL webhook.
+     * Match every path so dedicated-project identity is checked before any
+     * NextAuth/asset/SDK exemption. Shared deployments retain legacy exclusions
+     * via isLegacyProxyPassThrough. The outer gate never reads request bodies;
+     * allowed Workflow deliveries pass through to SDK-owned authentication.
      */
-    '/((?!_next/static|_next/image|favicon\\.ico|apple-touch-icon|api/auth|api/cron|api/irs|api/webhooks/bill$|api/webhooks/vercel-log-drain$|api/bill/onboard-reviewer$).*)',
+    '/:path*',
   ],
 };

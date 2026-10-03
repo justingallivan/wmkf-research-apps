@@ -22,8 +22,8 @@ beforeEach(() => {
   setSetting.mockResolvedValue(true);
 });
 
-test('the cap reads the setting when it is a whole number in range, else the default of 100 MB; a read failure is 503', async () => {
-  for (const [raw, expected] of [['250', { maxMb: 250, source: 'setting' }], [null, { maxMb: 100, source: 'default' }], ['abc', { maxMb: 100, source: 'default' }], ['0', { maxMb: 100, source: 'default' }], ['501', { maxMb: 100, source: 'default' }], ['12.5', { maxMb: 100, source: 'default' }]]) {
+test('the cap reads an in-range setting, else the default of 500 MB; a read failure is 503', async () => {
+  for (const [raw, expected] of [['250', { maxMb: 250, source: 'setting' }], [null, { maxMb: 500, source: 'default' }], ['abc', { maxMb: 500, source: 'default' }], ['0', { maxMb: 500, source: 'default' }], ['501', { maxMb: 500, source: 'default' }], ['12.5', { maxMb: 500, source: 'default' }]]) {
     getSettingStrict.mockResolvedValueOnce(raw === null ? { found: false, value: null } : { found: true, value: raw });
     expect(await getUploadMaxMb()).toEqual(expected);
   }
@@ -36,7 +36,7 @@ test('the cap reads the setting when it is a whole number in range, else the def
     body: { ok: false, reason: 'cap_unavailable' },
   });
   expect(error.body).toEqual({ ok: false, reason: 'cap_unavailable' });
-  expect(uploadMaxBytes(100)).toBe(104857600);
+  expect(uploadMaxBytes(500)).toBe(524288000);
 });
 
 test('setting the cap validates the range and writes the string value with the actor', async () => {
@@ -58,7 +58,7 @@ test('the admin route is superuser-only, GET reports the cap with limits, PUT ta
   const res = mockRes();
   await handler({ method: 'GET', query: {} }, res);
   expect(requireSuperuser).toHaveBeenCalled();
-  expect(res.body).toEqual({ success: true, maxMb: 100, source: 'default', limits: { min: 1, max: 500 }, defaultMb: 100 });
+  expect(res.body).toEqual({ success: true, maxMb: 500, source: 'default', limits: { min: 1, max: 500 }, defaultMb: 500 });
 
   const bad = mockRes();
   await handler({ method: 'PUT', body: { maxMb: 120, extra: true } }, bad);

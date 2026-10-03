@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
 import { requestJson } from '../../utils/api-request';
+import {
+  SITE_VISIT_MATERIALS_UPLOAD_MAX_MB_DEFAULT,
+  SITE_VISIT_MATERIALS_UPLOAD_MAX_MB_LIMITS,
+} from '../../config/siteVisitMaterials';
 
 /**
  * Admin editor for the applicant materials upload cap (plan §16 M3).
@@ -8,8 +12,8 @@ import { requestJson } from '../../utils/api-request';
 export default function SiteVisitMaterialsDefaultsSection() {
   const [maxMb, setMaxMb] = useState('');
   const [baseline, setBaseline] = useState('');
-  const [limits, setLimits] = useState({ min: 1, max: 500 });
-  const [defaultMb, setDefaultMb] = useState(100);
+  const [limits, setLimits] = useState(SITE_VISIT_MATERIALS_UPLOAD_MAX_MB_LIMITS);
+  const [defaultMb, setDefaultMb] = useState(SITE_VISIT_MATERIALS_UPLOAD_MAX_MB_DEFAULT);
   const [source, setSource] = useState('default');
   const [status, setStatus] = useState(null);
   const [error, setError] = useState(null);
@@ -27,8 +31,8 @@ export default function SiteVisitMaterialsDefaultsSection() {
         if (!active) return;
         setMaxMb(String(data.maxMb));
         setBaseline(String(data.maxMb));
-        setLimits(data.limits || { min: 1, max: 500 });
-        setDefaultMb(data.defaultMb ?? 100);
+        setLimits(data.limits || SITE_VISIT_MATERIALS_UPLOAD_MAX_MB_LIMITS);
+        setDefaultMb(data.defaultMb ?? SITE_VISIT_MATERIALS_UPLOAD_MAX_MB_DEFAULT);
         setSource(data.source || 'default');
         setError(null);
       } catch (err) {

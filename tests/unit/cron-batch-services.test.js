@@ -64,6 +64,8 @@ jest.mock('../../lib/services/scheduled-email-store', () => ({
   listScheduledEmailDigestRows: jest.fn(async () => []),
   listDueScheduledEmails: jest.fn(async () => []),
   listUnfinalizedScheduledEmails: jest.fn(async () => []),
+  listScheduledEmailReconciliationCandidates: jest.fn(async () => []),
+  listStoppedScheduledEmailsWithSendIntent: jest.fn(async () => []),
 }));
 jest.mock('../../lib/services/scheduled-email-service', () => ({
   scheduledSendAtForInvitation: jest.fn((value) => new Date(new Date(value).getTime() + 12 * 86400000)),
@@ -71,6 +73,8 @@ jest.mock('../../lib/services/scheduled-email-service', () => ({
   sendScheduledEmailDigest: jest.fn(),
   deliverScheduledEmail: jest.fn(),
   finalizeScheduledEmail: jest.fn(),
+  reconcileScheduledEmailCandidate: jest.fn(),
+  reconcileStoppedScheduledEmail: jest.fn(),
 }));
 
 import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
@@ -87,7 +91,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   grantRequestAdapter.getById.mockImplementation(async (id, opts) => {
     if (opts?.select === 'wmkf_wmkfprojectdescription') return { wmkf_wmkfprojectdescription: null, _etag: 'e1' };
-    return { akoya_requestid: id, akoya_requestnum: '1001', akoya_title: 'Award', _wmkf_projectleader_value: 'pi1', _akoya_primarycontactid_value: 'li1', _wmkf_programdirector_value: 'pd1' };
+    return { akoya_requestid: id, akoya_requestnum: '1001', akoya_title: 'Award', _wmkf_projectleader_value: 'pi1', _akoya_primarycontactid_value: 'li1', _wmkf_programdirector_value: 'pd1', _akoya_programid_value: null, _akoya_applicantid_value: null };
   });
   grantRequestAdapter.updateById.mockResolvedValue({});
   granteeDeliverableAdapter.update.mockResolvedValue({});
@@ -120,6 +124,42 @@ describe('runGranteeTitleGeneration', () => {
     const summary = await runGranteeTitleGeneration(args);
     expect(summary).toMatchObject({ skippedNoSource: 1, generated: 1 });
     expect(summary.failures).toEqual([{ requestNum: '1001', reason: 'missing/short title or abstract' }]);
+  });
+
+  it('passes one fixed 40-second absolute deadline to each generation call', async () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      grantRequestAdapter.queryAllRequests.mockResolvedValue({ records: [titleRow(1)], totalCount: 1 });
+      await runGranteeTitleGeneration(args);
+      expect(require('../../lib/services/grantee-title-service').generateGranteeTitle).toHaveBeenCalledWith({
+        sourceTitle: 'T1',
+        sourceAbstract: 'x'.repeat(120),
+        runSource: 'PowerAutomate Auto',
+        deadlineMs: 41_000,
+      });
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('returns failed at the row timeout and never writes if generation resolves late', async () => {
+    jest.useFakeTimers();
+    let releaseGeneration;
+    const generation = new Promise((resolve) => { releaseGeneration = resolve; });
+    require('../../lib/services/grantee-title-service').generateGranteeTitle.mockReturnValueOnce(generation);
+    grantRequestAdapter.queryAllRequests.mockResolvedValue({ records: [titleRow(1)], totalCount: 1 });
+    try {
+      const pending = runGranteeTitleGeneration(args);
+      await jest.advanceTimersByTimeAsync(40_000);
+      const summary = await pending;
+      expect(summary).toMatchObject({ failed: 1, generated: 0 });
+      releaseGeneration({ editedTitle: 'To do science after timeout' });
+      await Promise.resolve();
+      expect(grantRequestAdapter.getById).not.toHaveBeenCalled();
+      expect(grantRequestAdapter.updateById).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

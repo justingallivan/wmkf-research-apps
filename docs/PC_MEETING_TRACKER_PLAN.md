@@ -101,8 +101,20 @@ Two earlier decisions are **superseded in part** and must be read with this plan
   reported 22 exact / 0 absent / 0 divergent, and
   `MEETING_TRACKER_SCHEMA_READY` evaluates exact-on. The grant-protected
   runtime and UI are live.
-- **Recording / transcript / transcript-summary** artifact types exist in the registry but have no
-  producer; only distribution and logistics reference them as material categories.
+- **[SOURCE-BUILT/OFFLINE-TESTED 2026-09-25; BOUNDED PREVIEW ACCEPTED 2026-09-26 AND 2026-09-29;
+  PRODUCTION NOT DEPLOYED.]** Recording, transcript, and transcript-summary have
+  governed producers under the post-presentation rollout gates. The current visit
+  card exposes browser-direct MP4 upload, Pause/Resume, Finish saving, Cancel, Retry upload,
+  and independent 60-day Board presentation-link Copy/Reissue controls; Zoom URL and transcript
+  staff inputs passed a bounded signed-in Preview save/finalize/readback on synthetic sandbox
+  Request `1000350`. A later signed-in recipient Preview run showed the two current materials,
+  redirected to the synthetic Zoom URL, downloaded the transcript, and proved old-link rejection
+  after reissue. Real Zoom playback and anonymous private-window viewing remain unproved because
+  the synthetic recording does not exist and Vercel protection sent Safari Private Browsing to
+  sign-in. The Staff Deliberations tab reads the current three slots. Shared Postgres migration 055 was
+  applied, while the Dataverse Wave 30 test was sandbox-only. The bounded Preview test window
+  is closed and presentation access is off there. See the presentation-materials plan
+  for the separate Production gates and source-built/offline-tested staff Cancel/Retry controls.
 
 ## 4. The conflict the build must resolve first
 
@@ -148,7 +160,9 @@ calls the same service.
 - One visit editor per request: the fields the Activity already has, written through the existing
   logistics service. **[PRODUCTION-LIVE 2026-09-24 via PR #335 / `407ca908d`:]** the
   tracker GET also suggests applicant-side calendar attendees from the Request Project Leader
-  and liaison (Request Primary Contact, or applicant Account Org Primary Contact when blank).
+  and liaison (Request Primary Contact, or applicant Account Org Primary Contact when blank;
+  for Research, since 2026-09-29, the Account's Primary Contact only — the Liaison of record,
+  `docs/plans/LIAISON_FROM_INSTITUTION_PLAN_2026-09-29.md`).
   New-visit forms prefill distinct email addresses as required attendees. Saved visits keep their
   recorded attendees and show missing applicants as one-click Add suggestions, so removing a
   person stays removed across reloads. The Activity changes only when the PC reviews and saves.
@@ -271,7 +285,11 @@ schema readback and the readiness flip are complete.
 - The applicant-materials collection (Codex plan). The deliberation briefing page itself is
   built separately (`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`); the tracker only reads its live link.
 - Distribution email and logistics copy edits (owner: "noting for later").
-- Recording / transcript producers.
+- Post-presentation recording/transcript product behavior remains governed by
+  `docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`, outside
+  this tracker plan's original slices. Its Zoom/transcript/MP4 producers,
+  Staff Deliberations projection, and separate materials-only Board link are
+  source-built and offline-tested only; none is deployed or enabled.
 - A PC role. D4 stands until evidence says otherwise.
 - J27 differences (the auto-generation trigger and the narrative source path; register J27-082).
 

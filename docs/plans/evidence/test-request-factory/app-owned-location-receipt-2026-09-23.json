@@ -1,0 +1,93 @@
+{
+  "kind": "test-request-sandbox-rehearsal-receipt/v1",
+  "startedAt": "2026-09-23T02:30:53.583Z",
+  "target": "https://orgd9e66399.crm.dynamics.com",
+  "requestId": "63dab4af-178f-4bbc-b24d-3ccbaf74cbfc",
+  "runId": "06dadd69-c5d7-4159-b690-2cc8e5a61af9",
+  "createAttempted": true,
+  "createResponseStatus": 201,
+  "goverifyBypass": {
+    "workflowId": "a5d850ee-e5b4-409c-a7e5-65ac82ff9ceb",
+    "workflowName": "GOverify- check Publication 78 on create of a request record",
+    "originalVersionNumber": 56365965,
+    "deactivationAttemptedAt": "2026-09-23T02:30:56.753Z",
+    "restored": true,
+    "deactivatedAt": "2026-09-23T02:31:09.348Z",
+    "deactivatedVersionNumber": 56413023,
+    "restoredAt": "2026-09-23T02:31:30.115Z",
+    "restoredVersionNumber": 56413119
+  },
+  "locationProvision": {
+    "parentId": "c8117abb-dab0-ee11-a569-000d3a341e8f",
+    "folder": "1000339_63DAB4AF178F4BBCB24D3CCBAF74CBFC",
+    "folderAttempted": true,
+    "graphFolder": {
+      "siteId": "appriver3651007194.sharepoint.com,48930e19-ba2f-46e7-9dc1-e0f7f8ade852,270ae82a-6903-42ec-99d1-4079863f002d",
+      "driveId": "b!GQ6TSC-650adweD3-K3oUiroCicDaexCmdFAeYY_AC0LfwP99I31QY_tw5hNNRkY",
+      "id": "01G4GVMS3HFBVEVRBNIRDJIO5RKNUEUNBQ",
+      "path": "1000339_63DAB4AF178F4BBCB24D3CCBAF74CBFC"
+    },
+    "createAttempted": true,
+    "createResponseStatus": 201,
+    "locationId": "76e1d537-b0ad-4fa8-98d0-008dab6106e8"
+  },
+  "completedAt": "2026-09-23T02:32:33.991Z",
+  "request": {
+    "@odata.context": "https://orgd9e66399.crm.dynamics.com/api/data/v9.2/$metadata#akoya_requests(akoya_requestid,akoya_requestnum,akoya_title,akoya_fiscalyear,akoya_requesttype,wmkf_meetingdate,wmkf_istestrequest,wmkf_testcreationrunid,wmkf_respondreminderenabled,wmkf_reviewduereminderenabled,akoya_requeststatus,wmkf_phaseiistatus,akoya_recommendedamount,akoya_originalgrantamount,akoya_submissionaccepted,_akoya_applicantid_value,_akoya_payee_value,_akoya_primarycontactid_value,createdon,modifiedon)/$entity",
+    "@odata.etag": "W/\"56413071\"",
+    "_transactioncurrencyid_value": "0bc77bca-2c7b-ee11-8179-00224802aaea",
+    "wmkf_meetingdate": "2024-12-13T00:00:00Z",
+    "_akoya_primarycontactid_value": null,
+    "akoya_submissionaccepted": false,
+    "wmkf_testcreationrunid": "06dadd69-c5d7-4159-b690-2cc8e5a61af9",
+    "akoya_requestnum": "1000339",
+    "_akoya_payee_value": "537e3b60-c18f-ee11-8179-000d3a341e8f",
+    "modifiedon": "2026-09-23T02:31:21Z",
+    "wmkf_respondreminderenabled": false,
+    "_akoya_applicantid_value": "537e3b60-c18f-ee11-8179-000d3a341e8f",
+    "akoya_originalgrantamount": null,
+    "akoya_requesttype": 100000000,
+    "wmkf_reviewduereminderenabled": false,
+    "akoya_fiscalyear": "December 2099",
+    "akoya_recommendedamount": null,
+    "akoya_requestid": "63dab4af-178f-4bbc-b24d-3ccbaf74cbfc",
+    "wmkf_phaseiistatus": null,
+    "createdon": "2026-09-23T02:31:09Z",
+    "akoya_title": "TEST: Codex sandbox request factory rehearsal 2026-09-23 06dadd69",
+    "wmkf_istestrequest": true,
+    "akoya_requeststatus": null
+  },
+  "dynamicsLocations": [
+    {
+      "@odata.etag": "W/\"56413211\"",
+      "absoluteurl": null,
+      "relativeurl": "1000339_63DAB4AF178F4BBCB24D3CCBAF74CBFC",
+      "name": "Documents on Default Site 1",
+      "_parentsiteorlocation_value": "c8117abb-dab0-ee11-a569-000d3a341e8f",
+      "createdon": "2026-09-23T02:31:32Z",
+      "sharepointdocumentlocationid": "76e1d537-b0ad-4fa8-98d0-008dab6106e8"
+    }
+  ],
+  "locationParents": [
+    {
+      "@odata.context": "https://orgd9e66399.crm.dynamics.com/api/data/v9.2/$metadata#sharepointdocumentlocations(sharepointdocumentlocationid,name,relativeurl,absoluteurl,_parentsiteorlocation_value)/$entity",
+      "@odata.etag": "W/\"9304999\"",
+      "absoluteurl": null,
+      "relativeurl": "akoya_request",
+      "name": "Documents on Default Site 1",
+      "_parentsiteorlocation_value": "8ba18e9e-d3b0-ee11-a569-000d3a341fd9",
+      "sharepointdocumentlocationid": "c8117abb-dab0-ee11-a569-000d3a341e8f"
+    }
+  ],
+  "sharePointFiles": [],
+  "paymentRows": [],
+  "regardingEmails": [],
+  "verification": {
+    "ok": false,
+    "failures": [
+      "submission accepted unexpectedly populated"
+    ],
+    "accountChanges": [],
+    "contactChanges": []
+  }
+}
