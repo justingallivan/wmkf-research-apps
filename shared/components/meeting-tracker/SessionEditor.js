@@ -313,7 +313,7 @@ export default function SessionEditor() {
       setLoading(true);
       setError(null);
       try {
-        const dashboardQuery = new URLSearchParams({ ...(cycleCode ? { cycleCode } : {}), ...(programId ? { programId } : {}), scope: 'all' });
+        const dashboardQuery = new URLSearchParams({ projection: 'schedule', ...(cycleCode ? { cycleCode } : {}), ...(programId ? { programId } : {}), scope: 'all' });
         const requests = [readJson('/api/meeting-tracker/recipients'), readJson('/api/meeting-tracker/sessions')];
         if (cycleCode) requests.push(readJson(`/api/meeting-tracker/dashboard?${dashboardQuery}`));
         const envelopes = await Promise.all(requests);

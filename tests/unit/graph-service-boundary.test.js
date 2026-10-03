@@ -30,6 +30,15 @@ const options = { facade: FACADE, graphDir: GRAPH, inventory: { methods: METHODS
 const REAL_SOURCE_OPTIONS = {
   facade: FACADE,
   graphDir: GRAPH,
+  // This bounded read-only readiness probe needs Graph endpoint access for
+  // permission metadata, which has no facade method. Keep the exception to
+  // these exact source specifiers and resolved modules.
+  externalGraphImportExemptions: {
+    'scripts/probe-meeting-transcription-e2e-readiness.js': [
+      { specifier: '../lib/services/graph/constants.js', target: `${GRAPH}/constants.js` },
+      { specifier: '../lib/services/graph/http.js', target: `${GRAPH}/http.js` },
+    ],
+  },
   inventory: {
     methods: [
       ...METHODS,
@@ -162,10 +171,44 @@ test('the current facade has one public owner for every staged method/state item
   expect(sources.has(FACADE)).toBe(true);
 });
 
-test('tracked runtime census has no direct imports of Graph internals', () => {
+test('tracked runtime census has no unrecorded direct imports of Graph internals', () => {
   const sources = loadTrackedRuntimeSources(path.resolve(__dirname, '../..'));
   const result = analyzeSources(sources, REAL_SOURCE_OPTIONS);
   expect(result.errors).toEqual([]);
+});
+
+test('the Graph readiness-probe exception is exact and does not admit sibling files or other internals', () => {
+  const exception = REAL_SOURCE_OPTIONS.externalGraphImportExemptions;
+  const sources = new Map([
+    ['scripts/probe-meeting-transcription-e2e-readiness.js', `
+      import('../lib/services/graph/constants.js');
+      import('../lib/services/graph/http.js');
+    `],
+    [`${GRAPH}/constants.js`, 'export const GRAPH_BASE = "https://graph.microsoft.com/v1.0";'],
+    [`${GRAPH}/http.js`, 'export function fetchWithTimeout() {}'],
+  ]);
+  expect(analyzeSources(sources, { graphDir: GRAPH, externalGraphImportExemptions: exception }).errors).toEqual([]);
+
+  const wrongSpecifierSources = new Map(sources);
+  wrongSpecifierSources.set('scripts/probe-meeting-transcription-e2e-readiness.js', `
+    import('../lib/services/graph/constants.js');
+    import('../lib/services/graph/http');
+  `);
+  expect(analyzeSources(wrongSpecifierSources, { graphDir: GRAPH, externalGraphImportExemptions: exception }).errors)
+    .toContain(`external runtime import of Graph internals: scripts/probe-meeting-transcription-e2e-readiness.js -> ${GRAPH}/http.js`);
+
+  sources.set('scripts/another-readiness-probe.js', `import('../lib/services/graph/http.js');`);
+  sources.set(`${GRAPH}/auth.js`, 'export function getAccessToken() {}');
+  const errors = analyzeSources(sources, { graphDir: GRAPH, externalGraphImportExemptions: exception }).errors;
+  expect(errors).toContain(`external runtime import of Graph internals: scripts/another-readiness-probe.js -> ${GRAPH}/http.js`);
+
+  sources.set('scripts/probe-meeting-transcription-e2e-readiness.js', `
+    import('../lib/services/graph/constants.js');
+    import('../lib/services/graph/http.js');
+    import('../lib/services/graph/auth.js');
+  `);
+  expect(analyzeSources(sources, { graphDir: GRAPH, externalGraphImportExemptions: exception }).errors)
+    .toContain(`external runtime import of Graph internals: scripts/probe-meeting-transcription-e2e-readiness.js -> ${GRAPH}/auth.js`);
 });
 
 test('valid facade, leaf imports, side-effect import, and receiver-free operations pass', () => {

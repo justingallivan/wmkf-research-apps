@@ -144,6 +144,26 @@ test('arriving with a cycle in the URL still loads the cycle picker (the session
   // Discriminating: the picker payload was fetched once, without a cycle.
   const pickerCalls = global.fetch.mock.calls.filter(([u]) => String(u).includes('/dashboard') && !String(u).includes('cycleCode='));
   expect(pickerCalls).toHaveLength(1);
+  const cycleCall = global.fetch.mock.calls.find(([u]) => String(u).includes('/dashboard') && String(u).includes('cycleCode='));
+  expect(new URL(String(cycleCall[0]), 'https://example.org').searchParams.get('projection')).toBe('schedule');
+  expect(new URL(String(pickerCalls[0][0]), 'https://example.org').searchParams.get('projection')).toBe('schedule');
+});
+
+test('SessionEditor uses the schedule projection for its proposal lookup', async () => {
+  routerQuery = { id: 'new', cycleCode: 'D26', programId: 'p1' };
+  global.fetch = jest.fn(async (url) => {
+    const target = String(url);
+    const body = target.includes('/recipients')
+      ? { staff: [], board: [], defaultAttendeeRefs: [] }
+      : target.includes('/sessions')
+        ? { sessions: [] }
+        : { proposals: [] };
+    return { ok: true, status: 200, json: async () => body };
+  });
+  render(<SessionEditor />);
+  await waitFor(() => expect(global.fetch.mock.calls.some(([url]) => String(url).includes('/dashboard?'))).toBe(true));
+  const dashboardCall = global.fetch.mock.calls.find(([url]) => String(url).includes('/dashboard?'));
+  expect(new URL(String(dashboardCall[0]), 'https://example.org').searchParams.get('projection')).toBe('schedule');
 });
 
 test('a slot without a live briefing link says who shares it; with one it offers Open briefing', () => {

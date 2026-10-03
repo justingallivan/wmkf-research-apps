@@ -60,3 +60,26 @@ test('without expand the query carries no $expand and the restriction check sees
   expect(url.searchParams.has('$expand')).toBe(false);
   expect(svc.checkRestriction).toHaveBeenCalledWith('wmkf_deliberationslot', undefined, undefined);
 });
+
+test('queryAllRecords follows every page and marks the exact 5,000-row boundary capped', async () => {
+  const svc = svcStub();
+  let page = 0;
+  fetchWithTimeout.mockImplementation(async () => {
+    page += 1;
+    return {
+      ok: true,
+      json: async () => ({
+        value: Array.from({ length: 500 }, (_, index) => ({ id: `${page}-${index}` })),
+        '@odata.count': 5000,
+        ...(page < 10 ? { '@odata.nextLink': `https://org.crm.test/next/${page + 1}` } : {}),
+      }),
+    };
+  });
+  const result = await queryAllRecords(svc, 'wmkf_sitevisits', {
+    select: 'activityid,_regardingobjectid_value,scheduledstart,scheduledend',
+    filter: 'statecode eq 0',
+  });
+  expect(page).toBe(10);
+  expect(result).toMatchObject({ totalCount: 5000, capped: true });
+  expect(result.records).toHaveLength(5000);
+});

@@ -82,6 +82,37 @@ test('dashboard passes Workbench-compatible cycle, program, scope, and session i
   expect(res.statusCode).toBe(200);
 });
 
+test.each([
+  ['unknown', { projection: 'fast' }],
+  ['repeated', { projection: ['schedule', 'schedule'] }],
+])('dashboard rejects %s projection after auth and before service reads', async (_name, query) => {
+  const res = mockRes();
+  await dashboardHandler({ method: 'GET', query }, res);
+  expect(res.statusCode).toBe(400);
+  expect(requireAppAccess).toHaveBeenCalledTimes(1);
+  expect(loadMeetingTrackerDashboard).not.toHaveBeenCalled();
+});
+
+test('dashboard accepts schedule projection and passes it through after the route gates', async () => {
+  const res = mockRes();
+  await dashboardHandler({ method: 'GET', query: { cycleCode: 'D26', projection: 'schedule' } }, res);
+  expect(loadMeetingTrackerDashboard).toHaveBeenCalledWith(expect.objectContaining({
+    cycleCode: 'D26',
+    projection: 'schedule',
+  }));
+  expect(res.statusCode).toBe(200);
+});
+
+test('dashboard accepts full as a legacy compatibility alias', async () => {
+  const res = mockRes();
+  await dashboardHandler({ method: 'GET', query: { cycleCode: 'D26', projection: 'full' } }, res);
+  expect(loadMeetingTrackerDashboard).toHaveBeenCalledWith(expect.objectContaining({
+    cycleCode: 'D26',
+    projection: 'full',
+  }));
+  expect(res.statusCode).toBe(200);
+});
+
 test('recipients route authenticates first, then readiness-gates, and calls one aggregate service', async () => {
   mockSchemaReady = false;
   const blocked = mockRes();

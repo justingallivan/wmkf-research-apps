@@ -1,4 +1,65 @@
-# Session 569 Prompt: Admin alert remediation shipped; remaining warnings need separate review
+# Session 570 Prompt: targeted Meeting Tracker latency fixes; verify release state before new work
+
+## Session 569 Summary — 2026-10-03 PT (Codex performance lane)
+
+[VERIFIED via source, isolated tests and review receipts] The targeted Meeting
+Tracker read optimization and seven baseline test repairs are complete. The owner
+requested push, CI, and merge if CI is clean. This handoff is prepared before
+that promotion; the PR for `codex/tracker-read-performance` is the authority for
+its final checks, merge and deployment status. Do not infer deployment from a
+local build or this document.
+
+### What Was Completed
+
+1. Tracker callers request the additive schedule projection, sharing Workbench
+   selection without unused reviewer rollups. Site Visit summaries are read in
+   paginated batches instead of one detail read per visit. Legacy/full API
+   behavior, authorization, row visibility and missing-data notices remain.
+2. Seven pre-existing failing suites were repaired with exact inventories,
+   isolated mocks and meaningful negative coverage. The rehearsal operator now
+   verifies the complete current projection and rejects absent cleanup columns.
+3. Luna built and tested; Sol and root reviewed; Claude Fable approved through
+   subscription OAuth. No direct provider API or alternative paid review product
+   was used. Review findings were closed in bounded rounds.
+4. Before integration with newer main, the local full suite passed 1,214 suites
+   and 18,769 tests (8 suites / 72 tests skipped). Build, lint, types and 69
+   check scripts passed. Newer main is integrated before publication, retaining
+   its transcription maintenance and recovery behavior; final PR CI gates the
+   owner's merge authorization.
+
+After main integration, all seven repair suites passed (133 tests). Sol accepted
+the conflict resolutions with no material runtime change; current inventory is
+25 cron handler files, 24 exact scheduled paths and 23 scheduled endpoints.
+Main's daily/hourly transcription controls and newer assertions are preserved.
+
+### Commits and Evidence
+
+- `4b95863de` — targeted Tracker read optimization.
+- `170145c9c` — baseline repair and review records.
+- `3ffb20c46` — integrated main and reconciled verification contracts.
+- `docs/plans/MEETING_TRACKER_READ_PERFORMANCE_EXECUTION_2026-10-03.md`
+  and its linked review receipt — behavior, reduced-call evidence and rollback.
+- `docs/plans/BASELINE_TEST_REPAIRS_EXECUTION_2026-10-03.md`
+  and its linked Fable receipt — diagnoses, tests and review disposition.
+
+### Next Items
+
+- **DONE:** Agreed targeted implementation and baseline repairs. No large
+  refactor or new caching layer is selected. Do not reopen those without a new
+  requirement or measured bottleneck.
+- **Verify before acting:** Read the feature PR's final-head checks and merge
+  state, then its deployment result. Source approval does not prove live latency;
+  no production browser timing improvement is claimed.
+- **Preserved:** The original transcription checkout's unrelated dirty test and
+  untracked planning/audit documents are untouched. Other lanes below are
+  historical handoffs, not newly validated worklists.
+- **Milestone decision:** No new architecture or capability was introduced; this
+  contained optimization and verification repair needs no DEVELOPMENT_LOG entry.
+- Claim-evidence `--current` could not run because this session has no exported
+  observation key. No observation row was fabricated or borrowed from another
+  session. No memory-router edits were made by this lane.
+
+## Prior-lane handoffs — historical; not revalidated in Session 569
 
 ## Session 568 Summary — 2026-10-02/03 PT (Codex admin-alert lane)
 

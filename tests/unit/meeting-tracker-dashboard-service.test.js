@@ -14,6 +14,16 @@ function dependencies(overrides = {}) {
       success: true,
       cycleCode: 'D26',
       programs: [],
+      rollup: { total: 7, stages: { find: 2, invite: 1, awaiting: 1, review: 1, done: 2 } },
+      proposals: [
+        { requestId: REQUEST_B, requestNumber: '1002', projectLeader: 'Pat Two', programDirector: 'PD Two' },
+        { requestId: REQUEST_A, requestNumber: '1001', projectLeader: 'Pat One', programDirector: 'PD One', institution: 'Caltech' },
+      ],
+    })),
+    loadWorkbenchDashboardSelection: jest.fn(async () => ({
+      success: true,
+      cycleCode: 'D26',
+      programs: [],
       proposals: [
         { requestId: REQUEST_B, requestNumber: '1002', projectLeader: 'Pat Two', programDirector: 'PD Two' },
         { requestId: REQUEST_A, requestNumber: '1001', projectLeader: 'Pat One', programDirector: 'PD One', institution: 'Caltech' },
@@ -33,6 +43,18 @@ function dependencies(overrides = {}) {
       _regardingobjectid_value: REQUEST_A,
       scheduledstart: '2026-09-20T16:00:00.000Z',
     }]),
+    findActiveSiteVisitSummaries: jest.fn(async () => ({
+      records: [{
+        activityid: VISIT_A,
+        _regardingobjectid_value: REQUEST_A,
+        scheduledstart: '2026-09-20T16:00:00.000Z',
+        scheduledend: '2026-09-20T17:00:00.000Z',
+        wmkf_visitformat: 100000002,
+        wmkf_locationorlink: 'Board room',
+      }],
+      totalCount: 1,
+      capped: false,
+    })),
     getSiteVisitById: jest.fn(async () => ({
       activityid: VISIT_A,
       _regardingobjectid_value: REQUEST_A,
@@ -89,6 +111,65 @@ test('joins share, deliberation, and visit state and sorts by the next meeting',
     materials: null,
     needsScheduling: true,
   });
+  expect(result.rollup).toEqual({ total: 7, stages: { find: 2, invite: 1, awaiting: 1, review: 1, done: 2 } });
+  expect(deps.getSiteVisitById).toHaveBeenCalledTimes(1);
+});
+
+test('schedule projection preserves joined rows and duplicate notices without reviewer or detail reads', async () => {
+  const VISIT_B = '66666666-6666-4666-8666-666666666666';
+  const deps = dependencies({
+    findRequestsByIds: jest.fn(async () => ({ records: [
+      { akoya_requestid: REQUEST_A, akoya_title: 'Proposal A', _wmkf_currentpresitevisit_value: DOC_A },
+    ] })),
+    findActiveSiteVisitSummaries: jest.fn(async () => ({
+      records: [
+        { activityid: VISIT_B, _regardingobjectid_value: REQUEST_A, scheduledstart: '2026-09-25T16:00:00.000Z', scheduledend: '2026-09-25T17:00:00.000Z' },
+        { activityid: VISIT_A, _regardingobjectid_value: REQUEST_A, scheduledstart: '2026-09-20T16:00:00.000Z', scheduledend: '2026-09-20T17:00:00.000Z', wmkf_visitformat: 100000002, wmkf_locationorlink: 'Board room' },
+      ],
+      totalCount: 2,
+      capped: false,
+    })),
+  });
+  const result = await loadMeetingTrackerDashboard({ cycleCode: 'D26', projection: 'schedule' }, deps);
+
+  expect(deps.loadWorkbenchDashboardSelection).toHaveBeenCalledTimes(1);
+  expect(deps.loadWorkbenchDashboard).not.toHaveBeenCalled();
+  expect(deps.findActiveSiteVisits).not.toHaveBeenCalled();
+  expect(deps.getSiteVisitById).not.toHaveBeenCalled();
+  expect(result).not.toHaveProperty('rollup');
+  expect(result).toMatchObject({ projection: 'schedule', notices: [
+    { code: 'meeting_tracker_request_unresolved', requestIds: [REQUEST_B] },
+  ] });
+  expect(result.proposals).toHaveLength(2);
+  expect(result.proposals[0]).toMatchObject({ requestId: REQUEST_A, siteVisitNeedsReconciliation: true, siteVisit: { activityId: VISIT_A, formatLabel: 'Hybrid', location: 'Board room' } });
+  expect(result.proposals[1]).toMatchObject({ requestId: REQUEST_B, siteVisit: null, materials: null });
+});
+
+test('schedule projection rejects incomplete visit batches instead of claiming no visit', async () => {
+  const deps = dependencies({
+    findActiveSiteVisitSummaries: jest.fn(async () => ({ records: [], totalCount: 5000, capped: true })),
+  });
+  await expect(loadMeetingTrackerDashboard({ cycleCode: 'D26', projection: 'schedule' }, deps))
+    .rejects.toMatchObject({ httpStatus: 503, code: 'meeting_tracker_site_visit_summary_incomplete' });
+  expect(deps.getSiteVisitById).not.toHaveBeenCalled();
+});
+
+test('schedule projection keeps materials degradation behavior', async () => {
+  const deps = dependencies({
+    getMaterialsSummariesWithAvailability: jest.fn(async () => { throw new Error('pg down'); }),
+  });
+  const result = await loadMeetingTrackerDashboard({ cycleCode: 'D26', projection: 'schedule' }, deps);
+  expect(result.proposals.map(({ materials, materialsAvailability }) => [materials, materialsAvailability]))
+    .toEqual([[null, 'unavailable'], [null, 'unavailable']]);
+});
+
+test('no-cycle schedule projection keeps the cycle picker response and adds its discriminator', async () => {
+  const base = { cycles: [{ code: 'D26' }], defaultCycleCode: 'D26' };
+  const deps = dependencies({ loadWorkbenchDashboard: jest.fn(async () => base) });
+  await expect(loadMeetingTrackerDashboard({ projection: 'schedule' }, deps))
+    .resolves.toEqual({ ...base, projection: 'schedule' });
+  expect(deps.loadWorkbenchDashboardSelection).not.toHaveBeenCalled();
+  expect(deps.findActiveSiteVisitSummaries).not.toHaveBeenCalled();
 });
 
 test('a failing materials reader degrades every row to null instead of failing the cycle page', async () => {
