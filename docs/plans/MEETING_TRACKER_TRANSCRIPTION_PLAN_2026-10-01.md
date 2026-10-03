@@ -3,7 +3,7 @@ title: Meeting Tracker transcription integration
 domain: transcription
 kind: plan
 status: source-reviewed-disabled
-summary: "Shared transcription remains disabled. The bounded no-CRM synthetic speaker rehearsal is source-implemented, reviewed, and verified on isolated Preview: signed-in read/save/reload and TXT passed. VTT browser download and the full Tracker/release flow remain unverified."
+summary: "Owner-authorized migrations 060–064 are applied and physically verified in shared Production; all seven transcription controls remain unset and the three tables are empty. The dated disabled-release receipt records scope and limits. The synthetic rehearsal is verified on isolated Preview; VTT browser download and full Tracker flow remain unverified."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -286,18 +286,21 @@ deletion is added in this slice; existing records policy remains authoritative.
 
 ### Release boundary
 
-Build disabled on `codex/transcription-pilot`; no shared deployment merely to
-test the UI. Proposed runtime home is the shared application, not the isolated
-pilot. New Postgres migration(s) and an additive Dataverse wave are source-only
-until numbering, physical schema, target configuration and owner-approved apply
-are verified. Scope checks include existing 060–062, post-presentation schema,
+No shared deployment merely to test the UI. Proposed runtime home is the
+shared application, not the isolated pilot. Owner-authorized migrations
+060–064 were applied to shared Production and physically verified on
+2026-10-02: all 64 manifest entries match and the three transcription tables
+are present and empty. This additive schema change does not enable or deploy
+the feature. Scope checks include existing 060–062, post-presentation schema,
 private storage, provider controls and actual scheduler delivery. Schema
 readiness must gate select lists as well as routes so older environments still
 read legacy documents. Never enable the Admin pilot to activate Tracker.
-Shared/Production deployment, schema applies and feature enablement remain
-separately authorized. Migrations 063–064 are applied only to the dedicated
-Preview test Neon. No real-recording test or newly metered service call is
-authorized by this rehearsal.
+Shared/Production code deployment and feature enablement remain separately
+authorized. All seven transcription controls were unset in the Production
+readback; migrations 063–064 are also present in the dedicated Preview test
+Neon. See the dated [disabled-release receipt](evidence/TRANSCRIPTION_DISABLED_RELEASE_2026-10-02.md).
+No real-recording test or newly metered service call is authorized by this
+rehearsal.
 
 ### Bounded no-CRM synthetic speaker rehearsal — scoped hosted read/save verified
 
@@ -546,7 +549,9 @@ The Wave 31 preflight first found the optional `wmkf_transcriptbundlejson`
 memo absent and the Wave 16 `wmkf_requestdocument_generation_key` over
 `wmkf_generationkey` exact and Active. After the separately approved
 sandbox-only apply, exact readback confirmed the memo and active key.
-Production was not probed or changed. Wave 30 exactness was reported by the
+Production Dataverse was not probed or changed at that Wave 31 checkpoint.
+The later Production Postgres migration apply is recorded in the disabled-
+release receipt; no Dataverse change is implied. Wave 30 exactness was reported by the
 separate `scripts/preflight-post-presentation-materials-schema.mjs`. The
 shared Preview branch's `DYNAMICS_URL` resolved to
 the Production host during configuration inspection. The CLI pulled the

@@ -55,16 +55,24 @@ audio and transcript content. AssemblyAI owns the remote asynchronous job
 until completion or deletion. This table is not a transcript-content store,
 and it does not make a provider result authoritative until verified and saved.
 
-### Meeting Tracker extension — source-built, not applied or released
+### Meeting Tracker extension — source-built; schema applied, feature disabled
 
-**[SOURCE-REVIEWED FOR DISABLED SOURCE; MIGRATIONS NOT APPLIED; NOT RELEASED OR LIVE.]** Migration 063 adds
+**[SOURCE-REVIEWED; FEATURE DISABLED.]** Migration 063 adds
 nullable `request_id` and `site_visit_activity_id` UUID bindings to
 `transcription_jobs`; a CHECK requires both to be null or both non-null. These
 are Dataverse identities stored without Postgres foreign keys. It also adds
 nullable `publication_operation_id` and `updated_by_profile_id` (the latter
 references `user_profiles.id`) and a partial request/recent index. The existing
 dedicated pilot database and its deployed behavior remain as described above;
-no shared-database application or live schema readback is claimed here.
+the Meeting Tracker schema extension was applied to shared Production on
+2026-10-02. Read-only physical readback matched all 64 migration-manifest
+entries with no missing/extra names and verified `transcription_jobs`
+(61 columns, 27 constraints, 10 indexes),
+`transcription_workflow_dispatches` (10/7/2), and
+`meeting_transcript_publications` (30/17/4); all three Production tables are
+empty. Meeting Tracker transcription and AssemblyAI pilot enablement flags
+were unset at readback. This was schema-only and does not enable or release
+the Meeting Tracker feature. See the dated [disabled release receipt](../plans/evidence/TRANSCRIPTION_DISABLED_RELEASE_2026-10-02.md).
 The Meeting Tracker routes, services, and `SiteVisitEditor` consumer are now
 present in source, including the publication-receipt recovery flow. This does
 not change or extend the isolated pilot's deployed behavior, and the global
@@ -73,9 +81,12 @@ active provider-slot limit remains shared and unchanged. See the separate
 for source limits, the reviewed recovery contract, and the explicit
 quarantine/zero-row close path (closure waits until at least ten minutes after
 the receipt lease expires). Migration 064 adds close attribution to that
-source-only receipt schema.
+receipt schema.
 
-**Follow-up source changes; Sol/root/Fable reviewed; still disabled and not deployed.**
+**Follow-up source changes; Sol/root/Fable reviewed.** At the 2026-10-02
+disabled-release checkpoint these changes were not enabled in Production; see
+the [dated release receipt](../plans/evidence/TRANSCRIPTION_DISABLED_RELEASE_2026-10-02.md)
+for the pre-merge boundary and final deployment pointer.
 The shared transcription worker now releases a matching `ready` job lease after
 save-time and daily cleanup attempts, including when deletion fails;
 the bounded daily drain excludes job IDs already attempted in that pass so an
@@ -122,7 +133,10 @@ dispatch record are atomic. A retryable start-delivery failure returns the
 already-queued owner DTO with `transcription_dispatch_pending`; UI retry
 redelivers the same job without another browser upload. Existing job leases and
 persisted submission-intent fences prevent blind provider resubmission.
-Migrations 061 and 062 are applied/read back only in the isolated Neon database.
+Migrations 061 and 062 remain verified in the isolated pilot and Meeting
+Tracker Preview databases. The 2026-10-02 Production migration ledger and
+physical table readback also confirm the shared schema; they do not change the
+pilot deployment's separate data or runtime scope.
 Branch source retries active Workflow steps after 60 seconds (up to 1,440
 retries), hands off after 200 processing cycles, and has an hourly recovery path
 that queries SDK status and CAS-recovers only terminal `completed`, `failed`, or
@@ -172,7 +186,7 @@ on the live one-job transcript.
   `lib/db/migrations/061_transcription_workflow_dispatches.sql`,
   `lib/db/migrations/062_transcription_speaker_names.sql` (applied/read back in isolated Neon),
   `lib/db/migrations/063_meeting_tracker_transcription.sql` and
-  `lib/db/migrations/064_meeting_transcript_close_attribution.sql` (source-only; neither applied),
+  `lib/db/migrations/064_meeting_transcript_close_attribution.sql` (applied to shared Production and dedicated Preview test Neon; Production physical schema readback verified 2026-10-02),
   `lib/db/migrations-manifest.json`, and `scripts/setup-database.js`.
 - Persistence/model/formatters: `lib/services/transcription-pilot/store.js`,
   `model.js`, and `transcript-format.js`; the cron readiness-only mode is
@@ -195,8 +209,9 @@ Before any deployment to a different database, the migration number and
 tracker must be reconciled against that target with owner authorization, then
 physical schema readback must verify both tracker and actual
 table/index/constraint shape. The disabled candidate uses the initialized
-isolated Neon database through dedicated-project Production environment values; no shared schema was
-changed or probed.
+isolated Neon database through dedicated-project Production environment
+values. The shared Production database schema was separately extended and
+physically verified on 2026-10-02; no transcription enablement followed.
 The existing-database path is `node scripts/apply-migrations.js`; the
 fresh-install-only `scripts/setup-database.js` must not be used on a populated
 database. See the [pilot pre-enable runbook](../plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_RUNBOOK_2026-09-30.md).

@@ -2,8 +2,8 @@
 title: "Atlas: Meeting Tracker transcript publications (Postgres)"
 domain: postgres
 kind: state-page
-status: isolated-test-schema-ready-source-reviewed-disabled
-summary: "Fresh schema is applied and independently verified only in dedicated Preview test Neon; Meeting Tracker transcription remains disabled and unreleased. Local PostgreSQL integration passed; shared-database, deployment, and runtime behavior are not claimed."
+status: production-schema-verified-feature-disabled
+summary: "Migrations 063–064 are applied and physically verified in Production and dedicated Preview test Neon. The three Production tables are empty and Meeting Tracker transcription enablement flags are unset; the feature remains disabled. Hosted application runtime behavior is not claimed."
 canonical: true
 cataloged: 2026-10-01
 owner: product-engineering
@@ -21,7 +21,7 @@ related:
 
 ## Status
 
-**[SOURCE-REVIEWED FOR DISABLED SOURCE; NOT RELEASED OR LIVE.]** Migration 063 adds
+**[SOURCE-REVIEWED; FEATURE DISABLED.]** Migration 063 adds
 request/Site Visit bindings to `transcription_jobs` and defines
 `meeting_transcript_publications`; migration 064 adds the optional
 `closed_by_profile_id` audit field. **[VERIFIED via dedicated test-Neon
@@ -35,22 +35,34 @@ pilot tests passed (23/23). The new tests cover binding/source constraints,
 competing publication and cleanup fencing, recovery lease fencing, and close
 actor attribution. A real candidate-writer run exposed an unknown `$3`
 parameter; root corrected it with `$3::text`, with no other production-code
-fix required by that database check. No deployment or enabled Meeting Tracker
-transcription feature is claimed. The dedicated AssemblyAI pilot's deployment
+fix required by that database check. **[VERIFIED via owner-authorized
+Production migration apply and read-only physical readback, 2026-10-02]** The
+Production migration ledger matches all 64 manifest entries, with no missing
+or extra names. `transcription_jobs` is present with 61 columns, 27
+constraints and 10 indexes; `transcription_workflow_dispatches` has 10/7/2;
+`meeting_transcript_publications` has 30/17/4. All three tables have zero
+rows. The probe verified a read-only transaction and rollback. All Meeting
+Tracker transcription and AssemblyAI pilot enablement flags were unset; the
+separate post-presentation schema/access controls remained on. This is schema
+provisioning only; Production feature/runtime enablement is not claimed. See
+the dated [disabled release receipt](../plans/evidence/TRANSCRIPTION_DISABLED_RELEASE_2026-10-02.md).
+The dedicated AssemblyAI pilot's deployment
 and isolated-Neon state are recorded separately in [the pilot Atlas](postgres-transcription-pilot.md);
 those historical claims are unchanged by these source migrations.
 
 The source now includes request-bound upload/job, review, publication,
 correction, download, explicit reconciliation, and a `SiteVisitEditor` consumer.
-The source remains disabled and the Meeting Tracker feature is not released or
-live. The test-Neon schema is resource/bootstrap readiness, not deployment;
+The source-controlled feature remains disabled in Production as of the
+2026-10-02 probe. The
+test-Neon schema is resource/bootstrap readiness, not deployment;
 the local integration proof does not verify hosted adapter or runtime
 behavior. The global active
 provider-slot limit remains unchanged. A valid text-only provider draft with
 no timed utterances remains readable and downloadable as TXT; publication
 fails with `meeting_transcript_timed_vtt_required` and does not invent cue
 times or publish an empty VTT. The focused contract/UI tests cover this edge;
-they do not establish a live or database-applied flow.
+they do not establish a released or enabled application flow. Production
+schema application/readback does not establish hosted application behavior.
 
 ## Ownership and relationships
 
@@ -186,7 +198,7 @@ For ordinary reconciliation, a verified receipt whose Request Document has
 been superseded is marked terminal `published` (with the superseded error
 code), and the newer current artifact remains unchanged.
 
-## Follow-up source changes — reviewed, not deployed
+## Follow-up source changes — reviewed; no Production enablement claimed
 
 The disabled source now supports Meeting Tracker bundle formatter/schema v2
 with optional, validated word timings. When word spans align with the exact
@@ -213,8 +225,10 @@ pending late-upload watch. It retains the exact input pathname and upload
 window until a verified closure condition exists; expiry or a successful
 delete/HEAD observation is not treated as proof that late writes are
 impossible. The UI makes no claim that an automatic cleanup worker is running.
-These follow-ups remain disabled, unreleased, and not deployed; the dedicated
-isolated pilot's historical hosted behavior is unchanged.
+At the 2026-10-02 disabled-release checkpoint these follow-ups were not
+enabled in Production; the dedicated isolated pilot's historical hosted
+behavior is unchanged. See the [dated release receipt](../plans/evidence/TRANSCRIPTION_DISABLED_RELEASE_2026-10-02.md)
+for the pre-merge boundary and final deployment pointer.
 
 The builder reports five focused Jest suites (95 tests) and changed-source
 ESLint passing. Root's in-memory PGlite SQL check verified ready-lease release
@@ -250,14 +264,16 @@ and does not enable broader transcription or establish release readiness.
 ## Source evidence
 
 - Migrations: `lib/db/migrations/063_meeting_tracker_transcription.sql` and
-  `lib/db/migrations/064_meeting_transcript_close_attribution.sql` (exercised
-  only in a disposable local PostgreSQL 16 test schema, not applied to a
-  persistent target).
+  `lib/db/migrations/064_meeting_transcript_close_attribution.sql` (applied to
+  Production and dedicated Preview test Neon; Production physical schema
+  readback is summarized above; also exercised in disposable local PostgreSQL
+  16 integration).
 - Store: `lib/services/transcription-pilot/store.js`.
 - Settled product and publication contract: [Meeting Tracker transcription plan](../plans/MEETING_TRACKER_TRANSCRIPTION_PLAN_2026-10-01.md).
 - Dedicated pilot deployment and isolated Neon evidence: [AssemblyAI transcription pilot Atlas](postgres-transcription-pilot.md).
 
 The existing-database migration path is `node scripts/apply-migrations.js`;
 fresh-install-only `scripts/setup-database.js` must not be used on a populated
-database. Migration 063 must not be described as applied until an authorized
-target apply and physical schema readback are separately verified.
+database. Migrations 063–064 were applied to Production and physically
+verified on 2026-10-02; schema provisioning does not authorize feature
+enablement or establish shared-runtime release readiness.
