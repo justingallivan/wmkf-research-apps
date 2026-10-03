@@ -98,15 +98,16 @@ Safari Private Browsing reached Vercel sign-in before the app, so anonymous reci
 remains unproved on protected Preview. Preview branch access was restored to `off`; Production
 runtime is not deployed or enabled.
 
-**[SOURCE-REVIEWED FOR DISABLED SOURCE; NOT RELEASED OR LIVE.]** Wave 31
+**[SCHEMA VERIFIED IN PRODUCTION; APPLICATION FEATURE DEPLOYED BUT DISABLED.]** Wave 31
 adds the optional `wmkf_TranscriptBundleJson` Memo (logical name
 `wmkf_transcriptbundlejson`, maximum 32,000 characters) to
 `wmkf_requestdocument`. The schema-as-code record is
 `lib/dataverse/schema/wave31-meeting-transcript-bundle/wmkf_requestdocument_transcript_bundle.json`;
 it defines no relationship. **[VERIFIED via sandbox preflight and authorized
-sandbox-only apply/readback, 2026-10-02]** the memo is exact; the Wave 16
+sandbox-only apply/readback, 2026-10-02]** the memo was exact; the Wave 16
 `wmkf_requestdocument_generation_key` over `wmkf_generationkey` is exact and
-Active. Production was not probed or changed. Wave 30's two exact fields were
+Active. A Production read-only schema check on 2026-10-02 independently
+confirmed the memo and Active generation-key index. Wave 30's two exact fields were
 reported by the separate `scripts/preflight-post-presentation-materials-schema.mjs`.
 The Wave 31 preflight is `scripts/preflight-meeting-transcript-bundle-schema.mjs`.
 `MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY` must be exactly
@@ -123,11 +124,10 @@ whose primary SharePoint file is TXT. Its optional manifest binds the TXT,
 VTT, and normalized source-file descriptors for staff-side publication,
 verification, and correction. All bundle reads explicitly opt into the
 projection and cap each new Graph read at 4 MB; ordinary Request Document
-readers omit the memo field. This source remains disabled. Wave 31 is applied
-and read back only on sandbox, not Production. Migrations 063–064 passed
-disposable local PostgreSQL integration and were applied only to the isolated
-Preview test-Neon database documented in the Postgres Atlas, not shared
-application databases. Recipient DTOs do not
+readers omit the memo field. The deployed feature remains disabled pending
+controlled acceptance; broad staff access is not yet enabled.
+Production Postgres migrations 063–064 are applied; the three new tables were
+empty at the 2026-10-02 read-only verification. Recipient DTOs do not
 project the manifest or source-file descriptor; no recipient manifest, source
 projection, or recipient file inventory is implemented. No production
 behavior is claimed here.
