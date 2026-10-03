@@ -41,6 +41,12 @@ describe('factory config parity', () => {
     }
   });
 
+  test('legacy Factory abstract draft gets a fresh-source instruction', () => {
+    expect(messageFor(apiError('factory_bundle_abstract_required'))).toBe(
+      'This saved source predates the abstract copy check, so nothing was reserved. Look up the source Request again to export a fresh copy.',
+    );
+  });
+
   test('status field columns equal the server STATUS_FIELDS', () => {
     expect(Object.fromEntries(STATUS_FIELDS.map((field) => [field.key, field.column]))).toEqual({ ...SERVER_STATUS_FIELDS });
   });

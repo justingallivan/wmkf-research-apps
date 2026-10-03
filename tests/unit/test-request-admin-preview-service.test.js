@@ -34,7 +34,6 @@ function compilerMetadata() {
     akoya_applicantid: ['Lookup'],
     akoya_title: ['String', { maxLength: 200 }],
     akoya_purpose: ['Memo', { maxLength: 100000 }],
-    wmkf_abstract: ['Memo', { maxLength: 1048576 }],
     akoya_request: ['Money', { minValue: 0, maxValue: 1000000000 }],
     akoya_fiscalyear: ['String', { maxLength: 80 }],
     akoya_requesttype: ['Picklist'],

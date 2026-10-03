@@ -140,6 +140,21 @@ describe('sandbox clone source fence', () => {
       'test marker not true', 'run ID mismatch', 'meeting date mismatch', 'creator mismatch', 'owner mismatch',
       'abstract mismatch',
     ]));
+
+    for (const [expectedAbstract, actualAbstract, mismatch] of [
+      [null, null, false],
+      [null, '', false],
+      ['', null, false],
+      ['  \n ', '  \n ', false],
+      ['  \n ', '', true],
+    ]) {
+      const actual = verifyCloneRequestReadback({
+        ...manifest,
+        bundle: { version: 5, abstract: expectedAbstract },
+      }, { ...row, wmkf_abstract: actualAbstract });
+      if (mismatch) expect(actual).toContain('abstract mismatch');
+      else expect(actual).not.toContain('abstract mismatch');
+    }
   });
 });
 

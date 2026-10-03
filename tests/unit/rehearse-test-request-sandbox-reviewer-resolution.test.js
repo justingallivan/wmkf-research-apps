@@ -353,6 +353,19 @@ describe('F2 (Codex slice 6c-ii Stage C round 1): I4 -- reservation-time review-
     expect(writeManifestIndex).toBeGreaterThan(-1);
     expect(validateIndex).toBeLessThan(writeManifestIndex);
   });
+
+  test('runReserve rejects a legacy bundle after parsing and before manifest or ledger reservation', () => {
+    const source = fs.readFileSync(path.resolve(process.cwd(), 'scripts/rehearse-test-request-sandbox.mjs'), 'utf8');
+    const reserve = source.slice(source.indexOf('export async function runReserve'), source.indexOf('export async function runAdvance'));
+    const parseIndex = reserve.indexOf('const bundle = readSourceBundle');
+    const guardIndex = reserve.indexOf('assertBundleHasApplicantAbstract(bundle)');
+    const manifestIndex = reserve.indexOf('writeNewJson(args.manifestOut');
+    const reserveIndex = reserve.indexOf('ledger.reserveRun(');
+    expect(parseIndex).toBeGreaterThan(-1);
+    expect(guardIndex).toBeGreaterThan(parseIndex);
+    expect(manifestIndex).toBeGreaterThan(guardIndex);
+    expect(reserveIndex).toBeGreaterThan(guardIndex);
+  });
 });
 
 describe('P2-3: runReserve/runAdvance refuse before any Dataverse or ledger call when the switch is off', () => {

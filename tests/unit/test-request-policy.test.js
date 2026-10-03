@@ -110,6 +110,19 @@ describe('compileTestRequestDraft', () => {
     expect(result.blockers).toContainEqual(expect.objectContaining({ code: 'VALUE_OUT_OF_RANGE', field: 'wmkf_abstract' }));
   });
 
+  test.each([
+    ['unknown', undefined, 'METADATA_UNKNOWN'],
+    ['not createable', { createable: false, requiredLevel: 'None', type: 'Memo', maxLength: 1048576 }, 'FIELD_NOT_CREATEABLE'],
+    ['wrong type', { createable: true, requiredLevel: 'None', type: 'Boolean' }, 'METADATA_INVALID'],
+  ])('requires usable wmkf_abstract metadata when copying applicant text (%s)', (_label, abstractMetadata, code) => {
+    const result = compileTestRequestDraft(input({
+      sourceAbstract: 'Applicant text',
+      metadata: metadata({ wmkf_abstract: abstractMetadata }),
+    }));
+    expect(result.createBody).toBeNull();
+    expect(result.blockers).toContainEqual(expect.objectContaining({ code, field: 'wmkf_abstract' }));
+  });
+
   test('projects malicious source identity, contacts, paid state, and annotations out', () => {
     const result = compileTestRequestDraft(input({
       sourceRequest: {

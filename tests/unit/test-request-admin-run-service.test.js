@@ -13,7 +13,8 @@ import { runStatusChange as realRunStatusChange } from '../../lib/services/test-
 import { deriveActorId, deriveRunIds } from '../../lib/services/test-requests/admin-run-identity.js';
 import { artifactDigest, draftPathname, runPathname } from '../../lib/services/test-requests/factory-artifact-store.js';
 import { SANDBOX_URL, PRODUCTION_URL, sha256 } from '../../lib/services/test-requests/basic-clone-steps.js';
-import { buildSourceBundle } from '../../lib/services/test-requests/source-bundle.js';
+import { buildSourceBundle, PRE_SITE_SECTION_FIELDS } from '../../lib/services/test-requests/source-bundle.js';
+import { PROPOSAL_CORE_KEYS } from '../../shared/config/prompts/pre-site-visit-proposal-core.js';
 import { PRODUCTION_HOSTS } from '../../lib/dataverse/core/target-registry.js';
 import { MANAGED_LEDGER_HOSTS } from '../../lib/db/ledger-registry.js';
 import { TEST_REQUEST_FIXED_FIELDS } from '../../lib/services/test-requests/policy.js';
@@ -357,14 +358,29 @@ describe('Confirm: sandbox and production reservations', () => {
     expect(h.createClientCalls.map((c) => c.resourceUrl)).toEqual([PRODUCTION_URL]);
   });
 
-  test('new Confirm refuses a legacy draft without an abstract member before writing run artifacts', async () => {
+  test.each([2, 3, 4])('new Confirm refuses a v%d draft before writing run artifacts', async (version) => {
     const h = harness({
       deployment: 'preview',
       deps: {
         exportBundle: async ({ exportedAt }) => {
           const legacy = bundleAt(exportedAt);
-          delete legacy.abstract;
-          legacy.version = 2;
+          legacy.version = version;
+          if (version < 4) {
+            delete legacy.abstract;
+            if (version === 3) legacy.reviewers = [];
+          } else {
+            legacy.reviewers = [];
+            legacy.preSiteVisit = {
+              requestDocumentId: 'cccccccc-0000-0000-0000-000000000001',
+              sectionFields: Object.fromEntries(PRE_SITE_SECTION_FIELDS.map((field) => [field, 'section text'])),
+              proposalCoreJson: {
+                schemaVersion: 4,
+                proposalCore: Object.fromEntries(PROPOSAL_CORE_KEYS.map((key) => [key, 'core text'])),
+                diagnostics: [],
+              },
+              personnel: { principalInvestigator: 'PI', coPrincipalInvestigators: [] },
+            };
+          }
           return legacy;
         },
       },

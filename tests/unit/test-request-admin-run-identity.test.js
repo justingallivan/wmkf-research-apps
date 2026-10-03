@@ -8,6 +8,7 @@ import {
   FACTORY_ID_NAMESPACE, deriveActorId, deriveRunIds, targetFromDeployment,
 } from '../../lib/services/test-requests/admin-run-identity.js';
 import { buildCloneManifest } from '../../lib/services/test-requests/basic-clone-steps.js';
+import { sha256 } from '../../lib/services/test-requests/basic-clone-steps.js';
 import { TEST_REQUEST_FIXED_FIELDS } from '../../lib/services/test-requests/policy.js';
 import { buildSourceBundle } from '../../lib/services/test-requests/source-bundle.js';
 import { PRODUCTION_HOSTS } from '../../lib/dataverse/core/target-registry.js';
@@ -84,14 +85,14 @@ const LIAISON_ID = '99999999-9999-4999-8999-999999999999';
 const RL_ID = '15151515-1515-4151-8151-151515151515';
 const SOURCE_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const BASE_FIELDS = [
-  'akoya_requestid', 'akoya_title', 'akoya_purpose', 'akoya_request', 'akoya_fiscalyear',
+  'akoya_requestid', 'akoya_title', 'akoya_purpose', 'wmkf_abstract', 'akoya_request', 'akoya_fiscalyear',
   TEST_REQUEST_FIXED_FIELDS.requestType, 'wmkf_meetingdate', TEST_REQUEST_FIXED_FIELDS.marker,
   TEST_REQUEST_FIXED_FIELDS.runId, TEST_REQUEST_FIXED_FIELDS.responseReminder, TEST_REQUEST_FIXED_FIELDS.reviewReminder,
 ];
 
 function typeOf(field) {
   if (field === 'akoya_request') return 'Money';
-  if (field === 'akoya_purpose') return 'Memo';
+  if (field === 'akoya_purpose' || field === 'wmkf_abstract') return 'Memo';
   if (field === 'akoya_requestid' || field === TEST_REQUEST_FIXED_FIELDS.runId) return 'Uniqueidentifier';
   if (field === TEST_REQUEST_FIXED_FIELDS.requestType) return 'Picklist';
   if (field.includes('reminder') || field === TEST_REQUEST_FIXED_FIELDS.marker) return 'Boolean';
@@ -105,6 +106,7 @@ function metadata(production) {
     ...(field === 'akoya_request' ? { minValue: 0, maxValue: 1e9 } : {}),
     ...(['akoya_title', 'akoya_fiscalyear'].includes(field) ? { maxLength: 120 } : {}),
     ...(field === 'akoya_purpose' ? { maxLength: 100000 } : {}),
+    ...(field === 'wmkf_abstract' ? { maxLength: production ? 5000 : 2000 } : {}),
   }]));
   fields.akoya_applicantid = { createable: true, requiredLevel: 'None', type: 'Lookup', lookupTarget: 'accounts' };
   if (production) {
@@ -142,15 +144,18 @@ const SOURCE = {
   akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', revision: 'rev-1',
 };
 
-function bundleFor() {
+function bundleFor(abstract) {
+  const sourceRow = {
+    akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
+    akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', versionnumber: 1,
+  };
+  if (abstract !== undefined) sourceRow.wmkf_abstract = abstract;
   return buildSourceBundle({
-    sourceRow: {
-      akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
-      akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', versionnumber: 1,
-    },
+    sourceRow,
     documents: [],
     dataverseHost: PRODUCTION_HOSTS[0],
     exportedAt: new Date(Date.now() - 60_000),
+    ...(abstract === undefined ? {} : { applicantAbstract: abstract }),
   });
 }
 
@@ -178,6 +183,19 @@ describe('buildCloneManifest ids', () => {
     });
     expect(manifest.createBody.akoya_requestid).toBe(ids.requestId);
     expect(manifest.createBody[TEST_REQUEST_FIXED_FIELDS.runId]).toBe(ids.runId);
+  });
+
+  test('v5 applicant abstract reaches production create body and its digest', () => {
+    const abstract = '  Applicant text exactly\n';
+    const manifest = buildCloneManifest(preflight('production'), {
+      ...base, bundle: bundleFor(abstract),
+      programDirector: { systemuserid: PD_ID },
+      cast: { piContactId: PI_ID, liaisonContactId: LIAISON_ID, researchLeaderContactId: RL_ID }, ids,
+    });
+    expect(manifest.bundle.version).toBe(5);
+    expect(manifest.bundle.abstract).toBe(abstract);
+    expect(manifest.createBody.wmkf_abstract).toBe(abstract);
+    expect(manifest.createBodySha256).toBe(sha256(manifest.createBody));
   });
 
   test('without ids the builder still mints three distinct random GUIDs (CLI unchanged)', () => {

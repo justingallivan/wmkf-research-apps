@@ -227,6 +227,12 @@ test('bundle v5 carries the abstract as a required null-or-exact-string member',
   expect(readSourceBundle({ ...bundle, abstract: 'x'.repeat(30001) }).abstract).toHaveLength(30001);
 });
 
+test('v5 reports its own version when preSiteVisit is missing', () => {
+  const bundle = build({ applicantAbstract: 'Applicant source abstract' });
+  expect(() => readSourceBundle({ ...bundle, preSiteVisit: null }))
+    .toThrow(/Version 5 source bundle is missing its preSiteVisit section/);
+});
+
 test('rejects an unavailable archive bucket before hydrating source documents', async () => {
   const dependencies = exportDependencies();
   dependencies.discoverDocuments.mockReset().mockResolvedValue({
