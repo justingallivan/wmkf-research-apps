@@ -1,0 +1,16 @@
+{
+  "name": "wmkf_requestdocument-transcript-bundle",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_requestdocument",
+  "_comment": "Optional typed manifest for the three-file generated transcript bundle. The field is selected only by explicit bundle callers after MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY=on; it contains stable file metadata, never file bytes, URLs, or transcript text.",
+  "attributes": [
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_TranscriptBundleJson",
+      "displayName": "Transcript Bundle JSON",
+      "description": "Versioned stable identities, hashes, sizes, names and media types for the generated TXT/VTT/source bundle. Contains no URLs or transcript content.",
+      "maxLength": 32000
+    }
+  ],
+  "relationships": []
+}

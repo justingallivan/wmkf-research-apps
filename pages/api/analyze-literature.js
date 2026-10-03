@@ -17,7 +17,7 @@ import {
 import { requireAppAccess } from '../../lib/utils/auth';
 import { LLMClient } from '../../lib/services/llm-client';
 import { nextRateLimiter } from '../../shared/api/middleware/rateLimiter';
-import { safeFetch } from '../../lib/utils/safe-fetch';
+import { fetchPublicBlob } from '../../lib/utils/public-blob-fetch';
 
 const limiter = nextRateLimiter({ max: 5 });
 
@@ -74,7 +74,7 @@ export default async function handler(req, res) {
         sendProgress(res, progressPercent, `Analyzing paper ${processedFiles} of ${totalFiles}: ${file.filename}...`);
 
         // Fetch file from blob URL
-        const fileResponse = await safeFetch(file.url);
+        const fileResponse = await fetchPublicBlob(file.url);
         if (!fileResponse.ok) {
           throw new Error(`Failed to fetch file: ${fileResponse.statusText}`);
         }

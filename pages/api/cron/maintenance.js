@@ -242,6 +242,21 @@ export default async function handler(req, res) {
       results.presentationMaterialUploads = { error: error.message };
     }
 
+    // 7.6b. Reconcile known Meeting Tracker transcript publication receipts
+    // on the existing daily cadence. Exact identities only; no candidate
+    // deletion is attempted by this bounded verification pass.
+    try {
+      const { reconcileMeetingTranscriptPublicationsBatch } = await import(
+        '../../../lib/services/meeting-tracker-transcription/service'
+      );
+      results.meetingTranscriptPublications = await withDalContext(
+        'maintenance-meeting-transcript-publications',
+        () => reconcileMeetingTranscriptPublicationsBatch({ limit: 20 }),
+      );
+    } catch (error) {
+      results.meetingTranscriptPublications = { error: error.code || 'publication_reconcile_failed' };
+    }
+
     // 7.6b. Test Request Factory artifact store (admin form): ready-run and
     // unreserved artifacts and stale drafts only; never a resumable run's.
     try {

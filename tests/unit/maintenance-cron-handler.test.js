@@ -25,6 +25,11 @@ jest.mock('../../lib/services/notification-service', () => ({
 jest.mock('../../lib/services/review-draft-service', () => ({
   deleteExpired: jest.fn(async () => 0),
 }));
+jest.mock('../../lib/services/meeting-tracker-transcription/service', () => ({
+  reconcileMeetingTranscriptPublicationsBatch: jest.fn(async () => ({
+    skipped: 'schema_not_ready', checked: 0, reconciled: 0, attention: 0,
+  })),
+}));
 jest.mock('../../lib/services/maintenance-service', () => ({
   __esModule: true,
   default: {
@@ -67,6 +72,7 @@ jest.mock('../../lib/services/maintenance-service', () => ({
 import handler from '../../pages/api/cron/maintenance';
 import MaintenanceService from '../../lib/services/maintenance-service';
 import FeedbackService from '../../lib/services/feedback-service';
+import { reconcileMeetingTranscriptPublicationsBatch } from '../../lib/services/meeting-tracker-transcription/service';
 
 function makeRes() {
   return {
@@ -78,6 +84,17 @@ function makeRes() {
 }
 
 beforeEach(() => { jest.clearAllMocks(); });
+
+it('records the transcription publication reconciler schema-not-ready result without failing maintenance', async () => {
+  const res = makeRes();
+  await handler({ method: 'POST', headers: {} }, res);
+
+  expect(reconcileMeetingTranscriptPublicationsBatch).toHaveBeenCalledWith({ limit: 20 });
+  expect(res.body.results.meetingTranscriptPublications).toEqual({
+    skipped: 'schema_not_ready', checked: 0, reconciled: 0, attention: 0,
+  });
+  expect(res.body.ok).toBe(true);
+});
 
 describe('maintenance cron — maintenance_runs retention step wiring', () => {
   it('runs Dynamics feedback cleanup with the fixed 20-day ACK retention', async () => {

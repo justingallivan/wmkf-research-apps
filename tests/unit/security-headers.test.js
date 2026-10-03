@@ -1,4 +1,15 @@
-const nextConfig = require('../../next.config');
+const { execFileSync } = require('child_process');
+const path = require('path');
+// Assert the real resolved config, including the Workflow wrapper, without
+// asking Jest's CJS transformer to load the SDK's ESM build dependencies.
+const rules = JSON.parse(execFileSync(process.execPath, ['-e', `
+  (async () => {
+    const exported = require('./next.config');
+    const config = typeof exported === 'function'
+      ? await exported('phase-production-server', {}) : exported;
+    process.stdout.write(JSON.stringify(await config.headers()));
+  })().catch(error => { console.error(error); process.exit(1); });
+`], { cwd: path.resolve(__dirname, '../..'), encoding: 'utf8', timeout: 30000 }));
 
 function toHeaderMap(headers) {
   return Object.fromEntries(headers.map(({ key, value }) => [key, value]));
@@ -6,7 +17,6 @@ function toHeaderMap(headers) {
 
 describe('security headers', () => {
   it('sets the global browser security baseline', async () => {
-    const rules = await nextConfig.headers();
     const globalRule = rules.find(rule => rule.source === '/:path*');
     const headers = toHeaderMap(globalRule.headers);
 
@@ -23,7 +33,6 @@ describe('security headers', () => {
   });
 
   it('prevents API response caching by default', async () => {
-    const rules = await nextConfig.headers();
     const apiRule = rules.find(rule => rule.source === '/api/:path*');
     const headers = toHeaderMap(apiRule.headers);
 
@@ -31,7 +40,6 @@ describe('security headers', () => {
   });
 
   it('does not disclose presentation bearer paths through referrers or caches', async () => {
-    const rules = await nextConfig.headers();
     for (const source of ['/external/presentation/:path*', '/api/external/presentation/:path*']) {
       const headers = toHeaderMap(rules.find(rule => rule.source === source).headers);
       expect(headers['Referrer-Policy']).toBe('no-referrer');
@@ -40,7 +48,6 @@ describe('security headers', () => {
   });
 
   it('allows only same-origin framing of the Cycle Dossier PDF preview', async () => {
-    const rules = await nextConfig.headers();
     const rule = rules.find(r => r.source === '/api/cycle-dossier/download');
     expect(toHeaderMap(rule.headers)['X-Frame-Options']).toBe('SAMEORIGIN');
     // Ordering matters: the override must come after the global DENY rule.

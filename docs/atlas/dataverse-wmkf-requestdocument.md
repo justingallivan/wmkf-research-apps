@@ -22,8 +22,11 @@ related:
   - lib/dataverse/schema/wave20-guarded-reopen/wmkf_requestdocument_guarded_reopen.json
   - lib/dataverse/schema/wave22-final-writeup-transition/wmkf_requestdocument_final_writeup_transition.json
   - lib/dataverse/schema/wave30-post-presentation-materials/wmkf_requestdocument_post_presentation_materials.json
+  - lib/dataverse/schema/wave31-meeting-transcript-bundle/wmkf_requestdocument_transcript_bundle.json
+  - scripts/preflight-meeting-transcript-bundle-schema.mjs
   - scripts/preflight-post-presentation-materials-schema.mjs
   - lib/utils/post-presentation-materials-readiness.js
+  - lib/utils/meeting-transcript-bundle-readiness.js
   - lib/dataverse/adapters/request-document.js
   - lib/services/initial-assessment/artifact-service.js
   - lib/services/initial-assessment/controls-service.js
@@ -94,6 +97,40 @@ reissue while the replacement worked. See the
 Safari Private Browsing reached Vercel sign-in before the app, so anonymous recipient viewing
 remains unproved on protected Preview. Preview branch access was restored to `off`; Production
 runtime is not deployed or enabled.
+
+**[SOURCE-REVIEWED FOR DISABLED SOURCE; NOT RELEASED OR LIVE.]** Wave 31
+adds the optional `wmkf_TranscriptBundleJson` Memo (logical name
+`wmkf_transcriptbundlejson`, maximum 32,000 characters) to
+`wmkf_requestdocument`. The schema-as-code record is
+`lib/dataverse/schema/wave31-meeting-transcript-bundle/wmkf_requestdocument_transcript_bundle.json`;
+it defines no relationship. **[VERIFIED via sandbox preflight and authorized
+sandbox-only apply/readback, 2026-10-02]** the memo is exact; the Wave 16
+`wmkf_requestdocument_generation_key` over `wmkf_generationkey` is exact and
+Active. Production was not probed or changed. Wave 30's two exact fields were
+reported by the separate `scripts/preflight-post-presentation-materials-schema.mjs`.
+The Wave 31 preflight is `scripts/preflight-meeting-transcript-bundle-schema.mjs`.
+`MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY` must be exactly
+`on` before the field is selected. In addition, `requestDocumentSelect()`
+includes it only when a caller explicitly sets
+`includeMeetingTranscriptBundle: true`; its default and
+`REQUEST_DOCUMENT_SELECT` omit the field. Currently only
+`findByGenerationKey` and `findByRequest` expose that opt-in. This readiness
+flag only makes the projection available; it does not enable transcription or
+authorize a caller.
+
+The generated-publication source registers one `TRANSCRIPT` Request Document
+whose primary SharePoint file is TXT. Its optional manifest binds the TXT,
+VTT, and normalized source-file descriptors for staff-side publication,
+verification, and correction. All bundle reads explicitly opt into the
+projection and cap each new Graph read at 4 MB; ordinary Request Document
+readers omit the memo field. This source remains disabled. Wave 31 is applied
+and read back only on sandbox, not Production. Migrations 063–064 passed
+disposable local PostgreSQL integration and were applied only to the isolated
+Preview test-Neon database documented in the Postgres Atlas, not shared
+application databases. Recipient DTOs do not
+project the manifest or source-file descriptor; no recipient manifest, source
+projection, or recipient file inventory is implemented. No production
+behavior is claimed here.
 
 **[PRODUCTION-LIVE 2026-09-07: PR #176 merged as `25dc8645`, Ready deployment `dpl_22eyAD8S4yPmx16iv3Nng2u9sw5T`, owner-run signed-in smoke passed on Request `1002788`.]** Slice 4 adds the second governed transition on the same Final row, `advanceToLeadershipReview` (`lib/services/final-writeup/transition-service.js`, route `pages/api/workbench/final-writeup/leadership-review.js`): lifecycle `REVIEW` → `FINAL`, explicit `wmkf_LeadershipReviewStartedBy`/`wmkf_LeadershipReviewStartedAt`, and the row's own SharePoint observation fields (`wmkf_sharepointversionid`, `wmkf_sharepointetag`, `wmkf_sharepointlastmodified`, `wmkf_filesize`, `wmkf_contenthash`) refreshed to the verified current version, committed in one changeset with a request-ETag re-bind of `wmkf_CurrentFinalWriteup`. **The milestone triple and `wmkf_MilestoneCreatedBy` are not written** by this transition (owner D2, 2026-09-07): that actor field means the Pre-Site → Site Visit handoff person. A Final Writeup row in lifecycle `FINAL` is therefore "leadership review" only with the complete, well-formed leadership checkpoint, enforced by one shared predicate (`lib/services/final-writeup/leadership-checkpoint.js`) in the transition status, acknowledgement, and dashboard readers, so a half-written row is a reconciliation failure on every surface; the source Pre-Site row's `FINAL` lifecycle keeps its earlier meaning (handoff receipt). No backward action exists. **Owner-run reversal** for a mistaken transition: set the Final row's `wmkf_lifecyclestate` back to `100000001` (Review) and clear `wmkf_leadershipreviewstartedat` and `wmkf_LeadershipReviewStartedBy`; the observation fields may stay. Known pre-existing gap: group-review activation stamps `wmkf_milestonecreatedat` on the Final row without a milestone actor, which the explicit-actor census reports under its Site Visit kind; a separate Tier 0 census fix is owner-decided (plan §10 D6).
 

@@ -58,6 +58,11 @@
     "057_integrity_screening_reviews.sql",
     "058_test_request_cast_slot_bindings.sql",
     "059_scheduled_email_recipient_generation.sql",
-    "060_materials_background_jobs.sql"
+    "060_materials_background_jobs.sql",
+    "060_transcription_jobs.sql",
+    "061_transcription_workflow_dispatches.sql",
+    "062_transcription_speaker_names.sql",
+    "063_meeting_tracker_transcription.sql",
+    "064_meeting_transcript_close_attribution.sql"
   ]
 }

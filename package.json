@@ -15,6 +15,8 @@
     "ledger:apply": "node scripts/apply-ledger-migrations.js",
     "check:reviewer-reminder-hold": "node scripts/check-reviewer-reminder-hold.js",
     "check:reviewer-reminder-hold:self-test": "node scripts/check-reviewer-reminder-hold-self-test.js",
+    "check:transcription-pilot-deployment": "node scripts/check-transcription-pilot-deployment.js",
+    "check:transcription-pilot-deployment:self-test": "node scripts/check-transcription-pilot-deployment.js --self-test",
     "check:agent-invariants": "node scripts/check-agent-invariants.js",
     "check:agent-invariants:ci": "node scripts/check-agent-invariants.js --tracked-only",
     "check:instruction-architecture": "node scripts/check-instruction-architecture.js",
@@ -139,6 +141,7 @@
     "lucide-react": "^0.577.0",
     "mammoth": "^1.12.0",
     "marked": "^12.0.2",
+    "music-metadata": "^11.16.1",
     "next": "^16.3.8",
     "next-auth": "^4.24.15",
     "pdf-lib": "^1.17.1",
@@ -154,6 +157,7 @@
     "string-similarity": "^4.0.4",
     "tailwindcss": "^3.4.17",
     "uuid": "11.1.1",
+    "workflow": "5.0.0",
     "xml2js": "^0.6.2"
   },
   "devDependencies": {

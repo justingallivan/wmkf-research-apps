@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { bootstrapFreshDatabase, readMigrationManifest } from '../../scripts/lib/fresh-database-bootstrap';
+import { stripOuterTxn } from '../../scripts/apply-migrations.js';
 import {
   LEDGER_RECIPES, LEDGER_REASON_CODES, LEDGER_RECEIPT_KEYS, LEDGER_RESOURCE_KINDS, LEDGER_STEPS,
 } from '../../lib/services/test-requests/run-ledger.js';
@@ -300,12 +302,30 @@ describe('migration 054 and the later migration manifest', () => {
     expect(manifest.files.indexOf('058_test_request_cast_slot_bindings.sql')).toBeGreaterThan(ledgerIndex);
   });
 
-  it('V57 fresh-install slot table mirrors migration 058', () => {
+  it('manifest-driven fresh install executes migrations 058 and 059 and records their filenames', async () => {
+    const migrationName = '058_test_request_cast_slot_bindings.sql';
+    const recipientMigrationName = '059_scheduled_email_recipient_generation.sql';
+    expect(readMigrationManifest()).toContain(migrationName);
+    expect(readMigrationManifest()).toContain(recipientMigrationName);
     const migration058 = fs.readFileSync(path.join(process.cwd(), 'lib/db/migrations/058_test_request_cast_slot_bindings.sql'), 'utf8');
-    const setup = fs.readFileSync(path.join(process.cwd(), 'scripts/setup-database.js'), 'utf8');
-    const migrationTable = migration058.match(/CREATE TABLE IF NOT EXISTS test_request_cast_slot_bindings \([\s\S]*?\n\);/)?.[0];
-    const freshTable = setup.match(/const v57Statements = \[\s*`([\s\S]*?)`,\s*\];/)?.[1];
-    expect(freshTable?.replace(/\s+/g, ' ').trim()).toBe(migrationTable?.replace(/\s+/g, ' ').trim().replace(/;$/, ''));
+    const migration059 = fs.readFileSync(path.join(process.cwd(), 'lib/db/migrations', recipientMigrationName), 'utf8');
+    const calls = [];
+    const client = { query: jest.fn(async (sql, params) => {
+      calls.push({ sql, params });
+      if (sql.includes('FROM pg_catalog.pg_tables')) return { rows: [] };
+      if (sql.includes('SELECT name FROM schema_migrations')) return { rows: [] };
+      if (sql.includes('FROM information_schema.tables')) return { rows: [] };
+      return { rows: [] };
+    }) };
+    await bootstrapFreshDatabase(client, { baseGroups: [], supplementalGroups: [] });
+    expect(calls.some(({ sql }) => sql === stripOuterTxn(migration058))).toBe(true);
+    expect(calls.some(({ sql }) => sql === stripOuterTxn(migration059))).toBe(true);
+    expect(calls).toContainEqual(expect.objectContaining({
+      params: [migrationName, 'setup-database.js (migration SQL executed)'],
+    }));
+    expect(calls).toContainEqual(expect.objectContaining({
+      params: [recipientMigrationName, 'setup-database.js (migration SQL executed)'],
+    }));
   });
 
   function normalize(sql) {

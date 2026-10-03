@@ -23,6 +23,7 @@ const {
 const { withDalContext } = require('../../lib/dataverse/core/context');
 const {
   grantApps,
+  listAppKeysForUser,
   listAllGrantsForAdmin,
   revokeApps,
 } = require('../../lib/services/dataverse-app-access-service');
@@ -64,6 +65,7 @@ test('grantApps returns the completed prefix when a later grant fails', async ()
   const result = await withDalContext('q9-acceptance-grant', () =>
     grantApps(7, ['dynamics-explorer', 'literature-analyzer'], 9));
 
+  expect(resolveProfileToSystemUser.mock.calls).toEqual([[7], [9]]);
   expect(result).toEqual({
     granted: ['dynamics-explorer'],
     error: 'grant failed (literature-analyzer): 503 unavailable',
@@ -90,6 +92,7 @@ test('revokeApps returns the completed prefix when a later revoke fails', async 
   const result = await withDalContext('q9-acceptance-revoke', () =>
     revokeApps(7, ['dynamics-explorer', 'literature-analyzer']));
 
+  expect(resolveProfileToSystemUser.mock.calls).toEqual([[7]]);
   expect(result).toEqual({
     revoked: ['dynamics-explorer'],
     error: 'revoke failed (literature-analyzer): 503',
@@ -104,4 +107,28 @@ test('strict admin list rejects instead of returning a false-empty snapshot', as
   await expect(withDalContext('q9-acceptance-list', () =>
     listAllGrantsForAdmin({ throwOnError: true })))
     .rejects.toThrow('list all grants failed: 503');
+});
+
+test('app-grant read is the only resolver caller opting into supervised profile mapping; unmapped stays empty under strict read', async () => {
+  resolveProfileToSystemUser.mockResolvedValueOnce(null);
+
+  await expect(withDalContext('q9-acceptance-list-profile-grants', () =>
+    listAppKeysForUser(1, { throwOnError: true }))).resolves.toEqual([]);
+
+  expect(resolveProfileToSystemUser).toHaveBeenCalledWith(1, { allowSupervisedTestRead: true });
+  expect(createClient).not.toHaveBeenCalled();
+});
+
+test('app-grant read uses the explicit opt-in mapping and reads grants for that actor', async () => {
+  const client = { get: jest.fn().mockResolvedValue({ ok: true, body: { value: [
+    { wmkf_appkey: 'meeting-tracker' },
+  ] } }) };
+  createClient.mockReturnValue(client);
+  resolveProfileToSystemUser.mockResolvedValueOnce({ systemuserid: SYSTEM_USER_ID });
+
+  await expect(withDalContext('q9-acceptance-list-test-profile-grants', () =>
+    listAppKeysForUser(1, { throwOnError: true }))).resolves.toEqual(['meeting-tracker']);
+
+  expect(resolveProfileToSystemUser).toHaveBeenCalledWith(1, { allowSupervisedTestRead: true });
+  expect(client.get).toHaveBeenCalledWith(expect.stringContaining(encodeURIComponent(`_wmkf_user_value eq ${SYSTEM_USER_ID}`)));
 });

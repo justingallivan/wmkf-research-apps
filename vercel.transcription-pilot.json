@@ -1,0 +1,29 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "env": {
+    "TRANSCRIPTION_PILOT_DEPLOYMENT_PROFILE": "transcription-pilot"
+  },
+  "build": {
+    "env": {
+      "TRANSCRIPTION_PILOT_DEPLOYMENT_PROFILE": "transcription-pilot"
+    }
+  },
+  "git": {
+    "deploymentEnabled": false
+  },
+  "functions": {
+    "pages/api/cron/drain-transcriptions.js": {
+      "maxDuration": 300
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/drain-transcriptions",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/drain-transcriptions?recovery=1",
+      "schedule": "0 * * * *"
+    }
+  ]
+}

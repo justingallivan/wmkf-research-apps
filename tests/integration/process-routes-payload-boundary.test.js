@@ -48,8 +48,8 @@ jest.mock('../../lib/utils/usage-logger', () => ({
   estimateCostCents: jest.fn(() => 0),
 }));
 
-jest.mock('../../lib/utils/safe-fetch', () => ({
-  safeFetch: jest.fn(() => Promise.resolve({
+jest.mock('../../lib/utils/public-blob-fetch', () => ({
+  fetchPublicBlob: jest.fn(() => Promise.resolve({
     ok: true,
     arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
   })),
@@ -87,7 +87,7 @@ function makeOverLimit(maxChars) {
 
 async function runRoute(handlerModule, body, profileAppKeys) {
   // Reset module registry and reload the handler so the per-route mocks above
-  // (rateLimiter, LLMClient, pdf-parse, safe-fetch) are re-applied freshly.
+  // (rateLimiter, LLMClient, pdf-parse, public-blob-fetch) are re-applied freshly.
   jest.resetModules();
   mockAuthenticatedUser(2, profileAppKeys);
   const handler = (await import(handlerModule)).default;

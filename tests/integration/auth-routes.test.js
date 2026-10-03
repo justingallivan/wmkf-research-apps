@@ -87,9 +87,9 @@ jest.mock('../../lib/utils/email-generator', () => ({
 // Email personalization prompt
 
 // Safe fetch
-jest.mock('../../lib/utils/safe-fetch', () => ({
-  safeFetch: jest.fn(() => Promise.resolve({ ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) })),
-  isAllowedUrl: jest.fn(() => true),
+jest.mock('../../lib/utils/public-blob-fetch', () => ({
+  fetchPublicBlob: jest.fn(() => Promise.resolve({ ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) })),
+  isPublicBlobUrl: jest.fn(() => true),
 }));
 
 // Database service

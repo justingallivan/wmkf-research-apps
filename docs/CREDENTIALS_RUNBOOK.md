@@ -100,6 +100,11 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 | `DOSSIER_BLOB_READ_WRITE_TOKEN` | Dedicated private Blob RW token for Cycle Dossier immutable inputs and Word/PDF artifacts | **[VERIFIED 2026-09-07]** Connected under the custom `DOSSIER_BLOB` prefix in Development, Preview, and Production for store `wmkf-cycle-dossier-private` (`store_W9WC1TLR7kpl9hty`); managed token authenticated in Development. Do not claim Preview/Production runtime authentication until rollout preflight proves it. |
 | `DOSSIER_BLOB_STORE_ID` | Managed store identity paired with the dedicated Cycle Dossier Blob token | **[VERIFIED 2026-09-07]** `store_W9WC1TLR7kpl9hty`; rollout preflight performs an authenticated read-only list and checks token/store identity. |
 | `CYCLE_DOSSIER_ENABLED` | Cycle Dossier pilot activation flag | **Source-built 2026-09-07; disabled until rollout.** Set literal `true` only after migration 045, private Blob token, and governed prompts are verified; cron remains inert otherwise. |
+| `TRANSCRIPTION_PILOT_ENABLED` | AssemblyAI transcription pilot route and worker interlock | **Shared-source rollout guidance: keep unset/off** until migration 060, private Blob access, encryption/HMAC keys, and operational readiness are verified. Separate scope: the isolated dedicated Production pilot has a dated 2026-10-01 checkpoint with this switch enabled; see [`postgres-transcription-pilot.md`](atlas/postgres-transcription-pilot.md). Do not infer configuration on the prior shared-project alias. |
+| `TRANSCRIPTION_SUBMISSIONS_ENABLED` | AssemblyAI new-submission interlock | **Shared-source rollout guidance: keep unset/off** except during an explicitly approved pilot window; recovery, polling, and cleanup remain available while new submissions are disabled. Separate scope: the isolated dedicated Production pilot checkpoint dated 2026-10-01 records new submissions disabled; see [`postgres-transcription-pilot.md`](atlas/postgres-transcription-pilot.md). Do not infer configuration on the prior shared-project alias. |
+| `ASSEMBLYAI_API_KEY` | AssemblyAI server-side API key for upload, submit, poll, and delete | Direct AssemblyAI account credential; server-only. Not provisioned or verified by this source build. Track as `assemblyai_api_key`; configure only after owner authorization and controlled readiness checks. |
+| `ASSEMBLYAI_WEBHOOK_SECRET` | AssemblyAI callback HMAC credential | Server-only shared secret; generate independently from the provider API key, at least 32 bytes. Track as `assemblyai_webhook_secret`; no webhook/provider call was made during build. |
+| `TRANSCRIPTION_REFERENCE_ENCRYPTION_KEY` | Encryption key for persisted AssemblyAI upload references | Server-only independent key, 32 bytes encoded as 64 hex characters. Track as `transcription_reference_encryption_key`; required before any submission can be safely reconciled. |
 | `CYCLE_DOSSIER_REQUEST_ALLOWLIST` | Server-owned comma-separated request IDs or request numbers admitted to the controlled cohort | **Source-built 2026-09-07; not configured.** Required before activation; keep to the explicitly rehearsed request(s). |
 | `CYCLE_DOSSIER_ROLLOUT_MODE` | Cohort mode: `pilot` admits any authenticated superuser; `smoke` requires the configured operator profile and exactly one allowlisted request | **Source-built 2026-09-07; defaults to `pilot`.** Use `smoke` for the first one-request rehearsal. |
 | `CYCLE_DOSSIER_OPERATOR_PROFILE_ID` | One authenticated superuser profile allowed when rollout mode is `smoke` | **Source-built 2026-09-07; required in `smoke` mode.** The profile must already satisfy the normal active-superuser check. |
@@ -110,6 +115,36 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 | `REVIEW_PANEL_REQUEST_ALLOWLIST` | Server-owned comma-separated request IDs or request numbers admitted to the controlled cohort (readable config, not a secret) | **[VERIFIED 2026-09-13]** Four D26 request numbers in Production (owner's smoke subset). Parser trims whitespace; smoke mode admits at most four and requires exactly one selection per launch. |
 | `CYCLE_DOSSIER_OPERATOR_STOP` | Immediate process-level outer stop checked before paid calls and SharePoint writes | **Source-built 2026-09-07; unset by default.** The durable Postgres operator stop is the authoritative pause and settles queued/running runs. |
 | `NODE_ENV` | Environment flag | Auto-set (`production` on Vercel, `development` locally) |
+
+### Optional — Meeting Tracker transcription (disabled by default)
+
+These non-secret controls belong to the Meeting Tracker transcription source
+slice, not the separately hosted AssemblyAI `transcription-pilot` deployment
+and its `TRANSCRIPTION_PILOT_ENABLED` / `TRANSCRIPTION_SUBMISSIONS_ENABLED`
+switches. The Meeting Tracker flow and a separate supervised-test mode are
+source-implemented, but remain disabled unless their independent gates pass;
+this does not release transcription to the shared application. Keep these
+controls unset/off outside an explicitly approved supervised test on the
+dedicated test Preview project. The supervised test is pinned to sandbox
+request 1000334 and its Site Visit, and is mutually exclusive with the synthetic
+speaker rehearsal. It additionally requires the exact test-project identity,
+Preview/auth configuration, sandbox Dynamics origin, request-scoped access,
+Meeting Tracker and post-presentation schema readiness/access, and provider
+submission switches not enabled. No current live enablement is asserted here;
+see the approved [Meeting Tracker transcription E2E reconnaissance plan](plans/MEETING_TRANSCRIPTION_E2E_RECON_PLAN_2026-10-02.md)
+for the controlled-test prerequisites and remaining checks.
+
+| Variable | Purpose | Contract |
+|----------|---------|----------|
+| `MEETING_TRACKER_TRANSCRIPTION_ACCESS` | Independent request-scoped rollout access for Meeting Tracker transcription | `on` allows eligible server-bound requests; exact `test:<request GUID>` allows only that matching request. Unset, malformed, or any other value resolves to off. This does not replace schema readiness. |
+| `MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY` | Meeting Tracker transcription schema interlock | Only literal `on` marks the required schema ready. The service fails closed unless this and the access control both allow the request. Set only after the approved schema apply and exact readback; readiness alone does not authorize a request. |
+| `MEETING_TRANSCRIPTION_REHEARSAL_ENABLED` | Narrow synthetic speaker read/save rehearsal interlock | Only literal `on` permits the exact rehearsal page/API after independent project, Preview, identity, schema-ready, and request-access checks. Intended only for the dedicated test Preview project; it does not enable transcription processing or the provider. Keep unset/off elsewhere. |
+| `MEETING_TRANSCRIPTION_SUPERVISED_TEST_ENABLED` | Separate fixed-request Meeting Tracker supervised-test interlock | Only literal `on` enables this mode, and only when the dedicated test project, Preview/auth, exact sandbox Dynamics origin, fixed request access, Meeting Tracker and post-presentation schema/access, and callback-origin checks pass. It is mutually exclusive with `MEETING_TRANSCRIPTION_REHEARSAL_ENABLED=on`; `TRANSCRIPTION_PILOT_ENABLED` and `TRANSCRIPTION_SUBMISSIONS_ENABLED` must not be `true`. Unset or literal `off` disables it; any other present value claims the mode and fails closed unless the complete contract is valid. Keep unset/off elsewhere. No live enablement is claimed. |
+| `MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY` | Optional Request Document transcript-manifest projection readiness | Only literal `on` permits the optional memo field to be selected, and only for a read explicitly opting into the transcript-bundle projection. It does not enable transcription or grant access. Set only after the optional Dataverse field is provisioned and read back exactly. |
+
+No additional credential is introduced by this source slice. The AssemblyAI
+provider credentials listed above remain a separate contract; this documentation
+does not claim they are provisioned for Meeting Tracker.
 
 ### Optional — Dynamics Explorer
 
@@ -548,11 +583,14 @@ Canonical list lives in `lib/utils/tracked-secrets.js` — both `pages/api/cron/
 | `irs_verify_secret` | IRS Verify Secret (PowerAutomate shared) | hmac | No expiry. Rotate on PA-flow rebuild or compromise |
 | `bill_webhook_secret` | BILL Webhook Secret (HMAC for /api/webhooks/bill) | hmac | Per-subscription `securityKey` from BILL. Rotate via `POST /v3/subscriptions/{id}/security-key` |
 | `vercel_log_drain_secret` | Vercel Log Drain Secret (HMAC for /api/webhooks/vercel-log-drain) | hmac | No expiry. Rotate by editing the drain's Signature Verification Secret in Vercel Team Settings → Drains and updating the env var in the same window |
+| `assemblyai_webhook_secret` | AssemblyAI callback HMAC secret | hmac | No vendor expiry; independently generate and rotate on compromise/offboarding or at least annually. |
+| `transcription_reference_encryption_key` | Transcription provider-reference encryption key | hmac | No vendor expiry; rotation requires decrypt/re-encrypt of retained provider references before replacing the key. |
 | `claude_api_key` | Anthropic Claude API Key | vendor | No vendor expiry, but rotate on compromise or staff offboarding |
 | `openai_api_key` | OpenAI API Key (Executor provider seam; opt-in) | vendor | No assumed vendor expiry; rotate on compromise or staff offboarding and update every enabled runtime environment |
 | `openalex_api_key` | OpenAlex API Key | vendor | Authenticated request credential; rotate on compromise and update every runtime environment |
 | `cloudmersive_api_key` | Cloudmersive API Key (virus scan; gated by VIRUS_SCAN_ENABLED) | vendor | Pilot uses free tier (800 scans/mo); rotate on compromise |
 | `perplexity_api_key` | Perplexity API Key (VRP sonar claim-verification + reviewer web discovery) | vendor | No vendor expiry, but rotate on compromise or staff offboarding. Live in prod 2026-06-05; one key, two surfaces (set `VRP_ALLOWED_PROVIDERS` to gate VRP exposure). |
+| `assemblyai_api_key` | AssemblyAI transcription API key (pilot) | vendor | Vendor-issued; rotate via AssemblyAI account controls and update all intentionally enabled runtime environments. Not provisioned or used by this source build. |
 | `blob_read_write_token` | Vercel Blob RW Token (shared store) | blob | Vercel-issued; no expiry; rotate via Vercel dashboard if compromised |
 | `dvx_blob_rw_token` | Vercel Blob RW Token (dvx-export-private) | blob | Same as above |
 | `intake_blob_rw_token` | Vercel Blob RW Token (intake-applicant-private) | blob | Same as above |

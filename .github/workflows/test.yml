@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run lint
@@ -96,7 +96,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npx jest tests/integration/test-request-run-ledger.pg.test.js tests/integration/test-request-run-runner.pg.test.js tests/integration/site-visit-materials-claim.pg.test.js tests/integration/site-visit-materials-background-jobs.pg.test.js tests/integration/integrity-screening-reviews.pg.test.js tests/integration/factory-ledger-fingerprint.pg.test.js tests/integration/scheduled-email-engine.pg.test.js

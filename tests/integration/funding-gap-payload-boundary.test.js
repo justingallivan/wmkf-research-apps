@@ -39,8 +39,8 @@ jest.mock('../../shared/api/handlers/fileProcessor', () => ({
   })),
 }));
 
-jest.mock('../../lib/utils/safe-fetch', () => ({
-  safeFetch: jest.fn(async () => ({
+jest.mock('../../lib/utils/public-blob-fetch', () => ({
+  fetchPublicBlob: jest.fn(async () => ({
     ok: true,
     arrayBuffer: async () => new ArrayBuffer(8),
   })),
