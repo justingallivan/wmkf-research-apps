@@ -186,6 +186,7 @@ function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnl
   const [conflict, setConflict] = useState(false);
   const [closeAcknowledgedId, setCloseAcknowledgedId] = useState(null);
   const generationRef = useRef(0);
+  const collectionSequenceRef = useRef(0);
   const detailSequenceRef = useRef(0);
   const controllerRef = useRef(null);
   const mountedRef = useRef(false);
@@ -224,7 +225,7 @@ function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnl
     const turns = Array.isArray(correctionDetail?.content?.utterances) ? correctionDetail.content.utterances : [];
     return {
       text: correctionDetail?.content?.text || '',
-      utterances: turns.map((utterance) => ({ speaker: utterance.speakerId, start: utterance.startMs, end: utterance.endMs, text: utterance.text })),
+      utterances: turns,
     };
   }, [correctionDetail]);
   const correctionSpeakerIds = useMemo(() => getTranscriptSpeakers(correctionContent), [correctionContent]);
@@ -236,6 +237,7 @@ function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnl
     return () => {
       mountedRef.current = false;
       generationRef.current += 1;
+      collectionSequenceRef.current += 1;
       detailSequenceRef.current += 1;
       controllerRef.current?.abort();
     };
@@ -261,24 +263,49 @@ function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnl
     if (!requestId) return;
     const generation = generationRef.current;
     const expectedRequestId = requestId;
+    const sequence = ++collectionSequenceRef.current;
+    const current = () => isCurrent(generation, expectedRequestId) && collectionSequenceRef.current === sequence;
     setLoading(true);
     try {
       const body = await requestJson(basePath, { method: 'GET', fallbackMessage: 'Meeting transcription could not be loaded.' });
-      if (!isCurrent(generation, expectedRequestId)) return;
+      if (!current()) return;
       setCollection(body);
       setCollectionCheckedAt(Date.now());
       setError(null);
       setConflict(false);
-      if (!keepDetail && !body.jobs?.some((job) => job.id === selectedJobIdRef.current)) {
+      const selectedId = selectedJobIdRef.current;
+      const freshSelectedJob = body.jobs?.find((job) => job.id === selectedId);
+      if (freshSelectedJob) {
+        const contentStillSafe = freshSelectedJob.status === 'ready'
+          && freshSelectedJob.contentAccessAllowed === true
+          && !freshSelectedJob.cleanup_requested_at && !freshSelectedJob.content_purged_at;
+        if (contentStillSafe) {
+          setDetail((currentDetail) => currentDetail?.job?.id === selectedId
+            && Number(freshSelectedJob.version) >= Number(currentDetail.job.version)
+            ? { ...currentDetail, job: freshSelectedJob }
+            : currentDetail);
+        } else {
+          // A collection refresh can revoke access while a detail fetch or edit is
+          // in flight. Invalidate those callbacks and discard their content/draft state.
+          detailSequenceRef.current += 1;
+          setDetail((currentDetail) => currentDetail?.job?.id === selectedId
+            ? { job: freshSelectedJob, content: null, candidates: [] }
+            : currentDetail);
+          setSpeakerNames({});
+          setSelectedSuggestions({});
+          setBusy(null);
+        }
+      } else if (selectedId || !keepDetail) {
+        detailSequenceRef.current += 1;
         selectJob(null);
         setDetail(null);
         setSpeakerNames({});
         setSelectedSuggestions({});
       }
     } catch (loadError) {
-      if (isCurrent(generation, expectedRequestId) && loadError?.name !== 'AbortError') setError(errorMessage(loadError, 'Meeting transcription could not be loaded.'));
+      if (current() && loadError?.name !== 'AbortError') setError(errorMessage(loadError, 'Meeting transcription could not be loaded.'));
     } finally {
-      if (isCurrent(generation, expectedRequestId)) setLoading(false);
+      if (current()) setLoading(false);
     }
   }, [basePath, isCurrent, requestId, selectJob]);
 
@@ -804,6 +831,8 @@ function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnl
           {selectedJob && <section className="mt-4 min-w-0 rounded-lg border border-gray-200 p-4" aria-labelledby="meeting-transcription-review-title">
             <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 id="meeting-transcription-review-title" className="break-words text-base font-semibold text-gray-950">{selectedJob.original_filename || 'Transcription draft'}</h3><p className="mt-1 text-sm text-gray-700">{JOB_STATE_LABELS[status] || selectedJob.label || 'Unknown status'}{selectedJob.needsAttention ? ' · Needs attention' : ''}</p></div><button type="button" onClick={() => void loadDetail(selectedJob.id, { preserveDraft: true })} disabled={Boolean(busy)} className="min-h-9 shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">Reload draft</button></div>
             {status === 'submission_uncertain' && <div className="mt-4"><Notice tone="warning">The provider may have accepted this recording, but the result is not confirmed. Do not start another transcription for the same recording until this draft has been resolved.</Notice></div>}
+            {selectedJob.contentDeletionObserved && <div className="mt-4"><Notice tone="info">Deletion of this draft’s readable content was observed.</Notice></div>}
+            {selectedJob.lateUploadWatchPending && <div className="mt-4"><Notice tone="warning">The temporary upload path remains under a late-upload safety watch, so cleanup is not fully complete. This status does not confirm that an automatic cleanup worker is running.</Notice></div>}
             {ACTIVE_STATUSES.has(status) && <div className="mt-4"><Notice tone="info">Transcription is still processing. Refresh status to check for an update.</Notice></div>}
             {status === 'failed' && <div className="mt-4"><Notice>This draft could not be transcribed. You can delete it or contact an administrator if the problem continues.</Notice></div>}
             {status === 'expired' && <div className="mt-4"><Notice tone="warning">The temporary transcript has expired and its content is no longer available.</Notice></div>}
@@ -826,7 +855,7 @@ function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnl
             {(correctionDetail.currentArtifact?.id !== correctionDetail.correction?.expectedCurrentArtifactId || correctionDetail.currentArtifact?.fingerprint !== correctionDetail.correction?.expectedCurrentFingerprint) && <div className="mt-3"><Notice tone="warning">The current published transcript changed after this correction draft was created. Start a new correction from the current version.</Notice></div>}
             <SpeakerEditor content={correctionContent} candidates={correctionDetail.candidates || sourceList} candidateSources={collection?.candidateSources} names={correctionNames} selectedSuggestions={correctionSuggestions} onSuggestionChange={(speaker, candidateId) => setCorrectionSuggestions((current) => ({ ...current, [speaker]: candidateId }))} onNameChange={(speaker, name) => setCorrectionNames((current) => ({ ...current, [speaker]: name }))} disabled={Boolean(busy) || correctionDetail.correction?.state !== 'draft'} />
             <div className="mt-3 flex flex-wrap items-center gap-2"><span className="mr-auto text-xs text-gray-600">{dirtyCorrectionNames ? 'Unsaved correction changes' : 'Correction labels saved'}</span><button type="button" onClick={saveCorrection} disabled={!dirtyCorrectionNames || Boolean(busy) || correctionDetail.correction?.state !== 'draft'} className="min-h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500">{busy === 'save-correction' ? 'Saving correction…' : 'Save correction'}</button><button type="button" onClick={publishCorrection} disabled={Boolean(busy) || dirtyCorrectionNames || !correctionSpeakerIds.length || correctionDetail.correction?.state !== 'draft' || correctionDetail.currentArtifact?.id !== correctionDetail.correction?.expectedCurrentArtifactId || correctionDetail.currentArtifact?.fingerprint !== correctionDetail.correction?.expectedCurrentFingerprint} className="min-h-10 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700">{busy === 'publish-correction' ? 'Publishing correction…' : 'Publish correction'}</button></div>
-            {correctionDetail.content?.text && <TranscriptContent content={correctionContent} speakerNames={correctionNames} />}
+            {(correctionContent.text || correctionContent.utterances.length > 0) && <TranscriptContent content={correctionContent} speakerNames={correctionNames} />}
           </section>}
           {conflict && <p className="mt-3 text-sm text-amber-950" role="alert">A version conflict was detected. Reload the latest saved version before saving names or publishing.</p>}
         </div>

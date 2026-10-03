@@ -54,6 +54,54 @@ describe('Meeting Tracker generated transcript bundle', () => {
     expect(generated.files.vtt.bytes.toString()).toContain('00:01:02.000 --> 00:01:02.900\nPI: Hello, team.');
   });
 
+  it('keeps formatter v1 source and rendered bytes identical to the pre-timing contract', () => {
+    const generated = buildMeetingTranscriptFiles({ content, speakerNames: { A: 'PI', B: 'Co-PI' },
+      identity: { ...identity, formatterVersion: '1' } });
+    expect(generated.files.source.bytes.toString()).toBe(
+      `{"schemaVersion":1,"requestId":"${REQUEST}","siteVisitActivityId":"${VISIT}","revisionId":"${REVISION}","text":"","utterances":[{"speakerId":"A","startMs":62000,"endMs":62900,"text":"Hello, team."},{"speakerId":"B","startMs":125000,"endMs":127300,"text":"WEBVTT and --> are transcript text."}],"speakerNames":{"A":"PI","B":"Co-PI"}}`,
+    );
+    expect(generated.files.txt.bytes.toString()).toBe(
+      '1:00\nPI: Hello, team.\n\n2:00\nCo-PI: WEBVTT and --> are transcript text.\n',
+    );
+    expect(generated.files.vtt.bytes.toString()).toBe(
+      'WEBVTT\n\n00:01:02.000 --> 00:01:02.900\nPI: Hello, team.\n\n00:02:05.000 --> 00:02:07.300\nCo-PI: WEBVTT and —&gt; are transcript text.\n',
+    );
+    const parsed = parseVerifiedMeetingTranscriptSource(generated.files.source.bytes,
+      { size: generated.files.source.bytes.length, sha256: generated.files.source.sha256 }, identity);
+    const replay = buildMeetingTranscriptFiles({ content: parsed.content, speakerNames: parsed.speakerNames,
+      identity: { ...identity, formatterVersion: parsed.formatterVersion } });
+    for (const role of ['source', 'txt', 'vtt']) {
+      expect(replay.files[role].bytes.equals(generated.files[role].bytes)).toBe(true);
+      expect(replay.files[role].sha256).toBe(generated.files[role].sha256);
+    }
+  });
+
+  it('embeds fully aligned optional word timings only in formatter v2 source', () => {
+    const timedContent = { text: 'go now', utterances: [{ speaker: 'A', start: 0, end: 70_000,
+      text: 'go now', words: [{ start: 58_000, end: 59_000, text: 'go' }, { start: 61_000, end: 62_000, text: 'now' }] }] };
+    const generated = buildMeetingTranscriptFiles({ content: timedContent, speakerNames: {}, identity });
+    const parsed = parseVerifiedMeetingTranscriptSource(generated.files.source.bytes,
+      { size: generated.files.source.bytes.length, sha256: generated.files.source.sha256 }, identity);
+    expect(parsed.formatterVersion).toBe('2');
+    expect(parsed.content.utterances[0].words).toEqual(timedContent.utterances[0].words);
+    expect(generated.files.txt.bytes.toString()).toBe('0:00\nSpeaker A: go\n\n1:00\nSpeaker A: now\n');
+  });
+
+  it('drops only optional timings when they would exceed the source-byte cap', () => {
+    const text = `${'word '.repeat(999)}word`;
+    const words = Array.from({ length: 1000 }, (_, index) => ({ start: index * 10, end: index * 10 + 1, text: 'word' }));
+    const large = { text: '', utterances: Array.from({ length: 120 }, () => ({
+      speaker: 'A', start: 0, end: 10_000, text, words,
+    })) };
+    const generated = buildMeetingTranscriptFiles({ content: large, speakerNames: {}, identity });
+    expect(generated.files.source.bytes.length).toBeLessThanOrEqual(4_000_000);
+    expect(generated.sourceContent.utterances.every(row => row.words === undefined)).toBe(true);
+    const parsed = parseVerifiedMeetingTranscriptSource(generated.files.source.bytes,
+      { size: generated.files.source.bytes.length, sha256: generated.files.source.sha256 }, identity);
+    expect(parsed.content.utterances.every(row => row.words === undefined)).toBe(true);
+    expect(parsed.content.utterances[0].text).toBe(text);
+  });
+
   it('preserves provider text when diarization returned no utterances', () => {
     const transcriptText = 'A complete plain text transcript without diarized turns.';
     const generated = buildMeetingTranscriptFiles({ content: { text: transcriptText, utterances: [] }, speakerNames: {}, identity });

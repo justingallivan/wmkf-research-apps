@@ -75,6 +75,37 @@ quarantine/zero-row close path (closure waits until at least ten minutes after
 the receipt lease expires). Migration 064 adds close attribution to that
 source-only receipt schema.
 
+**Follow-up source changes; Sol/root/Fable reviewed; still disabled and not deployed.**
+The shared transcription worker now releases a matching `ready` job lease after
+save-time and daily cleanup attempts, including when deletion fails;
+the bounded daily drain excludes job IDs already attempted in that pass so an
+unresolved ready row is not reclaimed repeatedly in one run. This does not
+change the global active provider-slot limit or the older isolated pilot's
+deployed behavior. Meeting Tracker bundle formatter/schema v2 can preserve
+validated optional word timings and split readable TXT at timed minute
+boundaries; VTT keeps its original utterance cues. Missing or invalid word data
+falls back to the whole utterance. Recovery accepts explicit v1 and v2 formats
+and rebuilds against the receipt's frozen version, preserving existing v1
+publication recovery. Optional word data is dropped when necessary to stay
+within the existing 4 MB worker/bundle bound; it does not raise that cap.
+An already-written wordless output from an older worker is reused only if its
+bytes exactly match the legacy normalization of the same provider result;
+unknown content still fails integrity validation.
+
+Cleanup projection now reports `contentDeletionObserved` separately from
+`lateUploadWatchPending`. Confirmed readable-content deletion does not imply
+that the persisted upload pathname/window can be cleared: expiry or observed
+Blob deletion alone does not prove that a late upload is impossible. The UI
+labels the retained exact-path watch and explicitly does not claim that an
+automatic cleanup worker is running. These changes are source behavior only;
+the historical isolated-pilot hosted claims above are unchanged. The source
+handoff reports five focused Jest suites (95 tests) and changed-source ESLint
+passing; root's in-memory PGlite exercise is not native PostgreSQL, hosted, or
+concurrent-execution proof. Word-level gaps may contain only whitespace or
+Unicode punctuation; other incomplete/misaligned coverage falls back to the
+whole utterance. The existing 4 MB bound still applies, and the worker retains
+`audio_deleted_at` on first write rather than clearing it during cleanup.
+
 The shared application uses the same jobs table for request-bound work while
 the pilot remains owner-scoped and unbound. `store.js` treats a missing
 `request_id` column as unbound in pilot queries, preserving compatibility with

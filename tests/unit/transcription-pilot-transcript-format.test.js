@@ -1,6 +1,6 @@
 import {
   formatTranscriptMinuteHeading, formatTranscriptText, formatTranscriptVtt,
-  getTranscriptSpeakers, groupTranscriptByMinute, normalizeSpeakerNames,
+  getTranscriptSpeakers, groupTranscriptByMinute, normalizeSpeakerNames, normalizeUtteranceWordTimings,
 } from '../../lib/services/transcription-pilot/transcript-format';
 
 const transcript = {
@@ -13,7 +13,7 @@ const transcript = {
 };
 
 describe('transcription speaker overlay and one-minute formatting', () => {
-  it('finds speaker IDs once in first-appearance order and groups whole utterances by start minute', () => {
+  it('finds speaker IDs once in first-appearance order and preserves legacy whole-utterance grouping without word timings', () => {
     expect(getTranscriptSpeakers(transcript)).toEqual(['A', 'B']);
     expect(groupTranscriptByMinute(transcript, { A: 'Host' })).toEqual([
       { minute: 0, utterances: [
@@ -38,6 +38,56 @@ describe('transcription speaker overlay and one-minute formatting', () => {
     expect(formatTranscriptText(transcript, { A: 'Host' })).toBe(
       '0:00\nHost: First.\n\nHost: Earlier.\n\n1:00\nSpeaker B: Second.\n',
     );
+  });
+
+  it('splits a long utterance at timed word minute boundaries without losing text or changing VTT cues', () => {
+    const long = { text: 'Intro. Hello, there! Again.', utterances: [{
+      start: 0, end: 180_000, speaker: 'A', text: 'Hello, there! Again.',
+      words: [
+        { start: 58_000, end: 59_000, text: 'Hello' },
+        { start: 61_000, end: 62_000, text: 'there!' },
+        { start: 121_000, end: 122_000, text: 'Again.' },
+      ],
+    }] };
+    expect(groupTranscriptByMinute(long, { A: 'Host' })).toEqual([
+      { minute: 0, utterances: [{ start: 58_000, end: 59_000, speaker: 'A', speakerName: 'Host', text: 'Hello, ' }] },
+      { minute: 1, utterances: [{ start: 61_000, end: 62_000, speaker: 'A', speakerName: 'Host', text: 'there! ' }] },
+      { minute: 2, utterances: [{ start: 121_000, end: 122_000, speaker: 'A', speakerName: 'Host', text: 'Again.' }] },
+    ]);
+    expect(formatTranscriptText(long, { A: 'Host' })).toBe(
+      '0:00\nHost: Hello,\n\n1:00\nHost: there!\n\n2:00\nHost: Again.\n',
+    );
+    expect(formatTranscriptVtt(long, { A: 'Host' })).toBe(
+      'WEBVTT\n\n00:00:00.000 --> 00:03:00.000\nHost: Hello, there! Again.\n',
+    );
+  });
+
+  it('falls back to the original utterance when optional word timings do not align', () => {
+    const misaligned = { utterances: [{ start: 0, end: 180_000, speaker: 'A', text: 'Complete, exact text.',
+      words: [{ start: 61_000, end: 62_000, text: 'missing' }] }] };
+    expect(groupTranscriptByMinute(misaligned)).toEqual([
+      { minute: 0, utterances: [{ start: 0, end: 180_000, speaker: 'A', speakerName: 'Speaker A', text: 'Complete, exact text.' }] },
+    ]);
+  });
+
+  it('rejects incomplete word coverage instead of assigning omitted text to a timed minute', () => {
+    const utterance = (text, words) => ({ start: 0, end: 120_000, text, words });
+    expect(normalizeUtteranceWordTimings(utterance('hello many missing words world', [
+      { start: 0, end: 500, text: 'hello' }, { start: 61_000, end: 62_000, text: 'world' },
+    ]))).toBeNull();
+    expect(normalizeUtteranceWordTimings(utterance('missing hello world', [
+      { start: 0, end: 500, text: 'hello' }, { start: 61_000, end: 62_000, text: 'world' },
+    ]))).toBeNull();
+    expect(normalizeUtteranceWordTimings(utterance('hello world trailing words', [
+      { start: 0, end: 500, text: 'hello' }, { start: 61_000, end: 62_000, text: 'world' },
+    ]))).toBeNull();
+    const punctuation = utterance('“hello,” … world!', [
+      { start: 0, end: 500, text: 'hello' }, { start: 61_000, end: 62_000, text: 'world' },
+    ]);
+    expect(normalizeUtteranceWordTimings(punctuation)).not.toBeNull();
+    const grouped = groupTranscriptByMinute({ utterances: [punctuation] });
+    expect(grouped.flatMap(group => group.utterances.map(item => item.text)).join('')).toBe(punctuation.text);
+    expect(grouped.map(group => group.minute)).toEqual([0, 1]);
   });
 
   it('keeps VTT utterance order and exact times while escaping overlay names and cue text', () => {

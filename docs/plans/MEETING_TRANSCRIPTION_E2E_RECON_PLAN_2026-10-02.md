@@ -1,6 +1,50 @@
-# Meeting transcription end to end test reconnaissance
+# Meeting transcription end-to-end test record
 
-Prepare the smallest safe test of the complete workflow: upload a recording in Meeting Tracker, transcribe it, name the speakers, publish the result, and read that same result in the Workbench Staff Deliberations tab. The narrow disabled source change is implemented and reviewed by Sol, root and Fable. It has not been deployed or enabled. Subsequent read-only preflight found a separate legacy profile-1 identity-map blocker; its proposed correction is below. No live test or feature enablement follows from a source-readiness verdict.
+## Current status
+
+The supervised Meeting Tracker test and exact test-artifact cleanup recorded below
+are complete. That test used a dedicated Preview deployment and sandbox request
+1000334; it did not test the follow-up source changes described here. Current
+follow-ups are source-built and remain disabled, unreleased, and not deployed:
+ready-job leases are released after save-time or daily cleanup attempts, timed word
+data can split readable TXT by minute with legacy formatter-v1 recovery
+preserved, and cleanup projections distinguish observed content deletion from
+a retained late-upload watch. No follow-up has been applied to a database or
+verified through hosted execution. Root reran eight focused Jest suites (145
+tests), type checking, and changed-file ESLint (zero errors; four existing
+Admin React warnings). Root's in-memory PGlite
+check covered old-schema ready-lease release, foreign/stale/publication/cleanup
+fences, drain exclusions, and first-audio-deletion timestamp preservation; it is not native
+PostgreSQL, hosted, or concurrent-execution proof. A synthetic desktop/mobile
+UI check verified the minute split and no overflow, not a live provider result.
+Sol and root found no remaining material source blocker; Fable's final OAuth-only
+adversarial review returned **READY**, with no material findings. No API-key
+authentication or metered review product was used. The exact earlier supervised-test
+evidence and its cleanup boundaries remain in the run record below.
+
+The compatibility checks cover byte-identical v1 publication rebuilds and a
+`saving` job whose wordless output was already written before this change:
+only exact legacy-normalized bytes may be reused, and different content still
+fails integrity checking. Correction previews now consume the same normalized
+speaker/word-timing shape returned by the service. Collection refresh removes
+selected content when access is blocked or the draft disappears; an older
+collection version cannot replace a newer ready detail version. No new schema,
+provider call, deployment, or enablement is part of these follow-ups.
+
+Scoped deployment-isolation, Request Document writer, GUID-boundary, Atlas,
+doc-currency and fact-consistency gates and their sequential self-tests passed.
+The UI detector reported no findings; its unrelated stale design metadata was
+left untouched. Hosted end-to-end behavior, native concurrent PostgreSQL
+execution, and final remote late-upload closure remain unverified for this
+change. The retained watch is intentional, not a claim of complete erasure.
+
+## Historical reconnaissance and preparation
+
+The following reconnaissance, approval, and setup sections preserve the
+decision trail leading to the supervised test. Their proposed next actions are
+historical and are superseded by the completed run recorded below. The original
+disabled-source review did not itself authorize deployment or prove hosted
+behavior.
 
 ## Authorization and ownership
 
@@ -84,7 +128,7 @@ Root accepts these material requirements:
 
 Root corrects two reviewer assertions: grants are Dataverse-backed (`lib/services/app-access-service.js`), not a Neon app-grants table; the browser VTT failure's cause is still unknown, not proven to be an extension. Neither assertion is a basis for implementation. The review's proposed route-only code scope is provisional until actual dependency routes and credentials are checked.
 
-## Recommended next action
+## Historical recommendation — superseded by the completed run
 
 The owner selected sandbox request 1000334 for the manual-name test and permits labeled test folders in the existing SharePoint site. Do not create or modify a meeting or change its attendee data. Complete the narrow identity fix and dedicated setup, then run the approved supervised test. The existing recipient link is accepted under the owner-confirmed restricted Preview audience below. No separate SharePoint site, broad automation census, or general fixture platform is required; incomplete global automation coverage remains a stated limit.
 

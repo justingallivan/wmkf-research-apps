@@ -33,6 +33,7 @@ describe('transcription pilot persistence contract', () => {
       provider_transcript_id: 'provider-secret-id', provider_upload_ref_ciphertext: 'ciphertext',
       lease_token: 'lease', cleanup_requested_at: new Date(), expires_at: new Date(Date.now() + 60000),
       local_cleanup_completed_at: null, provider_cleanup_completed_at: null,
+      content_purged_at: new Date(), upload_valid_until: new Date(Date.now() + 60000),
     };
     const projected = projectOwnerTranscriptionJob(row);
     expect(projected.original_filename).toBeNull();
@@ -41,7 +42,9 @@ describe('transcription pilot persistence contract', () => {
     expect(projected.contentAccessAllowed).toBe(false);
     expect(projected.cleanupPending).toBe(true);
     expect(projected.providerCleanupPending).toBe(true);
-    for (const secret of ['output_pathname', 'input_cleanup_pathname', 'provider_transcript_id', 'provider_upload_ref_ciphertext', 'lease_token']) {
+    expect(projected.contentDeletionObserved).toBe(true);
+    expect(projected.lateUploadWatchPending).toBe(true);
+    for (const secret of ['output_pathname', 'input_cleanup_pathname', 'upload_valid_until', 'provider_transcript_id', 'provider_upload_ref_ciphertext', 'lease_token']) {
       expect(projected).not.toHaveProperty(secret);
     }
 
@@ -49,6 +52,37 @@ describe('transcription pilot persistence contract', () => {
     expect(expired.original_filename).toBeNull();
     expect(expired.correction_notes).toBeNull();
     expect(expired.speaker_names).toBeNull();
+  });
+
+  it.each([
+    ['partially deleted content retains the upload watch', {
+      cleanup_requested_at: new Date(), local_cleanup_completed_at: null,
+      content_purged_at: null, input_cleanup_pathname: 'private/path', upload_valid_until: new Date(),
+      provider_cleanup_completed_at: new Date(),
+    }, { contentDeletionObserved: false, lateUploadWatchPending: true, cleanupPending: true, providerCleanupPending: false }],
+    ['content deletion observed while provider cleanup is unresolved', {
+      cleanup_requested_at: new Date(), local_cleanup_completed_at: null,
+      content_purged_at: new Date(), input_cleanup_pathname: 'private/path', upload_valid_until: new Date(),
+      provider_cleanup_completed_at: null,
+    }, { contentDeletionObserved: true, lateUploadWatchPending: true, cleanupPending: true, providerCleanupPending: true }],
+    ['no upload capability leaves no late-upload watch', {
+      cleanup_requested_at: new Date(), local_cleanup_completed_at: null,
+      content_purged_at: null, input_cleanup_pathname: null, upload_valid_until: null,
+      provider_cleanup_completed_at: new Date(),
+    }, { contentDeletionObserved: false, lateUploadWatchPending: false, cleanupPending: true, providerCleanupPending: false }],
+    ['completed cleanup closes the watch without changing deletion evidence', {
+      cleanup_requested_at: new Date(), local_cleanup_completed_at: new Date(),
+      content_purged_at: new Date(), input_cleanup_pathname: null, upload_valid_until: new Date(),
+      provider_cleanup_completed_at: new Date(),
+    }, { contentDeletionObserved: true, lateUploadWatchPending: false, cleanupPending: false, providerCleanupPending: false }],
+    ['an ordinary ready job does not display a cleanup watch just because its upload token exists', {
+      status: 'ready',
+      cleanup_requested_at: null, local_cleanup_completed_at: null,
+      content_purged_at: null, input_cleanup_pathname: 'private/path', upload_valid_until: new Date(),
+      provider_cleanup_completed_at: new Date(),
+    }, { contentDeletionObserved: false, lateUploadWatchPending: false, cleanupPending: false, providerCleanupPending: false }],
+  ])('%s', (_label, fields, expected) => {
+    expect(projectOwnerTranscriptionJob({ status: 'expired', ...fields })).toMatchObject(expected);
   });
 
   it('rejects lease-field injection before it reaches SQL', async () => {
@@ -62,6 +96,20 @@ describe('transcription pilot persistence contract', () => {
       fields: { lease_token: '00000000-0000-4000-8000-000000000003' },
     })).rejects.toMatchObject({ code: 'transcription_immutable_field', httpStatus: 400 });
     expect(db.query).not.toHaveBeenCalled();
+  });
+
+  it('releases only a still-ready cleanup lease using a schema-compatible publication fence', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    await store.releaseReadyCleanupLease({ jobId: '00000000-0000-4000-8000-000000000001',
+      leaseToken: '00000000-0000-4000-8000-000000000002', expectedVersion: 7 });
+    const [sql, params] = db.query.mock.calls[0];
+    expect(sql).toContain("status = 'ready'");
+    expect(sql).toContain('cleanup_requested_at IS NULL');
+    expect(sql).toContain("COALESCE(to_jsonb(transcription_jobs)->>'publication_operation_id', '') = ''");
+    expect(sql).not.toMatch(/AND\s+publication_operation_id\s+IS NULL/);
+    expect(params).toEqual(['00000000-0000-4000-8000-000000000001',
+      '00000000-0000-4000-8000-000000000002', 7]);
   });
 
   it('stores speaker-name overlays under owner, version, ready, cleanup and expiry fences', async () => {

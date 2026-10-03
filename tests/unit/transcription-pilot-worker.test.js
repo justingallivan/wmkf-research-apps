@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+
 jest.mock('../../lib/services/transcription-pilot/store', () => ({
   beginTranscriptionProviderSubmission: jest.fn(),
   bindVerifiedTranscriptionProviderId: jest.fn(),
@@ -15,6 +17,7 @@ jest.mock('../../lib/services/transcription-pilot/store', () => ({
   markTranscriptionProviderDeletionCompleted: jest.fn(),
   mutateLeasedTranscriptionJob: jest.fn(),
   publishReadyTranscriptionJob: jest.fn(),
+  releaseReadyTranscriptionCleanupLease: jest.fn(),
   requeueExpiredPreIntentTranscriptionSubmissions: jest.fn(),
   releaseTranscriptionLease: jest.fn(),
   setTranscriptionProviderUploadReference: jest.fn(),
@@ -82,6 +85,7 @@ describe('transcription worker submission safety', () => {
     }));
     store.mutateLeasedTranscriptionJob.mockResolvedValue({ ...queued, version: 4, status: 'submission_uncertain' });
     store.releaseTranscriptionLease.mockResolvedValue({});
+    store.releaseReadyTranscriptionCleanupLease.mockResolvedValue({});
     store.claimNextDueTranscriptionJob.mockResolvedValueOnce({ job: { ...queued, status: 'submission_uncertain', provider_transcript_id: null, callback_candidate_transcript_id: null }, leaseToken: queued.lease_token }).mockResolvedValue(null);
     store.claimNextExpiredContentTranscriptionJob.mockResolvedValue(null);
     store.claimNextCleanupTranscriptionJob.mockResolvedValue(null);
@@ -124,7 +128,9 @@ describe('transcription worker submission safety', () => {
     store.claimNextDueTranscriptionJob.mockReset().mockResolvedValueOnce({ job: processing, leaseToken: queued.lease_token }).mockResolvedValue(null);
     const saving = { ...processing, status: 'saving', version: 8,
       output_pathname: `transcription-pilot/9/${processing.id}/output/transcript.json` };
-    store.getLeasedTranscriptionJob.mockResolvedValueOnce(processing).mockResolvedValueOnce(processing).mockResolvedValueOnce(saving);
+    store.getLeasedTranscriptionJob.mockResolvedValueOnce(processing).mockResolvedValueOnce(processing)
+      .mockResolvedValueOnce(saving).mockResolvedValueOnce({ ...processing, status: 'ready', version: 10 })
+      .mockResolvedValueOnce({ ...processing, status: 'ready', version: 10 });
     store.mutateLeasedTranscriptionJob.mockResolvedValue(saving);
     const bytes = Buffer.from('{"text":"hello","utterances":[{"start":0,"end":500,"text":"hello","speaker":null}],"outcome":"complete"}');
     runtime.readPrivateContentIfPresent.mockResolvedValueOnce(null).mockResolvedValueOnce({ buffer: bytes, blob: {
@@ -145,6 +151,36 @@ describe('transcription worker submission safety', () => {
       jobId: processing.id, outputSha256: expect.stringMatching(/^[a-f0-9]{64}$/), returnedModel: 'universal-2',
     }));
     expect(summary.ready).toBe(1);
+    expect(store.releaseReadyTranscriptionCleanupLease).toHaveBeenCalledWith({
+      jobId: processing.id, leaseToken: queued.lease_token, expectedVersion: 10,
+    });
+  });
+
+  it('releases a ready worker lease even when provider or Blob cleanup fails', async () => {
+    store.claimNextTranscriptionJob.mockReset().mockResolvedValue(null);
+    const processing = { ...queued, status: 'processing', provider_transcript_id: 'provider-1', version: 7 };
+    const saving = { ...processing, status: 'saving', version: 8,
+      output_pathname: `transcription-pilot/9/${processing.id}/output/transcript.json` };
+    const ready = { ...saving, status: 'ready', version: 9, audio_pathname: 'input/audio.mp3' };
+    store.claimNextDueTranscriptionJob.mockReset().mockResolvedValueOnce({ job: processing, leaseToken: queued.lease_token }).mockResolvedValue(null);
+    store.getLeasedTranscriptionJob.mockResolvedValueOnce(processing).mockResolvedValueOnce(processing)
+      .mockResolvedValueOnce(saving).mockResolvedValueOnce({ ...ready, version: 10 });
+    const bytes = Buffer.from('{"text":"hello","utterances":[],"outcome":"complete"}');
+    runtime.readPrivateContentIfPresent.mockResolvedValueOnce(null).mockResolvedValueOnce({ buffer: bytes,
+      blob: { pathname: saving.output_pathname } });
+    runtime.writePrivateContent.mockResolvedValue({ pathname: saving.output_pathname });
+    store.publishReadyTranscriptionJob.mockResolvedValue(ready);
+    getAssemblyAITranscript.mockResolvedValue({ status: 'completed', text: 'hello', utterances: [] });
+    deleteAssemblyAITranscript.mockRejectedValue(new Error('provider cleanup unavailable'));
+    runtime.deletePrivatePath.mockRejectedValue(new Error('Blob cleanup unavailable'));
+
+    const summary = await drainTranscriptionPilot({ maxJobs: 1 });
+
+    expect(summary.ready).toBe(1);
+    expect(store.publishReadyTranscriptionJob).toHaveBeenCalled();
+    expect(store.releaseReadyTranscriptionCleanupLease).toHaveBeenCalledWith({
+      jobId: processing.id, leaseToken: queued.lease_token, expectedVersion: 10,
+    });
   });
 
   it('recovers a saving job from an existing readback whose SDK metadata size is zero', async () => {
@@ -166,6 +202,67 @@ describe('transcription worker submission safety', () => {
     expect(uploadAssemblyAIAudio).not.toHaveBeenCalled();
     expect(submitAssemblyAITranscription).not.toHaveBeenCalled();
     expect(summary.ready).toBe(1);
+  });
+
+  it('reuses an exact pre-timing transcript Blob during a retry without replacing its bytes', async () => {
+    store.claimNextTranscriptionJob.mockReset().mockResolvedValue(null);
+    const saving = { ...queued, status: 'saving', provider_transcript_id: 'provider-1', version: 8,
+      output_pathname: 'transcription-pilot/9/11111111-1111-4111-8111-111111111111/output/transcript.json' };
+    const processing = { ...saving, status: 'processing', output_pathname: null };
+    const legacyBytes = Buffer.from(JSON.stringify({ text: 'hello', utterances: [
+      { start: 0, end: 1000, text: 'hello', speaker: 'A' },
+    ], outcome: 'complete' }));
+    store.claimNextDueTranscriptionJob.mockReset().mockResolvedValueOnce({ job: saving, leaseToken: queued.lease_token }).mockResolvedValue(null);
+    store.getLeasedTranscriptionJob.mockResolvedValueOnce(saving).mockResolvedValueOnce(processing)
+      .mockResolvedValueOnce(saving).mockResolvedValueOnce({ ...saving, status: 'ready', version: 10 });
+    runtime.readPrivateContentIfPresent.mockResolvedValueOnce({ buffer: legacyBytes, blob: { pathname: saving.output_pathname } });
+    getAssemblyAITranscript.mockResolvedValue({ status: 'completed', text: 'hello', utterances: [
+      { start: 0, end: 1000, text: 'hello', speaker: 'A', words: [{ start: 0, end: 900, text: 'hello' }] },
+    ] });
+    store.publishReadyTranscriptionJob.mockResolvedValue({ ...saving, status: 'ready', version: 9,
+      provider_transcript_id: null, audio_pathname: null });
+
+    await drainTranscriptionPilot({ maxJobs: 1 });
+
+    expect(runtime.writePrivateContent).not.toHaveBeenCalled();
+    expect(store.publishReadyTranscriptionJob).toHaveBeenCalledWith(expect.objectContaining({
+      outputSha256: expect.any(String),
+    }));
+    expect(store.publishReadyTranscriptionJob.mock.calls[0][0].outputSha256)
+      .toBe(crypto.createHash('sha256').update(legacyBytes).digest('hex'));
+  });
+
+  it('drops optional provider timings when they alone exceed the saved-output cap', async () => {
+    store.claimNextTranscriptionJob.mockReset().mockResolvedValue(null);
+    const processing = { ...queued, status: 'processing', provider_transcript_id: 'provider-1', version: 7 };
+    const saving = { ...processing, status: 'saving', version: 8,
+      output_pathname: 'transcription-pilot/9/11111111-1111-4111-8111-111111111111/output/transcript.json' };
+    store.claimNextDueTranscriptionJob.mockReset().mockResolvedValueOnce({ job: processing, leaseToken: queued.lease_token }).mockResolvedValue(null);
+    store.getLeasedTranscriptionJob.mockResolvedValueOnce(processing).mockResolvedValueOnce(processing)
+      .mockResolvedValueOnce(saving).mockResolvedValueOnce({ ...saving, status: 'ready', version: 10 });
+    let written;
+    runtime.readPrivateContentIfPresent.mockResolvedValueOnce(null).mockImplementationOnce(async () => ({
+      buffer: written, blob: { pathname: saving.output_pathname },
+    }));
+    runtime.writePrivateContent.mockImplementation(async (pathname, _type, bytes) => {
+      written = Buffer.from(bytes);
+      return { pathname };
+    });
+    store.publishReadyTranscriptionJob.mockResolvedValue({ ...saving, status: 'ready', version: 9,
+      provider_transcript_id: null, audio_pathname: null });
+    const text = `${'word '.repeat(999)}word`;
+    const words = Array.from({ length: 1000 }, (_, index) => ({ start: index * 10, end: index * 10 + 1, text: 'word' }));
+    getAssemblyAITranscript.mockResolvedValue({ status: 'completed', text: '', utterances: Array.from({ length: 120 }, () => ({
+      start: 0, end: 10_000, text, speaker: 'A', words,
+    })) });
+
+    await drainTranscriptionPilot({ maxJobs: 1 });
+
+    const saved = JSON.parse(written.toString());
+    expect(written.length).toBeLessThanOrEqual(4_000_000);
+    expect(saved.utterances.every(utterance => utterance.words === undefined)).toBe(true);
+    expect(saved.utterances[0].text).toBe(text);
+    expect(store.publishReadyTranscriptionJob).toHaveBeenCalled();
   });
 
   it('moves a late bound-ID conflict to operator-recoverable uncertain state', async () => {
@@ -346,7 +443,48 @@ describe('transcription worker submission safety', () => {
     expect(store.claimNextCleanupTranscriptionJob).toHaveBeenCalledTimes(1);
     expect(store.claimNextExpiredContentTranscriptionJob.mock.invocationCallOrder[0])
       .toBeLessThan(store.claimNextCleanupTranscriptionJob.mock.invocationCallOrder[0]);
+    expect(store.claimNextCleanupTranscriptionJob).toHaveBeenCalledWith({
+      excludeJobIds: [expired.id],
+    });
     expect(uploadAssemblyAIAudio).not.toHaveBeenCalled();
     expect(submitAssemblyAITranscription).not.toHaveBeenCalled();
+  });
+
+  it('releases an ordinary ready input-cleanup lease and excludes that job from same-pass reclaims', async () => {
+    const ready = { ...queued, status: 'ready', version: 8, cleanup_requested_at: null,
+      expires_at: new Date(Date.now() + 86_400_000), input_cleanup_pathname: 'transcription-pilot/ready/input.m4a',
+      output_cleanup_pathname: 'transcription-pilot/ready/output.json', audio_pathname: null,
+      provider_transcript_id: null, provider_upload_ref_ciphertext: null };
+    store.claimNextExpiredContentTranscriptionJob.mockResolvedValue(null);
+    store.claimNextCleanupTranscriptionJob.mockResolvedValueOnce({ job: ready, leaseToken: ready.lease_token }).mockResolvedValue(null);
+    store.getLeasedTranscriptionJob.mockResolvedValue({ ...ready, version: 9 });
+    runtime.deletePrivatePath.mockResolvedValue(true);
+    store.finishTranscriptionLocalCleanup.mockResolvedValue({ ...ready, version: 10,
+      input_cleanup_pathname: null, local_cleanup_completed_at: null });
+
+    await drainTranscriptionCleanup({ maxJobs: 2 });
+
+    expect(runtime.deletePrivatePath).toHaveBeenCalledWith(ready.input_cleanup_pathname, expect.any(Number));
+    expect(store.finishTranscriptionLocalCleanup).toHaveBeenCalledWith(expect.objectContaining({ deletedPaths: ['input_cleanup_pathname'] }));
+    expect(store.releaseReadyTranscriptionCleanupLease).toHaveBeenCalledWith({
+      jobId: ready.id, leaseToken: ready.lease_token, expectedVersion: 9,
+    });
+  });
+
+  it('does not release a ready cleanup lease after the live-token read is lost', async () => {
+    const ready = { ...queued, status: 'ready', version: 8, cleanup_requested_at: null,
+      expires_at: new Date(Date.now() + 86_400_000), input_cleanup_pathname: 'transcription-pilot/ready/input.m4a',
+      output_cleanup_pathname: 'transcription-pilot/ready/output.json', audio_pathname: null,
+      provider_transcript_id: null, provider_upload_ref_ciphertext: null };
+    store.claimNextExpiredContentTranscriptionJob.mockResolvedValue(null);
+    store.claimNextCleanupTranscriptionJob.mockResolvedValueOnce({ job: ready, leaseToken: ready.lease_token }).mockResolvedValue(null);
+    store.getLeasedTranscriptionJob.mockResolvedValue(null);
+    runtime.deletePrivatePath.mockResolvedValue(true);
+    store.finishTranscriptionLocalCleanup.mockResolvedValue({ ...ready, version: 10,
+      input_cleanup_pathname: null, local_cleanup_completed_at: null });
+
+    await drainTranscriptionCleanup({ maxJobs: 1 });
+
+    expect(store.releaseReadyTranscriptionCleanupLease).not.toHaveBeenCalled();
   });
 });

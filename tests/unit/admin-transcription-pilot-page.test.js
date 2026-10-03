@@ -329,6 +329,10 @@ test('a list refresh revokes the active transcript when cleanup starts', async (
         ...job,
         contentAccessAllowed: false,
         cleanup_requested_at: '2026-09-30T13:00:00.000Z',
+        content_purged_at: '2026-09-30T13:05:00.000Z',
+        contentDeletionObserved: true,
+        lateUploadWatchPending: true,
+        cleanupPending: true,
         original_filename: null,
       };
       return { ok: true, status: 200, data: { pilotEnabled: true, submissionsEnabled: false, jobs: [latestJob] } };
@@ -345,6 +349,9 @@ test('a list refresh revokes the active transcript when cleanup starts', async (
 
   await waitFor(() => expect(screen.queryByText('private transcript text')).not.toBeInTheDocument());
   expect(screen.queryByRole('link', { name: 'Download TXT' })).not.toBeInTheDocument();
+  expect(await screen.findByText(/Deletion of the readable content was observed/)).toBeInTheDocument();
+  expect(screen.getByText(/temporary upload path is still retained for a late-upload safety watch/)).toBeInTheDocument();
+  expect(screen.getByText(/does not confirm that an automatic cleanup worker is running/)).toBeInTheDocument();
   expect(listCalls).toBe(2);
 });
 

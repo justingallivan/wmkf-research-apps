@@ -495,6 +495,8 @@ function JobDetail({ job, transcript, processingDurationMs, onSaveEvaluation, on
         <InfoNotice>
           Cleanup was requested {formatPilotDate(job.cleanup_requested_at)}. This blocks further content access, but does not confirm immediate local erasure or provider cancellation.
           <span className="mt-1 block">Local cleanup: {job.local_cleanup_completed_at ? `confirmed ${formatPilotDate(job.local_cleanup_completed_at)}` : 'pending'}. Provider cleanup: {job.provider_cleanup_completed_at ? `confirmed ${formatPilotDate(job.provider_cleanup_completed_at)}` : 'pending or not confirmed'}.</span>
+          {job.contentDeletionObserved && <span className="mt-1 block">Deletion of the readable content was observed {formatPilotDate(job.content_purged_at)}.</span>}
+          {job.lateUploadWatchPending && <span className="mt-1 block">The temporary upload path is still retained for a late-upload safety watch, so local cleanup is not fully complete. This status does not confirm that an automatic cleanup worker is running.</span>}
         </InfoNotice>
       )}
       {actionMessage && <div className="mt-4" role="status" aria-live="polite"><InfoNotice>{actionMessage}</InfoNotice></div>}
@@ -887,10 +889,10 @@ export default function TranscriptionPilotPage() {
         setSubmissionsEnabled(false);
         setJobs([]);
         setDetail(null);
-        setUploadMessage('The transcription pilot is disabled. The uploaded file will remain subject to the server cleanup schedule.');
+        setUploadMessage('The transcription pilot is disabled. This page cannot confirm that the uploaded temporary file will be cleaned automatically. Contact an administrator before uploading again.');
       } else if (error.code === 'transcription_submissions_disabled') {
         setSubmissionsEnabled(false);
-        setUploadMessage('New submissions are disabled. The uploaded file remains subject to the server cleanup schedule.');
+        setUploadMessage('New submissions are disabled. This page cannot confirm that the uploaded temporary file will be cleaned automatically.');
       } else if (error.code === 'transcription_dispatch_pending' && error.payload?.job?.id) {
         const queuedJob = rememberJob(error.payload.job).job;
         setJobs((currentJobs) => currentJobs.some((job) => job.id === queuedJob.id)
@@ -1119,7 +1121,7 @@ export default function TranscriptionPilotPage() {
         {authorized && pilotState === 'disabled' && (
           <div className="mt-6 rounded-lg border border-gray-300 bg-white px-5 py-5">
             <h2 className="text-base font-semibold text-gray-950">Transcription pilot is disabled</h2>
-            <p className="mt-1 text-sm leading-6 text-gray-700">The server pilot flag is off or this environment has not enabled the pilot. Existing jobs remain subject to server-side cleanup.</p>
+            <p className="mt-1 text-sm leading-6 text-gray-700">The server pilot flag is off or this environment has not enabled the pilot. Existing jobs are inaccessible here; this page cannot confirm that automatic cleanup is running.</p>
           </div>
         )}
         {authorized && pilotState === 'error' && (

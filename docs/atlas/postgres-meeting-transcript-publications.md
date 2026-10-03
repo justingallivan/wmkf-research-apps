@@ -186,6 +186,46 @@ For ordinary reconciliation, a verified receipt whose Request Document has
 been superseded is marked terminal `published` (with the superseded error
 code), and the newer current artifact remains unchanged.
 
+## Follow-up source changes — reviewed, not deployed
+
+The disabled source now supports Meeting Tracker bundle formatter/schema v2
+with optional, validated word timings. When word spans align with the exact
+utterance text, readable TXT may split an utterance at timed minute boundaries
+without dropping its punctuation or changing speaker attribution; absent or
+misaligned timings retain whole-utterance v1 behavior. VTT continues to use the
+original utterance cues. New publications use v2; recovery accepts explicit v1
+and v2 source/manifests and rebuilds using the receipt's frozen formatter
+version so legacy v1 hashes remain reproducible. Optional word data is omitted
+if needed to stay within the existing 4 MB bounds. This is source behavior,
+not a deployed or database-applied format change.
+The correction UI consumes the service's normalized speaker/start/end/words
+shape, including timed turns with empty top-level text. A worker retry also
+preserves an already-written legacy output only after an exact byte match;
+this is separate from publication receipt replay.
+
+The shared worker's bounded daily drain excludes each job already attempted in
+that pass. After save-time or daily ready-job cleanup, including an error exit, it
+releases only the matching still-valid ready lease using its token and version;
+publication-bound, cleanup-requested, stale, or mismatched leases are not
+released by that helper. This does not change the global active provider-slot
+limit. Cleanup state separately projects observed content deletion and a
+pending late-upload watch. It retains the exact input pathname and upload
+window until a verified closure condition exists; expiry or a successful
+delete/HEAD observation is not treated as proof that late writes are
+impossible. The UI makes no claim that an automatic cleanup worker is running.
+These follow-ups remain disabled, unreleased, and not deployed; the dedicated
+isolated pilot's historical hosted behavior is unchanged.
+
+The builder reports five focused Jest suites (95 tests) and changed-source
+ESLint passing. Root's in-memory PGlite SQL check verified ready-lease release
+with matching token/version and rejection of wrong-token or stale-version
+release, plus same-drain claim exclusions; it also verified that an existing
+`audio_deleted_at` value survives the first cleanup write. This is not a native
+PostgreSQL integration run, hosted verification, or concurrent-drain proof.
+Root's synthetic desktop/mobile UI check showed the same long utterance split
+between 0:00 and 1:00 without overflow; it does not exercise a provider or live
+deployment.
+
 ## Synthetic speaker rehearsal boundary
 
 An isolated Preview-only rehearsal is source-implemented and Sol/Fable-reviewed for fixed synthetic job

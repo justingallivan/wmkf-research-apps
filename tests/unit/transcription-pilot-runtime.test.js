@@ -4,7 +4,12 @@ jest.mock('../../lib/services/transcription-pilot/crypto', () => ({
   createAssemblyAIWebhookAuth: jest.fn(), openProviderUploadReference: jest.fn(), sealProviderUploadReference: jest.fn(),
 }));
 jest.mock('../../lib/services/transcription-pilot/media-inspector', () => ({ inspectAudioBuffer: jest.fn() }));
-jest.mock('../../lib/services/transcription-pilot/model', () => ({ projectOwnerTranscriptionJob: jest.fn(row => ({ id: row.id, status: row.status })) }));
+jest.mock('../../lib/services/transcription-pilot/model', () => ({ projectOwnerTranscriptionJob: jest.fn(row => ({
+  id: row.id, status: row.status,
+  contentDeletionObserved: row.content_purged_at != null,
+  lateUploadWatchPending: row.input_cleanup_pathname != null && row.upload_valid_until != null
+    && (row.cleanup_requested_at != null || row.content_purged_at != null),
+})) }));
 jest.mock('../../lib/services/transcription-pilot/store', () => ({
   claimNextTranscriptionJob: jest.fn(), createTranscriptionJob: jest.fn(), getOwnerTranscriptionJob: jest.fn(),
   listOwnerTranscriptionJobs: jest.fn(), mutateLeasedTranscriptionJob: jest.fn(), queueTranscriptionJob: jest.fn(),
@@ -15,7 +20,7 @@ import { ReadableStream } from 'node:stream/web';
 import { del, get, put } from '@vercel/blob';
 import { generateClientTokenFromReadWriteToken } from '@vercel/blob/client';
 import * as store from '../../lib/services/transcription-pilot/store';
-import { createOwnerUpload, deletePrivatePath, readPrivateContentIfPresent, writePrivateContent, __private } from '../../lib/services/transcription-pilot/runtime';
+import { createOwnerUpload, deletePrivatePath, projectMeetingTranscriptionJob, readPrivateContentIfPresent, writePrivateContent, __private } from '../../lib/services/transcription-pilot/runtime';
 
 const job = {
   id: '11111111-1111-4111-8111-111111111111', owner_profile_id: 42, status: 'uploading', version: 1,
@@ -45,6 +50,19 @@ describe('transcription pilot private Blob runtime', () => {
       if (envBefore[name] === undefined) delete process.env[name];
       else process.env[name] = envBefore[name];
     }
+  });
+
+  it('forwards only safe content-deletion and upload-watch state to the Meeting Tracker DTO', () => {
+    const projected = projectMeetingTranscriptionJob({
+      id: 'meeting-job', status: 'expired', content_purged_at: new Date(),
+      input_cleanup_pathname: 'private/path', upload_valid_until: new Date(),
+      provider_transcript_id: 'provider-secret', provider_upload_ref_ciphertext: 'ciphertext',
+    });
+    expect(projected).toMatchObject({ contentDeletionObserved: true, lateUploadWatchPending: true });
+    expect(projected).not.toHaveProperty('input_cleanup_pathname');
+    expect(projected).not.toHaveProperty('upload_valid_until');
+    expect(projected).not.toHaveProperty('provider_transcript_id');
+    expect(projected).not.toHaveProperty('provider_upload_ref_ciphertext');
   });
 
   it('persists a bounded upload window before minting the client capability', async () => {

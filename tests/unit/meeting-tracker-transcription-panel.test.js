@@ -88,6 +88,39 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+test('refresh removes selected content when the draft disappears from the authorized list', async () => {
+  let listed = true;
+  global.fetch = jest.fn(async (url) => String(url).endsWith('/transcriptions')
+    ? response(collection({ jobs: listed ? [job()] : [] }))
+    : response({ job: job(), content, candidates: [] }));
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: /site-visit\.m4a/ }));
+  await screen.findByRole('link', { name: 'Download draft TXT' });
+  listed = false;
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh status' }));
+  await waitFor(() => expect(screen.queryByRole('link', { name: 'Download draft TXT' })).not.toBeInTheDocument());
+  expect(screen.queryByText('Hello from the site visit.')).not.toBeInTheDocument();
+});
+
+test('an older collection refresh does not replace a newer detail version before saving names', async () => {
+  global.fetch = jest.fn(async (url, options = {}) => {
+    if (String(url).endsWith('/transcriptions')) return response(collection());
+    if (options.method === 'PATCH') {
+      expect(JSON.parse(options.body).expectedVersion).toBe(5);
+      return response({ job: job({ version: 6, speaker_names: { A: 'Named speaker' } }) });
+    }
+    return response({ job: job({ version: 5 }), content, candidates: [] });
+  });
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: /site-visit\.m4a/ }));
+  await screen.findByLabelText('Manual display name for Speaker A');
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh status' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Refresh status' })).toBeEnabled());
+  fireEvent.change(screen.getByLabelText('Manual display name for Speaker A'), { target: { value: 'Named speaker' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save names' }));
+  await screen.findByText('Speaker names saved.');
+});
+
 test('uploads audio directly to private Blob storage before starting provider work', async () => {
   const randomUUID = jest.fn(() => '99999999-9999-4999-8999-999999999999');
   Object.defineProperty(global.crypto, 'randomUUID', { configurable: true, value: randomUUID });
@@ -211,6 +244,56 @@ test('reconciles crashed publishing receipts and requires acknowledgement before
   expect(closeCalls).toBe(1);
 });
 
+test('distinguishes observed content deletion from a retained late-upload safety watch', async () => {
+  const cleanedDraft = job({
+    original_filename: 'deleted-draft.m4a', status: 'expired', label: 'Expired',
+    contentAccessAllowed: false, cleanup_requested_at: '2026-10-01T18:00:00.000Z',
+    contentDeletionObserved: true, lateUploadWatchPending: true, cleanupPending: true,
+  });
+  global.fetch = jest.fn(async (url) => {
+    if (String(url).endsWith('/transcriptions')) return response(collection({ jobs: [cleanedDraft] }));
+    if (String(url).endsWith(`/${JOB_ID}`)) return response({ job: cleanedDraft, content: null, candidates: [] });
+    return response({});
+  });
+
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: /deleted-draft\.m4a/ }));
+
+  expect(await screen.findByText('Deletion of this draft’s readable content was observed.')).toBeInTheDocument();
+  expect(screen.getByText(/temporary upload path remains under a late-upload safety watch/)).toBeInTheDocument();
+  expect(screen.getByText(/does not confirm that an automatic cleanup worker is running/)).toBeInTheDocument();
+});
+
+test('refreshing the selected job immediately revokes stale transcript detail and unsafe name drafts', async () => {
+  let collectionLoads = 0;
+  const cleanupJob = job({
+    original_filename: 'site-visit.m4a', status: 'expired', label: 'Expired',
+    contentAccessAllowed: false, cleanup_requested_at: '2026-10-01T18:00:00.000Z',
+    contentDeletionObserved: true, lateUploadWatchPending: true, cleanupPending: true,
+  });
+  global.fetch = jest.fn(async (url) => {
+    if (String(url).endsWith('/transcriptions')) {
+      collectionLoads += 1;
+      return response(collection({ jobs: [collectionLoads === 1 ? job() : cleanupJob] }));
+    }
+    if (String(url).endsWith(`/${JOB_ID}`)) return response({ job: job(), content, candidates: collection().candidates });
+    return response({});
+  });
+
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: /site-visit\.m4a/ }));
+  fireEvent.change(await screen.findByLabelText('Manual display name for Speaker A'), { target: { value: 'Unsaved test label' } });
+  expect(screen.getByText('Unsaved speaker-name changes')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh status' }));
+
+  expect(await screen.findByText('Deletion of this draft’s readable content was observed.')).toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByText('Hello from the site visit.')).not.toBeInTheDocument());
+  expect(screen.queryByRole('link', { name: 'Download draft TXT' })).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Manual display name for Speaker A')).not.toBeInTheDocument();
+  expect(screen.queryByText('Unsaved speaker-name changes')).not.toBeInTheDocument();
+  expect(screen.getByText(/temporary upload path remains under a late-upload safety watch/)).toBeInTheDocument();
+});
+
 test('a failed job publish refreshes the selected version and the next attempt succeeds without navigation', async () => {
   let collectionLoads = 0;
   let version = 1;
@@ -282,7 +365,8 @@ test('creates, reviews, saves and publishes a label-only correction against the 
     expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: currentArtifact.fingerprint,
     speakerNames: {}, createdAt: '2026-10-01T17:00:00.000Z', expiresAt: '2026-10-08T17:00:00.000Z', errorCode: null,
   };
-  const correctionContent = { text: 'Opening remarks.', utterances: [{ speakerId: 'A', startMs: 1000, endMs: 2300, text: 'Opening remarks.' }] };
+  const correctionContent = { text: '', utterances: [{ speaker: 'A', start: 59000, end: 62000, text: 'Opening remarks.',
+    words: [{ start: 59000, end: 59500, text: 'Opening' }, { start: 61000, end: 62000, text: 'remarks.' }] }] };
   global.fetch = jest.fn(async (url, options = {}) => {
     const path = String(url);
     if (path.endsWith('/transcriptions')) return response(collection({ jobs: [], correctionDrafts: [correction] }));
@@ -307,7 +391,9 @@ test('creates, reviews, saves and publishes a label-only correction against the 
   render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Correct transcript' }));
   expect(await screen.findByRole('heading', { name: 'Correct published transcript' })).toBeInTheDocument();
-  expect(screen.getAllByText('Opening remarks.').length).toBeGreaterThan(0);
+  expect(screen.getByRole('heading', { name: '0:00' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '1:00' })).toBeInTheDocument();
+  expect(screen.getByText('remarks.')).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Suggestions for Speaker A'), { target: { value: 'candidate-three' } });
   expect(screen.getByLabelText('Manual display name for Speaker A')).toHaveValue('Jordan Rivera');
   fireEvent.click(screen.getByRole('button', { name: 'Save correction' }));
@@ -385,7 +471,7 @@ test('a delayed correction-save conflict cannot overwrite another job selected w
     operationId: OPERATION_ID, state: 'draft', version: 1, sourceArtifactId: ARTIFACT_ID,
     expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: currentArtifact.fingerprint, speakerNames: {},
   };
-  const correctionContent = { text: 'Opening remarks.', utterances: [{ speakerId: 'A', startMs: 1000, endMs: 2300, text: 'Opening remarks.' }] };
+  const correctionContent = { text: 'Opening remarks.', utterances: [{ speaker: 'A', start: 1000, end: 2300, text: 'Opening remarks.' }] };
   const secondContent = { text: 'Second speaker turn.', utterances: [{ speaker: 'B', start: 3000, end: 4000, text: 'Second speaker turn.' }] };
   global.fetch = jest.fn(async (url, options = {}) => {
     const path = String(url);
