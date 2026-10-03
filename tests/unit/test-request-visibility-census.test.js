@@ -6,6 +6,7 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { createTranscriptionPilotStore } from '../../lib/services/transcription-pilot/store.js';
 
 const ROOT = path.resolve(__dirname, '../..');
 const source = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
@@ -102,6 +103,19 @@ test('transcription evaluation export receives only unbound pilot jobs', () => {
   expect(ownerList).not.toBeNull();
   expect(ownerList[0]).toContain("COALESCE(to_jsonb(transcription_jobs)->>'request_id', '') = ''");
   expect(source('pages/api/admin/transcription-pilot/evaluation-export.js')).toContain('listOwnerJobs');
+});
+
+test('evaluation export executes the owner-job query with its blank-request discriminator', async () => {
+  const database = {
+    query: jest.fn(async () => ({ rows: [] })),
+    transaction: jest.fn(async (fn) => fn({ query: jest.fn(async () => ({ rows: [] })) })),
+  };
+  const store = createTranscriptionPilotStore(database);
+  await store.listOwnerJobs({ ownerProfileId: 42, limit: 100 });
+
+  const [query, params] = database.query.mock.calls[0];
+  expect(query).toMatch(/WHERE owner_profile_id = \$1\s+AND COALESCE\(to_jsonb\(transcription_jobs\)->>'request_id', ''\) = ''/);
+  expect(params).toEqual([42, 100]);
 });
 
 test('legacy pilot transcript download excludes request-bound Meeting Tracker jobs', () => {

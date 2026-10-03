@@ -18,6 +18,7 @@ test('operator defaults to readonly and mutations need explicit execute and tear
 test('ready-row SQL uses exact synthetic identities, fixed output pin, hash, and marker', () => {
   expect(INSERT_SQL).toContain('output_cleanup_pathname');
   expect(INSERT_SQL).toContain('provider_id_conflict');
+  expect(INSERT_SQL).toContain('provider_id_conflict, cleanup_requested_at,\n          content_purged_at, input_cleanup_pathname, upload_valid_until');
   expect(MARKER).toBe('meeting-tracker-speaker-rehearsal-v1');
   expect(transcriptHash).toMatch(/^[0-9a-f]{64}$/);
   expect(fixture.REHEARSAL_OUTPUT_PATH).toContain(fixture.REHEARSAL_JOB_ID);
@@ -37,12 +38,52 @@ test('preflight inserts only inside an explicitly rolled-back transaction and ex
       output_pathname: fixture.REHEARSAL_OUTPUT_PATH, output_sha256: transcriptHash,
       options_snapshot: { rehearsal_fixture: MARKER }, speaker_names: { A: '', B: '', C: '' },
       provider_id_conflict: false,
+      cleanup_requested_at: null, content_purged_at: null,
+      input_cleanup_pathname: null, upload_valid_until: null,
     }] };
     return { rows: [] };
   }) };
   const result = await preflight(client, projectMeetingTranscriptionJob);
   expect(result.preflightRolledBack).toBe(true);
   expect(result.projectionVerified).toBe(true);
+  expect(result.projectedFlags).toEqual({ contentDeletionObserved: false, lateUploadWatchPending: false });
+  expect(statements[0]).toBe('BEGIN');
+  expect(statements.at(-1)).toBe('ROLLBACK');
+  expect(statements).not.toContain('COMMIT');
+});
+
+test.each([
+  ['missing cleanup_requested_at', (row) => { delete row.cleanup_requested_at; }],
+  ['missing content_purged_at', (row) => { delete row.content_purged_at; }],
+  ['missing input_cleanup_pathname', (row) => { delete row.input_cleanup_pathname; }],
+  ['missing upload_valid_until', (row) => { delete row.upload_valid_until; }],
+  ['populated cleanup_requested_at', (row) => { row.cleanup_requested_at = new Date(); }],
+  ['populated content_purged_at', (row) => { row.content_purged_at = new Date(); }],
+  ['populated input_cleanup_pathname', (row) => { row.input_cleanup_pathname = 'transcription-pilot/fixture/input.m4a'; }],
+  ['populated upload_valid_until', (row) => { row.upload_valid_until = new Date(); }],
+])('preflight rejects %s and rolls the transaction back', async (_label, mutateRow) => {
+  const row = {
+    id: fixture.REHEARSAL_JOB_ID, owner_profile_id: fixture.REHEARSAL_OWNER_PROFILE_ID,
+    request_id: fixture.REHEARSAL_REQUEST_ID, site_visit_activity_id: fixture.REHEARSAL_SITE_VISIT_ACTIVITY_ID,
+    status: 'ready', version: 1, created_at: new Date(), updated_at: new Date(), ready_at: new Date(),
+    expires_at: new Date(Date.now() + 7 * 86400_000), receipt_expires_at: new Date(Date.now() + 30 * 86400_000),
+    output_pathname: fixture.REHEARSAL_OUTPUT_PATH, output_sha256: transcriptHash,
+    options_snapshot: { rehearsal_fixture: MARKER }, speaker_names: { A: '', B: '', C: '' },
+    provider_id_conflict: false, cleanup_requested_at: null, content_purged_at: null,
+    input_cleanup_pathname: null, upload_valid_until: null,
+  };
+  mutateRow(row);
+  const statements = [];
+  const client = { query: jest.fn(async (text) => {
+    statements.push(text);
+    if (text.includes('current_database')) return { rows: [{ db: 'neondb', app: 'test' }] };
+    if (text.includes('SELECT id FROM public.transcription_jobs')) return { rows: [] };
+    if (text.includes('transcription_workflow_dispatches')) return { rows: [] };
+    if (text.startsWith('INSERT')) return { rows: [row] };
+    return { rows: [] };
+  }) };
+
+  await expect(preflight(client, projectMeetingTranscriptionJob)).rejects.toThrow('preflight_projection_failed');
   expect(statements[0]).toBe('BEGIN');
   expect(statements.at(-1)).toBe('ROLLBACK');
   expect(statements).not.toContain('COMMIT');

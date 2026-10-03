@@ -5,7 +5,7 @@ type: project
 originSessionId: 855d17dc-8935-4bc6-88a5-cb73f4cb1b2d
 status: active
 scope: global
-last_verified: 2026-08-23 — pricing/capability registries and migration high-water mark 033 confirmed from source; Anthropic-console facts (auto-reload ON, $500/mo spend limit) are organizational, not probeable
+last_verified: 2026-10-02 — pricing/resolver remediation deployed through PR #420; provider pricing check completed; account settings below remain historical observations
 ---
 
 ## Recall Rule
@@ -19,7 +19,7 @@ Do:
 
 Do not:
 - Rebuild the removed low-balance estimator/anchor machinery — Anthropic-native auto-reload + spend limits replaced it (S181).
-- Assume migration `032_api_usage_stop_reason.sql` creates `model_pricing_audit` — that table is created in `scripts/setup-database.js`, not a numbered migration. (The current numbered high-water mark is `033_dynamics_explorer_request_telemetry.sql`.)
+- Assume migration `032_api_usage_stop_reason.sql` creates `model_pricing_audit` — that table is created in `scripts/setup-database.js`, not a numbered migration. Read `lib/db/migrations-manifest.json` for current numbered migrations; do not infer the high-water mark from this memory.
 
 Ground truth: `lib/utils/model-pricing.js`, `pages/api/admin/stats.js`, `pages/api/cron/{spend-check,pricing-canary,pricing-refresh}.js`, `api_usage_log` table; Anthropic console for reconciliation.
 
@@ -27,7 +27,7 @@ User ran out of Anthropic API credits during a batch expertise matching run (Apr
 
 **Why originally:** batch processing burns credits faster than interactive use. Running out mid-batch wastes time and leaves partial results. Per-app / per-user spend trends matter because the interactive-user base is small but backend/PA jobs may dominate cost once live.
 
-## Current state (S181, 2026-05-23)
+## Account baseline (historical S181 observation, 2026-05-23; not re-probed)
 
 **Account moved to work org.** Justin's WMKF Anthropic account replaces the personal account that motivated the original work. Production `CLAUDE_API_KEY` confirmed pointing at the work org (last-used timestamp comparison, S181).
 
@@ -40,10 +40,14 @@ User ran out of Anthropic API credits during a batch expertise matching run (Apr
 - **Admin tile (per-user, per-app)** — only WE can produce this; Anthropic only knows API keys, not WMKF users. `pages/api/admin/stats.js` queries `api_usage_log` for breakdowns.
 - **Daily-spend threshold alert** (`/api/cron/spend-check.js`) — kept as a runaway-cost detector (code wedged in a loop, prompt mistakenly looping a large input). Different failure mode than budget approaching.
 
-**Pricing accuracy machinery (S181):**
+## Pricing accuracy machinery
+
+**[DEPLOYED 2026-10-02 through PR #420; verified via deployment and maintenance receipts.]** The reviewed Opus 5.5 entry is $4/$20 per million input/output tokens, with cache reads at 0.05× input. Other models retain the default 0.1× read multiplier unless explicitly overridden. The global capability-discovery cutoff remains 2026-09-12 so other newer unreviewed ids still warn. Automatic tier resolution accepts only exact or dated-snapshot coverage in both registries; original degraded fallback ids are unchanged. The protected Production pricing refresh completed with 15 comparisons and no flagged drift; the old drift alert auto-resolved. The latest model canary flags Sonnet 5.5, which remains unreviewed and excluded from automatic tier selection.
+
+**Retained machinery:**
 - **`lib/utils/model-pricing.js`** — extracted from `usage-logger.js`. Longest-prefix-first matcher (was `.includes()`, which silently misrouted `claude-opus-4-6` → `claude-opus-4` pricing for 3× overestimate). `LAST_REVIEWED_AT` field. Current reviewed rates include Haiku 4.5 = $1/$5, Opus 5 and Opus 4.5+ = $5/$25, and Sonnet 5 = $2/$10 per million input/output tokens. Sonnet 5's previously announced September increase was cancelled. 1h cache write multiplier (2×) is included.
 - **`/api/cron/pricing-canary`** — weekly (Mon 10am UTC). Scans last 7d of `api_usage_log` for unknown model ids + flags if `LAST_REVIEWED_AT` >60 days old. It also compares live Anthropic model discovery against exact capability + pricing coverage and auto-resolves the keyed alert once coverage is complete. Free signal, no Admin API needed.
-- **`/api/cron/pricing-refresh`** — monthly (1st of month, 11am UTC). Pulls Anthropic `/v1/organizations/cost_report` for last 30d, derives per-(model, token_type) price from `cost / tokens`, compares to local table, alerts on >5% drift OR unknown-in-cost-report. Skips when `ANTHROPIC_ADMIN_API_KEY` not set. Writes audit history to `model_pricing_audit` (created in `scripts/setup-database.js`, not a numbered migration; numbered migration `032` is the unrelated API-usage stop-reason migration, and the current high-water mark is `033`). [verified from source 2026-08-23]
+- **`/api/cron/pricing-refresh`** — monthly (1st, 11am UTC). Source-built correction joins cost and Messages usage reports over the same 30-day window/day/model/workspace/tier/context/geography; provider tokens replace the app-local denominator, with separate 5m/1h cache writes. Audit rows persist in `model_pricing_audit` (fresh-install setup, not migration 032). Unknown pricing or >5% drift alerts; incomplete/empty comparisons preserve existing alerts and partial report pagination throws. Skips when `ANTHROPIC_ADMIN_API_KEY` is unset. Older persisted audit rows retain their original denominator.
 - **Storage decision:** pricing source of truth stays in code; cron alerts and humans edit. No auto-overwrite — protects against billing-system glitches corrupting prices.
 
 **Local code removed (S181):**
@@ -51,7 +55,7 @@ User ran out of Anthropic API credits during a batch expertise matching run (Apr
 - `scripts/update-balance-anchor.sh`. <!-- doc-symbol-refs:ignore reason=removed-s181 -->
 - Env vars `ANTHROPIC_BALANCE_ANCHOR_CENTS`, `ANTHROPIC_BALANCE_ANCHOR_DATE`, `LOW_BALANCE_ALERT_CENTS`. Also `SPEND_ALERT_EMAIL_TO/FROM` + `NOTIFICATION_EMAIL_TO` (removed earlier in S181 when alert recipients moved to the per-category routing config).
 
-## Accuracy of our local estimate vs Anthropic
+## Historical accuracy observation (S181; not a current pricing validation)
 
 S181 cross-check: local `api_usage_log` MTD = $2.53; Anthropic console MTD = $3.35. ~24% delta, mostly cache-write pricing variance + Anthropic's 5-min reporting lag. Numbers agree well enough that per-user breakdowns are trustworthy as estimates.
 
@@ -67,7 +71,7 @@ While building the tile, queried `api_usage_log` for `dynamics-explorer` cache h
 
 **Future-check when adding new streaming Claude callers:** verify the SSE parser captures BOTH cache fields from `message_start.message.usage` in addition to `input_tokens`. Easy to miss because the non-streaming path just spreads `data.usage` wholesale and works by default; the streaming path has to enumerate fields by name. Silent zeros in `cache_creation_tokens`/`cache_read_tokens` on a caller with a long system prompt = this bug.
 
-**For ground-truth reconciliation:** open the Anthropic console Billing → Usage. Auto-reload is ON; spend-limit is $500/mo with native Anthropic notifications. No code maintenance needed.
+**For ground-truth reconciliation:** open the Anthropic console Billing → Usage and recheck account auto-reload/spend-limit settings; the S181 observations above do not establish current settings.
 
 **For per-user breakdowns:** `/admin` Usage section, or `scripts/check-mtd-spend.js` for ad-hoc terminal queries.
 

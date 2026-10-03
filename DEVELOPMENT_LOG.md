@@ -10,6 +10,28 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Pricing alert reconciliation and reviewed model selection (Session 568)
+
+**Milestone:** Corrected the provider pricing comparison and deployed reviewed Opus 5.5 coverage.
+**Sessions:** 568 (admin-alert remediation, October 2).
+**Ship state:**
+- Owner-authorized PR #420 merged as `a829ba94c`; all CI checks passed and Production is READY.
+- Protected pricing refresh matched provider costs/tokens, completed 15 comparisons with no drift, and auto-resolved the misleading standing pricing alert. [VERIFIED via maintenance and alert receipts]
+- Automatic tier selection excludes models without specific capability/pricing coverage. The canary now identifies Sonnet 5.5 for separate review; the conservative transcription cleanup watch remains intact.
+**Why it matters:** Operators can distinguish actual rate drift from mismatched usage scopes, and newer models require review before automatic selection.
+**Pointers:** `docs/audits/ADMIN_ALERT_REMEDIATION_2026-10-02.md`; `docs/MODEL_CHANGE_STRATEGY.md`; PR #420.
+
+## October 2026 — Meeting Tracker transcription launched for Production staff (Session 567)
+
+**Milestone:** Staff can upload a Site Visit recording, name detected speakers, publish a verified TXT/VTT bundle, and review it in Workbench.
+**Sessions:** 567 (Production activation and bounded synthetic rehearsal).
+**Ship state:**
+- PR #416 (`23667af9d`) delivered the integrated runtime; PR #418 (`aa7d5b0e1`) enabled daily cleanup, hourly recovery, and operational alerts.
+- Production staff acceptance used an approved non-sensitive recording and passed upload, speaker naming, transcript publication, TXT/VTT download, and Workbench review; temporary test content was removed and a private operational receipt retained.
+- Use remains limited to approved non-sensitive recordings. Provider training is opted out; retention is one day, not zero-data-retention.
+**Why it matters:** Staff now have a governed, recoverable transcript workflow attached to Meeting Tracker Site Visits.
+**Pointers:** `docs/atlas/postgres-transcription-pilot.md`; `docs/API_ROUTE_SECURITY_MATRIX.md`; PRs #416 and #418.
+
 ## October 2026 — Open received applicant materials from Meeting Tracker (Session 565)
 
 **Milestone:** Staff can open uploaded applicant files directly from the Site Visit materials card.

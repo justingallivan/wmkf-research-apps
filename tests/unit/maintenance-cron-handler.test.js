@@ -96,6 +96,20 @@ it('records the transcription publication reconciler schema-not-ready result wit
   expect(res.body.ok).toBe(true);
 });
 
+it('runs publication reconciliation and marks its failure', async () => {
+  reconcileMeetingTranscriptPublicationsBatch.mockRejectedValueOnce(
+    Object.assign(new Error('reconciliation failed'), { code: 'publication_read_failed' }),
+  );
+  const res = makeRes();
+  await handler({ method: 'POST', headers: {} }, res);
+
+  expect(reconcileMeetingTranscriptPublicationsBatch).toHaveBeenCalledWith({ limit: 20 });
+  expect(res.body.results.meetingTranscriptPublications).toEqual({ error: 'publication_read_failed' });
+  expect(res.body.failedSubtasks).toContain('meetingTranscriptPublications');
+  expect(res.body.ok).toBe(false);
+  expect(MaintenanceService.completeRun).toHaveBeenCalledWith(1, expect.objectContaining({ status: 'failed' }));
+});
+
 describe('maintenance cron — maintenance_runs retention step wiring', () => {
   it('runs Dynamics feedback cleanup with the fixed 20-day ACK retention', async () => {
     FeedbackService.cleanupOldFeedback.mockResolvedValueOnce(5);

@@ -132,11 +132,12 @@ export default function MeetingTrackerList() {
     setNotices([]);
     try {
       const query = new URLSearchParams();
+      query.set('projection', 'schedule');
       if (selectedProgramId) query.set('programId', selectedProgramId);
       if (selectedCycleCode) query.set('cycleCode', selectedCycleCode);
       if (selectedScope === 'all') query.set('scope', 'all');
       const needsPicker = Boolean(selectedCycleCode) && cyclesRef.current.length === 0;
-      const pickerQuery = new URLSearchParams();
+      const pickerQuery = new URLSearchParams({ projection: 'schedule' });
       if (selectedProgramId) pickerQuery.set('programId', selectedProgramId);
       const [dashboardEnvelope, sessionsEnvelope, pickerEnvelope] = await Promise.all([
         requestEnvelope(`/api/meeting-tracker/dashboard${query.size ? `?${query}` : ''}`, { tolerantBody: true }),

@@ -1,4 +1,231 @@
-# Session 567 Prompt: Factory handoff items 1–3 closed; observe the sweep and the next refusal
+# Session 571 Prompt: dependency security closeout; two upstream alerts remain
+
+## Session 570 Summary — 2026-10-03 PT (Codex dependency-security lane)
+
+[VERIFIED via PR #419 merge, GitHub alerts and Production deployment status]
+The narrow dependency security fix is merged and deployed. Eight alerts are fixed;
+two remain open without a patched release at the October 3 checkpoint. The owner
+requested this documentation handoff on `main`; no additional runtime work is
+authorized by this closeout.
+
+### What Was Completed
+
+1. Scoped `@workflow/core` overrides select `devalue` 5.9.3 and `nanoid` 5.1.16.
+   Workflow remains 5.0.0; unrelated dependency resolutions were preserved.
+2. Luna built, Sol reviewed, root verified, and Claude Fable approved through
+   subscription OAuth only. No direct model API or metered review substitute was
+   used. Clean installation, production build, lint, 67 focused tests and relevant
+   gates passed; all final-head PR checks passed before owner-authorized merge.
+3. Compatibility coverage includes a real older serializer fixture decoded by
+   the current Workflow error codec. This is bounded evidence, not exhaustive
+   persisted-state compatibility. Shared-memory rejection is a safety invariant
+   that also passed before the patch, not proof of a newly fixed exploit.
+4. Merge `bf3ab8e17` received successful Production deployment status (GitHub
+   deployment 6830197259); the production sign-in page returned HTTP 200. No new
+   authenticated business-workflow or provider test is claimed for this patch.
+
+### Commits / Key Files
+
+- `b31b584a2` — scoped security dependency overrides and compatibility tests.
+- `0b75d4265` — main integration preserving concurrent documentation corrections.
+- `bf3ab8e17` — merged [PR #419](https://github.com/justingallivan/wmkf-research-apps/pull/419).
+- `package.json`, `package-lock.json`,
+  `tests/unit/dependency-security-compat.test.js` — complete final PR surface.
+
+### Next Items
+
+- **DONE:** Reviewed fix, final CI, owner-authorized merge and deployment check.
+  GitHub readback confirms alerts #65 and #108–114 fixed.
+- **Verified open / upstream-blocked:**
+  [#115](https://github.com/justingallivan/wmkf-research-apps/security/dependabot/115)
+  (`braces` 3.0.3, GHSA-vfj7-8cjw-p6xm) and
+  [#116](https://github.com/justingallivan/wmkf-research-apps/security/dependabot/116)
+  (`http-cache-semantics` 4.2.0, GHSA-ch52-4w7c-c8xp). No patched release was
+  available at this checkpoint. Both were traced to tooling dependencies; no
+  direct first-party application imports or production file-trace inclusion was
+  found. That does not make the packages safe. Keep alerts open; reassess when an
+  upstream fix appears or new application exposure is found. No automatic
+  follow-up monitor was created.
+- **Known limitation:** Overrides do not rewrite bundled serializer copies in
+  Workflow artifacts, including its developer observability UI. The inspected
+  application runtime uses external patched `devalue`; an upstream Workflow
+  release is needed to refresh bundled copies. Do not claim every embedded copy
+  or all dependency vulnerabilities are fixed.
+- **Verify before acting:** Other lanes below are historical handoffs, not
+  revalidated worklists. Their release state and authorization need fresh checks.
+- **Milestone decision:** Routine dependency maintenance, not a new capability,
+  cutover or architecture; no DEVELOPMENT_LOG entry required. No CLAUDE.md or
+  memory-router change was needed. Original checkout changes remain untouched.
+- Claim-evidence report could not read local observation state; no row was
+  fabricated. This stop changes documentation only; documentation gates apply.
+
+## Prior-lane handoffs — historical; not revalidated in Session 570
+
+## Session 569 Summary — 2026-10-03 PT (Codex performance lane)
+
+[VERIFIED via GitHub PR/checks, remote main and deployment status] PR #422
+merged to `main` as `df55ad954` after all 12 checks passed. The targeted Meeting
+Tracker read optimization and seven baseline test repairs are complete. The
+owner authorized the merge conditional on clean CI and requested this final
+handoff on `main`. GitHub records a successful Production deployment for the
+merge commit (deployment `6830261304`). No authenticated production browser
+smoke or live latency measurement was performed in this lane.
+
+### What Was Completed
+
+1. Tracker callers request the additive schedule projection, sharing Workbench
+   selection without unused reviewer rollups. Site Visit summaries are read in
+   paginated batches instead of one detail read per visit. Legacy/full API
+   behavior, authorization, row visibility and missing-data notices remain.
+2. Seven pre-existing failing suites were repaired with exact inventories,
+   isolated mocks and meaningful negative coverage. The rehearsal operator now
+   verifies the complete current projection and rejects absent cleanup columns.
+3. Luna built and tested; Sol and root reviewed; Claude Fable approved through
+   subscription OAuth. No direct provider API or alternative paid review product
+   was used. Review findings were closed in bounded rounds.
+4. Before integration with newer main, the local full suite passed 1,214 suites
+   and 18,769 tests (8 suites / 72 tests skipped). Build, lint, types and 69
+   check scripts passed. Main integration retained its transcription maintenance
+   and recovery behavior. The integrated local full run passed 1,251 suites and
+   20,181 tests (11 suites / 142 tests skipped), with five snapshots passing.
+   Final PR CI, including canonical build and PostgreSQL integration, passed.
+
+After main integration, all seven repair suites passed (133 tests). Sol accepted
+the conflict resolutions with no material runtime change; current inventory is
+25 cron handler files, 24 exact scheduled paths and 23 scheduled endpoints.
+Main's daily/hourly transcription controls and newer assertions are preserved.
+
+### Commits and Evidence
+
+- `4b95863de` — targeted Tracker read optimization.
+- `170145c9c` — baseline repair and review records.
+- `3ffb20c46` — integrated main and reconciled verification contracts.
+- `f952b20db` — pre-merge handoff, preserving concurrent lane history.
+- `df55ad954` — PR #422 merge to `main`, after 12 passing checks.
+- `docs/plans/MEETING_TRACKER_READ_PERFORMANCE_EXECUTION_2026-10-03.md`
+  and its linked review receipt — behavior, reduced-call evidence and rollback.
+- `docs/plans/BASELINE_TEST_REPAIRS_EXECUTION_2026-10-03.md`
+  and its linked Fable receipt — diagnoses, tests and review disposition.
+
+### Next Items
+
+- **DONE:** Agreed targeted implementation, baseline repairs, review, CI and
+  owner-authorized merge. No large refactor or new caching layer is selected.
+  Do not reopen those without a new requirement or measured bottleneck.
+- **Unverified / not claimed:** Authenticated production browser acceptance and
+  measured user-visible latency improvement. Deployment success does not prove
+  those properties. Any follow-up should begin with a concrete observed issue
+  or an explicitly requested measurement, not a new speculative refactor.
+- **Preserved:** The original transcription checkout's unrelated dirty test and
+  untracked planning/audit documents are untouched. Other lanes below are
+  historical handoffs, not newly validated worklists.
+- **Milestone decision:** No new architecture or capability was introduced; this
+  contained optimization and verification repair needs no DEVELOPMENT_LOG entry.
+- Claim-evidence `--current` could not run because this session has no exported
+  observation key. No observation row was fabricated or borrowed from another
+  session. No memory-router edits were made by this lane.
+
+## Prior-lane handoffs — historical; not revalidated in Session 569
+
+## Session 568 Summary — 2026-10-02/03 PT (Codex admin-alert lane)
+
+[VERIFIED via source, PR CI/merges, Vercel deployment and protected Production
+maintenance/alert readback] Pricing remediation and reviewed Opus 5.5 coverage
+are shipped. The owner authorized merge after CI and requested this closeout on
+`main`. Evidence remains bounded; no private operational data or credentials
+belong in the handoff.
+
+### What Was Completed
+
+1. **Pricing:** Replaced the app-local token denominator with matching provider
+   cost/usage cohorts, separated cache lifetimes, preserved alerts on incomplete
+   reports and corrected displayed dollar units. The protected Production check
+   completed 15 comparisons without drift and auto-resolved the pricing alert.
+2. **Model selection:** Reviewed Opus 5.5 pricing/capabilities, including its cache
+   read override. Automatic tiers require specific coverage in both registries.
+   The canary now flags Sonnet 5.5, which remains excluded from automatic tiers.
+3. **Transcription:** Read-only inspection found no processing backlog at the
+   October 2 checkpoint. One expired job retains a conservative late-upload safety
+   watch. The October 3 email supplied by the owner bears the October 2 8:51 PM
+   Pacific timestamp, before this release; it is consistent with that warning,
+   not new evidence of a processing failure. No new October 3 live probe occurred.
+4. **Verification:** Fresh independent review, 118 focused tests, scoped gates and
+   full PR CI passed. Runtime PR #420 and evidence PR #421 are merged. The local
+   dependency-symlink Turbopack limitation was covered by the canonical CI build.
+
+### Commits
+
+- `bbf6457a8` — provider pricing audit scope and reviewed model selection; merged
+  via PR #420 as `a829ba94c`.
+- `5cb14b859` — verified production evidence and milestone; merged via PR #421
+  as `43de4bf2c`.
+
+### Next Items
+
+- **DONE:** Agreed pricing fix, Opus review, selection guard, CI, owner-authorized
+  production release and pricing/model check readback. No further runtime work is
+  authorized by this documentation closeout.
+- **Verified open at October 2 checkpoint:** Sonnet 5.5 review. Source entries are
+  absent and the canary reports ancestor coverage; do not advance the global
+  review date or enable it automatically without a specific review.
+- **Parked:** Transcription-watch closure and calendar-triggered cleanup
+  observation. Preserve the safety watch; new relevant failures or an explicit
+  owner request are the reopen triggers.
+- **Known limitation:** Keyed alert deduplication retains the first payload, so
+  the open model card can still name Opus while the latest canary identifies
+  Sonnet. Verify fresh run details before using the card as current evidence.
+- **Verify before acting:** Older lane handoffs below are historical, not current
+  worklists. Their live state and owner authorization require a fresh preflight.
+
+### Key Files / Handoff
+
+- `docs/audits/ADMIN_ALERT_REMEDIATION_2026-10-02.md` — source contract, validation,
+  deployment outcome and rollback baseline.
+- `pages/api/cron/pricing-refresh.js`, `lib/services/anthropic-admin.js` — matched
+  provider reports; `scripts/probe-admin-alert-operations.js` — content-free,
+  explicitly scoped read-only Postgres probe.
+- `lib/services/model-resolver.js`, `lib/services/model-capabilities.js`,
+  `lib/utils/model-pricing.js` — reviewed selection and Opus coverage.
+- Production milestone is already recorded in DEVELOPMENT_LOG.md; this stop
+  needs no second milestone entry or mutable script catalogue in CLAUDE.md.
+- Claim-evidence observation report could not read local state; no observation
+  row was fabricated. The original transcription checkout's unrelated changes
+  remain untouched.
+
+## Prior-lane handoffs — historical; not revalidated at Session 568 closeout
+
+## Session 567 Summary — 2026-10-02 PT (Codex transcription lane)
+
+[VERIFIED via merged PRs, production configuration/deployment readback, authenticated browser, and exact cleanup receipts] Meeting Tracker transcription is enabled for authorized staff. The owner accepted completion and requested this closeout on `main`. Operational evidence stays private; do not copy recordings, transcript text, secrets, test-record identifiers, or detailed operational receipts into public documentation.
+
+### What Was Completed
+
+1. **Production release:** PR #416 integrated the request-bound flow; PR #418 added daily cleanup and hourly Workflow recovery through the existing operations-alert channel. No minute polling was added. Production access and both schema-readiness controls are on; the separate Admin pilot switches remain off in the shared application.
+2. **Acceptance:** An approved short synthetic recording passed private upload, `universal-3-5-pro`, detected-speaker naming, minute-grouped TXT, VTT download, governed publication, and Staff Deliberations projection. The test's temporary content and exact published files were removed; its document was soft-retired. Audit receipts and the late-upload safety watch remain intentionally; existing meeting details/materials were preserved.
+3. **Review/verification:** Luna built/reconnoitered, Sol reviewed, root verified, and Fable approved the bounded release through subscription OAuth only. Final PR checks passed. One unrelated Jest deadline flake passed on retry without changing or bypassing that test. Both maintenance modes returned 200 when triggered through the platform; the warning email was accepted for delivery, not inbox-verified.
+4. **Privacy:** Approved non-sensitive recordings only. Owner-confirmed training opt-out and one-day provider retention are accepted; true zero retention and blanket confidential-use clearance are not established.
+
+### Commits
+
+- `23667af9d` — merge PR #416, transcription integration and disabled-release preparation.
+- `1cc4302d7`, `302e9de27` — maintenance/alerts and scheduled-job census/reference corrections, merged in PR #418 as `aa7d5b0e1`.
+
+### Next Items
+
+- **DONE:** Agreed implementation, review, production enablement, bounded acceptance, and synthetic-content cleanup. Do not reopen infrastructure work without a new requirement or observed failure.
+- **Owner decision needed:** Broader confidential use requires separate privacy assurances and an explicit processing decision; do not relabel sensitive recordings as non-sensitive.
+- **Parked / not claimed:** Maximum-size live test, callback delivery, calendar-triggered maintenance observation, inbox receipt, and closure of the conservative late-upload watch. Manual platform delivery and content deletion are verified, not proof of those separate properties.
+- **Verify before acting:** Other lanes below are preserved historical handoffs, not revalidated worklists. Re-probe their state before acting; no unrelated cleanup is authorized by this closeout.
+
+### Key Files / Testing
+
+- `shared/components/meeting-tracker/MeetingTranscriptionPanel.js`, `lib/services/meeting-tracker-transcription/` — request-bound review and publication.
+- `pages/api/cron/drain-transcriptions.js`, `vercel.json` — daily cleanup and hourly recovery/alerts.
+- `docs/plans/MEETING_TRACKER_TRANSCRIPTION_PLAN_2026-10-01.md`, `docs/atlas/postgres-meeting-transcript-publications.md` — contract and persistence. <!-- drain-table:ignore reason=transcription-atlas-filename-not-retired-table -->
+- Release verification: focused tests, deployment/API/documentation gates and sequential self-tests, final PR CI, and production browser acceptance. This stop is documentation-only; run doc-currency/Atlas checks for changed references.
+- Claim-evidence report could not read local observation state; no observation row was fabricated. The original checkout's unrelated dirty test file remains untouched.
+
+## Prior-lane handoffs — historical; not revalidated in Session 567
 
 ## Session 566 Summary — 2026-10-02 PT (Factory follow-ups lane, Claude Fable, home Mac)
 
@@ -169,3 +396,28 @@ No claim-evidence observation row was added: the pilot report recorded no eligib
 The exact-root recursive-reader filter and five callers are Production-deployed in PR #404; it suppresses exact same-request portal-produced Superseded drive/item identities beneath canonical Site Visit materials roots, preserves current/manual identities, and omits affected candidates with a sanitized error when registry/drive evidence is incomplete. PR #407 added scan-rejection diagnostics, and PR #410 added upload progress and verified rejection messages. All three PRs passed CI and merged.
 
 [VERIFIED via owner-authorized agent Production probes] The first real job `33630e07-4311-41b3-8aef-737a2962ce03` (`presentation_source`) was admitted at 21:36:35 UTC, started at 21:37:05, recorded a clean scan checkpoint at 21:38:23, and completed at 21:39:19 on attempt 1 with no error; staging was consumed. Admission-to-completion took about 2m44s. The owner closed/reopened the browser during processing and later confirmed Received after reopening. Worker invocations 21:44–21:48 UTC were healthy with an empty queue. Monitoring remains required; no automatic email is sent. PR #405 merged as `1df8a33e2` after all current-head CI checks passed; PR #413 merged as `81dad17e2`. Both are included in Ready Production deployment `dpl_7zi1no5HrxgrPbCQo18Lsi1NM5CZ` at commit `b223dad7d` (October 2 final deployment readback and Git ancestry checks). The exact 500 MB live transfer remains unverified and parked, not a normal-use release blocker. The owner declined another simultaneous-large background test on October 2: the expected set is one large PPTX, a usually smaller PDF, and a text document. Reopen stress testing only if usage or failures warrant it. Cap enforcement is unit-tested. Preserve unrelated Factory and reviewer-refactor context above; this handoff replaces only the previous materials-lane section.
+
+
+## Admin alert remediation branch handoff — 2026-10-02
+
+[VERIFIED via branch source, focused tests and read-only operations probe]
+`codex/admin-alert-remediation` isolates the owner's alert work from the dirty
+transcription checkout. Pricing refresh now compares provider costs with matched
+provider token cohorts; Opus 5.5 has reviewed pricing/capabilities; automatic tiers
+exclude ancestor-only registry coverage. The intentional late-upload cleanup watch
+remains. See `docs/audits/ADMIN_ALERT_REMEDIATION_2026-10-02.md` for evidence,
+validation and deployment limitations. No production alerts were manually cleared.
+
+- **DONE:** Source fixes, fresh review, 118 focused tests, scoped gates/self-tests,
+  changed-file lint and webpack build. Canonical Turbopack build needs CI because
+  the isolated worktree uses a shared dependency symlink.
+- **DONE:** Owner authorized merge after CI; PR #420 passed all checks and merged.
+  The approved merge commit is READY in Production.
+- **DONE:** Protected Production pricing refresh completed with 15 comparisons
+  and no drift; its alert auto-resolved. The canary completed and now flags
+  Sonnet 5.5, which remains unreviewed and excluded from automatic tiers. The
+  existing card may retain old Opus text due to keyed alert deduplication.
+- **Parked:** Conservative transcription-watch closure and calendar-triggered
+  maintenance observation, consistent with the existing transcription handoff.
+- Production operational correction shipped through PR #420; see the audit
+  report for deployment and follow-up evidence.

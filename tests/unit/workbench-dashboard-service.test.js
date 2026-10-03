@@ -48,7 +48,7 @@ jest.mock('../../lib/services/reviewer-rollup', () => ({
   REVIEWERS_NEEDED: 3,
 }));
 
-import { loadDashboard } from '../../lib/services/workbench/dashboard-service';
+import { loadDashboard, loadMeetingTrackerSelection } from '../../lib/services/workbench/dashboard-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import { resolveWorkbenchProgramScope, buildProgramScopeFilter } from '../../lib/services/workbench/program-scope-service.js';
 
@@ -264,6 +264,53 @@ test('proposal mode: canonical session actor is case-insensitive and missing act
     .resolves.toMatchObject({ proposals: [{ canManage: true, isMine: true }] });
   await expect(loadDashboard(args({ cycleCode: 'D26', scope: 'all', callerSystemId: null })))
     .resolves.toMatchObject({ proposals: [{ canManage: false, isMine: true }] });
+});
+
+test('Tracker selection matches Workbench visibility and metadata without reading reviewer progress', async () => {
+  process.env.TEST_REQUEST_ISOLATION = 'on';
+  const records = [{
+    akoya_requestid: 'r-1',
+    akoya_requestnum: '1002836',
+    wmkf_meetingdate: '2026-12-11',
+    _akoya_applicantid_value_formatted: 'Caltech',
+    _wmkf_projectleader_value_formatted: 'Pat One',
+    _wmkf_programdirector_value_formatted: 'Dr. PD One',
+    _wmkf_programdirector_value: 'pd-1',
+    wmkf_istestrequest: true,
+    wmkf_testcreationrunid: '22222222-2222-4222-8222-222222222222',
+  }];
+  queryAllRequests.mockResolvedValue({ records, capped: false });
+  const dashboard = await loadDashboard(args({ cycleCode: 'D26', scope: 'my' }));
+  expect(fetchReviewerRollup).toHaveBeenCalledWith(['r-1']);
+  const legacyRollup = { total: 1, stages: { find: 1 } };
+  dashboard.rollup = legacyRollup;
+
+  queryAllRequests.mockClear();
+  fetchReviewerRollup.mockClear();
+  const selection = await loadMeetingTrackerSelection(args({ cycleCode: 'D26', scope: 'my' }));
+
+  expect(getUserRole).toHaveBeenCalledWith(1);
+  expect(fetchReviewerRollup).not.toHaveBeenCalled();
+  expect(queryAllRequests).toHaveBeenCalledWith(expect.objectContaining({
+    select: expect.stringContaining('wmkf_istestrequest'),
+    filter: expect.stringContaining('_wmkf_programdirector_value eq pd-1'),
+    orderby: 'akoya_requestnum asc',
+  }));
+  expect(selection).toMatchObject({
+    programDirector: dashboard.programDirector,
+    programs: dashboard.programs,
+    programId: dashboard.programId,
+    defaultProgramId: dashboard.defaultProgramId,
+    programName: dashboard.programName,
+    cycleCode: dashboard.cycleCode,
+    cycleLabel: dashboard.cycleLabel,
+    scope: dashboard.scope,
+    includeSetAside: dashboard.includeSetAside,
+    proposals: [{ requestId: 'r-1', requestNumber: '1002836', institution: 'Caltech', projectLeader: 'Pat One', programDirector: 'Dr. PD One', isTestRequest: true }],
+  });
+  expect(selection).not.toHaveProperty('rollup');
+  expect(selection.proposals[0]).not.toHaveProperty('reviewers');
+  expect(selection.proposals[0]).not.toHaveProperty('workRemaining');
 });
 
 test('Stage 1d: on mode badges test rows but excludes them from rollup totals', async () => {

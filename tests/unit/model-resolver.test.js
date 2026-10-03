@@ -152,3 +152,20 @@ describe('resolveModelWithCapabilities', () => {
     });
   });
 });
+
+describe('automatic tier review guard', () => {
+  afterEach(() => { clearAvailableModelsCache(); jest.restoreAllMocks(); });
+  it('skips a newer unreviewed descendant despite ancestor capabilities and prices', async () => {
+    const { loadAvailableModels, resolveTierSync } = require('../../lib/services/model-resolver');
+    const prior = process.env.CLAUDE_API_KEY; process.env.CLAUDE_API_KEY = 'sk-ant-test';
+    try {
+      jest.spyOn(global, 'fetch').mockResolvedValue({ ok: true, json: async () => ({ data: [
+        { id: 'claude-opus-5-99', created_at: '2026-12-01T00:00:00Z' },
+        { id: 'claude-opus-5-5', created_at: '2026-09-22T00:00:00Z' },
+        { id: 'claude-opus-5', created_at: '2026-08-20T00:00:00Z' },
+      ] }) });
+      await loadAvailableModels({ force: true });
+      expect(resolveTierSync('opus')).toBe('claude-opus-5-5');
+    } finally { if (prior === undefined) delete process.env.CLAUDE_API_KEY; else process.env.CLAUDE_API_KEY = prior; }
+  });
+});

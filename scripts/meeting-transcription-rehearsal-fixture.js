@@ -95,7 +95,8 @@ const INSERT_SQL = `INSERT INTO public.transcription_jobs
  RETURNING id, owner_profile_id, request_id, site_visit_activity_id, status,
           version, created_at, updated_at, ready_at, options_snapshot, output_pathname,
           output_sha256, output_cleanup_pathname, expires_at, receipt_expires_at,
-          speaker_names, attempts, provider_id_conflict`;
+          speaker_names, attempts, provider_id_conflict, cleanup_requested_at,
+          content_purged_at, input_cleanup_pathname, upload_valid_until`;
 
 async function assertNoFixture(client) {
   const { rows } = await client.query(
@@ -193,13 +194,20 @@ async function preflight(client, projectMeetingTranscriptionJob) {
       'needsAttention', 'contentAccessAllowed', 'contentDeletionObserved',
       'lateUploadWatchPending', 'cleanupPending',
     ].sort();
+    const projectedFlags = {
+      contentDeletionObserved: projected?.contentDeletionObserved,
+      lateUploadWatchPending: projected?.lateUploadWatchPending,
+    };
     if (!projected || projected.id !== fixture.REHEARSAL_JOB_ID || projected.status !== 'ready'
       || projected.contentAccessAllowed !== true || JSON.stringify(projectedKeys) !== JSON.stringify(expectedKeys)
+      || projectedFlags.contentDeletionObserved !== false || projectedFlags.lateUploadWatchPending !== false
+      || inserted.rows[0].cleanup_requested_at !== null || inserted.rows[0].content_purged_at !== null
+      || inserted.rows[0].input_cleanup_pathname !== null || inserted.rows[0].upload_valid_until !== null
       || !projected.speaker_names || Object.keys(projected.speaker_names).sort().join(',') !== 'A,B,C') {
       throw new Error('preflight_projection_failed');
     }
     await client.query('ROLLBACK');
-    return { preflightRolledBack: true, projectionVerified: true, projectedKeys,
+    return { preflightRolledBack: true, projectionVerified: true, projectedKeys, projectedFlags,
       fixedJobId: fixture.REHEARSAL_JOB_ID, fixtureBytes: transcriptBytes.length };
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
