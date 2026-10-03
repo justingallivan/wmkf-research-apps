@@ -23,17 +23,19 @@ jest.mock('../../lib/services/model-override-loader', () => ({
 }));
 
 let capturedMessages = null;
+let mockRefusalText = null;
 jest.mock('../../lib/services/llm-client', () => ({
   LLMClient: jest.fn().mockImplementation(() => ({
     complete: jest.fn(async ({ messages }) => {
       capturedMessages = messages;
-      return { text: 'refined summary', model: 'claude-test' };
+      return mockRefusalText === null ? { text: 'refined summary', model: 'claude-test' } : { text: mockRefusalText, refused: true, stopReason: 'refusal' };
     }),
   })),
 }));
 
 beforeEach(() => {
   capturedMessages = null;
+  mockRefusalText = null;
   clearAppAccessCache();
   process.env.CLAUDE_API_KEY = 'sk-ant-test';
 });
@@ -80,4 +82,16 @@ describe('/api/refine A7 hardening', () => {
     expect(prompt).not.toContain('UNSENT_TAIL');
     expect(prompt).toContain('AI payload boundary: refine.currentSummary');
   });
+});
+
+test.each(['', 'declined content must not become a summary'])('refinement refuses output %j without a successful summary', async text => {
+  mockRefusalText = text;
+  mockAuthenticatedUser(7, ['phase-ii-writeup']);
+  const handler = (await import('../../pages/api/refine')).default;
+  const res = createMockRes();
+  await handler(createMockReq({ method: 'POST', headers: { origin: 'http://localhost:3000', host: 'localhost:3000' }, body: { currentSummary: 'Keep this original', feedback: 'shorten' } }), res);
+  expect(res.status).toHaveBeenCalledWith(422);
+  expect(res.status).not.toHaveBeenCalledWith(200);
+  expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'model_refusal' }));
+  expect(res.json.mock.calls[0][0]).not.toHaveProperty('refinedSummary');
 });

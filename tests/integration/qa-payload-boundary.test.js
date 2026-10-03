@@ -23,10 +23,15 @@ jest.mock('../../lib/services/model-override-loader', () => ({
 }));
 
 let capturedStreamArgs = null;
+let mockRefusalText = null;
 jest.mock('../../lib/services/llm-client', () => ({
   LLMClient: jest.fn().mockImplementation(() => ({
     stream: jest.fn(async (args) => {
       capturedStreamArgs = args;
+      if (mockRefusalText !== null) {
+        if (mockRefusalText) args.onTextDelta?.(mockRefusalText);
+        return { refused: true, stopReason: 'refusal', text: mockRefusalText };
+      }
       args.onTextDelta?.('answer');
       return {
         usage: {
@@ -44,6 +49,7 @@ jest.mock('../../lib/services/llm-client', () => ({
 
 beforeEach(() => {
   capturedStreamArgs = null;
+  mockRefusalText = null;
   clearAppAccessCache();
   process.env.CLAUDE_API_KEY = 'sk-ant-test';
 });
@@ -134,3 +140,15 @@ describe('/api/qa payload boundary', () => {
   });
 });
 
+
+test.each(['', 'partial refusal explanation'])('Q&A refusal %j terminates as an error, never complete', async text => {
+  mockRefusalText = text;
+  mockAuthenticatedUser(7, ['phase-ii-writeup']);
+  const handler = (await import('../../pages/api/qa')).default;
+  const res = createMockRes();
+  await handler(createMockReq({ method: 'POST', headers: { origin: 'http://localhost:3000', host: 'localhost:3000' }, body: { question: 'Explain', messages: [] } }), res);
+  const events = parseNamedSseEvents(res);
+  expect(events).toContainEqual({ event: 'error', data: expect.objectContaining({ code: 'model_refusal' }) });
+  expect(events.some(e => e.event === 'complete')).toBe(false);
+  expect(res.end).toHaveBeenCalled();
+});

@@ -1,3 +1,4 @@
+import { requireAcceptedLlmResponse } from '../../../lib/utils/llm-response';
 /**
  * API Route: /api/expertise-finder/match
  *
@@ -104,6 +105,7 @@ export default async function handler(req, res) {
     try {
       result = await callClaude(apiKey, primaryModel, systemPrompt, userPrompt);
     } catch (primaryError) {
+      if (primaryError.code === 'model_refusal') throw primaryError;
       console.warn(`[ExpertiseFinder] Primary model (${primaryModel}) failed: ${primaryError.message}, trying fallback...`);
       modelUsed = fallbackModel;
       result = await callClaude(apiKey, fallbackModel, systemPrompt, userPrompt);
@@ -213,12 +215,12 @@ async function callClaude(apiKey, model, systemPrompt, userPrompt) {
   // record `modelUsed` (which may be the fallback) instead of the requested
   // model and reflect the route-level retry semantics.
   const claude = new LLMClient({ apiKey, model });
-  const r = await claude.complete({
+  const r = requireAcceptedLlmResponse(await claude.complete({
     system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: userPrompt }],
     maxTokens: 4096,
     temperature: 0.2,
-  });
+  }));
   return {
     content: r.content,
     usage: { input_tokens: r.usage.inputTokens, output_tokens: r.usage.outputTokens },

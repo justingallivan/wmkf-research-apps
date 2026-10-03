@@ -1,3 +1,4 @@
+import { requireAcceptedLlmResponse } from '../../lib/utils/llm-response';
 /**
  * Multi-Perspective Concept Evaluator API Endpoint
  *
@@ -407,6 +408,8 @@ async function runPerspectivesInParallel(initialAnalysis, literatureResults, fra
   ];
 
   const results = await Promise.allSettled(perspectivePromises);
+  const refusal = results.find(result => result.status === 'rejected' && result.reason?.code === 'model_refusal');
+  if (refusal) throw refusal.reason;
 
   return {
     optimist: results[0].status === 'fulfilled' ? results[0].value : { error: results[0].reason?.message || 'Failed' },
@@ -524,6 +527,7 @@ async function generateProposalSummary(initialAnalysis, literatureResults, apiKe
     }
     return validateStage(JSON.parse(jsonStr), PROPOSAL_SUMMARY_SCHEMA, 'proposal summary');
   } catch (error) {
+    if (error.code === 'model_refusal') throw error;
     console.error('Failed to generate proposal summary:', error);
     return {
       proposalSummary: {
@@ -574,7 +578,7 @@ async function callClaudeWithRetry(requestBody, apiKey, modelType = 'model', use
       const claude = new LLMClient({ apiKey, model: primaryModel, maxRetries: 0 });
       let r;
       try {
-        r = await claude.complete(toCompleteOpts(requestBody));
+        r = requireAcceptedLlmResponse(await claude.complete(toCompleteOpts(requestBody)));
       } catch (err) {
         // Wrapper throws on non-2xx; treat as Claude API error for retry logic.
         const status = err.status || 0;
@@ -611,8 +615,9 @@ async function callClaudeWithRetry(requestBody, apiKey, modelType = 'model', use
   const fallback = new LLMClient({ apiKey, model: fallbackModel, maxRetries: 0 });
   let r;
   try {
-    r = await fallback.complete(toCompleteOpts(requestBody));
+    r = requireAcceptedLlmResponse(await fallback.complete(toCompleteOpts(requestBody)));
   } catch (err) {
+    if (err.code === 'model_refusal') throw err;
     console.error('[MultiPerspective] Fallback model also failed:', err.message?.substring(0, 200));
     throw lastError || err;
   }

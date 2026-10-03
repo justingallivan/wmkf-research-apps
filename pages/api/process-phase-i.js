@@ -1,3 +1,4 @@
+import { requireAcceptedLlmResponse } from '../../lib/utils/llm-response';
 // SUNSET S344 (2026-07-08): backs the sunset-candidate app `batch-phase-i-summaries`
 // (PDF-upload, no longer used in current format). Route is intentionally LEFT
 // ROUTABLE; code retained as the reference for a planned Dataverse-native
@@ -159,11 +160,11 @@ async function generatePhaseISummary(text, filename, apiKey, summaryLength, summ
       appName: 'batch-phase-i',
       userProfileId,
     });
-    const { text: summaryText } = await claude.complete({
+    const { text: summaryText } = requireAcceptedLlmResponse(await claude.complete({
       messages: [{ role: 'user', content: prompt }],
       maxTokens: BASE_CONFIG.MODEL_PARAMS.DEFAULT_MAX_TOKENS,
       temperature: BASE_CONFIG.MODEL_PARAMS.SUMMARIZATION_TEMPERATURE,
-    });
+    }));
 
     // Create formatted markdown version for Phase I
     const formatted = enhancePhaseIFormatting(summaryText, filename, coverData);
@@ -182,6 +183,7 @@ async function generatePhaseISummary(text, filename, apiKey, summaryLength, summ
     };
 
   } catch (error) {
+    if (error.code === 'model_refusal') throw error;
     console.error('Summary generation error:', error);
     throw new Error('Failed to generate summary');
   }
@@ -208,11 +210,11 @@ async function extractStructuredData(text, filename, summary, apiKey, userProfil
       appName: 'batch-phase-i',
       userProfileId,
     });
-    const { text: jsonText } = await claude.complete({
+    const { text: jsonText } = requireAcceptedLlmResponse(await claude.complete({
       messages: [{ role: 'user', content: extractionPrompt }],
       maxTokens: 1000,
       temperature: 0.1,
-    });
+    }));
 
     if (jsonText) {
       try {
@@ -236,6 +238,7 @@ async function extractStructuredData(text, filename, summary, apiKey, userProfil
       }
     }
   } catch (error) {
+    if (error.code === 'model_refusal') throw error;
     console.warn('Structured data extraction failed, using fallback:', error.message);
   }
 

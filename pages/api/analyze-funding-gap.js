@@ -1,3 +1,4 @@
+import { requireAcceptedLlmResponse } from '../../lib/utils/llm-response';
 import { LLMClient } from '../../lib/services/llm-client';
 import { createFileProcessor } from '../../shared/api/handlers/fileProcessor';
 import { nextRateLimiter } from '../../shared/api/middleware/rateLimiter';
@@ -130,12 +131,13 @@ export default async function handler(req, res) {
         let extractionResponse;
 
         try {
-          ({ text: extractionResponse } = await claudeClient.complete({
+          ({ text: extractionResponse } = requireAcceptedLlmResponse(await claudeClient.complete({
             messages: [{ role: 'user', content: extractionPrompt }],
             maxTokens: 1000,
             temperature: 0.3,
-          }));
+          })));
         } catch (claudeError) {
+          if (claudeError.code === 'model_refusal') throw claudeError;
           console.error('Claude API error during extraction:', claudeError);
           throw new Error(`Claude API error: ${claudeError.message}`);
         }
@@ -387,13 +389,14 @@ export default async function handler(req, res) {
 
         let analysisResponse;
         try {
-          ({ text: analysisResponse } = await claudeClient.complete({
+          ({ text: analysisResponse } = requireAcceptedLlmResponse(await claudeClient.complete({
             messages: [{ role: 'user', content: analysisPrompt }],
             maxTokens: 4000,
             temperature: 0.4,
-          }));
+          })));
           sendProgress(`Analysis complete for ${file.filename}`, baseProgress + 75);
         } catch (claudeError) {
+          if (claudeError.code === 'model_refusal') throw claudeError;
           console.error('Claude API error during analysis:', claudeError);
           throw new Error(`Claude API error: ${claudeError.message}`);
         }

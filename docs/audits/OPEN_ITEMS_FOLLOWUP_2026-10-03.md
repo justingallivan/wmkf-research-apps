@@ -20,7 +20,7 @@ reported open list. Source baseline `d1eae6fd3`; isolated branch
 inference, migration or model admission was performed. Original checkout changes
 were preserved. Results below are bounded observations, not an all-clear.
 
-## Ordered results
+## Ordered results — initial read-only checkpoint
 
 | Item | Evidence and outcome | Remaining action |
 |---|---|---|
@@ -36,7 +36,7 @@ were preserved. Results below are bounded observations, not an all-clear.
 | Tracker acceptance/performance | VERIFIED authenticated production schedule load: 12 request cards and materials counts rendered; one reload to the final request card took 3,360 ms using browser-action timing. | Bounded read smoke only. No before/after baseline or speedup claim; no mutation acceptance performed. |
 | Older PRs | VERIFIED via GitHub: #332 conflicts with main; #328 draft/DO NOT MERGE and conflicting; #390 on owner hold, mergeable but prior Jest red. Dependency #417/#212/#148/#147 are open with red test checks. | #332 needs current-main integration and full revalidation; preserve explicit holds; investigate dependency CI before any promotion. |
 
-## Sonnet review findings
+## Sonnet review findings — initial checkpoint
 
 1. **P1 — ordinary callers discard refusal status.** `pages/api/refine.js:92`
    takes only text and returns HTTP 200; `pages/phase-ii-writeup.js` consumes it as
@@ -111,7 +111,8 @@ A separate read-only agent reviewed the v2 proposal and this report and found no
 material recovery-safety or evidence-scope issue. External observations were not
 independently repeated by that reviewer. Runtime admission edits were discarded;
 final changes are documentation and read-only operator probes. No main promotion
-is part of this pass.
+is part of this initial pass. The subsequent implementation is recorded in
+[the refusal-hardening execution report](LLM_REFUSAL_HARDENING_2026-10-03.md).
 
 Validation: all 15 selected documentation/safety gate commands and available
 self-tests passed sequentially (Atlas, doc currency, fact consistency, symbol

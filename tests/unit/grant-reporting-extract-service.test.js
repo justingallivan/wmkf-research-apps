@@ -124,3 +124,14 @@ describe('handleFullExtract', () => {
     });
   });
 });
+
+test.each(['', '{"value":"refused but plausible"}'])('grant extraction refuses %j without fallback or successful audit', async text => {
+  const { LLMClient } = require('../../lib/services/llm-client');
+  const { getFallbackModelForApp } = require('../../shared/config/baseConfig');
+  getFallbackModelForApp.mockReturnValue('fallback-model');
+  const complete = jest.fn().mockResolvedValue({ text, refused: true, usage: { inputTokens: 1, outputTokens: 1 } });
+  LLMClient.mockImplementation(() => ({ complete }));
+  await expect(regenerateField({ ...common, reportRef: REF, fieldKey: 'project_impacts' })).rejects.toMatchObject({ code: 'model_refusal' });
+  expect(complete).toHaveBeenCalledTimes(1);
+  expect(DynamicsService.logAiRun).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'completed' }));
+});
