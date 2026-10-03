@@ -16,6 +16,16 @@ jest.mock('../../lib/services/transcription-pilot/preflight', () => {
   const actual = jest.requireActual('../../lib/services/transcription-pilot/preflight');
   return { ...actual, runTranscriptionPreflight: jest.fn(actual.runTranscriptionPreflight) };
 });
+jest.mock('../../lib/services/alert-service', () => ({
+  autoResolve: jest.fn(async () => 0),
+}));
+jest.mock('../../lib/services/notification-service', () => ({
+  __esModule: true,
+  default: { notify: jest.fn(async () => ({ id: 1 })) },
+}));
+jest.mock('../../lib/dataverse/core/context', () => ({
+  withDalContext: jest.fn((_label, fn) => fn()),
+}));
 
 import handler from '../../pages/api/cron/drain-transcriptions';
 import { verifyTranscriptionCronSecret } from '../../lib/utils/cron-auth';
@@ -24,6 +34,9 @@ import { requeueExpiredPreIntentTranscriptionSubmissions, markExpiredTranscripti
 import { drainTranscriptionWorkflowDispatches } from '../../lib/services/transcription-pilot/workflow-dispatch';
 import { startSyntheticWorkflowProbe } from '../../lib/services/transcription-pilot/workflow-probe';
 import { runTranscriptionPreflight, validateTranscriptionPreflightEnv } from '../../lib/services/transcription-pilot/preflight';
+import AlertService from '../../lib/services/alert-service';
+import NotificationService from '../../lib/services/notification-service';
+import { withDalContext } from '../../lib/dataverse/core/context';
 
 const endpoint = 'ep-gentle-smoke-b77a6d90-pooler.c-13.us-east-1.aws.neon.tech';
 const url = `postgres://preview-user:preview-password@${endpoint}:5432/neondb?sslmode=require`;
@@ -91,6 +104,9 @@ describe('transcription Preview readiness preflight', () => {
     markExpiredTranscriptionSubmissionsUncertain.mockResolvedValue([]);
     drainTranscriptionCleanup.mockResolvedValue({ expiredContent: 0, cleanup: 0, incomplete: false });
     drainTranscriptionWorkflowDispatches.mockResolvedValue({ recovered: 0, started: 0, failed: 0, incomplete: false });
+    AlertService.autoResolve.mockClear().mockResolvedValue(0);
+    NotificationService.notify.mockClear().mockResolvedValue({ id: 1 });
+    withDalContext.mockClear().mockImplementation((_label, fn) => fn());
   });
 
   it.each([
@@ -304,5 +320,83 @@ describe('transcription Preview readiness preflight', () => {
     expect(deadline).toBeGreaterThan(Date.now());
     expect(deadline).toBeLessThanOrEqual(Date.now() + 270_000);
     expect(res.body.summary.incomplete).toBe(true);
+  });
+
+  it('alerts on daily incomplete cleanup while preserving the successful aggregate response', async () => {
+    drainTranscriptionCleanup.mockResolvedValue({ expiredContent: 3, cleanup: 2, incomplete: true });
+    const res = response();
+    await handler({ method: 'GET', query: {} }, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.summary.incomplete).toBe(true);
+    expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'transcription_cron_incomplete', severity: 'warning', emailAdmins: true,
+      autoResolveKey: 'transcription:daily-drain:incomplete', category: 'ops',
+      message: expect.not.stringMatching(/audio|transcript|https?:\/\//i),
+    }));
+    expect(withDalContext).toHaveBeenCalledWith('notification-email', expect.any(Function));
+    expect(AlertService.autoResolve).not.toHaveBeenCalledWith('transcription:daily-drain:incomplete');
+  });
+
+  it('auto-resolves an incomplete warning only after a clean bounded daily pass', async () => {
+    const res = response();
+    await handler({ method: 'GET', query: {} }, res);
+    expect(res.statusCode).toBe(200);
+    expect(AlertService.autoResolve).toHaveBeenCalledWith('transcription:daily-drain:incomplete');
+    expect(AlertService.autoResolve).toHaveBeenCalledWith('transcription:daily-workflow:incomplete');
+    expect(AlertService.autoResolve).not.toHaveBeenCalledWith('transcription:daily-drain:failed');
+  });
+
+  it('alerts on hourly recovery incompleteness and auto-resolves that condition after a clean sweep', async () => {
+    drainTranscriptionWorkflowDispatches.mockResolvedValueOnce({ recovered: 0, started: 0, failed: 0, incomplete: true });
+    const incomplete = response();
+    await handler({ method: 'GET', query: { recovery: '1' } }, incomplete);
+    expect(incomplete.statusCode).toBe(200);
+    expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'transcription_cron_incomplete', severity: 'warning', emailAdmins: true,
+      autoResolveKey: 'transcription:hourly-recovery:incomplete',
+    }));
+
+    drainTranscriptionWorkflowDispatches.mockResolvedValueOnce({ recovered: 0, started: 0, failed: 0, incomplete: false });
+    const clean = response();
+    await handler({ method: 'GET', query: { recovery: '1' } }, clean);
+    expect(clean.statusCode).toBe(200);
+    expect(AlertService.autoResolve).toHaveBeenCalledWith('transcription:hourly-recovery:incomplete');
+    expect(AlertService.autoResolve).not.toHaveBeenCalledWith('transcription:workflow-recovery:failed');
+  });
+
+  it('records hard cron failures without exposing provider or job details and returns 500', async () => {
+    requeueExpiredPreIntentTranscriptionSubmissions.mockRejectedValueOnce(new Error('sensitive details must not enter the alert'));
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const res = response();
+    await handler({ method: 'GET', query: {} }, res);
+    expect(res.statusCode).toBe(500);
+    expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'transcription_daily_drain_failed', severity: 'error',
+      autoResolveKey: 'transcription:daily-drain:failed', category: 'ops',
+      message: expect.not.stringContaining('sensitive details'),
+    }));
+    expect(NotificationService.notify.mock.calls[0][0].message).not.toMatch(/\b(?:audio|transcript)\b|https?:\/\//i);
+    errorSpy.mockRestore();
+  });
+
+  it('keeps hourly recovery failure as an HTTP failure and raises an ops alert', async () => {
+    drainTranscriptionWorkflowDispatches.mockRejectedValueOnce(new Error('sensitive details must not enter the alert'));
+    const res = response();
+    await handler({ method: 'GET', query: { recovery: '1' } }, res);
+    expect(res.statusCode).toBe(500);
+    expect(NotificationService.notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'transcription_workflow_recovery_failed', severity: 'error',
+      autoResolveKey: 'transcription:workflow-recovery:failed', category: 'ops',
+    }));
+  });
+
+  it('does not turn a successful cron response into a failure when alert delivery is unavailable', async () => {
+    drainTranscriptionCleanup.mockResolvedValue({ expiredContent: 0, cleanup: 0, incomplete: true });
+    NotificationService.notify.mockRejectedValueOnce(new Error('email unavailable'));
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const res = response();
+    await handler({ method: 'GET', query: {} }, res);
+    expect(res.statusCode).toBe(200);
+    errorSpy.mockRestore();
   });
 });

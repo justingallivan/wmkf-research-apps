@@ -122,6 +122,14 @@
     {
       "path": "/api/cron/drain-materials-uploads",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/drain-transcriptions",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/drain-transcriptions?recovery=1",
+      "schedule": "0 * * * *"
     }
   ]
 }
