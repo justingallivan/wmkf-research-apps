@@ -55,6 +55,13 @@ describe('safeFetch', () => {
     expect(fetch).toHaveBeenCalledWith(url, { redirect: 'manual' });
   });
 
+  it('fetches the canonical URL object href after validating the parsed host', async () => {
+    await safeFetch('https://api.anthropic.com/v1/messages path');
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.anthropic.com/v1/messages%20path', { redirect: 'manual' },
+    );
+  });
+
   // -- Blocked hosts --
   const blockedUrls = [
     ['cloud metadata', 'https://169.254.169.254/latest/meta-data/'],

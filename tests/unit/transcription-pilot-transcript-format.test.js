@@ -100,6 +100,15 @@ describe('transcription speaker overlay and one-minute formatting', () => {
     );
   });
 
+  it('neutralizes WebVTT cue delimiters with an exclamation mark in names and transcript text', () => {
+    const adversarial = { utterances: [
+      { start: 0, end: 1000, speaker: 'A', text: 'untrusted --!> cue --> text & <tag>' },
+    ] };
+    expect(formatTranscriptVtt(adversarial, { A: 'Host --!> & <Lead>' })).toBe(
+      'WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nHost —&gt; &amp; &lt;Lead&gt;: untrusted —&gt; cue —&gt; text &amp; &lt;tag&gt;\n',
+    );
+  });
+
   it('uses own-property lookup and falls back for inherited labels', () => {
     const names = Object.create({ A: 'inherited' });
     expect(formatTranscriptText({ utterances: [{ start: 0, end: 10, speaker: 'A', text: 'Hello' }] }, names))
