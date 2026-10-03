@@ -53,6 +53,7 @@ import {
 } from '../lib/services/test-requests/rehearsal-receipt.js';
 import {
   readSourceBundle,
+  assertBundleHasApplicantAbstract,
   summarizeSourceBundle,
   assertBundleHasPreSiteSectionForRecipe,
   assertBundleHasReviewerSectionForRecipe,
@@ -682,7 +683,7 @@ async function executeManifest(client, manifest, receiptPath, { bypassGoverify =
       throw new Error('Graph site or Request drive identity changed since prepare.');
     }
     const source = await fenceSource(client, manifest, preflightBefore.grantOption.value);
-    const rebuiltBody = compileBody(preflightBefore, manifest.values, source);
+    const rebuiltBody = compileBody(preflightBefore, manifest.values, source, manifest.bundle?.version === 5 ? manifest.bundle.abstract : undefined);
     if (sha256(rebuiltBody) !== manifest.createBodySha256) throw new Error('Fresh preflight does not reproduce manifest body.');
 
     await checkPreallocatedRequestAbsent(client, manifest.values.requestId);
@@ -909,6 +910,7 @@ export async function runReserve(client, args, ledgerUrl) {
   const { graph, sharePointTarget } = await buildGraphContext();
   const preflight = await runPreflight(client, graph, sharePointTarget);
   const bundle = readSourceBundle(readJson(args.bundle));
+  assertBundleHasApplicantAbstract(bundle);
   assertBundleHasReviewerSectionForRecipe(args.recipe, bundle);
   assertBundleHasPreSiteSectionForRecipe(args.recipe, bundle);
   const source = bundle.source.request;

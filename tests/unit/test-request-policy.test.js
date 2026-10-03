@@ -11,6 +11,7 @@ const bodyFields = [
   'akoya_applicantid@odata.bind',
   'akoya_title',
   'akoya_purpose',
+  'wmkf_abstract',
   'akoya_request',
   'akoya_fiscalyear',
   TEST_REQUEST_FIXED_FIELDS.requestType,
@@ -26,7 +27,7 @@ function metadata(overrides = {}) {
     createable: true,
     requiredLevel: 'None',
     type: field === 'akoya_request' ? 'Money'
-      : field === 'akoya_purpose' ? 'Memo'
+      : field === 'akoya_purpose' || field === 'wmkf_abstract' ? 'Memo'
           : field === 'akoya_requestid' ? 'Uniqueidentifier'
             : field === TEST_REQUEST_FIXED_FIELDS.requestType ? 'Picklist'
           : field.includes('reminder') || field === TEST_REQUEST_FIXED_FIELDS.marker ? 'Boolean'
@@ -35,6 +36,7 @@ function metadata(overrides = {}) {
     ...(field === 'akoya_request' ? { minValue: 0, maxValue: 1000000000 } : {}),
     ...(field === 'akoya_title' ? { maxLength: 120 } : {}),
     ...(field === 'akoya_purpose' ? { maxLength: 100000 } : {}),
+    ...(field === 'wmkf_abstract' ? { maxLength: 1048576 } : {}),
     ...(field === 'akoya_fiscalyear' ? { maxLength: 80 } : {}),
   }]));
   delete fields['akoya_applicantid@odata.bind'];
@@ -51,6 +53,7 @@ function input(overrides = {}) {
       akoya_purpose: 'Synthetic purpose',
       akoya_request: 1250,
     },
+    sourceAbstract: 'Applicant abstract',
     testLabel: 'Fixture one',
     fiscalYear: 'December 2026',
     requestType: 100000000,
@@ -71,6 +74,7 @@ describe('compileTestRequestDraft', () => {
       'akoya_applicantid@odata.bind': `/accounts(${ids.testOrganizationId})`,
       akoya_title: 'TEST: Fixture one',
       akoya_purpose: 'Synthetic purpose',
+      wmkf_abstract: 'Applicant abstract',
       akoya_request: 1250,
       akoya_fiscalyear: 'December 2026',
       akoya_requesttype: 100000000,
@@ -87,6 +91,23 @@ describe('compileTestRequestDraft', () => {
     const result = compileTestRequestDraft(input({ recipe: 'initial-assessment-ready', requestedAttributes: { evil: 'x' } }));
     expect(result.createBody).toBeNull();
     expect(result.blockers.map((item) => item.code)).toEqual(expect.arrayContaining(['RECIPE_UNSUPPORTED', 'INPUT_NOT_ALLOWED']));
+  });
+
+  test.each([
+    ['null', null, undefined],
+    ['empty', '', undefined],
+    ['whitespace', '  \n ', '  \n '],
+    ['text', 'Applicant text', 'Applicant text'],
+  ])('projects source abstract with exact safe semantics (%s)', (_label, sourceAbstract, expected) => {
+    const result = compileTestRequestDraft(input({ sourceAbstract }));
+    expect(result.blockers).toEqual([]);
+    expect(result.createBody.wmkf_abstract).toBe(expected);
+  });
+
+  test('validates abstract size against the field metadata', () => {
+    const result = compileTestRequestDraft(input({ sourceAbstract: 'x'.repeat(1048577) }));
+    expect(result.createBody).toBeNull();
+    expect(result.blockers).toContainEqual(expect.objectContaining({ code: 'VALUE_OUT_OF_RANGE', field: 'wmkf_abstract' }));
   });
 
   test('projects malicious source identity, contacts, paid state, and annotations out', () => {

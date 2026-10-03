@@ -28,6 +28,7 @@ const sourceRow = (over = {}) => ({
   akoya_requestnum: '1003222',
   akoya_requesttype: 100000001,
   akoya_purpose: 'Confidential purpose',
+  wmkf_abstract: 'Confidential applicant abstract',
   akoya_request: 1000000,
   akoya_fiscalyear: 'December 2026',
   wmkf_meetingdate: '2026-12-03T00:00:00Z',
@@ -588,7 +589,7 @@ describe('exportTestRequestSourceBundle wires the reviewer dependency triad', ()
     };
   }
 
-  test('produces a version-3 bundle when the reviewer triad is supplied and the re-read matches', async () => {
+  test('produces a version-5 bundle with reviewers when the reviewer triad is supplied and the re-read matches', async () => {
     const identity = {
       suggestionId: SUGGESTION_ID,
       suggestionEtag: '"{SUG-ETAG},1"',
@@ -607,8 +608,9 @@ describe('exportTestRequestSourceBundle wires the reviewer dependency triad', ()
       { sourceRequestNumber: '1003222', dataverseHost: 'wmkf.crm.dynamics.com', exportedAt: new Date('2026-09-23T12:00:00Z') },
       deps,
     );
-    expect(bundle.version).toBe(3);
+    expect(bundle.version).toBe(5);
     expect(bundle.reviewers).toHaveLength(1);
+    expect(bundle.abstract).toBe('Confidential applicant abstract');
   });
 
   test('fails closed as reviewer_source_changed when the re-read set drifted', async () => {
@@ -635,12 +637,13 @@ describe('exportTestRequestSourceBundle wires the reviewer dependency triad', ()
     expect(error?.code).toBe('reviewer_source_changed');
   });
 
-  test('produces a version-2 bundle when no reviewer dependencies are supplied (basic/IA path unchanged)', async () => {
+  test('produces a version-5 bundle when no reviewer dependencies are supplied', async () => {
     const bundle = await exportTestRequestSourceBundle(
       { sourceRequestNumber: '1003222', dataverseHost: 'wmkf.crm.dynamics.com', exportedAt: new Date('2026-09-23T12:00:00Z') },
       baseDocumentDeps(),
     );
-    expect(bundle.version).toBe(2);
+    expect(bundle.version).toBe(5);
+    expect(bundle.abstract).toBe('Confidential applicant abstract');
     expect(bundle).not.toHaveProperty('reviewers');
   });
 });

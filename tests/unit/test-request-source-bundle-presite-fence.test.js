@@ -22,6 +22,7 @@ const sourceRow = (over = {}) => ({
   akoya_requestnum: '1003222',
   akoya_requesttype: 100000001,
   akoya_purpose: 'Confidential purpose',
+  wmkf_abstract: 'Confidential applicant abstract',
   akoya_request: 1000000,
   akoya_fiscalyear: 'December 2026',
   wmkf_meetingdate: '2026-12-03T00:00:00Z',
@@ -105,11 +106,11 @@ async function runExport(deps) {
 }
 
 describe('exportTestRequestSourceBundle re-fences the Pre-Site document row (Codex adversarial round-1 finding 1)', () => {
-  test('produces a version-4 bundle when the Pre-Site row is unchanged between the two reads', async () => {
+  test('produces a version-5 bundle when the Pre-Site row is unchanged between the two reads', async () => {
     const first = draftResult();
     const deps = depsWithPreSite(first);
     const bundle = await runExport(deps);
-    expect(bundle.version).toBe(4);
+    expect(bundle.version).toBe(5);
     expect(bundle.preSiteVisit.requestDocumentId).toBe(WORD_ROW_ID);
     expect(deps.readPreSiteVisitDraft).toHaveBeenCalledTimes(2);
   });
@@ -199,7 +200,7 @@ describe('exportTestRequestSourceBundle re-fences the Pre-Site document row (Cod
   test('produces a version-3 bundle (no Pre-Site section, no re-fence) when readPreSiteVisitDraft is not supplied', async () => {
     const deps = baseDocumentDeps();
     const bundle = await runExport(deps);
-    expect(bundle.version).toBe(3);
+    expect(bundle.version).toBe(5);
     expect(bundle.preSiteVisit).toBeUndefined();
   });
 });

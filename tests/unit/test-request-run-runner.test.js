@@ -912,7 +912,7 @@ describe('advanceRun: create_request resume rules', () => {
         return ok({
           value: [
             'akoya_requestid', 'akoya_applicantid', 'akoya_title', 'akoya_purpose', 'akoya_request',
-            'akoya_fiscalyear', 'akoya_requesttype', 'wmkf_meetingdate', 'wmkf_istestrequest',
+            'akoya_fiscalyear', 'akoya_requesttype', 'wmkf_meetingdate', 'wmkf_abstract', 'wmkf_istestrequest',
             'wmkf_testcreationrunid', 'wmkf_respondreminderenabled', 'wmkf_reviewduereminderenabled',
           ].map((field) => ({ LogicalName: field, AttributeType: 'String', IsValidForCreate: true, RequiredLevel: { Value: 'None' } })),
         });

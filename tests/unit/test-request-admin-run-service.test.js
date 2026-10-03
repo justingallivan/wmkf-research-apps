@@ -108,13 +108,13 @@ function fakeBlob() {
 
 function metadata(production) {
   const fieldNames = [
-    'akoya_requestid', 'akoya_title', 'akoya_purpose', 'akoya_request', 'akoya_fiscalyear',
+    'akoya_requestid', 'akoya_title', 'akoya_purpose', 'wmkf_abstract', 'akoya_request', 'akoya_fiscalyear',
     TEST_REQUEST_FIXED_FIELDS.requestType, 'wmkf_meetingdate', TEST_REQUEST_FIXED_FIELDS.marker,
     TEST_REQUEST_FIXED_FIELDS.runId, TEST_REQUEST_FIXED_FIELDS.responseReminder, TEST_REQUEST_FIXED_FIELDS.reviewReminder,
   ];
   const typeOf = (field) => {
     if (field === 'akoya_request') return 'Money';
-    if (field === 'akoya_purpose') return 'Memo';
+    if (field === 'akoya_purpose' || field === 'wmkf_abstract') return 'Memo';
     if (field === 'akoya_requestid' || field === TEST_REQUEST_FIXED_FIELDS.runId) return 'Uniqueidentifier';
     if (field === TEST_REQUEST_FIXED_FIELDS.requestType) return 'Picklist';
     if (field.includes('reminder') || field === TEST_REQUEST_FIXED_FIELDS.marker) return 'Boolean';
@@ -126,6 +126,7 @@ function metadata(production) {
     ...(field === 'akoya_request' ? { minValue: 0, maxValue: 1e9 } : {}),
     ...(['akoya_title', 'akoya_fiscalyear'].includes(field) ? { maxLength: 120 } : {}),
     ...(field === 'akoya_purpose' ? { maxLength: 100000 } : {}),
+    ...(field === 'wmkf_abstract' ? { maxLength: 30000 } : {}),
   }]));
   fields.akoya_applicantid = { createable: true, requiredLevel: 'None', type: 'Lookup', lookupTarget: 'accounts' };
   if (production) {
@@ -163,11 +164,13 @@ function bundleAt(exportedAt) {
   return buildSourceBundle({
     sourceRow: {
       akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
+      wmkf_abstract: 'Applicant source abstract',
       akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', versionnumber: 1,
     },
     documents: [],
     dataverseHost: PRODUCTION_HOSTS[0],
     exportedAt: new Date(exportedAt),
+    applicantAbstract: 'Applicant source abstract',
   });
 }
 
@@ -352,6 +355,34 @@ describe('Confirm: sandbox and production reservations', () => {
     expect(manifest.createBody[TEST_REQUEST_FIXED_FIELDS.runId]).toBe(runId);
     expect(manifest.values).toMatchObject({ programDirectorId: PD_ID, piContactId: PI_ID });
     expect(h.createClientCalls.map((c) => c.resourceUrl)).toEqual([PRODUCTION_URL]);
+  });
+
+  test('new Confirm refuses a legacy draft without an abstract member before writing run artifacts', async () => {
+    const h = harness({
+      deployment: 'preview',
+      deps: {
+        exportBundle: async ({ exportedAt }) => {
+          const legacy = bundleAt(exportedAt);
+          delete legacy.abstract;
+          legacy.version = 2;
+          return legacy;
+        },
+      },
+    });
+    const draftId = await h.exportDraft();
+    expect(await code(h.service.confirmRun(h.confirmArgs(draftId)))).toBe('factory_bundle_abstract_required');
+    expect(h.ledger.rows.size).toBe(0);
+    expect(h.blobs.calls.put.filter((call) => call.pathname.includes('/runs/'))).toHaveLength(0);
+  });
+
+  test('same-key Confirm returns an already-reserved run before requiring a new bundle version', async () => {
+    const h = harness({ deployment: 'preview' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { source_request_number: '9000001' });
+    const result = await h.service.confirmRun(h.confirmArgs('11111111-1111-4111-8111-111111111111'));
+    expect(result.created).toBe(false);
+    expect(result.run.runId).toBe(runId);
+    expect(h.blobs.calls.get).toHaveLength(0);
   });
 
   test('production refuses a missing or invalid actor email and writes nothing', async () => {
@@ -631,7 +662,7 @@ describe('exportSource / readArtifacts / recheck', () => {
     const PARENT_ID = '6b6b6b6b-6b6b-4b6b-8b6b-6b6b6b6b6b6b';
     const sourceRow = {
       akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
-      akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', versionnumber: 7,
+      akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', wmkf_abstract: 'Source abstract', versionnumber: 7,
     };
     const gets = [];
     const fakeClient = (resourceUrl) => ({
@@ -736,7 +767,7 @@ describe('cooperative deadlines (slice 2)', () => {
   function sevenDocumentService() {
     const sourceRow = {
       akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
-      akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', versionnumber: 7,
+      akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', wmkf_abstract: 'Source abstract', versionnumber: 7,
     };
     const fakeClient = (resourceUrl) => ({
       baseUrl: `${resourceUrl}/api/data/v9.2`,
@@ -1245,7 +1276,7 @@ describe('slice 3 server contract', () => {
   });
 
   test('0.1 two rows, or a next link, is 409 factory_source_ambiguous', async () => {
-    const row = { akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001' };
+    const row = { akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', wmkf_abstract: null };
     const two = await exporterFor([row, { ...row, akoya_requestid: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }]).catch((e) => e);
     expect([two.httpStatus, two.code]).toEqual([409, 'factory_source_ambiguous']);
     const linked = await exporterFor([row], { '@odata.nextLink': 'https://x/next' }).catch((e) => e);
@@ -1256,11 +1287,12 @@ describe('slice 3 server contract', () => {
     const noCycle = (exportedAt) => buildSourceBundle({
       sourceRow: {
         akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
-        akoya_request: 5000, akoya_fiscalyear: null, wmkf_meetingdate: null, versionnumber: 1,
+        akoya_request: 5000, akoya_fiscalyear: null, wmkf_meetingdate: null, wmkf_abstract: null, versionnumber: 1,
       },
       documents: [],
       dataverseHost: PRODUCTION_HOSTS[0],
       exportedAt: new Date(exportedAt),
+      applicantAbstract: null,
     });
     const h = harness({ deployment: 'preview', deps: { exportBundle: async ({ exportedAt }) => noCycle(exportedAt) } });
     const exported = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });

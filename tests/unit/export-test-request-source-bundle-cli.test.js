@@ -115,12 +115,12 @@ describe('buildPreSiteDependencies', () => {
     expect(buildPreSiteDependencies(args, { client })).toBeNull();
   });
 
-  test('returns the readPreSiteVisitDraft/readAbstract pair when --with-pre-site is set', () => {
+  test('returns the Pre-Site reader when --with-pre-site is set; applicant abstract comes from the Request row', () => {
     const args = parseArgs(baseArgv(['--with-reviewers', '--source-marker-column=absent', '--with-pre-site']));
     const deps = buildPreSiteDependencies(args, { client });
     expect(deps).not.toBeNull();
     expect(typeof deps.readPreSiteVisitDraft).toBe('function');
-    expect(typeof deps.readAbstract).toBe('function');
+    expect(deps).not.toHaveProperty('readAbstract');
   });
 });
 

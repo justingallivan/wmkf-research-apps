@@ -17,6 +17,7 @@ const sourceRow = (over = {}) => ({
   akoya_requestnum: '1003222',
   akoya_requesttype: 100000001,
   akoya_purpose: PURPOSE,
+  wmkf_abstract: 'Applicant source abstract',
   akoya_request: 1000000,
   akoya_fiscalyear: 'December 2026',
   wmkf_meetingdate: '2026-12-03T00:00:00Z',
@@ -203,10 +204,27 @@ test('rejects documents from mixed SharePoint sites', () => {
 test('exports after an unchanged strict discovery and metadata pass', async () => {
   const dependencies = exportDependencies();
 
-  await expect(exportBundle(dependencies)).resolves.toEqual(build());
+  await expect(exportBundle(dependencies)).resolves.toEqual(build({ applicantAbstract: 'Applicant source abstract' }));
   expect(dependencies.discoverDocuments).toHaveBeenCalledTimes(2);
   expect(dependencies.assertReadLimits).toHaveBeenCalledTimes(2);
   expect(dependencies.readSourceRevision).toHaveBeenCalledWith(REQUEST_ID.toLowerCase());
+});
+
+test('export refuses an undefined abstract projection instead of downgrading to a legacy bundle', async () => {
+  const dependencies = exportDependencies();
+  dependencies.readSourceRow.mockResolvedValueOnce(sourceRow({ wmkf_abstract: undefined }));
+  await expect(exportBundle(dependencies)).rejects.toThrow(/abstract was not selected/);
+});
+
+test('bundle v5 carries the abstract as a required null-or-exact-string member', () => {
+  const bundle = build({ applicantAbstract: '  Applicant text\n' });
+  expect(bundle.version).toBe(5);
+  expect(bundle.abstract).toBe('  Applicant text\n');
+  expect(readSourceBundle(JSON.parse(JSON.stringify(bundle)))).toEqual(bundle);
+  expect(build({ applicantAbstract: '' }).abstract).toBeNull();
+  expect(build({ applicantAbstract: null }).abstract).toBeNull();
+  expect(() => readSourceBundle({ ...bundle, abstract: undefined })).toThrow(/missing its abstract member/);
+  expect(readSourceBundle({ ...bundle, abstract: 'x'.repeat(30001) }).abstract).toHaveLength(30001);
 });
 
 test('rejects an unavailable archive bucket before hydrating source documents', async () => {
