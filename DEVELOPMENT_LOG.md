@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Pricing alert reconciliation and reviewed model selection (Session 568)
+
+**Milestone:** Corrected the provider pricing comparison and deployed reviewed Opus 5.5 coverage.
+**Sessions:** 568 (admin-alert remediation, October 2).
+**Ship state:**
+- Owner-authorized PR #420 merged as `a829ba94c`; all CI checks passed and Production is READY.
+- Protected pricing refresh matched provider costs/tokens, completed 15 comparisons with no drift, and auto-resolved the misleading standing pricing alert. [VERIFIED via maintenance and alert receipts]
+- Automatic tier selection excludes models without specific capability/pricing coverage. The canary now identifies Sonnet 5.5 for separate review; the conservative transcription cleanup watch remains intact.
+**Why it matters:** Operators can distinguish actual rate drift from mismatched usage scopes, and newer models require review before automatic selection.
+**Pointers:** `docs/audits/ADMIN_ALERT_REMEDIATION_2026-10-02.md`; `docs/MODEL_CHANGE_STRATEGY.md`; PR #420.
+
 ## October 2026 — Meeting Tracker transcription launched for Production staff (Session 567)
 
 **Milestone:** Staff can upload a Site Visit recording, name detected speakers, publish a verified TXT/VTT bundle, and review it in Workbench.

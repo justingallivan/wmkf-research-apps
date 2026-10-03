@@ -5,7 +5,7 @@ type: project
 originSessionId: 855d17dc-8935-4bc6-88a5-cb73f4cb1b2d
 status: active
 scope: global
-last_verified: 2026-10-02 — pricing/resolver remediation source-built on codex/admin-alert-remediation; not deployed or provider-live-probed; account settings below remain historical observations
+last_verified: 2026-10-02 — pricing/resolver remediation deployed through PR #420; provider pricing check completed; account settings below remain historical observations
 ---
 
 ## Recall Rule
@@ -42,7 +42,7 @@ User ran out of Anthropic API credits during a batch expertise matching run (Apr
 
 ## Pricing accuracy machinery
 
-**[SOURCE-BUILT 2026-10-02 on `codex/admin-alert-remediation`; not deployed.]** The reviewed Opus 5.5 entry is $4/$20 per million input/output tokens, with cache reads at 0.05× input. Other models retain the default 0.1× read multiplier unless explicitly overridden. The global capability-discovery cutoff remains 2026-09-12 so other newer unreviewed ids still warn. Automatic tier resolution accepts only exact or dated-snapshot coverage in both registries; original degraded fallback ids are unchanged. Corrected live provider reports were not run because the sensitive Admin key was unavailable to the local pull.
+**[DEPLOYED 2026-10-02 through PR #420; verified via deployment and maintenance receipts.]** The reviewed Opus 5.5 entry is $4/$20 per million input/output tokens, with cache reads at 0.05× input. Other models retain the default 0.1× read multiplier unless explicitly overridden. The global capability-discovery cutoff remains 2026-09-12 so other newer unreviewed ids still warn. Automatic tier resolution accepts only exact or dated-snapshot coverage in both registries; original degraded fallback ids are unchanged. The protected Production pricing refresh completed with 15 comparisons and no flagged drift; the old drift alert auto-resolved. The latest model canary flags Sonnet 5.5, which remains unreviewed and excluded from automatic tier selection.
 
 **Retained machinery:**
 - **`lib/utils/model-pricing.js`** — extracted from `usage-logger.js`. Longest-prefix-first matcher (was `.includes()`, which silently misrouted `claude-opus-4-6` → `claude-opus-4` pricing for 3× overestimate). `LAST_REVIEWED_AT` field. Current reviewed rates include Haiku 4.5 = $1/$5, Opus 5 and Opus 4.5+ = $5/$25, and Sonnet 5 = $2/$10 per million input/output tokens. Sonnet 5's previously announced September increase was cancelled. 1h cache write multiplier (2×) is included.

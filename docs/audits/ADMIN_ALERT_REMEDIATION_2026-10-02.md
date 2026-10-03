@@ -2,8 +2,8 @@
 title: Admin alert remediation — scoped evidence (2026-10-02)
 domain: operations
 kind: audit
-status: source-validated-production-pending
-summary: "Source evidence and bounded private probe findings for pricing/model and transcription cleanup alerts; remediation not deployed."
+status: deployed-verified
+summary: "Source evidence and bounded private probe findings for pricing/model and transcription cleanup alerts; deployed remediation and protected runtime verification."
 canonical: false
 cataloged: 2026-10-02
 last_verified: 2026-10-02
@@ -19,11 +19,11 @@ related:
 Sweep mode: **Mode A — changed facts**, delegated from contract-reconcile audit 6.
 Scope: pricing-report denominators, reviewed model selection and Opus 5.5,
 plus the bounded transcription cleanup observation and two documentation gate
-filename collisions. Runtime changes are **source-built on
+filename collisions. At pre-promotion audit creation, runtime changes were **source-built on
 `codex/admin-alert-remediation`, not deployed**. Historical/archive evidence
 retains its dated boundaries; unrelated domains were not audited.
 
-## Contract evidence
+## Pre-promotion contract evidence
 
 | Claim | Producer | Persistence / source | Consumer | Evidence / status |
 |---|---|---|---|---|
@@ -116,5 +116,31 @@ production baseline is commit `6f759ef094435d6c6134e522443f9bec630f72d1` at
 If this patch causes model/request or pricing-check failures after promotion,
 restore that deployment with the platform rollback control, verify aliases and
 cron health, then revert this branch's runtime commit through a reviewed PR.
-No migration or audit-history rollback is required. No milestone-log entry is
-required: nothing was shipped to production in this session.
+No migration or audit-history rollback is required. This rollback paragraph was recorded before promotion; the production milestone
+is now recorded in DEVELOPMENT_LOG.md.
+
+## Production outcome — 2026-10-02 PT
+
+[VERIFIED via GitHub checks/merge, Vercel deployment and read-only Postgres
+maintenance/alert receipts] All PR #420 checks passed, including canonical build
+and full tests. The owner explicitly authorized merge after CI passed. Merge
+commit `a829ba94c6f5df071efd1f1065e4cf2b29d2482c` is READY in Production at
+`wmkfresearchapps-o55ex8qx0-justin-gallivans-projects.vercel.app`, deployment
+`dpl_7j1s4yFvR7pEfve4wra7teUygLKb`. The protected platform triggered both
+pricing-refresh and pricing-canary; both completed. Pricing refresh produced
+15 comparisons with no flagged drift and auto-resolved the standing pricing alert.
+This establishes the corrected audit outcome, not exact retrospective attribution
+of every old inflated estimate.
+
+The latest canary reports `claude-sonnet-5-5` as the remaining unreviewed model;
+Opus 5.5 is covered. Sonnet 5.5 is excluded from automatic tier selection. The
+existing keyed alert retains its original Opus wording because AlertService
+reuses open alerts without updating their payload; maintenance-run details are
+the current diagnostic evidence. No manual alert clearance or registry-wide
+review cutoff advancement occurred. Reviewing Sonnet 5.5 is separate follow-up.
+The conservative transcription watch remains intentionally open.
+
+The pre-promotion UNKNOWN and pending statements above describe the audit at
+creation. The protected pricing/model runs and deployment are now verified;
+actual effective model resolution and calendar-triggered cleanup closure remain
+unverified. No migration or content-bearing external request was needed.

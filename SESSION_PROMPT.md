@@ -217,11 +217,13 @@ validation and deployment limitations. No production alerts were manually cleare
 - **DONE:** Source fixes, fresh review, 118 focused tests, scoped gates/self-tests,
   changed-file lint and webpack build. Canonical Turbopack build needs CI because
   the isolated worktree uses a shared dependency symlink.
-- **Owner decision needed:** Merge/push to main is production promotion under the
-  campaign release strategy; review the PR and current-head CI before deciding.
-- **Verified open:** Corrected provider report run and canary/alert readback in the
-  protected production runtime after promotion. Sensitive Admin credentials were
-  unavailable locally, so corrected live comparisons are unknown.
+- **DONE:** Owner authorized merge after CI; PR #420 passed all checks and merged.
+  The approved merge commit is READY in Production.
+- **DONE:** Protected Production pricing refresh completed with 15 comparisons
+  and no drift; its alert auto-resolved. The canary completed and now flags
+  Sonnet 5.5, which remains unreviewed and excluded from automatic tiers. The
+  existing card may retain old Opus text due to keyed alert deduplication.
 - **Parked:** Conservative transcription-watch closure and calendar-triggered
   maintenance observation, consistent with the existing transcription handoff.
-- No production milestone shipped; no DEVELOPMENT_LOG entry required.
+- Production operational correction shipped through PR #420; see the audit
+  report for deployment and follow-up evidence.

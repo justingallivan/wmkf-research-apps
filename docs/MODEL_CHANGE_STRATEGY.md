@@ -30,9 +30,10 @@ and pricing entries ($4/$20 per million input/output tokens; cache reads
 candidate only when both registries cover its exact id or dated snapshot;
 ancestor-only coverage is insufficient. Original degraded fallback ids remain
 unchanged. The global capability discovery cutoff stays 2026-09-12 deliberately,
-so adding this model does not silence other newer unreviewed ids. **These changes
-are source-built, not deployed; production effective models have not been
-re-probed in this remediation.**
+so adding this model does not silence other newer unreviewed ids. **These changes are deployed through PR #420. The protected Production pricing
+check completed with 15 comparisons and no drift; the pricing alert auto-resolved.
+The canary now flags Sonnet 5.5, which remains excluded from automatic selection.
+Production effective models were not directly re-probed.**
 
 **Historical production baseline (2026-08-23):** tier overrides resolved
 `sonnet` to `claude-sonnet-5` and `opus` to `claude-opus-5`; the source
