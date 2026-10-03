@@ -10,7 +10,7 @@ import { createSummarizationPrompt, createStructuredDataExtractionPrompt, enhanc
 import { requireAppAccess } from '../../lib/utils/auth';
 import { LLMClient } from '../../lib/services/llm-client';
 import { nextRateLimiter } from '../../shared/api/middleware/rateLimiter';
-import { safeFetch } from '../../lib/utils/safe-fetch';
+import { fetchPublicBlob } from '../../lib/utils/public-blob-fetch';
 import {
   DATA_CLASSES,
   BATCH_PHASE_II_PROPOSAL_MAX_CHARS,
@@ -69,7 +69,7 @@ export default async function handler(req, res) {
         console.log(`Processing file: ${file.filename}, URL: ${file.url}`);
         
         // Fetch file from blob URL
-        const fileResponse = await safeFetch(file.url);
+        const fileResponse = await fetchPublicBlob(file.url);
         if (!fileResponse.ok) {
           throw new Error(`Failed to fetch file from blob storage: ${fileResponse.statusText}`);
         }

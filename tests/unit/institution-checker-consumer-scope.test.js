@@ -355,7 +355,7 @@ describe('institution consistency checker: consumer scope (behavioral, value-bas
         reviewerInstitutionPhase2Enabled: jest.fn(() => false),
         TTL_SECONDS: 14 * 24 * 60 * 60,
       }));
-      jest.doMock('../../lib/utils/safe-fetch', () => ({ safeFetch: jest.fn() }));
+      jest.doMock('../../lib/utils/public-blob-fetch', () => ({ fetchPublicBlob: jest.fn() }));
 
       ({ enrichRecommended } = require('../../lib/services/workbench/enrich-recommended-service'));
     });

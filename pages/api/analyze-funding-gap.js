@@ -6,7 +6,7 @@ import { queryNSFforPI, queryNSFforKeywords, queryNIHforPI, queryNIHforKeywords,
 import { BASE_CONFIG, getModelForApp } from '../../shared/config/baseConfig';
 import { loadModelOverrides } from '../../lib/services/model-override-loader';
 import { requireAppAccess } from '../../lib/utils/auth';
-import { safeFetch } from '../../lib/utils/safe-fetch';
+import { fetchPublicBlob } from '../../lib/utils/public-blob-fetch';
 import {
   DATA_CLASSES,
   FUNDING_GAP_PROPOSAL_MAX_CHARS,
@@ -98,7 +98,7 @@ export default async function handler(req, res) {
       try {
         // Step 1: Extract text from PDF
         sendProgress(`Extracting text from ${file.filename}...`, baseProgress + 1);
-        const fileResponse = await safeFetch(file.url);
+        const fileResponse = await fetchPublicBlob(file.url);
         if (!fileResponse.ok) {
           throw new Error(`Failed to fetch file from blob storage: ${fileResponse.statusText}`);
         }

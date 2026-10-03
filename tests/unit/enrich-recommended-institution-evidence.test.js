@@ -69,7 +69,7 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
 jest.mock('../../lib/services/workbench/applicant-known-reviewer-service', () => ({
   loadApplicantKnownReviewerContext: jest.fn(),
 }));
-jest.mock('../../lib/utils/safe-fetch', () => ({ safeFetch: jest.fn() }));
+jest.mock('../../lib/utils/public-blob-fetch', () => ({ fetchPublicBlob: jest.fn() }));
 
 import {
   institutionEvidenceConnectsIdentity,

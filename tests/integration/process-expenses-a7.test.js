@@ -23,8 +23,8 @@ jest.mock('../../lib/services/model-override-loader', () => ({
   loadModelOverrides: jest.fn(() => Promise.resolve()),
 }));
 
-jest.mock('../../lib/utils/safe-fetch', () => ({
-  safeFetch: jest.fn(() => Promise.resolve({
+jest.mock('../../lib/utils/public-blob-fetch', () => ({
+  fetchPublicBlob: jest.fn(() => Promise.resolve({
     ok: true,
     arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
   })),

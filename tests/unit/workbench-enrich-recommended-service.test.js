@@ -134,7 +134,7 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
   findCandidateBySuggestion: (...a) => findCandidateBySuggestion(...a),
 }));
 
-jest.mock('../../lib/utils/safe-fetch', () => ({ safeFetch: jest.fn() }));
+jest.mock('../../lib/utils/public-blob-fetch', () => ({ fetchPublicBlob: jest.fn() }));
 jest.mock('../../lib/utils/contact-parser', () => ({
   ContactParser: { isNameConsistentEmail: jest.fn(() => true) },
 }));
