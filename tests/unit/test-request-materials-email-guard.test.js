@@ -70,7 +70,7 @@ test.each([
 });
 
 
-test('sendReminderEmail runs after the claim and does no test-request read of its own', async () => {
+test('sendReminderEmail does not repeat the service-level recipient check', async () => {
   const deps = { sendEmail: jest.fn(async () => 'email-1') };
   await expect(sendReminderEmail({
     row: { id: 7, request_id: REQUEST_ID, contacts: CONTACTS },

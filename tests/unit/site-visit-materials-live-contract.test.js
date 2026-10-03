@@ -80,7 +80,7 @@ test('the default materials sender refuses to create an activity without a valid
   await expect(collection.sendEmail({
     regardingId: 'bad-guid', subject: 'Materials', bodyText: 'Upload', from: 'pc@wmkeck.org',
     to: ['pi@example.invalid'], cc: [], url: 'https://apps.test/materials', buttonLabel: 'Upload',
-  })).rejects.toMatchObject({ code: 'site_visit_materials_request_invalid' });
+  })).rejects.toMatchObject({ code: 'site_visit_materials_request_invalid', dispatched: false });
   expect(emailAdapter.create).not.toHaveBeenCalled();
 });
 

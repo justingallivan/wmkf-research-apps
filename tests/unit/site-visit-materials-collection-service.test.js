@@ -427,7 +427,7 @@ test('send actions refuse a fetched Request or collection bound to a different R
   }));
   const created = await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR }, wrongInsertedCollection);
   expect(created.invitationSent).toBe(false);
-  expect(created.invitationOutcome).toBe('uncertain');
+  expect(created.invitationOutcome).toBe('failed');
   expect(wrongInsertedCollection.sendEmail).not.toHaveBeenCalled();
 
   for (const action of [inviteMaterialsContributors, remindMaterialsContributors]) {
