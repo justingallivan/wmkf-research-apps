@@ -117,9 +117,17 @@ function validateSharedConfig(config) {
     const pathOnly = typeof entry?.path === 'string' ? entry.path.split('?')[0] : '';
     return pathOnly === '/api/cron/drain-transcriptions';
   });
-  return transcriptionCrons.length
-    ? ['Standard Vercel config must not schedule the transcription drain; use the isolated pilot profile.']
-    : [];
+  const errors = [];
+  if (transcriptionCrons.length !== EXPECTED_CRONS.length) {
+    errors.push('Standard Vercel config must contain exactly the two approved transcription crons.');
+  }
+  for (const expected of EXPECTED_CRONS) {
+    const matches = transcriptionCrons.filter((entry) => entry?.path === expected.path);
+    if (matches.length !== 1 || matches[0]?.schedule !== expected.schedule) {
+      errors.push(`Standard cron ${expected.path} must appear exactly once with its approved schedule.`);
+    }
+  }
+  return errors;
 }
 
 function validateEnvironmentNames(environmentNames) {
@@ -217,16 +225,33 @@ function runSelfTest() {
     throw new Error('Approved dedicated manifest fixture should pass.');
   }
   const shared = JSON.parse(fs.readFileSync(SHARED_CONFIG_PATH, 'utf8'));
-  if (validateSharedConfig(shared).length) throw new Error('Standard config must keep transcription schedules isolated.');
-  const scheduledSharedConfig = {
-    ...shared,
-    crons: [...shared.crons,
-      { path: '/api/cron/drain-transcriptions', schedule: '0 3 * * *' },
-      { path: '/api/cron/drain-transcriptions?recovery=1', schedule: '0 * * * *' },
-    ],
+  if (validateSharedConfig(shared).length) throw new Error('Standard config must contain the approved transcription schedule pair.');
+  const scheduledSharedConfig = { ...shared, crons: [...shared.crons] };
+  if (validateSharedConfig(scheduledSharedConfig).length) {
+    throw new Error('The exact approved transcription schedule pair should pass for standard config.');
+  }
+  const wrongFrequency = {
+    ...scheduledSharedConfig,
+    crons: scheduledSharedConfig.crons.map((entry) => entry.path === '/api/cron/drain-transcriptions'
+      ? { ...entry, schedule: '* * * * *' }
+      : entry),
   };
-  if (!validateSharedConfig(scheduledSharedConfig).some((error) => /must not schedule/.test(error))) {
-    throw new Error('A transcription cron added to the standard config must be rejected.');
+  if (!validateSharedConfig(wrongFrequency).some((error) => /approved schedule/.test(error))) {
+    throw new Error('A transcription cron with an unapproved frequency must be rejected.');
+  }
+  const missingRecovery = {
+    ...scheduledSharedConfig,
+    crons: scheduledSharedConfig.crons.filter((entry) => entry.path !== '/api/cron/drain-transcriptions?recovery=1'),
+  };
+  if (!validateSharedConfig(missingRecovery).some((error) => /exactly the two/.test(error))) {
+    throw new Error('A missing hourly recovery cron must be rejected.');
+  }
+  const extraRecoveryVariant = {
+    ...scheduledSharedConfig,
+    crons: [...scheduledSharedConfig.crons, { path: '/api/cron/drain-transcriptions?recovery=1&extra=1', schedule: '0 * * * *' }],
+  };
+  if (!validateSharedConfig(extraRecoveryVariant).some((error) => /exactly the two/.test(error))) {
+    throw new Error('An extra/malformed transcription cron must be rejected.');
   }
   expectError({ config: { ...good, crons: [...good.crons, { path: '/api/cron/unrelated', schedule: '* * * * *' }] }, environmentNames: [PROFILE_MARKER] }, /exactly the two/, 'extra cron');
   expectError({ config: { ...good, git: { deploymentEnabled: true } }, environmentNames: [PROFILE_MARKER] }, /explicitly disabled/, 'Git automation');

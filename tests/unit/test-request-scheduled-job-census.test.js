@@ -27,9 +27,13 @@ const RECORDED_CRONS = {
   'drain-materials-uploads': { scheduled: true, class: 'allowed', note: 'continues an explicitly submitted token-authorized applicant upload; no request selection or email; materials background plan records this decision' },
   'drain-cycle-dossiers': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/cycle-dossier-service.js'], note: 'cycle-wide report: roster excludes test requests' },
   'drain-transcriptions': {
-    scheduled: false,
+    scheduled: true,
+    scheduleEntries: [
+      { path: '/api/cron/drain-transcriptions', schedule: '0 3 * * *' },
+      { path: '/api/cron/drain-transcriptions?recovery=1', schedule: '0 * * * *' },
+    ],
     class: 'allowed',
-    note: 'route exists but is not scheduled in the shared vercel.json; manual/recovery invocation continues persisted transcription jobs/outbox and exact-path cleanup; request-bound jobs enter only through staff-authorized request controls, and the worker rechecks request access before a new provider submission',
+    note: 'daily pass performs bounded cleanup and lease recovery; hourly query mode performs bounded workflow recovery; request-bound jobs enter only through staff-authorized request controls, and the worker rechecks request access before a new provider submission',
   },
   'drain-review-panels': { scheduled: true, class: 'allowed', note: 'staff-launched AI panel on chosen requests' },
   'drain-review-syntheses': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/review-synthesis-drain.js'] },
@@ -63,10 +67,22 @@ test('every cron route is recorded', () => {
 });
 
 test('the recorded schedule matches vercel.json', () => {
-  const scheduled = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8')).crons
+  const crons = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8')).crons;
+  const transcriptionCrons = crons.filter((cron) =>
+    typeof cron.path === 'string' && cron.path.split('?')[0] === '/api/cron/drain-transcriptions'
+  ).map(({ path: cronPath, schedule }) => ({ path: cronPath, schedule })).sort((a, b) => a.path.localeCompare(b.path));
+  const expectedTranscriptionCrons = RECORDED_CRONS['drain-transcriptions'].scheduleEntries
+    .slice().sort((a, b) => a.path.localeCompare(b.path));
+  expect(transcriptionCrons).toEqual(expectedTranscriptionCrons);
+
+  const scheduled = crons
+    .filter((cron) => !(typeof cron.path === 'string' && cron.path.split('?')[0] === '/api/cron/drain-transcriptions'))
     .map((cron) => cron.path.replace(/^\/api\/cron\//, ''))
     .sort();
-  const recorded = Object.entries(RECORDED_CRONS).filter(([, v]) => v.scheduled).map(([k]) => k).sort();
+  const recorded = Object.entries(RECORDED_CRONS)
+    .filter(([route, value]) => value.scheduled && route !== 'drain-transcriptions')
+    .map(([route]) => route)
+    .sort();
   expect(scheduled).toEqual(recorded);
 });
 
