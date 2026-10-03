@@ -64,13 +64,24 @@ test.each([false, true])('real cron projection and preparation resolve names bef
     expect(emailAdapter.create).not.toHaveBeenCalled();
   } else {
     expect(result.sent).toBe(1);
-    expect(emailAdapter.create).toHaveBeenCalledWith(expect.objectContaining({ subject, to: ['pi@example.invalid'], cc: ['liaison@example.invalid'] }));
+    expect(emailAdapter.create).toHaveBeenCalledWith(expect.objectContaining({
+      subject, to: ['pi@example.invalid'], cc: ['liaison@example.invalid'],
+      regardingId: REQUEST, regardingType: 'akoya_request',
+    }));
     const html = emailAdapter.create.mock.calls[0][0].body;
     expect(html).toContain('Dear Dr. de la Cruz,');
     expect(html).toContain('Assigned Coordinator');
     expect(html).not.toContain('Wrong Actor');
     expect(html).not.toContain('{{');
   }
+});
+
+test('the default materials sender refuses to create an activity without a valid Request GUID', async () => {
+  await expect(collection.sendEmail({
+    regardingId: 'bad-guid', subject: 'Materials', bodyText: 'Upload', from: 'pc@wmkeck.org',
+    to: ['pi@example.invalid'], cc: [], url: 'https://apps.test/materials', buttonLabel: 'Upload',
+  })).rejects.toMatchObject({ code: 'site_visit_materials_request_invalid' });
+  expect(emailAdapter.create).not.toHaveBeenCalled();
 });
 
 test('Research: the sweep sends to the institution Liaison and names that same person, never the divergent Request copy', async () => {
