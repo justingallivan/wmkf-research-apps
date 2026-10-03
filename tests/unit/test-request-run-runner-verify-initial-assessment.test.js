@@ -256,7 +256,7 @@ function fakeClient({ requestRow } = {}) {
           ok: true, status: 200,
           body: {
             value: [
-              'akoya_requestid', 'akoya_applicantid', 'akoya_title', 'akoya_purpose', 'akoya_request',
+              'akoya_requestid', 'akoya_applicantid', 'akoya_title', 'akoya_purpose', 'wmkf_abstract', 'akoya_request',
               'akoya_fiscalyear', 'akoya_requesttype', 'wmkf_meetingdate', 'wmkf_istestrequest',
               'wmkf_testcreationrunid', 'wmkf_respondreminderenabled', 'wmkf_reviewduereminderenabled',
             ].map((field) => ({ LogicalName: field, AttributeType: 'String', IsValidForCreate: true, RequiredLevel: { Value: 'None' } })),
