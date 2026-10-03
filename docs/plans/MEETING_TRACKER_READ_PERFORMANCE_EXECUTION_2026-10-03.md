@@ -18,8 +18,9 @@ reviewer-rollup reads from the schedule projection, and replace per-visit
 detail reads with a paginated batch summary. Request context, caching, router
 behavior, and unrelated refactors are out of scope. Source and tests are on
 `codex/tracker-read-performance` from
-`fb5d39fc907f80d294a55157f81726c6671f0204`. **This is not deployed.** No live
-Dataverse, Postgres, Vercel, Blob, or browser state was read or changed.
+`fb5d39fc907f80d294a55157f81726c6671f0204`. This records the isolated
+implementation phase, before publication. No live Dataverse, Postgres, Vercel,
+Blob, or browser state was read or changed during that phase.
 
 ## Behavior and compatibility
 
@@ -134,9 +135,10 @@ The source change is complete and reviewed. The user subsequently authorized
 repairing the seven baseline failures; current repair and verification evidence
 is maintained in [the follow-up execution record](BASELINE_TEST_REPAIRS_EXECUTION_2026-10-03.md).
 The failures above describe the original run, not the current branch status.
-**Production promotion remains unapproved**; normal staff rehearsal and deployment
-verification still apply. No deployment, migration or live operation was performed
-during implementation. The original transcription checkout and its uncommitted
+On 2026-10-03 the owner authorized push and merge conditional on clean CI.
+The feature PR records the subsequent promotion outcome; the source approval
+here does not claim deployment or live latency verification. No deployment,
+migration or live operation was performed during isolated implementation. The original transcription checkout and its uncommitted
 test changes remain untouched.
 
 Rollback: revert the targeted feature commit before promotion, or restore the
@@ -168,4 +170,3 @@ The test environment used Node v26.6.0, Next 16.3.5 and React 18.3.1 installed b
 `npm ci --ignore-scripts`; no dependency versions were changed.
 
 Review receipt: [Sol, root and Fable evidence](../audits/MEETING_TRACKER_READ_PERFORMANCE_REVIEW_2026-10-03.md).
-

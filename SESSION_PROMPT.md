@@ -1,4 +1,132 @@
-# Session 568 Prompt: Meeting Tracker transcription live; preserve non-sensitive-use boundary
+# Session 570 Prompt: targeted Meeting Tracker latency fixes; verify release state before new work
+
+## Session 569 Summary — 2026-10-03 PT (Codex performance lane)
+
+[VERIFIED via source, isolated tests and review receipts] The targeted Meeting
+Tracker read optimization and seven baseline test repairs are complete. The owner
+requested push, CI, and merge if CI is clean. This handoff is prepared before
+that promotion; the PR for `codex/tracker-read-performance` is the authority for
+its final checks, merge and deployment status. Do not infer deployment from a
+local build or this document.
+
+### What Was Completed
+
+1. Tracker callers request the additive schedule projection, sharing Workbench
+   selection without unused reviewer rollups. Site Visit summaries are read in
+   paginated batches instead of one detail read per visit. Legacy/full API
+   behavior, authorization, row visibility and missing-data notices remain.
+2. Seven pre-existing failing suites were repaired with exact inventories,
+   isolated mocks and meaningful negative coverage. The rehearsal operator now
+   verifies the complete current projection and rejects absent cleanup columns.
+3. Luna built and tested; Sol and root reviewed; Claude Fable approved through
+   subscription OAuth. No direct provider API or alternative paid review product
+   was used. Review findings were closed in bounded rounds.
+4. Before integration with newer main, the local full suite passed 1,214 suites
+   and 18,769 tests (8 suites / 72 tests skipped). Build, lint, types and 69
+   check scripts passed. Newer main is integrated before publication, retaining
+   its transcription maintenance and recovery behavior; final PR CI gates the
+   owner's merge authorization.
+
+After main integration, all seven repair suites passed (133 tests). Sol accepted
+the conflict resolutions with no material runtime change; current inventory is
+25 cron handler files, 24 exact scheduled paths and 23 scheduled endpoints.
+Main's daily/hourly transcription controls and newer assertions are preserved.
+
+### Commits and Evidence
+
+- `4b95863de` — targeted Tracker read optimization.
+- `170145c9c` — baseline repair and review records.
+- `3ffb20c46` — integrated main and reconciled verification contracts.
+- `docs/plans/MEETING_TRACKER_READ_PERFORMANCE_EXECUTION_2026-10-03.md`
+  and its linked review receipt — behavior, reduced-call evidence and rollback.
+- `docs/plans/BASELINE_TEST_REPAIRS_EXECUTION_2026-10-03.md`
+  and its linked Fable receipt — diagnoses, tests and review disposition.
+
+### Next Items
+
+- **DONE:** Agreed targeted implementation and baseline repairs. No large
+  refactor or new caching layer is selected. Do not reopen those without a new
+  requirement or measured bottleneck.
+- **Verify before acting:** Read the feature PR's final-head checks and merge
+  state, then its deployment result. Source approval does not prove live latency;
+  no production browser timing improvement is claimed.
+- **Preserved:** The original transcription checkout's unrelated dirty test and
+  untracked planning/audit documents are untouched. Other lanes below are
+  historical handoffs, not newly validated worklists.
+- **Milestone decision:** No new architecture or capability was introduced; this
+  contained optimization and verification repair needs no DEVELOPMENT_LOG entry.
+- Claim-evidence `--current` could not run because this session has no exported
+  observation key. No observation row was fabricated or borrowed from another
+  session. No memory-router edits were made by this lane.
+
+## Prior-lane handoffs — historical; not revalidated in Session 569
+
+## Session 568 Summary — 2026-10-02/03 PT (Codex admin-alert lane)
+
+[VERIFIED via source, PR CI/merges, Vercel deployment and protected Production
+maintenance/alert readback] Pricing remediation and reviewed Opus 5.5 coverage
+are shipped. The owner authorized merge after CI and requested this closeout on
+`main`. Evidence remains bounded; no private operational data or credentials
+belong in the handoff.
+
+### What Was Completed
+
+1. **Pricing:** Replaced the app-local token denominator with matching provider
+   cost/usage cohorts, separated cache lifetimes, preserved alerts on incomplete
+   reports and corrected displayed dollar units. The protected Production check
+   completed 15 comparisons without drift and auto-resolved the pricing alert.
+2. **Model selection:** Reviewed Opus 5.5 pricing/capabilities, including its cache
+   read override. Automatic tiers require specific coverage in both registries.
+   The canary now flags Sonnet 5.5, which remains excluded from automatic tiers.
+3. **Transcription:** Read-only inspection found no processing backlog at the
+   October 2 checkpoint. One expired job retains a conservative late-upload safety
+   watch. The October 3 email supplied by the owner bears the October 2 8:51 PM
+   Pacific timestamp, before this release; it is consistent with that warning,
+   not new evidence of a processing failure. No new October 3 live probe occurred.
+4. **Verification:** Fresh independent review, 118 focused tests, scoped gates and
+   full PR CI passed. Runtime PR #420 and evidence PR #421 are merged. The local
+   dependency-symlink Turbopack limitation was covered by the canonical CI build.
+
+### Commits
+
+- `bbf6457a8` — provider pricing audit scope and reviewed model selection; merged
+  via PR #420 as `a829ba94c`.
+- `5cb14b859` — verified production evidence and milestone; merged via PR #421
+  as `43de4bf2c`.
+
+### Next Items
+
+- **DONE:** Agreed pricing fix, Opus review, selection guard, CI, owner-authorized
+  production release and pricing/model check readback. No further runtime work is
+  authorized by this documentation closeout.
+- **Verified open at October 2 checkpoint:** Sonnet 5.5 review. Source entries are
+  absent and the canary reports ancestor coverage; do not advance the global
+  review date or enable it automatically without a specific review.
+- **Parked:** Transcription-watch closure and calendar-triggered cleanup
+  observation. Preserve the safety watch; new relevant failures or an explicit
+  owner request are the reopen triggers.
+- **Known limitation:** Keyed alert deduplication retains the first payload, so
+  the open model card can still name Opus while the latest canary identifies
+  Sonnet. Verify fresh run details before using the card as current evidence.
+- **Verify before acting:** Older lane handoffs below are historical, not current
+  worklists. Their live state and owner authorization require a fresh preflight.
+
+### Key Files / Handoff
+
+- `docs/audits/ADMIN_ALERT_REMEDIATION_2026-10-02.md` — source contract, validation,
+  deployment outcome and rollback baseline.
+- `pages/api/cron/pricing-refresh.js`, `lib/services/anthropic-admin.js` — matched
+  provider reports; `scripts/probe-admin-alert-operations.js` — content-free,
+  explicitly scoped read-only Postgres probe.
+- `lib/services/model-resolver.js`, `lib/services/model-capabilities.js`,
+  `lib/utils/model-pricing.js` — reviewed selection and Opus coverage.
+- Production milestone is already recorded in DEVELOPMENT_LOG.md; this stop
+  needs no second milestone entry or mutable script catalogue in CLAUDE.md.
+- Claim-evidence observation report could not read local state; no observation
+  row was fabricated. The original transcription checkout's unrelated changes
+  remain untouched.
+
+## Prior-lane handoffs — historical; not revalidated at Session 568 closeout
 
 ## Session 567 Summary — 2026-10-02 PT (Codex transcription lane)
 

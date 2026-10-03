@@ -16,7 +16,10 @@ related:
 This is local source approval for the seven pre-existing failing Jest suites
 identified during the Meeting Tracker performance work. It is not deployment
 approval or evidence of measured latency improvement. The earlier performance
-implementation is unchanged by these repairs.
+implementation is unchanged by these repairs. This receipt records the review
+leading to `170145c9c`, before newer main was integrated for publication; its
+census and test counts are historical. Subsequent integration verification is
+recorded in the session handoff and feature PR.
 
 ## Review chain and fingerprint
 
@@ -32,7 +35,8 @@ exact cron schedule inventory. No further runtime correction was required.
 `4b95863de903ca064173581236eaac2842e51bc7`. SHA-256 of the final
 `git diff --binary -- scripts tests` reviewed by Sol and root:
 `56942629dda294f2289d768b0f95ea4ce96b510d69205f3d0a3bb0330ab3850c`.
-Only documentation reconciliation followed this source freeze.
+Only documentation reconciliation followed this source freeze before commit
+`170145c9c`; later main integration is outside this historical fingerprint.
 
 Contract reconciliation covered the Graph import exception and its rejecting
 complement; owner-export route to store query; maintenance subtask failure to
@@ -59,7 +63,7 @@ provided evidence; it did not run tests or read verification logs.
 
 The final review read Stage 1c just before Luna saved its documentation update.
 Root closed that documentation-only remainder by checking the saved record:
-the original 23-route/21-scheduled figure is explicitly historical; the current
+the original 23-route/21-scheduled figure is explicitly historical; the then-current
 inventory is 24 cron handler files, 23 exact scheduled paths and 22 scheduled routes.
 The normal and recovery transcription paths are recorded alongside existing
 staff-launched review-panel work. This classifies current behavior under the

@@ -21,6 +21,10 @@ This record covers the seven Jest suites reproduced against base commit
 worktree started at `4b95863de903ca064173581236eaac2842e51bc7`; the repairs
 are source changes only. No application provider call, live data operation, or deployment was made. Development review used subscription-authenticated agent sessions; no project/provider API key was used.
 
+The diagnoses and local verification below describe commit `170145c9c`, before
+integration with newer main. That integration retains newer equivalent fixes
+and schedule behavior; the session handoff and feature PR contain its verification.
+
 ## Diagnoses and changes
 
 | Failing suite | Verified cause | Repair |
@@ -28,7 +32,7 @@ are source changes only. No application provider call, live data operation, or d
 | `graph-service-boundary.test.js` | The bounded readiness probe directly imports `graph/constants.js` and `graph/http.js` for permission metadata calls. The boundary census correctly reported those edges as unrecorded. | Record only that file, those exact import strings, and their resolved modules. Negative cases reject a sibling script, a different Graph internal, and another specifier resolving to an exempt module. |
 | `maintenance-cron-handler.test.js` | The handler gained publication reconciliation after its original test mock setup. The tests did not model that subtask. | Mock and assert the reconciliation call. A separate rejection case proves its failure remains visible in `failedSubtasks` and marks the maintenance run failed. |
 | `test-request-visibility-census.test.js` | The new evaluation export route was absent from the route inventory. Its owner-job store query admits only rows whose `request_id` is empty, excluding request-bound rows. | Record the route as not applicable to request visibility, require the route’s `listOwnerJobs` call, and execute the actual store method against a captured query to pin the owner and blank-request predicate. |
-| `test-request-scheduled-job-census.test.js` | The transcription drain route and its recovery schedule were absent from the cron inventory. | Record the route as existing staff-launched transcription work, classified alongside review panels, and preserve both exact scheduled paths, including `?recovery=1`, in the schedule census. The census pins the current 24 cron handler files and 23 exact schedule entries covering 22 cron endpoints; the design record retains 23 cron handlers / 21 scheduled paths as its 2026-09-23 historical snapshot. |
+| `test-request-scheduled-job-census.test.js` | The transcription drain route and its recovery schedule were absent from the cron inventory. | Record the route as existing staff-launched transcription work, classified alongside review panels, and preserve both exact scheduled paths, including `?recovery=1`, in the schedule census. At that repair revision, the census pinned 24 cron handler files and 23 exact schedule entries covering 22 cron endpoints; the design record retains 23 cron handlers / 21 scheduled paths as its 2026-09-23 historical snapshot. |
 | `meeting-transcription-rehearsal-fixture-operator.test.js` | The rehearsal operator still expected the earlier owner projection, which now includes `contentDeletionObserved` and `lateUploadWatchPending`. | Include both flags in the exact projection contract and verify each is false for the synthetic ready row. The insert now returns all four cleanup-state columns and requires each to be exactly `null`; tests reject each missing or populated column with `preflight_projection_failed` and prove rollback without commit. |
 | `legacy-host-redirect.test.js`, `security-headers.test.js` | Requiring `next.config.js` in Jest parsed the external ESM `workflow/next` build wrapper. | Mock only `withWorkflow` at the test boundary as an identity wrapper; tests continue to inspect the actual Next config object. The production wrapper and canonical build remain unchanged. |
 
@@ -58,8 +62,8 @@ environment file was copied into the worktree. Node was `v26.6.0`; installed
 Next and React versions were `16.3.5` and `18.3.1`. Dependencies were not
 changed.
 
-The repair code and checks remain on the feature branch. The related
-performance execution and review records now identify the original failures
-as historical and link here for current verification. Production promotion
-and staff rehearsal remain separate; nothing was pushed or deployed.
-No production milestone entry is required for this local verification repair.
+This record describes verification before publication. The related performance
+execution and review records identify the original failures as historical. On
+2026-10-03 the owner authorized push and merge conditional on clean CI; the
+feature PR records the subsequent promotion outcome. No production milestone
+entry is required for this contained optimization and verification repair.
