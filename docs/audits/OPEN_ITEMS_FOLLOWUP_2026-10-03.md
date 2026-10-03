@@ -3,7 +3,7 @@ title: Ordered open-items follow-up
 domain: operations
 kind: report
 status: active
-summary: "October 3 follow-up: refusal safeguards built, reminder PR integrated, dependency PR repaired and duplicates closed; authorized test visit saved and test email accepted for delivery; inbox receipt unverified and PR promotion pending."
+summary: "October 3 follow-up: refusal safeguards built, reminder PR integrated, dependency PR repaired and duplicates closed; authorized test visit saved and test email accepted for delivery; PI inbox receipt owner-confirmed; liaison receipt unverified and PR promotion pending."
 canonical: false
 owner: product-engineering
 related:
@@ -140,4 +140,4 @@ Remaining external prerequisites from the initial checkpoint (Office Mac access,
 
 ## Approved email send — October 3, 10:55 a.m. Pacific
 
-[VERIFIED via authenticated Production browser] After the owner approved the displayed message and recipients, the first attempt was refused as stale with an explicit **Not sent** result. The preview was refreshed and its sender, recipients, subject and rendered body matched the approved version. The subsequent send completed with **Sent for delivery** at 10:55:23 a.m. Pacific: from `jgallivan@wmkeck.org`, to the Factory PI test address, cc the Factory liaison test address. The materials card now shows **Waiting on the applicant**, an October 7 deadline, an October 16 link expiration, and both invited test contacts. No repeat invitation or reminder was sent. This verifies application acceptance for delivery, not inbox receipt; recipient confirmation remains unverified.
+[VERIFIED via authenticated Production browser] After the owner approved the displayed message and recipients, the first attempt was refused as stale with an explicit **Not sent** result. The preview was refreshed and its sender, recipients, subject and rendered body matched the approved version. The subsequent send completed with **Sent for delivery** at 10:55:23 a.m. Pacific: from `jgallivan@wmkeck.org`, to the Factory PI test address, cc the Factory liaison test address. The materials card now shows **Waiting on the applicant**, an October 7 deadline, an October 16 link expiration, and both invited test contacts. No repeat invitation or reminder was sent. This browser observation verifies application acceptance for delivery. [OWNER-REPORTED on October 3] Justin subsequently confirmed receipt at `cations61oaths@icloud.com` (the Factory PI address), closing the PI delivery check. Receipt at the copied Factory liaison address remains unverified.
