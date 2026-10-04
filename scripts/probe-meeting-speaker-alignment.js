@@ -188,6 +188,20 @@ console.log('  samples per speaker: ' + [...bySpeaker.keys()].map(id => `${id}=$
 const table = (support) => Object.entries(support).map(([id, entries]) => `${id}: ${Object.entries(entries).map(([n, e]) => `${n}×${e.count}`).join(', ') || '—'}`).join('\n    ');
 console.log('\n== Support at LIVE thresholds (minContentWords ' + D.minContentWords + ', overlap ' + D.minTokenOverlap + ', ratio ' + D.ambiguityShareRatio + ') ==');
 console.log('  full set:\n    ' + table(zoom.computeNameSupport(sampled.samples, utterances, parsed.names, D)));
+// What the CURRENT verifier code would decide for this job if the model abstained on every speaker
+// (the strictest honest case under the veto rule), and if it agreed with every dominant name.
+console.log('\n== Verifier outcome under current code ==');
+const fullSupport = zoom.computeNameSupport(sampled.samples, utterances, parsed.names, D);
+const visibleSupport = zoom.computeNameSupport(visible, utterances, parsed.names, D);
+const decide = (verdict, label) => {
+  const { names: applied, alignment } = zoom.verifyAlignmentVerdict(visible, visibleSupport, verdict, { zoomNames: parsed.names, content, conflictSupport: fullSupport });
+  console.log(`  ${label}: status=${alignment.status}; applied ${Object.entries(applied).map(([id, n]) => `${id}=${n}`).join(', ') || '—'}`);
+  if (Object.keys(alignment.reasons || {}).length) console.log(`    reasons: ${JSON.stringify(alignment.reasons)}`);
+  console.log(`    confidence/basis: ${Object.entries(alignment.speakers).map(([id, v]) => `${id}=${v.confidence}/${v.basis}`).join(', ') || '—'}`);
+};
+decide({}, 'model abstains on all');
+decide(Object.fromEntries(Object.entries(fullSupport).map(([id, e]) => { const top = Object.entries(e).sort((a, b) => b[1].count - a[1].count)[0]; return [id, top ? { name: top[0], confidence: 0.9, pairIds: top[1].pairIds.slice(0, 1) } : null]; })), 'model agrees with each dominant name at 0.9');
+
 for (const [mcw, ov] of [[4, 0.5], [3, 0.5], [3, 0.4], [2, 0.5]]) {
   console.log(`\n== Counterfactual support (minContentWords ${mcw}, overlap ${ov}) ==\n    ` + table(zoom.computeNameSupport(visible, utterances, parsed.names, { ...D, minContentWords: mcw, minTokenOverlap: ov })));
 }
