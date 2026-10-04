@@ -1,3 +1,81 @@
+# Session 572 Prompt: transcript generation, staff video sharing, leadership dashboards
+
+## Session 571 Summary — 2026-10-03 PT (Codex Factory recovery closeout)
+
+[OWNER DECISION] Stop for the evening. Tomorrow's order is transcript-generation
+acceptance, staff video-sharing acceptance, then leadership-dashboard readiness.
+The owner thinks dashboards are mostly done; that is an expectation to verify,
+not a new completion claim or instruction to rebuild them.
+
+### Completed and retained
+
+- [VERIFIED via GitHub] Draft PR #428 contains Sandbox-only fresh Basic file
+  readback recovery on `codex/factory-readback-proof`. Commits: `2bb311927`
+  (offline proof), `c751bda5f` (implementation), `18d9c794e` (review evidence).
+  All PR checks passed at `18d9c794e`; a handoff-only push needs fresh CI.
+- Luna built, Sol and root reviewed, and Claude Fable approved via subscription
+  OAuth. Eight focused suites / 280 tests passed, including six real PostgreSQL
+  tests. Production recovery is refused; original six-hour freshness stays.
+- [VERIFIED via read-only Sandbox workflow definitions/account inputs] The
+  inspected acknowledgment workflow's email branch is not reached by Basic
+  create fields. GoVerify's current predicate is true and would update the
+  shared Foundation account. No fixture was created; no recovery was executed.
+  Private sanitized receipt: `/tmp/factory-pr428-create-preflight.json`.
+- [OWNER DECISION] Park the live rehearsal and isolated-applicant fixture work.
+  Do not spend more time constructing fixtures. Revisit only with a suitable
+  fresh run or a new owner decision. #428 remains draft/unmerged; neither
+  production promotion nor live proof is claimed.
+- Earlier releases and the abstract repair are recorded in
+  `docs/audits/AUTONOMOUS_FOLLOWUP_2026-10-03.md`. Historical test-email repair is
+  owner-closed; retain Request 1003308. No new sends, deletions, production writes,
+  or shared-workflow changes occurred in this recovery rehearsal preflight.
+
+### Next session — owner-requested order, verify before acting
+
+1. **Test transcript generation.** Existing transcription shipped in PRs #416
+   and #418 with a bounded synthetic acceptance (historical Session 567 below).
+   Begin with the current UI and one appropriate owner-selected recording;
+   verify generation, speaker handling, transcript output and staff visibility.
+   Do not reopen infrastructure work unless this test exposes a concrete gap.
+   Prior privacy limits remain; no blanket confidential-recording clearance.
+2. **Test video sharing with staff.** Trace the existing sharing path and check
+   that intended staff can open/play the video with correct access. Exact
+   recordings, audience and current readiness remain to be established; saving
+   this agenda does not itself authorize sending messages to staff tonight.
+3. **Assess leadership dashboard delivery.** Inventory what already exists,
+   inspect current data and intended leadership access, and list only actual
+   remaining delivery gaps. [UNKNOWN] Current completeness and delivery date;
+   the owner's expectation is that the dashboards are mostly done. Establish
+   the target date if none is already recorded before declaring on-track status.
+
+### Parked / do not reopen automatically
+
+- #428 live fixture/recovery rehearsal and Production recovery promotion.
+- #328 Postgres access-layer Stage 0: explicit DO NOT MERGE / regroup hold.
+- #390 documentation-only refactor assessment: preserve earlier hold; no new
+  refactor selected. GitHub confirmed these and #428 are the only open PRs at
+  this checkpoint.
+- Automatic reviewer reminder cron stays held. No resend or historical email
+  repair. Office Mac checks, source-refusal observation and dependency alerts
+  are separate watch items, not tomorrow's active build agenda.
+
+### Handoff / validation
+
+- Continue Luna reconnaissance/build → Sol review → root final → Claude Fable
+  adversarial review through OAuth when code work is needed. Bound review loops;
+  root takes over if they become incremental tail-chasing.
+- The owner authorized copying this handoff alone to `main`. Recovery runtime
+  remains on the unmerged #428 branch. The original dirty checkout and prior
+  lanes below are preserved.
+- Milestone determination for this recovery closeout: no new production
+  capability or cutover shipped; no new DEVELOPMENT_LOG entry required.
+- No CLAUDE.md or memory-router change. Claim-evidence report could not read
+  local observation state; no observation row fabricated.
+- Documentation-only closeout; run relevant documentation gates. Existing
+  runtime-test and review evidence remains bounded as described above.
+
+## Earlier lane handoffs — historical; not tomorrow's worklist
+
 # Session 571 Prompt: dependency security closeout; two upstream alerts remain
 
 ## Session 570 Summary — 2026-10-03 PT (Codex dependency-security lane)
