@@ -65,3 +65,14 @@ test('rendered labels can push even the first sample over budget while sampler t
   expect(store.failTranscriptionAlignment).toHaveBeenCalledWith(expect.objectContaining({ terminal: true, code: 'samples_over_budget' }));
   expect(executePrompt).not.toHaveBeenCalled();
 });
+
+test('the runtime serializer and the natively importable alignment-samples module are the same function (probe parity)', async () => {
+  // Codex review 2026-10-04: the diagnostic probe once treated every sampled pair as visible and
+  // reported "applied" where runAlignment would fail samples_over_budget. The probe now imports
+  // serializeSpeakerSamples from alignment-samples.js; this pins that the service re-exports the
+  // identical function so the two can never diverge silently.
+  const service = await import('../../lib/services/meeting-tracker-transcription/alignment-service.js');
+  const samples = await import('../../lib/services/meeting-tracker-transcription/alignment-samples.js');
+  expect(service.serializeSpeakerSamples).toBe(samples.serializeSpeakerSamples);
+  expect(samples.VARIABLE_MAX.speaker_samples).toBe(160000);
+});

@@ -34,8 +34,8 @@ for (const envFile of ['.env', '.env.local']) {
 const { sql } = await import('@vercel/postgres');
 const { get } = await import('@vercel/blob');
 const zoom = await import('../lib/services/transcription-pilot/zoom-vtt.js');
-// Mirrors shared/config/prompts/meeting-speaker-alignment.js speaker_samples maxChars.
-const SPEAKER_SAMPLES_MAX_CHARS = 160_000;
+const { VARIABLE_MAX, serializeSpeakerSamples } = await import('../lib/services/meeting-tracker-transcription/alignment-samples.js');
+const SPEAKER_SAMPLES_MAX_CHARS = VARIABLE_MAX.speaker_samples;
 
 // Same read as runtime.js readPrivateContentIfPresent, inlined because runtime.js uses
 // bundler-only extensionless imports that plain Node ESM cannot resolve.
@@ -180,17 +180,22 @@ console.log(`  recoverable cues agreeing with the dominant wording name: ${agree
 
 // Live support (full set vs visible set), then relaxed counterfactuals.
 const sampled = zoom.sampleAlignmentPairs(utterances, parsed.cues, { maxChars: SPEAKER_SAMPLES_MAX_CHARS });
-// The live run also trims samples that do not fit the rendered prompt; the sampler's own
-// char budget is the same number, so when truncated=false the visible set equals the sampled set.
-const visible = sampled.samples;
-console.log(`\n== Sampling == samples ${sampled.samples.length}, truncated=${sampled.truncated}, reservedOverBudget=${sampled.reservedOverBudget}; cues carried by samples: ${sampled.samples.reduce((n, s) => n + s.cues.length, 0)}`);
+// Same serialization and reserved-sample guards as runAlignment (alignment-service.js): the rendered
+// prompt adds labels and separators, so the sampler's char budget alone does not decide visibility.
+const reservedPairIds = new Set(zoom.sampleAlignmentPairs(utterances, parsed.cues, { maxChars: Infinity, maxPerSpeaker: D.minPerSpeaker }).samples.map(s => s.pairId));
+const serialized = serializeSpeakerSamples(sampled.samples, SPEAKER_SAMPLES_MAX_CHARS, reservedPairIds);
+const visible = sampled.samples.filter(s => serialized.keptPairIds.has(s.pairId));
+const runtimeTerminal = sampled.reservedOverBudget || serialized.droppedSpeaker || serialized.droppedReserved.length > 0;
+console.log(`\n== Sampling == samples ${sampled.samples.length}, visible after serialization ${visible.length}, rendered ${serialized.text.length}/${SPEAKER_SAMPLES_MAX_CHARS} chars, truncated=${sampled.truncated}, reservedOverBudget=${sampled.reservedOverBudget}, droppedReserved=${serialized.droppedReserved.length}, droppedSpeaker=${serialized.droppedSpeaker}`);
+if (runtimeTerminal) console.log('  RUNTIME WOULD FAIL TERMINALLY: samples_over_budget (the verifier outcome below is hypothetical)');
+console.log(`  cues carried by samples: ${sampled.samples.reduce((n, s) => n + s.cues.length, 0)}`);
 console.log('  samples per speaker: ' + [...bySpeaker.keys()].map(id => `${id}=${sampled.samples.filter(s => s.speakerId === id).length}`).join(', '));
 const table = (support) => Object.entries(support).map(([id, entries]) => `${id}: ${Object.entries(entries).map(([n, e]) => `${n}×${e.count}`).join(', ') || '—'}`).join('\n    ');
 console.log('\n== Support at LIVE thresholds (minContentWords ' + D.minContentWords + ', overlap ' + D.minTokenOverlap + ', ratio ' + D.ambiguityShareRatio + ') ==');
 console.log('  full set:\n    ' + table(zoom.computeNameSupport(sampled.samples, utterances, parsed.names, D)));
 // What the CURRENT verifier code would decide for this job if the model abstained on every speaker
 // (the strictest honest case under the veto rule), and if it agreed with every dominant name.
-console.log('\n== Verifier outcome under current code ==');
+console.log('\n== Verifier outcome under current code' + (runtimeTerminal ? ' (HYPOTHETICAL: runtime fails samples_over_budget first)' : '') + ' ==');
 const fullSupport = zoom.computeNameSupport(sampled.samples, utterances, parsed.names, D);
 const visibleSupport = zoom.computeNameSupport(visible, utterances, parsed.names, D);
 const decide = (verdict, label) => {
