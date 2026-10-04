@@ -449,6 +449,22 @@ const SURFACES = [
     requiredMarkers: ['untrusted: true', "source: { kind: 'override' }", 'maxChars: 100000', "target: { kind: 'none' }"],
   },
   {
+    // Executor-driven (meeting-transcript.speaker-alignment, Zoom VTT speaker
+    // mapping, stage 5 caller alignment-service.js). Hardening lives in
+    // execute-prompt.js: wrapUntrustedContent + buildUntrustedContentPreamble
+    // injected for the untrusted speaker_samples (provider transcript text +
+    // Zoom caption cues), zoom_names (participant display names from the VTT)
+    // and prior (name-overlap hint derived from the VTT) variables. The prompt
+    // code file carries no markers of its own; registered here so the
+    // unregistered-prompt-file check tracks it. callSiteFiles MUST include
+    // execute-prompt.js or the marker checks fail.
+    id: 'meeting-speaker-alignment',
+    inv: 32,
+    status: 'migrated',
+    promptFiles: ['shared/config/prompts/meeting-speaker-alignment.js'],
+    callSiteFiles: ['lib/services/execute-prompt.js'],
+  },
+  {
     // Virtual Review Panel Phase A (seat + chair). Both are seeded, provider-
     // agnostic prompts (review-panel-generation.js snapshots the row per seat
     // with only the model swapped); the shared Executor wraps every declared

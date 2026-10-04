@@ -150,6 +150,7 @@ test('uploads audio directly to private Blob storage before starting provider wo
   fireEvent.change(await screen.findByLabelText('Audio file'), { target: { files: [file] } });
   fireEvent.click(screen.getByLabelText(/I confirm the recording is non-sensitive/));
   fireEvent.click(screen.getByRole('button', { name: 'Upload and start transcription' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Continue without it' }));
 
   await waitFor(() => expect(global.fetch.mock.calls.some(([url, options]) => String(url).endsWith(`/${JOB_ID}/start`) && options?.method === 'POST')).toBe(true));
   expect(put).toHaveBeenCalledWith('private/path', file, expect.objectContaining({ access: 'private', token: 'scoped-token', contentType: 'audio/mpeg' }));
@@ -550,4 +551,273 @@ test('review-only rehearsal supports speaker labels while hiding other job and p
   expect(writes[0][0]).toBe(`${rehearsalBase}/${JOB_ID}/speakers`);
   expect(JSON.parse(writes[0][1].body)).toEqual({ expectedVersion: 1, speakerNames: { A: 'Synthetic PI' } });
   expect(put).not.toHaveBeenCalled();
+});
+
+// --- Zoom transcript (VTT) upload and speaker alignment ---
+const isStart = ([url, options]) => String(url).endsWith(`/${JOB_ID}/start`) && options?.method === 'POST';
+const isCreate = ([url, options]) => String(url).endsWith('/transcriptions') && options?.method === 'POST';
+const zoomUpload = { pathname: 'zoom/path', token: 'zoom-token', contentType: 'text/vtt', maximumSizeInBytes: 4000000 };
+
+function mockUploadFetch({ zoom = zoomUpload, onCreate } = {}) {
+  Object.defineProperty(global.crypto, 'randomUUID', { configurable: true, value: jest.fn(() => '99999999-9999-4999-8999-999999999999') });
+  const uploadedJob = job({ status: 'uploading', version: 1 });
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const path = String(url);
+    if (isCreate([url, options])) {
+      const pending = onCreate ? onCreate() : null;
+      if (pending) await pending;
+      return response({ job: uploadedJob, upload: { pathname: 'private/path', token: 'scoped-token', contentType: 'audio/mpeg', maximumSizeInBytes: 52428800, access: 'private', zoomTranscript: zoom } });
+    }
+    if (path.endsWith(`/${JOB_ID}/start`)) return response({ job: job({ status: 'queued', version: 2 }) });
+    if (path.endsWith('/transcriptions')) return response(collection({ jobs: [uploadedJob] }));
+    if (path.endsWith(`/${JOB_ID}`)) return response({ job: job({ status: 'queued', version: 2 }), content: null, candidates: [] });
+    return response({});
+  });
+  put.mockReset();
+  put.mockResolvedValue({ url: 'https://blob.example/x' });
+}
+
+async function pickFiles({ audio, vtt, ack = true } = {}) {
+  if (audio) fireEvent.change(await screen.findByLabelText('Audio file'), { target: { files: [audio] } });
+  if (vtt) fireEvent.change(screen.getByLabelText('Zoom transcript (.vtt, optional)'), { target: { files: [vtt] } });
+  if (ack) fireEvent.click(screen.getByLabelText(/I confirm the recording is non-sensitive/));
+}
+
+const audioFile = () => new File(['audio'], 'recording.mp3', { type: 'audio/mpeg' });
+const vttFileOf = (type = 'text/vtt', size = 'WEBVTT\n') => new File([size], 'zoom.vtt', { type });
+
+test('audio only asks for confirmation instead of submitting, and continuing omits zoomTranscript', async () => {
+  mockUploadFetch({ zoom: null });
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  await pickFiles({ audio: audioFile() });
+  fireEvent.click(screen.getByRole('button', { name: 'Upload and start transcription' }));
+  expect(await screen.findByText('No Zoom transcript selected. Speakers will need to be named by hand after transcription.')).toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(isCreate)).toBe(false);
+  fireEvent.click(screen.getByRole('button', { name: 'Continue without it' }));
+  await waitFor(() => expect(global.fetch.mock.calls.some(isStart)).toBe(true));
+  const createCall = global.fetch.mock.calls.find(isCreate);
+  expect(JSON.parse(createCall[1].body)).not.toHaveProperty('zoomTranscript');
+  expect(put).toHaveBeenCalledTimes(1);
+});
+
+test('"Add Zoom transcript" focuses the VTT input without submitting', async () => {
+  mockUploadFetch({ zoom: null });
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  await pickFiles({ audio: audioFile() });
+  fireEvent.click(screen.getByRole('button', { name: 'Upload and start transcription' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Add Zoom transcript' }));
+  expect(screen.getByLabelText('Zoom transcript (.vtt, optional)')).toHaveFocus();
+  expect(screen.queryByText(/No Zoom transcript selected/)).not.toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(isCreate)).toBe(false);
+});
+
+test('audio plus VTT submits directly, uploads both blobs, then starts', async () => {
+  mockUploadFetch();
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  const audio = audioFile();
+  const vtt = vttFileOf('', 'WEBVTT\n\n1\n00:00:01.000 --> 00:00:02.000\nA: hi\n');
+  Object.defineProperty(vtt, 'type', { value: '' });
+  expect(vtt.type).toBe('');
+  await pickFiles({ audio, vtt });
+  fireEvent.click(screen.getByRole('button', { name: 'Upload and start transcription' }));
+  await waitFor(() => expect(global.fetch.mock.calls.some(isStart)).toBe(true));
+  expect(screen.queryByText(/No Zoom transcript selected/)).not.toBeInTheDocument();
+  const body = JSON.parse(global.fetch.mock.calls.find(isCreate)[1].body);
+  expect(body.zoomTranscript).toEqual({ contentType: 'text/vtt', bytes: vtt.size });
+  expect(body.zoomTranscript).not.toHaveProperty('filename');
+  expect(put).toHaveBeenCalledTimes(2);
+  expect(put.mock.calls[0][0]).toBe('private/path');
+  expect(put.mock.calls[1][0]).toBe('zoom/path');
+  expect(put.mock.calls[1][1]).toBe(vtt);
+  expect(put.mock.calls[1][2]).toEqual(expect.objectContaining({ access: 'private', token: 'zoom-token', contentType: 'text/vtt' }));
+  expect(put.mock.invocationCallOrder[1]).toBeLessThan(global.fetch.mock.invocationCallOrder[global.fetch.mock.calls.findIndex(isStart)]);
+});
+
+test('a VTT larger than the server limit errors before any blob upload', async () => {
+  mockUploadFetch({ zoom: { ...zoomUpload, maximumSizeInBytes: 3 } });
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  await pickFiles({ audio: audioFile(), vtt: vttFileOf('text/vtt', 'WEBVTT and more') });
+  fireEvent.click(screen.getByRole('button', { name: 'Upload and start transcription' }));
+  expect(await screen.findByText(/Zoom transcript exceeds the private upload limit/)).toBeInTheDocument();
+  expect(put).not.toHaveBeenCalled();
+  expect(global.fetch.mock.calls.some(isStart)).toBe(false);
+});
+
+test('rejects a non-.vtt transcript file client-side', async () => {
+  mockUploadFetch();
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  await pickFiles({ audio: audioFile() });
+  fireEvent.change(screen.getByLabelText('Zoom transcript (.vtt, optional)'), { target: { files: [new File(['x'], 'notes.txt', { type: 'text/plain' })] } });
+  expect(screen.getByText('Choose a Zoom transcript saved as a .vtt file.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Upload and start transcription' })).toBeDisabled();
+});
+
+test('selecting two files in one input sorts them into the audio and VTT slots', async () => {
+  mockUploadFetch();
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  const audio = audioFile();
+  const vtt = vttFileOf();
+  fireEvent.change(await screen.findByLabelText('Audio file'), { target: { files: [vtt, audio] } });
+  expect(screen.getByText(/recording\.mp3/)).toBeInTheDocument();
+  expect(screen.getByText(/zoom\.vtt/)).toBeInTheDocument();
+});
+
+test('the no-transcript confirmation resets when the audio file changes', async () => {
+  mockUploadFetch({ zoom: null });
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  await pickFiles({ audio: audioFile() });
+  fireEvent.click(screen.getByRole('button', { name: 'Upload and start transcription' }));
+  await screen.findByText(/No Zoom transcript selected/);
+  fireEvent.change(screen.getByLabelText('Audio file'), { target: { files: [new File(['other'], 'other.mp3', { type: 'audio/mpeg' })] } });
+  expect(screen.queryByText(/No Zoom transcript selected/)).not.toBeInTheDocument();
+});
+
+test('acknowledgement mentions Anthropic only when a Zoom transcript is selected', async () => {
+  mockUploadFetch();
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  await pickFiles({ audio: audioFile(), ack: false });
+  expect(screen.getByLabelText(/I confirm the recording is non-sensitive/).closest('label')).toHaveTextContent('AssemblyAI');
+  expect(screen.getByLabelText(/I confirm the recording is non-sensitive/).closest('label')).not.toHaveTextContent('Anthropic');
+  await pickFiles({ vtt: vttFileOf(), ack: false });
+  expect(screen.getByLabelText(/I confirm the recording is non-sensitive/).closest('label')).toHaveTextContent('excerpts of both transcripts are sent to Anthropic');
+});
+
+test('a request change while the upload is being prepared uploads and starts nothing', async () => {
+  let release;
+  mockUploadFetch({ onCreate: () => new Promise((resolve) => { release = resolve; }) });
+  const view = render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  await pickFiles({ audio: audioFile(), vtt: vttFileOf() });
+  fireEvent.click(screen.getByRole('button', { name: 'Upload and start transcription' }));
+  await waitFor(() => expect(global.fetch.mock.calls.some(isCreate)).toBe(true));
+  view.rerender(<MeetingTranscriptionPanel requestId="88888888-8888-4888-8888-888888888888" />);
+  await act(async () => { release(); });
+  await act(async () => { await Promise.resolve(); });
+  expect(put).not.toHaveBeenCalled();
+  expect(global.fetch.mock.calls.some(isStart)).toBe(false);
+});
+
+async function openReadyJob(alignment, extra = {}) {
+  global.fetch = jest.fn(async (url) => {
+    const jobBody = job({ speaker_alignment: alignment, zoomTranscriptAttached: alignment !== undefined, ...extra });
+    if (String(url).endsWith('/transcriptions')) return response(collection({ jobs: [jobBody] }));
+    return response({ job: jobBody, content, candidates: [] });
+  });
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: /site-visit\.m4a/ }));
+  await screen.findByLabelText('Manual display name for Speaker A');
+}
+const editorDetails = () => screen.getByText('Adjust names manually').closest('details');
+
+test('pending alignment shows the matching notice, collapses the editor and blocks save and publish', async () => {
+  await openReadyJob({ status: 'pending' });
+  expect(screen.getByText('Matching speaker names from the Zoom transcript…')).toBeInTheDocument();
+  expect(editorDetails().open).toBe(false);
+  fireEvent.change(screen.getByLabelText('Manual display name for Speaker A'), { target: { value: 'Typed' } });
+  expect(screen.getByRole('button', { name: 'Save names' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Publish transcript' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Check matching status' })).toBeEnabled();
+});
+
+test('applied alignment lists names with confidence and collapses the editor', async () => {
+  await openReadyJob({ status: 'applied', speakers: { A: { name: 'Dana Ortiz', confidence: 0.92 }, B: { name: 'Sam Lee', confidence: 0.8 } } }, { speaker_names: { A: 'Dana Ortiz', B: 'Sam Lee' } });
+  expect(screen.getByText('Speaker names from Zoom transcript')).toBeInTheDocument();
+  expect(screen.getByText(/Speaker A: Dana Ortiz \(92% confidence\)/)).toBeInTheDocument();
+  expect(screen.getByText(/Speaker B: Sam Lee \(80% confidence\)/)).toBeInTheDocument();
+  expect(editorDetails().open).toBe(false);
+  expect(screen.getByLabelText('Manual display name for Speaker A')).toHaveValue('Dana Ortiz');
+  expect(screen.getByRole('button', { name: 'Save names' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Publish transcript' })).toBeEnabled();
+});
+
+test('partial alignment opens the editor and a suggestion button fills the draft', async () => {
+  await openReadyJob({ status: 'partial', speakers: { A: { name: 'Dana Ortiz', confidence: 0.9 } }, suggestions: { B: ['Sam Lee', 'Samuel Lee'] }, code: 'secret_internal_code' }, { speaker_names: { A: 'Dana Ortiz' } });
+  expect(editorDetails().open).toBe(true);
+  expect(screen.queryByText(/secret_internal_code/)).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Suggestions for Speaker B'), { target: { value: 'candidate-three' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Use Sam Lee for Speaker B' }));
+  expect(screen.getByLabelText('Manual display name for Speaker B')).toHaveValue('Sam Lee');
+  expect(screen.getByLabelText('Suggestions for Speaker B')).toHaveValue('');
+  expect(screen.getByRole('button', { name: 'Save names' })).toBeEnabled();
+});
+
+test.each([
+  ['abstained', 'The Zoom transcript did not match the speakers confidently; name them manually.'],
+  ['no_speakers', 'The Zoom transcript has no speaker labels.'],
+  ['failed', 'Automatic speaker matching did not complete; name speakers manually.'],
+  ['superseded', 'Names were edited before matching finished.'],
+])('%s alignment keeps the editor primary with a one-line reason', async (status, reason) => {
+  await openReadyJob({ status, code: 'internal_code_x' });
+  expect(screen.getByText(reason)).toBeInTheDocument();
+  expect(screen.queryByText('Adjust names manually')).not.toBeInTheDocument();
+  expect(screen.queryByText(/internal_code_x/)).not.toBeInTheDocument();
+});
+
+test('a job with no alignment renders the legacy editor without alignment notices', async () => {
+  await openReadyJob(undefined);
+  expect(screen.queryByText('Adjust names manually')).not.toBeInTheDocument();
+  expect(screen.queryByText(/Speaker names from Zoom transcript|Matching speaker names|did not match|no speaker labels/)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Publish transcript' })).toBeEnabled();
+});
+
+test('a create response without a Zoom transcript upload errors before any put or start and re-enables the button', async () => {
+  mockUploadFetch({ zoom: null });
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  await pickFiles({ audio: audioFile(), vtt: vttFileOf() });
+  fireEvent.click(screen.getByRole('button', { name: 'Upload and start transcription' }));
+  expect(await screen.findByText(/did not return a Zoom transcript upload/)).toBeInTheDocument();
+  expect(put).not.toHaveBeenCalled();
+  expect(global.fetch.mock.calls.some(isStart)).toBe(false);
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Upload and start transcription' })).toBeEnabled());
+});
+
+test('a Zoom transcript upload contract without an integer size limit errors before any put', async () => {
+  mockUploadFetch({ zoom: { ...zoomUpload, maximumSizeInBytes: undefined } });
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  await pickFiles({ audio: audioFile(), vtt: vttFileOf() });
+  fireEvent.click(screen.getByRole('button', { name: 'Upload and start transcription' }));
+  expect(await screen.findByText(/incomplete Zoom transcript contract/)).toBeInTheDocument();
+  expect(put).not.toHaveBeenCalled();
+});
+
+test('multi-file selection never clears the other slot', async () => {
+  mockUploadFetch();
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  await pickFiles({ audio: audioFile(), vtt: vttFileOf(), ack: false });
+  const second = new File(['v'], 'second.vtt', { type: 'text/vtt' });
+  fireEvent.change(screen.getByLabelText('Zoom transcript (.vtt, optional)'), { target: { files: [vttFileOf(), second] } });
+  expect(screen.getByText(/recording\.mp3/)).toBeInTheDocument();
+  const otherAudio = new File(['a'], 'other.mp3', { type: 'audio/mpeg' });
+  fireEvent.change(screen.getByLabelText('Audio file'), { target: { files: [audioFile(), otherAudio] } });
+  expect(screen.getByText(/zoom\.vtt/)).toBeInTheDocument();
+});
+
+async function openPendingThenApply({ typeFirst }) {
+  let applied = false;
+  const jobBody = () => (applied
+    ? job({ version: 2, speaker_alignment: { status: 'applied', speakers: { A: { name: 'Dana Ortiz', confidence: 0.9 }, B: { name: 'Sam Lee', confidence: 0.9 } } }, zoomTranscriptAttached: true, speaker_names: { A: 'Dana Ortiz', B: 'Sam Lee' } })
+    : job({ speaker_alignment: { status: 'pending' }, zoomTranscriptAttached: true }));
+  global.fetch = jest.fn(async (url) => (String(url).endsWith('/transcriptions')
+    ? response(collection({ jobs: [jobBody()] }))
+    : response({ job: jobBody(), content, candidates: [] })));
+  render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: /site-visit\.m4a/ }));
+  await screen.findByLabelText('Manual display name for Speaker A');
+  if (typeFirst) fireEvent.change(screen.getByLabelText('Manual display name for Speaker A'), { target: { value: 'Typed A' } });
+  applied = true;
+  fireEvent.click(screen.getByRole('button', { name: 'Check matching status' }));
+  await screen.findByText('Speaker names from Zoom transcript');
+}
+
+test('an untouched draft shows the applied names once matching finishes', async () => {
+  await openPendingThenApply({ typeFirst: false });
+  expect(screen.getByLabelText('Manual display name for Speaker A')).toHaveValue('Dana Ortiz');
+  expect(screen.getByLabelText('Manual display name for Speaker B')).toHaveValue('Sam Lee');
+  expect(screen.getByText('Speaker names saved')).toBeInTheDocument();
+});
+
+test('a name typed during matching survives completion', async () => {
+  await openPendingThenApply({ typeFirst: true });
+  expect(screen.getByLabelText('Manual display name for Speaker A')).toHaveValue('Typed A');
+  expect(screen.getByLabelText('Manual display name for Speaker B')).toHaveValue('');
+  expect(screen.getByText('Unsaved speaker-name changes')).toBeInTheDocument();
 });

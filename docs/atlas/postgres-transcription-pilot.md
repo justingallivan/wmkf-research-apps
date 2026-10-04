@@ -14,12 +14,38 @@ related:
   - lib/db/migrations/060_transcription_jobs.sql
   - lib/db/migrations/061_transcription_workflow_dispatches.sql
   - lib/db/migrations/063_meeting_tracker_transcription.sql
+  - lib/db/migrations/065_transcription_zoom_transcript.sql
   - lib/services/transcription-pilot/store.js
+  - lib/services/transcription-pilot/zoom-vtt.js
+  - docs/plans/ZOOM_VTT_SPEAKER_MAPPING_PLAN_2026-10-04.md
 ---
 
 # Atlas: AssemblyAI transcription pilot (Postgres)
 
 ## Current status
+
+**[BUILT ON BRANCH `feature/zoom-vtt-speaker-mapping`, 2026-10-04; NOT APPLIED TO ANY DATABASE; NOT DEPLOYED.]**
+Migration `065_transcription_zoom_transcript.sql` adds four nullable columns to
+`transcription_jobs` for the optional Zoom WebVTT upload and post-ready
+speaker alignment: `zoom_transcript_pathname`, `zoom_transcript_cleanup_pathname`,
+`zoom_transcript_sha256`, and `speaker_alignment` (JSONB, bounded object ≤ 64 KiB
+via `transcription_jobs_speaker_alignment_shape`). It re-creates
+`transcription_jobs_purged_content_shape` so both the Zoom pointer and the
+alignment are null once content is purged. The Zoom file is retained for the
+life of the job (not deleted with the audio at ready) and deleted by the same
+purge that deletes the transcript; late-upload retention mirrors the audio
+input path. Alignment runs after ready under the job's existing lease
+(`claimJobForAlignment` / `completeAlignment` / `failAlignment`, plus
+`claimNextPendingAlignmentJob` and `expireExhaustedAlignments` for hourly
+recovery); while the lease is held, the speaker PATCH and publication freeze
+return 409. `speaker_alignment` is projected through an allowlist (status,
+attempts, code, per-speaker name and confidence, suggestions) and never exposes a
+pathname. Local PostgreSQL 16 integration suites cover the fences (37 cases).
+Enabling in Production requires applying 065 before deploying the runtime and
+seeding the `meeting-transcript.speaker-alignment` prompt row; see the plan.
+[VERIFIED via `lib/db/migrations/065_transcription_zoom_transcript.sql`,
+`lib/services/transcription-pilot/store.js` alignment functions, and
+`tests/integration/meeting-tracker-transcription.pg.test.js` on the branch.]
 
 **[VERIFIED via Production migration readback, deployment configuration, and
 bounded staff acceptance, 2026-10-02]** The shared Meeting Tracker release is
@@ -205,10 +231,12 @@ on the live one-job transcript.
   `lib/db/migrations/062_transcription_speaker_names.sql` (applied/read back in isolated Neon),
   `lib/db/migrations/063_meeting_tracker_transcription.sql` and
   `lib/db/migrations/064_meeting_transcript_close_attribution.sql` (applied to shared Production and dedicated Preview test Neon; Production physical schema readback verified 2026-10-02),
-  `lib/db/migrations-manifest.json`, and `scripts/setup-database.js`.
+  `lib/db/migrations-manifest.json`, and `scripts/setup-database.js`;
+  `lib/db/migrations/065_transcription_zoom_transcript.sql` (branch-built, not applied anywhere as of 2026-10-04).
 - Persistence/model/formatters: `lib/services/transcription-pilot/store.js`,
-  `model.js`, and `transcript-format.js`; the cron readiness-only mode is
-  implemented in `lib/services/transcription-pilot/preflight.js`.
+  `model.js`, `transcript-format.js`, and `zoom-vtt.js` (pure Zoom WebVTT
+  parser, cue-exclusive name support, verdict verifier); the cron readiness-only mode is
+  implemented in `lib/services/transcription-pilot/preflight.js` (checks 062 and 065).
 - Consumers: `lib/services/transcription-pilot/runtime.js` and `worker.js`,
   `lib/services/transcription-pilot/workflow-dispatch.js`, `workflow.js`,
   and the provider-free `workflow-probe.js`,

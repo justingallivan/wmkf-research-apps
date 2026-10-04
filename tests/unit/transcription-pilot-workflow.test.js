@@ -11,6 +11,9 @@ jest.mock('../../lib/services/transcription-pilot/store', () => ({
   touchTranscriptionWorkflowDispatch: jest.fn(),
 }));
 jest.mock('../../lib/services/transcription-pilot/worker', () => ({ advanceTranscriptionPilotJob: jest.fn() }));
+jest.mock('../../lib/services/meeting-tracker-transcription/alignment-service', () => ({
+  alignMeetingTranscriptionSpeakers: jest.fn(),
+}));
 jest.mock('../../lib/services/transcription-pilot/workflow-dispatch', () => ({
   dispatchQueuedTranscriptionWorkflow: jest.fn().mockResolvedValue({ started: true, state: 'running' }),
 }));
@@ -22,6 +25,7 @@ import {
 } from '../../lib/services/transcription-pilot/store';
 import { advanceTranscriptionPilotJob } from '../../lib/services/transcription-pilot/worker';
 import { dispatchQueuedTranscriptionWorkflow } from '../../lib/services/transcription-pilot/workflow-dispatch';
+import { alignMeetingTranscriptionSpeakers } from '../../lib/services/meeting-tracker-transcription/alignment-service';
 import { transcriptionPilotWorkflow } from '../../lib/services/transcription-pilot/workflow';
 
 const jobId = '00000000-0000-4000-8000-000000000001';
@@ -33,6 +37,7 @@ beforeEach(() => {
   touchTranscriptionWorkflowDispatch.mockResolvedValue(true);
   advanceTranscriptionPilotJob.mockResolvedValue({ state: 'complete' });
   dispatchQueuedTranscriptionWorkflow.mockResolvedValue({ started: true, state: 'running' });
+  alignMeetingTranscriptionSpeakers.mockResolvedValue({ outcome: 'applied' });
 });
 
 test('ready or paused work finishes without an idle retention sleep', async () => {
@@ -103,4 +108,34 @@ test('a transient handoff failure is retried with only a fixed message and delay
   expect(error.message).toBe('transcription_workflow_handoff_failed');
   expect(error.options).toEqual({ retryAfter: 60_000 });
   expect(JSON.stringify(error)).not.toContain('private');
+});
+
+test('speaker alignment runs once, only on complete, after finishStep, under the lease budget', async () => {
+  const before = Date.now();
+  await transcriptionPilotWorkflow(jobId, 1);
+  expect(alignMeetingTranscriptionSpeakers).toHaveBeenCalledTimes(1);
+  const [{ jobId: aligned, deadlineMs }] = alignMeetingTranscriptionSpeakers.mock.calls[0];
+  expect(aligned).toBe(jobId);
+  expect(deadlineMs - before).toBeGreaterThan(100_000);
+  expect(deadlineMs - Date.now()).toBeLessThanOrEqual(150_000);
+  expect(finishTranscriptionWorkflowDispatch.mock.invocationCallOrder[0])
+    .toBeLessThan(alignMeetingTranscriptionSpeakers.mock.invocationCallOrder[0]);
+});
+
+test.each(['paused', 'attention'])('speaker alignment is skipped when the job state is %s', async (state) => {
+  advanceTranscriptionPilotJob.mockResolvedValue({ state });
+  await transcriptionPilotWorkflow(jobId, 1);
+  expect(finishTranscriptionWorkflowDispatch).toHaveBeenCalled();
+  expect(alignMeetingTranscriptionSpeakers).not.toHaveBeenCalled();
+});
+
+test('a recorded alignment failure does not fail the workflow', async () => {
+  alignMeetingTranscriptionSpeakers.mockResolvedValue({ outcome: 'failed', code: 'alignment_blocked' });
+  await expect(transcriptionPilotWorkflow(jobId, 1)).resolves.toBeUndefined();
+});
+
+test('an exhausted alignment step does not fail the workflow run', async () => {
+  alignMeetingTranscriptionSpeakers.mockRejectedValue(new Error('private database detail'));
+  await expect(transcriptionPilotWorkflow(jobId, 1)).resolves.toBeUndefined();
+  expect(finishTranscriptionWorkflowDispatch).toHaveBeenCalledTimes(1);
 });

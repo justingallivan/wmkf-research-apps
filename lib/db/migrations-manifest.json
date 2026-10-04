@@ -63,6 +63,7 @@
     "061_transcription_workflow_dispatches.sql",
     "062_transcription_speaker_names.sql",
     "063_meeting_tracker_transcription.sql",
-    "064_meeting_transcript_close_attribution.sql"
+    "064_meeting_transcript_close_attribution.sql",
+    "065_transcription_zoom_transcript.sql"
   ]
 }

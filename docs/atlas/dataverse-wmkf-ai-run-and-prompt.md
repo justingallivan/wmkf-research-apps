@@ -85,6 +85,18 @@ Migration plans touching either entity must preserve these foreign keys.
 - Connor edits in Dynamics directly (per `project_dynamics_as_prompt_ground_truth.md` — staff-readable/editable prompts).
 - `scripts/seed-phase-i-summary-prompt.js`, `scripts/seed-phase-ii-prompts.js` (4 `phase-ii.*` rows), `scripts/seed-reviewer-finder-prompts.js` (2 `reviewer-finder.*` rows), `scripts/seed-peer-review-summarizer-prompts.js` (2 `peer-review-summarizer.*` rows) — **upsert** prompt rows keyed on `wmkf_ai_promptname` + `wmkf_ai_iscurrent` (update-in-place when current). LEGACY pattern; not yet converted (a separate audited sweep — S269 Codex review).
 - **Seed governance (S269) — `lib/services/prompt-seed.js`, the GO-FORWARD default for Tier-1 system prompts.** The grantee title/abstract, Initial Assessment, Review Synthesis, and local Pre-Site Visit proposal-core seeds use it: **create-only by default** (refuses if ANY row for the name exists — admin's versioned history is never clobbered; the file is a bootstrap artifact, not the live state), and **`--force` is version-preserving** (publishes `max(version)+1` as a new current row, flips priors with ETag — same invariant as the admin publish path). Stamps `wmkf_ai_publisheddatetime` on every version. **Dataverse `wmkf_ai_prompts` is the source of truth; after bootstrap, `/admin` versioned publish is the governed edit path.** Admin publish can change body, system prompt, validated output-schema JSON, and `wmkf_ai_model` only by creating a new immutable version. It checks the editor's expected version, validates the complete template/schema, and rejects unreviewed models; native-structured prompts additionally require a reviewed compatible concrete model whose output limit covers the stored token budget. Provenance is legible via `createdon` (version created) / `wmkf_ai_publisheddatetime` (domain publish) / `modifiedon` (last touch) / `_modifiedby_value` (seed = app identity, admin = superuser). Rationale: [[project-prompt-governance]].
+- **Meeting transcript speaker alignment (branch-built 2026-10-04; NOT SEEDED in
+  any environment):** `shared/config/prompts/meeting-speaker-alignment.js`
+  defines `meeting-transcript.speaker-alignment` (three `override` variables, all
+  `untrusted` with `dataClass: 'meeting_transcript'`; json-mode `record` verdict
+  keyed by provider speaker ID; `rawOutputRetention: 'none'`; single `kind: none`
+  output) and `scripts/seed-meeting-speaker-alignment-prompt.js` is a create-only
+  `seedPromptRow` bootstrap with the `sonnet` tier alias and 16384 max tokens.
+  The caller `lib/services/meeting-tracker-transcription/alignment-service.js`
+  passes `requireNoPersistence: true` and the Executor's `auditRetention:
+  'content-free'` option (added on the same branch) so no run row carries
+  transcript text or names on any path. The row must be seeded before alignment
+  is enabled so its variable caps match the code.
 - **Pre-Site Visit proposal core (Production-live durable app slice and prompt,
   2026-08-17):**
   `shared/config/prompts/pre-site-visit-proposal-core.js` defines the reviewed

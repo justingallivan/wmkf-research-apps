@@ -190,9 +190,9 @@ async function preflight(client, projectMeetingTranscriptionJob) {
     const expectedKeys = [
       'id', 'status', 'version', 'created_at', 'updated_at', 'original_filename',
       'declared_content_type', 'declared_bytes', 'verified_content_type', 'verified_bytes',
-      'audio_duration_ms', 'ready_at', 'expires_at', 'speaker_names', 'label',
+      'audio_duration_ms', 'ready_at', 'expires_at', 'speaker_names', 'speaker_alignment', 'label',
       'needsAttention', 'contentAccessAllowed', 'contentDeletionObserved',
-      'lateUploadWatchPending', 'cleanupPending',
+      'lateUploadWatchPending', 'cleanupPending', 'zoomTranscriptAttached',
     ].sort();
     const projectedFlags = {
       contentDeletionObserved: projected?.contentDeletionObserved,

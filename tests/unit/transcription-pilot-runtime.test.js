@@ -7,6 +7,7 @@ jest.mock('../../lib/services/transcription-pilot/media-inspector', () => ({ ins
 jest.mock('../../lib/services/transcription-pilot/model', () => ({ projectOwnerTranscriptionJob: jest.fn(row => ({
   id: row.id, status: row.status,
   contentDeletionObserved: row.content_purged_at != null,
+  speaker_alignment: row.speaker_alignment ?? null,
   lateUploadWatchPending: row.input_cleanup_pathname != null && row.upload_valid_until != null
     && (row.cleanup_requested_at != null || row.content_purged_at != null),
 })) }));
@@ -14,13 +15,19 @@ jest.mock('../../lib/services/transcription-pilot/store', () => ({
   claimNextTranscriptionJob: jest.fn(), createTranscriptionJob: jest.fn(), getOwnerTranscriptionJob: jest.fn(),
   listOwnerTranscriptionJobs: jest.fn(), mutateLeasedTranscriptionJob: jest.fn(), queueTranscriptionJob: jest.fn(),
   reserveTranscriptionUploadWindow: jest.fn(),
+  createMeetingTranscriptionJob: jest.fn(), getMeetingTranscriptionJob: jest.fn(),
+  reserveMeetingTranscriptionUploadWindow: jest.fn(), queueMeetingTranscriptionJob: jest.fn(),
+}));
+jest.mock('../../lib/services/meeting-tracker-transcription/policy', () => ({
+  requireMeetingTranscriptionEnabled: jest.fn(), getMeetingTranscriptionControls: jest.fn(),
 }));
 
 import { ReadableStream } from 'node:stream/web';
 import { del, get, put } from '@vercel/blob';
 import { generateClientTokenFromReadWriteToken } from '@vercel/blob/client';
 import * as store from '../../lib/services/transcription-pilot/store';
-import { createOwnerUpload, deletePrivatePath, projectMeetingTranscriptionJob, readPrivateContentIfPresent, writePrivateContent, __private } from '../../lib/services/transcription-pilot/runtime';
+import { inspectAudioBuffer } from '../../lib/services/transcription-pilot/media-inspector';
+import { createMeetingTranscriptionUpload, queueMeetingTranscription, createOwnerUpload, deletePrivatePath, projectMeetingTranscriptionJob, readPrivateContentIfPresent, writePrivateContent, __private } from '../../lib/services/transcription-pilot/runtime';
 
 const job = {
   id: '11111111-1111-4111-8111-111111111111', owner_profile_id: 42, status: 'uploading', version: 1,
@@ -63,6 +70,23 @@ describe('transcription pilot private Blob runtime', () => {
     expect(projected).not.toHaveProperty('upload_valid_until');
     expect(projected).not.toHaveProperty('provider_transcript_id');
     expect(projected).not.toHaveProperty('provider_upload_ref_ciphertext');
+  });
+
+  it('exposes alignment status and a Zoom-attached boolean but never the Zoom pathnames', () => {
+    const projected = projectMeetingTranscriptionJob({
+      id: 'meeting-job', status: 'ready', output_pathname: 'private/output.json',
+      expires_at: new Date(Date.now() + 86_400_000),
+      zoom_transcript_cleanup_pathname: 'private/zoom-transcript.vtt',
+      zoom_transcript_pathname: 'private/zoom-transcript.vtt', zoom_transcript_sha256: 'a'.repeat(64),
+      speaker_alignment: { status: 'pending', attempts: 0 },
+    });
+    expect(projected).toMatchObject({ zoomTranscriptAttached: true, speaker_alignment: { status: 'pending', attempts: 0 } });
+    for (const field of ['zoom_transcript_pathname', 'zoom_transcript_cleanup_pathname', 'zoom_transcript_sha256']) {
+      expect(projected).not.toHaveProperty(field);
+    }
+    expect(JSON.stringify(projected)).not.toContain('zoom-transcript.vtt');
+    expect(projectMeetingTranscriptionJob({ id: 'j', status: 'ready', expires_at: new Date(Date.now() + 1e6) }))
+      .toMatchObject({ zoomTranscriptAttached: false });
   });
 
   it('persists a bounded upload window before minting the client capability', async () => {
@@ -165,5 +189,123 @@ describe('transcription pilot private Blob runtime', () => {
     await expect(createOwnerUpload({ ownerProfileId: 42, body: {} })).rejects.toMatchObject({ code: 'transcription_submissions_disabled' });
     expect(store.createTranscriptionJob).not.toHaveBeenCalled();
     expect(generateClientTokenFromReadWriteToken).not.toHaveBeenCalled();
+  });
+});
+
+describe('Meeting Tracker Zoom transcript upload and start', () => {
+  const requestId = '33333333-3333-4333-8333-333333333333';
+  const siteVisitActivityId = '44444444-4444-4444-8444-444444444444';
+  const jobId = '11111111-1111-4111-8111-111111111111';
+  const audioPath = `transcription-pilot/42/${jobId}/input/audio.mp3`;
+  const zoomPath = `transcription-pilot/42/${jobId}/input/zoom-transcript.vtt`;
+  const body = (extra = {}) => ({
+    filename: 'meeting.mp3', contentType: 'audio/mpeg', bytes: 4,
+    idempotencyKey: '55555555-5555-4555-8555-555555555555', providerRegion: 'us', ...extra,
+  });
+  const vtt = 'WEBVTT\n\n1\n00:00:01.000 --> 00:00:03.000\nAlice Example: hello there everyone\n';
+  const row = (extra = {}) => ({
+    ...job, input_cleanup_pathname: audioPath, declared_bytes: 4, declared_content_type: 'audio/mpeg',
+    zoom_transcript_cleanup_pathname: zoomPath, options_snapshot: { zoomTranscript: { bytes: Buffer.byteLength(vtt) } },
+    ...extra,
+  });
+  const blobResult = (buffer, contentType, pathname) => ({ statusCode: 200, stream: readable(buffer), blob: { pathname, contentType, etag: 'e' } });
+  const queueArgs = { ownerProfileId: 42, requestId, siteVisitActivityId, jobId, expectedVersion: 1, acknowledged: true };
+
+  beforeEach(() => {
+    process.env.TRANSCRIPTION_PILOT_ENABLED = 'true';
+    process.env.UPLOADS_BLOB_RW_TOKEN = 'private-test-token';
+    jest.clearAllMocks();
+    generateClientTokenFromReadWriteToken.mockImplementation(async ({ pathname }) => `token:${pathname}`);
+    store.reserveMeetingTranscriptionUploadWindow.mockResolvedValue({ ...job, version: 2 });
+    store.createMeetingTranscriptionJob.mockImplementation(async (input) => ({
+      created: true, job: { ...job, id: input.id, input_cleanup_pathname: input.inputPathname,
+        zoom_transcript_cleanup_pathname: input.zoomTranscriptCleanupPathname ?? null },
+    }));
+    store.queueMeetingTranscriptionJob.mockResolvedValue({ ...job, status: 'queued' });
+    inspectAudioBuffer.mockResolvedValue({ container: 'MPEG', durationSeconds: 5 });
+  });
+
+  it('mints a second text/vtt-only token on a server-chosen path and snapshots bytes only', async () => {
+    const result = await createMeetingTranscriptionUpload({ ownerProfileId: 42, requestId, siteVisitActivityId,
+      body: body({ zoomTranscript: { contentType: 'text/vtt', bytes: 1234 } }) });
+    const input = store.createMeetingTranscriptionJob.mock.calls[0][0];
+    expect(input.zoomTranscriptCleanupPathname).toBe(`transcription-pilot/42/${input.id}/input/zoom-transcript.vtt`);
+    expect(input.optionsSnapshot).toEqual({ zoomTranscript: { bytes: 1234 } });
+    expect(generateClientTokenFromReadWriteToken).toHaveBeenCalledTimes(2);
+    const zoomCall = generateClientTokenFromReadWriteToken.mock.calls[1][0];
+    expect(zoomCall).toMatchObject({ pathname: input.zoomTranscriptCleanupPathname, maximumSizeInBytes: 1234,
+      allowedContentTypes: ['text/vtt'], addRandomSuffix: false });
+    expect(zoomCall.validUntil).toBe(generateClientTokenFromReadWriteToken.mock.calls[0][0].validUntil);
+    expect(result.upload.zoomTranscript).toEqual({ pathname: input.zoomTranscriptCleanupPathname,
+      token: `token:${input.zoomTranscriptCleanupPathname}`, maximumSizeInBytes: 1234, contentType: 'text/vtt' });
+  });
+
+  it('without a Zoom transcript mints one token and returns zoomTranscript null', async () => {
+    const result = await createMeetingTranscriptionUpload({ ownerProfileId: 42, requestId, siteVisitActivityId, body: body() });
+    expect(generateClientTokenFromReadWriteToken).toHaveBeenCalledTimes(1);
+    expect(store.createMeetingTranscriptionJob.mock.calls[0][0].optionsSnapshot).toEqual({});
+    expect(result.upload.zoomTranscript).toBeNull();
+  });
+
+  it.each([
+    ['another content type', { contentType: 'text/plain', bytes: 10 }],
+    ['a filename', { contentType: 'text/vtt', bytes: 10, filename: 'x.vtt' }],
+    ['zero bytes', { contentType: 'text/vtt', bytes: 0 }],
+    ['too many bytes', { contentType: 'text/vtt', bytes: 4_000_001 }],
+    ['fractional bytes', { contentType: 'text/vtt', bytes: 1.5 }],
+  ])('rejects a zoomTranscript with %s before creating a row', async (_label, zoomTranscript) => {
+    await expect(createMeetingTranscriptionUpload({ ownerProfileId: 42, requestId, siteVisitActivityId, body: body({ zoomTranscript }) }))
+      .rejects.toMatchObject({ code: 'invalid_zoom_transcript_metadata' });
+    expect(store.createMeetingTranscriptionJob).not.toHaveBeenCalled();
+    expect(generateClientTokenFromReadWriteToken).not.toHaveBeenCalled();
+  });
+
+  function arrangeStart({ zoom, zoomRow = row() }) {
+    store.getMeetingTranscriptionJob.mockResolvedValue(zoomRow);
+    get.mockImplementation(async (pathname) => {
+      if (pathname === audioPath) return blobResult(Buffer.from('abcd'), 'audio/mpeg', audioPath);
+      return zoom === null ? null : zoom;
+    });
+  }
+
+  it('start with a valid VTT passes its sha256 and no alignment marker', async () => {
+    arrangeStart({ zoom: blobResult(Buffer.from(vtt), 'text/vtt', zoomPath) });
+    await queueMeetingTranscription(queueArgs);
+    const call = store.queueMeetingTranscriptionJob.mock.calls[0][0];
+    expect(call.zoomTranscriptSha256).toBe(require('node:crypto').createHash('sha256').update(vtt).digest('hex'));
+    expect(call.speakerAlignment).toBeNull();
+  });
+
+  it('start with a speaker-less VTT records no_speakers', async () => {
+    const plain = 'WEBVTT\n\n00:00:01.000 --> 00:00:03.000\nno speaker prefix here at all\n';
+    arrangeStart({ zoom: blobResult(Buffer.from(plain), 'text/vtt', zoomPath),
+      zoomRow: row({ options_snapshot: { zoomTranscript: { bytes: Buffer.byteLength(plain) } } }) });
+    await queueMeetingTranscription(queueArgs);
+    expect(store.queueMeetingTranscriptionJob.mock.calls[0][0].speakerAlignment).toEqual({ status: 'no_speakers', attempts: 0 });
+    expect(store.queueMeetingTranscriptionJob.mock.calls[0][0].zoomTranscriptSha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('start without a Zoom attachment does not read or hash one', async () => {
+    arrangeStart({ zoom: null, zoomRow: row({ zoom_transcript_cleanup_pathname: null }) });
+    await queueMeetingTranscription(queueArgs);
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(store.queueMeetingTranscriptionJob.mock.calls[0][0]).toMatchObject({ zoomTranscriptSha256: null, speakerAlignment: null });
+  });
+
+  it('a missing VTT blob is 410 zoom_transcript_missing and nothing is queued', async () => {
+    arrangeStart({ zoom: null });
+    await expect(queueMeetingTranscription(queueArgs)).rejects.toMatchObject({ code: 'zoom_transcript_missing', status: 410 });
+    expect(store.queueMeetingTranscriptionJob).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['size mismatch', () => blobResult(Buffer.from(`${vtt}extra`), 'text/vtt', zoomPath)],
+    ['wrong content type', () => blobResult(Buffer.from(vtt), 'text/plain', zoomPath)],
+    ['pathname mismatch', () => blobResult(Buffer.from(vtt), 'text/vtt', `${zoomPath}.other`)],
+    ['missing WEBVTT header', () => blobResult(Buffer.from(vtt.replace('WEBVTT', 'NOTVTT')), 'text/vtt', zoomPath)],
+  ])('a VTT with %s is 422 zoom_transcript_invalid and nothing is queued', async (_label, make) => {
+    arrangeStart({ zoom: make() });
+    await expect(queueMeetingTranscription(queueArgs)).rejects.toMatchObject({ code: 'zoom_transcript_invalid', status: 422 });
+    expect(store.queueMeetingTranscriptionJob).not.toHaveBeenCalled();
   });
 });

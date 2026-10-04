@@ -14,7 +14,10 @@ related:
   - docs/plans/evidence/MEETING_TRANSCRIPTION_READINESS_CHECK_2026-10-02.md
   - lib/db/migrations/063_meeting_tracker_transcription.sql
   - lib/db/migrations/064_meeting_transcript_close_attribution.sql
+  - lib/db/migrations/065_transcription_zoom_transcript.sql
   - lib/services/transcription-pilot/store.js
+  - lib/services/meeting-tracker-transcription/alignment-service.js
+  - docs/plans/ZOOM_VTT_SPEAKER_MAPPING_PLAN_2026-10-04.md
 ---
 
 # Atlas: Meeting Tracker transcript publications (Postgres)
@@ -93,6 +96,26 @@ The migration also adds these nullable columns to `transcription_jobs`:
 | `site_visit_activity_id` | Exact Site Visit activity UUID; a CHECK requires it to be null exactly when `request_id` is null. |
 | `publication_operation_id` | Active publication operation associated with the job. |
 | `updated_by_profile_id` | Profile attribution; references `user_profiles.id`. |
+
+**[BUILT ON BRANCH `feature/zoom-vtt-speaker-mapping`, 2026-10-04; NOT APPLIED; NOT DEPLOYED.]**
+Migration 065 adds these nullable columns to `transcription_jobs` for the optional
+Zoom WebVTT upload and automatic speaker naming:
+
+| Column | Purpose / constraint |
+|---|---|
+| `zoom_transcript_pathname` | Live pointer to the private Zoom VTT blob; retained for the life of the job; cleared at purge. |
+| `zoom_transcript_cleanup_pathname` | Exact server-minted path deleted at purge; retained under the late-upload watch like the audio input path. |
+| `zoom_transcript_sha256` | Hash verified at start and re-verified before alignment. |
+| `speaker_alignment` | Bounded JSONB status/result (`pending`, `running`, `applied`, `partial`, `abstained`, `no_speakers`, `failed`, `superseded`); CHECK `transcription_jobs_speaker_alignment_shape`; must be null once content is purged (re-created `transcription_jobs_purged_content_shape`). |
+
+Alignment is a post-ready stage: the ready transition only stamps `pending`; a
+workflow step (and the hourly recovery cron) claims the job lease, reads the
+transcript and VTT, calls the `meeting-transcript.speaker-alignment` Executor
+prompt content-free, verifies the verdict against cue-exclusive wording support,
+and writes `speaker_names` plus `speaker_alignment` under the lease and version
+fence. A publication that exists for the job, a hand edit, or a held lease makes
+alignment yield (`superseded` / 409), never overwrite. Service:
+`lib/services/meeting-tracker-transcription/alignment-service.js`.
 
 An index supports recent request-bound job listing. Migration 063 leaves the
 global active provider-slot index from migration 060 unchanged: jobs in
@@ -268,6 +291,7 @@ The rehearsal added no table and did not itself enable Production processing.
   readback is summarized above; also exercised in disposable local PostgreSQL
   16 integration).
 - Store: `lib/services/transcription-pilot/store.js`.
+- Zoom VTT speaker alignment (branch-built 2026-10-04, not applied or deployed): `lib/db/migrations/065_transcription_zoom_transcript.sql`, `lib/services/transcription-pilot/zoom-vtt.js`, `lib/services/meeting-tracker-transcription/alignment-service.js`, and [Zoom VTT speaker mapping plan](../plans/ZOOM_VTT_SPEAKER_MAPPING_PLAN_2026-10-04.md).
 - Settled product and publication contract: [Meeting Tracker transcription plan](../plans/MEETING_TRACKER_TRANSCRIPTION_PLAN_2026-10-01.md).
 - Dedicated pilot deployment and isolated Neon evidence: [AssemblyAI transcription pilot Atlas](postgres-transcription-pilot.md).
 
