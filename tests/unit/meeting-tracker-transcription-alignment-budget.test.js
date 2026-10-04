@@ -74,5 +74,5 @@ test('the runtime serializer and the natively importable alignment-samples modul
   const service = await import('../../lib/services/meeting-tracker-transcription/alignment-service.js');
   const samples = await import('../../lib/services/meeting-tracker-transcription/alignment-samples.js');
   expect(service.serializeSpeakerSamples).toBe(samples.serializeSpeakerSamples);
-  expect(samples.VARIABLE_MAX.speaker_samples).toBe(160000);
+  expect(samples.VARIABLE_MAX.speaker_samples).toBe(400); // this suite mocks the prompt budget to 400 chars
 });

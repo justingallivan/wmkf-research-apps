@@ -42,8 +42,9 @@ return 409. `speaker_alignment` is projected through an allowlist (status,
 attempts, code, per-speaker name, confidence and `basis` of `model` or `support`,
 suggestions, and per-speaker `reasons` codes for IDs not applied; added 2026-10-04)
 and never exposes a pathname. Local PostgreSQL 16 integration suites cover the fences (37 cases).
-Enabling in Production requires applying 065 before deploying the runtime and
-seeding the `meeting-transcript.speaker-alignment` prompt row; see the plan.
+Production enablement completed 2026-10-04: migration 065 applied, runtime merged
+as `c99f8d966`, and the `meeting-transcript.speaker-alignment` prompt row seeded
+(v1, `sonnet` tier); the first rehearsal ran on Request 1003222 the same day.
 [VERIFIED via `lib/db/migrations/065_transcription_zoom_transcript.sql`,
 `lib/services/transcription-pilot/store.js` alignment functions, and
 `tests/integration/meeting-tracker-transcription.pg.test.js` on the branch.]
