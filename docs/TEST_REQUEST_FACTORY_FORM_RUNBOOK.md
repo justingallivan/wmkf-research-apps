@@ -113,7 +113,7 @@ Only a `ready` production run. One change may be open per run. The form confirms
 
 The recheck's `ok` means this pass found no newly unrecorded effects and no open or failed jobs. It does not establish that the change had no effects, that an email was delivered, or that a sender has stopped. A change still marked `dispatched` remains unresolved. No new web closure, rerun or recovery action is authorized by rechecking.
 
-[BRANCH IMPLEMENTATION, not deployed] The status-outcome explanation displays the returned change number and recorded status beside per-pass counts, keeps unresolved results visually distinct from complete results, and discards results when a later journal read identifies a different change or status. Starting another status action clears the old recheck result. The existing actor/superuser checks and operation semantics remain unchanged.
+[SOURCE; #427 merged as `025749f4d`, owner-reported Production deployment] The status-outcome explanation displays the returned change number and recorded status beside per-pass counts, keeps unresolved results visually distinct from complete results, and discards results when a later journal read identifies a different change or status. Starting another status action clears the old recheck result. The existing actor/superuser checks and operation semantics remain unchanged.
 
 ## The command-line tool
 
@@ -128,6 +128,16 @@ The recheck's `ok` means this pass found no newly unrecorded effects and no open
 | `--ledger-check` | Ledger schema against the tracked fingerprint. |
 
 To get a form run's manifest and bundle: the run panel's artifacts download, or `scripts/factory-artifacts-download.mjs` (owner-run, reads `FACTORY_BLOB_RW_TOKEN` locally).
+
+## Fresh file recovery — Sandbox build, live rehearsal pending
+
+[SOURCE, October 3; not deployed or live-rehearsed] `scripts/factory-file-readback.mjs` is a separate owner-operated command. Its initial scope is Sandbox Basic runs stopped at `file_journal_unverified`, with an exact recorded item identity and source evidence still inside the original six-hour window. Production is refused. Expired runs get `bundle_not_fresh` / `new_run_required`; recovery refuses them before claiming a lease.
+
+Inspection is read-only by default. Supply `--target=sandbox --run-id=<GUID> --confirm-request=<number>`. Form-created runs load their saved private artifacts; CLI-created runs may supply paired absolute `--manifest` and `--bundle` paths. Both paths are subject to the same manifest/bundle/run integrity checks.
+
+Recovery additionally requires `--recover --receipt-out=/absolute/private/new-file.json`, with the receipt outside the repository. It claims the current run lease, repeats exact Request/source/file/inventory verification, writes a private create-only evidence file, and atomically compares the run and resource snapshots. Success verifies one receipt and restores the same copy step. The ordinary runner must still process remaining files and perform final verification; this command never uploads or marks ready.
+
+The private file records **pre-transaction evidence and intent**, not proof the database transition committed. After a lost response or other ambiguous result, inspect the ledger before taking another action. A conflict leaves recovery unconfirmed. A successful result names `recovered_to_copy_step`; the recorded file's verified outcome and the run's same-step state are the authority. No live run has been recovered with this command yet. Retained Request 1003308 remains untouched; enabling Production recovery requires the remaining rehearsal and release decision.
 
 ## Artifacts and the daily sweep
 

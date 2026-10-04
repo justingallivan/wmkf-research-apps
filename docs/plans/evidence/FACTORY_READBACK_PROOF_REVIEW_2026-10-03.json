@@ -1,0 +1,57 @@
+{
+  "date": "2026-10-03",
+  "branch": "codex/factory-readback-proof",
+  "base": "025749f4d1eb98b335bbabad61a55e19708bca7d",
+  "status": "Offline content-integrity feasibility approved; live proof unperformed; no runtime implementation",
+  "reviews": {
+    "builder": "Luna",
+    "sol": "approved; independently ran 13 focused tests",
+    "root": "approved; ran 216 tests across three suites",
+    "fable": {
+      "authentication": "subscription OAuth; API credential variables unset",
+      "verdict": "**Verdict: approve.** The four material findings are resolved for the narrow claim (offline content-integrity feasibility only). This was a source read; I ran no tests, so the 13-pass result rests on Sol's rerun.\n\n## Findings\n\n1. **Duplicate destination \u2014 resolved.** The listing at test lines 393-399 is now built from `file.destination.filename`, so the filter at line 230 matches two entries rather than zero. The test would fail if the duplicate guard were removed, because the first entry's ID matches the receipt.\n2. **Invented reader shapes \u2014 resolved by narrowing.** The test header, the plan table's limit column and the closing `[VERIFIED via source review]` paragraph all say the site/drive/parent fields are hypothetical and that no live target or parent authority is established.\n3. **Run-pin negatives \u2014 resolved for what is now claimed.**\n   - The plan-digest check is split out at line 188, and the `run.planDigest` mutation reaches it.\n   - The pending-index case (a single row at index 1 while index 0 is requested) throws at line 171.\n   - The bare `.rejects.toThrow()` calls now assert specific messages. The three manifest-mutation messages match `basic-clone-steps.js:743,750,754`, which correctly attributes them to the existing `bundleSourceOf` rather than the candidate's pin block.\n   - The table row now reads \"selected \u2026 not an exhaustive guard audit\", which matches the coverage.\n4. **Missing `attestedDigest` \u2014 resolved by disclosure.** The plan states the failed XLSX row intentionally lacks a prior digest, that the result is in-memory only, and that the persisted-receipt invariant is not proven.\n\nThe file holds 13 cases (12 \u2212 1 + 2), consistent with the pending count.\n\n## Non-blocking residue\n\n- **Stale status prose:** the plan still says \"The 12 offline experiment cases pass\", \"Sol independently ran its 12 tests\" and \"Adversarial review is pending\". These are covered by your stated post-verdict update; make sure all three change.\n- **Untested pin block:** the combined block at lines 180-187 (run ID, request ID, location, `bundleSha256`, `copyPolicyDigest`, `createBodySha256` against `run.*`) still has no negative test of its own. The \"not exhaustive\" wording covers it, but do not later cite this suite as evidence for those bindings.\n- **\"Wrong site\" case:** it still compares against the test's own `SITE` constant. The hypothetical-shape disclaimer covers it.\n- **Shared error message:** \"missing or duplicates\" is still one message for both branches. The fixture now discriminates, so this is acceptable.\n- **Cosmetic:**\n  - `bundleStale: true` is still a literal.\n  - Callers pass unused `sourceBytes`/`destinationBytes` arguments.\n  - Plan step 3 still says \"Disposable\" where the rest says \"offline\".",
+      "is_error": false,
+      "permission_denials": []
+    }
+  },
+  "validation": {
+    "focused_tests": 13,
+    "three_suite_tests": 216,
+    "suites": [
+      "test-request-readback-recovery-proof",
+      "test-request-bundle-file-copy",
+      "docx-package-attestation"
+    ],
+    "lint": "passed",
+    "whitespace": "passed",
+    "gates": [
+      "doc-currency and self-test",
+      "fact-consistency and self-test",
+      "doc-symbol-refs and self-test",
+      "docs-catalog",
+      "secret-scan and self-test",
+      "scaffolding-tokens and self-test"
+    ]
+  },
+  "read_only_recon": {
+    "platform_census": "Registered Sandbox and Production metadata endpoints returned complete 200 listings; no business records read",
+    "sandbox_ledger": "Schema check passed on target-specific sandbox ledger",
+    "sandbox_automation": "GoVerify active on Request create; other active workflows/plugins observed",
+    "disposable_fixture": "Not verified; no clone/create/upload attempted",
+    "local_configuration": "Explicit registered Sandbox URL missing; configuration unchanged"
+  },
+  "limits": [
+    "Synthetic in-memory file reads; real Graph parent/site/drive identity adapter unproved",
+    "Selected negative guards only; combined run-pin checks not exhaustively tested",
+    "New package digest and normalized parts held in memory, no complete persisted receipt proof",
+    "No durable CAS, live concurrency, late-write or lease-fencing proof",
+    "No freshness remedy or run continuation",
+    "No production or sandbox record mutation, email, deletion, deployment or change to Request 1003308"
+  ],
+  "sha256": {
+    "tests/unit/test-request-readback-recovery-proof.test.js": "5c8f94def2e22c1761d686249d2c7688e2d2d17b45ee0cb99912f26e66066a34",
+    "lib/services/test-requests/bundle-file-copy.js": "86a136f359335373ec2f69668ce4c61c33ffcec1ec6cff215ee3ad0df26ad335",
+    "lib/services/test-requests/docx-package-attestation.js": "1abab6ab6d0a952801ea95ce176c2b7dd7c119097a16426d11301438c4fa4c80",
+    "lib/services/test-requests/basic-clone-steps.js": "60f67f928831c758fcbee304209a8bdc63fa1e72e15199f18201f9b9032a1f18"
+  }
+}

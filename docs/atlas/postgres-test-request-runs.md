@@ -31,11 +31,11 @@ and recovery" and the "3. Basic clone" build-stage row). The owner-run record
 names the local `ledger_prod` as the ledger for the production cast creation
 [VERIFIED via `docs/plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md`,
 *Order* 4]. For the first cast-bound clone (run `e33fa857`, Request 1003303)
-and its `--bind-reviewer`, *Order* 5 does not name the ledger. The CLI
-structurally requires an operator-supplied `TEST_REQUEST_LEDGER_URL` for those
+and its `--bind-reviewer`, *Order* 5 does not name the ledger. At that historical checkpoint, the CLI
+structurally required an operator-supplied `TEST_REQUEST_LEDGER_URL` for those
 modes and refuses one that is unset, equals a shared `POSTGRES_URL*` /
 `DATABASE_URL` value, or names a neon.tech host [VERIFIED via
-`scripts/rehearse-test-request-sandbox.mjs:750-760,1283-1341`]. That rules out
+`scripts/rehearse-test-request-sandbox.mjs:750-760,1283-1341`]. That historical guard ruled out
 the configured shared URLs and neon.tech hosts, but does not independently
 prove the supplied URL is local or which database was used; the
 exact owner-run target for that clone and binding is unverified (no direct
@@ -52,20 +52,8 @@ the B4 plan forbids pointing that runner at them (cast plan, *Order* 6, §6).
 
 ## Contract
 
-- **Writer:** `lib/services/test-requests/run-ledger.js` (`createRunLedger`),
-  called by the bounded resumable runner
-  `lib/services/test-requests/run-runner.js` (`advanceRun`, one step per
-  call) through the CLI modes `--reserve` / `--advance` / `--run-inspect`
-  (and the production `--set-status` / `--status-recheck` / `--status-abandon`, `--create-cast` /
-  `--bind-reviewer` and `--run-recheck` modes, which use the same ledger URL
-  check [VERIFIED via `scripts/rehearse-test-request-sandbox.mjs:1283-1341`])
-  of `scripts/rehearse-test-request-sandbox.mjs`, which connect only to
-  the operator-supplied `TEST_REQUEST_LEDGER_URL` (refused when unset, when
-  it names a neon.tech host, or when it equals any shared `POSTGRES_URL*` /
-  `DATABASE_URL` value). No API route or worker calls the ledger yet.
-- **Reader:** the same run-ledger store (`getRun`, `listRunResources`,
-  `listRuns`) and, eventually, the admin Test Requests operations panel
-  (list/status/resume/retire, design-doc stage 5, not yet built).
+- **Writer:** `lib/services/test-requests/run-ledger.js` (`createRunLedger`), called by the bounded resumable runner and status/cast CLI operations through `scripts/rehearse-test-request-sandbox.mjs`, and by the deployed admin form described below. Target-bound `requireLedgerUrl` uses the tracked registry and refuses shared app databases; the managed ledger is allowed only with its matching target database. The new local `file-recovery-runner.js` uses a separate narrow `recoverFileReadback` transaction; its initial entry point is Sandbox-only and has not been exercised against a live stopped run.
+- **Reader:** the same ledger store (`getRun`, `listRunResources`, `listRuns`), owner CLI inspection, and the deployed actor-scoped admin list/detail/diagnosis. The new file verifier adds exact live file evidence without changing the web diagnosis.
 - **Cleanup:** none yet. Retirement (`status = 'retiring' → 'retired'`) is a
   planned admin action (design-doc stage 5); no automatic row deletion
   exists or is planned — the ledger is a durable audit trail of clone runs,
@@ -147,6 +135,12 @@ the B4 plan forbids pointing that runner at them (cast plan, *Order* 6, §6).
   is `refreshed` or `not_refreshed`. Sandbox runs write neither row. The
   read-only CLI mode `--target=production --run-recheck=<runId>` re-reads the
   account and evaluates it against the same baseline (no ledger write).
+
+## Fresh Basic file receipt recovery — source build, live rehearsal pending
+
+[VERIFIED via source, 2026-10-03] The local `file-recovery-runner.js` claims the run lease and repeats read-only verification before `recoverFileReadback`. The transaction locks/fences the run by token, generation, version, stored actor, target, exact Request, step and pinned digests; compares the exact old resource outcome, sequence, planned identity, provenance and readback; and checks the original six-hour source freshness using the database clock. A mismatch leaves the file receipt unchanged. A failure after the resource update rolls the whole transaction back.
+
+Success marks exactly one file `verified`, merges only typed readback metadata/digests, preserves dispatch history, clears the run's stop reason, increments its version and releases the lease at the same `copy_file` step. It neither skips remaining files nor marks `ready`. The ordinary runner still performs final verification. Complete package-attestation details live in a private create-only local receipt written before the transaction; the ledger retains the existing attested digest. There is no schema migration, source-time renewal, remote file write or cleanup. Initial recovery is Sandbox-only; Production recovery promotion and a live disposable rehearsal remain outstanding. Request 1003308 is excluded.
 
 ## Second writer: the deployed admin form (2026-10-02)
 

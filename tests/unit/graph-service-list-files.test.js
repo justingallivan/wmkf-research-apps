@@ -75,6 +75,7 @@ test('fails loud when a strict inventory exceeds maxFiles', async () => {
   await expect(GraphService.listFiles('akoya_request', 'root', {
     maxFiles: 1,
     failOnTruncation: true,
+    failOnMalformedResponse: true,
   })).rejects.toMatchObject({ code: 'graph_file_list_truncated' });
 });
 
@@ -247,6 +248,46 @@ test('optionally excludes only UUID staging folders beneath Site Visit materials
   expect(global.fetch.mock.calls.some(([url]) => (
     String(url).includes(`/Site%20Visit%20-`) && String(url).includes(`/portal-${stagingId}:`)
   ))).toBe(false);
+});
+
+test('strict inventories reject malformed page and item shapes instead of treating them as empty', async () => {
+  global.fetch.mockResolvedValueOnce(graphResponse({ value: null }));
+  await expect(GraphService.listFiles('akoya_request', 'root', {
+    failOnMalformedResponse: true,
+  })).rejects.toMatchObject({ code: 'graph_file_list_malformed' });
+
+  global.fetch.mockResolvedValueOnce(graphResponse({ value: [{ id: 'file', name: '../escape.pdf', size: 1, file: { mimeType: 'application/pdf' } }] }));
+  await expect(GraphService.listFiles('akoya_request', 'root', {
+    failOnMalformedResponse: true,
+  })).rejects.toMatchObject({ code: 'graph_file_list_malformed' });
+});
+
+test('strict inventories reject malformed next links and unbound ID-addressed pagination', async () => {
+  global.fetch.mockResolvedValueOnce(graphResponse({
+    value: [],
+    '@odata.nextLink': false,
+  }));
+  await expect(GraphService.listFiles('akoya_request', 'root', {
+    failOnMalformedResponse: true,
+  })).rejects.toMatchObject({ code: 'graph_file_list_malformed' });
+
+  global.fetch.mockResolvedValueOnce(graphResponse({
+    value: [],
+    '@odata.nextLink': 'https://graph.microsoft.com/v1.0/drives/drive/items/folder-item/children?$skiptoken=next',
+  }));
+  await expect(GraphService.listFiles('akoya_request', 'root', {
+    failOnMalformedResponse: true,
+    failOnUnboundNextLink: true,
+  })).rejects.toMatchObject({ code: 'graph_file_list_unbound_next_link' });
+
+  const pathNextLink = 'https://graph.microsoft.com/v1.0/drives/drive/root:/root:/children?$skiptoken=page-2';
+  global.fetch
+    .mockResolvedValueOnce(graphResponse({ value: [], '@odata.nextLink': pathNextLink }))
+    .mockResolvedValueOnce(graphResponse({ value: [{ id: '01ABC', name: 'safe.pdf', size: 1, file: { mimeType: 'application/pdf' } }] }));
+  await expect(GraphService.listFiles('akoya_request', 'root', {
+    failOnMalformedResponse: true,
+    failOnUnboundNextLink: true,
+  })).resolves.toEqual([expect.objectContaining({ id: '01ABC', folder: 'root' })]);
 });
 
 test('keeps staging folders in the legacy recursive inventory unless exclusion is opted into', async () => {

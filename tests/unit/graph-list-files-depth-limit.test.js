@@ -41,13 +41,19 @@ describe('listFiles maxDepth boundary', () => {
 
   it('with failOnDepthLimit, a folder at the boundary the walk will not enter fails closed with graph_file_list_truncated', async () => {
     installTree({ leafDepth: 4 });
-    await expect(listFiles(svc, LIB, ROOT, { recursive: true, maxDepth: 2, failOnDepthLimit: true }))
+    await expect(listFiles(svc, LIB, ROOT, {
+      recursive: true, maxDepth: 2, failOnDepthLimit: true,
+      failOnMalformedResponse: true, failOnUnboundNextLink: true,
+    }))
       .rejects.toMatchObject({ code: 'graph_file_list_truncated' });
   });
 
   it('with failOnDepthLimit, a tree that ends within maxDepth is listed completely', async () => {
     installTree({ leafDepth: 2 });
-    const files = await listFiles(svc, LIB, ROOT, { recursive: true, maxDepth: 2, failOnDepthLimit: true });
+    const files = await listFiles(svc, LIB, ROOT, {
+      recursive: true, maxDepth: 2, failOnDepthLimit: true,
+      failOnMalformedResponse: true, failOnUnboundNextLink: true,
+    });
     expect(files.map((f) => f.name)).toEqual(['file0.pdf', 'file1.pdf', 'file2.pdf']);
   });
 
