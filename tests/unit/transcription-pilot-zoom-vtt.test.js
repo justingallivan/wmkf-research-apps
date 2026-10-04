@@ -280,11 +280,12 @@ describe('computeNameSupport (cue-exclusive)', () => {
     expect(computeNameSupport(samples, utterances, [AVERY])).toEqual({ A: {}, B: {} });
   });
 
-  test('a clearly better match (gap above 0.1) is attributed to that speaker only', () => {
-    // Fails if the tie rule discards every multi-candidate cue.
+  test('a fuller match is attributed to that speaker when only it overlaps the cue in time', () => {
+    // 6/9 = 0.67 is within the ambiguity ratio, so the time tie-breaker decides: A alone overlaps the cue.
+    // Fails if ambiguous multi-candidate cues are discarded despite a unique overlapping candidate.
     const partial = `${BASES.slice(0, 6).map((b) => `${b}1`).join(' ')} extra1x extra2x extra3x extra4x`;
     const utterances = [{ start: 0, end: 10_000, speaker: 'A', text: sentence(1) },
-      { start: 2000, end: 9000, speaker: 'B', text: partial }];
+      { start: 11_000, end: 14_000, speaker: 'B', text: partial }];
     const { samples } = sampleAlignmentPairs(utterances, [cue(0, 10_000, AVERY, sentence(1))]);
     const support = computeNameSupport(samples, utterances, [AVERY]);
     expect(support.A[AVERY].count).toBe(1);
@@ -537,6 +538,97 @@ describe('verifyAlignmentVerdict', () => {
       const support = computeNameSupport(samples, utterances, [AVERY, JORDAN]);
       return { samples, support, opts: { zoomNames: [AVERY, JORDAN], content: { utterances } } };
     };
+
+    describe('short echo cannot outrank the fuller original (absolute shared words rank first)', () => {
+      const build = (aText) => {
+        const utterances = [];
+        const cues = [];
+        for (let i = 1; i <= 4; i++) {
+          const t = i * 60_000;
+          const caption = `${sentence(i)} tail${i}x tail${i}y`;
+          utterances.push({ start: t, end: t + 8000, speaker: 'A', text: aText(i) });
+          cues.push(cue(t, t + 8000, AVERY, caption));
+          // B echoes only the first six words of the caption: overlap 1.0 against a 6-word set.
+          utterances.push({ start: t + 9000, end: t + 12_000, speaker: 'B', text: sentence(i).split(' ').slice(0, 6).join(' ') });
+        }
+        const { samples } = sampleAlignmentPairs(utterances, cues);
+        const support = computeNameSupport(samples, utterances, [AVERY]);
+        const verdict = { A: { name: AVERY, confidence: 0.99, pairIds: support.A?.[AVERY]?.pairIds ?? [] },
+          B: { name: AVERY, confidence: 0.99, pairIds: [] } };
+        return { support, result: verifyAlignmentVerdict(samples, support, verdict, { zoomNames: [AVERY], content: { utterances } }) };
+      };
+
+      test('A with two ASR substitutions (9 shared words, overlap 0.82) keeps the name; the 6-word echo gets none', () => {
+        // Fails under overlap-first ranking: B (overlap 1.0) would take every cue and be named Avery.
+        const { support, result } = build((i) => `${sentence(i)} subst${i}a subst${i}b`);
+        expect(scoreTextMatch(`${sentence(1)} subst1a subst1b`, `${sentence(1)} tail1x tail1y`).shared).toBe(9);
+        expect(support.B).toEqual({});
+        expect(support.A[AVERY].count).toBe(4);
+        expect(result.names).toEqual({ A: AVERY });
+      });
+
+      test('control: A with exact wording is named and B is not', () => {
+        const { support, result } = build((i) => `${sentence(i)} tail${i}x tail${i}y`);
+        expect(support.B).toEqual({});
+        expect(result.names).toEqual({ A: AVERY });
+      });
+
+      test('an uncontested captioned B with its own cue is still named', () => {
+        // Fails if the ambiguity rule discards candidates that have no cross-speaker rival.
+        const utterances = [];
+        const cues = [];
+        for (let i = 1; i <= 4; i++) {
+          const t = i * 60_000;
+          utterances.push({ start: t, end: t + 8000, speaker: 'B', text: sentence(i) });
+          cues.push(cue(t, t + 8000, JORDAN, sentence(i)));
+        }
+        const { samples } = sampleAlignmentPairs(utterances, cues);
+        const support = computeNameSupport(samples, utterances, [JORDAN]);
+        expect(support.B[JORDAN].count).toBe(4);
+      });
+    });
+
+    describe('timing breaks ties only among wording-eligible candidates', () => {
+      const CAPTION_WORDS = 9;
+      /** A overlaps the cue with 8 of 9 words; B echoes all 9 words at `echoStartMs` after the cue starts. */
+      const reverse = (echoStartMs, echoLengthMs = 3000, keptWords = CAPTION_WORDS - 1) => {
+        const utterances = [];
+        const cues = [];
+        for (let i = 1; i <= 4; i++) {
+          const t = i * 120_000;
+          const words = sentence(i).split(' ');
+          utterances.push({ start: t, end: t + 8000, speaker: 'A', text: words.slice(0, keptWords).join(' ') });
+          cues.push(cue(t, t + 8000, AVERY, words.join(' ')));
+          utterances.push({ start: t + echoStartMs, end: t + echoStartMs + echoLengthMs, speaker: 'B', text: words.join(' ') });
+        }
+        const { samples } = sampleAlignmentPairs(utterances, cues);
+        return computeNameSupport(samples, utterances, [AVERY]);
+      };
+
+      test.each([6, 7, 8])('reverse echo: A keeping %i of 9 words gets the cue, the later full echo B gets none', (kept) => {
+        // Fails without the time tie-breaker (both lost) or with a ratio above kept/9 (B takes the cue
+        // and is named Avery); 6/9 = 0.67 is the weakest case at ambiguityShareRatio 0.65.
+        const support = reverse(20_000, 3000, kept);
+        expect(support.A[AVERY].count).toBe(4);
+        expect(support.B).toEqual({});
+      });
+
+      test('crosstalk: when the echo also overlaps the cue, neither gets it', () => {
+        const support = reverse(2000, 5000);
+        expect(support).toEqual({ A: {}, B: {} });
+      });
+
+      test('a shift beyond the window leaves no overlapping candidate: ambiguous cues go to none', () => {
+        // Both candidates are wording-eligible and neither overlaps the shifted cue.
+        const t = 0;
+        const words = sentence(1).split(' ');
+        const utterances = [{ start: t, end: t + 8000, speaker: 'A', text: words.slice(0, 8).join(' ') },
+          { start: t + 9000, end: t + 12_000, speaker: 'B', text: words.join(' ') }];
+        const cues = [cue(t + 45_000, t + 53_000, AVERY, words.join(' '))];
+        const { samples } = sampleAlignmentPairs(utterances, cues, { windowMs: 60_000 });
+        expect(computeNameSupport(samples, utterances, [AVERY], { windowMs: 60_000 })).toEqual({ A: {}, B: {} });
+      });
+    });
 
     test('B whose own cue is missed by ASR noise is not named from the neighbour\'s cues', () => {
       // Fails without cue-exclusive attribution: A's concatenated window covers B's words and names B Avery.

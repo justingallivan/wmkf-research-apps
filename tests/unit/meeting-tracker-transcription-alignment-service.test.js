@@ -283,3 +283,117 @@ test('recoverPendingAlignments stops claiming when the remaining budget is too s
   expect(store.claimTranscriptionJobForAlignment).not.toHaveBeenCalled();
   expect(counts.attempted).toBe(0);
 });
+
+// ---- Reserved-sample loss and full-set conflict detection (Codex adversarial review) ----
+function genFixture({ per = 4, textWords = 12, cuesPerSample = 2, contrary = false, fillerNameLen = 60, fillerPad = 0 }) {
+  const names = Array.from({ length: 8 }, (_, s) => `Speaker Person ${s}`);
+  const utterances = []; const cues = []; const verdict = {};
+  for (let s = 0; s < 8; s++) {
+    for (let i = 0; i < per; i++) {
+      const t0 = (s * per + i) * 60_000;
+      const text = Array.from({ length: textWords }, (_, k) => `term${s}x${i}x${k}`).join(' ');
+      const index = utterances.length;
+      utterances.push({ speaker: `S${s}`, start: t0, end: t0 + 4000, text });
+      const cueName = contrary && i === per - 1 ? names[(s + 1) % 8] : names[s];
+      cues.push(`${ts(t0)} --> ${ts(t0 + 4000)}\n${cueName}: ${text}`);
+      for (let k = 0; k < cuesPerSample - 1; k++) {
+        cues.push(`${ts(t0 + 5000 + k * 400)} --> ${ts(t0 + 5300 + k * 400)}\nFiller ${k} ${'F'.repeat(fillerNameLen)}: noise${s}x${i}x${k} unrelated${'.'.repeat(fillerPad)}`);
+      }
+      (verdict[`S${s}`] ||= { name: names[s], confidence: 0.99, pairIds: [] }).pairIds.push(`S${s}-${index}`);
+    }
+  }
+  return { content: JSON.stringify({ utterances }), vtt: `WEBVTT\n\n${cues.join('\n\n')}\n`, verdict, names };
+}
+
+test('(a) 8 speakers x 4 reserved, 25 long-name cues per sample, contrary fourth sample: never applies names; terminal when a reserved sample cannot be kept', async () => {
+  const { content, vtt, verdict } = genFixture({ textWords: 200, cuesPerSample: 25, contrary: true, fillerNameLen: 70, fillerPad: 90 });
+  arrange({ content, vtt });
+  executePrompt.mockResolvedValue({ blocked: false, parsed: verdict });
+  await alignMeetingTranscriptionSpeakers({ jobId });
+  expect(store.completeTranscriptionAlignment).not.toHaveBeenCalled();
+  expect(executePrompt).not.toHaveBeenCalled();
+  expect(store.failTranscriptionAlignment).toHaveBeenCalledWith(expect.objectContaining({ terminal: true, code: 'samples_over_budget' }));
+});
+
+test('(a2) when every reserved sample is kept, 3:1 contrary names abstain with both suggestions even at confidence 0.99', async () => {
+  const { content, vtt, verdict, names } = genFixture({ contrary: true });
+  arrange({ content, vtt });
+  executePrompt.mockResolvedValue({ blocked: false, parsed: verdict });
+  await alignMeetingTranscriptionSpeakers({ jobId });
+  const { speakerNames, alignment } = store.completeTranscriptionAlignment.mock.calls[0][0];
+  expect(speakerNames).toEqual({});
+  expect(alignment.status).toBe('abstained');
+  expect(alignment.suggestions.S0).toEqual(expect.arrayContaining([names[0], names[1]]));
+});
+
+test('(b) control: same fixture without contrary names applies all eight names', async () => {
+  const { content, vtt, verdict, names } = genFixture({ contrary: false });
+  arrange({ content, vtt });
+  executePrompt.mockResolvedValue({ blocked: false, parsed: verdict });
+  await alignMeetingTranscriptionSpeakers({ jobId });
+  const { speakerNames } = store.completeTranscriptionAlignment.mock.calls[0][0];
+  expect(speakerNames).toEqual(Object.fromEntries(names.map((name, s) => [`S${s}`, name])));
+});
+
+test('(c) only extras drop: the run proceeds and every speaker keeps its reserved samples', async () => {
+  const { content, vtt, verdict } = genFixture({ per: 10, textWords: 190, cuesPerSample: 15, fillerNameLen: 70 });
+  arrange({ content, vtt });
+  executePrompt.mockResolvedValue({ blocked: false, parsed: verdict });
+  await alignMeetingTranscriptionSpeakers({ jobId });
+  expect(store.failTranscriptionAlignment).not.toHaveBeenCalled();
+  const text = executePrompt.mock.calls[0][0].overrideVariables.speaker_samples;
+  const shown = text.match(/^\[S\d+-\d+\]/gm);
+  expect(text.length).toBeLessThanOrEqual(160000);
+  expect(shown.length).toBeLessThan(80);
+  for (let s = 0; s < 8; s++) expect(shown.filter(id => id.startsWith(`[S${s}-`)).length).toBeGreaterThanOrEqual(4);
+});
+
+test.each([['null', null], ['an array', []], ['a non-object entry', { S0: 'x' }]])('a malformed verdict (%s) applies nothing and does not throw', async (_label, parsed) => {
+  arrange(fixture());
+  executePrompt.mockResolvedValue({ blocked: false, parsed });
+  await alignMeetingTranscriptionSpeakers({ jobId });
+  expect(store.completeTranscriptionAlignment.mock.calls[0][0].speakerNames).toEqual({});
+});
+
+const EXTRA_FIXTURE = { per: 6, textWords: 70, cuesPerSample: 25, contrary: true, fillerNameLen: 70 };
+const shownIds = text => (text.match(/^\[S\d+-\d+\]/gm) || []).map(id => id.slice(1, -1));
+
+test('contrary evidence on a dropped EXTRA sample still forces abstention (support is computed on the full sampled set)', async () => {
+  const { content, vtt, verdict, names } = genFixture(EXTRA_FIXTURE);
+  arrange({ content, vtt });
+  executePrompt.mockResolvedValue({ blocked: false, parsed: verdict });
+  await alignMeetingTranscriptionSpeakers({ jobId });
+  expect(store.failTranscriptionAlignment).not.toHaveBeenCalled();
+  const shown = shownIds(executePrompt.mock.calls[0][0].overrideVariables.speaker_samples);
+  const contraryIds = Object.values(verdict).map(v => v.pairIds.at(-1));
+  expect(shown.length).toBeLessThan(48);
+  expect(contraryIds.some(id => !shown.includes(id))).toBe(true);
+  const { speakerNames, alignment } = store.completeTranscriptionAlignment.mock.calls[0][0];
+  const droppedSpeakers = Object.entries(verdict).filter(([, v]) => !shown.includes(v.pairIds.at(-1))).map(([id]) => id);
+  for (const id of droppedSpeakers) {
+    expect(speakerNames).not.toHaveProperty(id);
+    const index = Number(id.slice(1));
+    expect(alignment.suggestions[id]).toEqual(expect.arrayContaining([names[index], names[(index + 1) % 8]]));
+  }
+});
+
+test('a verdict citing a real but unshown pair is not applied even with full support and 0.99 confidence', async () => {
+  const { content, vtt, verdict, names } = genFixture({ ...EXTRA_FIXTURE, contrary: false });
+  arrange({ content, vtt });
+  executePrompt.mockImplementation(async ({ overrideVariables }) => {
+    const shown = shownIds(overrideVariables.speaker_samples);
+    const hidden = Object.values(verdict).flatMap(v => v.pairIds).filter(id => !shown.includes(id));
+    expect(hidden.length).toBeGreaterThan(0);
+    const speaker = hidden[0].split('-')[0];
+    const seenOnly = Object.fromEntries(Object.entries(verdict).map(([id, v]) => [id, { ...v, pairIds: v.pairIds.filter(pid => shown.includes(pid)) }]));
+    seenOnly[speaker] = { ...seenOnly[speaker], pairIds: [...seenOnly[speaker].pairIds, hidden[0]] };
+    return { blocked: false, parsed: seenOnly };
+  });
+  await alignMeetingTranscriptionSpeakers({ jobId });
+  const { speakerNames, alignment } = store.completeTranscriptionAlignment.mock.calls[0][0];
+  const unseenSpeaker = Object.keys(speakerNames).length;
+  expect(unseenSpeaker).toBeLessThan(8);
+  const missing = Array.from({ length: 8 }, (_, s) => `S${s}`).filter(id => !(id in speakerNames));
+  expect(missing).toHaveLength(1);
+  expect(alignment.suggestions[missing[0]]).toEqual([names[Number(missing[0].slice(1))]]);
+});
