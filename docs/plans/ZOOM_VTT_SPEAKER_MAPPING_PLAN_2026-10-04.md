@@ -1,6 +1,6 @@
 # Zoom VTT speaker mapping for Meeting Tracker transcriptions
 
-Status: **PLAN, revision 5 (2026-10-04, S572). Not built. Codex rounds 1 to 3 returned NEEDS REWORK; round 4 returned READY WITH NAMED CHANGES (two predicate fixes, applied in this revision). Every finding is answered below with the mechanism that closes it. Build may start on branch `feature/zoom-vtt-speaker-mapping` once the owner signs off on D9; the build itself gets a fresh adversarial review.**
+Status: **BUILT ON BRANCH `feature/zoom-vtt-speaker-mapping` (2026-10-04, S572); NOT MERGED, NOT DEPLOYED, MIGRATION NOT APPLIED, PROMPT NOT SEEDED.** Plan rounds: Codex 1 to 3 NEEDS REWORK, round 4 READY WITH NAMED CHANGES (applied). Build stages 1 to 5b each passed a Sonnet build → Opus review loop (stage 5a required one reject-and-fix round for a wrong import source and claim shape that mocked tests had hidden). Build-time refinements recorded below: cue-exclusive support, Sonnet tier alias (D7), sample budget 160 000 / name budget 20 000, Executor `auditRetention`. Pending: Codex adversarial review of the branch, owner merge decision, apply 065 before deploy, seed the prompt row, production rehearsal on Request `1003222`.
 
 ## Problem
 
@@ -152,7 +152,7 @@ Workflow wiring: `alignSpeakersStep(jobId)` in `workflow.js`, `'use step'`, `max
 
 ### 10. Docs [PLANNED]
 
-`docs/atlas/postgres-transcription-pilot.md` and `docs/atlas/postgres-meeting-transcript-publications.md` (new dated status, columns, lease use, sources, `related:` 065); `docs/atlas/dataverse-wmkf-ai-run-and-prompt.md` (new Tier-1 prompt); `docs/API_ROUTE_SECURITY_MATRIX.md` rows for the collection and start routes; `docs/SERVICE_AND_UTILITY_CATALOG.md` transcription entries; `docs/EXECUTOR_CONTRACT.md` for the D9 option. No new route, so canonical route counts are unchanged. [NOT-READ: the Atlas, matrix, and catalog files above beyond the cited Executor contract lines — the inventory subagent located the rows; read before editing.]
+`docs/atlas/postgres-transcription-pilot.md` and `docs/atlas/postgres-meeting-transcript-publications.md` (new dated status, columns, lease use, sources, `related:` 065); `docs/atlas/dataverse-wmkf-ai-run-and-prompt.md` (new Tier-1 prompt); `docs/API_ROUTE_SECURITY_MATRIX.md` rows for the collection and start routes; `docs/SERVICE_AND_UTILITY_CATALOG.md` transcription entries; `docs/EXECUTOR_CONTRACT.md` for the D9 option. No new route, so canonical route counts are unchanged. [NOT-READ: the Atlas, matrix, and catalog files above beyond the cited Executor contract lines — the inventory subagent located the rows; read before editing.] <!-- drain-table:ignore reason=atlas-file-path-contains-word-publications -->
 
 ## Invariant table
 
