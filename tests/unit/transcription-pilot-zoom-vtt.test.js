@@ -337,6 +337,41 @@ describe('verifyAlignmentVerdict', () => {
     expect(() => verifyAlignmentVerdict(samples, support, {}, { zoomNames: 'x', content })).toThrow(TypeError);
   });
 
+  describe('Codex round 2: positive support must be visible to the model', () => {
+    const four = () => pipeline([['A', AVERY, 1], ['A', AVERY, 2], ['B', JORDAN, 3], ['B', JORDAN, 4]], [AVERY, JORDAN]);
+
+    test('a name supported only by samples the model never saw is not applied, even with empty citations and 0.99', () => {
+      // Fails if acceptance reads the full-set support or if an empty citation list passes.
+      const p = four();
+      const visibleSamples = p.samples.filter((s) => s.speakerId === 'B');
+      const visible = computeNameSupport(visibleSamples, p.utterances, [AVERY, JORDAN]);
+      expect(visible.A ?? {}).toEqual({});
+      const verdict = { A: { name: AVERY, confidence: 0.99, pairIds: [] }, B: ok(visible, 'B', JORDAN) };
+      const result = verifyAlignmentVerdict(p.samples, visible, verdict, { ...p.opts, conflictSupport: p.support });
+      expect(result.names).toEqual({ B: JORDAN });
+      expect(result.alignment.status).toBe('partial');
+      expect(result.alignment.suggestions.A).toBeUndefined();
+    });
+
+    test('an empty citation list is rejected even when visible support is sufficient', () => {
+      const p = four();
+      const verdict = { A: { name: AVERY, confidence: 0.99, pairIds: [] }, B: ok(p.support, 'B', JORDAN) };
+      const result = verifyAlignmentVerdict(p.samples, p.support, verdict, p.opts);
+      expect(result.names).toEqual({ B: JORDAN });
+      expect(result.alignment.suggestions.A).toEqual([AVERY]);
+    });
+
+    test('a conflict present only in the full-set support still blocks a visibly sole name', () => {
+      // Fails if the conflict check reads only the visible support.
+      const p = four();
+      const conflictSupport = { ...p.support, A: { ...p.support.A, [JORDAN]: { count: 1, pairIds: ['A-9'] } } };
+      const verdict = { A: ok(p.support, 'A', AVERY, 0.99), B: ok(p.support, 'B', JORDAN) };
+      const result = verifyAlignmentVerdict(p.samples, p.support, verdict, { ...p.opts, conflictSupport });
+      expect(result.names).toEqual({ B: JORDAN });
+      expect(result.alignment.suggestions.A).toEqual(expect.arrayContaining([AVERY, JORDAN]));
+    });
+  });
+
   test('an ID from content with no samples is not applied, giving status partial', () => {
     // Fails if speaker IDs come from the samples (status would be applied) or the ID is auto-named.
     const p = pipeline([['A', AVERY, 1], ['A', AVERY, 2], ['B', null, 3]], [AVERY]);
@@ -618,6 +653,43 @@ describe('verifyAlignmentVerdict', () => {
         expect(support).toEqual({ A: {}, B: {} });
       });
 
+      /** Earlier A (all 9 words, no overlap), concurrent A (8 words), and optionally concurrent B (6 words). */
+      const concurrent = ({ withB = true, bOverlaps = true } = {}) => {
+        const utterances = [];
+        const cues = [];
+        for (let i = 1; i <= 4; i++) {
+          const t = i * 120_000;
+          const words = sentence(i).split(' ');
+          utterances.push({ start: t - 12_000, end: t - 6000, speaker: 'A', text: words.join(' ') });
+          utterances.push({ start: t + 1000, end: t + 7000, speaker: 'A', text: words.slice(0, 8).join(' ') });
+          if (withB) {
+            const bStart = bOverlaps ? t + 2000 : t + 9000;
+            utterances.push({ start: bStart, end: bStart + 4000, speaker: 'B', text: words.slice(0, 6).join(' ') });
+          }
+          cues.push(cue(t, t + 8000, AVERY, words.join(' ')));
+        }
+        const { samples } = sampleAlignmentPairs(utterances, cues);
+        return computeNameSupport(samples, utterances, [AVERY]);
+      };
+
+      test('Codex round 2: a concurrent same-speaker utterance keeps the time check honest (9/8/6 words: both overlap, none)', () => {
+        // Fails if the time tie-breaker only considers the best candidate plus rivals: the concurrent
+        // A (8 words) vanished from the check and B (6 words) became the sole overlapping candidate.
+        expect(concurrent()).toEqual({ A: {}, B: {} });
+      });
+
+      test('the same evidence without B attributes to A', () => {
+        const support = concurrent({ withB: false });
+        expect(support.A[AVERY].count).toBe(4);
+      });
+
+      test('several overlapping utterances of ONE identity are not a cross-speaker conflict', () => {
+        // B is a wording-eligible rival but does not overlap the cue; only A overlaps (twice) -> A.
+        const support = concurrent({ bOverlaps: false });
+        expect(support.A[AVERY].count).toBe(4);
+        expect(support.B).toEqual({});
+      });
+
       test('a shift beyond the window leaves no overlapping candidate: ambiguous cues go to none', () => {
         // Both candidates are wording-eligible and neither overlaps the shifted cue.
         const t = 0;
@@ -703,7 +775,7 @@ describe('verifyAlignmentVerdict', () => {
       const name = '\u6f22'.repeat(80);
       const support = Object.fromEntries(speakerIds.map((id) => [id, { [name]: { count: 3, pairIds: [`${id}-0`] } }]));
       const confidence = 0.8123456789012345;
-      const verdict = Object.fromEntries(speakerIds.map((id) => [id, { name, confidence, pairIds: [] }]));
+      const verdict = Object.fromEntries(speakerIds.map((id) => [id, { name, confidence, pairIds: [`${id}-0`] }]));
       const { names, alignment } = verifyAlignmentVerdict(samples, support, verdict, { zoomNames: [name], content });
       const bytes = Buffer.byteLength(JSON.stringify(alignment));
       expect(bytes).toBeLessThanOrEqual(LIMIT);
@@ -718,7 +790,7 @@ describe('verifyAlignmentVerdict', () => {
       // Fails if the final step is removed: an oversized applied alignment would be returned.
       const name = '\u6f22'.repeat(80);
       const support = Object.fromEntries(speakerIds.map((id) => [id, { [name]: { count: 3, pairIds: [`${id}-0`] } }]));
-      const verdict = Object.fromEntries(speakerIds.map((id) => [id, { name, confidence: 0.9, pairIds: [] }]));
+      const verdict = Object.fromEntries(speakerIds.map((id) => [id, { name, confidence: 0.9, pairIds: [`${id}-0`] }]));
       const result = verifyAlignmentVerdict(samples, support, verdict, { zoomNames: [name], content, maxAlignmentBytes: 1000 });
       expect(result.names).toEqual({});
       expect(result.alignment).toEqual({ status: 'abstained', floor: 0.8, speakers: {}, suggestions: {} });
@@ -729,7 +801,7 @@ describe('verifyAlignmentVerdict', () => {
       const name = longName('a');
       const support = Object.fromEntries(speakerIds.map((id) => [id, { [name]: { count: 5,
         pairIds: Array.from({ length: 5 }, (_, j) => `${id}-${String(j).padStart(60, '0')}`) } }]));
-      const verdict = Object.fromEntries(speakerIds.map((id) => [id, { name, confidence: 0.9, pairIds: [] }]));
+      const verdict = Object.fromEntries(speakerIds.map((id) => [id, { name, confidence: 0.9, pairIds: support[id][name].pairIds.slice(0, 1) }]));
       const { names, alignment } = verifyAlignmentVerdict(samples, support, verdict, { zoomNames: [name], content });
       expect(Object.keys(names)).toHaveLength(200);
       expect(Buffer.byteLength(JSON.stringify(alignment))).toBeLessThanOrEqual(LIMIT);

@@ -285,7 +285,7 @@ test('recoverPendingAlignments stops claiming when the remaining budget is too s
 });
 
 // ---- Reserved-sample loss and full-set conflict detection (Codex adversarial review) ----
-function genFixture({ per = 4, textWords = 12, cuesPerSample = 2, contrary = false, fillerNameLen = 60, fillerPad = 0 }) {
+function genFixture({ per = 4, textWords = 12, cuesPerSample = 2, contrary = false, fillerNameLen = 60, fillerPad = 0, mute = null }) {
   const names = Array.from({ length: 8 }, (_, s) => `Speaker Person ${s}`);
   const utterances = []; const cues = []; const verdict = {};
   for (let s = 0; s < 8; s++) {
@@ -295,7 +295,9 @@ function genFixture({ per = 4, textWords = 12, cuesPerSample = 2, contrary = fal
       const index = utterances.length;
       utterances.push({ speaker: `S${s}`, start: t0, end: t0 + 4000, text });
       const cueName = contrary && i === per - 1 ? names[(s + 1) % 8] : names[s];
-      cues.push(`${ts(t0)} --> ${ts(t0 + 4000)}\n${cueName}: ${text}`);
+      // A muted cue keeps its name and byte length but no longer matches the utterance wording.
+      const cueText = mute && mute(s, index) ? text.replace(/term/g, 'zzzz') : text;
+      cues.push(`${ts(t0)} --> ${ts(t0 + 4000)}\n${cueName}: ${cueText}`);
       for (let k = 0; k < cuesPerSample - 1; k++) {
         cues.push(`${ts(t0 + 5000 + k * 400)} --> ${ts(t0 + 5300 + k * 400)}\nFiller ${k} ${'F'.repeat(fillerNameLen)}: noise${s}x${i}x${k} unrelated${'.'.repeat(fillerPad)}`);
       }
@@ -396,4 +398,34 @@ test('a verdict citing a real but unshown pair is not applied even with full sup
   const missing = Array.from({ length: 8 }, (_, s) => `S${s}`).filter(id => !(id in speakerNames));
   expect(missing).toHaveLength(1);
   expect(alignment.suggestions[missing[0]]).toEqual([names[Number(missing[0].slice(1))]]);
+});
+
+test('Codex round 2: a speaker whose ONLY name support sits on trimmed samples is not applied on an empty-citation 0.99 verdict', async () => {
+  // Pass 1 (control) learns which pair ids the serializer trims; pass 2 mutes the wording of the target
+  // speaker's VISIBLE cues (same name, same byte length, so sampling is identical), leaving its only
+  // matching cues on trimmed samples.
+  const control = genFixture({ ...EXTRA_FIXTURE, contrary: false });
+  arrange(control);
+  executePrompt.mockResolvedValue({ blocked: false, parsed: control.verdict });
+  await alignMeetingTranscriptionSpeakers({ jobId });
+  const shown = new Set(shownIds(executePrompt.mock.calls[0][0].overrideVariables.speaker_samples));
+  const hiddenBySpeaker = new Map();
+  for (const [id, v] of Object.entries(control.verdict)) hiddenBySpeaker.set(id, v.pairIds.filter(pid => !shown.has(pid)));
+  const target = [...hiddenBySpeaker.entries()].find(([, hidden]) => hidden.length >= 2)?.[0];
+  expect(target).toBeDefined();
+  const hidden = new Set(hiddenBySpeaker.get(target));
+  jest.clearAllMocks();
+
+  const fixture2 = genFixture({ ...EXTRA_FIXTURE, contrary: false, mute: (s, index) => `S${s}` === target && !hidden.has(`S${s}-${index}`) });
+  arrange(fixture2);
+  const verdict = Object.fromEntries(Object.entries(fixture2.verdict).map(([id, v]) => [id,
+    id === target ? { name: v.name, confidence: 0.99, pairIds: [] } : { ...v, pairIds: v.pairIds.filter(pid => shown.has(pid)) }]));
+  executePrompt.mockResolvedValue({ blocked: false, parsed: verdict });
+  await alignMeetingTranscriptionSpeakers({ jobId });
+  expect(store.failTranscriptionAlignment).not.toHaveBeenCalled();
+  expect(new Set(shownIds(executePrompt.mock.calls[0][0].overrideVariables.speaker_samples))).toEqual(shown);
+  const { speakerNames, alignment } = store.completeTranscriptionAlignment.mock.calls[0][0];
+  expect(speakerNames).not.toHaveProperty(target);
+  expect(alignment.suggestions[target]).toBeUndefined();
+  expect(Object.keys(speakerNames)).toHaveLength(7);
 });
