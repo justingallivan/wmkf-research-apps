@@ -59,9 +59,9 @@ in `lib/services/llm-client.js` and `lib/services/multi-llm-service.js`.
 | Modules that construct `LLMClient` / `createLLMClient` (runtime, non-test) | 20 files, 27 construction sites | grep `new LLMClient(` / `createLLMClient(` |
 | `complete()` / `stream()` call sites on those clients | 32 (29 direct plus 3 through the Explorer `callClaudeBatch` wrapper) | grep `.complete(` / `.stream(` / `callClaudeBatch(` |
 | Call sites guarded by `requireAcceptedLlmResponse` (`lib/utils/llm-response.js`) | 22 sites in 13 files | grep |
-| Call sites covered by another terminal refusal policy | 4 (Executor, reviewer-finder, Explorer ×2) | read |
+| Call sites covered by another terminal refusal policy | 4 (Executor, reviewer-finder, Explorer chat stream, Explorer `callClaudeBatch` via its guarded callers) | read |
 | Unguarded call sites | 6 sites in 5 files | remainder, each read |
-| Direct `/v1/messages` callers outside `LLMClient` | `lib/services/multi-llm-service.js` (3 consumers), `lib/utils/health-checker.js` (probe), `lib/services/anthropic-admin.js` + `pages/api/cron/pricing-canary.js` + `lib/services/model-resolver.js` (models/admin endpoints, no completions) | grep `api.anthropic.com` / `@anthropic-ai/sdk` |
+| Direct `/v1/messages` callers outside `LLMClient` | `lib/services/multi-llm-service.js` (3 consumers), `lib/utils/health-checker.js` (probe). `lib/services/anthropic-admin.js`, `pages/api/cron/pricing-canary.js`, `lib/services/model-resolver.js` call only `/v1/models` or admin endpoints [VERIFIED via grep `v1/`] | grep `api.anthropic.com` / `@anthropic-ai/sdk` |
 | Scripts importing the client (`scripts/run-reviewer-holistic-m1.mjs`, `scripts/audit-system-prompt-sizes.js`, `scripts/compare-phase-i-v1-v2.js`) | owner-run, not runtime | excluded |
 
 ## Covered call sites (no action)
@@ -86,8 +86,10 @@ Other terminal policies, each read this session:
   `complete()` wrapper and its caller records `status: 'analysis_refused'`.
   Primary is the concrete `claude-opus-4-8`; **fallback is the `sonnet` tier**, so the
   runbook §4 replay applies (see "Next gate").
-- Explorer: `lib/services/dynamics-explorer/model-call.js` chat loop treats refusal
-  as terminal (PR #423). Default model is the `haiku` tier.
+- Explorer: `lib/services/dynamics-explorer/model-call.js` has two sites. The chat
+  loop's `stream()` call treats refusal as terminal (PR #423); the `callClaudeBatch`
+  `complete()` call is covered by the three `requireAcceptedLlmResponse` guards in
+  `tools/batch-processing.js`. Default model is the `haiku` tier.
 
 ## Unguarded call sites inside the admission blast radius (blockers)
 
