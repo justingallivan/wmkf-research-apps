@@ -29,11 +29,11 @@ beforeEach(() => {
   });
 });
 
-it('exports TXT with minute headings and saved display names', async () => {
+it('exports TXT as one paragraph per speaker turn with saved display names (formatter v3)', async () => {
   const res = response();
   await downloadHandler({ method: 'GET', query: { id: 'job-1', format: 'txt' } }, res);
   expect(res.statusCode).toBe(200);
-  expect(res.body).toBe('1:00\nChair: Hello there.\n');
+  expect(res.body).toBe('[01:02] Chair: Hello there.\n');
   expect(getOwnerJobContent).toHaveBeenCalledWith({ ownerProfileId: 7, jobId: 'job-1' });
 });
 

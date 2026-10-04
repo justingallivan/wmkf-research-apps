@@ -50,7 +50,7 @@ describe('Meeting Tracker generated transcript bundle', () => {
     }, identity);
     expect(parsed.content).toEqual({ text: '', ...content });
     expect(parsed.speakerNames).toEqual({ A: 'PI', B: 'Co-PI' });
-    expect(generated.files.txt.bytes.toString()).toContain('1:00\nPI: Hello, team.');
+    expect(generated.files.txt.bytes.toString()).toContain('[01:02] PI: Hello, team.');
     expect(generated.files.vtt.bytes.toString()).toContain('00:01:02.000 --> 00:01:02.900\nPI: Hello, team.');
   });
 
@@ -76,15 +76,30 @@ describe('Meeting Tracker generated transcript bundle', () => {
     }
   });
 
-  it('embeds fully aligned optional word timings only in formatter v2 source', () => {
-    const timedContent = { text: 'go now', utterances: [{ speaker: 'A', start: 0, end: 70_000,
-      text: 'go now', words: [{ start: 58_000, end: 59_000, text: 'go' }, { start: 61_000, end: 62_000, text: 'now' }] }] };
+  const timedContent = { text: 'go now', utterances: [{ speaker: 'A', start: 0, end: 70_000,
+    text: 'go now', words: [{ start: 58_000, end: 59_000, text: 'go' }, { start: 61_000, end: 62_000, text: 'now' }] }] };
+
+  it('embeds fully aligned optional word timings in formatter v2+ source; the default v3 TXT is one turn paragraph', () => {
     const generated = buildMeetingTranscriptFiles({ content: timedContent, speakerNames: {}, identity });
     const parsed = parseVerifiedMeetingTranscriptSource(generated.files.source.bytes,
       { size: generated.files.source.bytes.length, sha256: generated.files.source.sha256 }, identity);
-    expect(parsed.formatterVersion).toBe('2');
+    expect(parsed.formatterVersion).toBe('3');
+    expect(generated.sourceContent.schemaVersion).toBe(3);
     expect(parsed.content.utterances[0].words).toEqual(timedContent.utterances[0].words);
+    expect(generated.files.txt.bytes.toString()).toBe('[00:00] Speaker A: go now\n');
+  });
+
+  it('keeps formatter v2 minute-split TXT reproducible from a frozen v2 source', () => {
+    // Fails if the v2 layout is dropped: existing publications rebuild through their recorded version.
+    const generated = buildMeetingTranscriptFiles({ content: timedContent, speakerNames: {}, identity: { ...identity, formatterVersion: '2' } });
+    expect(generated.formatterVersion).toBe('2');
     expect(generated.files.txt.bytes.toString()).toBe('0:00\nSpeaker A: go\n\n1:00\nSpeaker A: now\n');
+    const parsed = parseVerifiedMeetingTranscriptSource(generated.files.source.bytes,
+      { size: generated.files.source.bytes.length, sha256: generated.files.source.sha256 }, identity);
+    expect(parsed.formatterVersion).toBe('2');
+    const replay = buildMeetingTranscriptFiles({ content: parsed.content, speakerNames: parsed.speakerNames,
+      identity: { ...identity, formatterVersion: parsed.formatterVersion } });
+    for (const role of ['source', 'txt', 'vtt']) expect(replay.files[role].sha256).toBe(generated.files[role].sha256);
   });
 
   it('drops only optional timings when they would exceed the source-byte cap', () => {

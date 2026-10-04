@@ -1,6 +1,7 @@
 import {
-  formatTranscriptMinuteHeading, formatTranscriptText, formatTranscriptVtt,
-  getTranscriptSpeakers, groupTranscriptByMinute, normalizeSpeakerNames, normalizeUtteranceWordTimings,
+  formatTranscriptMinuteHeading, formatTranscriptText, formatTranscriptTurnTime, formatTranscriptVtt,
+  getTranscriptSpeakers, groupTranscriptByMinute, groupTranscriptByTurn, normalizeSpeakerNames,
+  normalizeUtteranceWordTimings, TRANSCRIPT_FORMATTER_VERSION, TRANSCRIPT_FORMATTER_VERSIONS,
 } from '../../lib/services/transcription-pilot/transcript-format';
 
 const transcript = {
@@ -35,7 +36,7 @@ describe('transcription speaker overlay and one-minute formatting', () => {
   });
 
   it('formats TXT as minute headings plus speaker paragraphs without utterance-time noise', () => {
-    expect(formatTranscriptText(transcript, { A: 'Host' })).toBe(
+    expect(formatTranscriptText(transcript, { A: 'Host' }, { layout: 'minute' })).toBe(
       '0:00\nHost: First.\n\nHost: Earlier.\n\n1:00\nSpeaker B: Second.\n',
     );
   });
@@ -54,7 +55,7 @@ describe('transcription speaker overlay and one-minute formatting', () => {
       { minute: 1, utterances: [{ start: 61_000, end: 62_000, speaker: 'A', speakerName: 'Host', text: 'there! ' }] },
       { minute: 2, utterances: [{ start: 121_000, end: 122_000, speaker: 'A', speakerName: 'Host', text: 'Again.' }] },
     ]);
-    expect(formatTranscriptText(long, { A: 'Host' })).toBe(
+    expect(formatTranscriptText(long, { A: 'Host' }, { layout: 'minute' })).toBe(
       '0:00\nHost: Hello,\n\n1:00\nHost: there!\n\n2:00\nHost: Again.\n',
     );
     expect(formatTranscriptVtt(long, { A: 'Host' })).toBe(
@@ -111,7 +112,70 @@ describe('transcription speaker overlay and one-minute formatting', () => {
 
   it('uses own-property lookup and falls back for inherited labels', () => {
     const names = Object.create({ A: 'inherited' });
-    expect(formatTranscriptText({ utterances: [{ start: 0, end: 10, speaker: 'A', text: 'Hello' }] }, names))
+    expect(formatTranscriptText({ utterances: [{ start: 0, end: 10, speaker: 'A', text: 'Hello' }] }, names, { layout: 'minute' }))
       .toBe('0:00\nSpeaker A: Hello\n');
+    expect(formatTranscriptText({ utterances: [{ start: 0, end: 10, speaker: 'A', text: 'Hello' }] }, names))
+      .toBe('[00:00] Speaker A: Hello\n');
+  });
+});
+
+describe('formatter v3: one paragraph per speaker turn (owner decision 2026-10-04)', () => {
+  // A four-minute monologue chopped at minute marks read worse than one paragraph (Oregon State rehearsal).
+  const monologue = {
+    text: '',
+    utterances: [
+      { start: 20 * 60_000 + 50_000, end: 22 * 60_000, speaker: 'A', text: 'We begin here.' },
+      { start: 22 * 60_000, end: 24 * 60_000 + 30_000, speaker: 'A', text: 'We continue for a while.' },
+      { start: 24 * 60_000 + 30_000, end: 25 * 60_000 + 10_000, speaker: 'A', text: 'And we finish.' },
+      { start: 25 * 60_000 + 12_000, end: 25 * 60_000 + 20_000, speaker: 'B', text: 'A question.' },
+      { start: 25 * 60_000 + 21_000, end: 25 * 60_000 + 40_000, speaker: 'A', text: 'An answer.' },
+    ],
+  };
+
+  test('version constants', () => {
+    expect(TRANSCRIPT_FORMATTER_VERSIONS).toEqual(['1', '2', '3']);
+    expect(TRANSCRIPT_FORMATTER_VERSION).toBe('3');
+  });
+
+  test('consecutive utterances by one speaker merge into a single turn spanning several minutes', () => {
+    const turns = groupTranscriptByTurn(monologue, { A: 'Andrea Balbas', B: 'Beth Pruitt' });
+    expect(turns.map((turn) => [turn.speakerName, turn.text])).toEqual([
+      ['Andrea Balbas', 'We begin here. We continue for a while. And we finish.'],
+      ['Beth Pruitt', 'A question.'],
+      ['Andrea Balbas', 'An answer.'],
+    ]);
+    expect(turns[0]).toMatchObject({ start: 20 * 60_000 + 50_000, end: 25 * 60_000 + 10_000, speaker: 'A' });
+  });
+
+  test('TXT has one paragraph per turn with its start time and no minute headings', () => {
+    expect(formatTranscriptText(monologue, { A: 'Andrea Balbas', B: 'Beth Pruitt' })).toBe(
+      '[20:50] Andrea Balbas: We begin here. We continue for a while. And we finish.\n\n'
+      + '[25:12] Beth Pruitt: A question.\n\n'
+      + '[25:21] Andrea Balbas: An answer.\n',
+    );
+    expect(formatTranscriptText(monologue, { A: 'Andrea Balbas', B: 'Beth Pruitt' })).not.toMatch(/^\d+:00$/m);
+  });
+
+  test('utterances are ordered by start before merging; same-speaker turns merge across a silence gap', () => {
+    // Fails if input order is trusted: "Earlier." (10 s) would otherwise be glued after Speaker B's 62 s turn.
+    expect(formatTranscriptText(transcript, { A: 'Host' })).toBe(
+      '[00:10] Host: Earlier. First.\n\n[01:02] Speaker B: Second.\n',
+    );
+  });
+
+  test('a speaker-less utterance never merges and gets no label; hours appear only when non-zero', () => {
+    const content = { utterances: [
+      { start: 0, end: 1000, speaker: null, text: 'Unattributed one.' },
+      { start: 1000, end: 2000, speaker: null, text: 'Unattributed two.' },
+      { start: 3_600_000 + 5000, end: 3_600_000 + 9000, speaker: 'A', text: 'Into the second hour.' },
+    ] };
+    expect(groupTranscriptByTurn(content)).toHaveLength(3);
+    expect(formatTranscriptText(content)).toBe('[00:00] Unattributed one.\n\n[00:01] Unattributed two.\n\n[1:00:05] Speaker A: Into the second hour.\n');
+    expect(formatTranscriptTurnTime(3_600_000 + 5000)).toBe('1:00:05');
+  });
+
+  test('plain text fallback and control-character scrubbing still apply', () => {
+    expect(formatTranscriptText({ text: 'Only\u0007 text', utterances: [] })).toBe('Only  text\n');
+    expect(formatTranscriptText({ utterances: [{ start: 0, end: 5, speaker: 'A', text: 'Line\nbreak' }] })).toBe('[00:00] Speaker A: Line break\n');
   });
 });

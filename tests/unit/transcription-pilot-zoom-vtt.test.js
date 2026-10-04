@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
-  ZOOM_ALIGNMENT_DEFAULTS, buildAlignmentPrior, computeNameSupport, parseZoomVtt, sampleAlignmentPairs,
+  ZOOM_ALIGNMENT_DEFAULTS, buildAlignmentPrior, computeNameSupport, parseZoomVtt, sampleAlignmentPairs, zoomDisplayName,
   scoreTextMatch, tokenizeTranscriptText, verifyAlignmentVerdict,
 } from '../../lib/services/transcription-pilot/zoom-vtt';
 
@@ -9,6 +9,7 @@ import {
 const fixture = (name) => readFileSync(path.join(__dirname, '../fixtures/zoom-vtt', name), 'utf8');
 const AVERY = 'Avery Lin';
 const JORDAN = 'Park, Jordan';
+const JORDAN_OUT = 'Jordan Park'; // zoomDisplayName reorders applied and suggested names
 const RILEY = 'Riley Stone';
 const ids = { [AVERY]: 'A', [JORDAN]: 'B', [RILEY]: 'C' };
 const cue = (start, end, name, text) => ({ start, end, name, text });
@@ -348,7 +349,7 @@ describe('verifyAlignmentVerdict', () => {
       expect(visible.A ?? {}).toEqual({});
       const verdict = { A: { name: AVERY, confidence: 0.99, pairIds: [] }, B: ok(visible, 'B', JORDAN) };
       const result = verifyAlignmentVerdict(p.samples, visible, verdict, { ...p.opts, conflictSupport: p.support });
-      expect(result.names).toEqual({ B: JORDAN });
+      expect(result.names).toEqual({ B: JORDAN_OUT });
       expect(result.alignment.status).toBe('partial');
       expect(result.alignment.suggestions.A).toBeUndefined();
     });
@@ -358,7 +359,7 @@ describe('verifyAlignmentVerdict', () => {
       const p = four();
       const verdict = { A: { name: AVERY, confidence: 0.99, pairIds: [] }, B: ok(p.support, 'B', JORDAN) };
       const result = verifyAlignmentVerdict(p.samples, p.support, verdict, p.opts);
-      expect(result.names).toEqual({ A: AVERY, B: JORDAN });
+      expect(result.names).toEqual({ A: AVERY, B: JORDAN_OUT });
       expect(result.alignment.speakers.A).toMatchObject({ basis: 'model', confidence: 0.99 });
       expect(result.alignment.speakers.A.pairIds).toEqual(p.support.A[AVERY].pairIds.slice(0, 3));
     });
@@ -369,8 +370,8 @@ describe('verifyAlignmentVerdict', () => {
       const conflictSupport = { ...p.support, A: { ...p.support.A, [JORDAN]: { count: 1, pairIds: ['A-9'] } } };
       const verdict = { A: ok(p.support, 'A', AVERY, 0.99), B: ok(p.support, 'B', JORDAN) };
       const result = verifyAlignmentVerdict(p.samples, p.support, verdict, { ...p.opts, conflictSupport });
-      expect(result.names).toEqual({ B: JORDAN });
-      expect(result.alignment.suggestions.A).toEqual(expect.arrayContaining([AVERY, JORDAN]));
+      expect(result.names).toEqual({ B: JORDAN_OUT });
+      expect(result.alignment.suggestions.A).toEqual(expect.arrayContaining([AVERY, JORDAN_OUT]));
     });
   });
 
@@ -405,7 +406,7 @@ describe('verifyAlignmentVerdict', () => {
     const result = verifyAlignmentVerdict(p.samples, p.support, { A: ok(p.support, 'A', AVERY, 0.99) }, p.opts);
     expect(result.names).toEqual({});
     expect(result.alignment.status).toBe('abstained');
-    expect(result.alignment.suggestions.A.sort()).toEqual([AVERY, JORDAN].sort());
+    expect(result.alignment.suggestions.A.sort()).toEqual([AVERY, JORDAN_OUT].sort());
   });
 
   test('fabricated citations do not block application; stored pairIds come from verified support, never the verdict', () => {
@@ -448,7 +449,7 @@ describe('verifyAlignmentVerdict', () => {
     const verdict = { A: { name: JORDAN, confidence: 0.99, pairIds: cite(p.support, 'A', AVERY) } };
     const result = verifyAlignmentVerdict(p.samples, p.support, verdict, p.opts);
     expect(result.names).toEqual({});
-    expect(result.alignment.suggestions.A).toEqual([AVERY, JORDAN]);
+    expect(result.alignment.suggestions.A).toEqual([AVERY, JORDAN_OUT]);
     expect(result.alignment.reasons.A).toBe('model_veto');
   });
 
@@ -499,7 +500,9 @@ describe('verifyAlignmentVerdict', () => {
       const verdict = { B: { name: 'John Sader', confidence: 0.98, pairIds: ['B-32', 'B-40', 'B-82'] },
         A: { name: null, confidence: 0.2, pairIds: [], reason: 'unsure' }, C: { name: null, confidence: 0.3, pairIds: [] } };
       const { names: applied, alignment } = verifyAlignmentVerdict(samples, observed, verdict, { zoomNames: names, content });
-      expect(applied).toEqual({ A: 'Balbas, Andrea', B: 'John Sader', C: 'Beth Pruitt', D: 'Edward Stolper', E: 'Justin Gallivan' });
+      expect(applied).toEqual({ A: 'Andrea Balbas', B: 'John Sader', C: 'Beth Pruitt', D: 'Edward Stolper', E: 'Justin Gallivan' });
+      expect(alignment.speakers.A).toMatchObject({ name: 'Andrea Balbas', zoomName: 'Balbas, Andrea' });
+      expect(alignment.speakers.B.zoomName).toBeUndefined();
       expect(alignment.status).toBe('applied');
       expect(alignment.speakers.B).toMatchObject({ basis: 'model', confidence: 0.98 });
       expect(alignment.speakers.A).toMatchObject({ basis: 'support', confidence: 0.95 });
@@ -513,6 +516,7 @@ describe('verifyAlignmentVerdict', () => {
       expect(applied.C).toBeUndefined();
       expect(alignment.reasons.C).toBe('conflict');
       expect(alignment.suggestions.C).toEqual(['Beth Pruitt', 'John Sader']);
+      expect(alignment.suggestions.C.every((n) => !n.includes(','))).toBe(true);
       expect(applied.D).toBe('Edward Stolper');
     });
 
@@ -545,7 +549,7 @@ describe('verifyAlignmentVerdict', () => {
     test('control: the aligned fixture applies all three names', () => {
       // Guards the negative tests below: proves the fixture succeeds when aligned.
       const { result, prior } = run(parsed, supportedVerdict);
-      expect(result.names).toEqual({ A: AVERY, B: JORDAN, C: RILEY });
+      expect(result.names).toEqual({ A: AVERY, B: JORDAN_OUT, C: RILEY });
       expect(result.alignment.status).toBe('applied');
       expect(prior.A[0].name).toBe(AVERY);
     });
@@ -553,7 +557,7 @@ describe('verifyAlignmentVerdict', () => {
     test('a shift inside the window keeps the correct names', () => {
       // Fails if wording support depended on exact timing instead of the +/- window.
       const { result } = run(shift(5000), supportedVerdict);
-      expect(result.names).toEqual({ A: AVERY, B: JORDAN, C: RILEY });
+      expect(result.names).toEqual({ A: AVERY, B: JORDAN_OUT, C: RILEY });
     });
 
     test.each([30_000, 45_000])('a %i ms shift (beyond window plus inter-turn gap) abstains even if the verdict follows the wrong prior', (ms) => {
@@ -807,7 +811,7 @@ describe('verifyAlignmentVerdict', () => {
       expect(support.B[JORDAN].count).toBe(4);
       const verdict = { A: { name: AVERY, confidence: 0.9, pairIds: support.A[AVERY].pairIds },
         B: { name: JORDAN, confidence: 0.9, pairIds: support.B[JORDAN].pairIds } };
-      expect(verifyAlignmentVerdict(samples, support, verdict, opts).names).toEqual({ A: AVERY, B: JORDAN });
+      expect(verifyAlignmentVerdict(samples, support, verdict, opts).names).toEqual({ A: AVERY, B: JORDAN_OUT });
     });
   });
 
@@ -912,5 +916,27 @@ describe('verifyAlignmentVerdict', () => {
       expect(Object.keys(alignment.suggestions).length === 0
         || Object.values(alignment.suggestions).every((list) => list.length === 1)).toBe(true);
     });
+  });
+});
+
+describe('zoomDisplayName', () => {
+  test.each([
+    ['Balbas, Andrea', 'Andrea Balbas'],
+    ['  Balbas ,  Andrea ', 'Andrea Balbas'],
+    ["O'Neil, Mary-Jane", "Mary-Jane O'Neil"],
+    ['García Márquez, Gabriel', 'Gabriel García Márquez'],
+  ])('reorders %s to %s', (input, expected) => {
+    expect(zoomDisplayName(input)).toBe(expected);
+  });
+
+  test.each([
+    'Edward Stolper', 'Smith, Jr.', 'Smith, PhD', 'Smith, Jr., John', 'Room 204, Building B', 'Jean', '', 'Doe, 2nd',
+  ])('leaves %p unchanged', (input) => {
+    expect(zoomDisplayName(input)).toBe(input);
+  });
+
+  test('non-strings pass through', () => {
+    expect(zoomDisplayName(null)).toBeNull();
+    expect(zoomDisplayName(undefined)).toBeUndefined();
   });
 });
