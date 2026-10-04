@@ -1,4 +1,72 @@
-# Session 572 Prompt: transcript generation, staff video sharing, leadership dashboards
+# Session 573 Prompt: staff video sharing, leadership dashboards, transcription follow-ups
+
+## Session 572 Summary — 2026-10-04 PT (Zoom caption speaker alignment shipped; Claude Fable orchestrating)
+
+Owner directive: Fable orchestrates; Sonnet builds; Opus reviews; Fable final review; Codex adversarial review until satisfied; owner makes every merge decision. Everything below is on `main` and deployed unless marked otherwise.
+
+### What Was Completed
+
+1. **Zoom VTT speaker alignment** (plan `docs/plans/ZOOM_VTT_SPEAKER_MAPPING_PLAN_2026-10-04.md`). Optional Zoom WebVTT uploaded with the audio in the Meeting transcription card; after the transcript is ready a workflow step aligns speaker IDs to Zoom names. Codex plan review 4 rounds; Codex code review 5 rounds (four verified identity bypasses fixed). Migration 065 applied to Production, prompt row `meeting-transcript.speaker-alignment` v1 seeded (owner ran the seed with `DATAVERSE_PROD_WRITE_ACK`), merge `c99f8d966`.
+2. **Verifier revision after the first live run:** verified wording support decides, the model is a veto only; dominance ratio 0.2 replaces any-second-name conflicts; per-speaker `reasons`; `basis` model/support. Codex 3 rounds. Merge `c8901db6b`.
+3. **Audio cap 50 → 200 MiB** (one constant in `lib/services/transcription-pilot/limits.js`; migration 066 applied). Merge `bde1bb41f`. Streaming upload stays queued.
+4. **Transcript formatter v3:** one paragraph per speaker turn with start time; v1/v2 publications rebuild byte-identical; surname-first Zoom names shown "Given Surname", collision-safe. Codex 2 rounds. Merge `005d2fef5`.
+5. **Short-utterance reassignment** from Zoom evidence (continuous caption coverage; backchannel list; content words need captioned evidence). Codex 3 rounds. Merge `0caac4972`.
+6. **Read-only diagnostic** `scripts/probe-meeting-speaker-alignment.js` (owner-run; prod reads). Reruns the deterministic pipeline on a live job: support tables, clock calibration, verifier outcome, reassignment and why-not-moved reasons.
+7. **Live rehearsal, Request 1003222:** three uploads of the Oregon State recording. Final job `7c1c5643`: 7 of 8 diarized speakers named automatically (Jean unresolved, six captions), 41:25 misattribution fixed, names first-name first. Allison Keller did not speak; earlier belief that she was merged into Andrea's ID was disproved by the probe.
+8. **Deliberately NOT merged** (documented in the plan § "Deliberately NOT merged" and the work queue Parked section, `14ddf0543`): `feature/unsupported-stretch-split` (targets a scenario that did not occur) and `feature/reassign-direct-overlap` (one word of benefit, Codex-reproduced regression).
+
+### Commits (main)
+- `c99f8d966`, `bde1bb41f`, `c8901db6b`, `005d2fef5`, `0caac4972` — the five merges above.
+- `14ddf0543` — parked-branch rationale. Handoff commit follows.
+
+### Codex worktree
+`/Users/gallivan/Code/WMKF_Apps-codex-dashboards` on `codex/leadership-dashboard-testing` (synced with origin at `9fec71a97`, two commits: readiness test + assessment record; `package-lock.json` locally modified from npm install, not committed). Owner was given a paste-in brief; outcome not reviewed this session.
+
+## Next Items
+
+### Verified Open
+1. **Staff video-sharing acceptance** (owner order item 2 from Session 571). Evidence: untouched this session; `docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`. Trace the sharing path and confirm intended staff can open the video.
+2. **Leadership dashboard readiness** (owner order item 3). Evidence: Codex worktree commits `a76b0f31a`, `9fec71a97` exist but were not read by this session. Start by reading the assessment record there; establish the target date.
+3. **Post-presentation materials transcript slot rejects plain VTT as malware** (`scan_infected` from Cloudmersive advanced scan on an 81 KB WEBVTT text file). Evidence: owner report; `lib/services/post-presentation-materials/material-service.js:1840-1852` discards the content flags. Minimum fix: record `contentFlags` on infected verdicts; then decide a text-file policy. Separate surface from the alignment VTT upload, which has no scan.
+4. **Jean on job `7c1c5643`** is a manual pick in the Detected speakers editor (suggestion offered). Stray one-word lines in rapid exchanges (~30) stay as diarized by design.
+
+### Owner Decision Needed
+1. **Sonnet 5.5 in the reviewed model registry** before the alignment prompt can be moved off the `sonnet` tier alias (resolves to claude-sonnet-5). Evidence: `check:model-registry` gate; prompt row editable in Admin › Prompts & budgets.
+2. **Dependabot: two high-severity alerts on the default branch** reported at push time; predate today. Evidence: GitHub push output 2026-10-04.
+
+### Parked
+1. `feature/unsupported-stretch-split`, `feature/reassign-direct-overlap` — see plan § "Deliberately NOT merged". Re-open only on a new owner decision with a recording that exhibits the problem.
+2. Calibrated timing votes for sub-floor cues (clock agreement measured: median 0.00 s, p90 0.5 s) and streaming audio upload — `docs/CURRENT_WORK_QUEUE.md`.
+3. Items parked in Session 571 (#428 rehearsal, #328, #390, reminder cron) remain parked; not revalidated.
+
+### Verify Before Acting
+1. Before re-running the alignment seed or any Dataverse write from a local shell: the target interlock requires `DATAVERSE_PROD_WRITE_ACK="<purpose> <YYYY-MM-DD UTC>"`; the seed is create-only and refuses when a row exists.
+2. The auto-mode classifier blocked the agent from production reads/writes (Vercel env pull, migrations, seeds); the owner ran those via `!`. Expect the same.
+
+### Do Not Reopen Without New Decision
+1. Model-as-veto, dominance 0.2, rendered-slice attribution, backchannel exemption with its accepted residual risk (simultaneous "yes" over uninterrupted speech) — owner decisions recorded in the plan § 2.
+2. Time-split speaker editor — owner declined 2026-10-04 ("not worth the effort").
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `lib/services/transcription-pilot/zoom-vtt.js` | parse VTT, sample, cue-exclusive support, verifier (veto), display names, short-utterance reassignment |
+| `lib/services/meeting-tracker-transcription/alignment-service.js` | claim → blobs → sample/serialize → Executor → verify → reassign → fenced complete |
+| `lib/services/meeting-tracker-transcription/alignment-samples.js` | pure sample rendering/budget (shared with the probe) |
+| `lib/services/transcription-pilot/transcript-format.js` | formatter versions, turn grouping, `applySpeakerReassignments` |
+| `lib/services/transcription-pilot/limits.js` | 200 MiB audio cap |
+| `scripts/probe-meeting-speaker-alignment.js` | owner-run live diagnostic |
+
+## Testing
+
+```bash
+npx jest tests/unit/transcription-pilot tests/unit/meeting-tracker-transcription
+TRANSCRIPTION_PILOT_PG_TEST_URL=postgres://postgres:contract@127.0.0.1:55432/transcription_pilot_test MEETING_TRACKER_TRANSCRIPTION_PG_TEST_URL=$TRANSCRIPTION_PILOT_PG_TEST_URL npx jest --runInBand tests/integration/transcription-pilot.pg.test.js tests/integration/meeting-tracker-transcription.pg.test.js
+node scripts/probe-meeting-speaker-alignment.js            # owner shell; newest job with a VTT
+```
+
+## Earlier handoff — Session 571 (historical; items 1 of its order completed above, 2–3 still open)
 
 ## Session 571 Summary — 2026-10-03 PT (Codex Factory recovery closeout)
 

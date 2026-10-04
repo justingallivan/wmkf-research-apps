@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Zoom caption speaker alignment and transcript readability in Production (Session 572)
+
+**Milestone:** Meeting Tracker transcripts name their speakers automatically from the Zoom caption file and read as one paragraph per speaker turn.
+**Sessions:** 572 (plan, Sonnet/Opus/Codex build loop, five production merges, live rehearsal on Request 1003222).
+**Ship state:**
+- Zoom VTT uploaded with the audio; verified wording support decides each speaker's name and the model (Sonnet, admin-editable prompt row `meeting-transcript.speaker-alignment`) can only veto. Migration 065 applied, prompt seeded, merges `c99f8d966`, `c8901db6b`.
+- Audio cap 200 MiB (migration 066, `bde1bb41f`); transcript formatter v3 paragraphs per turn with v1/v2 publications still byte-identical (`005d2fef5`); surname-first Zoom names reordered collision-safe; misdiarized one-word utterances reassigned from Zoom evidence (`0caac4972`).
+- Live rehearsal: 7 of 8 diarized speakers named automatically on the third upload; two refinement branches deliberately parked with evidence (`14ddf0543`).
+**Why it matters:** Staff no longer hand-name speakers for Zoom-captioned meetings, and the published transcript reads like a conversation rather than minute-stamped fragments.
+**Pointers:** `docs/plans/ZOOM_VTT_SPEAKER_MAPPING_PLAN_2026-10-04.md`; `docs/atlas/postgres-transcription-pilot.md`; `scripts/probe-meeting-speaker-alignment.js`.
+
 ## October 2026 — Pricing alert reconciliation and reviewed model selection (Session 568)
 
 **Milestone:** Corrected the provider pricing comparison and deployed reviewed Opus 5.5 coverage.
