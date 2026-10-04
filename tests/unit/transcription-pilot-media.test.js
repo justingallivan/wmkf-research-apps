@@ -86,7 +86,7 @@ describe('transcription media inspection', () => {
     })).toThrow(expect.objectContaining({ code: 'audio_format_not_allowed' }));
   });
 
-  test('enforces the 50 MiB byte cap before starting the parser worker', async () => {
+  test('enforces the byte cap before starting the parser worker', async () => {
     await expect(inspectAudioBuffer(Buffer.alloc(TRANSCRIPTION_MAX_AUDIO_BYTES + 1)))
       .rejects.toMatchObject({ code: 'audio_too_large' });
   });
@@ -112,7 +112,8 @@ describe('transcription media inspection', () => {
     }
     // The measured RSS includes both the caller's capped Buffer and one
     // transferable worker copy; it is a regression bound, not a V8 heap cap.
-    expect(peak - baseline).toBeLessThan(256 * 1024 * 1024);
+    // Bound: two capped copies (caller Buffer + transferable worker copy) plus 112 MiB of slack.
+    expect(peak - baseline).toBeLessThan(2 * TRANSCRIPTION_MAX_AUDIO_BYTES + 112 * 1024 * 1024);
   });
 
   test('accepts a synthetic MP3 exactly at four hours and rejects one frame over', async () => {

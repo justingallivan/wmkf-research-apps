@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { requestJson } from '../../utils/api-request';
 import { formatTranscriptMinuteHeading, getTranscriptSpeakers, groupTranscriptByMinute } from '../../../lib/services/transcription-pilot/transcript-format';
 
-const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
+import { MAX_TRANSCRIPTION_BYTES as MAX_AUDIO_BYTES, MAX_TRANSCRIPTION_MIB } from '../../../lib/services/transcription-pilot/limits';
 const MAX_VTT_BYTES = 4_000_000;
 const API_PATH = '/api/meeting-tracker/visits';
 const ALIGNMENT_ACTIVE = new Set(['pending', 'running']);
@@ -472,7 +472,7 @@ function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnl
   const uploadAndStart = async () => {
     if (reviewOnly || !selectedFile || uploadError || !acknowledged || busy || !requestId) return;
     if (selectedFile.size < 1 || selectedFile.size > MAX_AUDIO_BYTES) {
-      setError('Choose an audio recording no larger than 50 MiB.');
+      setError(`Choose an audio recording no larger than ${MAX_TRANSCRIPTION_MIB} MiB.`);
       return;
     }
     if (vttFile && vttError) return;
@@ -861,12 +861,12 @@ function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnl
         <div className="min-w-0 space-y-4">
           {!reviewOnly && <div>
             <h3 className="text-sm font-semibold text-gray-900">Upload a recording</h3>
-            <p className="mt-1 text-xs leading-5 text-gray-600">Maximum 50 MiB. The file uploads directly to private storage and is sent to AssemblyAI when you start transcription. Do not upload sensitive material.</p>
+            <p className="mt-1 text-xs leading-5 text-gray-600">Maximum {MAX_TRANSCRIPTION_MIB} MiB. The file uploads directly to private storage and is sent to AssemblyAI when you start transcription. Do not upload sensitive material.</p>
             <label htmlFor="meeting-transcription-file" className="mt-3 block text-xs font-medium text-gray-700">Audio file</label>
             <input id="meeting-transcription-file" type="file" accept=".m4a,.mp3,audio/mp4,audio/x-m4a,audio/mpeg" disabled={Boolean(busy)} multiple onChange={(event) => chooseFiles(event.target.files, 'audio')} className="mt-1 block w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-100" />
             {selectedFile && <p className="mt-2 break-all text-xs text-gray-700">{selectedFile.name} · {(selectedFile.size / (1024 * 1024)).toFixed(1)} MiB</p>}
             {uploadError && <p className="mt-2 text-sm text-red-800" role="alert">{uploadError}</p>}
-            {selectedFile && (selectedFile.size < 1 || selectedFile.size > MAX_AUDIO_BYTES) && <p className="mt-2 text-sm text-red-800" role="alert">Choose an audio recording larger than 0 bytes and no larger than 50 MiB.</p>}
+            {selectedFile && (selectedFile.size < 1 || selectedFile.size > MAX_AUDIO_BYTES) && <p className="mt-2 text-sm text-red-800" role="alert">Choose an audio recording larger than 0 bytes and no larger than {MAX_TRANSCRIPTION_MIB} MiB.</p>}
             <label htmlFor="meeting-transcription-vtt" className="mt-3 block text-xs font-medium text-gray-700">Zoom transcript (.vtt, optional)</label>
             <input id="meeting-transcription-vtt" ref={vttInputRef} type="file" accept=".vtt,text/vtt" multiple disabled={Boolean(busy)} aria-describedby="meeting-transcription-vtt-help" onChange={(event) => chooseFiles(event.target.files, 'vtt')} className="mt-1 block w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-100" />
             <p id="meeting-transcription-vtt-help" className="mt-1 text-xs leading-5 text-gray-600">Speakers will be named automatically from it. Maximum 4 MB.</p>

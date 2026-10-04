@@ -132,7 +132,7 @@ test('uploads audio directly to private Blob storage before starting provider wo
         filename: 'recording.mp3', contentType: 'audio/mpeg', bytes: 5,
         idempotencyKey: '99999999-9999-4999-8999-999999999999', providerRegion: 'us',
       });
-      return response({ job: uploadedJob, upload: { pathname: 'private/path', token: 'scoped-token', contentType: 'audio/mpeg', maximumSizeInBytes: 52428800, access: 'private' } });
+      return response({ job: uploadedJob, upload: { pathname: 'private/path', token: 'scoped-token', contentType: 'audio/mpeg', maximumSizeInBytes: 209715200, access: 'private' } });
     }
     if (path.endsWith(`/${JOB_ID}/start`)) {
       expect(options.method).toBe('POST');
@@ -566,7 +566,7 @@ function mockUploadFetch({ zoom = zoomUpload, onCreate } = {}) {
     if (isCreate([url, options])) {
       const pending = onCreate ? onCreate() : null;
       if (pending) await pending;
-      return response({ job: uploadedJob, upload: { pathname: 'private/path', token: 'scoped-token', contentType: 'audio/mpeg', maximumSizeInBytes: 52428800, access: 'private', zoomTranscript: zoom } });
+      return response({ job: uploadedJob, upload: { pathname: 'private/path', token: 'scoped-token', contentType: 'audio/mpeg', maximumSizeInBytes: 209715200, access: 'private', zoomTranscript: zoom } });
     }
     if (path.endsWith(`/${JOB_ID}/start`)) return response({ job: job({ status: 'queued', version: 2 }) });
     if (path.endsWith('/transcriptions')) return response(collection({ jobs: [uploadedJob] }));
