@@ -134,4 +134,26 @@ describe('Dynamics Explorer model call configuration', () => {
       else process.env.CLAUDE_API_KEY = previousApiKey;
     }
   });
+
+  test.each([
+    [{ refused: true }, { refused: true }],
+    [{ stopReason: 'refusal' }, { stopReason: 'refusal' }],
+  ])('batch adapter preserves provider refusal metadata %j for its text consumer', async (marker, expected) => {
+    const complete = jest.fn().mockResolvedValue({
+      text: 'provider refusal text',
+      ...marker,
+      usage: { inputTokens: 1, outputTokens: 2, cacheCreationTokens: 0, cacheReadTokens: 0 },
+    });
+    LLMClient.mockImplementation(() => ({ complete }));
+    const previousApiKey = process.env.CLAUDE_API_KEY;
+    process.env.CLAUDE_API_KEY = 'batch-test-key';
+    try {
+      await expect(callClaudeBatch({ systemPrompt: 'system', userMessage: 'user', userProfileId: 'user-2' })).resolves.toMatchObject({
+        text: 'provider refusal text', ...expected,
+      });
+    } finally {
+      if (previousApiKey === undefined) delete process.env.CLAUDE_API_KEY;
+      else process.env.CLAUDE_API_KEY = previousApiKey;
+    }
+  });
 });

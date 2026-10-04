@@ -293,6 +293,29 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
     return res.write.mock.calls.map(c => c[0]).join('');
   }
 
+  test.each(['thinking', 'redacted_thinking'])('signed %s prefix reaches model round three unchanged', async type => {
+    const snapshots = [];
+    let calls = 0;
+    mockStream.mockReset().mockImplementation(async args => {
+      snapshots.push(JSON.parse(JSON.stringify(args)));
+      calls++;
+      return {
+        content: calls < 3 ? [
+          { type, thinking: '', signature: 'test-signature', data: 'redacted' },
+          { type: 'tool_use', id: `signed-tool-${calls}`, name: 'query_records', input: { table_name: 'akoya_requests', select: ['akoya_requestnum'] } },
+        ] : [{ type: 'text', text: 'Done' }],
+        model: 'claude-test', usage: {}, stopReason: calls < 3 ? 'tool_use' : 'end_turn', textStreamed: false,
+      };
+    });
+    const res = createMockRes();
+    await handler(createMockReq({ method: 'POST', body: { messages: [{ role: 'user', content: 'Read requests' }] } }), res);
+    expect(mockStream).toHaveBeenCalledTimes(3);
+    expect(snapshots[2].system).toEqual(snapshots[1].system);
+    expect(snapshots[2].tools).toEqual(snapshots[1].tools);
+    expect(snapshots[2].messages.slice(0, snapshots[1].messages.length)).toEqual(snapshots[1].messages);
+    expect(snapshots[2].messages[1].content[1].input).toEqual({ table_name: 'akoya_requests', select: ['akoya_requestnum'] });
+  });
+
   // ─── Item 1: SSE event census ───
 
   test('item 1: full SSE event census across document, export, blocked, and final-answer rounds', async () => {
@@ -399,6 +422,34 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
 
     const normalized = rawSse(res).split(requestId).join('<REQUEST_ID>');
     expect(normalized).toMatchSnapshot('sse-census-normalized');
+  });
+
+  test.each([false, true])('export refusal (confirmed=%s) ends the chat without retry, another model round, or file_ready', async (confirmed) => {
+    mockStream.mockReset().mockResolvedValueOnce({
+      content: [{ type: 'tool_use', id: 'tool-export-refused', name: 'export_csv', input: {
+        table_name: 'akoya_requests', process_instruction: 'Summarize', confirmed,
+      } }],
+      model: 'claude-test', usage: {}, stopReason: 'tool_use', textStreamed: false,
+    });
+    mockComplete.mockReset();
+    if (confirmed) mockComplete.mockResolvedValueOnce({ text: '{"summary":"sample columns"}', usage: { inputTokens: 1, outputTokens: 1, cacheCreationTokens: 0, cacheReadTokens: 0 } });
+    mockComplete.mockResolvedValueOnce({
+      text: '{"summary":"PRIVATE_REFUSAL_TEXT"}', stopReason: 'refusal', refused: true,
+      usage: { inputTokens: 1, outputTokens: 1, cacheCreationTokens: 0, cacheReadTokens: 0 },
+    });
+
+    const res = createMockRes();
+    await handler(createMockReq({ method: 'POST', body: { messages: [{ role: 'user', content: 'Export these requests' }] } }), res);
+
+    const blocks = parseSse(res);
+    expect(mockComplete).toHaveBeenCalledTimes(confirmed ? 2 : 1); // no retry in either sample or full batch
+    expect(mockStream).toHaveBeenCalledTimes(1); // no follow-up model round
+    expect(blocks.some((block) => block.event === 'file_ready')).toBe(false);
+    expect(blocks.some((block) => block.event === 'export_progress')).toBe(false);
+    expect(blocks.find((block) => block.event === 'response').data.content).toBe('The AI provider declined this export request, so processing stopped.');
+    expect(blocks.find((block) => block.event === 'complete').data.outcome).toBe('refused');
+    expect(rawSse(res)).not.toContain('PRIVATE_REFUSAL_TEXT');
+    expect(mockFinalizeRequest.mock.calls[0][0].outcome).toBe('refused');
   });
 
   // ─── Item 2: blocked tool path ───

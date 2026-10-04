@@ -1,3 +1,4 @@
+import { requireAcceptedLlmResponse } from '../../lib/utils/llm-response';
 // SUNSET S344 (2026-07-08): backs the sunset-candidate apps `phase-ii-writeup`
 // and `batch-proposal-summaries` (both PDF-upload, no longer used in current
 // format). Route is intentionally LEFT ROUTABLE; code retained as the reference
@@ -149,12 +150,13 @@ async function generateSummary(text, filename, apiKey, summaryLength, userProfil
     });
     let summaryText;
     try {
-      ({ text: summaryText } = await claude.complete({
+      ({ text: summaryText } = requireAcceptedLlmResponse(await claude.complete({
         messages: [{ role: 'user', content: prompt }],
         maxTokens: BASE_CONFIG.MODEL_PARAMS.DEFAULT_MAX_TOKENS,
         temperature: BASE_CONFIG.MODEL_PARAMS.SUMMARIZATION_TEMPERATURE,
-      }));
+      })));
     } catch (err) {
+      if (err.code === 'model_refusal') throw err;
       throw new Error(getApiErrorMessage(err.status || 500, err.message));
     }
 
@@ -197,11 +199,11 @@ async function extractStructuredData(text, filename, summary, apiKey, userProfil
       appName: 'batch-phase-ii',
       userProfileId,
     });
-    const { text: jsonTextRaw } = await claude.complete({
+    const { text: jsonTextRaw } = requireAcceptedLlmResponse(await claude.complete({
       messages: [{ role: 'user', content: extractionPrompt }],
       maxTokens: 1000,
       temperature: 0.1,
-    });
+    }));
     let jsonText = jsonTextRaw;
     if (jsonText) {
       try {
@@ -227,6 +229,7 @@ async function extractStructuredData(text, filename, summary, apiKey, userProfil
       }
     }
   } catch (error) {
+    if (error.code === 'model_refusal') throw error;
     console.warn('Structured data extraction failed, using fallback:', error.message);
   }
 

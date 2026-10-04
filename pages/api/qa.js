@@ -1,3 +1,4 @@
+import { requireAcceptedLlmResponse } from '../../lib/utils/llm-response';
 /**
  * API Route: /api/qa
  *
@@ -181,7 +182,7 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('Q&A streaming error:', error);
-    sendEvent('error', { message: error.message || 'Failed to process question' });
+    sendEvent('error', { message: error.message || 'Failed to process question', ...(error.code === 'model_refusal' ? { code: error.code } : {}) });
   } finally {
     res.end();
   }
@@ -204,7 +205,7 @@ async function callClaudeStreaming(apiKey, model, systemPrompt, messages, sendEv
   const sources = [];
   let sentSearchEvent = false;
 
-  const r = await claude.stream({
+  const r = requireAcceptedLlmResponse(await claude.stream({
     system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
     messages,
     maxTokens: 4096,
@@ -242,7 +243,7 @@ async function callClaudeStreaming(apiKey, model, systemPrompt, messages, sendEv
         }
       }
     },
-  });
+  }));
 
   if (sources.length > 0) {
     sendEvent('sources', { sources });

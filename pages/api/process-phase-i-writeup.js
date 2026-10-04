@@ -1,3 +1,4 @@
+import { requireAcceptedLlmResponse } from '../../lib/utils/llm-response';
 // SUNSET S344 (2026-07-08): backs the sunset-candidate app `phase-i-writeup`
 // (PDF-upload, no longer used in current format). Route is intentionally LEFT
 // ROUTABLE; code retained as the direct reference for the planned Dataverse-native
@@ -152,11 +153,11 @@ async function generatePhaseIWriteup(text, filename, institution, apiKey, userPr
       appName: 'phase-i-writeup',
       userProfileId,
     });
-    const { text: writeupText } = await claude.complete({
+    const { text: writeupText } = requireAcceptedLlmResponse(await claude.complete({
       messages: [{ role: 'user', content: prompt }],
       maxTokens: BASE_CONFIG.MODEL_PARAMS.DEFAULT_MAX_TOKENS,
       temperature: BASE_CONFIG.MODEL_PARAMS.SUMMARIZATION_TEMPERATURE,
-    });
+    }));
 
     // Create formatted markdown version
     const formatted = enhanceFormatting(writeupText, filename);
@@ -170,6 +171,7 @@ async function generatePhaseIWriteup(text, filename, institution, apiKey, userPr
     };
 
   } catch (error) {
+    if (error.code === 'model_refusal') throw error;
     console.error('Writeup generation error:', error);
     throw new Error('Failed to generate writeup');
   }
@@ -196,11 +198,11 @@ async function extractStructuredData(text, filename, writeup, apiKey, userProfil
       appName: 'phase-i-writeup',
       userProfileId,
     });
-    const { text: jsonText } = await claude.complete({
+    const { text: jsonText } = requireAcceptedLlmResponse(await claude.complete({
       messages: [{ role: 'user', content: extractionPrompt }],
       maxTokens: 1000,
       temperature: 0.2,
-    });
+    }));
 
     // Parse + validate against the per-app schema (A7 Part 5). Undeclared keys
     // an injected model might add are dropped; bad types fail validation. A
@@ -223,6 +225,7 @@ async function extractStructuredData(text, filename, writeup, apiKey, userProfil
     }
 
   } catch (error) {
+    if (error.code === 'model_refusal') throw error;
     console.error('Structured data extraction error:', error);
     return {};
   }

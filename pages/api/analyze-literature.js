@@ -1,3 +1,4 @@
+import { requireAcceptedLlmResponse } from '../../lib/utils/llm-response';
 /**
  * Literature Analyzer API Endpoint
  *
@@ -221,7 +222,7 @@ async function extractPaperInfo(base64Pdf, apiKey, userProfileId) {
     appName: 'literature-analyzer',
     userProfileId,
   });
-  const { text: responseText } = await claude.complete({
+  const { text: responseText } = requireAcceptedLlmResponse(await claude.complete({
     messages: [{
       role: 'user',
       content: [
@@ -230,7 +231,7 @@ async function extractPaperInfo(base64Pdf, apiKey, userProfileId) {
       ],
     }],
     maxTokens: 4000,
-  });
+  }));
 
   // Parse JSON response
   try {
@@ -263,11 +264,11 @@ async function generateSynthesis(papers, focusTopic, apiKey, userProfileId) {
     appName: 'literature-analyzer',
     userProfileId,
   });
-  const { text: responseText } = await claude.complete({
+  const { text: responseText } = requireAcceptedLlmResponse(await claude.complete({
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 6000,
     temperature: 0.3,
-  });
+  }));
 
   // Parse JSON response
   try {
@@ -298,11 +299,11 @@ async function generateComparisonData(papers, comparisonType, apiKey, userProfil
     appName: 'literature-analyzer',
     userProfileId,
   });
-  const { text: responseText } = await claude.complete({
+  const { text: responseText } = requireAcceptedLlmResponse(await claude.complete({
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 4000,
     temperature: 0.3,
-  });
+  }));
 
   // Parse JSON response
   try {
