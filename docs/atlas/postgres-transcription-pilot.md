@@ -39,8 +39,9 @@ input path. Alignment runs after ready under the job's existing lease
 `claimNextPendingAlignmentJob` and `expireExhaustedAlignments` for hourly
 recovery); while the lease is held, the speaker PATCH and publication freeze
 return 409. `speaker_alignment` is projected through an allowlist (status,
-attempts, code, per-speaker name and confidence, suggestions) and never exposes a
-pathname. Local PostgreSQL 16 integration suites cover the fences (37 cases).
+attempts, code, per-speaker name, confidence and `basis` of `model` or `support`,
+suggestions, and per-speaker `reasons` codes for IDs not applied; added 2026-10-04)
+and never exposes a pathname. Local PostgreSQL 16 integration suites cover the fences (37 cases).
 Enabling in Production requires applying 065 before deploying the runtime and
 seeding the `meeting-transcript.speaker-alignment` prompt row; see the plan.
 [VERIFIED via `lib/db/migrations/065_transcription_zoom_transcript.sql`,

@@ -945,7 +945,7 @@ function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnl
               {matchingApplied && <div className="mt-4 space-y-2" aria-live="polite">
                 <Notice tone="success">
                   <p className="font-semibold">Speaker names from Zoom transcript</p>
-                  {!!appliedRows.length && <ul className="mt-1 space-y-0.5">{appliedRows.map(([id, value]) => <li key={id}>Speaker {id}: {value.name}{typeof value.confidence === 'number' ? ` (${Math.round(value.confidence * 100)}% confidence)` : ''}</li>)}</ul>}
+                  {!!appliedRows.length && <ul className="mt-1 space-y-0.5">{appliedRows.map(([id, value]) => <li key={id}>Speaker {id}: {value.name}{typeof value.confidence === 'number' ? ` (${Math.round(value.confidence * 100)}% confidence${value.basis === 'support' ? ', matched captions' : ''})` : ''}</li>)}</ul>}
                   {!!suggestionRows.length && <ul className="mt-2 space-y-1">{suggestionRows.map(([id, names]) => <li key={id} className="flex flex-wrap items-center gap-2"><span>Speaker {id} is unnamed. Suggestions:</span>{names.map((name) => <button key={name} type="button" disabled={Boolean(busy)} onClick={() => { setSpeakerNames((current) => ({ ...current, [id]: name })); setSelectedSuggestions((current) => ({ ...current, [id]: '' })); }} className="min-h-9 rounded-lg border border-green-800 bg-white px-3 py-1.5 text-xs font-semibold text-green-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-700 disabled:cursor-not-allowed disabled:opacity-60">Use {name} for Speaker {id}</button>)}</li>)}</ul>}
                 </Notice>
               </div>}
