@@ -1005,6 +1005,44 @@ describe('reassignShortUtterances (misdiarized one-word utterances, owner decisi
     expect(reassignShortUtterances(ok.utterances, ok.cues, ok.applied).reassigned).toEqual({ 1: 'A' });
   });
 
+  test('Codex round 2: two cues with a silent gap do not bridge an uncaptioned utterance; adjacent or overlapping cues do', () => {
+    // Alice: 'No further questions' 0-4900, 'Thank you' 5500-10000. Bob's 'No.' at 5000-5400 sits in the 600 ms gap.
+    const gap = base();
+    gap.cues[0] = cue(0, 4900, AVERY, 'no further questions');
+    gap.cues.push(cue(5500, 10_000, AVERY, 'thank you'));
+    gap.utterances[1] = { speaker: 'D', start: 5000, end: 5400, text: 'No.' };
+    expect(reassignShortUtterances(gap.utterances, gap.cues, gap.applied).reassigned).toEqual({});
+    // Same words captioned, but the cues are adjacent (300 ms gap, within tolerance): covered -> moves.
+    gap.cues[0] = cue(0, 5200, AVERY, 'no further questions');
+    expect(reassignShortUtterances(gap.utterances, gap.cues, gap.applied).reassigned).toEqual({ 1: 'A' });
+    // Edge allowance is capped at half the utterance: a 500 ms 'Right.' overhanging the cue end by
+    // 200 ms passes; a 700 ms one overhanging by 400 ms (more than half uncaptioned) fails.
+    const edge = base();
+    edge.utterances[1] = { speaker: 'D', start: 9700, end: 10_200, text: 'Right.' };
+    edge.utterances[2] = { speaker: 'A', start: 10_500, end: 12_000, text: 'and so on' };
+    expect(reassignShortUtterances(edge.utterances, edge.cues, edge.applied).reassigned).toEqual({ 1: 'A' });
+    edge.utterances[1] = { speaker: 'D', start: 9700, end: 10_400, text: 'Right.' };
+    expect(reassignShortUtterances(edge.utterances, edge.cues, edge.applied).reassigned).toEqual({});
+  });
+
+  test('a one-word answer in the pause after a question is not a backchannel and stays put', () => {
+    // Alice asks, her caption ENDS, Bob says 'Yes.' in the pause, Alice resumes under a new caption.
+    const qa = base();
+    qa.cues[0] = cue(0, 4800, AVERY, 'do you approve the proposed grant');
+    qa.cues.push(cue(5600, 10_000, AVERY, 'then we can proceed'));
+    qa.utterances[1] = { speaker: 'D', start: 5000, end: 5400, text: 'Yes.' };
+    expect(reassignShortUtterances(qa.utterances, qa.cues, qa.applied).reassigned).toEqual({});
+  });
+
+  test('evaluative words are not backchannels: they need captioned evidence', () => {
+    const ev = base();
+    ev.cues[0] = cue(0, 10_000, AVERY, 'the pockets are ablated quickly usually fifteen seconds between each ablation');
+    for (const word of ['Correct.', 'Absolutely.', 'Good.', 'Great.']) {
+      ev.utterances[1] = { speaker: 'D', start: 5000, end: 5400, text: word };
+      expect(reassignShortUtterances(ev.utterances, ev.cues, ev.applied).reassigned).toEqual({});
+    }
+  });
+
   test('a backchannel moves on containment alone even when Zoom dropped it (the 41:25 case); content words need captioning', () => {
     const dropped = base();
     dropped.cues[0] = cue(0, 10_000, AVERY, 'the pockets are ablated quickly usually fifteen seconds between each ablation'); // no "right"
