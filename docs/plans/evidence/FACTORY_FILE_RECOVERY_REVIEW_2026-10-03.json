@@ -1,0 +1,44 @@
+{
+  "scope": "Sandbox-only fresh Basic file receipt recovery; no live recovery or Production enablement",
+  "implementationCommit": "c751bda5f",
+  "reviews": {
+    "luna": "built and focused-tested",
+    "sol": "approved bounded Sandbox build",
+    "root": "approved after Date-shaped lease, pre-claim freshness, rollback/concurrency and failure-path checks",
+    "fable": {
+      "authentication": "Claude OAuth subscription",
+      "verdict": "approved; no blockers",
+      "permissionDenials": 0,
+      "executedTests": false,
+      "reviewFile": "/tmp/factory-runtime-fable-review.json"
+    }
+  },
+  "validation": {
+    "focusedSuites": 8,
+    "focusedTestsPassed": 280,
+    "realPostgresTestsPassed": 6,
+    "postgres": "disposable localhost container; TEST_REQUEST_LEDGER_REQUIRE=1",
+    "typecheck": "passed",
+    "lint": "passed",
+    "syntaxAndWhitespace": "passed",
+    "scopedGatesAndSelfTestsPassed": 15
+  },
+  "sourceSha256": {
+    "lib/services/graph/files.js": "f17d7f88c2ef78c49bb2fc31165534dc774eaa549253c1b5683104ebad1c74d7",
+    "lib/services/test-requests/file-readback-verifier.js": "2a0f940d4529d984eae4e51ff2be666208076d287de24e56643aca922b50fbca",
+    "lib/services/test-requests/file-recovery-runner.js": "0cd7f78e8728e0d2c11daa3d3d7afc467f2ed6ef37af4be583cec27276dabf68",
+    "lib/services/test-requests/run-ledger.js": "06db188d67ead6ed7c5c2f7e40c114c509b314be79be5f051a05bcc561e4a57a",
+    "scripts/factory-file-readback.mjs": "5130b0ab0879e1d0fca38f1b08036946e223091b0e7d561e2825393b42d69a2f",
+    "tests/unit/test-request-file-readback-verifier.test.js": "d471692e22809ef678fbd0faf139db8fe9b0e1ae468fe350347ea58fb4849a15",
+    "tests/unit/test-request-file-recovery-runner.test.js": "d45324329b29b4ae9734e32e65013dce9598aa39e6f5a78fc366dabe49fa1f8d",
+    "tests/integration/test-request-file-recovery.pg.test.js": "07096a827da396704f793e4cdd4dffbfa9ef7d0a439b56270fe94b1c41ad0c17"
+  },
+  "limits": [
+    "Live exact Request/file metadata reads confirmed one expired Pre-Site sandbox candidate only.",
+    "No eligible fresh Basic run or live recovery rehearsal.",
+    "CLI refuses Production; original six-hour freshness stays intact.",
+    "Private operator receipt records pre-CAS evidence, not proof of commit.",
+    "Request 1003308 untouched; no email, deletion, shared workflow change or remote business mutation.",
+    "A fresh fixture needs safe create-automation effects and a deliberate, labeled pending-file state."
+  ]
+}

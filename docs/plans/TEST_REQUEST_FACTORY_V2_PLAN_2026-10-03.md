@@ -117,7 +117,7 @@ Luna built the experiment; Sol independently ran its 13 tests and approved the b
 
 The [experiment receipt](evidence/FACTORY_READBACK_PROOF_REVIEW_2026-10-03.json) records final fingerprints, review verdicts, tests and probe limits. No runtime implementation or deployment is included.
 
-## Fresh-run recovery implementation contract — Sandbox source built, review in progress
+## Fresh-run recovery implementation contract — Sandbox source built and reviewed
 
 Owner decision: recover only while the original source bundle is within six hours; expired runs are diagnosed and require a new run. There is no source rebase, timestamp refresh, stale-bundle continuation, or change to retained Request 1003308.
 
@@ -135,6 +135,16 @@ The real verifier must bind the saved manifest/bundle/policy and run, reread the
 
 Persistence uses existing ledger columns/constraints; no new schema is planned. The recovery writer must not reuse the generic unconditional resource-readback update. It must return a conflict without a partial verified receipt if any original resource or run condition has changed. A run becomes `creating` at the same `copy_file` step, never `ready`; the next ordinary Advance remains subject to freshness and terminal verification.
 
-[VERIFIED via read-only owner-scoped Sandbox ledger census and exact Request/file metadata reads] A retained, approximately six-day-old sandbox Pre-Site run still has a marked Request with matching run correlation and two accessible journaled file identities. This is a real-reader candidate, not a fresh Basic recovery fixture; no bytes were downloaded or remote data changed during that census. A separate disposable local PostgreSQL instance is available for transactional tests. Neither observation proves live end-to-end recovery.
+[VERIFIED via read-only owner-scoped Sandbox ledger census and exact Request/file metadata reads] A retained, approximately six-day-old sandbox Pre-Site run still has a marked Request with matching run correlation and two accessible journaled file identities. This is a real-reader candidate, not a fresh Basic recovery fixture; no bytes were downloaded or remote data changed during that census. A separate disposable local PostgreSQL instance was used for the transactional tests below. Neither observation proves live end-to-end recovery.
 
 [VERIFIED via source] The private receipt is written before the transaction and deliberately records CAS intent. A lost or ambiguous response requires a fresh ledger inspection; the file alone never proves a completed transition. Production recovery remains refused in this initial Sandbox entry point.
+
+## Runtime build verification and remaining live rehearsal
+
+[VERIFIED via focused tests and source review] Luna built the verifier and recovery command; Sol and root approved after bounded corrections. The final eight-suite run passed **280 tests**, including **six real disposable PostgreSQL tests** with `TEST_REQUEST_LEDGER_REQUIRE=1`: exact receipt transition, source expiry, snapshot conflicts, concurrent claim winner, stale-generation rejection, concurrent recovery winner, and rollback after the resource update. Package attestation, normal final-verifier receipt compatibility, strict Graph listing and failure-path lease release are included. Type checking, touched-file lint, syntax/whitespace checks and 15 scoped gates/self-tests passed. No migration was introduced.
+
+Fable approved the bounded Sandbox source through OAuth with no blocking findings and no tool permission denials. Fable performed source review only; its packet predated the final test result, so its note that two failure tests had not yet run is superseded by the 280-test execution. Its live source-path/inventory adapter cautions remain part of the rehearsal checklist. The [runtime review receipt](evidence/FACTORY_FILE_RECOVERY_REVIEW_2026-10-03.json) records evidence and limits.
+
+[PLANNED, not executed] The smallest full rehearsal needs a fresh marked Sandbox Basic Request, its ordinary document location and copied files, retained as test evidence. The existing ready sandbox candidate is expired and uses a different recipe. A deterministic recovery demonstration also needs an explicitly labeled pending-file interruption fixture; the current CLI has no safe switch that deliberately stops between upload and verification. A ledger-only fault fixture must preserve actual Request/file provenance, and must not be described as a naturally occurring failure.
+
+The GoVerify toggle is optional in source, which does **not** establish that an ordinary create succeeds with active automation. Historical sandbox creates were refused without the bypass. Current active create-workflow/plugin side effects have not been proved safe for a new fixture. Do not disable shared workflows or execute creation merely to bypass this evidence gap. The remaining operational prerequisite is a reviewed disposable fixture whose creation respects the no-email constraint; its exact create/location/file/ledger effects must be known before execution. No live fixture creation, recovery, Production enablement, email or deletion occurred in this build. Request 1003308 remains retained.
