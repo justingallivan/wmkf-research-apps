@@ -62,7 +62,7 @@ export const PROMPT_VARIABLES = {
       cacheable: false,
       placement: 'user',
       dataClass: 'meeting_transcript',
-      maxChars: 60000,
+      maxChars: 160000,
       untrusted: true,
     },
     {
@@ -71,7 +71,7 @@ export const PROMPT_VARIABLES = {
       required: true,
       placement: 'user',
       dataClass: 'meeting_transcript',
-      maxChars: 4000,
+      maxChars: 20000,
       untrusted: true,
     },
     {

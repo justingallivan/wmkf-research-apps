@@ -20,8 +20,8 @@ test('prompt name is pinned', () => {
 });
 
 test.each([
-  ['speaker_samples', 60000],
-  ['zoom_names', 4000],
+  ['speaker_samples', 160000],
+  ['zoom_names', 20000],
   ['prior', 4000],
 ])('%s stays untrusted override with dataClass and maxChars %i', (name, maxChars) => {
   const v = PROMPT_VARIABLES.variables.find((x) => x.name === name);

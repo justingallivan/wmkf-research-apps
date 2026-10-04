@@ -74,7 +74,8 @@ export default async function handler(req, res) {
     if (req.query.recovery !== '1') return res.status(400).json({ error: 'Invalid recovery request' });
     try {
       const { drainTranscriptionWorkflowDispatches } = await import('../../../lib/services/transcription-pilot/workflow-dispatch');
-      const result = await drainTranscriptionWorkflowDispatches({ maxRuns: 20, deadline: Date.now() + 270_000 });
+      const recoveryDeadline = Date.now() + 270_000;
+      const result = await drainTranscriptionWorkflowDispatches({ maxRuns: 20, deadline: recoveryDeadline });
       if (result.incomplete) {
         await reportIncomplete(
           WORKFLOW_RECOVERY_INCOMPLETE_ALERT_KEY,
@@ -85,7 +86,16 @@ export default async function handler(req, res) {
       } else {
         await AlertService.autoResolve(WORKFLOW_RECOVERY_INCOMPLETE_ALERT_KEY);
       }
-      return res.status(200).json({ ok: true, recovery: result });
+      // Speaker-alignment recovery must never mask the dispatch result.
+      let alignment;
+      try {
+        const { recoverPendingAlignments } = await import('../../../lib/services/meeting-tracker-transcription/alignment-service');
+        alignment = await recoverPendingAlignments({ limit: 5, deadlineMs: recoveryDeadline - 30_000 });
+      } catch (error) {
+        console.error('[transcription-pilot/cron] alignment recovery failed:', error?.code || error?.name || 'unknown');
+        alignment = { failed: true };
+      }
+      return res.status(200).json({ ok: true, recovery: result, alignment });
     } catch {
       await notifyOps({
         type: 'transcription_workflow_recovery_failed',

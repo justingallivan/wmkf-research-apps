@@ -6,7 +6,8 @@ import { TranscriptionPilotError } from '../../../../../lib/services/transcripti
 import { getMeetingTranscriptionOverview, uploadMeetingTranscription } from '../../../../../lib/services/meeting-tracker-transcription/service.js';
 
 export const config = { api: { bodyParser: { sizeLimit: '8kb' } }, maxDuration: 60 };
-const CREATE_KEYS = new Set(['filename','contentType','bytes','idempotencyKey','providerRegion']);
+const REQUIRED_CREATE_KEYS = ['filename','contentType','bytes','idempotencyKey','providerRegion'];
+const CREATE_KEYS = new Set([...REQUIRED_CREATE_KEYS, 'zoomTranscript']);
 function errorResponse(res, error) {
   const status = error instanceof ServiceHttpError ? error.httpStatus : error instanceof TranscriptionPilotError ? error.status : Number(error?.httpStatus) || 500;
   const code = error?.code || 'meeting_transcription_failed';
@@ -16,7 +17,7 @@ function errorResponse(res, error) {
 function exactCreate(body) {
   return body && typeof body === 'object' && !Array.isArray(body)
     && Object.keys(body).every(key => CREATE_KEYS.has(key))
-    && Object.keys(body).length === CREATE_KEYS.size;
+    && REQUIRED_CREATE_KEYS.every(key => Object.hasOwn(body, key));
 }
 
 export default async function handler(req, res) {

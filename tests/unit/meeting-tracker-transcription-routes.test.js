@@ -55,6 +55,32 @@ test('collection POST rejects identity injection before service dispatch', async
   expect(uploadMeetingTranscription).not.toHaveBeenCalled();
 });
 
+const createBody = { filename: 'meeting.m4a', contentType: 'audio/mp4', bytes: 1000, idempotencyKey: 'valid-key-0001', providerRegion: 'us' };
+
+test('collection POST accepts the optional zoomTranscript key', async () => {
+  const res = response();
+  const body = { ...createBody, zoomTranscript: { contentType: 'text/vtt', bytes: 500 } };
+  await collection({ method: 'POST', query: { requestId }, body }, res);
+  expect(res.statusCode).toBe(201);
+  expect(uploadMeetingTranscription).toHaveBeenCalledWith({ requestId, ownerProfileId: 9, body });
+});
+
+test('collection POST still works without zoomTranscript', async () => {
+  const res = response();
+  await collection({ method: 'POST', query: { requestId }, body: createBody }, res);
+  expect(res.statusCode).toBe(201);
+});
+
+test.each([
+  ['an unknown top-level key', { ...createBody, zoomFilename: 'x.vtt' }],
+  ['a missing required key', { filename: 'a.m4a', contentType: 'audio/mp4', bytes: 1, idempotencyKey: 'valid-key-0001', zoomTranscript: { contentType: 'text/vtt', bytes: 5 } }],
+])('collection POST rejects %s before service dispatch', async (_label, body) => {
+  const res = response();
+  await collection({ method: 'POST', query: { requestId }, body }, res);
+  expect(res.statusCode).toBe(400);
+  expect(uploadMeetingTranscription).not.toHaveBeenCalled();
+});
+
 test('auth-bypass profile absence is rejected on the actual route', async () => {
   requireAppAccess.mockResolvedValue({ profileId: null, session: { user: {}, authBypassed: true } });
   const res = response();
