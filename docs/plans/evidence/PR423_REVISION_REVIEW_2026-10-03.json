@@ -1,0 +1,234 @@
+{
+  "date": "2026-10-03",
+  "pr": 423,
+  "baseMain": "a4bad2c047695ec31815580e8bc727959c0c5c53",
+  "integrationCommit": "7432025e5",
+  "builder": "Luna",
+  "sol": "approved",
+  "root": "approved",
+  "fable": {
+    "authentication": "subscription OAuth; no API credentials",
+    "is_error": false,
+    "permission_denials": [],
+    "review": {
+      "review": "PR #423 final correction \u2014 static read-only review",
+      "verdict": "APPROVE_PENDING_INCOMPLETE_SUITES",
+      "verdict_basis": "All four original findings are resolved in source. No material findings remain. Approval is conditional on the three pre-existing PR test suites, which were still running and are not counted as passed. I ran no tests or commands; the 6 suites / 45 tests / 1 snapshot, TypeScript and lint results are root-reported.",
+      "original_findings": [
+        {
+          "id": 1,
+          "topic": "Superseding Factory v2 plan retained; stale proposal wording corrected",
+          "status": "RESOLVED",
+          "evidence": [
+            "origin-main-to-working-tree.patch:402-472 \u2014 the plan differs from origin/main only in five status-wording hunks, so main's plan body and protected-record policy are intact",
+            "docs/plans/TEST_REQUEST_FACTORY_V2_PLAN_2026-10-03.md:6,19,21,83 \u2014 'shipped in #426'; supersession clause and Request 1003308 retention kept",
+            "docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md (integration-to-working-tree.patch:24-40) \u2014 'separate proposal' and 'branch implementation, not deployed' replaced with shipped-in-#426 wording",
+            "docs/audits/OPEN_ITEMS_FOLLOWUP_2026-10-03.md:147 and the 'Factory decisions' row \u2014 earlier draft marked superseded"
+          ]
+        },
+        {
+          "id": 2,
+          "topic": "Phase I Dynamics rejects nonempty refusal before durable write or completed audit",
+          "status": "RESOLVED",
+          "evidence": [
+            "lib/services/phase-i-dynamics/summarize-service.js:135-141 \u2014 guard wraps llm.complete before resp.text is read",
+            "summarize-service.js:142-153 \u2014 failed audit records only err.message, which is the fixed generic string from lib/utils/llm-response.js:10, then rethrows",
+            "summarize-service.js:174 (wmkf_ai_summary write) and :197-200 (completed/needs_review audit) are unreachable after the throw",
+            "tests/unit/phase-i-summarize-service.test.js (integration-to-working-tree.patch:564-577) \u2014 both refusal markers with nonempty text; asserts no updateById, exactly one failed audit, no refusal text, no completed audit"
+          ]
+        },
+        {
+          "id": 3,
+          "topic": "Explorer adapter preserves refusal metadata; batch/export refusal terminal; transient semantics retained",
+          "status": "RESOLVED",
+          "evidence": [
+            "lib/services/dynamics-explorer/model-call.js:81-83 \u2014 stopReason and refused passed through; llm-client.js:460-462 sets them",
+            "tools/batch-processing.js:57 \u2014 sample guard precedes the JSON match and the text.substring fallback at :64-67",
+            "batch-processing.js:144-150 \u2014 refusal rethrown before the retry; a refusal on the retry attempt is also guarded and terminal",
+            "batch-processing.js:171-172 \u2014 refusal thrown before failedCount/blank-cell accounting and before export_progress at :185",
+            "tools/export.js:86,127-140 \u2014 no catch around runSampleProcessing or processRecordsBatch, so generateExcelExport and file_ready (:162) are never reached",
+            "Transient path: batch-processing.js:146-150 (retry once) and :173-183 (count failed batch, keep blank cells, continue) are unchanged and reachable only for errors that are not model_refusal",
+            "tests/unit/dynamics-explorer-batch-refusal.test.js:13-41, tests/unit/dynamics-explorer-export-refusal.test.js:30-54, tests/unit/dynamics-explorer-call-config.test.js (patch:489-509)"
+          ],
+          "caveat": "Retention of the ordinary transient retry and partial-batch behaviour is established by reading the diff only. No test in tests/ exercises that path (searches for failedCount, 'Batch retry' and 'No JSON array' return nothing)."
+        },
+        {
+          "id": 4,
+          "topic": "Chat loop does not retry refusal",
+          "status": "RESOLVED",
+          "evidence": [
+            "lib/services/dynamics-explorer/chat-session.js:174 \u2014 model_refusal bypasses classifyToolError, so it is never turned into a tool_result",
+            "chat-session.js:234-247 \u2014 terminal 'refused' outcome with fixed copy; returns before messages are appended, so no further model round",
+            "lib/services/dynamics-explorer/tool-executor.js:30 onward \u2014 the dispatcher awaits and returns with no wrapping catch in the portion read (the export_csv case itself was not read)",
+            "tests/unit/dynamics-explorer-chat-characterization.test.js (patch:521-547) \u2014 end-to-end for confirmed and unconfirmed export: one stream call, no file_ready, no export_progress, no refusal text in SSE, finalize outcome 'refused'. Propagation through the dispatcher rests on this root-reported passing test."
+          ]
+        }
+      ],
+      "audit_claim_scope": {
+        "status": "ACCURATE_AND_BOUNDED",
+        "evidence": [
+          "docs/audits/LLM_REFUSAL_HARDENING_2026-10-03.md:25,31,80 \u2014 claims limited to 'enumerated guarded callers' and 'the original guard set'; states the report does not cover every LLM consumer and that Sonnet admission stays blocked pending a separate inventory",
+          "That bound is true: LLM call sites without the guard remain in pages/api/process-expenses.js, pages/api/cron/log-analysis.js, lib/services/reviewer-exclusion-parser.js, lib/services/integrity-service.js, lib/services/contact-enrichment/search-tiers.js and lib/services/claude-reviewer-service.js. These are outside this PR's claims; no change is requested.",
+          "docs/audits/OPEN_ITEMS_FOLLOWUP_2026-10-03.md:66 \u2014 'Executor already rejects refusal' matches lib/services/execute-prompt.js:877-880; 'Explorer chat loop terminal' matches chat-session.js:119-123; the export gap is acknowledged as not covered by the initial finding",
+          "LLM_REFUSAL_HARDENING:82 \u2014 'after already-dispatched sibling batches settle' and 'sibling tools may finish independently' match the Promise.allSettled behaviour at batch-processing.js:124 and chat-session.js:233"
+        ]
+      },
+      "email_literals": {
+        "current_tree": "CLEAN for this PR. No added line in origin-main-to-working-tree.patch contains an email address, and neither do docs/audits/*2026-10-03.md or the two untracked tests. The two literals in the old 'Approved email send' paragraph are replaced with role descriptions (integration-to-working-tree.patch:244-245).",
+        "branch_history": "NOT ERASED. Earlier commits on the published branch still contain the literals. docs/audits/OPEN_ITEMS_FOLLOWUP_2026-10-03.md:149 says this correctly: tree edit only, no force push or history purge, and a squash merge should use the corrected tree.",
+        "note": "Email literals elsewhere in the repository (tests, older docs, and others) are already on main and are not touched by this PR."
+      },
+      "remaining_material_findings": [],
+      "non_blocking_observations": [
+        {
+          "severity": "low",
+          "path": "tests/unit/dynamics-explorer-batch-refusal.test.js",
+          "observation": "No test pins the ordinary transient path (throw then success gives one retry; double failure gives failedCount, blank ai_ cells and export_progress). The 'remains unchanged' sentence at LLM_REFUSAL_HARDENING:82 is therefore supported by source only.",
+          "recommendation": "Optional: add one non-refusal test to this file. No runtime change."
+        },
+        {
+          "severity": "low",
+          "path": "docs/audits/LLM_REFUSAL_HARDENING_2026-10-03.md:84",
+          "observation": "'Revision validation and final review are pending' is true now and will go stale.",
+          "recommendation": "Once the three remaining suites finish, replace it with the actual results only."
+        },
+        {
+          "severity": "nit",
+          "path": "tests/unit/dynamics-explorer-batch-refusal.test.js:9",
+          "observation": "The `refusal` helper is declared and never used.",
+          "recommendation": "Remove it."
+        },
+        {
+          "severity": "nit",
+          "path": "lib/services/dynamics-explorer/chat-session.js:234-238",
+          "observation": "The terminal copy says 'export request' but the check fires for a model_refusal from any tool. Only export_csv raises it today. The refused tool call also gets no logQuery row; the refusal is recorded only through onTerminal.",
+          "recommendation": "No change needed in this PR."
+        }
+      ],
+      "recommendation": "No source change is required from this review. Let the three in-progress suites finish and treat any failure as blocking; then update LLM_REFUSAL_HARDENING:84 and get fresh CI. Merge remains a separate owner decision. This review does not recommend Sonnet admission, deployment or wider runtime changes."
+    }
+  },
+  "conditionResolution": "All twelve disjoint unit/integration suites subsequently passed: 92 tests and one snapshot. No runtime change after review. Removed unused test helper only.",
+  "validation": {
+    "suites": 12,
+    "tests": 92,
+    "snapshots": 1,
+    "types": "passed",
+    "targetedLint": "passed",
+    "gates": [
+      {
+        "check": "check:doc-currency",
+        "exit": 0
+      },
+      {
+        "check": "check:doc-currency:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:fact-consistency",
+        "exit": 0
+      },
+      {
+        "check": "check:fact-consistency:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:doc-symbol-refs",
+        "exit": 0
+      },
+      {
+        "check": "check:doc-symbol-refs:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:docs-catalog",
+        "exit": 0
+      },
+      {
+        "check": "check:secret-scan",
+        "exit": 0
+      },
+      {
+        "check": "check:secret-scan:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:scaffolding-tokens",
+        "exit": 0
+      },
+      {
+        "check": "check:scaffolding-tokens:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:api-routes",
+        "exit": 0
+      },
+      {
+        "check": "check:api-routes:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:prompt-injection-tagging",
+        "exit": 0
+      },
+      {
+        "check": "check:prompt-injection-tagging:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:model-registry",
+        "exit": 0
+      },
+      {
+        "check": "check:model-registry:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:model-override-warming",
+        "exit": 0
+      },
+      {
+        "check": "check:model-override-warming:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:route-service-boundary",
+        "exit": 0
+      },
+      {
+        "check": "check:route-service-boundary:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:status-enum-parity",
+        "exit": 0
+      },
+      {
+        "check": "check:status-enum-parity:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:trust-boundary-guid",
+        "exit": 0
+      },
+      {
+        "check": "check:trust-boundary-guid:self-test",
+        "exit": 0
+      }
+    ]
+  },
+  "sourceSha256": {
+    "lib/services/phase-i-dynamics/summarize-service.js": "706ed200d504c9de361d7319bd8688c43cbf11883f3d2586037210019a4f0351",
+    "lib/services/dynamics-explorer/model-call.js": "619d93a01632f125d5115498693166b0944e4ccb3fb45d4f1cb63a81edf368d9",
+    "lib/services/dynamics-explorer/tools/batch-processing.js": "d1592d014c8a5c10861264468c0432ed3330245aa495ff2f0d82295468d42a3e",
+    "lib/services/dynamics-explorer/chat-session.js": "08d9490d1e4629d52a8810d781e4491aeb7f91872d777dba1506a19fe8fe168c"
+  },
+  "limits": [
+    "No live model replay or production mutation",
+    "No model admission",
+    "Existing published branch history was not erased",
+    "Non-refusal retry preservation reviewed in source; optional new regression not added",
+    "Fresh CI required after push; merge separately authorized"
+  ]
+}

@@ -3,7 +3,7 @@ title: Ordered open-items follow-up
 domain: operations
 kind: report
 status: active
-summary: "October 3 follow-up: refusal safeguards built, reminder PR integrated, dependency PR repaired and duplicates closed; authorized test visit saved and test email accepted for delivery; PI inbox receipt owner-confirmed; liaison receipt unverified and PR promotion pending."
+summary: "October 3 follow-up: refusal safeguards built, reminder and dependency PRs merged, duplicates closed; authorized test visit saved and test email accepted for delivery; PI inbox receipt owner-confirmed; liaison receipt unverified; refusal-hardening PR under revision."
 canonical: false
 owner: product-engineering
 related:
@@ -20,7 +20,7 @@ reported open list. Source baseline `d1eae6fd3`; isolated branch
 inference, migration or model admission was performed. Original checkout changes
 were preserved. Results below are bounded observations, not an all-clear.
 
-## Ordered results — initial read-only checkpoint
+## Ordered results — historical initial read-only checkpoint
 
 | Item | Evidence and outcome | Remaining action |
 |---|---|---|
@@ -30,7 +30,7 @@ were preserved. Results below are bounded observations, not an all-clear.
 | Factory artifacts | VERIFIED via read-only maintenance record: daily maintenance at 2026-10-03 03:00:50.382Z completed at 03:01:02.022Z; Factory aggregate deleted 4, kept 2, errors 0, neither scan nor deletion truncated. | This closes aggregate sweep observation only; exact per-object deletion/retention was not proved. |
 | Test email browser check | PARTIAL: authenticated Workbench on cast-bound Request 1003303 shows neither a presentation nor a visit scheduled. | Prepare an explicit test visit/schedule and recipient preview before a separately authorized send. No successful delivery claimed. |
 | Office Mac | UNKNOWN: brief read; current machine cannot establish office checkout/environment state. | Run the existing Office Mac sync brief on that machine. |
-| Factory decisions | VERIFIED owner decisions: prepare v2 plan; retain marked Request 1003308. | Linked plan is a proposal; no recovery or cleanup of retained record. |
+| Factory decisions | VERIFIED owner decisions: prepare v2 plan; retain marked Request 1003308. | The draft at this checkpoint was superseded by main’s Factory v2 plan in #426; no recovery or cleanup of retained record. |
 | Transcription | VERIFIED via content-free operations probe: no active processing jobs; one expired job retains input watch/local cleanup pending. Audio deletion, provider cleanup and content purge observed. | Keep intentional watch. Confidential-use assurances, maximum-size test, callback delivery and inbox receipt remain unproved/parked. |
 | Scheduled transcription execution | PARTIAL: read-only Vercel logs show recurring hourly GETs returning 200. Logs omit query strings and invocation origin. | Do not claim those rows separately prove daily mode, platform origin, clean cleanup, or callback/inbox success. |
 | Tracker acceptance/performance | VERIFIED authenticated production schedule load: 12 request cards and materials counts rendered; one reload to the final request card took 3,360 ms using browser-action timing. | Bounded read smoke only. No before/after baseline or speedup claim; no mutation acceptance performed. |
@@ -63,7 +63,7 @@ consumer inventory also identified Phase I/II summary generation, Phase I
 writeup and multi-perspective evaluation as dropping refusal metadata. Expertise
 matching and grant extraction parse text without explicit refusal handling;
 generic parse failure is not supported refusal handling. Shared Executor already
-rejects refusal before persistence; Explorer already handles refusal as terminal.
+rejects refusal before persistence; Explorer’s chat loop already handles refusal as terminal. The export batch path was not covered by that initial finding and is addressed in the later PR revision.
 The prerequisite is the affected-consumer inventory, not only fixes to two routes.
 
 ## Evidence mechanisms and limits
@@ -105,9 +105,9 @@ is claimed. Verdict: changed sweep-observation claim reconciled; broader Factory
 domain AUDIT INCOMPLETE. Detailed source-cause and exact-object claims remain
 UNKNOWN. No unrelated cleanup or memory-router diet was undertaken.
 
-## Review and validation
+## Historical initial review and validation
 
-A separate read-only agent reviewed the v2 proposal and this report and found no
+A separate read-only agent reviewed the now-superseded v2 draft and this initial report and found no
 material recovery-safety or evidence-scope issue. External observations were not
 independently repeated by that reviewer. Runtime admission edits were discarded;
 final changes are documentation and read-only operator probes. No main promotion
@@ -126,9 +126,9 @@ extended operations probe both passed.
 
 [VERIFIED via source, local tests, independent reviews and GitHub] The owner asked to work through the next actions. These results supersede the initial checkpoint's open-PR and consumer-blocker status:
 
-- **PR #423**, runtime head `fa9d312a5`: explicit refusal handling across the affected legacy callers and signed-thinking preservation in Explorer are implemented; all checks passed on that head. The PR is ready for review and remains unmerged. Sonnet 5.5 is still excluded from automatic selection; this is prerequisite hardening, not model admission. Detailed validation is in `LLM_REFUSAL_HARDENING_2026-10-03.md`.
-- **PR #332**, head `4a68b7f39`: current main integrated, conflicts resolved, 17 focused suites / 345 tests passed, relevant gates/self-tests passed and a fresh source review found no material integration regressions. All GitHub checks passed. Main's test-request exclusion, exact manual test-recipient checks, and current `reviewAll` preference contract are preserved. The automatic reminder cron stays held. The Tier 2 rollback/deployment preparation and owner promotion decision remain.
-- **PR #417**, head `fac320fd4`: current main integrated with shipped security overrides retained. npm 10 generated the two missing nested Workflow lock entries, Chokidar 5.0.0 and Readdirp 5.1.1; the repair changes no other entry. Clean install with lifecycle scripts disabled, final lock validation, and 11 dependency-sensitive suites / 295 tests passed. Independent narrow lock review found no material findings. All GitHub checks passed. It remains unmerged.
+- **PR #423**, runtime head `fa9d312a5`: explicit refusal handling across the affected legacy callers and signed-thinking preservation in Explorer are implemented; all checks passed on that head. That was a pre-integration checkpoint; the PR remains unmerged and is undergoing the Fable-requested revision below. Sonnet 5.5 is still excluded from automatic selection; this is prerequisite hardening, not model admission. Detailed validation is in `LLM_REFUSAL_HARDENING_2026-10-03.md`.
+- **PR #332**, head `4a68b7f39`: current main integrated, conflicts resolved, 17 focused suites / 345 tests passed, relevant gates/self-tests passed and a fresh source review found no material integration regressions. All GitHub checks passed. Main's test-request exclusion, exact manual test-recipient checks, and current `reviewAll` preference contract are preserved. The automatic reminder cron stays held. The owner subsequently approved merge as `bab0d3989`; production readiness is recorded in `AUTONOMOUS_FOLLOWUP_2026-10-03.md`.
+- **PR #417**, head `fac320fd4`: current main integrated with shipped security overrides retained. npm 10 generated the two missing nested Workflow lock entries, Chokidar 5.0.0 and Readdirp 5.1.1; the repair changes no other entry. Clean install with lifecycle scripts disabled, final lock validation, and 11 dependency-sensitive suites / 295 tests passed. Independent narrow lock review found no material findings. All GitHub checks passed. The owner subsequently approved merge as `a4bad2c04`; production completion has not been verified in this report.
 - **PRs #147, #148 and #212 closed as duplicates**: main already contains their exact proposed qs/side-channel, xmldom, and csv-parse lock entries (and the csv-parse manifest version). Their old red jobs were unrelated Awardees test failures or an old harness-framing failure. No extra runtime change was needed. PRs #328 and #390 remain on their existing holds.
 
 [VERIFIED via owner authorization, Factory ledger command and authenticated Production browser] The owner authorized preparing a visit/preview for marked Request 1003303, then separately authorized advancing it when scheduling was refused. The existing Factory status command verified ready run `e33fa857-4b00-4c60-94da-77d4406d4027` and changed Phase II from unset to **Phase II Pending Committee Review**. Change `a9324159-642a-4a6f-83b7-40d815450cc7` completed with request status **Phase II Pending**, two background jobs settled, and zero new emails, tracking rows or payments. The marked test Request and cast contacts were retained.
@@ -140,4 +140,10 @@ Remaining external prerequisites from the initial checkpoint (Office Mac access,
 
 ## Approved email send — October 3, 10:55 a.m. Pacific
 
-[VERIFIED via authenticated Production browser] After the owner approved the displayed message and recipients, the first attempt was refused as stale with an explicit **Not sent** result. The preview was refreshed and its sender, recipients, subject and rendered body matched the approved version. The subsequent send completed with **Sent for delivery** at 10:55:23 a.m. Pacific: from `jgallivan@wmkeck.org`, to the Factory PI test address, cc the Factory liaison test address. The materials card now shows **Waiting on the applicant**, an October 7 deadline, an October 16 link expiration, and both invited test contacts. No repeat invitation or reminder was sent. This browser observation verifies application acceptance for delivery. [OWNER-REPORTED on October 3] Justin subsequently confirmed receipt at `cations61oaths@icloud.com` (the Factory PI address), closing the PI delivery check. Receipt at the copied Factory liaison address remains unverified.
+[VERIFIED via authenticated Production browser] After the owner approved the displayed message and recipients, the first attempt was refused as stale with an explicit **Not sent** result. The preview was refreshed and its sender, recipients, subject and rendered body matched the approved version. The subsequent send completed with **Sent for delivery** at 10:55:23 a.m. Pacific: from the signed-in staff mailbox, to the Factory PI test address, cc the Factory liaison test address. The materials card now shows **Waiting on the applicant**, an October 7 deadline, an October 16 link expiration, and both invited test contacts. No repeat invitation or reminder was sent. This browser observation verifies application acceptance for delivery. [OWNER-REPORTED on October 3] Justin subsequently confirmed receipt at the Factory PI test address, closing the PI delivery check. Receipt at the copied Factory liaison address remains unverified.
+
+## PR #423 review revision
+
+[VERIFIED via Git integration] Current main through dependency release #417 (`a4bad2c04`) is integrated. The Factory plan conflict was resolved by retaining main’s superseding plan and its protected-record policy. [VERIFIED via GitHub; OWNER-REPORTED deployment] #426 merged as `31a432de5` and the owner reported a clean deployment. Later status-outcome UI work is on a separate local branch, not part of this PR.
+
+The revision addresses the Phase I Dynamics summary and Explorer export refusal gaps identified by Fable, with scoped validation recorded in `LLM_REFUSAL_HARDENING_2026-10-03.md`. The report’s unnecessary email literals were replaced with role descriptions. This edits the current tree; it does not erase already-published branch history. Any eventual squash merge should use the corrected tree. No force push or history purge was performed.

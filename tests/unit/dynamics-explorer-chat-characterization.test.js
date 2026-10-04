@@ -424,6 +424,34 @@ describe('/api/dynamics-explorer/chat characterization (Stage 0)', () => {
     expect(normalized).toMatchSnapshot('sse-census-normalized');
   });
 
+  test.each([false, true])('export refusal (confirmed=%s) ends the chat without retry, another model round, or file_ready', async (confirmed) => {
+    mockStream.mockReset().mockResolvedValueOnce({
+      content: [{ type: 'tool_use', id: 'tool-export-refused', name: 'export_csv', input: {
+        table_name: 'akoya_requests', process_instruction: 'Summarize', confirmed,
+      } }],
+      model: 'claude-test', usage: {}, stopReason: 'tool_use', textStreamed: false,
+    });
+    mockComplete.mockReset();
+    if (confirmed) mockComplete.mockResolvedValueOnce({ text: '{"summary":"sample columns"}', usage: { inputTokens: 1, outputTokens: 1, cacheCreationTokens: 0, cacheReadTokens: 0 } });
+    mockComplete.mockResolvedValueOnce({
+      text: '{"summary":"PRIVATE_REFUSAL_TEXT"}', stopReason: 'refusal', refused: true,
+      usage: { inputTokens: 1, outputTokens: 1, cacheCreationTokens: 0, cacheReadTokens: 0 },
+    });
+
+    const res = createMockRes();
+    await handler(createMockReq({ method: 'POST', body: { messages: [{ role: 'user', content: 'Export these requests' }] } }), res);
+
+    const blocks = parseSse(res);
+    expect(mockComplete).toHaveBeenCalledTimes(confirmed ? 2 : 1); // no retry in either sample or full batch
+    expect(mockStream).toHaveBeenCalledTimes(1); // no follow-up model round
+    expect(blocks.some((block) => block.event === 'file_ready')).toBe(false);
+    expect(blocks.some((block) => block.event === 'export_progress')).toBe(false);
+    expect(blocks.find((block) => block.event === 'response').data.content).toBe('The AI provider declined this export request, so processing stopped.');
+    expect(blocks.find((block) => block.event === 'complete').data.outcome).toBe('refused');
+    expect(rawSse(res)).not.toContain('PRIVATE_REFUSAL_TEXT');
+    expect(mockFinalizeRequest.mock.calls[0][0].outcome).toBe('refused');
+  });
+
   // ─── Item 2: blocked tool path ───
 
   test('item 2: a restricted table_name yields Blocked thinking, DENIED tool result, and a denied logQuery row', async () => {

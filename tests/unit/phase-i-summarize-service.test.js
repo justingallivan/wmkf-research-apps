@@ -98,6 +98,21 @@ describe('summarizeToDynamics', () => {
     expect(grantRequestAdapter.updateById).not.toHaveBeenCalled();
   });
 
+  it.each([{ refused: true }, { stopReason: 'refusal' }])('refusal marker %j does not write or audit refusal text as a completed summary', async (marker) => {
+    const refusalText = 'I cannot help with this request. PRIVATE_REFUSAL_DETAIL';
+    createLLMClient.mockReturnValueOnce({ complete: jest.fn(async () => ({
+      text: refusalText, model: 'claude-test', ...marker,
+    })) });
+    await expect(summarizeToDynamics(args())).rejects.toMatchObject({ code: 'model_refusal', status: 422 });
+    expect(grantRequestAdapter.updateById).not.toHaveBeenCalled();
+    expect(DynamicsService.logAiRun).toHaveBeenCalledTimes(1);
+    expect(DynamicsService.logAiRun).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'failed', rawOutput: { error: 'The AI provider declined this request. No result was generated.' },
+    }));
+    expect(JSON.stringify(DynamicsService.logAiRun.mock.calls)).not.toContain(refusalText);
+    expect(DynamicsService.logAiRun.mock.calls.some(([entry]) => entry.status === 'completed')).toBe(false);
+  });
+
   it('empty summary → failed audit + 502 ServiceHttpError, no writeback', async () => {
     createLLMClient.mockReturnValueOnce({ complete: jest.fn(async () => ({ text: 'short', model: 'm' })) });
     await expect(summarizeToDynamics(args())).rejects.toBeInstanceOf(ServiceHttpError);

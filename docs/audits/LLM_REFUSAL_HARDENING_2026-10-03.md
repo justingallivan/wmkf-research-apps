@@ -22,13 +22,13 @@ provider inference, production mutation or promotion is included.
 
 | Invariant | Implementation | Verification |
 |---|---|---|
-| A provider refusal cannot become formatted text, parsed JSON or a saved match | `requireAcceptedLlmResponse` checks either normalized refusal signal before legacy consumers drop metadata | Empty and nonempty refusal tests at utility, refinement, QA, summary/writeup, grant and expertise boundaries |
+| In the enumerated guarded callers, a provider refusal cannot become formatted text, parsed JSON or a saved match | `requireAcceptedLlmResponse` checks either normalized refusal signal before legacy consumers drop metadata | Empty and nonempty refusal tests at utility, refinement, QA, summary/writeup, grant and expertise boundaries |
 | Refusal does not trigger another model | Expertise/grant fallback catches rethrow; multi-perspective rejects rather than retrying | One-call assertions with fallback available; perspective fan-out cannot reach integration |
 | Refusal on secondary extraction cannot silently become ordinary success | Structured fallback catches preserve typed refusal; per-file error results remain explicit | Each summary/writeup route refuses on call 1 and call 2 |
-| Shared wrapper stays lossless | LLMClient response contract unchanged; Executor/Explorer own their existing terminal policy | No shared-wrapper implementation edit |
+| Shared wrapper stays lossless | LLMClient response contract unchanged; Executor and Explorer chat retain their existing terminal policy; Explorer export guards before conversion | No shared-wrapper implementation edit |
 | Signed thinking history stays append-only within Explorer's tool loop | Compaction returns original history for thinking or redacted_thinking; ordinary history still compacts | Three actual mocked model rounds preserve earlier system/tools/messages; both block types covered |
 
-The guard is applied to refine, QA, Phase I/II summarization, Phase I writeup,
+The original guard set covers refine, QA, PDF-upload Phase I/II summarization, Phase I writeup,
 funding analysis, literature analysis, multi-perspective evaluation, individual
 and batch expertise matching, and grant extraction. It returns ordinary responses
 unchanged; it does not treat truncation or pause as refusal, enforce complete JSON,
@@ -74,3 +74,11 @@ review/replay/release decision.
 
 Release tier: runtime branch/PR with deliberate owner promotion. No deployment or
 live Sonnet behavior is claimed. Rollback is a code revert; no data migration.
+
+## Fable-requested revision after current-main integration
+
+The additional scope is the live Phase I Dynamics summary service and Explorer’s separate AI export batch path. Their earlier omission was a preexisting code gap and an overstatement in the original inventory. This report covers the listed callers, not every LLM consumer in the repository. Automatic Sonnet admission remains blocked pending a separately reviewed complete consumer inventory and any required replay.
+
+The Phase I guard rejects either normalized refusal signal before extracting text, writing `wmkf_ai_summary`, or recording a completed audit. The existing failure audit may retain the generic refusal error, never provider refusal text. Explorer’s batch adapter preserves refusal metadata and both text consumers guard it before parsing; sample refusal stops before schema/output parsing, and a refused work batch is not retried and does not produce refusal-derived AI cell content. A refused work batch terminates export after already-dispatched sibling batches settle; it does not become a blank-cell success artifact. The chat tool loop also stops with a refused outcome rather than feeding the error back for another model retry. Already-dispatched sibling tools may finish independently; the refusal message describes only the stopped export. Ordinary non-refusal partial-batch behavior remains unchanged. Current-main integration retains the superseding Factory plan and shipped safeguards.
+
+Revision validation: twelve focused unit/integration suites passed (92 tests, one snapshot), including direct export and full chat-route refusal cases. Type checking and targeted ESLint passed; 25 scoped gates/self-tests passed. Luna built the correction; Sol and root approved the source. Fable found no remaining material findings and approved conditional on the then-running suites; all twelve suites subsequently passed, satisfying that condition. The optional transient-retry characterization was not added: unchanged non-refusal behavior was verified by source review. The [final review receipt](../plans/evidence/PR423_REVISION_REVIEW_2026-10-03.json) records the evidence and limits. No live provider replay or production write is part of this revision.
