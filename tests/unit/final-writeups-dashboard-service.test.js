@@ -907,3 +907,44 @@ describe('leadership checkpoint (shared with the transition and acknowledgement 
     ]).toContain(error.code);
   });
 });
+
+
+test('leadership-only queue keeps a reviewed publication in history after Word changes', async () => {
+  const { dependencies } = harness();
+  dependencies.resolvePersonas.mockResolvedValue({ enabled: true, personas: ['leadership'] });
+  dependencies.findAcknowledgementsByFinalDocuments.mockResolvedValue({ records: [], capped: false });
+  const metadata = dependencies.getFileMetadataById.getMockImplementation();
+  dependencies.getFileMetadataById.mockImplementation(async (...args) => ({
+    ...await metadata(...args), versionId: '1.0',
+  }));
+  const load = () => loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, dependencies);
+
+  // The harness includes group-review rows A and C: their exclusion is exercised.
+  const open = await load();
+  expect(open.queues.open.map((row) => row.requestId)).toEqual([REQUEST_B_ID]);
+  expect(open.queues.history).toEqual([]);
+  expect(open.queues.stewardship).toEqual([]);
+
+  dependencies.findAcknowledgementsByFinalDocuments.mockResolvedValue({
+    records: [acknowledgementRow()], capped: false,
+  });
+  const reviewed = await load();
+  expect(reviewed.queues.open).toEqual([]);
+  expect(reviewed.queues.history).toHaveLength(1);
+  expect(reviewed.queues.history[0]).toMatchObject({
+    requestId: REQUEST_B_ID, personalState: 'reviewed', acknowledgedPublicationVersionId: '1.0',
+  });
+
+  dependencies.getFileMetadataById.mockImplementation(metadata);
+  const updated = await load();
+  expect(updated.counts).toEqual({ total: 1, open: 0, history: 1, stewardship: 0 });
+  expect(updated.queues.open).toEqual([]);
+  expect(updated.queues.history[0]).toMatchObject({
+    requestId: REQUEST_B_ID,
+    personalState: 'updated',
+    acknowledgedAt: acknowledgementRow().wmkf_acknowledgedat,
+    acknowledgedPublicationVersionId: '1.0',
+    document: { publicationVersionId: '2.0' },
+  });
+  expect(updated.coordinatorMatrix).toBeNull();
+});

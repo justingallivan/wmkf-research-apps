@@ -1,3 +1,19 @@
+jest.mock('../../lib/utils/auth', () => ({
+  requireAppAccess: jest.fn(),
+  getUserRole: jest.fn(),
+}));
+jest.mock('../../lib/dataverse/core/context', () => ({
+  withDalContext: jest.fn((_label, fn) => fn()),
+}));
+// Keep the real route and transition service; replace only external seams.
+jest.mock('../../lib/services/final-writeup/transition-dependencies.js', () => ({
+  DEFAULT_DEPENDENCIES: {},
+}));
+
+import { requireAppAccess, getUserRole } from '../../lib/utils/auth';
+import { DEFAULT_DEPENDENCIES } from '../../lib/services/final-writeup/transition-dependencies.js';
+import leadershipHandler from '../../pages/api/workbench/final-writeup/leadership-review';
+
 import {
   advanceToLeadershipReview,
   getFinalWriteupStatus,
@@ -523,5 +539,47 @@ describe('advanceToLeadershipReview', () => {
     await expect(advance(harness, { expectedFinalArtifactId: 'latest' }))
       .rejects.toMatchObject({ httpStatus: 400, code: 'final_writeup_invalid_identity' });
     expect(harness.dependencies.getRequest).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('leadership POST composed with the real transition service', () => {
+  function response() {
+    const res = { statusCode: 200, body: null };
+    res.status = jest.fn((code) => { res.statusCode = code; return res; });
+    res.json = jest.fn((body) => { res.body = body; return res; });
+    res.setHeader = jest.fn();
+    return res;
+  }
+
+  test.each([
+    ['non-lead staff', OTHER_USER_ID, 'user', 403],
+    ['lead PD', LEAD_PD_ID, 'user', 200],
+    ['superuser', OTHER_USER_ID, 'superuser', 200],
+  ])('%s receives the server-derived manage decision', async (_label, actorId, role, expectedStatus) => {
+    const harness = createHarness();
+    Object.assign(DEFAULT_DEPENDENCIES, harness.dependencies);
+    requireAppAccess.mockResolvedValue({
+      profileId: 7, // Existing route-suite profile fixture.
+      session: { user: { dynamicsSystemuserId: actorId } },
+    });
+    getUserRole.mockResolvedValue(role);
+    const res = response();
+    await leadershipHandler({
+      method: 'POST',
+      body: { requestId: REQUEST_ID, expectedFinalArtifactId: FINAL_ID },
+    }, res);
+    expect(res.statusCode).toBe(expectedStatus);
+    if (expectedStatus === 403) {
+      expect(res.body.code).toBe('final_writeup_leadership_forbidden');
+      expect(harness.dependencies.resolveActor).not.toHaveBeenCalled();
+      expect(harness.dependencies.getFileMetadataById).not.toHaveBeenCalled();
+      expectNoWrite(harness);
+      expect(harness.final.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW);
+    } else {
+      expect(res.body).toMatchObject({ success: true, phase: 'leadership-review', reused: false });
+      expect(harness.dependencies.commitChangeset).toHaveBeenCalledTimes(1);
+      expect(harness.final.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL);
+    }
   });
 });
