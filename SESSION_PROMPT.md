@@ -1,5 +1,13 @@
 # Session 573 Prompt: staff video sharing, leadership dashboards, transcription follow-ups
 
+## Session 573 in progress — 2026-10-04 PT (owner decisions; legacy VRP retirement)
+
+1. **Legacy Virtual Review Panel retired** (owner decision 2026-10-04). Branch `feature/retire-legacy-virtual-review-panel`, two commits (`d276790da` runtime archive, `b4c218f74` docs reconciliation), pushed; **draft PR open, not merged** — owner promotes. Page/route/service/prompt/schema in `_archived/`; `APP_LIFECYCLE_REGISTRY` entry `deprecated`; tables, grants, `multi-llm-service.js`, `vrp-providers.js`, `VRP_ALLOWED_PROVIDERS` retained. Full unit suite and all gates green on the branch.
+2. **Sonnet 5.5 admission** reframed as a fleet move (see Owner Decision Needed §1 below). Inventory on branch `audit/sonnet-55-consumer-inventory` (pushed). Of its two sonnet-tier blockers, the VRP synthesis one is removed by item 1 once merged; the remaining one is `lib/services/integrity-service.js` (owner to confirm effective model in Admin › Models; fix is a one-line guard). Then runbook §4 replay needs owner authorization (spends credits).
+3. **Dependabot** rechecked; both alerts upstream-blocked (details in Owner Decision Needed §2).
+4. Untouched this session: staff video-sharing acceptance, leadership dashboard readiness, VTT-as-malware scan fix, Jean manual pick.
+
+
 ## Session 572 Summary — 2026-10-04 PT (Zoom caption speaker alignment shipped; Claude Fable orchestrating)
 
 Owner directive: Fable orchestrates; Sonnet builds; Opus reviews; Fable final review; Codex adversarial review until satisfied; owner makes every merge decision. Everything below is on `main` and deployed unless marked otherwise.
