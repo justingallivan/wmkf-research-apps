@@ -113,7 +113,7 @@ Only a `ready` production run. One change may be open per run. The form confirms
 
 The recheck's `ok` means this pass found no newly unrecorded effects and no open or failed jobs. It does not establish that the change had no effects, that an email was delivered, or that a sender has stopped. A change still marked `dispatched` remains unresolved. No new web closure, rerun or recovery action is authorized by rechecking.
 
-[BRANCH IMPLEMENTATION, not deployed] The status-outcome explanation displays the returned change number and recorded status beside per-pass counts, keeps unresolved results visually distinct from complete results, and discards results when a later journal read identifies a different change or status. Starting another status action clears the old recheck result. The existing actor/superuser checks and operation semantics remain unchanged.
+[SOURCE; #427 merged as `025749f4d`, owner-reported Production deployment] The status-outcome explanation displays the returned change number and recorded status beside per-pass counts, keeps unresolved results visually distinct from complete results, and discards results when a later journal read identifies a different change or status. Starting another status action clears the old recheck result. The existing actor/superuser checks and operation semantics remain unchanged.
 
 ## The command-line tool
 
