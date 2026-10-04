@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
-  ZOOM_ALIGNMENT_DEFAULTS, buildAlignmentPrior, computeNameSupport, parseZoomVtt, sampleAlignmentPairs, zoomDisplayName, zoomDisplayNames,
+  ZOOM_ALIGNMENT_DEFAULTS, buildAlignmentPrior, computeNameSupport, parseZoomVtt, reassignShortUtterances, sampleAlignmentPairs, zoomDisplayName, zoomDisplayNames,
   scoreTextMatch, tokenizeTranscriptText, verifyAlignmentVerdict,
 } from '../../lib/services/transcription-pilot/zoom-vtt';
 
@@ -967,5 +967,55 @@ describe('zoomDisplayNames (collision-aware, Codex review 2026-10-04)', () => {
   test('the same original name verified on two speaker IDs is not a collision', () => {
     const map = zoomDisplayNames(['Lee, Jordan', 'Lee, Jordan']);
     expect(map.get('Lee, Jordan')).toBe('Jordan Lee');
+  });
+});
+
+describe('reassignShortUtterances (misdiarized one-word utterances, owner decision 2026-10-04)', () => {
+  // Andrea (A) talks 0-10 s under one Zoom cue; the diarizer hands "Right." at 5 s to D.
+  const base = () => ({
+    utterances: [
+      { speaker: 'A', start: 0, end: 5000, text: 'the pockets are ablated quickly between measurements' },
+      { speaker: 'D', start: 5000, end: 5400, text: 'Right.' },
+      { speaker: 'A', start: 5500, end: 10_000, text: 'usually fifteen seconds between each ablation' },
+      { speaker: 'D', start: 20_000, end: 26_000, text: 'a longer independent remark from the other speaker' },
+    ],
+    cues: [cue(0, 10_000, AVERY, 'the pockets are ablated quickly right usually fifteen seconds between each ablation'),
+      cue(20_000, 26_000, JORDAN, 'a longer independent remark from the other speaker')],
+    applied: { A: AVERY, D: JORDAN },
+  });
+
+  test('reassigns the short utterance to the captioned neighbouring speaker', () => {
+    const { utterances, cues, applied } = base();
+    const result = reassignShortUtterances(utterances, cues, applied);
+    expect(result).toEqual({ reassigned: { 1: 'A' }, considered: 1, reassignedCount: 1 });
+  });
+
+  test('a genuine interjection with its own Zoom cue is left alone (two names caption that moment)', () => {
+    const { utterances, cues, applied } = base();
+    cues.push(cue(5000, 5400, JORDAN, 'right'));
+    expect(reassignShortUtterances(utterances, cues, applied).reassigned).toEqual({});
+  });
+
+  test('left alone when the captioned name is applied to two speaker IDs, or to none, or is already this speaker', () => {
+    const { utterances, cues, applied } = base();
+    expect(reassignShortUtterances(utterances, cues, { ...applied, C: AVERY }).reassigned).toEqual({});
+    expect(reassignShortUtterances(utterances, cues, { D: JORDAN }).reassigned).toEqual({});
+    utterances[1].speaker = 'A';
+    expect(reassignShortUtterances(utterances, cues, applied).reassigned).toEqual({});
+  });
+
+  test('left alone when neither time neighbour belongs to the captioned speaker', () => {
+    const { utterances, cues, applied } = base();
+    utterances[0].speaker = 'B'; utterances[2].speaker = 'B';
+    expect(reassignShortUtterances(utterances, cues, { ...applied, B: RILEY }).reassigned).toEqual({});
+  });
+
+  test('utterances above the word limit are not considered; the count cap holds', () => {
+    const { utterances, cues, applied } = base();
+    utterances[1].text = 'Right, that is what I meant';
+    expect(reassignShortUtterances(utterances, cues, applied)).toMatchObject({ considered: 0, reassignedCount: 0 });
+    const { utterances: u2, cues: c2, applied: a2 } = base();
+    u2.push({ speaker: 'D', start: 5410, end: 5450, text: 'Yes.' });
+    expect(reassignShortUtterances(u2, c2, a2, { reassignMaxCount: 1 }).reassignedCount).toBe(1);
   });
 });

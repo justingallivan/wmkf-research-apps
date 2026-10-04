@@ -478,3 +478,17 @@ test('control: the same cues matching wording inside the slice apply both names'
   expect(speakerNames).toEqual({ S0: names[0], S1: names[1] });
   expect(alignment.status).toBe('applied');
 });
+
+test('records Zoom-evidence reassignment of a misdiarized one-word utterance alongside the applied names', async () => {
+  // "Right." at 3.0-3.4 s is labelled B by the diarizer but sits inside A's caption between A's words.
+  const { content, vtt } = fixture();
+  const parsed = JSON.parse(content);
+  parsed.utterances.splice(1, 0, { speaker: 'B', start: 3000, end: 3400, text: 'Right.' });
+  arrange({ content: JSON.stringify(parsed), vtt });
+  executePrompt.mockResolvedValue({ blocked: false, parsed: {} });
+  await alignMeetingTranscriptionSpeakers({ jobId });
+  const { speakerNames, alignment } = store.completeTranscriptionAlignment.mock.calls[0][0];
+  expect(speakerNames).toEqual({ A: NAME_A, B: NAME_B });
+  expect(alignment.reassigned).toEqual({ 1: 'A' });
+  expect(alignment.reassignedCount).toBe(1);
+});
