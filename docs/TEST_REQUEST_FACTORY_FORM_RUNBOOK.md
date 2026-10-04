@@ -6,7 +6,7 @@ status: active
 summary: "Operating the admin Test Request form in Production: what it needs, what each stop means, what a retry does, and how to turn it off."
 canonical: false
 cataloged: 2026-10-02
-last_verified: 2026-10-02
+last_verified: 2026-10-03
 owner: product-engineering
 related:
   - docs/plans/TEST_REQUEST_FACTORY_ADMIN_FORM_PLAN_2026-10-01.md
@@ -53,7 +53,7 @@ The panel shows "Stopped at …", plain copy for the recorded reason, and the ra
 vercel logs --environment production --since 1h -q "admin test-request run" -x
 ```
 
-When available, "Retry step" sends the same advance again. What that does depends on whether a write had already been attempted. The table describes the existing backend runner (also used by the CLI), not a guarantee that the branch diagnosis enables every form retry. The table is **[SOURCE]** (a delegated trace of `run-runner.js`, `basic-clone-steps.js`, `bundle-file-copy.js` and `run-ledger.js` on 2026-10-02, spot-checked) except where a row is marked **[RUN]**.
+When available, "Retry step" sends the same advance again. What that does depends on whether a write had already been attempted. The table describes the existing backend runner (also used by the CLI), not a guarantee that the diagnosis enables every form retry. The table is **[SOURCE]** (a delegated trace of `run-runner.js`, `basic-clone-steps.js`, `bundle-file-copy.js` and `run-ledger.js` on 2026-10-02, spot-checked) except where a row is marked **[RUN]**.
 
 | Step | What you see | What a retry does | Can it continue? |
 |---|---|---|---|
@@ -81,17 +81,19 @@ A request that outlives the 300-second lease is not recorded as a stop: the run 
 
 A run that cannot continue stays `needs_attention` in the ledger. Whatever it created stays in production as a marked test record: possibly a Request, its document location and folder, and some copied documents. Its two Blob objects are never swept. No mode of the command-line tool abandons, resets or force-advances a run, or resolves an unverified upload or an ambiguous create [SOURCE: the mode dispatch in `scripts/rehearse-test-request-sandbox.mjs`]. The practical path is a new run from a fresh lookup.
 
-Parked today **[RUN]**: run `20407283-c279-5e0c-b396-210ad6842482`, test Request 1003308, two PDFs verified, one XLSX uploaded and unverified.
+Owner decision 2026-10-03: retain this partly built marked test record; no cleanup or recovery is authorized by that decision. Factory v2’s first diagnosis slice shipped in #426; later operations remain in the [plan](plans/TEST_REQUEST_FACTORY_V2_PLAN_2026-10-03.md).
 
-## Read-only diagnosis — branch implementation, not deployed
+Parked **[RUN]**: run `20407283-c279-5e0c-b396-210ad6842482`, test Request 1003308, two PDFs verified, one XLSX uploaded and unverified.
 
-[SOURCE, October 3] The `codex/factory-run-diagnosis` branch adds guidance to the existing actor-owned run-detail GET. It reads only the saved run row and resource receipts. It does not read private artifacts, inspect live Dataverse/SharePoint records, claim a lease, run status recheck or write anything. Normal runner checks remain authoritative when an existing Advance is requested.
+## Read-only diagnosis — shipped in PR #426
+
+[SOURCE, October 3; owner-reported clean deployment after #426] The diagnosis adds guidance to the existing actor-owned run-detail GET. It reads only the saved run row and resource receipts. It does not read private artifacts, inspect live Dataverse/SharePoint records, claim a lease, run status recheck or write anything. Normal runner checks remain authoritative when an existing Advance is requested.
 
 Named existing retries remain available for Request/location readback after an uncertain create and for `verification_failed` at Basic verification. These use the unchanged runner safeguards; the diagnosis neither performs recovery nor promises it. Receipts from known earlier completed steps do not block the current step, while unknown/future evidence stays blocked.
 
 For Basic runs, the panel explains a live lease (wait and inspect again), expired source evidence (a new run is needed), an unverified copied item (readback investigation), a supported retry with no unresolved dispatch, or an unknown state (operator investigation). A new run neither repairs nor deletes the partial destination of an old run. Request 1003308 remains retained and unchanged. The six-hour check is based on the saved export timestamp; it does not establish artifact integrity or availability.
 
-The Basic Advance control is enabled only when the current diagnosis permits retry and the existing write switch permits it. A new selection, an advance response or a failed refresh clears the previous diagnosis; responses from an old selection cannot replace the current view. Other known recipes are reported as not assessed and retain their existing controls after inspection succeeds; a failed or missing inspection disables Advance until the run can be inspected again. The form is deliberately more conservative than the backend runner for unclassified Basic failures. Unknown errors, source/preflight failures, and pre-upload failures without a positively classified retry remain disabled in the form; investigate first rather than treating a disabled button as proof the backend cannot recover. Any owner-directed CLI action still uses the existing runner checks and requires its own operational authorization. Later recovery, status operations and retirement are outside this slice. This section describes branch code, not a production release.
+The Basic Advance control is enabled only when the current diagnosis permits retry and the existing write switch permits it. A new selection, an advance response or a failed refresh clears the previous diagnosis; responses from an old selection cannot replace the current view. Other known recipes are reported as not assessed and retain their existing controls after inspection succeeds; a failed or missing inspection disables Advance until the run can be inspected again. The form is deliberately more conservative than the backend runner for unclassified Basic failures. Unknown errors, source/preflight failures, and pre-upload failures without a positively classified retry remain disabled in the form; investigate first rather than treating a disabled button as proof the backend cannot recover. Any owner-directed CLI action still uses the existing runner checks and requires its own operational authorization. Later recovery, status operations and retirement are outside this slice. This diagnosis shipped in #426; later operations remain separately reviewed work.
 
 ## Status changes
 
@@ -121,7 +123,9 @@ To get a form run's manifest and bundle: the run panel's artifacts download, or 
 
 ## Artifacts and the daily sweep
 
-The daily maintenance cron deletes Factory Blob objects (`sweepFactoryArtifacts`, `factory-artifact-store.js`) **[SOURCE; not yet seen running in Production]**: saved lookups older than 6 hours; a run's bundle and manifest once the run is `ready`; objects with no ledger row once older than 24 hours. It keeps everything for a run that is `prepared`, `creating` or `needs_attention`. Download a finished run's artifacts the same day if they will be wanted.
+The daily maintenance cron deletes Factory Blob objects (`sweepFactoryArtifacts`, `factory-artifact-store.js`) **[SOURCE; aggregate Production execution observed 2026-10-03]**: saved lookups older than 6 hours; a run's bundle and manifest once the run is `ready`; objects with no ledger row once older than 24 hours. It keeps everything for a run that is `prepared`, `creating` or `needs_attention`. Download a finished run's artifacts the same day if they will be wanted.
+
+[VERIFIED via read-only `maintenance_runs` record] The 2026-10-03 03:00 UTC daily pass completed with Factory totals of 4 deleted, 2 kept, 0 errors, and neither scan nor deletion truncated. These aggregate counts do not establish which exact objects were deleted or retained. See [follow-up evidence](audits/OPEN_ITEMS_FOLLOWUP_2026-10-03.md).
 
 ## Turning the form off
 

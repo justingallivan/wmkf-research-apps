@@ -137,3 +137,21 @@ test('no tracked SharePoint location → 404 with requestNumber echoed', async (
     select: 'name,relativeurl,_parentsiteorlocation_value',
   });
 });
+
+test.each(['', '{"proposal_summary":{"title":"refused"}}'])('refusal %j never falls back or inserts a match', async text => {
+  sharepointDocumentLocationAdapter.findByRegardingObject.mockResolvedValue({ records: [{ relativeurl: '/sites/x/folder', _parentsiteorlocation_value: 'parent-1' }] });
+  sharepointDocumentLocationAdapter.findByParentIds.mockResolvedValue({ records: [{ relativeurl: 'akoya_request' }] });
+  GraphService.listFiles.mockResolvedValue([{ name: 'Phase_I_Staff_Version.pdf' }]);
+  GraphService.downloadFileByPath.mockResolvedValue({ buffer: Buffer.from('pdf-bytes') });
+  pdf.mockResolvedValue({ text: 'A'.repeat(150) });
+  sql.mockResolvedValue({ rows: [{ name: 'Dr. Roster', role_type: 'reviewer' }] });
+  const complete = jest.fn().mockResolvedValue({ content: text ? [{ type: 'text', text }] : [], stopReason: 'refusal' });
+  LLMClient.mockImplementation(() => ({ complete }));
+  const res = mockRes();
+  await handler({ method: 'POST', body: { requestId: 'req-1', requestNumber: 'R-1000' } }, res);
+  expect(res.statusCode).toBeGreaterThanOrEqual(400);
+  expect(res.body.success).not.toBe(true);
+  expect(complete).toHaveBeenCalledTimes(1);
+  expect(sql).toHaveBeenCalledTimes(1); // roster read only; no match INSERT
+  expect(logUsage).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'success' }));
+});

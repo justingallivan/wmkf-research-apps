@@ -1,3 +1,4 @@
+import { requireAcceptedLlmResponse } from '../../lib/utils/llm-response';
 import { LLMClient } from '../../lib/services/llm-client';
 import { BASE_CONFIG, getModelForApp } from '../../shared/config/baseConfig';
 import { loadModelOverrides } from '../../lib/services/model-override-loader';
@@ -89,11 +90,11 @@ export default async function handler(req, res) {
       label: 'proposal summary',
     });
     const prompt = REFINEMENT_PROMPT(summaryPayload.text, feedback, [summaryPayload.nonce]);
-    const { text: refinedSummary } = await claude.complete({
+    const { text: refinedSummary } = requireAcceptedLlmResponse(await claude.complete({
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 3000,
       temperature: 0.3,
-    });
+    }));
     
     res.status(200).json({ 
       refinedSummary,
@@ -101,6 +102,7 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
+    if (error.code === 'model_refusal') return res.status(422).json({ error: error.message, code: error.code });
     console.error('Refinement API error:', error);
     res.status(500).json({ 
       error: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED,

@@ -57,11 +57,14 @@ jest.mock('../../lib/utils/public-blob-fetch', () => ({
 
 // Shared fake LLMClient — captures the user message strings sent to Claude.
 const sentUserMessages = [];
+let mockRefusalAt = 0;
+let mockRefusalText = "";
 jest.mock('../../lib/services/llm-client', () => ({
   LLMClient: jest.fn().mockImplementation(() => ({
     complete: jest.fn(async ({ messages }) => {
       const userText = messages?.[0]?.content ?? '';
       sentUserMessages.push(userText);
+      if (sentUserMessages.length === mockRefusalAt) return { text: mockRefusalText, stopReason: 'refusal' };
       // Return JSON-parseable text so the extraction call's parser does not
       // throw and short-circuit the route mid-test.
       return { text: '{"institution":"Example U"}', model: 'claude-test' };
@@ -75,6 +78,7 @@ jest.mock('pdf-parse', () => jest.fn(async () => ({ text: mockedPdfText, numpage
 
 beforeEach(() => {
   sentUserMessages.length = 0;
+  mockRefusalAt = 0;
   clearAppAccessCache();
   process.env.CLAUDE_API_KEY = 'sk-ant-test';
 });
@@ -292,5 +296,24 @@ describe('payload boundary constants', () => {
     expect(BATCH_PHASE_II_PROPOSAL_MAX_CHARS).toBe(100_000);
     expect(BATCH_PHASE_I_PROPOSAL_MAX_CHARS).toBe(100_000);
     expect(PHASE_I_WRITEUP_PROPOSAL_MAX_CHARS).toBe(100_000);
+  });
+});
+
+describe.each([
+  ['process', 'batch-proposal-summaries'],
+  ['process-phase-i', 'batch-phase-i-summaries'],
+  ['process-phase-i-writeup', 'phase-i-writeup'],
+])('%s refusal containment', (route, app) => {
+  test.each([[1, ''], [1, 'VALID_LOOKING_REFUSED_OUTPUT'], [2, ''], [2, '{"institution":"VALID_LOOKING_REFUSED_OUTPUT"}']])('call %i refuses %j without usable output', async (at, text) => {
+    mockRefusalAt = at;
+    mockRefusalText = text;
+    mockedPdfText = 'Proposal text '.repeat(100);
+    const res = await runRoute(`../../pages/api/${route}`, { files: [{ filename: 'refusal.pdf', url: 'https://test.public.blob.vercel-storage.com/refusal.pdf' }] }, [app]);
+    expect(sentUserMessages).toHaveLength(at);
+    const events = res.write.mock.calls.map(([chunk]) => { try { return JSON.parse(chunk.replace(/^data: /, '').trim()); } catch { return null; } });
+    const final = events.find(event => event?.results);
+    expect(final.results['refusal.pdf'].structured.error).toBeTruthy();
+    expect(JSON.stringify(final.results)).not.toContain('VALID_LOOKING_REFUSED_OUTPUT');
+    expect(final.results['refusal.pdf']).not.toHaveProperty('extractedText');
   });
 });
