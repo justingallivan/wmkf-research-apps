@@ -1,0 +1,83 @@
+{
+  "createdAt": "2026-10-03",
+  "reviews": [
+    {
+      "pr": 423,
+      "url": "https://github.com/justingallivan/wmkf-research-apps/pull/423",
+      "head": "b0c3843aa1b737e704ff01f6a143f245b71cf46e",
+      "currentMain": "31a432de55bdad9f06737d35008a135ccff48711",
+      "verdict": "CHANGES_REQUESTED",
+      "reviewType": "Fable OAuth read-only static review; packet follow-up completed. No local tests run.",
+      "githubStatus": {
+        "state": "OPEN",
+        "mergeable": "CONFLICTING",
+        "checks": "All reported SUCCESS on exact PR head, including Jest, Playwright, Postgres integration, Trivy, CodeQL, Vercel, and Claude review."
+      },
+      "materialFindings": [
+        {
+          "severity": "high",
+          "origin": "Current-main integration conflict introduced by #426 after the PR merge base.",
+          "source": "docs/plans/TEST_REQUEST_FACTORY_V2_PLAN_2026-10-03.md; docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md; docs/audits/OPEN_ITEMS_FOLLOWUP_2026-10-03.md",
+          "evidence": "Main #426 has a different plan at the same path and explicitly says it supersedes the draft on #423. Main records the first read-only diagnosis slice as implemented on a branch, and corrects status recheck as potentially writing late effects. PR text still says proposal-only / slice 1 planned. GitHub marks #423 conflicting.",
+          "recommendedAction": "When resolving, retain the current-main plan verbatim; update PR runbook/open-items proposal wording and label the review note as referring to the superseded draft; rerun relevant doc gates on the integrated head."
+        },
+        {
+          "severity": "medium",
+          "origin": "Pre-existing code gap; new coverage claim in this PR.",
+          "source": "docs/audits/LLM_REFUSAL_HARDENING_2026-10-03.md:25,31-33; lib/services/phase-i-dynamics/summarize-service.js:134-175",
+          "evidence": "The audit says Phase I/II summarization is covered, but unchanged Phase I Dynamics summarize consumes response text without checking refusal metadata and writes it to akoya_request.wmkf_ai_summary, marking the run completed. A refusal with nonempty text can cross this durable-write path.",
+          "recommendedAction": "Guard the llm.complete result and test refusal causes no update/completed audit, or narrow the audit and keep this service as an explicit Sonnet-admission blocker."
+        },
+        {
+          "severity": "medium-low",
+          "origin": "Pre-existing code gap; new coverage claim in this PR.",
+          "source": "docs/audits/OPEN_ITEMS_FOLLOWUP_2026-10-03.md:66; lib/services/dynamics-explorer/tools/batch-processing.js; lib/services/dynamics-explorer/model-call.js",
+          "evidence": "The report claims Explorer handles refusal as terminal. Root independently verified the batch adapter returns only text/usage from the LLM helper, dropping refusal metadata; the export path parses text and has retry behavior. The chat tool-loop evidence does not cover this separate export path.",
+          "recommendedAction": "Guard the batch adapter and avoid retry on model_refusal, or narrow the report to the chat loop and state export is not assessed."
+        },
+        {
+          "severity": "medium-low",
+          "origin": "New in PR; public visibility verified by root.",
+          "source": "docs/audits/OPEN_ITEMS_FOLLOWUP_2026-10-03.md:143",
+          "evidence": "The new committed report includes literal sender and personal iCloud email addresses; repository visibility is PUBLIC. The report elsewhere uses role descriptions, so literals are unnecessary for its evidence claim.",
+          "recommendedAction": "Replace with role descriptions. Decide whether to rewrite/squash the PR branch history so literals do not become part of main history."
+        }
+      ],
+      "assessedNoMaterialFinding": [
+        "Thinking-history compaction preservation is technically coherent and the documented token/context trade-off is acceptable for current scope; re-evaluate context-limit behavior before enabling Sonnet overrides."
+      ],
+      "reviewEvidence": {
+        "fableRawFirstPass": "/tmp/pr423-fable-review.json",
+        "fableScopedFollowup": "/tmp/pr423-fable-current-main-review.json",
+        "extractedPacket": "/tmp/pr423-review-packet/",
+        "independentCurrentMainCheck": "origin/main contains #426 at 31a432de; exact plan path is superseded and repository reports PR #423 conflicting."
+      }
+    },
+    {
+      "pr": 417,
+      "url": "https://github.com/justingallivan/wmkf-research-apps/pull/417",
+      "head": "fac320fd4f9a9e4ac6ab5cb6c4a2644cd6aedbbc",
+      "currentMain": "31a432de55bdad9f06737d35008a135ccff48711",
+      "verdict": "APPROVE_NO_BLOCKERS",
+      "reviewType": "Fable OAuth read-only static review of the exact merge-base-to-head diff and main/head manifest+lock snapshots. No local tests run.",
+      "githubStatus": {
+        "state": "OPEN",
+        "mergeable": "MERGEABLE",
+        "checks": "All reported SUCCESS on exact PR head, including Jest, Playwright, Postgres integration, Trivy, CodeQL, Vercel, and Claude review."
+      },
+      "materialFindings": [],
+      "lowRiskNotes": [
+        "The 17 direct dependency changes are all minor/patch; lockfile root agrees with package.json, security overrides remain effective, workflow peer restoration has no net change from merge base, and all added registry entries have integrity hashes.",
+        "docx 9.8.1 brings nested nanoid 6.0.1 with Node engine support for 22/24/26+, while the workflow runs Node 22. The scoped @workflow/core nanoid override remains at 5.1.16. Fable found no new ESM blocker; a DOCX generation smoke on Preview is a reasonable low-risk assurance if desired.",
+        "A major @types/node 26 transitive lift is pulled by docx and undici-types moves 7 to 8; `check:types` is configured in the CI test workflow, and that workflow passed on the PR head."
+      ],
+      "currentMainCompatibility": "Direct diff shows package.json/package-lock updates only; the merge result should combine the PR dependency state with the current-main reviewer-reminder script. No conflict is reported. CI is on PR head, not a post-merge-main snapshot.",
+      "reviewEvidence": {
+        "fableRawFirstPass": "/tmp/pr417-fable-review.json",
+        "fableScopedFollowup": "/tmp/pr417-fable-current-main-review.json",
+        "extractedPacket": "/tmp/pr417-review-packet/",
+        "independentChecks": "`gh pr checks 417` returned all SUCCESS; current-main direct comparison and test workflow config were inspected."
+      }
+    }
+  ]
+}
