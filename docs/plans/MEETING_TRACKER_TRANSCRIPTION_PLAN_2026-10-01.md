@@ -84,7 +84,7 @@ do not weaken that boundary or repurpose its database for shared records.
 ## Accepted bounded workflow
 
 1. Open the existing Meeting Tracker Site Visit for a request. Upload approved
-   M4A/MP3 audio (up to 50 MiB) and explicitly start paid transcription.
+   M4A/MP3 audio (up to 50 MiB at build time; 200 MiB since 2026-10-04) and explicitly start paid transcription.
    Existing MP4, Zoom-link, and manually uploaded transcript controls remain.
    Automatic MP4 extraction/Zoom retrieval is excluded by owner choice.
 2. Bind the job to the server-verified request, exact Site Visit and initiating

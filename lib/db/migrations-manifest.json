@@ -64,6 +64,7 @@
     "062_transcription_speaker_names.sql",
     "063_meeting_tracker_transcription.sql",
     "064_meeting_transcript_close_attribution.sql",
-    "065_transcription_zoom_transcript.sql"
+    "065_transcription_zoom_transcript.sql",
+    "066_transcription_audio_cap_200mib.sql"
   ]
 }

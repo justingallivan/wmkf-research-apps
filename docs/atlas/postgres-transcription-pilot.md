@@ -71,7 +71,7 @@ owner-scoped transcript review passed. The isolated database contains one ready
 job (version 26); its transcript remains available, its input Blob is absent,
 and the provider API deletion was verified; this does not claim independent
 physical erasure of remote bytes. The accepted 40,809,588-byte upload is below
-the 50 MiB cap, so maximum-size behavior remains unverified. The earlier
+the original 50 MiB cap, so maximum-size behavior remains unverified. The cap is 200 MiB since 2026-10-04 (`lib/services/transcription-pilot/limits.js`; migration 066 widened the `declared_bytes`/`verified_bytes` CHECK constraints to 209,715,200), chosen because an observed Zoom M4A ran about 0.66 MB per minute and 50 MiB covered only about 76 minutes; the worker still buffers the whole file, and a near-cap production run has not yet been observed. The earlier
 deployment `dpl_FybqjEfKVRfbqNggHTJNx6Km1PLh` passed all 16 preflight checks,
 zero-work recovery/cleanup, and route isolation; its synthetic Workflow probe
 completed retry, sleep/resume, and AAC inspection. Exactly hourly recovery and

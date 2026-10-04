@@ -68,7 +68,8 @@ test('validates only bounded M4A/MP3 inputs and formats millisecond timestamps',
   expect(validateAudioFile({ name: 'meeting.m4a', size: 25, type: 'audio/mp4' })).toBeNull();
   expect(validateAudioFile({ name: 'meeting.mp3', size: 25, type: 'audio/mpeg' })).toBeNull();
   expect(validateAudioFile({ name: 'meeting.wav', size: 25, type: 'audio/wav' })).toMatch(/M4A or MP3/);
-  expect(validateAudioFile({ name: 'meeting.mp3', size: 50 * 1024 * 1024 + 1, type: 'audio/mpeg' })).toMatch(/50 MiB/);
+  expect(validateAudioFile({ name: 'meeting.mp3', size: 200 * 1024 * 1024 + 1, type: 'audio/mpeg' })).toMatch(/200 MiB/);
+  expect(validateAudioFile({ name: 'meeting.mp3', size: 200 * 1024 * 1024, type: 'audio/mpeg' })).toBeNull();
   expect(formatAudioDuration(65_000)).toBe('1:05');
   expect(formatTranscriptTimestamp(3_723_045)).toBe('01:02:03.045');
   expect(isCurrentPilotGeneration(4, 4, '73', '73')).toBe(true);

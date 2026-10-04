@@ -10,7 +10,7 @@ import { TRANSCRIPTION_JOB_LABELS } from '../../lib/services/transcription-pilot
 import { formatTranscriptMinuteHeading, getTranscriptSpeakers, groupTranscriptByMinute } from '../../lib/services/transcription-pilot/transcript-format';
 
 const API_ROOT = '/api/admin/transcription-pilot';
-const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
+import { MAX_TRANSCRIPTION_BYTES as MAX_AUDIO_BYTES, MAX_TRANSCRIPTION_MIB } from '../../lib/services/transcription-pilot/limits';
 const POLL_MS = 5000;
 const IN_PROGRESS_STATUSES = new Set(['uploading', 'queued', 'submitting', 'processing', 'saving']);
 const STATUS_LABELS = TRANSCRIPTION_JOB_LABELS;
@@ -21,7 +21,7 @@ export function isCurrentPilotGeneration(expected, current, expectedOwner, curre
 
 export function validateAudioFile(file) {
   if (!file) return 'Choose an audio file.';
-  if (file.size < 1 || file.size > MAX_AUDIO_BYTES) return 'Choose an audio file no larger than 50 MiB.';
+  if (file.size < 1 || file.size > MAX_AUDIO_BYTES) return `Choose an audio file no larger than ${MAX_TRANSCRIPTION_MIB} MiB.`;
   const extension = file.name.toLowerCase().split('.').pop();
   const acceptedTypes = extension === 'm4a'
     ? ['audio/mp4', 'audio/x-m4a']
@@ -152,7 +152,7 @@ function AudioUpload({
             onChange={(event) => onFile(event.target.files?.[0] || null)}
             className="mt-2 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-100"
           />
-          <p className="mt-2 text-xs leading-5 text-gray-600">Maximum 50 MiB and four hours. Audio is uploaded directly to private storage; the browser does not send the recording through an app server request.</p>
+          <p className="mt-2 text-xs leading-5 text-gray-600">Maximum {MAX_TRANSCRIPTION_MIB} MiB and four hours. Audio is uploaded directly to private storage; the browser does not send the recording through an app server request.</p>
           {file && <p className="mt-2 break-all text-sm text-gray-800">Selected: <span className="font-medium">{file.name}</span> · {(file.size / (1024 * 1024)).toFixed(1)} MiB</p>}
 
           <div className="mt-5 space-y-3">
@@ -203,7 +203,7 @@ function AudioUpload({
           <h3 className="font-semibold">Pilot limits</h3>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             <li>M4A or MP3 only</li>
-            <li>50 MiB maximum</li>
+            <li>{MAX_TRANSCRIPTION_MIB} MiB maximum</li>
             <li>Four hours maximum</li>
             <li>One provider job at a time</li>
           </ul>

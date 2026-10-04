@@ -63,6 +63,19 @@ sequence.
   mechanisms in bounded changes. Requirements and remaining follow-ups:
   `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
 
+- **Stream transcription audio instead of buffering it (2026-10-04).** [OPEN —
+  owner decision, not yet built] The transcription worker reads the whole
+  recording from private Blob into Function memory, copies it into a worker
+  thread for container inspection, then uploads the bytes to AssemblyAI. The
+  byte cap was raised from 50 MiB to 200 MiB the same day (`limits.js`,
+  migration 066) because a 62-minute Zoom M4A measured 40.8 MB, so 50 MiB
+  covered about 76 minutes. 200 MiB keeps roughly three capped copies inside
+  a default Function, but the ceiling is still memory-bound. Follow-up: pipe
+  the Blob download straight into the provider upload, inspect the container
+  from a bounded prefix read, and re-measure peak RSS, after which the byte
+  cap can track the four-hour duration cap instead of memory. Verify the
+  200 MiB cap first with a real two-to-three-hour recording in production.
+
 ## Audit follow-ups — verified open, not silently prioritized
 - **Hard-coded late-2026 `expiresAt` dates in unit-test fixtures (2026-09-27, S546).**
   `reviewer-roster-endpoint.test.js` failed on `main` when its fixed

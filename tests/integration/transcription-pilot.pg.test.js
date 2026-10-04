@@ -29,6 +29,7 @@ const MIGRATION_PATHS = [
   path.join(process.cwd(), 'lib/db/migrations/061_transcription_workflow_dispatches.sql'),
   path.join(process.cwd(), 'lib/db/migrations/062_transcription_speaker_names.sql'),
   path.join(process.cwd(), 'lib/db/migrations/065_transcription_zoom_transcript.sql'),
+  path.join(process.cwd(), 'lib/db/migrations/066_transcription_audio_cap_200mib.sql'),
 ];
 
 describeIf('transcription pilot store (isolated local Postgres proof)', () => {
@@ -361,6 +362,16 @@ describeIf('transcription pilot store (isolated local Postgres proof)', () => {
       `UPDATE transcription_jobs SET content_purged_at=NOW() WHERE id=$1`, [queued.id],
     )).rejects.toMatchObject({ code: '23514', constraint: 'transcription_jobs_purged_content_shape' });
     expect(bound.job.status).toBe('processing');
+  });
+
+  it('066: declared and verified bytes accept exactly 200 MiB and reject one byte more', async () => {
+    const queued = await makeQueuedJob();
+    const cap = 200 * 1024 * 1024;
+    await pool.query('UPDATE transcription_jobs SET declared_bytes=$2 WHERE id=$1', [queued.id, cap]);
+    await expect(pool.query('UPDATE transcription_jobs SET declared_bytes=$2 WHERE id=$1', [queued.id, cap + 1]))
+      .rejects.toMatchObject({ code: '23514', constraint: 'transcription_jobs_declared_bytes_check' });
+    await expect(pool.query('UPDATE transcription_jobs SET verified_bytes=$2 WHERE id=$1', [queued.id, cap + 1]))
+      .rejects.toMatchObject({ code: '23514', constraint: 'transcription_jobs_verified_bytes_check' });
   });
 
   it.each(['processing', 'saving'])('claims %s cleanup after DELETE and lease expiry', async status => {
