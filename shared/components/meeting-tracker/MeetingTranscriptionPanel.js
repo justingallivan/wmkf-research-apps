@@ -3,7 +3,17 @@ import { requestJson } from '../../utils/api-request';
 import { formatTranscriptMinuteHeading, getTranscriptSpeakers, groupTranscriptByMinute } from '../../../lib/services/transcription-pilot/transcript-format';
 
 const MAX_AUDIO_BYTES = 50 * 1024 * 1024;
+const MAX_VTT_BYTES = 4_000_000;
 const API_PATH = '/api/meeting-tracker/visits';
+const ALIGNMENT_ACTIVE = new Set(['pending', 'running']);
+const ALIGNMENT_APPLIED = new Set(['applied', 'partial']);
+const ALIGNMENT_REASONS = {
+  abstained: 'The Zoom transcript did not match the speakers confidently; name them manually.',
+  no_speakers: 'The Zoom transcript has no speaker labels.',
+  failed: 'Automatic speaker matching did not complete; name speakers manually.',
+  superseded: 'Names were edited before matching finished.',
+};
+const MATCHING_BLOCKED_REASON = 'Speaker names are still being matched from the Zoom transcript; saving and publishing are unavailable until that finishes.';
 const ACTIVE_STATUSES = new Set(['uploading', 'queued', 'submitting', 'processing', 'saving']);
 const JOB_STATE_LABELS = {
   uploading: 'Uploading', queued: 'Queued', submitting: 'Transcribing', processing: 'Transcribing', saving: 'Saving transcript',
@@ -20,6 +30,19 @@ function errorMessage(error, fallback) {
 
 function emptyNameDraft(job) {
   return Object.fromEntries(Object.entries(job?.speaker_names || {}).map(([id, name]) => [id, String(name || '')]));
+}
+
+function sameNames(a, b) {
+  const left = a || {};
+  const right = b || {};
+  return [...new Set([...Object.keys(left), ...Object.keys(right)])].every((id) => String(left[id] || '') === String(right[id] || ''));
+}
+
+function vttFormat(file) {
+  if (!file) return null;
+  if (!String(file.name || '').toLowerCase().endsWith('.vtt')) return 'Choose a Zoom transcript saved as a .vtt file.';
+  if (file.size < 1 || file.size > MAX_VTT_BYTES) return 'Choose a Zoom transcript larger than 0 bytes and no larger than 4 MB.';
+  return null;
 }
 
 function filenameFormat(file) {
@@ -176,6 +199,10 @@ function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnl
   const [correctionNames, setCorrectionNames] = useState({});
   const [correctionSuggestions, setCorrectionSuggestions] = useState({});
   const [selectedFile, setSelectedFile] = useState(null);
+  const [vttFile, setVttFile] = useState(null);
+  const [noVttConfirmation, setNoVttConfirmation] = useState(null);
+  const vttInputRef = useRef(null);
+  const alignmentPrevRef = useRef(null);
   const [providerRegion, setProviderRegion] = useState('us');
   const [acknowledged, setAcknowledged] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
@@ -231,6 +258,34 @@ function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnl
   const correctionSpeakerIds = useMemo(() => getTranscriptSpeakers(correctionContent), [correctionContent]);
   const dirtyCorrectionNames = useMemo(() => correctionSpeakerIds.some((id) => String(correctionNames[id] || '') !== String(correctionDetail?.correction?.speakerNames?.[id] || '')), [correctionDetail?.correction?.speakerNames, correctionNames, correctionSpeakerIds]);
   const uploadError = filenameFormat(selectedFile);
+  const vttError = vttFormat(vttFile);
+  const alignmentStatus = selectedJob?.speaker_alignment?.status || null;
+
+  // Confirmation is bound to the exact file pair; the panel remounts per request, so it also resets there.
+  const confirmNoVtt = noVttConfirmation?.audio === selectedFile && noVttConfirmation?.vtt === vttFile;
+
+  // When matching finishes while the draft was still untouched, show the applied names
+  // instead of leaving the untouched draft looking like unsaved edits.
+  useEffect(() => {
+    const previous = alignmentPrevRef.current;
+    alignmentPrevRef.current = selectedJob ? { id: selectedJob.id, status: alignmentStatus, names: emptyNameDraft(selectedJob) } : null;
+    if (previous && selectedJob && previous.id === selectedJob.id && ALIGNMENT_ACTIVE.has(previous.status) && !ALIGNMENT_ACTIVE.has(alignmentStatus)) {
+      setSpeakerNames((current) => (sameNames(current, previous.names) ? emptyNameDraft(selectedJob) : current));
+    }
+  }, [selectedJob, alignmentStatus]);
+
+  const chooseFiles = (files, slot) => {
+    const list = Array.from(files || []);
+    const isVtt = (file) => String(file?.name || '').toLowerCase().endsWith('.vtt');
+    if (list.length > 1) {
+      const audio = list.find((file) => !isVtt(file));
+      const vtt = list.find(isVtt);
+      if (audio) setSelectedFile(audio);
+      if (vtt) setVttFile(vtt);
+    } else if (slot === 'vtt') setVttFile(list[0] || null);
+    else setSelectedFile(list[0] || null);
+    setError(null);
+  };
 
   useEffect(() => {
     mountedRef.current = true;
@@ -420,6 +475,12 @@ function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnl
       setError('Choose an audio recording no larger than 50 MiB.');
       return;
     }
+    if (vttFile && vttError) return;
+    if (!vttFile && !confirmNoVtt) {
+      setNoVttConfirmation({ audio: selectedFile, vtt: vttFile });
+      return;
+    }
+    setNoVttConfirmation(null);
     const contentType = selectedFile.type || (selectedFile.name.toLowerCase().endsWith('.m4a') ? 'audio/mp4' : 'audio/mpeg');
     const generation = generationRef.current;
     const expectedRequestId = requestId;
@@ -438,7 +499,10 @@ function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnl
       if (!idempotencyKey) throw new Error('This browser cannot create a secure upload request. Use a current browser and try again.');
       const prepared = await requestJson(basePath, {
         method: 'POST', signal: controller.signal,
-        body: { filename: selectedFile.name, contentType, bytes: selectedFile.size, idempotencyKey, providerRegion },
+        body: {
+          filename: selectedFile.name, contentType, bytes: selectedFile.size, idempotencyKey, providerRegion,
+          ...(vttFile ? { zoomTranscript: { contentType: 'text/vtt', bytes: vttFile.size } } : {}),
+        },
         fallbackMessage: 'A private upload could not be prepared.',
       });
       if (!isCurrent(generation, expectedRequestId)) return;
@@ -448,6 +512,11 @@ function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnl
         throw new Error('The private upload service returned an incomplete contract. Refresh this page before trying again.');
       }
       if (selectedFile.size > upload.maximumSizeInBytes) throw new Error('The recording exceeds the private upload limit. Choose a smaller file.');
+      if (vttFile && (!upload.zoomTranscript?.pathname || !upload.zoomTranscript?.token)) {
+        throw new Error('The private upload service did not return a Zoom transcript upload. Refresh this page before trying again.');
+      }
+      if (vttFile && !Number.isInteger(upload.zoomTranscript.maximumSizeInBytes)) throw new Error('The private upload service returned an incomplete Zoom transcript contract. Refresh this page before trying again.');
+      if (vttFile && vttFile.size > upload.zoomTranscript.maximumSizeInBytes) throw new Error('The Zoom transcript exceeds the private upload limit. Choose a smaller file.');
       const { put } = await import('@vercel/blob/client');
       if (!isCurrent(generation, expectedRequestId)) return;
       await put(upload.pathname, selectedFile, {
@@ -456,6 +525,14 @@ function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnl
         onUploadProgress: ({ percentage }) => { if (isCurrent(generation, expectedRequestId)) setUploadProgress(Math.max(0, Math.min(100, Math.round(percentage)))); },
       });
       if (!isCurrent(generation, expectedRequestId)) return;
+      if (vttFile && upload.zoomTranscript) {
+        setBusy('upload-transcript');
+        await put(upload.zoomTranscript.pathname, vttFile, {
+          access: 'private', token: upload.zoomTranscript.token, contentType: 'text/vtt',
+          abortSignal: controller.signal,
+        });
+        if (!isCurrent(generation, expectedRequestId)) return;
+      }
       startRequested = true;
       setBusy('starting');
       const started = await requestJson(`${basePath}/${encodeURIComponent(job.id)}/start`, {
@@ -471,6 +548,7 @@ function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnl
       }
       if (currentContext()) {
         setSelectedFile(null);
+        setVttFile(null);
         setAcknowledged(false);
       }
       setUploadProgress(null);
@@ -751,7 +829,15 @@ function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnl
   const unresolvedPublication = (collection?.publications || []).find((publication) => ['publishing', 'retryable', 'unknown', 'published_reconcile'].includes(publication.state));
   const alreadyPublished = (collection?.publications || []).some((publication) => publication.inputJobId === selectedJob?.id && ['published', 'published_reconcile', 'unknown'].includes(publication.state));
   const hasText = typeof detail?.content?.text === 'string' && detail.content.text.trim().length > 0;
-  const publishBlockedReason = !utterances.length
+  const alignment = selectedJob?.speaker_alignment || null;
+  const alignmentShown = Boolean(alignment) && selectedJob?.zoomTranscriptAttached !== false;
+  const matchingActive = alignmentShown && ALIGNMENT_ACTIVE.has(alignmentStatus);
+  const matchingApplied = alignmentShown && ALIGNMENT_APPLIED.has(alignmentStatus);
+  const alignmentSpeakers = alignment?.speakers || {};
+  const appliedRows = Object.entries(alignmentSpeakers).filter(([, value]) => value?.name);
+  const suggestionRows = Object.entries(alignment?.suggestions || {}).filter(([id, names]) => !alignmentSpeakers[id]?.name && Array.isArray(names) && names.length);
+  const unnamedSpeakerExists = speakerIds.some((id) => !alignmentSpeakers[id]?.name);
+  const publishBlockedReason = matchingActive ? MATCHING_BLOCKED_REASON : !utterances.length
     ? 'Publishing requires timed speaker turns. This text-only result can still be read and downloaded as a temporary TXT.'
     : unresolvedPublication ? 'Resolve the existing transcript publication before starting another publication.'
       : dirtyNames ? 'Save speaker-name changes before publishing.'
@@ -777,15 +863,27 @@ function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnl
             <h3 className="text-sm font-semibold text-gray-900">Upload a recording</h3>
             <p className="mt-1 text-xs leading-5 text-gray-600">Maximum 50 MiB. The file uploads directly to private storage and is sent to AssemblyAI when you start transcription. Do not upload sensitive material.</p>
             <label htmlFor="meeting-transcription-file" className="mt-3 block text-xs font-medium text-gray-700">Audio file</label>
-            <input id="meeting-transcription-file" type="file" accept=".m4a,.mp3,audio/mp4,audio/x-m4a,audio/mpeg" disabled={Boolean(busy)} onChange={(event) => { setSelectedFile(event.target.files?.[0] || null); setError(null); }} className="mt-1 block w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-100" />
+            <input id="meeting-transcription-file" type="file" accept=".m4a,.mp3,audio/mp4,audio/x-m4a,audio/mpeg" disabled={Boolean(busy)} multiple onChange={(event) => chooseFiles(event.target.files, 'audio')} className="mt-1 block w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-100" />
             {selectedFile && <p className="mt-2 break-all text-xs text-gray-700">{selectedFile.name} · {(selectedFile.size / (1024 * 1024)).toFixed(1)} MiB</p>}
             {uploadError && <p className="mt-2 text-sm text-red-800" role="alert">{uploadError}</p>}
             {selectedFile && (selectedFile.size < 1 || selectedFile.size > MAX_AUDIO_BYTES) && <p className="mt-2 text-sm text-red-800" role="alert">Choose an audio recording larger than 0 bytes and no larger than 50 MiB.</p>}
+            <label htmlFor="meeting-transcription-vtt" className="mt-3 block text-xs font-medium text-gray-700">Zoom transcript (.vtt, optional)</label>
+            <input id="meeting-transcription-vtt" ref={vttInputRef} type="file" accept=".vtt,text/vtt" multiple disabled={Boolean(busy)} aria-describedby="meeting-transcription-vtt-help" onChange={(event) => chooseFiles(event.target.files, 'vtt')} className="mt-1 block w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-100" />
+            <p id="meeting-transcription-vtt-help" className="mt-1 text-xs leading-5 text-gray-600">Speakers will be named automatically from it. Maximum 4 MB.</p>
+            {vttFile && <p className="mt-2 break-all text-xs text-gray-700">{vttFile.name} · {(vttFile.size / 1024).toFixed(0)} KiB</p>}
+            {vttError && <p className="mt-2 text-sm text-red-800" role="alert">{vttError}</p>}
             <label htmlFor="meeting-transcription-region" className="mt-3 block text-xs font-medium text-gray-700">Provider region</label>
             <select id="meeting-transcription-region" value={providerRegion} disabled={Boolean(busy)} onChange={(event) => setProviderRegion(event.target.value)} className="mt-1 block min-h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:bg-gray-100"><option value="us">United States</option><option value="eu">European Union</option></select>
-            <label className="mt-3 flex items-start gap-2 text-xs leading-5 text-gray-800"><input type="checkbox" checked={acknowledged} disabled={Boolean(busy)} onChange={(event) => setAcknowledged(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-600" /><span>I confirm the recording is non-sensitive and approved for third-party processing. I understand starting transcription may consume paid credits.</span></label>
-            {uploadProgress !== null && <div className="mt-3" aria-live="polite"><div className="flex justify-between text-xs text-gray-700"><span>{uploadProgress < 100 ? 'Uploading to private storage' : 'Upload complete'}</span><span>{uploadProgress}%</span></div><progress className="mt-1 h-2 w-full accent-gray-900" max="100" value={uploadProgress} aria-label="Private audio upload progress" /></div>}
-            <button type="button" onClick={uploadAndStart} disabled={!selectedFile || Boolean(uploadError) || selectedFile.size < 1 || selectedFile.size > MAX_AUDIO_BYTES || !acknowledged || Boolean(busy)} className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700">{busy === 'upload' ? 'Uploading…' : busy === 'starting' ? 'Starting transcription…' : 'Upload and start transcription'}</button>
+            <label className="mt-3 flex items-start gap-2 text-xs leading-5 text-gray-800"><input type="checkbox" checked={acknowledged} disabled={Boolean(busy)} onChange={(event) => setAcknowledged(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-600" /><span>I confirm the recording is non-sensitive and approved for third-party processing. The recording is sent to AssemblyAI{vttFile ? ', and excerpts of both transcripts are sent to Anthropic to match speaker names' : ''}. I understand starting transcription may consume paid credits.</span></label>
+            {uploadProgress !== null && <div className="mt-3" aria-live="polite"><div className="flex justify-between text-xs text-gray-700"><span>{busy === 'upload-transcript' ? 'Uploading Zoom transcript' : uploadProgress < 100 ? 'Uploading to private storage' : 'Upload complete'}</span><span>{uploadProgress}%</span></div><progress className="mt-1 h-2 w-full accent-gray-900" max="100" value={uploadProgress} aria-label={busy === 'upload-transcript' ? 'Private transcript upload progress' : 'Private audio upload progress'} /></div>}
+            <button type="button" onClick={uploadAndStart} disabled={!selectedFile || Boolean(uploadError) || Boolean(vttError) || selectedFile.size < 1 || selectedFile.size > MAX_AUDIO_BYTES || !acknowledged || Boolean(busy)} className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700">{busy === 'upload' ? 'Uploading…' : busy === 'upload-transcript' ? 'Uploading Zoom transcript…' : busy === 'starting' ? 'Starting transcription…' : 'Upload and start transcription'}</button>
+            {confirmNoVtt && !vttFile && !busy && <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-5 text-amber-950" role="alert">
+              <p>No Zoom transcript selected. Speakers will need to be named by hand after transcription.</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button type="button" onClick={() => { setNoVttConfirmation(null); vttInputRef.current?.focus(); }} className="min-h-9 rounded-lg border border-amber-800 bg-white px-3 py-1.5 text-xs font-semibold text-amber-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-700">Add Zoom transcript</button>
+                <button type="button" onClick={uploadAndStart} className="min-h-9 rounded-lg border border-gray-500 bg-white px-3 py-1.5 text-xs font-semibold text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">Continue without it</button>
+              </div>
+            </div>}
           </div>}
 
           <div>
@@ -840,8 +938,25 @@ function MeetingTranscriptionPanelForRequest({ requestId, apiBasePath, reviewOnl
             {canReview && <>
               <p className="mt-3 text-xs text-gray-600">Temporary draft. It is not visible as a published Meeting Tracker material. {selectedJob.expires_at ? `Draft content expires ${new Date(selectedJob.expires_at).toLocaleString()}.` : ''}</p>
               <div className="mt-3 flex flex-wrap gap-2"><a className="inline-flex min-h-9 items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600" href={`${basePath}/${encodeURIComponent(selectedJob.id)}/download?format=txt`}>Download draft TXT</a>{utterances.length > 0 && <a className="inline-flex min-h-9 items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600" href={`${basePath}/${encodeURIComponent(selectedJob.id)}/download?format=vtt`}>Download draft VTT</a>}</div>
-              <SpeakerEditor content={detail.content} candidates={sourceList} candidateSources={collection?.candidateSources} names={speakerNames} selectedSuggestions={selectedSuggestions} onSuggestionChange={(speaker, candidateId) => setSelectedSuggestions((current) => ({ ...current, [speaker]: candidateId }))} onNameChange={(speaker, name) => setSpeakerNames((current) => ({ ...current, [speaker]: name }))} disabled={Boolean(busy)} />
-              <div className="mt-3 flex flex-wrap items-center gap-2"><span className="mr-auto text-xs text-gray-600">{dirtyNames ? 'Unsaved speaker-name changes' : 'Speaker names saved'}</span><button type="button" onClick={saveSpeakerNames} disabled={!dirtyNames || Boolean(busy)} className="min-h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500">{busy === 'speakers' ? 'Saving names…' : 'Save names'}</button><button type="button" onClick={publish} hidden={reviewOnly} disabled={Boolean(publishBlockedReason) || Boolean(busy)} className="min-h-10 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700">{busy === 'publish' ? 'Publishing…' : alreadyPublished ? 'Publication already started' : 'Publish transcript'}</button></div>
+              {matchingActive && <div className="mt-4 space-y-2" aria-live="polite">
+                <Notice tone="info">Matching speaker names from the Zoom transcript…</Notice>
+                <button type="button" onClick={() => void loadDetail(selectedJob.id, { preserveDraft: true })} disabled={Boolean(busy)} className="min-h-9 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500">Check matching status</button>
+              </div>}
+              {matchingApplied && <div className="mt-4 space-y-2" aria-live="polite">
+                <Notice tone="success">
+                  <p className="font-semibold">Speaker names from Zoom transcript</p>
+                  {!!appliedRows.length && <ul className="mt-1 space-y-0.5">{appliedRows.map(([id, value]) => <li key={id}>Speaker {id}: {value.name}{typeof value.confidence === 'number' ? ` (${Math.round(value.confidence * 100)}% confidence)` : ''}</li>)}</ul>}
+                  {!!suggestionRows.length && <ul className="mt-2 space-y-1">{suggestionRows.map(([id, names]) => <li key={id} className="flex flex-wrap items-center gap-2"><span>Speaker {id} is unnamed. Suggestions:</span>{names.map((name) => <button key={name} type="button" disabled={Boolean(busy)} onClick={() => { setSpeakerNames((current) => ({ ...current, [id]: name })); setSelectedSuggestions((current) => ({ ...current, [id]: '' })); }} className="min-h-9 rounded-lg border border-green-800 bg-white px-3 py-1.5 text-xs font-semibold text-green-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-700 disabled:cursor-not-allowed disabled:opacity-60">Use {name} for Speaker {id}</button>)}</li>)}</ul>}
+                </Notice>
+              </div>}
+              {alignmentShown && ALIGNMENT_REASONS[alignmentStatus] && <p className="mt-4 text-sm leading-5 text-gray-700">{ALIGNMENT_REASONS[alignmentStatus]}</p>}
+              {matchingActive || matchingApplied ? (
+                <details className="mt-4 rounded-lg border border-gray-200" open={matchingApplied && alignmentStatus === 'partial' && unnamedSpeakerExists ? true : undefined}>
+                  <summary className="cursor-pointer px-4 py-2 text-sm font-semibold text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600">Adjust names manually</summary>
+                  <SpeakerEditor content={detail.content} candidates={sourceList} candidateSources={collection?.candidateSources} names={speakerNames} selectedSuggestions={selectedSuggestions} onSuggestionChange={(speaker, candidateId) => setSelectedSuggestions((current) => ({ ...current, [speaker]: candidateId }))} onNameChange={(speaker, name) => setSpeakerNames((current) => ({ ...current, [speaker]: name }))} disabled={Boolean(busy)} />
+                </details>
+              ) : <SpeakerEditor content={detail.content} candidates={sourceList} candidateSources={collection?.candidateSources} names={speakerNames} selectedSuggestions={selectedSuggestions} onSuggestionChange={(speaker, candidateId) => setSelectedSuggestions((current) => ({ ...current, [speaker]: candidateId }))} onNameChange={(speaker, name) => setSpeakerNames((current) => ({ ...current, [speaker]: name }))} disabled={Boolean(busy)} />}
+              <div className="mt-3 flex flex-wrap items-center gap-2"><span className="mr-auto text-xs text-gray-600">{dirtyNames ? 'Unsaved speaker-name changes' : 'Speaker names saved'}</span><button type="button" onClick={saveSpeakerNames} disabled={!dirtyNames || Boolean(busy) || matchingActive} className="min-h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500">{busy === 'speakers' ? 'Saving names…' : 'Save names'}</button><button type="button" onClick={publish} hidden={reviewOnly} disabled={Boolean(publishBlockedReason) || Boolean(busy)} className="min-h-10 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700">{busy === 'publish' ? 'Publishing…' : alreadyPublished ? 'Publication already started' : 'Publish transcript'}</button></div>
               {!reviewOnly && publishBlockedReason && <p className="mt-2 text-xs leading-5 text-gray-600">{publishBlockedReason}</p>}
               {hasText && <TranscriptContent content={detail.content} speakerNames={speakerNames} />}
             </>}
