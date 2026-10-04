@@ -690,6 +690,42 @@ describe('verifyAlignmentVerdict', () => {
         expect(support.B).toEqual({});
       });
 
+      describe('Codex round 3: positive support must match the rendered sample text', () => {
+        // Four A utterances: ~1,560 chars of unique noise, then the nine caption words past the slice.
+        const tailOnly = (matchAtStart = false) => {
+          const utterances = [];
+          const cues = [];
+          for (let i = 1; i <= 4; i++) {
+            const t = i * 120_000;
+            const words = sentence(i).split(' ');
+            const noise = Array.from({ length: 130 }, (_, k) => `noise${i}x${k}pad`).join(' ');
+            expect(noise.length).toBeGreaterThan(1500);
+            const text = matchAtStart ? `${words.join(' ')} ${noise}` : `${noise} ${words.join(' ')}`;
+            utterances.push({ start: t, end: t + 60_000, speaker: 'A', text });
+            cues.push(cue(t + 50_000, t + 58_000, AVERY, words.join(' ')));
+          }
+          const { samples } = sampleAlignmentPairs(utterances, cues);
+          expect(samples.every((s) => s.text.length === 1500)).toBe(true);
+          return {
+            full: computeNameSupport(samples, utterances, [AVERY]),
+            visible: computeNameSupport(samples, utterances, [AVERY], { visibleTextOnly: true }),
+          };
+        };
+
+        test('wording past the 1,500-char slice attributes (full) but earns no visible support', () => {
+          // Fails if visibleTextOnly reads the full utterance text.
+          const { full, visible } = tailOnly();
+          expect(full.A[AVERY].count).toBe(4);
+          expect(visible.A ?? {}).toEqual({});
+        });
+
+        test('control: wording inside the slice earns support both ways', () => {
+          const { full, visible } = tailOnly(true);
+          expect(full.A[AVERY].count).toBe(4);
+          expect(visible.A[AVERY].count).toBe(4);
+        });
+      });
+
       test('a shift beyond the window leaves no overlapping candidate: ambiguous cues go to none', () => {
         // Both candidates are wording-eligible and neither overlaps the shifted cue.
         const t = 0;

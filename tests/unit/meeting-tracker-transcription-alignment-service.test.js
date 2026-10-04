@@ -429,3 +429,46 @@ test('Codex round 2: a speaker whose ONLY name support sits on trimmed samples i
   expect(alignment.suggestions[target]).toBeUndefined();
   expect(Object.keys(speakerNames)).toHaveLength(7);
 });
+
+// ---- Codex round 3: wording past the rendered 1,500-char slice is not visible evidence ----
+function tailFixture({ matchAtStart = false } = {}) {
+  const names = ['Speaker Person 0', 'Speaker Person 1'];
+  const utterances = []; const cues = []; const verdict = {};
+  for (let s = 0; s < 2; s++) {
+    for (let i = 0; i < 4; i++) {
+      const t0 = (s * 4 + i) * 120_000;
+      const words = Array.from({ length: 9 }, (_, k) => `term${s}x${i}x${k}`);
+      const noise = Array.from({ length: 130 }, (_, k) => `noise${s}x${i}x${k}pad`).join(' ');
+      const text = matchAtStart ? `${words.join(' ')} ${noise}` : `${noise} ${words.join(' ')}`;
+      const index = utterances.length;
+      utterances.push({ speaker: `S${s}`, start: t0, end: t0 + 60_000, text });
+      cues.push(`${ts(t0 + 50_000)} --> ${ts(t0 + 58_000)}\n${names[s]}: ${words.join(' ')}`);
+      (verdict[`S${s}`] ||= { name: names[s], confidence: 0.99, pairIds: [] }).pairIds.push(`S${s}-${index}`);
+    }
+  }
+  return { content: JSON.stringify({ utterances }), vtt: `WEBVTT\n\n${cues.join('\n\n')}\n`, verdict, names };
+}
+
+test('Codex round 3: cues matching only wording past the rendered slice do not apply a name even with visible citations at 0.99', async () => {
+  const { content, vtt, verdict } = tailFixture();
+  arrange({ content, vtt });
+  executePrompt.mockResolvedValue({ blocked: false, parsed: verdict });
+  await alignMeetingTranscriptionSpeakers({ jobId });
+  expect(store.failTranscriptionAlignment).not.toHaveBeenCalled();
+  const text = executePrompt.mock.calls[0][0].overrideVariables.speaker_samples;
+  expect(text).toMatch(/^ {2}cue Speaker Person 0: term0x0x0 /m); // the cue IS shown
+  expect(text).not.toMatch(/^\[S0-0\] speaker S0: [^\n]*term0x0x8/m); // the matching utterance tail is NOT
+  const { speakerNames, alignment } = store.completeTranscriptionAlignment.mock.calls[0][0];
+  expect(speakerNames).toEqual({});
+  expect(alignment.status).toBe('abstained');
+});
+
+test('control: the same cues matching wording inside the slice apply both names', async () => {
+  const { content, vtt, verdict, names } = tailFixture({ matchAtStart: true });
+  arrange({ content, vtt });
+  executePrompt.mockResolvedValue({ blocked: false, parsed: verdict });
+  await alignMeetingTranscriptionSpeakers({ jobId });
+  const { speakerNames, alignment } = store.completeTranscriptionAlignment.mock.calls[0][0];
+  expect(speakerNames).toEqual({ S0: names[0], S1: names[1] });
+  expect(alignment.status).toBe('applied');
+});
