@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
-  ZOOM_ALIGNMENT_DEFAULTS, buildAlignmentPrior, computeNameSupport, parseZoomVtt, sampleAlignmentPairs, zoomDisplayName,
+  ZOOM_ALIGNMENT_DEFAULTS, buildAlignmentPrior, computeNameSupport, parseZoomVtt, sampleAlignmentPairs, zoomDisplayName, zoomDisplayNames,
   scoreTextMatch, tokenizeTranscriptText, verifyAlignmentVerdict,
 } from '../../lib/services/transcription-pilot/zoom-vtt';
 
@@ -938,5 +938,34 @@ describe('zoomDisplayName', () => {
   test('non-strings pass through', () => {
     expect(zoomDisplayName(null)).toBeNull();
     expect(zoomDisplayName(undefined)).toBeUndefined();
+  });
+});
+
+describe('zoomDisplayNames (collision-aware, Codex review 2026-10-04)', () => {
+  test('two distinct Zoom names that would reorder to the same display keep their originals', () => {
+    const map = zoomDisplayNames(['Lee, Jordan', 'Jordan Lee', 'Smith, Pat']);
+    expect(map.get('Lee, Jordan')).toBe('Lee, Jordan');
+    expect(map.get('Jordan Lee')).toBe('Jordan Lee');
+    expect(map.get('Smith, Pat')).toBe('Pat Smith');
+  });
+
+  test('verifier applies both colliding participants under their original labels, and still reorders the others', () => {
+    // Fails if display normalisation ignores the rest of the closed set: both IDs would read "Jordan Lee".
+    const zoomNames = ['Lee, Jordan', 'Jordan Lee', 'Smith, Pat'];
+    const support = {
+      A: { 'Lee, Jordan': { count: 5, pairIds: ['A-1'] } },
+      B: { 'Jordan Lee': { count: 5, pairIds: ['B-1'] } },
+      C: { 'Smith, Pat': { count: 5, pairIds: ['C-1'] } },
+    };
+    const samples = [{ pairId: 'A-1', speakerId: 'A' }, { pairId: 'B-1', speakerId: 'B' }, { pairId: 'C-1', speakerId: 'C' }];
+    const { names, alignment } = verifyAlignmentVerdict(samples, support, {}, { zoomNames, content: { utterances: [{ speaker: 'A' }, { speaker: 'B' }, { speaker: 'C' }] } });
+    expect(names).toEqual({ A: 'Lee, Jordan', B: 'Jordan Lee', C: 'Pat Smith' });
+    expect(alignment.speakers.A.zoomName).toBeUndefined();
+    expect(alignment.speakers.C).toMatchObject({ name: 'Pat Smith', zoomName: 'Smith, Pat' });
+  });
+
+  test('the same original name verified on two speaker IDs is not a collision', () => {
+    const map = zoomDisplayNames(['Lee, Jordan', 'Lee, Jordan']);
+    expect(map.get('Lee, Jordan')).toBe('Jordan Lee');
   });
 });
