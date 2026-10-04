@@ -194,8 +194,11 @@ test('reviews a draft, saves names without candidate IDs, and publishes against 
   expect((await screen.findAllByText('Hello from the site visit.')).length).toBeGreaterThan(0);
   expect(screen.getByRole('heading', { name: 'Detected speakers (2)' })).toBeInTheDocument();
   expect(screen.getByText('Some name suggestions are unavailable.')).toBeInTheDocument();
-  expect(screen.getByText('1:00')).toBeInTheDocument();
-  expect(screen.getByText('2:00')).toBeInTheDocument();
+  // Formatter v3 (2026-10-04): one paragraph per speaker turn labelled with its start time, no minute headings.
+  expect(screen.getByText('01:02')).toBeInTheDocument();
+  expect(screen.getByText('02:05')).toBeInTheDocument();
+  expect(screen.queryByText('1:00')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Transcript by speaker turn')).toBeInTheDocument();
 
   fireEvent.change(screen.getByLabelText('Suggestions for Speaker A'), { target: { value: 'candidate-one' } });
   expect(screen.getByLabelText('Manual display name for Speaker A')).toHaveValue('Alex Lee');
@@ -392,9 +395,10 @@ test('creates, reviews, saves and publishes a label-only correction against the 
   render(<MeetingTranscriptionPanel requestId={REQUEST_ID} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Correct transcript' }));
   expect(await screen.findByRole('heading', { name: 'Correct published transcript' })).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: '0:00' })).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: '1:00' })).toBeInTheDocument();
-  expect(screen.getByText('remarks.')).toBeInTheDocument();
+  // A word-timed utterance is no longer split at the minute boundary: one turn, one paragraph.
+  expect(screen.getByText('00:59')).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: '1:00' })).not.toBeInTheDocument();
+  expect(screen.getAllByText('Opening remarks.').length).toBeGreaterThan(0); // transcript turn + editor excerpt
   fireEvent.change(screen.getByLabelText('Suggestions for Speaker A'), { target: { value: 'candidate-three' } });
   expect(screen.getByLabelText('Manual display name for Speaker A')).toHaveValue('Jordan Rivera');
   fireEvent.click(screen.getByRole('button', { name: 'Save correction' }));

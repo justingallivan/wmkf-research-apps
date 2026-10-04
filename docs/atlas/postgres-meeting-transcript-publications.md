@@ -224,6 +224,15 @@ code), and the newer current artifact remains unchanged.
 
 ## Deployed follow-up behavior and bounded verification
 
+Formatter/schema v3 (branch-built 2026-10-04, owner decision after the Oregon
+State rehearsal) renders readable TXT as one paragraph per speaker turn, each
+prefixed with the turn's start time, with no minute sections; consecutive
+utterances by the same speaker ID merge, so a multi-minute monologue reads as
+one paragraph. The source shape is identical to v2 (optional word timings kept).
+New publications use v3; `TRANSCRIPT_FORMATTER_VERSIONS` in
+`lib/services/transcription-pilot/transcript-format.js` is the single accepted-
+version list for the bundle builder, the manifest validator and the store, and
+recovery still rebuilds v1 and v2 byte-for-byte through the recorded version.
 The deployed flow supports Meeting Tracker bundle formatter/schema v2
 with optional, validated word timings. When word spans align with the exact
 utterance text, readable TXT may split an utterance at timed minute boundaries

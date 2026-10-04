@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { requestJson } from '../../utils/api-request';
-import { formatTranscriptMinuteHeading, getTranscriptSpeakers, groupTranscriptByMinute } from '../../../lib/services/transcription-pilot/transcript-format';
+import { formatTranscriptTurnTime, getTranscriptSpeakers, groupTranscriptByTurn } from '../../../lib/services/transcription-pilot/transcript-format';
 
 import { MAX_TRANSCRIPTION_BYTES as MAX_AUDIO_BYTES, MAX_TRANSCRIPTION_MIB } from '../../../lib/services/transcription-pilot/limits';
 const MAX_VTT_BYTES = 4_000_000;
@@ -102,8 +102,9 @@ function SpeakerEditor({ content, candidates, candidateSources, names, selectedS
     for (const candidate of candidates || []) counts.set(candidate.displayName, (counts.get(candidate.displayName) || 0) + 1);
     return counts;
   }, [candidates]);
-  const groups = groupTranscriptByMinute(content, names || {});
-  const excerpts = new Map(speakers.map((id) => [id, groups.flatMap((group) => group.utterances).find((item) => item.speaker === id)?.text || '']));
+  const turns = groupTranscriptByTurn(content, names || {});
+  // A turn can be a multi-minute paragraph; the editor only needs enough to recognise the voice.
+  const excerpts = new Map(speakers.map((id) => { const text = turns.find((turn) => turn.speaker === id)?.text || ''; return [id, text.length > 240 ? `${text.slice(0, 240).trimEnd()}…` : text]; }));
 
   if (!speakers.length) return <p className="mt-4 text-sm text-gray-700">No timed speaker turns were detected. The transcript is available as text, but it cannot be published as a timed TXT/VTT bundle.</p>;
   return (
@@ -170,17 +171,17 @@ function SpeakerEditor({ content, candidates, candidateSources, names, selectedS
 }
 
 function TranscriptContent({ content, speakerNames }) {
-  const groups = groupTranscriptByMinute(content, speakerNames || {});
-  if (groups.length) return (
-    <div className="mt-4 max-h-[32rem] overflow-y-auto rounded-lg border border-gray-200" aria-label="Transcript grouped by minute">
-      {groups.map((group) => (
-        <section key={group.minute} aria-labelledby={`meeting-transcription-minute-${group.minute}`} className="border-b border-gray-200 last:border-b-0">
-          <h4 id={`meeting-transcription-minute-${group.minute}`} className="sticky top-0 border-b border-gray-200 bg-gray-100 px-4 py-2 text-xs font-semibold tabular-nums text-gray-700">{formatTranscriptMinuteHeading(group.minute)}</h4>
-          <div className="space-y-3 px-4 py-3">
-            {group.utterances.map((utterance, index) => <p key={`${utterance.start}-${utterance.end}-${index}`} className="whitespace-pre-wrap break-words text-sm leading-6 text-gray-900">{utterance.speakerName && <span className="font-semibold">{utterance.speakerName}: </span>}{utterance.text}</p>)}
-          </div>
-        </section>
-      ))}
+  const turns = groupTranscriptByTurn(content, speakerNames || {});
+  if (turns.length) return (
+    <div className="mt-4 max-h-[32rem] overflow-y-auto rounded-lg border border-gray-200" aria-label="Transcript by speaker turn">
+      <div className="space-y-4 px-4 py-3">
+        {turns.map((turn, index) => (
+          <p key={`${turn.start}-${turn.end}-${index}`} className="whitespace-pre-wrap break-words text-sm leading-6 text-gray-900">
+            <span className="mr-2 font-mono text-xs tabular-nums text-gray-500">{formatTranscriptTurnTime(turn.start)}</span>
+            {turn.speakerName ? <span className="font-semibold">{turn.speakerName}: </span> : null}<span>{turn.text}</span>
+          </p>
+        ))}
+      </div>
     </div>
   );
   if (typeof content?.text === 'string' && content.text.trim()) return <pre className="mt-4 max-h-[32rem] overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-gray-200 bg-gray-50 p-4 font-sans text-sm leading-6 text-gray-900">{content.text}</pre>;
