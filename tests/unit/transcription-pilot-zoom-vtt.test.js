@@ -353,12 +353,14 @@ describe('verifyAlignmentVerdict', () => {
       expect(result.alignment.suggestions.A).toBeUndefined();
     });
 
-    test('an empty citation list is rejected even when visible support is sufficient', () => {
+    test('an empty citation list does not block: verified support applies the name on the model basis when it agrees', () => {
+      // Citations stopped gating application when the model became a veto (2026-10-04).
       const p = four();
       const verdict = { A: { name: AVERY, confidence: 0.99, pairIds: [] }, B: ok(p.support, 'B', JORDAN) };
       const result = verifyAlignmentVerdict(p.samples, p.support, verdict, p.opts);
-      expect(result.names).toEqual({ B: JORDAN });
-      expect(result.alignment.suggestions.A).toEqual([AVERY]);
+      expect(result.names).toEqual({ A: AVERY, B: JORDAN });
+      expect(result.alignment.speakers.A).toMatchObject({ basis: 'model', confidence: 0.99 });
+      expect(result.alignment.speakers.A.pairIds).toEqual(p.support.A[AVERY].pairIds.slice(0, 3));
     });
 
     test('a conflict present only in the full-set support still blocks a visibly sole name', () => {
@@ -406,8 +408,8 @@ describe('verifyAlignmentVerdict', () => {
     expect(result.alignment.suggestions.A.sort()).toEqual([AVERY, JORDAN].sort());
   });
 
-  test('fabricated citation (pair whose cue does not match) is rejected', () => {
-    // Fails if citations are not checked against the verified supporting pairs.
+  test('fabricated citations do not block application; stored pairIds come from verified support, never the verdict', () => {
+    // Fails if the verdict's pairIds are stored or if a bad citation withholds a verified name.
     const entries = [['A', AVERY, 1], ['A', AVERY, 2], ['A', AVERY, 3], ['A', JORDAN, 4]];
     const { utterances, cues } = scenario(entries);
     cues[3] = cue(180_000, 190_000, JORDAN, sentence(99)); // caption wording differs from the utterance
@@ -416,49 +418,46 @@ describe('verifyAlignmentVerdict', () => {
     expect(Object.keys(support.A)).toEqual([AVERY]);
     const opts = { zoomNames: [AVERY, JORDAN], content: { utterances } };
     const unsupported = samples.map((s) => s.pairId).find((id) => !support.A[AVERY].pairIds.includes(id));
-    const verdict = { A: { name: AVERY, confidence: 0.99, pairIds: [...support.A[AVERY].pairIds.slice(0, 2), unsupported] } };
+    const verdict = { A: { name: AVERY, confidence: 0.99, pairIds: [unsupported] } };
     const result = verifyAlignmentVerdict(samples, support, verdict, opts);
-    expect(result.names).toEqual({});
-    expect(result.alignment.suggestions.A).toEqual([AVERY]);
-    for (const bad of ['A-999', 'B-0', 42]) {
-      const other = verifyAlignmentVerdict(samples, support, { A: { name: AVERY, confidence: 0.99, pairIds: [bad] } }, opts);
-      expect(other.names).toEqual({});
-    }
+    expect(result.names).toEqual({ A: AVERY });
+    expect(result.alignment.speakers.A.pairIds).not.toContain(unsupported);
+    expect(result.alignment.speakers.A.pairIds.every((id) => support.A[AVERY].pairIds.includes(id))).toBe(true);
   });
 
-  test('a cited pair belonging to another speaker is rejected', () => {
-    // Fails if citations are matched by id existence only.
+  test('two speaker IDs verified to the same name both apply (diarization split is not a conflict)', () => {
     const p = pipeline([['A', AVERY, 1], ['A', AVERY, 2], ['B', AVERY, 3], ['B', AVERY, 4]], [AVERY]);
-    const verdict = { A: { name: AVERY, confidence: 0.95, pairIds: [cite(p.support, 'B', AVERY)[0]] } };
-    expect(verifyAlignmentVerdict(p.samples, p.support, verdict, p.opts).names).toEqual({});
+    const result = verifyAlignmentVerdict(p.samples, p.support, {}, p.opts);
+    expect(result.names).toEqual({ A: AVERY, B: AVERY });
+    expect(result.alignment.speakers.A.basis).toBe('support');
   });
 
-  test('more than 100 cited pairIds is rejected', () => {
-    // Fails if the citation-count cap is removed (a valid id repeated 101 times would pass).
-    const p = pipeline([['A', AVERY, 1], ['A', AVERY, 2], ['A', AVERY, 3]], [AVERY]);
-    const [valid] = cite(p.support, 'A', AVERY);
-    const run = (n) => verifyAlignmentVerdict(p.samples, p.support,
-      { A: { name: AVERY, confidence: 0.99, pairIds: Array(n).fill(valid) } }, p.opts);
-    expect(run(100).names).toEqual({ A: AVERY });
-    expect(run(101).names).toEqual({});
-  });
-
-  test('a verdict name outside the closed Zoom name set is rejected even if support names it', () => {
-    // Fails if the closed-set check is removed: the hand-built support below names Casey Rowe.
+  test('a verdict name outside the closed Zoom name set is never applied, even if hand-built support names it', () => {
+    // Defensive: computeNameSupport already filters to the closed set; the verifier re-checks.
     const support = { A: { 'Casey Rowe': { count: 3, pairIds: ['A-0', 'A-1', 'A-2'] } } };
     const samples = [{ pairId: 'A-0', speakerId: 'A' }];
     const verdict = { A: { name: 'Casey Rowe', confidence: 0.99, pairIds: ['A-0'] } };
     const result = verifyAlignmentVerdict(samples, support, verdict, { zoomNames: [AVERY], content: contentFor('A') });
     expect(result.names).toEqual({});
+    expect(result.alignment.reasons.A).toBe('name_not_in_zoom_set');
   });
 
-  test('verdict name differing from the sole supported name is rejected', () => {
-    // Fails if the verdict name is trusted over the verified support.
+  test('model veto: a confident DIFFERENT closed-list name withholds a verified name and suggests both', () => {
+    // Fails if the model is ignored entirely or if it is trusted over verified support.
     const p = pipeline([['A', AVERY, 1], ['A', AVERY, 2], ['A', AVERY, 3]], [AVERY, JORDAN]);
     const verdict = { A: { name: JORDAN, confidence: 0.99, pairIds: cite(p.support, 'A', AVERY) } };
     const result = verifyAlignmentVerdict(p.samples, p.support, verdict, p.opts);
     expect(result.names).toEqual({});
-    expect(result.alignment.suggestions.A).toEqual([AVERY]);
+    expect(result.alignment.suggestions.A).toEqual([AVERY, JORDAN]);
+    expect(result.alignment.reasons.A).toBe('model_veto');
+  });
+
+  test('a different name BELOW floor is not a veto: the verified name applies on the support basis', () => {
+    const p = pipeline([['A', AVERY, 1], ['A', AVERY, 2], ['A', AVERY, 3]], [AVERY, JORDAN]);
+    const verdict = { A: { name: JORDAN, confidence: 0.4, pairIds: [] } };
+    const result = verifyAlignmentVerdict(p.samples, p.support, verdict, p.opts);
+    expect(result.names).toEqual({ A: AVERY });
+    expect(result.alignment.speakers.A).toEqual({ name: AVERY, confidence: 0.815, basis: 'support', pairIds: p.support.A[AVERY].pairIds.slice(0, 3) });
   });
 
   test('a sole supported name below minVerifiedPairs is not applied', () => {
@@ -469,17 +468,60 @@ describe('verifyAlignmentVerdict', () => {
     expect(result.names).toEqual({});
   });
 
-  test('confidence below the floor is a suggestion only (0.6 and 0.3); invalid confidence is rejected', () => {
-    // Fails if the floor is not applied, a sub-0.5 verdict loses its suggestion, or NaN/out-of-range passes.
+  test('model confidence at or above floor is stored as the model basis; below floor or invalid falls back to the support basis', () => {
+    // Fails if a timid or malformed agreeing verdict withholds a verified name, or if the model's
+    // confidence is stored when it was below floor.
     const p = pipeline([['A', AVERY, 1], ['A', AVERY, 2], ['A', AVERY, 3]], [AVERY]);
     const run = (confidence) => verifyAlignmentVerdict(p.samples, p.support, { A: ok(p.support, 'A', AVERY, confidence) }, p.opts);
-    for (const low of [0.6, 0.3]) {
-      expect(run(low).names).toEqual({});
-      expect(run(low).alignment.suggestions.A).toEqual([AVERY]);
+    for (const low of [0.6, 0.3, 1.5, Number.NaN]) {
+      expect(run(low).names).toEqual({ A: AVERY });
+      expect(run(low).alignment.speakers.A).toMatchObject({ basis: 'support', confidence: 0.815 });
     }
-    expect(run(0.8).names).toEqual({ A: AVERY });
-    expect(run(1.5).names).toEqual({});
-    expect(run(Number.NaN).names).toEqual({});
+    expect(run(0.8).alignment.speakers.A).toMatchObject({ basis: 'model', confidence: 0.8 });
+    expect(run(0.97).alignment.speakers.A).toMatchObject({ basis: 'model', confidence: 0.97 });
+  });
+
+  describe('Oregon State rehearsal, 2026-10-04 (observed support tables)', () => {
+    // Live job 9fc376d9: wording support below; the model named only B. Under the any-second-name
+    // conflict rule and the model gate, only B applied. All five must apply now.
+    const observed = {
+      A: { 'Balbas, Andrea': { count: 50, pairIds: ['A-1', 'A-2', 'A-3'] }, Jean: { count: 1, pairIds: ['A-9'] } },
+      D: { 'Edward Stolper': { count: 30, pairIds: ['D-1', 'D-2', 'D-3'] }, 'Adam Kent': { count: 4, pairIds: ['D-7'] }, 'Sujoy Mukhopadhyay': { count: 2, pairIds: ['D-8'] } },
+      E: { 'Justin Gallivan': { count: 11, pairIds: ['E-1', 'E-2'] } },
+      B: { 'John Sader': { count: 20, pairIds: ['B-32', 'B-40', 'B-82'] } },
+      C: { 'Beth Pruitt': { count: 12, pairIds: ['C-1', 'C-2'] } },
+    };
+    const names = ['Balbas, Andrea', 'Edward Stolper', 'Justin Gallivan', 'John Sader', 'Sujoy Mukhopadhyay', 'Beth Pruitt', 'Jean', 'Adam Kent'];
+    const samples = Object.keys(observed).map((id) => ({ pairId: `${id}-1`, speakerId: id }));
+    const content = contentFor('A', 'B', 'C', 'D', 'E');
+
+    test('all five speakers apply; B on the model basis, the rest on the support basis', () => {
+      const verdict = { B: { name: 'John Sader', confidence: 0.98, pairIds: ['B-32', 'B-40', 'B-82'] },
+        A: { name: null, confidence: 0.2, pairIds: [], reason: 'unsure' }, C: { name: null, confidence: 0.3, pairIds: [] } };
+      const { names: applied, alignment } = verifyAlignmentVerdict(samples, observed, verdict, { zoomNames: names, content });
+      expect(applied).toEqual({ A: 'Balbas, Andrea', B: 'John Sader', C: 'Beth Pruitt', D: 'Edward Stolper', E: 'Justin Gallivan' });
+      expect(alignment.status).toBe('applied');
+      expect(alignment.speakers.B).toMatchObject({ basis: 'model', confidence: 0.98 });
+      expect(alignment.speakers.A).toMatchObject({ basis: 'support', confidence: 0.95 });
+      expect(alignment.speakers.E).toMatchObject({ basis: 'support', confidence: 0.935 });
+      expect(alignment.reasons).toEqual({});
+    });
+
+    test('a 3:1 split is still a conflict while 30:4 is not (dominanceRatio 0.2)', () => {
+      const split = { ...observed, C: { 'Beth Pruitt': { count: 3, pairIds: ['C-1'] }, 'John Sader': { count: 1, pairIds: ['C-2'] } } };
+      const { names: applied, alignment } = verifyAlignmentVerdict(samples, split, {}, { zoomNames: names, content });
+      expect(applied.C).toBeUndefined();
+      expect(alignment.reasons.C).toBe('conflict');
+      expect(alignment.suggestions.C).toEqual(['Beth Pruitt', 'John Sader']);
+      expect(applied.D).toBe('Edward Stolper');
+    });
+
+    test('a conflict that exists only in the full-set support still blocks', () => {
+      const hidden = { ...observed, E: { 'Justin Gallivan': { count: 11, pairIds: ['E-1'] }, 'Beth Pruitt': { count: 5, pairIds: ['E-5'] } } };
+      const { names: applied, alignment } = verifyAlignmentVerdict(samples, observed, {}, { zoomNames: names, content, conflictSupport: hidden });
+      expect(applied.E).toBeUndefined();
+      expect(alignment.reasons.E).toBe('conflict');
+    });
   });
 
   describe('end to end on the synthetic fixtures', () => {
@@ -826,11 +868,14 @@ describe('verifyAlignmentVerdict', () => {
       const { names, alignment } = verifyAlignmentVerdict(samples, support, verdict, { zoomNames: [name], content });
       const bytes = Buffer.byteLength(JSON.stringify(alignment));
       expect(bytes).toBeLessThanOrEqual(LIMIT);
-      // Arithmetic: with pairIds the JSON is ~71 KB (over); once pairIds are dropped it is 63,862 bytes.
-      expect(bytes).toBe(63_862);
+      // Arithmetic: with pairIds the JSON is ~71 KB (over); without pairIds but with 200 "basis"
+      // fields it is ~67 KB (still over); after the final basis-trimming step it is 63,875 bytes
+      // (63,862 before the empty "reasons" object was added, 2026-10-04).
+      expect(bytes).toBe(63_875);
+      expect(alignment.speakers[speakerIds[0]].basis).toBeUndefined();
       expect(alignment.status).toBe('applied');
       expect(Object.keys(names)).toHaveLength(200);
-      expect(alignment.speakers[speakerIds[0]]).toEqual({ name, confidence: 0.812, pairIds: [] });
+      expect(alignment.speakers[speakerIds[0]]).toEqual({ name, confidence: 0.812, pairIds: [] }); // basis trimmed by the byte fit
     });
 
     test('fail-closed: still too large after all trimming returns the empty abstained result', () => {
@@ -840,7 +885,7 @@ describe('verifyAlignmentVerdict', () => {
       const verdict = Object.fromEntries(speakerIds.map((id) => [id, { name, confidence: 0.9, pairIds: [`${id}-0`] }]));
       const result = verifyAlignmentVerdict(samples, support, verdict, { zoomNames: [name], content, maxAlignmentBytes: 1000 });
       expect(result.names).toEqual({});
-      expect(result.alignment).toEqual({ status: 'abstained', floor: 0.8, speakers: {}, suggestions: {} });
+      expect(result.alignment).toEqual({ status: 'abstained', floor: 0.8, speakers: {}, suggestions: {}, reasons: {} });
     });
 
     test('applied shape (200 IDs x 32-char IDs x 80-char names x long pairIds)', () => {

@@ -285,7 +285,7 @@ test('recoverPendingAlignments stops claiming when the remaining budget is too s
 });
 
 // ---- Reserved-sample loss and full-set conflict detection (Codex adversarial review) ----
-function genFixture({ per = 4, textWords = 12, cuesPerSample = 2, contrary = false, fillerNameLen = 60, fillerPad = 0, mute = null }) {
+function genFixture({ per = 4, textWords = 12, cuesPerSample = 2, contrary = false, fillerNameLen = 60, fillerPad = 0, mute = null, contraryCount = 1 }) {
   const names = Array.from({ length: 8 }, (_, s) => `Speaker Person ${s}`);
   const utterances = []; const cues = []; const verdict = {};
   for (let s = 0; s < 8; s++) {
@@ -294,7 +294,7 @@ function genFixture({ per = 4, textWords = 12, cuesPerSample = 2, contrary = fal
       const text = Array.from({ length: textWords }, (_, k) => `term${s}x${i}x${k}`).join(' ');
       const index = utterances.length;
       utterances.push({ speaker: `S${s}`, start: t0, end: t0 + 4000, text });
-      const cueName = contrary && i === per - 1 ? names[(s + 1) % 8] : names[s];
+      const cueName = contrary && i >= per - contraryCount ? names[(s + 1) % 8] : names[s];
       // A muted cue keeps its name and byte length but no longer matches the utterance wording.
       const cueText = mute && mute(s, index) ? text.replace(/term/g, 'zzzz') : text;
       cues.push(`${ts(t0)} --> ${ts(t0 + 4000)}\n${cueName}: ${cueText}`);
@@ -350,18 +350,22 @@ test('(c) only extras drop: the run proceeds and every speaker keeps its reserve
   for (let s = 0; s < 8; s++) expect(shown.filter(id => id.startsWith(`[S${s}-`)).length).toBeGreaterThanOrEqual(4);
 });
 
-test.each([['null', null], ['an array', []], ['a non-object entry', { S0: 'x' }]])('a malformed verdict (%s) applies nothing and does not throw', async (_label, parsed) => {
+test.each([['null', null], ['an array', []], ['a non-object entry', { S0: 'x' }]])('a malformed verdict (%s) does not throw; verified names apply on the support basis', async (_label, parsed) => {
+  // The model is a veto, not a gate (2026-10-04): a useless verdict cannot withhold verified names.
   arrange(fixture());
   executePrompt.mockResolvedValue({ blocked: false, parsed });
   await alignMeetingTranscriptionSpeakers({ jobId });
-  expect(store.completeTranscriptionAlignment.mock.calls[0][0].speakerNames).toEqual({});
+  const { speakerNames, alignment } = store.completeTranscriptionAlignment.mock.calls[0][0];
+  expect(Object.keys(speakerNames).length).toBeGreaterThan(0);
+  expect(Object.values(alignment.speakers).every(v => v.basis === 'support')).toBe(true);
 });
 
 const EXTRA_FIXTURE = { per: 6, textWords: 70, cuesPerSample: 25, contrary: true, fillerNameLen: 70 };
 const shownIds = text => (text.match(/^\[S\d+-\d+\]/gm) || []).map(id => id.slice(1, -1));
 
 test('contrary evidence on a dropped EXTRA sample still forces abstention (support is computed on the full sampled set)', async () => {
-  const { content, vtt, verdict, names } = genFixture(EXTRA_FIXTURE);
+  // Two contrary samples of six (4:2) stay a conflict under dominanceRatio 0.2; one of six (5:1) would not.
+  const { content, vtt, verdict, names } = genFixture({ ...EXTRA_FIXTURE, contraryCount: 2 });
   arrange({ content, vtt });
   executePrompt.mockResolvedValue({ blocked: false, parsed: verdict });
   await alignMeetingTranscriptionSpeakers({ jobId });
@@ -379,7 +383,7 @@ test('contrary evidence on a dropped EXTRA sample still forces abstention (suppo
   }
 });
 
-test('a verdict citing a real but unshown pair is not applied even with full support and 0.99 confidence', async () => {
+test('a verdict citing a real but unshown pair loses the model basis; the verified name still applies on support', async () => {
   const { content, vtt, verdict, names } = genFixture({ ...EXTRA_FIXTURE, contrary: false });
   arrange({ content, vtt });
   executePrompt.mockImplementation(async ({ overrideVariables }) => {
@@ -393,11 +397,13 @@ test('a verdict citing a real but unshown pair is not applied even with full sup
   });
   await alignMeetingTranscriptionSpeakers({ jobId });
   const { speakerNames, alignment } = store.completeTranscriptionAlignment.mock.calls[0][0];
-  const unseenSpeaker = Object.keys(speakerNames).length;
-  expect(unseenSpeaker).toBeLessThan(8);
-  const missing = Array.from({ length: 8 }, (_, s) => `S${s}`).filter(id => !(id in speakerNames));
-  expect(missing).toHaveLength(1);
-  expect(alignment.suggestions[missing[0]]).toEqual([names[Number(missing[0].slice(1))]]);
+  // The unseen citation neutralises the model's verdict for that speaker; verified support still
+  // applies the name, but on the support basis rather than the model's 0.99.
+  expect(Object.keys(speakerNames)).toHaveLength(8);
+  const supportBased = Object.entries(alignment.speakers).filter(([, v]) => v.basis === 'support').map(([id]) => id);
+  expect(supportBased).toHaveLength(1);
+  expect(speakerNames[supportBased[0]]).toBe(names[Number(supportBased[0].slice(1))]);
+  expect(Object.entries(alignment.speakers).filter(([, v]) => v.basis === 'model')).toHaveLength(7);
 });
 
 test('Codex round 2: a speaker whose ONLY name support sits on trimmed samples is not applied on an empty-citation 0.99 verdict', async () => {

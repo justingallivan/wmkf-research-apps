@@ -719,10 +719,10 @@ test('pending alignment shows the matching notice, collapses the editor and bloc
 });
 
 test('applied alignment lists names with confidence and collapses the editor', async () => {
-  await openReadyJob({ status: 'applied', speakers: { A: { name: 'Dana Ortiz', confidence: 0.92 }, B: { name: 'Sam Lee', confidence: 0.8 } } }, { speaker_names: { A: 'Dana Ortiz', B: 'Sam Lee' } });
+  await openReadyJob({ status: 'applied', speakers: { A: { name: 'Dana Ortiz', confidence: 0.92, basis: 'model' }, B: { name: 'Sam Lee', confidence: 0.8, basis: 'support' } } }, { speaker_names: { A: 'Dana Ortiz', B: 'Sam Lee' } });
   expect(screen.getByText('Speaker names from Zoom transcript')).toBeInTheDocument();
   expect(screen.getByText(/Speaker A: Dana Ortiz \(92% confidence\)/)).toBeInTheDocument();
-  expect(screen.getByText(/Speaker B: Sam Lee \(80% confidence\)/)).toBeInTheDocument();
+  expect(screen.getByText(/Speaker B: Sam Lee \(80% confidence, matched captions\)/)).toBeInTheDocument();
   expect(editorDetails().open).toBe(false);
   expect(screen.getByLabelText('Manual display name for Speaker A')).toHaveValue('Dana Ortiz');
   expect(screen.getByRole('button', { name: 'Save names' })).toBeDisabled();
