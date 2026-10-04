@@ -122,13 +122,14 @@ npm run check:secret-scan && npm run check:secret-scan:self-test              # 
 npm run check:scaffolding-tokens && npm run check:scaffolding-tokens:self-test  # no leaked tool-call scaffolding tags (bare-line </content>/</invoke>/antml:*) in tracked files
 npm run check:harness-framing && npm run check:harness-framing:self-test        # active harness wording stays expert/procedural; rationale lives in sidecars/backups
 npm run check:j27-register && npm run check:j27-register:self-test            # advisory: J27 marker tags name real register ids; register sites still contain their excerpts
+npm run check:transcription-pilot-deployment && npm run check:transcription-pilot-deployment:self-test # transcription pilot deployment configuration parity
 npm run check:memory-drift:no-write                                            # advisory: memory↔code drift (read-only)
 npm run check:memory-drift                                                     # advisory: default memory↔code drift check
 npm run check:memory-health                                                    # advisory: active-memory hygiene worklist (shadow-atlas/weak-basis/no-recall-rule/oversize/stale-routed); never fails
 npm run check:types                                                            # type check over the repo (no self-test)
 ```
 
-**This list is the full set as of 2026-07-11. Before running, `grep '"check:' package.json` — if a `check:*` script exists that is NOT above (and is not a `:self-test` of one already listed), run it too and add it here.** That keeps the list from silently going stale as gates are added. Skip silently only if NONE of these scripts is defined (not every project has them); do not skip a gate that IS defined.
+**This list is the full set as of 2026-10-04. Before running, `grep '"check:' package.json` — if a `check:*` script exists that is NOT above (and is not a `:self-test` of one already listed), run it too and add it here.** That keeps the list from silently going stale as gates are added. Skip silently only if NONE of these scripts is defined (not every project has them); do not skip a gate that IS defined.
 
 **Router notice:** if `check:memory-router` prints the routine-audit notice
 (router at/over the 8 KiB trigger), surface it in the Step 4 summary and
