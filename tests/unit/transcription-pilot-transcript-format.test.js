@@ -1,5 +1,5 @@
 import {
-  formatTranscriptMinuteHeading, formatTranscriptText, formatTranscriptTurnTime, formatTranscriptVtt,
+  applySpeakerReassignments, formatTranscriptMinuteHeading, formatTranscriptText, formatTranscriptTurnTime, formatTranscriptVtt,
   getTranscriptSpeakers, groupTranscriptByMinute, groupTranscriptByTurn, normalizeSpeakerNames,
   normalizeUtteranceWordTimings, TRANSCRIPT_FORMATTER_VERSION, TRANSCRIPT_FORMATTER_VERSIONS,
 } from '../../lib/services/transcription-pilot/transcript-format';
@@ -177,5 +177,30 @@ describe('formatter v3: one paragraph per speaker turn (owner decision 2026-10-0
   test('plain text fallback and control-character scrubbing still apply', () => {
     expect(formatTranscriptText({ text: 'Only\u0007 text', utterances: [] })).toBe('Only  text\n');
     expect(formatTranscriptText({ utterances: [{ start: 0, end: 5, speaker: 'A', text: 'Line\nbreak' }] })).toBe('[00:00] Speaker A: Line break\n');
+  });
+});
+
+describe('applySpeakerReassignments', () => {
+  const content = { text: '', utterances: [
+    { speaker: 'A', start: 0, end: 5000, text: 'first' }, { speaker: 'D', start: 5000, end: 5400, text: 'Right.' }, { speaker: 'A', start: 5500, end: 9000, text: 'third' },
+  ] };
+
+  test('returns a new content with the reassigned speaker and leaves the input untouched', () => {
+    const out = applySpeakerReassignments(content, { 1: 'A' });
+    expect(out.utterances.map((u) => u.speaker)).toEqual(['A', 'A', 'A']);
+    expect(content.utterances[1].speaker).toBe('D');
+    expect(out).not.toBe(content);
+  });
+
+  test('ignores bad indices, unknown speaker IDs, same-speaker entries and malformed maps', () => {
+    expect(applySpeakerReassignments(content, { 9: 'A', '-1': 'A', x: 'A', 1: 'Z', 0: 'A' })).toBe(content);
+    expect(applySpeakerReassignments(content, null)).toBe(content);
+    expect(applySpeakerReassignments(content, ['A'])).toBe(content);
+    expect(applySpeakerReassignments(null, { 1: 'A' })).toBeNull();
+  });
+
+  test('turn grouping then merges the reassigned word into the surrounding paragraph', () => {
+    expect(formatTranscriptText(applySpeakerReassignments(content, { 1: 'A' }), { A: 'Andrea Balbas' }))
+      .toBe('[00:00] Andrea Balbas: first Right. third\n');
   });
 });

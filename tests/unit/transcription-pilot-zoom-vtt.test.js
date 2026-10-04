@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
-  ZOOM_ALIGNMENT_DEFAULTS, buildAlignmentPrior, computeNameSupport, parseZoomVtt, sampleAlignmentPairs, zoomDisplayName, zoomDisplayNames,
+  ZOOM_ALIGNMENT_DEFAULTS, buildAlignmentPrior, computeNameSupport, parseZoomVtt, reassignShortUtterances, sampleAlignmentPairs, zoomDisplayName, zoomDisplayNames,
   scoreTextMatch, tokenizeTranscriptText, verifyAlignmentVerdict,
 } from '../../lib/services/transcription-pilot/zoom-vtt';
 
@@ -967,5 +967,120 @@ describe('zoomDisplayNames (collision-aware, Codex review 2026-10-04)', () => {
   test('the same original name verified on two speaker IDs is not a collision', () => {
     const map = zoomDisplayNames(['Lee, Jordan', 'Lee, Jordan']);
     expect(map.get('Lee, Jordan')).toBe('Jordan Lee');
+  });
+});
+
+describe('reassignShortUtterances (misdiarized one-word utterances, owner decision 2026-10-04)', () => {
+  // Andrea (A) talks 0-10 s under one Zoom cue; the diarizer hands "Right." at 5 s to D.
+  const base = () => ({
+    utterances: [
+      { speaker: 'A', start: 0, end: 5000, text: 'the pockets are ablated quickly between measurements' },
+      { speaker: 'D', start: 5000, end: 5400, text: 'Right.' },
+      { speaker: 'A', start: 5500, end: 10_000, text: 'usually fifteen seconds between each ablation' },
+      { speaker: 'D', start: 20_000, end: 26_000, text: 'a longer independent remark from the other speaker' },
+    ],
+    cues: [cue(0, 10_000, AVERY, 'the pockets are ablated quickly right usually fifteen seconds between each ablation'),
+      cue(20_000, 26_000, JORDAN, 'a longer independent remark from the other speaker')],
+    applied: { A: AVERY, D: JORDAN },
+  });
+
+  test('reassigns the short utterance to the captioned neighbouring speaker', () => {
+    const { utterances, cues, applied } = base();
+    const result = reassignShortUtterances(utterances, cues, applied);
+    expect(result).toEqual({ reassigned: { 1: 'A' }, considered: 1, reassignedCount: 1 });
+  });
+
+  test('Codex counterexamples: proximity without containment, or containment without the word, never reassigns', () => {
+    // Edward says "No." in a 200 ms gap after Andrea's cue ends: not contained -> untouched.
+    const gap = base();
+    gap.cues[0] = cue(0, 5000, AVERY, 'the pockets are ablated quickly');
+    gap.utterances[1] = { speaker: 'D', start: 5200, end: 5400, text: 'No.' };
+    expect(reassignShortUtterances(gap.utterances, gap.cues, gap.applied).reassigned).toEqual({});
+    // Contained in Andrea's cue, but Zoom never captioned the content word "no" -> untouched (uncaptioned dial-in case).
+    const missing = base();
+    missing.utterances[1] = { speaker: 'D', start: 5000, end: 5400, text: 'No.' };
+    expect(reassignShortUtterances(missing.utterances, missing.cues, missing.applied).reassigned).toEqual({});
+    // Control: the captioned "Right." still moves.
+    const ok = base();
+    expect(reassignShortUtterances(ok.utterances, ok.cues, ok.applied).reassigned).toEqual({ 1: 'A' });
+  });
+
+  test('Codex round 2: two cues with a silent gap do not bridge an uncaptioned utterance; adjacent or overlapping cues do', () => {
+    // Alice: 'No further questions' 0-4900, 'Thank you' 5500-10000. Bob's 'No.' at 5000-5400 sits in the 600 ms gap.
+    const gap = base();
+    gap.cues[0] = cue(0, 4900, AVERY, 'no further questions');
+    gap.cues.push(cue(5500, 10_000, AVERY, 'thank you'));
+    gap.utterances[1] = { speaker: 'D', start: 5000, end: 5400, text: 'No.' };
+    expect(reassignShortUtterances(gap.utterances, gap.cues, gap.applied).reassigned).toEqual({});
+    // Same words captioned, but the cues are adjacent (300 ms gap, within tolerance): covered -> moves.
+    gap.cues[0] = cue(0, 5200, AVERY, 'no further questions');
+    expect(reassignShortUtterances(gap.utterances, gap.cues, gap.applied).reassigned).toEqual({ 1: 'A' });
+    // Edge allowance is capped at half the utterance: a 500 ms 'Right.' overhanging the cue end by
+    // 200 ms passes; a 700 ms one overhanging by 400 ms (more than half uncaptioned) fails.
+    const edge = base();
+    edge.utterances[1] = { speaker: 'D', start: 9700, end: 10_200, text: 'Right.' };
+    edge.utterances[2] = { speaker: 'A', start: 10_500, end: 12_000, text: 'and so on' };
+    expect(reassignShortUtterances(edge.utterances, edge.cues, edge.applied).reassigned).toEqual({ 1: 'A' });
+    edge.utterances[1] = { speaker: 'D', start: 9700, end: 10_400, text: 'Right.' };
+    expect(reassignShortUtterances(edge.utterances, edge.cues, edge.applied).reassigned).toEqual({});
+  });
+
+  test('a one-word answer in the pause after a question is not a backchannel and stays put', () => {
+    // Alice asks, her caption ENDS, Bob says 'Yes.' in the pause, Alice resumes under a new caption.
+    const qa = base();
+    qa.cues[0] = cue(0, 4800, AVERY, 'do you approve the proposed grant');
+    qa.cues.push(cue(5600, 10_000, AVERY, 'then we can proceed'));
+    qa.utterances[1] = { speaker: 'D', start: 5000, end: 5400, text: 'Yes.' };
+    expect(reassignShortUtterances(qa.utterances, qa.cues, qa.applied).reassigned).toEqual({});
+  });
+
+  test('evaluative words are not backchannels: they need captioned evidence', () => {
+    const ev = base();
+    ev.cues[0] = cue(0, 10_000, AVERY, 'the pockets are ablated quickly usually fifteen seconds between each ablation');
+    for (const word of ['Correct.', 'Absolutely.', 'Good.', 'Great.']) {
+      ev.utterances[1] = { speaker: 'D', start: 5000, end: 5400, text: word };
+      expect(reassignShortUtterances(ev.utterances, ev.cues, ev.applied).reassigned).toEqual({});
+    }
+  });
+
+  test('a backchannel moves on containment alone even when Zoom dropped it (the 41:25 case); content words need captioning', () => {
+    const dropped = base();
+    dropped.cues[0] = cue(0, 10_000, AVERY, 'the pockets are ablated quickly usually fifteen seconds between each ablation'); // no "right"
+    expect(reassignShortUtterances(dropped.utterances, dropped.cues, dropped.applied).reassigned).toEqual({ 1: 'A' });
+    dropped.utterances[1].text = 'Yeah, okay.';
+    expect(reassignShortUtterances(dropped.utterances, dropped.cues, dropped.applied).reassigned).toEqual({ 1: 'A' });
+    dropped.utterances[1].text = 'Right, usually!'; // "usually" is a content word and IS captioned
+    expect(reassignShortUtterances(dropped.utterances, dropped.cues, dropped.applied).reassigned).toEqual({ 1: 'A' });
+    dropped.utterances[1].text = 'Right, wait'; // "wait" is a content word Zoom did not caption
+    expect(reassignShortUtterances(dropped.utterances, dropped.cues, dropped.applied).reassigned).toEqual({});
+  });
+
+  test('a genuine interjection with its own Zoom cue is left alone (two names caption that moment)', () => {
+    const { utterances, cues, applied } = base();
+    cues.push(cue(5000, 5400, JORDAN, 'right'));
+    expect(reassignShortUtterances(utterances, cues, applied).reassigned).toEqual({});
+  });
+
+  test('left alone when the captioned name is applied to two speaker IDs, or to none, or is already this speaker', () => {
+    const { utterances, cues, applied } = base();
+    expect(reassignShortUtterances(utterances, cues, { ...applied, C: AVERY }).reassigned).toEqual({});
+    expect(reassignShortUtterances(utterances, cues, { D: JORDAN }).reassigned).toEqual({});
+    utterances[1].speaker = 'A';
+    expect(reassignShortUtterances(utterances, cues, applied).reassigned).toEqual({});
+  });
+
+  test('left alone when neither time neighbour belongs to the captioned speaker', () => {
+    const { utterances, cues, applied } = base();
+    utterances[0].speaker = 'B'; utterances[2].speaker = 'B';
+    expect(reassignShortUtterances(utterances, cues, { ...applied, B: RILEY }).reassigned).toEqual({});
+  });
+
+  test('utterances above the word limit are not considered; the count cap holds', () => {
+    const { utterances, cues, applied } = base();
+    utterances[1].text = 'Right, that is what I meant';
+    expect(reassignShortUtterances(utterances, cues, applied)).toMatchObject({ considered: 0, reassignedCount: 0 });
+    const { utterances: u2, cues: c2, applied: a2 } = base();
+    u2.push({ speaker: 'D', start: 5410, end: 5450, text: 'Yes.' });
+    expect(reassignShortUtterances(u2, c2, a2, { reassignMaxCount: 1 }).reassignedCount).toBe(1);
   });
 });

@@ -309,3 +309,23 @@ describe('Meeting Tracker Zoom transcript upload and start', () => {
     expect(store.queueMeetingTranscriptionJob).not.toHaveBeenCalled();
   });
 });
+
+describe('getMeetingTranscriptionJobContent applies recorded short-utterance reassignments', () => {
+  const crypto = require('node:crypto');
+  const runtime = require('../../lib/services/transcription-pilot/runtime');
+
+  it('rewrites the reassigned utterance speaker for every consumer without touching the stored bytes', async () => {
+    const raw = JSON.stringify({ text: '', utterances: [
+      { speaker: 'A', start: 0, end: 5000, text: 'first' }, { speaker: 'D', start: 5000, end: 5400, text: 'Right.' }, { speaker: 'A', start: 5500, end: 9000, text: 'third' },
+    ] });
+    const buffer = Buffer.from(raw);
+    const row = { id: 'job-1', status: 'ready', output_pathname: 'private/output.json', expires_at: new Date(Date.now() + 86_400_000),
+      output_sha256: crypto.createHash('sha256').update(buffer).digest('hex'), speaker_alignment: { status: 'applied', reassigned: { 1: 'A' }, reassignedCount: 1 } };
+    store.getMeetingTranscriptionJob.mockResolvedValue(row);
+    process.env.UPLOADS_BLOB_RW_TOKEN = 'token';
+    get.mockResolvedValueOnce({ statusCode: 200, stream: ReadableStream.from([buffer]), blob: {} });
+    const { content } = await runtime.getMeetingTranscriptionJobContent({ requestId: 'r', siteVisitActivityId: 's', jobId: 'job-1' });
+    expect(content.utterances.map((u) => u.speaker)).toEqual(['A', 'A', 'A']);
+    expect(JSON.parse(raw).utterances[1].speaker).toBe('D');
+  });
+});

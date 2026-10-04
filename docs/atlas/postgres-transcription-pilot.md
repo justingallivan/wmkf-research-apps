@@ -40,8 +40,11 @@ input path. Alignment runs after ready under the job's existing lease
 recovery); while the lease is held, the speaker PATCH and publication freeze
 return 409. `speaker_alignment` is projected through an allowlist (status,
 attempts, code, per-speaker name, confidence and `basis` of `model` or `support`,
-suggestions, and per-speaker `reasons` codes for IDs not applied; added 2026-10-04)
-and never exposes a pathname. Local PostgreSQL 16 integration suites cover the fences (37 cases).
+suggestions, per-speaker `reasons` codes for IDs not applied, and `reassignedCount`;
+added 2026-10-04) and never exposes a pathname. `speaker_alignment.reassigned`
+(`{ utteranceIndex: speakerId }`) records Zoom-evidence reassignment of short
+misdiarized utterances; `getMeetingTranscriptionJobContent` applies it at the
+content read for every consumer and the transcript Blob is never rewritten. Local PostgreSQL 16 integration suites cover the fences (37 cases).
 Production enablement completed 2026-10-04: migration 065 applied, runtime merged
 as `c99f8d966`, and the `meeting-transcript.speaker-alignment` prompt row seeded
 (v1, `sonnet` tier); the first rehearsal ran on Request 1003222 the same day.

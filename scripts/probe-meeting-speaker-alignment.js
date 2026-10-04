@@ -207,6 +207,19 @@ const decide = (verdict, label) => {
 decide({}, 'model abstains on all');
 decide(Object.fromEntries(Object.entries(fullSupport).map(([id, e]) => { const top = Object.entries(e).sort((a, b) => b[1].count - a[1].count)[0]; return [id, top ? { name: top[0], confidence: 0.9, pairIds: top[1].pairIds.slice(0, 1) } : null]; })), 'model agrees with each dominant name at 0.9');
 
+// Short-utterance reassignment the current code would record for this job (Zoom evidence).
+console.log('\n== Short-utterance reassignment (<= ' + D.reassignMaxWords + ' words, tolerance ' + D.reassignToleranceMs + ' ms) ==');
+{
+  const dominantZoom = Object.fromEntries(Object.entries(fullSupport).map(([id, e]) => [id, Object.entries(e).sort((a, b) => b[1].count - a[1].count)[0]?.[0]]).filter(([, n]) => n));
+  const { reassigned, considered, reassignedCount } = zoom.reassignShortUtterances(utterances, parsed.cues, dominantZoom, D);
+  console.log(`  short utterances considered ${considered}; reassigned ${reassignedCount}`);
+  const byPair = new Map();
+  for (const [idx, to] of Object.entries(reassigned)) { const k = `${utterances[Number(idx)].speaker}->${to}`; byPair.set(k, (byPair.get(k) || 0) + 1); }
+  console.log('  by speaker pair: ' + ([...byPair].map(([k, n]) => `${k}×${n}`).join(', ') || '—'));
+  const fmt = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, '0')}`;
+  console.log('  first ten: ' + Object.entries(reassigned).slice(0, 10).map(([idx, to]) => { const u = utterances[Number(idx)]; return `#${idx} ${fmt(u.start)} ${u.speaker}->${to} (${u.text.trim().split(/\s+/).length}w)`; }).join('; '));
+}
+
 for (const [mcw, ov] of [[4, 0.5], [3, 0.5], [3, 0.4], [2, 0.5]]) {
   console.log(`\n== Counterfactual support (minContentWords ${mcw}, overlap ${ov}) ==\n    ` + table(zoom.computeNameSupport(visible, utterances, parsed.names, { ...D, minContentWords: mcw, minTokenOverlap: ov })));
 }
