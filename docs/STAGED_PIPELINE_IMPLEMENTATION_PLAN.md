@@ -10,8 +10,8 @@ owner: product-engineering
 related:
   - docs/STAGED_REVIEW_PIPELINE.md
   - scripts/setup-database.js
-  - shared/config/prompts/virtual-review-panel.js
-  - lib/services/panel-review-service.js
+  - _archived/shared/config/prompts/virtual-review-panel.js
+  - _archived/lib/services/panel-review-service.js
 ---
 
 # Staged Proposal Review Pipeline — App Implementation Plan
@@ -30,7 +30,7 @@ Strategy: build as interactive apps first (matching existing app patterns), test
 
 2. **Proposal Pipeline** — Orchestration dashboard for all 3 stages. Tracks proposals through screening → intelligence → panel review, with staff decision points between stages. Stage 3 delegates to the existing `PanelReviewService` (links to `panel_reviews` table, doesn't duplicate).
 
-The existing **Virtual Review Panel** stays unchanged — the Pipeline links to it for Stage 3.
+(Superseded 2026-10-04: the legacy Virtual Review Panel was retired and archived; a Stage 3 link would target the successor Review Panel.)
 
 ---
 
@@ -93,7 +93,7 @@ Indexes on user_profile_id, overall_status, current_stage, stage3_panel_review_i
 
 Extract `_runIntelligencePass` from `PanelReviewService` (lines 449-548) into a standalone method in `PipelineService.runIntelligencePass()`. Update `PanelReviewService._runIntelligencePass` to delegate to it. This is a pure extraction — same code, same behavior, shared between both apps.
 
-Reuses existing prompts from `shared/config/prompts/virtual-review-panel.js` (claim extraction, collation, synthesis, assembleIntelligenceBlock) unchanged.
+Reuses prompts from `_archived/shared/config/prompts/virtual-review-panel.js` (archived with the legacy panel 2026-10-04) (claim extraction, collation, synthesis, assembleIntelligenceBlock) unchanged.
 
 **Test:** Run Virtual Review Panel with intelligence pass enabled, confirm identical behavior.
 

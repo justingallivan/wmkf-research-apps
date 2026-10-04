@@ -33,7 +33,7 @@ Three amplifiers push the ROI higher than raw per-call savings suggest:
 
 1. **Expensive models.** When we move deeper-touch workflows to Opus or extended-thinking models, per-token cost is 5–10× Sonnet. Context savings matter correspondingly more. A compliance screen on a 5-page PDF with images might be $0.25 under Opus; against pre-extracted context, $0.03.
 
-2. **Multi-LLM panel work.** Virtual Review Panel calls Claude + GPT + Gemini + Perplexity per stage. If we give each provider the full proposal, context cost is 4× per stage. If we give them pre-extracted structured context, the saving multiplies by the provider count. Panel runs are already 343 calls/year and growing.
+2. **Multi-LLM panel work.** The legacy Virtual Review Panel (retired 2026-10-04) called Claude + GPT + Gemini + Perplexity per stage. If we give each provider the full proposal, context cost is 4× per stage. If we give them pre-extracted structured context, the saving multiplies by the provider count. Panel runs are already 343 calls/year and growing.
 
 3. **Chain depth.** Any one proposal advancing to deep-dive may hit 5–10 downstream calls (reviewer match, panel claim-verification, panel structured-review, panel devil's-advocate, panel synthesis, compliance, staff Q&A). At 7K vs. 1.5K per call × 8 calls, that's ~44K tokens saved per advancing proposal.
 

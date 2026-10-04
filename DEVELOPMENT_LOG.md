@@ -10,6 +10,16 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Legacy Virtual Review Panel retired (Session 573)
+
+**Milestone:** The original multi-LLM Virtual Review Panel app is retired; the source-built Review Panel is the only panel app.
+**Sessions:** 573 (owner decision 2026-10-04, branch `feature/retire-legacy-virtual-review-panel`).
+**Ship state:**
+- Page, SSE API route, `panel-review-service.js`, `literature-search-service.js`, prompt file and output schema moved to `_archived/` (mirrored paths); four legacy test suites deleted; `APP_LIFECYCLE_REGISTRY['virtual-review-panel']` recorded as `deprecated` with successor `review-panel`.
+- Retained: `panel_reviews` / `panel_review_items` history, existing user grants, `multi-llm-service.js` and `lib/utils/vrp-providers.js` (provider vocabulary for the successor), `VRP_ALLOWED_PROVIDERS`.
+**Why it matters:** Removes the last Claude consumer that read a provider refusal as ordinary text on the `sonnet` tier, and ends the maintenance of two panel apps.
+**Pointers:** `docs/VIRTUAL_REVIEW_PANEL.md` (historical); `_archived/README.md`; `docs/audits/SONNET_55_CONSUMER_INVENTORY_2026-10-04.md` (branch `audit/sonnet-55-consumer-inventory`).
+
 ## October 2026 — Zoom caption speaker alignment and transcript readability in Production (Session 572)
 
 **Milestone:** Meeting Tracker transcripts name their speakers automatically from the Zoom caption file and read as one paragraph per speaker turn.

@@ -1,26 +1,30 @@
 ---
 name: Virtual Review Panel
-description: Multi-LLM review panel app — Claude, GPT, Gemini, Perplexity independently review proposals against WMKF reviewer form, then Claude synthesizes
+description: RETIRED 2026-10-04 (S573) — legacy multi-LLM review panel app, archived to _archived/; was Claude, GPT, Gemini, Perplexity independently review proposals against WMKF reviewer form, then Claude synthesizes
 type: project
-status: active
+status: closed
 scope: reviewer
-last_verified: 2026-07-27 via panel route/service, provider gate, migration 003, and current VRP doc
+last_verified: 2026-10-04 via retirement commit (S573)
 ---
+
+## Retirement (2026-10-04, Session 573)
+
+Owner decision. The page, SSE API route, panel-review service, literature-search service, prompt file and output schema moved to mirrored paths under `_archived/`: `_archived/pages/virtual-review-panel.js`, `_archived/pages/api/virtual-review-panel.js`, `_archived/lib/services/panel-review-service.js`, `_archived/lib/services/literature-search-service.js`, `_archived/shared/config/prompts/virtual-review-panel.js`, `_archived/shared/config/virtual-review-panel-output-schema.js`. `APP_LIFECYCLE_REGISTRY['virtual-review-panel']` is `deprecated`, successor `review-panel`. `panel_reviews` / `panel_review_items` and existing grants retained. `multi-llm-service.js` and `lib/utils/vrp-providers.js` stay live for the successor. Everything below is historical.
 
 ## Recall Rule
 
-Read this when: working on the Virtual Review Panel app, its multi-LLM pipeline, or its provider gating.
+Read this when: someone asks about the legacy Virtual Review Panel, its archived pipeline, or the `panel_reviews` history tables. For live work use the Review Panel wiki topic.
 
 Do:
 - Use app key `virtual-review-panel`; access is granted via admin dashboard (NOT in DEFAULT_APP_GRANTS).
 - Honor `VRP_ALLOWED_PROVIDERS` (intersected with configured keys, fail-closed if unset, must include `claude`) via `lib/utils/vrp-providers.js`.
-- Reference key files: `multi-llm-service.js`, `panel-review-service.js`, `shared/config/prompts/virtual-review-panel.js`, the SSE route + page.
+- Reference key files (archived): `_archived/lib/services/panel-review-service.js`, `_archived/shared/config/prompts/virtual-review-panel.js`, the archived SSE route + page; `multi-llm-service.js` is still live.
 
 Do not:
 - Cite a "V24"/`024` migration — the real file is `lib/db/migrations/003_virtual_review_panel.sql`.
 - Repeat the stale "not yet tested end-to-end" line — it's live and iterated through late-May 2026.
 
-Ground truth: `docs/VIRTUAL_REVIEW_PANEL.md`; `pages/api/virtual-review-panel.js`, `lib/utils/vrp-providers.js`.
+Ground truth: `docs/VIRTUAL_REVIEW_PANEL.md` (historical); `_archived/pages/api/virtual-review-panel.js`, `lib/utils/vrp-providers.js`.
 
 ## Virtual Review Panel App
 
@@ -39,10 +43,10 @@ New app (Session 91) that creates a virtual review panel using 3-4 LLMs to indep
 
 ### Key Files
 - `lib/services/multi-llm-service.js` — Unified interface for 4 LLM APIs (Claude, OpenAI, Gemini, Perplexity)
-- `lib/services/panel-review-service.js` — DB CRUD + pipeline orchestration
-- `shared/config/prompts/virtual-review-panel.js` — Stage 1, Stage 2, and synthesis prompts
-- `pages/api/virtual-review-panel.js` — SSE streaming API route
-- `pages/virtual-review-panel.js` — Frontend with provider selection, progress, results
+- `_archived/lib/services/panel-review-service.js` — DB CRUD + pipeline orchestration (archived)
+- `_archived/shared/config/prompts/virtual-review-panel.js` — Stage 1, Stage 2, and synthesis prompts (archived)
+- `_archived/pages/api/virtual-review-panel.js` — SSE streaming API route (archived)
+- `_archived/pages/virtual-review-panel.js` — Frontend with provider selection, progress, results (archived)
 
 ### Environment Variables (New)
 - `OPENAI_API_KEY` — required for GPT reviewer

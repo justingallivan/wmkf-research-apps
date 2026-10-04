@@ -41,7 +41,7 @@ update_triggers:
 
 # Review Panel (Phase A foundation)
 
-**Do not confuse with `docs/VIRTUAL_REVIEW_PANEL.md`'s app** (`virtual-review-panel` key, `MultiLLMService`-based, still live — D5 says unchanged, no retirement work in Phase A). This is a **separate, source-built successor** (app key `review-panel`) on the governed Executor.
+**Do not confuse with `docs/VIRTUAL_REVIEW_PANEL.md`'s app** (`virtual-review-panel` key, `MultiLLMService`-based — **retired 2026-10-04 by owner decision in S573, superseding Phase A decision D5**; page/route/service archived to `_archived/`, tables and grants retained). This is a **separate, source-built successor** (app key `review-panel`) on the governed Executor.
 
 ## Files
 

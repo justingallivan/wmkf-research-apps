@@ -62,7 +62,7 @@ changes that policy.
 | `CRON_SECRET` | Authenticates `/api/cron/*` endpoints | Self-generated (`openssl rand -base64 32`) | Required for cron jobs (secret-check, retraction-watch, Cycle Dossier drain, etc.). Cycle Dossier and the strict drain verifier require the bearer in every environment; the shared verifier retains its existing local-development bypass for other routes. |
 | `EXTERNAL_LINK_SECRET` | HMAC-signs external JWTs (`/api/external/*`); in Preview it also derives authenticated-encryption keys for the disposable presentation-media upload permit and proof-token subject | Self-generated (32+ chars; `openssl rand -base64 32`) | **Must be separate from `NEXTAUTH_SECRET`**; read by `lib/services/external-token.js` and the Preview-only presentation proof service. Rotatable without breaking durable live links — see [Rotating EXTERNAL_LINK_SECRET](#rotating-external_link_secret). A rotation intentionally invalidates any in-flight disposable proof permit/token; clean up its exact test item before rotating. |
 | `EXTERNAL_LINK_SECRET_PREVIOUS` | Outgoing `EXTERNAL_LINK_SECRET` value during a rotation window | The previous `EXTERNAL_LINK_SECRET` | **Optional** — set only while rotating. `verifyToken` also accepts tokens signed with it; `mintToken` never uses it. Clear once all old tokens have expired. |
-| `VRP_ALLOWED_PROVIDERS` | Comma-separated allowlist for Virtual Review Panel | Manual (e.g., `claude,openai,gemini`) | Must include `claude`. Production fails closed if unset. Intersects with configured API keys |
+| `VRP_ALLOWED_PROVIDERS` | Comma-separated provider allowlist read by `lib/utils/vrp-providers.js` for the Review Panel (`review-panel`); the legacy Virtual Review Panel it was named for retired 2026-10-04 | Manual (e.g., `claude,openai,gemini`) | Must include `claude`. Production fails closed if unset. Intersects with configured API keys |
 | `IRS_VERIFY_SECRET` | Authenticates PowerAutomate calls to `/api/irs/verify-ein` | Self-generated (32+ chars; `openssl rand -base64 32`) | **Must be separate from `CRON_SECRET`** — PA is not a Vercel cron. Sent by PA in the `x-irs-verify-secret` request header. |
 
 ### Optional — Applicant Intake Portal (dual-provider auth)
@@ -77,12 +77,12 @@ The `/apply/*` intake portal authenticates against a separate Entra External ID 
 
 ### Optional — Virtual Review Panel (multi-LLM)
 
-Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which are exposed to the panel.
+Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which are exposed to the Review Panel.
 
 | Variable | Purpose | Source |
 |----------|---------|--------|
 | `OPENAI_API_KEY` | GPT panel reviewer and the shared Executor provider seam (explicit per-call opt-in only) | [OpenAI Platform](https://platform.openai.com/api-keys) | **[VERIFIED 2026-09-13 via `vercel env ls`]** Set as a Secret in Production for the Review Panel OpenAI seat; `VRP_ALLOWED_PROVIDERS=claude,openai` set the same day. | `GOOGLE_AI_API_KEY` | Gemini panel reviewer | [Google AI Studio](https://aistudio.google.com/) |
-| `PERPLEXITY_API_KEY` | Perplexity — VRP panel reviewer (sonar claim verification) AND reviewer-finder web discovery (Search API, Track C). Live in prod 2026-06-05. Same key, two surfaces; setting it also makes `perplexity` a *configured* VRP provider — gate VRP exposure with `VRP_ALLOWED_PROVIDERS`. | [Perplexity API](https://docs.perplexity.ai/) |
+| `PERPLEXITY_API_KEY` | Perplexity — reviewer-finder web discovery (Search API, Track C); formerly also the legacy VRP panel reviewer (sonar claim verification), retired 2026-10-04. Live in prod 2026-06-05. Same key, two surfaces; setting it also makes `perplexity` a *configured* VRP provider — gate VRP exposure with `VRP_ALLOWED_PROVIDERS`. | [Perplexity API](https://docs.perplexity.ai/) |
 
 ### Vercel-Managed (Auto-configured)
 
@@ -589,7 +589,7 @@ Canonical list lives in `lib/utils/tracked-secrets.js` — both `pages/api/cron/
 | `openai_api_key` | OpenAI API Key (Executor provider seam; opt-in) | vendor | No assumed vendor expiry; rotate on compromise or staff offboarding and update every enabled runtime environment |
 | `openalex_api_key` | OpenAlex API Key | vendor | Authenticated request credential; rotate on compromise and update every runtime environment |
 | `cloudmersive_api_key` | Cloudmersive API Key (virus scan; gated by VIRUS_SCAN_ENABLED) | vendor | Pilot uses free tier (800 scans/mo); rotate on compromise |
-| `perplexity_api_key` | Perplexity API Key (VRP sonar claim-verification + reviewer web discovery) | vendor | No vendor expiry, but rotate on compromise or staff offboarding. Live in prod 2026-06-05; one key, two surfaces (set `VRP_ALLOWED_PROVIDERS` to gate VRP exposure). |
+| `perplexity_api_key` | Perplexity API Key (reviewer web discovery; legacy VRP claim-verification use retired 2026-10-04) | vendor | No vendor expiry, but rotate on compromise or staff offboarding. Live in prod 2026-06-05; one key, two surfaces (set `VRP_ALLOWED_PROVIDERS` to gate VRP exposure). |
 | `assemblyai_api_key` | AssemblyAI transcription API key (pilot) | vendor | Vendor-issued; rotate via AssemblyAI account controls and update all intentionally enabled runtime environments. Production Secret presence and one successful provider transcription verified 2026-10-02 PT. |
 | `blob_read_write_token` | Vercel Blob RW Token (shared store) | blob | Vercel-issued; no expiry; rotate via Vercel dashboard if compromised |
 | `dvx_blob_rw_token` | Vercel Blob RW Token (dvx-export-private) | blob | Same as above |

@@ -242,7 +242,7 @@ application/operational stores whose current Atlas pages keep them there.
 | `grant_cycles` | Shared | Grant cycle definitions | drain-only post-W3; explicitly kept by migration 018; Dataverse `wmkf_appgrantcycle` is source of truth |
 | `integrity_screenings` | Per-user | Screening history | Postgres-only (not yet migrated) |
 | `screening_dismissals` | Per-user | False positive dismissals | Postgres-only (not yet migrated) |
-| `panel_reviews` | Per-user | Virtual review panel results | Postgres-only (not yet migrated) |
+| `panel_reviews` | Per-user | Legacy virtual review panel results (app retired 2026-10-04; table retained) | Postgres-only (not yet migrated) |
 | `expertise_roster` | Shared | Internal reviewer/consultant/board roster (38+ entries) | Postgres-only (not yet migrated) |
 | `expertise_matches` | Per-user | AI proposal-to-reviewer matching history | Postgres-only (not yet migrated) |
 

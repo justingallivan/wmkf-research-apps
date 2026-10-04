@@ -185,11 +185,11 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`shared/utils/graph-browser-upload.js`** — Shared browser-direct Graph transport with a code-owned 10 MiB default, strict sequential range validation, status-aware bounded network/5xx/416/429 recovery, stall and response watchdogs, confirmed-versus-in-flight progress, sampled throughput/ETA, graceful pause, offline wait, reconnect status authorization, lifecycle abort, and same-browser locking. Both Preview proof and durable producer adapters use this byte path without sharing authorization state.
 - **`presentation-media-rate-limit.js`** — Dedicated fail-closed token/IP limiter for post-presentation Zoom/Graph resolution. It stores only hashed token bucket keys in `external_rate_limit`; database failure returns unavailable instead of bypassing the control.
 
-### Multi-LLM panel (Virtual Review Panel)
+### Multi-LLM panel (legacy Virtual Review Panel — retired 2026-10-04)
 
-- **`multi-llm-service.js`** — Claude / OpenAI / Gemini / Perplexity wrappers with normalized responses + retry/fan-out. Claude request shaping uses `model-capabilities.js`; Fable-style refusal metadata is surfaced in normalized results.
-- **`panel-review-service.js`** — VRP pipeline: optional pre-review intelligence → optional claim verification → structured review → synthesis. Persistence in `panel_reviews` / `panel_review_items`. See `docs/VIRTUAL_REVIEW_PANEL.md`.
-- **`literature-search-service.js`** — Stage 0 academic search orchestration; normalized results.
+- **`multi-llm-service.js`** — Claude / OpenAI / Gemini / Perplexity wrappers with normalized responses + retry/fan-out. Claude request shaping uses `model-capabilities.js`; Fable-style refusal metadata is surfaced in normalized results. Since the legacy panel retired (S573) `MultiLLMService.call` has no runtime caller; `getAvailableProviders()` is still used by `review-panel-generation.js`.
+- **`panel-review-service.js`** — archived 2026-10-04 to `_archived/lib/services/panel-review-service.js`. Was the legacy VRP pipeline (intelligence → claim verification → structured review → synthesis) writing `panel_reviews` / `panel_review_items`. See `docs/VIRTUAL_REVIEW_PANEL.md` (historical).
+- **`literature-search-service.js`** — archived 2026-10-04 to `_archived/lib/services/literature-search-service.js` (the legacy panel was its only importer).
 
 ### Research-database clients
 

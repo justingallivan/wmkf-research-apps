@@ -80,7 +80,7 @@ Key environment variables:
 - `USER_PREFS_ENCRYPTION_KEY` — 32-byte hex key for encrypting user preferences
 - `EXTERNAL_LINK_SECRET` — HMAC for external-reviewer magic-link JWTs (must be separate from `NEXTAUTH_SECRET`)
 - `CRON_SECRET` — authenticates `/api/cron/*` calls
-- `VRP_ALLOWED_PROVIDERS` — Virtual Review Panel provider allowlist (production fails closed if unset)
+- `VRP_ALLOWED_PROVIDERS` — Review Panel provider allowlist (production fails closed if unset); the legacy Virtual Review Panel it was named for retired 2026-10-04
 
 All secrets are configured in Vercel Environment Variables and are not stored in code. Full env-var inventory: `docs/CREDENTIALS_RUNBOOK.md`.
 

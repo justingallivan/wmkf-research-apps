@@ -2,19 +2,21 @@
 title: Virtual Review Panel
 domain: prompt-executor
 kind: spec
-status: active
-summary: Thin design / operations reference for the Virtual Review Panel app. Created S191 to receive content extracted from CLAUDE.md so the table-row...
-canonical: true
+status: historical
+summary: Retired 2026-10-04 (S573). Historical reference for the legacy multi-LLM Virtual Review Panel, now in _archived/; successor is the Review Panel.
+canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
 related:
   - shared/config/appRegistry.js
-  - pages/virtual-review-panel.js
-  - lib/services/panel-review-service.js
+  - _archived/pages/virtual-review-panel.js
+  - _archived/lib/services/panel-review-service.js
   - lib/services/multi-llm-service.js
 ---
 
 # Virtual Review Panel
+
+> **Retired 2026-10-04 (Session 573, owner decision).** The page, SSE API route, `panel-review-service.js`, `literature-search-service.js`, prompt file and output schema were moved to `_archived/` (mirrored paths). The `virtual-review-panel` key is recorded as `deprecated` in `APP_LIFECYCLE_REGISTRY`; `panel_reviews` / `panel_review_items` and existing user grants are retained. `multi-llm-service.js` and `lib/utils/vrp-providers.js` remain live for the successor. Everything below is historical.
 
 Thin design / operations reference for the Virtual Review Panel app. Created S191 to receive content extracted from CLAUDE.md so the table-row trim wouldn't drop load-bearing facts (notably the access posture).
 

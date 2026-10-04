@@ -168,7 +168,7 @@ hangs off events and state transitions:
    - *Status:* contract shipped (Vercel). The Phase I summary route plus live grantee, field-primer,
      and review services read prompts from Dataverse via the Executor; many other AI paths still use bundled in-repo prompts —
      which live in **three places** per the A7 surface taxonomy: `shared/config/prompts/`,
-     route-local, and service-local (e.g. `panel-review-service.js`). **Prompt migration is a named workstream, not a background detail.**
+     route-local, and service-local (e.g. the since-archived `panel-review-service.js`). **Prompt migration is a named workstream, not a background detail.**
      Migration is **demand-driven**: a prompt moves to Dataverse when it becomes **shared** (a second
      caller, esp. PA). *(Open fork: does staff-editability* also *force a Dataverse home, or only
      cross-surface sharing? — unresolved.)* The live application-definition count is
@@ -247,7 +247,7 @@ machinery even applies):
 | Shape | fixed prompt → defined output | open-ended chat / agent loop |
 | "Prompt" | canonical, shared, Dataverse, cached, audited | whatever the user types — no canonical prompt |
 | Output | Dataverse field / SharePoint doc (org memory) | ephemeral — in-app transcript / export / download |
-| Examples | Executor-backed proposal summary, grantee abstract/title, field primer, review synthesis | Integrity Screener; Virtual Review Panel; "consult LLM on this proposal"; NL CRM chat |
+| Examples | Executor-backed proposal summary, grantee abstract/title, field primer, review synthesis | Integrity Screener; legacy Virtual Review Panel (retired 2026-10-04); "consult LLM on this proposal"; NL CRM chat |
 | Governed by | Executor contract, prompt migration, dual-caller | context assembly + ephemerality only |
 
 **"Consult LLM" (Mode 2 exemplar + de-risking first slice — target-state):** in the Workbench the

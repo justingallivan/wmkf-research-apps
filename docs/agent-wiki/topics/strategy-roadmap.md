@@ -610,7 +610,7 @@ document inventory, and individual implementation plans do not establish priorit
   December 2026, exact date TBD (owner, 2026-09-06). See
   `docs/J27_TRANSITION_REGISTER.md` row J27-051.
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
-- Virtual Review Panel: `project-virtual-review-panel`.
+- Virtual Review Panel (legacy, retired 2026-10-04): `project-virtual-review-panel`.
 - Roadmap snapshots: `project-app-roadmap-2026-04-25`, `project-phase-i-summary-app-winddown`.
 - Phasing/cycle scoping: `project-grant-phasing-evolution`, `feedback-cycle-vs-executor-scope`, `feedback-concepts-vs-phase-i`. Every J27-sensitive site (retire / persist / change / build / scale) lives in `docs/J27_TRANSITION_REGISTER.md`; add there, not here.
 - J27 document-capture & Proposal-tab evolution (document identity/metadata →
