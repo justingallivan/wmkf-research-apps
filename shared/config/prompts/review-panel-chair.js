@@ -8,7 +8,7 @@
  * panel-summary shape. Publishing stays Claude-only (D8); the chair's model
  * is always Anthropic (enforced in snapshotConfiguration, not here).
  * Adapted from the retired interactive Virtual Review Panel's
- * createPanelSynthesisPrompt (shared/config/prompts/virtual-review-panel.js).
+ * createPanelSynthesisPrompt (archived 2026-10-04 to _archived/shared/config/prompts/virtual-review-panel.js).
  */
 import { REVIEW_PANEL_SEATS } from '../reviewPanelSeats';
 

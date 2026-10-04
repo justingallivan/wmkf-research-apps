@@ -53,7 +53,8 @@ export const BASE_CONFIG = {
     'email-personalization':       { model: 'haiku',  fallback: 'haiku' },
     'dynamics-explorer':           { model: 'haiku',  fallback: 'haiku' },
     'expertise-finder':            { model: 'sonnet', fallback: 'haiku' },
-    'virtual-review-panel':        { model: 'sonnet', fallback: 'haiku' },
+    // 'virtual-review-panel' retired 2026-10-04 (Session 573); legacy multi-LLM panel
+    // archived to /_archived. Successor is 'review-panel' below.
     'review-panel': {
       'seat.claude': 'claude-fable-5-1',
       'seat.openai': 'gpt-5.6-sol',

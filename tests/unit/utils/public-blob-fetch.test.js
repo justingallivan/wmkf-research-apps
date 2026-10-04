@@ -76,7 +76,7 @@ const directReaders = [
   'pages/api/expertise-finder/match.js', 'pages/api/evaluate-multi-perspective.js',
   'pages/api/process-phase-i-writeup.js', 'pages/api/process-peer-reviews.js',
   'pages/api/process-phase-i.js', 'pages/api/process.js',
-  'pages/api/reviewer-finder/analyze.js', 'pages/api/virtual-review-panel.js',
+  'pages/api/reviewer-finder/analyze.js',
   'lib/services/workbench/enrich-recommended-service.js',
   'lib/services/review-manager/send-emails-service.js',
   'lib/utils/uploaded-blob.js', 'pages/api/blob-proxy.js',

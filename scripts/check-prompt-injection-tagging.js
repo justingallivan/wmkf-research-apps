@@ -254,26 +254,6 @@ const SURFACES = [
     callSiteFiles: ['lib/services/integrity-service.js'],
   },
   {
-    id: 'virtual-review-panel',
-    inv: 15,
-    status: 'migrated',
-    promptFiles: ['shared/config/prompts/virtual-review-panel.js'],
-    callSiteFiles: ['pages/api/virtual-review-panel.js'],
-    // Call-site-granular: every builder must carry the preamble in its own
-    // body. `createPanelSynthesisPrompt` once had none — the 7 sibling
-    // builders masked it at the file level (Codex S176).
-    builders: [
-      'createClaimExtractionPrompt',
-      'createSearchCollationPrompt',
-      'createIntelligenceSynthesisPrompt',
-      'createClaimVerificationPrompt',
-      'createPerplexityClaimVerificationPrompt',
-      'createStructuredReviewPrompt',
-      'createDevilsAdvocatePrompt',
-      'createPanelSynthesisPrompt',
-    ],
-  },
-  {
     id: 'reviewer-finder-analyze',
     inv: 16,
     status: 'migrated',

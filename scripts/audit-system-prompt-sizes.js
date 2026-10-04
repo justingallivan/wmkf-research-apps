@@ -127,17 +127,6 @@ const MODEL = COUNT_MODEL;
     });
   }
 
-  // ── 5. virtual-review-panel ─────────────────────────────────────────────
-  {
-    const mod = await import('../shared/config/prompts/virtual-review-panel.js');
-    const sys = mod.SYSTEM_PROMPT || mod.default?.SYSTEM_PROMPT || '';
-    if (sys) {
-      rows.push({ app: 'virtual-review-panel', desc: 'SYSTEM_PROMPT constant', tokens: await countTokens(sys), hasCacheControl: false });
-    } else {
-      rows.push({ app: 'virtual-review-panel', desc: '(no SYSTEM_PROMPT export found — inspect prompts file)', tokens: null, hasCacheControl: false });
-    }
-  }
-
   // ── 6. phase-i-summaries (v1 Phase I) ───────────────────────────────────
   {
     const { createPhaseISummarizationPrompt } = await import('../shared/config/prompts/phase-i-summaries.js');
