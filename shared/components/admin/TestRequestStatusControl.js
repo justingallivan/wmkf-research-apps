@@ -9,6 +9,12 @@ import {
 
 const RISK_SENTENCE = 'It changes a real status on the test Request.';
 const EFFECT_PHRASES = { emails: 'send emails', tracking: 'create a status-tracking row', payments: 'create a payment row' };
+const RECHECK_STATUS_COPY = Object.freeze({
+  dispatched: 'The status change is still marked as sent, and its result is not confirmed. Rechecking does not settle it or prove sending has stopped.',
+  applied: 'The status change is applied but not complete. Rechecking does not change its status.',
+  complete: 'The saved status change is complete. This recheck can record newly observed late effects in its history.',
+  needs_attention: 'The saved status change needs attention. This recheck can record newly observed late effects in its history.',
+});
 // What the planner expects a change to do: null effects (unknown) says only that it may do any of these.
 const effectsSentence = (effects) => {
   if (!Array.isArray(effects)) return 'It may send emails or create payment and tracking rows.';
@@ -116,6 +122,12 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
       const data = await requestJson(base, { signal: scope.signal, fallbackMessage: 'The status could not be loaded.' });
       if (!scope.alive()) return null;
       setLoad({ state: 'ready', data });
+      const latestDispatched = (data.changes || []).filter((change) => change.dispatchedAt).at(-1);
+      setRecheck((current) => (current?.reply && (
+        current.changeId !== latestDispatched?.changeId
+        || current.reply.sequence !== latestDispatched?.sequence
+        || current.reply.status !== latestDispatched?.status
+      ) ? null : current));
       // The no-retry record ends only when its change is no longer the open one.
       const held = stuckRef.current;
       if (held && !(data.changes || []).some((change) => change.changeId === held.changeId && OPEN_CHANGE_STATUSES.includes(change.status))) {
@@ -127,6 +139,7 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
     } catch (error) {
       if (!scope.alive() || error?.name === 'AbortError') return null;
       setLoad({ state: 'error', data: null, text: messageFor(error) });
+      setRecheck(null);
       return null;
     }
   }, [base]);
@@ -139,6 +152,12 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
 
   const data = load.data;
   const changes = data?.changes || [];
+  const latestDispatchedChange = changes.filter((change) => change.dispatchedAt).at(-1);
+  const displayedRecheck = recheck?.reply && (
+    recheck.changeId !== latestDispatchedChange?.changeId
+    || recheck.reply.sequence !== latestDispatchedChange?.sequence
+    || recheck.reply.status !== latestDispatchedChange?.status
+  ) ? null : recheck;
   const open = changes.find((change) => OPEN_CHANGE_STATUSES.includes(change.status)) || null;
   const openField = open ? fieldByColumn(open.field) : null;
   const effectiveKey = openField ? openField.key : fieldKey;
@@ -157,6 +176,7 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
     const scope = liveScope();
     setBusy(true);
     setResult(null);
+    setRecheck(null);
     setConfirming(false);
     try {
       const reply = await requestJson(base, { method: 'POST', body, signal: scope.signal, fallbackMessage: 'The status change could not be sent.' });
@@ -194,6 +214,7 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
     const changeId = open.changeId;
     setBusy(true);
     setResult(null);
+    setRecheck(null);
     const fresh = await loadJournal(scope);
     if (!scope.alive()) return;
     const stillOpen = fresh?.changes?.find((change) => change.changeId === changeId && OPEN_CHANGE_STATUSES.includes(change.status));
@@ -218,8 +239,14 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
     try {
       const reply = await requestJson(`${base}/recheck`, { method: 'POST', signal: scope.signal, fallbackMessage: 'The status effects could not be rechecked.' });
       if (!scope.alive()) return;
-      setRecheck({ reply });
-      await loadJournal(scope);
+      const fresh = await loadJournal(scope);
+      if (!scope.alive()) return;
+      const latestDispatched = (fresh?.changes || []).filter((change) => change.dispatchedAt).at(-1);
+      if (!latestDispatched || latestDispatched.sequence !== reply.sequence || latestDispatched.status !== reply.status) {
+        setRecheck({ error: 'The status list changed during this check. Reload it before relying on these results.' });
+        return;
+      }
+      setRecheck({ reply, changeId: latestDispatched.changeId });
     } catch (error) {
       if (!scope.alive() || error?.name === 'AbortError') return;
       setRecheck({ error: messageFor(error) });
@@ -375,12 +402,14 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
           </button>
           {recheckReason ? <Reason id="factory-recheck-reason">{recheckReason}</Reason> : null}
         </div>
-        {recheck?.error ? <div role="alert" className={ERROR_BAND}>{recheck.error}</div> : null}
-        {recheck?.reply ? (
-          <div role="status" className={`rounded-lg border px-4 py-3 text-sm ${recheck.reply.ok ? 'border-green-200 bg-green-50 text-green-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
-            {recheck.reply.ok
-              ? 'No late effects, and no open or failed background jobs.'
-              : `Late emails: ${recheck.reply.lateEffects?.emails ?? 0}, tracking rows: ${recheck.reply.lateEffects?.tracking ?? 0}, payments: ${recheck.reply.lateEffects?.payments ?? 0}. Open jobs: ${recheck.reply.openJobs}, failed jobs: ${recheck.reply.failedJobs}.`}
+        <p className="text-sm leading-6 text-gray-600">
+          Recheck reads the Request and its background jobs. It may add newly found late-effect records to the saved history when the change is complete or needs attention. If the change is still marked as sent, this check does not confirm its result or that sending has stopped. Email records do not prove delivery.
+        </p>
+        {displayedRecheck?.error ? <div role="alert" className={ERROR_BAND}>{displayedRecheck.error}</div> : null}
+        {displayedRecheck?.reply ? (
+          <div role="status" className={`rounded-lg border px-4 py-3 text-sm ${displayedRecheck.reply.ok && displayedRecheck.reply.status === 'complete' ? 'border-green-200 bg-green-50 text-green-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+            <p>Rechecked change {displayedRecheck.reply.sequence}: {RECHECK_STATUS_COPY[displayedRecheck.reply.status] || 'The stored status is not recognized. This check does not change it.'}</p>
+            <p className="mt-1">Records absent from saved history at this check: email {displayedRecheck.reply.lateEffects?.emails ?? 0}; tracking {displayedRecheck.reply.lateEffects?.tracking ?? 0}; payments {displayedRecheck.reply.lateEffects?.payments ?? 0}. Open background jobs: {displayedRecheck.reply.openJobs}; failed background jobs: {displayedRecheck.reply.failedJobs}.</p>
           </div>
         ) : null}
       </div>

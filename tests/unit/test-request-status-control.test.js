@@ -204,7 +204,9 @@ describe('status control', () => {
     // Even when the journal now shows the open (sent) change, a retry is never offered after in_progress.
     server.on('POST', `${BASE}/recheck`, { status: 200, body: { sequence: 1, status: 'dispatched', ok: true, openJobs: 0, failedJobs: 0, lateEffects: { emails: 0, tracking: 0, payments: 0 } } });
     fireEvent.click(screen.getByRole('button', { name: 'Recheck status effects' }));
-    await screen.findByText('No late effects, and no open or failed background jobs.');
+    const rechecked = await screen.findByText(/Rechecked change 1: The status change is still marked as sent/);
+    expect(rechecked.closest('[role="status"]').className).toContain('border-amber-200');
+    expect(screen.getByText(/does not confirm its result or that sending has stopped/)).toBeTruthy();
     await waitFor(() => expect(screen.getByLabelText('New status').disabled).toBe(true));
     expect(screen.queryByRole('button', { name: 'Check again' })).toBeNull();
     expect(server.count('POST', BASE)).toBe(1);
@@ -305,12 +307,56 @@ describe('status control', () => {
     for (const body of server.bodies('POST', BASE)) expect(Object.keys(body).sort()).toEqual(['field', 'optionLabel']);
   });
 
-  test('Recheck status effects shows late effects and open or failed jobs', async () => {
+  test.each([
+    ['complete', 'The saved status change is complete.'],
+    ['needs_attention', 'The saved status change needs attention.'],
+    ['applied', 'The status change is applied but not complete.'],
+    ['future_status', 'The stored status is not recognized.'],
+  ])('Recheck status effects explains %s and shows late effects and open or failed jobs', async (status, copy) => {
+    const server = makeServer().on('GET', BASE, statusBody([change({ status })]));
+    await renderControl(server);
+    server.on('POST', `${BASE}/recheck`, { status: 200, body: { sequence: 1, status, ok: false, openJobs: 1, failedJobs: 2, lateEffects: { emails: 3, tracking: 0, payments: 1 } } });
+    fireEvent.click(screen.getByRole('button', { name: 'Recheck status effects' }));
+    const expected = status === 'needs_attention' || status === 'complete'
+      ? `${copy} This recheck can record newly observed late effects in its history.`
+      : `${copy}${status === 'applied' ? ' Rechecking does not change its status.' : ' This check does not change it.'}`;
+    await screen.findByText(`Rechecked change 1: ${expected}`);
+    expect(screen.getByText(/Records absent from saved history at this check: email 3; tracking 0; payments 1\. Open background jobs: 1; failed background jobs: 2\./)).toBeTruthy();
+  });
+
+  test('a recheck reply is hidden when the refreshed journal points at another dispatched change', async () => {
+    let getCount = 0;
+    const server = makeServer().on('GET', BASE, () => {
+      getCount += 1;
+      return getCount === 1
+        ? statusBody([change()])
+        : statusBody([change({ changeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', sequence: 2, status: 'dispatched', completedAt: null })]);
+    });
+    await renderControl(server);
+    server.on('POST', `${BASE}/recheck`, { status: 200, body: { sequence: 1, status: 'complete', ok: true, openJobs: 0, failedJobs: 0, lateEffects: { emails: 0, tracking: 0, payments: 0 } } });
+    fireEvent.click(screen.getByRole('button', { name: 'Recheck status effects' }));
+    await screen.findByRole('alert');
+    expect(screen.getByRole('alert').textContent).toMatch(/status list changed during this check/i);
+    expect(screen.queryByText(/Rechecked change 1:/)).toBeNull();
+    expect(screen.queryByText(/Records absent from saved history at this check/)).toBeNull();
+  });
+
+  test('a new status send clears the previous recheck result', async () => {
     const server = makeServer().on('GET', BASE, statusBody([change()]));
     await renderControl(server);
-    server.on('POST', `${BASE}/recheck`, { status: 200, body: { sequence: 1, status: 'complete', ok: false, openJobs: 1, failedJobs: 2, lateEffects: { emails: 3, tracking: 0, payments: 1 } } });
+    server.on('POST', `${BASE}/recheck`, { status: 200, body: { sequence: 1, status: 'complete', ok: true, openJobs: 0, failedJobs: 0, lateEffects: { emails: 0, tracking: 0, payments: 0 } } });
     fireEvent.click(screen.getByRole('button', { name: 'Recheck status effects' }));
-    await screen.findByText('Late emails: 3, tracking rows: 0, payments: 1. Open jobs: 1, failed jobs: 2.');
+    await screen.findByText(/Rechecked change 1:/);
+
+    choose('phase1', 'Invited');
+    fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
+    server.on('POST', BASE, { status: 200, body: { outcome: 'complete', emails: 0, tracking: 0, payments: 0, jobs: 0 } });
+    server.on('GET', BASE, statusBody([
+      change(), change({ changeId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', sequence: 2, field: 'wmkf_phaseistatus', optionBefore: 100000000, optionAfter: 100000003 }),
+    ], { phase1: 100000003, phase2: 100000001 }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, set this status' }));
+    await screen.findByText(/^Status changed\./);
+    expect(screen.queryByText(/Rechecked change 1:/)).toBeNull();
   });
 
   test('with the form off, Set status, Check again and Recheck are disabled with the reason; the journal still loads', async () => {

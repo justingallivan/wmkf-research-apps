@@ -1,0 +1,96 @@
+{
+  "date": "2026-10-03",
+  "branch": "codex/factory-status-outcomes",
+  "base": "31a432de55bdad9f06737d35008a135ccff48711",
+  "status": "reviewed local implementation; not deployed",
+  "reviews": {
+    "builder": "Luna",
+    "sol": "approved",
+    "root": "approved",
+    "fable": {
+      "authentication": "subscription OAuth, no API credentials",
+      "verdict": "**Final verdict: approved. Both prior findings are resolved, and the supplied diff raises no new material findings.**\n\nThis is a source review of `/tmp/factory-status-review.diff` plus the audit's item 2 in the working tree. I ran no tests or gates. The 95/95, 47/47, type, lint and 15-gate results are yours as reported, not verified by me.\n\n## Prior findings\n\n- **Finding 1 (audit evidence conflated): resolved.** Item 2 at `docs/audits/AUTONOMOUS_FOLLOWUP_2026-10-03.md:54` now attributes the 368/182 results to the #426 diagnosis slice. It separately states the status-outcome slice's 95 focused tests and describes its Fable review as approved with corrections in progress. The plan's new \"Status-outcome explanation evidence\" section keeps the same separation.\n- **Finding 2 (repeating \"New records\u2026 this pass\"): resolved.** The label is now \"Records absent from saved history at this check\", asserted in the component tests. It holds for every status, including `dispatched`/`applied` where nothing is saved and the count repeats.\n\nThe label in the diff is not the \"Records not yet in the saved history\" wording your brief quotes. The diff's wording is the better one, because \"not yet\" would imply a `dispatched` change's records will be saved, and they won't be. If the working tree actually carries the \"not yet\" wording, the diff you gave me is stale.\n\n## Confirmed from the diff\n\n- **Runtime delta is confined to the component.** The runner change is the doc comment only, and the new comment matches the code. The route, service and ledger are not in the diff.\n- **Stale results are protected.** Beyond what I reviewed before, the diff derives `displayedRecheck` at render time against the current journal. A reply for a different change, sequence or status cannot render even if state was not cleared, so the invalidation no longer depends on call ordering.\n- **No delivery or closure implication.** The old green \"No late effects\u2026\" band, which showed for any `ok` reply including a `dispatched` one, is gone. Green now requires `ok` and `complete`, and the in-progress test asserts amber for `dispatched`.\n- **Finite fallback.** Unknown statuses get the fixed \"not recognized\" copy in amber, covered by the `future_status` case.\n- **New runner test.** It pins that a `dispatched` recheck reports counts without calling `recordLateStatusChangeEffects` or changing status, which is the right contract.\n- **Runbook and plan text** are consistent with the source.\n\n## Limits\n\n- **Stale review-state wording to update after this verdict.** These are not findings.\n  - The plan says \"Fable review is pending\" and \"review in progress\".\n  - The audit summary says \"review in progress\", and item 2 says the corrections \"are being completed\".\n  - The 47/47 rerun is not recorded in either document.\n- **Not assessed.** The diff was reviewed as supplied, not re-derived. The copy change was not viewed in a browser. Deployment and promotion were out of scope.",
+      "is_error": false,
+      "permission_denials": []
+    }
+  },
+  "validation": {
+    "status_control_and_runner_tests": 95,
+    "final_status_control_tests": 47,
+    "types": "passed",
+    "lint": "zero errors; two existing hook warnings",
+    "gates": [
+      {
+        "check": "check:doc-currency",
+        "exit": 0
+      },
+      {
+        "check": "check:doc-currency:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:fact-consistency",
+        "exit": 0
+      },
+      {
+        "check": "check:fact-consistency:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:doc-symbol-refs",
+        "exit": 0
+      },
+      {
+        "check": "check:doc-symbol-refs:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:docs-catalog",
+        "exit": 0
+      },
+      {
+        "check": "check:secret-scan",
+        "exit": 0
+      },
+      {
+        "check": "check:secret-scan:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:scaffolding-tokens",
+        "exit": 0
+      },
+      {
+        "check": "check:scaffolding-tokens:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:status-enum-parity",
+        "exit": 0
+      },
+      {
+        "check": "check:status-enum-parity:self-test",
+        "exit": 0
+      },
+      {
+        "check": "check:trust-boundary-guid",
+        "exit": 0
+      },
+      {
+        "check": "check:trust-boundary-guid:self-test",
+        "exit": 0
+      }
+    ]
+  },
+  "sha256": {
+    "shared/components/admin/TestRequestStatusControl.js": "de824222d9a4614187f6fc1ec3c4a82facc4ae5435e07ce9e3fbf6be0fc1db12",
+    "lib/services/test-requests/status-change-runner.js": "16c11343e55adb3b3373809a990d4a3875a01e8a1c0c72373656acddec0af8bb",
+    "tests/unit/test-request-status-control.test.js": "4c302421d50d9b7071fd08d34ac50e515707f16d8fb97c2ba93163aa4973c4ca",
+    "tests/unit/test-request-status-change-runner.test.js": "c27a0976f8d133873eebd61d6c05af2a6360408eb352615d6ed0f8b667a46cf3"
+  },
+  "limits": [
+    "Source and mocked tests only; no browser rehearsal",
+    "No live status change or recheck executed",
+    "No deployment, email, recovery writer, repair or deletion"
+  ]
+}

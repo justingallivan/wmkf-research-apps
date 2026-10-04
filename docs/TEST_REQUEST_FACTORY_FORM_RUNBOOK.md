@@ -53,7 +53,7 @@ The panel shows "Stopped at …", plain copy for the recorded reason, and the ra
 vercel logs --environment production --since 1h -q "admin test-request run" -x
 ```
 
-When available, "Retry step" sends the same advance again. What that does depends on whether a write had already been attempted. The table describes the existing backend runner (also used by the CLI), not a guarantee that the branch diagnosis enables every form retry. The table is **[SOURCE]** (a delegated trace of `run-runner.js`, `basic-clone-steps.js`, `bundle-file-copy.js` and `run-ledger.js` on 2026-10-02, spot-checked) except where a row is marked **[RUN]**.
+When available, "Retry step" sends the same advance again. What that does depends on whether a write had already been attempted. The table describes the existing backend runner (also used by the CLI), not a guarantee that the diagnosis enables every form retry. The table is **[SOURCE]** (a delegated trace of `run-runner.js`, `basic-clone-steps.js`, `bundle-file-copy.js` and `run-ledger.js` on 2026-10-02, spot-checked) except where a row is marked **[RUN]**.
 
 | Step | What you see | What a retry does | Can it continue? |
 |---|---|---|---|
@@ -83,15 +83,15 @@ A run that cannot continue stays `needs_attention` in the ledger. Whatever it cr
 
 Parked today **[RUN]**: run `20407283-c279-5e0c-b396-210ad6842482`, test Request 1003308, two PDFs verified, one XLSX uploaded and unverified.
 
-## Read-only diagnosis — branch implementation, not deployed
+## Read-only diagnosis — shipped in PR #426
 
-[SOURCE, October 3] The `codex/factory-run-diagnosis` branch adds guidance to the existing actor-owned run-detail GET. It reads only the saved run row and resource receipts. It does not read private artifacts, inspect live Dataverse/SharePoint records, claim a lease, run status recheck or write anything. Normal runner checks remain authoritative when an existing Advance is requested.
+[SOURCE, October 3; owner-reported clean deployment after #426 merged] The run diagnosis adds guidance to the existing actor-owned run-detail GET. It reads only the saved run row and resource receipts. It does not read private artifacts, inspect live Dataverse/SharePoint records, claim a lease, run status recheck or write anything. Normal runner checks remain authoritative when an existing Advance is requested.
 
 Named existing retries remain available for Request/location readback after an uncertain create and for `verification_failed` at Basic verification. These use the unchanged runner safeguards; the diagnosis neither performs recovery nor promises it. Receipts from known earlier completed steps do not block the current step, while unknown/future evidence stays blocked.
 
 For Basic runs, the panel explains a live lease (wait and inspect again), expired source evidence (a new run is needed), an unverified copied item (readback investigation), a supported retry with no unresolved dispatch, or an unknown state (operator investigation). A new run neither repairs nor deletes the partial destination of an old run. Request 1003308 remains retained and unchanged. The six-hour check is based on the saved export timestamp; it does not establish artifact integrity or availability.
 
-The Basic Advance control is enabled only when the current diagnosis permits retry and the existing write switch permits it. A new selection, an advance response or a failed refresh clears the previous diagnosis; responses from an old selection cannot replace the current view. Other known recipes are reported as not assessed and retain their existing controls after inspection succeeds; a failed or missing inspection disables Advance until the run can be inspected again. The form is deliberately more conservative than the backend runner for unclassified Basic failures. Unknown errors, source/preflight failures, and pre-upload failures without a positively classified retry remain disabled in the form; investigate first rather than treating a disabled button as proof the backend cannot recover. Any owner-directed CLI action still uses the existing runner checks and requires its own operational authorization. Later recovery, status operations and retirement are outside this slice. This section describes branch code, not a production release.
+The Basic Advance control is enabled only when the current diagnosis permits retry and the existing write switch permits it. A new selection, an advance response or a failed refresh clears the previous diagnosis; responses from an old selection cannot replace the current view. Other known recipes are reported as not assessed and retain their existing controls after inspection succeeds; a failed or missing inspection disables Advance until the run can be inspected again. The form is deliberately more conservative than the backend runner for unclassified Basic failures. Unknown errors, source/preflight failures, and pre-upload failures without a positively classified retry remain disabled in the form; investigate first rather than treating a disabled button as proof the backend cannot recover. Any owner-directed CLI action still uses the existing runner checks and requires its own operational authorization. Later recovery, status operations and retirement are outside this slice. PR #426 shipped this diagnosis; later operations require separate review.
 
 ## Status changes
 
@@ -104,6 +104,14 @@ Only a `ready` production run. One change may be open per run. The form confirms
 | Result could not be read (`unconfirmed`) | Sent; the read-back failed | "Check again". Do not start a different change |
 | Being sent (`in_progress`) | Another request is sending it, or one was cut off after sending | Do not retry. If it never resolves, establish that no sender is still running, then close it from the CLI with the command the form shows (`--status-abandon … --change-id …`); that writes the ledger only |
 | Refusals | Already set; another change open; the Request changed since it was read; transition not allowed from the current status; would repeat a payment or tracking row | Nothing was sent. Reload and choose again. A repeat that would create a payment or tracking row needs the CLI `--set-status … --rerun` after inspection |
+
+### Recheck status effects and Check again are different
+
+[SOURCE, October 3] **Check again** reloads the open change and resumes only that same change through the existing status setter. **Recheck status effects** inspects effects and background jobs since the latest dispatched change. It never sends another status PATCH or settles a `dispatched` change. For an already `complete` or `needs_attention` change, it may record newly observed email, tracking and payment IDs in the saved history. It is therefore not a wholly read-only operation, even though it does not write Dataverse.
+
+The recheck's `ok` means this pass found no newly unrecorded effects and no open or failed jobs. It does not establish that the change had no effects, that an email was delivered, or that a sender has stopped. A change still marked `dispatched` remains unresolved. No new web closure, rerun or recovery action is authorized by rechecking.
+
+[BRANCH IMPLEMENTATION, not deployed] The status-outcome explanation displays the returned change number and recorded status beside per-pass counts, keeps unresolved results visually distinct from complete results, and discards results when a later journal read identifies a different change or status. Starting another status action clears the old recheck result. The existing actor/superuser checks and operation semantics remain unchanged.
 
 ## The command-line tool
 
