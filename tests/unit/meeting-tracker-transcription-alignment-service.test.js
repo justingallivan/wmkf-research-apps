@@ -449,7 +449,7 @@ function tailFixture({ matchAtStart = false } = {}) {
   return { content: JSON.stringify({ utterances }), vtt: `WEBVTT\n\n${cues.join('\n\n')}\n`, verdict, names };
 }
 
-test('Codex round 3: cues matching only wording past the rendered slice do not apply a name even with visible citations at 0.99', async () => {
+test('Codex rounds 3-4: cues matching only wording past the rendered slice do not apply a name even with visible citations at 0.99', async () => {
   const { content, vtt, verdict } = tailFixture();
   arrange({ content, vtt });
   executePrompt.mockResolvedValue({ blocked: false, parsed: verdict });

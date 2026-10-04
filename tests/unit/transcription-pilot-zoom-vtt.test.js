@@ -690,7 +690,7 @@ describe('verifyAlignmentVerdict', () => {
         expect(support.B).toEqual({});
       });
 
-      describe('Codex round 3: positive support must match the rendered sample text', () => {
+      describe('Codex rounds 3-4: only the rendered 1,500-char slice of any utterance is evidence', () => {
         // Four A utterances: ~1,560 chars of unique noise, then the nine caption words past the slice.
         const tailOnly = (matchAtStart = false) => {
           const utterances = [];
@@ -706,23 +706,34 @@ describe('verifyAlignmentVerdict', () => {
           }
           const { samples } = sampleAlignmentPairs(utterances, cues);
           expect(samples.every((s) => s.text.length === 1500)).toBe(true);
-          return {
-            full: computeNameSupport(samples, utterances, [AVERY]),
-            visible: computeNameSupport(samples, utterances, [AVERY], { visibleTextOnly: true }),
-          };
+          return computeNameSupport(samples, utterances, [AVERY]);
         };
 
-        test('wording past the 1,500-char slice attributes (full) but earns no visible support', () => {
-          // Fails if visibleTextOnly reads the full utterance text.
-          const { full, visible } = tailOnly();
-          expect(full.A[AVERY].count).toBe(4);
-          expect(visible.A ?? {}).toEqual({});
+        test('wording past the slice earns no support', () => {
+          // Fails if attribution tokenizes the full utterance text.
+          expect(tailOnly().A ?? {}).toEqual({});
         });
 
-        test('control: wording inside the slice earns support both ways', () => {
-          const { full, visible } = tailOnly(true);
-          expect(full.A[AVERY].count).toBe(4);
-          expect(visible.A[AVERY].count).toBe(4);
+        test('control: wording inside the slice earns support', () => {
+          expect(tailOnly(true).A[AVERY].count).toBe(4);
+        });
+
+        test('Codex round 4: hidden words cannot break a tie between identical visible matches', () => {
+          // Simultaneous A and B share the same ten visible words; A alone has ten more cue words past
+          // its slice. Fails if the hidden words rank A above B (A applied); both must abstain.
+          const utterances = [];
+          const cues = [];
+          for (let i = 1; i <= 4; i++) {
+            const t = i * 120_000;
+            const shared = Array.from({ length: 10 }, (_, k) => `shared${i}x${k}`);
+            const hidden = Array.from({ length: 10 }, (_, k) => `hidden${i}x${k}`);
+            const noise = Array.from({ length: 130 }, (_, k) => `noise${i}x${k}pad`).join(' ');
+            utterances.push({ start: t, end: t + 60_000, speaker: 'A', text: `${shared.join(' ')} ${noise} ${hidden.join(' ')}` });
+            utterances.push({ start: t, end: t + 60_000, speaker: 'B', text: `${shared.join(' ')} ${noise}` });
+            cues.push(cue(t, t + 8000, AVERY, [...shared, ...hidden].join(' ')));
+          }
+          const { samples } = sampleAlignmentPairs(utterances, cues);
+          expect(computeNameSupport(samples, utterances, [AVERY])).toEqual({ A: {}, B: {} });
         });
       });
 
