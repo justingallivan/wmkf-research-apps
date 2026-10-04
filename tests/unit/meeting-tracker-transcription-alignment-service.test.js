@@ -484,7 +484,10 @@ test('records Zoom-evidence reassignment of a misdiarized one-word utterance alo
   const { content, vtt } = fixture();
   const parsed = JSON.parse(content);
   parsed.utterances.splice(1, 0, { speaker: 'B', start: 3000, end: 3400, text: 'Right.' });
-  arrange({ content: JSON.stringify(parsed), vtt });
+  // Zoom captioned the word inside A's first cue (affirmative wording evidence).
+  const captioned = vtt.replace(`${NAME_A}: ${LINES.A[0]}`, `${NAME_A}: ${LINES.A[0]} right`);
+  expect(captioned).not.toBe(vtt);
+  arrange({ content: JSON.stringify(parsed), vtt: captioned });
   executePrompt.mockResolvedValue({ blocked: false, parsed: {} });
   await alignMeetingTranscriptionSpeakers({ jobId });
   const { speakerNames, alignment } = store.completeTranscriptionAlignment.mock.calls[0][0];

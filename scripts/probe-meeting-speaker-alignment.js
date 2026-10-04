@@ -212,7 +212,10 @@ console.log('\n== Short-utterance reassignment (<= ' + D.reassignMaxWords + ' wo
 {
   const dominantZoom = Object.fromEntries(Object.entries(fullSupport).map(([id, e]) => [id, Object.entries(e).sort((a, b) => b[1].count - a[1].count)[0]?.[0]]).filter(([, n]) => n));
   const { reassigned, considered, reassignedCount } = zoom.reassignShortUtterances(utterances, parsed.cues, dominantZoom, D);
-  console.log(`  short utterances considered ${considered}; reassigned ${reassignedCount}`);
+  const loose = zoom.reassignShortUtterances(utterances, parsed.cues, dominantZoom, { ...D, reassignRequireWords: false });
+  console.log(`  short utterances considered ${considered}; reassigned under the LIVE rule (contained + captioned words) ${reassignedCount}; under containment-only ${loose.reassignedCount}`);
+  const onlyLoose = Object.keys(loose.reassigned).filter(k => !(k in reassigned));
+  console.log('  containment-only extras (not captioned words), first ten: ' + (onlyLoose.slice(0, 10).map(idx => { const u = utterances[Number(idx)]; return `#${idx} ${Math.floor(u.start / 60000)}:${String(Math.floor((u.start % 60000) / 1000)).padStart(2, '0')} ${u.speaker}->${loose.reassigned[idx]} (${u.text.trim().split(/\s+/).length}w)`; }).join('; ') || '—'));
   const byPair = new Map();
   for (const [idx, to] of Object.entries(reassigned)) { const k = `${utterances[Number(idx)].speaker}->${to}`; byPair.set(k, (byPair.get(k) || 0) + 1); }
   console.log('  by speaker pair: ' + ([...byPair].map(([k, n]) => `${k}×${n}`).join(', ') || '—'));

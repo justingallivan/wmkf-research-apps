@@ -990,6 +990,29 @@ describe('reassignShortUtterances (misdiarized one-word utterances, owner decisi
     expect(result).toEqual({ reassigned: { 1: 'A' }, considered: 1, reassignedCount: 1 });
   });
 
+  test('Codex counterexamples: proximity without containment, or containment without the word, never reassigns', () => {
+    // Edward says "No." in a 200 ms gap after Andrea's cue ends: not contained -> untouched.
+    const gap = base();
+    gap.cues[0] = cue(0, 5000, AVERY, 'the pockets are ablated quickly');
+    gap.utterances[1] = { speaker: 'D', start: 5200, end: 5400, text: 'No.' };
+    expect(reassignShortUtterances(gap.utterances, gap.cues, gap.applied).reassigned).toEqual({});
+    // Contained in Andrea's cue, but Zoom never captioned the word "no" -> untouched (uncaptioned dial-in case).
+    const missing = base();
+    missing.utterances[1] = { speaker: 'D', start: 5000, end: 5400, text: 'No.' };
+    expect(reassignShortUtterances(missing.utterances, missing.cues, missing.applied).reassigned).toEqual({});
+    // Control: the captioned "Right." still moves.
+    const ok = base();
+    expect(reassignShortUtterances(ok.utterances, ok.cues, ok.applied).reassigned).toEqual({ 1: 'A' });
+  });
+
+  test('every word must be captioned; punctuation and case do not matter', () => {
+    const two = base();
+    two.utterances[1] = { speaker: 'D', start: 5000, end: 5400, text: 'Right, usually!' };
+    expect(reassignShortUtterances(two.utterances, two.cues, two.applied).reassigned).toEqual({ 1: 'A' });
+    two.utterances[1] = { speaker: 'D', start: 5000, end: 5400, text: 'Right, exactly' };
+    expect(reassignShortUtterances(two.utterances, two.cues, two.applied).reassigned).toEqual({});
+  });
+
   test('a genuine interjection with its own Zoom cue is left alone (two names caption that moment)', () => {
     const { utterances, cues, applied } = base();
     cues.push(cue(5000, 5400, JORDAN, 'right'));
