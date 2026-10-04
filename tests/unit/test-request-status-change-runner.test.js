@@ -496,6 +496,18 @@ describe('exactly one PATCH per change', () => {
 });
 
 describe('recheckStatusChange', () => {
+  test('reports new records for a dispatched change without changing its status or recording late effects', async () => {
+    const late = [{ activityid: '44444444-4444-4444-8444-444444444444', createdon: AFTER }];
+    const client = fakeClient({ emails: late });
+    const ledger = memoryLedger(READY_RUN, [{ ...DISPATCHED, effects: { emailIds: [] } }]);
+    const recordLate = jest.spyOn(ledger, 'recordLateStatusChangeEffects');
+    const result = await recheckStatusChange({ client, ledger, runId: RUN_ID });
+    expect(result).toMatchObject({ status: 'dispatched', ok: false, lateEffects: { emails: 1, tracking: 0, payments: 0 } });
+    expect(recordLate).not.toHaveBeenCalled();
+    expect(ledger.rows[0].status).toBe('dispatched');
+    expect(ledger.rows[0].effects.emailIds).toEqual([]);
+  });
+
   test('reports effects that arrived after the change completed', async () => {
     const late = [{ activityid: '44444444-4444-4444-8444-444444444444', createdon: AFTER }];
     const client = fakeClient({ emails: late });

@@ -107,6 +107,14 @@ Only a `ready` production run. One change may be open per run. The form confirms
 | Being sent (`in_progress`) | Another request is sending it, or one was cut off after sending | Do not retry. If it never resolves, establish that no sender is still running, then close it from the CLI with the command the form shows (`--status-abandon … --change-id …`); that writes the ledger only |
 | Refusals | Already set; another change open; the Request changed since it was read; transition not allowed from the current status; would repeat a payment or tracking row | Nothing was sent. Reload and choose again. A repeat that would create a payment or tracking row needs the CLI `--set-status … --rerun` after inspection |
 
+### Recheck status effects and Check again are different
+
+[SOURCE, October 3] **Check again** reloads the open change and resumes only that same change through the existing status setter. **Recheck status effects** inspects effects and background jobs since the latest dispatched change. It never sends another status PATCH or settles a `dispatched` change. For an already `complete` or `needs_attention` change, it may record newly observed email, tracking and payment IDs in the saved history. It is therefore not a wholly read-only operation, even though it does not write Dataverse.
+
+The recheck's `ok` means this pass found no newly unrecorded effects and no open or failed jobs. It does not establish that the change had no effects, that an email was delivered, or that a sender has stopped. A change still marked `dispatched` remains unresolved. No new web closure, rerun or recovery action is authorized by rechecking.
+
+[BRANCH IMPLEMENTATION, not deployed] The status-outcome explanation displays the returned change number and recorded status beside per-pass counts, keeps unresolved results visually distinct from complete results, and discards results when a later journal read identifies a different change or status. Starting another status action clears the old recheck result. The existing actor/superuser checks and operation semantics remain unchanged.
+
 ## The command-line tool
 
 `scripts/rehearse-test-request-sandbox.mjs --target=production`, owner-run, reads `.env.local`.
@@ -115,7 +123,7 @@ Only a `ready` production run. One change may be open per run. The form confirms
 |---|---|
 | `--run-inspect=<runId>` | Read-only: the run row and every resource receipt. No Dataverse. Its output on 2026-10-02 did not include status changes **[RUN]**. |
 | `--run-recheck=<runId>` | Read-only: the Foundation account against the run's baseline. |
-| `--advance=<runId> --manifest=<file> --bundle=<file>` | The same advance the form performs, so it cannot pass a stop the form cannot pass. Needs the run's manifest and bundle as local files. |
+| `--advance=<runId> --manifest=<file> --bundle=<file>` | Uses the same backend runner. The form may withhold Advance when diagnosis is uncertain; an owner CLI retry remains subject to runner checks and separate operational authorization. Needs the run's manifest and bundle as local files. |
 | `--set-status`, `--status-recheck`, `--status-abandon` | The status setter, its recheck, and closing a change stuck `dispatched`. |
 | `--ledger-check` | Ledger schema against the tracked fingerprint. |
 
