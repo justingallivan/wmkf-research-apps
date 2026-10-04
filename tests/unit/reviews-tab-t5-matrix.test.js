@@ -8,7 +8,7 @@
  * :318 stays raw, allowlisted per plan §2.6):
  *   - load                GET  /api/review-manager/reviewers
  *   - generate (synthesis) POST /api/review-manager/synthesize-reviews
- *   - handleSend (reminder) POST /api/review-manager/send-review-reminder
+ *   - review-due reminder preview + explicit send in the shared composer
  *
  * All three already parse with `.json().catch(() => ({}))`, so a malformed
  * or empty body was already tolerant pre-migration at both 2xx and non-2xx —
@@ -172,65 +172,64 @@ test('synthesize POST: request bytes (url, method, headers, exact body) unchange
   expect(opts.body).toBe(JSON.stringify({ requestId: REQUEST_ID, overwrite: false, confirmEarly: false }));
 });
 
-// --- send-review-reminder POST -----------------------------------------
+// --- review-due reminder composer -------------------------------------
 
-test('send-review-reminder POST: 2xx success shows the sent state', async () => {
-  await renderReady();
-  global.fetch = jest.fn((url) => {
-    if (String(url).includes('send-review-reminder')) return Promise.resolve({ ok: true, status: 200, json: async () => ({ ok: true }) });
-    return Promise.resolve(reviewersOk());
-  });
-  fireEvent.click(screen.getByRole('button', { name: 'Send reminder' }));
-  expect(await screen.findByText('Sent for delivery.')).toBeInTheDocument();
-});
-
-test('send-review-reminder POST: non-2xx send_unconfirmed maps to uncertain (verbatim)', async () => {
-  await renderReady();
-  global.fetch = jest.fn((url) => {
+const REMINDER_TEMPLATE = { subject: 'Review reminder', body: '{{greeting}} {{reviewDueDate}} {{signature}}' };
+const REMINDER_DRAFT = {
+  name: 'Dr. Pending', from: 'pd@example.org', to: 'reviewer@example.org', senderId: 'pd-1',
+  subject: REMINDER_TEMPLATE.subject, previewHtml: '<p>Due soon</p>', template: REMINDER_TEMPLATE, proof: 'proof-1',
+};
+function installReminderFetch(sendResult = { ok: true, status: 200, json: async () => ({ ok: true }) }) {
+  global.fetch = jest.fn((url, opts) => {
+    if (String(url).includes('reminder-email-preferences?')) return Promise.resolve({ ok: true, status: 200, json: async () => ({ ok: true, ownSystemId: 'pd-1' }) });
     if (String(url).includes('send-review-reminder')) {
-      return Promise.resolve({ ok: false, status: 409, json: async () => ({ ok: false, reason: 'send_unconfirmed' }) });
+      const body = JSON.parse(opts.body);
+      if (body.action === 'preview') return Promise.resolve({ ok: true, status: 200, json: async () => ({ ok: true, draft: REMINDER_DRAFT }) });
+      return typeof sendResult === 'function' ? sendResult() : Promise.resolve(sendResult);
     }
     return Promise.resolve(reviewersOk());
   });
+}
+async function sendFromPreview() {
   fireEvent.click(screen.getByRole('button', { name: 'Send reminder' }));
+  expect(await screen.findByText('Email preview')).toBeInTheDocument();
+  const sendButtons = screen.getAllByRole('button', { name: 'Send reminder' });
+  fireEvent.click(sendButtons[sendButtons.length - 1]);
+}
+
+test('Workbench review-due reminder previews before a proof-bound send', async () => {
+  await renderReady();
+  installReminderFetch();
+  fireEvent.click(screen.getByRole('button', { name: 'Send reminder' }));
+  expect(await screen.findByText('Email preview')).toBeInTheDocument();
+  expect(global.fetch.mock.calls.filter(([url, opts]) => String(url).includes('send-review-reminder') && JSON.parse(opts.body).action === 'send')).toHaveLength(0);
+  const sendButtons = screen.getAllByRole('button', { name: 'Send reminder' });
+  fireEvent.click(sendButtons[sendButtons.length - 1]);
+  expect(await screen.findByText('Sent for delivery.')).toBeInTheDocument();
+  const actions = global.fetch.mock.calls.filter(([url]) => String(url).includes('send-review-reminder')).map(([, opts]) => JSON.parse(opts.body));
+  expect(actions).toEqual([
+    { requestId: REQUEST_ID, suggestionId: 'reviewer-1', kind: 'reviewdue', action: 'preview' },
+    { requestId: REQUEST_ID, suggestionId: 'reviewer-1', kind: 'reviewdue', action: 'send', template: REMINDER_TEMPLATE, proof: 'proof-1' },
+  ]);
+});
+
+test('an unconfirmed send stays uncertain in the composer', async () => {
+  await renderReady();
+  installReminderFetch({ ok: false, status: 502, json: async () => ({ ok: false, reason: 'send_unconfirmed' }) });
+  await sendFromPreview();
   expect(await screen.findByText(/Dynamics did not confirm the send/i)).toBeInTheDocument();
 });
 
-test('send-review-reminder POST: network rejection maps to the uncertain receipt', async () => {
+test('a network rejection after explicit Send stays uncertain', async () => {
   await renderReady();
-  global.fetch = jest.fn((url) => {
-    if (String(url).includes('send-review-reminder')) return Promise.reject(new Error('offline'));
-    return Promise.resolve(reviewersOk());
-  });
-  fireEvent.click(screen.getByRole('button', { name: 'Send reminder' }));
+  installReminderFetch(() => Promise.reject(new Error('offline')));
+  await sendFromPreview();
   expect(await screen.findByText(/The app could not confirm the result/i)).toBeInTheDocument();
 });
 
-test('send-review-reminder POST axis (e): 502 unparseable body is never silent (falls to generic refusal copy)', async () => {
+test('an unparseable send failure is visible', async () => {
   await renderReady();
-  global.fetch = jest.fn((url) => {
-    if (String(url).includes('send-review-reminder')) return Promise.resolve({ ok: false, status: 502, json: unparseable });
-    return Promise.resolve(reviewersOk());
-  });
-  fireEvent.click(screen.getByRole('button', { name: 'Send reminder' }));
-  expect(await screen.findByText('The reminder was not sent.')).toBeInTheDocument();
-});
-
-test('send-review-reminder POST: request bytes (url, method, headers, exact body) unchanged', async () => {
-  await renderReady();
-  let captured;
-  global.fetch = jest.fn((url, opts) => {
-    if (String(url).includes('send-review-reminder')) {
-      captured = [url, opts];
-      return Promise.resolve({ ok: true, status: 200, json: async () => ({ ok: true }) });
-    }
-    return Promise.resolve(reviewersOk());
-  });
-  fireEvent.click(screen.getByRole('button', { name: 'Send reminder' }));
-  await waitFor(() => expect(captured).toBeDefined());
-  const [url, opts] = captured;
-  expect(url).toBe('/api/review-manager/send-review-reminder');
-  expect(opts.method).toBe('POST');
-  expect(opts.headers).toEqual({ 'Content-Type': 'application/json' });
-  expect(opts.body).toBe(JSON.stringify({ requestId: REQUEST_ID, suggestionId: 'reviewer-1' }));
+  installReminderFetch({ ok: false, status: 502, json: unparseable });
+  await sendFromPreview();
+  expect(await screen.findByText(/Could not send the reminder/i)).toBeInTheDocument();
 });

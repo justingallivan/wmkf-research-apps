@@ -101,17 +101,20 @@ describe('sandbox clone source fence', () => {
         akoya_title: 'TEST: safe fixture',
         akoya_fiscalyear: 'December 2026',
         akoya_purpose: 'Synthetic purpose',
+        wmkf_abstract: 'Exact applicant abstract',
         akoya_request: 125000,
         akoya_requesttype: 100000000,
         wmkf_respondreminderenabled: false,
         wmkf_reviewduereminderenabled: false,
       },
     };
+    manifest.bundle = { version: 5, abstract: 'Exact applicant abstract' };
     const row = {
       akoya_requestid: manifest.values.requestId,
       akoya_title: manifest.createBody.akoya_title,
       akoya_fiscalyear: manifest.createBody.akoya_fiscalyear,
       akoya_purpose: manifest.createBody.akoya_purpose,
+      wmkf_abstract: manifest.createBody.wmkf_abstract,
       akoya_request: manifest.createBody.akoya_request,
       akoya_requesttype: manifest.createBody.akoya_requesttype,
       wmkf_meetingdate: manifest.values.meetingDate,
@@ -131,10 +134,27 @@ describe('sandbox clone source fence', () => {
       wmkf_meetingdate: '2024-12-13',
       _createdby_value: '55555555-5555-4555-8555-555555555555',
       _ownerid_value: '66666666-6666-4666-8666-666666666666',
+      wmkf_abstract: 'Changed applicant abstract',
     });
     expect(drifted).toEqual(expect.arrayContaining([
       'test marker not true', 'run ID mismatch', 'meeting date mismatch', 'creator mismatch', 'owner mismatch',
+      'abstract mismatch',
     ]));
+
+    for (const [expectedAbstract, actualAbstract, mismatch] of [
+      [null, null, false],
+      [null, '', false],
+      ['', null, false],
+      ['  \n ', '  \n ', false],
+      ['  \n ', '', true],
+    ]) {
+      const actual = verifyCloneRequestReadback({
+        ...manifest,
+        bundle: { version: 5, abstract: expectedAbstract },
+      }, { ...row, wmkf_abstract: actualAbstract });
+      if (mismatch) expect(actual).toContain('abstract mismatch');
+      else expect(actual).not.toContain('abstract mismatch');
+    }
   });
 });
 

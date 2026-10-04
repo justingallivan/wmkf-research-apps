@@ -95,7 +95,7 @@ describeIf('automatic reminder claim (live Postgres)', () => {
         listDue: async (now) => (await store.listCollectionsDueForAutomaticReminder(now)).filter((row) => row.id === id),
         claim: store.claimAutomaticReminder,
         attachEmailId: store.attachReminderEmailId,
-        getRequest: async () => ({ akoya_requestid: 'r1', akoya_requestnum: '1003222' }),
+        getRequest: async (requestId) => ({ akoya_requestid: requestId, akoya_requestnum: '1003222' }),
         resolveContacts: async () => {
           await onResolveContacts?.();
           return C;

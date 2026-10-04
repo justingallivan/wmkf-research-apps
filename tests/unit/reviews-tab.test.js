@@ -191,11 +191,11 @@ test('shows an empty state when no reviewer has submitted', async () => {
 test.each([
   ['removed', /removed from the proposal.*restore them first/i],
   ['revoked', /access was withdrawn.*reissue their link/i],
-  ['not_found', /no longer available.*refresh to update/i],
-  ['conflict', /already claimed.*refresh to see/i],
-  ['read_failed', /couldn't verify.*no reminder was sent/i],
-  ['prepare_failed', /could not prepare.*no reminder was sent/i],
-])('maps the %s reminder refusal to durable actionable copy without erasing the row', async (reason, copy) => {
+  ['not_found', /no longer available.*refresh the list/i],
+  ['conflict', /another send changed this reminder.*refresh/i],
+  ['read_failed', /latest reviewer status could not be verified.*no reminder was sent/i],
+  ['prepare_failed', /reminder could not be prepared.*no reminder was sent/i],
+])('maps a %s preview refusal to actionable copy without sending', async (reason, copy) => {
   const proposal = {
     proposalId: 'req1',
     reviewers: [{
@@ -207,22 +207,17 @@ test.each([
       reviewDueReminderEligibility: 'eligible',
     }],
   };
-  fetch
-    .mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ success: true, proposals: [proposal] }),
-    })
-    .mockResolvedValueOnce({
-      ok: false,
-      status: 409,
-      json: async () => ({ ok: false, reason }),
-    });
+  fetch.mockImplementation((url) => {
+    if (String(url).includes('send-review-reminder')) return Promise.resolve({ ok: false, status: 409, json: async () => ({ ok: false, reason }) });
+    if (String(url).includes('reminder-email-preferences?')) return Promise.resolve({ ok: true, json: async () => ({ ok: true, ownSystemId: 'pd-1' }) });
+    return Promise.resolve({ ok: true, json: async () => ({ success: true, proposals: [proposal] }) });
+  });
 
   render(<ReviewsTab requestId="req1" />);
   fireEvent.click(await screen.findByRole('button', { name: 'Send reminder' }));
 
   expect(await screen.findByText(copy)).toBeInTheDocument();
-  expect(fetch).toHaveBeenCalledTimes(2);
+  expect(fetch.mock.calls.filter(([url, opts]) => String(url).includes('send-review-reminder') && JSON.parse(opts.body).action === 'send')).toHaveLength(0);
   expect(screen.getByText('Dr. Pending')).toBeInTheDocument();
   expect(screen.queryByText(reason, { exact: true })).not.toBeInTheDocument();
 });

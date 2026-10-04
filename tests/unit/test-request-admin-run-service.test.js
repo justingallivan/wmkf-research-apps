@@ -8,12 +8,13 @@
  * @jest-environment node
  */
 import { jest } from '@jest/globals';
-import { createAdminRunService } from '../../lib/services/test-requests/admin-run-service.js';
+import { createAdminRunService, diagnoseFactoryRun } from '../../lib/services/test-requests/admin-run-service.js';
 import { runStatusChange as realRunStatusChange } from '../../lib/services/test-requests/status-change-runner.js';
 import { deriveActorId, deriveRunIds } from '../../lib/services/test-requests/admin-run-identity.js';
 import { artifactDigest, draftPathname, runPathname } from '../../lib/services/test-requests/factory-artifact-store.js';
 import { SANDBOX_URL, PRODUCTION_URL, sha256 } from '../../lib/services/test-requests/basic-clone-steps.js';
-import { buildSourceBundle } from '../../lib/services/test-requests/source-bundle.js';
+import { buildSourceBundle, PRE_SITE_SECTION_FIELDS } from '../../lib/services/test-requests/source-bundle.js';
+import { PROPOSAL_CORE_KEYS } from '../../shared/config/prompts/pre-site-visit-proposal-core.js';
 import { PRODUCTION_HOSTS } from '../../lib/dataverse/core/target-registry.js';
 import { MANAGED_LEDGER_HOSTS } from '../../lib/db/ledger-registry.js';
 import { TEST_REQUEST_FIXED_FIELDS } from '../../lib/services/test-requests/policy.js';
@@ -108,13 +109,13 @@ function fakeBlob() {
 
 function metadata(production) {
   const fieldNames = [
-    'akoya_requestid', 'akoya_title', 'akoya_purpose', 'akoya_request', 'akoya_fiscalyear',
+    'akoya_requestid', 'akoya_title', 'akoya_purpose', 'wmkf_abstract', 'akoya_request', 'akoya_fiscalyear',
     TEST_REQUEST_FIXED_FIELDS.requestType, 'wmkf_meetingdate', TEST_REQUEST_FIXED_FIELDS.marker,
     TEST_REQUEST_FIXED_FIELDS.runId, TEST_REQUEST_FIXED_FIELDS.responseReminder, TEST_REQUEST_FIXED_FIELDS.reviewReminder,
   ];
   const typeOf = (field) => {
     if (field === 'akoya_request') return 'Money';
-    if (field === 'akoya_purpose') return 'Memo';
+    if (field === 'akoya_purpose' || field === 'wmkf_abstract') return 'Memo';
     if (field === 'akoya_requestid' || field === TEST_REQUEST_FIXED_FIELDS.runId) return 'Uniqueidentifier';
     if (field === TEST_REQUEST_FIXED_FIELDS.requestType) return 'Picklist';
     if (field.includes('reminder') || field === TEST_REQUEST_FIXED_FIELDS.marker) return 'Boolean';
@@ -126,6 +127,7 @@ function metadata(production) {
     ...(field === 'akoya_request' ? { minValue: 0, maxValue: 1e9 } : {}),
     ...(['akoya_title', 'akoya_fiscalyear'].includes(field) ? { maxLength: 120 } : {}),
     ...(field === 'akoya_purpose' ? { maxLength: 100000 } : {}),
+    ...(field === 'wmkf_abstract' ? { maxLength: 30000 } : {}),
   }]));
   fields.akoya_applicantid = { createable: true, requiredLevel: 'None', type: 'Lookup', lookupTarget: 'accounts' };
   if (production) {
@@ -163,11 +165,13 @@ function bundleAt(exportedAt) {
   return buildSourceBundle({
     sourceRow: {
       akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
+      wmkf_abstract: 'Applicant source abstract',
       akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', versionnumber: 1,
     },
     documents: [],
     dataverseHost: PRODUCTION_HOSTS[0],
     exportedAt: new Date(exportedAt),
+    applicantAbstract: 'Applicant source abstract',
   });
 }
 
@@ -352,6 +356,49 @@ describe('Confirm: sandbox and production reservations', () => {
     expect(manifest.createBody[TEST_REQUEST_FIXED_FIELDS.runId]).toBe(runId);
     expect(manifest.values).toMatchObject({ programDirectorId: PD_ID, piContactId: PI_ID });
     expect(h.createClientCalls.map((c) => c.resourceUrl)).toEqual([PRODUCTION_URL]);
+  });
+
+  test.each([2, 3, 4])('new Confirm refuses a v%d draft before writing run artifacts', async (version) => {
+    const h = harness({
+      deployment: 'preview',
+      deps: {
+        exportBundle: async ({ exportedAt }) => {
+          const legacy = bundleAt(exportedAt);
+          legacy.version = version;
+          if (version < 4) {
+            delete legacy.abstract;
+            if (version === 3) legacy.reviewers = [];
+          } else {
+            legacy.reviewers = [];
+            legacy.preSiteVisit = {
+              requestDocumentId: 'cccccccc-0000-0000-0000-000000000001',
+              sectionFields: Object.fromEntries(PRE_SITE_SECTION_FIELDS.map((field) => [field, 'section text'])),
+              proposalCoreJson: {
+                schemaVersion: 4,
+                proposalCore: Object.fromEntries(PROPOSAL_CORE_KEYS.map((key) => [key, 'core text'])),
+                diagnostics: [],
+              },
+              personnel: { principalInvestigator: 'PI', coPrincipalInvestigators: [] },
+            };
+          }
+          return legacy;
+        },
+      },
+    });
+    const draftId = await h.exportDraft();
+    expect(await code(h.service.confirmRun(h.confirmArgs(draftId)))).toBe('factory_bundle_abstract_required');
+    expect(h.ledger.rows.size).toBe(0);
+    expect(h.blobs.calls.put.filter((call) => call.pathname.includes('/runs/'))).toHaveLength(0);
+  });
+
+  test('same-key Confirm returns an already-reserved run before requiring a new bundle version', async () => {
+    const h = harness({ deployment: 'preview' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { source_request_number: '9000001' });
+    const result = await h.service.confirmRun(h.confirmArgs('11111111-1111-4111-8111-111111111111'));
+    expect(result.created).toBe(false);
+    expect(result.run.runId).toBe(runId);
+    expect(h.blobs.calls.get).toHaveLength(0);
   });
 
   test('production refuses a missing or invalid actor email and writes nothing', async () => {
@@ -631,7 +678,7 @@ describe('exportSource / readArtifacts / recheck', () => {
     const PARENT_ID = '6b6b6b6b-6b6b-4b6b-8b6b-6b6b6b6b6b6b';
     const sourceRow = {
       akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
-      akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', versionnumber: 7,
+      akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', wmkf_abstract: 'Source abstract', versionnumber: 7,
     };
     const gets = [];
     const fakeClient = (resourceUrl) => ({
@@ -736,7 +783,7 @@ describe('cooperative deadlines (slice 2)', () => {
   function sevenDocumentService() {
     const sourceRow = {
       akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
-      akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', versionnumber: 7,
+      akoya_request: 5000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-01', wmkf_abstract: 'Source abstract', versionnumber: 7,
     };
     const fakeClient = (resourceUrl) => ({
       baseUrl: `${resourceUrl}/api/data/v9.2`,
@@ -1245,7 +1292,7 @@ describe('slice 3 server contract', () => {
   });
 
   test('0.1 two rows, or a next link, is 409 factory_source_ambiguous', async () => {
-    const row = { akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001' };
+    const row = { akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', wmkf_abstract: null };
     const two = await exporterFor([row, { ...row, akoya_requestid: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }]).catch((e) => e);
     expect([two.httpStatus, two.code]).toEqual([409, 'factory_source_ambiguous']);
     const linked = await exporterFor([row], { '@odata.nextLink': 'https://x/next' }).catch((e) => e);
@@ -1256,11 +1303,12 @@ describe('slice 3 server contract', () => {
     const noCycle = (exportedAt) => buildSourceBundle({
       sourceRow: {
         akoya_requestid: SOURCE_ID, akoya_requestnum: '9000001', akoya_requesttype: 100000000, akoya_purpose: 'Synthetic purpose',
-        akoya_request: 5000, akoya_fiscalyear: null, wmkf_meetingdate: null, versionnumber: 1,
+        akoya_request: 5000, akoya_fiscalyear: null, wmkf_meetingdate: null, wmkf_abstract: null, versionnumber: 1,
       },
       documents: [],
       dataverseHost: PRODUCTION_HOSTS[0],
       exportedAt: new Date(exportedAt),
+      applicantAbstract: null,
     });
     const h = harness({ deployment: 'preview', deps: { exportBundle: async ({ exportedAt }) => noCycle(exportedAt) } });
     const exported = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
@@ -1305,6 +1353,192 @@ describe('slice 3 server contract', () => {
     const result = await h.service.inspectRun({ profileId: PROFILE, runId });
     expect(result.foundationCapturedAt).toBe('2026-10-01T12:00:00.000Z');
     expect(result.resources).toHaveLength(2);
+  });
+
+  test('inspectRun reports a stale copy_file run as blocked/new-run using ledger evidence only', async () => {
+    const h = harness({ deployment: 'production' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, {
+      status: 'needs_attention', current_step: 'copy_file', step_index: 4,
+      needs_attention_reason: 'file_journal_unverified',
+      bundle_exported_at: new Date(h.clock.t - 7 * HOUR).toISOString(),
+    });
+    h.ledger.state.resources.push({
+      run_id: runId, sequence: 1, step: 'copy_file', resource_kind: 'sharepoint_file',
+      outcome: 'failed', readback: { itemId: 'journaled-item' },
+    });
+
+    const result = await h.service.inspectRun({ profileId: PROFILE, runId });
+    expect(result.diagnosis).toMatchObject({
+      evidenceSource: 'run_ledger', currentStep: 'copy_file', bundleFreshness: 'expired',
+      nextAction: 'new_run', unresolvedResourceCount: 1,
+    });
+    expect(result.diagnosis.message).toMatch(/do not retry/i);
+    expect(result.diagnosis.message).toMatch(/does not repair or remove any partial Request/i);
+    expect(JSON.stringify(result.diagnosis)).not.toContain('journaled-item');
+    expect(h.blobs.calls.get).toHaveLength(0);
+    expect(h.createClientCalls).toHaveLength(0);
+    expect(h.spies.advanceRun).not.toHaveBeenCalled();
+  });
+
+  test('inspectRun waits for a live lease before interpreting stale bundle state', async () => {
+    const h = harness({ deployment: 'production' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, {
+      status: 'creating', current_step: 'copy_file', step_index: 4,
+      locked_until: new Date(h.clock.t + HOUR).toISOString(),
+      bundle_exported_at: new Date(h.clock.t - 7 * HOUR).toISOString(),
+    });
+    const result = await h.service.inspectRun({ profileId: PROFILE, runId });
+    expect(result.diagnosis).toMatchObject({ nextAction: 'wait', lease: 'active', bundleFreshness: 'unknown' });
+    expect(h.blobs.calls.get).toHaveLength(0);
+  });
+
+  test('inspectRun offers readback evaluation for the exact journaled item only while the source window is fresh', async () => {
+    const h = harness({ deployment: 'production' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, {
+      status: 'needs_attention', current_step: 'copy_file', step_index: 4,
+      needs_attention_reason: 'file_journal_unverified',
+      bundle_exported_at: new Date(h.clock.t - HOUR).toISOString(),
+    });
+    h.ledger.state.resources.push({
+      run_id: runId, sequence: 1, step: 'copy_file', resource_kind: 'sharepoint_file',
+      outcome: 'failed', readback: { itemId: 'journaled-item' },
+    });
+    const result = await h.service.inspectRun({ profileId: PROFILE, runId });
+    expect(result.diagnosis).toMatchObject({ nextAction: 'readback_review', bundleFreshness: 'within_six_hour_window' });
+    expect(result.diagnosis.message).toMatch(/Do not retry the upload/);
+    expect(h.blobs.calls.get).toHaveLength(0);
+    expect(h.createClientCalls).toHaveLength(0);
+  });
+
+  test('diagnosis recommends retry only for a fresh, unlocked Basic run with no dispatch marker', async () => {
+    const h = harness({ deployment: 'production' });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { status: 'creating', current_step: 'create_request', step_index: 1 });
+    h.ledger.state.resources.push({
+      run_id: runId, sequence: 1, step: 'create_request', resource_kind: 'dataverse_request',
+      outcome: 'planned', dispatched_at: null, readback: {},
+    });
+    const result = await h.service.inspectRun({ profileId: PROFILE, runId });
+    expect(result.diagnosis.nextAction).toBe('retry');
+    expect(result.diagnosis.message).toMatch(/independently check the saved artifacts/);
+    expect(h.blobs.calls.get).toHaveLength(0);
+    expect(h.createClientCalls).toHaveLength(0);
+  });
+});
+
+describe('diagnoseFactoryRun fail-closed inputs', () => {
+  const run = (extra = {}) => ({
+    status: 'prepared', currentStep: 'fence_source', stepIndex: 0, recipe: 'basic',
+    lockedUntil: null, bundleExportedAt: '2026-10-03T12:00:00.000Z', ...extra,
+  });
+
+  test('missing resource collection and non-finite clock never recommend retry', () => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    expect(diagnoseFactoryRun(run(), null, at).nextAction).toBe('operator_review');
+    expect(diagnoseFactoryRun(run(), [], NaN).nextAction).toBe('operator_review');
+  });
+
+  test('unsupported recipes are not assessed and unknown recipes fail closed', () => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    expect(diagnoseFactoryRun(run({ recipe: 'reviews' }), [], at).nextAction).toBe('not_assessed');
+    expect(diagnoseFactoryRun(run({ recipe: 'future_unknown_recipe' }), [], at).nextAction).toBe('operator_review');
+  });
+
+  test.each([
+    ['upload attempt timestamp', { readback: { uploadAttemptedAt: '2026-10-03T12:01:00.000Z' } }],
+    ['recorded item identity', { readback: { itemId: 'existing-item' } }],
+    ['response status', { responseStatus: 204 }],
+  ])('planned receipt carrying %s blocks retry even when dispatchedAt is null', (_label, extra) => {
+    const result = diagnoseFactoryRun(run({ status: 'creating', currentStep: 'create_request', stepIndex: 1 }), [{
+      outcome: 'planned', step: 'create_request', resourceKind: 'dataverse_request', dispatchedAt: null, ...extra,
+    }], Date.parse('2026-10-03T12:02:00.000Z'));
+    expect(result.nextAction).toBe('operator_review');
+  });
+
+  test('a reserved two-hour-old bundle remains inside the six-hour source window', () => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    const result = diagnoseFactoryRun(run({ bundleExportedAt: new Date(at - 2 * HOUR).toISOString() }), [], at);
+    expect(result).toMatchObject({ nextAction: 'retry', bundleFreshness: 'within_six_hour_window' });
+  });
+
+  test.each(['timeout', 'network', 'upstream_http (http 429)', 'upstream_http (http 503)'])(
+    'known transient %s may retry with no write receipt left unresolved', (reason) => {
+      const at = Date.parse('2026-10-03T12:02:00.000Z');
+      const result = diagnoseFactoryRun(run({ status: 'needs_attention', needsAttentionReason: reason }), [], at);
+      expect(result.nextAction).toBe('retry');
+    },
+  );
+
+  test('known transient failure may retry with an undispatched planned receipt', () => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    const result = diagnoseFactoryRun(run({ status: 'needs_attention', needsAttentionReason: 'timeout' }), [{
+      outcome: 'planned', step: 'fence_source', resourceKind: 'foundation_transition', dispatchedAt: null, responseStatus: null, readback: {},
+    }], at);
+    expect(result.nextAction).toBe('retry');
+  });
+
+  test.each([
+    ['upstream_http (http 400)', []],
+    ['timeout', [{ outcome: 'planned', step: 'fence_source', resourceKind: 'foundation_transition', dispatchedAt: null, readback: { createAttemptedAt: '2026-10-03T12:01:00.000Z' } }]],
+  ])('unknown or write-adjacent transient %s remains blocked', (reason, resources) => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    const result = diagnoseFactoryRun(run({ status: 'needs_attention', needsAttentionReason: reason }), resources, at);
+    expect(result.nextAction).toBe('operator_review');
+  });
+
+  test('completed prior-step receipts, including an old dispatch marker, do not block the current step', () => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    const result = diagnoseFactoryRun(run({ status: 'creating', currentStep: 'correct_meeting_date', stepIndex: 2 }), [{
+      step: 'create_request', resourceKind: 'dataverse_request', outcome: 'recovered',
+      readback: { createAttemptedAt: '2026-10-03T12:01:00.000Z' },
+    }], at);
+    expect(result).toMatchObject({ nextAction: 'retry', unresolvedResourceCount: 0 });
+  });
+
+  test.each([
+    ['Request GUID readback', { status: 'needs_attention', currentStep: 'create_request', stepIndex: 1, needsAttentionReason: 'ambiguous_create_outcome' }, 'dataverse_request', { createAttemptedAt: '2026-10-03T12:01:00.000Z' }, /read the reserved Request GUID first/],
+    ['expired-lease Request GUID readback', { status: 'creating', currentStep: 'create_request', stepIndex: 1 }, 'dataverse_request', { createAttemptedAt: '2026-10-03T12:01:00.000Z' }, /read the reserved Request GUID first/],
+    ['document-location readback', { status: 'needs_attention', currentStep: 'provision_location', stepIndex: 3, needsAttentionReason: 'location_readback_mismatch' }, 'dataverse_document_location', { locationCreateAttemptedAt: '2026-10-03T12:01:00.000Z' }, /read the Request locations first/],
+  ])('%s remains eligible for its existing readback-first runner retry', (_label, runChanges, resourceKind, readback, message) => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    const result = diagnoseFactoryRun(run(runChanges), [{
+      step: runChanges.currentStep, resourceKind, outcome: 'planned', readback,
+    }], at);
+    expect(result.nextAction).toBe('retry');
+    expect(result.message).toMatch(message);
+  });
+
+  test('Basic verification failure may re-enter its read-only checks before ready', () => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    const result = diagnoseFactoryRun(run({
+      status: 'needs_attention', currentStep: 'verify', stepIndex: 6, needsAttentionReason: 'verification_failed',
+    }), [{ step: 'verify', resourceKind: 'foundation_baseline', outcome: 'failed', readback: {} }], at);
+    expect(result.nextAction).toBe('retry');
+    expect(result.message).toMatch(/repeat its read-only source, Request and file checks/);
+  });
+
+  test('a create dispatch marker does not override an unrelated stopped reason', () => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    const result = diagnoseFactoryRun(run({
+      status: 'needs_attention', currentStep: 'create_request', stepIndex: 1, needsAttentionReason: 'manifest_digest_mismatch',
+    }), [{
+      step: 'create_request', resourceKind: 'dataverse_request', outcome: 'planned',
+      readback: { createAttemptedAt: '2026-10-03T12:01:00.000Z' },
+    }], at);
+    expect(result.nextAction).toBe('operator_review');
+  });
+
+  test.each([
+    ['unknown step', { step: 'future_step', resourceKind: 'dataverse_request', outcome: 'planned' }],
+    ['future step', { step: 'verify', resourceKind: 'foundation_baseline', outcome: 'planned' }],
+    ['unknown current-step kind', { step: 'create_request', resourceKind: 'future_kind', outcome: 'planned' }],
+  ])('blocks %s evidence', (_label, receipt) => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    const result = diagnoseFactoryRun(run({ status: 'creating', currentStep: 'create_request', stepIndex: 1 }), [receipt], at);
+    expect(result.nextAction).toBe('operator_review');
   });
 });
 

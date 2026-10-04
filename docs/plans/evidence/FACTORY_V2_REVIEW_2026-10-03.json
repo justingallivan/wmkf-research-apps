@@ -1,0 +1,61 @@
+{
+  "recordedOn": "2026-10-03",
+  "scope": "Factory v2 plan only; adjusted sandbox and conditional production email scripts separately reviewed",
+  "authentication": "Claude subscription OAuth; no model API authentication",
+  "factoryV2FinalReview": "**Approve.** All three clarifications are present in the file and internally consistent; I checked the plan text only, not the source behind it.\n\n- **A (line 49, table row 45):** Integrity-only stale-tolerant verification is distinguished from the ordinary runner freshness window. Source bytes are re-downloaded and checked against pinned metadata/hash. 1003308 stays blocked, with a new run as the fallback.\n- **B (lines 49, 51):** The future receipt transition is fenced, with compare-and-set against the current resource outcome, and retains the complete package-attestation receipt and exact digest.\n- **C (line 36, row 43, item 2):** Read-only diagnosis is barred from the effectful recheck, and dispatched status stays unchanged.\n\nNon-blocking nit: the \"wait/recheck\" disposition (line 36, row 44) could be misread as the effectful status recheck; \"wait/re-inspect\" would be clearer.",
+  "emailScriptsReview": "**Verdict: approve.** No blocking safety findings; I read only the two files, made no writes and no external calls.\n\n- **Production:** the only write is one `updateRecord` PATCH carrying the regarding bind alone, with `ifMatch` and `noFallback`. It has no send, create or delete path. The pins, exact To/Cc, zero Bcc, allowlist, test-request/run and same-day field-exact proof gate (including `validPatchCompleted === true`) all hold, and a 412 or readback mismatch stops with no retry.\n- **Sandbox:** it uses the pinned existing draft with no create or delete, enforces exactly one Owner (role 9) at every checkpoint, sends with `IssueSend:false`, and requires the stale-ETag 412 before the valid PATCH. Every ambiguous branch does a readback and stops.\n\nNon-blocking notes (all fail closed):\n\n1. **The sandbox run may not pass as written.** Dataverse may refuse `SendEmail` on a draft with no recipient or sender. Separately, if setting regarding adds a role-8 party, the final exactly-one-party check (line 279) rejects a successful run. Either way no proof is written, production stays gated, and the draft may be left sent and unresumable.\n2. **Unverified from these files:** the `_writeFetch` argument order, the `_regardingobjectid_value_entity` and `_partyid_value_entity` mappings, `queryRecords().totalCount`, and the `DATAVERSE_PROD_WRITE_ACK` format.\n3. **Residual risk:** any production flow or plugin triggered by an email update is outside what the script can see.",
+  "documentationGates": [
+    {
+      "check": "check:atlas",
+      "exit": 0
+    },
+    {
+      "check": "check:atlas:self-test",
+      "exit": 0
+    },
+    {
+      "check": "check:doc-currency",
+      "exit": 0
+    },
+    {
+      "check": "check:doc-currency:self-test",
+      "exit": 0
+    },
+    {
+      "check": "check:fact-consistency",
+      "exit": 0
+    },
+    {
+      "check": "check:fact-consistency:self-test",
+      "exit": 0
+    },
+    {
+      "check": "check:doc-symbol-refs",
+      "exit": 0
+    },
+    {
+      "check": "check:doc-symbol-refs:self-test",
+      "exit": 0
+    },
+    {
+      "check": "check:docs-catalog",
+      "exit": 0
+    },
+    {
+      "check": "check:secret-scan",
+      "exit": 0
+    },
+    {
+      "check": "check:secret-scan:self-test",
+      "exit": 0
+    },
+    {
+      "check": "check:scaffolding-tokens",
+      "exit": 0
+    },
+    {
+      "check": "check:scaffolding-tokens:self-test",
+      "exit": 0
+    }
+  ]
+}

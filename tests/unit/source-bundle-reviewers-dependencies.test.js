@@ -373,7 +373,8 @@ describe('end-to-end through exportTestRequestSourceBundle', () => {
   function documentDeps() {
     return {
       readSourceRow: jest.fn(async () => ({
-        akoya_requestid: REQUEST_ID, akoya_requestnum: '1003222', akoya_requesttype: 100000001, versionnumber: 1,
+        akoya_requestid: REQUEST_ID, akoya_requestnum: '1003222', akoya_requesttype: 100000001,
+        wmkf_abstract: 'Applicant abstract fixture', versionnumber: 1,
       })),
       discoverDocuments: jest.fn(async () => ({ documents: [], errors: [] })),
       assertReadLimits: jest.fn(),
@@ -384,7 +385,7 @@ describe('end-to-end through exportTestRequestSourceBundle', () => {
     };
   }
 
-  test('produces a v3 bundle with the reviewer wired for real (fake transports), file downloaded exactly once', async () => {
+  test('produces a v5 bundle with abstract and reviewer wired for real (fake transports), file downloaded exactly once', async () => {
     const client = makeFakeClient({
       suggestionListRows: [{ wmkf_appreviewersuggestionid: SUGGESTION_ID, _wmkf_potentialreviewer_value: PERSON_ID }],
       suggestionRow: baseSuggestionRow(),
@@ -398,7 +399,8 @@ describe('end-to-end through exportTestRequestSourceBundle', () => {
       { sourceRequestNumber: '1003222', dataverseHost: 'wmkf.crm.dynamics.com', exportedAt: new Date('2026-09-23T12:00:00Z') },
       { ...documentDeps(), ...deps },
     );
-    expect(bundle.version).toBe(3);
+    expect(bundle.version).toBe(5);
+    expect(bundle.abstract).toBe('Applicant abstract fixture');
     expect(bundle.reviewers).toHaveLength(1);
     expect(bundle.reviewers[0].suggestionId).toBe(SUGGESTION_ID);
     // hydrateReviewer downloads once; readCurrentReviewerIdentity (the
@@ -424,14 +426,14 @@ describe('end-to-end through exportTestRequestSourceBundle', () => {
     expect(hydrated.files[1].name).toBe('appendix.pdf');
   });
 
-  test('a request with zero suggestions still gets a v3 bundle with an EMPTY reviewers array', async () => {
+  test('a request with zero suggestions still gets a v5 bundle with an EMPTY reviewers array', async () => {
     const client = makeFakeClient({ suggestionListRows: [] });
     const deps = createReviewerSourceDependencies({ client, graph: makeFakeGraph(), markerColumnPresent: false });
     const bundle = await exportTestRequestSourceBundle(
       { sourceRequestNumber: '1003222', dataverseHost: 'wmkf.crm.dynamics.com', exportedAt: new Date('2026-09-23T12:00:00Z') },
       { ...documentDeps(), ...deps },
     );
-    expect(bundle.version).toBe(3);
+    expect(bundle.version).toBe(5);
     expect(bundle.reviewers).toEqual([]);
   });
 });

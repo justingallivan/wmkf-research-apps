@@ -79,6 +79,7 @@ function httpError(status, message) { return Object.assign(new Error(message), {
 
 const ATTRIBUTE_TYPES = {
   akoya_requestid: 'Uniqueidentifier', akoya_applicantid: 'Lookup', akoya_title: 'String', akoya_purpose: 'Memo',
+  wmkf_abstract: 'Memo',
   akoya_request: 'Money', akoya_fiscalyear: 'String', akoya_requesttype: 'Picklist', wmkf_meetingdate: 'DateOnly',
   wmkf_istestrequest: 'Boolean', wmkf_testcreationrunid: 'String', wmkf_respondreminderenabled: 'Boolean',
   wmkf_reviewduereminderenabled: 'Boolean',

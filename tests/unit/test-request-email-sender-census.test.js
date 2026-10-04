@@ -57,7 +57,7 @@ const RECORDED_SENDERS = {
 const RECORDED_INDIRECT = {
   'lib/services/cron/grantee-deliverable-reminders-service.js': 'processRow skips test requests before recipient reads or ledger writes; deliverScheduledEmail checks before claim',
   'lib/services/reviewer-manual-reminder.js': 'sendOneReminder sends with the request as regarding; delivery seam and dispatch recheck',
-  'lib/services/site-visit-materials/reminder-sweep.js': 'per-row check before read, preparation or claim; sendReminderEmail (post-claim) does no read',
+  'lib/services/site-visit-materials/reminder-sweep.js': 'per-row check before read, preparation or claim; sendReminderEmail uses shared Dynamics Request recheck after claim',
 };
 
 function walk(dir, out = []) {

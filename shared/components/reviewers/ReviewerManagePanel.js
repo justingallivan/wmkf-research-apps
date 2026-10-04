@@ -22,7 +22,7 @@
  *                  write controls are hidden and the table is read-only. Each
  *                  mutation route must enforce its own server authorization;
  *                  this prop is never an authorization boundary.
- *   - showReviewReminderAction : exposes the direct review-due reminder in the
+ *   - showReviewReminderAction : exposes the review-due reminder composer in the
  *                  consolidated follow-up page without changing other hosts.
  *   - previewReadOnly : shows that reminder control disabled so a Preview backed
  *                  by production Dataverse remains visibly fail-closed.

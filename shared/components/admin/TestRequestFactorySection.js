@@ -154,11 +154,13 @@ export default function TestRequestFactorySection({ onTarget }) {
       const body = await requestJson(`${BASE}/${scope.runId}`, { signal: scope.controller.signal, fallbackMessage: 'The run could not be loaded.' });
       if (!isLive(scope)) return;
       setView((current) => ({
-        state: 'ready', run: body.run, resources: body.resources || [], foundationCapturedAt: body.foundationCapturedAt || null, text: '', skipFocus: Boolean(current?.skipFocus && current.run.runId === body.run.runId),
+        state: 'ready', run: body.run, resources: body.resources || [], foundationCapturedAt: body.foundationCapturedAt || null,
+        diagnosis: body.diagnosis || null, text: '', skipFocus: Boolean(current?.skipFocus && current.run.runId === body.run.runId),
       }));
     } catch (error) {
       if (!isLive(scope) || error?.name === 'AbortError') return;
-      setView((current) => (current && current.run.runId === scope.runId ? { ...current, state: 'error', text: messageFor(error) } : current));
+      setView((current) => (current && current.run.runId === scope.runId
+        ? { ...current, state: 'error', diagnosis: null, text: messageFor(error) } : current));
     }
   }
 
@@ -168,7 +170,7 @@ export default function TestRequestFactorySection({ onTarget }) {
     const scope = openScope(run.runId);
     resetPanel();
     setView({
-      state: 'loading', run, resources: null, foundationCapturedAt: null, text: '', skipFocus,
+      state: 'loading', run, resources: null, foundationCapturedAt: null, diagnosis: null, text: '', skipFocus,
     });
     return refreshRun(scope);
   }
@@ -180,7 +182,7 @@ export default function TestRequestFactorySection({ onTarget }) {
     if (reply.currentStep != null) next.currentStep = reply.currentStep;
     if (Number.isInteger(reply.stepIndex)) next.stepIndex = reply.stepIndex;
     if (reply.destinationRequestNumber) next.destinationRequestNumber = reply.destinationRequestNumber;
-    return { ...current, run: next };
+    return { ...current, run: next, diagnosis: null };
   });
 
   // ---- advance loop --------------------------------------------------------
