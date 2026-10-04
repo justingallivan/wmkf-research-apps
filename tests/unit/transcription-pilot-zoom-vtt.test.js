@@ -996,7 +996,7 @@ describe('reassignShortUtterances (misdiarized one-word utterances, owner decisi
     gap.cues[0] = cue(0, 5000, AVERY, 'the pockets are ablated quickly');
     gap.utterances[1] = { speaker: 'D', start: 5200, end: 5400, text: 'No.' };
     expect(reassignShortUtterances(gap.utterances, gap.cues, gap.applied).reassigned).toEqual({});
-    // Contained in Andrea's cue, but Zoom never captioned the word "no" -> untouched (uncaptioned dial-in case).
+    // Contained in Andrea's cue, but Zoom never captioned the content word "no" -> untouched (uncaptioned dial-in case).
     const missing = base();
     missing.utterances[1] = { speaker: 'D', start: 5000, end: 5400, text: 'No.' };
     expect(reassignShortUtterances(missing.utterances, missing.cues, missing.applied).reassigned).toEqual({});
@@ -1005,12 +1005,16 @@ describe('reassignShortUtterances (misdiarized one-word utterances, owner decisi
     expect(reassignShortUtterances(ok.utterances, ok.cues, ok.applied).reassigned).toEqual({ 1: 'A' });
   });
 
-  test('every word must be captioned; punctuation and case do not matter', () => {
-    const two = base();
-    two.utterances[1] = { speaker: 'D', start: 5000, end: 5400, text: 'Right, usually!' };
-    expect(reassignShortUtterances(two.utterances, two.cues, two.applied).reassigned).toEqual({ 1: 'A' });
-    two.utterances[1] = { speaker: 'D', start: 5000, end: 5400, text: 'Right, exactly' };
-    expect(reassignShortUtterances(two.utterances, two.cues, two.applied).reassigned).toEqual({});
+  test('a backchannel moves on containment alone even when Zoom dropped it (the 41:25 case); content words need captioning', () => {
+    const dropped = base();
+    dropped.cues[0] = cue(0, 10_000, AVERY, 'the pockets are ablated quickly usually fifteen seconds between each ablation'); // no "right"
+    expect(reassignShortUtterances(dropped.utterances, dropped.cues, dropped.applied).reassigned).toEqual({ 1: 'A' });
+    dropped.utterances[1].text = 'Yeah, okay.';
+    expect(reassignShortUtterances(dropped.utterances, dropped.cues, dropped.applied).reassigned).toEqual({ 1: 'A' });
+    dropped.utterances[1].text = 'Right, usually!'; // "usually" is a content word and IS captioned
+    expect(reassignShortUtterances(dropped.utterances, dropped.cues, dropped.applied).reassigned).toEqual({ 1: 'A' });
+    dropped.utterances[1].text = 'Right, wait'; // "wait" is a content word Zoom did not caption
+    expect(reassignShortUtterances(dropped.utterances, dropped.cues, dropped.applied).reassigned).toEqual({});
   });
 
   test('a genuine interjection with its own Zoom cue is left alone (two names caption that moment)', () => {
