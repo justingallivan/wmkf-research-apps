@@ -84,4 +84,4 @@ Command: `npm test -- --runInBand --silent 'tests/unit/.*final-writeup.*\.test\.
 
 [VERIFIED via Git] Only the two test files and this report are owned by this lane. The pre-existing `package-lock.json` modification is excluded. No runtime/service/route/component/migration change, production mutation, main-checkout edit, merge, or main push occurred.
 
-[VERIFIED via Git history] Assessment commit: the commit introducing this report and the two test additions, subject `test: verify leadership dashboard readiness`. Resolve its exact SHA with `git log -1 --format=%H -- docs/audits/LEADERSHIP_DASHBOARD_READINESS_2026-10-04.md`; self-referential commit hashes are not invented. A follow-up receipt records its exact SHA after creation.
+[VERIFIED via Git history and successful feature-branch push] Assessment/test commit: `a76b0f31a` — `test: verify leadership dashboard readiness`. It contains this inventory and four new passing test cases. This receipt-only follow-up records that commit after creation; both belong to `codex/leadership-dashboard-testing`. No merge is authorized or performed. The existing lockfile modification remains uncommitted and excluded.
