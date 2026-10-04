@@ -22,7 +22,7 @@ Meeting Tracker transcription jobs (`transcription_jobs`, AssemblyAI provider) r
 
 | Round | Finding | Revision 3 answer |
 |---|---|---|
-| 1 high | Overlap agreement does not establish identity. | Overlap vote is a prior only. Sonnet 5.5 proposes; deterministic evidence verification in our code decides (section 2, `verifyAlignmentVerdict`). |
+| 1 high | Overlap agreement does not establish identity. | Overlap vote is a prior only. The Sonnet-tier model proposes (the `sonnet` alias resolves to `claude-sonnet-5`; Sonnet 5.5 is not admitted, see `docs/audits/SONNET_55_CONSUMER_INVENTORY_2026-10-04.md`); deterministic evidence verification in our code decides (section 2, `verifyAlignmentVerdict`). |
 | 1 high | Alignment inside the worker shares the save deadline. | Alignment is a separate workflow step after ready, with its own lease and deadline. The ready transition only stamps `pending`. |
 | 1 medium | VTT filename persisted in `options_snapshot`. | Filename never accepted or stored; `options_snapshot` records bytes only. |
 | 2 high | Executor persists override variables unless declared bounded; failure envelopes embed `err.message`, stack, and JSON-parse excerpts. [VERIFIED via `lib/services/execute-prompt.js:1118-1122, 1319-1335, 937-946, 1142-1162`] | All prompt variables declare `dataClass` + `maxChars` so overrides are redacted. `rawOutputRetention: 'none'`. D9 (now `auditRetention: 'content-free'`, see round 3) removes message and stack from the failure envelope. Sentinel test asserts no transcript text or name in any run-row payload across success, invalid JSON, prompt-fetch failure. |
