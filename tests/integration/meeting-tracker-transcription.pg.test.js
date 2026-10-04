@@ -31,6 +31,7 @@ const MIGRATION_PATHS = [
   '062_transcription_speaker_names.sql',
   '063_meeting_tracker_transcription.sql',
   '064_meeting_transcript_close_attribution.sql',
+  '065_transcription_zoom_transcript.sql',
 ].map(file => path.join(process.cwd(), 'lib/db/migrations', file));
 const uuid = () => crypto.randomUUID();
 
@@ -242,5 +243,241 @@ describeIf('Meeting Tracker publication store (isolated local Postgres proof)', 
     const closed = await store.closeMeetingPublicationWithoutWrites({ operationId, requestId,
       siteVisitActivityId, leaseToken: frozen.publication.lease_token, actorProfileId: ownerId });
     expect(closed).toMatchObject({ state: 'closed', closed_by_profile_id: ownerId, error_code: 'closed_before_write' });
+  });
+
+  describe('Zoom transcript alignment fences (migration 065)', () => {
+    async function makeAlignmentJob({ alignment = { status: 'pending', attempts: 0 }, names = {}, zoom = true } = {}) {
+      const id = uuid();
+      const zoomPath = `transcription-pilot/${ownerId}/${id}/input/zoom-transcript.vtt`;
+      const created = await store.createMeetingJob({
+        id, ownerProfileId: ownerId, idempotencyKey: uuid(), requestId, siteVisitActivityId,
+        originalFilename: `${id}.m4a`, declaredContentType: 'audio/mp4', declaredBytes: 8192,
+        inputPathname: `transcription-pilot/${ownerId}/${id}/input/a.m4a`,
+        zoomTranscriptCleanupPathname: zoom ? zoomPath : undefined,
+        providerRegion: 'us', requestedModel: 'universal-2', optionsSnapshot: {},
+        expiresAt: new Date(Date.now() + 86400000), receiptExpiresAt: new Date(Date.now() + 30 * 86400000),
+      });
+      jobIds.push(created.job.id);
+      await pool.query(
+        `UPDATE transcription_jobs SET status='ready', output_pathname=$2, output_cleanup_pathname=$2,
+           output_sha256=$3, ready_at=NOW(), speaker_names=$4::jsonb,
+           zoom_transcript_pathname=$5, zoom_transcript_sha256=$6, speaker_alignment=$7::jsonb WHERE id=$1`,
+        [id, `transcription-pilot/${ownerId}/${id}/output/transcript.json`, 'a'.repeat(64), JSON.stringify(names),
+          zoom ? zoomPath : null, zoom ? 'b'.repeat(64) : null, alignment ? JSON.stringify(alignment) : null],
+      );
+      return store.getJob(id);
+    }
+    const expireLease = id => pool.query(`UPDATE transcription_jobs SET lease_expires_at=NOW()-INTERVAL '1 second' WHERE id=$1`, [id]);
+
+    it('queues a Zoom job with the live pointer and hash, and publishReady stamps pending only with a Zoom pathname', async () => {
+      for (const withZoom of [true, false]) {
+        const id = uuid();
+        const created = await store.createMeetingJob({
+          id, ownerProfileId: ownerId, idempotencyKey: uuid(), requestId, siteVisitActivityId,
+          originalFilename: 'a.m4a', declaredContentType: 'audio/mp4', declaredBytes: 8192,
+          inputPathname: `transcription-pilot/${ownerId}/${id}/input/a.m4a`,
+          zoomTranscriptCleanupPathname: withZoom ? `transcription-pilot/${ownerId}/${id}/input/zoom-transcript.vtt` : undefined,
+          providerRegion: 'us', requestedModel: 'universal-2', optionsSnapshot: {},
+          expiresAt: new Date(Date.now() + 86400000), receiptExpiresAt: new Date(Date.now() + 30 * 86400000),
+        });
+        jobIds.push(id);
+        const queued = await store.queueMeetingJob({ jobId: id, requestId, siteVisitActivityId, actorProfileId: ownerId,
+          expectedVersion: created.job.version, acknowledgementAt: new Date(), verifiedContentType: 'audio/mp4',
+          verifiedBytes: 8192, durationMs: 5000, sha256: 'a'.repeat(64), etag: null,
+          zoomTranscriptSha256: withZoom ? 'b'.repeat(64) : null });
+        expect(queued.zoom_transcript_pathname).toBe(withZoom ? queued.zoom_transcript_cleanup_pathname : null);
+        expect(queued.zoom_transcript_sha256).toBe(withZoom ? 'b'.repeat(64) : null);
+        const token = uuid();
+        await pool.query(`UPDATE transcription_jobs SET status='saving', provider_transcript_id='p-'||$1::text,
+          lease_token=$2, lease_expires_at=NOW()+INTERVAL '1 minute' WHERE id=$1`, [id, token]);
+        const current = await store.getJob(id);
+        const ready = await store.publishReady({ jobId: id, leaseToken: token, expectedVersion: current.version,
+          outputPathname: `transcription-pilot/${ownerId}/${id}/output/transcript.json`, outputSha256: 'c'.repeat(64) });
+        expect(ready.status).toBe('ready');
+        expect(ready.speaker_alignment).toEqual(withZoom ? { status: 'pending', attempts: 0 } : null);
+      }
+    });
+
+    it('claims once, refuses a live-lease running row and exhausted attempts', async () => {
+      const job = await makeAlignmentJob();
+      const [one, two] = await Promise.all([store.claimJobForAlignment({ jobId: job.id }), store.claimJobForAlignment({ jobId: job.id })]);
+      expect([one, two].filter(Boolean)).toHaveLength(1);
+      const claimed = one || two;
+      expect(claimed.job.speaker_alignment).toMatchObject({ status: 'running', attempts: 1 });
+      expect(claimed.job.version).toBe(job.version + 1);
+      expect(await store.claimJobForAlignment({ jobId: job.id })).toBeNull();
+      await expireLease(job.id);
+      const reclaimed = await store.claimJobForAlignment({ jobId: job.id });
+      expect(reclaimed.job.speaker_alignment).toMatchObject({ status: 'running', attempts: 2 });
+      await pool.query(`UPDATE transcription_jobs SET lease_token=NULL, lease_expires_at=NULL,
+        speaker_alignment='{"status":"pending","attempts":3}'::jsonb WHERE id=$1`, [job.id]);
+      expect(await store.claimJobForAlignment({ jobId: job.id })).toBeNull();
+      const noZoom = await makeAlignmentJob({ zoom: false, alignment: null });
+      expect(await store.claimJobForAlignment({ jobId: noZoom.id })).toBeNull();
+    });
+
+    it('completeAlignment writes once; a stale token, stale version, or hand-edited names write nothing', async () => {
+      const job = await makeAlignmentJob();
+      const first = await store.claimJobForAlignment({ jobId: job.id });
+      const result = { speakerNames: { A: 'Chair' }, alignment: { status: 'applied', attempts: 1 } };
+      expect(await store.completeAlignment({ jobId: job.id, leaseToken: uuid(), expectedVersion: first.job.version, ...result })).toBeNull();
+      expect(await store.completeAlignment({ jobId: job.id, leaseToken: first.leaseToken, expectedVersion: first.job.version - 1, ...result })).toBeNull();
+      await pool.query(`UPDATE transcription_jobs SET speaker_names='{"A":"Hand edit"}'::jsonb WHERE id=$1`, [job.id]);
+      expect(await store.completeAlignment({ jobId: job.id, leaseToken: first.leaseToken, expectedVersion: first.job.version, ...result })).toBeNull();
+      await pool.query(`UPDATE transcription_jobs SET speaker_names='{}'::jsonb WHERE id=$1`, [job.id]);
+      const done = await store.completeAlignment({ jobId: job.id, leaseToken: first.leaseToken, expectedVersion: first.job.version, ...result });
+      expect(done).toMatchObject({ speaker_names: { A: 'Chair' }, speaker_alignment: { status: 'applied' }, lease_token: null });
+      expect(done.version).toBe(first.job.version + 1);
+      expect(await store.completeAlignment({ jobId: job.id, leaseToken: first.leaseToken, expectedVersion: first.job.version, ...result })).toBeNull();
+    });
+
+    it('an expired-lease reclaim fences the old token out', async () => {
+      const job = await makeAlignmentJob();
+      const first = await store.claimJobForAlignment({ jobId: job.id });
+      await expireLease(job.id);
+      const second = await store.claimJobForAlignment({ jobId: job.id });
+      expect(await store.completeAlignment({ jobId: job.id, leaseToken: first.leaseToken, expectedVersion: first.job.version,
+        speakerNames: { A: 'Old' }, alignment: { status: 'applied' } })).toBeNull();
+      expect(await store.failAlignment({ jobId: job.id, leaseToken: first.leaseToken, expectedVersion: first.job.version,
+        code: 'x' })).toBeNull();
+      expect((await store.getJob(job.id)).lease_token).toBe(second.leaseToken);
+    });
+
+    it('failAlignment returns to pending after attempts 1 and 2 and fails on the third non-terminal attempt', async () => {
+      const job = await makeAlignmentJob();
+      const expected = ['pending', 'pending', 'failed'];
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        const claimed = await store.claimJobForAlignment({ jobId: job.id });
+        expect(claimed.job.speaker_alignment.attempts).toBe(attempt);
+        const failed = await store.failAlignment({ jobId: job.id, leaseToken: claimed.leaseToken,
+          expectedVersion: claimed.job.version, code: 'executor_timeout' });
+        expect(failed).toMatchObject({ lease_token: null,
+          speaker_alignment: { status: expected[attempt - 1], attempts: attempt, code: 'executor_timeout' } });
+      }
+      expect(await store.claimJobForAlignment({ jobId: job.id })).toBeNull();
+      const terminalJob = await makeAlignmentJob();
+      const claimed = await store.claimJobForAlignment({ jobId: terminalJob.id });
+      const terminal = await store.failAlignment({ jobId: terminalJob.id, leaseToken: claimed.leaseToken,
+        expectedVersion: claimed.job.version, terminal: true, code: 'zoom_transcript_missing' });
+      expect(terminal.speaker_alignment).toMatchObject({ status: 'failed', code: 'zoom_transcript_missing' });
+    });
+
+    it('with an expired lease and no reclaim, the still-current token and version cannot complete or fail', async () => {
+      const job = await makeAlignmentJob();
+      const claimed = await store.claimJobForAlignment({ jobId: job.id });
+      await expireLease(job.id);
+      expect(await store.completeAlignment({ jobId: job.id, leaseToken: claimed.leaseToken, expectedVersion: claimed.job.version,
+        speakerNames: { A: 'Late' }, alignment: { status: 'applied' } })).toBeNull();
+      expect(await store.failAlignment({ jobId: job.id, leaseToken: claimed.leaseToken, expectedVersion: claimed.job.version,
+        code: 'late' })).toBeNull();
+      expect((await store.getJob(job.id)).speaker_names).toEqual({});
+    });
+
+    it('a hand edit on a running row with an expired lease supersedes it and the claim then finds nothing', async () => {
+      const job = await makeAlignmentJob();
+      await store.claimJobForAlignment({ jobId: job.id });
+      await expireLease(job.id);
+      const current = await store.getJob(job.id);
+      const updated = await store.updateMeetingSpeakerNames({ jobId: job.id, requestId, siteVisitActivityId,
+        expectedVersion: current.version, actorProfileId: ownerId, speakerNames: { A: 'Hand' } });
+      expect(updated.speaker_alignment).toMatchObject({ status: 'superseded', attempts: 1 });
+      expect(await store.claimJobForAlignment({ jobId: job.id })).toBeNull();
+    });
+
+    it('never claims a job that has a publication row', async () => {
+      const job = await makeAlignmentJob();
+      const operationId = uuid();
+      operationIds.push(operationId);
+      await pool.query(
+        `INSERT INTO meeting_transcript_publications(operation_id, request_id, site_visit_activity_id,
+           initiator_profile_id, input_job_id, state) VALUES($1,$2,$3,$4,$5,'closed')`,
+        [operationId, requestId, siteVisitActivityId, ownerId, job.id],
+      );
+      expect(await store.claimJobForAlignment({ jobId: job.id })).toBeNull();
+      expect(await store.claimNextPendingAlignmentJob({ limit: 50 })).not.toContain(job.id);
+    });
+
+    it('expireExhaustedAlignments fails running+attempts>=3 with a free or expired lease and spares a live lease', async () => {
+      const exhausted = '{"status":"running","attempts":3}';
+      const expired = await makeAlignmentJob({ alignment: JSON.parse(exhausted) });
+      const released = await makeAlignmentJob({ alignment: JSON.parse(exhausted) });
+      const live = await makeAlignmentJob({ alignment: JSON.parse(exhausted) });
+      const under = await makeAlignmentJob({ alignment: { status: 'running', attempts: 2 } });
+      await pool.query(`UPDATE transcription_jobs SET lease_token=$2, lease_expires_at=NOW()-INTERVAL '1 second' WHERE id=$1`, [expired.id, uuid()]);
+      await pool.query(`UPDATE transcription_jobs SET lease_token=$2, lease_expires_at=NOW()+INTERVAL '5 minutes' WHERE id=$1`, [live.id, uuid()]);
+      const rows = await store.expireExhaustedAlignments({ limit: 50 });
+      expect(rows.map(row => row.id).sort()).toEqual([expired.id, released.id].sort());
+      for (const id of [expired.id, released.id]) {
+        expect(await store.getJob(id)).toMatchObject({ lease_token: null,
+          speaker_alignment: { status: 'failed', code: 'attempts_exhausted' } });
+      }
+      expect((await store.getJob(live.id)).speaker_alignment.status).toBe('running');
+      expect((await store.getJob(under.id)).speaker_alignment.status).toBe('running');
+    });
+
+    it('recovery scan reaches a running row with a released or expired lease and skips live leases and fresh pending', async () => {
+      const fresh = await makeAlignmentJob();
+      const stale = await makeAlignmentJob();
+      const running = await makeAlignmentJob({ alignment: { status: 'running', attempts: 1 } });
+      const live = await makeAlignmentJob({ alignment: { status: 'running', attempts: 1 } });
+      await pool.query(`UPDATE transcription_jobs SET updated_at=NOW()-INTERVAL '10 minutes' WHERE id=$1`, [stale.id]);
+      await pool.query(`UPDATE transcription_jobs SET lease_token=$2, lease_expires_at=NOW()+INTERVAL '5 minutes' WHERE id=$1`, [live.id, uuid()]);
+      const ids = await store.claimNextPendingAlignmentJob({ limit: 50 });
+      expect(ids).toEqual(expect.arrayContaining([stale.id, running.id]));
+      expect(ids).not.toContain(fresh.id);
+      expect(ids).not.toContain(live.id);
+    });
+
+    it('a hand edit supersedes a pending alignment (including an empty save) and the claim then finds nothing', async () => {
+      for (const names of [{ A: 'Hand' }, {}]) {
+        const job = await makeAlignmentJob();
+        const updated = await store.updateMeetingSpeakerNames({ jobId: job.id, requestId, siteVisitActivityId,
+          expectedVersion: job.version, actorProfileId: ownerId, speakerNames: names });
+        expect(updated.speaker_alignment).toMatchObject({ status: 'superseded', attempts: 0 });
+        expect(await store.claimJobForAlignment({ jobId: job.id })).toBeNull();
+      }
+      const applied = await makeAlignmentJob({ alignment: { status: 'applied', attempts: 1 } });
+      const kept = await store.updateMeetingSpeakerNames({ jobId: applied.id, requestId, siteVisitActivityId,
+        expectedVersion: applied.version, actorProfileId: ownerId, speakerNames: { A: 'Edit' } });
+      expect(kept.speaker_alignment.status).toBe('applied');
+    });
+
+    it('purge deletes the Zoom path last-acknowledged, clears speaker_alignment, and never purges early', async () => {
+      const job = await makeAlignmentJob();
+      const cleanup = await store.requestMeetingJobCleanup({ jobId: job.id, requestId, siteVisitActivityId,
+        actorProfileId: ownerId, expectedVersion: job.version });
+      expect(cleanup.speaker_alignment).toBeNull();
+      const claimed = await store.claimCleanup({ jobId: job.id });
+      const partial = await store.finishLocalCleanup({ jobId: job.id, leaseToken: claimed.leaseToken, expectedVersion: claimed.job.version,
+        deletedPaths: [] });
+      expect(partial.content_purged_at).toBeNull();
+      expect(partial.zoom_transcript_cleanup_pathname).not.toBeNull();
+      await expireLease(job.id);
+      const again = await store.claimCleanup({ jobId: job.id });
+      const done = await store.finishLocalCleanup({ jobId: job.id, leaseToken: again.leaseToken, expectedVersion: again.job.version,
+        deletedPaths: ['input_cleanup_pathname', 'output_cleanup_pathname', 'zoom_transcript_cleanup_pathname'] });
+      expect(done).toMatchObject({ zoom_transcript_cleanup_pathname: null, zoom_transcript_pathname: null, speaker_alignment: null });
+      expect(done.content_purged_at).not.toBeNull();
+    });
+
+    it('the purged-content CHECK rejects a purged row that still has a Zoom pointer or alignment', async () => {
+      const job = await makeAlignmentJob();
+      const purged = `content_purged_at=NOW(), audio_pathname=NULL, output_pathname=NULL, diagnostic_pathname=NULL,
+        correction_notes=NULL, original_filename=NULL, audio_sha256=NULL, audio_etag=NULL, status='expired'`;
+      const withPointer = await pool.query(`UPDATE transcription_jobs SET ${purged}, speaker_alignment=NULL,
+        zoom_transcript_pathname='p' WHERE id=$1`, [job.id]).catch(err => err);
+      expect(withPointer.constraint).toBe('transcription_jobs_purged_content_shape');
+      const withAlignment = await pool.query(`UPDATE transcription_jobs SET ${purged}, zoom_transcript_pathname=NULL,
+        speaker_alignment='{"status":"applied"}'::jsonb WHERE id=$1`, [job.id]).catch(err => err);
+      expect(withAlignment.constraint).toBe('transcription_jobs_purged_content_shape');
+    });
+
+    it('rejects an oversized or non-object speaker_alignment', async () => {
+      const job = await makeAlignmentJob();
+      for (const bad of ['[]', JSON.stringify({ status: 'x', pad: 'y'.repeat(70000) })]) {
+        const error = await pool.query('UPDATE transcription_jobs SET speaker_alignment=$2::jsonb WHERE id=$1', [job.id, bad]).catch(err => err);
+        expect(error.constraint).toBe('transcription_jobs_speaker_alignment_shape');
+      }
+    });
   });
 });

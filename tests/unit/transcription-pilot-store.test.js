@@ -1,3 +1,5 @@
+jest.mock('@vercel/blob', () => ({ del: jest.fn(), get: jest.fn(), put: jest.fn() }));
+jest.mock('@vercel/blob/client', () => ({ generateClientTokenFromReadWriteToken: jest.fn() }));
 import {
   TRANSCRIPTION_JOB_LABELS, TRANSCRIPTION_JOB_STATUSES, TRANSCRIPTION_JOB_STATUS,
   projectOwnerTranscriptionJob,
@@ -44,7 +46,8 @@ describe('transcription pilot persistence contract', () => {
     expect(projected.providerCleanupPending).toBe(true);
     expect(projected.contentDeletionObserved).toBe(true);
     expect(projected.lateUploadWatchPending).toBe(true);
-    for (const secret of ['output_pathname', 'input_cleanup_pathname', 'upload_valid_until', 'provider_transcript_id', 'provider_upload_ref_ciphertext', 'lease_token']) {
+    for (const secret of ['output_pathname', 'input_cleanup_pathname', 'upload_valid_until', 'provider_transcript_id', 'provider_upload_ref_ciphertext', 'lease_token',
+      'zoom_transcript_pathname', 'zoom_transcript_sha256', 'zoom_transcript_cleanup_pathname']) {
       expect(projected).not.toHaveProperty(secret);
     }
 
@@ -516,5 +519,241 @@ describe('transcription pilot persistence contract', () => {
     for (const key of ['original_filename', 'declared_bytes', 'verified_bytes', 'audio_duration_ms',
       'requested_model', 'returned_model', 'word_accuracy_score', 'speaker_accuracy_score', 'correction_notes']) expect(dto[key]).toBeNull();
     expect(dto.cleanupPending).toBe(true);
+  });
+});
+
+describe('Zoom transcript and speaker alignment persistence', () => {
+  const JOB = '00000000-0000-4000-8000-000000000001';
+  const TOKEN = '00000000-0000-4000-8000-0000000000aa';
+  const meetingArgs = {
+    ownerProfileId: 7, idempotencyKey: '00000000-0000-4000-8000-000000000009', requestId: NON_RFC_REQUEST_ID,
+    siteVisitActivityId: NON_RFC_SITE_VISIT_ID, originalFilename: 'a.m4a', declaredContentType: 'audio/mp4',
+    declaredBytes: 10, providerRegion: 'us', requestedModel: 'universal-2', optionsSnapshot: {},
+    expiresAt: new Date(), receiptExpiresAt: new Date(),
+  };
+
+  it('createMeetingJob inserts the Zoom cleanup path only under the job prefix', async () => {
+    const db = fakeDatabase();
+    db.query.mockResolvedValueOnce({ rows: [{ id: JOB }] });
+    const store = createTranscriptionPilotStore(db);
+    const good = `transcription-pilot/7/${JOB}/input/zoom-transcript.vtt`;
+    await store.createMeetingJob({ ...meetingArgs, id: JOB, inputPathname: `transcription-pilot/7/${JOB}/input/a.m4a`,
+      zoomTranscriptCleanupPathname: good });
+    expect(db.query.mock.calls[0][0]).toMatch(/zoom_transcript_cleanup_pathname/);
+    expect(db.query.mock.calls[0][1]).toContain(good);
+    await expect(store.createMeetingJob({ ...meetingArgs, id: JOB, inputPathname: `transcription-pilot/7/${JOB}/input/a.m4a`,
+      zoomTranscriptCleanupPathname: `transcription-pilot/7/other/zoom.vtt` })).rejects.toMatchObject({ code: 'transcription_invalid_value' });
+  });
+
+  it('queueMeetingJob promotes the Zoom cleanup path to the live pointer with its hash', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    await store.queueMeetingJob({ jobId: JOB, requestId: NON_RFC_REQUEST_ID, siteVisitActivityId: NON_RFC_SITE_VISIT_ID,
+      actorProfileId: 7, expectedVersion: 1, acknowledgementAt: new Date(), verifiedContentType: 'audio/mp4',
+      verifiedBytes: 10, durationMs: 1000, sha256: 'a'.repeat(64), etag: null,
+      zoomTranscriptSha256: 'b'.repeat(64), speakerAlignment: { status: 'no_speakers' } });
+    const [query, params] = db.query.mock.calls[0];
+    expect(query).toMatch(/zoom_transcript_pathname = zoom_transcript_cleanup_pathname/);
+    expect(params).toContain('b'.repeat(64));
+    expect(params).toContain('{"status":"no_speakers"}');
+  });
+
+  it('publishReady stamps a pending marker only when a Zoom pathname exists', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    await store.publishReady({ jobId: JOB, leaseToken: TOKEN, expectedVersion: 3,
+      outputPathname: 'transcription-pilot/x/output.json', outputSha256: 'c'.repeat(64) });
+    const query = db.query.mock.calls[0][0];
+    expect(query).toMatch(/speaker_alignment = CASE WHEN zoom_transcript_pathname IS NOT NULL AND speaker_alignment IS NULL\s+THEN '\{"status":"pending","attempts":0\}'::jsonb ELSE speaker_alignment END/);
+  });
+
+  it('updateMeetingSpeakerNames supersedes a pending or running alignment, including an empty save', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    await store.updateMeetingSpeakerNames({ jobId: JOB, requestId: NON_RFC_REQUEST_ID, siteVisitActivityId: NON_RFC_SITE_VISIT_ID,
+      expectedVersion: 2, actorProfileId: 7, speakerNames: {} });
+    const [query, params] = db.query.mock.calls[0];
+    expect(query).toMatch(/speaker_alignment->>'status' IN \('pending','running'\)\s+THEN jsonb_set\(speaker_alignment, '\{status\}', '"superseded"'\)/);
+    expect(params).toContain('{}');
+  });
+
+  it('claimJobForAlignment is lease-, status-, attempt-, and fence-guarded', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    await expect(store.claimJobForAlignment({ jobId: JOB })).resolves.toBeNull();
+    const [query, params] = db.query.mock.calls[0];
+    expect(params[2]).toBe(180);
+    for (const fragment of [
+      /status = 'ready' AND output_pathname IS NOT NULL/, /zoom_transcript_pathname IS NOT NULL/,
+      /speaker_names = '\{\}'::jsonb/, /publication_operation_id IS NULL/, /cleanup_requested_at IS NULL/,
+      /\(lease_token IS NULL OR lease_expires_at <= NOW\(\)\)/,
+      /speaker_alignment->>'status' = 'pending' OR speaker_alignment->>'status' = 'running'/,
+      /\(speaker_alignment->>'attempts'\)::int < 3/, /version = version \+ 1/,
+    ]) expect(query).toMatch(fragment);
+    await expect(store.claimJobForAlignment({ jobId: JOB, leaseSeconds: 181 })).rejects.toMatchObject({ code: 'transcription_invalid_value' });
+  });
+
+  it('completeAlignment fences on lease, version, and empty hand-edit names', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    await expect(store.completeAlignment({ jobId: JOB, leaseToken: TOKEN, expectedVersion: 4,
+      speakerNames: { A: 'Chair' }, alignment: { status: 'applied', attempts: 1 } })).resolves.toBeNull();
+    const [query, params] = db.query.mock.calls[0];
+    expect(query).toMatch(/lease_token = \$2 AND lease_expires_at > NOW\(\) AND version = \$3/);
+    expect(query).toMatch(/speaker_names = '\{\}'::jsonb/);
+    expect(query).toMatch(/version = version \+ 1/);
+    expect(params.slice(3)).toEqual(['{"A":"Chair"}', '{"status":"applied","attempts":1}']);
+    await expect(store.completeAlignment({ jobId: JOB, leaseToken: TOKEN, expectedVersion: 4,
+      speakerNames: {}, alignment: [] })).rejects.toMatchObject({ code: 'transcription_invalid_value' });
+    await expect(store.completeAlignment({ jobId: JOB, leaseToken: TOKEN, expectedVersion: 4,
+      speakerNames: {}, alignment: { status: 'applied', blob: 'x'.repeat(70000) } })).rejects.toMatchObject({ code: 'transcription_invalid_value' });
+  });
+
+  it('failAlignment is fenced, caps at three attempts, and validates its code', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    await store.failAlignment({ jobId: JOB, leaseToken: TOKEN, expectedVersion: 4, terminal: true, code: 'zoom_transcript_missing' });
+    const [query, params] = db.query.mock.calls[0];
+    expect(query).toMatch(/lease_token = \$2 AND lease_expires_at > NOW\(\) AND version = \$3/);
+    expect(query).toMatch(/\(speaker_alignment->>'attempts'\)::int >= 3/);
+    expect(query).toMatch(/lease_token = NULL, lease_expires_at = NULL/);
+    expect(params[3]).toBe(true);
+    await expect(store.failAlignment({ jobId: JOB, leaseToken: TOKEN, expectedVersion: 4, code: 'Bad Code' }))
+      .rejects.toMatchObject({ code: 'transcription_invalid_value' });
+  });
+
+  it('recovery scan and exhaustion expiry both match a free or expired lease and never a live one', async () => {
+    const db = fakeDatabase();
+    db.query.mockResolvedValueOnce({ rows: [{ id: JOB }] });
+    const store = createTranscriptionPilotStore(db);
+    await expect(store.claimNextPendingAlignmentJob({ limit: 3 })).resolves.toEqual([JOB]);
+    await store.expireExhaustedAlignments({ limit: 3 });
+    const [scan, expire] = db.query.mock.calls.map(call => call[0]);
+    expect(scan).toMatch(/\(lease_token IS NULL OR lease_expires_at <= NOW\(\)\)/);
+    expect(scan).toMatch(/speaker_alignment->>'status' = 'pending' AND updated_at < NOW\(\) - INTERVAL '2 minutes'/);
+    expect(scan).toMatch(/speaker_alignment->>'status' = 'running'/);
+    expect(scan).toMatch(/\(speaker_alignment->>'attempts'\)::int < 3/);
+    expect(expire).toMatch(/speaker_alignment->>'status' = 'running'/);
+    expect(expire).toMatch(/\(lease_token IS NULL OR lease_expires_at <= NOW\(\)\)/);
+    expect(expire).toMatch(/\(speaker_alignment->>'attempts'\)::int >= 3/);
+    expect(expire).toMatch(/"attempts_exhausted"/);
+    expect(expire).toMatch(/version = version \+ 1/);
+  });
+
+  describe('finishLocalCleanup with a Zoom transcript path', () => {
+    const zoom = 'transcription-pilot/7/job/input/zoom-transcript.vtt';
+    const baseRow = {
+      id: JOB, status: 'ready', version: 5, cleanup_requested_at: new Date(), upload_valid_until: null,
+      input_cleanup_pathname: null, audio_pathname: null, output_cleanup_pathname: null, output_pathname: null,
+      diagnostic_cleanup_pathname: null, diagnostic_pathname: null,
+      zoom_transcript_cleanup_pathname: zoom, zoom_transcript_pathname: zoom,
+    };
+    function run(row, deletedPaths) {
+      const tx = { query: jest.fn().mockResolvedValueOnce({ rows: [row] }).mockResolvedValueOnce({ rows: [{ id: JOB }] }) };
+      const db = { query: jest.fn(), transaction: jest.fn(async fn => fn(tx)) };
+      return createTranscriptionPilotStore(db).finishLocalCleanup({ jobId: JOB, leaseToken: TOKEN, expectedVersion: 5, deletedPaths })
+        .then(() => tx.query.mock.calls[1]);
+    }
+
+    it('does not mark content purged while the Zoom path is unacknowledged', async () => {
+      const [query, params] = await run(baseRow, []);
+      expect(query).not.toMatch(/content_purged_at/);
+      expect(query).not.toMatch(/local_cleanup_completed_at/);
+      expect(params).not.toContain(null);
+    });
+
+    it('acknowledged Zoom deletion clears both pointers, purges, and nulls speaker_alignment', async () => {
+      const [query, params] = await run(baseRow, ['zoom_transcript_cleanup_pathname']);
+      expect(query).toMatch(/zoom_transcript_cleanup_pathname = \$/);
+      expect(query).toMatch(/zoom_transcript_pathname = \$/);
+      expect(query).toMatch(/content_purged_at = \$/);
+      expect(query).toMatch(/speaker_alignment = \$/);
+      expect(query).toMatch(/local_cleanup_completed_at = NOW\(\)/);
+      expect(params.filter(value => value === null).length).toBeGreaterThanOrEqual(3);
+    });
+
+    it('late-upload retention keeps the Zoom cleanup path like the input path', async () => {
+      const [query] = await run({ ...baseRow, upload_valid_until: new Date(Date.now() + 60000) }, ['zoom_transcript_cleanup_pathname']);
+      expect(query).not.toMatch(/zoom_transcript_cleanup_pathname = \$/);
+      expect(query).not.toMatch(/local_cleanup_completed_at/);
+    });
+
+    it('rejects a non-column acknowledgement', async () => {
+      await expect(run(baseRow, ['zoom_transcript_pathname'])).rejects.toMatchObject({ code: 'transcription_invalid_value' });
+    });
+  });
+
+  it('expireContent nulls the live Zoom pointer and speaker_alignment', async () => {
+    const tx = { query: jest.fn().mockResolvedValueOnce({ rows: [] }) };
+    const db = { query: jest.fn(), transaction: jest.fn(async fn => fn(tx)) };
+    await createTranscriptionPilotStore(db).expireContent({ jobId: JOB, leaseToken: TOKEN, expectedVersion: 2 });
+    expect(tx.query.mock.calls[0][0]).toMatch(/zoom_transcript_pathname = NULL/);
+    expect(tx.query.mock.calls[0][0]).toMatch(/speaker_alignment = NULL/);
+  });
+
+  it('owner projection redacts alignment on blocked content and watches the Zoom path under an upload window', () => {
+    const base = { id: 'j', status: 'ready', version: 1, expires_at: new Date(Date.now() + 60000),
+      speaker_alignment: { status: 'applied' }, upload_valid_until: new Date(Date.now() + 60000) };
+    expect(projectOwnerTranscriptionJob(base).speaker_alignment).toEqual({ status: 'applied' });
+    expect(projectOwnerTranscriptionJob({ ...base, cleanup_requested_at: new Date() }).speaker_alignment).toBeNull();
+    expect(projectOwnerTranscriptionJob({ ...base, receipt_expires_at: new Date(Date.now() - 1) }).speaker_alignment).toBeNull();
+    const watch = projectOwnerTranscriptionJob({ ...base, cleanup_requested_at: new Date(), zoom_transcript_cleanup_pathname: 'p' });
+    expect(watch.lateUploadWatchPending).toBe(true);
+    expect(watch).not.toHaveProperty('zoom_transcript_cleanup_pathname');
+  });
+});
+
+describe('speaker alignment validation and projection allowlist', () => {
+  const JOB = '00000000-0000-4000-8000-000000000001';
+  const TOKEN = '00000000-0000-4000-8000-0000000000aa';
+
+  it('completeAlignment accepts only terminal result statuses and integer attempts', async () => {
+    const store = createTranscriptionPilotStore(fakeDatabase());
+    const base = { jobId: JOB, leaseToken: TOKEN, expectedVersion: 2, speakerNames: {} };
+    await expect(store.completeAlignment({ ...base, alignment: { status: 'pending', attempts: 0 } })).rejects.toMatchObject({ code: 'transcription_invalid_value' });
+    await expect(store.completeAlignment({ ...base, alignment: { status: 'applied', attempts: '1' } })).rejects.toMatchObject({ code: 'transcription_invalid_value' });
+    await expect(store.completeAlignment({ ...base, alignment: { status: 'applied', attempts: 4 } })).rejects.toMatchObject({ code: 'transcription_invalid_value' });
+    await expect(store.completeAlignment({ ...base, alignment: { status: 'bogus' } })).rejects.toMatchObject({ code: 'transcription_invalid_value' });
+    await expect(store.completeAlignment({ ...base, alignment: { status: 'partial', attempts: 2 } })).resolves.toBeNull();
+  });
+
+  it('queueMeetingJob accepts only a no_speakers marker and only with a Zoom hash, and refuses to queue a VTT job without one', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    const args = { jobId: JOB, requestId: NON_RFC_REQUEST_ID, siteVisitActivityId: NON_RFC_SITE_VISIT_ID, actorProfileId: 7,
+      expectedVersion: 1, acknowledgementAt: new Date(), verifiedContentType: 'audio/mp4', verifiedBytes: 10,
+      durationMs: 1000, sha256: 'a'.repeat(64), etag: null };
+    await expect(store.queueMeetingJob({ ...args, zoomTranscriptSha256: 'b'.repeat(64), speakerAlignment: { status: 'pending' } }))
+      .rejects.toMatchObject({ code: 'transcription_invalid_value' });
+    await expect(store.queueMeetingJob({ ...args, speakerAlignment: { status: 'no_speakers' } }))
+      .rejects.toMatchObject({ code: 'transcription_invalid_value' });
+    await store.queueMeetingJob({ ...args, zoomTranscriptSha256: 'b'.repeat(64) });
+    expect(db.query.mock.calls[0][0]).toMatch(/AND \(zoom_transcript_cleanup_pathname IS NULL OR \$12::text IS NOT NULL\)/);
+  });
+
+  it('alignment claim excludes any job that was ever published', async () => {
+    const db = fakeDatabase();
+    const store = createTranscriptionPilotStore(db);
+    await store.claimJobForAlignment({ jobId: JOB });
+    await store.claimNextPendingAlignmentJob({ limit: 1 });
+    for (const [query] of db.query.mock.calls) {
+      expect(query).toMatch(/NOT EXISTS \(SELECT 1 FROM meeting_transcript_publications p WHERE p\.input_job_id = transcription_jobs\.id\)/);
+    }
+  });
+
+  it('projects only allowlisted alignment keys through the owner and Meeting projections', () => {
+    const row = { id: 'j', status: 'ready', version: 1, expires_at: new Date(Date.now() + 60000),
+      output_pathname: 'p', zoom_transcript_cleanup_pathname: 'z',
+      speaker_alignment: { status: 'applied', attempts: 1, code: null, model: 'm', floor: 0.8, secretTop: 'LEAK',
+        speakers: { A: { name: 'Chair', confidence: 0.9, prior: { x: 1 }, pairIds: ['p1'], extra: 'LEAK' } },
+        suggestions: { B: ['Vice'] } } };
+    const owner = projectOwnerTranscriptionJob(row);
+    expect(owner.speaker_alignment).toEqual({ status: 'applied', attempts: 1, code: null,
+      speakers: { A: { name: 'Chair', confidence: 0.9 } }, suggestions: { B: ['Vice'] } });
+    expect(JSON.stringify(owner)).not.toMatch(/pairIds|LEAK|prior|floor/);
+    const { projectMeetingTranscriptionJob } = jest.requireActual('../../lib/services/transcription-pilot/runtime.js');
+    const meeting = projectMeetingTranscriptionJob(row);
+    expect(JSON.stringify(meeting.speaker_alignment)).not.toMatch(/pairIds|LEAK|prior|floor/);
+    expect(meeting.speaker_alignment.speakers.A).toEqual({ name: 'Chair', confidence: 0.9 });
   });
 });

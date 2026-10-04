@@ -487,4 +487,56 @@ describe('transcription worker submission safety', () => {
 
     expect(store.releaseReadyTranscriptionCleanupLease).not.toHaveBeenCalled();
   });
+
+  const zoomPath = 'transcription-pilot/ready/zoom-transcript.vtt';
+  function zoomReadyJob(overrides = {}) {
+    return { ...queued, status: 'ready', version: 8, cleanup_requested_at: null,
+      expires_at: new Date(Date.now() + 86_400_000), input_cleanup_pathname: 'transcription-pilot/ready/input.m4a',
+      output_cleanup_pathname: 'transcription-pilot/ready/output.json', zoom_transcript_cleanup_pathname: zoomPath,
+      audio_pathname: null, provider_transcript_id: null, provider_upload_ref_ciphertext: null, ...overrides };
+  }
+
+  it('purge cleanup deletes and acknowledges the Zoom transcript path', async () => {
+    const purging = zoomReadyJob({ cleanup_requested_at: new Date() });
+    store.claimNextExpiredContentTranscriptionJob.mockResolvedValue(null);
+    store.claimNextCleanupTranscriptionJob.mockResolvedValueOnce({ job: purging, leaseToken: purging.lease_token }).mockResolvedValue(null);
+    store.getLeasedTranscriptionJob.mockResolvedValue({ ...purging, version: 9 });
+    runtime.deletePrivatePath.mockResolvedValue(true);
+    store.finishTranscriptionLocalCleanup.mockResolvedValue({ ...purging, version: 10, input_cleanup_pathname: null,
+      output_cleanup_pathname: null, zoom_transcript_cleanup_pathname: null, local_cleanup_completed_at: new Date() });
+
+    await drainTranscriptionCleanup({ maxJobs: 1 });
+
+    expect(runtime.deletePrivatePath).toHaveBeenCalledWith(zoomPath, expect.any(Number));
+    expect(store.finishTranscriptionLocalCleanup).toHaveBeenCalledWith(expect.objectContaining({
+      deletedPaths: expect.arrayContaining(['zoom_transcript_cleanup_pathname']) }));
+  });
+
+  it('keeps cleanup pending while the Zoom transcript path remains after a purge pass', async () => {
+    const purging = zoomReadyJob({ cleanup_requested_at: new Date() });
+    store.claimNextExpiredContentTranscriptionJob.mockResolvedValue(null);
+    store.claimNextCleanupTranscriptionJob.mockResolvedValueOnce({ job: purging, leaseToken: purging.lease_token }).mockResolvedValue(null);
+    store.getLeasedTranscriptionJob.mockResolvedValue({ ...purging, version: 9 });
+    runtime.deletePrivatePath.mockResolvedValue(true);
+    store.finishTranscriptionLocalCleanup.mockResolvedValue({ ...purging, version: 10, input_cleanup_pathname: null,
+      output_cleanup_pathname: null, zoom_transcript_cleanup_pathname: zoomPath });
+
+    const result = await drainTranscriptionCleanup({ maxJobs: 3 });
+
+    expect(result.incomplete).toBe(true);
+  });
+
+  it('ready-time (non-purge) cleanup leaves the Zoom transcript path alone', async () => {
+    const ready = zoomReadyJob();
+    store.claimNextExpiredContentTranscriptionJob.mockResolvedValue(null);
+    store.claimNextCleanupTranscriptionJob.mockResolvedValueOnce({ job: ready, leaseToken: ready.lease_token }).mockResolvedValue(null);
+    store.getLeasedTranscriptionJob.mockResolvedValue({ ...ready, version: 9 });
+    runtime.deletePrivatePath.mockResolvedValue(true);
+    store.finishTranscriptionLocalCleanup.mockResolvedValue({ ...ready, version: 10, input_cleanup_pathname: null });
+
+    await drainTranscriptionCleanup({ maxJobs: 1 });
+
+    expect(runtime.deletePrivatePath).not.toHaveBeenCalledWith(zoomPath, expect.anything());
+    expect(store.finishTranscriptionLocalCleanup).toHaveBeenCalledWith(expect.objectContaining({ deletedPaths: ['input_cleanup_pathname'] }));
+  });
 });

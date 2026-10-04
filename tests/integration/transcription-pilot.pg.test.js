@@ -28,6 +28,7 @@ const MIGRATION_PATHS = [
   path.join(process.cwd(), 'lib/db/migrations/060_transcription_jobs.sql'),
   path.join(process.cwd(), 'lib/db/migrations/061_transcription_workflow_dispatches.sql'),
   path.join(process.cwd(), 'lib/db/migrations/062_transcription_speaker_names.sql'),
+  path.join(process.cwd(), 'lib/db/migrations/065_transcription_zoom_transcript.sql'),
 ];
 
 describeIf('transcription pilot store (isolated local Postgres proof)', () => {

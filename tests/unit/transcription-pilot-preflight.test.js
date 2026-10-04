@@ -67,7 +67,7 @@ function response() {
 }
 
 function readOnlyClient({ readOnly = 'on', database = 'neondb', jobs = '0', dispatches = '0', migration = true, shape = true,
-  speakerNamesMigration = true, speakerNamesShape = true } = {}) {
+  speakerNamesMigration = true, speakerNamesShape = true, zoomMigration = true, zoomShape = true } = {}) {
   const calls = [];
   return {
     calls,
@@ -80,6 +80,9 @@ function readOnlyClient({ readOnly = 'on', database = 'neondb', jobs = '0', disp
       if (normalized.startsWith('SELECT EXISTS (SELECT 1 FROM public.schema_migrations WHERE name = $1)')) return { rows: [{ applied: migration }] };
       if (normalized.includes('062_transcription_speaker_names.sql')) return { rows: [{
         migration_applied: speakerNamesMigration, column_present: speakerNamesShape, constraint_present: speakerNamesShape,
+      }] };
+      if (normalized.includes('065_transcription_zoom_transcript.sql')) return { rows: [{
+        migration_applied: zoomMigration, columns_present: zoomShape, constraints_present: zoomShape,
       }] };
       if (normalized.startsWith('SELECT to_regclass(')) return { rows: [{
         table_present: shape, columns_match: shape, constraints_match: shape,
@@ -151,6 +154,7 @@ describe('transcription Preview readiness preflight', () => {
       "SELECT EXISTS (SELECT 1 FROM public.schema_migrations WHERE name = $1) AS applied",
       expect.stringContaining('to_regclass'),
       expect.stringContaining('062_transcription_speaker_names.sql'),
+      expect.stringContaining('065_transcription_zoom_transcript.sql'),
       'SELECT COUNT(*)::text AS count FROM public.transcription_jobs',
       'SELECT COUNT(*)::text AS count FROM public.transcription_workflow_dispatches', 'COMMIT', 'end',
     ]);
@@ -162,6 +166,7 @@ describe('transcription Preview readiness preflight', () => {
         readOnlyDatabase: true, expectedDatabase: true,
         workflowDispatchMigration: true, workflowDispatchShape: true,
         speakerNamesMigration: true, speakerNamesShape: true,
+        zoomTranscriptMigration: true, zoomTranscriptShape: true,
         zeroJobs: true, zeroWorkflowDispatches: true,
       },
       jobs: 0,
@@ -199,6 +204,18 @@ describe('transcription Preview readiness preflight', () => {
     expect(malformedSpeakerNamesResult.ok).toBe(false);
     expect(malformedSpeakerNamesResult.checks.speakerNamesShape).toBe(false);
     expect(malformedSpeakerNamesShape.calls).toContain('ROLLBACK');
+
+    const missingZoomMigration = readOnlyClient({ zoomMigration: false });
+    const missingZoomMigrationResult = await runTranscriptionPreflight({ env: goodEnv, createClient: () => missingZoomMigration });
+    expect(missingZoomMigrationResult.ok).toBe(false);
+    expect(missingZoomMigrationResult.checks.zoomTranscriptMigration).toBe(false);
+    expect(missingZoomMigration.calls).toContain('ROLLBACK');
+
+    const malformedZoomShape = readOnlyClient({ zoomShape: false });
+    const malformedZoomResult = await runTranscriptionPreflight({ env: goodEnv, createClient: () => malformedZoomShape });
+    expect(malformedZoomResult.ok).toBe(false);
+    expect(malformedZoomResult.checks.zoomTranscriptShape).toBe(false);
+    expect(malformedZoomShape.calls).toContain('ROLLBACK');
 
     const malformed = readOnlyClient({ shape: false });
     const malformedResult = await runTranscriptionPreflight({ env: goodEnv, createClient: () => malformed });

@@ -7,6 +7,7 @@ jest.mock('../../lib/services/transcription-pilot/media-inspector', () => ({ ins
 jest.mock('../../lib/services/transcription-pilot/model', () => ({ projectOwnerTranscriptionJob: jest.fn(row => ({
   id: row.id, status: row.status,
   contentDeletionObserved: row.content_purged_at != null,
+  speaker_alignment: row.speaker_alignment ?? null,
   lateUploadWatchPending: row.input_cleanup_pathname != null && row.upload_valid_until != null
     && (row.cleanup_requested_at != null || row.content_purged_at != null),
 })) }));
@@ -63,6 +64,23 @@ describe('transcription pilot private Blob runtime', () => {
     expect(projected).not.toHaveProperty('upload_valid_until');
     expect(projected).not.toHaveProperty('provider_transcript_id');
     expect(projected).not.toHaveProperty('provider_upload_ref_ciphertext');
+  });
+
+  it('exposes alignment status and a Zoom-attached boolean but never the Zoom pathnames', () => {
+    const projected = projectMeetingTranscriptionJob({
+      id: 'meeting-job', status: 'ready', output_pathname: 'private/output.json',
+      expires_at: new Date(Date.now() + 86_400_000),
+      zoom_transcript_cleanup_pathname: 'private/zoom-transcript.vtt',
+      zoom_transcript_pathname: 'private/zoom-transcript.vtt', zoom_transcript_sha256: 'a'.repeat(64),
+      speaker_alignment: { status: 'pending', attempts: 0 },
+    });
+    expect(projected).toMatchObject({ zoomTranscriptAttached: true, speaker_alignment: { status: 'pending', attempts: 0 } });
+    for (const field of ['zoom_transcript_pathname', 'zoom_transcript_cleanup_pathname', 'zoom_transcript_sha256']) {
+      expect(projected).not.toHaveProperty(field);
+    }
+    expect(JSON.stringify(projected)).not.toContain('zoom-transcript.vtt');
+    expect(projectMeetingTranscriptionJob({ id: 'j', status: 'ready', expires_at: new Date(Date.now() + 1e6) }))
+      .toMatchObject({ zoomTranscriptAttached: false });
   });
 
   it('persists a bounded upload window before minting the client capability', async () => {
