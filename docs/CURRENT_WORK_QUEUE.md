@@ -682,6 +682,13 @@ These are valid directions but are not current app-team delivery commitments:
   reconciliation is required before execution.
 - Reviewer institution-to-CRM linking/typeahead — parked pending Connor/Sarah account cleanup.
 - Destructive reviewer cleanup — gated by promotion plus one full campaign.
+- Zoom speaker-alignment refinements `feature/unsupported-stretch-split` and
+  `feature/reassign-direct-overlap` (2026-10-04) — built, Codex-reviewed and deliberately
+  NOT merged: live probes showed the first targets a scenario that did not occur (the
+  supposed uncaptioned participant never spoke) and the second moved one word while
+  reintroducing a weak-overlap attribution hole. Not forgotten work. Reopen only on a new
+  owner decision with a recording that exhibits the problem. Rationale and evidence:
+  `docs/plans/ZOOM_VTT_SPEAKER_MAPPING_PLAN_2026-10-04.md` § "Deliberately NOT merged".
 
 ## Completed implementation records — not backlog
 
