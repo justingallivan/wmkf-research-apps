@@ -560,3 +560,79 @@ describe('presentation end', () => {
     expect(screen.queryByText(/Presentation end/)).not.toBeInTheDocument();
   });
 });
+
+describe('presentation summary', () => {
+  const DRAFT_ID = '99999999-9999-4999-8999-999999999999';
+  const ACK = 'presentation-summary-2026-10-05';
+  const readyDraft = (overrides = {}) => ({ id: DRAFT_ID, state: 'ready', version: 2, text: 'What was presented\nQuantum dots.',
+    edited: false, presentationEndMs: 62900, createdAt: CONFIRMED_AT, updatedAt: CONFIRMED_AT, expiresAt: '2026-10-19T23:30:00.000Z', ...overrides });
+  const summaryState = (overrides = {}) => ({ draft: null, draftMatchesTranscript: false, lastFailure: null,
+    transcriptSummary: { state: 'missing', artifactId: null, publishedAt: null }, ...overrides });
+  const withSummary = (artifactOverrides = {}) => collection({ jobs: [], currentArtifact: boundaryArtifact({
+    transcriptSummary: { state: 'missing', artifactId: null, publishedAt: null }, ...artifactOverrides }) });
+
+  test('Summarize stays disabled until the acknowledgment is ticked, then posts the version and both expectations', async () => {
+    let postBody = null;
+    route({ materials: [transcriptRow()], collection: withSummary(), detail: detailFor({}) }, {
+      '/summary-draft': { method: 'GET', respond: () => response(summaryState()) },
+    });
+    global.fetch.mockImplementation(((original) => async (url, options = {}) => {
+      if (String(url).endsWith('/summary-draft') && options.method === 'POST') {
+        postBody = JSON.parse(options.body);
+        return response({ draft: readyDraft(), slidesIncluded: false, transcriptSummary: { state: 'missing', artifactId: null, publishedAt: null } });
+      }
+      return original(url, options);
+    })(global.fetch.getMockImplementation()));
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    const button = await screen.findByRole('button', { name: 'Summarize presentation' });
+    expect(button).toBeDisabled();
+    expect(screen.getByText('No summary published yet.')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText(/may be sent to Anthropic/));
+    expect(button).not.toBeDisabled();
+    fireEvent.click(button);
+    expect(await screen.findByLabelText(/^Draft/)).toHaveValue('What was presented\nQuantum dots.');
+    expect(postBody).toEqual({ acknowledgmentVersion: ACK, expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: 'e'.repeat(64) });
+    expect(screen.getByText(/no slide PDF on file/)).toBeInTheDocument();
+    // The acknowledgment is per request: it is cleared after a run.
+    expect(screen.getByLabelText(/may be sent to Anthropic/)).not.toBeChecked();
+  });
+
+  test('a draft from an earlier transcript version cannot be published', async () => {
+    route({ materials: [transcriptRow()], collection: withSummary(), detail: detailFor({}) }, {
+      '/summary-draft': { method: 'GET', respond: () => response(summaryState({ draft: readyDraft(), draftMatchesTranscript: false })) },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByText(/This draft was made from an earlier transcript version/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Publish summary' })).toBeDisabled();
+  });
+
+  test('publishing an edited draft saves it first, then publishes the saved version and reloads', async () => {
+    const calls = [];
+    route({ materials: [transcriptRow()], collection: withSummary(), detail: detailFor({}) });
+    const base = global.fetch.getMockImplementation();
+    global.fetch.mockImplementation(async (url, options = {}) => {
+      const path = String(url); const method = options.method || 'GET';
+      if (path.endsWith('/summary-draft/publish')) { calls.push(['publish', JSON.parse(options.body)]); return response({ transcriptSummary: { state: 'bound' }, draft: null }); }
+      if (path.endsWith('/summary-draft') && method === 'PATCH') { calls.push(['save', JSON.parse(options.body)]); return response({ draft: readyDraft({ version: 3, text: 'Edited', edited: true }) }); }
+      if (path.endsWith('/summary-draft') && method === 'GET') return response(summaryState({ draft: readyDraft(), draftMatchesTranscript: true }));
+      return base(url, options);
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    const editor = await screen.findByLabelText(/^Draft/);
+    fireEvent.change(editor, { target: { value: 'Edited' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish summary' }));
+    await waitFor(() => expect(calls.map(([kind]) => kind)).toEqual(['save', 'publish']));
+    expect(calls[0][1]).toEqual({ draftId: DRAFT_ID, expectedVersion: 2, text: 'Edited' });
+    expect(calls[1][1]).toEqual({ draftId: DRAFT_ID, expectedVersion: 3 });
+    expect(await screen.findByText(/Summary published/)).toBeInTheDocument();
+  });
+
+  test('a stale published summary says the Board link no longer shows it; the block shows no ids', async () => {
+    route({ materials: [transcriptRow()], collection: withSummary({ transcriptSummary: { state: 'stale', artifactId: DRAFT_ID, publishedAt: CONFIRMED_AT } }), detail: detailFor({}) }, {
+      '/summary-draft': { method: 'GET', respond: () => response(summaryState({ transcriptSummary: { state: 'stale', artifactId: DRAFT_ID, publishedAt: CONFIRMED_AT } })) },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByText(/The Board link no longer shows it/)).toBeInTheDocument();
+    expect(screen.getByTestId('presentation-summary-block').textContent).not.toContain(DRAFT_ID);
+  });
+});

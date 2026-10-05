@@ -27,7 +27,24 @@ test('Workbench GET returns only visit and materials, even if the service gains 
   await handler({ method: 'GET', query: { requestId: REQUEST_ID } }, res);
 
   expect(requireAppAccess).toHaveBeenCalledWith(expect.anything(), res, 'reviewers');
-  expect(getSiteVisitLogistics).toHaveBeenCalledWith({ requestId: REQUEST_ID });
+  expect(getSiteVisitLogistics).toHaveBeenCalledWith({ requestId: REQUEST_ID, includePresentationSummaryText: true });
   expect(res.statusCode).toBe(200);
   expect(res.body).toEqual({ success: true, siteVisit: { activityId: 'a1' }, materials: [{ artifactId: 'm1' }] });
 });
+
+test('Workbench GET passes the presentation summary through only with a ready projection', async () => {
+  requireAppAccess.mockResolvedValue({ session: { user: { dynamicsSystemuserId: REQUEST_ID } } });
+  const presentationSummary = { text: 'What was presented', stale: false, publishedAt: '2026-10-05T15:00:00Z' };
+  getSiteVisitLogistics.mockResolvedValue({ siteVisit: null, materials: [], presentationMaterialsStatus: 'ready',
+    presentationMaterials: [], presentationMaterialConflicts: [], presentationSummary });
+  const res = { statusCode: 200, body: null };
+  res.status = (code) => { res.statusCode = code; return res; };
+  res.json = (body) => { res.body = body; return res; };
+  await handler({ method: 'GET', query: { requestId: REQUEST_ID } }, res);
+  expect(res.body).toMatchObject({ presentationMaterialsStatus: 'ready', presentationSummary });
+
+  getSiteVisitLogistics.mockResolvedValue({ siteVisit: null, materials: [], presentationMaterialsStatus: 'disabled', presentationSummary });
+  await handler({ method: 'GET', query: { requestId: REQUEST_ID } }, res);
+  expect(res.body).not.toHaveProperty('presentationSummary');
+});
+

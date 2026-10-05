@@ -10,8 +10,9 @@ import {
 } from '../../shared/config/requestDocument';
 import { SITE_VISIT_FORMAT } from '../../shared/config/siteVisit';
 import {
-  presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey,
+  presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey, transcriptSummaryBindingFingerprint,
 } from '../../lib/services/post-presentation-materials/presentation-transcript-binding';
+import { createHash } from 'node:crypto';
 import { PARTY_NAVIGATION_PROPERTY } from '../../lib/dataverse/adapters/site-visit';
 import { TRIAGE_STATUS } from '../../shared/config/triageStatus';
 
@@ -273,6 +274,49 @@ describe('staff feed binds the transcript derivatives to the current boundary', 
       derivative(PRES_30, REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT, presentationTranscriptGenerationKey, 1_800_000),
       derivative(DISC_30, REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT, staffDiscussionTranscriptGenerationKey, 1_800_000)]);
     expect(ids(result.presentationMaterials)).toEqual(['11111111-aaaa-4aaa-8aaa-000000000001']);
+  });
+
+  describe('inline presentation summary', () => {
+    const SUMMARY_ID = '66666666-6666-4666-8666-66666666666a';
+    const TEXT = 'What was presented\nQuantum dots.';
+    const BYTES = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(`${TEXT}\n`, 'utf8')]);
+    const summary = (endMs, extra = {}) => ({ ...derivative(SUMMARY_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, () => 'unique', endMs),
+      wmkf_inputfingerprint: transcriptSummaryBindingFingerprint({ requestId: REQUEST_ID, sourceRevisionId: REVISION, presentationEndMs: endMs }),
+      wmkf_contenthash: createHash('sha256').update(BYTES).digest('hex'), createdon: '2026-10-05T15:00:00Z', ...extra });
+    const summaryFeed = (records, { include = true, download = async () => ({ buffer: BYTES }) } = {}) => {
+      const downloadFile = jest.fn(download);
+      return getSiteVisitLogistics({ requestId: REQUEST_ID, includePresentationSummaryText: include }, dependencies({
+        findDocumentsByRequest: jest.fn(async () => ({ records })),
+        presentationSchemaReady: () => true, presentationRequestAllowed: () => true, downloadFile,
+      })).then((result) => ({ result, downloadFile }));
+    };
+
+    test('a bound summary is returned with its text, BOM stripped', async () => {
+      const { result, downloadFile } = await summaryFeed([transcript(1_800_000), summary(1_800_000)]);
+      expect(result.presentationSummary).toEqual({ text: TEXT, stale: false, publishedAt: '2026-10-05T15:00:00Z' });
+      expect(downloadFile).toHaveBeenCalledWith('drive', `item-${SUMMARY_ID}`, { maxBytes: 256 * 1024 });
+    });
+
+    test('a summary from another boundary is still shown to staff, marked stale', async () => {
+      const { result } = await summaryFeed([transcript(2_400_000), summary(1_800_000)]);
+      expect(result.presentationSummary).toMatchObject({ text: TEXT, stale: true });
+    });
+
+    test('bytes that do not match the pinned hash, or a failed read, leave only the link', async () => {
+      const replaced = await summaryFeed([transcript(1_800_000), summary(1_800_000)], { download: async () => ({ buffer: Buffer.from('other') }) });
+      expect(replaced.result.presentationSummary).toMatchObject({ text: null, stale: false });
+      const failed = await summaryFeed([transcript(1_800_000), summary(1_800_000)], { download: async () => { throw new Error('graph'); } });
+      expect(failed.result.presentationSummary).toMatchObject({ text: null });
+    });
+
+    test('nothing is read unless the caller asks, and null without a summary row', async () => {
+      const off = await summaryFeed([transcript(1_800_000), summary(1_800_000)], { include: false });
+      expect(off.result).not.toHaveProperty('presentationSummary');
+      expect(off.downloadFile).not.toHaveBeenCalled();
+      const none = await summaryFeed([transcript(1_800_000)]);
+      expect(none.result.presentationSummary).toBeNull();
+      expect(none.downloadFile).not.toHaveBeenCalled();
+    });
   });
 
   test('the default reader opts into bundle metadata', () => {
