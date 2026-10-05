@@ -5,7 +5,7 @@ metadata:
   type: reference
   status: closed
   scope: docs
-  last_verified: 2026-09-17 via memory-router diet
+  last_verified: 2026-10-05 via memory-router diet
 ---
 
 ## Recall Rule
@@ -45,6 +45,7 @@ These items are **done, closed, or point-in-time** and no longer earn a slot in 
 - **Reviewer Find latency / warm reconciliation incident (Request 1002903, 2026-08-03)** — `docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md`; lesson lives in [[feedback-latency-plan-scope-accretion-postmortem]].
 - **Reviewer workflow stabilization assessment (Request 1002912)** — point-in-time Fable assessment `outputs/reviewer-workflow-stabilization-fable-assessment.md`; directive `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md`.
 - **Request Workbench redesign history** (split 2026-09-17) — dated checkpoints, S194–S206 chronology, Workbench-v1 slice and build sequence. [[project-reviewer-apps-redesign-history]]; live direction stays in [[project-reviewer-apps-redesign-direction]].
+- **Legacy Virtual Review Panel** (RETIRED 2026-10-04, S573, owner decision) — page, SSE route, panel-review and literature-search services, prompt and output schema moved to `_archived/`; successor is the Review Panel. [[project-virtual-review-panel]], `_archived/README.md`, `docs/agent-wiki/topics/review-panel.md`.
 - **Initial Assessment governed-artifact pilot record** (split 2026-09-17) — Request 1002788/1003109 rehearsals, recovery fixes, pilot-environment decision, retired hold step. [[project-j27-doc-capture-history]]; live invariants stay in [[project-j27-doc-capture-evolution]].
 
 ## Point-in-time status snapshots (superseded by live SESSION_PROMPT handoffs)

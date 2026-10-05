@@ -196,6 +196,7 @@ audit 2026-09-18: 8 current prompts, e.g. `cycle-dossier.research-plan` on Opus 
 - Reviewer prompt migration: `project-reviewer-prompt-dataverse-migration`.
 - Prompt injection/security: `project-a7-prompt-injection-hardening`.
 - Thinking-default budget truncation (zero-text `max_tokens`): `project-executor-thinking-budget-truncation`.
+- Prompt governance (Tier-1 rows, create-only seeds, versioned admin publish; routed here from the memory router 2026-10-05): `project-prompt-governance`.
 
 ## Standard Probe
 

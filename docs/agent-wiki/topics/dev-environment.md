@@ -58,6 +58,9 @@ Claude config sync, and environment-specific operating notes.
 - Vercel env and deploy verification (routed here from the memory router 2026-09-17): `feedback-verify-vercel-env-with-env-ls`, `feedback-deployment-monitoring-use-inspect`, `feedback-verify-deploy-is-the-merge-build`, `feedback-no-vercel-cli-update-reminders`, `reference-vercel-sensitive-env-unreadable`, `reference-vercel-logs-filtering`.
 - Delegated Codex work (routed here from the memory router 2026-09-17; contract in `docs/AGENT_COLLABORATION_PLAN.md`): `feedback-codex-worktree-owner-runs-it`, `feedback-codex-delegation-review-vs-rescue-routing`, `reference-codex-review-needs-a-committed-diff`, `feedback-codex-model-gpt56-sol`.
 - Vercel Node 22 runtime cannot `require(esm)`; sanitize-html/jsdom pins: `project-vercel-node22-no-require-esm`, `project-jsdom-serverless-esm-incompat`.
+- Delegated builds and review cadence (routed here from the memory router 2026-10-05): `feedback-orchestrator-checks-builds-before-review`, `feedback-cap-subagent-load-in-reproduction-briefs`, `project-agent-worktree-base-is-main` (also kept on the router as a live hazard).
+- Local containers, ledger Postgres, sandbox rehearsal, and owner-run durable state (routed here from the memory router 2026-10-05): `project-local-docker-is-colima`, `feedback-postgres-url-handling-hazards`, `project-sandbox-rehearsal-bypass-allow-rule`, `project-preview-rehearsal-venue-limits`, `feedback-operational-state-must-be-reachable-from-every-workstation` (plan `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`).
+- Handoff commits run `check:harness-framing` first: `feedback-run-harness-framing-before-handoff-commit`.
 
 ## Operating Notes
 

@@ -783,6 +783,7 @@ invitation stating a different date than the portal and reminders use.
 - Data model/migration: `project-reviewer-finder-dataverse-entry-path`, `project-appresearcher-collapse-post-pilot`. Historical S136 migration rationale is in closed memory `project-reviewer-postgres-to-dataverse-migration`.
 - Count/history/excluded invariants: `project-reviewer-count-invariant`, `project-reviewer-history-data-quality`, `project-excluded-reviewers-often-in-pool`.
 - Closeout, reliability, transient states, local invite testing (routed here from the memory router 2026-09-17): `project-reviewer-closeout-payability`, `project-reviewer-reliability-data`, `project-accepted-awaiting-materials-is-transient`, `reviewer-invite-capture-mode-not-full-sandbox`, `project-workbench-consolidation-rollout`.
+- Candidate-card simplification and affordance consistency (routed here from the memory router 2026-10-05): `project-reviewer-card-simplification-direction`, `feedback-affordance-consistency-beats-deduplication`. The closed lifecycle-autonomy directive (D0–D5 orchestration cycle) is indexed in `project-closed-work-archive`.
 
 ## Applicant-Suggested Reviewer Flow (S263/S264)
 
