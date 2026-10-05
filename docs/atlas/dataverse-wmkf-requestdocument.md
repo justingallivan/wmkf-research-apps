@@ -756,8 +756,8 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   hidden rather than shown beside a newer one (Codex review 2026-10-05); the
   full TRANSCRIPT stays listed.
 - **Transcript Summary writer** (`100000007`; Stage 2 of the Site Visit
-  summaries plan §4.3, §16; **[SOURCE-BUILT on branch `feature/presentation-summary`
-  2026-10-05; not deployed]**): `lib/services/post-presentation-materials/transcript-summary-service.js`
+  summaries plan §4.3, §16; **[PRODUCTION-LIVE 2026-10-05; PR #440
+  merge `11ff96467`; owner-accepted on 1003222]**): `lib/services/post-presentation-materials/transcript-summary-service.js`
   (registered writer, `REQUIRED` actor policy) publishes a program
   coordinator's reviewed draft (Postgres `meeting_transcript_summary_drafts`,
   migration 070) as a BOM-prefixed TXT under `Site Visit - Transcript Summary/`,

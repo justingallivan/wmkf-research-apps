@@ -2,8 +2,8 @@
 title: "Atlas: Site Visit summary drafts (Postgres)"
 domain: postgres
 kind: state-page
-status: source-built
-summary: "Migration 070 defines meeting_transcript_summary_drafts: one row per Summarize run holding the summarization acknowledgment and, only while ready or publishing, the generated presentation summary a program coordinator reviews before publishing. Source-built on feature/presentation-summary; not applied or deployed."
+status: live
+summary: "Migration 070 defines meeting_transcript_summary_drafts: one row per Summarize run holding the summarization acknowledgment and, only while ready or publishing, the generated presentation summary a program coordinator reviews before publishing. Production-live since 2026-10-05 (migration 070 applied; PR #440 deployed)."
 canonical: true
 cataloged: 2026-10-05
 owner: product-engineering
@@ -20,9 +20,9 @@ related:
 
 ## Status
 
-**[SOURCE-BUILT 2026-10-05, branch `feature/presentation-summary`.]** Migration
-070 is written and listed in the manifest; it is not applied in any shared
-database and the code is not deployed. Stage 2 of the Site Visit summaries plan
+**[PRODUCTION-LIVE 2026-10-05.]** The owner applied migration 070 to the shared
+Preview/Production database (1 applied, 68 skipped). PR #440 merged as
+`11ff96467` and is served by Production deployment `dpl_7Ci2zRWiMsWH5iZ5zoiBoR9JqnyD`. Stage 2 of the Site Visit summaries plan
 (§4.3, §6, §16).
 
 ## Ownership and contract

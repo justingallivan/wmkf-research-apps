@@ -18,8 +18,9 @@ related:
 
 Status: Stage 1 Production-live (PR #434 merge `32664485b`, Production deployment 6863898521 success; migration 068 applied and picklist 100000012 inserted (owner-run, re-read verified) 2026-10-05; §11, §12);
 accepted on test request 1003222 by the owner 2026-10-05 (§13). Stage 2
-source-built on branch `feature/presentation-summary` 2026-10-05, not merged
-or deployed (§17); Stages 3–4 not built. Stages 2–3 re-reviewed against live
+Production-live (PR #440 merge `11ff96467`, deployment `dpl_7Ci2zRWiMsWH5iZ5zoiBoR9JqnyD`,
+2026-10-05) and accepted on 1003222 by the owner, with two checks still open (§17);
+Stage 3 planned (§18); Stage 4 not built. Stages 2–3 re-reviewed against live
 code 2026-10-05 (§16). Owner
 decisions complete (§3, §7, §16).
 
@@ -752,7 +753,25 @@ Owner decisions, 2026-10-05:
 
 ## 17. Stage 2 build record, 2026-10-05 (branch `feature/presentation-summary`)
 
-**Status: source-built, not merged or deployed.** Built by Claude Opus 5.5
+**Status: Production-live 2026-10-05.** PR #440 merged as `11ff96467` once
+every check had passed (the Postgres integration check re-ran green after the
+GitHub Actions incident). `applications.wmkeck.org` serves
+`dpl_7Ci2zRWiMsWH5iZ5zoiBoR9JqnyD`, the deployment built from that merge.
+
+**Owner acceptance on 1003222, 2026-10-05:**
+- **Summarize** produced a draft from the presentation transcript and the
+  on-file applicant slide PDF. The PDF was a dummy file; the model identified
+  it as unrelated and left it out of the summary, which is the intended
+  handling of untrusted applicant input.
+- **Stale check:** a speaker-names republish made the open draft stale ("made
+  from an earlier transcript version"); a new Summarize cleared it.
+- **Publish:** the Board link showed the summary, and it downloaded.
+- **Open:** the real-deck contribution waits for a Site Visit with real slides;
+  there is no staff action to replace a closed collection's file. Not yet
+  reported: the post-publish names-edit hide on the Board link, and the inline
+  text on Staff Deliberations.
+
+Built by Claude Opus 5.5
 directly in three commits (binding and outside pages; server; UI).
 
 What was built:
