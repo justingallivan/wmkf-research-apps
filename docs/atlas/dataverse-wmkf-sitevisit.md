@@ -91,8 +91,11 @@ fallback.
 - **[PRODUCTION-LIVE via PR #432, deployed 2026-10-05.]** `listPreSiteVisitDrafts`
   (`lib/services/pre-site-visit/cycle-list-service.js`) is the read-only Site
   Visit consumer for the Staff Deliberations request-first cycle view. It first
-  resolves requests in the selected grant program and cycle, applying the
-  authenticated lead-PD filter for “my” and omitting only that filter for “all”.
+  resolves requests in the selected grant program and cycle using the shared
+  Workbench advancement predicate (`buildVisibilityFilter(false)`): Advancing
+  or Phase II Pending, with Set aside excluded. It applies the authenticated
+  lead-PD filter for “my” and omits only that filter for “all”. Eligible requests
+  remain visible even when they have no briefing or working writeup.
   It then calls `site-visit.js::findSummariesByRequests(requestIds)` for those
   selected requests. The paginated, party-free query reads all related events
   and selects activity/request IDs, scheduled start/end, modified time, and

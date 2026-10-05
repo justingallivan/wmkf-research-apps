@@ -117,7 +117,7 @@ The state and action contract below is source-built and fixture-tested. “Due�
 
 ## Request selection and read model
 
-[SOURCE-BUILT] The request-first cohort uses the UTC cycle window, selected grant program, and authenticated lead-PD identity for “my”. “All” omits only the lead-PD predicate; program, cycle and access restrictions remain. List visibility includes documentless and otherwise non-enrolled requests; worker eligibility is separate.
+[SOURCE-BUILT] The request-first cohort uses the UTC cycle window, selected grant program, the shared Workbench Phase II visibility predicate, and authenticated lead-PD identity for “my”. That predicate includes `akoya_requeststatus = 'Phase II Pending'` or advancing triage and excludes Set Aside. “All” omits only the lead-PD predicate; program, cycle and access restrictions remain. Documentless requests remain visible within this eligible Phase II/advancing cohort; worker enrollment is narrower and separate.
 
 [SOURCE-BUILT, DISABLED] Worker enrollment is narrower than list visibility and uses explicit program/cycle/status allowlists, known Site Visit event classification, and `TEST_REQUEST_ISOLATION=on`. Exact request statuses are compared as Dataverse strings. Withdrawn, cancelled, set-aside, and test records are not automatically generated. Configuration fails closed unless all readiness flags, including guarded correction schema, test isolation, and explicit atomic-fence confirmation, are present. The observed state/status-pair map is configured in Production, but automatic-enablement flags and worker allowlists remain unset.
 
