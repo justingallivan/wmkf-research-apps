@@ -82,7 +82,10 @@ is not implied by schema readiness. Exact sandbox readback confirmed both Wave 3
 durable MP4 producer then finalized retained Request Document
 `0a30ffaa-62b9-f111-aaad-70a8a5b1c1c6` for sandbox Request `1000334` through a local runtime and
 disposable local Postgres store. Migration 055 was applied to the shared Preview/Production
-Postgres database on 2026-09-26; the wave remains unapplied to Production Dataverse.
+Postgres database on 2026-09-26. **[PRODUCTION-LIVE 2026-09-29]** Wave 30 was applied to
+Production Dataverse and read back exactly; Production schema readiness and general
+presentation access are `on`. See the
+[Production receipt](../plans/evidence/post-presentation/production-bounded-2026-09-29.md).
 **[SIGNED-IN PREVIEW ACCEPTED 2026-09-29]** On separate marked sandbox Request `1000350`,
 the Zoom Recording and VTT Transcript producers created two Ready Request Documents through
 the Meeting Tracker card. Staff readback persisted after reload; the 203-byte SharePoint
@@ -95,8 +98,8 @@ synthetic Zoom URL, downloaded the 203-byte transcript, and rejected the first t
 reissue while the replacement worked. See the
 [recipient receipt](../plans/evidence/post-presentation/board-link-preview-2026-09-29.md).
 Safari Private Browsing reached Vercel sign-in before the app, so anonymous recipient viewing
-remains unproved on protected Preview. Preview branch access was restored to `off`; Production
-runtime is not deployed or enabled.
+remains unproved on protected Preview. Preview branch access was restored to `off`. (The
+Production release followed on 2026-09-29; see above.)
 
 **[PRODUCTION-LIVE 2026-10-02 PT.]** Wave 31
 adds the optional `wmkf_TranscriptBundleJson` Memo (logical name

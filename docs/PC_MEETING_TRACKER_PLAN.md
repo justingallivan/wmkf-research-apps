@@ -101,8 +101,12 @@ Two earlier decisions are **superseded in part** and must be read with this plan
   reported 22 exact / 0 absent / 0 divergent, and
   `MEETING_TRACKER_SCHEMA_READY` evaluates exact-on. The grant-protected
   runtime and UI are live.
-- **[SOURCE-BUILT/OFFLINE-TESTED 2026-09-25; BOUNDED PREVIEW ACCEPTED 2026-09-26 AND 2026-09-29;
-  PRODUCTION NOT DEPLOYED.]** Recording, transcript, and transcript-summary have
+- **[PRODUCTION-LIVE 2026-09-29; VERIFIED via the
+  [Production receipt](plans/evidence/post-presentation/production-bounded-2026-09-29.md).]**
+  Production Dataverse Wave 30 is applied, schema readiness is `on`, and
+  `POST_PRESENTATION_MATERIALS_ACCESS` is `on` (general access) at deployment
+  `dpl_Gw8dTzcA1JaUc2ifQjbzbBe7wCoT`. Destructive cleanup is a separate control. The Preview
+  history below is retained as the pre-release record. Recording, transcript, and transcript-summary have
   governed producers under the post-presentation rollout gates. The current visit
   card exposes browser-direct MP4 upload, Pause/Resume, Finish saving, Cancel, Retry upload,
   and independent 60-day Board presentation-link Copy/Reissue controls; Zoom URL and transcript
@@ -114,7 +118,7 @@ Two earlier decisions are **superseded in part** and must be read with this plan
   sign-in. The Staff Deliberations tab reads the current three slots. Shared Postgres migration 055 was
   applied, while the Dataverse Wave 30 test was sandbox-only. The bounded Preview test window
   is closed and presentation access is off there. See the presentation-materials plan
-  for the separate Production gates and source-built/offline-tested staff Cancel/Retry controls.
+  for the Production release record and the offline-tested staff Cancel/Retry controls.
 
 ## 4. The conflict the build must resolve first
 
