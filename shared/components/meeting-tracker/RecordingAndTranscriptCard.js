@@ -1003,6 +1003,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   const [detail, setDetail] = useState(null);
   const [correctionDetail, setCorrectionDetail] = useState(null);
   const [names, setNames] = useState({});
+  const [endEdit, setEndEdit] = useState(null);
   const [suggestionPicks, setSuggestionPicks] = useState({});
   const [audioFile, setAudioFile] = useState(null);
   const [vttFile, setVttFile] = useState(null);
@@ -1052,6 +1053,13 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   const baseline = useMemo(() => seedNames(baselineRaw), [baselineSig]);
   const editorKey = correction ? `c:${correction.operationId}` : (detail?.job?.id && detail.job.id === focusJob?.id ? `j:${detail.job.id}` : null);
   const dirtyNames = speakerIds.some((id) => String(names[id] || '') !== String(baseline[id] || ''));
+  // The presentation end is only editable on a correction draft. A local pick is keyed to the draft it was made on,
+  // so switching drafts or saving drops it and the saved value shows through.
+  const baselineEndMs = correction && Number.isSafeInteger(correction.presentationEndMs) ? correction.presentationEndMs : null;
+  const presentationEndMs = correction && endEdit?.key === editorKey ? endEdit.value : baselineEndMs;
+  const dirtyEnd = presentationEndMs !== baselineEndMs;
+  const dirty = dirtyNames || dirtyEnd;
+  const setPresentationEndMs = (value) => setEndEdit({ key: editorKey, value: Number.isSafeInteger(value) ? value : null });
 
   // Seed the editor from the server whenever the edited target changes, and adopt newly arrived
   // server names (for example matching finishing) while the local draft is still untouched.
@@ -1202,7 +1210,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   };
 
   const saveNames = async () => {
-    if (!dirtyNames || busy) return;
+    if (!dirty || busy) return;
     const generation = generationRef.current;
     const targetKey = editorKey;
     if (correction) {
@@ -1211,25 +1219,27 @@ function useTranscription(requestId, { onMaterialsChanged }) {
       setNotice(null);
       try {
         const result = await requestJson(`${basePath}/corrections/${encodeURIComponent(correction.operationId)}`, {
-          method: 'PATCH', body: { expectedVersion: correction.version, speakerNames: names },
-          fallbackMessage: 'Speaker names could not be saved.',
+          method: 'PATCH', body: { expectedVersion: correction.version, speakerNames: names, presentationEndMs },
+          fallbackMessage: 'Your changes could not be saved.',
         });
         if (!isCurrent(generation)) return;
         if (editorKeyRef.current !== targetKey) return;
         setCorrectionDetail((currentDetail) => (currentDetail ? { ...currentDetail, correction: result.correction } : currentDetail));
         setNames(seedNames(result.correction?.speakerNames));
-        setNotice('Speaker names saved.');
+        setEndEdit(null);
+        setNotice('Changes saved.');
         setConflict(false);
       } catch (saveError) {
         if (isCurrent(generation)) {
           setConflict(saveError?.status === 409);
-          setError(errorMessage(saveError, 'Speaker names could not be saved.'));
+          setError(errorMessage(saveError, 'Your changes could not be saved.'));
         }
       } finally {
         if (isCurrent(generation)) setBusy(null);
       }
       return;
     }
+    if (!dirtyNames) return;
     const result = await postJobAction('speakers', { expectedVersion: selectedJob.version, speakerNames: names }, 'Saving names');
     if (!result?.job || editorKeyRef.current !== targetKey) return;
     setNames(seedNames(result.job.speaker_names));
@@ -1262,7 +1272,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
 
   const publishCorrection = async () => {
     const artifact = correctionDetail?.currentArtifact;
-    if (!correction || !artifact || dirtyNames || !speakerIds.length || correction.state !== 'draft' || busy) return;
+    if (!correction || !artifact || dirty || !speakerIds.length || correction.state !== 'draft' || busy) return;
     if (artifact.id !== correction.expectedCurrentArtifactId || artifact.fingerprint !== correction.expectedCurrentFingerprint) {
       setError('The published transcript changed after you started editing. Cancel, then choose Edit speaker names again.');
       return;
@@ -1285,6 +1295,37 @@ function useTranscription(requestId, { onMaterialsChanged }) {
         if (isCurrent(generation)) {
           setConflict(publishError?.status === 409);
           setError(errorMessage(publishError, 'The edited transcript could not be published.'));
+        }
+      }
+    } finally {
+      if (isCurrent(generation)) setBusy(null);
+    }
+  };
+
+  const generatePresentationTranscript = async () => {
+    const artifact = collection?.currentArtifact;
+    if (!artifact?.id || busy) return;
+    const generation = generationRef.current;
+    setBusy('presentation-transcript');
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await requestJson(`${basePath}/presentation-transcript`, {
+        method: 'POST', body: { expectedCurrentArtifactId: artifact.id, expectedCurrentFingerprint: artifact.fingerprint },
+        fallbackMessage: 'The presentation transcript could not be generated.',
+      });
+      if (!isCurrent(generation)) return;
+      if (result?.currentArtifact) setCollection((state) => (state ? { ...state, currentArtifact: result.currentArtifact } : state));
+      setNotice('Presentation transcript generated.');
+      setConflict(false);
+      await loadCollection();
+      await onMaterialsChangedRef.current?.();
+    } catch (generateError) {
+      if (isCurrent(generation)) {
+        await loadCollection();
+        if (isCurrent(generation)) {
+          setConflict(generateError?.status === 409);
+          setError(errorMessage(generateError, 'The presentation transcript could not be generated.'));
         }
       }
     } finally {
@@ -1513,10 +1554,10 @@ function useTranscription(requestId, { onMaterialsChanged }) {
 
   return {
     basePath, collection, collectionCheckedAt, savedDraft, loading, jobs, publications, newestJob, focusJob, showReview, selectedJob,
-    correction, correctionDetail, content, speakerIds, names, setNames: editNames, baseline, dirtyNames, suggestionPicks, setSuggestionPicks,
+    correction, correctionDetail, content, speakerIds, names, setNames: editNames, baseline, dirtyNames, dirtyEnd, dirty, presentationEndMs, setPresentationEndMs, suggestionPicks, setSuggestionPicks,
     detail, audioFile, vttFile, setVttFile, acknowledged, setAcknowledged, uploadProgress, busy, error, notice, conflict,
     closeAcknowledgedId, setCloseAcknowledgedId, confirmNoVtt, setNoVttConfirmation,
-    loadCollection, reviewRun, refreshReview, saveNames, publishJob, publishCorrection, beginEditNames, cancelEditNames,
+    loadCollection, reviewRun, refreshReview, saveNames, publishJob, publishCorrection, generatePresentationTranscript, beginEditNames, cancelEditNames,
     discardRun, checkPublication, closePublication, chooseFiles, uploadAndStart,
   };
 }
@@ -1630,6 +1671,63 @@ function SpeakerEditor({ t, alignment, readOnly }) {
   );
 }
 
+function clip(text, max) {
+  const value = String(text || '');
+  return value.length > max ? `${value.slice(0, max).trimEnd()}…` : value;
+}
+
+function PresentationEndEditor({ t, readOnly }) {
+  const { content, names, presentationEndMs, setPresentationEndMs, busy } = t;
+  const proposed = t.correctionDetail?.presentationEnd?.proposed || null;
+  const turns = useMemo(() => groupTranscriptByTurn(content, names || {}), [content, names]);
+  if (!turns.length) return null;
+  const turnName = (turn) => String(turn.speakerName || '').trim() || (turn.speaker !== null && turn.speaker !== undefined ? `Speaker ${turn.speaker}` : 'Unlabelled');
+  const selected = Number.isSafeInteger(presentationEndMs) ? presentationEndMs : null;
+  const exact = selected === null ? -1 : turns.findIndex((turn) => turn.end === selected);
+  const index = selected === null ? -1 : exact >= 0 ? exact : turns.findIndex((turn) => turn.end >= selected);
+  const chosen = index >= 0 ? turns[index] : null;
+  const next = index >= 0 ? turns[index + 1] || null : null;
+  const proposedName = proposed ? (String(names?.[proposed.speakerId] || '').trim() || `Speaker ${proposed.speakerId}`) : null;
+  const disabled = Boolean(busy) || readOnly;
+  return (
+    <div className="mt-5" data-testid="presentation-end-editor">
+      <h4 className="text-sm font-semibold text-gray-950">Presentation end</h4>
+      <p className="mt-1 text-xs text-gray-600">The Board link shows the transcript only up to this point. Choose the last turn of the presentation.</p>
+      {proposed && Number.isSafeInteger(proposed.endMs) && proposed.endMs !== selected && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-900">
+          <span>Proposed: {formatTranscriptTurnTime(proposed.endMs)} — last turn by {proposedName}</span>
+          <button type="button" disabled={disabled} onClick={() => setPresentationEndMs(proposed.endMs)} className={BTN}>Use proposed</button>
+        </div>
+      )}
+      <label className="mt-2 block text-xs font-medium text-gray-700">
+        Presentation ends after
+        <select
+          aria-label="Presentation ends after"
+          value={selected === null ? '' : String(selected)}
+          disabled={disabled}
+          onChange={(event) => setPresentationEndMs(event.target.value === '' ? null : Number(event.target.value))}
+          className={INPUT}
+        >
+          <option value="">Not confirmed</option>
+          {chosen && exact < 0 && <option value={String(selected)}>{formatTranscriptTurnTime(selected)} · within a turn</option>}
+          {turns.map((turn, turnIndex) => (
+            <option key={`${turn.start}-${turn.end}-${turnIndex}`} value={String(turn.end)}>
+              {formatTranscriptTurnTime(turn.end)} · {turnName(turn)}: {clip(turn.text, 60)}
+            </option>
+          ))}
+        </select>
+      </label>
+      {chosen && (
+        <div className="mt-2 space-y-2 text-xs leading-5 text-gray-700">
+          <p className="break-words"><span className="font-semibold text-gray-900">Presentation ends after:</span> {clip(chosen.text, 240)}</p>
+          {next && <p className="break-words"><span className="font-semibold text-gray-900">Staff discussion begins:</span> {clip(next.text, 240)}</p>}
+        </div>
+      )}
+      {selected === null && <p className="mt-2 text-xs text-gray-600">Not confirmed. The Board link shows no transcript.</p>}
+    </div>
+  );
+}
+
 function TranscriptPreview({ content, names }) {
   const turns = groupTranscriptByTurn(content, names || {});
   if (!turns.length) return null;
@@ -1651,7 +1749,7 @@ function TranscriptPreview({ content, names }) {
 }
 
 function ReviewBlock({ t }) {
-  const { selectedJob: job, correction, busy, conflict, dirtyNames, collection, publications } = t;
+  const { selectedJob: job, correction, busy, conflict, dirty, collection, publications } = t;
   const status = job?.status;
   const alignment = correction ? null : job?.speaker_alignment || null;
   const alignmentShown = Boolean(alignment) && job?.zoomTranscriptAttached !== false;
@@ -1663,7 +1761,7 @@ function ReviewBlock({ t }) {
   const staleCorrection = Boolean(correction) && (t.correctionDetail?.currentArtifact?.id !== correction.expectedCurrentArtifactId
     || t.correctionDetail?.currentArtifact?.fingerprint !== correction.expectedCurrentFingerprint);
   const publishBlockedReason = matchingActive ? 'Matching still running'
-    : dirtyNames ? 'Save names first'
+    : dirty ? (correction ? 'Save changes first' : 'Save names first')
       : !hasTurns ? 'Publishing needs timed speaker turns.'
         : staleCorrection ? 'The published transcript changed. Cancel and start again.'
           : correction ? (correction.state !== 'draft' ? 'This edit was already published.' : null)
@@ -1671,7 +1769,7 @@ function ReviewBlock({ t }) {
               : alreadyPublished ? 'This run is already published.'
                 : status !== 'ready' ? 'Only a ready run can be published.' : null;
   const canReview = correction ? Boolean(t.content) : status === 'ready' && job?.contentAccessAllowed === true && Boolean(t.content);
-  const title = correction ? 'Edit speaker names' : displayName(job);
+  const title = correction ? 'Edit speaker names and presentation end' : displayName(job);
   const showRefresh = matchingActive || conflict || (status === 'ready' && !t.content && Boolean(t.error));
   const base = t.basePath;
 
@@ -1681,7 +1779,7 @@ function ReviewBlock({ t }) {
         <div className="min-w-0">
           <h3 className="break-words text-base font-semibold text-gray-950">{title}</h3>
           {correction
-            ? <p className="mt-1 text-xs text-gray-600">Changes names only. The wording and timestamps stay the same.</p>
+            ? <p className="mt-1 text-xs text-gray-600">Changes names and where the presentation ends. The wording and timestamps stay the same.</p>
             : <p className="mt-1 text-sm text-gray-700">{RUN_STATE_LABELS[status] || 'Unknown'}{job?.ready_at ? ` ${fmtDateTime(job.ready_at)}` : ''}{job?.needsAttention ? ' · Needs attention' : ''}</p>}
         </div>
         {showRefresh && <button type="button" onClick={t.refreshReview} disabled={Boolean(busy)} className={BTN}>{busy === 'loading' ? 'Refreshing…' : 'Refresh'}</button>}
@@ -1700,10 +1798,11 @@ function ReviewBlock({ t }) {
         {matchingActive && <div className="mt-3" aria-live="polite"><Notice tone="info">Matching names from Zoom captions…</Notice></div>}
         {alignmentShown && ALIGNMENT_REASONS[alignmentStatus] && <p className="mt-3 text-sm leading-5 text-gray-700">{ALIGNMENT_REASONS[alignmentStatus]}</p>}
         <SpeakerEditor t={{ ...t, collection }} alignment={alignment} readOnly={matchingActive || (correction && correction.state !== 'draft')} />
+        {correction && <PresentationEndEditor t={t} readOnly={correction.state !== 'draft'} />}
         <TranscriptPreview content={t.content} names={t.names} />
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="mr-auto text-xs text-gray-600" aria-live="polite">{dirtyNames ? 'Unsaved name changes' : 'Names saved'}</span>
-          <button type="button" onClick={t.saveNames} disabled={!dirtyNames || Boolean(busy) || matchingActive} className={BTN}>{busy === 'speakers' ? 'Saving names…' : 'Save names'}</button>
+          <span className="mr-auto text-xs text-gray-600" aria-live="polite">{correction ? (dirty ? 'Unsaved changes' : 'Saved') : (dirty ? 'Unsaved name changes' : 'Names saved')}</span>
+          <button type="button" onClick={t.saveNames} disabled={!dirty || Boolean(busy) || matchingActive} className={BTN}>{busy === 'speakers' ? (correction ? 'Saving…' : 'Saving names…') : (correction ? 'Save changes' : 'Save names')}</button>
           <button type="button" onClick={correction ? t.publishCorrection : t.publishJob} disabled={Boolean(publishBlockedReason) || Boolean(busy)} className={BTN_PRIMARY}>{busy === 'publish' ? 'Publishing…' : 'Publish transcript'}</button>
         </div>
         {publishBlockedReason && <p className="mt-2 text-xs leading-5 text-gray-600">{publishBlockedReason}</p>}
@@ -1847,6 +1946,9 @@ function TranscriptBlock({ m, t, transcriptInputRef }) {
   const generateReason = !t.collection ? 'Not available right now' : !featureEnabled ? 'Not enabled for this request' : null;
   const active = t.jobs.find((job) => ACTIVE_STATUSES.has(job.status)) || null;
   const editing = Boolean(t.correction);
+  const showBoundary = generated && Boolean(artifact?.bundleEditable) && !editing;
+  const presentationEnd = artifact?.presentationEnd && Number.isSafeInteger(artifact.presentationEnd.endMs) ? artifact.presentationEnd : null;
+  const boundaryState = artifact?.presentationTranscript?.state;
   const reviewOpen = editing || Boolean(t.showReview && t.focusJob && !ACTIVE_STATUSES.has(t.focusJob.status));
   const toggle = (form) => setOpenForm((value) => (value === form ? null : form));
   return (
@@ -1863,6 +1965,21 @@ function TranscriptBlock({ m, t, transcriptInputRef }) {
         </>}
         {!generated && openUrl && <a className={BTN} href={openUrl} target="_blank" rel="noopener noreferrer">Open</a>}
       </div>}
+      {showBoundary && (
+        <div className="mt-3" data-testid="presentation-end-line">
+          {!presentationEnd ? <>
+            <p className="text-sm leading-6 text-gray-900">Presentation end not confirmed. The Board link shows no transcript until a program coordinator confirms where the presentation ends.</p>
+            {!t.savedDraft && <button type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.busy === 'create-draft' ? 'Opening…' : 'Set presentation end'}</button>}
+          </> : <>
+            <p className="text-sm leading-6 text-gray-900">Presentation ends at {formatTranscriptTurnTime(presentationEnd.endMs)}{presentationEnd.confirmedAt ? ` · confirmed ${fmtDateTime(presentationEnd.confirmedAt)}` : ''}</p>
+            {boundaryState === 'bound' && <p className="mt-1 text-sm text-gray-900">Presentation transcript ready for the Board link.</p>}
+            {(boundaryState === 'missing' || boundaryState === 'stale') && <div className="mt-2">
+              <Notice tone="warning">The Board link shows no transcript until the presentation transcript is generated.</Notice>
+              <button type="button" onClick={t.generatePresentationTranscript} disabled={Boolean(t.busy)} className={`mt-2 ${BTN_PRIMARY}`}>{t.busy === 'presentation-transcript' ? 'Generating…' : 'Generate presentation transcript'}</button>
+            </div>}
+          </>}
+        </div>
+      )}
       <div className="mt-4 flex flex-wrap items-start gap-3">
         <button type="button" onClick={() => toggle('upload')} aria-expanded={openForm === 'upload'} className={BTN}>Upload a transcript</button>
         <div>
