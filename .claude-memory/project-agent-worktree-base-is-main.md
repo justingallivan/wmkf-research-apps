@@ -4,6 +4,7 @@ description: "Agent tool `isolation: worktree` branches from main, not the curre
 metadata:
   node_type: memory
   type: project
+  status: active
   originSessionId: fa2abe28-0431-4a5a-bddf-f68ca3111d9c
   modified: 2026-10-05T15:39:05.999Z
 ---
