@@ -143,7 +143,9 @@ export default function StaffMaterialUpload({ requestId, slot, label, disabled =
 
   const busy = Boolean(phase);
   return (
-    <div className="text-right">
+    // Fixed width so progress and error text wrap inside the control instead of
+    // widening the row's action column and pushing "Open file" sideways.
+    <div className="w-44 py-2 text-right">
       <input
         ref={inputRef}
         type="file"
