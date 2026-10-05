@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — One Recording and transcript card on the Site Visit page (Session 574)
+
+**Milestone:** The Site Visit page's Post-presentation materials card and Meeting transcription panel are replaced by one task-oriented Recording and transcript card; plain-text and VTT transcript uploads no longer go through the malware scanner.
+**Sessions:** 574 (owner screenshot review 2026-10-04; Impeccable-shaped plan; Codex plan review; Sonnet build, Opus review, Codex code review; PR #431 merged `38c767ae9`, Production deployment `dpl_AYayRueQDchJ7Qv2p4WMfNDnPAgA` Ready).
+**Ship state:**
+- `shared/components/meeting-tracker/RecordingAndTranscriptCard.js` over the unchanged one-slot TRANSCRIPT services: human current line from the TRANSCRIPT row, one speaker editor seeded from the job and pinned to the run under edit, saved names drafts reopened, publication bookkeeping only under "Needs attention", no GUIDs or stored filenames rendered.
+- `finalizeTranscriptUpload`: `.txt`/`.vtt` get a local readability check (`transcript_text_invalid`), PDF/DOCX keep Cloudmersive and name the tripped flags. Old card and panel files remain for the rehearsal page only.
+- Owner decisions 1–5 recorded in the plan; follow-on plan for summaries and Board sharing written and Codex-reviewed, not built.
+**Why it matters:** Staff see one place for the recording and transcript instead of two cards writing the same slot, and Zoom VTT files upload without a false malware rejection.
+**Pointers:** `docs/plans/SITE_VISIT_TRANSCRIPT_CARD_REDESIGN_PLAN_2026-10-04.md` (§13 review record); `docs/plans/SITE_VISIT_SUMMARIES_AND_BOARD_SHARING_PLAN_2026-10-04.md`; commits `e87b72c68`, `6776b7cd5`, `b6225504e`, `7de7bbba4`.
+
 ## October 2026 — Legacy Virtual Review Panel retired (Session 573)
 
 **Milestone:** The original multi-LLM Virtual Review Panel app is retired; the source-built Review Panel is the only panel app.
