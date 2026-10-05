@@ -29,6 +29,8 @@
  *   node scripts/probe-dataverse-batch-changeset.mjs --suggestion=<guid>            # DRY RUN (read-only: resolves set name, validates target, prints the $batch body)
  *   node scripts/probe-dataverse-batch-changeset.mjs --suggestion=<guid> --execute  # sends the changesets (prod writes, then cleans up)
  *   node scripts/probe-dataverse-batch-changeset.mjs --target=prod --suggestion=<guid> --execute
+ *   node scripts/probe-dataverse-batch-changeset.mjs --site-visit-end-fence --target=prod --activity-id=<guid> --expected-state=active|completed  # read-only
+ *   node scripts/probe-dataverse-batch-changeset.mjs --site-visit-end-fence --target=prod --activity-id=<guid> --expected-state=active|completed --execute
  *
  * To find a test suggestion GUID:
  *   (a row on the D26 test request 1002788, or any suggestion you're OK scribbling probe rows under and deleting)
@@ -46,10 +48,19 @@ const BOGUS_GUID = '00000000-0000-0000-0000-000000000000';
 const BOGUS_ETAG = 'W/"00000000-0000-0000-0000-000000000000"';
 
 function parseArgs(argv) {
-  const out = { target: 'prod', suggestion: null, execute: false };
+  const out = {
+    target: 'prod', targetSpecified: false, suggestion: null, execute: false,
+    siteVisitEndFence: false, activityId: null, expectedState: null,
+  };
   for (const a of argv.slice(2)) {
     if (a === '--execute') out.execute = true;
-    else if (a.startsWith('--target=')) out.target = a.slice('--target='.length);
+    else if (a === '--site-visit-end-fence') out.siteVisitEndFence = true;
+    else if (a.startsWith('--activity-id=')) out.activityId = a.slice('--activity-id='.length);
+    else if (a.startsWith('--expected-state=')) out.expectedState = a.slice('--expected-state='.length);
+    else if (a.startsWith('--target=')) {
+      out.target = a.slice('--target='.length);
+      out.targetSpecified = true;
+    }
     else if (a.startsWith('--suggestion=')) out.suggestion = a.slice('--suggestion='.length);
     else if (a === '--help' || a === '-h') { console.log('See header for usage.'); process.exit(0); }
     else { console.error(`Unknown flag: ${a}`); process.exit(1); }
@@ -180,6 +191,43 @@ async function findProbeRows(baseUrl, token, entitySet, suggestionId) {
 
 (async () => {
   const args = parseArgs(process.argv);
+  if (args.siteVisitEndFence) {
+    const probe = require('./lib/site-visit-end-fence-probe.js');
+    const [grantRequest, siteVisit, changeset, dalContext, isolation, targetRegistry] = await Promise.all([
+      import('../lib/dataverse/adapters/grant-request.js'),
+      import('../lib/dataverse/adapters/site-visit.js'),
+      import('../lib/dataverse/core/changeset.js'),
+      import('../lib/dataverse/core/context.js'),
+      import('../lib/services/test-requests/isolation.js'),
+      import('../lib/dataverse/core/target-registry.js'),
+    ]);
+    const result = await probe.runSiteVisitEndFenceProbe(args, {
+      testIsolationEnabled: isolation.testRequestIsolationEnabled(),
+      env: process.env,
+      productionHosts: targetRegistry.PRODUCTION_HOSTS,
+      withDalContext: dalContext.withDalContext,
+      getRequest: (id, options) => grantRequest.getById(id, options),
+      findVisits: (ids) => siteVisit.findSummariesByRequests(ids),
+      getVisit: (id) => siteVisit.getById(id),
+      runChangeset: changeset.runChangeset,
+      getChoiceMetadata: async (field) => {
+        const { loadEnvLocal, getAccessToken, createClient } = require('../lib/dataverse/client.js');
+        loadEnvLocal();
+        const resource = resourceUrl('prod');
+        const client = createClient({ resourceUrl: resource, token: await getAccessToken(resource) });
+        const cast = field === 'statecode' ? 'StateAttributeMetadata' : 'StatusAttributeMetadata';
+        const response = await client.get(
+          `/EntityDefinitions(LogicalName='wmkf_sitevisit')/Attributes(LogicalName='${field}')/Microsoft.Dynamics.CRM.${cast}?$expand=OptionSet`,
+        );
+        if (!response.ok || !response.body) {
+          throw new Error(`Could not read live ${field} choice metadata (${response.status}).`);
+        }
+        return response.body;
+      },
+    });
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
   const resource = resourceUrl(args.target);
   const baseUrl = `${resource}/api/data/v9.2`;
   console.log(`Target:     ${args.target} (${resource})`);
