@@ -1,15 +1,8 @@
-import * as grantRequestAdapter from '../../../../lib/dataverse/adapters/grant-request.js';
 import { withDalContext } from '../../../../lib/dataverse/core/context.js';
 import { requestPreparationRetry } from '../../../../lib/services/pre-site-visit/preparation-worker.js';
 import { ServiceHttpError } from '../../../../lib/services/service-http-error.js';
 import { getUserRole, requireAppAccess } from '../../../../lib/utils/auth.js';
 import { isGuid } from '../../../../lib/utils/guid.js';
-import { withTestRequestIsolationSelect } from '../../../../lib/services/test-requests/isolation.js';
-
-const SELECT = withTestRequestIsolationSelect([
-  'akoya_requestid', '_wmkf_programdirector_value', 'wmkf_istestrequest',
-  'wmkf_testcreationrunid',
-]);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -30,14 +23,7 @@ export default async function handler(req, res) {
 
   return withDalContext('workbench-pre-site-visit-retry', async () => {
     try {
-      const request = await grantRequestAdapter.getById(requestId, { select: SELECT });
-      if (!request?.akoya_requestid) return res.status(404).json({ error: 'Request not found.' });
-      const isLeadPd = request._wmkf_programdirector_value && callerSystemId
-        && String(request._wmkf_programdirector_value).toLowerCase() === String(callerSystemId).toLowerCase();
-      if (!isSuperuser && !isLeadPd) {
-        return res.status(403).json({ error: 'Only the lead Program Director can retry preparation.' });
-      }
-      const result = await requestPreparationRetry(requestId);
+      const result = await requestPreparationRetry(requestId, undefined, { callerSystemId, isSuperuser });
       return res.status(202).json(result);
     } catch (error) {
       if (error instanceof ServiceHttpError) {

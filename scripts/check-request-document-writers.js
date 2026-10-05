@@ -24,7 +24,11 @@ const WRITERS = Object.freeze([
   // That substitution happens one layer below this call site, so it does not
   // change the text this gate scans and does not need a second WRITERS row.
   ['lib/services/initial-assessment/controls-service.js', 'dependencies.createDocument(', 'REQUIRED'],
-  ['lib/services/pre-site-visit/artifact-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
+  ['lib/services/pre-site-visit/artifact-service.js', 'dependencies.createDocument(', {
+    expression: 'actorPolicy: missingOnly ? REQUEST_DOCUMENT_ACTOR_POLICY.SCHEDULED_AUTOMATION : REQUEST_DOCUMENT_ACTOR_POLICY.ALLOW_UNATTRIBUTED,',
+    fixtureExpression: 'missingOnly ? REQUEST_DOCUMENT_ACTOR_POLICY.SCHEDULED_AUTOMATION : REQUEST_DOCUMENT_ACTOR_POLICY.ALLOW_UNATTRIBUTED',
+    description: 'SCHEDULED_AUTOMATION for missing-only work and ALLOW_UNATTRIBUTED for ordinary manual generation',
+  }],
   ['lib/services/pre-site-visit/reopen-service.js', 'dependencies.createDocument(', 'REQUIRED'],
   ['lib/services/pre-site-visit/distribution/retained-snapshot.js', 'dependencies.createDocument(', 'REQUIRED'],
   ['lib/services/final-writeup/transition-service.js', 'dependencies.createDocument(', 'REQUIRED'],
@@ -74,8 +78,12 @@ function validateWriter(relative, source, callNeedle, expectedPolicy) {
   if (count !== 1) errors.push(`${relative}: expected exactly one ${callNeedle} call, found ${count}`);
   const callAt = source.indexOf(callNeedle);
   const callWindow = callAt >= 0 ? source.slice(callAt, callAt + 4000) : '';
-  if (!callWindow.includes(`actorPolicy: REQUEST_DOCUMENT_ACTOR_POLICY.${expectedPolicy}`)) {
-    errors.push(`${relative}: create call is missing actor policy ${expectedPolicy}`);
+  if (typeof expectedPolicy === 'string') {
+    if (!callWindow.includes(`actorPolicy: REQUEST_DOCUMENT_ACTOR_POLICY.${expectedPolicy}`)) {
+      errors.push(`${relative}: create call is missing actor policy ${expectedPolicy}`);
+    }
+  } else if (!callWindow.replace(/\s+/g, ' ').includes(expectedPolicy.expression)) {
+    errors.push(`${relative}: create call must use actor policy ${expectedPolicy.description}`);
   }
   if (!callWindow.includes('actorContext:')) {
     errors.push(`${relative}: create call is missing bounded actorContext`);
@@ -128,7 +136,8 @@ function liveSources() {
 }
 
 function runSelfTest() {
-  const goodCall = (needle, policy) => `${needle}{}, { actorPolicy: REQUEST_DOCUMENT_ACTOR_POLICY.${policy}, actorContext: {} });`;
+  const goodCall = (needle, policy) => `${needle}{}, { actorPolicy: ${typeof policy === 'string'
+    ? `REQUEST_DOCUMENT_ACTOR_POLICY.${policy}` : policy.fixtureExpression}, actorContext: {} });`;
   // Two WRITERS rows can share one file (run-runner.js has the IA and the
   // Pre-Site seed writers), so fixture sources are concatenated per path, and
   // every writer that reaches the adapter through a dependency contributes
@@ -192,6 +201,19 @@ function runSelfTest() {
   errors = validateSources(wrongPolicy);
   if (!errors.some((error) => error.includes('missing actor policy REQUIRED'))) {
     throw new Error('wrong-policy fixture was not rejected');
+  }
+
+  const wrongScheduledPolicy = new Map(base);
+  const [preSiteRelative, , preSitePolicy] = WRITERS.find(
+    ([writerPath]) => writerPath === 'lib/services/pre-site-visit/artifact-service.js',
+  );
+  wrongScheduledPolicy.set(preSiteRelative, base.get(preSiteRelative).replace(
+    preSitePolicy.expression,
+    'actorPolicy: missingOnly ? REQUEST_DOCUMENT_ACTOR_POLICY.ALLOW_UNATTRIBUTED : REQUEST_DOCUMENT_ACTOR_POLICY.SCHEDULED_AUTOMATION,',
+  ));
+  errors = validateSources(wrongScheduledPolicy);
+  if (!errors.some((error) => error.includes(`must use actor policy ${preSitePolicy.description}`))) {
+    throw new Error('reversed scheduled actor-policy fixture was not rejected');
   }
 
   const missingActorContext = new Map(base);

@@ -1,4 +1,6 @@
 /** @jest-environment node */
+jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({ getById: jest.fn(), queryAllRequests: jest.fn() }));
+import { getById } from '../../lib/dataverse/adapters/grant-request.js';
 import { drainStaffDeliberationsPreparations, getPreparationForRequest, requestPreparationRetry } from '../../lib/services/pre-site-visit/preparation-worker.js';
 import { readPreparationConfig } from '../../lib/services/pre-site-visit/preparation-config.js';
 import { REQUEST_DOCUMENT_LIFECYCLE_STATE as L, REQUEST_DOCUMENT_OPERATION_STATUS as O } from '../../shared/config/requestDocument.js';
@@ -7,6 +9,7 @@ const REQUEST = 'aaaaaaaa-0000-4000-8000-000000000001';
 const PROGRAM = 'bbbbbbbb-0000-4000-8000-000000000001';
 const VISIT = 'cccccccc-0000-4000-8000-000000000001';
 const DOC = 'dddddddd-0000-4000-8000-000000000001';
+const LEAD_PD = '99999999-0000-4000-8000-000000000001';
 const END = '2026-12-01T18:00:00.000Z';
 const MODIFIED = '2026-11-01T12:00:00.000Z';
 
@@ -43,6 +46,7 @@ function harness({ currentArtifact = null, generatedArtifact = null } = {}) {
       akoya_requeststatus: 'Phase II Pending',
       wmkf_meetingdate: '2026-12-10T00:00:00Z',
       _wmkf_grantprogram_value: PROGRAM,
+      _wmkf_programdirector_value: LEAD_PD,
     }], capped: false }),
     findSiteVisits: jest.fn().mockResolvedValue({ records: [{
       activityid: VISIT,
@@ -57,6 +61,7 @@ function harness({ currentArtifact = null, generatedArtifact = null } = {}) {
       akoya_requeststatus: 'Phase II Pending',
       wmkf_meetingdate: '2026-12-10T00:00:00Z',
       _wmkf_grantprogram_value: PROGRAM,
+      _wmkf_programdirector_value: LEAD_PD,
     }),
     getSiteVisit: jest.fn().mockResolvedValue({
       activityid: VISIT,
@@ -106,6 +111,14 @@ it('preserves an existing edited draft, skips generation, and records service pr
   }));
   expect(result).toMatchObject({ prepared: 1, blocked: 0 });
   expect(dependencies.queryRequests.mock.calls[0][0].filter).toContain("akoya_requeststatus eq 'Phase II Pending'");
+});
+
+it('uses canonical OData escaping for allowlisted string statuses', async () => {
+  const { dependencies } = harness();
+  dependencies.config = { ...config, requestStatuses: ["Phase II O'Pending"] };
+  await drainStaffDeliberationsPreparations(dependencies);
+  expect(dependencies.queryRequests.mock.calls[0][0].filter)
+    .toContain("akoya_requeststatus eq 'Phase II O''Pending'");
 });
 
 it('uses missing-only generation and promotes its returned current Word identity', async () => {
@@ -312,7 +325,7 @@ it('reports due detail as disabled when scheduled preparation is inactive', asyn
 it('retry requeues only the exact blocked receipt after current request and event revalidation', async () => {
   const { dependencies } = harness();
   dependencies.retryReceipt = jest.fn().mockResolvedValue(true);
-  const result = await requestPreparationRetry(REQUEST, dependencies);
+  const result = await requestPreparationRetry(REQUEST, dependencies, { callerSystemId: LEAD_PD });
   expect(result).toMatchObject({ success: true, queued: true, requestId: REQUEST, siteVisitId: VISIT });
   expect(dependencies.retryReceipt).toHaveBeenCalledWith(REQUEST, VISIT, END, '');
 });
@@ -327,13 +340,45 @@ it('retries a completed correction using its retained receipt epoch while keepin
   };
   const { dependencies } = harness({ currentArtifact: reviewed });
   dependencies.retryReceipt = jest.fn().mockResolvedValue(true);
-  await requestPreparationRetry(REQUEST, dependencies);
+  await requestPreparationRetry(REQUEST, dependencies, { callerSystemId: LEAD_PD });
   expect(dependencies.retryReceipt).toHaveBeenCalledWith(REQUEST, VISIT, END, 'staff-reopen-7');
 
   dependencies.readArtifactStatus.mockResolvedValue({
     currentArtifact: { ...reviewed, lifecycleState: L.DRAFT },
   });
-  await expect(requestPreparationRetry(REQUEST, dependencies)).rejects.toMatchObject({
+  await expect(requestPreparationRetry(REQUEST, dependencies, { callerSystemId: LEAD_PD })).rejects.toMatchObject({
     code: 'preparation_correction_requires_staff',
   });
+});
+
+it('requires trusted lead-PD or superuser authorization before retrying', async () => {
+  const { dependencies } = harness();
+  dependencies.retryReceipt = jest.fn();
+  await expect(requestPreparationRetry(REQUEST, dependencies, { callerSystemId: '88888888-0000-4000-8000-000000000001' }))
+    .rejects.toMatchObject({ httpStatus: 403, code: 'preparation_retry_forbidden' });
+  expect(dependencies.retryReceipt).not.toHaveBeenCalled();
+});
+
+it('selects the trusted lead-PD identity for authorization on the default service read', async () => {
+  getById.mockResolvedValueOnce({
+    akoya_requestid: REQUEST,
+    akoya_requeststatus: 'Phase II Pending',
+    wmkf_meetingdate: '2026-12-10T00:00:00Z',
+    _wmkf_grantprogram_value: PROGRAM,
+    _wmkf_programdirector_value: LEAD_PD,
+  });
+  const dependencies = {
+    config,
+    now: () => new Date('2026-12-02T00:00:00.000Z'),
+    findSiteVisits: jest.fn().mockResolvedValue({ records: [{
+      activityid: VISIT, _regardingobjectid_value: REQUEST, scheduledend: END,
+      modifiedon: MODIFIED, statecode: 10, statuscode: 11,
+    }] }),
+    readArtifactStatus: jest.fn().mockResolvedValue({ currentArtifact: null }),
+    retryReceipt: jest.fn().mockResolvedValue(true),
+  };
+  await requestPreparationRetry(REQUEST, dependencies, { callerSystemId: LEAD_PD });
+  expect(getById).toHaveBeenCalledWith(REQUEST, expect.objectContaining({
+    select: expect.arrayContaining(['_wmkf_programdirector_value']),
+  }));
 });

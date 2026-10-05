@@ -12,13 +12,11 @@ jest.mock('../../lib/utils/auth', () => ({
   getUserRole: jest.fn(),
   requireAppAccess: jest.fn(),
 }));
-jest.mock('../../lib/dataverse/adapters/grant-request', () => ({ getById: jest.fn() }));
 
 import { verifyCronSecret } from '../../lib/utils/cron-auth';
 import { withDalContext } from '../../lib/dataverse/core/context';
 import { drainStaffDeliberationsPreparations, requestPreparationRetry } from '../../lib/services/pre-site-visit/preparation-worker';
 import { getUserRole, requireAppAccess } from '../../lib/utils/auth';
-import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request';
 import cronHandler from '../../pages/api/cron/staff-deliberations-preparation';
 import retryHandler from '../../pages/api/workbench/pre-site-visit/retry-preparation';
 
@@ -43,10 +41,6 @@ beforeEach(() => {
     session: { user: { dynamicsSystemuserId: PD } },
   });
   getUserRole.mockResolvedValue('program_director');
-  grantRequestAdapter.getById.mockResolvedValue({
-    akoya_requestid: REQUEST,
-    _wmkf_programdirector_value: PD,
-  });
 });
 
 it('rejects cron auth before establishing DAL context or entering the worker', async () => {
@@ -66,28 +60,25 @@ it('allows an authenticated cron request to return disabled without forcing work
   expect(drainStaffDeliberationsPreparations).toHaveBeenCalledTimes(1);
 });
 
-it('requires strict requestId-only retry bodies and rejects non-lead-PDs', async () => {
+it('requires strict requestId-only retry bodies before entering the retry service', async () => {
   let res = response();
   await retryHandler({ method: 'POST', body: { requestId: REQUEST, force: true } }, res);
   expect(res.statusCode).toBe(400);
   expect(requestPreparationRetry).not.toHaveBeenCalled();
 
-  grantRequestAdapter.getById.mockResolvedValueOnce({ akoya_requestid: REQUEST, _wmkf_programdirector_value: 'cccccccc-0000-4000-8000-000000000001' });
-  res = response();
-  await retryHandler({ method: 'POST', body: { requestId: REQUEST } }, res);
-  expect(res.statusCode).toBe(403);
   expect(requestPreparationRetry).not.toHaveBeenCalled();
 });
 
-it('allows the lead PD or a superuser to queue a revalidated retry', async () => {
+it('passes authenticated lead-PD or superuser identity to the revalidating retry service', async () => {
   let res = response();
   await retryHandler({ method: 'POST', body: { requestId: REQUEST } }, res);
   expect(res.statusCode).toBe(202);
-  expect(requestPreparationRetry).toHaveBeenCalledWith(REQUEST);
+  expect(requestPreparationRetry).toHaveBeenCalledWith(REQUEST, undefined, { callerSystemId: PD, isSuperuser: false });
 
   requireAppAccess.mockResolvedValueOnce({ profileId: null, session: { user: {} } });
   res = response();
   await retryHandler({ method: 'POST', body: { requestId: REQUEST } }, res);
   expect(res.statusCode).toBe(202);
   expect(requestPreparationRetry).toHaveBeenCalledTimes(2);
+  expect(requestPreparationRetry).toHaveBeenLastCalledWith(REQUEST, undefined, { callerSystemId: null, isSuperuser: true });
 });

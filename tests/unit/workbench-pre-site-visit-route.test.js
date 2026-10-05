@@ -23,11 +23,11 @@ jest.mock('../../lib/services/site-visit-materials/summary-reader', () => ({
   getMaterialsSummaryForRequest: jest.fn(async () => null),
 }));
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({ getById: jest.fn() }));
-jest.mock('../../lib/dataverse/adapters/request-document', () => ({ findByRequest: jest.fn() }));
+jest.mock('../../lib/dataverse/adapters/request-document', () => ({ findByIds: jest.fn() }));
 jest.mock('../../lib/services/pre-site-visit/preparation-worker', () => ({ getPreparationForRequest: jest.fn() }));
 jest.mock('../../lib/services/final-writeup/transition-service', () => ({ getFinalWriteupStatus: jest.fn() }));
 import { getById } from '../../lib/dataverse/adapters/grant-request';
-import { findByRequest } from '../../lib/dataverse/adapters/request-document';
+import { findByIds } from '../../lib/dataverse/adapters/request-document';
 import { getPreparationForRequest } from '../../lib/services/pre-site-visit/preparation-worker';
 import { getFinalWriteupStatus } from '../../lib/services/final-writeup/transition-service';
 import { getMaterialsSummaryForRequest } from '../../lib/services/site-visit-materials/summary-reader';
@@ -69,7 +69,7 @@ function get(requestId = REQUEST_ID) {
 beforeEach(() => {
   jest.clearAllMocks();
   getById.mockResolvedValue({ akoya_requestid: REQUEST_ID });
-  findByRequest.mockResolvedValue({ records: [] });
+  findByIds.mockResolvedValue({ records: [] });
   getPreparationForRequest.mockResolvedValue({ timing: { availability: 'missing' }, preparation: { state: 'none', due: false }, writeup: { availability: 'missing' } });
   getFinalWriteupStatus.mockResolvedValue({ available: true, phase: 'ready', artifact: null });
   requireAppAccess.mockResolvedValue({
