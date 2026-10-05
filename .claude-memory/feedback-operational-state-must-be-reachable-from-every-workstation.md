@@ -6,7 +6,12 @@ metadata:
   status: active
 ---
 
-**Recall rule:** read before designing or reviewing any owner-run tool (CLI, script, rehearsal) that writes durable state outside the app database.
+## Recall Rule
+Read before designing or reviewing any owner-run tool (CLI, script, rehearsal) that writes durable state outside the app database.
+
+Do: register where the state may live in a tracked allowlist and guard the actual host against it; verify its schema with tooling before commands run; name the store beside every record id in handoffs.
+Do not: ship a guard that only says where state must not live; leave the only copy on one laptop or a container without a scheduled dump.
+Ground truth: `lib/db/ledger-registry.js`, `lib/dataverse/core/target-registry.js`, `check:factory-ledger` (`scripts/check-factory-ledger.js`), `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`.
 
 **What happened (2026-09-30, S553):** the Test Request Factory's production ledger existed only in a Docker container on the owner's home Mac. The CLI guard refused the app's shared Postgres and every `neon.tech` host but named no place the ledger *should* be, so a laptop was the only compliant location. A day's B4 release work stalled in the office, and a Colima reset had already deleted the container once.
 

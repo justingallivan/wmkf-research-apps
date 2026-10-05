@@ -11,6 +11,13 @@ scope: docs
 last_verified: 2026-09-19 via Explorer extraction S9 full gate run (spurious reds re-run green alone) and j27-register fix 542b0892
 ---
 
+## Recall Rule
+Read before running `check:*` gates while another session or a delegated reviewer works in the same worktree, or when writing a staged move plan's per-stage gate list.
+
+Do: run gates from one session per worktree at a time (tell reviewers not to, or wait for them); derive per-stage gate lists from `grep '"check:' package.json` filtered to gates that scan the moved paths.
+Do not: trust a red that appeared while two gate runs overlapped without re-running it alone; reuse a fixed gate list across stages.
+Ground truth: `docs/CI_GATES_REFERENCE.md` (sequential self-test rule); `package.json` `check:*` scripts.
+
 Two lessons from the Dynamics Explorer chat-service extraction (branch `claude/explorer-chat-extraction`, 2026-09-19):
 
 1. Only one session may run `check:*` gates in a given worktree at a time. When the orchestrator's full gate run overlapped an Opus reviewer's gate run in the same worktree, `check:doc-currency:self-test`, `check:fact-consistency`, and `check:model-override-warming:self-test` went red spuriously; each was green when re-run alone.

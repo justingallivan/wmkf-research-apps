@@ -1,6 +1,6 @@
 ---
 title: Memory Routine Audit — 2026-10-05
-summary: "Router diet per MEMORY_HYGIENE_RUNBOOK §10 (8,325 → 6,863 B; 69 → 47 unique leaf refs); 25 health flags dispositioned, substantive leaf fixes queued."
+summary: "Router diet per MEMORY_HYGIENE_RUNBOOK §10 (8,325 → 6,863 B; 69 → 47 unique leaf refs); 25 health flags dispositioned, all recall-rule gaps fixed (25 → 15 flags)."
 canonical: false
 owner: product-engineering
 last_verified: 2026-10-05
@@ -51,13 +51,13 @@ archive (S575 handoff debt).
 
 | file | flag | classification | disposition |
 |---|---|---|---|
-| feedback-cap-subagent-load-in-reproduction-briefs | no-recall-rule | hygiene-debt | queued: add recall rule |
-| feedback-one-session-runs-gates-per-worktree | no-recall-rule | hygiene-debt | queued: add recall rule |
-| feedback-operational-state-must-be-reachable-from-every-workstation | no-recall-rule | hygiene-debt | queued: add recall rule |
-| project-agent-worktree-base-is-main | no-recall-rule | hygiene-debt | queued: add recall rule (new S575 leaf) |
-| feedback-postgres-url-handling-hazards | no-recall-rule, shadow-atlas | hygiene-debt | queued: recall rule; inspect the structural-term match |
-| project-sandbox-rehearsal-bypass-allow-rule | no-recall-rule, weak-basis, shadow-atlas | hygiene-debt | queued: recall rule, dated verification, inspect the structural-term match |
-| project-sharepoint-property-promotion-rewrites-docx | no-recall-rule | hygiene-debt | queued: add recall rule |
+| feedback-cap-subagent-load-in-reproduction-briefs | no-recall-rule | hygiene-debt | fixed: recall rule added (second commit) |
+| feedback-one-session-runs-gates-per-worktree | no-recall-rule | hygiene-debt | fixed: recall rule added |
+| feedback-operational-state-must-be-reachable-from-every-workstation | no-recall-rule | hygiene-debt | fixed: the inline "Recall rule" line became a full section with ground truth |
+| project-agent-worktree-base-is-main | no-recall-rule | hygiene-debt | fixed: recall rule added |
+| feedback-postgres-url-handling-hazards | no-recall-rule, shadow-atlas | hygiene-debt | fixed: full recall section; ground truth names `lib/db/ledger-registry.js` and the credentials runbook, which grounds the Postgres claims (flag cleared) |
+| project-sandbox-rehearsal-bypass-allow-rule | no-recall-rule, weak-basis, shadow-atlas | hygiene-debt + real-defect | fixed: recall rule added; body said the script and design doc were "Factory branch only" — [VERIFIED 2026-10-05] both are on `main` (`git log` on each path), so the two `doc-symbol-refs:ignore` markers were removed and the working-directory note corrected; allow rule present on the owner's Mac (grep of `.claude/settings.local.json`). shadow-atlas accepted: matches the `crm.dynamics.com` sandbox URL and the repo path. weak-basis remains queued |
+| project-sharepoint-property-promotion-rewrites-docx | no-recall-rule | hygiene-debt + real-defect | fixed: recall rule added; "lands on `main` with PR #336" was stale — [VERIFIED 2026-10-05] the module is on `main` (added in `9f061fe92`), ignore marker removed |
 | feedback-codex-model-gpt56-sol | shadow-atlas | accepted | checker false positive: `\brows\b` matched "the thread's rows" in Codex's local log; no data-ownership claim (match context read this pass) |
 | feedback-codex-worktree-owner-runs-it | shadow-atlas | accepted | false positive: `wmkf_[a-z]+` matches the repo path `WMKF_Apps` case-insensitively (re-read this pass; same disposition as 2026-09-17) |
 | feedback-consistency-over-preview-rationale | shadow-atlas | accepted | narrative "concurrent Dataverse edit" and "finding-disposition table" (re-read this pass; same disposition as 2026-09-17) |
@@ -93,6 +93,11 @@ archive (S575 handoff debt).
   prompt-executor, security-auth), the closed-work archive, this note, and the
   runbook §18 row.
 - Before → after: 8,325 → 6,863 B; 75 → 65 lines; 69 → 47 unique leaf refs.
+- Second commit: recall rules on all seven no-recall-rule leaves (two stale
+  "not on main yet" statements corrected in the same pass). Health flags
+  21 → 15: no-recall-rule 7 → 0, shadow-atlas 9 → 8 (one grounded); the 8
+  remaining shadow-atlas flags are all accepted false positives; weak-basis 7
+  and one oversize-routed leaf remain queued.
 
 ## Unknowns & owner decisions
 
@@ -113,5 +118,6 @@ Appended to `docs/MEMORY_HYGIENE_RUNBOOK.md` §18.
 ## Verdict
 
 RECONCILED WITH EXPLICIT UNKNOWNS — router diet complete and verified;
-seven shadow-atlas flags accepted with read evidence; recall-rule,
-weak-basis, and oversize repairs queued with named dispositions.
+all no-recall-rule flags fixed; eight shadow-atlas flags accepted with read
+evidence; weak-basis (7) and one oversize split queued with named
+dispositions.
