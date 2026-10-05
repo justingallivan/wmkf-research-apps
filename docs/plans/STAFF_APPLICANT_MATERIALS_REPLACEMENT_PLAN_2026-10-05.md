@@ -15,7 +15,9 @@ related:
 # Staff replacement upload for Site Visit applicant materials
 
 Drafted 2026-10-05 (Session 577) after Stage 2 acceptance on 1003222. Status:
-**PLANNED, not built.** This is Tier 1 runtime work: branch, PR, owner merge.
+**SOURCE-BUILT on `feature/staff-materials-replacement`
+(2026-10-05), not merged or deployed; see §7.** This is Tier 1 runtime work:
+branch, PR, owner merge.
 
 ## 1. What the owner asked for (2026-10-05)
 
@@ -223,8 +225,9 @@ try again once the applicant's upload finishes.
 **Staging scope:** reuse `site_visit_material` with the `profile:<id>`
 binding, so the existing candidate reconciler
 (`portal-upload-staging.js:870`) and cleanup cover staff rows unchanged.
-Before building, verify that the reconciler and maintenance never assume a
-`materials:` binding [ASSUMED until read]. If they do, add a
+The reconciler and maintenance never assume a `materials:` binding: the
+binding is only compared on claim [VERIFIED
+`lib/services/portal-upload-staging.js:188-227`]. If they do, add a
 `staff_site_visit_material` scope; that also requires a CHECK migration on
 `portal_upload_staging.scope`, last changed in 055.
 
@@ -290,3 +293,46 @@ No Dataverse schema change is needed: no new picklist value and no new column.
    adversarial round on the PR. The focus is the staff branch of
    `finalizeMaterialUpload`, which skips the collection-state and waiver
    checks, because exemptions are where fail-open hides.
+
+## 7. Build record, 2026-10-05 (Session 577)
+
+Branch `feature/staff-materials-replacement`, cut from `main` at `a93974cdf`.
+
+1. **Server** (`737249ed2`):
+   - `staff-upload-token` and `staff-finalize` under
+     `/api/meeting-tracker/visits/[requestId]/materials/`.
+   - `finalizeMaterialUpload` gains an explicit `uploader`. Anything other than
+     `contributor`, or `staff` with a GUID system user, fails closed, and a
+     staff uploader with a background job is refused.
+   - Writer-gate note, matrix rows, canonical counts.
+   - The waived-slot and unknown-uploader guards were mutation-checked: each
+     mutation turned the suite red.
+2. **Card** (`5c2f8354d`): `StaffMaterialUpload` on every checklist row, in
+   any collection state, disabled while that slot has a blocking applicant
+   job. The staff read exposes `uploadedByStaff` from `_wmkf_initiatedby_value`.
+3. **Slides-changed note** (`f99376e43`):
+   - Migration 071; `summary-slides-identity.js`.
+   - `slidesChangedSinceSummary` on the summary-draft GET, and `slidesChanged`
+     on the Staff Deliberations feed.
+   - The 071 CHECK was exercised against a throwaway Postgres 16 with seven
+     cases. It first accepted an id without a hash (`NULL ~ regex` is NULL);
+     fixed with an explicit `IS NOT NULL`.
+
+**Verification:**
+- Full unit suite: 1,239 suites, 20,090 tests passed.
+- Gates passed with sequential self-tests: `api-routes`,
+  `route-lifecycle-auth`, `trust-boundary-guid`, `request-document-writers`,
+  `route-service-boundary`, `dataverse-access-layer`,
+  `dynamics-context-boundary`, `model-override-warming`,
+  `migrations-manifest`, `types`, and the docs gates.
+
+**Before merge (owner-run):**
+- Apply migration 071 (`node scripts/apply-migrations.js`). The new summary
+  insert writes its columns.
+
+**Known gap, not addressed here:**
+- `scripts/setup-database.js` already lacked the fresh-install shape for 061,
+  064, 070 and the 068/069 constraint changes. 071 follows that state rather
+  than half-fixing it. `apply-migrations.js` still applies every file after a
+  fresh install.
+
