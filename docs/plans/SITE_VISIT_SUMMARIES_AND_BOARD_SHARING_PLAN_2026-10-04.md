@@ -826,6 +826,30 @@ Named deviations from the plan text:
    re-verify its file; outside pages already refuse a file whose eTag differs
    from the pinned one, so the failure mode is hidden, not wrong content.
 
+**Codex re-review (2026-10-05), three findings on the first fix, fixed:**
+
+1. **The claim was not exclusive.** A second publish could re-claim a
+   `publishing` row and its error path release the first publisher's claim,
+   letting a discard run while the first publish registered the text. Fix: an
+   owner token on every claim; claim, release, yield, the registry-phase flag,
+   and the final mark all require it; a claim held by a running publish is
+   refused (takeover only after 180 s).
+2. **"Registration attempted" lived in one request's memory**, so a later
+   retry that failed early could release an already registered draft to
+   `ready`, and an edited republish could overwrite the published file. Fix:
+   the durable `publish_registration_attempted` flag, set just before the
+   first registry write, blocks release forever; the filename adds the draft
+   version (`…-143210-v2.txt`), which every edit bumps, so different text never
+   reuses a path.
+3. **A stuck `publishing` draft had no UI recovery** once the transcript
+   changed. Fix: a new Summarize retires a `publishing` row that no request
+   holds, and the card offers it beside Publish again.
+
+All three exercised against a throwaway Postgres 16 (A holds, B refused and
+unable to release; registration then two failed retries never return to
+`ready`; takeover only after 180 s; recovery by a new run) and in service
+tests with a stateful store stand-in; each service guard mutation-checked.
+
 Open items:
 
 - **Pre-Site distribution email allowlist** still offers Transcript Summary

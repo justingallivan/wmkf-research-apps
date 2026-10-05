@@ -3,10 +3,12 @@
 -- acknowledgment (actor, time, disclosure version) before any provider call, so
 -- the record survives a failed call. Generated summary text lives here only while
 -- the draft is 'ready' for a program coordinator to review and edit, and while a
--- publish holds it ('publishing': claimed atomically before any SharePoint or
--- Dataverse write, so edit, discard, and a new run cannot change what is being
--- published); publishing, discarding, superseding, or expiring the draft clears
--- the text and keeps the metadata. The published text lives in governed SharePoint, registered as a
+-- publish holds it ('publishing': claimed atomically, with the publishing
+-- request's token, before any SharePoint or Dataverse write, so edit, discard,
+-- a new run, and a second publish cannot change or release what is being
+-- published). Once a registry write is attempted the row records it and can no
+-- longer return to 'ready'. Publishing, discarding, superseding, or expiring the
+-- draft clears the text and keeps the metadata. The published text lives in governed SharePoint, registered as a
 -- Transcript Summary request-document row. Stage 3 extends artifact_type with
 -- 100000010 (Staff Discussion Summary).
 CREATE TABLE IF NOT EXISTS meeting_transcript_summary_drafts (
@@ -26,6 +28,8 @@ CREATE TABLE IF NOT EXISTS meeting_transcript_summary_drafts (
   failure_code TEXT,
   published_artifact_id UUID,
   publish_claimed_at TIMESTAMPTZ,
+  publish_claim_token UUID,
+  publish_registration_attempted BOOLEAN NOT NULL DEFAULT FALSE,
   acknowledgment_version TEXT NOT NULL,
   acknowledged_by_profile_id INTEGER NOT NULL REFERENCES user_profiles(id),
   acknowledged_at TIMESTAMPTZ NOT NULL,
@@ -42,6 +46,9 @@ CREATE TABLE IF NOT EXISTS meeting_transcript_summary_drafts (
     CHECK (summary_text IS NULL OR state IN ('ready', 'publishing')),
   CONSTRAINT meeting_transcript_summary_drafts_publishing_has_text
     CHECK (state <> 'publishing' OR (summary_text IS NOT NULL AND publish_claimed_at IS NOT NULL)),
+  CONSTRAINT meeting_transcript_summary_drafts_ready_unclaimed
+    CHECK (state NOT IN ('generating', 'ready')
+      OR (publish_claim_token IS NULL AND publish_claimed_at IS NULL AND NOT publish_registration_attempted)),
   CONSTRAINT meeting_transcript_summary_drafts_text_size
     CHECK (summary_text IS NULL OR char_length(summary_text) BETWEEN 1 AND 100000),
   CONSTRAINT meeting_transcript_summary_drafts_end_nonnegative

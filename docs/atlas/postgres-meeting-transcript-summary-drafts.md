@@ -40,21 +40,27 @@ adds 100000010). `request_id`, `source_revision_id`, `source_artifact_id`, and
 | `source_revision_id`, `presentation_end_ms`, `source_artifact_id` | The transcript revision, confirmed boundary, and bound Presentation Transcript row the summary was made from; publish refuses a draft whose pair is no longer current |
 | `summary_text`, `text_edited`, `version` | The generated (then staff-edited) text and an optimistic version; text is allowed only in states `ready` and `publishing` (CHECK) and is at most 100,000 characters |
 | `prompt_name`, `prompt_version`, `prompt_id`, `ai_run_id`, `failure_code` | Executor provenance; the run row keeps content-free audit only |
-| `publish_claimed_at` | When a publish claimed the draft; required in state `publishing` (CHECK) |
+| `publish_claim_token`, `publish_claimed_at`, `publish_registration_attempted` | The publishing request's token and claim time (required in state `publishing`), and a durable flag set just before the first registry write; `generating` and `ready` rows carry none of them (CHECK) |
 | `published_artifact_id` | The Transcript Summary request-document row, set exactly when state is `published` (CHECK) |
 
 States: `generating` → `ready` | `failed`; `ready` → `publishing` |
 `discarded` | `superseded` (a new Summarize) | `expired`; `publishing` →
-`published` | `ready` (released when the publish stopped before any registry
-write) | `superseded` (abandoned) | `expired`. A publish claims the row
-(`publishing`) at the expected version before any SharePoint or Dataverse
-write; edit, discard, and a new run act only on `ready` rows, so what is
-published is exactly the claimed text (Codex review 2026-10-05). Once a
-registry write was attempted the claim is kept and only a retry (same
-generation key and file) can finish it. A partial unique index allows at most
+`published` | `ready` | `superseded` | `expired`.
+
+A publish claims the row with its own token at the expected version before any
+SharePoint or Dataverse write. Edit, discard, and a new run act only on `ready`
+rows, and a claim held by a running publish cannot be claimed, released, or
+yielded by another request (Codex reviews 2026-10-05). Just before the first
+registry write the publish sets `publish_registration_attempted`; after that
+the row can never return to `ready` (its text may already be published), even
+across later retries. On failure the publish releases to `ready` when the flag
+is unset, otherwise it yields its token and the row stays `publishing` for an
+immediate retry (same generation key, same file). A claim older than 180 s is
+abandoned and can be taken over (the publish route allows 120 s). A new run
+retires a `publishing` row that no request holds (yielded or abandoned);
+whatever it registered stays published. A partial unique index allows at most
 one `generating`, `ready`, or `publishing` row per request and type; a
-`generating` row or a `publishing` claim older than 360 s is treated as
-abandoned and superseded by the next run.
+`generating` row older than 360 s is abandoned.
 
 ## Retention
 

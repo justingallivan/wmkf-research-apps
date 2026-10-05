@@ -627,7 +627,7 @@ describe('presentation summary', () => {
     expect(await screen.findByText(/Summary published/)).toBeInTheDocument();
   });
 
-  test('an unfinished publish is read-only and offers only Publish again', async () => {
+  test('an unfinished publish is read-only and offers Publish again or a fresh summary', async () => {
     route({ materials: [transcriptRow()], collection: withSummary(), detail: detailFor({}) }, {
       '/summary-draft': { method: 'GET', respond: () => response(summaryState({ draft: readyDraft({ state: 'publishing' }), draftMatchesTranscript: true })) },
     });
@@ -637,7 +637,17 @@ describe('presentation summary', () => {
     expect(screen.getByRole('button', { name: 'Publish summary' })).not.toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Save draft' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Discard draft' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Replace draft|Summarize presentation/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Replace draft with a new summary' })).toBeDisabled();
+  });
+
+  test('an unfinished publish from an earlier transcript version can still be replaced by a new summary', async () => {
+    route({ materials: [transcriptRow()], collection: withSummary(), detail: detailFor({}) }, {
+      '/summary-draft': { method: 'GET', respond: () => response(summaryState({ draft: readyDraft({ state: 'publishing' }), draftMatchesTranscript: false })) },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByRole('button', { name: 'Publish summary' })).toBeDisabled();
+    fireEvent.click(screen.getByLabelText(/may be sent to Anthropic/));
+    expect(screen.getByRole('button', { name: 'Replace draft with a new summary' })).not.toBeDisabled();
   });
 
   test('a stale published summary says the Board link no longer shows it; the block shows no ids', async () => {

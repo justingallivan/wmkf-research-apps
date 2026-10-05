@@ -2111,7 +2111,8 @@ function SummaryBlock({ t }) {
     : published?.state === 'stale'
       ? 'The published summary is from an earlier transcript version. The Board link no longer shows it; staff still see it. Summarize again to replace it.'
       : 'No summary published yet.';
-  const summarizeForm = presentationReady && draft?.state !== 'publishing' && (
+  // Offered for a stuck 'publishing' draft too: the server retires it only when no publish holds it.
+  const summarizeForm = presentationReady && (
     <div className="mt-3">
       <label htmlFor={ackId} className="flex items-start gap-2 text-sm leading-6 text-gray-900">
         <input id={ackId} type="checkbox" className="mt-1.5" checked={t.summaryAck} disabled={Boolean(t.busy)}
@@ -2139,7 +2140,7 @@ function SummaryBlock({ t }) {
             Draft{draft.edited ? ' (edited)' : ''} · expires {fmtDateTime(draft.expiresAt)}
           </label>
           {draft.state === 'publishing' && (
-            <Notice tone="warning">Publishing this draft did not finish. Publish it again to complete it; it cannot be edited or discarded meanwhile.</Notice>
+            <Notice tone="warning">Publishing this draft did not finish. Publish it again to complete it, or summarize again to start over. It cannot be edited or discarded.</Notice>
           )}
           <textarea id="presentation-summary-text" rows={14} className={`${INPUT} font-mono`} value={t.summaryText}
             maxLength={SUMMARY_TEXT_MAX_CHARS} disabled={Boolean(t.busy) || draft.state !== 'ready'}
