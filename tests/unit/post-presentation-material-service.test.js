@@ -1014,6 +1014,75 @@ test('infected transcript is refused before SharePoint or the slot lease', async
   expect(d.acquireSlotLease).not.toHaveBeenCalled();
 });
 
+const finalizeText = (d, filename, mimeType, buffer) => finalizeTranscriptUpload({
+  requestId: REQUEST_ID,
+  stagingId: STAGING_ID,
+  actorProfileId: 42,
+  actingUserSystemId: ACTOR_ID,
+  file: { filename, mimeType, buffer, leaseToken: 'blob-lease', candidate: null },
+}, d);
+
+test('a .vtt transcript finalizes without calling the scanner', async () => {
+  const bytes = Buffer.from('WEBVTT\n\n00:00.000 --> 00:01.000\nHello\n');
+  const d = deps({
+    scanEnabled: jest.fn(() => true),
+    downloadFile: jest.fn(async () => ({ buffer: bytes })),
+  });
+  await finalizeText(d, 'transcript.vtt', 'text/vtt', bytes);
+  expect(d.scanBytes).not.toHaveBeenCalled();
+  expect(d.uploadFile).toHaveBeenCalled();
+});
+
+test.each([
+  ['NUL byte', Buffer.from('hello\0world')],
+  ['invalid UTF-8', Buffer.from([0x68, 0xff, 0xfe, 0x69])],
+])('a .txt transcript with %s is refused as transcript_text_invalid', async (_label, bytes) => {
+  const d = deps({ scanEnabled: jest.fn(() => true) });
+  await expect(finalizeText(d, 'chat.txt', 'text/plain', bytes))
+    .rejects.toMatchObject({ code: 'transcript_text_invalid', httpStatus: 422 });
+  expect(d.scanBytes).not.toHaveBeenCalled();
+  expect(d.uploadFile).not.toHaveBeenCalled();
+});
+
+test('a .vtt without the WEBVTT header is refused as transcript_text_invalid', async () => {
+  const d = deps({ scanEnabled: jest.fn(() => true) });
+  await expect(finalizeText(d, 'transcript.vtt', 'text/vtt', Buffer.from('just some text')))
+    .rejects.toMatchObject({ code: 'transcript_text_invalid', httpStatus: 422 });
+  expect(d.uploadFile).not.toHaveBeenCalled();
+});
+
+test('a .pdf transcript is still scanned; content-flag-only rejection names the flags', async () => {
+  const d = deps({
+    scanEnabled: jest.fn(() => true),
+    scanBytes: jest.fn(async () => ({
+      scan_result: 'infected', signatureDetected: false,
+      contentFlags: ['embedded_macro', 'embedded_script'],
+      detectedThreats: ['embedded macro', 'embedded script'],
+      foundViruses: [{ fileName: 'transcript.pdf', virusName: 'embedded macro' }],
+    })),
+  });
+  await expect(finalizeText(d, 'transcript.pdf', 'application/pdf', Buffer.from('%PDF-1.7')))
+    .rejects.toMatchObject({
+      code: 'scan_infected', httpStatus: 422,
+      message: 'The transcript was rejected by the file scanner: embedded macro, embedded script.',
+    });
+  expect(d.scanBytes).toHaveBeenCalledTimes(1);
+});
+
+test('a .pdf transcript with a real signature gets the plain malware message', async () => {
+  const d = deps({
+    scanEnabled: jest.fn(() => true),
+    scanBytes: jest.fn(async () => ({
+      scan_result: 'infected', signatureDetected: true, contentFlags: [], detectedThreats: [],
+      foundViruses: [{ fileName: 'transcript.pdf', virusName: 'Eicar' }],
+    })),
+  });
+  await expect(finalizeText(d, 'transcript.pdf', 'application/pdf', Buffer.from('%PDF-1.7')))
+    .rejects.toMatchObject({
+      code: 'scan_infected', httpStatus: 422, message: 'The transcript failed the malware scan.',
+    });
+});
+
 test('a lost upload response adopts only the matching deterministic-path item before registry creation', async () => {
   const bytes = Buffer.from('%PDF-1.7');
   const conflict = Object.assign(new Error('exists'), { status: 409 });

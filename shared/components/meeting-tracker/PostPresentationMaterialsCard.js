@@ -22,7 +22,7 @@ const TRANSCRIPT_CONTENT_TYPES = Object.freeze({
 });
 const PERMANENT_TRANSCRIPT_CODES = new Set([
   'empty_file', 'file_too_large', 'extension_not_allowed', 'content_type_mismatch',
-  'vtt_header_invalid', 'signature_mismatch', 'post_presentation_content_mismatch',
+  'vtt_header_invalid', 'transcript_text_invalid', 'signature_mismatch', 'post_presentation_content_mismatch',
   'post_presentation_candidate_mismatch', 'post_presentation_replay_mismatch',
   'post_presentation_generation_ambiguous', 'staged_upload_mismatch',
   'staging_publicly_readable', 'staging_expired', 'staging_not_found',

@@ -35,6 +35,7 @@ const PERMANENT_RESULT_CODES = new Set([
   'extension_not_allowed',
   'content_type_mismatch',
   'vtt_header_invalid',
+  'transcript_text_invalid',
   'signature_mismatch',
   'post_presentation_content_mismatch',
   'post_presentation_candidate_mismatch',
