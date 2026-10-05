@@ -132,9 +132,9 @@ describe('formatter v3: one paragraph per speaker turn (owner decision 2026-10-0
     ],
   };
 
-  test('version constants (v4 adds the presentation end to the bundle; same turn layout as v3)', () => {
-    expect(TRANSCRIPT_FORMATTER_VERSIONS).toEqual(['1', '2', '3', '4']);
-    expect(TRANSCRIPT_FORMATTER_VERSION).toBe('4');
+  test('version constants (v4 adds the presentation end; v5 adds the TXT byte-order mark; same turn layout as v3)', () => {
+    expect(TRANSCRIPT_FORMATTER_VERSIONS).toEqual(['1', '2', '3', '4', '5']);
+    expect(TRANSCRIPT_FORMATTER_VERSION).toBe('5');
   });
 
   test('consecutive utterances by one speaker merge into a single turn spanning several minutes', () => {

@@ -17,8 +17,9 @@ related:
 # Site Visit summaries, Staff Deliberations follow-up, and Board sharing
 
 Status: Stage 1 Production-live (PR #434 merge `32664485b`, Production deployment 6863898521 success; migration 068 applied and picklist 100000012 inserted (owner-run, re-read verified) 2026-10-05; §11, §12);
-acceptance on test request 1003222 pending. Stages 2–4 not built. Owner
-decisions complete (§3, §7).
+accepted on test request 1003222 by the owner 2026-10-05 (§13). Stages 2–4 not built;
+Stages 2–3 re-reviewed against live code 2026-10-05 (§16). Owner
+decisions complete (§3, §7, §16).
 
 ## 1. What the owner asked for (2026-10-04)
 
@@ -179,8 +180,8 @@ be its own row:
 **Boundary generation.** Every derivative (the presentation-transcript row,
 the Board recording link, both summaries and their drafts) records the
 source bundle `revisionId` and `presentationEndMs` it was made from, on the
-request-document row (`wmkf_generationinputsnapshot`-style field as the Pre-RP
-Brief does; exact field to be confirmed against the Wave 16 schema) and in
+request-document row (as the SHA-256 `wmkf_generationkey`; resolved in §11
+item 2 [VERIFIED via `presentation-transcript-binding.js:28-34`]) and in
 the draft. Outside pages compare that pair with the current TRANSCRIPT row's
 confirmed boundary at context time and again at open time, and omit any
 derivative that does not match. Moving the boundary, re-confirming it, or
@@ -201,7 +202,7 @@ card keep the full files.
 
 | | Presentation summary | Staff discussion summary |
 |---|---|---|
-| Input | the presentation-only transcript text plus the applicant presentation PDF text if present | the turns after the boundary, derived at run time from the full bundle |
+| Input | the bound Presentation Transcript row's text plus the applicant presentation PDF text if present (newest Ready `APPLICANT_SLIDES` row with a PDF content type; applicant-supplied, so tagged as untrusted input) | the bound Staff Discussion Transcript row's text (`bindStaffDiscussionTranscript`; §7 decision 7), not a re-derived cut |
 | Prompt row | `meeting-transcript.presentation-summary` | `meeting-transcript.discussion-summary` |
 | Output | plain text (`.txt`), sections: what was presented, questions and answers, open points | plain text, sections: assessments voiced, concerns, follow-ups, who said what only where it matters |
 | Artifact type | `TRANSCRIPT_SUMMARY = 100000007` (exists) | new `STAFF_DISCUSSION_SUMMARY = 100000010` |
@@ -218,22 +219,40 @@ later from the stored text.
 
 Generation flow mirrors the transcript's draft-to-publish contract:
 
-1. PC clicks "Summarize" in the card (requires a confirmed boundary).
-2. The Executor runs both prompts; results land as drafts in Postgres (same
-   expiry discipline as transcript drafts), never directly as materials.
+1. PC clicks "Summarize" in the card (requires a bound derivative for the
+   summary's input) and ticks the summarization acknowledgment (§6).
+2. The route runs the prompt synchronously (`maxDuration: 300`, as the
+   Pre-Site generation route does [VERIFIED via
+   `pages/api/workbench/pre-site-visit.js:23-29`]; §16 decision C). Only a
+   successful, accepted response writes a draft. Drafts live in a new
+   Postgres table (§16 finding 3), never as request-document rows: the
+   outside winner rule excludes only SUPERSEDED [VERIFIED via
+   `material-model.js:124-129`], so a Dataverse DRAFT row would be served.
 3. The PC reads and may edit each draft, then publishes it; publish writes
    the `.txt` to SharePoint and the request-document row bound to the AI
-   run, superseding any previous summary of that type.
-4. Republishing the transcript (names edit) does not invalidate a published
-   summary; the card shows "Summary from an earlier transcript version" and
-   offers Summarize again.
+   run, superseding any previous summary of that type. The row carries a
+   `wmkf_generationkey` from the same recipe as the transcript derivatives
+   (producer, request, type, source `revisionId`, `presentationEndMs`) and a
+   pinned eTag.
+4. ~~Republishing the transcript (names edit) does not invalidate a
+   published summary.~~ **Superseded (§16 decision A, 2026-10-05):** any
+   republish, including a names edit, mints a new `revisionId` [VERIFIED via
+   `meeting-tracker-transcription/service.js:480`], so outside pages hide the
+   summary until a PC summarizes and publishes again. Staff surfaces keep
+   showing it with "Summary from an earlier transcript version" and offer
+   Summarize again.
 
-LLM admission (per S573): `APP_MODELS` rows for both prompts (`sonnet`,
-fallback `haiku`; §7 decision 4), `requireAcceptedLlmResponse` on both
-calls, executor budget rows sized for a long answer with thinking (the IA
-2,200-token lesson), `requireNoPersistence` with content-free audit as the
-alignment prompt does, A7 registry entries, seeds owner-run with the write
-ack, and a line each in the Sonnet 5.5 consumer inventory.
+LLM admission: both prompt rows seeded with `wmkf_ai_model = sonnet`. The
+Executor takes the model from the prompt row and passes no fallback model to
+`LLMClient` [VERIFIED via `execute-prompt.js:553-560,666-678`; `grep
+fallbackModel` finds no hit], so §16 decision B supersedes the haiku fallback
+in §7 decision 4, and no `APP_MODELS` row is needed. Also:
+`requireAcceptedLlmResponse` on both calls, executor budget rows sized for a
+long answer with thinking (the IA 2,200-token lesson), `requireNoPersistence`
+with content-free audit as the alignment prompt does [VERIFIED via
+`alignment-service.js:144-155`], A7 registry entries (the applicant PDF is an
+untrusted input), seeds owner-run with the write ack, and a line each in the
+Sonnet 5.5 consumer inventory.
 
 ### 4.4 Staff Deliberations segment
 
@@ -249,8 +268,10 @@ ack, and a line each in the Sonnet 5.5 consumer inventory.
 The segment stays read-only under `reviewers`; generation and publication
 stay in the Meeting Tracker card under `meeting-tracker`. The logistics API
 that feeds the segment adds the two summary texts (bounded size) to its
-response. [NOT-READ: lib/services/site-visit/logistics-service.js — feed
-identified by the subagent; read before building.]
+response by downloading each bound summary `.txt` from SharePoint at feed
+time, size-capped (§16 decision D). The feed makes no Graph reads today
+[VERIFIED via `logistics-service.js:401-403`, descriptors only]; a failed or
+oversized read degrades to the file link and never fails the feed.
 
 ### 4.5 Board sharing
 
@@ -301,7 +322,7 @@ outside ones:
 | Labels `REQUEST_DOCUMENT_ARTIFACT_LABEL` and the type enum | `shared/config/requestDocument.js` | yes | yes | yes |
 | Writer registry gate `check:request-document-writers` | `scripts/check-request-document-writers.js` | new writer row | new writer row | new writer row |
 | Atlas page | `docs/atlas/dataverse-wmkf-requestdocument.md` | yes | yes | yes |
-| Postgres CHECK constraints `presentation_material_slot_leases_artifact_type_check` and `presentation_material_uploads_artifact_type_check`, both limited to 100000005-100000007 [VERIFIED `lib/db/migrations/055_post_presentation_materials.sql:71-72,146-147`, `scripts/setup-database.js:1638-1639,1711-1712`]; the shared publication lease inserts the requested type directly | new migration (next number after 066) extending both constraints, mirrored in `scripts/setup-database.js` and `lib/db/migrations-manifest.json`; owner applies with `node scripts/apply-migrations.js` | yes | yes | yes |
+| Postgres CHECK constraints `presentation_material_slot_leases_artifact_type_check` and `presentation_material_uploads_artifact_type_check`, both limited to 100000005-100000007 [VERIFIED `lib/db/migrations/055_post_presentation_materials.sql:71-72,146-147`, `scripts/setup-database.js:1638-1639,1711-1712`]; the shared publication lease inserts the requested type directly | done: migration 068 admits 100000010, 100000011, 100000012 and 069 adds 100000013 [VERIFIED via `lib/db/migrations/069_staff_discussion_transcript_type.sql:11,17`]; Stages 2–4 need no constraint migration | done | done | done |
 | External-backing and watch guards (RECORDING-only today; §4.5) | `material-model.js`, both outside `open` resolvers, `canWatch` | n/a | yes | n/a |
 
 The staff-only type needs its own small projection for the logistics feed
@@ -344,14 +365,17 @@ recording; move the boundary earlier and confirm the Board link shows no
 transcript until the row regenerates; simulate recovery with files uploaded
 and no registry row.
 
-**Stage 2. Presentation summary.** Prompt file, seed script, A7 entry,
-`APP_MODELS` row, budget row, draft and publish flow in the card,
-`TRANSCRIPT_SUMMARY` writer, inline rendering in the segment. Owner-run: seed
-with write ack; budget and model rows through admin. Acceptance: a summary a
+**Stage 2. Presentation summary.** Prompt file, seed script (model
+`sonnet` on the prompt row), A7 entry, budget row, the summary-draft table
+migration and Atlas page, the summarization acknowledgment, draft and publish
+flow in the card, `TRANSCRIPT_SUMMARY` writer with generation key and pinned
+eTag, the summary binding on both outside pages (listing and open), inline
+rendering in the segment (§16). Owner-run: the migration; seed with write
+ack; budget row through admin. Acceptance: a summary a
 PD would accept without rewriting; the Board page shows it.
 
 **Stage 3. Staff discussion summary.** Picklist extension for `100000010`
-(owner-run, dry-run first), folder, second prompt and seed, second writer,
+(owner-run, dry-run first; the Postgres constraints already admit it), folder, second prompt and seed, second writer,
 its own staff-only projection in the logistics feed, segment rendering, the
 §4.7 outside-exclusion test. Owner-run: the
 extension script and the seed. Acceptance: the summary appears on Staff
@@ -376,15 +400,21 @@ route that resolves a model.
   queued and persists only a timestamp [VERIFIED `runtime.js:145-148,181`].
   That acknowledgment does not cover summarization, and bundles published
   before stage 3 never saw any summarization wording. So "Summarize" takes
-  its own server-validated, versioned acknowledgment: the PC confirms, per
-  recording, a disclosure that names the LLM provider and the staff
-  discussion; the server persists actor, time, disclosure version, and the
-  source bundle `revisionId`; an absent or mismatched acknowledgment blocks
-  the provider call. The upload-time copy also gains the sentence, for
+  its own server-validated, versioned acknowledgment: the PC confirms, on
+  every Summarize request, a disclosure that names the LLM provider and the
+  staff discussion; the server rejects a request without it before any
+  provider call and persists actor, time, disclosure version, and the source
+  bundle `revisionId` on the draft row it creates (§16 finding 4). Per run is
+  stricter than per recording and needs no stable recording identity. The upload-time copy also gains the sentence, for
   awareness, but it is not what authorizes the call. The handoff's "no
   blanket confidential-recording clearance" still stands. [§7 decision 3]
 - Summaries are AI drafts a PD reviews before they become materials
   (product principle 1). The draft never leaves Postgres until published.
+  Unlike transcript correction drafts, which are label-only with bytes kept
+  in SharePoint [VERIFIED via `063_meeting_tracker_transcription.sql:91`], a
+  summary draft holds generated text about the staff discussion in
+  Postgres: the new table expires drafts, deletes the text on publish or
+  expiry, and gets its own Atlas page.
 - Audit: `wmkf_ai_run` rows with content-free retention; the request-document
   row binds to the run and prompt version like the Initial Assessment.
 - The Staff Discussion Transcript (§7 decision 7) adds no new disclosure:
@@ -407,6 +437,8 @@ route that resolves a model.
    discussion is also summarized by the LLM provider; the PC still decides
    per recording. No blanket clearance.
 4. **Model tier:** `sonnet` with `haiku` fallback for both summary prompts.
+   **Amended 2026-10-05 (§16 decision B):** `sonnet` only; the Executor has
+   no fallback swap.
 5. **Interim gap accepted:** between stage 1 and stage 4 the outside links
    show no recording. Closing the exposure comes first.
 6. **Applicant presentation PDF is an input** to the presentation summary
@@ -617,4 +649,101 @@ bound to the current revision and boundary (`withoutUnboundDerivatives`);
 without bundle metadata both are hidden and the full transcript stays. The
 regression test for that exact sequence, plus the readiness-off case, turned
 red with the filter removed. Outside-page exclusion was judged sound.
+
+## 14. Boundary proposal stray-line guard, 2026-10-05 (branch `feature/boundary-proposal-stray-lines`)
+
+**Status: Production-live** (PR #437, merge `9dfec5479`, deployment 6865805766 success).
+
+**Acceptance finding on 1003222 (owner):** the proposal landed late, at a
+one-word line ("[1:00:48] Sujoy Mukhopadhyay: Same.") that diarization
+attributed to the PI more than ten minutes into the staff discussion. The
+speaker classification was right; the attribution was wrong. Had the
+proposal been confirmed unchecked, the Board link would have carried that
+stretch of staff discussion, so the stakes are higher than "advisory"
+suggested.
+
+**Owner constraint:** a closing "Thank you" is often the applicants' last
+line, so short lines cannot be dropped by length alone.
+
+**Rule:** a short applicant line (≤ 3 words) is skipped only when it starts
+more than 2 minutes after the previous longer (> 3 words) applicant line;
+the gap is measured to the last longer line so a cluster of strays is
+skipped together. Errors stay visible: a real closing thanks after more than
+two minutes of staff talk is skipped (proposal lands slightly early) and is
+shown with "Use this line instead"; every skipped line is listed in the
+editor. The roster-as-inside rule (handoff S575 §9) remains unconfirmed: this
+run was consistent with it but did not show whether any roster attendee
+spoke.
+
+## 15. TXT encoding fix, 2026-10-05 (branch `feature/transcript-txt-utf8-bom`)
+
+**Status: Production-live** (PR #438, merge `1e2a798fd`, deployment 6865646088 success). Existing 1003222 files need a republish and Generate to pick it up.
+
+**Owner report on 1003222:** the staff discussion TXT opened from SharePoint
+showed "youâ€” I think". The file bytes were correct UTF-8 (`e2 80 94`); the
+viewer read them as Windows-1252 because a `.txt` carries no charset. The
+card's own "Download TXT" was unaffected (its route sends
+`charset=utf-8`); the Board link redirects to SharePoint and was presumed
+affected (not verified in Production).
+
+**Fix:** a UTF-8 byte-order mark on every published TXT. The full transcript
+gets it through formatter/bundle version 5, so v1–v4 publications still
+rebuild byte-identical during recovery; the presentation and discussion
+derivatives get it in their writer. VTT and source JSON are unchanged.
+Already-written files keep their bytes; regenerating replaces them.
+
+## 16. Contract-reconcile review of Stages 2–3, 2026-10-05 (Mode A, after Stage 1)
+
+Surface: two summary writers (types 100000007 and 100000010), a summary-draft
+table, a summarization acknowledgment, the outside summary binding, and
+inline summary text on Staff Deliberations. Verdict before amendment: READY
+WITH NAMED CHANGES for §4.4/§4.7, NEEDS REWORK for §4.3/§6. All findings
+below are folded into those sections.
+
+1. **Model and fallback.** The Executor resolves the model from the prompt
+   row's `wmkf_ai_model` [VERIFIED via `execute-prompt.js:553-560`] and
+   builds `LLMClient` with no fallback model [VERIFIED via
+   `execute-prompt.js:666-678`; `grep fallbackModel` in that file returns
+   nothing]. `APP_MODELS` rows would be unused; the haiku fallback had no
+   mechanism.
+2. **§4.3 step 4 contradicted the §4.2 binding.** Every republish mints a
+   new `revisionId` [VERIFIED via `meeting-tracker-transcription/service.js:480`]
+   and the binding recipe hashes it [VERIFIED via
+   `presentation-transcript-binding.js:28-34`].
+3. **Summary drafts are a new content-bearing surface.** The transcript
+   publication table holds label-only drafts [VERIFIED via
+   `063_meeting_tracker_transcription.sql:91`]. Drafts as Dataverse DRAFT
+   rows would be served outside, because the winner rule excludes only
+   SUPERSEDED [VERIFIED via `material-model.js:124-129`].
+4. **The summarization acknowledgment had no named store.** The upload-time
+   acknowledgment persists only a timestamp [VERIFIED via
+   `transcription-pilot/runtime.js:14,47`]. Resolved: per Summarize request,
+   stored on the draft row.
+5. **The §4.7 constraint migration was already done** (068/069).
+6. **Async audit applies.** The existing transcript route runs at
+   `maxDuration: 120` [VERIFIED via
+   `pages/api/meeting-tracker/visits/[requestId]/transcriptions/presentation-transcript.js:8`];
+   a long summary call needs the 300 s ceiling and a card-side guard against
+   a response landing after the PC switched requests.
+7. **Inline text needs a byte read.** The feed projects descriptors only and
+   has no Graph reads (grep of `logistics-service.js` for Graph or fetch: 0
+   hits).
+8. **Both outside pages pass the summary through unbound** [VERIFIED via
+   `presentation-page-service.js:94-99`, `briefing-page-service.js:291-295`];
+   Stage 2 binds it on both, at listing and open time.
+9. Stage 3 input reads the bound Staff Discussion Transcript row; the
+   applicant PDF is chosen from `APPLICANT_SLIDES` by content type, since
+   portal PDFs and sources share that type [VERIFIED via
+   `site-visit-materials/contributor-service.js:44-45`].
+
+Owner decisions, 2026-10-05:
+
+- **A.** A names-edit republish hides the published summary outside until it
+  is re-summarized and published; staff keep it with an "earlier transcript
+  version" note.
+- **B.** `sonnet` only, no fallback (amends §7 decision 4).
+- **C.** Synchronous generation in a 300 s route; a draft is written only on
+  success.
+- **D.** Staff Deliberations reads the bound summary file from SharePoint at
+  feed time, size-capped, falling back to the link.
 

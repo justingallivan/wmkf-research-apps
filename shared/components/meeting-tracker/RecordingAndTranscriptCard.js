@@ -1710,6 +1710,14 @@ function PresentationEndEditor({ t, readOnly }) {
           <button type="button" disabled={disabled} onClick={() => setPresentationEndMs(proposed.endMs)} className={BTN}>Use proposed</button>
         </div>
       )}
+      {(proposed?.skipped || []).filter((line) => Number.isSafeInteger(line?.endMs)).map((line) => (
+        <div key={`skipped-${line.endMs}`} className="mt-2" data-testid="presentation-end-skipped">
+          <Notice tone="info">
+            Skipped a short line attributed to {String(names?.[line.speakerId] || '').trim() || `Speaker ${line.speakerId}`} at {formatTranscriptTurnTime(line.startMs)}: “{clip(line.text, 80)}” It came {Math.round(line.gapMs / 60_000)} minutes after the last longer applicant line, so it may belong to someone else.
+          </Notice>
+          {line.endMs !== selected && <button type="button" disabled={disabled} onClick={() => setPresentationEndMs(line.endMs)} className={`mt-2 ${BTN}`}>Use this line instead</button>}
+        </div>
+      ))}
       <label className="mt-2 block text-xs font-medium text-gray-700">
         Presentation ends after
         <select

@@ -110,6 +110,11 @@ const MEETING_TRACKER_DEFAULTS_DATAVERSE_FIELDS = [
 ];
 const SITE_VISIT_MATERIALS_DEFAULTS_DATAVERSE_FIELDS = [
   appSystemSettingField(
+    'Materials due-date offset',
+    'site_visit_materials.due_business_days',
+    'Whole number of business days before the site visit (1–30, default 2). New materials requests only; existing deadlines remain unchanged.',
+  ),
+  appSystemSettingField(
     'Applicant materials upload cap',
     'site_visit_materials.upload_max_mb',
     'Whole number of megabytes (1–500). Unset reads as the 500 MB default. The briefing page opens files up to 50 MB and lists larger ones with a note.',
@@ -3303,8 +3308,8 @@ export function WorkflowsWorkspace({ view }) {
           </AdminEditorPanel>
           <AdminEditorPanel
             id="site-visit-materials-upload-cap"
-            title="Applicant materials upload cap"
-            description="Largest file an applicant can upload for a site visit through the materials link."
+            title="Materials defaults"
+            description="Set the deadline for new site visit materials requests and the largest file applicants can upload."
             scope="Global setting"
             dataverseFields={SITE_VISIT_MATERIALS_DEFAULTS_DATAVERSE_FIELDS}
           >

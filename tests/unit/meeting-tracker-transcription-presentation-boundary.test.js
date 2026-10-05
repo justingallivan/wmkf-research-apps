@@ -98,7 +98,7 @@ describe('correction draft presentation end', () => {
     const result = await getMeetingCorrectionDraft({ requestId, operationId: draftId });
     expect(result.correction.presentationEndMs).toBe(3000);
     expect(result.presentationEnd).toEqual({ current, draft: { endMs: 3000 },
-      proposed: { endMs: 2000, speakerId: 'B', utteranceIndex: 1 } });
+      proposed: { endMs: 2000, speakerId: 'B', utteranceIndex: 1, skipped: [] } });
     expect(result).not.toHaveProperty('receipt');
   });
 

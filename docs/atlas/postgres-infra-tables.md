@@ -898,7 +898,7 @@ Cleanup: none (CF5 — a deleted row is simply gone).
 Owner: applicant materials collection (`lib/services/site-visit-materials/collection-service.js`
 + `collection-store.js`; docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md §16). One row per collection
 the PC starts from a request's active `wmkf_sitevisit`: request and Activity ids, `status`
-(`open | ready | closed`), `due_at` (two business days before the visit in its zone) and
+(`open | ready | closed`), `due_at` (saved at creation using the configured business-day offset before the visit in its zone) and
 `closes_at` (visit end + 7 days), the checklist template with per-item waivers, the PI/liaison
 contacts snapshot, the sealed contributor link (`jti`, `token_digest`, `token_ciphertext`; raw
 token never stored), invitation and reminder receipts (Dynamics email ids, counts, timestamps),
@@ -906,6 +906,12 @@ and the PC's ready confirmation. One non-closed row per request (partial unique 
 never here: accepted uploads are SharePoint items registered in `wmkf_requestdocument`, which the
 service reads back by artifact type and canonical filename. Migration 044 adds `slot_leases JSONB
 NOT NULL DEFAULT '{}'::jsonb`: one server-owned token/expiry object per canonical checklist slot.
+**[BRANCH-BUILT 2026-10-05; due-date setting not deployed.]** New collections read
+`site_visit_materials.due_business_days` from Dataverse settings: integer 1–30, absent default 2,
+weekends skipped and holidays not excluded. Invalid stored values or read failures return 503;
+a changed deadline between preview and creation requires a new preview. The Admin setting does
+not rewrite existing `due_at` values, and existing invitations, reminders, and applicant displays
+continue consuming the saved deadline. No schema change is required.
 **[PRODUCTION-LIVE 2026-09-24 via PR #335 / `407ca908d`:]** manual email previews
 read the current Project Leader and liaison emails without writing this row. The liaison is the
 Liaison of record (`lib/services/contacts/request-liaison.js`): for Research the applicant

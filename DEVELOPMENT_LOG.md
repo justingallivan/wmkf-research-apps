@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Board links serve the presentation only; staff keep the discussion (Session 575)
+
+**Milestone:** Outside Board presentation and briefing links stop serving the full Site Visit transcript and recording (which contain the staff discussion). A coordinator-confirmed presentation end splits each published transcript into a Board-servable Presentation Transcript and a staff-only Staff Discussion Transcript.
+**Sessions:** 575 (plan Stage 1 PR #434 `32664485b`; owner decision 7 PR #435 `700702ee9`; stray-line proposal guard PR #437 `9dfec5479`; TXT UTF-8 byte-order mark PR #438 `1e2a798fd`; all Production deployments success; migrations 068/069 and picklist values 100000012/100000013 owner-applied).
+**Ship state:**
+- Transcript bundle v4 freezes `presentationEnd` in source, manifest, identity hash, and receipt; v5 adds a TXT byte-order mark. v1–v4 rebuild byte-identical.
+- Derivatives are bound by generation key (source revision + boundary) and by the pinned SharePoint eTag; outside pages re-check both at context and open time and fail closed. Staff Deliberations shows only bound derivatives.
+- Boundary proposal from speaker classes, skipping isolated short applicant lines (misattribution guard), every skip shown to the coordinator.
+- Acceptance run by the owner on test request 1003222.
+**Why it matters:** Board recipients no longer receive staff deliberation through the post-presentation links, and staff gain a separate discussion transcript for later summarization.
+**Pointers:** `docs/plans/SITE_VISIT_SUMMARIES_AND_BOARD_SHARING_PLAN_2026-10-04.md` §11–§15; `docs/atlas/dataverse-wmkf-requestdocument.md` "Presentation Transcript contract".
+
 ## October 2026 — One Recording and transcript card on the Site Visit page (Session 574)
 
 **Milestone:** The Site Visit page's Post-presentation materials card and Meeting transcription panel are replaced by one task-oriented Recording and transcript card; plain-text and VTT transcript uploads no longer go through the malware scanner.

@@ -130,7 +130,9 @@ test('writes the presentation-only TXT, registers the row under the derivative k
       presentationTranscript: { artifactId: NEW_ID, state: 'bound' } } });
 
   const expectedText = buildPresentationTranscriptText(content, speakerNames, 2000);
-  expect(uploadedBytes.toString('utf8')).toBe(expectedText);
+  // BOM-prefixed so SharePoint and the Board's browser read it as UTF-8.
+  expect([...uploadedBytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+  expect(uploadedBytes.toString('utf8')).toBe(`\uFEFF${expectedText}`);
   expect(expectedText).toContain('Our project.');
   expect(expectedText).not.toContain('Staff only discussion.');
   expect(deps.uploadFile).toHaveBeenCalledWith('akoya_request', 'akoya_request/1002912_x/Site Visit - Presentation Transcript',
@@ -171,7 +173,7 @@ test('one action writes both halves: the presentation first, then the staff disc
     ['akoya_request/1002912_x/Site Visit - Staff Discussion Transcript', DISCUSSION_FILENAME],
   ]);
   const discussionText = uploads.get('disc-item').bytes.toString('utf8');
-  expect(discussionText).toBe(buildStaffDiscussionTranscriptText(content, speakerNames, 2000));
+  expect(discussionText).toBe(`\uFEFF${buildStaffDiscussionTranscriptText(content, speakerNames, 2000)}`);
   expect(discussionText).toContain('Staff only discussion.');
   expect(discussionText).not.toContain('Our project.');
   const [payload, options] = deps.createDocument.mock.calls[1];
@@ -196,7 +198,7 @@ test('a boundary at the last utterance writes a one-line discussion note, never 
   transcriptRow = { ...transcriptRow, wmkf_transcriptbundlejson: JSON.stringify(manifest), wmkf_inputfingerprint: generated.inputSha256 };
   state.rows = [transcriptRow];
   await call();
-  expect(uploads.get('disc-item').bytes.toString('utf8')).toBe('No discussion was recorded after the presentation ended at 0h00m03s.\n');
+  expect(uploads.get('disc-item').bytes.toString('utf8')).toBe('\uFEFFNo discussion was recorded after the presentation ended at 0h00m03s.\n');
 });
 
 test('a bound presentation transcript with a missing discussion writes only the discussion', async () => {

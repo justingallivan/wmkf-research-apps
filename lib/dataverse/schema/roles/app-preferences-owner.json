@@ -1,0 +1,14 @@
+{
+  "name": "WMKF App Preferences Owner",
+  "description": "Allows a staff user to own app preference rows written by the application service. Read is limited to the user's own rows; no shared-settings privileges are granted.",
+  "businessUnit": "root",
+  "privileges": [
+    {
+      "table": "wmkf_appuserpreference",
+      "depth": "Basic",
+      "ops": [
+        "Read"
+      ]
+    }
+  ]
+}

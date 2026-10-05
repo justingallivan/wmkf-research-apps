@@ -7,7 +7,6 @@ import {
   clearPersonalMaterialsTemplate,
   sharedMaterialsEmailDefaults,
   validateMaterialsEmailTemplate,
-  MATERIALS_EMAIL_PREFERENCE_KEYS,
   mergeMaterialsEmailTemplate,
   materialsEmailOverrides,
 } from '../../../lib/services/site-visit-materials/email-personalization';
@@ -55,7 +54,15 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, kind, template: {} });
       }
       const result = await savePersonalMaterialsTemplate(access.profileId, kind, overrides);
-      if (!result.ok) return res.status(result.errors?.includes('persistence') ? 500 : 400).json({ error: 'The email template is invalid.', issues: result.errors });
+      if (!result.ok) {
+        const persistenceFailed = result.errors?.includes('persistence');
+        return res.status(persistenceFailed ? 500 : 400).json({
+          error: persistenceFailed
+            ? 'Your default could not be saved. Please try again or contact support.'
+            : 'The email template is invalid.',
+          issues: result.errors,
+        });
+      }
       return res.status(200).json({ ok: true, kind, template: result.value });
     });
   } catch (error) {
