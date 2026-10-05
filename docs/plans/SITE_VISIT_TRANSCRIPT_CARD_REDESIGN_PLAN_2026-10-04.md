@@ -48,8 +48,8 @@ Owner-observed symptoms on request 1003222 (screenshot 2026-10-04):
 | Transcript appears in both cards with no cue they are one slot | design gap | VERIFIED, §1 above |
 | "Current version · ea8e3af6-…" with no date, source, or version number | design gap; the data exists on the TRANSCRIPT row: `materialDescriptor` carries `createdAt` and `slotVersion` (`wmkf_slotversion`); jobs carry filename and ready time. The publication row's `version` is an optimistic-concurrency counter bumped on lease renewals and checkpoints, and a correction row's `createdAt` is its draft-creation time, so neither is revision metadata | VERIFIED `material-model.js:127-130,181-200`, `transcription-pilot/store.js:1368-1431`, `service.js:150` |
 | Three stacked amber boxes: "Publication status", "Published", "Published" | bug: `collection.publications` includes correction-draft rows and the label map has no `draft` case, so the draft falls through to the literal heading | VERIFIED `MeetingTranscriptionPanel.js:899-910`, `service.js:149-150` |
-| Correction badge says "Draft" while its operation id is the published filename | ASSUMED bug; probe needed (§8) | screenshot only |
-| Green block lists seven aligned names with confidences; editor fields are blank; footer says "Unsaved speaker-name changes" | ASSUMED UI reset; alignment does persist names to the job (`completeTranscriptionAlignment` receives `speakerNames`) so the editor should seed from them; probe needed | VERIFIED persistence call `alignment-service.js:184`; blank state ASSUMED |
+| Correction badge says "Draft" while its operation id is the published filename | design gap: the draft is labeled with the corrected transcript's id, not its own (§8) | VERIFIED via probe, §8 |
+| Green block lists seven aligned names with confidences; editor fields are blank; footer says "Unsaved speaker-name changes" | component defect: the job holds the names, the component cleared its local draft (§8) | VERIFIED via probe, §8; persistence call `alignment-service.js:184` |
 | "Use Jean for Speaker B" sits in the summary, apart from the editor where the pick happens | design gap | SESSION_PROMPT Verified Open §4 |
 | Both cards accept a Zoom VTT with different rules: card one scans with Cloudmersive and rejected a plain 81 KB VTT as malware; card two has no scan and a 4 MB cap | design gap plus open policy | SESSION_PROMPT Verified Open §3 |
 | Four same-named draft jobs in the left rail, one expired, no indication which is current | design gap | screenshot |
@@ -250,21 +250,32 @@ Eliminated by the target state (no pre-work; see
 - Duplicate transcript row across two cards.
 - Jean suggestion separated from the editor.
 
-Survive the redesign and need a probe before being called design or bug:
+Probed 2026-10-04 (owner-run read-only Postgres probe on request 1003222;
+ids, states, names and timestamps only):
 
-- Correction badge "Draft" while its id is on the published file. Probe:
-  owner-run read of request 1003222's publication rows (operation id, state,
-  source artifact) against the current TRANSCRIPT row's filename. If the
-  publish of a correction leaves the draft row in `draft`, that is a service
-  defect to fix regardless of UI.
-- Editor blank after alignment applied names. Probe: load job 7c1c5643 fresh
-  and inspect `speaker_names` versus `speaker_alignment.speakers`; then
-  reproduce the UI reset path (the component clears names on several
-  actions). If names are on the job and the UI clears them, that is a
-  component defect the new editor must not inherit.
-
-Both probes are prod reads; the owner runs them per
-`feedback-never-self-authorize-prod-dataverse-reads`.
+- **Correction badge "Draft" next to the published file's id: design gap,
+  not a bug.** [VERIFIED via probe] Three publication rows exist: op
+  `75170f4a` published (job `42d73d85`), op `4e7be123` published from job
+  `9fc376d9` producing document `ea8e3af6`, and op `703b5986` in state
+  `draft` whose source artifact is `ea8e3af6`. The service bookkeeping is
+  correct. The UI labels the correction draft with the id of the transcript
+  it corrects rather than its own, and shows the resulting document id as
+  "Current version", so the same transcript appears under two different ids
+  on one screen. The redesign removes both ids from the UI (§6).
+- **Editor blank while alignment names exist: component defect.**
+  [VERIFIED via probe] Job `7c1c5643` carries `speaker_names` for A, C, D,
+  E, F, G, H identical to `speaker_alignment.speakers`, status `partial`,
+  suggestion B: Jean. The screenshot shows empty name fields and "Unsaved
+  speaker-name changes" for that job, so the component's local name draft
+  was cleared after load (one of its `setSpeakerNames({})` paths) while the
+  job held the names. The new editor must seed from the job on every load
+  and never clear names without a user action; add a test for it.
+- **The three amber boxes are exactly the three rows above:** the draft row
+  renders the fallback "Publication status" label, the two published rows
+  render "Published". Confirms the §1 diagnosis.
+- Note for acceptance: the current published transcript (`ea8e3af6`) came
+  from job `9fc376d9`, not from the newest run `7c1c5643` that holds the
+  aligned names. The newest run is unpublished.
 
 ## 9. Open decisions (owner)
 
