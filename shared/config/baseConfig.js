@@ -52,6 +52,10 @@ export const BASE_CONFIG = {
     'contact-enrichment':          { model: 'haiku',  fallback: 'haiku' },
     'email-personalization':       { model: 'haiku',  fallback: 'haiku' },
     'dynamics-explorer':           { model: 'haiku',  fallback: 'haiku' },
+    // Integrity Screener summarization (integrity-service analyzeWithHaiku). Was
+    // missing from this map, so it silently inherited CLAUDE.DEFAULT_MODEL
+    // ('sonnet') until S573 (2026-10-04, owner decision: Haiku when available).
+    'integrity-screener':          { model: 'haiku',  fallback: 'sonnet' },
     'expertise-finder':            { model: 'sonnet', fallback: 'haiku' },
     'virtual-review-panel':        { model: 'sonnet', fallback: 'haiku' },
     'review-panel': {
