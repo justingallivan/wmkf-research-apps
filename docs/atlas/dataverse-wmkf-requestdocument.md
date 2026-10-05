@@ -361,7 +361,9 @@ Production Request Document row was created by this release smoke.
   `meeting-tracker-post-presentation`. Every member is re-proved against the
   token-bound request before a fresh HTTPS Graph redirect; Zoom is watch-only,
   SharePoint MP4 Watch has no 50 MiB application cap, and no file bytes traverse
-  the application.
+  the application. **Stage 1 (source-built 2026-10-05, not deployed) changes
+  both outside readers to serve the bound Presentation Transcript and the
+  Transcript Summary only; see "Presentation Transcript contract" below.**
 - `wmkf_requestdocument` owns the request/cycle relationship, typed artifact and
   lifecycle state, producer operation state, stable Graph site/drive/item
   identity, upload/finalization eTag/version snapshot, and
@@ -663,6 +665,68 @@ in `lib/services/pre-site-visit/distribution/context.js`) picks the field
 list from the row's own `schemaVersion`, and the live fingerprint the UI
 echoes back as `acknowledgeStaleInputs` is likewise computed under the
 stored row's schema version.
+
+## Presentation Transcript contract (Stage 1, source-built on `feature/site-visit-presentation-boundary`, 2026-10-05)
+
+`docs/plans/SITE_VISIT_SUMMARIES_AND_BOARD_SHARING_PLAN_2026-10-04.md` §4.1,
+§4.2, §4.7, §4.8, §5 Stage 1. **[SOURCE-BUILT; NOT DEPLOYED; picklist value
+not yet inserted.]** One Zoom recording holds the research presentation and,
+after the applicants leave, the staff discussion (owner decision 1). The
+outside Board presentation link and the deliberation briefing link therefore
+must never serve the full `TRANSCRIPT` or `RECORDING` rows.
+
+- **Artifact type `Presentation Transcript = 100000012`** (mirrored in
+  `shared/config/requestDocument.js` and the Wave 16 record). Inserted by the
+  owner-run, dry-run-default sibling script
+  `scripts/extend-requestdocument-artifacttype-presentation-transcript.mjs`.
+  Values `100000010` (Staff Discussion Summary) and `100000011` (Board
+  Presentation Recording) are reserved for Stages 3 and 4 and are not inserted.
+  Postgres migration `068_presentation_transcript_boundary.sql` admits all three
+  in the shared slot-lease and upload `artifact_type` CHECKs (the fresh-install
+  bootstrap runs manifest migrations for real, so there is no inline mirror).
+- **Bundle schema/formatter version 4** (`lib/services/meeting-tracker-transcription/bundle.js`,
+  `lib/services/transcription-pilot/transcript-format.js`): same turn layout as
+  v3; the `wmkf_transcriptbundlejson` manifest and the uploaded source envelope
+  carry `presentationEnd: null | { endMs, confirmedBy, confirmedAt }`, which is
+  part of the frozen identity hash (`wmkf_inputfingerprint`). A v1-v3 bundle
+  still rebuilds byte-identical; a pre-v4 identity cannot carry a boundary. The
+  publication receipt (`meeting_transcript_publications.presentation_end_ms`,
+  `_confirmed_by`, `_confirmed_at`, migration 068) freezes the same three
+  values before uploads start so recovery can compare them with the parsed
+  source. Every new publish is v4 (null boundary until confirmed); the boundary
+  is confirmed on the correction draft (`PATCH .../corrections/[operationId]`
+  with `presentationEndMs`, which must equal an utterance end) and published
+  as a new revision through the normal supersede path, never in place.
+- **The derivative row**: one file-backed `.txt` (turn layout, utterances ending
+  at or before the boundary) under `Site Visit - Presentation Transcript/`,
+  `wmkf_producer = 'meeting-tracker-post-presentation'`, written by
+  `lib/services/post-presentation-materials/presentation-transcript-service.js`
+  (registered writer, `REQUIRED` actor policy) from
+  `POST /api/meeting-tracker/visits/[requestId]/transcriptions/presentation-transcript`.
+  No manifest memo on this row. `wmkf_generationkey` = SHA-256 over
+  `meeting-tracker-post-presentation:<request id>:100000012:<source bundle revisionId>:<endMs>`
+  (`presentationTranscriptGenerationKey` in
+  `lib/services/post-presentation-materials/presentation-transcript-binding.js`).
+  This key is the binding: both outside readers recompute it from the current
+  `TRANSCRIPT` winner's verified v4 manifest at context time and again at open
+  time, and serve the derivative only on an exact match
+  (`bindPresentationTranscript`). Moving or clearing the boundary, or
+  publishing a bundle from new audio, hides the derivative until it is
+  regenerated; supersession alone is not relied on (plan §4.2, Codex §10
+  finding 1). Readers must opt into `includeMeetingTranscriptBundle: true`;
+  with the bundle readiness flag off the binding fails closed and nothing is
+  served outside.
+- **Outside projection after Stage 1**: the Board presentation page and the
+  briefing page serve only the bound `Presentation Transcript` row and the
+  `Transcript Summary` winner; `TRANSCRIPT` and `RECORDING` are never served
+  (no recording appears outside until Stage 4's Board recording type). Staff
+  surfaces (the Recording and transcript card, the Staff Deliberations feed)
+  keep the full files.
+- **Boundary proposal**: advisory, computed from the applied speaker names and
+  the name candidates (`presentation-boundary.js`): `pi`/`co_pi` and manual
+  attendees are outside the foundation; saved staff and roster attendees are
+  inside; the proposal is the end of the last named outside turn. The
+  roster-as-inside rule is unconfirmed on a real visit (handoff S575 §9).
 
 ## Retry and partial-success behavior
 
