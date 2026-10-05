@@ -84,6 +84,13 @@ describe('staff-upload-token', () => {
     expect(staging.createPortalUpload).toHaveBeenCalledTimes(1);
   });
 
+  test('the hidden other slot is refused before any staging row is minted', async () => {
+    const other = res(); await uploadTokenHandler(req({ slot: 'other', filename: 'map.docx', size: 10 }), other);
+    expect(other.statusCode).toBe(400);
+    expect(other.body.reason).toBe('slot_not_open');
+    expect(staging.createPortalUpload).not.toHaveBeenCalled();
+  });
+
   test('a non-GUID path request id and a disabled schema are refused', async () => {
     const bad = res(); await uploadTokenHandler(req({ slot: 'presentation_pdf', filename: 'deck.pdf', size: 10 }, 'x'), bad); expect(bad.statusCode).toBe(400);
     isSiteVisitMaterialsSchemaReady.mockReturnValueOnce(false);

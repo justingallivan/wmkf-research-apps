@@ -330,6 +330,20 @@ Branch `feature/staff-materials-replacement`, cut from `main` at `a93974cdf`.
 - Apply migration 071 (`node scripts/apply-migrations.js`). The new summary
   insert writes its columns.
 
+**Behaviour notes for review:**
+- **`other` is add-only.** `finalizeMaterialUpload` supersedes nothing for
+  `other`, and the slot lease does not serialize it against jobs
+  [VERIFIED `collection-store.js:281`]. So "Add other file" appends a file and
+  never replaces a specific one. Per-file replacement of `other` would need its
+  own design. The slot is hidden in Production
+  (`SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED` false), and both staff routes
+  refuse it before minting.
+- **Non-staging load errors release the staging row.** When
+  `loadClaimedPortalImage` throws an error that is not a staging error,
+  `staff-finalize` releases the row and rethrows, so a Retry can claim it
+  again. The contributor route rethrows without releasing (`finalize.js:179-191`).
+  This difference is deliberate.
+
 **Known gap, not addressed here:**
 - `scripts/setup-database.js` already lacked the fresh-install shape for 061,
   064, 070 and the 068/069 constraint changes. 071 follows that state rather
