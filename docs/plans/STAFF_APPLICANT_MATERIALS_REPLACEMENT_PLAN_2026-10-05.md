@@ -28,7 +28,8 @@ Owner decisions, 2026-10-05:
    from the Applicant materials card. It works after the link expires. The PI
    gets no new link.
 2. **All slots:** presentation PDF, presentation source, participant bios, and
-   other materials.
+   other materials, **including waived slots** (owner, 2026-10-05: an item is
+   sometimes waived only to move forward, and the file arrives later).
 3. **Summary note, not hide.** If the slide PDF is replaced after a
    presentation summary was published, the summary stays published, and staff
    see that the slides changed since it was made. Staff can click Summarize
@@ -139,7 +140,8 @@ persisted [VERIFIED `transcript-summary-service.js:275, 380-381`;
      literal-on schema gate.
    - Body allowlist: `slot, filename, contentType, size`.
    - Server checks: a collection exists for the request (open, ready or
-     closed); the slot is a non-waived checklist key, or `other` when enabled;
+     closed); the slot is any checklist key, waived or not, or `other` when
+     enabled;
      the extension is allowed for the slot; the size is within the cap.
    - Mint: `createPortalUpload` with a staff binding `profile:<id>` from the
      session, never from the body.
@@ -169,7 +171,9 @@ only three things:
   literal [VERIFIED via `rg "applicant upload"`: only the writer at
   `contributor-service.js:500`]);
 - the collection-state check is skipped, because staff authorization replaces
-  the token.
+  the token;
+- a waived slot is accepted. Today's slot check rejects waived items
+  [VERIFIED `contributor-service.js:318`]; the contributor branch keeps that.
 
 It keeps the following unchanged: the producer, the folder, the canonical
 filename, the generation key, the scan, the slot lease, and the supersede step.
@@ -191,8 +195,8 @@ has not taken it):**
   token match or an open status. It must **not** flip `ready` to `open`, so a
   staff replacement never reopens the applicant link.
 - **Drain:** `admittedCollectionStillValid` keeps today's rule for contributor
-  jobs. For staff jobs it requires the same collection and request and an open
-  slot, and ignores token and status.
+  jobs. For staff jobs it requires the same collection and request and a slot
+  that is still in the checklist (waived allowed), and ignores token and status.
 - **Actor for the async write:** add `actor_system_user_id UUID NULL` with a
   CHECK that it is present if and only if `admission_kind = 'staff'`. Enqueue
   records it from the session. The drain passes it as `actingUserSystemId`,
@@ -259,6 +263,7 @@ note, and that limitation is recorded rather than guessed at.
 | A staff upload never reopens or extends the applicant link | test: a ready or closed collection stays ready or closed after staff enqueue and drain |
 | Contributor jobs keep every token check | test: a contributor job with a changed `token_digest` still settles `collection_or_token_changed` |
 | An unknown `uploader.kind` or `admission_kind` fails closed | tests on both switches |
+| Staff may fill a waived slot; contributors still may not | tests: a staff upload to a waived slot succeeds inline and through the drain; a contributor upload to the same slot is refused |
 | A staff row written by the drain records the uploader | test: a staff job carries `actor_system_user_id`; the row is created with `REQUIRED` and that actor; a job without it is refused by the CHECK |
 | A staff-uploaded APPLICANT_SLIDES PDF is what `readSlidesText` and the Board page read | test with a staff-produced row (same producer) |
 | The slides-changed note is decided by row id and hash, not by timestamp | test: replace the slides after publish, and the flag turns true |
@@ -271,10 +276,13 @@ No Dataverse schema change is needed: no new picklist value and no new column.
 
 ## 6. Open items
 
-1. Waived slots: a closed collection hides the waive controls
-   (`SiteVisitMaterialsCard.js:274`). If a PI sends a file for a waived item,
-   staff would need to un-waive it first. This plan keeps the existing rule:
-   no upload to a waived slot.
+1. ~~Waived slots~~ **Decided 2026-10-05:** staff may upload to a waived
+   slot. The waiver flag is left as it is; there is no extra collection write.
+   The card already shows a received file on a waived row
+   [VERIFIED `SiteVisitMaterialsCard.js:267-269`]. At build time, drop the
+   strike-through when a waived slot has a file. Readers that pick a file by
+   artifact type (the summary slides reader, the Board page) do not consult
+   the waiver.
 2. Migration numbering with Stage 3 of the summaries plan: whichever branch
    applies first takes 071 (memory `project-migration-numbers-claimed-off-main`).
 3. Reviews before build: `/contract-reconcile` Mode B and a Codex
