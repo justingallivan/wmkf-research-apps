@@ -25,6 +25,9 @@ jest.mock('../../lib/services/notification-service', () => ({
 jest.mock('../../lib/services/review-draft-service', () => ({
   deleteExpired: jest.fn(async () => 0),
 }));
+jest.mock('../../lib/services/post-presentation-materials/summary-draft-store', () => ({
+  expireSummaryDrafts: jest.fn(async () => 0),
+}));
 jest.mock('../../lib/services/meeting-tracker-transcription/service', () => ({
   reconcileMeetingTranscriptPublicationsBatch: jest.fn(async () => ({
     skipped: 'schema_not_ready', checked: 0, reconciled: 0, attention: 0,
@@ -218,6 +221,18 @@ describe('maintenance cron — maintenance_runs retention step wiring', () => {
     // All other steps return 0 here, so the GC count is folded into totalDeleted.
     expect(res.body.totalDeleted).toBe(4);
     expect(res.body.failedSubtasks).not.toContain('reviewDrafts');
+  });
+
+  it('wires the Site Visit summary-draft expiry and folds the cleared count into totalDeleted', async () => {
+    const { expireSummaryDrafts } = require('../../lib/services/post-presentation-materials/summary-draft-store');
+    expireSummaryDrafts.mockResolvedValueOnce(2);
+    const res = makeRes();
+    await handler({ method: 'POST', headers: {} }, res);
+
+    expect(expireSummaryDrafts).toHaveBeenCalledTimes(1);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.results.summaryDrafts).toEqual({ expired: 2 });
+    expect(res.body.totalDeleted).toBe(2);
   });
 
   it('wires exact-path portal staging cleanup and folds deleted blobs into totalDeleted', async () => {
