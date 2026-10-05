@@ -57,7 +57,7 @@ export default async function handler(req, res) {
         if (!isGuid(requestId)) {
           return res.status(400).json({ error: 'requestId is required and must be a GUID' });
         }
-        const result = await getSiteVisitLogistics({ requestId });
+        const result = await getSiteVisitLogistics({ requestId, includePresentationSummaryText: true });
         return res.status(200).json({
           success: true,
           siteVisit: result.siteVisit,
@@ -66,6 +66,7 @@ export default async function handler(req, res) {
           ...(result.presentationMaterialsStatus === 'ready' ? {
             presentationMaterials: result.presentationMaterials,
             presentationMaterialConflicts: result.presentationMaterialConflicts,
+            presentationSummary: result.presentationSummary ?? null,
           } : {}),
         });
       }

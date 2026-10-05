@@ -22,6 +22,7 @@ import ReviewDraftService from '../../../lib/services/review-draft-service';
 import AlertService from '../../../lib/services/alert-service';
 import FeedbackService from '../../../lib/services/feedback-service';
 import NotificationService from '../../../lib/services/notification-service';
+import { expireSummaryDrafts } from '../../../lib/services/post-presentation-materials/summary-draft-store';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -225,6 +226,16 @@ export default async function handler(req, res) {
       }
     } catch (error) {
       results.portalUploadStaging = { error: error.message };
+    }
+
+    // 7.6c. Site Visit summary drafts: clear the generated text of drafts past
+    // their 14-day expiry (rows and acknowledgment metadata are kept).
+    try {
+      const expired = await expireSummaryDrafts();
+      results.summaryDrafts = { expired };
+      totalDeleted += expired;
+    } catch (error) {
+      results.summaryDrafts = { error: error.message };
     }
 
     // 7.6a. Durable presentation MP4 intents. Off/test rollout modes inspect,

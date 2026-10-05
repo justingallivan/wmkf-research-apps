@@ -63,6 +63,7 @@ export default function useSiteVisitContext(requestId) {
         presentationMaterialsStatus: projectionReady ? 'loaded' : 'disabled',
         presentationMaterials: projectionReady ? (logisticsBody.presentationMaterials || []) : [],
         presentationMaterialConflicts: projectionReady ? (logisticsBody.presentationMaterialConflicts || []) : [],
+        presentationSummary: projectionReady ? (logisticsBody.presentationSummary || null) : null,
       });
       return directory.then((directoryEnvelope) => {
         if (cancelled) return;

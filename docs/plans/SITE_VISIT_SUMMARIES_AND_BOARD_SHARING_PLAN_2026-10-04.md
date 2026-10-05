@@ -17,8 +17,10 @@ related:
 # Site Visit summaries, Staff Deliberations follow-up, and Board sharing
 
 Status: Stage 1 Production-live (PR #434 merge `32664485b`, Production deployment 6863898521 success; migration 068 applied and picklist 100000012 inserted (owner-run, re-read verified) 2026-10-05; §11, §12);
-accepted on test request 1003222 by the owner 2026-10-05 (§13). Stages 2–4 not built;
-Stages 2–3 re-reviewed against live code 2026-10-05 (§16). Owner
+accepted on test request 1003222 by the owner 2026-10-05 (§13). Stage 2
+source-built on branch `feature/presentation-summary` 2026-10-05, not merged
+or deployed (§17); Stages 3–4 not built. Stages 2–3 re-reviewed against live
+code 2026-10-05 (§16). Owner
 decisions complete (§3, §7, §16).
 
 ## 1. What the owner asked for (2026-10-04)
@@ -747,4 +749,120 @@ Owner decisions, 2026-10-05:
   success.
 - **D.** Staff Deliberations reads the bound summary file from SharePoint at
   feed time, size-capped, falling back to the link.
+
+## 17. Stage 2 build record, 2026-10-05 (branch `feature/presentation-summary`)
+
+**Status: source-built, not merged or deployed.** Built by Claude Opus 5.5
+directly in three commits (binding and outside pages; server; UI).
+
+What was built:
+
+1. **Outside binding** (`bindTranscriptSummary`): both outside pages serve the
+   Transcript Summary only when its `wmkf_inputfingerprint` equals the
+   SHA-256 of (producer, request, 100000007, current `revisionId`, confirmed
+   `endMs`); a missing fingerprint fails closed. Mutation-checked: restoring
+   the unbound pass-through turned all ten new outside-page cases red. The
+   Meeting Tracker overview reports `transcriptSummary {state, artifactId,
+   publishedAt}`.
+2. **Prompt** `meeting-transcript.presentation-summary`
+   (`shared/config/prompts/meeting-presentation-summary.js`): untrusted
+   `presentation_transcript` (400,000 chars; the service refuses a longer
+   transcript rather than letting the wrapper truncate it) and
+   `presentation_slides` (60,000 chars, clipped by the service); raw output,
+   no raw retention; seed script with `sonnet` on the row; standing Executor
+   budget 16,000 tokens and 240 s; A7 registry entry `inv: 33`.
+3. **Drafts** (migration 070, `summary-draft-store.js`): one row per
+   Summarize run; the acknowledgment is written before the provider call, so a
+   failed call keeps its record (resolves the §6 gap between "ack on the
+   draft" and "draft only on success"); text only while `ready`; daily
+   maintenance clears expired text. SQL exercised against a throwaway local
+   Postgres 16 with untyped parameters.
+4. **Service and routes**: `transcript-summary-service.js`;
+   `.../transcriptions/summary-draft` (GET, POST at 300 s, PATCH, DELETE) and
+   `.../summary-draft/publish`. Publish claims the draft before any external
+   write (see the review below), refuses a draft whose revision or
+   boundary is no longer current (`summary_draft_stale`), writes a
+   BOM-prefixed TXT to `Site Visit - Transcript Summary/`, pins the eTag,
+   supersedes older summaries, and clears the draft text.
+5. **Card** (`SummaryBlock`): acknowledgment checkbox (cleared after each
+   run), Summarize, an editable draft with Save, Publish, and Discard; publish
+   is disabled for a draft from an earlier transcript version.
+6. **Staff Deliberations**: the workbench logistics read (opt-in
+   `includePresentationSummaryText`) returns the summary text, read from
+   SharePoint only when the bytes match the pinned hash; the segment shows the
+   first section with "Read more" and marks a stale summary.
+
+Named deviations from the plan text:
+
+- **Binding field.** The summary binds through `wmkf_inputfingerprint`, not
+  `wmkf_generationkey`: a summary can be republished at the same revision and
+  boundary, and the generation key is a unique alternate key. The generation
+  key is per publish (draft id + content SHA-256), stable across retries.
+- **No `requireAcceptedLlmResponse` call.** The Executor already throws on a
+  refusal, a `max_tokens` stop, and any other non-terminal stop
+  (`execute-prompt.js`); the service maps those to 422/502 copy.
+- **No `APP_MODELS` row** (§16 finding 1).
+- **Shared writer helpers.** `uploadAndVerify`, `settleWinner`, and
+  `recordReconciliation` are exported from the derivative writer with
+  label/code parameters whose defaults keep its behavior; its 21 tests pass
+  unedited.
+- **Staff feed cost.** One SharePoint read per Staff Deliberations load when
+  a summary exists; the Meeting Tracker visit page does not opt in.
+
+**Codex adversarial review (2026-10-05), two high findings, fixed on the branch:**
+
+1. **A discarded or replaced draft could still be published.** Publish read the
+   draft once and then wrote externally while discard and a new run were
+   unfenced. Fix: publish first claims the draft (`ready` → `publishing` at the
+   expected version) before any external write; edit, discard, and a new run
+   act only on `ready` rows; the claim is released to `ready` only when no
+   registry write was attempted, otherwise only a retry (same key, same file)
+   can finish it. Exercised against a throwaway Postgres 16; service tests
+   cover claim-before-write, release on stale or upload failure, no release
+   after a registry attempt, and a retry after a failed final mark.
+2. **A republish could overwrite a published file.** The filename used the
+   draft's creation minute with `replace`. Fix: the claim closes the
+   edit-after-registration path, and the filename uses the creation second, so
+   it is unique per draft. A retry that finds the existing row does not
+   re-verify its file; outside pages already refuse a file whose eTag differs
+   from the pinned one, so the failure mode is hidden, not wrong content.
+
+**Codex re-review (2026-10-05), three findings on the first fix, fixed:**
+
+1. **The claim was not exclusive.** A second publish could re-claim a
+   `publishing` row and its error path release the first publisher's claim,
+   letting a discard run while the first publish registered the text. Fix: an
+   owner token on every claim; claim, release, yield, the registry-phase flag,
+   and the final mark all require it; a claim held by a running publish is
+   refused (takeover only after 180 s).
+2. **"Registration attempted" lived in one request's memory**, so a later
+   retry that failed early could release an already registered draft to
+   `ready`, and an edited republish could overwrite the published file. Fix:
+   the durable `publish_registration_attempted` flag, set just before the
+   first registry write, blocks release forever; the filename adds the draft
+   version (`…-143210-v2.txt`), which every edit bumps, so different text never
+   reuses a path.
+3. **A stuck `publishing` draft had no UI recovery** once the transcript
+   changed. Fix: a new Summarize retires a `publishing` row that no request
+   holds, and the card offers it beside Publish again.
+
+All three exercised against a throwaway Postgres 16 (A holds, B refused and
+unable to release; registration then two failed retries never return to
+`ready`; takeover only after 180 s; recovery by a new run) and in service
+tests with a stateful store stand-in; each service guard mutation-checked.
+
+Open items:
+
+- **Pre-Site distribution email allowlist** still offers Transcript Summary
+  rows (bound or stale) as staff-selected SharePoint links; same open owner
+  decision as §11.
+- **Owner-run order before merge:** (1) `node scripts/apply-migrations.js`
+  for 070; (2) `node scripts/seed-meeting-presentation-summary-prompt.js
+  --dry-run`, then `--execute` with `DATAVERSE_PROD_WRITE_ACK`. The seed must
+  precede the merge: an Admin budget publication reads every standing
+  prompt's row, so publishing budgets would fail until this prompt exists.
+- **Acceptance on 1003222:** summarize with and without the slide PDF, edit,
+  publish, open the Board link and see the summary; edit speaker names,
+  republish, and confirm the Board link hides the summary while Staff
+  Deliberations shows it as stale.
 

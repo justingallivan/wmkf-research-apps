@@ -726,7 +726,7 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   served outside.
 - **Outside projection after Stage 1**: the Board presentation page and the
   briefing page serve only the bound `Presentation Transcript` row and the
-  `Transcript Summary` winner; `TRANSCRIPT` and `RECORDING` are never served
+  bound `Transcript Summary` (see the next item); `TRANSCRIPT` and `RECORDING` are never served
   (no recording appears outside until Stage 4's Board recording type). Staff
   surfaces (the Recording and transcript card, the Staff Deliberations feed)
   keep the full files.
@@ -755,6 +755,25 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   revision and boundary (`withoutUnboundDerivatives`), so a stale half is
   hidden rather than shown beside a newer one (Codex review 2026-10-05); the
   full TRANSCRIPT stays listed.
+- **Transcript Summary writer** (`100000007`; Stage 2 of the Site Visit
+  summaries plan §4.3, §16; **[SOURCE-BUILT on branch `feature/presentation-summary`
+  2026-10-05; not deployed]**): `lib/services/post-presentation-materials/transcript-summary-service.js`
+  (registered writer, `REQUIRED` actor policy) publishes a program
+  coordinator's reviewed draft (Postgres `meeting_transcript_summary_drafts`,
+  migration 070) as a BOM-prefixed TXT under `Site Visit - Transcript Summary/`,
+  `wmkf_producer = 'meeting-tracker-post-presentation'`, with the prompt name,
+  version, prompt and AI run bound like the Initial Assessment. The binding is
+  `wmkf_inputfingerprint` = SHA-256 over
+  `meeting-tracker-post-presentation:<request id>:100000007:<revisionId>:<endMs>`
+  (`transcriptSummaryBindingFingerprint`), not the generation key, because a
+  summary can be republished at the same revision and boundary;
+  `wmkf_generationkey` is unique per publish (draft id + content SHA-256) and
+  stable across retries of one publish. Both outside readers serve the summary
+  only when `bindTranscriptSummary` finds that fingerprint equal to the current
+  `TRANSCRIPT` winner's revision and confirmed boundary; a missing fingerprint
+  fails closed, so any republish (including a names edit) hides it outside until
+  re-summarized (owner decision, plan §16 decision A). Staff surfaces keep
+  showing a stale summary with a note. The eTag pin above applies.
 - **Boundary proposal, stray-line guard** (Production-live 2026-10-05: PR #437
   merge `9dfec5479`, deployment 6865805766 success): a short applicant
   line (three words or fewer) that starts more than two minutes after the
