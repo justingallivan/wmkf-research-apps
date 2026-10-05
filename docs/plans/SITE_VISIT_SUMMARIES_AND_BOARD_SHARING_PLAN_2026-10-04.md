@@ -74,8 +74,11 @@ field or a file role means a new schema version and an updated validator.
 Speaker-name candidates carry a source class (`pi`, `co_pi`, `staff`, saved
 attendees). The applied alignment stores a name (and Zoom name) and
 confidence per speaker ID, not a class; the class is recoverable by matching
-the applied name to the candidate list. [ASSUMED] Board attendees are among
-the saved-attendee candidates; confirm before relying on it for the boundary.
+the applied name to the candidate list. The saved-attendee classes are
+`staff`, `roster`, and `manual` [VERIFIED `binding.js:104-107`]; there is no
+explicit Board class. [ASSUMED] Board members appear as `roster` refs; the
+boundary proposal must treat `staff` and `roster` as inside the foundation
+and confirm this against a real visit before relying on it.
 
 **[VERIFIED via `lib/services/initial-assessment/artifact-service.js:210-266`]**
 The pattern for a generated document is: `getExecutorBudget` →
@@ -136,7 +139,14 @@ trims to in Zoom.
   downstream treats the transcript as split.
 - **Stored on the TRANSCRIPT row's bundle manifest** as
   `presentationEndMs` with `confirmedBy`/`confirmedAt`, manifest
-  `schemaVersion` 4 with the validator extended. The boundary is a property
+  `schemaVersion` 4 with the validator extended. Because publication
+  recovery rebuilds a bundle from the uploaded source envelope and the
+  Postgres receipt before any Dataverse row exists [VERIFIED
+  `service.js:545-561`], the same three fields are frozen in the source
+  envelope (schema 4, validated by `parseVerifiedMeetingTranscriptSource`,
+  whose version list at `bundle.js:149-150` must also admit 4) and in the
+  publication receipt before uploads start, and they enter the frozen input
+  hash so identity covers them. The boundary is a property
   of that transcript's timeline; a republish (names edit) carries it forward;
   a new run from new audio starts unconfirmed. Alternative considered: a
   field on the Site Visit activity. Rejected because a boundary belongs to a
@@ -162,6 +172,21 @@ be its own row:
   the summary draft's input snapshot.
 - The full `txt`/`vtt` stay as today for staff.
 
+**Boundary generation.** Every derivative (the presentation-transcript row,
+the Board recording link, both summaries and their drafts) records the
+source bundle `revisionId` and `presentationEndMs` it was made from, on the
+request-document row (`wmkf_generationinputsnapshot`-style field as the Pre-RP
+Brief does; exact field to be confirmed against the Wave 16 schema) and in
+the draft. Outside pages compare that pair with the current TRANSCRIPT row's
+confirmed boundary at context time and again at open time, and omit any
+derivative that does not match. Moving the boundary, re-confirming it, or
+publishing a transcript from new audio therefore hides every derivative
+immediately until it is regenerated, and the card says so. Supersession
+alone is not relied on, because the outside services pick winners per type
+independently [VERIFIED `material-model.js:119-125`] and a partial failure
+while replacing one row would otherwise leave the older, longer one
+eligible.
+
 Outside pages: project `PRESENTATION_TRANSCRIPT` and never `TRANSCRIPT`.
 With no confirmed boundary there is no presentation row, so no transcript
 appears outside. A manually uploaded transcript (no bundle) therefore never
@@ -180,10 +205,12 @@ card keep the full files.
 | Visible outside | yes (Board page and briefing page already project it) | never; both outside services must exclude it explicitly and a test pins that |
 | Visible to staff | segment, inline, with file link | segment, inline, with file link |
 
-Why `.txt` and not DOCX: the Board page admits only `text/vtt` and
-`text/plain` for the summary slot [VERIFIED §2]; a DOCX would 404 there, and
-the segment renders the same bytes inline for PDs. A DOCX export can be
-added later from the stored text.
+Why `.txt`: the Board page serves `.txt`, `.vtt`, `.pdf`, and `.docx` for
+transcript-type rows [VERIFIED `presentation-page-service.js:30-36`; the
+earlier draft's claim that only text types were admitted was wrong], so DOCX
+would work too. Plain text is chosen because the Staff Deliberations segment
+renders the same bytes inline with no conversion. A DOCX export can be added
+later from the stored text.
 
 Generation flow mirrors the transcript's draft-to-publish contract:
 
@@ -232,6 +259,14 @@ what it serves.
   as the trim target. Outside pages project this type and never RECORDING.
   The one-winner-per-type projection [VERIFIED §2] makes a second type the
   simplest way to keep the full recording for staff. [§7 decision 2]
+  A Zoom-backed row is accepted only for RECORDING today: the backing check
+  [VERIFIED `material-model.js:103-105`], both outside `open` resolvers
+  [VERIFIED `presentation-page-service.js:172-175`,
+  `briefing-page-service.js:765-773`], and the `canWatch` descriptor
+  [VERIFIED `presentation-page-service.js:93`] all name RECORDING alone.
+  Each must admit `BOARD_PRESENTATION_RECORDING` for external backing and
+  watch mode, and a test drives a Zoom-backed 100000011 row through both
+  context and open endpoints while a full RECORDING row stays excluded.
 - **Transcript:** the `PRESENTATION_TRANSCRIPT` row only (§4.2).
 - **Summary:** `TRANSCRIPT_SUMMARY` only; the staff discussion summary is
   excluded by type.
@@ -262,6 +297,8 @@ outside ones:
 | Labels `REQUEST_DOCUMENT_ARTIFACT_LABEL` and the type enum | `shared/config/requestDocument.js` | yes | yes | yes |
 | Writer registry gate `check:request-document-writers` | `scripts/check-request-document-writers.js` | new writer row | new writer row | new writer row |
 | Atlas page | `docs/atlas/dataverse-wmkf-requestdocument.md` | yes | yes | yes |
+| Postgres CHECK constraints `presentation_material_slot_leases_artifact_type_check` and `presentation_material_uploads_artifact_type_check`, both limited to 100000005-100000007 [VERIFIED `lib/db/migrations/055_post_presentation_materials.sql:71-72,146-147`, `scripts/setup-database.js:1638-1639,1711-1712`]; the shared publication lease inserts the requested type directly | new migration (next number after 066) extending both constraints, mirrored in `scripts/setup-database.js` and `lib/db/migrations-manifest.json`; owner applies with `node scripts/apply-migrations.js` | yes | yes | yes |
+| External-backing and watch guards (RECORDING-only today; §4.5) | `material-model.js`, both outside `open` resolvers, `canWatch` | n/a | yes | n/a |
 
 The staff-only type needs its own small projection for the logistics feed
 rather than reuse of the shared set. A test constructs a READY
@@ -289,15 +326,19 @@ the boundary on the manifest means:
 Each stage is a branch and PR, owner merges; Tier 1 runtime work.
 
 **Stage 1. Boundary and presentation transcript; close the exposure.**
-Picklist extension for `100000012` (owner-run, dry-run first); manifest and
-formatter version 4; boundary proposal and confirmation in the card; the
+Picklist extension for `100000012` (owner-run, dry-run first); the Postgres
+constraint migration (§4.7, owner-applied); manifest, source-envelope, and
+formatter version 4 with the boundary frozen in the receipt (§4.1);
+boundary-generation binding and the outside-page match checks (§4.2); boundary proposal and confirmation in the card; the
 presentation-transcript row written on confirmation; outside pages project
 `PRESENTATION_TRANSCRIPT` instead of `TRANSCRIPT` and stop projecting
 `RECORDING` (until stage 4, outside pages show no recording); Board page
 file-mode check converted to an allowlist; §4.7 allowlists edited. No LLM.
 Owner-run: the extension script. Acceptance on 1003222: confirm the boundary
 at the real time, open the Board link, see the transcript end there and no
-recording.
+recording; move the boundary earlier and confirm the Board link shows no
+transcript until the row regenerates; simulate recovery with files uploaded
+and no registry row.
 
 **Stage 2. Presentation summary.** Prompt file, seed script, A7 entry,
 `APP_MODELS` row, budget row, draft and publish flow in the card,
@@ -327,10 +368,17 @@ route that resolves a model.
 ## 6. Data handling
 
 - The staff discussion already reaches AssemblyAI and SharePoint under the
-  current consent copy. Summarization sends it to Anthropic as well. The
-  consent checkbox copy should say so once stage 3 ships. The handoff's "no
-  blanket confidential-recording clearance" still stands: the PC decides per
-  recording. [§7 decision 3]
+  upload-time acknowledgment, which is checked only when transcription is
+  queued and persists only a timestamp [VERIFIED `runtime.js:145-148,181`].
+  That acknowledgment does not cover summarization, and bundles published
+  before stage 3 never saw any summarization wording. So "Summarize" takes
+  its own server-validated, versioned acknowledgment: the PC confirms, per
+  recording, a disclosure that names the LLM provider and the staff
+  discussion; the server persists actor, time, disclosure version, and the
+  source bundle `revisionId`; an absent or mismatched acknowledgment blocks
+  the provider call. The upload-time copy also gains the sentence, for
+  awareness, but it is not what authorizes the call. The handoff's "no
+  blanket confidential-recording clearance" still stands. [§7 decision 3]
 - Summaries are AI drafts a PD reviews before they become materials
   (product principle 1). The draft never leaves Postgres until published.
 - Audit: `wmkf_ai_run` rows with content-free retention; the request-document
@@ -391,3 +439,28 @@ Findings folded into the draft above:
 
 Verdict: READY WITH NAMED CHANGES, all applied above; the §7 decisions
 remain the owner's.
+
+## 10. Codex adversarial review, 2026-10-05 (gpt-6-astra)
+
+Verdict needs-attention; five findings and two citation corrections, all
+verified against source and folded in above:
+
+1. Boundary moves and partial replacement could leave derivatives outside
+   with excluded staff talk: §4.2 "Boundary generation" binds every
+   derivative to the source revision and boundary and checks the match at
+   context and open time.
+2. The Postgres lease and upload constraints admit only the three original
+   types: §4.7 adds the migration row; stage 1 carries it.
+3. Manifest-only boundary metadata is unavailable to publication recovery,
+   and the source validator also pins the version list: §4.1 freezes the
+   fields in the source envelope and receipt and names both validators.
+4. Upload-time consent does not authorize summarization of existing
+   bundles: §6 adds a versioned summarization acknowledgment bound to the
+   source revision, server-enforced.
+5. A Zoom-backed Board recording is rejected by the backing check, both
+   outside resolvers, and the watch descriptor: §4.5 and §4.7 add them to
+   the fan-out with a test.
+6. Corrections: the Board page already serves PDF and DOCX transcript rows
+   (§4.3 reasoning reworded); speaker candidates carry `staff`, `roster`,
+   `manual`, with no Board class (§2, boundary rule now treats `staff` and
+   `roster` as inside, flagged for confirmation).
