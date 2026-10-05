@@ -9,6 +9,13 @@ metadata:
   modified: 2026-09-27T17:40:00.000Z
 ---
 
+## Recall Rule
+Read before asserting or journaling byte identity for a DOCX, XLSX, or other Office file across a SharePoint upload, copy, or download.
+
+Do: compare the governed `word/` parts (`hashGovernedDocxContent`) plus the characterized allowlist in the attestation module; settle-check `size`/`eTag`/`cTag`/`versionId` before journaling a copy.
+Do not: compare whole-package SHA-256 or file size across a round-trip; widen the allowlist outside a reviewed commit.
+Ground truth: `lib/services/test-requests/docx-package-attestation.js`, `scripts/probe-sharepoint-download-stability.mjs`. Plain text (`.txt`) uploads are not covered here.
+
 **Fact (verified 2026-09-24, Session 542, live sandbox Request 1000342):** a DOCX
 uploaded through Graph to the akoyaGO `akoya_request` library and downloaded back
 is not byte-identical. SharePoint property promotion adds `customXml/item1-3.xml`
@@ -22,7 +29,7 @@ rendered, 16,897 downloaded, same governed hash). `docProps/app.xml` was untouch
 **Why:** a raw whole-package SHA-256 journaled at upload can never equal a
 download; the Test Request Factory's first byte-digest verify anchor failed on
 exactly this and was replaced by
-`lib/services/test-requests/docx-package-attestation.js` (lands on `main` with PR #336), which normalizes only <!-- doc-symbol-refs:ignore reason=lands-with-pr-336 -->
+`lib/services/test-requests/docx-package-attestation.js` (on `main` since PR #336), which normalizes only
 these characterized mutations. Earlier memory notes that Word Online re-saves
 re-serialize the package too; this is the upload-time counterpart.
 

@@ -9,6 +9,13 @@ metadata:
   modified: 2026-10-05T15:39:05.999Z
 ---
 
+## Recall Rule
+Read before spawning builders with the Agent tool's `isolation: "worktree"` while on a feature branch, or before merging work a worktree builder produced.
+
+Do: name the exact base commit in every builder brief and make `git merge --ff-only <sha>` step zero; check each worktree's merge-base with the feature branch before merging.
+Do not: tell a builder it is branched from the feature branch; assume an unmerged contract commit is visible in its worktree.
+Ground truth: `git merge-base <worktree-branch> <feature-branch>` on the produced branch; observed behavior recorded below (S575).
+
 The Claude Code Agent tool's `isolation: "worktree"` creates the subagent's worktree from `main`
 (observed 2026-10-05, Session 575: all three Stage 1 builders started at `a8474e16e` while the
 orchestrator was on `feature/site-visit-presentation-boundary` at `9bd10764a`). Two builders

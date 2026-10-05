@@ -6,7 +6,7 @@ status: active
 summary: Governed request-artifact registry with Production-proved same-item Final lineage, explicit group-review attribution, and the Production-live leadership-review transition (2026-09-07).
 canonical: false
 owner: product-engineering
-last_verified: 2026-10-02
+last_verified: 2026-10-05
 related:
   - lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json
   - lib/dataverse/schema/wave16-request-document-registry/zz_akoya_request_pre_rp_brief_pointer.json
@@ -82,7 +82,10 @@ is not implied by schema readiness. Exact sandbox readback confirmed both Wave 3
 durable MP4 producer then finalized retained Request Document
 `0a30ffaa-62b9-f111-aaad-70a8a5b1c1c6` for sandbox Request `1000334` through a local runtime and
 disposable local Postgres store. Migration 055 was applied to the shared Preview/Production
-Postgres database on 2026-09-26; the wave remains unapplied to Production Dataverse.
+Postgres database on 2026-09-26. **[PRODUCTION-LIVE 2026-09-29]** Wave 30 was applied to
+Production Dataverse and read back exactly; Production schema readiness and general
+presentation access are `on`. See the
+[Production receipt](../plans/evidence/post-presentation/production-bounded-2026-09-29.md).
 **[SIGNED-IN PREVIEW ACCEPTED 2026-09-29]** On separate marked sandbox Request `1000350`,
 the Zoom Recording and VTT Transcript producers created two Ready Request Documents through
 the Meeting Tracker card. Staff readback persisted after reload; the 203-byte SharePoint
@@ -95,8 +98,8 @@ synthetic Zoom URL, downloaded the 203-byte transcript, and rejected the first t
 reissue while the replacement worked. See the
 [recipient receipt](../plans/evidence/post-presentation/board-link-preview-2026-09-29.md).
 Safari Private Browsing reached Vercel sign-in before the app, so anonymous recipient viewing
-remains unproved on protected Preview. Preview branch access was restored to `off`; Production
-runtime is not deployed or enabled.
+remains unproved on protected Preview. Preview branch access was restored to `off`. (The
+Production release followed on 2026-09-29; see above.)
 
 **[PRODUCTION-LIVE 2026-10-02 PT.]** Wave 31
 adds the optional `wmkf_TranscriptBundleJson` Memo (logical name
@@ -723,7 +726,7 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   served outside.
 - **Outside projection after Stage 1**: the Board presentation page and the
   briefing page serve only the bound `Presentation Transcript` row and the
-  `Transcript Summary` winner; `TRANSCRIPT` and `RECORDING` are never served
+  bound `Transcript Summary` (see the next item); `TRANSCRIPT` and `RECORDING` are never served
   (no recording appears outside until Stage 4's Board recording type). Staff
   surfaces (the Recording and transcript card, the Staff Deliberations feed)
   keep the full files.
@@ -752,6 +755,25 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   revision and boundary (`withoutUnboundDerivatives`), so a stale half is
   hidden rather than shown beside a newer one (Codex review 2026-10-05); the
   full TRANSCRIPT stays listed.
+- **Transcript Summary writer** (`100000007`; Stage 2 of the Site Visit
+  summaries plan §4.3, §16; **[PRODUCTION-LIVE 2026-10-05; PR #440
+  merge `11ff96467`; owner-accepted on 1003222]**): `lib/services/post-presentation-materials/transcript-summary-service.js`
+  (registered writer, `REQUIRED` actor policy) publishes a program
+  coordinator's reviewed draft (Postgres `meeting_transcript_summary_drafts`,
+  migration 070) as a BOM-prefixed TXT under `Site Visit - Transcript Summary/`,
+  `wmkf_producer = 'meeting-tracker-post-presentation'`, with the prompt name,
+  version, prompt and AI run bound like the Initial Assessment. The binding is
+  `wmkf_inputfingerprint` = SHA-256 over
+  `meeting-tracker-post-presentation:<request id>:100000007:<revisionId>:<endMs>`
+  (`transcriptSummaryBindingFingerprint`), not the generation key, because a
+  summary can be republished at the same revision and boundary;
+  `wmkf_generationkey` is unique per publish (draft id + content SHA-256) and
+  stable across retries of one publish. Both outside readers serve the summary
+  only when `bindTranscriptSummary` finds that fingerprint equal to the current
+  `TRANSCRIPT` winner's revision and confirmed boundary; a missing fingerprint
+  fails closed, so any republish (including a names edit) hides it outside until
+  re-summarized (owner decision, plan §16 decision A). Staff surfaces keep
+  showing a stale summary with a note. The eTag pin above applies.
 - **Boundary proposal, stray-line guard** (Production-live 2026-10-05: PR #437
   merge `9dfec5479`, deployment 6865805766 success): a short applicant
   line (three words or fewer) that starts more than two minutes after the

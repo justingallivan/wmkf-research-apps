@@ -1,7 +1,8 @@
 ---
 name: project-migration-numbers-claimed-off-main
-description: "Before picking a Postgres migration number, check shared Production `schema_migrations` and numbers claimed on unmerged branches. Migration 055 was applied before merging and is now on main; B4 claims 058."
+description: "Before picking a Postgres migration number, check shared Production `schema_migrations` and numbers claimed on unmerged branches. 055 and 070 were applied to Production before merging; as of 2026-10-05 067 is claimed off main and the next free number is 071."
 status: active
+last_verified: 2026-10-05 via lib/db/migrations on main (68 files, ends at 069) and a scan of every remote branch for 065-079
 metadata:
   type: project
 ---
@@ -58,5 +59,12 @@ origin/main`, 2026-09-30]. The episode shows why "the next number after
   alone through a one-off owner-run script (BEGIN; body; tracker INSERT; COMMIT,
   `applied_by` `claude-part-a-2026-09-30`) because `apply-migrations.js` has no
   per-file filter and would have applied 058 to the app database too.
+- [VERIFIED 2026-10-05 via `ls` and remote-branch scan] `main` ends at 069 with
+  067 absent: 067 is claimed by the unmerged `origin/codex/staff-deliberations-rework`
+  (`067_staff_deliberations_preparations.sql`). 070 is on `feature/presentation-summary`
+  (PR #440) and was applied to Production on 2026-10-05 before merge, the same pattern
+  as 055. The owner's run reported 1 applied, 68 skipped from that branch's 69 files, so
+  067 was not part of that run; whether Production holds 067 is [ASSUMED unknown]. The
+  next free number is 071.
 - Auto-mode permissions block Claude from running `apply-migrations.js` against
   the shared database even with owner authorization; the owner runs it with `!`.

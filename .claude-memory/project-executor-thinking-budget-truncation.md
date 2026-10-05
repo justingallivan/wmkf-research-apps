@@ -2,6 +2,7 @@
 name: project-executor-thinking-budget-truncation
 description: Opus 5 / Sonnet 5 / Fable think by default and spend max_tokens on reasoning; a prompt row budget sized for answer text (IA 2,200) stops on max_tokens with ZERO text. Advisory floor 4,096 + content-free block census deployed to production 2026-09-18 via PR #314 (IA generation re-rehearsed PASS the same day: 1,065 output tokens, thinkingTokens=0); a tier-alias advance or model-only republish is the usual trigger.
 status: active
+last_verified: 2026-10-05 via execute-prompt.js THINKING_BUDGET_FLOOR_TOKENS 4_096 and THINKING_DEFAULT_ON_MODES, executorBudgets.js initial-assessment.generate standing entry, and model-capabilities.js thinking modes
 metadata:
   type: project
 ---
@@ -20,6 +21,8 @@ prompt row with `wmkf_ai_maxtokens` below 4,096.
   text, so an exhausted budget looks like "2,200 output tokens, no answer".
 - The Executor sends no `thinking`/`effort`; behaviour is whatever the resolved model
   defaults to. Opus 4.6–4.8 default OFF; Opus 5, Sonnet 5, Fable default ON.
+  [VERIFIED 2026-10-05] Opus 5.5 (`claude-opus-5-5`) is also `adaptive_always_on`, so the
+  advisory floor covers it; a future Sonnet 5.5 entry would be too.
 - Model changes reach prompts without a budget review: admin publish clones
   `wmkf_ai_maxtokens`, tier aliases move with the live model list, and only listed
   prompts have standing budgets.

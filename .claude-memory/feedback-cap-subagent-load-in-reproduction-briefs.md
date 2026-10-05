@@ -8,6 +8,13 @@ metadata:
   modified: 2026-10-03T00:05:29.134Z
 ---
 
+## Recall Rule
+Read before writing a subagent brief that reproduces a flaky or load-dependent test, or before running tests in parallel on the owner's laptop.
+
+Do: pull CI failure logs first (`gh run view <id> --log-failed`); write a hard ceiling into the brief (at most 2 concurrent Jest processes, one test by name, `--maxWorkers=1`, never `--coverage`).
+Do not: ask for "CPU pressure" or "several copies concurrently" without a number; run full-file coverage in parallel.
+Ground truth: `docs/AGENT_COLLABORATION_PLAN.md` (delegation briefs); the incident is this file's body (S566).
+
 **Rule:** when delegating a flaky-test reproduction, state an explicit ceiling in the brief
 ("at most 2 concurrent Jest processes, one test by name, `--maxWorkers=1`, never `--coverage`,
 never the whole file in parallel") and say that the machine is a laptop the owner is using.

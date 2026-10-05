@@ -72,6 +72,15 @@ export const EXECUTOR_BUDGET_DEFAULTS = Object.freeze({
     maxTokensOverride: 12_000,
     timeoutMsOverride: 120_000,
   }),
+  // meeting-transcript.presentation-summary is 'standing' from the start (plan
+  // §16, 2026-10-05): a one-hour presentation transcript plus slide text, with
+  // Sonnet adaptive thinking counted inside the output budget (the IA lesson
+  // above). The route allows 300 s, so 240 s matches the Pre-Site envelope.
+  'meeting-transcript.presentation-summary': Object.freeze({
+    kind: 'standing',
+    maxTokensOverride: 16_000,
+    timeoutMsOverride: 240_000,
+  }),
 });
 
 // Safety bounds remain code-owned. Admin publications may tune values only
@@ -116,6 +125,12 @@ export const EXECUTOR_BUDGET_LIMITS = Object.freeze({
     maxTokensOverride: Object.freeze({ min: 4_096, max: 32_000 }),
     timeoutMsOverride: Object.freeze({ min: 60_000, max: 240_000 }),
   }),
+  // Same envelope as initial-assessment: a bounded plain-text answer plus
+  // reasoning, inside a 300 s Meeting Tracker route.
+  'meeting-transcript.presentation-summary': Object.freeze({
+    maxTokensOverride: Object.freeze({ min: 4_096, max: 32_000 }),
+    timeoutMsOverride: Object.freeze({ min: 60_000, max: 240_000 }),
+  }),
 });
 
 export const EXECUTOR_BUDGET_DESCRIPTIONS = Object.freeze({
@@ -146,6 +161,10 @@ export const EXECUTOR_BUDGET_DESCRIPTIONS = Object.freeze({
   'initial-assessment.generate': Object.freeze({
     since: '2026-09-18 (owner decision after rehearsal run 7d8b647c)',
     reason: 'Four short JSON sections over a proposal narrative. The prompt row\'s 2,200-token budget was spent entirely on Opus 5 default adaptive thinking (max_tokens stop, zero answer text). Thinking is counted inside this output budget, so it must be raisable without a prompt republish or code change.',
+  }),
+  'meeting-transcript.presentation-summary': Object.freeze({
+    since: '2026-10-05 (Site Visit summaries plan §16)',
+    reason: 'One three-section plain-text summary over a full presentation transcript plus slide text. Adaptive thinking is counted inside this output budget, so it is admin-tunable from the start.',
   }),
 });
 

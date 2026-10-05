@@ -6,7 +6,12 @@ metadata:
   status: active
 ---
 
-**Recall rule:** read before printing anything derived from a `POSTGRES_URL`/ledger URL, piping pg_dump output into a pooled Neon URL, or planning to run the app against a non-Neon database.
+## Recall Rule
+Read before printing anything derived from a `POSTGRES_URL` or ledger URL, piping pg_dump output into a pooled Neon URL, or planning to run the app against a non-Neon database.
+
+Do: parse with `new URL(u).hostname` and print only that (or a boolean); run `RESET search_path` through a pooled URL after any restore; use a disposable Neon branch for an isolated app run.
+Do not: use a `sed`/regex substitution as redaction; point `npm run dev` at a local container.
+Ground truth: `docs/CREDENTIALS_RUNBOOK.md` ("Rotating the app Postgres password"); `lib/db/ledger-registry.js` for ledger hosts.
 
 **What happened (2026-10-01, S559):**
 - A `sed -E 's#.*@[^.]+\.([a-z0-9-]+)\.aws\.neon\.tech.*#…#'` meant to print only the region did not match the `c-2.` host segment, so `sed` echoed the full `POSTGRES_URL`, password included, into the transcript. That turned a planned Sensitive conversion into a forced password rotation.

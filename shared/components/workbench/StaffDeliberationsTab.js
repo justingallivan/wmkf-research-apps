@@ -1384,6 +1384,7 @@ export default function StaffDeliberationsTab({
         <ResearchPresentationFollowUp
           status="loaded"
           materials={siteVisitContext.presentationMaterials || EMPTY_LIST}
+          summary={siteVisitContext.presentationSummary || null}
         />
       )}
 

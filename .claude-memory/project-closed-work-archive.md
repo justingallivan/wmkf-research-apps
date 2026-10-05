@@ -5,7 +5,7 @@ metadata:
   type: reference
   status: closed
   scope: docs
-  last_verified: 2026-09-17 via memory-router diet
+  last_verified: 2026-10-05 via memory-router diet
 ---
 
 ## Recall Rule
@@ -40,11 +40,12 @@ These items are **done, closed, or point-in-time** and no longer earn a slot in 
 - **Spec-audit docs recovery** (RESOLVED S350-S352) — design docs were recovered, accept-fast-response verified, and quota/PD-email behavior built. [[project-spec-audit-docs-recovery-parked]].
 
 - **Reviewer lifecycle elective + boundary program** (SHIPPED S489, 2026-09-06) — Stages 2, 3A–3K, 5, 6C, 6D, 7 merged as PRs #152–#168; LAW gate `check:reviewer-engagement-boundary` live; `bulkUpdateByRequest` deleted. Owner decisions D0–D5 remain open in the Stage 7 plan. [[project-reviewer-lifecycle-autonomy-directive-2026-09-05]], `docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md`.
-- **Site Visit materials / applicant additional materials / briefing room** (collection SHIPPED S503; PR 3 merged S507 as PR #252 with the reminder cron built but unscheduled; briefing page live S502) — [[project-site-visit-materials-planning-handoff]], `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md`. Automatic reminder cron retired 2026-09-17 (owner): staff monitor arrivals manually; route stays unscheduled ([[project-ops-meeting-2026-09-16-agenda]], closed).
+- **Site Visit materials / applicant additional materials / briefing room** (collection SHIPPED S503; PR 3 merged S507 as PR #252 with the reminder cron built but unscheduled; briefing page live S502) — [[project-site-visit-materials-planning-handoff]], `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md`. Automatic reminder cron retired 2026-09-17 (owner): staff monitor arrivals manually; route stays unscheduled ([[project-ops-meeting-2026-09-16-agenda]], closed). History (2026-09-08 planning handoff, 2026-09-09 briefing-room build): [[project-site-visit-materials-history]].
 - **PC Meeting Tracker / sessions / visits / agenda email / Staff Deliberations rail** (D1–D25 decided; live in prod S503) — `docs/PC_MEETING_TRACKER_PLAN.md`; build briefs `docs/plans/SESSION_AGENDA_EMAIL_CODEX_BRIEF_2026-09-10.md`, `docs/plans/REVIEWER_RELEASE_REASON_CODEX_BRIEF_2026-09-09.md`.
 - **Reviewer Find latency / warm reconciliation incident (Request 1002903, 2026-08-03)** — `docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md`; lesson lives in [[feedback-latency-plan-scope-accretion-postmortem]].
 - **Reviewer workflow stabilization assessment (Request 1002912)** — point-in-time Fable assessment `outputs/reviewer-workflow-stabilization-fable-assessment.md`; directive `docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md`.
 - **Request Workbench redesign history** (split 2026-09-17) — dated checkpoints, S194–S206 chronology, Workbench-v1 slice and build sequence. [[project-reviewer-apps-redesign-history]]; live direction stays in [[project-reviewer-apps-redesign-direction]].
+- **Legacy Virtual Review Panel** (RETIRED 2026-10-04, S573, owner decision) — page, SSE route, panel-review and literature-search services, prompt and output schema moved to `_archived/`; successor is the Review Panel. [[project-virtual-review-panel]], `_archived/README.md`, `docs/agent-wiki/topics/review-panel.md`.
 - **Initial Assessment governed-artifact pilot record** (split 2026-09-17) — Request 1002788/1003109 rehearsals, recovery fixes, pilot-environment decision, retired hold step. [[project-j27-doc-capture-history]]; live invariants stay in [[project-j27-doc-capture-evolution]].
 
 ## Point-in-time status snapshots (superseded by live SESSION_PROMPT handoffs)

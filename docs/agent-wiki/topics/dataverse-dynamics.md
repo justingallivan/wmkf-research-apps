@@ -124,6 +124,8 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
 - Identity reconciliation and sandbox state: `project-dynamics-identity-reconciliation`, `project-dynamics-sandbox-state`.
 - Explorer and Power Tools: `project-dynamics-explorer-details`, `project-dynamics-explorer-schema-diff`, `project-dynamics-explorer-reuse-power-tools`, `project-dynamics-feedback-admin-shipped`, `project-dataverse-power-tools`.
 - Export and lifecycle facts: `dataverse-export-floor-scoping`, `project-akoya-request-pd-fields`, `project-grant-lifecycle-states-confirmed`, `akoya-temporal-axis-encodings`.
+- SharePoint upload round-trips and DOCX/XLSX byte identity (routed here from the memory router 2026-10-05): `project-sharepoint-property-promotion-rewrites-docx`.
+- Explorer behavior campaign (SoCal vernacular; plan `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md`): `project-dynamics-explorer-socal-campaign`.
 
 ## Operating Notes
 

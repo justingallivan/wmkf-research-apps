@@ -178,6 +178,7 @@ not a current authority.
 - Security: `project-a7-prompt-injection-hardening`.
 - Private download pattern: `project-download-proxy-parked`.
 - No banking/PII: `project-no-banking-pii-in-dataverse`.
+- Org-open reviewer access and staff-wide document reads, by design (routed here from the memory router 2026-10-05): `project-reviewer-org-open-access-by-design`.
 
 ## Standard Probe
 

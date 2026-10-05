@@ -13,6 +13,13 @@ jest.mock('../../lib/services/meeting-tracker-transcription/service.js', () => (
   updateMeetingCorrection: jest.fn(async () => ({ correction: { presentationEndMs: null } })),
 }));
 jest.mock('../../lib/utils/actor-ref.js', () => ({ actorRefFromSession: jest.fn(() => '77777777-7777-4777-8777-777777777777') }));
+jest.mock('../../lib/services/post-presentation-materials/transcript-summary-service.js', () => ({
+  createPresentationSummaryDraft: jest.fn(async () => ({ draft: { id: 'd' } })),
+  getPresentationSummaryDraft: jest.fn(async () => ({ draft: null })),
+  updatePresentationSummaryDraft: jest.fn(async () => ({ draft: { id: 'd' } })),
+  discardPresentationSummaryDraft: jest.fn(async () => ({ draft: null })),
+  publishPresentationSummaryDraft: jest.fn(async () => ({ transcriptSummary: { state: 'bound' } })),
+}));
 jest.mock('../../lib/services/post-presentation-materials/presentation-transcript-service.js', () => ({
   generatePresentationTranscript: jest.fn(async () => ({ presentationTranscript: { artifactId: 'a', state: 'bound' } })),
 }));
@@ -24,6 +31,12 @@ import { generatePresentationTranscript } from '../../lib/services/post-presenta
 import correction from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/corrections/[operationId].js';
 import presentationTranscript from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/presentation-transcript.js';
 import collection from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions.js';
+import summaryDraft from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/summary-draft.js';
+import summaryPublish from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/summary-draft/publish.js';
+import {
+  createPresentationSummaryDraft, getPresentationSummaryDraft, updatePresentationSummaryDraft, discardPresentationSummaryDraft,
+  publishPresentationSummaryDraft,
+} from '../../lib/services/post-presentation-materials/transcript-summary-service.js';
 import speakers from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/[jobId]/speakers.js';
 import publish from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/[jobId]/publish.js';
 import closePublication from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/publications/[operationId]/close.js';
@@ -226,3 +239,68 @@ describe('presentation-transcript route', () => {
     }
   });
 });
+
+describe('summary-draft routes', () => {
+  const draftId = '55555555-5555-4555-8555-555555555555';
+  const createBody = { acknowledgmentVersion: 'presentation-summary-2026-10-05',
+    expectedCurrentArtifactId: '44444444-4444-4444-8444-444444444444', expectedCurrentFingerprint: 'a'.repeat(64) };
+  const actor = '77777777-7777-4777-8777-777777777777';
+
+  test('each method dispatches with the authenticated profile; only writes that reach Dataverse get the mapped actor', async () => {
+    const cases = [
+      ['GET', undefined, getPresentationSummaryDraft, { requestId, ownerProfileId: 9, body: undefined }],
+      ['POST', createBody, createPresentationSummaryDraft, { requestId, ownerProfileId: 9, body: createBody, actingUserSystemId: actor }],
+      ['PATCH', { draftId, expectedVersion: 2, text: 'Edited' }, updatePresentationSummaryDraft,
+        { requestId, ownerProfileId: 9, body: { draftId, expectedVersion: 2, text: 'Edited' } }],
+      ['DELETE', { draftId, expectedVersion: 2 }, discardPresentationSummaryDraft,
+        { requestId, ownerProfileId: 9, body: { draftId, expectedVersion: 2 } }],
+    ];
+    for (const [method, body, service, expected] of cases) {
+      const res = response();
+      await summaryDraft({ method, query: { requestId }, body }, res);
+      expect(requireAppAccess).toHaveBeenLastCalledWith(expect.anything(), res, 'meeting-tracker');
+      expect(service).toHaveBeenCalledWith(expected);
+      expect(res.statusCode).toBe(200);
+    }
+    const res = response();
+    await summaryPublish({ method: 'POST', query: { requestId }, body: { draftId, expectedVersion: 2 } }, res);
+    expect(publishPresentationSummaryDraft).toHaveBeenCalledWith({ requestId, ownerProfileId: 9, actingUserSystemId: actor,
+      body: { draftId, expectedVersion: 2 } });
+    expect(res.statusCode).toBe(200);
+  });
+
+  test.each([
+    ['POST with an extra key', 'POST', { ...createBody, profileId: 77 }],
+    ['POST without the acknowledgment', 'POST', { expectedCurrentArtifactId: createBody.expectedCurrentArtifactId, expectedCurrentFingerprint: createBody.expectedCurrentFingerprint }],
+    ['PATCH with a non-GUID draft', 'PATCH', { draftId: 'x', expectedVersion: 2, text: 'a' }],
+    ['PATCH with a zero version', 'PATCH', { draftId, expectedVersion: 0, text: 'a' }],
+    ['PATCH with non-string text', 'PATCH', { draftId, expectedVersion: 2, text: 5 }],
+    ['DELETE with an extra key', 'DELETE', { draftId, expectedVersion: 2, force: true }],
+  ])('rejects %s before service dispatch', async (_label, method, body) => {
+    const res = response();
+    await summaryDraft({ method, query: { requestId }, body }, res);
+    expect(res.statusCode).toBe(400);
+    for (const service of [createPresentationSummaryDraft, updatePresentationSummaryDraft, discardPresentationSummaryDraft]) {
+      expect(service).not.toHaveBeenCalled();
+    }
+  });
+
+  test('publish rejects a malformed body and non-POST methods', async () => {
+    const bad = response();
+    await summaryPublish({ method: 'POST', query: { requestId }, body: { draftId, expectedVersion: '2' } }, bad);
+    expect(bad.statusCode).toBe(400);
+    const get = response();
+    await summaryPublish({ method: 'GET', query: { requestId }, body: {} }, get);
+    expect(get.statusCode).toBe(405);
+    expect(publishPresentationSummaryDraft).not.toHaveBeenCalled();
+  });
+
+  test('reports service status and code', async () => {
+    createPresentationSummaryDraft.mockRejectedValueOnce(Object.assign(new Error('declined'), { code: 'summary_claude_output_refused', httpStatus: 422 }));
+    const res = response();
+    await summaryDraft({ method: 'POST', query: { requestId }, body: createBody }, res);
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toMatchObject({ code: 'summary_claude_output_refused', error: 'declined' });
+  });
+});
+

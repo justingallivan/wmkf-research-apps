@@ -9,7 +9,7 @@ import {
   REQUEST_DOCUMENT_LIFECYCLE_STATE,
   REQUEST_DOCUMENT_OPERATION_STATUS,
 } from '../../shared/config/requestDocument.js';
-import { presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
+import { presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey, transcriptSummaryBindingFingerprint } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
 import * as requestDocumentAdapter from '../../lib/dataverse/adapters/request-document.js';
 
 jest.mock('../../lib/dataverse/adapters/request-document.js', () => ({
@@ -97,7 +97,9 @@ function derivative(endMs = 70_000, overrides = {}) {
 }
 function summaryRow(overrides = {}) {
   return fileRow(SUMMARY_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, PRODUCER, {
-    wmkf_filename: 'summary.pdf', wmkf_sharepointetag: 'e1', ...overrides,
+    wmkf_filename: 'summary.pdf', wmkf_sharepointetag: 'e1',
+    wmkf_inputfingerprint: transcriptSummaryBindingFingerprint({ requestId: REQUEST_ID, sourceRevisionId: REVISION, presentationEndMs: 70_000 }),
+    ...overrides,
   });
 }
 function zoomRecording(overrides = {}) {
@@ -173,7 +175,7 @@ test('a bound Presentation Transcript opens and downloads by redirect, but never
 test('a replaced SharePoint file (live eTag differs from the pinned one) is never served, for the derivative or the summary (Codex finding)', async () => {
   const replaced = dependencies([fullTranscript(), derivative(), summaryRow()], { resolveMediaDownloadUrl: textMedia('presentation.txt', 'text/plain', { eTag: 'e2' }) });
   await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: `material:${PRESENTATION_ID}`, mode: 'open' }, replaced));
-  const replacedSummary = dependencies([summaryRow()], { resolveMediaDownloadUrl: textMedia('summary.pdf', 'application/pdf', { eTag: 'e2' }) });
+  const replacedSummary = dependencies([fullTranscript(), summaryRow()], { resolveMediaDownloadUrl: textMedia('summary.pdf', 'application/pdf', { eTag: 'e2' }) });
   await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: `material:${SUMMARY_ID}`, mode: 'open' }, replacedSummary));
   // A row that never pinned an eTag fails closed too.
   const unpinned = dependencies([fullTranscript(), derivative(70_000, { wmkf_sharepointetag: null })], { resolveMediaDownloadUrl: textMedia() });
@@ -183,10 +185,10 @@ test('a replaced SharePoint file (live eTag differs from the pinned one) is neve
 });
 
 test('the summary is served as text/pdf/docx only', async () => {
-  const ok = dependencies([summaryRow()], { resolveMediaDownloadUrl: textMedia('summary.pdf', 'application/pdf') });
+  const ok = dependencies([fullTranscript(), summaryRow()], { resolveMediaDownloadUrl: textMedia('summary.pdf', 'application/pdf') });
   await expect(resolvePresentationMember({ requestId: REQUEST_ID, member: `material:${SUMMARY_ID}`, mode: 'open' }, ok))
     .resolves.toMatchObject({ kind: 'file' });
-  const video = dependencies([summaryRow()], { resolveMediaDownloadUrl: textMedia('summary.mp4', 'video/mp4') });
+  const video = dependencies([fullTranscript(), summaryRow()], { resolveMediaDownloadUrl: textMedia('summary.mp4', 'video/mp4') });
   await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: `material:${SUMMARY_ID}`, mode: 'open' }, video));
 });
 
@@ -290,3 +292,21 @@ test.each([
   });
   await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: `material:${SLIDES_ID}`, mode: 'download' }, deps));
 });
+
+test.each([
+  ['has no binding fingerprint', () => [fullTranscript(), summaryRow({ wmkf_inputfingerprint: null })]],
+  ['was made from another revision', () => [fullTranscript(), summaryRow({ wmkf_inputfingerprint: transcriptSummaryBindingFingerprint({
+    requestId: REQUEST_ID, sourceRevisionId: '33333333-3333-4333-8333-3333333333bb', presentationEndMs: 70_000 }) })]],
+  ['was made at another boundary', () => [fullTranscript(), summaryRow({ wmkf_inputfingerprint: transcriptSummaryBindingFingerprint({
+    requestId: REQUEST_ID, sourceRevisionId: REVISION, presentationEndMs: 65_000 }) })]],
+  ['has no confirmed boundary to bind to', () => [fullTranscript(v4Manifest({ presentationEnd: null })), summaryRow()]],
+  ['has no transcript at all', () => [summaryRow()]],
+])('a summary that %s is omitted at context and 404s on open and download', async (_label, makeRows) => {
+  const deps = dependencies(makeRows(), { resolveMediaDownloadUrl: textMedia('summary.pdf', 'application/pdf') });
+  expect((await buildPresentationContext({ requestId: REQUEST_ID }, deps)).materials.map((item) => item.member)).not.toContain(`material:${SUMMARY_ID}`);
+  for (const mode of ['open', 'download']) {
+    await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: `material:${SUMMARY_ID}`, mode }, deps));
+  }
+  expect(deps.resolveMediaDownloadUrl).not.toHaveBeenCalled();
+});
+
