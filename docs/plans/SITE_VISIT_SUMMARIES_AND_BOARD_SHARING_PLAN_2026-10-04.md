@@ -866,3 +866,93 @@ Open items:
   republish, and confirm the Board link hides the summary while Staff
   Deliberations shows it as stale.
 
+## 18. Stage 3 build plan: staff discussion summary (drafted 2026-10-05, Session 577)
+
+Status: **PLANNED, not built.** PR #440 merged as `11ff96467` (2026-10-05); the
+Stage 3 branch is cut from `main` after that merge.
+
+Facts below were read 2026-10-05 from `main` and from
+PR #440 at `5958f3066` (now merged; marked "PR #440").
+
+### 18.1 Decision first: one summary service with a kind table
+
+[VERIFIED via PR #440] `transcript-summary-service.js` handles one kind only.
+`TRANSCRIPT_SUMMARY` appears on 13 lines of that file (grep count), alongside:
+
+- the constants `FOLDER` and `LABEL`;
+- the prompt import from `meeting-presentation-summary.js`;
+- the input readers `readPresentationText` and `readSlidesText`;
+- the exported `*PresentationSummary*` function names;
+- the routes `.../transcriptions/summary-draft` and `.../summary-draft/publish`;
+- `PRESENTATION_SUMMARY_ACKNOWLEDGMENT` in `shared/config/transcriptSummary.js`.
+
+The draft store and migration 070 already key on
+`(request_id, artifact_type)`. [VERIFIED: the unique partial index
+`idx_meeting_transcript_summary_drafts_one_active`.]
+
+- **Option A (recommended):** a frozen `SUMMARY_KINDS` table keyed by
+  artifact type. Each entry holds:
+  - the folder and label;
+  - the prompt key and its input builder;
+  - the bind function (`bindTranscriptSummary`, or a new
+    `bindStaffDiscussionSummary`);
+  - the acknowledgment;
+  - an `outside: boolean` flag.
+
+  The routes take a `kind` from a server-side allowlist of two values. The
+  claim, registration-flag and versioned-filename logic stays as one copy.
+- **Option B:** a second service file. It needs no refactor, but it copies a
+  publish state machine that took three review rounds to get right, so any
+  later fix has to be made twice.
+
+Option A is a shared-helper extraction. At build time it needs
+`/contract-reconcile` and a Codex adversarial round, focused on the guards
+that gain a per-kind axis: the exclusive claim token, the durable
+`publish_registration_attempted` flag, recovery by a new Summarize, and the
+generation-key recipe (which already includes the type).
+
+### 18.2 Surface inventory (what Stage 3 touches)
+
+| Surface | Change | Evidence |
+|---|---|---|
+| `shared/config/requestDocument.js` | add `STAFF_DISCUSSION_SUMMARY: 100000010` and its label | [VERIFIED absent on `main`; only `STAFF_DISCUSSION_TRANSCRIPT: 100000013` exists] |
+| Dataverse picklist | owner-run `scripts/extend-requestdocument-artifacttype-staff-discussion-summary.mjs`, dry-run first, a sibling of `...-staff-discussion-transcript.mjs` | [VERIFIED sibling exists] |
+| Migration **071** | extend 070's `meeting_transcript_summary_drafts_artifact_type_check` to `IN (100000007, 100000010)`, and update `scripts/setup-database.js` to match. §4.7's "Stages 2–4 need no constraint migration" covers only the 055 tables, not the 070 drafts table | [VERIFIED 070 CHECK is `IN (100000007)`; next free number 071, see memory `project-migration-numbers-claimed-off-main`] |
+| Prompt and seed | `meeting-transcript.discussion-summary`, `wmkf_ai_model: 'sonnet'`, a seed script beside the Stage 2 seed, a standing Executor budget in `shared/config/executorBudgets.js`, an A7 registry entry (the transcript is untrusted input), and a line in the Sonnet 5.5 consumer inventory | §4.3; inventory amended `16ced436e` |
+| Input | text of the bound `STAFF_DISCUSSION_TRANSCRIPT` row through `bindStaffDiscussionTranscript` | [VERIFIED `presentation-transcript-binding.js:107` on `main`] |
+| Acknowledgment | a new versioned constant whose text names the **staff discussion**. Stage 2's text names only the presentation transcript and slides, so it cannot be reused | [VERIFIED `transcriptSummary.js` on PR #440] |
+| Staff-only binding | a new staff-side binder that keeps a summary made from an earlier staff-transcript revision and marks it stale (decision A's staff half; nothing outside applies) | §4.3 step 4 |
+| Card | a second `SummaryBlock` under the staff discussion transcript, with its own acknowledgment checkbox | PR #440 `RecordingAndTranscriptCard.js` |
+| Staff Deliberations | logistics feed reads the bound staff summary `.txt` the same way as Stage 2's `readPresentationSummary`, using the same 256 KiB cap and falling back to the link. Renders in `ResearchPresentationFollowUp` | §16 decision D; PR #440 `logistics-service.js` |
+| Outside exclusion | add nothing to the Board page `OUTSIDE_POST_PRESENTATION_TYPE_LIST` or the briefing page `OUTSIDE_POST_PRESENTATION_TYPES`. Both are allowlists, so the type is excluded by construction. A mutation-checked test on each page builds a READY 100000010 row and asserts it is not listed and that `open` returns 404 | [VERIFIED allowlists at `presentation-page-service.js:35-39`, `briefing-page-service.js:100`] |
+| Pre-Site distribution | `MATERIAL_TYPES` in `lib/services/pre-site-visit/distribution/model.js` is an allowlist without 100000010, so the new type is never offered. Pin it with a test | [VERIFIED lines 23-30]; see 18.4 |
+| Gates and docs | `check:request-document-writers` (new writer row), `check:prompt-injection-tagging`, `check:model-override-warming` for any new route, `check:api-routes`, `check:atlas`. Docs to update: API matrix rows, the Atlas page for `wmkf_requestdocument`, and the summary-drafts Atlas page for the 071 CHECK | §5 gates |
+
+### 18.3 Owner-run steps (in order)
+
+1. Picklist extension for 100000010: dry-run, then apply with the Dataverse write ack.
+2. Migration 071 (`node scripts/apply-migrations.js`).
+3. Seed `meeting-transcript.discussion-summary` with the write ack.
+4. Budget row through admin, if the standing budget needs a non-default value.
+
+The seed must exist before the code merges. Admin budget publishing reads
+every standing prompt's row (handoff "Verify Before Acting" item 2).
+
+Acceptance on 1003222: summarize the staff discussion, edit, and publish. Then
+check that:
+
+- the summary appears inline on Staff Deliberations;
+- it is absent from the Board link and the briefing page;
+- after a speaker-names republish, Staff Deliberations marks it as from an
+  earlier transcript.
+
+### 18.4 Owner decisions needed
+
+1. **Option A or B** (18.1). Recommendation: A.
+2. **Acknowledgment wording** for the staff summary. Draft: "I confirm the staff
+   discussion transcript may be sent to Anthropic, the LLM provider, to draft
+   this summary. I will review the draft before it is published."
+3. **Pre-Site distribution email:** this was already pending, and Stage 3 does
+   not widen it. The allowlist excludes 100000010, but the open question about
+   offering the full RECORDING, TRANSCRIPT and Transcript Summary rows as links
+   still stands.
