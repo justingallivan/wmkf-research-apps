@@ -62,6 +62,8 @@ Each item below is [VERIFIED via the cited file:line], read this session on `mai
 - Purge deletes a hard-coded list of pathname columns; completion is computed from hand-written ANDs: `worker.js:319-328`, `store.js:1764-1797` (`finishLocalCleanup`), `store.js:1830-1845` (`expireContent`), pending check `worker.js:400-402`.
 - Late-upload watch: both minted tokens would share `upload_valid_until` (`store.js:312,329`), but only the input path is retained under it (`store.js:813`, `store.js:1786`, `lib/services/transcription-pilot/model.js:72`).
 - Owner projection nulls `speaker_names` when content is blocked or the receipt expired: `model.js:52-64`. `speaker_alignment` must mirror both.
+> Current state (2026-10-04): the Site Visit page renders `RecordingAndTranscriptCard` instead of `MeetingTranscriptionPanel`; the panel file remains for the rehearsal page only. The upload copy, seeding, and acknowledgement wording below describe the panel as built on 2026-10-04 and are superseded by `docs/plans/SITE_VISIT_TRANSCRIPT_CARD_REDESIGN_PLAN_2026-10-04.md` §4-§6 and §13.
+
 - Panel seeds its draft from `job.speaker_names`: `shared/components/meeting-tracker/MeetingTranscriptionPanel.js:21-22,338`.
 - Collection POST requires an exact key set: `pages/api/meeting-tracker/visits/[requestId]/transcriptions.js:9-20`. Start requires an exact key set: `pages/api/meeting-tracker/visits/[requestId]/transcriptions/[jobId]/start.js:19-20`.
 - Purged-content CHECK constraint: `lib/db/migrations/060_transcription_jobs.sql:95-100`.

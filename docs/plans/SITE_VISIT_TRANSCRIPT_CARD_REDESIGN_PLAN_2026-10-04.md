@@ -2,7 +2,7 @@
 title: Site Visit recording and transcript card redesign
 domain: transcription
 kind: plan
-status: draft
+status: built-in-branch
 summary: "Replace the Post-presentation materials card and the Meeting transcription panel on the Site Visit page with one task-oriented Recording and transcript card over the existing one-slot services; UI-only on the write side, with a state-to-copy table and the defects the redesign eliminates."
 owner: product-engineering
 related:
@@ -14,7 +14,7 @@ related:
 
 # Site Visit recording and transcript card redesign
 
-Status: draft for owner discussion after Codex review. Nothing here is built.
+Status: built on `feature/site-visit-transcript-card` (see §13); awaiting owner merge and Production acceptance.
 Shaped with the Impeccable skill (Operate mode, incumbent "Clear Workbench"
 design system in `DESIGN.md`); this is a brief, not component code.
 
@@ -362,3 +362,40 @@ checked against source and hold; the plan above is amended accordingly.
    correction's publication row is created at draft time
    [VERIFIED `service.js:150`]. Disposition: current line now reads the
    TRANSCRIPT row's `createdAt` and `slotVersion`; §1, §4, §6, §11 amended.
+
+## 13. Build and review record, 2026-10-04
+
+Built on branch `feature/site-visit-transcript-card` (Sonnet build, Opus
+review, Sonnet fix rounds, Codex code review, Fable orchestration and final
+review). Owner merges.
+
+- New `shared/components/meeting-tracker/RecordingAndTranscriptCard.js`
+  replaces both cards in `SiteVisitEditor`; the old card and panel files
+  remain for the rehearsal page (decision 5) and are no longer imported by
+  the Site Visit page.
+- `finalizeTranscriptUpload` in `material-service.js`: `text/plain` and
+  `text/vtt` skip Cloudmersive and get `assertReadableTextTranscript`
+  (UTF-8, no NUL, WEBVTT header for .vtt); new permanent code
+  `transcript_text_invalid` (422), added to the finalize route's permanent
+  set; PDF/DOCX content-flag rejections name the tripped flags.
+- Deviations from §4/§6, accepted: no "Test folder" chip and no "speakers
+  named" fragment (no API field carries either); uploaded and recording
+  lines show date and type only, never the stored filename (it embeds a
+  GUID); "Publishing… started <time>" omits the time for names-edit rows.
+- Opus review (12 findings, all fixed in `6776b7cd5`): GUID filenames
+  rendered on the uploaded/recording lines; server messages for
+  `transcript_text_invalid`/`scan_infected` replaced by generic copy; a
+  collection refresh surfacing a newer run could discard unsaved names
+  (editor now pins the run under edit); late save responses could write to
+  a switched editor (target checked after await); names-edit publish left a
+  stale draft editor; Refresh lost after some 409s and after a failed draft
+  load; generated transcript mislabeled "Uploaded" while the collection was
+  loading; conflict notice missing outside the review block; remaining
+  "reconciliation" copy; stale docblock; plus the restored transcript
+  preview, the collection stale-response guard, and lint-clean refs.
+- Codex code review (gpt-6-astra, 2 findings, both verified and fixed):
+  saved names-edit drafts were never reopened (`collection.correctionDrafts`
+  unused), so a saved edit was orphaned after reload; an active older run
+  had no progress line or Refresh when the newest run was not active.
+- Verification before each review round: 12 related jest suites, eslint on
+  the new file, `check:types`, the code and docs gates, and `npm run build`.
