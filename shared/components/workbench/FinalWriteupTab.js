@@ -628,6 +628,9 @@ export default function FinalWriteupTab({ requestId }) {
               {status.sourceFile?.name && (
                 <p className="mt-2 text-xs text-gray-500">{status.sourceFile.name}</p>
               )}
+              {status.startCompatibilityReason === 'legacy_review_schedule_unverified' && (
+                <p className="mt-3 text-sm text-amber-800">This uses the existing completed writeup. Presentation timing has not been verified.</p>
+              )}
               {!status.canStart && (
                 <p className="mt-3 text-sm font-medium text-amber-800">
                   {status.startBlockedReason === 'final_writeup_site_visit_not_ended'

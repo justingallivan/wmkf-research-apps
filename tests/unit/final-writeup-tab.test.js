@@ -581,3 +581,11 @@ test('schedule-blocked lead PD sees a timing explanation rather than a false per
   expect(await screen.findByText('Group review becomes available after the scheduled presentation ends.')).toBeInTheDocument();
   expect(screen.queryByText('Only the lead Program Director or a superuser can start this stage.')).not.toBeInTheDocument();
 });
+
+
+test('legacy review compatibility is disclosed without disabling an authorized review action', async () => {
+  global.fetch.mockResolvedValue(response({ ...readyStatus(true), startCompatibilityReason: 'legacy_review_schedule_unverified' }));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  expect(await screen.findByText('This uses the existing completed writeup. Presentation timing has not been verified.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Ready for group review' })).toBeInTheDocument();
+});
