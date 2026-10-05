@@ -99,3 +99,21 @@ test('rejects invalid kind, invalid tokens, and persistence failures without suc
   expect(failure.statusCode).toBe(500);
   expect(failure.body.error).toBe('Materials email preferences are unavailable.');
 });
+
+test.each(['invitation', 'reminder'])('reports a %s storage refusal as a save failure, not an invalid template', async (kind) => {
+  DatabaseService.setUserPreference.mockResolvedValueOnce(false);
+  const template = {
+    subject: 'My subject',
+    body: kind === 'invitation' ? 'Please send {{checklist}}' : 'Please send {{missingItems}}',
+  };
+  const res = mockRes();
+  await handler({ method: 'PUT', body: { kind, template } }, res);
+  expect(DatabaseService.setUserPreference).toHaveBeenCalledWith(
+    17, `site_visit_materials_${kind}_template`, JSON.stringify(template),
+  );
+  expect(res.statusCode).toBe(500);
+  expect(res.body).toEqual({
+    error: 'Your default could not be saved. Please try again or contact support.',
+    issues: ['persistence'],
+  });
+});
