@@ -11,7 +11,7 @@ import {
 import { normalizeZoomPaste } from '../../../lib/services/post-presentation-materials/material-model';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../config/requestDocument';
 import { Button } from '../Layout';
-import { getTranscriptSpeakers, groupTranscriptByTurn } from '../../../lib/services/transcription-pilot/transcript-format';
+import { formatTranscriptTurnTime, getTranscriptSpeakers, groupTranscriptByTurn } from '../../../lib/services/transcription-pilot/transcript-format';
 import { MAX_TRANSCRIPTION_BYTES as MAX_AUDIO_BYTES, MAX_TRANSCRIPTION_MIB } from '../../../lib/services/transcription-pilot/limits';
 
 const MP4_MAX_BYTES = 2_000_000_000;
@@ -78,10 +78,10 @@ function uploadFailureMessage(error) {
     return 'Microsoft confirmed that this upload session expired. Reselect the same recording and choose Retry upload; a new session starts at zero.';
   }
   if (code === 'post_presentation_upload_session_closed') {
-    return 'Microsoft closed this upload session, but the file outcome is uncertain. The upload is retained for reconciliation.';
+    return 'Microsoft closed this upload session, but the file outcome is uncertain. The upload is kept so it can be checked later.';
   }
   if (code === 'post_presentation_upload_reconciliation_pending') {
-    return 'The exact file or upload-session outcome is uncertain. This upload is retained for reconciliation.';
+    return 'The exact file or upload-session outcome is uncertain. This upload is kept so it can be checked later.';
   }
   if (code === 'post_presentation_site_visit_changed') {
     return 'The active Site Visit changed after this upload began. Reload the page before resuming.';
@@ -170,7 +170,7 @@ function safeMaterialUrl(material) {
   }
 }
 
-function useMaterials(requestId) {
+function useMaterials(requestId, transcriptInputRef) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [unavailable, setUnavailable] = useState(false);
@@ -203,7 +203,6 @@ function useMaterials(requestId) {
   const zoomOperationRef = useRef(null);
   const transcriptStageRef = useRef(null);
   const transcriptControllerRef = useRef(null);
-  const transcriptInputRef = useRef(null);
   const pauseControllerRef = useRef(null);
   const pauseRef = useRef(false);
   const recoveryBusyRef = useRef(null);
@@ -352,7 +351,7 @@ function useMaterials(requestId) {
         setNotice(`${superseded
           ? 'Recording save completed, but a newer recording is current.'
           : 'Recording saved.'}${result.reconciliationRequired
-          ? ' An earlier recording needs reconciliation.' : ''}`);
+          ? ' An earlier recording save did not finish. Check now.' : ''}`);
         setTransfer(null);
         return result;
       } catch (finalizeError) {
@@ -499,7 +498,7 @@ function useMaterials(requestId) {
         setNotice(`${currentIsZoom
           ? 'Zoom recording link saved.'
           : 'This Zoom link was saved, but a newer recording is current. Review the current material.'}${result.reconciliationRequired
-          ? ' An earlier recording needs reconciliation.' : ''}`);
+          ? ' An earlier recording save did not finish. Check now.' : ''}`);
       }
     } catch (saveError) {
       if (current(generation)) setZoomError(saveError.message || 'The Zoom recording link could not be saved. Retry with the same link.');
@@ -578,7 +577,7 @@ function useMaterials(requestId) {
         setNotice(`${superseded
           ? 'Transcript save completed, but a newer transcript is current.'
           : 'Transcript saved.'}${result.reconciliationRequired
-          ? ' An earlier transcript needs reconciliation.' : ''}`);
+          ? ' An earlier transcript save did not finish. Check now.' : ''}`);
       }
     } catch (uploadError) {
       if (uploadError?.name !== 'AbortError' && current(generation)) {
@@ -597,8 +596,11 @@ function useMaterials(requestId) {
         const retryHint = transcriptStageRef.current?.requestId === requestId
           ? ' The staged file is retained; choose Finish transcript to retry.' : '';
         const reason = code === 'post_presentation_generation_ambiguous'
-            ? 'The transcript save needs reconciliation. Reload and contact support before trying again.'
-            : unusable
+            ? 'The transcript save did not finish. Reload the page, then try again or contact support.'
+            : unusable && ['transcript_text_invalid', 'scan_infected'].includes(code)
+              && typeof uploadError.message === 'string' && uploadError.message.trim() && uploadError.message !== code
+              ? uploadError.message
+              : unusable
               ? 'The staged transcript cannot be used. Reselect the file and upload it again.'
               : uploadError.message === code
                 ? 'The transcript could not be saved.'
@@ -861,13 +863,12 @@ function useMaterials(requestId) {
     setTransfer((value) => (value ? { ...value, phase: 'pausing', etaSeconds: null } : value));
   };
   return {
-    changeZoomText, chooseTranscriptFile, requestPause, transcriptInputRef,
+    changeZoomText, chooseTranscriptFile, requestPause,
     data, loading, unavailable, file, setFile, zoomText, setZoomText, zoomBusy, zoomError, setZoomError,
     transcriptFile, setTranscriptFile, transcriptBusy, transcriptProgress, transcriptStagedId, setTranscriptStagedId,
     setTranscriptProgress, transcriptError, setTranscriptError, error, notice, busyUploadId, recoveryBusyId,
     confirmCancelId, setConfirmCancelId, transfer, setTransfer, pauseRequested, setPauseRequested, link, linkBusy,
-    linkError, linkCopied, manualCopy, confirmReissue, setConfirmReissue, zoomOperationRef, transcriptStageRef,
-    transcriptInputRef, pauseRef, pauseControllerRef, current, generationRef,
+    linkError, linkCopied, manualCopy, confirmReissue, setConfirmReissue,
     load, saveZoom, uploadTranscript, begin, resume, finish, cancel, retry, mutateLink, copyLink,
   };
 }
@@ -954,10 +955,15 @@ export function describeCurrentTranscript({ material, collection }) {
   const artifact = collection?.currentArtifact;
   const generated = Boolean(artifact?.bundleEditable) && sameId(artifact.id, material.artifactId);
   if (!generated) {
-    return {
-      kind: 'uploaded',
-      text: `Uploaded ${fmtDateTime(material.createdAt)}${material.filename ? ` · ${material.filename}` : ''}`.replace(/\s+/g, ' ').trim(),
-    };
+    // Stored filenames embed a GUID, so only the extension is ever shown.
+    if (artifact?.bundleEditable === false) {
+      const extension = String(material.filename || '').match(/\.([a-z0-9]{1,5})$/i)?.[1];
+      return {
+        kind: 'uploaded',
+        text: `Uploaded ${fmtDateTime(material.createdAt)}${extension ? ` · ${extension.toUpperCase()} file` : ''}`.replace(/\s+/g, ' ').trim(),
+      };
+    }
+    return { kind: 'saved', text: `Saved ${fmtDateTime(material.createdAt)}`.trim() };
   }
   const publications = (collection?.publications || []).filter((row) => row.state !== 'draft');
   const jobs = collection?.jobs || [];
@@ -1011,6 +1017,8 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   const generationRef = useRef(0);
   const mountedRef = useRef(false);
   const detailSeqRef = useRef(0);
+  const collectionSequenceRef = useRef(0);
+  const editorKeyRef = useRef(null);
   const controllerRef = useRef(null);
   const attemptRef = useRef(null);
   const baselineRef = useRef({ key: null, names: {} });
@@ -1055,13 +1063,22 @@ function useTranscription(requestId, { onMaterialsChanged }) {
     else if (!sameNames(previous.names, baseline)) setNames((current) => (sameNames(current, previous.names) ? seedNames(baseline) : current));
   }, [editorKey, baseline]);
 
+  useEffect(() => { editorKeyRef.current = editorKey; }, [editorKey]);
+  // Editing pins the run under edit so a refresh that surfaces a newer run cannot swap the editor and drop unsaved names.
+  const editNames = (updater) => {
+    setNames(updater);
+    if (!focusId && !correction && focusJob) setFocusId(focusJob.id);
+  };
+
   const loadCollection = useCallback(async () => {
     if (!requestId) return;
     const generation = generationRef.current;
+    const sequence = ++collectionSequenceRef.current;
+    const isLatest = () => isCurrent(generation) && collectionSequenceRef.current === sequence;
     setLoading(true);
     try {
       const body = await requestJson(basePath, { method: 'GET', fallbackMessage: 'Transcription status could not be loaded.' });
-      if (!isCurrent(generation)) return;
+      if (!isLatest()) return;
       setCollection(body);
       setCollectionCheckedAt(Date.now());
       setError(null);
@@ -1075,9 +1092,9 @@ function useTranscription(requestId, { onMaterialsChanged }) {
         return Number(fresh.version) >= Number(currentDetail.job.version) ? { ...currentDetail, job: fresh } : currentDetail;
       });
     } catch (loadError) {
-      if (isCurrent(generation) && loadError?.name !== 'AbortError') setError(errorMessage(loadError, 'Transcription status could not be loaded.'));
+      if (isLatest() && loadError?.name !== 'AbortError') setError(errorMessage(loadError, 'Transcription status could not be loaded.'));
     } finally {
-      if (isCurrent(generation)) setLoading(false);
+      if (isLatest()) setLoading(false);
     }
   }, [basePath, isCurrent, requestId]);
 
@@ -1187,6 +1204,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   const saveNames = async () => {
     if (!dirtyNames || busy) return;
     const generation = generationRef.current;
+    const targetKey = editorKey;
     if (correction) {
       setBusy('speakers');
       setError(null);
@@ -1197,6 +1215,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
           fallbackMessage: 'Speaker names could not be saved.',
         });
         if (!isCurrent(generation)) return;
+        if (editorKeyRef.current !== targetKey) return;
         setCorrectionDetail((currentDetail) => (currentDetail ? { ...currentDetail, correction: result.correction } : currentDetail));
         setNames(seedNames(result.correction?.speakerNames));
         setNotice('Speaker names saved.');
@@ -1212,7 +1231,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
       return;
     }
     const result = await postJobAction('speakers', { expectedVersion: selectedJob.version, speakerNames: names }, 'Saving names');
-    if (!result?.job) return;
+    if (!result?.job || editorKeyRef.current !== targetKey) return;
     setNames(seedNames(result.job.speaker_names));
     setNotice('Speaker names saved.');
   };
@@ -1257,14 +1276,16 @@ function useTranscription(requestId, { onMaterialsChanged }) {
       if (!isCurrent(generation)) return;
       if (result.currentArtifact) setCollection((state) => (state ? { ...state, currentArtifact: result.currentArtifact } : state));
       announcePublication(result.publication || { state: 'unknown' }, false);
-      if (result.publication?.state === 'published') setCorrectionDetail(null);
+      setCorrectionDetail(null);
       await loadCollection();
       await onMaterialsChangedRef.current?.();
     } catch (publishError) {
       if (isCurrent(generation)) {
-        setConflict(publishError?.status === 409);
         await loadCollection();
-        if (isCurrent(generation)) setError(errorMessage(publishError, 'The edited transcript could not be published.'));
+        if (isCurrent(generation)) {
+          setConflict(publishError?.status === 409);
+          setError(errorMessage(publishError, 'The edited transcript could not be published.'));
+        }
       }
     } finally {
       if (isCurrent(generation)) setBusy(null);
@@ -1356,9 +1377,11 @@ function useTranscription(requestId, { onMaterialsChanged }) {
     } catch (closeError) {
       if (isCurrent(generation)) {
         setCloseAcknowledgedId(null);
-        setConflict(closeError?.status === 409);
         await loadCollection();
-        if (isCurrent(generation)) setError(errorMessage(closeError, 'This attempt could not be closed.'));
+        if (isCurrent(generation)) {
+          setConflict(closeError?.status === 409);
+          setError(errorMessage(closeError, 'This attempt could not be closed.'));
+        }
       }
     } finally {
       if (isCurrent(generation)) setBusy(null);
@@ -1478,7 +1501,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
 
   return {
     basePath, collection, collectionCheckedAt, loading, jobs, publications, newestJob, focusJob, showReview, selectedJob,
-    correction, correctionDetail, content, speakerIds, names, setNames, baseline, dirtyNames, suggestionPicks, setSuggestionPicks,
+    correction, correctionDetail, content, speakerIds, names, setNames: editNames, baseline, dirtyNames, suggestionPicks, setSuggestionPicks,
     detail, audioFile, vttFile, setVttFile, acknowledged, setAcknowledged, uploadProgress, busy, error, notice, conflict,
     closeAcknowledgedId, setCloseAcknowledgedId, confirmNoVtt, setNoVttConfirmation,
     loadCollection, reviewRun, refreshReview, saveNames, publishJob, publishCorrection, beginEditNames, cancelEditNames,
@@ -1595,6 +1618,26 @@ function SpeakerEditor({ t, alignment, readOnly }) {
   );
 }
 
+function TranscriptPreview({ content, names }) {
+  const turns = groupTranscriptByTurn(content, names || {});
+  if (!turns.length) return null;
+  return (
+    <details className="mt-4" data-testid="transcript-preview">
+      <summary className={`cursor-pointer text-sm font-semibold text-gray-900 ${FOCUS_RING}`}>Read the transcript</summary>
+      <div className="mt-2 max-h-[32rem] overflow-y-auto rounded-lg border border-gray-200" aria-label="Transcript by speaker turn">
+        <div className="space-y-4 px-4 py-3">
+          {turns.map((turn, index) => (
+            <p key={`${turn.start}-${turn.end}-${index}`} className="whitespace-pre-wrap break-words text-sm leading-6 text-gray-900">
+              <span className="mr-2 font-mono text-xs tabular-nums text-gray-500">{formatTranscriptTurnTime(turn.start)}</span>
+              {turn.speakerName ? <span className="font-semibold">{turn.speakerName}: </span> : null}<span>{turn.text}</span>
+            </p>
+          ))}
+        </div>
+      </div>
+    </details>
+  );
+}
+
 function ReviewBlock({ t }) {
   const { selectedJob: job, correction, busy, conflict, dirtyNames, collection, publications } = t;
   const status = job?.status;
@@ -1617,7 +1660,7 @@ function ReviewBlock({ t }) {
                 : status !== 'ready' ? 'Only a ready run can be published.' : null;
   const canReview = correction ? Boolean(t.content) : status === 'ready' && job?.contentAccessAllowed === true && Boolean(t.content);
   const title = correction ? 'Edit speaker names' : displayName(job);
-  const showRefresh = matchingActive || conflict;
+  const showRefresh = matchingActive || conflict || (status === 'ready' && !t.content && Boolean(t.error));
   const base = t.basePath;
 
   return (
@@ -1645,6 +1688,7 @@ function ReviewBlock({ t }) {
         {matchingActive && <div className="mt-3" aria-live="polite"><Notice tone="info">Matching names from Zoom captions…</Notice></div>}
         {alignmentShown && ALIGNMENT_REASONS[alignmentStatus] && <p className="mt-3 text-sm leading-5 text-gray-700">{ALIGNMENT_REASONS[alignmentStatus]}</p>}
         <SpeakerEditor t={{ ...t, collection }} alignment={alignment} readOnly={matchingActive || (correction && correction.state !== 'draft')} />
+        <TranscriptPreview content={t.content} names={t.names} />
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className="mr-auto text-xs text-gray-600" aria-live="polite">{dirtyNames ? 'Unsaved name changes' : 'Names saved'}</span>
           <button type="button" onClick={t.saveNames} disabled={!dirtyNames || Boolean(busy) || matchingActive} className={BTN}>{busy === 'speakers' ? 'Saving names…' : 'Save names'}</button>
@@ -1714,7 +1758,7 @@ function EarlierRuns({ t }) {
               </p>
             </div>
             {job.status === 'ready' && <div className="flex items-center gap-3">
-              <button type="button" onClick={() => t.reviewRun(job)} disabled={Boolean(t.busy)} className={BTN}>Review</button>
+              <button type="button" onClick={() => t.reviewRun(job)} disabled={Boolean(t.busy) && t.busy !== 'speakers'} className={BTN}>Review</button>
               <button type="button" onClick={() => void t.discardRun(job)} disabled={Boolean(t.busy)} className={BTN_LINK}>Discard this draft</button>
             </div>}
           </li>
@@ -1758,14 +1802,14 @@ function GenerateForm({ t }) {
   );
 }
 
-function UploadForm({ m }) {
+function UploadForm({ m, inputRef }) {
   return (
     <div className="mt-4 border-t border-gray-200 pt-4" data-testid="upload-form">
       <label htmlFor="recording-transcript-file" className="block text-xs font-medium text-gray-700">Transcript file (VTT, text, PDF, or DOCX, up to 25 MiB)</label>
       <p className="mt-1 text-xs text-gray-600">Zoom’s chat.txt is meeting chat, not a transcript. Uploading replaces the current transcript.</p>
       <input
         id="recording-transcript-file"
-        ref={m.transcriptInputRef}
+        ref={inputRef}
         type="file"
         accept=".vtt,.txt,.pdf,.docx,text/vtt,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         disabled={m.transcriptBusy}
@@ -1780,7 +1824,7 @@ function UploadForm({ m }) {
   );
 }
 
-function TranscriptBlock({ m, t }) {
+function TranscriptBlock({ m, t, transcriptInputRef }) {
   const [openForm, setOpenForm] = useState(null);
   const material = (m.data?.materials || []).find((item) => Number(item.artifactType) === REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT) || null;
   const line = describeCurrentTranscript({ material, collection: t.collection });
@@ -1791,6 +1835,7 @@ function TranscriptBlock({ m, t }) {
   const generateReason = !t.collection ? 'Not available right now' : !featureEnabled ? 'Not enabled for this request' : null;
   const active = t.newestJob && ACTIVE_STATUSES.has(t.newestJob.status) ? t.newestJob : null;
   const editing = Boolean(t.correction);
+  const reviewOpen = editing || Boolean(t.showReview && t.focusJob && !ACTIVE_STATUSES.has(t.focusJob.status));
   const toggle = (form) => setOpenForm((value) => (value === form ? null : form));
   return (
     <section className="mt-6 border-t border-gray-200 pt-5" aria-labelledby="recording-transcript-transcript-title">
@@ -1812,7 +1857,7 @@ function TranscriptBlock({ m, t }) {
           {generateReason && <p className="mt-1 text-xs text-gray-600">{generateReason}</p>}
         </div>
       </div>
-      {openForm === 'upload' && <UploadForm m={m} />}
+      {openForm === 'upload' && <UploadForm m={m} inputRef={transcriptInputRef} />}
       {openForm === 'generate' && !generateReason && <GenerateForm t={t} />}
       {t.error && <div className="mt-4"><Notice>{t.error}</Notice></div>}
       {t.notice && <div className="mt-4"><Notice tone={/could not|did not|still needs/.test(t.notice) ? 'warning' : 'success'}>{t.notice}</Notice></div>}
@@ -1822,7 +1867,13 @@ function TranscriptBlock({ m, t }) {
           <button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={BTN}>{t.loading ? 'Refreshing…' : 'Refresh'}</button>
         </div>
       )}
-      {(editing || (t.showReview && t.focusJob && !ACTIVE_STATUSES.has(t.focusJob.status))) && <ReviewBlock t={t} />}
+      {!reviewOpen && t.conflict && (
+        <div className="mt-4" role="alert">
+          <Notice tone="warning">Another session changed this. Refresh to load the latest version.</Notice>
+          <button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.loading ? 'Refreshing…' : 'Refresh'}</button>
+        </div>
+      )}
+      {reviewOpen && <ReviewBlock t={t} />}
       <AttentionBlock t={t} />
       <EarlierRuns t={t} />
     </section>
@@ -1847,7 +1898,7 @@ function RecordingBlock({ m }) {
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-gray-900" data-testid="current-recording-line">
           {recording
-            ? `${recording.backing === 'external' ? 'Zoom link' : recording.filename}${recording.createdAt ? ` · added ${fmtDateTime(recording.createdAt)}` : ''}`
+            ? `${recording.backing === 'external' ? 'Zoom recording link' : 'MP4 recording'}${recording.createdAt ? ` · added ${fmtDateTime(recording.createdAt)}` : ''}`
             : 'No recording yet'}
         </p>
         <div className="flex items-center gap-2">
@@ -1955,7 +2006,8 @@ function PresentationLinkBlock({ m }) {
 }
 
 function RecordingAndTranscriptCardForRequest({ requestId }) {
-  const m = useMaterials(requestId);
+  const transcriptInputRef = useRef(null);
+  const m = useMaterials(requestId, transcriptInputRef);
   const t = useTranscription(requestId, { onMaterialsChanged: m.load });
   const heading = <h2 className="text-lg font-semibold text-gray-950">Recording and transcript</h2>;
   const shell = 'mt-8 min-w-0 rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6';
@@ -1968,7 +2020,7 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
       {m.data && (
         <div className="mt-4">
           <RecordingBlock m={m} />
-          <TranscriptBlock m={m} t={t} />
+          <TranscriptBlock m={m} t={t} transcriptInputRef={transcriptInputRef} />
           <PresentationLinkBlock m={m} />
         </div>
       )}

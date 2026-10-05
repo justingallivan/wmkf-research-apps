@@ -1,5 +1,5 @@
 /** @jest-environment jsdom */
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { put } from '@vercel/blob/client';
 import RecordingAndTranscriptCard from '../../shared/components/meeting-tracker/RecordingAndTranscriptCard';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../shared/config/requestDocument';
@@ -163,7 +163,7 @@ test('an uploaded transcript with no source bundle shows no editor and says name
   route(state);
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
   const line = await screen.findByTestId('current-transcript-line');
-  expect(line.textContent).toBe(`Uploaded ${shortDate('2026-10-04T22:24:00.000Z')} · Transcript.vtt`);
+  expect(line.textContent).toBe(`Uploaded ${shortDate('2026-10-04T22:24:00.000Z')} · VTT file`);
   expect(screen.getByText(/speaker names cannot be edited here/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Edit speaker names' })).not.toBeInTheDocument();
   expect(screen.queryByLabelText(/Name for Speaker/)).not.toBeInTheDocument();
@@ -212,15 +212,138 @@ test('an active run shows only the progress line, and the card never shows ids o
   const progress = await screen.findByTestId('transcript-progress');
   expect(progress.textContent).toContain('Transcribing Oregon State recording');
   expect(screen.queryByTestId('transcript-review')).not.toBeInTheDocument();
-  expect(container.textContent).not.toMatch(/AssemblyAI|provider region|reconcile|quarantine|bundle|[0-9a-f]{8}-[0-9a-f]{4}-/i);
+  expect(container.textContent).not.toMatch(/AssemblyAI|provider region|reconcil|quarantine|bundle|[0-9a-f]{8}-[0-9a-f]{4}-/i);
 });
 
 test('changing the request resets both data sets', async () => {
   route({ materials: [transcriptRow()], collection: collection({ jobs: [] }), detail: detailFor({}) });
   const { rerender } = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-  expect(await screen.findByTestId('current-transcript-line')).toHaveTextContent(/^Uploaded/);
+  expect(await screen.findByTestId('current-transcript-line')).toHaveTextContent(/^Saved/);
   route({ materials: [], collection: collection({ jobs: [] }), detail: detailFor({}) });
   rerender(<RecordingAndTranscriptCard requestId={OTHER_REQUEST_ID} />);
   await waitFor(() => expect(screen.getByTestId('current-transcript-line')).toHaveTextContent('No transcript yet.'));
   expect(global.fetch.mock.calls.some(([url]) => String(url).includes(`/visits/${OTHER_REQUEST_ID}/transcriptions`))).toBe(true);
+});
+
+const GUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-/;
+const JOB_Y = '77777777-7777-4777-8777-777777777777';
+const OP_ID = '88888888-8888-4888-8888-888888888888';
+
+test('stored GUID filenames are never rendered for uploaded transcripts or recordings', async () => {
+  const guidName = '1003222-Transcript-4e7be123-7264-4fc0-bf07-66888f80bae6.txt';
+  const state = {
+    materials: [
+      transcriptRow({ filename: guidName }),
+      { artifactId: 'rec-1', artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING, backing: 'file', filename: '1003222-Recording-4e7be123-7264-4fc0-bf07-66888f80bae6.mp4', createdAt: '2026-10-04T21:00:00.000Z', webUrl: 'https://example.sharepoint.com/r.mp4' },
+    ],
+    collection: collection({ jobs: [], currentArtifact: { id: ARTIFACT_ID, fingerprint: 'c'.repeat(64), bundleEditable: false } }),
+    detail: detailFor({}),
+  };
+  route(state);
+  const { container } = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  const line = await screen.findByTestId('current-transcript-line');
+  expect(line.textContent).toBe(`Uploaded ${shortDate('2026-10-04T22:24:00.000Z')} · TXT file`);
+  expect(screen.getByTestId('current-recording-line').textContent).toBe(`MP4 recording · added ${shortDate('2026-10-04T21:00:00.000Z')}`);
+  expect(container.textContent).not.toMatch(GUID_RE);
+});
+
+test('a generated transcript with no collection is not labelled uploaded', async () => {
+  route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: null }), detail: detailFor({}) });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  const line = await screen.findByTestId('current-transcript-line');
+  expect(line.textContent).toBe(`Saved ${shortDate('2026-10-04T22:24:00.000Z')}`);
+  expect(screen.queryByText(/cannot be edited here/)).not.toBeInTheDocument();
+});
+
+test('finalize 422 transcript_text_invalid shows the server message and no Retry button', async () => {
+  const message = "This file is not a readable text transcript. Zoom's chat.txt and renamed media files are not transcripts.";
+  route({ collection: collection({ jobs: [], featureState: 'disabled' }), detail: detailFor({}) }, {
+    '/presentation-uploads/staging-1/finalize': { respond: () => response({ code: 'transcript_text_invalid', message }, 422) },
+    '/presentation-uploads': { method: 'POST', respond: () => response({ upload: { stagingId: 'staging-1', pathname: 'private/x', clientToken: 'tok', contentType: 'text/plain', access: 'private' } }) },
+  });
+  put.mockResolvedValue({});
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Upload a transcript' }));
+  fireEvent.change(screen.getByLabelText(/Transcript file/), { target: { files: [new File(['x'], 'chat.txt', { type: 'text/plain' })] } });
+  fireEvent.click(screen.getByRole('button', { name: 'Upload transcript' }));
+  expect(await screen.findByText(message)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /retry|finish transcript/i })).not.toBeInTheDocument();
+});
+
+test('a refresh that returns a newer run does not replace the editor or discard unsaved names', async () => {
+  const JOB_NEW = '99999999-9999-4999-8999-999999999999';
+  const state = {
+    collection: collection({ publications: [{ operationId: OP_ID, state: 'unknown', version: 1, createdAt: '2026-10-04T20:30:00.000Z', inputJobId: 'older-job', resultingDocumentId: 'doc-x' }] }),
+    detail: detailFor({}),
+  };
+  route(state, { [`/publications/${OP_ID}/reconcile`]: { respond: () => { state.collection = collection({ jobs: [job({ id: JOB_NEW, created_at: '2026-10-04T23:00:00.000Z', original_filename: 'Newer run.m4a' }), job()], publications: [] }); return response({ publication: { state: 'published' } }); } } });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  const field = await screen.findByLabelText('Name for Speaker A');
+  fireEvent.change(field, { target: { value: 'Edited name' } });
+  fireEvent.click(await screen.findByRole('button', { name: 'Check now' }));
+  await waitFor(() => expect(screen.getByTestId('earlier-runs')).toHaveTextContent('Newer run'));
+  expect(screen.getByLabelText('Name for Speaker A')).toHaveValue('Edited name');
+  expect(screen.getByTestId('transcript-review')).toHaveTextContent('Oregon State recording');
+});
+
+test('a save that resolves after switching runs does not write into the other run', async () => {
+  let resolveSave;
+  let patchDone = false;
+  const saved = new Promise((resolve) => { resolveSave = resolve; });
+  const jobY = job({ id: JOB_Y, created_at: '2026-10-04T19:00:00.000Z', original_filename: 'Earlier run.m4a', speaker_names: { A: 'Yara' } });
+  const state = { collection: collection({ jobs: [job(), jobY] }), detail: detailFor({}) };
+  route(state, {
+    [`/transcriptions/${JOB_Y}`]: { method: 'GET', respond: () => response({ job: jobY, content, candidates: [] }) },
+    [`/transcriptions/${JOB_ID}/speakers`]: { method: 'PATCH', respond: async () => { await saved; patchDone = true; return response({ job: job({ version: 2, speaker_names: { B: 'Late X name' } }) }); } },
+  });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  fireEvent.change(await screen.findByLabelText('Name for Speaker B'), { target: { value: 'Late X name' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save names' }));
+  fireEvent.click(within(screen.getByTestId('earlier-runs')).getByRole('button', { name: 'Review' }));
+  await waitFor(() => expect(screen.getByLabelText('Name for Speaker A')).toHaveValue('Yara'));
+  resolveSave();
+  await waitFor(() => expect(patchDone).toBe(true));
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+  expect(screen.getByLabelText('Name for Speaker A')).toHaveValue('Yara');
+  expect(screen.getByLabelText('Name for Speaker B')).toHaveValue('');
+});
+
+test('publishing an edited-names draft closes the editor for any result and lists the unresolved row', async () => {
+  const published = { operationId: 'op-orig', state: 'published', version: 1, createdAt: '2026-10-04T21:00:00.000Z', inputJobId: JOB_ID, resultingDocumentId: ARTIFACT_ID };
+  const artifact = { id: ARTIFACT_ID, fingerprint: 'd'.repeat(64), bundleEditable: true };
+  const state = { materials: [transcriptRow()], collection: collection({ currentArtifact: artifact, publications: [published] }), detail: detailFor({}) };
+  const correction = { operationId: OP_ID, state: 'draft', version: 1, speakerNames: {}, expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: artifact.fingerprint };
+  route(state, {
+    '/corrections': { method: 'POST', respond: (path) => (path.endsWith('/publish')
+      ? (() => { state.collection = collection({ currentArtifact: artifact, publications: [published, { operationId: 'op-edit', state: 'published_reconcile', version: 2, createdAt: '2026-10-04T23:00:00.000Z', sourceArtifactId: ARTIFACT_ID, resultingDocumentId: 'doc-2' }] }); return response({ publication: { state: 'published_reconcile' }, currentArtifact: artifact }); })()
+      : response({ correction, content, currentArtifact: artifact, candidates: [] })) },
+  });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit speaker names' }));
+  const publish = await screen.findByRole('button', { name: 'Publish transcript' });
+  await waitFor(() => expect(publish).toBeEnabled());
+  fireEvent.click(publish);
+  expect(await screen.findByTestId('needs-attention')).toBeInTheDocument();
+  expect(screen.queryByTestId('transcript-review')).not.toBeInTheDocument();
+});
+
+test('a 409 closing an attempt keeps the Refresh affordance after the reload', async () => {
+  const state = { collection: collection({ jobs: [], publications: [{ operationId: OP_ID, state: 'unknown', version: 1, createdAt: '2020-01-01T00:00:00.000Z', quarantineUntil: '2020-01-02T00:00:00.000Z', inputJobId: 'x', resultingDocumentId: 'y' }] }), detail: detailFor({}) };
+  route(state, { [`/publications/${OP_ID}/close`]: { respond: () => response({ code: 'conflict', message: 'stale' }, 409) } });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('checkbox'));
+  fireEvent.click(screen.getByRole('button', { name: 'Close this attempt' }));
+  expect(await screen.findByText(/Another session changed this/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+});
+
+test('the review block offers a transcript preview that shows live speaker names', async () => {
+  route({ collection: collection(), detail: detailFor({}) });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  fireEvent.change(await screen.findByLabelText('Name for Speaker A'), { target: { value: 'Alex Lee' } });
+  const preview = screen.getByTestId('transcript-preview');
+  expect(preview).not.toHaveAttribute('open');
+  expect(within(preview).getByText('Read the transcript')).toBeInTheDocument();
+  expect(within(preview).getByText('Hello from the site visit.')).toBeInTheDocument();
+  expect(within(preview).getByText(/Alex Lee:/)).toBeInTheDocument();
 });
