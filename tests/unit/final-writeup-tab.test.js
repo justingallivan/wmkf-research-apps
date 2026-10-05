@@ -150,7 +150,7 @@ test('confirms the irreversible handoff and then exposes only the separate Word 
 
   fireEvent.click(await screen.findByRole('button', { name: 'Ready for group review' }));
   const dialog = screen.getByRole('dialog', { name: 'Start group review?' });
-  expect(dialog).toHaveTextContent('SharePoint file stays the same');
+  expect(dialog).toHaveTextContent('Word file stays the same');
   fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for group review' }));
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
@@ -175,7 +175,7 @@ test('names the Site Visit prerequisite when the initial status load reports no 
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
   const alert = await screen.findByRole('alert');
-  expect(alert).toHaveTextContent(/Start the Site Visit from the Staff Deliberations tab/);
+  expect(alert).toHaveTextContent(/Check working-writeup preparation in Staff Deliberations/);
   expect(alert).not.toHaveTextContent(/is required before Final Writeup can start/);
 });
 
@@ -193,7 +193,7 @@ test('names the Site Visit prerequisite when the server reports no source docume
   fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for group review' }));
 
   const alert = await screen.findByRole('alert');
-  expect(alert).toHaveTextContent(/Start the Site Visit from the Staff Deliberations tab/);
+  expect(alert).toHaveTextContent(/Check working-writeup preparation in Staff Deliberations/);
   expect(alert).not.toHaveTextContent(/is required before Final Writeup can start/);
 });
 

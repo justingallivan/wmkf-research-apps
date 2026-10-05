@@ -1,39 +1,6 @@
-/**
- * Staff Deliberations — the merged workspace for the deliberation cycle's
- * governed documents (S466; replaces PreSiteVisitTab + SiteVisitTab).
- *
- * docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md §4-§5 slice 5:
- * the workspace now carries two independent governed artifacts with their
- * own lifecycle state — the Pre-Research Presentation Brief (Generate /
- * Regenerate / Download / Open in SharePoint / Share) and the legacy
- * Pre-Site Visit writeup (Generate / Regenerate / Download / Edit / an
- * explicit **Start Site Visit** action, B11). Share locks and distributes
- * the BRIEF (`lock-for-share`, never `start-site-visit`); starting the Site
- * Visit is a separate, explicit transition on the Pre-Site card, available
- * whenever a Ready/Draft Pre-Site row exists, independent of Share. Final
- * Writeup still requires the Pre-Site row in Review (B11); its prerequisite
- * is named on the Pre-Site card rather than surfacing a generic failure.
- *
- * Stage backing (PC Meeting Tracker slice 3, docs/PC_MEETING_TRACKER_PLAN.md
- * D5-D9; composite projection revised for the brief per plan §3.5): four
- * keyed stops — draft | shared | visit | final — derived by
- * shared/utils/deliberation-stage.js from the BRIEF's lifecycle (DRAFT /
- * REVIEW via the guarded lock-for-share route) and the wmkf_sitevisit
- * Activity's scheduled start (date-derived "visited", D7), with `final`
- * driven independently by the canonical Pre-Site row reaching FINAL
- * (Final Writeup activation marks the Pre-Site row, not the brief). Display
- * labels are admin-editable (D6; shared/config/editableTextDefaults.js) and
- * arrive on the GET /api/workbench/pre-site-visit payload as `stageLabels`.
- * "Shared" means the brief is locked (§3.4) — a substate ("not-sent"/"sent")
- * tracks whether materials have actually gone out, fed by the distribution
- * panel's onHistory callback (server-keyed to the brief's document id).
- *
- * Tab redesign (docs/plans/STAFF_DELIBERATIONS_TAB_SHAPE_BRIEF_2026-09-09.md,
- * owner-approved 2026-09-10): stage → sentence → one primary action per card.
- * Share opens the distribution composer as a dialog; the composer locks the
- * brief (guarded lock-for-share) at preview time, then sends, so the preview
- * is always built from the locked version. The session line reads the
- * tracker through the Pre-Site status payload (§5.4 seam).
+/** Briefing before presentation; preserved working writeup afterward.
+ * Scheduled preparation never starts group or leadership review.
+ * Brief distribution and guarded correction actions retain independent contracts.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -41,16 +8,12 @@ import { Card } from '../Layout';
 import PreSiteDistributionPanel from './PreSiteDistributionPanel';
 import useSiteVisitContext from './useSiteVisitContext';
 import ResearchPresentationFollowUp from './ResearchPresentationFollowUp';
-import DeliberationStageRail from './DeliberationStageRail';
 import OverflowMenu from './OverflowMenu';
 import ResearchPresentationMaterialsCard from './ResearchPresentationMaterialsCard';
 import {
   DELIBERATION_STAGE_DEFAULT_LABELS,
   deliberationSessionLine,
-  deliberationStageSentence,
-  deliberationVisitLine,
   deriveDeliberationStage,
-  visitExpected,
 } from '../../utils/deliberation-stage';
 import { siteVisitMaterialsLine } from '../../utils/site-visit-materials-line';
 import { requestJson, requestEnvelope } from '../../utils/api-request';
@@ -189,7 +152,11 @@ export default function StaffDeliberationsTab({
   const [artifact, setArtifact] = useState(null);
   const [pendingArtifact, setPendingArtifact] = useState(null);
   const [reopenHistory, setReopenHistory] = useState(EMPTY_LIST);
-  const [stageLabels, setStageLabels] = useState(EMPTY_STAGE_LABELS);
+  const [, setStageLabels] = useState(EMPTY_STAGE_LABELS);
+  const [preparation, setPreparation] = useState(null);
+  const [timing, setTiming] = useState(null);
+  const [preparationReadError, setPreparationReadError] = useState(null);
+  const [retryingPreparation, setRetryingPreparation] = useState(false);
   // The workbench keys this tab by requestId, so a mounted instance never
   // changes request: the status read starts on mount, never on a switch.
   const [checkingStatus, setCheckingStatus] = useState(Boolean(requestId));
@@ -244,6 +211,8 @@ export default function StaffDeliberationsTab({
       readStatus(id, controller.signal)
         .then((status) => {
           if (generationSequence.current !== sequence || id !== requestId) return;
+          setPreparation(status.preparation || null);
+          setTiming(status.timing || null);
           setArtifact(status.currentArtifact || null);
           setPendingArtifact(status.pendingArtifact || null);
           setReopenHistory(status.reopenHistory || EMPTY_LIST);
@@ -277,6 +246,35 @@ export default function StaffDeliberationsTab({
       activeController.current?.abort();
       activeController.current = null;
     };
+  }, [requestId]);
+
+  useEffect(() => {
+    if (!requestId) return undefined;
+    let disposed = false;
+    let timer;
+    const controller = new AbortController();
+    const refresh = async () => {
+      const sequence = generationSequence.current;
+      try {
+        const status = await readStatus(requestId, controller.signal);
+        if (disposed || sequence !== generationSequence.current) return;
+        setPreparation(status.preparation || null);
+        setTiming(status.timing || null);
+        setPreparationReadError(null);
+        if (!activeController.current) {
+          setArtifact(status.currentArtifact || null);
+          setPendingArtifact(status.pendingArtifact || null);
+        }
+      } catch (readError) {
+        if (!disposed && sequence === generationSequence.current && readError.name !== 'AbortError') {
+          setPreparationReadError('Preparation status is unavailable. Your existing document remains accessible.');
+        }
+      } finally {
+        if (!disposed) timer = setTimeout(refresh, 15000);
+      }
+    };
+    timer = setTimeout(refresh, 15000);
+    return () => { disposed = true; clearTimeout(timer); controller.abort(); };
   }, [requestId]);
 
   useEffect(() => {
@@ -657,7 +655,7 @@ export default function StaffDeliberationsTab({
   // Writeup activation marks the Pre-Site row while the brief stays in
   // Review (B11).
   const stageFetchFailed = Boolean(briefError) && !briefArtifact && !briefPendingArtifact && !noBriefRowsAtAll;
-  const { stage, substate, visit } = deriveDeliberationStage({
+  const { stage } = deriveDeliberationStage({
     stageArtifact: briefArtifact
       || briefPendingArtifact
       || (noBriefRowsAtAll ? (artifact || pendingArtifact) : null),
@@ -665,7 +663,7 @@ export default function StaffDeliberationsTab({
     siteVisitStartIso,
     everSent,
   });
-  const movedToFinal = stage === 'final';
+  const movedToFinal = preSiteFinal;
   // A lifecycle outside the four keyed stops (Board Ready/Superseded/unknown —
   // never produced for the *current* brief in practice). The rail has
   // nothing meaningful to show for it, so it stays hidden (fail closed).
@@ -675,7 +673,7 @@ export default function StaffDeliberationsTab({
   // this cycle. No production caller varies it today (D26 is always true), but
   // the visit line at draft/shared is anticipatory ("not scheduled" as a PC
   // to-do) and has nothing honest to say once J27 makes a visit optional.
-  const visitLineVisible = visitExpected() || stage === 'visit' || stage === 'final';
+
 
   // Locks the exact brief as the working document (guarded lock-for-share,
   // ETag-fenced). Called by the composer before it prepares the preview, so
@@ -979,20 +977,40 @@ export default function StaffDeliberationsTab({
     setError(null);
     setComposerOpen(true);
   };
-  const sentence = deliberationStageSentence({
-    stage,
-    substate,
-    sharedAtIso: briefArtifact?.milestone?.createdAt || null,
-    visit,
-  });
-  // Session and visit lines belong to the stages where the PC's scheduling is
-  // still ahead (draft, shared); at Visit the sentence already carries the
-  // visit date, and at Final nothing is pending.
-  const showSessionLine = !beyondDeliberations && stage !== 'visit';
-  const showVisitLine = showSessionLine && visitLineVisible;
-  // Applicant materials (plan §16.3, PR 3): shown at every stage before Final
-  // once a collection exists, since the files matter through the visit.
-  const materialsLine = !beyondDeliberations && stage !== 'final' ? siteVisitMaterialsLine(materials) : null;
+  const due = preparation?.due === true;
+  const correctionDraft = preSiteDraftReady && (Boolean(artifact?.correction?.cycleId) || reopenHistory.length > 0);
+  const milestoneComplete = Boolean(artifact?.milestone?.versionId && artifact?.milestone?.contentHash && artifact?.milestone?.createdAt);
+  const editingReady = preSiteShared && milestoneComplete;
+  const preparationState = preparationReadError ? 'unavailable' : preparation?.state;
+  const phase = preSiteFinal ? 'In review'
+    : correctionDraft ? 'Corrections in progress'
+      : preparationState === 'blocked' || preparationReadError ? 'Needs attention'
+        : due && editingReady ? 'Post-visit editing'
+          : due ? 'Preparing working writeup'
+            : timing?.endIso ? 'Before presentation' : 'Schedule needed';
+  const materialsLine = siteVisitMaterialsLine(materials);
+  const timingLabel = timing?.endIso
+    ? `Scheduled presentation end: ${new Date(timing.endIso).toLocaleString(undefined, timing.timeZone ? { timeZone: timing.timeZone } : undefined)}${timing.timeZone ? ` (${timing.timeZone})` : ''}`
+    : 'Presentation schedule unavailable or not yet recorded.';
+  const retryPreparation = async () => {
+    const sequence = generationSequence.current;
+    setRetryingPreparation(true);
+    try {
+      await requestJson('/api/workbench/pre-site-visit/retry-preparation', {
+        method: 'POST', body: { requestId }, fallbackMessage: 'Preparation could not be retried.',
+      });
+      if (sequence !== generationSequence.current) return;
+      const status = await readStatus(requestId);
+      if (sequence !== generationSequence.current) return;
+      setPreparation(status.preparation || null);
+      setTiming(status.timing || null);
+      setPreparationReadError(null);
+    } catch (retryError) {
+      if (sequence === generationSequence.current) setPreparationReadError(retryError.message);
+    } finally {
+      if (sequence === generationSequence.current) setRetryingPreparation(false);
+    }
+  };
 
   // Research Presentation Materials sits above Email history when the
   // distribution panel shows it (owner 2026-09-25), otherwise after the cards.
@@ -1043,98 +1061,11 @@ export default function StaffDeliberationsTab({
     },
   ].filter(Boolean);
 
-  return (
-    <div className="space-y-4">
-      {recoveryMessage && (
-        <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm" role="status">
-          {recoveryMessage}
-        </div>
-      )}
-      {briefRecoveryMessage && (
-        <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm" role="status">
-          {briefRecoveryMessage}
-        </div>
-      )}
-      <Card hover={false}>
+  const briefingCard = (
+<Card key="brief" hover={false}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-gray-900">Staff Deliberations</h2>
-            {stageFetchFailed && (
-              <p className="mt-2 max-w-2xl text-sm text-red-800" data-testid="deliberations-stage-error">
-                The deliberation stage could not be determined: {briefError}
-              </p>
-            )}
-            {!stageFetchFailed && !unknownLifecycle && (
-              <>
-                <DeliberationStageRail
-                  stage={stage}
-                  substate={substate}
-                  labels={stageLabels}
-                  reopened={preSiteDraftReady && reopenHistory.length > 0}
-                />
-                <p className="mt-2 max-w-2xl text-sm text-gray-700" data-testid="deliberations-stage-sentence">
-                  {sentence}
-                </p>
-                {showSessionLine && (
-                  <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-session-line">
-                    {deliberationSessionLine(session)}
-                  </p>
-                )}
-                {showVisitLine && (
-                  <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-visit-line">
-                    {deliberationVisitLine(visit)}
-                  </p>
-                )}
-                {materialsLine && (
-                  <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-materials-line">
-                    {materialsLine}
-                  </p>
-                )}
-                {briefShared && latestSendFailure && (
-                  <p className="mt-1 text-xs font-medium text-red-700" role="alert" data-testid="deliberations-send-failure">
-                    The last send failed: {latestSendFailure.message}
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-          {movedToFinal && onSelectTab && (
-            <button type="button" onClick={() => onSelectTab('final-writeup')} className={primaryClass}>
-              Open Final Writeup
-            </button>
-          )}
-        </div>
-        {unknownLifecycle && (
-          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-            <h3 className="font-semibold">Staff Deliberations is read-only</h3>
-            <p className="mt-1">
-              The Pre-Research Presentation Brief has moved beyond the deliberation stages.
-              It cannot be downloaded or regenerated from this tab. The Site Visit writeup
-              below keeps its own actions.
-            </p>
-          </div>
-        )}
-        {movedToFinal && (
-          <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-950">
-            <h3 className="font-semibold">Moved to Final Writeup</h3>
-            <p className="mt-1">
-              This tab now preserves the Staff Deliberations record. Open the Final Writeup tab to continue in Word.
-            </p>
-          </div>
-        )}
-      </Card>
-
-      {siteVisitContext?.presentationMaterialsStatus === 'loaded' && (
-        <ResearchPresentationFollowUp
-          status="loaded"
-          materials={siteVisitContext.presentationMaterials || EMPTY_LIST}
-        />
-      )}
-
-      <Card hover={false}>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h3 className="text-base font-semibold text-gray-900">Pre-Research Presentation Brief</h3>
+            <h3 className="text-base font-semibold text-gray-900">Pre-site briefing</h3>
             {briefError && (
               <p className="mt-2 text-sm text-red-800" role="alert">{briefError}</p>
             )}
@@ -1212,7 +1143,7 @@ export default function StaffDeliberationsTab({
                 )}
               </>
             )}
-            {briefReadyFile && briefShared && stage === 'shared' && substate === 'not-sent' && (
+            {briefReadyFile && briefShared && !everSent && (
               <>
                 {!briefRegenerationPending && (
                   <button
@@ -1233,7 +1164,7 @@ export default function StaffDeliberationsTab({
                 </a>
               </>
             )}
-            {briefReadyFile && briefShared && !(stage === 'shared' && substate === 'not-sent') && (
+            {briefReadyFile && briefShared && everSent && (
               <>
                 <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
                   Open working document
@@ -1258,11 +1189,12 @@ export default function StaffDeliberationsTab({
           </div>
         )}
       </Card>
-
-      <Card hover={false}>
+  );
+  const writeupCard = (
+<Card key="writeup" hover={false}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <h3 className="text-base font-semibold text-gray-900">Pre-Site Visit Writeup</h3>
+            <h3 className="text-base font-semibold text-gray-900">Working writeup</h3>
             {error && (
               <p className="mt-2 text-sm text-red-800" role="alert">{error}</p>
             )}
@@ -1302,22 +1234,22 @@ export default function StaffDeliberationsTab({
                   <Warnings warnings={warnings} label={preSiteShared || preSiteFinal ? 'Working document needs a quick edit check' : 'Draft needs a quick edit check'} />
                 </div>
               )}
-              {stage === 'visit' && !preSiteShared && !preSiteFinal && (
+              {due && !preSiteShared && !preSiteFinal && (
                 <p className="mt-2 text-xs font-medium text-amber-800" data-testid="final-writeup-prerequisite">
-                  Start the Site Visit on this writeup before continuing to Final Writeup.
+                  The working writeup is being prepared for post-visit editing. Group review starts only when you choose.
                 </p>
               )}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {!readyFile && !preSiteShared && !preSiteFinal && (
+            {!due && !readyFile && !preSiteShared && !preSiteFinal && (
               <button
                 type="button"
                 onClick={generate}
                 disabled={generating || !requestId || unchangedRetryBlocked}
                 className={primaryClass}
               >
-                {generating ? 'Generating…' : 'Generate Word Draft'}
+                {generating ? 'Preparing…' : 'Prepare working draft'}
               </button>
             )}
             {readyFile && preSiteDraftReady && (
@@ -1325,9 +1257,9 @@ export default function StaffDeliberationsTab({
                 <a href={readyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
                   Edit in Word
                 </a>
-                <button type="button" onClick={startSiteVisitAction} disabled={startingSiteVisit || generating} className={secondaryClass}>
-                  {startingSiteVisit ? 'Starting…' : 'Start Site Visit'}
-                </button>
+                {correctionDraft && <button type="button" onClick={startSiteVisitAction} disabled={startingSiteVisit || generating} className={secondaryClass}>
+                  {startingSiteVisit ? 'Finishing…' : 'Finish corrections'}
+                </button>}
               </>
             )}
             {readyFile && (preSiteShared || preSiteFinal) && (
@@ -1335,9 +1267,9 @@ export default function StaffDeliberationsTab({
                 Open working document
               </a>
             )}
-            {stage === 'visit' && preSiteShared && onSelectTab && (
+            {due && editingReady && onSelectTab && (
               <button type="button" onClick={() => onSelectTab('final-writeup')} className={secondaryClass}>
-                Continue in Final Writeup
+                Review readiness
               </button>
             )}
             {preSiteMoreItems.length > 0 && <OverflowMenu label="More writeup actions" items={preSiteMoreItems} />}
@@ -1353,6 +1285,82 @@ export default function StaffDeliberationsTab({
           </div>
         )}
       </Card>
+  );
+
+  return (
+    <div className="space-y-4">
+      {recoveryMessage && (
+        <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm" role="status">
+          {recoveryMessage}
+        </div>
+      )}
+      {briefRecoveryMessage && (
+        <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm" role="status">
+          {briefRecoveryMessage}
+        </div>
+      )}
+      <Card hover={false}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-gray-900">Staff Deliberations</h2>
+            {stageFetchFailed && (
+              <p className="mt-2 max-w-2xl text-sm text-red-800" data-testid="deliberations-stage-error">
+                The deliberation stage could not be determined: {briefError}
+              </p>
+            )}
+            <p className="mt-2 font-medium text-gray-900" data-testid="deliberations-stage-sentence">{phase}</p>
+            <p className="mt-1 text-sm text-gray-600" data-testid="deliberations-visit-line">{timingLabel}</p>
+            <p className="mt-1 text-sm text-gray-600" data-testid="deliberations-session-line">{deliberationSessionLine(session)}</p>
+            {materialsLine && <p className="mt-1 text-sm text-gray-600" data-testid="deliberations-materials-line">{materialsLine}</p>}
+            <p className="mt-3 max-w-2xl text-sm text-gray-700">
+              {preSiteFinal ? 'Continue the colleague and leadership review workflow in Final Writeup.'
+                : due ? 'Add findings from the research presentation to the working writeup. You decide when it is ready for group review.'
+                  : 'Circulate the briefing before the presentation. The fuller working writeup is optional now and carries forward afterward.'}
+            </p>
+            {preparationReadError && <p role="alert" className="mt-2 text-sm text-amber-800">{preparationReadError}</p>}
+            {preparationState === 'blocked' && <div className="mt-3 text-sm text-amber-800">
+              <p>Automatic preparation needs attention. Your existing document has been preserved.</p>
+              <button type="button" onClick={retryPreparation} disabled={retryingPreparation} className={secondaryClass}>
+                {retryingPreparation ? 'Retrying…' : 'Retry preparation'}
+              </button>
+            </div>}
+            {briefShared && latestSendFailure && <p className="mt-2 text-sm text-red-700" role="alert" data-testid="deliberations-send-failure">The last send failed: {latestSendFailure.message}</p>}
+
+          </div>
+          {movedToFinal && onSelectTab && (
+            <button type="button" onClick={() => onSelectTab('final-writeup')} className={primaryClass}>
+              Open Final Writeup
+            </button>
+          )}
+        </div>
+        {unknownLifecycle && (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+            <h3 className="font-semibold">Staff Deliberations is read-only</h3>
+            <p className="mt-1">
+              The Pre-Research Presentation Brief has moved beyond the deliberation stages.
+              It cannot be downloaded or regenerated from this tab. The Site Visit writeup
+              below keeps its own actions.
+            </p>
+          </div>
+        )}
+        {movedToFinal && (
+          <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-950">
+            <h3 className="font-semibold">Moved to Final Writeup</h3>
+            <p className="mt-1">
+              This tab now preserves the Staff Deliberations record. Open the Final Writeup tab to continue in Word.
+            </p>
+          </div>
+        )}
+      </Card>
+
+      {siteVisitContext?.presentationMaterialsStatus === 'loaded' && (
+        <ResearchPresentationFollowUp
+          status="loaded"
+          materials={siteVisitContext.presentationMaterials || EMPTY_LIST}
+        />
+      )}
+
+      {due ? [writeupCard, briefingCard] : [briefingCard, writeupCard]}
 
       {showDistributionPanel && (
         <PreSiteDistributionPanel

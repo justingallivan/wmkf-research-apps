@@ -18,7 +18,7 @@ const ACKNOWLEDGEMENT_SCHEMA_NOT_READY = 'final_writeup_acknowledgement_schema_n
 // Start Site Visit on Staff Deliberations, so say that instead of the
 // generic server sentence.
 const SITE_VISIT_PREREQUISITE_MESSAGE = 'Final Writeup needs a Site Visit working document first. '
-  + 'Start the Site Visit from the Staff Deliberations tab, then come back here.';
+  + 'Check working-writeup preparation in Staff Deliberations. It becomes available after the scheduled presentation ends.';
 
 function transitionErrorMessage(error) {
   return error?.code === 'final_writeup_source_missing'
@@ -623,7 +623,7 @@ export default function FinalWriteupTab({ requestId }) {
             <div className="max-w-2xl">
               <h3 className="text-lg font-semibold text-gray-900">Ready for group review</h3>
               <p className="mt-1 text-sm leading-6 text-gray-600">
-                This records the document’s current Word version and turns off Pre-Site regeneration.
+                This records the current Word version as the starting point for group review.
               </p>
               {status.sourceFile?.name && (
                 <p className="mt-2 text-xs text-gray-500">{status.sourceFile.name}</p>
@@ -669,7 +669,7 @@ export default function FinalWriteupTab({ requestId }) {
               ) : (
                 <>
                   <p>The current Word version becomes the starting point for group review.</p>
-                  <p>The SharePoint file stays the same. Pre-Site regeneration will no longer be available.</p>
+                  <p>The Word file stays the same, including your edits. This step begins group review.</p>
                 </>
               )}
             </div>
