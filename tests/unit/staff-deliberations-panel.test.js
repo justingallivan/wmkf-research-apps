@@ -1,222 +1,89 @@
 /** @jest-environment jsdom */
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import StaffDeliberationsPanel from '../../shared/components/workbench/StaffDeliberationsPanel';
+jest.mock('next/link', () => function MockLink({ children, href }) { return <a href={href}>{children}</a>; });
+const PROGRAM = '11111111-1111-4111-8111-111111111111';
+const props = { programId: PROGRAM, cycleCode: 'D26', scope: 'my', loadingCycles: false };
+const response = (artifacts, extra = {}) => ({ ok: true, status: 200, json: async () => ({ artifacts, requestCounts: { ordinary: artifacts.length, test: 0, total: artifacts.length }, ...extra }) });
+function row(extra = {}) { return { requestId: 'r1', requestNumber: '1002903', title: 'Living cells', institution: 'University', programDirector: 'PD', timing: { availability: 'available', endIso: '2026-09-28T18:00:00Z', timeZone: 'America/Los_Angeles' }, preparation: { due: false, state: 'none' }, brief: { availability: 'missing' }, writeup: { availability: 'missing' }, ...extra }; }
+beforeEach(() => { global.fetch = jest.fn(); });
 
-jest.mock('next/link', () => function MockLink({ children, href }) {
-  return <a href={href}>{children}</a>;
+test('documentless requests are visible and the query preserves program cycle and ownership scope', async () => {
+  global.fetch.mockResolvedValue(response([row()])); render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText(/#1002903/)).toBeInTheDocument();
+  const url = global.fetch.mock.calls[0][0];
+  expect(url).toContain(`programId=${PROGRAM}`); expect(url).toContain('cycleCode=D26'); expect(url).toContain('scope=my');
+  expect(screen.getByRole('link', { name: 'Review briefing' })).toHaveAttribute('href', expect.stringContaining('tab=staff-deliberations'));
+  expect(screen.getByText('No sharing recorded in this app')).toBeInTheDocument();
 });
 
-let visitExpectedFeed = true;
-jest.mock('../../shared/utils/deliberation-stage', () => ({
-  ...jest.requireActual('../../shared/utils/deliberation-stage'),
-  visitExpected: () => visitExpectedFeed,
-}));
-
-const STAGE_LABELS = { draft: 'AI draft ready', shared: 'Shared', visit: 'Visit', final: 'Final' };
-
-function artifact(overrides = {}) {
-  return {
-    artifactId: 'a1',
-    requestId: 'r1',
-    requestNumber: '1002959',
-    title: 'Drafted proposal',
-    institution: 'U',
-    programDirector: 'PD',
-    isCurrent: true,
-    operationLabel: 'Ready',
-    lifecycleLabel: 'Draft',
-    stage: 'draft',
-    substate: 'ready',
-    visit: { status: 'not-scheduled', startIso: null },
-    everSent: false,
-    siteVisit: null,
-    file: { webUrl: 'https://sp/doc.docx', name: 'doc.docx', metadataStatus: 'unchecked' },
-    ...overrides,
-  };
-}
-
-function mockResponse(body) {
-  return { ok: true, status: 200, json: async () => body };
-}
-
-beforeEach(() => {
-  visitExpectedFeed = true;
-  global.fetch = jest.fn();
+test('named Word links cannot confuse the briefing and full writeup', async () => {
+  global.fetch.mockResolvedValue(response([row({ brief: { availability: 'available', lifecycleState: 100000001, file: { webUrl: 'https://sp/brief' } }, writeup: { availability: 'available', lifecycleState: 100000000, file: { webUrl: 'https://sp/full' } } })]));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByRole('link', { name: 'Open briefing in Word' })).toHaveAttribute('href','https://sp/brief');
+  expect(screen.getByRole('link', { name: 'Open working writeup in Word' })).toHaveAttribute('href','https://sp/full');
+  expect(screen.getByText('Working briefing')).toBeInTheDocument();
 });
 
-it('renders the stage sentence, session and visit lines, and a plain Open document link (no registry block or metadata cue)', async () => {
-  global.fetch.mockResolvedValue(mockResponse({
-    success: true,
-    cycleCode: 'D26',
-    scope: 'all',
-    stageLabels: STAGE_LABELS,
-    counts: { draft: 1, shared: 0, visit: 0, final: 0 },
-    artifacts: [artifact()],
-  }));
-  render(<StaffDeliberationsPanel cycleCode="D26" loadingCycles={false} scope="all" />);
-
-  const link = await screen.findByRole('link', { name: 'Open document →' });
-  expect(link).toHaveAttribute('href', 'https://sp/doc.docx');
-  expect(screen.queryByText(/has not been checked/)).not.toBeInTheDocument();
-  expect(screen.queryByText('Ready')).not.toBeInTheDocument();
-  expect(screen.getByTestId('deliberations-stage-sentence'))
-    .toHaveTextContent('Review and edit the AI draft in Word, then share it for the deliberation session.');
-  expect(screen.getByTestId('deliberations-session-line')).toHaveTextContent('Deliberation session: not yet scheduled.');
-  expect(screen.getByTestId('deliberations-visit-line')).toHaveTextContent('Visit not scheduled.');
+test('due preparation never labels an absent document ready and never writes', async () => {
+  global.fetch.mockResolvedValue(response([row({ preparation: { due: true, state: 'pending' } })]));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText('Preparing writeup')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Check preparation' })).toHaveAttribute('href',expect.stringContaining('staff-deliberations'));
+  expect(global.fetch.mock.calls.every(([,options]) => !options?.method || options.method === 'GET')).toBe(true);
 });
 
-it('M3: a needsReconciliation row shows a distinct call-out, not the generic "Not the current draft" line', async () => {
-  global.fetch.mockResolvedValue(mockResponse({
-    success: true,
-    cycleCode: 'D26',
-    scope: 'all',
-    stageLabels: STAGE_LABELS,
-    counts: { draft: 1, shared: 0, visit: 0, final: 0 },
-    artifacts: [artifact({ isCurrent: false, needsReconciliation: true })],
-  }));
-  render(<StaffDeliberationsPanel cycleCode="D26" loadingCycles={false} scope="all" />);
-
-  expect(await screen.findByTestId('deliberations-reconciliation'))
-    .toHaveTextContent(/needs reconciliation/i);
-  expect(screen.queryByText('Not the current draft.')).not.toBeInTheDocument();
+test('a schedule classification problem keeps the actual recorded time visible', async () => {
+  global.fetch.mockResolvedValue(response([row({ timing: { availability: 'unavailable', endIso: '2026-09-28T18:00:00Z', timeZone: 'America/Los_Angeles' } })]));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText('Needs attention',{selector:'p'})).toBeInTheDocument();
+  expect(screen.getByText(/Scheduled presentation end/)).toHaveTextContent('11:00');
 });
 
-it('a non-current row without needsReconciliation still shows the generic line', async () => {
-  global.fetch.mockResolvedValue(mockResponse({
-    success: true,
-    cycleCode: 'D26',
-    scope: 'all',
-    stageLabels: STAGE_LABELS,
-    counts: { draft: 1, shared: 0, visit: 0, final: 0 },
-    artifacts: [artifact({ isCurrent: false, needsReconciliation: false })],
-  }));
-  render(<StaffDeliberationsPanel cycleCode="D26" loadingCycles={false} scope="all" />);
-
-  expect(await screen.findByText('Not the current draft.')).toBeInTheDocument();
-  expect(screen.queryByTestId('deliberations-reconciliation')).not.toBeInTheDocument();
+test('task filter and search keep review and working requests distinct', async () => {
+  global.fetch.mockResolvedValue(response([row(),row({requestId:'r2',requestNumber:'1002912',title:'Ubiquitin',finalPhase:'group-review'})]));
+  render(<StaffDeliberationsPanel {...props} />); await screen.findByText(/#1002903/);
+  fireEvent.change(screen.getByLabelText('Task'),{target:{value:'review'}});
+  expect(screen.queryByText(/#1002903/)).not.toBeInTheDocument(); expect(screen.getByText(/#1002912/)).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Search'),{target:{value:'absent'}});
+  expect(screen.getByText(/No requests match/)).toBeInTheDocument();
 });
 
-it('a scheduled session renders its date and time in the session\'s own time zone', async () => {
-  global.fetch.mockResolvedValue(mockResponse({
-    success: true,
-    cycleCode: 'D26',
-    scope: 'all',
-    stageLabels: STAGE_LABELS,
-    counts: { draft: 0, shared: 1, visit: 0, final: 0 },
-    artifacts: [artifact({
-      stage: 'shared',
-      substate: 'sent',
-      sharedAtIso: '2026-09-10T16:03:28Z',
-      session: { scheduledStartIso: '2026-12-01T18:00:00Z', scheduledEndIso: null, ianaTimeZone: 'America/Los_Angeles', meetingLink: null, location: null },
-    })],
-  }));
-  render(<StaffDeliberationsPanel cycleCode="D26" loadingCycles={false} scope="all" />);
-
-  const line = await screen.findByTestId('deliberations-session-line');
-  expect(line).toHaveTextContent(/^Deliberation session: .*Dec 1, 2026.*10:00.*AM\.$/);
-  expect(screen.getByTestId('deliberations-stage-sentence'))
-    .toHaveTextContent(`Shared on ${new Date('2026-09-10T16:03:28Z').toLocaleDateString()}. The deliberation email has gone out`);
+test('late old-scope results cannot replace the new selection', async () => {
+  let resolveOld; global.fetch.mockReturnValueOnce(new Promise(resolve => { resolveOld = resolve; })).mockResolvedValueOnce(response([row({requestNumber:'1002912'})]));
+  const {rerender}=render(<StaffDeliberationsPanel {...props} />);
+  rerender(<StaffDeliberationsPanel {...props} scope="all" />); await screen.findByText(/#1002912/);
+  await act(async()=>resolveOld(response([row()])));
+  expect(screen.queryByText(/#1002903/)).not.toBeInTheDocument();
 });
 
-it('guards a missing artifact.visit and renders "Visit not scheduled." instead of crashing', async () => {
-  const rowWithoutVisit = artifact();
-  delete rowWithoutVisit.visit;
-  global.fetch.mockResolvedValue(mockResponse({
-    success: true,
-    cycleCode: 'D26',
-    scope: 'all',
-    stageLabels: STAGE_LABELS,
-    counts: { draft: 1, shared: 0, visit: 0, final: 0 },
-    artifacts: [rowWithoutVisit],
-  }));
-  render(<StaffDeliberationsPanel cycleCode="D26" loadingCycles={false} scope="all" />);
-
-  expect(await screen.findByTestId('deliberations-visit-line')).toHaveTextContent('Visit not scheduled.');
+test('ordinary total excludes separately reported test rows', async () => {
+  global.fetch.mockResolvedValue(response([row(),row({requestId:'test',requestNumber:'1002788',isTestRequest:true})],{requestCounts:{ordinary:1,test:1,total:2}}));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText(/1 requests in this program/)).toHaveTextContent('1 test requests also shown');
 });
 
-it('puts a row with an unknown stage in a trailing "Other" block instead of dropping it', async () => {
-  global.fetch.mockResolvedValue(mockResponse({
-    success: true,
-    cycleCode: 'D26',
-    scope: 'all',
-    stageLabels: STAGE_LABELS,
-    counts: { draft: 0, shared: 0, visit: 0, final: 0 },
-    artifacts: [artifact({ stage: 'beyond', substate: 'unknown-lifecycle', lifecycleLabel: 'Board Ready' })],
-  }));
-  render(<StaffDeliberationsPanel cycleCode="D26" loadingCycles={false} scope="all" />);
 
-  expect(await screen.findByText(/#1002959/)).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: 'Other' })).toBeInTheDocument();
+test('disabled preparation is visibly paused and exact sharing receipt is displayed', async () => {
+  global.fetch.mockResolvedValue(response([row({ preparation: { due: true, state: 'disabled' }, briefSharing: { availability: 'available', sentAtIso: '2026-09-27T18:00:00Z', sourceVersionId: '3.0' } })]));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText('Preparation paused')).toBeInTheDocument();
+  expect(screen.getByText(/Sent through app/)).toBeInTheDocument();
+  expect(screen.queryByText('Preparing writeup')).not.toBeInTheDocument();
 });
 
-it('when visitExpected() is false, the visit line is hidden at draft/shared but not at visit/final (discriminating fixture)', async () => {
-  visitExpectedFeed = false;
-  global.fetch.mockResolvedValue(mockResponse({
-    success: true,
-    cycleCode: 'D26',
-    scope: 'all',
-    stageLabels: STAGE_LABELS,
-    counts: { draft: 1, shared: 1, final: 1 }, // service omits 'visit' when not expected
-    artifacts: [
-      artifact({ artifactId: 'a-draft', requestNumber: '1', stage: 'draft' }),
-      artifact({ artifactId: 'a-shared', requestNumber: '2', stage: 'shared', substate: 'not-sent' }),
-      artifact({
-        artifactId: 'a-visit',
-        requestNumber: '3',
-        stage: 'visit',
-        substate: 'awaiting-observations',
-        visit: { status: 'visited', startIso: '2020-01-01T00:00:00Z' },
-      }),
-    ],
-  }));
-  render(<StaffDeliberationsPanel cycleCode="D26" loadingCycles={false} scope="all" />);
-
-  await screen.findByText(/#1/);
-  // No anticipatory visit line at draft/shared; the visited row states the
-  // real date in its stage sentence instead of a separate line.
-  expect(screen.queryAllByTestId('deliberations-visit-line')).toHaveLength(0);
-  const sentences = screen.getAllByTestId('deliberations-stage-sentence');
-  expect(sentences[2]).toHaveTextContent(`Visited ${new Date('2020-01-01T00:00:00Z').toLocaleDateString()}. Add your site-visit edits`);
-  // The lead line omits the visit stop entirely rather than showing "0 visit".
-  expect(screen.getByText('1 ai draft ready · 1 shared · 1 final')).toBeInTheDocument();
+test('a Final source without verified review lineage needs attention', async () => {
+  global.fetch.mockResolvedValue(response([row({ finalPhase: 'none', finalReview: { availability: 'unavailable' }, writeup: { availability: 'available', lifecycleState: 100000004 } })]));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText('Needs attention', { selector: 'p' })).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Open Final Writeup' })).not.toBeInTheDocument();
 });
 
-test('cycle-view rails read the draft substate on the first stop (S503)', async () => {
-  global.fetch.mockResolvedValue(mockResponse({
-    success: true,
-    cycleCode: 'D26',
-    scope: 'all',
-    stageLabels: STAGE_LABELS,
-    counts: { draft: 3, shared: 0, visit: 0, final: 0 },
-    artifacts: [
-      artifact({ artifactId: 'a-none', requestNumber: '1', stage: 'draft', substate: 'none', file: null }),
-      artifact({ artifactId: 'a-gen', requestNumber: '2', stage: 'draft', substate: 'generating', file: null }),
-      artifact({ artifactId: 'a-ready', requestNumber: '3', stage: 'draft', substate: 'ready' }),
-    ],
-  }));
-  render(<StaffDeliberationsPanel cycleCode="D26" loadingCycles={false} scope="all" />);
 
-  await screen.findByText(/#3/);
-  const rails = screen.getAllByTestId('stage-rail');
-  expect(rails.map((rail) => rail.textContent)).toEqual([
-    expect.stringContaining('● No draft yet'),
-    expect.stringContaining('● Generating draft'),
-    expect.stringContaining('● AI draft ready'),
-  ]);
-});
-
-it('renders the applicant-materials line when the row carries a summary and omits it otherwise (plan §16.3, PR 3)', async () => {
-  const materials = { state: 'missing', receivedCount: 2, requiredCount: 3, otherCount: 0, dueAt: '2026-10-05T19:00:00Z', closesAt: '2026-10-14T19:00:00Z', overdue: true, invited: true };
-  global.fetch.mockResolvedValue(mockResponse({
-    success: true, cycleCode: 'D26', scope: 'all', stageLabels: STAGE_LABELS,
-    counts: { draft: 1, shared: 1, visit: 0, final: 0 },
-    artifacts: [
-      artifact({ artifactId: 'with', requestNumber: '1002959', materials }),
-      artifact({ artifactId: 'without', requestId: 'r2', requestNumber: '1003001', stage: 'shared', substate: 'sent', materials: null }),
-    ],
-  }));
-  render(<StaffDeliberationsPanel cycleCode="D26" loadingCycles={false} scope="all" />);
-  const lines = await screen.findAllByTestId('deliberations-materials-line');
-  expect(lines).toHaveLength(1);
-  expect(lines[0]).toHaveTextContent('Materials: 2 of 3 received · overdue');
+test('reopened corrections remain a staff task even when an older preparation receipt is complete', async () => {
+  global.fetch.mockResolvedValue(response([row({ preparation: { due: true, state: 'prepared' }, writeup: { availability: 'available', lifecycleState: 100000000, correctionInProgress: true } })]));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText('Corrections in progress')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Continue corrections' })).toHaveAttribute('href', expect.stringContaining('staff-deliberations'));
+  expect(screen.queryByText('Post-visit editing')).not.toBeInTheDocument();
 });

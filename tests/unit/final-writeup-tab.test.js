@@ -150,7 +150,7 @@ test('confirms the irreversible handoff and then exposes only the separate Word 
 
   fireEvent.click(await screen.findByRole('button', { name: 'Ready for group review' }));
   const dialog = screen.getByRole('dialog', { name: 'Start group review?' });
-  expect(dialog).toHaveTextContent('SharePoint file stays the same');
+  expect(dialog).toHaveTextContent('Word file stays the same');
   fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for group review' }));
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
@@ -175,7 +175,7 @@ test('names the Site Visit prerequisite when the initial status load reports no 
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
   const alert = await screen.findByRole('alert');
-  expect(alert).toHaveTextContent(/Start the Site Visit from the Staff Deliberations tab/);
+  expect(alert).toHaveTextContent(/Check working-writeup preparation in Staff Deliberations/);
   expect(alert).not.toHaveTextContent(/is required before Final Writeup can start/);
 });
 
@@ -193,7 +193,7 @@ test('names the Site Visit prerequisite when the server reports no source docume
   fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for group review' }));
 
   const alert = await screen.findByRole('alert');
-  expect(alert).toHaveTextContent(/Start the Site Visit from the Staff Deliberations tab/);
+  expect(alert).toHaveTextContent(/Check working-writeup preparation in Staff Deliberations/);
   expect(alert).not.toHaveTextContent(/is required before Final Writeup can start/);
 });
 
@@ -572,4 +572,20 @@ test('T2 markReviewed(): malformed 2xx body reads as a stale-Final mismatch', as
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Mark reviewed' }));
   await waitFor(() => expect(screen.getByText(/current Final Writeup changed/i)).toBeInTheDocument());
+});
+
+
+test('schedule-blocked lead PD sees a timing explanation rather than a false permission error', async () => {
+  global.fetch.mockResolvedValue(response({ ...readyStatus(false), startBlockedReason: 'final_writeup_site_visit_not_ended' }));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  expect(await screen.findByText('Group review becomes available after the scheduled presentation ends.')).toBeInTheDocument();
+  expect(screen.queryByText('Only the lead Program Director or a superuser can start this stage.')).not.toBeInTheDocument();
+});
+
+
+test('legacy review compatibility is disclosed without disabling an authorized review action', async () => {
+  global.fetch.mockResolvedValue(response({ ...readyStatus(true), startCompatibilityReason: 'legacy_review_schedule_unverified' }));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  expect(await screen.findByText('This uses the existing completed writeup. Presentation timing has not been verified.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Ready for group review' })).toBeInTheDocument();
 });

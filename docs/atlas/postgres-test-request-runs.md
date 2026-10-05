@@ -6,12 +6,14 @@ status: active
 summary: "Durable test Request ledger, written by the owner-run CLI and, since 2026-10-02, by the deployed admin form in Production. Current copy: managed Neon ledger (054 + 058, operational data loaded 2026-09-30) behind a tracked host registry and schema fingerprint check. Shared Production app DB has 054 + 058 tables (empty; never the ledger); Preview unverified."
 canonical: false
 cataloged: 2026-09-23
-last_verified: 2026-10-02
+last_verified: 2026-10-05
 owner: product-engineering
 related:
   - docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md
   - lib/db/migrations/054_test_request_runs.sql
   - lib/db/migrations/058_test_request_cast_slot_bindings.sql
+  - lib/services/test-requests/foundation-transition.js
+  - docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md
 ---
 
 # Atlas: Test Request Factory Postgres ledger
@@ -147,6 +149,15 @@ the B4 plan forbids pointing that runner at them (cast plan, *Order* 6, §6).
   is `refreshed` or `not_refreshed`. Sandbox runs write neither row. The
   read-only CLI mode `--target=production --run-recheck=<runId>` re-reads the
   account and evaluates it against the same baseline (no ledger write).
+  The protected projection digest remains unchanged and stores no account
+  values. A narrowly bounded GoVerify PDF transition is accepted only when
+  the original baseline explicitly contained `akoya_goverifypdfurl: null`,
+  replacing that one current value with `null` reproduces the stored digest,
+  and the current URL has the tracked Akoya GoVerify host/site/path shape with
+  a valid `GOverifyUpdate_YYYYMMDDHHmmssfff.pdf` timestamp inside the run
+  window. The observed GoVerify trigger must also satisfy the existing moved
+  stamp checks. This does not exempt the field from the projection or accept
+  a non-null baseline; every other protected account change still fails.
 
 ## Second writer: the deployed admin form (2026-10-02)
 

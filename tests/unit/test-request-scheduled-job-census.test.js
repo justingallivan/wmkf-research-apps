@@ -15,7 +15,7 @@ import fs from 'fs';
 import path from 'path';
 
 const ROOT = path.resolve(__dirname, '../..');
-const GUARD = /createRequestTestStateLookup\(|resolveRequestTestState|resolveTestState\(|TEST_REQUEST_ORDINARY_OData_FILTER/;
+const GUARD = /createRequestTestStateLookup\(|resolveRequestTestState|resolveTestState\(|TEST_REQUEST_ORDINARY_OData_FILTER|withOrdinaryTestRequestODataFilter\(/;
 
 // route → { scheduled, class, guardFiles?, note }
 //   guarded     — acts on request-linked rows; skips test requests at selection
@@ -54,6 +54,7 @@ const RECORDED_CRONS = {
   'secret-check': { scheduled: true, class: 'operational' },
   'send-review-thankyous': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/reviewer-thankyou-sweep.js'] },
   'site-visit-materials-reminders': { scheduled: false, class: 'guarded', guardFiles: ['lib/services/site-visit-materials/reminder-sweep.js'] },
+  'staff-deliberations-preparation': { scheduled: false, class: 'guarded', guardFiles: ['lib/services/pre-site-visit/preparation-worker.js'], note: 'disabled pending approved pilot; request selection and retry exclude test requests' },
   'spend-check': { scheduled: true, class: 'operational', note: 'aggregate spend alarm; counts all spend, test requests included' },
   'sweep-stale-invites': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/reviewer-suggestion-sweep.js'] },
 };
@@ -63,7 +64,7 @@ test('every cron route is recorded', () => {
     .filter((name) => name.endsWith('.js'))
     .map((name) => name.replace(/\.js$/, ''))
     .sort();
-  expect(routes).toHaveLength(25);
+  expect(routes).toHaveLength(26);
   expect(routes).toEqual(Object.keys(RECORDED_CRONS).sort());
 });
 

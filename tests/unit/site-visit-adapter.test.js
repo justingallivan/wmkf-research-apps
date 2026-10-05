@@ -85,7 +85,7 @@ test('summary batch returns no reads for empty ids and deduplicates mixed-case G
   const [entitySet, options] = DynamicsService.queryAllRecords.mock.calls[0];
   expect(entitySet).toBe('wmkf_sitevisits');
   expect(options).toMatchObject({
-    select: 'activityid,_regardingobjectid_value,scheduledstart,scheduledend',
+    select: 'activityid,_regardingobjectid_value,scheduledstart,scheduledend,modifiedon,statecode,statuscode',
     filter: expect.stringContaining('_regardingobjectid_value eq'),
   });
   expect(options).not.toHaveProperty('expand');
@@ -99,7 +99,7 @@ test.each([[25, 1], [26, 2], [51, 3]])('summary batch chunks %i distinct request
   expect(DynamicsService.queryAllRecords).toHaveBeenCalledTimes(expectedCalls);
   expect(result).toEqual({ records: [], totalCount: 0, capped: false });
   for (const [, options] of DynamicsService.queryAllRecords.mock.calls) {
-    expect(options.select).toBe('activityid,_regardingobjectid_value,scheduledstart,scheduledend');
+    expect(options.select).toBe('activityid,_regardingobjectid_value,scheduledstart,scheduledend,modifiedon,statecode,statuscode');
     expect(options).not.toHaveProperty('expand');
   }
 });
@@ -109,7 +109,7 @@ test('summary batch selects only ready logistics fields and propagates the bound
   DynamicsService.queryAllRecords.mockResolvedValueOnce({ records: [], totalCount: 5000, capped: true });
   const result = await findActiveSummariesByRequests([ACTIVITY_ID]);
   expect(DynamicsService.queryAllRecords).toHaveBeenCalledWith('wmkf_sitevisits', expect.objectContaining({
-    select: 'activityid,_regardingobjectid_value,scheduledstart,scheduledend,wmkf_visitformat,wmkf_locationorlink',
+    select: 'activityid,_regardingobjectid_value,scheduledstart,scheduledend,modifiedon,statecode,statuscode,wmkf_visitformat,wmkf_locationorlink',
   }));
   expect(result).toEqual({ records: [], totalCount: 5000, capped: true });
 });

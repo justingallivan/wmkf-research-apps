@@ -24,7 +24,7 @@ export const VIEWS = {
   },
   'staff-deliberations': {
     label: 'Staff deliberations',
-    description: 'Track pre-site draft writeups and their stage for the selected cycle.',
+    description: 'Review visit schedules, briefings, and post-visit preparation for the selected program and cycle.',
   },
   'initial-assessments': {
     label: 'Initial assessments',

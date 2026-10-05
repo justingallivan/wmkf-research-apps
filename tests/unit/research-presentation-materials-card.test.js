@@ -23,6 +23,14 @@ describe('presentationMaterialsStatus', () => {
     ['loading', null, null, null],
     ['unavailable', { unavailable: true }, null, 'The presentation schedule could not be loaded.'],
     ['no visit', { siteVisit: null }, null, 'Presentation not scheduled.'],
+    ['completed visit from status timing', { siteVisit: null }, null, 'Presentation scheduled · materials not requested.', { availability: 'available', endIso: '2026-10-05T16:30:00Z' }],
+    ['missing schedule', { siteVisit: null }, null, 'Presentation not scheduled.', { availability: 'missing', endIso: null }],
+    ['missing timing overrides active logistics', VISIT, null, 'Presentation not scheduled.', { availability: 'missing', endIso: null }],
+    ['unavailable schedule', { siteVisit: null }, null, 'The presentation schedule could not be loaded.', { availability: 'unavailable', endIso: null }],
+    ['unavailable timing overrides active logistics', VISIT, null, 'The presentation schedule could not be loaded.', { availability: 'unavailable', endIso: null }],
+    ['ambiguous schedule', { siteVisit: null }, null, 'The presentation schedule could not be loaded.', { availability: 'ambiguous', endIso: null }],
+    ['ambiguous timing overrides active logistics', VISIT, null, 'The presentation schedule could not be loaded.', { availability: 'ambiguous', endIso: null }],
+    ['status still loading', { siteVisit: null }, null, null, null],
     ['visit, no collection', VISIT, null, 'Presentation scheduled · materials not requested.'],
     ['open collection', VISIT, { state: 'missing' }, 'Presentation scheduled · materials requested.'],
     ['all received, unconfirmed', VISIT, { state: 'received' }, 'Presentation scheduled · materials requested.'],
@@ -32,8 +40,9 @@ describe('presentationMaterialsStatus', () => {
     ['attention upload', VISIT, { state: 'needs_attention', attentionCount: 1 }, 'Presentation scheduled · 1 upload needs coordinator attention.'],
     ['closed with attention', VISIT, { state: 'closed', attentionCount: 1 }, 'Presentation scheduled · materials request closed · 1 upload needs attention.'],
     ['failed materials status read', VISIT, { unavailable: true }, 'Applicant materials status could not be loaded.'],
-  ])('%s', (_label, context, summary, text) => {
-    expect(presentationMaterialsStatus(context, summary)?.text ?? null).toBe(text);
+  ])('%s', (...args) => {
+    const [_label, context, summary, text, timing] = args;
+    expect(presentationMaterialsStatus(context, summary, timing)?.text ?? null).toBe(text);
   });
 
   it('never reads a failed visit fetch as "not scheduled", even with a summary present', () => {
@@ -42,6 +51,19 @@ describe('presentationMaterialsStatus', () => {
 });
 
 describe('ResearchPresentationMaterialsCard', () => {
+  it('uses authoritative status timing when the active-only logistics read has no visit', async () => {
+    global.fetch = jest.fn(async () => respond({ success: true, folderFound: true, slides: [], participantBios: [] }));
+    render(<ResearchPresentationMaterialsCard
+      requestId={REQUEST_ID}
+      siteVisitContext={{ siteVisit: null }}
+      timing={{ availability: 'available', endIso: '2026-10-05T16:30:00Z' }}
+      materialsSummary={null}
+    />);
+    expect(screen.getByText('Presentation scheduled · materials not requested.')).toBeInTheDocument();
+    expect(screen.queryByText('Presentation not scheduled.')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText('Not received yet')).toHaveLength(2));
+  });
+
   it('links every file found in each folder and marks an empty folder "Not received yet"', async () => {
     global.fetch = jest.fn(async () => respond({
       success: true,

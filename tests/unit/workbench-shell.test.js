@@ -69,31 +69,18 @@ function mockFetch(overrides = {}) {
       const url = new URL(href, 'http://x');
       const code = url.searchParams.get('cycleCode');
       const rowScope = url.searchParams.get('scope');
-      const stageLabels = { draft: 'AI draft ready', shared: 'Shared', visit: 'Visit', final: 'Final' };
-      const artifacts = code === 'D26' ? [{
-        artifactId: 'p1',
-        requestId: 'r9',
-        requestNumber: '1002959',
-        title: 'Drafted proposal',
-        institution: 'U',
-        programDirector: 'PD',
-        isCurrent: true,
-        operationLabel: 'Ready',
-        lifecycleLabel: 'Draft',
-        stage: 'draft',
-        substate: 'ready',
-        visit: { status: 'not-scheduled', startIso: null },
-        everSent: false,
-        siteVisit: null,
-        file: null,
+      const requests = code === 'D26' ? [{
+        requestId: 'r9', requestNumber: '1002959', title: 'Drafted proposal',
+        institution: 'U', programDirector: 'PD',
+        timing: { availability: 'missing', endIso: null },
+        preparation: { state: 'none', due: false },
+        brief: { availability: 'missing' },
+        writeup: { availability: 'missing' },
       }] : [];
       return response({
-        success: true,
-        cycleCode: code,
-        scope: rowScope || 'my',
-        stageLabels,
-        counts: { draft: artifacts.length, shared: 0, visit: 0, final: 0 },
-        artifacts,
+        success: true, cycleCode: code, scope: rowScope || 'my',
+        programId: url.searchParams.get('programId'), artifacts: requests,
+        requestCounts: { ordinary: requests.length, test: 0, total: requests.length },
       });
     }
     if (href.startsWith('/api/workbench/initial-assessment?')) {
@@ -304,30 +291,25 @@ test('the Awardees view shows the working cycle, links the last decided cycle wh
   await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/grantee-deliverables/awardees?cycleCode=J26&scope=all', expect.any(Object)));
 });
 
-test('the Staff deliberations view lists the cycle\'s pre-site drafts with its intro, groups by stage, and links each to the request tab', async () => {
+test('the Staff deliberations view includes documentless requests in the selected program and cycle and shares PD scope', async () => {
   routerState.query = { view: 'staff-deliberations', cycleCode: 'D26' };
   routerState.asPath = '/workbench?view=staff-deliberations&cycleCode=D26';
   render(<WorkbenchShell />);
   expect(await screen.findByText(/#1002959 — Drafted proposal/)).toBeInTheDocument();
-  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/staff-deliberations?cycleCode=D26&scope=my', expect.objectContaining({ method: 'GET' }));
-  expect(screen.getByRole('heading', { name: 'Staff deliberations' })).toBeInTheDocument();
-  expect(screen.getByText('Track pre-site draft writeups and their stage for the selected cycle.')).toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/staff-deliberations?programId=p1&cycleCode=D26&scope=my', expect.objectContaining({ method: 'GET' }));
+  expect(screen.getByRole('heading', { name: 'Staff Deliberations' })).toBeInTheDocument();
+  expect(screen.getByText('1 requests in this program and cycle')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Staff deliberations' })).toHaveAttribute('aria-current', 'page');
   expect(screen.getByRole('link', { name: /#1002959/ })).toHaveAttribute('href', '/workbench/r9?tab=staff-deliberations&n=1002959');
-  // Tab redesign: the registry block (lifecycle/operation labels) is gone; the
-  // card states the next step instead.
-  expect(screen.queryByText('Draft')).not.toBeInTheDocument();
-  expect(screen.queryByText('Ready')).not.toBeInTheDocument();
-  expect(screen.getByTestId('deliberations-stage-sentence'))
-    .toHaveTextContent('Review and edit the AI draft in Word, then share it for the deliberation session.');
-  expect(screen.getByText('Deliberation session: not yet scheduled.')).toBeInTheDocument();
-  expect(screen.getByText('1 ai draft ready · 0 shared · 0 visit · 0 final')).toBeInTheDocument();
-  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● AI draft ready');
-  expect(screen.getByText('Visit not scheduled.')).toBeInTheDocument();
+  expect(screen.getByText('Schedule needed')).toBeInTheDocument();
+  expect(screen.getByText('No presentation time available')).toBeInTheDocument();
+  expect(screen.getByText('Pre-site briefing')).toBeInTheDocument();
+  expect(screen.getByText('Working writeup')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Review briefing' })).toHaveAttribute('href', '/workbench/r9?tab=staff-deliberations&n=1002959');
 
   fireEvent.click(screen.getByRole('button', { name: 'All program directors' }));
   expect(replace).toHaveBeenLastCalledWith('/workbench?view=staff-deliberations&cycleCode=D26&scope=all', undefined, expect.any(Object));
-  await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/staff-deliberations?cycleCode=D26&scope=all', expect.objectContaining({ method: 'GET' })));
+  await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/staff-deliberations?programId=p1&cycleCode=D26&scope=all', expect.objectContaining({ method: 'GET' })));
 });
 
 test('the Initial assessments view renders the D26 card without calling the API, and loads artifacts for a later cycle', async () => {

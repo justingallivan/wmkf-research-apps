@@ -2,9 +2,9 @@
  * Research Presentation Materials — read-only card on the Staff
  * Deliberations tab (docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md §16.13).
  *
- * Status comes from data the tab already holds: the Site Visit read
- * (useSiteVisitContext) and the portal collection summary on the Pre-Site
- * status payload. File links come from a direct listing of the request's
+ * Status comes from data the tab already holds: active logistics context, the
+ * authoritative scheduled timing on the Pre-Site status payload, and the portal
+ * collection summary. File links come from a direct listing of the request's
  * `Site Visit - Slides` / `Site Visit - Participant Bios` SharePoint folders
  * (GET /api/workbench/site-visit/material-files) — INTERIM, so files placed
  * there by hand in AkoyaGo show while the upload portal is still in testing.
@@ -21,10 +21,25 @@ const ROWS = [
 ];
 
 /** The one-line status, or null while the Site Visit read is in flight. */
-export function presentationMaterialsStatus(siteVisitContext, summary) {
-  if (!siteVisitContext) return null;
-  if (siteVisitContext.unavailable) return { tone: 'error', text: 'The presentation schedule could not be loaded.' };
-  if (!siteVisitContext.siteVisit) return { tone: 'muted', text: 'Presentation not scheduled.' };
+export function presentationMaterialsStatus(siteVisitContext, summary, timing) {
+  if (timing === null) return null;
+  let hasSchedule;
+  if (timing !== undefined) {
+    if (timing.availability === 'available' && Number.isFinite(Date.parse(timing.endIso || ''))) {
+      hasSchedule = true;
+    } else if (timing.availability === 'missing') {
+      return { tone: 'muted', text: 'Presentation not scheduled.' };
+    } else {
+      return { tone: 'error', text: 'The presentation schedule could not be loaded.' };
+    }
+  } else {
+    // Compatibility for older callers that have not supplied the status timing.
+    if (!siteVisitContext) return null;
+    if (siteVisitContext.unavailable) return { tone: 'error', text: 'The presentation schedule could not be loaded.' };
+    if (!siteVisitContext.siteVisit) return { tone: 'muted', text: 'Presentation not scheduled.' };
+    hasSchedule = true;
+  }
+  if (!hasSchedule) return { tone: 'muted', text: 'Presentation not scheduled.' };
   if (summary?.unavailable || summary?.availability === 'unavailable') return { tone: 'error', text: 'Applicant materials status could not be loaded.' };
   if (!summary) return { tone: 'body', text: 'Presentation scheduled · materials not requested.' };
   const processingCount = Number.isSafeInteger(summary.processingCount) ? summary.processingCount : 0;
@@ -69,7 +84,7 @@ function FileLinks({ files }) {
   );
 }
 
-export default function ResearchPresentationMaterialsCard({ requestId, siteVisitContext, materialsSummary }) {
+export default function ResearchPresentationMaterialsCard({ requestId, siteVisitContext, materialsSummary, timing }) {
   // Results are keyed by request so a request change reads as loading
   // without a synchronous reset inside the effect.
   const [result, setResult] = useState(null);
@@ -89,7 +104,7 @@ export default function ResearchPresentationMaterialsCard({ requestId, siteVisit
     return () => controller.abort();
   }, [requestId]);
 
-  const status = presentationMaterialsStatus(siteVisitContext, materialsSummary);
+  const status = presentationMaterialsStatus(siteVisitContext, materialsSummary, timing);
 
   let body;
   if (files.state === 'loading') {
