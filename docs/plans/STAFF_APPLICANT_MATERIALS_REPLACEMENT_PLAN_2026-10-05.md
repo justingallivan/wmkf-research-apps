@@ -35,7 +35,7 @@ Owner decisions, 2026-10-05:
    again.
 
 `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` never decided staff upload
-[VERIFIED: grep for staff upload, on behalf, coordinator, replace].
+[VERIFIED via `rg -i "staff upload|on behalf|coordinator upload"`, no hits].
 - Line 443 requires applicant replacement only.
 - Lines 806-808 describe staff placing files "by hand through AkoyaGo", and
   those files get no registry row.
@@ -165,7 +165,9 @@ only three things:
 
 - the actor policy is `REQUIRED` with the staff system user, so
   `wmkf_initiatedby` records who uploaded;
-- `wmkf_name` ends in "(staff upload)";
+- `wmkf_name` ends in "(staff upload)" (nothing reads the "(applicant upload)"
+  literal [VERIFIED via `rg "applicant upload"`: only the writer at
+  `contributor-service.js:500`]);
 - the collection-state check is skipped, because staff authorization replaces
   the token.
 
@@ -191,6 +193,23 @@ has not taken it):**
 - **Drain:** `admittedCollectionStillValid` keeps today's rule for contributor
   jobs. For staff jobs it requires the same collection and request and an open
   slot, and ignores token and status.
+- **Actor for the async write:** add `actor_system_user_id UUID NULL` with a
+  CHECK that it is present if and only if `admission_kind = 'staff'`. Enqueue
+  records it from the session. The drain passes it as `actingUserSystemId`,
+  because `REQUIRED` needs a GUID system user and re-reads it as enabled
+  [VERIFIED `lib/services/request-document-actor-service.js:65-74, 104`], and
+  a cron drain has no session.
+- **The exemption, stated:** for contributor jobs the token is the
+  authorization, and the drain re-checks it. For staff jobs, authorization is
+  enforced at mint and at enqueue (`requireAppAccess('meeting-tracker')`,
+  session-derived binding and system user). The drain trusts the recorded
+  `actor_binding` and `actor_system_user_id` and does not re-authorize; its
+  actor read fails closed if the user is no longer enabled.
+- **One active job per slot:** the existing unique index on `(request_id,
+  slot)` for active non-`other` jobs
+  [VERIFIED `060_materials_background_jobs.sql:49-51`] means a staff upload
+  while an applicant job is active on that slot gets 409. That is expected;
+  the card says to wait.
 - **Fresh install:** `scripts/setup-database.js` gets the same change.
 
 Alternative: staff uploads always run inline, with no migration. Rejected
@@ -240,6 +259,7 @@ note, and that limitation is recorded rather than guessed at.
 | A staff upload never reopens or extends the applicant link | test: a ready or closed collection stays ready or closed after staff enqueue and drain |
 | Contributor jobs keep every token check | test: a contributor job with a changed `token_digest` still settles `collection_or_token_changed` |
 | An unknown `uploader.kind` or `admission_kind` fails closed | tests on both switches |
+| A staff row written by the drain records the uploader | test: a staff job carries `actor_system_user_id`; the row is created with `REQUIRED` and that actor; a job without it is refused by the CHECK |
 | A staff-uploaded APPLICANT_SLIDES PDF is what `readSlidesText` and the Board page read | test with a staff-produced row (same producer) |
 | The slides-changed note is decided by row id and hash, not by timestamp | test: replace the slides after publish, and the flag turns true |
 
