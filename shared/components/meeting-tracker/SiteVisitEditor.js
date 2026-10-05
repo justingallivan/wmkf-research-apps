@@ -13,8 +13,7 @@ import { requestEnvelope } from '../../utils/api-request';
 import Layout, { Button } from '../Layout';
 import { SITE_VISIT_FORMAT, SITE_VISIT_FORMAT_LABEL, SITE_VISIT_LIMITS } from '../../config/siteVisit';
 import SiteVisitMaterialsCard from './SiteVisitMaterialsCard';
-import PostPresentationMaterialsCard from './PostPresentationMaterialsCard';
-import MeetingTranscriptionPanel from './MeetingTranscriptionPanel';
+import RecordingAndTranscriptCard from './RecordingAndTranscriptCard';
 
 const DEFAULT_TIME_ZONE = 'America/Los_Angeles';
 
@@ -336,8 +335,7 @@ export default function SiteVisitEditor() {
       )}
 
       {!loading && visit && <SiteVisitMaterialsCard requestId={requestId} requestNumber={requestNumber} />}
-      {!loading && visit && <PostPresentationMaterialsCard requestId={requestId} />}
-      {!loading && visit && <MeetingTranscriptionPanel requestId={requestId} />}
+      {!loading && visit && <RecordingAndTranscriptCard requestId={requestId} />}
     </Layout>
   );
 }

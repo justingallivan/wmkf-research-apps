@@ -1,6 +1,87 @@
-# Session 574 Prompt: transcription issue (owner-stated next focus), then video sharing and dashboards
+# Session 575 Prompt: build Stage 1 of the summaries and Board sharing plan (closes an outside-link exposure)
 
-## Session 573 Summary — 2026-10-04 PT (owner decisions; legacy VRP retired; Integrity Screener on Haiku)
+## Session 574 Summary — 2026-10-04/05 PT (Site Visit card redesign shipped; summaries and Board sharing planned)
+
+Owner opened with a screenshot of the Site Visit page and said the Post-presentation materials card and the Meeting transcription panel were confusing and overlapping, then that "pretty much everything about that panel sucks" (GUIDs with no timestamps, etc.). Everything below is on `main` and deployed unless marked otherwise.
+
+### What Was Completed
+
+1. **One "Recording and transcript" card replaces two cards.** Plan `docs/plans/SITE_VISIT_TRANSCRIPT_CARD_REDESIGN_PLAN_2026-10-04.md` (Impeccable Operate mode; Codex plan review; owner decisions 1–5). Built on `feature/site-visit-transcript-card`: Sonnet build → Opus review (12 findings fixed) → Codex code review (2 findings fixed; that fix round was test- and mutation-checked, not re-reviewed by Codex). PR #431 merged `38c767ae9`; Production deployment `dpl_AYayRueQDchJ7Qv2p4WMfNDnPAgA` Ready and tied to the merge commit. Owner looked at Production: "It looks better." New `shared/components/meeting-tracker/RecordingAndTranscriptCard.js` (~2,000 lines; composes the old materials logic and a rewritten transcription hook); `SiteVisitEditor` renders only it. Old `PostPresentationMaterialsCard.js` and `MeetingTranscriptionPanel.js` remain, unwired, for the rehearsal page (decision 5).
+2. **Text transcripts skip the malware scanner** (owner decision: Zoom-generated, staff-uploaded, no execution surface). `finalizeTranscriptUpload` runs a local readability check for `.txt`/`.vtt` (UTF-8, no NUL, WEBVTT header), new permanent code `transcript_text_invalid` (also added to the finalize route's permanent set and the old card's list); PDF/DOCX keep Cloudmersive and the rejection names the tripped content flags. Closes S573 Verified Open §3.
+3. **Jean suggestion sits in Speaker B's row** of the single editor; the editor seeds from the job on every load and is pinned to the run under edit (probe showed the old panel cleared names the job held). Closes S573 Verified Open §4 as a UI matter.
+4. **Owner-run probe on request 1003222** (read-only Postgres): the "Draft" badge next to the published file's id was a labeling gap, not a service bug (draft row `703b5986` sources document `ea8e3af6`, published from op `4e7be123`); the blank editor was a component defect (job `7c1c5643` held seven aligned names). Both recorded in plan §8.
+5. **Summaries and Board sharing plan written and Codex-reviewed, not built:** `docs/plans/SITE_VISIT_SUMMARIES_AND_BOARD_SHARING_PLAN_2026-10-04.md`. Two owner question rounds plus six decisions (all DECIDED 2026-10-05, §7): one recording with the staff discussion as its tail; boundary = last turn by a non-foundation speaker, proposed automatically, confirmed by a PC, stored on the transcript bundle as version 4 and frozen in the receipt; three new artifact types (presentation transcript 100000012, staff discussion summary 100000010, Board recording 100000011); summaries as reviewed drafts published to `.txt`; Board links serve only the presentation part; staff discussion may go to Anthropic per recording under a versioned, server-enforced summarization acknowledgment; `sonnet`/`haiku`; applicant PDF as input; the interim no-recording-outside gap accepted. Contract-reconcile (3 findings) and Codex adversarial review (5 findings, 2 citation corrections) folded in (§9, §10).
+6. **Memory:** new `feedback-staff-ui-never-shows-internal-ids.md`, routed under Working Norms. DEVELOPMENT_LOG entry added for the card consolidation.
+
+### Commits (main)
+- `e0dea5d54`, `ce5f1a8d5` — card redesign plan and probe results.
+- `38c767ae9` — merge PR #431 (branch commits `e87b72c68`, `6776b7cd5`, `b6225504e`, `7de7bbba4`).
+- `5ffb8792a`, `1d38cf31e`, `20378bbaa` — summaries and Board sharing plan, decisions, Codex findings.
+- Handoff commit follows.
+
+## Next Items
+
+### Verified Open
+
+1. **Outside-link exposure.** Evidence: `presentation-page-service.js:25-30,145-152`, `briefing-page-service.js:91-99` project the full TRANSCRIPT and RECORDING; owner confirmed the recording continues after the applicants leave. Any Board presentation link or briefing link minted for such a request exposes staff deliberation. Owner-run read of `presentation_material_links` and `deliberation_briefing_links` tells whether one exists. Stage 1 closes it regardless.
+2. **Build Stage 1 of the summaries plan** (plan §5): Postgres constraint migration (next after 066) extending the two `artifact_type` CHECKs; picklist insert 100000012 (owner-run sibling of `scripts/extend-requestdocument-artifacttype-pre-rp-brief.mjs`); manifest/source/formatter version 4 with the boundary frozen in the receipt; boundary proposal and confirmation in the card; presentation-transcript row; boundary-generation binding checked at context and open time; outside pages project the new type and stop projecting RECORDING; Board page file-mode check converted to an allowlist. No LLM. Owner-run: the migration and the picklist script.
+3. **PR #431 acceptance checklist not fully run.** Evidence: owner said "It looks better"; the checklist in the PR body (publish from a fresh run, edit names and republish, upload a plain VTT, chat.txt-as-.vtt refused) was not confirmed executed. Run it on 1003222 when convenient.
+4. **Staff video-sharing acceptance** (S571 order item 2). Evidence: untouched; the new card's recording line has Open, but whether intended staff can play the SharePoint MP4 was not traced.
+5. **Leadership dashboard readiness** (S571 order item 3). Evidence: Codex worktree `/Users/gallivan/Code/WMKF_Apps-codex-dashboards` on `codex/leadership-dashboard-testing` at `9fec71a97`, not read in S572–S574.
+6. **Sonnet 5.5 inventory amendment** (branch `audit/sonnet-55-consumer-inventory`): still lists two closed blockers; also add the two planned summary prompts as future `sonnet` consumers. Docs-only PR.
+7. **Memory hygiene debt.** Evidence: router at 8,238 B before this session, grown by one pointer this session (`feedback-staff-ui-never-shows-internal-ids.md`); routine audit per `docs/MEMORY_HYGIENE_RUNBOOK.md` §10 still owed; `project-virtual-review-panel.md` is `status: closed` but not listed in `project-closed-work-archive.md`.
+8. **Sweep item:** `docs/PC_MEETING_TRACKER_PLAN.md:105` says presentation materials are "PRODUCTION NOT DEPLOYED"; the materials plan front matter and the 2026-09-29 evidence say enabled in Production.
+9. **Boundary rule confirmation:** speaker candidates carry `staff`, `roster`, `manual` (no Board class, `binding.js:104-107`); the plan treats `staff` and `roster` as inside the foundation. Confirm on a real visit before Stage 1 relies on it.
+
+### Owner Decision Needed
+
+1. **Authorize the Sonnet 5.5 pre-flip replay** (carried from S573; spends provider credits).
+2. **Dependabot #115 (`braces`) and #116 (`http-cache-semantics`)** — upstream-blocked as of 2026-10-04.
+
+### Parked
+
+1. `feature/unsupported-stretch-split`, `feature/reassign-direct-overlap` — Zoom plan § "Deliberately NOT merged".
+2. Items parked in S571 (#428 rehearsal, #328, #390, reminder cron); not revalidated.
+3. Old `PostPresentationMaterialsCard.js` and `MeetingTranscriptionPanel.js`: retire together with the rehearsal page later (card plan §9 decision 5). Not before.
+4. `multi-llm-service.js` `DEFAULT_MODELS.claude` dead config (S573).
+
+### Verify Before Acting
+
+1. Before any Dataverse write from a local shell: `DATAVERSE_PROD_WRITE_ACK="<purpose> <YYYY-MM-DD UTC>"`; seeds are create-only.
+2. The auto-mode classifier blocks the agent from production reads/writes (even `node --check` on a script that reads prod); the owner runs them via `!`. Expect the same for the exposure read, the migration, and the picklist script.
+3. Stage 1 touches outside-facing pages; Tier 1 branch + PR + owner merge, acceptance on 1003222 with the owner present.
+
+### Do Not Reopen Without New Decision
+
+1. Card redesign decisions 1–5 (card plan §9) and summaries plan decisions 1–6 (§7), all owner-decided 2026-10-04/05.
+2. Model-as-veto, dominance 0.2, time-split editor, legacy VRP retirement, Integrity Screener haiku pin — earlier owner decisions.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `docs/plans/SITE_VISIT_SUMMARIES_AND_BOARD_SHARING_PLAN_2026-10-04.md` | the next build; §4.7 fan-out table, §4.8 version coupling, §9/§10 review records |
+| `docs/plans/SITE_VISIT_TRANSCRIPT_CARD_REDESIGN_PLAN_2026-10-04.md` | shipped card; §6 state-to-copy table, §13 build/review record |
+| `shared/components/meeting-tracker/RecordingAndTranscriptCard.js` | the live card (`useMaterials`, `useTranscription`, `describeCurrentTranscript`, `SpeakerEditor`) |
+| `lib/services/post-presentation-materials/material-service.js` | `finalizeTranscriptUpload` text check; `publishMeetingTranscriptBundle` |
+| `lib/services/post-presentation-materials/material-model.js:15-21,103-105,119-125` | shared type allowlist, external-backing guard, winner rule |
+| `lib/services/meeting-tracker-transcription/bundle.js:114-150` | manifest and source validators (version lists) |
+| `lib/db/migrations/055_post_presentation_materials.sql:71-72,146-147` | the two `artifact_type` CHECK constraints Stage 1 must extend |
+| `scripts/extend-requestdocument-artifacttype-pre-rp-brief.mjs` | precedent for the owner-run picklist insert |
+| `shared/components/workbench/ResearchPresentationFollowUp.js` | Staff Deliberations segment to grow in Stages 2–3 |
+
+## Testing
+
+```bash
+npx jest tests/unit/recording-and-transcript-card.test.js tests/unit/post-presentation-material-service.test.js tests/unit/meeting-tracker-visit-editor.test.js
+npx eslint shared/components/meeting-tracker/RecordingAndTranscriptCard.js
+npm run -s check:request-document-writers && npm run -s check:types
+```
+
+## Earlier handoff — Session 573 (historical; its open items are carried above)
+
+
+### Session 573 Summary — 2026-10-04 PT (owner decisions; legacy VRP retired; Integrity Screener on Haiku)
 
 Owner picked "address the owner decisions" first. Both landed as fleet-level facts rather than the one-line items the Session 572 handoff framed. Everything below is on `main` and deployed unless marked otherwise.
 

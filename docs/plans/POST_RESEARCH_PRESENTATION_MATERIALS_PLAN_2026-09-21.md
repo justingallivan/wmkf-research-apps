@@ -181,6 +181,8 @@ works.
 
 ### 4.1 Meeting Tracker: Post-presentation materials
 
+> Current state (2026-10-04): the card described here was merged with the Meeting transcription panel into `RecordingAndTranscriptCard` on the Site Visit page; `PostPresentationMaterialsCard` is no longer rendered there. Plain-text and VTT transcript uploads no longer go through the Cloudmersive scan. See `docs/plans/SITE_VISIT_TRANSCRIPT_CARD_REDESIGN_PLAN_2026-10-04.md` §9 decision 2 and §13.
+
 Add `PostPresentationMaterialsCard` immediately after `SiteVisitMaterialsCard` in the existing
 visit editor. It renders only after an active Site Visit exists.
 
