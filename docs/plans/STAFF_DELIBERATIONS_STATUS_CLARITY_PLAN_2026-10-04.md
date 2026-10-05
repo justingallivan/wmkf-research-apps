@@ -1,137 +1,181 @@
 ---
-title: Staff Deliberations Status and Coverage Plan
+title: Staff Deliberations Briefing and Post-Visit Writeup Rework
 domain: workbench
 kind: plan
 status: draft
-summary: "Proposed separation of scheduled visit timing, brief sharing, and writeup readiness; explicit list coverage and prerequisite-aware actions. Planning only; no runtime or production changes authorized."
+summary: "Owner-directed workflow: lighter briefing before the presentation, automatic working-writeup preparation at scheduled end, and explicit staff initiation of review. Proposed implementation; not deployed."
 canonical: false
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
   - docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md
+  - docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md
   - docs/APPLICATION_STATE_ATLAS.md
   - docs/API_ROUTE_SECURITY_MATRIX.md
 ---
 
-# Staff Deliberations status and coverage plan
+# Staff Deliberations: briefing to post-visit writeup
 
-## Outcome and scope
+## Purpose and decisions
 
-[PLANNED] Staff should be able to answer three separate questions without clicking into every request: whose scheduled visit date has passed, what has been shared through the app, and which writeup is ready for its next document action. A visit date must never imply that someone advanced a document, completed a visit, or sent an email.
+[OWNER DECISION, 2026-10-04] The lighter pre-site briefing is now the primary pre-presentation circulation document. Leadership wanted preliminary information presented less formally. The full Pre-Site draft remains useful as an optional staff working document before the visit and as the foundation for the final writeup. Findings needed to complete that writeup come from the actual site visit/research presentation.
 
-This is a proposed implementation plan, not authorization to change runtime, send messages, advance documents, backfill history, or inspect production records. Source baseline: `9fec71a97` on `codex/leadership-dashboard-testing`; the pre-existing lockfile change is unrelated and must remain untouched. Implement later on a dedicated feature branch based on then-current main. Do not mix this work into the leadership-readiness test changes or Claude's transcription work.
+[OWNER DECISION] At the meeting's **scheduled end time**, automatically prepare the full working writeup for post-visit editing. Preserve an existing document and all staff edits. When no full draft exists, generate its foundation, then prepare it for editing. Staff explicitly decide when their additions are ready for colleague review; leadership review remains a later explicit action.
 
-Impeccable direction: **Operate** mode, preserving PRODUCT.md and DESIGN.md's calm, task-focused Workbench. Improve the information model and action hierarchy; no visual rebrand, extra dashboard metrics, decorative animation, or replacement framework.
+[OWNER DECISION] Show every request in the selected cycle and staff scope, even with no documents. [PROPOSED, scope clarification pending] Also respect the Workbench grant-program selector. The earlier list ignores that selector; that mismatch is not authorization to include all programs in the redesigned list. Do not implement this selector choice until confirmed.
 
-## Evidence and diagnosis
+[PLANNED] Replace the earlier plan in this file in full. A manual “Start Site Visit” prerequisite and the earlier read-only-only scope are superseded. Automatic promotion is a durable write, and generating a missing draft consumes application AI resources. This document authorizes neither implementation nor execution of those operations. No production records were read for this revision; exact D26 counts remain UNKNOWN.
 
-[VERIFIED via supplied PDFs/screenshots] Request 1002903 simultaneously displays Visit and Start Site Visit. The supplied all-PD screenshot also shows 1002912 and 1002988 under Visit. These are examples, not a verified D26 census. [OWNER-REPORTED] At least ten requests have had visits. [UNKNOWN] The exact request set and persisted document states have not been read from production.
+## Current evidence and implementation boundary
 
-| Mechanism | Evidence | Consequence |
+Source baseline: `9b1a60ed5`, branch `codex/leadership-dashboard-testing`. These are source findings, not new production verification.
+
+| Finding | Source evidence | Consequence for this plan |
 |---|---|---|
-| [VERIFIED] Visit is inferred from scheduled start being in the past, conditional on the chosen stage artifact being Review | `shared/utils/deliberation-stage.js:75`, `:108` | A Draft brief keeps a past visit out of the Visit group; the date alone is not proof of attendance/completion. |
-| [VERIFIED] Stage prefers the Pre-Research Presentation Brief; Pre-Site writeup has an independent lifecycle | `shared/components/workbench/StaffDeliberationsTab.js:572`, `:649` | A shared brief plus past date can show Visit while the writeup remains Draft. |
-| [VERIFIED] Start Site Visit is an explicit writeup transition | `lib/services/pre-site-visit/site-visit-transition-service.js:185`; `StaffDeliberationsTab.js:718` | The button updates the existing document's lifecycle/checkpoint; elapsed time does not perform this write. |
-| [VERIFIED] Cycle list starts from document rows, then resolves their requests | `lib/services/pre-site-visit/cycle-list-service.js:283` | Requests without either artifact can be completely absent, not merely in the wrong group. |
-| [VERIFIED] Cycle-card destination depends on composite stage | `shared/components/workbench/StaffDeliberationsPanel.js:32` | A date-derived Visit row directs staff to Final even when its writeup prerequisite is incomplete. |
-| [VERIFIED] Current scope is cycle plus PD; the shell does not pass program to this panel | `pages/api/workbench/staff-deliberations.js:30`; `shared/components/workbench/WorkbenchShell.js:307` | Do not describe the existing list as program-filtered or silently add a new program contract. |
+| [VERIFIED] The composite Visit stage uses scheduled **start** in the past plus a Review stage artifact. | `shared/utils/deliberation-stage.js`, `deriveVisit` and `deriveDeliberationStage` | Replace the clock boundary and stop using brief lifecycle as the visit gate. |
+| [VERIFIED] The cycle list starts with brief/Pre-Site document rows and unions owner IDs. | `lib/services/pre-site-visit/cycle-list-service.js`, `listPreSiteVisitDrafts` | Requests without documents disappear today; use request-first selection. |
+| [VERIFIED] Explicit promotion keeps the same SharePoint item and records a verified version/hash/time; a complete Review milestone returns without re-stamping. | `lib/services/pre-site-visit/site-visit-transition-service.js`, `startSiteVisitStage` | Reuse its document safeguards, but add a scheduled-event fence and honest automation attribution. |
+| [VERIFIED] Generation has claims, recovery and pointer fencing, but can regenerate an existing Draft. | `lib/services/pre-site-visit/artifact-service.js`, `generatePreSiteVisitArtifact`; `artifact-lineage.js`, `commitReadyLineage` | Automatic preparation needs a missing-only generation contract; simply calling the existing generator is unsafe for staff edits. |
+| [VERIFIED] Starting Final Writeup starts group review and stamps its actor/time, using the same Word item. | `lib/services/final-writeup/transition-service.js`, `startFinalWriteup`; `transition-claims.js`, `activate` | The scheduled worker must NOT call this transition. A prepared working writeup is not a Final/group-review artifact. |
+| [VERIFIED] Calendar, session, materials and document actions have additional stage-dependent consumers. | `StaffDeliberationsTab.js`, `StaffDeliberationsPanel.js`, `FinalWriteupTab.js` under `shared/components/workbench/` | Migrate every action condition, not just the rail. Preserve session/materials visibility. |
+| [VERIFIED] Cycle discovery is program-filtered, while this panel currently receives cycle/scope only. | `lib/services/workbench/dashboard-service.js`, `listCycles`; `shared/components/workbench/WorkbenchShell.js` | Make effective program scope explicit and consistent. |
 
-[VERIFIED via existing local test run] Three suites / 131 tests passed: `deliberation-stage.test.js`, `staff-deliberations-tab.test.js`, and `pre-site-visit-cycle-list-service.test.js`. The tab suite explicitly expects the confusing Visit-plus-Draft combination at line 1031. Passing those tests establishes current behavior, not adequate UX. New acceptance cases below supersede that visual expectation while retaining transition safety.
+Read-contract references: `docs/atlas/dataverse-wmkf-sitevisit.md` documents UTC scheduled start/end, local display zone, and active-only readers; `docs/atlas/dataverse-wmkf-requestdocument.md` describes document lineage and review checkpoints. Those readers and stored records are foundations, not proof that scheduled automation exists. New worker, receipt, authorization and schedule fencing below are PLANNED and unprovisioned.
 
-## Owner decisions and scope
+## UX brief — Impeccable / Operate
 
-1. **[OWNER DECISION] Show every request in the selected cycle and PD scope, including requests with no generated documents.** Source the list from requests, not document presence. Do not apply the Workbench reviewer-finding selector's Phase II/advancing/set-aside filters: they would narrow the owner's chosen cohort. Preserve actual access restrictions and test-record handling. Make the scope explicit: this Staff Deliberations list is cycle/PD scoped; it does not currently apply the shell's grant-program filter. Do not silently add one.
-2. **[OWNER CONTEXT] Leadership requested the lighter briefing document because the full Pre-Site Visit drafts were too formal.** Keep the Pre-Research Presentation Brief (the source's current name for this lighter document) separate from the full Pre-Site Visit writeup that seeds Final. Do not merge their files, permissions, publishing actions, sharing state, or lifecycle. In user-facing instructions always name which document is being opened or circulated.
-3. **[PLANNED recommendation] No new external-sharing record in the core fix.** “No sharing recorded in this app” means lack of app evidence, not “not shared with leadership.” Existing external attachments must never cause an automatic resend or a document transition. An optional later “Record brief shared outside the app” action could capture staff attribution and evidence without sending mail, but it requires a separately approved persistence/audit contract and is not authorized by this plan.
+**Audience and job.** Program directors and staff need to circulate preliminary information before a presentation, then finish a substantive writeup afterward without manually reconciling workflow statuses. Leadership must not mistake a polished foundation for a completed assessment.
 
-[PLANNED] Display scheduled timing, not claimed completion; retain explicit writeup transitions. No new visit-completion storage or delivery date is proposed.
+**Design authority.** Preserve PRODUCT.md and DESIGN.md: Inter, neutral surfaces, compact hierarchy, existing controls and focus treatment. Use Impeccable Shape and Operate guidance. No rebrand, extra dashboard metrics, decorative animation or new navigation framework. The supplied Workbench screenshots are evidence of the confusion, not a template to preserve the rail.
 
-## Proposed screen and language
+**Primary distinction.** Organize around the staff task: “Before presentation”, “Preparing writeup”, “Post-visit editing”, “Group review”, “Leadership review”, with “Schedule needed” or “Needs attention” where appropriate. These are user-facing projections, not new persisted document enums. Do not use the same green Visit dot for a passed date and a completed document action.
 
-[PLANNED] Replace the four-stop AI draft → Shared → Visit → Final rail on the cycle cards and per-request Staff Deliberations header with independently labeled facts. A rail implies a single ordered process that the system does not enforce.
+### Cycle list
 
-- **Visit timing:** Not scheduled; Scheduled — date; Scheduled date passed — date; or Schedule unavailable. Never label an elapsed date Visited/Completed without separate authoritative evidence.
-- **Presentation brief:** Not generated; Generating; Generation failed; Draft; or Working brief. Show sharing separately: Sent through app — recorded date, No send recorded for this brief, or Sharing history unavailable. A Review lifecycle alone is a locked working document, not proof of email delivery; a sent receipt is transport acceptance, not inbox confirmation.
-- **Pre-Site writeup:** Not generated; Generating; Generation failed; Draft; Site Visit workspace started; or Handed off to Final. Broken pointers, incomplete checkpoints and unrecognized states read Status needs checking; never guess from a newer draft or the calendar.
+Every in-scope request appears once. Keep request number/title, institution and PD prominent. Show one concise task status, presentation date/time with timezone, briefing state and working-writeup state. Preserve the deliberation-session line, applicant-materials information and test-record badges. Session scheduling and research-presentation timing are separately named; neither substitutes for the other.
 
-Do not overload the screen with identical pills. Each request row/card has request number/title/institution and PD first; visit timing and the two named document lines next; one primary navigation action and an explicitly named Word link last. Use green only for recorded affirmative state, neutral text for time passing, amber for a genuine prerequisite/problem. Text carries every distinction without relying on dot color. Preserve existing test badges and ordinary-count exclusions.
+Use one primary navigation action per row. Explicit secondary links say “Open briefing in Word” and “Open working writeup in Word”. Scope appears beside the total: grant program, cycle, and Assigned to me / All program directors. Default filter is All; offer Before presentation, Post-visit work, In review, Needs attention plus text search. Missing/ambiguous schedules remain visible. Define one primary bucket with precedence: confirmed review state, blocking exception, due/preparing/editing, upcoming, unscheduled; counts derive from the same request IDs. Independent dates remain visible after review begins.
 
-Illustrative rendering for the supplied 1002903 screen (not a new live read):
+Ordinary totals retain test exclusions and separately identify visible test rows. Unknown or capped results never show an unqualified total. “No sharing recorded in this app” is not a claim that staff never emailed the briefing.
+
+### Per-request Staff Deliberations
+
+Before the presentation, lead with **Pre-site briefing** and its existing explicit Share action. Supporting copy: “Preliminary information for the research presentation.” Keep the canonical artifact and external briefing permissions separate from the full working writeup.
+
+Show **Working writeup** below it, marked “Optional before the presentation”. If absent, offer “Prepare working draft”; if present, offer “Open working writeup in Word”. Explain that the fuller document carries forward after the presentation. Do not automatically generate, regenerate or send the briefing as part of this workflow.
+
+At scheduled end, move the working-writeup section into the primary position. The briefing stays accessible below with its sharing history; reordering must not steal keyboard focus or close an active composer. Display “Preparing working writeup…” until the durable operation is confirmed. Then display **Post-visit editing** with “Add findings from the research presentation, then mark the writeup ready for group review.” Opening Word stays the primary action. A secondary “Review readiness” link takes the user to the existing Final Writeup surface; it does not start review.
+
+On Final Writeup, retain the explicit **Ready for group review** confirmation, actor restrictions, and later **Ready for leadership review** confirmation. Update prerequisite copy to point to preparation progress or a recoverable error, not “Start Site Visit”. Before scheduled end, do not offer group-review initiation for this workflow. The matching server rule must agree with the UI. Already-started legacy reviews remain usable; no automatic downgrade.
+
+Illustrative states (not production readbacks):
 
 ```text
-1002903 · Multiplexed Ultrasound Decoding for Gene Programs in Living Cells
-University of Southern California · PD: Justin Gallivan
+Before presentation · Sep 28, 10:00–11:00 AM [meeting timezone]
+Pre-site briefing    Draft                         [Review briefing]
+Working writeup      Optional · Draft available     Open working writeup in Word
+Deliberation session [recorded session or explicit availability state]
 
-Visit timing       Scheduled date passed · Sep 28, 2026
-Presentation brief Working brief · [sharing receipt loaded separately]
-Pre-Site writeup   Draft
-
-Review the draft and start its Site Visit workspace before creating Final Writeup.
-[Review writeup]   [Open Pre-Site writeup in Word]
+Post-visit editing · Scheduled presentation ended Sep 28, 11:00 AM
+Working writeup      Ready for your visit findings  [Open working writeup in Word]
+Pre-site briefing    [actual sharing receipt]       Open briefing in Word
+Add your findings, then review readiness.            Review readiness →
 ```
 
-The bracketed sharing explanation is specification notation, not UI copy. Render the actual receipt state from the list above. Do not infer it from the green rail in the screenshot. Open-document links must identify which document they open; a brief's file link must not masquerade as the Pre-Site writeup link.
+Use neutral styling for elapsed time; green confirms prepared availability or an actual recorded review state. Never claim attendance or completion from the clock. Keep errors inline and actionable. On narrow screens stack facts and actions under each request; no horizontal progress rail. Long titles wrap, status text remains readable, and document links name their destination. Use existing touch targets, visible focus, labeled controls, semantic headings and polite announcements for background preparation; avoid repeated announcements on each poll.
 
-### List organization and counts
+## State and action contract
 
-[PLANNED] Default to one request list with an **All / Date passed / Upcoming / Not scheduled** timing control and request/title search. A failed/ambiguous schedule stays visible under All with explicit unavailable status; do not count it as Not scheduled. Retain the existing cycle and Assigned to me / All program directors controls; label the effective scope beside counts. Do not change the user's scope automatically or call an Assigned to me count D26 total.
+All entries below are PLANNED. “Due” means a uniquely resolved, noncancelled research-presentation activity has a valid UTC end at or before server time. Invalid/missing end is not replaced by start time or midnight. Read failure is not “not scheduled”.
 
-Timing filters are independent of sharing, writeup state, and Final handoff. A request whose date has passed remains in Date passed even after its document advances to Final. All requests in the agreed cycle/PD scope are included, regardless of document presence. Missing or invalid meeting dates cannot be invented into a cycle; state the cycle-association rule explicitly and provide a reconciliation indication for contradicting recorded evidence.
-
-Counts and visible rows use the same scoped request identities. Ordinary totals exclude marked test records per existing policy; show their separate presence so a visible test card does not look like a count error. Unknown/capped data must not produce a confident complete total. Keep grouping and counts simple; document state remains on each row rather than adding another forest of filters.
-
-### Next action and effects
-
-| Verified document state | Cycle-list navigation | Per-request action/copy |
+| Condition | Display / next action | Automatic effect |
 |---|---|---|
-| Missing brief and/or writeup | Open Staff Deliberations | Each named document card retains its own generation action, subject to existing eligibility and permissions. Never direct staff to generate or circulate the full writeup as a substitute for leadership’s lighter brief. |
-| Ready Draft | Review writeup → Staff Deliberations | Proposed button label: Start Site Visit workspace. Explain: records this Word version for the writeup workflow; does not schedule a meeting or send an email. |
-| Complete Site Visit workspace handoff | Open writeup → Staff Deliberations | Edit current Word document; existing Continue in Final Writeup navigation is available. Navigation is not a claim that all Final eligibility checks pass. |
-| Final handoff confirmed | Open Final Writeup | Existing Final status/review controls remain authoritative. |
-| Missing identity, failed read, invalid pointer/checkpoint | Check writeup status → Staff Deliberations | Explain the failed read or reconciliation condition; no mutation offered from guessed state. |
+| Future end; no full draft | Before presentation; briefing primary, optional Prepare working draft | None |
+| Future end; current full draft | Before presentation; optional Word editing | Preserve file and lifecycle |
+| End passed; current Ready/Draft | Preparing, then Post-visit editing | Record handoff on the same Word item after fresh checks |
+| End passed; genuinely no full draft | Preparing working writeup | Generate foundation once; then promote after Ready readback |
+| Generation already in flight | Preparing working writeup | Join/reconcile existing work; never launch a competing generation |
+| Complete existing Review handoff | Post-visit editing | Reuse, no re-stamp or regeneration |
+| Existing Final/group/leadership review | Corresponding review state | No generation or downgrade |
+| Failed input, broken pointer, incomplete milestone, duplicate schedule | Needs attention; existing file link remains if verified | Stop affected operation, explain repair/retry; never infer missing |
+| Cancelled, missing, future-moved or invalid schedule before promotion | Before presentation / Schedule needed / Needs attention | No promotion; cancel or defer pending work |
+| Schedule moved/cancelled after promotion | Preserve editable file; show schedule changed | No rollback or re-generation; block new review until current eligibility is resolved |
 
-All cycle-list controls remain navigation/read-only. A mutation happens only through the existing per-request action with fresh server authorization and fences. Date passing changes timing copy/filter membership only. Keep Share's preview, recipient choice and explicit send intact. Rename matching prerequisite/error/success messages in FinalWriteupTab consistently if the Start Site Visit button label changes.
+“Prepared” means ready for staff editing, not that visit findings were automatically written. The generator uses its governed foundation inputs; it must not invent observations or imply that it incorporated a transcript. Transcript extraction/augmentation and changes to briefing content are out of scope.
 
-### Loading, errors and responsive behavior
+### Replace every composite-stage condition
 
-[PLANNED] Keep the request identity visible while secondary status loads. Display unavailable status for failed secondary reads; do not substitute No document, Not scheduled, Not shared, or zero. Suppress old-cycle/old-scope data immediately on a context switch; fence success and failure responses. Refresh after a confirmed action without claiming success when only the navigation completed.
+- Brief Share/Resend conditions currently involving `stage === 'shared'` and `substate`: use the brief's exact file, lifecycle, regeneration state, send receipt and existing preview/recipient permissions. A passed visit never hides an otherwise valid sharing action.
+- The draft prerequisite currently under `stage === 'visit'`: use due/preparation state and the full writeup checkpoint. Replace manual-start instructions with preparation/recovery copy.
+- Continue in Final Writeup currently under `stage === 'visit' && preSiteShared`: use confirmed post-visit preparation and current schedule eligibility. Never initiate review from navigation.
+- Rail hiding under `beyond`, `visitExpected()` counts, session/materials visibility: replace with independent total projections; keep session/materials lines and their actual availability states across all task phases.
+- The generic Word link and “Not the current draft” warning: bind to a named brief or full-writeup identity independently. A stale brief must not mislabel the writeup.
+- Reopen/correction cycles, group/leadership review, acknowledgements and Final dashboards retain their contracts. Automation must not re-promote a staff-opened correction cycle. Retain a clearly labeled human “Finish corrections” handoff for the resulting Ready/Draft, using existing correction authorization, current-pointer, version and milestone fences. This exception is not the ordinary manual Start Site Visit prerequisite; it prevents a corrected draft from becoming stranded.
 
-At desktop width use compact aligned facts and a clear action column; at narrow width stack facts beneath the request heading and keep the primary action adjacent. No horizontal progress rail or color-only meaning. Use existing focus styles, labeled controls, accessible status/error feedback and at least the surface's existing touch target size. Verify long titles, missing dates, no documents, test rows, permission-limited staff and a populated cycle.
+## Request selection and read model
 
-## Read contract and implementation sequence
+[PLANNED] The cohort uses `cycleCodeToOdataFilter(cycleCode)` (request `wmkf_meetingdate` UTC month window), the confirmed program scope, and `_wmkf_programdirector_value` for “my”. Enforce session-derived identity, app access and Dataverse restrictions. Do not reuse Phase-II/advancing/set-aside visibility filters: all in-scope requests remain discoverable, including Concept, withdrawn and set-aside records. Visibility does not imply eligibility for automatic generation.
 
-[PLANNED] Trace: Workbench cycle/scope controls → authenticated staff-deliberations GET → request cohort → exact document pointers and distribution receipts plus visit summaries → explicit status DTO → cycle list and per-request consumers. Persistence owners remain Dataverse request/document/activity rows, existing distribution ledger, and SharePoint; no new write or migration is required by the recommended core scope.
+[PLANNED] Worker enrollment is narrower than list visibility: use an explicit release-approved cycle/program allowlist, a valid linked research-presentation event, eligible active request state, and test isolation. Reuse verified request business eligibility where applicable; do not infer worker permission from a row appearing in the UI. Withdrawn/cancelled/set-aside and test records remain visible but are not automatically generated in production. Pin the exact stored status values and their mapping in fixture tests before enabling the worker. Requests with no valid cycle association need an explicit reconciliation result; do not invent D26 membership.
 
-1. **Freeze cohort and source baseline.** Apply the owner decisions above. Inspect current callers, cycle association, access restrictions, test isolation, request caps and duplicates. Do not narrow the cohort using document presence or reviewer-finding eligibility. Source tests, not the reported count of ten, define offline fixtures. Production verification needs separately authorized bounded reads; never run all startup checks blindly because the factory-ledger gate loads live configuration itself.
-2. **Add independent read projections.** Retain the existing authenticated route/service facade. Project separate brief, writeup and timing states plus availability and exact document links. Resolve canonical pointers independently; legacy no-brief fallback must not hide the existence or absence of a Pre-Site writeup. Preserve compatibility fields until every consumer is switched. Do not make one generic lifecycle mapping serve two different documents.
-3. **Fix coverage.** Select all requests in the chosen cycle/PD scope first and join documents optionally. Read current pointer targets even if artifact cycle stamps differ from the request cycle; classify contradictions rather than silently choosing a row. Retain any legacy/document-only rows through an explicit reviewed disposition so narrowing eligibility cannot erase them. Never use one document per-request network waterfall to populate a cycle. Propagate request/document pagination completeness; capped results fail visibly or present explicitly incomplete counts. Evaluate existing `findActiveSummariesByRequests` for bounded paginated visit reads, retaining a visible duplicate/ambiguous-visit indication. It reads active states only: verify how completed/cancelled activities are represented before claiming a complete visit census; no unchecked active-only filter or earliest-row guess.
-4. **Update cycle and request surfaces together.** Replace composite stage grouping/rail, align status terminology and exact Word links, route actions by writeup readiness. Changes are limited to StaffDeliberationsPanel, StaffDeliberationsTab, relevant helpers, shell wiring, and FinalWriteupTab prerequisite copy. Calendar/materials/transcript readers keep their existing responsibilities. A shared pure presentation helper is appropriate only after both callers' input/availability differences are enumerated.
-5. **Reconcile documentation and verify.** Update the PC Meeting Tracker D7/date language, Pre-RP Brief plan §3.5/B11, route security row, service catalogue and relevant Atlas read contracts to the implemented behavior. Inventory `DELIBERATION_STAGE_KEYS`, editable stage-label settings, their defaults/admin readers, counts and tests before retiring any stage vocabulary. Preserve saved configuration compatibility; no automatic deletion, migration, or repurposing of labels. Release as a reviewed feature branch with explicit promotion and rollback; no data repair should be necessary.
+The proposed GET projection contains separate `timing`, `brief`, `writeup`, `preparation`, `session`, and `materials` facts, each with availability (`available`, `missing`, `unavailable`, `ambiguous`) and exact source identity. Include server time, scoped count completeness, due time and persisted preparation outcome. This is a projection contract, not permission to add document lifecycle values.
 
-Candidate files: `lib/services/pre-site-visit/cycle-list-service.js`, `pages/api/workbench/staff-deliberations.js`, `shared/utils/deliberation-stage.js`, `shared/components/workbench/StaffDeliberationsPanel.js`, `StaffDeliberationsTab.js`, `WorkbenchShell.js`, and `FinalWriteupTab.js`. Cohort/source changes may require a bounded request selector or adapter extension after inspection; a full Workbench/dashboard refactor is outside scope. Reusing the Meeting Tracker selection entry point without checking its lifecycle/set-aside/program filters is not accepted proof of coverage.
+Request-first paginated reads join optional artifacts in bounded batches. Resolve canonical pointers even when artifact cycle stamps differ; report contradictions. Never silently select the newest row over a current pointer. Specify legacy/document-only disposition explicitly. Propagate `capped` from request and document reads; replace the visit reader that drops pagination metadata. Ledger failure must not fail or erase the request list: project sharing history unavailable. Add a bounded ledger projection for latest successful sent time and exact source version; current `sentSourceDocumentIds` provides IDs only.
+
+Resolve duplicates consistently on list, detail and worker: ambiguous schedule, no automation. Include completed noncancelled events as eligible evidence after validating target state/status meanings; active-only readers are insufficient. Preserve the existing session/materials readers' responsibilities, but add availability results where their current null-on-error behavior obscures failure. GET, filtering and navigation stay read-only.
+
+## Scheduled preparation and persistence
+
+[PLANNED architecture] A server-side due-work scan runs independently of browser visits. Proposed polling interval: one minute, subject to deployment validation; the UI changes to “Preparing” at the end boundary and reports actual completion only after readback. Generation may take longer. Never promise the document is ready at an exact second. Scheduled processing catches up after outages and includes already-ended events in the rollout allowlist.
+
+Use an authenticated cron entry point and bounded worker following existing server-worker patterns, with trusted DAL context and the target/write interlock. Do not introduce an external queue/vendor for this task. Cron configuration, endpoint, service and migration names are implementation work, not already provisioned resources.
+
+Proposed durable operational receipt: one preparation record per request and guarded correction/lineage epoch, with a unique key; event ID/end/revision, state (pending/running/prepared/blocked), lease token/expiry, attempt count/next attempt, exact document ID, completion time, automation actor/provenance, and bounded error reason. Store operational receipts in Postgres; Dataverse document lineage and SharePoint remain authoritative. Add an existing-DB migration, manifest entry, fresh-install parity, Atlas record, retention/cap policy and schema readiness check. Finalize names and types against current migration inventory before code. Do not overload human milestone-actor fields to pretend a PD clicked a button.
+
+Worker sequence:
+
+1. Paginate enrolled requests/events with a durable scan cursor or equivalent completeness-safe scan. Upsert due receipts under the unique key. One request failing must not prevent other due requests from being processed.
+2. Claim a bounded batch with an atomic lease. Re-read request eligibility, schedule identity/end/state, current document pointers, pending generations, correction epoch and existing Final state. Unknown or changed facts defer/block; never proceed from the earlier scan alone.
+3. If a current full draft exists, preserve it without invoking generation. For genuine absence, use a new missing-only entry contract on the existing producer. Fence activation against the expected absent pointer and schedule revision; concurrent manual generation wins. Recheck before model work and before activation. Recover stored output/uploads rather than rerunning paid generation after uncertain outcomes.
+4. For a Ready/Draft, reuse promotion's version/hash validation. Add commit-time current-pointer, schedule-version/end, request eligibility and correction-epoch fences, including an atomic conditional schedule check with the document write where needed. A standalone read just before PATCH is not a cross-record race guarantee. If the platform cannot enforce that contract, resolve the mechanism before enabling automation.
+5. Record automatic provenance without impersonation. Retain existing complete milestones without re-stamping. A complete Dataverse handoff is success even if receipt acknowledgement failed: retry reads authoritative state and repairs the receipt, not the document. A successful receipt without a valid document checkpoint is a reconciliation error.
+6. Use bounded retries/backoff for transient transport or file-version conflicts. Configuration errors, unchanged invalid inputs, missing files, duplicate events, and incomplete checkpoints become visible blocked outcomes. Authenticated Retry preparation reuses the same receipt and revalidates eligibility; it cannot force regeneration or bypass schedule rules. Return per-request outcomes, not only success counts.
+
+Generation and promotion need separate checkpoints. If a meeting moves during generation, retain the generated foundation safely, defer promotion, and do not repeatedly pay to regenerate it. No current file is overwritten or replaced by automatic work. Missing-only checks must hold at activation, not just at initial load. A background worker must not supersede an existing edited Draft through the current general generation path.
+
+Before enabling writes, resolve a trusted service-principal execution policy and audit representation. Existing promotion's ALLOW_UNATTRIBUTED policy is not sufficient evidence of an acceptable scheduled-actor contract. Do not borrow the PD's identity or weaken app/DAL restrictions. Reuse existing application provider configuration for authorized application generation; no agent API credentials or new provider integration belongs in this change.
+
+## Delivery sequence
+
+1. **Freeze product/read contracts.** Confirm the outstanding program scope, pin event status semantics, cohort predicate, worker eligibility, correction/reopen behavior and review start boundary. Freeze fixture cases. Preserve current source facts in canonical docs until implemented.
+2. **Request-first read model.** Add independent facts, completeness and availability while retaining compatibility fields until both consumers migrate. Add program wiring once confirmed. This can be reviewed separately from mutation work.
+3. **Durable preparation.** Implement receipt migration, worker, missing-only generation, commit fences, automation audit and recovery. Deploy disabled. Do not call `startFinalWriteup` from the worker.
+4. **Coordinated UX changes.** Replace the rail and stage-dependent actions on both surfaces; reorder briefing/writeup by task phase; preserve session/materials and permissions. Update Final prerequisite, confirmation and regeneration copy. Preserve explicit group/leadership review actions. Enforce scheduled-end eligibility server-side as well as in the UI, with legacy review compatibility.
+5. **Validate and reconcile.** Update the PC Tracker D7/D8 language, Pre-RP Brief plan, writeup lifecycle plan, Atlas pages/index, route security matrix, service catalogue, J27-083 register and relevant agent wiki/memory routing. Inventory stage-label configuration/defaults/admin readers before retirement; preserve stored-label compatibility. No automatic configuration deletion.
+6. **Controlled rollout.** Review a read-only due-work report by cycle/program: already prepared/reviewing, existing draft, missing draft, blocked and excluded. Obtain authorization for production catch-up and AI generation before enabling; use a small allowlisted batch, inspect exact receipts/files, then expand. Enforce a batch and application-generation budget. Monitor age of due work, blocked reasons, duplicates and retries. No email is sent by preparation.
+
+Rollback: disable enrollment/worker writes first, retain readable receipts and documents, and keep the UI able to show committed preparation. Do not reverse checkpoints, delete files or roll back staff edits. Review transitions already committed remain authoritative.
 
 ## Acceptance and verification
 
-[PLANNED] Add discriminating fixtures using existing fixture conventions, never invented production records:
+- Same past event with brief Draft, Review, missing or externally circulated: request visible and preparation eligibility identical; no sharing inference/resend.
+- Existing Word file contains a distinctive staff edit: automatic promotion retains item identity and exact content. The test fails if the edit disappears. General generation is never called for an existing current draft.
+- Missing draft: one foundation and handoff despite duplicate ticks, concurrent manual generation, worker crash, upload timeout or receipt-ack failure. Recovery does not pay for a second model run after persisted output exists.
+- Future, exact-end boundary, DST/timezone, missing end, cancelled, completed, duplicate and rescheduled events: UI and server agree. Change the event during generation/promotion to test the commit fence.
+- An existing correction/reopen epoch is not automatically consumed; stale receipts cannot promote replacement documents. Already-final/reviewing artifacts are untouched.
+- Meeting ended but preparation blocked: show Needs attention with a safe retry/repair explanation and verified existing file link; never show Ready or require Start Site Visit.
+- Automatic preparation cannot set group/leadership review timestamps, expose a new Final item to leadership, send mail, or mark anyone reviewed. Explicit review start records the real staff actor and requires current readiness.
+- Program/cycle/my/all, missing identity, restrictions, Concept/set-aside/withdrawn/test fixtures, empty documents, pointer contradictions and caps: correct visibility, separate worker eligibility, no false total.
+- Ledger/session/materials failures leave request identity and other facts visible. Successful send for a different source version does not label the current briefing sent.
+- Rapid program/cycle/scope/request switches: fence every late success/error and action response. Verify Share/Resend and Final navigation independent of brief-derived stage.
+- Desktop/narrow layout, long titles, keyboard flow, active composer during timed refresh, screen-reader feedback and loading/error states. Inspect both widths once, fix in one batch, confirm once; use Impeccable craft-floor/detector only when implementing UI.
 
-- Past scheduled date with brief Draft, brief Review, no brief, no writeup, and Final handoff: each remains discoverable under Date passed in the complete cycle/PD cohort.
-- Same past date plus Pre-Site Draft: exact draft state and Review writeup link; no implication that the Site Visit workspace or Final was started.
-- Shared/locked brief without successful send, successful send for a different version, external attachment unknown, and history read failure: distinguish each; never mark Sent or trigger resend to fix a status.
-- Not-generated document versus failed read, broken pointer, newer failed attempt, mismatched cycle stamp, malformed lifecycle and incomplete handoff: missing/unknown/reconciliation semantics are not conflated.
-- Scope my/all, missing caller identity, Concept/Phase II/advancing/set-aside/withdrawn requests in the selected cycle, current cycle vs artifact stamp, test exclusions, duplicate visits, completed/cancelled activity policy, pagination/caps: no disappearing requests or false complete count.
-- Date boundary, timezone display, moved future date and invalid date: time only alters timing state; no document POST is issued. Declare server timing reference and refresh policy so browser/server clocks cannot disagree on filter counts.
-- Valid handoff and Final navigation, failed/unknown-outcome action and retry: existing identity/ETag/actor/readback safeguards remain. No email, generation or transition caused by filtering, opening a card, or loading the page.
-- Rapid cycle/scope/request changes and late success/failure responses: no stale request facts/actions. Keyboard, narrow screen and long-title layouts remain usable.
+Run affected unit/integration tests, migration/schema and cron-auth tests, type/lint and canonical build; scoped route, Atlas, status parity, J27 register and document gates, each gate/self-test sequentially. Do not run broad startup checks that may load live configuration. Use sandbox fixtures for cross-store races and catch-up before authorized production verification. Live schema, exact counts and scheduler latency remain UNKNOWN until those bounded probes.
 
-Run affected existing and new unit suites, scoped type/lint and route/Atlas/status parity gates with each self-test sequentially. Run doc-currency, fact-consistency, doc-symbol-refs and their self-tests after documentation edits. For implementation, run canonical build and a bounded browser fixture pass at desktop/narrow widths. Impeccable: inspect both widths once, fix findings as one batch, confirm once; run its detector only after UI edits. A fresh contract reviewer must trace selection→persistence reads→DTO→both UIs and test exclusions before promotion. A before/after production count remains [UNKNOWN] until separately authorized and measured.
+## Review and open items
 
-## Plan review boundary
+Fable's earlier review was of the superseded display-only plan. Its valid findings are incorporated here: program/cohort precision, every stage-dependent action, explicit Final behavior, preserved session/materials, read completeness, duplicate semantics, sent-date projection and J27 register. Its suggestion about pre-visit Final navigation is superseded by the owner's scheduled-end information boundary.
 
-[PLANNED] Whole-flow, stale-state, partial read failure, enum/count fan-out and durable-document reconciliation are required. New persistence and new mutation contracts are N/A for the recommended core fix. External-share recording, visit-completion confirmation, automatic document advancement, backfills and bulk sends are outside that core. Adding the optional external-sharing record or altering the owner-approved cohort requires a bounded plan amendment before code.
+This is an implementation proposal, not an implementation-ready schema receipt. Product workflow is decided; program scope confirmation, exact event-state mapping, trusted scheduled actor, atomic schedule fence, migration layout and deployment timing validation are explicit pre-enable dependencies. A fresh contract review must cover request selection → scheduled worker → document persistence → both UIs → explicit review, including partial success and unknown outcomes.
 
-
-## Planning verification
-
-[VERIFIED via local documentation gates] doc-currency, fact-consistency and doc-symbol-refs plus each self-test, and docs-catalog passed. These checks validate document conventions, not the proposed runtime behavior. No implementation, browser mockup, production read or state change occurred during planning.
-
-[VERIFIED via fresh read-only contract reviewer `/root/status_plan_review`] READY for planning scope; source review confirmed the current date/lifecycle mix, document-first omission, separate pointers, premature Final navigation, active-only visit-summary limitation and cycle/PD-only shell contract. The reviewer ran no tests or live calls. Implementation must verify cycle association, completed/cancelled/duplicate visit treatment and receipt version/date projection before asserting complete counts or sharing facts.
+[VERIFIED via local checks] Documentation currency, fact consistency, symbol references, their sequential self-tests, and docs catalogue checks passed for this revision. [VERIFIED via fresh read-only contract review] Reviewer found no material blocker for this planning deliverable and confirmed that scheduled automation remains unimplemented; the correction-handoff clarification was incorporated. No runtime tests, production calls or UI implementation were performed. The original sandbox self-test attempt could not create a fixture; the authorized host rerun passed. The unrelated `package-lock.json` change remains untouched. Impeccable context was loaded earlier in this session; its stale generated design-metadata warning was reported separately and is not repaired by this task.
