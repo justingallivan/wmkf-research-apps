@@ -26,6 +26,8 @@ related:
 
 [SOURCE-BUILT 2026-10-04 on `codex/staff-deliberations-rework`; not deployed to production.] The earlier manual “Start Site Visit” prerequisite and read-only-only scope are superseded. The worker and human review guards are implemented behind fail-closed configuration; production automation is off and no cron schedule is registered. Migration 067 is source-only and unapplied. This plan does not authorize production activation, catch-up writes, or AI generation. No production records were read for this implementation; exact D26 counts remain UNKNOWN.
 
+[OWNER DECISION, 2026-10-05] Rehearse on a dedicated marked production test request using existing application and Test Request Factory controls. Do not build out the sandbox or create one-off testing infrastructure. The request number and concrete production writes must be agreed before execution; this decision does not authorize migration, deployment, or broad automation activation.
+
 ## Current evidence and implementation boundary
 
 Reviewed runtime checkpoint: `bc638dfe8` on `codex/staff-deliberations-rework`, with documentation reconciliation in `51835eef5`. The source and offline test evidence below do not establish deployment, live schema readiness, or production automation.
@@ -137,7 +139,7 @@ Worker sequence:
 1. Paginate enrolled requests/events with a durable scan cursor or equivalent completeness-safe scan. Upsert due receipts under the unique key. One request failing must not prevent other due requests from being processed.
 2. Claim a bounded batch with an atomic lease. Re-read request eligibility, schedule identity/end/state, current document pointers, pending generations, correction epoch and existing Final state. Unknown or changed facts defer/block; never proceed from the earlier scan alone.
 3. If a current full draft exists, preserve it without invoking generation. For genuine absence, use a new missing-only entry contract on the existing producer. Fence activation against the expected absent pointer and schedule revision; concurrent manual generation wins. Recheck before model work and before activation. Recover stored output/uploads rather than rerunning paid generation after uncertain outcomes.
-4. For a Ready/Draft, the worker reuses promotion's version/hash validation and commit-time current-pointer, schedule/end, request-eligibility and correction-epoch fences. It conditionally patches the observed event in the same Dataverse changeset as request/document writes. The assumed same-value event PATCH semantics still require authorized sandbox proof before production enablement; a standalone read just before PATCH is not a cross-record race guarantee.
+4. For a Ready/Draft, the worker reuses promotion's version/hash validation and commit-time current-pointer, schedule/end, request-eligibility and correction-epoch fences. It conditionally patches the observed event in the same Dataverse changeset as request/document writes. The assumed same-value event PATCH semantics still require an owner-authorized, bounded production test-request proof before general production enablement; a standalone read just before PATCH is not a cross-record race guarantee.
 5. Record automatic provenance without impersonation. Retain existing complete milestones without re-stamping. A complete Dataverse handoff is success even if receipt acknowledgement failed: retry reads authoritative state and repairs the receipt, not the document. A successful receipt without a valid document checkpoint is a reconciliation error.
 6. The worker uses bounded retries/backoff for transient transport or file-version conflicts. Configuration errors, unchanged invalid inputs, missing files, duplicate events, and incomplete checkpoints become visible blocked outcomes. Authenticated Retry preparation reuses the same receipt and revalidates eligibility; it cannot force regeneration or bypass schedule rules. Cron returns per-request outcomes, not only success counts.
 
@@ -169,7 +171,23 @@ Rollback: disable enrollment/worker writes first, retain readable receipts and d
 - Rapid program/cycle/scope/request switches: fence every late success/error and action response. Verify Share/Resend and Final navigation independent of brief-derived stage.
 - Desktop/narrow layout, long titles, keyboard flow, active composer during timed refresh, screen-reader feedback and loading/error states. Inspect both widths once, fix in one batch, confirm once; use Impeccable craft-floor/detector only when implementing UI.
 
-Run affected unit/integration tests, migration/schema and cron-auth tests, type/lint and canonical build; scoped route, Atlas, status parity, J27 register and document gates, each gate/self-test sequentially. Do not run broad startup checks that may load live configuration. Use sandbox fixtures for cross-store races and catch-up before authorized production verification. Live schema, exact counts and scheduler latency remain UNKNOWN until those bounded probes.
+Run affected unit/integration tests, migration/schema and cron-auth tests, type/lint and canonical build; scoped route, Atlas, status parity, J27 register and document gates, each gate/self-test sequentially. Do not run broad startup checks that may load live configuration. Use offline fixtures for cross-store races and catch-up; live acceptance uses the owner-selected production test request and existing controls. Live schema, exact counts and scheduler latency remain UNKNOWN until those bounded probes.
+
+## Production test-request rehearsal — current execution gap
+
+[VERIFIED via source, 2026-10-05] The deployed Factory form creates a Basic recipe (`lib/services/test-requests/admin-run-service.js`, `confirmRun`); the CLI also requires Basic for production reservation (`scripts/rehearse-test-request-sandbox.mjs`, argument validation). The `pre_site_visit` recipe in `run-runner.js` finishes at `verify_presite`; it does not invoke scheduled preparation. The new worker's scan, fresh eligibility reads, automatic promotion helper and retry path exclude marked test requests (`preparation-worker.js`, `site-visit-transition-service.js`). There is no existing Factory operation that demonstrates the new automatic worker end to end on a marked production request.
+
+Existing staff actions can exercise request visibility, program/cycle/PD scope, separate briefing/writeup facts, draft creation, preservation of staff edits through manual promotion, and explicit review initiation. A group-review transition with a verified configured event map can exercise the same-value event PATCH fence; the legacy absent-map compatibility path cannot prove that fence. Manual promotion does not prove scheduled discovery, durable worker retries, or missing-only automatic generation.
+
+Execution order:
+
+1. **Completed in source, 2026-10-05:** merge `259bbc961` reconciles PR #432 with main at `b5752272e`; migration 067 remains alongside 068 and the combined source retains PR #434's presentation-only external transcript restrictions. Full verification passed 20,689 tests across 1,270 suites (157 tests / 11 suites skipped), plus the production build. Test log: `/tmp/deliberations-oct5-full-tests.log`.
+2. Select an owner-approved production test request that is not already reserved by another workstream. Do not assume request 1003222 is available; Claude's transcript acceptance uses it.
+3. Inspect that request, its event, current Word artifacts, schema/configuration, and allowed actors read-only. Record the exact expected writes before seeking release or execution approval. Keep the recurring worker unscheduled and disabled.
+4. After explicit authorization and required deployment/schema readiness, rehearse the existing manual/UI paths and the event fence. Preserve the test marker and staff file contents; no email send is required. Do not present this as automatic-worker acceptance.
+5. The automatic-worker test path remains an owner decision: existing controls cannot exercise it on a marked request. Do not silently remove the marker, disable isolation, add a hidden bypass, or build a separate rehearsal system. Automatic activation remains pending until the execution gap is resolved and its behavior is proved.
+
+[UNKNOWN] The selected production test request, current live configuration/schema for this feature, and actual event PATCH behavior have not been probed in this reconciliation. No live rehearsal or production mutation has been performed.
 
 ## Review and open items
 
