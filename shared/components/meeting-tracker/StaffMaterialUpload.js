@@ -96,10 +96,8 @@ export default function StaffMaterialUpload({ requestId, slot, label, disabled =
   };
 
   const upload = async (file) => {
-    if (!file) return;
+    if (!file || pending) return;
     const generation = ++generationRef.current;
-    // Choosing a new file abandons any earlier unfinished upload; its staging row expires.
-    setPending(null);
     setError(null);
     setPercent(null);
     setPhase('Preparing…');
@@ -151,13 +149,13 @@ export default function StaffMaterialUpload({ requestId, slot, label, disabled =
         type="file"
         className="sr-only"
         aria-label={`${label}: choose a file`}
-        disabled={disabled || busy}
+        disabled={disabled || busy || Boolean(pending)}
         onChange={(event) => { void upload(event.target.files?.[0]); }}
         data-testid={`staff-upload-input-${slot}`}
       />
       <button
         type="button"
-        disabled={disabled || busy}
+        disabled={disabled || busy || Boolean(pending)}
         onClick={() => inputRef.current?.click()}
         className="text-xs font-semibold text-gray-700 underline underline-offset-4 hover:text-gray-900 disabled:opacity-50"
       >
@@ -165,6 +163,7 @@ export default function StaffMaterialUpload({ requestId, slot, label, disabled =
       </button>
       {busy && <p className="mt-1 text-xs text-blue-800" role="status">{phase}{percent !== null ? ` ${percent}%` : ''}</p>}
       {error && <p className="mt-1 text-xs text-red-800" role="alert">{error}</p>}
+      {pending && !busy && <p className="mt-1 text-xs text-gray-700">Press Retry to finish saving the earlier file first.</p>}
       {pending && !busy && (
         <button
           type="button"

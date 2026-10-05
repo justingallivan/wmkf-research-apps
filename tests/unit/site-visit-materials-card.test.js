@@ -293,11 +293,40 @@ describe('staff replacement upload (staff replacement plan §3.4)', () => {
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
   });
 
+  test('an unresolved finalize blocks another file and Retry preserves the original staging id', async () => {
+    const posts = finalizeScript([
+      { status: 503, body: { ok: false, reason: 'supersede_failed' } },
+      { status: 200, body: { ok: true, slot: 'presentation_pdf', filename: 'p.pdf' } },
+    ]);
+    await choose();
+    const retry = await screen.findByRole('button', { name: 'Retry' });
+    const input = screen.getByTestId('staff-upload-input-presentation_pdf');
+    expect(screen.getByRole('button', { name: 'Upload updated file' })).toBeDisabled();
+    expect(input).toBeDisabled();
+    expect(screen.getByText('Press Retry to finish saving the earlier file first.')).toBeInTheDocument();
+
+    fireEvent.change(input, { target: { files: [new File(['%PDF C'], 'C.pdf', { type: 'application/pdf' })] } });
+    expect(posts.map(([path]) => path)).toEqual(['staff-upload-token', 'staff-finalize']);
+    expect(screen.getByRole('button', { name: 'Retry' })).toBe(retry);
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Presentation (PDF) saved.'));
+    expect(posts.map(([path]) => path)).toEqual(['staff-upload-token', 'staff-finalize', 'staff-finalize']);
+    expect(posts[1][1]).toEqual({ stagingId: STAGING, slot: 'presentation_pdf' });
+    expect(posts[2][1]).toEqual({ stagingId: STAGING, slot: 'presentation_pdf' });
+    expect(mockPut).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Upload updated file' })).toBeEnabled();
+    expect(input).toBeEnabled();
+  });
+
   test('a final rejection clears the staged upload: no Retry is offered', async () => {
     finalizeScript([{ status: 422, body: { ok: false, reason: 'extension_not_allowed' } }]);
     await choose();
     expect(await screen.findByRole('alert')).toHaveTextContent('That file type is not accepted for this item.');
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Upload updated file' })).toBeEnabled();
+    expect(screen.getByTestId('staff-upload-input-presentation_pdf')).toBeEnabled();
   });
 
   test('a refused finalize shows its reason and does not claim success', async () => {

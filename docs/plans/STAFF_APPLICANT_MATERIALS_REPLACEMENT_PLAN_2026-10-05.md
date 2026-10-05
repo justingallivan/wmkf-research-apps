@@ -344,9 +344,21 @@ Branch `feature/staff-materials-replacement`, cut from `main` at `a93974cdf`.
   followed by Retry; both show one blob upload and two finalizes with the same
   staging id. A final 422 offers no Retry. Each retention guard was
   mutation-checked.
-- **Limitation:** the staged id is held in component memory only. A page reload
-  loses it; the staging row then expires, and the slot shows the previous
-  file.
+- **Round 2 (needs-attention, one medium):** the file chooser stayed enabled
+  beside Retry, so choosing file C discarded B's staging id. C then superseded
+  only B, and predecessor A stayed current.
+  - **Fix (implemented by Codex rescue, reviewed by Claude):** while a finalize
+    is unresolved, the upload button and file input are disabled, a line says
+    to press Retry first, and `upload()` refuses without minting a token.
+  - **Tests:** the regression covers 503 → choosing C → Retry with the original
+    staging id; after a terminal 422 the controls are enabled again. The
+    defensive guard and the disabled controls were each mutation-checked
+    separately.
+- **Limitation:** the staged id is held in component memory only. A page
+  reload, or switching to another request or slot, loses it. The staging row
+  then expires; the slot keeps whichever file is current. After a
+  `supersede_failed`, that can be the new file beside the old one, until a
+  later upload to the same slot supersedes the newest receipt only.
 
 **Behaviour notes for review:**
 - **`other` is add-only.** `finalizeMaterialUpload` supersedes nothing for
