@@ -16,8 +16,9 @@ related:
 
 # Site Visit summaries, Staff Deliberations follow-up, and Board sharing
 
-Status: Stage 1 source-built on `feature/site-visit-presentation-boundary`
-(2026-10-05, §11); Stages 2–4 not built. Owner decisions complete (§3, §7).
+Status: Stage 1 Production-live (PR #434 merge `32664485b`, Production deployment 6863898521 success; migration 068 applied and picklist 100000012 inserted (owner-run, re-read verified) 2026-10-05; §11, §12);
+acceptance on test request 1003222 pending. Stages 2–4 not built. Owner
+decisions complete (§3, §7).
 
 ## 1. What the owner asked for (2026-10-04)
 

@@ -361,7 +361,7 @@ Production Request Document row was created by this release smoke.
   `meeting-tracker-post-presentation`. Every member is re-proved against the
   token-bound request before a fresh HTTPS Graph redirect; Zoom is watch-only,
   SharePoint MP4 Watch has no 50 MiB application cap, and no file bytes traverse
-  the application. **Stage 1 (source-built 2026-10-05, not deployed) changes
+  the application. **Stage 1 (Production-live 2026-10-05) changes
   both outside readers to serve the bound Presentation Transcript and the
   Transcript Summary only; see "Presentation Transcript contract" below.**
 - `wmkf_requestdocument` owns the request/cycle relationship, typed artifact and
@@ -666,11 +666,11 @@ list from the row's own `schemaVersion`, and the live fingerprint the UI
 echoes back as `acknowledgeStaleInputs` is likewise computed under the
 stored row's schema version.
 
-## Presentation Transcript contract (Stage 1, source-built on `feature/site-visit-presentation-boundary`, 2026-10-05)
+## Presentation Transcript contract (Stage 1, Production-live 2026-10-05)
 
 `docs/plans/SITE_VISIT_SUMMARIES_AND_BOARD_SHARING_PLAN_2026-10-04.md` §4.1,
-§4.2, §4.7, §4.8, §5 Stage 1. **[SOURCE-BUILT; NOT DEPLOYED; picklist value
-not yet inserted.]** One Zoom recording holds the research presentation and,
+§4.2, §4.7, §4.8, §5 Stage 1. **[PRODUCTION-LIVE: PR #434 merge `32664485b`, Production deployment 6863898521 success; migration 068 applied and picklist 100000012 inserted (owner-run, re-read verified) 2026-10-05. Acceptance on
+test request 1003222 not yet run.]** One Zoom recording holds the research presentation and,
 after the applicants leave, the staff discussion (owner decision 1). The
 outside Board presentation link and the deliberation briefing link therefore
 must never serve the full `TRANSCRIPT` or `RECORDING` rows.
