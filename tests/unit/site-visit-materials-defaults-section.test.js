@@ -109,3 +109,51 @@ describe('SiteVisitMaterialsDefaultsSection', () => {
     });
   });
 });
+
+
+test('offset and upload cap save independently; blank and fractional offsets cannot be saved', async () => {
+  global.fetch = jest.fn().mockResolvedValueOnce(jsonResponse(200, { maxMb: 500, dueBusinessDays: 2, source: 'default' }));
+  render(<SiteVisitMaterialsDefaultsSection />);
+  const days = await screen.findByLabelText('Materials due (business days before the site visit)');
+  const save = screen.getByRole('button', { name: 'Save due-date offset' });
+  expect(days).toHaveValue(2);
+  for (const value of ['', '1.5', '0', '31']) {
+    fireEvent.change(days, { target: { value } });
+    expect(save).toBeDisabled();
+  }
+  fireEvent.change(screen.getByLabelText('Upload cap (MB)'), { target: { value: '200' } });
+  fireEvent.change(days, { target: { value: '5' } });
+  global.fetch.mockResolvedValueOnce(jsonResponse(200, { success: true, dueBusinessDays: 5, dueDaysSource: 'setting' }));
+  fireEvent.click(save);
+  expect(await screen.findByRole('status')).toHaveTextContent('Existing deadlines are unchanged');
+  expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual({ dueBusinessDays: 5 });
+  expect(screen.getByLabelText('Upload cap (MB)')).toHaveValue(200);
+  expect(screen.getByRole('button', { name: 'Save upload cap' })).toBeEnabled();
+});
+
+test('an offset save failure keeps the edit retryable and never claims success', async () => {
+  global.fetch = jest.fn().mockResolvedValueOnce(jsonResponse(200, { maxMb: 500, dueBusinessDays: 2 }));
+  render(<SiteVisitMaterialsDefaultsSection />);
+  const days = await screen.findByLabelText('Materials due (business days before the site visit)');
+  fireEvent.change(days, { target: { value: '5' } });
+  global.fetch.mockResolvedValueOnce(jsonResponse(503, { error: 'Setting unavailable' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save due-date offset' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Setting unavailable');
+  expect(days).toHaveValue(5);
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Save due-date offset' })).toBeEnabled();
+});
+
+
+test.each([{}, { success: true }, { success: true, dueBusinessDays: 0 }])('incomplete offset save response %p does not claim success', async (response) => {
+  global.fetch = jest.fn().mockResolvedValueOnce(jsonResponse(200, { maxMb: 500, dueBusinessDays: 2 }));
+  render(<SiteVisitMaterialsDefaultsSection />);
+  const days = await screen.findByLabelText('Materials due (business days before the site visit)');
+  fireEvent.change(days, { target: { value: '5' } });
+  global.fetch.mockResolvedValueOnce(jsonResponse(200, response));
+  fireEvent.click(screen.getByRole('button', { name: 'Save due-date offset' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('The save could not be confirmed');
+  expect(days).toHaveValue(5);
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Save due-date offset' })).toBeEnabled();
+});

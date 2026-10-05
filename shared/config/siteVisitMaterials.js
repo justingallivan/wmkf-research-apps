@@ -8,7 +8,16 @@ export const SITE_VISIT_MATERIALS_UPLOAD_MAX_MB_DEFAULT = 500;
 export const SITE_VISIT_MATERIALS_UPLOAD_MAX_MB_LIMITS = Object.freeze({ min: 1, max: 500 });
 
 export const SITE_VISIT_MATERIALS_AUDIENCE = 'materials';
-export const SITE_VISIT_MATERIALS_DUE_BUSINESS_DAYS = 2;
+export const SITE_VISIT_MATERIALS_DUE_BUSINESS_DAYS_SETTING = 'site_visit_materials.due_business_days';
+export const SITE_VISIT_MATERIALS_DUE_BUSINESS_DAYS_DEFAULT = 2;
+export const SITE_VISIT_MATERIALS_DUE_BUSINESS_DAYS_LIMITS = Object.freeze({ min: 1, max: 30 });
+
+export function normalizeDueBusinessDays(value) {
+  if (typeof value !== 'number' && typeof value !== 'string') return null;
+  if (typeof value === 'string' && !/^\d+$/.test(value.trim())) return null;
+  const days = Number(value);
+  return Number.isInteger(days) && days >= 1 && days <= 30 ? days : null;
+}
 export const SITE_VISIT_MATERIALS_CLOSE_AFTER_DAYS = 7;
 
 /** M1: the cycle checklist template. Keys are stable; labels are copy. */

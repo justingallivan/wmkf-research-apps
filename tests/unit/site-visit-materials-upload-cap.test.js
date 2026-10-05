@@ -5,6 +5,7 @@ jest.mock('../../lib/services/settings-service.js', () => ({ getSettingStrict: j
 
 import { requireSuperuser } from '../../lib/utils/auth';
 import { getSettingStrict, setSetting } from '../../lib/services/settings-service.js';
+import { getDueBusinessDays, setDueBusinessDays } from '../../lib/services/site-visit-materials/due-date-setting';
 import { getUploadMaxMb, setUploadMaxMb, uploadMaxBytes } from '../../lib/services/site-visit-materials/upload-cap';
 import handler from '../../pages/api/admin/site-visit-materials-defaults';
 
@@ -20,6 +21,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   requireSuperuser.mockResolvedValue({ profileId: 3 });
   setSetting.mockResolvedValue(true);
+  getSettingStrict.mockResolvedValue({ found: false, value: null });
 });
 
 test('the cap reads an in-range setting, else the default of 500 MB; a read failure is 503', async () => {
@@ -58,7 +60,7 @@ test('the admin route is superuser-only, GET reports the cap with limits, PUT ta
   const res = mockRes();
   await handler({ method: 'GET', query: {} }, res);
   expect(requireSuperuser).toHaveBeenCalled();
-  expect(res.body).toEqual({ success: true, maxMb: 500, source: 'default', limits: { min: 1, max: 500 }, defaultMb: 500 });
+  expect(res.body).toEqual({ success: true, maxMb: 500, source: 'default', limits: { min: 1, max: 500 }, defaultMb: 500, dueBusinessDays: 2, dueDaysSource: 'default', dueDaysLimits: { min: 1, max: 30 }, defaultDueBusinessDays: 2 });
 
   const bad = mockRes();
   await handler({ method: 'PUT', body: { maxMb: 120, extra: true } }, bad);
@@ -79,4 +81,46 @@ test('the admin route is superuser-only, GET reports the cap with limits, PUT ta
   const denied = mockRes();
   await handler({ method: 'GET', query: {} }, denied);
   expect(denied.body).toBeNull();
+});
+
+
+test('due offset defaults only when absent and reads a valid saved value', async () => {
+  expect(await getDueBusinessDays()).toEqual({ dueBusinessDays: 2, dueDaysSource: 'default' });
+  getSettingStrict.mockResolvedValueOnce({ found: true, value: '5' });
+  expect(await getDueBusinessDays()).toEqual({ dueBusinessDays: 5, dueDaysSource: 'setting' });
+  expect(getSettingStrict).toHaveBeenCalledWith('site_visit_materials.due_business_days');
+});
+
+test.each([null, '', ' ', false, [], {}, 0, -1, 31, 1.5, 'abc', '2days'])('invalid offset %p cannot be saved or used from storage', async (value) => {
+  await expect(setDueBusinessDays(value)).rejects.toMatchObject({ httpStatus: 400 });
+  expect(setSetting).not.toHaveBeenCalled();
+  getSettingStrict.mockResolvedValueOnce({ found: true, value });
+  await expect(getDueBusinessDays()).rejects.toMatchObject({ httpStatus: 503 });
+});
+
+test('offset read/write failures are explicit and saves retain actor attribution', async () => {
+  getSettingStrict.mockRejectedValueOnce(new Error('private storage error'));
+  await expect(getDueBusinessDays()).rejects.toMatchObject({ httpStatus: 503, code: 'site_visit_materials_due_days_unavailable' });
+  for (const value of [1, 30]) {
+    expect(await setDueBusinessDays(value, { updatedBy: 3 })).toEqual({ dueBusinessDays: value, dueDaysSource: 'setting' });
+    expect(setSetting).toHaveBeenLastCalledWith('site_visit_materials.due_business_days', String(value), 3);
+  }
+  setSetting.mockResolvedValueOnce(false);
+  await expect(setDueBusinessDays(5)).rejects.toMatchObject({ httpStatus: 503 });
+  setSetting.mockRejectedValueOnce(new Error('private storage error'));
+  await expect(setDueBusinessDays(5)).rejects.toMatchObject({ httpStatus: 503 });
+});
+
+test('the admin route saves only the selected setting and rejects combined or unprivileged writes', async () => {
+  const res = mockRes();
+  await handler({ method: 'PUT', body: { dueBusinessDays: 5 } }, res);
+  expect(res.body).toEqual({ success: true, dueBusinessDays: 5, dueDaysSource: 'setting' });
+  expect(setSetting).toHaveBeenCalledTimes(1);
+  expect(setSetting).toHaveBeenCalledWith('site_visit_materials.due_business_days', '5', 3);
+  const combined = mockRes();
+  await handler({ method: 'PUT', body: { dueBusinessDays: 5, maxMb: 120 } }, combined);
+  expect(combined.statusCode).toBe(400);
+  requireSuperuser.mockResolvedValueOnce(null);
+  await handler({ method: 'PUT', body: { dueBusinessDays: 6 } }, mockRes());
+  expect(setSetting).toHaveBeenCalledTimes(1);
 });

@@ -14,6 +14,7 @@ jest.mock('../../lib/services/site-visit-materials/collection-service', () => {
       ? (args) => value(args, mockDeps) : value]));
 });
 
+import { ServiceHttpError } from '../../lib/services/service-http-error';
 import handler from '../../pages/api/meeting-tracker/visits/[requestId]/materials';
 import { requireAppAccess } from '../../lib/utils/auth';
 import { DatabaseService } from '../../lib/services/database-service';
@@ -34,6 +35,7 @@ function fixture() {
   let row = null;
   const d = {
     schemaReady: () => true,
+    getDueBusinessDays: jest.fn(async () => ({ dueBusinessDays: 2, dueDaysSource: 'default' })),
     getRequest: jest.fn(async () => ({ akoya_requestid: REQUEST, akoya_requestnum: '1003222', akoya_title: 'Study A', wmkf_meetingdate: '2030-12-11', akoya_requeststatus: 100000001, wmkf_triagestatus: 100000000 })),
     findActiveSiteVisit: jest.fn(async () => ({ activityid: VISIT, scheduledstart: '2030-10-07T16:00:00Z', scheduledend: '2030-10-07T19:00:00Z', wmkf_ianatimezone: 'America/Los_Angeles' })),
     resolveRecipients: jest.fn(async () => ({ pi: { name: 'Pat', email: 'pat@example.edu' }, liaison: { name: 'Lee', email: 'lee@example.edu' } })),
@@ -404,4 +406,57 @@ test('recipient role swap after route validation is rejected even with legacy na
   expect(result.statusCode).toBe(409);
   expect(mockDeps.insertCollection).not.toHaveBeenCalled();
   expect(mockDeps.sendEmail).not.toHaveBeenCalled();
+});
+
+
+test('a configured five-day offset is previewed and persisted on new collection creation', async () => {
+  mockDeps.getDueBusinessDays.mockResolvedValue({ dueBusinessDays: 5, dueDaysSource: 'setting' });
+  const draft = await preview();
+  expect(new Date(draft.dueAt).toISOString()).toBe('2030-09-30T16:00:00.000Z');
+  const sent = await post({ action: 'create', emailTemplate: invitation, proof: draft.proof });
+  expect(sent.statusCode).toBe(200);
+  expect(mockDeps.insertCollection.mock.calls[0][0].dueAt.toISOString()).toBe('2030-09-30T16:00:00.000Z');
+});
+
+test('a changed offset invalidates a reviewed invitation before any side effect', async () => {
+  const draft = await preview();
+  mockDeps.getDueBusinessDays.mockResolvedValue({ dueBusinessDays: 5, dueDaysSource: 'setting' });
+  const sent = await post({ action: 'create', emailTemplate: invitation, proof: draft.proof });
+  expect(sent.statusCode).toBe(409);
+  for (const name of ['insertCollection', 'mint', 'sendEmail']) expect(mockDeps[name]).not.toHaveBeenCalled();
+});
+
+test('an offset change between proof verification and collection creation is also rejected', async () => {
+  const draft = await preview();
+  mockDeps.getDueBusinessDays.mockResolvedValueOnce({ dueBusinessDays: 2 }).mockResolvedValueOnce({ dueBusinessDays: 5 });
+  const sent = await post({ action: 'create', emailTemplate: invitation, proof: draft.proof });
+  expect(sent.statusCode).toBe(409);
+  for (const name of ['insertCollection', 'mint', 'sendEmail']) expect(mockDeps[name]).not.toHaveBeenCalled();
+});
+
+test.each(['invite', 'remind'])('existing %s uses its saved deadline even when the setting is unavailable', async (action) => {
+  mockDeps.setRow(existingRow());
+  mockDeps.getDueBusinessDays.mockRejectedValue(new Error('setting unavailable'));
+  const template = action === 'invite' ? invitation : reminder;
+  const draft = await preview(action, template);
+  expect(new Date(draft.dueAt).toISOString()).toBe('2030-10-03T16:00:00.000Z');
+  const sent = await post({ action, emailTemplate: template, proof: draft.proof });
+  expect(sent.statusCode).toBe(200);
+  expect(mockDeps.getDueBusinessDays).not.toHaveBeenCalled();
+  expect(mockDeps.getRow().due_at).toBe('2030-10-03T16:00:00Z');
+});
+
+
+test('an unavailable offset refuses new preview and send before side effects', async () => {
+  const draft = await preview();
+  mockDeps.getDueBusinessDays.mockRejectedValue(new ServiceHttpError('Due-date setting unavailable', { httpStatus: 503, code: 'site_visit_materials_due_days_unavailable' }));
+  for (const body of [
+    { action: 'preview', sendAction: 'create', emailTemplate: invitation },
+    { action: 'create', emailTemplate: invitation, proof: draft.proof },
+  ]) {
+    const result = await post(body);
+    expect(result.statusCode).toBe(503);
+    expect(result.body.error).toBe('Due-date setting unavailable');
+  }
+  for (const name of ['insertCollection', 'mint', 'sendEmail']) expect(mockDeps[name]).not.toHaveBeenCalled();
 });
