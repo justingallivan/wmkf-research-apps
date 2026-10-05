@@ -5,6 +5,7 @@ metadata:
   node_type: memory
   type: project
   status: active
+  last_verified: 2026-10-05 source only - execute-prompt.js calls buildUntrustedContentPreamble() without nonces, the byte-identical marked-block test exists, and the audit doc and probe script exist; the post-fix production cache-read check was not run
   originSessionId: 0a631ca0-29ca-4f6c-913a-f551fb1ced7d
 ---
 

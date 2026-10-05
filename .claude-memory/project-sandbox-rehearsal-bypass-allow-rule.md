@@ -5,6 +5,7 @@ metadata:
   node_type: memory
   type: project
   status: active
+  last_verified: 2026-10-05 via the allow rule present in .claude/settings.local.json and --bypass-goverify parsing plus its production refusal in scripts/rehearse-test-request-sandbox.mjs
   originSessionId: 5fb56b4d-c45a-4872-8a32-38a75b670ef3
   modified: 2026-09-24T05:02:25.866Z
 ---

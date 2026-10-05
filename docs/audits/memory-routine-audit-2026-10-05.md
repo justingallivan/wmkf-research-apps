@@ -121,3 +121,21 @@ RECONCILED WITH EXPLICIT UNKNOWNS — router diet complete and verified;
 all no-recall-rule flags fixed; eight shadow-atlas flags accepted with read
 evidence; weak-basis (7) and one oversize split queued with named
 dispositions.
+
+## Follow-up — Session 577 (2026-10-05)
+
+- The 7 weak-basis leaves each got a dated `last_verified` after a source or
+  local probe (weak-basis 7 → 0). Content fixes made in the same pass:
+  - **Colima:** the container image is `postgres:16-alpine`.
+  - **Migration numbers:** the current allocation is recorded (`main` ends at
+    069, 067 is claimed off `main`, 070 was applied before merge, 071 is next).
+  - **Executor thinking budget:** Opus 5.5 is `adaptive_always_on`.
+  - **Email tokens:** the stored Dataverse defaults are marked `[ASSUMED]`.
+- `project-site-visit-materials-planning-handoff` was split: the 2026-09-08 and
+  2026-09-09 history moved to the closed `project-site-visit-materials-history`,
+  which the archive now lists. Two stale claims were corrected: PR #252 merged
+  on 2026-09-11, and the due-date offset merged in PR #439. A bullet that
+  contradicted its own Recall Rule was dropped. The note went from 9.2 KB to
+  5.1 KB (oversize-routed 1 → 0).
+- Health is 8 flags, all accepted shadow-atlas false positives (see the
+  memory-health checker narrowing, an owner decision).

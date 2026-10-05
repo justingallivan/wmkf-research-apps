@@ -4,6 +4,7 @@ description: What a Tier 2 browser rehearsal can and cannot exercise on the Verc
 metadata:
   type: project
   status: active
+  last_verified: 2026-10-05 source only - previewReadOnly from VERCEL_ENV in pages/workbench/[requestId].js, no EXTERNAL_LINK_SECRET line in .env.local, reactStrictMode true in next.config.js; Vercel env and interlock rows not re-read
   originSessionId: a5cf6aac-de71-42f1-8c9f-0450c4232296
 ---
 

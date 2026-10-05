@@ -6,7 +6,7 @@ metadata:
   type: project
   status: active
   scope: dataverse
-  last_verified: 2026-10-01 via four server renderer sources; dual-syntax aliases remain; stored defaults not reprobed
+  last_verified: 2026-10-05 via the four server renderers importing lib/utils/email-placeholders.js, bracket aliases still in reviewer-reminder-email.js, and {{proposalClause}} in lib/seed/email-defaults
   originSessionId: b4f727da-b275-4ffe-a50a-250fc68727a9
 ---
 
@@ -30,6 +30,9 @@ separate cleanup decision is made.
   in `lib/utils/email-placeholders.js`; this is not the central System A resolver
   and does not change the client composer or token vocabulary. Source verified
   2026-10-01; see `docs/plans/EMAIL_PLACEHOLDER_EXTRACTION_PLAN_2026-10-01.md`.
+
+[ASSUMED] The stored Dataverse admin defaults were not re-read on 2026-10-05; the
+source checks above do not prove the live rows.
 
 ## What to know before touching email templates
 - **Resolvers are DUAL-SYNTAX (accept both `[x]` and `{{x}}`, longest-first order).**

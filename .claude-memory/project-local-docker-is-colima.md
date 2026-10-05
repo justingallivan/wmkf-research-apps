@@ -2,6 +2,7 @@
 name: project-local-docker-is-colima
 description: "On the owner's Mac, Docker runs through Colima (no Docker Desktop app): start it with `colima start`. The Test Request Factory's throwaway ledger Postgres is the container wmkf-ledger-pg (postgres:16, 127.0.0.1:5433, password ledger, db ledger)."
 status: active
+last_verified: 2026-10-05 via colima/docker on PATH, docker context colima, and docker inspect of wmkf-ledger-pg (127.0.0.1:5433, db and password ledger)
 metadata:
   type: project
 ---
@@ -21,5 +22,6 @@ application named 'Docker'"); `/opt/homebrew/bin/colima` and `docker` exist.
 Then `TEST_REQUEST_LEDGER_TEST_URL=postgres://postgres:ledger@127.0.0.1:5433/ledger`
 and run the two `.pg.test.js` suites with `--runInBand` (running them in
 parallel on a fresh database races on schema creation and fails spuriously).
-When migration 054 changes, drop `test_request_run_resources`,
+[VERIFIED 2026-10-05] The running `wmkf-ledger-pg` uses `postgres:16-alpine`, not
+`postgres:16`; either image works for these suites. When migration 054 changes, drop `test_request_run_resources`,
 `test_request_runs` and `test_request_receipt_ok(jsonb)` first.
