@@ -64,6 +64,26 @@ function route(state, handlers = {}) {
   });
 }
 
+const CONFIRMED_AT = '2026-10-04T23:30:00.000Z';
+function boundaryArtifact(overrides = {}) {
+  return {
+    id: ARTIFACT_ID, fingerprint: 'e'.repeat(64), bundleEditable: true,
+    presentationEnd: { endMs: 62900, confirmedBy: 42, confirmedAt: CONFIRMED_AT },
+    presentationTranscript: { state: 'bound', artifactId: ARTIFACT_ID },
+    ...overrides,
+  };
+}
+const CORRECTION_ID = '88888888-8888-4888-8888-888888888888';
+function draftCorrection(overrides = {}) {
+  return { operationId: CORRECTION_ID, state: 'draft', version: 1, speakerNames: {}, presentationEndMs: null, expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: 'e'.repeat(64), ...overrides };
+}
+function correctionDetail(artifact, overrides = {}) {
+  return {
+    correction: draftCorrection(), content, currentArtifact: artifact, candidates: [],
+    presentationEnd: { current: null, draft: null, proposed: { endMs: 62900, speakerId: 'A', utteranceIndex: 0 } }, ...overrides,
+  };
+}
+
 const shortDate = (iso) => new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 const detailFor = (jobOverrides) => () => ({ job: job(jobOverrides), content, candidates: [] });
 
@@ -213,6 +233,15 @@ test('an active run shows only the progress line, and the card never shows ids o
   expect(progress.textContent).toContain('Transcribing Oregon State recording');
   expect(screen.queryByTestId('transcript-review')).not.toBeInTheDocument();
   expect(container.textContent).not.toMatch(/AssemblyAI|provider region|reconcil|quarantine|bundle|[0-9a-f]{8}-[0-9a-f]{4}-/i);
+});
+
+test('a confirmed boundary with a stale presentation transcript shows no ids or banned words', async () => {
+  const state = { materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact({ presentationTranscript: { state: 'stale', artifactId: null } }) }), detail: detailFor({}) };
+  route(state);
+  const { container } = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  expect(await screen.findByText(/Presentation ends at 01:02/)).toBeInTheDocument();
+  expect(container.textContent).not.toMatch(/AssemblyAI|provider region|reconcil|quarantine|bundle|[0-9a-f]{8}-[0-9a-f]{4}-/i);
+  expect(container.textContent).not.toContain('42');
 });
 
 test('changing the request resets both data sets', async () => {
@@ -377,4 +406,123 @@ test('an older active run still shows progress with Refresh while the newest run
   const before = global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/transcriptions')).length;
   fireEvent.click(refresh);
   await waitFor(() => expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/transcriptions')).length).toBe(before + 1));
+});
+
+describe('presentation end', () => {
+  test('an unconfirmed boundary says so and Set presentation end opens the editor', async () => {
+    const artifact = boundaryArtifact({ presentationEnd: null, presentationTranscript: { state: 'not_confirmed', artifactId: null } });
+    const state = { materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) };
+    route(state, { '/corrections': { method: 'POST', respond: () => response(correctionDetail(artifact)) } });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByText(/Presentation end not confirmed\. The Board link shows no transcript until a program coordinator confirms/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Set presentation end' }));
+    expect(await screen.findByRole('heading', { name: 'Edit speaker names and presentation end' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Presentation ends after')).toHaveValue('');
+  });
+
+  test('a saved draft keeps one opener, Continue editing names', async () => {
+    const artifact = boundaryArtifact({ presentationEnd: null, presentationTranscript: { state: 'not_confirmed', artifactId: null } });
+    const draft = { operationId: CORRECTION_ID, state: 'draft', sourceArtifactId: ARTIFACT_ID, speakerNames: {}, createdAt: '2026-10-04T21:00:00.000Z', expiresAt: '2099-01-01T00:00:00.000Z' };
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact, correctionDrafts: [draft] }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByRole('button', { name: 'Continue editing names' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Set presentation end' })).not.toBeInTheDocument();
+  });
+
+  test('Use proposed then Save sends the three-key PATCH with the proposed time', async () => {
+    const artifact = boundaryArtifact({ presentationEnd: null, presentationTranscript: { state: 'not_confirmed', artifactId: null } });
+    let patchBody = null;
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) }, {
+      '/corrections': { method: 'POST', respond: () => response(correctionDetail(artifact)) },
+      [`/corrections/${CORRECTION_ID}`]: { method: 'PATCH', respond: (path, options) => { patchBody = JSON.parse(options.body); return response({ correction: draftCorrection({ version: 2, presentationEndMs: 62900 }) }); } },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Set presentation end' }));
+    expect(await screen.findByText(/Proposed: 01:02 — last turn by Speaker A/)).toBeInTheDocument();
+    expect(screen.getByText('Saved')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Use proposed' }));
+    expect(screen.getByLabelText('Presentation ends after')).toHaveValue('62900');
+    expect(screen.getByText('Presentation ends after:')).toBeInTheDocument();
+    expect(screen.getByText('Staff discussion begins:')).toBeInTheDocument();
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+    expect(screen.getByText('Save changes first')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(screen.getByText('Saved')).toBeInTheDocument());
+    expect(patchBody).toEqual({ expectedVersion: 1, speakerNames: {}, presentationEndMs: 62900 });
+    expect(screen.queryByRole('button', { name: 'Use proposed' })).not.toBeInTheDocument();
+  });
+
+  test('choosing Not confirmed sends a null boundary', async () => {
+    const artifact = boundaryArtifact();
+    let patchBody = null;
+    const confirmed = { endMs: 62900, confirmedBy: 42, confirmedAt: CONFIRMED_AT };
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) }, {
+      '/corrections': { method: 'POST', respond: () => response(correctionDetail(artifact, { correction: draftCorrection({ presentationEndMs: 62900 }), presentationEnd: { current: confirmed, draft: { endMs: 62900 }, proposed: null } })) },
+      [`/corrections/${CORRECTION_ID}`]: { method: 'PATCH', respond: (path, options) => { patchBody = JSON.parse(options.body); return response({ correction: draftCorrection({ version: 2, presentationEndMs: null }) }); } },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit speaker names' }));
+    const select = await screen.findByLabelText('Presentation ends after');
+    expect(select).toHaveValue('62900');
+    fireEvent.change(select, { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(patchBody).toEqual({ expectedVersion: 1, speakerNames: {}, presentationEndMs: null }));
+    await waitFor(() => expect(screen.getByText('Saved')).toBeInTheDocument());
+  });
+
+  test('confirmed and stale shows the warning, and Generate posts the two expectations then reloads', async () => {
+    const artifact = boundaryArtifact({ presentationTranscript: { state: 'stale', artifactId: null } });
+    const state = { materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) };
+    let postBody = null;
+    route(state, { '/presentation-transcript': { method: 'POST', respond: (path, options) => {
+      postBody = JSON.parse(options.body);
+      state.collection = collection({ jobs: [], currentArtifact: boundaryArtifact() });
+      return response({ presentationTranscript: { artifactId: ARTIFACT_ID, state: 'bound' }, currentArtifact: boundaryArtifact() });
+    } } });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByText(`Presentation ends at 01:02 · confirmed ${shortDate(CONFIRMED_AT)}`)).toBeInTheDocument();
+    expect(screen.getByText('The Board link shows no transcript until the presentation transcript is generated.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Generate presentation transcript' }));
+    await waitFor(() => expect(screen.getByText('Presentation transcript ready for the Board link.')).toBeInTheDocument());
+    expect(postBody).toEqual({ expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: 'e'.repeat(64) });
+    expect(screen.queryByRole('button', { name: 'Generate presentation transcript' })).not.toBeInTheDocument();
+  });
+
+  test('confirmed and bound shows the ready line and no Generate button', async () => {
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByText('Presentation transcript ready for the Board link.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Generate presentation transcript' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Set presentation end' })).not.toBeInTheDocument();
+  });
+
+  test('a 409 on Generate shows the conflict notice and reloads', async () => {
+    const artifact = boundaryArtifact({ presentationTranscript: { state: 'missing', artifactId: null } });
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) }, {
+      '/presentation-transcript': { method: 'POST', respond: () => response({ code: 'meeting_transcript_current_changed', message: 'The current transcript changed.' }, 409) },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate presentation transcript' }));
+    expect(await screen.findByText(/Another session changed this/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+  });
+
+  test('a 409 on Generate for an unconfirmed boundary shows the specific reason, not the draft-conflict copy', async () => {
+    const artifact = boundaryArtifact({ presentationTranscript: { state: 'missing', artifactId: null } });
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) }, {
+      '/presentation-transcript': { method: 'POST', respond: () => response({ code: 'presentation_end_not_confirmed', message: 'server words' }, 409) },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate presentation transcript' }));
+    expect(await screen.findByText(/Confirm where the presentation ends before generating/)).toBeInTheDocument();
+    expect(screen.queryByText(/Another session changed this/)).not.toBeInTheDocument();
+  });
+
+  test('job review mode shows nothing about the boundary', async () => {
+    route({ collection: collection(), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    await screen.findByLabelText('Name for Speaker A');
+    expect(screen.queryByTestId('presentation-end-editor')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Presentation end/)).not.toBeInTheDocument();
+  });
 });

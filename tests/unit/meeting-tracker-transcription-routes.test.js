@@ -9,11 +9,20 @@ jest.mock('../../lib/services/meeting-tracker-transcription/service.js', () => (
   renameMeetingTranscriptionSpeakers: jest.fn(async () => ({ job: { id: 'j' } })),
   publishMeetingTranscription: jest.fn(async () => ({ publication: { state: 'published' } })),
   closeMeetingTranscriptPublication: jest.fn(async () => ({ closed: true, retainedFiles: true })),
+  getMeetingCorrectionDraft: jest.fn(async () => ({ correction: {} })),
+  updateMeetingCorrection: jest.fn(async () => ({ correction: { presentationEndMs: null } })),
+}));
+jest.mock('../../lib/utils/actor-ref.js', () => ({ actorRefFromSession: jest.fn(() => '77777777-7777-4777-8777-777777777777') }));
+jest.mock('../../lib/services/post-presentation-materials/presentation-transcript-service.js', () => ({
+  generatePresentationTranscript: jest.fn(async () => ({ presentationTranscript: { artifactId: 'a', state: 'bound' } })),
 }));
 
 import { requireAppAccess } from '../../lib/utils/auth.js';
 import { getMeetingTranscriptionOverview, uploadMeetingTranscription, renameMeetingTranscriptionSpeakers,
-  publishMeetingTranscription, closeMeetingTranscriptPublication } from '../../lib/services/meeting-tracker-transcription/service.js';
+  publishMeetingTranscription, closeMeetingTranscriptPublication, updateMeetingCorrection } from '../../lib/services/meeting-tracker-transcription/service.js';
+import { generatePresentationTranscript } from '../../lib/services/post-presentation-materials/presentation-transcript-service.js';
+import correction from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/corrections/[operationId].js';
+import presentationTranscript from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/presentation-transcript.js';
 import collection from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions.js';
 import speakers from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/[jobId]/speakers.js';
 import publish from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/[jobId]/publish.js';
@@ -129,4 +138,91 @@ test('close route requires exact retained-file acknowledgement and supplies the 
   expect(closeMeetingTranscriptPublication).toHaveBeenCalledWith({ requestId, operationId: jobId,
     actorProfileId: 9, acknowledgeRetainedFiles: true });
   expect(accepted.statusCode).toBe(200);
+});
+
+describe('correction PATCH body shapes', () => {
+  const query = { requestId, operationId: jobId };
+  test.each([
+    ['the two-key shape leaves the presentation end untouched', { expectedVersion: 2, speakerNames: { A: 'Chair' } }],
+    ['the three-key shape sets the presentation end', { expectedVersion: 2, speakerNames: { A: 'Chair' }, presentationEndMs: 61000 }],
+    ['the three-key shape clears it with null', { expectedVersion: 2, speakerNames: { A: 'Chair' }, presentationEndMs: null }],
+  ])('%s', async (_label, body) => {
+    const res = response();
+    await correction({ method: 'PATCH', query, body }, res);
+    expect(res.statusCode).toBe(200);
+    expect(updateMeetingCorrection).toHaveBeenCalledWith({ requestId, ownerProfileId: 9, operationId: jobId, body });
+  });
+
+  test.each([
+    ['an extra key', { expectedVersion: 2, speakerNames: {}, presentationEndMs: 1, profileId: 77 }],
+    ['presentationEndMs without speakerNames', { expectedVersion: 2, presentationEndMs: 1 }],
+    ['a non-integer version', { expectedVersion: '2', speakerNames: {} }],
+  ])('rejects %s before service dispatch', async (_label, body) => {
+    const res = response();
+    await correction({ method: 'PATCH', query, body }, res);
+    expect(res.statusCode).toBe(400);
+    expect(updateMeetingCorrection).not.toHaveBeenCalled();
+  });
+
+  test('an invalid presentationEndMs is reported by the service as 400 transcription_invalid_value', async () => {
+    updateMeetingCorrection.mockRejectedValueOnce(Object.assign(new Error('transcription_invalid_value'),
+      { code: 'transcription_invalid_value', httpStatus: 400 }));
+    const res = response();
+    await correction({ method: 'PATCH', query, body: { expectedVersion: 2, speakerNames: {}, presentationEndMs: 1234 } }, res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toMatchObject({ code: 'transcription_invalid_value' });
+  });
+});
+
+describe('presentation-transcript route', () => {
+  const artifact = '44444444-4444-4444-8444-444444444444';
+  const goodBody = { expectedCurrentArtifactId: artifact, expectedCurrentFingerprint: 'a'.repeat(64) };
+
+  test('supplies the authenticated profile and mapped actor, never client identity', async () => {
+    const res = response();
+    await presentationTranscript({ method: 'POST', query: { requestId }, body: goodBody }, res);
+    expect(requireAppAccess).toHaveBeenCalledWith(expect.anything(), res, 'meeting-tracker');
+    expect(generatePresentationTranscript).toHaveBeenCalledWith({ requestId, ownerProfileId: 9,
+      actingUserSystemId: '77777777-7777-4777-8777-777777777777', body: goodBody });
+    expect(res.statusCode).toBe(200);
+  });
+
+  test.each([
+    ['an extra key', { ...goodBody, profileId: 77 }],
+    ['a missing key', { expectedCurrentArtifactId: artifact }],
+    ['a non-GUID artifact id', { ...goodBody, expectedCurrentArtifactId: 'not-a-guid' }],
+    ['an uppercase fingerprint', { ...goodBody, expectedCurrentFingerprint: 'A'.repeat(64) }],
+    ['a short fingerprint', { ...goodBody, expectedCurrentFingerprint: 'a'.repeat(63) }],
+    ['a null artifact id', { ...goodBody, expectedCurrentArtifactId: null }],
+    ['an array body', [goodBody]],
+  ])('rejects %s before service dispatch', async (_label, body) => {
+    const res = response();
+    await presentationTranscript({ method: 'POST', query: { requestId }, body }, res);
+    expect(res.statusCode).toBe(400);
+    expect(generatePresentationTranscript).not.toHaveBeenCalled();
+  });
+
+  test('rejects non-POST methods, a bad request id, and a missing profile', async () => {
+    const get = response();
+    await presentationTranscript({ method: 'GET', query: { requestId }, body: goodBody }, get);
+    expect(get.statusCode).toBe(405);
+    const badId = response();
+    await presentationTranscript({ method: 'POST', query: { requestId: 'nope' }, body: goodBody }, badId);
+    expect(badId.statusCode).toBe(400);
+    requireAppAccess.mockResolvedValue({ profileId: null, session: { user: {} } });
+    const noProfile = response();
+    await presentationTranscript({ method: 'POST', query: { requestId }, body: goodBody }, noProfile);
+    expect(noProfile.statusCode).toBe(401);
+    expect(generatePresentationTranscript).not.toHaveBeenCalled();
+  });
+
+  test('reports service statuses and codes, including the two documented 409s', async () => {
+    for (const code of ['meeting_transcript_current_changed', 'presentation_end_not_confirmed']) {
+      generatePresentationTranscript.mockRejectedValueOnce(Object.assign(new Error(code), { code, httpStatus: 409 }));
+      const res = response();
+      await presentationTranscript({ method: 'POST', query: { requestId }, body: goodBody }, res);
+      expect(res.statusCode).toBe(409);
+      expect(res.body).toMatchObject({ code });
+    }
+  });
 });

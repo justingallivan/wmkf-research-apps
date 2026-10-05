@@ -205,6 +205,25 @@ test('returns only eligible ready non-superseded material links for the request'
   expect(result.applicantAttendeesUnavailable).toBe(false);
 });
 
+test('the staff material feed includes a Ready Presentation Transcript without a binding filter', async () => {
+  const presentation = {
+    wmkf_requestdocumentid: '66666666-6666-4666-8666-666666666667',
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_filename: 'presentation.txt',
+    wmkf_sharepointweburl: 'https://example.sharepoint.com/presentation.txt',
+  };
+  const result = await getSiteVisitLogistics({ requestId: REQUEST_ID }, dependencies({
+    findDocumentsByRequest: jest.fn(async () => ({ records: [presentation] })),
+  }));
+  expect(result.materials).toEqual([expect.objectContaining({
+    artifactId: presentation.wmkf_requestdocumentid,
+    artifactTypeLabel: 'Presentation Transcript',
+  })]);
+});
+
 test('a failed applicant-contact read leaves the tracker visit usable and reports unavailable suggestions', async () => {
   const result = await getSiteVisitLogistics({ requestId: REQUEST_ID, includeApplicantAttendees: true }, dependencies({
     resolveApplicantContacts: jest.fn(async () => { throw new Error('Dataverse unavailable'); }),

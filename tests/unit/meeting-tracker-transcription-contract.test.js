@@ -79,14 +79,63 @@ describe('Meeting Tracker generated transcript bundle', () => {
   const timedContent = { text: 'go now', utterances: [{ speaker: 'A', start: 0, end: 70_000,
     text: 'go now', words: [{ start: 58_000, end: 59_000, text: 'go' }, { start: 61_000, end: 62_000, text: 'now' }] }] };
 
-  it('embeds fully aligned optional word timings in formatter v2+ source; the default v3 TXT is one turn paragraph', () => {
+  it('embeds fully aligned optional word timings in formatter v2+ source; the default v4 TXT is one turn paragraph with no boundary', () => {
     const generated = buildMeetingTranscriptFiles({ content: timedContent, speakerNames: {}, identity });
     const parsed = parseVerifiedMeetingTranscriptSource(generated.files.source.bytes,
       { size: generated.files.source.bytes.length, sha256: generated.files.source.sha256 }, identity);
-    expect(parsed.formatterVersion).toBe('3');
-    expect(generated.sourceContent.schemaVersion).toBe(3);
+    expect(parsed.formatterVersion).toBe('4');
+    expect(generated.sourceContent.schemaVersion).toBe(4);
+    expect(generated.sourceContent.presentationEnd).toBeNull();
+    expect(generated.presentationEnd).toBeNull();
+    expect(parsed.presentationEnd).toBeNull();
     expect(parsed.content.utterances[0].words).toEqual(timedContent.utterances[0].words);
     expect(generated.files.txt.bytes.toString()).toBe('[00:00] Speaker A: go now\n');
+  });
+
+  describe('version 4 presentation end (boundary)', () => {
+    const boundary = { endMs: 70_000, confirmedBy: 12, confirmedAt: '2026-10-05T18:00:00.000Z' };
+
+    it('freezes the confirmed boundary in the source envelope, the identity hash, and the manifest; v3 cannot carry one', () => {
+      const plain = buildMeetingTranscriptFiles({ content: timedContent, speakerNames: {}, identity });
+      const bounded = buildMeetingTranscriptFiles({ content: timedContent, speakerNames: {}, identity: { ...identity, presentationEnd: boundary } });
+      expect(bounded.presentationEnd).toEqual(boundary);
+      expect(bounded.sourceContent.presentationEnd).toEqual(boundary);
+      expect(bounded.inputSha256).not.toBe(plain.inputSha256);
+      // Same TXT and VTT bytes: the boundary changes identity, never the readable files.
+      expect(bounded.files.txt.bytes.equals(plain.files.txt.bytes)).toBe(true);
+      expect(bounded.files.vtt.bytes.equals(plain.files.vtt.bytes)).toBe(true);
+      const parsed = parseVerifiedMeetingTranscriptSource(bounded.files.source.bytes,
+        { size: bounded.files.source.bytes.length, sha256: bounded.files.source.sha256 }, identity);
+      expect(parsed.presentationEnd).toEqual(boundary);
+      const rebuilt = buildMeetingTranscriptFiles({ content: parsed.content, speakerNames: parsed.speakerNames,
+        identity: { ...identity, formatterVersion: parsed.formatterVersion, presentationEnd: parsed.presentationEnd } });
+      expect(rebuilt.inputSha256).toBe(bounded.inputSha256);
+      expect(() => buildMeetingTranscriptFiles({ content: timedContent, speakerNames: {},
+        identity: { ...identity, formatterVersion: '3', presentationEnd: boundary } })).toThrow('invalid_transcript_bundle');
+      const files = Object.fromEntries(['txt','vtt','source'].map((role, index) => [role, {
+        siteId: 'site-1', driveId: 'drive-1', itemId: `item-${index}`, versionId: 'version-1', eTag: 'etag-1',
+        sha256: bounded.files[role === 'vtt' ? 'txt' : role].sha256, size: 10, filename: `f.${role}`,
+        contentType: { txt: 'text/plain; charset=utf-8', vtt: 'text/vtt; charset=utf-8', source: 'application/json' }[role],
+      }]));
+      const manifest = buildMeetingTranscriptManifest({ identity: { ...identity, presentationEnd: boundary }, files });
+      expect(manifest.schemaVersion).toBe(4);
+      expect(manifest.presentationEnd).toEqual(boundary);
+      expect(validateMeetingTranscriptManifest({ ...manifest, presentationEnd: null })).toBeTruthy();
+      expect(() => validateMeetingTranscriptManifest({ ...manifest, schemaVersion: 3, formatterVersion: '3' })).toThrow('invalid_transcript_bundle');
+      const { presentationEnd: _dropped, ...withoutBoundaryKey } = manifest;
+      expect(() => validateMeetingTranscriptManifest(withoutBoundaryKey)).toThrow('invalid_transcript_bundle');
+    });
+
+    it('rejects a boundary that is not an utterance end or has extra, missing, or malformed fields', () => {
+      const build = (presentationEnd) => buildMeetingTranscriptFiles({ content: timedContent, speakerNames: {}, identity: { ...identity, presentationEnd } });
+      expect(() => build({ ...boundary, endMs: 69_999 })).toThrow('invalid_transcript_bundle');
+      expect(() => build({ ...boundary, endMs: -1 })).toThrow('invalid_transcript_bundle');
+      expect(() => build({ ...boundary, confirmedBy: 0 })).toThrow('invalid_transcript_bundle');
+      expect(() => build({ ...boundary, confirmedAt: 'yesterday' })).toThrow('invalid_transcript_bundle');
+      expect(() => build({ ...boundary, extra: true })).toThrow('invalid_transcript_bundle');
+      expect(() => build({ endMs: 70_000 })).toThrow('invalid_transcript_bundle');
+      expect(() => build('70000')).toThrow('invalid_transcript_bundle');
+    });
   });
 
   it('keeps formatter v2 minute-split TXT reproducible from a frozen v2 source', () => {

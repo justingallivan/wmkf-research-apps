@@ -8,12 +8,20 @@ import {
   buildBriefingContext,
   resolveBriefingMediaMember,
   resolveBriefingMember,
+  _internal,
 } from '../../lib/services/deliberation-briefing/briefing-page-service';
 import { PRE_SITE_DISTRIBUTION_CONTRACT } from '../../shared/config/requestDocument.js';
+import { presentationTranscriptGenerationKey } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
+import * as requestDocumentAdapter from '../../lib/dataverse/adapters/request-document.js';
 import { REQUEST_DOCUMENT_ACTOR_POLICY } from '../../lib/services/request-document-actor-service.js';
 import { reviewSetFingerprint } from '../../lib/services/pre-site-visit/review-bundle-service.js';
 import { retainReviewBundle as realRetainReviewBundle } from '../../lib/services/pre-site-visit/distribution-service.js';
 import { PDFDocument } from 'pdf-lib';
+
+jest.mock('../../lib/dataverse/adapters/request-document.js', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/request-document.js'),
+  findByRequest: jest.fn(async () => ({ records: [] })),
+}));
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const RECEIVED_ID = '22222222-2222-4222-8222-222222222222';
@@ -324,12 +332,11 @@ test('the proposal member resolves Reviewer Materials/Proposal_<num>.pdf by gove
   expect(missing.downloadFile).not.toHaveBeenCalled();
 });
 
-test('materials: the context lists this request\'s Ready applicant/visit files by label, never the writeup row, and flags oversize files as unavailable', async () => {
+test('materials: the context lists this request\'s Ready applicant/visit files by label, never the writeup row, and never lists a legacy recording', async () => {
   const d = deps();
   const context = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d);
   expect(context.materials).toEqual([
     { member: `material:${SLIDES_ID}`, label: 'Applicant Slides', filename: 'Applicant Slides.pdf', size: 2048, available: true, inline: true },
-    { member: `material:${RECORDING_ID}`, label: 'Recording', filename: 'Visit.mp4', size: 900 * 1024 * 1024, available: false, inline: false },
   ]);
   expect(JSON.stringify(context.materials)).not.toMatch(/drive|item|sharepoint|Writeup\.docx|Other\.pdf|Reviews - aaaaaaaa/i);
   // A registry failure leaves the section empty rather than failing the page.
@@ -368,59 +375,6 @@ test('materials: a file whose actual bytes exceed the cap is refused even when t
   await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: `material:${SLIDES_ID}` }, d)).rejects.toMatchObject({ httpStatus: 404 });
 });
 
-test('post-presentation materials: full briefing uses the shared current winner without leaking Zoom URL', async () => {
-  const older = {
-    wmkf_requestdocumentid: 'abababab-abab-4bab-8bab-abababababab',
-    _wmkf_request_value: REQUEST_ID,
-    wmkf_artifacttype: 100000005,
-    wmkf_operationstatus: 100000001,
-    wmkf_lifecyclestate: 100000000,
-    wmkf_producer: 'meeting-tracker-post-presentation',
-    wmkf_externalurl: 'https://zoom.us/rec/share/older?pwd=x',
-    wmkf_slotversion: 4,
-    createdon: '2026-09-25T13:00:00Z',
-  };
-  const current = {
-    ...older,
-    wmkf_requestdocumentid: RECORDING_ID,
-    wmkf_name: 'Research presentation recording',
-    wmkf_externalurl: 'https://us02web.zoom.us/rec/share/current?pwd=secret',
-    wmkf_slotversion: 5,
-    createdon: '2026-09-25T12:00:00Z',
-  };
-  const d = deps({
-    presentationSchemaReady: jest.fn(() => true),
-    presentationRequestAllowed: jest.fn(() => true),
-    findDocuments: jest.fn(async () => ({ records: [older, current] })),
-    resolveMediaDownloadUrl: jest.fn(),
-  });
-  const context = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d);
-  expect(context.materials).toEqual([{
-    member: `material:${RECORDING_ID}`,
-    label: 'Recording',
-    filename: 'Research presentation recording',
-    size: null,
-    available: true,
-    inline: false,
-    backing: 'external',
-    media: true,
-  }]);
-  expect(JSON.stringify(context.materials)).not.toContain('zoom.us');
-
-  const resolved = await resolveBriefingMediaMember({
-    requestId: REQUEST_ID,
-    member: `material:${RECORDING_ID}`,
-    mode: 'watch',
-  }, d);
-  expect(resolved).toMatchObject({ kind: 'external', redirectUrl: current.wmkf_externalurl });
-  expect(d.resolveMediaDownloadUrl).not.toHaveBeenCalled();
-  await expect(resolveBriefingMediaMember({
-    requestId: REQUEST_ID,
-    member: `material:${older.wmkf_requestdocumentid}`,
-    mode: 'watch',
-  }, d)).rejects.toMatchObject({ httpStatus: 404 });
-});
-
 test.each([
   ['Zoom', { wmkf_externalurl: 'https://zoom.us/rec/share/current?pwd=x' }],
   ['MP4', { wmkf_externalurl: null, wmkf_sharepointdriveid: 'drive', wmkf_sharepointitemid: 'item' }],
@@ -446,84 +400,6 @@ test.each([
   await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: `material:${RECORDING_ID}` }, d))
     .rejects.toMatchObject({ httpStatus: 404 });
   expect(d.downloadFile).not.toHaveBeenCalled();
-});
-
-test('post-presentation file resolver is non-buffering, mode-constrained, and malware-fail-closed', async () => {
-  const fileRow = {
-    wmkf_requestdocumentid: RECORDING_ID,
-    _wmkf_request_value: REQUEST_ID,
-    wmkf_artifacttype: 100000005,
-    wmkf_operationstatus: 100000001,
-    wmkf_lifecyclestate: 100000000,
-    wmkf_producer: 'meeting-tracker-post-presentation',
-    wmkf_externalurl: null,
-    wmkf_sharepointdriveid: 'drive',
-    wmkf_sharepointitemid: 'item',
-    wmkf_slotversion: 6,
-    createdon: '2026-09-25T12:00:00Z',
-  };
-  const d = deps({
-    presentationSchemaReady: jest.fn(() => true),
-    presentationRequestAllowed: jest.fn(() => true),
-    findDocuments: jest.fn(async () => ({ records: [fileRow] })),
-    resolveMediaDownloadUrl: jest.fn(async () => ({
-      driveId: 'drive',
-      itemId: 'item',
-      downloadUrl: 'https://microsoft.example/download',
-      filename: 'visit.mp4',
-      mimeType: 'video/mp4',
-      malware: null,
-    })),
-  });
-  const resolved = await resolveBriefingMediaMember({
-    requestId: REQUEST_ID,
-    member: `material:${RECORDING_ID}`,
-    mode: 'watch',
-  }, d);
-  expect(resolved).toMatchObject({ kind: 'file', redirectUrl: 'https://microsoft.example/download' });
-  expect(d.downloadFile).not.toHaveBeenCalled();
-
-  d.resolveMediaDownloadUrl.mockResolvedValueOnce({
-    driveId: 'drive',
-    itemId: 'item',
-    downloadUrl: 'https://microsoft.example/download',
-    filename: 'visit.mp4',
-    mimeType: 'video/mp4',
-    malware: {},
-  });
-  await expect(resolveBriefingMediaMember({
-    requestId: REQUEST_ID,
-    member: `material:${RECORDING_ID}`,
-    mode: 'open',
-  }, d)).rejects.toMatchObject({ httpStatus: 404 });
-
-  d.resolveMediaDownloadUrl.mockResolvedValueOnce({
-    driveId: 'drive',
-    itemId: 'item',
-    downloadUrl: 'https://microsoft.example/download',
-    filename: 'visit.mp4',
-    mimeType: 'text/html',
-    malware: null,
-  });
-  await expect(resolveBriefingMediaMember({
-    requestId: REQUEST_ID,
-    member: `material:${RECORDING_ID}`,
-    mode: 'watch',
-  }, d)).rejects.toMatchObject({ httpStatus: 404 });
-
-  d.resolveMediaDownloadUrl.mockResolvedValueOnce({
-    driveId: 'other-drive',
-    itemId: 'item',
-    downloadUrl: 'https://microsoft.example/download',
-    filename: 'visit.mp4',
-    mimeType: 'video/mp4',
-    malware: null,
-  });
-  await expect(resolveBriefingMediaMember({
-    requestId: REQUEST_ID,
-    member: `material:${RECORDING_ID}`,
-    mode: 'open',
-  }, d)).rejects.toMatchObject({ httpStatus: 404 });
 });
 
 test('post-presentation briefing member is omitted and unresolvable when readiness or request access is off', async () => {
@@ -1512,4 +1388,217 @@ describe('writeup-docx verifies the governed content hash from the snapshot regi
     expect(legacy.findDocumentById).not.toHaveBeenCalled();
     expect(legacy.hashDocx).not.toHaveBeenCalled();
   });
+});
+
+// ---- Stage 1 outside-page boundary: only the bound Presentation Transcript and the summary are served ----
+const TRANSCRIPT_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+function fileRow(id, artifactType, producer, overrides = {}) {
+  return {
+    wmkf_requestdocumentid: id, _wmkf_request_value: REQUEST_ID, wmkf_artifacttype: artifactType,
+    wmkf_operationstatus: 100000001, wmkf_lifecyclestate: 100000000, wmkf_producer: producer,
+    wmkf_sharepointdriveid: `drive-${id}`, wmkf_sharepointitemid: `item-${id}`,
+    wmkf_filename: 'material.pdf', wmkf_contenttype: 'application/pdf', wmkf_filesize: 500,
+    wmkf_slotversion: 1, createdon: '2026-09-25T12:00:00Z', ...overrides,
+  };
+}
+const REQUEST_DOCUMENT_ARTIFACT_TYPE = {
+  RECORDING: 100000005, TRANSCRIPT: 100000006, TRANSCRIPT_SUMMARY: 100000007, PRESENTATION_TRANSCRIPT: 100000012,
+};
+
+const PRESENTATION_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const SUMMARY_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const REVISION = '33333333-3333-4333-8333-3333333333aa';
+const SHA = 'a'.repeat(64);
+const PRODUCER = 'meeting-tracker-post-presentation';
+
+function v4Manifest(overrides = {}) {
+  const file = (role, contentType) => ({
+    siteId: 'site', driveId: `drive-${TRANSCRIPT_ID}`, itemId: `item-${role}`, versionId: 'v1', eTag: 'e1', sha256: SHA,
+    size: 10, filename: `t.${role}`, contentType,
+  });
+  return {
+    schemaVersion: 4, requestId: REQUEST_ID, siteVisitActivityId: '22222222-2222-4222-8222-2222222222bb',
+    revisionId: REVISION, operationId: REVISION, sourceRevisionId: null, formatterVersion: '4',
+    files: { txt: file('txt', 'text/plain; charset=utf-8'), vtt: file('vtt', 'text/vtt; charset=utf-8'), source: file('source', 'application/json') },
+    presentationEnd: { endMs: 70_000, confirmedBy: 5, confirmedAt: '2026-10-05T18:00:00.000Z' },
+    ...overrides,
+  };
+}
+function fullTranscript(manifest = v4Manifest()) {
+  const txt = manifest.files.txt;
+  return fileRow(TRANSCRIPT_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT, PRODUCER, {
+    wmkf_transcriptbundlejson: JSON.stringify(manifest),
+    wmkf_sharepointsiteid: txt.siteId, wmkf_sharepointdriveid: txt.driveId, wmkf_sharepointitemid: txt.itemId,
+    wmkf_sharepointversionid: txt.versionId, wmkf_sharepointetag: txt.eTag, wmkf_filename: txt.filename,
+    wmkf_contenthash: txt.sha256, wmkf_contenttype: txt.contentType, wmkf_filesize: txt.size,
+  });
+}
+function derivative(endMs = 70_000, overrides = {}) {
+  return fileRow(PRESENTATION_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT, PRODUCER, {
+    wmkf_filename: 'presentation.txt', wmkf_contenttype: 'text/plain', wmkf_filesize: 500, wmkf_sharepointetag: 'e1',
+    wmkf_generationkey: presentationTranscriptGenerationKey({ requestId: REQUEST_ID, sourceRevisionId: REVISION, presentationEndMs: endMs }),
+    ...overrides,
+  });
+}
+function summaryRow(overrides = {}) {
+  return fileRow(SUMMARY_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, PRODUCER, {
+    wmkf_filename: 'summary.pdf', wmkf_sharepointetag: 'e1', ...overrides,
+  });
+}
+function zoomRecording(overrides = {}) {
+  return fileRow(RECORDING_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING, PRODUCER, {
+    wmkf_sharepointdriveid: null, wmkf_sharepointitemid: null, wmkf_sharepointweburl: null, wmkf_filename: null,
+    wmkf_contenttype: null, wmkf_filesize: null, wmkf_externalurl: 'https://zoom.us/rec/share/current?pwd=secret',
+    ...overrides,
+  });
+}
+function fileRecording() {
+  return fileRow(RECORDING_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING, PRODUCER, {
+    wmkf_filename: 'recording.mp4', wmkf_contenttype: 'video/mp4',
+  });
+}
+function textMedia(filename = 'presentation.txt', mimeType = 'text/plain', { eTag = 'e1' } = {}) {
+  return jest.fn(async (driveId, itemId) => ({
+    driveId, itemId, filename, mimeType, malware: null, eTag, downloadUrl: 'https://tenant.sharepoint.com/download?short=1',
+  }));
+}
+
+
+function enabledDeps(rows, overrides = {}) {
+  return deps({
+    presentationSchemaReady: jest.fn(() => true),
+    presentationRequestAllowed: jest.fn(() => true),
+    findDocuments: jest.fn(async () => ({ records: rows })),
+    resolveMediaDownloadUrl: jest.fn(),
+    downloadFile: jest.fn(),
+    ...overrides,
+  });
+}
+const briefingMember = (id) => `material:${id}`;
+async function expectBriefingNotFound(promise) {
+  await expect(promise).rejects.toMatchObject({ httpStatus: 404 });
+}
+
+test('the default findDocuments opts into the transcript bundle', async () => {
+  await _internal.DEFAULT_DEPENDENCIES.findDocuments(REQUEST_ID);
+  expect(requestDocumentAdapter.findByRequest).toHaveBeenCalledWith(REQUEST_ID, { includeMeetingTranscriptBundle: true });
+});
+
+test('briefing lists only the bound Presentation Transcript and the summary from the post-presentation set, with no internals', async () => {
+  const d = enabledDeps([fullTranscript(), derivative(), summaryRow(), fileRecording()]);
+  const context = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d);
+  expect(context.materials.map((m) => m.member).sort()).toEqual([briefingMember(PRESENTATION_ID), briefingMember(SUMMARY_ID)].sort());
+  expect(context.materials.find((m) => m.member === briefingMember(PRESENTATION_ID))).toMatchObject({ label: 'Presentation Transcript', backing: 'file' });
+  const json = JSON.stringify(context.materials);
+  for (const leak of [REVISION, 'presentationEnd', 'generationkey', 'schemaVersion', 'drive-', 'item-']) expect(json).not.toContain(leak);
+});
+
+test.each([
+  ['a READY full transcript', () => [fullTranscript()]],
+  ['a READY SharePoint recording', () => [fileRecording()]],
+  ['a READY Zoom recording', () => [zoomRecording()]],
+])('briefing: %s is absent from context and 404s on every resolver', async (_label, makeRows) => {
+  const d = enabledDeps(makeRows());
+  expect((await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d)).materials).toEqual([]);
+  for (const id of [TRANSCRIPT_ID, RECORDING_ID]) {
+    await expectBriefingNotFound(resolveBriefingMember({ requestId: REQUEST_ID, member: briefingMember(id) }, d));
+    for (const mode of ['open', 'watch', 'download']) {
+      await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(id), mode }, d));
+    }
+  }
+  expect(d.resolveMediaDownloadUrl).not.toHaveBeenCalled();
+  expect(d.downloadFile).not.toHaveBeenCalled();
+});
+
+test('briefing: a bound Presentation Transcript opens by redirect, is never buffered, and never watches', async () => {
+  const d = enabledDeps([fullTranscript(), derivative()], { resolveMediaDownloadUrl: textMedia() });
+  for (const mode of ['open', 'download']) {
+    const result = await resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID), mode }, d);
+    expect(result).toMatchObject({ kind: 'file', redirectUrl: 'https://tenant.sharepoint.com/download?short=1' });
+  }
+  await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID), mode: 'watch' }, d));
+  await expectBriefingNotFound(resolveBriefingMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID) }, d));
+  expect(d.downloadFile).not.toHaveBeenCalled();
+});
+
+test('briefing: a replaced SharePoint file (live eTag differs from the pinned one) is never served, for the derivative or the summary (Codex finding)', async () => {
+  const replaced = enabledDeps([fullTranscript(), derivative(), summaryRow()], { resolveMediaDownloadUrl: textMedia('presentation.txt', 'text/plain', { eTag: 'e2' }) });
+  await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID), mode: 'open' }, replaced));
+  const replacedSummary = enabledDeps([summaryRow()], { resolveMediaDownloadUrl: textMedia('summary.pdf', 'application/pdf', { eTag: 'e2' }) });
+  await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(SUMMARY_ID), mode: 'open' }, replacedSummary));
+  // A row that never pinned an eTag fails closed too.
+  const unpinned = enabledDeps([fullTranscript(), derivative(70_000, { wmkf_sharepointetag: null })], { resolveMediaDownloadUrl: textMedia() });
+  await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID), mode: 'open' }, unpinned));
+  const noLiveTag = enabledDeps([fullTranscript(), derivative()], { resolveMediaDownloadUrl: textMedia('presentation.txt', 'text/plain', { eTag: null }) });
+  await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID), mode: 'open' }, noLiveTag));
+});
+
+test('briefing: the summary opens only as text/pdf/docx', async () => {
+  const ok = enabledDeps([summaryRow()], { resolveMediaDownloadUrl: textMedia('summary.pdf', 'application/pdf') });
+  await expect(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(SUMMARY_ID), mode: 'open' }, ok))
+    .resolves.toMatchObject({ kind: 'file' });
+  const video = enabledDeps([summaryRow()], { resolveMediaDownloadUrl: textMedia('summary.mp4', 'video/mp4') });
+  await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(SUMMARY_ID), mode: 'open' }, video));
+});
+
+test('briefing: a derivative whose boundary moved is omitted at context and 404s at open', async () => {
+  const moved = v4Manifest({ presentationEnd: { endMs: 65_000, confirmedBy: 5, confirmedAt: '2026-10-05T18:30:00.000Z' } });
+  const d = enabledDeps([fullTranscript(moved), derivative(70_000)], { resolveMediaDownloadUrl: textMedia() });
+  expect((await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d)).materials).toEqual([]);
+  await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID), mode: 'open' }, d));
+  expect(d.resolveMediaDownloadUrl).not.toHaveBeenCalled();
+});
+
+test('briefing: a derivative whose key matches but whose transcript has a v3 manifest, no manifest, or no boundary is omitted', async () => {
+  const v3 = v4Manifest({ schemaVersion: 3, formatterVersion: '3' });
+  delete v3.presentationEnd;
+  const transcripts = [
+    fullTranscript(v3),
+    { ...fullTranscript(), wmkf_transcriptbundlejson: null },
+    fullTranscript(v4Manifest({ presentationEnd: null })),
+  ];
+  for (const transcript of transcripts) {
+    const d = enabledDeps([transcript, derivative()], { resolveMediaDownloadUrl: textMedia() });
+    expect((await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d)).materials).toEqual([]);
+    await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID), mode: 'open' }, d));
+  }
+});
+
+test('briefing: a derivative with no transcript winner, or from another producer, is omitted', async () => {
+  const alone = enabledDeps([derivative()], { resolveMediaDownloadUrl: textMedia() });
+  expect((await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, alone)).materials).toEqual([]);
+  await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID), mode: 'open' }, alone));
+  const foreign = enabledDeps([fullTranscript(), derivative(70_000, { wmkf_producer: 'someone-else' })], { resolveMediaDownloadUrl: textMedia() });
+  expect((await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, foreign)).materials).toEqual([]);
+  await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID), mode: 'open' }, foreign));
+});
+
+test('briefing: an external (Zoom) backing on a Presentation Transcript is never served', async () => {
+  const zoomish = derivative(70_000, {
+    wmkf_sharepointdriveid: null, wmkf_sharepointitemid: null,
+    wmkf_externalurl: 'https://zoom.us/rec/share/current?pwd=secret',
+  });
+  const d = enabledDeps([fullTranscript(), zoomish]);
+  expect((await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d)).materials).toEqual([]);
+  await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID), mode: 'open' }, d));
+});
+
+test('briefing: post-presentation file resolver stays malware-fail-closed and drive/item-bound', async () => {
+  const base = { driveId: `drive-${PRESENTATION_ID}`, itemId: `item-${PRESENTATION_ID}`, downloadUrl: 'https://microsoft.example/download', filename: 'presentation.txt', mimeType: 'text/plain', malware: null };
+  for (const bad of [{ malware: {} }, { driveId: 'other-drive' }, { itemId: 'other-item' }, { mimeType: 'text/html' }, { filename: 'presentation.html' }]) {
+    const d = enabledDeps([fullTranscript(), derivative()], { resolveMediaDownloadUrl: jest.fn(async () => ({ ...base, ...bad })) });
+    await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID), mode: 'open' }, d));
+  }
+});
+
+test('briefing: legacy (post-presentation disabled) path never serves a Presentation Transcript, full transcript, or recording', async () => {
+  const legacyTranscript = { ...fullTranscript(), wmkf_producer: 'legacy-producer' };
+  const legacyPresentation = { ...derivative(), wmkf_producer: 'legacy-producer' };
+  const legacyRecording = { ...fileRecording(), wmkf_producer: 'legacy-producer' };
+  const d = deps({ findDocuments: jest.fn(async () => ({ records: [legacyTranscript, legacyPresentation, legacyRecording] })) });
+  expect((await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d)).materials).toEqual([]);
+  for (const id of [TRANSCRIPT_ID, PRESENTATION_ID, RECORDING_ID]) {
+    await expectBriefingNotFound(resolveBriefingMember({ requestId: REQUEST_ID, member: briefingMember(id) }, d));
+  }
+  expect(d.downloadFile).not.toHaveBeenCalled();
 });
