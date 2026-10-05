@@ -52,7 +52,7 @@ function documentState(fact, isBrief) {
   if (fact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) return 'Preparing';
   if (fact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) return 'Preparation failed';
   if (fact?.availability !== 'available') return 'Not prepared';
-  if (fact.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW) return isBrief ? 'Working briefing' : 'Ready for visit findings';
+  if (fact.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW) return isBrief ? 'Working briefing' : fact.milestoneComplete ? 'Ready for visit findings' : 'Preparation checkpoint incomplete';
   if (fact.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL) return 'In review';
   return 'Draft';
 }
@@ -114,6 +114,7 @@ export default function StaffDeliberationsPanel({
   const [clockRefresh, setClockRefresh] = useState(0);
   const [error, setError] = useState(null);
   const requestSequence = useRef(0);
+  const loadedScope = useRef(null);
 
   useEffect(() => {
     if (!programId || !cycleCode) {
@@ -125,7 +126,8 @@ export default function StaffDeliberationsPanel({
       return undefined;
     }
     const sequence = ++requestSequence.current;
-    setRequests([]);
+    const scopeKey = `${programId}:${cycleCode}:${scope}`;
+    if (loadedScope.current !== scopeKey) setRequests([]);
     setLoading(true);
     setError(null);
     (async () => {
@@ -136,6 +138,7 @@ export default function StaffDeliberationsPanel({
           { fallbackMessage: 'Failed to load requests', tolerantBody: true },
         );
         if (requestSequence.current !== sequence) return;
+        loadedScope.current = scopeKey;
         setRequests(Array.isArray(body.artifacts) ? body.artifacts : []);
         setRequestCounts(body.requestCounts || { ordinary: body.artifacts?.length || 0, test: 0, total: body.artifacts?.length || 0 });
         setServerNowIso(body.serverNowIso || null);
@@ -190,7 +193,7 @@ export default function StaffDeliberationsPanel({
             <option value="all">All tasks</option><option value="before">Before presentation</option><option value="post">Post-visit work</option><option value="review">In review</option><option value="attention">Needs attention</option>
           </select>
         </label>
-        <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-gray-700">Search
+        <label className="flex w-full min-w-0 items-center gap-2 text-sm text-gray-700 sm:w-auto sm:flex-1">Search
           <input value={search} onChange={(event) => setSearch(event.target.value)} type="search" placeholder="Request, title, institution or PD" className="min-h-11 min-w-0 flex-1 rounded-lg border border-gray-300 px-3" />
         </label>
       </div>

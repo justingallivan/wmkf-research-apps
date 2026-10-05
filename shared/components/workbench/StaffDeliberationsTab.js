@@ -29,6 +29,16 @@ const STATUS_POLL_ATTEMPTS = 20;
 const EMPTY_LIST = Object.freeze([]);
 const EMPTY_STAGE_LABELS = DELIBERATION_STAGE_DEFAULT_LABELS;
 
+function presentationEndLabel(timing) {
+  const ms = Date.parse(timing?.endIso || '');
+  if (!Number.isFinite(ms)) return 'Presentation schedule unavailable or not yet recorded.';
+  try {
+    return `Scheduled presentation end: ${new Date(ms).toLocaleString(undefined, timing.timeZone ? { timeZone: timing.timeZone } : undefined)}${timing.timeZone ? ` (${timing.timeZone})` : ''}`;
+  } catch {
+    return `Scheduled presentation end: ${new Date(ms).toISOString()} (recorded time zone unavailable)`;
+  }
+}
+
 // Both use requestEnvelope, not requestJson: the fallback message embeds
 // `response.status` in the site's own wording ("Status check failed (${n})"),
 // which is not the helper's `deriveErrorMessage` fallback rule (a static
@@ -989,9 +999,7 @@ export default function StaffDeliberationsTab({
           : due ? 'Preparing working writeup'
             : timing?.endIso ? 'Before presentation' : 'Schedule needed';
   const materialsLine = siteVisitMaterialsLine(materials);
-  const timingLabel = timing?.endIso
-    ? `Scheduled presentation end: ${new Date(timing.endIso).toLocaleString(undefined, timing.timeZone ? { timeZone: timing.timeZone } : undefined)}${timing.timeZone ? ` (${timing.timeZone})` : ''}`
-    : 'Presentation schedule unavailable or not yet recorded.';
+  const timingLabel = presentationEndLabel(timing);
   const retryPreparation = async () => {
     const sequence = generationSequence.current;
     setRetryingPreparation(true);
