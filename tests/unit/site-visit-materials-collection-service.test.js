@@ -67,6 +67,7 @@ function deps(overrides = {}) {
   let stored = null;
   const d = {
     schemaReady: () => true,
+    getDueBusinessDays: jest.fn(async () => ({ dueBusinessDays: 2, dueDaysSource: 'default' })),
     getRequest: jest.fn(async () => request()),
     findActiveSiteVisit: jest.fn(async () => visit()),
     resolveRecipients: jest.fn(async () => ({ pi: { name: 'Pat Investigator', email: 'PI@example.edu', hasEmail: true }, liaison: { name: 'Lee Liaison', email: 'liaison@example.edu', hasEmail: true } })),
