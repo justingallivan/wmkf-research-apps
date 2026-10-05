@@ -46,3 +46,24 @@ it('keeps a claimed receipt leased beyond the cron function maximum duration', a
   expect(client.query.mock.calls[0][0]).toContain('lease_expires_at=NOW()+');
   expect(client.query.mock.calls[0][1][1]).toBe(420_000);
 });
+
+it('requeues only a staff-correction receipt when a complete Review checkpoint is observed', async () => {
+  let statement = '';
+  const client = { query: jest.fn(async (sql) => { statement = sql; return { rows: [] }; }) };
+  await upsertDuePreparation({
+    requestId: 'aaaaaaaa-0000-4000-8000-000000000001',
+    programId: 'bbbbbbbb-0000-4000-8000-000000000001',
+    cycleCode: 'D26',
+    siteVisitId: 'cccccccc-0000-4000-8000-000000000001',
+    scheduledEnd: '2026-12-01T18:00:00Z',
+    eventModifiedOn: '2026-11-01T12:00:00Z',
+    stateCode: 10,
+    statusCode: 11,
+    correctionEpoch: 'reopen-cycle-1',
+    initialState: 'pending',
+    resumeCorrection: true,
+  }, client);
+  expect(client.query.mock.calls[0][1][12]).toBe(true);
+  expect(statement).toContain("last_error_code='correction_reopen_requires_staff'");
+  expect(statement).toContain('AND $13::boolean THEN \'pending\'');
+});

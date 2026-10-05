@@ -767,6 +767,57 @@ test('accepts one ended eligible event alongside a known cancelled historical ev
   expect(status).toMatchObject({ canStart: true, startBlockedReason: null });
 });
 
+test('preserves complete Review when schedule classification is absent and automation is inactive', async () => {
+  const h = createHarness();
+  h.dependencies.env = { NODE_ENV: 'test' };
+  h.dependencies.readSchedulePairs.mockReturnValue([]);
+  const status = await getFinalWriteupStatus({
+    requestId: REQUEST_ID, actingUserSystemId: LEAD_PD_ID,
+  }, h.dependencies);
+  expect(status).toMatchObject({
+    canStart: true,
+    startBlockedReason: null,
+    startCompatibilityReason: 'legacy_review_schedule_unverified',
+  });
+  await startFinalWriteup({
+    requestId: REQUEST_ID, expectedArtifactId: SOURCE_ID, actingUserSystemId: LEAD_PD_ID,
+  }, h.dependencies);
+  expect(h.dependencies.commitChangeset).toHaveBeenCalledTimes(1);
+  expect(h.dependencies.commitChangeset.mock.calls[0][0]).toHaveLength(3);
+});
+
+test('does not use absent-map legacy Review compatibility before a known future Site Visit end', async () => {
+  const h = createHarness();
+  h.dependencies.env = { NODE_ENV: 'test' };
+  h.dependencies.readSchedulePairs.mockReturnValue([]);
+  h.dependencies.findSiteVisits.mockResolvedValue({ records: [{
+    activityid: '77777777-7777-4777-8777-777777777777',
+    _regardingobjectid_value: REQUEST_ID,
+    scheduledend: '2026-08-30T19:06:00Z',
+    statecode: 10,
+    statuscode: 11,
+  }] });
+  const status = await getFinalWriteupStatus({
+    requestId: REQUEST_ID, actingUserSystemId: LEAD_PD_ID,
+  }, h.dependencies);
+  expect(status).toMatchObject({ canStart: false, startBlockedReason: 'final_writeup_site_visit_not_ended' });
+});
+
+test('retains explicit zero-event complete Review compatibility with a configured map', async () => {
+  const h = createHarness();
+  h.dependencies.env = { NODE_ENV: 'test', STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS: '[]' };
+  h.dependencies.readSchedulePairs.mockReturnValue([]);
+  h.dependencies.findSiteVisits.mockResolvedValue({ records: [] });
+  const status = await getFinalWriteupStatus({
+    requestId: REQUEST_ID, actingUserSystemId: LEAD_PD_ID,
+  }, h.dependencies);
+  expect(status).toMatchObject({
+    canStart: true,
+    startBlockedReason: null,
+    startCompatibilityReason: 'legacy_complete_review_without_schedule',
+  });
+});
+
 test('rechecks and atomically fences the schedule immediately before Final review activation', async () => {
   const h = createHarness();
   h.dependencies.findSiteVisits

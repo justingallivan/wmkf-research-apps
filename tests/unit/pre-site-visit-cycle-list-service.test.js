@@ -160,6 +160,26 @@ it('marks schedule duplicates ambiguous and requires a valid end before reportin
   expect(result.artifacts[1].preparation.due).toBe(false);
 });
 
+it('does not show a prepared receipt as current when its document no longer matches the request pointer', async () => {
+  jest.useFakeTimers().setSystemTime(new Date('2026-12-02T00:00:00Z'));
+  grantRequestAdapter.queryAllRequests.mockResolvedValue({
+    records: [req(R1, { _wmkf_currentpresitevisit_value: 'writeup-current' })], capped: false,
+  });
+  requestDocumentAdapter.findByRequests.mockResolvedValue({ records: [doc('writeup-current', R1)], capped: false });
+  siteVisitAdapter.findSummariesByRequests.mockResolvedValue({ records: [{
+    _regardingobjectid_value: R1, activityid: 'visit-current', statecode: 1, statuscode: 2,
+    scheduledend: '2026-12-01T18:00:00Z',
+  }], capped: false });
+  listPreparationsForSchedules.mockResolvedValue(new Map([[R1, {
+    state: 'prepared', siteVisitId: 'visit-current', scheduledEndIso: '2026-12-01T18:00:00Z',
+    documentId: 'writeup-old', errorCode: null,
+  }]]));
+  const result = await list();
+  expect(result.artifacts[0].preparation).toMatchObject({
+    state: 'blocked', documentId: null, errorCode: 'document_pointer_changed',
+  });
+});
+
 it('fails closed on an unclassified Site Visit state/status pair', async () => {
   delete process.env.STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS;
   siteVisitAdapter.findSummariesByRequests.mockResolvedValue({ records: [

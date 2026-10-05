@@ -123,6 +123,44 @@ it('uses missing-only generation and promotes its returned current Word identity
   expect(dependencies.promote).toHaveBeenCalledWith(expect.objectContaining({ expectedArtifactId: DOC }));
 });
 
+it('re-reads and preserves a concurrent manual missing-only activation after a specific 409', async () => {
+  const concurrentDraft = {
+    artifactId: DOC,
+    operationStatus: O.READY,
+    lifecycleState: L.DRAFT,
+  };
+  const { dependencies } = harness();
+  dependencies.readArtifactStatus
+    .mockResolvedValueOnce({ currentArtifact: null })
+    .mockResolvedValueOnce({ currentArtifact: null })
+    .mockResolvedValueOnce({ currentArtifact: concurrentDraft });
+  dependencies.generate.mockRejectedValueOnce(Object.assign(new Error('manual generation won'), {
+    status: 409,
+    code: 'pre_site_visit_missing_only_current_exists',
+  }));
+  const result = await drainStaffDeliberationsPreparations(dependencies);
+  expect(dependencies.generate).toHaveBeenCalledTimes(1);
+  expect(dependencies.promote).toHaveBeenCalledWith(expect.objectContaining({ expectedArtifactId: DOC }));
+  expect(result.prepared).toBe(1);
+});
+
+it('backs off for a matching generation still in flight after a missing-only race', async () => {
+  const { dependencies } = harness();
+  dependencies.readArtifactStatus
+    .mockResolvedValueOnce({ currentArtifact: null })
+    .mockResolvedValueOnce({ currentArtifact: null })
+    .mockResolvedValueOnce({ currentArtifact: null, pendingArtifact: { artifactId: DOC } });
+  dependencies.generate.mockRejectedValueOnce(Object.assign(new Error('generation already claimed'), {
+    status: 409,
+    code: 'pre_site_visit_missing_only_pending_conflict',
+  }));
+  await drainStaffDeliberationsPreparations(dependencies);
+  expect(dependencies.promote).not.toHaveBeenCalled();
+  expect(dependencies.finishReceipt).toHaveBeenCalledWith(expect.any(String), expect.any(String), expect.objectContaining({
+    state: 'pending', retryAfterMs: 30_000, errorCode: 'generation_in_progress',
+  }));
+});
+
 it('will not automatically promote a staff correction epoch, even when the receipt was scanned after reopen', async () => {
   const currentArtifact = {
     artifactId: DOC,
@@ -138,6 +176,31 @@ it('will not automatically promote a staff correction epoch, even when the recei
     state: 'blocked', errorCode: 'correction_reopen_requires_staff',
   }));
   expect(result.blocked).toBe(1);
+});
+
+it('reconciles a completed staff-finished correction without clearing its lineage epoch', async () => {
+  const currentArtifact = {
+    artifactId: DOC,
+    lifecycleState: L.REVIEW,
+    operationStatus: O.READY,
+    correction: { cycleId: 'staff-reopen-7' },
+    file: { itemId: 'same-word-item', versionId: '8.0' },
+    milestone: { versionId: '8.0', contentHash: 'a'.repeat(64), createdAt: '2026-12-02T01:00:00Z' },
+  };
+  const { dependencies } = harness({ currentArtifact });
+  const result = await drainStaffDeliberationsPreparations(dependencies);
+  expect(dependencies.promote).not.toHaveBeenCalled();
+  expect(dependencies.generate).not.toHaveBeenCalled();
+  expect(dependencies.upsertReceipt).toHaveBeenCalledWith(expect.objectContaining({
+    correctionEpoch: 'staff-reopen-7',
+    resumeCorrection: true,
+  }));
+  expect(dependencies.finishReceipt).toHaveBeenCalledWith(expect.any(String), expect.any(String), expect.objectContaining({
+    state: 'prepared',
+    documentId: DOC,
+    provenance: expect.objectContaining({ operation: 'reconciled-complete-handoff' }),
+  }));
+  expect(result.prepared).toBe(1);
 });
 
 it('repairs a lost receipt acknowledgement from an already completed Final milestone without re-stamping', async () => {
@@ -197,10 +260,34 @@ it('fails closed when correction lineage fields have not passed schema readiness
     STAFF_DELIBERATIONS_AUTO_PREPARE_REQUEST_STATUSES: JSON.stringify(['Phase II Pending']),
     STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS: JSON.stringify([[10, 11, true]]),
     STAFF_DELIBERATIONS_AUTO_PREPARE_ATOMIC_FENCE_CONFIRMED: 'on',
+    TEST_REQUEST_ISOLATION: 'on',
   };
   expect(readPreparationConfig(env)).toMatchObject({ active: false, blockedBy: expect.arrayContaining(['correction_schema_not_ready']) });
   env.GUARDED_REOPEN_SCHEMA_READY = 'on';
   expect(readPreparationConfig(env).active).toBe(true);
+});
+
+it('keeps automation disabled before any worker reads when test-request isolation is off', async () => {
+  const env = {
+    NODE_ENV: 'test',
+    STAFF_DELIBERATIONS_AUTO_PREPARE: 'on',
+    STAFF_DELIBERATIONS_AUTO_PREPARE_PROGRAM_IDS: JSON.stringify([PROGRAM]),
+    STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES: JSON.stringify(['D26']),
+    STAFF_DELIBERATIONS_AUTO_PREPARE_REQUEST_STATUSES: JSON.stringify(['Phase II Pending']),
+    STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS: JSON.stringify([[10, 11, true]]),
+    STAFF_DELIBERATIONS_AUTO_PREPARE_ATOMIC_FENCE_CONFIRMED: 'on',
+    GUARDED_REOPEN_SCHEMA_READY: 'on',
+  };
+  const { dependencies } = harness();
+  dependencies.config = readPreparationConfig(env);
+  expect(dependencies.config).toMatchObject({
+    active: false,
+    blockedBy: expect.arrayContaining(['test_request_isolation_not_ready']),
+  });
+  const result = await drainStaffDeliberationsPreparations(dependencies);
+  expect(result.status).toBe('disabled');
+  expect(dependencies.queryRequests).not.toHaveBeenCalled();
+  expect(dependencies.findSiteVisits).not.toHaveBeenCalled();
 });
 
 it('reports artifact lineage as unavailable instead of missing on detail read failure', async () => {
@@ -211,10 +298,42 @@ it('reports artifact lineage as unavailable instead of missing on detail read fa
   expect(projection.writeup).toMatchObject({ availability: 'unavailable', artifactId: null });
 });
 
+it('reports due detail as disabled when scheduled preparation is inactive', async () => {
+  const { dependencies } = harness();
+  dependencies.config = { ...config, active: false, blockedBy: ['feature_disabled'] };
+  dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(new Map());
+  const projection = await getPreparationForRequest(REQUEST, dependencies);
+  expect(projection).toMatchObject({
+    timing: { availability: 'available' },
+    preparation: { due: true, state: 'disabled', automationActive: false },
+  });
+});
+
 it('retry requeues only the exact blocked receipt after current request and event revalidation', async () => {
   const { dependencies } = harness();
   dependencies.retryReceipt = jest.fn().mockResolvedValue(true);
   const result = await requestPreparationRetry(REQUEST, dependencies);
   expect(result).toMatchObject({ success: true, queued: true, requestId: REQUEST, siteVisitId: VISIT });
   expect(dependencies.retryReceipt).toHaveBeenCalledWith(REQUEST, VISIT, END, '');
+});
+
+it('retries a completed correction using its retained receipt epoch while keeping Draft correction human-only', async () => {
+  const reviewed = {
+    artifactId: DOC,
+    lifecycleState: L.REVIEW,
+    correction: { cycleId: 'staff-reopen-7' },
+    file: { versionId: '8.0' },
+    milestone: { versionId: '8.0', contentHash: 'a'.repeat(64), createdAt: '2026-12-02T01:00:00Z' },
+  };
+  const { dependencies } = harness({ currentArtifact: reviewed });
+  dependencies.retryReceipt = jest.fn().mockResolvedValue(true);
+  await requestPreparationRetry(REQUEST, dependencies);
+  expect(dependencies.retryReceipt).toHaveBeenCalledWith(REQUEST, VISIT, END, 'staff-reopen-7');
+
+  dependencies.readArtifactStatus.mockResolvedValue({
+    currentArtifact: { ...reviewed, lifecycleState: L.DRAFT },
+  });
+  await expect(requestPreparationRetry(REQUEST, dependencies)).rejects.toMatchObject({
+    code: 'preparation_correction_requires_staff',
+  });
 });
