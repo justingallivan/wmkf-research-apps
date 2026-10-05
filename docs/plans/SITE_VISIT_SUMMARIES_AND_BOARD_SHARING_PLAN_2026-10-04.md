@@ -566,6 +566,9 @@ Verdict needs-attention, one high finding, verified and fixed on the branch:
 
 ## 13. Staff discussion transcript build record, 2026-10-05 (branch `feature/staff-discussion-transcript`)
 
+**Status: Production-live** (PR #435, merge `700702ee9`, Production deployment
+6864926345 success, 2026-10-05). Acceptance on test request 1003222 pending.
+
 **Stage 1 acceptance (test request 1003222, owner, 2026-10-05):** the owner
 published the 7c1c5643 run with Speaker B named, opened the speaker-name and
 presentation-end editor, confirmed a boundary, generated the presentation

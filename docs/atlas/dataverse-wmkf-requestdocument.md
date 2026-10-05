@@ -728,9 +728,7 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   surfaces (the Recording and transcript card, the Staff Deliberations feed)
   keep the full files.
 - **Staff Discussion Transcript** (`100000013`, owner decision 2026-10-05,
-  plan §7 decision 7, §13; **[SOURCE-BUILT on `feature/staff-discussion-transcript`;
-  NOT DEPLOYED; migration 069 applied and picklist 100000013 inserted by the
-  owner 2026-10-05, ahead of the merge]**): the exact
+  plan §7 decision 7, §13; **[PRODUCTION-LIVE: PR #435 merge `700702ee9`, Production deployment 6864926345 success, 2026-10-05; migration 069 applied and picklist 100000013 inserted by the owner ahead of the merge. Acceptance on test request 1003222 not yet run.]**): the exact
   complement of the presentation cut (utterances ending after the boundary),
   written by the same `POST .../presentation-transcript` action under its own
   slot lease into `Site Visit - Staff Discussion Transcript/`, generation key
