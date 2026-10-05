@@ -4,6 +4,14 @@
 
 Compact summary for the Postgres tables outside the reviewer-finder domain. Promote any of these to its own page on next significant touch.
 
+## Staff Deliberations preparation — source-built, migration unapplied
+
+### `staff_deliberations_preparations`
+**Source of truth:** Operational receipt in Postgres; Dataverse Request Document lineage and SharePoint bytes remain authoritative for the working writeup.
+**Schema:** Migration 067; unique request/Site Visit/scheduled-end/correction-epoch identity, pending/running/prepared/blocked state, bounded lease and retry schedule, exact document ID, service provenance, and bounded error fields.
+**Read/write paths:** `lib/services/pre-site-visit/preparation-store.js` and `preparation-worker.js`; authenticated retry route under `/api/workbench/pre-site-visit/retry-preparation`; disabled cron route `/api/cron/staff-deliberations-preparation`.
+**Readiness:** [SOURCE-BUILT 2026-10-04 on `codex/staff-deliberations-rework`; migration 067 is not applied or live-verified.] Production automation is disabled and no deployment schedule is registered. No live rows or production receipts were read.
+
 ## Identity / authn / app access
 
 ### `user_profiles` (9 rows)

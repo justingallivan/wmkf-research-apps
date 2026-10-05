@@ -2,8 +2,8 @@
 title: Staff Deliberations Briefing and Post-Visit Writeup Rework
 domain: workbench
 kind: plan
-status: draft
-summary: "Owner-directed workflow: lighter briefing before the presentation, automatic working-writeup preparation at scheduled end, and explicit staff initiation of review. Proposed implementation; not deployed."
+status: implemented
+summary: "Source-built request-first Staff Deliberations flow with guarded scheduled-end working-writeup preparation and explicit staff review. Not deployed; production automation remains disabled and unscheduled."
 canonical: false
 owner: product-engineering
 related:
@@ -24,11 +24,11 @@ related:
 
 [OWNER DECISION, 2026-10-04] Respect the selected grant program and grant cycle. “Assigned to me” shows requests for which the signed-in staff member is the lead PD; “All program directors” also shows requests handled by other PDs within that same program and cycle, matching other Workbench surfaces. Both scopes include requests with no briefing or writeup. Changing PD scope never expands the grant-program or cycle scope and never grants additional mutation permissions.
 
-[PLANNED] Replace the earlier plan in this file in full. A manual “Start Site Visit” prerequisite and the earlier read-only-only scope are superseded. Automatic promotion is a durable write, and generating a missing draft consumes application AI resources. This document authorizes neither implementation nor execution of those operations. No production records were read for this revision; exact D26 counts remain UNKNOWN.
+[SOURCE-BUILT 2026-10-04 on `codex/staff-deliberations-rework`; not deployed.] The earlier manual “Start Site Visit” prerequisite and read-only-only scope are superseded. The worker and human review guards are implemented behind fail-closed configuration; production automation is off and no cron schedule is registered. Migration 067 is source-only and unapplied. This plan does not authorize production activation, catch-up writes, or AI generation. No production records were read for this implementation; exact D26 counts remain UNKNOWN.
 
 ## Current evidence and implementation boundary
 
-Source baseline: `9b1a60ed5`, branch `codex/leadership-dashboard-testing`. These are source findings, not new production verification.
+Implementation baseline: `35bf61f09` on `codex/staff-deliberations-rework`, based on the local feature branch. The source and offline test evidence below do not establish deployment, live schema readiness, or production automation.
 
 | Finding | Source evidence | Consequence for this plan |
 |---|---|---|
@@ -40,7 +40,7 @@ Source baseline: `9b1a60ed5`, branch `codex/leadership-dashboard-testing`. These
 | [VERIFIED] Calendar, session, materials and document actions have additional stage-dependent consumers. | `StaffDeliberationsTab.js`, `StaffDeliberationsPanel.js`, `FinalWriteupTab.js` under `shared/components/workbench/` | Migrate every action condition, not just the rail. Preserve session/materials visibility. |
 | [VERIFIED] Cycle discovery is program-filtered, while this panel currently receives cycle/scope only. | `lib/services/workbench/dashboard-service.js`, `listCycles`; `shared/components/workbench/WorkbenchShell.js` | Make effective program scope explicit and consistent. |
 
-Read-contract references: `docs/atlas/dataverse-wmkf-sitevisit.md` documents UTC scheduled start/end, local display zone, and active-only readers; `docs/atlas/dataverse-wmkf-requestdocument.md` describes document lineage and review checkpoints. Those readers and stored records are foundations, not proof that scheduled automation exists. New worker, receipt, authorization and schedule fencing below are PLANNED and unprovisioned.
+Read-contract references: `docs/atlas/dataverse-wmkf-sitevisit.md` documents UTC scheduled start/end, local display zone, and active-only readers; `docs/atlas/dataverse-wmkf-requestdocument.md` describes document lineage and review checkpoints. The source-built worker, receipt, route authorization, UI, and schedule fences are not production-provisioned or live-verified. The automatic writer is deliberately disabled and unscheduled.
 
 ## UX brief — Impeccable / Operate
 
@@ -86,7 +86,7 @@ Use neutral styling for elapsed time; green confirms prepared availability or an
 
 ## State and action contract
 
-All entries below are PLANNED. “Due” means a uniquely resolved, noncancelled research-presentation activity has a valid UTC end at or before server time. Invalid/missing end is not replaced by start time or midnight. Read failure is not “not scheduled”.
+The state and action contract below is source-built and fixture-tested. “Due” means a uniquely resolved eligible research-presentation activity has a valid UTC end at or before server time. Invalid/missing end is not replaced by start time or midnight. Read failure is not “not scheduled”.
 
 | Condition | Display / next action | Automatic effect |
 |---|---|---|
@@ -114,11 +114,11 @@ All entries below are PLANNED. “Due” means a uniquely resolved, noncancelled
 
 ## Request selection and read model
 
-[PLANNED] The cohort uses `cycleCodeToOdataFilter(cycleCode)` (request `wmkf_meetingdate` UTC month window), the selected grant-program predicate, and `_wmkf_programdirector_value` matched to the authenticated staff identity for “my”. For “all”, omit only the lead-PD predicate; keep program, cycle and access restrictions unchanged. Enforce session-derived identity, app access and Dataverse restrictions. Do not reuse Phase-II/advancing/set-aside visibility filters: all in-scope requests remain discoverable, including Concept, withdrawn and set-aside records. Visibility does not imply eligibility for automatic generation.
+[SOURCE-BUILT] The request-first cohort uses the UTC cycle window, selected grant program, and authenticated lead-PD identity for “my”. “All” omits only the lead-PD predicate; program, cycle and access restrictions remain. List visibility includes documentless and otherwise non-enrolled requests; worker eligibility is separate.
 
-[PLANNED] Worker enrollment is narrower than list visibility: use an explicit release-approved cycle/program allowlist, a valid linked research-presentation event, eligible active request state, and test isolation. Reuse verified request business eligibility where applicable; do not infer worker permission from a row appearing in the UI. Withdrawn/cancelled/set-aside and test records remain visible but are not automatically generated in production. Pin the exact stored status values and their mapping in fixture tests before enabling the worker. Requests with no valid cycle association need an explicit reconciliation result; do not invent D26 membership.
+[SOURCE-BUILT, DISABLED] Worker enrollment is narrower than list visibility and uses explicit program/cycle/status allowlists, known Site Visit event classification, and `TEST_REQUEST_ISOLATION=on`. Exact request statuses are compared as Dataverse strings. Withdrawn, cancelled, set-aside, and test records are not automatically generated. Configuration fails closed unless all readiness flags, including guarded correction schema, test isolation, and explicit atomic-fence confirmation, are present. No production allowlist or status mapping has been activated.
 
-The proposed GET projection contains separate `timing`, `brief`, `writeup`, `preparation`, `session`, and `materials` facts, each with availability (`available`, `missing`, `unavailable`, `ambiguous`) and exact source identity. Include server time, scoped count completeness, due time and persisted preparation outcome. This is a projection contract, not permission to add document lifecycle values.
+The source-built GET projection contains separate `timing`, `brief`, `writeup`, `preparation`, `session`, and `materials` facts, with availability and source identity. It includes server time, scoped count completeness, due time and persisted preparation outcome. This remains a projection contract, not a new document lifecycle value.
 
 Request-first paginated reads join optional artifacts in bounded batches. Resolve canonical pointers even when artifact cycle stamps differ; report contradictions. Never silently select the newest row over a current pointer. Specify legacy/document-only disposition explicitly. Propagate `capped` from request and document reads; replace the visit reader that drops pagination metadata. Ledger failure must not fail or erase the request list: project sharing history unavailable. Add a bounded ledger projection for latest successful sent time and exact source version; current `sentSourceDocumentIds` provides IDs only.
 
@@ -126,33 +126,32 @@ Resolve duplicates consistently on list, detail and worker: ambiguous schedule, 
 
 ## Scheduled preparation and persistence
 
-[PLANNED architecture] A server-side due-work scan runs independently of browser visits. Proposed polling interval: one minute, subject to deployment validation; the UI changes to “Preparing” at the end boundary and reports actual completion only after readback. Generation may take longer. Never promise the document is ready at an exact second. Scheduled processing catches up after outages and includes already-ended events in the rollout allowlist.
+The source-built server-side due-work scan runs independently of browser visits. It reports completion only after authoritative readback; generation may take longer than the end boundary. No polling interval is registered in deployment, so there is no production catch-up processing.
 
-Use an authenticated cron entry point and bounded worker following existing server-worker patterns, with trusted DAL context and the target/write interlock. Do not introduce an external queue/vendor for this task. Cron configuration, endpoint, service and migration names are implementation work, not already provisioned resources.
+The authenticated cron entry point and bounded worker use trusted DAL context and the target/write interlock. No external queue/vendor was added. The route exists in source but is not registered as a deployment schedule.
 
-Proposed durable operational receipt: one preparation record per request and guarded correction/lineage epoch, with a unique key; event ID/end/revision, state (pending/running/prepared/blocked), lease token/expiry, attempt count/next attempt, exact document ID, completion time, automation actor/provenance, and bounded error reason. Store operational receipts in Postgres; Dataverse document lineage and SharePoint remain authoritative. Add an existing-DB migration, manifest entry, fresh-install parity, Atlas record, retention/cap policy and schema readiness check. Finalize names and types against current migration inventory before code. Do not overload human milestone-actor fields to pretend a PD clicked a button.
+Operational receipts use `staff_deliberations_preparations` with a unique request/event/end/correction-epoch key, bounded leases/retries, exact document ID, service provenance and bounded errors. Migration 067 is in the manifest and fresh-install schema but has not been applied. Dataverse lineage and SharePoint remain authoritative. No human milestone actor is impersonated.
 
 Worker sequence:
 
 1. Paginate enrolled requests/events with a durable scan cursor or equivalent completeness-safe scan. Upsert due receipts under the unique key. One request failing must not prevent other due requests from being processed.
 2. Claim a bounded batch with an atomic lease. Re-read request eligibility, schedule identity/end/state, current document pointers, pending generations, correction epoch and existing Final state. Unknown or changed facts defer/block; never proceed from the earlier scan alone.
 3. If a current full draft exists, preserve it without invoking generation. For genuine absence, use a new missing-only entry contract on the existing producer. Fence activation against the expected absent pointer and schedule revision; concurrent manual generation wins. Recheck before model work and before activation. Recover stored output/uploads rather than rerunning paid generation after uncertain outcomes.
-4. For a Ready/Draft, reuse promotion's version/hash validation. Add commit-time current-pointer, schedule-version/end, request eligibility and correction-epoch fences, including an atomic conditional schedule check with the document write where needed. A standalone read just before PATCH is not a cross-record race guarantee. If the platform cannot enforce that contract, resolve the mechanism before enabling automation.
+4. For a Ready/Draft, the worker reuses promotion's version/hash validation and commit-time current-pointer, schedule/end, request-eligibility and correction-epoch fences. It conditionally patches the observed event in the same Dataverse changeset as request/document writes. The assumed same-value event PATCH semantics still require authorized sandbox proof before production enablement; a standalone read just before PATCH is not a cross-record race guarantee.
 5. Record automatic provenance without impersonation. Retain existing complete milestones without re-stamping. A complete Dataverse handoff is success even if receipt acknowledgement failed: retry reads authoritative state and repairs the receipt, not the document. A successful receipt without a valid document checkpoint is a reconciliation error.
-6. Use bounded retries/backoff for transient transport or file-version conflicts. Configuration errors, unchanged invalid inputs, missing files, duplicate events, and incomplete checkpoints become visible blocked outcomes. Authenticated Retry preparation reuses the same receipt and revalidates eligibility; it cannot force regeneration or bypass schedule rules. Return per-request outcomes, not only success counts.
+6. The worker uses bounded retries/backoff for transient transport or file-version conflicts. Configuration errors, unchanged invalid inputs, missing files, duplicate events, and incomplete checkpoints become visible blocked outcomes. Authenticated Retry preparation reuses the same receipt and revalidates eligibility; it cannot force regeneration or bypass schedule rules. Cron returns per-request outcomes, not only success counts.
 
 Generation and promotion need separate checkpoints. If a meeting moves during generation, retain the generated foundation safely, defer promotion, and do not repeatedly pay to regenerate it. No current file is overwritten or replaced by automatic work. Missing-only checks must hold at activation, not just at initial load. A background worker must not supersede an existing edited Draft through the current general generation path.
 
 Before enabling writes, resolve a trusted service-principal execution policy and audit representation. Existing promotion's ALLOW_UNATTRIBUTED policy is not sufficient evidence of an acceptable scheduled-actor contract. Do not borrow the PD's identity or weaken app/DAL restrictions. Reuse existing application provider configuration for authorized application generation; no agent API credentials or new provider integration belongs in this change.
 
-## Delivery sequence
+## Delivery record
 
-1. **Freeze product/read contracts.** Apply the confirmed program/cycle and lead-PD/all-PDs scope; pin event status semantics, cohort predicate, worker eligibility, correction/reopen behavior and review start boundary. Freeze fixture cases. Preserve current source facts in canonical docs until implemented.
-2. **Request-first read model.** Add independent facts, completeness and availability while retaining compatibility fields until both consumers migrate. Wire the selected program through the shell, route validation, service selection and response identity for both PD scopes. This can be reviewed separately from mutation work.
-3. **Durable preparation.** Implement receipt migration, worker, missing-only generation, commit fences, automation audit and recovery. Deploy disabled. Do not call `startFinalWriteup` from the worker.
-4. **Coordinated UX changes.** Replace the rail and stage-dependent actions on both surfaces; reorder briefing/writeup by task phase; preserve session/materials and permissions. Update Final prerequisite, confirmation and regeneration copy. Preserve explicit group/leadership review actions. Enforce scheduled-end eligibility server-side as well as in the UI, with legacy review compatibility.
-5. **Validate and reconcile.** Update the PC Tracker D7/D8 language, Pre-RP Brief plan, writeup lifecycle plan, Atlas pages/index, route security matrix, service catalogue, J27-083 register and relevant agent wiki/memory routing. Inventory stage-label configuration/defaults/admin readers before retirement; preserve stored-label compatibility. No automatic configuration deletion.
-6. **Controlled rollout.** Review a read-only due-work report by cycle/program: already prepared/reviewing, existing draft, missing draft, blocked and excluded. Obtain authorization for production catch-up and AI generation before enabling; use a small allowlisted batch, inspect exact receipts/files, then expand. Enforce a batch and application-generation budget. Monitor age of due work, blocked reasons, duplicates and retries. No email is sent by preparation.
+1. **Complete in source:** product/read contracts, request-first list and per-request status, program/cycle and lead-PD/all-PDs scopes, fixture-pinned schedule eligibility, correction behavior, and explicit review boundary.
+2. **Complete in source:** durable receipt migration 067, missing-only generation contract, worker/recovery, atomic Dataverse event/request/document fence, cron and authorized retry routes. Never call `startFinalWriteup` from the worker.
+3. **Complete in source:** both Workbench surfaces, independent briefing/writeup facts, preserved session/materials, explicit group/leadership review actions, and Final scheduled-end GET/POST guards with legacy complete-review handling.
+4. **Documentation and offline verification:** underway on this branch; migration remains unapplied. Inventory/canonical-doc updates and scoped gates are recorded below.
+5. **Production rollout: not started.** Requires separate owner authorization for migration, readiness flags/allowlists, catch-up and AI generation, plus sandbox proof for conditional same-value Site Visit PATCH behavior. No production writes or email are part of this change.
 
 Rollback: disable enrollment/worker writes first, retain readable receipts and documents, and keep the UI able to show committed preparation. Do not reverse checkpoints, delete files or roll back staff edits. Review transitions already committed remain authoritative.
 
@@ -176,6 +175,12 @@ Run affected unit/integration tests, migration/schema and cron-auth tests, type/
 
 Fable's earlier review was of the superseded display-only plan. Its valid findings are incorporated here: program/cohort precision, every stage-dependent action, explicit Final behavior, preserved session/materials, read completeness, duplicate semantics, sent-date projection and J27 register. Its suggestion about pre-visit Final navigation is superseded by the owner's scheduled-end information boundary.
 
-This is an implementation proposal, not an implementation-ready schema receipt. Product workflow and program/cycle/PD scope are decided; exact event-state mapping, trusted scheduled actor, atomic schedule fence, migration layout and deployment timing validation are explicit pre-enable dependencies. A fresh contract review must cover request selection → scheduled worker → document persistence → both UIs → explicit review, including partial success and unknown outcomes.
+## Review and local evidence
 
-[VERIFIED via local checks] Documentation currency, fact consistency, symbol references, their sequential self-tests, and docs catalogue checks passed for this revision. [VERIFIED via fresh read-only contract review] Reviewer found no material blocker for this planning deliverable and confirmed that scheduled automation remains unimplemented; the correction-handoff clarification was incorporated. No runtime tests, production calls or UI implementation were performed. The original sandbox self-test attempt could not create a fixture; the authorized host rerun passed. The unrelated `package-lock.json` change remains untouched. Impeccable context was loaded earlier in this session; its stale generated design-metadata warning was reported separately and is not repaired by this task.
+Sol's final source-level review approved the five material implementation fixes. Fable (`claude-fable-5-1`, authenticated through the user's OAuth subscription) returned changes required on 2026-10-04. The five material findings were accepted and fixed: inactive automation state in detail, missing-only generation conflict reconciliation, correction-epoch completion/retry behavior, cycle receipt-to-pointer identity, and the narrowly scoped legacy Final schedule fallback. Fable's targeted follow-up is pending. One low-severity edge remains: a duplicate-cancel receipt may require authenticated manual retry.
+
+Fable's review discussed a hypothetical deployed rollout; this branch is not deployed. Its analysis does not establish live schema, environment flags, schedule delivery, or production outcomes.
+
+The implementation is source-built, not production-ready. Production enablement still requires owner authorization, migration 067 application and schema readback, verified event-state mapping, `TEST_REQUEST_ISOLATION=on` verification, deployment flag/allowlist review, and sandbox proof that conditional same-value schedule patches behave as the atomic fence assumes. No live environment acceptance or scheduler-latency evidence exists. A fresh contract review must cover request selection → scheduled worker → document persistence → both UIs → explicit review, including partial success and unknown outcomes.
+
+[VERIFIED via local offline checks, 2026-10-04] The final integrated feature/UI/security run passed 279 tests across 15 suites; log: `/tmp/deliberations-integrated-tests-final.log`. The focused cron/retry authorization suite passed 4/4, scoped ESLint passed, and canonical Turbopack build passed (`/tmp/deliberations-build-reviewed.log`). API route, Atlas, docs-catalog, doc-currency, fact-consistency, symbol-reference, and canonical-pointer gates/self-tests passed; the API route gate retains three existing warnings for external materials token routes. No live Dataverse, Postgres, Graph, LLM, migration, deployment, or production schedule operation was performed.
