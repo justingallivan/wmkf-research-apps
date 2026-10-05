@@ -453,6 +453,24 @@ describe('presentation end', () => {
     expect(screen.queryByRole('button', { name: 'Use proposed' })).not.toBeInTheDocument();
   });
 
+  test('a skipped short line is shown with its speaker, time, and text, and Use this line instead selects it', async () => {
+    const artifact = boundaryArtifact({ presentationEnd: null, presentationTranscript: { state: 'not_confirmed', artifactId: null } });
+    const skipped = [{ endMs: 127300, startMs: 125000, speakerId: 'B', utteranceIndex: 1, text: 'We have a question.', gapMs: 62100 * 10 }];
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) }, {
+      '/corrections': { method: 'POST', respond: () => response(correctionDetail(artifact, {
+        correction: draftCorrection({ speakerNames: { B: 'Sujoy Mukhopadhyay' } }),
+        presentationEnd: { current: null, draft: null, proposed: { endMs: 62900, speakerId: 'A', utteranceIndex: 0, skipped } } })) },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Set presentation end' }));
+    const notice = await screen.findByTestId('presentation-end-skipped');
+    expect(notice).toHaveTextContent('Skipped a short line attributed to Sujoy Mukhopadhyay at 02:05: “We have a question.” It came 10 minutes after the last longer applicant line, so it may belong to someone else.');
+    fireEvent.click(screen.getByRole('button', { name: 'Use this line instead' }));
+    expect(screen.getByLabelText('Presentation ends after')).toHaveValue('127300');
+    expect(screen.queryByRole('button', { name: 'Use this line instead' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use proposed' })).toBeInTheDocument();
+  });
+
   test('choosing Not confirmed sends a null boundary', async () => {
     const artifact = boundaryArtifact();
     let patchBody = null;
