@@ -58,7 +58,7 @@ Owner decisions, 2026-10-05:
   admission and the virus scan are both enabled; otherwise it calls
   `finalizeMaterialUpload` inline [VERIFIED `finalize.js:84, 139-148, 196-204`].
 
-### The background path is token-bound (blocker for a staff path)
+### The background path is token-bound (why staff uploads stay inline)
 
 1. `enqueueMaterialsUploadJob` selects the collection with
    `token_digest = $3 AND status <> 'closed' AND closes_at > clock_timestamp()`
@@ -179,46 +179,46 @@ It keeps the following unchanged: the producer, the folder, the canonical
 filename, the generation key, the scan, the slot lease, and the supersede step.
 `check:request-document-writers` records the new actor policy.
 
-### 3.3 Background processing for staff uploads (the main build decision)
+### 3.3 Staff uploads finalize inline (owner decision 2026-10-05)
 
-Large decks need the background path; a 300+ MB PPTX exhausted inline
-finalize memory before PR #400 (applicant materials plan §16.14). Staff jobs
-cannot satisfy the token checks in 2.2, so the job contract needs a second
-admission kind. **Migration (next free number at build time; 071 if Stage 3
-has not taken it):**
+`staff-finalize` calls `finalizeMaterialUpload` directly within the request,
+using the same 300-second budget as the contributor route
+[VERIFIED `pages/api/external/materials/[token]/finalize.js:45`]. It never
+enqueues a background job. As a result, the token-bound job contract in 2.2 is
+untouched: there is no migration and no relaxed check. The signed-in session
+supplies the staff system user, so `REQUIRED` resolves its actor the way the
+grantee precedent does
+[VERIFIED `lib/services/request-document-actor-service.js:65-74, 104`].
 
-- **Jobs table:** add `admission_kind TEXT NOT NULL DEFAULT 'contributor'
-  CHECK (admission_kind IN ('contributor','staff'))`. Make `token_digest`
-  nullable, with a CHECK that it is present if and only if
-  `admission_kind = 'contributor'`.
-- **Enqueue:** a staff job requires a collection that exists, but not a
-  token match or an open status. It must **not** flip `ready` to `open`, so a
-  staff replacement never reopens the applicant link.
-- **Drain:** `admittedCollectionStillValid` keeps today's rule for contributor
-  jobs. For staff jobs it requires the same collection and request and a slot
-  that is still in the checklist (waived allowed), and ignores token and status.
-- **Actor for the async write:** add `actor_system_user_id UUID NULL` with a
-  CHECK that it is present if and only if `admission_kind = 'staff'`. Enqueue
-  records it from the session. The drain passes it as `actingUserSystemId`,
-  because `REQUIRED` needs a GUID system user and re-reads it as enabled
-  [VERIFIED `lib/services/request-document-actor-service.js:65-74, 104`], and
-  a cron drain has no session.
-- **The exemption, stated:** for contributor jobs the token is the
-  authorization, and the drain re-checks it. For staff jobs, authorization is
-  enforced at mint and at enqueue (`requireAppAccess('meeting-tracker')`,
-  session-derived binding and system user). The drain trusts the recorded
-  `actor_binding` and `actor_system_user_id` and does not re-authorize; its
-  actor read fails closed if the user is no longer enabled.
-- **One active job per slot:** the existing unique index on `(request_id,
-  slot)` for active non-`other` jobs
-  [VERIFIED `060_materials_background_jobs.sql:49-51`] means a staff upload
-  while an applicant job is active on that slot gets 409. That is expected;
-  the card says to wait.
-- **Fresh install:** `scripts/setup-database.js` gets the same change.
+Why inline is acceptable for staff:
+- **Proven at size:** PR #400 made a 326,914,310-byte PPTX complete inline
+  (applicant materials plan §16.14, memory
+  `project-site-visit-materials-planning-handoff`).
+- **Timing:** the first real large Production job took about 2m44s end to
+  end, about 1m20s of it in the scan
+  (`docs/plans/MATERIALS_BACKGROUND_PROCESSING_PLAN_2026-10-01.md:20`).
+- **Usage:** staff uploads are occasional and made by one coordinator.
 
-Alternative: staff uploads always run inline, with no migration. Rejected
-because it reintroduces the large-file memory failure for exactly the files
-staff will upload.
+Costs, accepted:
+- The staff member keeps the page open while it runs.
+- A timeout, or an upload overlapping an applicant job's memory use, surfaces
+  as a retryable error. Retry reuses the staged bytes and the generation key,
+  so it does not create a second row [VERIFIED generation key
+  `contributor-service.js:396` keys on the staging id].
+
+**Revisit trigger:** if staff hit timeouts in practice, add a staff admission
+kind to the background jobs. That design (nullable `token_digest`, an
+`admission_kind`, a recorded `actor_system_user_id`, a staff rule in
+`admittedCollectionStillValid`, and no ready-to-open flip) is recorded in
+this plan's git history at `5106fd54a`.
+
+**Interaction with an active applicant job:** `acquireSlotLease` locks the
+collection row and takes a per-request advisory lock. It returns no lease while
+another live lease holds the slot, or while a queued, processing or
+needs-attention job exists for a non-`other` slot
+[VERIFIED `lib/services/site-visit-materials/collection-store.js:258-288`]. So
+a staff upload on a busy slot is refused rather than racing; the card says to
+try again once the applicant's upload finishes.
 
 **Staging scope:** reuse `site_visit_material` with the `profile:<id>`
 binding, so the existing candidate reconciler
@@ -239,7 +239,7 @@ and refresh the row. The row shows "Uploaded by staff" when
 
 ### 3.5 "Slides changed" note on the presentation summary
 
-- **Migration (with 3.3):** add `slides_artifact_id UUID NULL` and
+- **Migration (the only one in this plan):** add `slides_artifact_id UUID NULL` and
   `slides_content_hash CHAR(64) NULL` to `meeting_transcript_summary_drafts`.
 - **Write:** `createPresentationSummaryDraft` stores the slides row's id and
   `wmkf_contenthash` when `readSlidesText` used one, and NULLs otherwise. The
@@ -260,17 +260,18 @@ note, and that limitation is recorded rather than guessed at.
 | Invariant | Verification |
 |---|---|
 | A staff upload needs `meeting-tracker` access, and the staff binding comes only from the session | route tests: a body-supplied actor is ignored; a wrong profile cannot claim another's staging row |
-| A staff upload never reopens or extends the applicant link | test: a ready or closed collection stays ready or closed after staff enqueue and drain |
-| Contributor jobs keep every token check | test: a contributor job with a changed `token_digest` still settles `collection_or_token_changed` |
-| An unknown `uploader.kind` or `admission_kind` fails closed | tests on both switches |
-| Staff may fill a waived slot; contributors still may not | tests: a staff upload to a waived slot succeeds inline and through the drain; a contributor upload to the same slot is refused |
-| A staff row written by the drain records the uploader | test: a staff job carries `actor_system_user_id`; the row is created with `REQUIRED` and that actor; a job without it is refused by the CHECK |
+| A staff upload never reopens or extends the applicant link, and never enqueues a job | test: a ready or closed collection stays ready or closed after a staff finalize; no `materials_upload_jobs` row is written |
+| The contributor path is unchanged | the existing contributor finalize and drain suites pass unmodified |
+| An unknown `uploader.kind` fails closed | test |
+| Staff may fill a waived slot; contributors still may not | tests: a staff upload to a waived slot succeeds; a contributor upload to the same slot is refused |
+| A staff row records the uploader | test: the row is created with `REQUIRED` and the session's system user; a session without one is refused before any byte work |
 | A staff-uploaded APPLICANT_SLIDES PDF is what `readSlidesText` and the Board page read | test with a staff-produced row (same producer) |
 | The slides-changed note is decided by row id and hash, not by timestamp | test: replace the slides after publish, and the flag turns true |
 
 ## 5. Owner-run steps
 
-1. The migration (`node scripts/apply-migrations.js`).
+1. The migration for the summary-drafts columns (3.5;
+   `node scripts/apply-migrations.js`).
 
 No Dataverse schema change is needed: no new picklist value and no new column.
 
@@ -285,6 +286,7 @@ No Dataverse schema change is needed: no new picklist value and no new column.
    the waiver.
 2. Migration numbering with Stage 3 of the summaries plan: whichever branch
    applies first takes 071 (memory `project-migration-numbers-claimed-off-main`).
-3. Reviews before build: `/contract-reconcile` Mode B and a Codex
-   adversarial round on the enqueue/drain admission change, because it
-   relaxes a gate (2.2) and exemptions are where fail-open hides.
+3. Reviews: `/contract-reconcile` Mode B during the build, and a Codex
+   adversarial round on the PR. The focus is the staff branch of
+   `finalizeMaterialUpload`, which skips the collection-state and waiver
+   checks, because exemptions are where fail-open hides.
