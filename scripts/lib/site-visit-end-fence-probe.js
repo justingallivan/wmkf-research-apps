@@ -7,12 +7,13 @@ const ENTITY_SET = 'wmkf_sitevisits';
 const REQUEST_SELECT = ['akoya_requestid', 'akoya_requestnum', 'wmkf_istestrequest', 'wmkf_testcreationrunid'];
 const { GUID_RE: GUID } = require('../../lib/utils/guid.js');
 
-function assertProbeArgs({ target, targetSpecified, execute, activityId, expectedState }) {
+function assertProbeArgs({ target, targetSpecified, execute, activityId, expectedState, fenceMode = 'end' }) {
   if (target !== 'prod' || targetSpecified !== true) {
     throw new Error('Site Visit end-fence proof requires explicit --target=prod.');
   }
   if (typeof activityId !== 'string' || !GUID.test(activityId)) throw new Error('--activity-id=<GUID> is required.');
   if (!['active', 'completed'].includes(expectedState)) throw new Error('--expected-state=active|completed is required.');
+  if (!['end', 'status'].includes(fenceMode)) throw new Error('--fence=end|status is required.');
 }
 
 function assertProductionProbePreflight({
@@ -129,17 +130,30 @@ function validateActivitySet(records, { activityId, expectedState, choices }) {
   return expectedRows[0];
 }
 
-function buildConditionalPatch(activityId, scheduledEnd, etag) {
-  if (!GUID.test(activityId) || !scheduledEnd || !etag) throw new Error('A validated activity id, scheduled end, and ETag are required.');
-  return [{ method: 'PATCH', entitySet: ENTITY_SET, key: activityId, body: { scheduledend: scheduledEnd }, ifMatch: etag }];
+function buildConditionalPatch(activityId, event, etag, fenceMode = 'end') {
+  if (!GUID.test(activityId) || !event || !etag || !['end', 'status'].includes(fenceMode)) {
+    throw new Error('A validated activity id, event snapshot, ETag, and fence mode are required.');
+  }
+  if (fenceMode === 'end') {
+    if (!event.scheduledend) throw new Error('A validated scheduled end is required for the end fence.');
+    return [{ method: 'PATCH', entitySet: ENTITY_SET, key: activityId, body: { scheduledend: event.scheduledend }, ifMatch: etag }];
+  }
+  const stateCode = Number(event.statecode);
+  const statusCode = Number(event.statuscode);
+  if (event.statecode === null || event.statecode === undefined
+    || event.statuscode === null || event.statuscode === undefined
+    || !Number.isInteger(stateCode) || !Number.isInteger(statusCode)) {
+    throw new Error('Exact integer statecode and statuscode values are required for the status fence.');
+  }
+  return [{ method: 'PATCH', entitySet: ENTITY_SET, key: activityId, body: { statecode: stateCode, statuscode: statusCode }, ifMatch: etag }];
 }
 
 function errorStatus(error) {
   return Number(error?.status ?? error?.httpStatus ?? error?.response?.status);
 }
 
-async function runSiteVisitEndFenceProbe({ target, targetSpecified, execute, activityId, expectedState }, deps) {
-  assertProbeArgs({ target, targetSpecified, execute, activityId, expectedState });
+async function runSiteVisitEndFenceProbe({ target, targetSpecified, execute, activityId, expectedState, fenceMode = 'end' }, deps) {
+  assertProbeArgs({ target, targetSpecified, execute, activityId, expectedState, fenceMode });
   const preflight = assertProductionProbePreflight({
     env: deps?.env, productionHosts: deps?.productionHosts, now: deps?.now, requireWriteAck: execute === true,
   });
@@ -169,7 +183,7 @@ async function runSiteVisitEndFenceProbe({ target, targetSpecified, execute, act
       throw new Error(`Expected ${expectedState}, read ${choices.labelForState(before.statecode)}.`);
     }
     const report = {
-      target, requestNumber: REQUEST_NUMBER, activityId, expectedState,
+      target, requestNumber: REQUEST_NUMBER, activityId, expectedState, fenceMode,
       actualState: choices.labelForState(before.statecode),
       actualStatus: choices.labelForStatus(before.statuscode, before.statecode),
       scheduledEnd: before.scheduledend, preflight,
@@ -181,7 +195,7 @@ async function runSiteVisitEndFenceProbe({ target, targetSpecified, execute, act
     assertProductionProbePreflight({
       env: deps?.env, productionHosts: deps?.productionHosts, now: deps?.now, requireWriteAck: true,
     });
-    const patch = buildConditionalPatch(activityId, before.scheduledend, before._etag);
+    const patch = buildConditionalPatch(activityId, before, before._etag, fenceMode);
     const commit = await deps.runChangeset(patch);
     if (commit?.ok !== true || !Array.isArray(commit.operations) || commit.operations.length !== 1
       || commit.operations.some((operation) => Number(operation.status) < 200 || Number(operation.status) >= 300)) {
@@ -202,7 +216,7 @@ async function runSiteVisitEndFenceProbe({ target, targetSpecified, execute, act
     });
     let staleStatus = null;
     try {
-      await deps.runChangeset(buildConditionalPatch(activityId, before.scheduledend, before._etag));
+      await deps.runChangeset(buildConditionalPatch(activityId, before, before._etag, fenceMode));
     } catch (error) {
       staleStatus = errorStatus(error);
       if (staleStatus !== 412) throw error;

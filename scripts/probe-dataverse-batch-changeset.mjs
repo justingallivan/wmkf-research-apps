@@ -50,13 +50,14 @@ const BOGUS_ETAG = 'W/"00000000-0000-0000-0000-000000000000"';
 function parseArgs(argv) {
   const out = {
     target: 'prod', targetSpecified: false, suggestion: null, execute: false,
-    siteVisitEndFence: false, activityId: null, expectedState: null,
+    siteVisitEndFence: false, activityId: null, expectedState: null, fenceMode: 'end',
   };
   for (const a of argv.slice(2)) {
     if (a === '--execute') out.execute = true;
     else if (a === '--site-visit-end-fence') out.siteVisitEndFence = true;
     else if (a.startsWith('--activity-id=')) out.activityId = a.slice('--activity-id='.length);
     else if (a.startsWith('--expected-state=')) out.expectedState = a.slice('--expected-state='.length);
+    else if (a.startsWith('--fence=')) out.fenceMode = a.slice('--fence='.length);
     else if (a.startsWith('--target=')) {
       out.target = a.slice('--target='.length);
       out.targetSpecified = true;

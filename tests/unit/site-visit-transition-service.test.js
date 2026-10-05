@@ -198,7 +198,8 @@ it('automatically promotes the same Word item under request, schedule, and corre
   expect(h.dependencies.commitChangeset).toHaveBeenCalledTimes(1);
   const operations = h.dependencies.commitChangeset.mock.calls[0][0];
   expect(operations).toHaveLength(3);
-  expect(operations[0]).toMatchObject({ key: h.event.activityid, body: { scheduledend: '2026-12-01T18:00:00Z' }, ifMatch: 'event-etag-1' });
+  expect(operations[0]).toMatchObject({ key: h.event.activityid, body: { statecode: 10, statuscode: 11 }, ifMatch: 'event-etag-1' });
+  expect(operations[0].body).not.toHaveProperty('scheduledend');
   expect(operations[1].body['wmkf_CurrentPreSiteVisit@odata.bind']).toContain(ARTIFACT_ID);
   expect(operations[2].body).toMatchObject({
     wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
@@ -208,6 +209,23 @@ it('automatically promotes the same Word item under request, schedule, and corre
   expect(operations[2].body).not.toHaveProperty('wmkf_GroupReviewStartedAt');
   expect(operations[2].body).not.toHaveProperty('wmkf_LeadershipReviewStartedAt');
   expect(h.row.wmkf_sharepointitemid).toBe('item-id');
+});
+
+it('keeps the request and draft unchanged when the atomic event-status fence rejects', async () => {
+  const h = createAutomaticHarness({ commitError: Object.assign(new Error('Dataverse 412'), { status: 412 }) });
+  await expect(prepareSiteVisitStageAutomatically({
+    requestId: REQUEST_ID, expectedArtifactId: ARTIFACT_ID, siteVisitId: h.event.activityid,
+    scheduledEnd: h.event.scheduledend, eventModifiedOn: h.event.modifiedon,
+    stateCode: h.event.statecode, statusCode: h.event.statuscode, eligibility: AUTO_CONFIG,
+  }, h.dependencies)).rejects.toMatchObject({ status: 412 });
+  const operations = h.dependencies.commitChangeset.mock.calls[0][0];
+  expect(operations[0]).toMatchObject({
+    method: 'PATCH', entitySet: 'wmkf_sitevisits', key: h.event.activityid,
+    body: { statecode: 10, statuscode: 11 }, ifMatch: 'event-etag-1',
+  });
+  expect(operations[0].body).not.toHaveProperty('scheduledend');
+  expect(h.request._wmkf_currentpresitevisit_value).toBe(ARTIFACT_ID);
+  expect(h.row.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT);
 });
 
 it('rejects a changed program at the fresh automatic-promotion fence', async () => {

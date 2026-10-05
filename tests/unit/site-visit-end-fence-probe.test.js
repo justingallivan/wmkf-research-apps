@@ -99,6 +99,24 @@ describe.each(['active', 'completed'])('Site Visit end-fence probe (%s)', (expec
   });
 });
 
+describe.each(['active', 'completed'])('Site Visit status-fence probe (%s)', (expectedState) => {
+  test('patches only the verified state/status pair with current ETag, then proves stale ETag rejection', async () => {
+    const { deps, changesets } = fixture(expectedState);
+    const statecode = expectedState === 'completed' ? 1 : 0;
+    const statuscode = expectedState === 'completed' ? 21 : 11;
+    const result = await runSiteVisitEndFenceProbe({
+      target: 'prod', targetSpecified: true, execute: true, activityId: ACTIVITY_ID, expectedState, fenceMode: 'status',
+    }, deps);
+    expect(result).toMatchObject({ fenceMode: 'status', sameValuePatch: 'confirmed', staleEtagStatus: 412, staleAttemptReadback: 'unchanged' });
+    expect(changesets).toHaveLength(2);
+    expect(changesets[0]).toEqual([{
+      method: 'PATCH', entitySet: 'wmkf_sitevisits', key: ACTIVITY_ID,
+      body: { statecode, statuscode }, ifMatch: 'W/"1"',
+    }]);
+    expect(changesets[1]).toEqual(changesets[0]);
+  });
+});
+
 test('requires explicit production target, execute, and active/completed expectation', async () => {
   const { deps } = fixture('active');
   await expect(runSiteVisitEndFenceProbe({ target: 'sandbox', targetSpecified: true, execute: true, activityId: ACTIVITY_ID, expectedState: 'active' }, deps)).rejects.toThrow('explicit --target=prod');
@@ -179,10 +197,15 @@ test('read-only preflight still requires tracked local production-read controls'
   expect(() => assertProductionProbePreflight({ env: { ...env, NODE_ENV: 'test' }, productionHosts: ['wmkf.crm.dynamics.com'] })).toThrow('local operator process');
 });
 
-test('conditional operation permits only the Site Visit end and requires a valid activity GUID', () => {
-  expect(buildConditionalPatch(ACTIVITY_ID, SCHEDULED_END, 'W/"17"')).toEqual([{
+test('conditional operation selects exactly one fence and validates the observed fields', () => {
+  expect(buildConditionalPatch(ACTIVITY_ID, { scheduledend: SCHEDULED_END, statecode: 1, statuscode: 21 }, 'W/"17"')).toEqual([{
     method: 'PATCH', entitySet: 'wmkf_sitevisits', key: ACTIVITY_ID,
     body: { scheduledend: SCHEDULED_END }, ifMatch: 'W/"17"',
   }]);
+  expect(buildConditionalPatch(ACTIVITY_ID, { scheduledend: SCHEDULED_END, statecode: 1, statuscode: 21 }, 'W/"17"', 'status')).toEqual([{
+    method: 'PATCH', entitySet: 'wmkf_sitevisits', key: ACTIVITY_ID,
+    body: { statecode: 1, statuscode: 21 }, ifMatch: 'W/"17"',
+  }]);
+  expect(() => buildConditionalPatch(ACTIVITY_ID, { statecode: null, statuscode: 21 }, 'W/"17"', 'status')).toThrow('Exact integer statecode and statuscode');
   expect(() => buildConditionalPatch('not-a-guid', SCHEDULED_END, 'W/"17"')).toThrow();
 });

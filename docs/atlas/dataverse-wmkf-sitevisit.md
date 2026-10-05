@@ -152,3 +152,5 @@ fallback.
   operation `f497643a-2e9e-4032-a323-1e40874d16f1` reached `sent` with this Site
   Visit ID, one governed material, and no final error. `sent` proves Dynamics
   transport acceptance, not independent inbox or calendar-client delivery.
+
+- **[PRODUCTION-PROVED, narrow concurrency probe, 2026-10-05.]** On marked test request `1003312`, retained activity `4079ab1a-f9c0-f111-aaad-6045bd04539e` rejected an unchanged `scheduledend` PATCH after completion (`0x8004022e`). A PATCH containing only the same observed `statecode`/`statuscode` with `If-Match` succeeded, advanced the ETag, and preserved end/state/status. Replaying the stale ETag returned 412; a companion request-title write in the same changeset rolled back, with title and request ETag unchanged. The Staff Deliberations feature branch uses this status-only fence in automatic preparation and Final activation; it is not deployed. This proves the conditional-write primitive, not full worker or document-transition acceptance. Evidence: `/tmp/deliberations-status-only-experiment.log` and `/tmp/deliberations-status-rollback-experiment.log`.

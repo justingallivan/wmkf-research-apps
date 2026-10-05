@@ -129,7 +129,7 @@ function createHarness({ actorId = LEAD_PD_ID, schemaReady = true } = {}) {
       reason: 'schema-not-ready',
     }),
   };
-  return { request, source, rows, metadata, dependencies, actorId };
+  return { request, source, siteVisit, rows, metadata, dependencies, actorId };
 }
 
 function finalStatusRow(overrides = {}) {
@@ -273,7 +273,7 @@ test('moves the same stable Word item into one Ready/Review Final row atomically
         method: 'PATCH',
         entitySet: 'wmkf_sitevisits',
         key: '77777777-7777-4777-8777-777777777777',
-        body: { scheduledend: '2026-08-30T19:00:00.000Z' },
+        body: { statecode: 10, statuscode: 11 },
         ifMatch: 'site-visit-etag-1',
       },
     ],
@@ -618,6 +618,15 @@ test('a rejected atomic activation leaves pointers and source lifecycle unchange
   expect(harness.source.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW);
   expect(harness.rows.find((row) => row.wmkf_requestdocumentid === FINAL_ID))
     .toMatchObject({ wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED });
+  const operations = harness.dependencies.commitChangeset.mock.calls[0][0];
+  expect(operations[3]).toMatchObject({
+    method: 'PATCH', entitySet: 'wmkf_sitevisits', key: harness.siteVisit.activityid,
+    body: { statecode: 10, statuscode: 11 }, ifMatch: 'site-visit-etag-1',
+  });
+  expect(operations[3].body).not.toHaveProperty('scheduledend');
+  expect(harness.siteVisit).toMatchObject({
+    scheduledend: '2026-08-30T19:00:00.000Z', statecode: 10, statuscode: 11, _etag: 'site-visit-etag-1',
+  });
 });
 
 test('a live deterministic claim returns in progress without a second write', async () => {
