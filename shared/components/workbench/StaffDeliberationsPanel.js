@@ -35,6 +35,7 @@ function dateTime(value, timeZone = null) {
 function taskFor(request) {
   if (request.finalPhase === 'leadership-review') return { label: 'Leadership review', bucket: 'review', action: 'Open Final Writeup', tab: 'final-writeup' };
   if (request.finalPhase === 'group-review') return { label: 'In review', bucket: 'review', action: 'Open Final Writeup', tab: 'final-writeup' };
+  if (request.writeup?.correctionInProgress) return { label: 'Corrections in progress', bucket: 'attention', action: 'Continue corrections', tab: 'staff-deliberations' };
   const attention = ['blocked', 'unavailable'].includes(request.preparation?.state)
     || request.finalReview?.availability === 'unavailable'
     || (request.writeup?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL && request.finalPhase !== 'group-review')

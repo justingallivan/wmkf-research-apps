@@ -78,3 +78,12 @@ test('a Final source without verified review lineage needs attention', async () 
   expect(await screen.findByText('Needs attention', { selector: 'p' })).toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'Open Final Writeup' })).not.toBeInTheDocument();
 });
+
+
+test('reopened corrections remain a staff task even when an older preparation receipt is complete', async () => {
+  global.fetch.mockResolvedValue(response([row({ preparation: { due: true, state: 'prepared' }, writeup: { availability: 'available', lifecycleState: 100000000, correctionInProgress: true } })]));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText('Corrections in progress')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Continue corrections' })).toHaveAttribute('href', expect.stringContaining('staff-deliberations'));
+  expect(screen.queryByText('Post-visit editing')).not.toBeInTheDocument();
+});
