@@ -727,6 +727,15 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   (no recording appears outside until Stage 4's Board recording type). Staff
   surfaces (the Recording and transcript card, the Staff Deliberations feed)
   keep the full files.
+- **Formatter/bundle version 5** (source-built 2026-10-05 on
+  `feature/transcript-txt-utf8-bom`, not deployed): identical to v4 except
+  that the published TXT starts with a UTF-8 byte-order mark (EF BB BF).
+  Without it, SharePoint and browsers opening the file directly read UTF-8
+  punctuation as Windows-1252 ("—" shown as "â€”"; owner report on 1003222).
+  v1–v4 TXT rebuild byte-identical; VTT and the source JSON never carry a
+  BOM. The Presentation and Staff Discussion Transcript TXTs are
+  BOM-prefixed by their writer; rows already written keep their bytes until
+  regenerated.
 - **Staff Discussion Transcript** (`100000013`, owner decision 2026-10-05,
   plan §7 decision 7, §13; **[PRODUCTION-LIVE: PR #435 merge `700702ee9`, Production deployment 6864926345 success, 2026-10-05; migration 069 applied and picklist 100000013 inserted by the owner ahead of the merge. Acceptance on test request 1003222 not yet run.]**): the exact
   complement of the presentation cut (utterances ending after the boundary),

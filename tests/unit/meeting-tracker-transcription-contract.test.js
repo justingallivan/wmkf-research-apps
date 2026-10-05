@@ -79,17 +79,30 @@ describe('Meeting Tracker generated transcript bundle', () => {
   const timedContent = { text: 'go now', utterances: [{ speaker: 'A', start: 0, end: 70_000,
     text: 'go now', words: [{ start: 58_000, end: 59_000, text: 'go' }, { start: 61_000, end: 62_000, text: 'now' }] }] };
 
-  it('embeds fully aligned optional word timings in formatter v2+ source; the default v4 TXT is one turn paragraph with no boundary', () => {
+  it('embeds fully aligned optional word timings in formatter v2+ source; the default v5 TXT is one turn paragraph, BOM-prefixed, with no boundary', () => {
     const generated = buildMeetingTranscriptFiles({ content: timedContent, speakerNames: {}, identity });
     const parsed = parseVerifiedMeetingTranscriptSource(generated.files.source.bytes,
       { size: generated.files.source.bytes.length, sha256: generated.files.source.sha256 }, identity);
-    expect(parsed.formatterVersion).toBe('4');
-    expect(generated.sourceContent.schemaVersion).toBe(4);
+    expect(parsed.formatterVersion).toBe('5');
+    expect(generated.sourceContent.schemaVersion).toBe(5);
     expect(generated.sourceContent.presentationEnd).toBeNull();
     expect(generated.presentationEnd).toBeNull();
     expect(parsed.presentationEnd).toBeNull();
     expect(parsed.content.utterances[0].words).toEqual(timedContent.utterances[0].words);
-    expect(generated.files.txt.bytes.toString()).toBe('[00:00] Speaker A: go now\n');
+    expect(generated.files.txt.bytes.toString()).toBe('\uFEFF[00:00] Speaker A: go now\n');
+    expect([...generated.files.txt.bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+  });
+
+  it('formatter v5 adds a UTF-8 byte-order mark to the TXT only; v4 TXT is byte-identical to before and VTT/source never carry one', () => {
+    const content = { text: 'x', utterances: [{ speaker: 'A', start: 0, end: 1000, text: 'you\u2014 I think, José said \u201cyes\u201d' }] };
+    const v4 = buildMeetingTranscriptFiles({ content, speakerNames: {}, identity: { ...identity, formatterVersion: '4' } });
+    const v5 = buildMeetingTranscriptFiles({ content, speakerNames: {}, identity: { ...identity, formatterVersion: '5' } });
+    expect(v4.files.txt.bytes[0]).toBe(0x5b);
+    expect(v5.files.txt.bytes.equals(Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), v4.files.txt.bytes]))).toBe(true);
+    expect(v5.files.vtt.bytes.equals(v4.files.vtt.bytes)).toBe(true);
+    expect(v5.files.source.bytes[0]).toBe(0x7b);
+    // Decoding the v5 TXT as UTF-8 recovers the em dash and accents intact.
+    expect(v5.files.txt.bytes.subarray(3).toString('utf8')).toContain('you\u2014 I think, José said');
   });
 
   describe('version 4 presentation end (boundary)', () => {
@@ -118,7 +131,7 @@ describe('Meeting Tracker generated transcript bundle', () => {
         contentType: { txt: 'text/plain; charset=utf-8', vtt: 'text/vtt; charset=utf-8', source: 'application/json' }[role],
       }]));
       const manifest = buildMeetingTranscriptManifest({ identity: { ...identity, presentationEnd: boundary }, files });
-      expect(manifest.schemaVersion).toBe(4);
+      expect(manifest.schemaVersion).toBe(5);
       expect(manifest.presentationEnd).toEqual(boundary);
       expect(validateMeetingTranscriptManifest({ ...manifest, presentationEnd: null })).toBeTruthy();
       expect(() => validateMeetingTranscriptManifest({ ...manifest, schemaVersion: 3, formatterVersion: '3' })).toThrow('invalid_transcript_bundle');
@@ -169,7 +182,7 @@ describe('Meeting Tracker generated transcript bundle', () => {
   it('preserves provider text when diarization returned no utterances', () => {
     const transcriptText = 'A complete plain text transcript without diarized turns.';
     const generated = buildMeetingTranscriptFiles({ content: { text: transcriptText, utterances: [] }, speakerNames: {}, identity });
-    expect(generated.files.txt.bytes.toString()).toBe(`${transcriptText}\n`);
+    expect(generated.files.txt.bytes.toString()).toBe(`\uFEFF${transcriptText}\n`);
     expect(generated.publishable).toBe(false);
     expect(generated.files.vtt).toBeUndefined();
     const parsed = parseVerifiedMeetingTranscriptSource(generated.files.source.bytes, {

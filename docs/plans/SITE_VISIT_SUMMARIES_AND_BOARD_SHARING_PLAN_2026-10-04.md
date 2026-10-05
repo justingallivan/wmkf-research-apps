@@ -618,3 +618,18 @@ without bundle metadata both are hidden and the full transcript stays. The
 regression test for that exact sequence, plus the readiness-off case, turned
 red with the filter removed. Outside-page exclusion was judged sound.
 
+## 15. TXT encoding fix, 2026-10-05 (branch `feature/transcript-txt-utf8-bom`)
+
+**Owner report on 1003222:** the staff discussion TXT opened from SharePoint
+showed "youâ€” I think". The file bytes were correct UTF-8 (`e2 80 94`); the
+viewer read them as Windows-1252 because a `.txt` carries no charset. The
+card's own "Download TXT" was unaffected (its route sends
+`charset=utf-8`); the Board link redirects to SharePoint and was presumed
+affected (not verified in Production).
+
+**Fix:** a UTF-8 byte-order mark on every published TXT. The full transcript
+gets it through formatter/bundle version 5, so v1–v4 publications still
+rebuild byte-identical during recovery; the presentation and discussion
+derivatives get it in their writer. VTT and source JSON are unchanged.
+Already-written files keep their bytes; regenerating replaces them.
+
