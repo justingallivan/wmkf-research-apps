@@ -22,6 +22,7 @@ import { getDeliberationScheduleByRequestsWithAvailability } from '../../lib/ser
 import { getMaterialsSummaryByRequestsWithAvailability } from '../../lib/services/site-visit-materials/summary-reader.js';
 import { resolveWorkbenchProgramScope } from '../../lib/services/workbench/program-scope-service.js';
 import { listPreSiteVisitDrafts } from '../../lib/services/pre-site-visit/cycle-list-service';
+import { buildVisibilityFilter } from '../../shared/config/workbenchVisibility';
 import {
   PRE_RP_BRIEF_CONTRACT,
   PRE_SITE_VISIT_CONTRACT,
@@ -116,6 +117,7 @@ it('uses an active server-resolved program plus the selected cycle and lead-PD f
   const query = grantRequestAdapter.queryAllRequests.mock.calls[0][0];
   expect(query.filter).toContain('wmkf_meetingdate ge 2026-12-01T00:00:00Z');
   expect(query.filter).toContain(`_wmkf_grantprogram_value eq ${PROGRAM}`);
+  expect(query.filter).toContain(buildVisibilityFilter(false));
   expect(query.filter).toContain(`_wmkf_programdirector_value eq ${PD_A}`);
 });
 
@@ -133,6 +135,7 @@ it('all-PDs removes only the lead-PD predicate and retains request-first documen
   const query = grantRequestAdapter.queryAllRequests.mock.calls[0][0];
   expect(query.filter).not.toContain('_wmkf_programdirector_value');
   expect(query.filter).toContain(`_wmkf_grantprogram_value eq ${PROGRAM}`);
+  expect(query.filter).toContain(buildVisibilityFilter(false));
   expect(result.artifacts.map((item) => item.requestId)).toEqual([R1, R2]);
   expect(result.artifacts[1].writeup).toMatchObject({ availability: 'missing', file: null });
   expect(result.requestCounts).toEqual({ total: 2, ordinary: 2, test: 0 });

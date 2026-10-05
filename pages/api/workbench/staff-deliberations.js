@@ -1,10 +1,10 @@
 /**
  * API: /api/workbench/staff-deliberations
  *
- * GET ?cycleCode=D26 → every request in the cycle with a Pre-Site Visit Word
- * draft, each with its current draft's operation/lifecycle state and recorded
- * SharePoint link. Read-only; the per-request Staff Deliberations tab owns
- * every write.
+ * GET ?cycleCode=D26 → Phase II-visible/advancing requests in the selected
+ * program, cycle, and PD scope, including requests without documents. Each
+ * row includes available document facts and recorded SharePoint links.
+ * Read-only; the per-request Staff Deliberations tab owns every write.
  *
  * Same `reviewers` app gate as the sibling initial-assessment route.
  */
