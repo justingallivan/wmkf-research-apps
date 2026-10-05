@@ -15,7 +15,9 @@ export default async function handler(req, res) {
   if (!Number.isSafeInteger(access.profileId) || access.profileId < 1) return res.status(401).json({ error: 'An active linked staff profile is required.' });
   if (req.method === 'PATCH') {
     const body = req.body;
-    if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).sort().join(',') !== 'expectedVersion,speakerNames'
+    // The two-key shape leaves the presentation end untouched; the three-key shape sets it or clears it (null).
+    const keys = body && typeof body === 'object' && !Array.isArray(body) ? Object.keys(body).sort().join(',') : '';
+    if (!['expectedVersion,speakerNames', 'expectedVersion,presentationEndMs,speakerNames'].includes(keys)
       || !Number.isSafeInteger(body.expectedVersion)) return res.status(400).json({ error: 'The correction-label request is invalid.' });
   }
   res.setHeader('Cache-Control','private, no-store');
