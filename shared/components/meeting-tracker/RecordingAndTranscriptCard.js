@@ -1574,8 +1574,9 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   const [summaryNotice, setSummaryNotice] = useState(null);
   const currentArtifact = collection?.currentArtifact || null;
   const presentationBound = currentArtifact?.presentationTranscript?.state === 'bound';
-  const summaryDraft = summary?.draft?.state === 'ready' ? summary.draft : null;
-  const summaryDirty = Boolean(summaryDraft) && summaryText !== (summaryDraft.text || '');
+  // A 'publishing' draft is one whose publish did not finish: it is read-only and can only be published again.
+  const summaryDraft = ['ready', 'publishing'].includes(summary?.draft?.state) ? summary.draft : null;
+  const summaryDirty = summaryDraft?.state === 'ready' && summaryText !== (summaryDraft.text || '');
 
   const loadSummary = useCallback(async () => {
     if (!requestId) return;
@@ -1585,7 +1586,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
       const body = await requestJson(summaryPath, { method: 'GET', fallbackMessage: 'The presentation summary could not be loaded.' });
       if (!isCurrent(generation) || summarySequenceRef.current !== sequence) return;
       setSummary(body);
-      setSummaryText(body?.draft?.state === 'ready' ? body.draft.text || '' : '');
+      setSummaryText(['ready', 'publishing'].includes(body?.draft?.state) ? body.draft.text || '' : '');
     } catch (loadError) {
       if (!isCurrent(generation) || summarySequenceRef.current !== sequence) return;
       setSummary(null);
@@ -1633,7 +1634,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   };
 
   const saveSummaryDraft = async () => {
-    if (!summaryDraft || busy) return null;
+    if (summaryDraft?.state !== 'ready' || busy) return null;
     const generation = generationRef.current;
     setBusy('summary-save');
     setSummaryError(null);
@@ -1657,7 +1658,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   };
 
   const discardSummaryDraft = async () => {
-    if (!summaryDraft || busy) return;
+    if (summaryDraft?.state !== 'ready' || busy) return;
     const generation = generationRef.current;
     setBusy('summary-discard');
     setSummaryError(null);
@@ -2110,7 +2111,7 @@ function SummaryBlock({ t }) {
     : published?.state === 'stale'
       ? 'The published summary is from an earlier transcript version. The Board link no longer shows it; staff still see it. Summarize again to replace it.'
       : 'No summary published yet.';
-  const summarizeForm = presentationReady && (
+  const summarizeForm = presentationReady && draft?.state !== 'publishing' && (
     <div className="mt-3">
       <label htmlFor={ackId} className="flex items-start gap-2 text-sm leading-6 text-gray-900">
         <input id={ackId} type="checkbox" className="mt-1.5" checked={t.summaryAck} disabled={Boolean(t.busy)}
@@ -2137,19 +2138,25 @@ function SummaryBlock({ t }) {
           <label htmlFor="presentation-summary-text" className="mt-2 block text-sm font-medium text-gray-900">
             Draft{draft.edited ? ' (edited)' : ''} · expires {fmtDateTime(draft.expiresAt)}
           </label>
+          {draft.state === 'publishing' && (
+            <Notice tone="warning">Publishing this draft did not finish. Publish it again to complete it; it cannot be edited or discarded meanwhile.</Notice>
+          )}
           <textarea id="presentation-summary-text" rows={14} className={`${INPUT} font-mono`} value={t.summaryText}
-            maxLength={SUMMARY_TEXT_MAX_CHARS} disabled={Boolean(t.busy)} onChange={(event) => t.setSummaryText(event.target.value)} />
+            maxLength={SUMMARY_TEXT_MAX_CHARS} disabled={Boolean(t.busy) || draft.state !== 'ready'}
+            onChange={(event) => t.setSummaryText(event.target.value)} />
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button type="button" onClick={t.publishSummaryDraft} className={BTN_PRIMARY}
               disabled={Boolean(t.busy) || !t.summary?.draftMatchesTranscript || !t.summaryText.trim()}>
               {t.busy === 'summary-publish' ? 'Publishing…' : 'Publish summary'}
             </button>
-            <button type="button" onClick={() => void t.saveSummaryDraft()} className={BTN} disabled={Boolean(t.busy) || !t.summaryDirty || !t.summaryText.trim()}>
-              {t.busy === 'summary-save' ? 'Saving…' : 'Save draft'}
-            </button>
-            <button type="button" onClick={t.discardSummaryDraft} className={BTN_LINK} disabled={Boolean(t.busy)}>
-              {t.busy === 'summary-discard' ? 'Discarding…' : 'Discard draft'}
-            </button>
+            {draft.state === 'ready' && <>
+              <button type="button" onClick={() => void t.saveSummaryDraft()} className={BTN} disabled={Boolean(t.busy) || !t.summaryDirty || !t.summaryText.trim()}>
+                {t.busy === 'summary-save' ? 'Saving…' : 'Save draft'}
+              </button>
+              <button type="button" onClick={t.discardSummaryDraft} className={BTN_LINK} disabled={Boolean(t.busy)}>
+                {t.busy === 'summary-discard' ? 'Discarding…' : 'Discard draft'}
+              </button>
+            </>}
           </div>
         </div>
       )}

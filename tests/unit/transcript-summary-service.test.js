@@ -87,6 +87,9 @@ beforeEach(() => {
     updateSummaryDraftText: jest.fn(async (args) => draftRow({ summary_text: args.text, version: 3, text_edited: true })),
     discardSummaryDraft: jest.fn(async () => ({})),
     markSummaryDraftPublished: jest.fn(async () => ({ id: DRAFT_ID, state: 'published' })),
+    claimSummaryDraftForPublish: jest.fn(async (args) => (args.id === DRAFT_ID && args.expectedVersion === 2
+      ? draftRow({ state: 'publishing', publish_claimed_at: new Date('2026-10-05T15:00:00Z') }) : null)),
+    releaseSummaryDraftClaim: jest.fn(async () => ({})),
   };
   deps = {
     schemaReady: jest.fn(() => true), requestAllowed: jest.fn(() => true),
@@ -251,7 +254,7 @@ describe('publish', () => {
 
     const [library, folder, filename, bytes, contentType] = deps.uploadFile.mock.calls[0];
     expect([library, folder, contentType]).toEqual(['akoya_request', 'akoya_request/1002912_x/Site Visit - Transcript Summary', 'text/plain; charset=utf-8']);
-    expect(filename).toBe('1002912-Presentation-Summary-20261005-1432.txt');
+    expect(filename).toBe('1002912-Presentation-Summary-20261005-143210.txt');
     expect(bytes.toString('utf8')).toBe(`﻿${SUMMARY_TEXT}\n`);
 
     const payload = deps.createDocument.mock.calls[0][0];
@@ -278,22 +281,73 @@ describe('publish', () => {
   test.each([
     ['another revision', { source_revision_id: OTHER_REVISION }],
     ['another boundary', { presentation_end_ms: '1500' }],
-  ])('a draft made from %s is refused before any upload', async (_label, extra) => {
-    drafts.getActiveSummaryDraft.mockResolvedValue(draftRow(extra));
+  ])('a draft made from %s is refused before any upload and its claim is released', async (_label, extra) => {
+    drafts.claimSummaryDraftForPublish.mockResolvedValue(draftRow({ state: 'publishing', ...extra }));
     await expect(publish()).rejects.toMatchObject({ httpStatus: 409, code: 'summary_draft_stale' });
     expect(deps.uploadFile).not.toHaveBeenCalled();
     expect(deps.createDocument).not.toHaveBeenCalled();
     expect(deps.releaseSlotLease).toHaveBeenCalled();
+    expect(drafts.releaseSummaryDraftClaim).toHaveBeenCalledWith({ id: DRAFT_ID, requestId: REQUEST_ID, expectedVersion: 2 });
   });
 
-  test.each([
-    ['a different version', { expectedVersion: 3 }, () => draftRow()],
-    ['no active draft', {}, () => null],
-    ['a generating draft', {}, () => draftRow({ state: 'generating', summary_text: null })],
-  ])('%s is refused before the lease', async (_label, body, active) => {
-    drafts.getActiveSummaryDraft.mockResolvedValue(active());
-    await expect(publish(body)).rejects.toMatchObject({ httpStatus: 409, code: 'summary_draft_changed' });
+  test('a draft the store will not claim (edited, discarded, replaced, generating, or expired) is refused before the lease', async () => {
+    await expect(publish({ expectedVersion: 3 })).rejects.toMatchObject({ httpStatus: 409, code: 'summary_draft_changed' });
+    expect(drafts.claimSummaryDraftForPublish).toHaveBeenCalledWith({ id: DRAFT_ID, requestId: REQUEST_ID, expectedVersion: 3, profileId: 12 });
     expect(deps.acquireSlotLease).not.toHaveBeenCalled();
+    expect(deps.uploadFile).not.toHaveBeenCalled();
+  });
+
+  test('the claim precedes every external write, and the published text is the claimed text', async () => {
+    // A discard or edit arriving later cannot reach a claimed row (store contract), so the bytes come from the claim.
+    drafts.claimSummaryDraftForPublish.mockResolvedValueOnce(draftRow({ state: 'publishing', summary_text: 'Claimed text' }));
+    drafts.getActiveSummaryDraft.mockResolvedValue(null);
+    await publish();
+    expect(drafts.claimSummaryDraftForPublish.mock.invocationCallOrder[0]).toBeLessThan(deps.acquireSlotLease.mock.invocationCallOrder[0]);
+    expect(deps.uploadFile.mock.calls[0][3].toString('utf8')).toBe('\uFEFFClaimed text\n');
+    expect(drafts.getActiveSummaryDraft).not.toHaveBeenCalled();
+  });
+
+  test('an upload failure releases the claim so the PC can edit again', async () => {
+    deps.uploadFile.mockRejectedValueOnce(Object.assign(new Error('sp'), { code: 'graph_down' }));
+    await expect(publish()).rejects.toMatchObject({ code: 'graph_down' });
+    expect(drafts.releaseSummaryDraftClaim).toHaveBeenCalled();
+  });
+
+  test('after a registry write is attempted the claim is kept, and a retry finishes with the same file and row', async () => {
+    drafts.markSummaryDraftPublished.mockRejectedValueOnce(new Error('pg down'));
+    await expect(publish()).rejects.toThrow('pg down');
+    expect(drafts.releaseSummaryDraftClaim).not.toHaveBeenCalled();
+    const created = state.rows.find((item) => item.wmkf_requestdocumentid === SUMMARY_NEW_ID);
+    state.byKey = [created];
+    deps.uploadFile.mockClear(); deps.createDocument.mockClear();
+    // The retry re-claims the 'publishing' row at the same version (the store allows it), and the key finds the row.
+    await expect(publish()).resolves.toMatchObject({ transcriptSummary: { state: 'bound', artifactId: SUMMARY_NEW_ID } });
+    expect(deps.uploadFile).not.toHaveBeenCalled();
+    expect(deps.createDocument).not.toHaveBeenCalled();
+    expect(drafts.markSummaryDraftPublished).toHaveBeenCalledTimes(2);
+  });
+
+  test('a registry failure keeps the claim (the row may exist); only a retry can finish it', async () => {
+    deps.createDocument.mockRejectedValueOnce(Object.assign(new Error('dv'), { code: 'dataverse_timeout' }));
+    await expect(publish()).rejects.toMatchObject({ code: 'dataverse_timeout' });
+    expect(drafts.releaseSummaryDraftClaim).not.toHaveBeenCalled();
+  });
+
+  test('a lost claim at the final mark is recorded, and the publish still reports the bound summary', async () => {
+    drafts.markSummaryDraftPublished.mockResolvedValueOnce(null);
+    await expect(publish()).resolves.toMatchObject({ transcriptSummary: { state: 'bound' }, draft: null });
+    expect(deps.recordEvent).toHaveBeenCalledWith(expect.objectContaining({ stage: 'transcript-summary-draft-mark',
+      metadata: expect.objectContaining({ reason: 'draft_claim_lost' }) }));
+  });
+
+  test('two drafts created in the same minute publish to different files', async () => {
+    await publish();
+    const first = deps.uploadFile.mock.calls[0][2];
+    uploads.clear();
+    drafts.claimSummaryDraftForPublish.mockResolvedValueOnce(draftRow({ state: 'publishing', id: '88888888-8888-4888-8888-8888888888cc',
+      created_at: new Date('2026-10-05T14:32:50Z'), summary_text: 'Second draft' }));
+    await publish({ draftId: '88888888-8888-4888-8888-8888888888cc' });
+    expect(deps.uploadFile.mock.calls[1][2]).not.toBe(first);
   });
 
   test('a retry after the row was created reuses it without a second upload', async () => {

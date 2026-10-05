@@ -627,6 +627,19 @@ describe('presentation summary', () => {
     expect(await screen.findByText(/Summary published/)).toBeInTheDocument();
   });
 
+  test('an unfinished publish is read-only and offers only Publish again', async () => {
+    route({ materials: [transcriptRow()], collection: withSummary(), detail: detailFor({}) }, {
+      '/summary-draft': { method: 'GET', respond: () => response(summaryState({ draft: readyDraft({ state: 'publishing' }), draftMatchesTranscript: true })) },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByText(/Publishing this draft did not finish/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Draft/)).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Publish summary' })).not.toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Save draft' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Discard draft' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Replace draft|Summarize presentation/ })).not.toBeInTheDocument();
+  });
+
   test('a stale published summary says the Board link no longer shows it; the block shows no ids', async () => {
     route({ materials: [transcriptRow()], collection: withSummary({ transcriptSummary: { state: 'stale', artifactId: DRAFT_ID, publishedAt: CONFIRMED_AT } }), detail: detailFor({}) }, {
       '/summary-draft': { method: 'GET', respond: () => response(summaryState({ transcriptSummary: { state: 'stale', artifactId: DRAFT_ID, publishedAt: CONFIRMED_AT } })) },

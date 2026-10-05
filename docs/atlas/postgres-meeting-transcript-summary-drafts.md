@@ -3,7 +3,7 @@ title: "Atlas: Site Visit summary drafts (Postgres)"
 domain: postgres
 kind: state-page
 status: source-built
-summary: "Migration 070 defines meeting_transcript_summary_drafts: one row per Summarize run holding the summarization acknowledgment and, only while ready, the generated presentation summary a program coordinator reviews before publishing. Source-built on feature/presentation-summary; not applied or deployed."
+summary: "Migration 070 defines meeting_transcript_summary_drafts: one row per Summarize run holding the summarization acknowledgment and, only while ready or publishing, the generated presentation summary a program coordinator reviews before publishing. Source-built on feature/presentation-summary; not applied or deployed."
 canonical: true
 cataloged: 2026-10-05
 owner: product-engineering
@@ -38,18 +38,27 @@ adds 100000010). `request_id`, `source_revision_id`, `source_artifact_id`, and
 |---|---|
 | `acknowledgment_version`, `acknowledged_by_profile_id`, `acknowledged_at` | The summarization acknowledgment (plan §6), written when the row is inserted, before the provider call; kept in every state |
 | `source_revision_id`, `presentation_end_ms`, `source_artifact_id` | The transcript revision, confirmed boundary, and bound Presentation Transcript row the summary was made from; publish refuses a draft whose pair is no longer current |
-| `summary_text`, `text_edited`, `version` | The generated (then staff-edited) text and an optimistic version; text is allowed only in state `ready` (CHECK) and is at most 100,000 characters |
+| `summary_text`, `text_edited`, `version` | The generated (then staff-edited) text and an optimistic version; text is allowed only in states `ready` and `publishing` (CHECK) and is at most 100,000 characters |
 | `prompt_name`, `prompt_version`, `prompt_id`, `ai_run_id`, `failure_code` | Executor provenance; the run row keeps content-free audit only |
+| `publish_claimed_at` | When a publish claimed the draft; required in state `publishing` (CHECK) |
 | `published_artifact_id` | The Transcript Summary request-document row, set exactly when state is `published` (CHECK) |
 
-States: `generating` → `ready` | `failed`; `ready` → `published` | `discarded`
-| `superseded` (a new Summarize) | `expired`. A partial unique index allows at
-most one `generating` or `ready` row per request and type; a `generating` row
-older than 360 s is treated as abandoned and superseded by the next run.
+States: `generating` → `ready` | `failed`; `ready` → `publishing` |
+`discarded` | `superseded` (a new Summarize) | `expired`; `publishing` →
+`published` | `ready` (released when the publish stopped before any registry
+write) | `superseded` (abandoned) | `expired`. A publish claims the row
+(`publishing`) at the expected version before any SharePoint or Dataverse
+write; edit, discard, and a new run act only on `ready` rows, so what is
+published is exactly the claimed text (Codex review 2026-10-05). Once a
+registry write was attempted the claim is kept and only a retry (same
+generation key and file) can finish it. A partial unique index allows at most
+one `generating`, `ready`, or `publishing` row per request and type; a
+`generating` row or a `publishing` claim older than 360 s is treated as
+abandoned and superseded by the next run.
 
 ## Retention
 
-Generated text lives here only while a draft is `ready`. Publishing,
+Generated text lives here only while a draft is `ready` or `publishing`. Publishing,
 discarding, superseding, or expiring clears `summary_text` and keeps the
 metadata, so the acknowledgment record survives. Drafts expire 14 days after
 creation; the daily maintenance cron (`pages/api/cron/maintenance.js`) clears

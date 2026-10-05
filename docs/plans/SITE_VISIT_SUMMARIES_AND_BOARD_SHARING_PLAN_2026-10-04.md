@@ -778,7 +778,8 @@ What was built:
    Postgres 16 with untyped parameters.
 4. **Service and routes**: `transcript-summary-service.js`;
    `.../transcriptions/summary-draft` (GET, POST at 300 s, PATCH, DELETE) and
-   `.../summary-draft/publish`. Publish refuses a draft whose revision or
+   `.../summary-draft/publish`. Publish claims the draft before any external
+   write (see the review below), refuses a draft whose revision or
    boundary is no longer current (`summary_draft_stale`), writes a
    BOM-prefixed TXT to `Site Visit - Transcript Summary/`, pins the eTag,
    supersedes older summaries, and clears the draft text.
@@ -806,6 +807,24 @@ Named deviations from the plan text:
   unedited.
 - **Staff feed cost.** One SharePoint read per Staff Deliberations load when
   a summary exists; the Meeting Tracker visit page does not opt in.
+
+**Codex adversarial review (2026-10-05), two high findings, fixed on the branch:**
+
+1. **A discarded or replaced draft could still be published.** Publish read the
+   draft once and then wrote externally while discard and a new run were
+   unfenced. Fix: publish first claims the draft (`ready` → `publishing` at the
+   expected version) before any external write; edit, discard, and a new run
+   act only on `ready` rows; the claim is released to `ready` only when no
+   registry write was attempted, otherwise only a retry (same key, same file)
+   can finish it. Exercised against a throwaway Postgres 16; service tests
+   cover claim-before-write, release on stale or upload failure, no release
+   after a registry attempt, and a retry after a failed final mark.
+2. **A republish could overwrite a published file.** The filename used the
+   draft's creation minute with `replace`. Fix: the claim closes the
+   edit-after-registration path, and the filename uses the creation second, so
+   it is unique per draft. A retry that finds the existing row does not
+   re-verify its file; outside pages already refuse a file whose eTag differs
+   from the pinned one, so the failure mode is hidden, not wrong content.
 
 Open items:
 
