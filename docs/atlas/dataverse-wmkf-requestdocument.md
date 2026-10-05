@@ -752,6 +752,13 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   revision and boundary (`withoutUnboundDerivatives`), so a stale half is
   hidden rather than shown beside a newer one (Codex review 2026-10-05); the
   full TRANSCRIPT stays listed.
+- **Boundary proposal, stray-line guard** (source-built 2026-10-05 on
+  `feature/boundary-proposal-stray-lines`, not deployed): a short applicant
+  line (three words or fewer) that starts more than two minutes after the
+  previous longer applicant line is skipped as a likely diarization
+  misattribution and reported in `proposed.skipped`; the editor shows each
+  skipped line with "Use this line instead". Found on 1003222: "Same."
+  attributed to the PI more than ten minutes into the staff discussion.
 - **Boundary proposal**: advisory, computed from the applied speaker names and
   the name candidates (`presentation-boundary.js`): `pi`/`co_pi` and manual
   attendees are outside the foundation; saved staff and roster attendees are

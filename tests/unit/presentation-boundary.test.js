@@ -33,7 +33,7 @@ test('speakers classify by applied name, case and whitespace insensitive; unname
 
 test('the proposal is the end of the last turn by a named outside speaker', () => {
   const proposal = proposePresentationEnd({ utterances, speakerNames: { A: 'Maria Lopez', B: 'Dana Reyes', C: 'Board Member', D: 'Maria Lopez' }, candidates });
-  expect(proposal).toEqual({ endMs: 70_000, speakerId: 'B', utteranceIndex: 3 });
+  expect(proposal).toEqual({ endMs: 70_000, speakerId: 'B', utteranceIndex: 3, skipped: [] });
 });
 
 test('no proposal when no name is applied or every named speaker is inside the foundation', () => {
@@ -43,7 +43,7 @@ test('no proposal when no name is applied or every named speaker is inside the f
 });
 
 test('a name that matches no candidate counts as outside (a presenter staff did not pre-register still ends the presentation)', () => {
-  expect(proposePresentationEnd({ utterances, speakerNames: { D: 'Visiting Postdoc' }, candidates })).toEqual({ endMs: 95_000, speakerId: 'D', utteranceIndex: 5 });
+  expect(proposePresentationEnd({ utterances, speakerNames: { D: 'Visiting Postdoc' }, candidates })).toEqual({ endMs: 95_000, speakerId: 'D', utteranceIndex: 5, skipped: [] });
 });
 
 test('presentation content keeps only utterances ending at or before the boundary and drops the full text', () => {
@@ -76,5 +76,60 @@ test('the staff discussion TXT starts after the boundary, and is null when nothi
   expect(text).toBe('[01:10] Maria Lopez: Now, among ourselves.\n\n[01:30] Speaker D: Agreed.\n');
   expect(text).not.toContain('Thank you.');
   expect(buildStaffDiscussionTranscriptText({ text: 'everything', utterances }, {}, 95_000)).toBeNull();
+});
+
+describe('isolated short applicant lines (misattribution guard)', () => {
+  const names = { P: 'Dana Reyes', S: 'Maria Lopez' };
+  const at = (min, sec = 0) => (min * 60 + sec) * 1000;
+  const line = (speaker, startMin, startSec, endSec, text) => ({ speaker, start: at(startMin, startSec), end: at(startMin, endSec), text });
+
+  test('a one-word applicant line more than two minutes after the last substantive applicant line is skipped and reported', () => {
+    const rows = [
+      line('P', 50, 0, 40, 'And that is how the instrument resolves the second-order effects.'),
+      line('S', 50, 41, 50, 'Thank you all so much for coming in today.'),
+      line('S', 51, 0, 50, 'Now, among ourselves, what did we think about the budget?'),
+      line('P', 60, 48, 49, 'Same.'),
+      line('S', 60, 50, 59, 'Agreed, let us move on.'),
+    ];
+    const proposal = proposePresentationEnd({ utterances: rows, speakerNames: names, candidates });
+    expect(proposal).toMatchObject({ endMs: at(50, 40), speakerId: 'P', utteranceIndex: 0 });
+    expect(proposal.skipped).toEqual([{ endMs: at(60, 49), startMs: at(60, 48), speakerId: 'P', utteranceIndex: 3,
+      text: 'Same.', gapMs: at(60, 48) - at(50, 40) }]);
+  });
+
+  test('a closing "Thank you" right after the applicants\' last answer is kept as the end', () => {
+    const rows = [
+      line('P', 50, 0, 40, 'And that is how the instrument resolves the second-order effects.'),
+      line('S', 50, 41, 50, 'Do you have any questions for us?'),
+      line('P', 50, 51, 53, 'Thank you.'),
+      line('S', 51, 0, 50, 'Now, among ourselves, what did we think about the budget?'),
+    ];
+    expect(proposePresentationEnd({ utterances: rows, speakerNames: names, candidates }))
+      .toEqual({ endMs: at(50, 53), speakerId: 'P', utteranceIndex: 2, skipped: [] });
+  });
+
+  test('two strays close to each other are both skipped, because the gap is measured to the last substantive line', () => {
+    const rows = [
+      line('P', 50, 0, 40, 'And that is how the instrument resolves the second-order effects.'),
+      line('S', 51, 0, 50, 'Now, among ourselves, what did we think about the budget?'),
+      line('P', 58, 0, 1, 'Yes.'),
+      line('P', 58, 30, 31, 'Same.'),
+    ];
+    const proposal = proposePresentationEnd({ utterances: rows, speakerNames: names, candidates });
+    expect(proposal.endMs).toBe(at(50, 40));
+    expect(proposal.skipped.map((row) => row.text)).toEqual(['Yes.', 'Same.']);
+  });
+
+  test('a short line within two minutes of substantive applicant speech is kept, and a short line with no substantive line before it is kept', () => {
+    const near = [
+      line('P', 50, 0, 40, 'And that is how the instrument resolves the second-order effects.'),
+      line('S', 51, 0, 50, 'Thanks so much, that was a lovely talk, we really enjoyed it.'),
+      line('P', 52, 30, 32, 'Thank you!'),
+    ];
+    expect(proposePresentationEnd({ utterances: near, speakerNames: names, candidates }).endMs).toBe(at(52, 32));
+    const onlyShort = [line('S', 1, 0, 30, 'Welcome everyone to the site visit today.'), line('P', 10, 0, 2, 'Thank you.')];
+    expect(proposePresentationEnd({ utterances: onlyShort, speakerNames: names, candidates }))
+      .toEqual({ endMs: at(10, 2), speakerId: 'P', utteranceIndex: 1, skipped: [] });
+  });
 });
 

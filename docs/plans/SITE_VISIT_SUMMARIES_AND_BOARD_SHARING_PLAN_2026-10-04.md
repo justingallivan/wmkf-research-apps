@@ -618,6 +618,29 @@ without bundle metadata both are hidden and the full transcript stays. The
 regression test for that exact sequence, plus the readiness-off case, turned
 red with the filter removed. Outside-page exclusion was judged sound.
 
+## 14. Boundary proposal stray-line guard, 2026-10-05 (branch `feature/boundary-proposal-stray-lines`)
+
+**Acceptance finding on 1003222 (owner):** the proposal landed late, at a
+one-word line ("[1:00:48] Sujoy Mukhopadhyay: Same.") that diarization
+attributed to the PI more than ten minutes into the staff discussion. The
+speaker classification was right; the attribution was wrong. Had the
+proposal been confirmed unchecked, the Board link would have carried that
+stretch of staff discussion, so the stakes are higher than "advisory"
+suggested.
+
+**Owner constraint:** a closing "Thank you" is often the applicants' last
+line, so short lines cannot be dropped by length alone.
+
+**Rule:** a short applicant line (≤ 3 words) is skipped only when it starts
+more than 2 minutes after the previous longer (> 3 words) applicant line;
+the gap is measured to the last longer line so a cluster of strays is
+skipped together. Errors stay visible: a real closing thanks after more than
+two minutes of staff talk is skipped (proposal lands slightly early) and is
+shown with "Use this line instead"; every skipped line is listed in the
+editor. The roster-as-inside rule (handoff S575 §9) remains unconfirmed: this
+run was consistent with it but did not show whether any roster attendee
+spoke.
+
 ## 15. TXT encoding fix, 2026-10-05 (branch `feature/transcript-txt-utf8-bom`)
 
 **Owner report on 1003222:** the staff discussion TXT opened from SharePoint
