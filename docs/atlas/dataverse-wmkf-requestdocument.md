@@ -727,8 +727,8 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   (no recording appears outside until Stage 4's Board recording type). Staff
   surfaces (the Recording and transcript card, the Staff Deliberations feed)
   keep the full files.
-- **Formatter/bundle version 5** (source-built 2026-10-05 on
-  `feature/transcript-txt-utf8-bom`, not deployed): identical to v4 except
+- **Formatter/bundle version 5** (Production-live 2026-10-05: PR #438 merge
+  `1e2a798fd`, deployment 6865646088 success): identical to v4 except
   that the published TXT starts with a UTF-8 byte-order mark (EF BB BF).
   Without it, SharePoint and browsers opening the file directly read UTF-8
   punctuation as Windows-1252 ("—" shown as "â€”"; owner report on 1003222).
@@ -752,8 +752,8 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   revision and boundary (`withoutUnboundDerivatives`), so a stale half is
   hidden rather than shown beside a newer one (Codex review 2026-10-05); the
   full TRANSCRIPT stays listed.
-- **Boundary proposal, stray-line guard** (source-built 2026-10-05 on
-  `feature/boundary-proposal-stray-lines`, not deployed): a short applicant
+- **Boundary proposal, stray-line guard** (Production-live 2026-10-05: PR #437
+  merge `9dfec5479`, deployment 6865805766 success): a short applicant
   line (three words or fewer) that starts more than two minutes after the
   previous longer applicant line is skipped as a likely diarization
   misattribution and reported in `proposed.skipped`; the editor shows each

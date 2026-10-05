@@ -620,6 +620,8 @@ red with the filter removed. Outside-page exclusion was judged sound.
 
 ## 14. Boundary proposal stray-line guard, 2026-10-05 (branch `feature/boundary-proposal-stray-lines`)
 
+**Status: Production-live** (PR #437, merge `9dfec5479`, deployment 6865805766 success).
+
 **Acceptance finding on 1003222 (owner):** the proposal landed late, at a
 one-word line ("[1:00:48] Sujoy Mukhopadhyay: Same.") that diarization
 attributed to the PI more than ten minutes into the staff discussion. The
@@ -642,6 +644,8 @@ run was consistent with it but did not show whether any roster attendee
 spoke.
 
 ## 15. TXT encoding fix, 2026-10-05 (branch `feature/transcript-txt-utf8-bom`)
+
+**Status: Production-live** (PR #438, merge `1e2a798fd`, deployment 6865646088 success). Existing 1003222 files need a republish and Generate to pick it up.
 
 **Owner report on 1003222:** the staff discussion TXT opened from SharePoint
 showed "youâ€” I think". The file bytes were correct UTF-8 (`e2 80 94`); the
