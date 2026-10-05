@@ -4,13 +4,13 @@
 
 Compact summary for the Postgres tables outside the reviewer-finder domain. Promote any of these to its own page on next significant touch.
 
-## Staff Deliberations preparation — source-built; migration applied
+## Staff Deliberations preparation — Production deployed; automation disabled
 
 ### `staff_deliberations_preparations`
 **Source of truth:** Operational receipt in Postgres; Dataverse Request Document lineage and SharePoint bytes remain authoritative for the working writeup.
 **Schema:** Migration 067; unique request/Site Visit/scheduled-end/correction-epoch identity, pending/running/prepared/blocked state, bounded lease and retry schedule, exact document ID, service provenance, and bounded error fields.
-**Read/write paths:** `lib/services/pre-site-visit/preparation-store.js` and `preparation-worker.js`; authenticated retry route under `/api/workbench/pre-site-visit/retry-preparation`; disabled cron route `/api/cron/staff-deliberations-preparation`; owner-run exact-Factory one-shot `scripts/run-staff-deliberations-factory-test.mjs`.
-**Readiness:** [SOURCE-BUILT 2026-10-04 on `codex/staff-deliberations-rework`; migration 067 applied in Production at `2026-10-05T21:15:31.072Z` and schema-verified: 22 columns, four indexes, seven constraints; no migrations pending.] An owner-authorized one-shot through the real worker prepared one receipt for marked TEST Request `1003313`; an idempotent rerun produced no duplicate. The source branch remains undeployed; normal production automation is disabled and no deployment schedule is registered.
+**Read/write paths:** `lib/services/pre-site-visit/preparation-store.js` and `preparation-worker.js`; authenticated retry route under `/api/workbench/pre-site-visit/retry-preparation`; cron route `/api/cron/staff-deliberations-preparation` (not scheduled); owner-run exact-Factory one-shot `scripts/run-staff-deliberations-factory-test.mjs`.
+**Readiness:** [PRODUCTION-LIVE via PR #432 (`d8c658b2e`), deployed 2026-10-05 as Ready deployment `dpl_1392m7UkCfPGuSqMDGBfHeq35rzH`; migration 067 applied at `2026-10-05T21:15:31.072Z` and schema-verified: 22 columns, four indexes, seven constraints; no migrations pending.] The real worker prepared one receipt for marked TEST Request `1003313`; its idempotent rerun produced no duplicate. Production’s observed Site Visit state/status map is configured, but automatic-enablement flags and worker allowlists remain unset; no deployment schedule is registered. The worker is therefore not active in normal production traffic. The bounded one-shot and manual workflow acceptance are recorded in the Staff Deliberations plan; they do not prove scheduled delivery or latency.
 
 ## Identity / authn / app access
 

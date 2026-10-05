@@ -4,7 +4,7 @@ domain: dataverse
 kind: source-of-truth
 status: canonical
 owner: product-engineering
-last_verified: 2026-09-29
+last_verified: 2026-10-05
 related:
   - docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md
   - docs/API_ROUTE_SECURITY_MATRIX.md
@@ -85,18 +85,24 @@ fallback.
   reconciliation notice; no per-visit `getById` follows the summary read.
   A capped summary result (including the exact 5,000-row boundary) returns 503
   in schedule mode rather than treating missing rows as no visit. The existing
-  `findActiveByRequests` behavior remains in use by this consumer's legacy path
-  and the Staff Deliberations cycle view below. Slice 2 does not add a Site
-  Visit writer; that editor remains the separately scoped slice 2b.
-- `listPreSiteVisitDrafts` (`lib/services/pre-site-visit/cycle-list-service.js`,
-  PC Meeting Tracker slice 3, 2026-09-09) is a READ-ONLY multi-request
-  consumer for the Staff Deliberations cycle view: `site-visit.js::
-  findActiveByRequests(requestIds)` chunks the OR filter at 25 ids and reads
-  `activityid, _regardingobjectid_value, scheduledstart, scheduledend,
-  wmkf_visitformat, wmkf_locationorlink` for every advancing request in the
-  cycle at once — no ActivityParty expand, since the cycle view only needs the
-  scheduled date to derive the rail's `visit` stop (D7: date-derived), not
-  attendees.
+  `findActiveByRequests` behavior remains in use by the Meeting Tracker's legacy
+  path only. Slice 2 does not add a Site Visit writer; that editor remains the
+  separately scoped slice 2b.
+- **[PRODUCTION-LIVE via PR #432, deployed 2026-10-05.]** `listPreSiteVisitDrafts`
+  (`lib/services/pre-site-visit/cycle-list-service.js`) is the read-only Site
+  Visit consumer for the Staff Deliberations request-first cycle view. It first
+  resolves requests in the selected grant program and cycle, applying the
+  authenticated lead-PD filter for “my” and omitting only that filter for “all”.
+  It then calls `site-visit.js::findSummariesByRequests(requestIds)` for those
+  selected requests. The paginated, party-free query reads all related events
+  and selects activity/request IDs, scheduled start/end, modified time, and
+  state/status (plus readiness-gated display fields). The service classifies
+  the configured state/status pairs, uses a unique eligible event for scheduled-
+  end timing and preparation eligibility, and treats duplicates/unknown pairs
+  as attention. It does not expand ActivityParty or hydrate each activity; an
+  incomplete/capped result fails closed. The cycle card keeps the recorded
+  presentation end separate from the deliberation-session line. The normal
+  preparation worker remains disabled and unscheduled in Production.
 - `useSiteVisitContext` (`shared/components/workbench/useSiteVisitContext.js`)
   is the Workbench's READ-ONLY consumer since S466: the logistics editor
   (`SiteVisitLogisticsPanel`) was removed 2026-08-28 by owner decision —
@@ -153,4 +159,4 @@ fallback.
   Visit ID, one governed material, and no final error. `sent` proves Dynamics
   transport acceptance, not independent inbox or calendar-client delivery.
 
-- **[PRODUCTION-PROVED, narrow concurrency probe, 2026-10-05.]** On marked test request `1003312`, retained activity `4079ab1a-f9c0-f111-aaad-6045bd04539e` rejected an unchanged `scheduledend` PATCH after completion (`0x8004022e`). A PATCH containing only the same observed `statecode`/`statuscode` with `If-Match` succeeded, advanced the ETag, and preserved end/state/status. Replaying the stale ETag returned 412; a companion request-title write in the same changeset rolled back, with title and request ETag unchanged. The Staff Deliberations feature branch uses this status-only fence in automatic preparation and Final activation; it is not deployed. This proves the conditional-write primitive, not full worker or document-transition acceptance. Evidence: `/tmp/deliberations-status-only-experiment.log` and `/tmp/deliberations-status-rollback-experiment.log`.
+- **[PRODUCTION-PROVED, narrow concurrency probe, 2026-10-05.]** On marked test request `1003312`, retained activity `4079ab1a-f9c0-f111-aaad-6045bd04539e` rejected an unchanged `scheduledend` PATCH after completion (`0x8004022e`). A PATCH containing only the same observed `statecode`/`statuscode` with `If-Match` succeeded, advanced the ETag, and preserved end/state/status. Replaying the stale ETag returned 412; a companion request-title write in the same changeset rolled back, with title and request ETag unchanged. PR #432 deployed the status-only fence in automatic preparation and Final activation. This probe proves the conditional-write primitive; bounded worker and manual document-transition acceptance are recorded separately in the Staff Deliberations plan. The production worker remains disabled and unscheduled. Evidence: `/tmp/deliberations-status-only-experiment.log` and `/tmp/deliberations-status-rollback-experiment.log`.
