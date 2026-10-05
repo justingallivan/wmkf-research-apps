@@ -56,8 +56,8 @@ afterAll(() => {
   }
 });
 
-function fixture(sourceRevisionId = null) {
-  const identity = { requestId, siteVisitActivityId: visitId, revisionId: operationId, operationId, sourceRevisionId };
+function fixture(sourceRevisionId = null, presentationEnd = null) {
+  const identity = { requestId, siteVisitActivityId: visitId, revisionId: operationId, operationId, sourceRevisionId, presentationEnd };
   const generated = buildMeetingTranscriptFiles({ identity,
     content: { text: 'Synthetic words.', utterances: [{ speaker: 'A', start: 0, end: 1000, text: 'Synthetic words.' }] },
     speakerNames: { A: 'Synthetic Chair' } });
@@ -72,7 +72,10 @@ function fixture(sourceRevisionId = null) {
     frozen_input_sha256: generated.inputSha256, formatter_version: generated.formatterVersion,
     published_by_profile_id: 8, published_by_system_id: originalActor, slot_fence_version: 7,
     verified_files: verifiedFiles, candidate_paths: candidatePaths,
-    expected_current_artifact_id: null, expected_current_fingerprint: null };
+    expected_current_artifact_id: null, expected_current_fingerprint: null,
+    presentation_end_ms: presentationEnd ? presentationEnd.endMs : null,
+    presentation_end_confirmed_by: presentationEnd ? presentationEnd.confirmedBy : null,
+    presentation_end_confirmed_at: presentationEnd ? new Date(presentationEnd.confirmedAt) : null };
   binding.loadMeetingTranscriptionBinding.mockResolvedValue({ requestId, siteVisitActivityId: visitId });
   documents.findByRequest.mockResolvedValue({ records: [] });
   documents.findByGenerationKey.mockResolvedValue({ records: [] });
@@ -165,6 +168,50 @@ test.each([null, predecessor])('another authorized staff member recovers exact f
   }));
   expect(GraphService.downloadFile).toHaveBeenCalledWith('drive', 'source', { maxBytes: 4_000_000 });
   expect(receipt.published_by_system_id).toBe(originalActor);
+});
+
+const boundary = { endMs: 1000, confirmedBy: 12, confirmedAt: '2026-10-05T12:00:00.000Z' };
+
+test('recovery rebuilds a version-4 bundle from the receipt-frozen presentation end', async () => {
+  const receipt = fixture(null, boundary);
+  const result = await reconcileMeetingTranscriptPublication({ requestId, operationId,
+    actorProfileId: 12, actingUserSystemId: currentActor });
+  expect(result).toMatchObject({ resumed: true, requiresAttention: false });
+  expect(receipt.formatter_version).toBe('4');
+  expect(publisher.publishMeetingTranscriptBundle).toHaveBeenCalledWith(expect.objectContaining({
+    frozenInputSha256: receipt.frozen_input_sha256,
+    identity: expect.objectContaining({ presentationEnd: boundary }),
+  }));
+});
+
+test.each([
+  ['receipt has no boundary but the source does', receipt => {
+    receipt.presentation_end_ms = null; receipt.presentation_end_confirmed_by = null;
+    receipt.presentation_end_confirmed_at = null;
+  }],
+  ['receipt boundary ms differs from the source', receipt => { receipt.presentation_end_ms = 999; }],
+  ['receipt confirmer differs from the source', receipt => { receipt.presentation_end_confirmed_by = 13; }],
+  ['receipt confirmation instant differs from the source', receipt => {
+    receipt.presentation_end_confirmed_at = new Date('2026-10-05T12:00:01.000Z');
+  }],
+])('recovery fails closed when %s', async (_label, mutate) => {
+  const receipt = fixture(null, boundary);
+  mutate(receipt);
+  await expect(reconcileMeetingTranscriptPublication({ requestId, operationId, actorProfileId: 12,
+    actingUserSystemId: currentActor })).rejects.toMatchObject({ code: 'meeting_transcript_source_integrity_failed' });
+  expect(publisher.publishMeetingTranscriptBundle).not.toHaveBeenCalled();
+  expect(store.transitionMeetingTranscriptPublication).toHaveBeenCalledWith(expect.objectContaining({
+    state: 'unknown', errorCode: 'meeting_transcript_source_integrity_failed',
+  }));
+});
+
+test('recovery fails closed when the receipt carries a boundary the source lacks', async () => {
+  const receipt = fixture(null, null);
+  receipt.presentation_end_ms = 1000; receipt.presentation_end_confirmed_by = 12;
+  receipt.presentation_end_confirmed_at = new Date(boundary.confirmedAt);
+  await expect(reconcileMeetingTranscriptPublication({ requestId, operationId, actorProfileId: 12,
+    actingUserSystemId: currentActor })).rejects.toMatchObject({ code: 'meeting_transcript_source_integrity_failed' });
+  expect(publisher.publishMeetingTranscriptBundle).not.toHaveBeenCalled();
 });
 
 test('maintenance never resumes a missing registry row using stored publisher identity', async () => {
