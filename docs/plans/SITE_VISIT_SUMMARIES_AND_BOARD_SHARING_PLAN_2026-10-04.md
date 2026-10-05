@@ -16,8 +16,8 @@ related:
 
 # Site Visit summaries, Staff Deliberations follow-up, and Board sharing
 
-Status: draft for owner discussion. Nothing here is built. Written after two
-owner question rounds on 2026-10-04; the decisions from those rounds are in §3.
+Status: draft, owner decisions complete (§3, §7), Codex adversarial review
+pending. Nothing here is built.
 
 ## 1. What the owner asked for (2026-10-04)
 
@@ -140,7 +140,7 @@ trims to in Zoom.
   of that transcript's timeline; a republish (names edit) carries it forward;
   a new run from new audio starts unconfirmed. Alternative considered: a
   field on the Site Visit activity. Rejected because a boundary belongs to a
-  specific recording, and the activity outlives re-uploads. [Decision §7.1]
+  specific recording, and the activity outlives re-uploads. [§7 decision 1]
 
 ### 4.2 Split transcript: a presentation-only row, not extra bundle roles
 
@@ -197,8 +197,8 @@ Generation flow mirrors the transcript's draft-to-publish contract:
    summary; the card shows "Summary from an earlier transcript version" and
    offers Summarize again.
 
-LLM admission (per S573): `APP_MODELS` rows for both prompts (tier proposed
-`sonnet`, fallback `haiku`; see §7.4), `requireAcceptedLlmResponse` on both
+LLM admission (per S573): `APP_MODELS` rows for both prompts (`sonnet`,
+fallback `haiku`; §7 decision 4), `requireAcceptedLlmResponse` on both
 calls, executor budget rows sized for a long answer with thinking (the IA
 2,200-token lesson), `requireNoPersistence` with content-free audit as the
 alignment prompt does, A7 registry entries, seeds owner-run with the write
@@ -231,7 +231,7 @@ what it serves.
   recording block gains "Board recording link" with the boundary time shown
   as the trim target. Outside pages project this type and never RECORDING.
   The one-winner-per-type projection [VERIFIED §2] makes a second type the
-  simplest way to keep the full recording for staff. [Decision §7.2]
+  simplest way to keep the full recording for staff. [§7 decision 2]
 - **Transcript:** the `PRESENTATION_TRANSCRIPT` row only (§4.2).
 - **Summary:** `TRANSCRIPT_SUMMARY` only; the staff discussion summary is
   excluded by type.
@@ -330,31 +330,30 @@ route that resolves a model.
   current consent copy. Summarization sends it to Anthropic as well. The
   consent checkbox copy should say so once stage 3 ships. The handoff's "no
   blanket confidential-recording clearance" still stands: the PC decides per
-  recording. [Decision §7.3]
+  recording. [§7 decision 3]
 - Summaries are AI drafts a PD reviews before they become materials
   (product principle 1). The draft never leaves Postgres until published.
 - Audit: `wmkf_ai_run` rows with content-free retention; the request-document
   row binds to the run and prompt version like the Initial Assessment.
 
-## 7. Owner decisions needed
+## 7. Owner decisions (all DECIDED 2026-10-05)
 
-1. **Boundary storage** on the transcript bundle manifest as version 4
-   (recommended; §4.8) or on the Site Visit activity.
-2. **Three new artifact types** (recommended: presentation transcript,
-   Board recording, staff discussion summary; one owner-run picklist script
-   per stage) or fewer types with the bundle-role approach, which the
-   outside media path cannot serve without a new file-resolution contract
-   (§4.2).
-3. **Send the staff discussion to Anthropic for summarization.** Yes, per
-   recording, under the updated consent copy (recommended), or staff
-   discussion summaries are off until a separate decision.
-4. **Model tier** for the two summaries: `sonnet` (recommended for a long
-   faithful summary) or `haiku`.
-5. **Stage 1 side effect:** until stage 4, outside pages show no recording
-   at all. Accept, or keep serving the full RECORDING outside until the Board
-   type exists (not recommended; it is the exposure in §2.1).
-6. **Applicant PDF as summary input** (recommended when present) or
-   transcript only.
+1. **Boundary storage:** on the transcript bundle manifest as version 4
+   (§4.8). A names-edit republish carries it forward; a new audio upload
+   starts unconfirmed.
+2. **Three new artifact types**, one per stage: `PRESENTATION_TRANSCRIPT`
+   100000012 (stage 1), `STAFF_DISCUSSION_SUMMARY` 100000010 (stage 3),
+   `BOARD_PRESENTATION_RECORDING` 100000011 (stage 4). One owner-run
+   picklist script per stage, dry-run first.
+3. **Staff discussion may be sent to Anthropic for summarization**, per
+   recording. The consent checkbox copy gains a sentence saying the staff
+   discussion is also summarized by the LLM provider; the PC still decides
+   per recording. No blanket clearance.
+4. **Model tier:** `sonnet` with `haiku` fallback for both summary prompts.
+5. **Interim gap accepted:** between stage 1 and stage 4 the outside links
+   show no recording. Closing the exposure comes first.
+6. **Applicant presentation PDF is an input** to the presentation summary
+   when one is on file; transcript only otherwise.
 
 ## 8. Open items for the sweep, not this plan
 
