@@ -6,7 +6,7 @@ status: active
 summary: "Production-live PC app for deliberation sessions, proposal slots, site visits, and agenda email preparation; Wave 28 is exact and the readiness flag is on."
 canonical: false
 cataloged: 2026-09-09
-last_verified: 2026-09-15
+last_verified: 2026-10-05
 owner: product-engineering
 related:
   - docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md

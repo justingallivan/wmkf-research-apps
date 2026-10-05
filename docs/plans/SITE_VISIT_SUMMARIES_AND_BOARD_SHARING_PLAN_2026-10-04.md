@@ -453,9 +453,10 @@ route that resolves a model.
 
 ## 8. Open items for the sweep, not this plan
 
-- `docs/PC_MEETING_TRACKER_PLAN.md:105` says the presentation materials are
-  "PRODUCTION NOT DEPLOYED"; the materials plan front matter and the
-  2026-09-29 evidence say enabled in Production. Reconcile in a sweep.
+- ~~`docs/PC_MEETING_TRACKER_PLAN.md:105` says the presentation materials are
+  "PRODUCTION NOT DEPLOYED"~~ **Done 2026-10-05 (`8b99e1bb4`):** that plan, the
+  credentials runbook, and both Atlas pages now say Production-live since
+  2026-09-29, citing the Production receipt.
 
 ## 9. Contract-reconcile review, 2026-10-04 (Mode A, on this draft)
 

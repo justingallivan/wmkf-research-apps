@@ -7,7 +7,7 @@ summary: "Created: 2026-05-07 (S137, Phase 1 of docs/CLAUDE_REMEDIATION_PLAN.md)
 canonical: true
 cataloged: 2026-07-02
 owner: product-engineering
-last_verified: 2026-10-02
+last_verified: 2026-10-05
 related:
   - docs/CLAUDE_REMEDIATION_PLAN.md
   - scripts/audit-postgres-state.js
