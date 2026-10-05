@@ -164,6 +164,7 @@ export default function StaffDeliberationsTab({
   const [reopenHistory, setReopenHistory] = useState(EMPTY_LIST);
   const [, setStageLabels] = useState(EMPTY_STAGE_LABELS);
   const [preparation, setPreparation] = useState(null);
+  const [correctionInProgress, setCorrectionInProgress] = useState(false);
   const [timing, setTiming] = useState(null);
   const [preparationReadError, setPreparationReadError] = useState(null);
   const [retryingPreparation, setRetryingPreparation] = useState(false);
@@ -222,6 +223,7 @@ export default function StaffDeliberationsTab({
         .then((status) => {
           if (generationSequence.current !== sequence || id !== requestId) return;
           setPreparation(status.preparation || null);
+          setCorrectionInProgress(status.correctionInProgress === true);
           setTiming(status.timing || null);
           setArtifact(status.currentArtifact || null);
           setPendingArtifact(status.pendingArtifact || null);
@@ -269,6 +271,7 @@ export default function StaffDeliberationsTab({
         const status = await readStatus(requestId, controller.signal);
         if (disposed || sequence !== generationSequence.current) return;
         setPreparation(status.preparation || null);
+          setCorrectionInProgress(status.correctionInProgress === true);
         setTiming(status.timing || null);
         setPreparationReadError(null);
         if (!activeController.current) {
@@ -988,7 +991,7 @@ export default function StaffDeliberationsTab({
     setComposerOpen(true);
   };
   const due = preparation?.due === true;
-  const correctionDraft = preSiteDraftReady && (Boolean(artifact?.correction?.cycleId) || reopenHistory.length > 0);
+  const correctionDraft = preSiteDraftReady && (correctionInProgress || Boolean(artifact?.correction?.cycleId) || reopenHistory.length > 0);
   const milestoneComplete = Boolean(artifact?.milestone?.versionId && artifact?.milestone?.contentHash && artifact?.milestone?.createdAt);
   const editingReady = preSiteShared && milestoneComplete && !preparationReadError
     && timing?.availability === 'available';
@@ -1014,6 +1017,7 @@ export default function StaffDeliberationsTab({
       const status = await readStatus(requestId);
       if (sequence !== generationSequence.current) return;
       setPreparation(status.preparation || null);
+          setCorrectionInProgress(status.correctionInProgress === true);
       setTiming(status.timing || null);
       setPreparationReadError(null);
     } catch (retryError) {

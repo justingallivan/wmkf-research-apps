@@ -161,13 +161,14 @@ function statusResponse({
   hasBriefRows = undefined,
   preparation = null,
   timing = null,
+  correctionInProgress = false,
 } = {}) {
   return response({
     success: true,
     currentArtifact,
     pendingArtifact,
     reopenHistory,
-    preparation, timing,
+    preparation, timing, correctionInProgress,
     ...(stageLabels ? { stageLabels } : {}),
     ...(materials ? { materials } : {}),
     ...(session ? { session } : {}),
@@ -1384,4 +1385,11 @@ test('brief lock failures remain actionable in the composer', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'mock-prepare' }));
   expect(await screen.findByText('mock-error: Lock conflict')).toBeInTheDocument();
   expect(calls('startSiteVisit')).toHaveLength(0);
+});
+
+test('staff can finish corrections without receiving restricted correction audit details', async () => {
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT), correctionInProgress: true, preparation: { due: true, state: 'blocked' } }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} isSuperuser={false} />);
+  expect(await screen.findByRole('button', { name: 'Finish corrections' })).toBeInTheDocument();
+  expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('Corrections in progress');
 });
