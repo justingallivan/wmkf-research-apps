@@ -1042,6 +1042,7 @@ export default function StaffDeliberationsTab({
       requestId={requestId}
       siteVisitContext={siteVisitContext}
       materialsSummary={materials}
+      timing={preparationReadError ? { availability: 'unavailable' } : timing}
     />
   );
 
