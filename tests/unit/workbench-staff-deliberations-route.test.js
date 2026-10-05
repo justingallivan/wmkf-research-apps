@@ -46,6 +46,14 @@ it('guards with the reviewers app and returns the service body for a valid cycle
   expect(res.body).toEqual({ success: true, cycleCode: 'D26', programId: PROGRAM, scope: 'my', stageLabels: {}, counts: {}, artifacts: [] });
 });
 
+it('accepts the existing Research Grant Program GUID outside RFC version/variant ranges', async () => {
+  const researchProgramId = 'c247b11a-a7cb-ee11-9078-000d3a341e8f';
+  const res = responseHarness();
+  await handler({ method: 'GET', query: { cycleCode: 'D26', programId: researchProgramId, scope: 'my' } }, res);
+  expect(res.statusCode).toBe(200);
+  expect(listPreSiteVisitDrafts).toHaveBeenCalledWith(expect.objectContaining({ programId: researchProgramId }));
+});
+
 it('passes scope=my through and resolves callerSystemId from the session (actorRefFromSession)', async () => {
   const res = responseHarness();
   await handler({ method: 'GET', query: { cycleCode: 'D26', programId: PROGRAM, scope: 'my' } }, res);

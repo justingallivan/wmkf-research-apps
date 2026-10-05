@@ -10,6 +10,7 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { isGuid } from '../../../lib/utils/guid';
 import { actorRefFromSession } from '../../../lib/utils/actor-ref';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
@@ -31,7 +32,7 @@ export default async function handler(req, res) {
   if (!/^[A-Za-z]\d{2}$/.test(cycleCode)) {
     return res.status(400).json({ error: 'cycleCode is invalid' });
   }
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(programId)) {
+  if (!isGuid(programId)) {
     return res.status(400).json({ error: 'programId must be a valid Grant Program GUID' });
   }
   const scope = String(req.query.scope || 'my').trim();
