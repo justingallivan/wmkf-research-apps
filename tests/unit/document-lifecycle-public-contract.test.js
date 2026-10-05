@@ -3,6 +3,9 @@
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn(), getUserRole: jest.fn() }));
 jest.mock('../../lib/dataverse/core/context', () => ({ withDalContext: jest.fn((_label, fn) => fn()) }));
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({ getById: jest.fn(), findByIds: jest.fn() }));
+jest.mock('../../lib/dataverse/adapters/site-visit.js', () => ({
+  findSummariesByRequests: jest.fn(async () => ({ records: [], capped: false })), getById: jest.fn(),
+}));
 jest.mock('../../lib/dataverse/adapters/request-document.js', () => ({
   findByRequest: jest.fn(), findByGenerationKey: jest.fn(), create: jest.fn(), update: jest.fn(),
 }));
@@ -23,6 +26,7 @@ jest.mock('../../lib/services/pre-site-visit/distribution-store.js', () => ({
 
 import { requireAppAccess, getUserRole } from '../../lib/utils/auth';
 import * as requestAdapter from '../../lib/dataverse/adapters/grant-request.js';
+import * as siteVisitAdapter from '../../lib/dataverse/adapters/site-visit.js';
 import * as documentAdapter from '../../lib/dataverse/adapters/request-document.js';
 import { runChangeset } from '../../lib/dataverse/core/changeset.js';
 import { GraphService } from '../../lib/services/graph-service.js';
@@ -247,7 +251,10 @@ describe('real routes compose default services and nonempty projections', () => 
   test('Final GET resolves session authorization and projects a pending row through defaults', async () => {
     const pendingId = '44444444-4444-4444-8444-444444444444';
     requestAdapter.getById.mockResolvedValue({ akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: ARTIFACT_ID, _wmkf_programdirector_value: ACTOR_ID });
-    documentAdapter.findByRequest.mockResolvedValue({ records: [registryRow(), registryRow({
+    documentAdapter.findByRequest.mockResolvedValue({ records: [registryRow({
+      wmkf_sharepointversionid: '1.0', wmkf_milestoneversionid: '1.0',
+      wmkf_milestonecontenthash: 'fixture-hash', wmkf_milestonecreatedat: '2026-09-01T12:00:00Z',
+    }), registryRow({
       wmkf_requestdocumentid: pendingId, wmkf_artifacttype: TYPE.FINAL_WRITEUP,
       _wmkf_sourcedocument_value: ARTIFACT_ID, wmkf_operationstatus: STATUS.FAILED,
       wmkf_lifecyclestate: LIFE.DRAFT,
@@ -258,6 +265,7 @@ describe('real routes compose default services and nonempty projections', () => 
     expect(res.body).toMatchObject({ success: true, available: true, phase: 'ready', canStart: true,
       sourceArtifactId: ARTIFACT_ID, pendingArtifact: { artifactId: pendingId, sourceArtifactId: ARTIFACT_ID } });
     expect(documentAdapter.findByRequest).toHaveBeenCalledWith(REQUEST_ID);
+    expect(siteVisitAdapter.findSummariesByRequests).toHaveBeenCalledWith([REQUEST_ID]);
     expect(getUserRole).toHaveBeenCalledWith(ACTOR_ID);
   });
 
