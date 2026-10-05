@@ -88,7 +88,7 @@ function RequestCard({ request }) {
           <p className="mt-2 text-sm text-gray-600">{sharing}</p>
           <div className="mt-4 space-y-1 border-t border-gray-200 pt-3 text-sm text-gray-600">
             <p>Deliberation session: {request.sessionAvailability === 'unavailable' ? 'Details unavailable' : dateTime(request.session?.scheduledStartIso, request.session?.ianaTimeZone) || 'Not yet scheduled'}</p>
-            <p>{request.materialsAvailability === 'unavailable' ? 'Materials status unavailable' : siteVisitMaterialsLine(request.materials) || 'No materials recorded'}</p>
+            <p>{request.materialsAvailability === 'unavailable' ? 'Materials status unavailable' : siteVisitMaterialsLine(request.materials) || 'No materials request recorded; check the request for existing files.'}</p>
           </div>
         </div>
         <div className="flex shrink-0 flex-col items-start gap-3 md:max-w-56 md:items-end">
