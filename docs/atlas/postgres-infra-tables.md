@@ -898,7 +898,7 @@ and the PC's ready confirmation. One non-closed row per request (partial unique 
 never here: accepted uploads are SharePoint items registered in `wmkf_requestdocument`, which the
 service reads back by artifact type and canonical filename. Migration 044 adds `slot_leases JSONB
 NOT NULL DEFAULT '{}'::jsonb`: one server-owned token/expiry object per canonical checklist slot.
-**[BRANCH-BUILT 2026-10-05; due-date setting not deployed.]** New collections read
+**[PRODUCTION-LIVE 2026-10-05 via PR #439 / merge `458ba7d63`; signed-in Admin UAT remains unverified.]** New collections read
 `site_visit_materials.due_business_days` from Dataverse settings: integer 1–30, absent default 2,
 weekends skipped and holidays not excluded. Invalid stored values or read failures return 503;
 a changed deadline between preview and creation requires a new preview. The Admin setting does

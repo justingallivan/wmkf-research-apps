@@ -1,4 +1,63 @@
-# Session 575 Prompt: build Stage 1 of the summaries and Board sharing plan (closes an outside-link exposure)
+# Session 576 Prompt: follow up on Site Visit materials only if needed
+
+## Session 575 Summary — 2026-10-05 PT (Codex debugging lane)
+
+[VERIFIED via source, GitHub PR checks/merges, Dataverse permission readback, and Vercel deployment inspection] The materials-template save fix and Admin-configurable deadline offset are deployed. Owner: Codex; worktree `/Users/gallivan/.codex/worktrees/debugging/WMKF_Apps-codex`; branch `codex/debugging`. The owner requested this closeout while retaining this worktree/branch. Documentation is pushed on this branch; no additional runtime change or release is part of the stop.
+
+### What Was Completed
+
+1. **Personal default save failure diagnosed and fixed.** Production logs showed missing Basic Read `prvReadwmkf_AppUserPreference` for the affected staff member. With owner authorization, the minimal `WMKF App Preferences Owner` role was applied and assigned; readback verified Basic Read as the only newly effective privilege. The API now distinguishes persistence failure from invalid template input. PR #436 merged as `5999a066e`; its Production deployment `dpl_9n9dKnstH9svsDQpQfckahDNK825` was Ready. No real email was sent or personal template saved by the agent.
+2. **Materials deadline is an Admin setting.** Admin → Site Visits → Materials defaults saves `site_visit_materials.due_business_days` independently of the upload cap: whole business days 1–30, absent default 2, weekends excluded (not holidays). Invalid or unreadable stored configuration fails closed with 503. New collections read the setting; existing saved `due_at` values are preserved. A changed resulting deadline after preview requires a refreshed preview before sending. No table, migration, or Production setting seed was needed.
+3. **Deadline release verified.** PR #439 merged as `458ba7d63e` after all 12 checks passed. Vercel Production deployment `dpl_FqFFJSFTqS4Nytc8TBnyhUGvwZ6M` reported Ready with the `applications.wmkeck.org` alias. Sign-in returned HTTP 200; the initial deployment error-log scan returned no entries. This does not establish signed-in Admin acceptance. Pre-release rollback target: `dpl_4bibqzwp6BCuiU2QYBjzmp5wW4Wh`.
+4. **Other work preserved.** PR #434 Stage 1 is already merged (`32664485b`) and present in this worktree's starting ancestry; do not carry its former build task forward. PR #432 remains OPEN on `codex/staff-deliberations-rework` at this checkpoint and belongs to another worktree. This lane did not modify or merge it.
+
+### Commits
+
+- `f816c7978` — Fix materials default save errors and define minimal preference owner role (PR #436).
+- `28e9424b0` — Make site visit materials deadline offset an Admin setting (PR #439).
+- Documentation closeout commit follows on `codex/debugging`.
+
+## Next Items
+
+### Verified Open
+
+1. **Signed-in acceptance remains unverified.** Evidence: this session performed focused tests, CI, deployment inspection, and public sign-in checks only. On ordinary use, confirm the affected staff member can save a personal default and an administrator can save/reload the deadline offset. Do not infer an unresolved defect from this testing limitation. New Production writes or real sends still require explicit authorization.
+
+### Verify Before Acting
+
+1. **Other lanes' carryovers below are historical, not this lane's worklist.** Recheck source, owner decisions, and current branch/PR state before using them. In particular, the old Stage 1 build task is DONE via PR #434; PR #432 is another agent's responsibility.
+2. **Handoff integration:** this stop's docs are on `codex/debugging`, not a new main merge. Check current main and concurrent documentation ownership before any later integration. Remain in this worktree/branch unless the owner changes that instruction.
+
+### Do Not Reopen Without New Decision
+
+1. Both materials fixes are shipped. Do not rerun permissions writes, add a setting seed, change existing deadlines, send test invitations, or introduce new testing infrastructure merely to repeat this closeout.
+2. Preserve Staff Deliberations PR #432 and unrelated agents' work.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `lib/dataverse/schema/roles/app-preferences-owner.json` | Minimal preference-owner role specification |
+| `pages/api/meeting-tracker/materials-email-preferences.js` | Personal-default persistence error handling |
+| `lib/services/site-visit-materials/due-date-setting.js` | Strict offset setting read/write contract |
+| `lib/services/site-visit-materials/collection-service.js` | Preview, deadline persistence, and stale-preview checks |
+| `pages/api/admin/site-visit-materials-defaults.js` | Superuser defaults route, independent setting saves |
+| `shared/components/admin/SiteVisitMaterialsDefaultsSection.js` | Admin deadline and upload-cap controls |
+| `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` | Materials behavior and release contract |
+
+## Testing and Stop-time Notes
+
+- Feature verification: 28 focused Jest suites / 350 tests passed (2 suites / 21 tests skipped); type check, changed-file lint, applicable API/auth/boundary and documentation gates with sequential self-tests passed. Ten existing unrelated Admin effect warnings remained. Independent contract review found no blocking issue; its two requested negative-path tests were added. All final PR checks passed.
+- No signed-in Admin UAT, test send, new migration, or Production setting seed was performed. CI Claude review uses subscription OAuth; no agent API credits or metered review product was used.
+- Claim-evidence pilot report returned “local state could not be read”; no observation row was fabricated or borrowed from another session.
+- Milestone determination: a new Production Admin capability and a permissions incident outcome shipped, so DEVELOPMENT_LOG.md receives “Site Visit materials preferences and configurable deadlines.” CLAUDE.md needs no new mutable feature catalogue or convention. The memory router is unchanged; older router-diet debt is historical and requires a fresh preflight.
+- Stop changes documentation only. Doc-currency, fact-consistency, and Atlas gates plus their sequential self-tests passed, as did `git diff --check`. Branch verification and push target remain `codex/debugging`.
+
+## Historical prior-lane handoffs — superseded checkpoints, not current instructions
+
+The following records preserve other lanes' history. Their open-item labels and deployment assertions describe their own checkpoints; they are not revalidated by this debugging closeout. The current next items are above. The former Stage 1 build recommendation is superseded by merged PR #434.
+
+## Historical Session 575 prompt — Stage 1 subsequently shipped in PR #434
 
 ## Session 574 Summary — 2026-10-04/05 PT (Site Visit card redesign shipped; summaries and Board sharing planned)
 

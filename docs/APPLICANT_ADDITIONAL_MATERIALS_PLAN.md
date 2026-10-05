@@ -497,7 +497,7 @@ needs no manifest and no viewer work; a finalized upload appears on the page on 
 | # | Decision |
 |---|---|
 | M1 | Baseline checklist: **Presentation (PDF)**, **Presentation source (PPTX or Keynote)**, **Participant bios (PDF or Word)**. One cycle template; the PC may waive an item per request and applicants may add bounded "Other" files. |
-| M2 | Due date: **an admin-editable 1–30 business-day offset before the site visit starts, default 2**, computed in the visit's IANA zone (`lib/utils/business-days.js`, weekends only; no holiday calendar this cycle). **[BRANCH-BUILT 2026-10-05; not deployed.]** Admin › Site visits › Materials defaults stores `site_visit_materials.due_business_days` through the existing Dataverse settings service, independently of the upload cap. New-collection preview and creation on Send read the setting; a changed resulting deadline requires a refreshed preview (409). An absent setting uses 2; an unreadable or invalid saved value fails closed with sanitized 503. The resulting `due_at` is saved at creation; existing collections, invitations, reminders, and applicant displays retain that saved deadline without reading the offset. No new table or migration. Contributor access closes seven days after the visit ends. This is independent of briefing-link expiry, which is 60 days from issuance under deliberation-briefing decision D17 revised 2026-09-15. |
+| M2 | Due date: **an admin-editable 1–30 business-day offset before the site visit starts, default 2**, computed in the visit's IANA zone (`lib/utils/business-days.js`, weekends only; no holiday calendar this cycle). **[PRODUCTION-LIVE 2026-10-05 via PR #439 / merge `458ba7d63`; signed-in Admin UAT remains unverified.]** Admin › Site visits › Materials defaults stores `site_visit_materials.due_business_days` through the existing Dataverse settings service, independently of the upload cap. New-collection preview and creation on Send read the setting; a changed resulting deadline requires a refreshed preview (409). An absent setting uses 2; an unreadable or invalid saved value fails closed with sanitized 503. The resulting `due_at` is saved at creation; existing collections, invitations, reminders, and applicant displays retain that saved deadline without reading the offset. No new table or migration. Contributor access closes seven days after the visit ends. This is independent of briefing-link expiry, which is 60 days from issuance under deliberation-briefing decision D17 revised 2026-09-15. |
 | M3 | Upload size cap: an **admin-editable setting** `site_visit_materials.upload_max_mb` (Admin › Site visits), **default 500 MB** (owner decision 2026-10-01). Saved administrator overrides remain effective within the supported 1–500 MB range. The briefing page serves files up to 50 MB and lists larger ones with a note (D19). |
 | M4 | SharePoint layout: **flat request-relative folders** `Site Visit - Slides`, `Site Visit - Participant Bios`, `Site Visit - Other`; no nested `Site Visit/Applicant Materials/…` form. Canonical filenames per §7.3. |
 | M5 | **Go for this cycle.** Reminders are PC-triggered in the first release; an automated reminder cron is a follow-up the owner has flagged to remember. *Follow-up closed 2026-09-17: the automatic cron is retired; staff monitor arrivals manually (§16.6 item 1).* |
@@ -963,3 +963,15 @@ Each infected verdict attempts one best-effort warning `operational_events` writ
 references, staging-id deduplication, and only the allowlisted diagnostic in metadata. There is no notification email,
 new column, or migration. The diagnostic and applicant-facing progress/rejection copy are
 Production-deployed via PRs #407 and #410. Exact 500 MB live transfer remains unverified.
+
+### 16.17 2026-10-05: Admin materials deadline offset [PRODUCTION-LIVE via PR #439]
+
+M2's Admin setting shipped in PR #439, merge
+`458ba7d63e0483c82ee8f4ff137fcda6f0bef6f8`, after all 12 PR checks passed.
+**[VERIFIED via release deployment readback and bounded post-deploy checks.]** Vercel
+`dpl_FqFFJSFTqS4Nytc8TBnyhUGvwZ6M` reached Ready and was assigned
+`applications.wmkeck.org`; sign-in returned HTTP 200 and the initial error scan was empty.
+Signed-in Admin save/reload UAT was not performed. Release verification seeded no Production
+setting, ran no migration, and sent no email. The absent-setting default preserves two
+business days until an administrator saves another supported value; existing collection
+deadlines remain unchanged.

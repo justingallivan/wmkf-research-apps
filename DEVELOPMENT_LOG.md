@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Site visit materials preferences and configurable deadlines (Session 575)
+
+**Milestone:** Repaired the reported materials-email default-save permission failure and moved the new-collection deadline offset into Admin → Site Visits → Materials defaults.
+**Sessions:** 575 (diagnosis, owner-authorized permission repair, focused implementation/review, and two Production releases on October 5).
+**Ship state:**
+- PR #436 (`5999a066e`, source `f816c7978`) distinguishes persistence errors from invalid templates; the affected staff member received the minimal Basic Read AppUserPreference role after owner authorization and permission readback.
+- PR #439 (`458ba7d63`, source `28e9424b0`) exposes 1–30 business days, default 2, in the existing Dataverse settings store. New collections persist the configured deadline; existing `due_at` values remain unchanged. Missing setting uses 2; malformed/unreadable settings fail closed, and changed preview deadlines require a refresh.
+- Both releases passed CI and reached Ready; final deployment `dpl_FqFFJSFTqS4Nytc8TBnyhUGvwZ6M` passed sign-in HTTP 200 with no errors in the initial log scan. [VERIFIED via GitHub and Vercel release checks]
+- Signed-in default-save/Admin acceptance remains unverified. No real email, migration, or Production deadline-setting seed ran.
+**Why it matters:** A storage-permission failure no longer masquerades as bad email wording, and staff can adjust future materials deadlines without a code release or changing existing commitments.
+**Pointers:** `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16 M2; `docs/atlas/postgres-infra-tables.md`; `lib/dataverse/schema/roles/app-preferences-owner.json`; PRs #436 and #439.
+
 ## October 2026 — One Recording and transcript card on the Site Visit page (Session 574)
 
 **Milestone:** The Site Visit page's Post-presentation materials card and Meeting transcription panel are replaced by one task-oriented Recording and transcript card; plain-text and VTT transcript uploads no longer go through the malware scanner.
