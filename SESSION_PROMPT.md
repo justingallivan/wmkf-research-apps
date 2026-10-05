@@ -1,12 +1,81 @@
-# Session 573 Prompt: staff video sharing, leadership dashboards, transcription follow-ups
+# Session 574 Prompt: transcription issue (owner-stated next focus), then video sharing and dashboards
 
-## Session 573 in progress — 2026-10-04 PT (owner decisions; legacy VRP retirement)
+## Session 573 Summary — 2026-10-04 PT (owner decisions; legacy VRP retired; Integrity Screener on Haiku)
 
-1. **Legacy Virtual Review Panel retired** (owner decision 2026-10-04). **MERGED and deployed** 2026-10-04: PR #429 merge `9240042f0`, Production deployment 6848777180 success (owner-ordered: main pushed, #430 first, then #429). Branch commits `d276790da` runtime archive, `b4c218f74` docs reconciliation, `e896470c1` admin label map. Page/route/service/prompt/schema in `_archived/`; `APP_LIFECYCLE_REGISTRY` entry `deprecated`; tables, grants, `multi-llm-service.js`, `vrp-providers.js`, `VRP_ALLOWED_PROVIDERS` retained. Full unit suite and all gates green on the branch.
-2. **Sonnet 5.5 admission** reframed as a fleet move (see Owner Decision Needed §1 below). Inventory on branch `audit/sonnet-55-consumer-inventory` (pushed). Of its two sonnet-tier blockers, the VRP synthesis one is removed by item 1 once merged; the remaining one (`lib/services/integrity-service.js`) is **MERGED and deployed** 2026-10-04 (PR #430 merge `df274539c`, Production deployment 6848756433 success; branch commit `fbf196810`): owner decision 2026-10-04 = Haiku when available; `APP_MODELS['integrity-screener']` added (`haiku`, 529-fallback `sonnet`) and the call is refusal-guarded. Both PRs are merged, so the inventory's blockers are closed except the multi-LLM first-block check (moot once the legacy VRP is archived) and the runbook §4 replay, which needs owner authorization (spends credits). Owner confirmed 2026-10-04: `CLAUDE_MODEL_INTEGRITY_SCREENER` exists in neither Vercel nor `.env.local`, and the admin Models API only accepts keys present in `APP_MODELS`, so no DB override can exist for this key. On merge the haiku default is the effective model.
-3. **Dependabot** rechecked; both alerts upstream-blocked (details in Owner Decision Needed §2).
-4. Untouched this session: staff video-sharing acceptance, leadership dashboard readiness, VTT-as-malware scan fix, Jean manual pick.
+Owner picked "address the owner decisions" first. Both landed as fleet-level facts rather than the one-line items the Session 572 handoff framed. Everything below is on `main` and deployed unless marked otherwise.
 
+### What Was Completed
+
+1. **Legacy Virtual Review Panel retired** (owner decision). PR #429, merge `9240042f0`, Production deployment 6848777180 success. Page, SSE route, `panel-review-service.js`, `literature-search-service.js`, prompt file and output schema moved to mirrored paths under `_archived/`; `APP_LIFECYCLE_REGISTRY['virtual-review-panel']` is `deprecated` (successor `review-panel`); removed from `APP_REGISTRY`, `APP_MODELS`, and the admin label map (successor now labeled "Review Panel"). Retained: `panel_reviews` / `panel_review_items` history, existing grants, `multi-llm-service.js` + `lib/utils/vrp-providers.js` (successor's provider vocabulary; `MultiLLMService.call` now has no runtime caller), `VRP_ALLOWED_PROVIDERS`. Canonical app count 14 → 13. Docs/Atlas/wiki/memory/dev log reconciled.
+2. **Integrity Screener on the haiku tier with a refusal guard** (owner decision "Haiku if available"). PR #430, merge `df274539c`, Production deployment 6848756433 success. `integrity-screener` was missing from `APP_MODELS`, so `analyzeWithHaiku` silently inherited the `sonnet` default; now `{ model: 'haiku', fallback: 'sonnet' }` (fallback = LLMClient 529-overload swap only) and the call is wrapped in `requireAcceptedLlmResponse`. Owner confirmed no `CLAUDE_MODEL_INTEGRITY_SCREENER` env var exists in Vercel or `.env.local`; the admin Models API rejects keys outside `APP_MODELS`, so no DB override can exist. New test `tests/unit/integrity-service-model-and-refusal.test.js`.
+3. **Sonnet 5.5 admission reframed.** `resolveTierSync` picks the newest *reviewed* family member from the live model list, so adding Sonnet 5.5 to the registries flips every `sonnet`-tier app — a fleet move, not a one-prompt pin. Complete LLM consumer inventory written (`docs/audits/SONNET_55_CONSUMER_INVENTORY_2026-10-04.md` on branch `audit/sonnet-55-consumer-inventory`, pushed, no PR). Its two sonnet-tier refusal blockers are both closed by items 1 and 2.
+4. **Dependabot rechecked:** `http-cache-semantics` 4.3.0 (published 2026-10-04) does not touch `max-stale` (tarball diff: Vary fix + `status()` accessor only); `braces` has no fix. Both tooling-only; keep open.
+5. **Plan correction:** the Zoom alignment plan said "Sonnet 5.5 proposes"; the `sonnet` alias resolves to Sonnet 5 (`34785709e`).
+
+### Commits (main)
+- `28510be43`, `34785709e`, `5e1333826`, `d92a48d7f`, `f5e4df6c9`, `1f05600f5` — handoff/doc commits.
+- `df274539c` — merge PR #430 (branch commit `fbf196810`).
+- `9240042f0` — merge PR #429 (branch commits `d276790da`, `b4c218f74`, `e896470c1`).
+
+### Codex worktree
+`/Users/gallivan/Code/WMKF_Apps-codex-dashboards` on `codex/leadership-dashboard-testing` (synced with origin at `9fec71a97`; two commits: readiness test + assessment record; `package-lock.json` locally modified). Not touched in S573.
+
+## Next Items
+
+### Owner-Stated Next Focus
+1. **"Work to do on the transcription issue."** Owner stated this at the close of S573 without naming which issue. Evidence: owner words 2026-10-04. Ask which before starting; candidates already recorded below are Verified Open §3 (post-presentation transcript slot rejects plain VTT as malware) and §4 (Jean unresolved on job `7c1c5643`). Do not assume either.
+
+### Verified Open
+1. **Staff video-sharing acceptance** (owner order item 2 from Session 571). Evidence: untouched in S572–S573; `docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`. Trace the sharing path and confirm intended staff can open the video.
+2. **Leadership dashboard readiness** (owner order item 3). Evidence: Codex worktree commits `a76b0f31a`, `9fec71a97` exist but were not read. Start by reading the assessment record there; establish the target date.
+3. **Post-presentation materials transcript slot rejects plain VTT as malware** (`scan_infected` from Cloudmersive advanced scan on an 81 KB WEBVTT text file). Evidence: owner report; `lib/services/post-presentation-materials/material-service.js` discards the content flags. Minimum fix: record `contentFlags` on infected verdicts; then decide a text-file policy. Separate surface from the alignment VTT upload, which has no scan.
+4. **Jean on job `7c1c5643`** is a manual pick in the Detected speakers editor (suggestion offered). Stray one-word lines in rapid exchanges (~30) stay as diarized by design.
+5. **Amend the Sonnet 5.5 inventory before it merges.** Evidence: `docs/audits/SONNET_55_CONSUMER_INVENTORY_2026-10-04.md` (branch `audit/sonnet-55-consumer-inventory`) still lists integrity-service and VRP synthesis as open blockers; both closed on `main` (items 1–2 above). Update "Decision state", open a PR, docs-only.
+6. **Memory hygiene debt.** Evidence: Stop/Start hook notice — `.claude-memory/MEMORY.md` is over the 8 KiB routine-audit trigger (router diet, `docs/MEMORY_HYGIENE_RUNBOOK.md` §10); `.claude-memory/project-virtual-review-panel.md` is now `status: closed` but not yet listed in `project-closed-work-archive.md`.
+
+### Owner Decision Needed
+1. **Authorize the Sonnet 5.5 pre-flip replay** (`docs/MODEL_CHANGE_STRATEGY.md` §4 step 5, `scripts/validate-reviewer-analyze.mjs`; reviewer-finder's fallback is the `sonnet` tier). Spends provider credits. After a clean replay: mirror commit `bbf6457a8` (capability + pricing entries, tests; keep `LAST_CAPABILITY_REVIEWED_AT` unchanged) and accept that the whole `sonnet` tier flips. Vendor facts verified 2026-10-04 are in the inventory doc. Note for the entry author: vendor table lists Sonnet 5.5 thinking as "Adaptive" (floor is `between_tools`), not "always on" like Opus 5.5; pick the `thinkingMode` enum deliberately.
+2. **Dependabot #115 (`braces`) and #116 (`http-cache-semantics`)** — upstream-blocked as of 2026-10-04 (see item 4 above). Reassess only when a release that touches the advisory appears.
+
+### Parked
+1. `feature/unsupported-stretch-split`, `feature/reassign-direct-overlap` — see the Zoom plan § "Deliberately NOT merged". Re-open only on a new owner decision with a recording that exhibits the problem.
+2. Calibrated timing votes for sub-floor cues and streaming audio upload — `docs/CURRENT_WORK_QUEUE.md`.
+3. Items parked in Session 571 (#428 rehearsal, #328, #390, reminder cron) remain parked; not revalidated.
+4. `multi-llm-service.js` `DEFAULT_MODELS.claude` (dated Sonnet 4 id) is dead config since S573; leave unless the file is next touched.
+
+### Verify Before Acting
+1. Before any Dataverse write from a local shell: the target interlock requires `DATAVERSE_PROD_WRITE_ACK="<purpose> <YYYY-MM-DD UTC>"`; seeds are create-only.
+2. The auto-mode classifier blocked the agent from production reads/writes (Vercel env pull, migrations, seeds); the owner ran those via `!`. Expect the same.
+3. Production probes from an unauthenticated shell cannot distinguish a removed route from a live one on applications.wmkeck.org (everything 307s to sign-in). The build is the evidence for route removal; a signed-in look at the landing page confirms the tile is gone.
+
+### Do Not Reopen Without New Decision
+1. Model-as-veto, dominance 0.2, rendered-slice attribution, backchannel exemption — owner decisions recorded in the Zoom plan § 2.
+2. Time-split speaker editor — owner declined 2026-10-04 ("not worth the effort").
+3. Legacy Virtual Review Panel retirement and the Integrity Screener haiku pin — owner decisions 2026-10-04, shipped.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `docs/audits/SONNET_55_CONSUMER_INVENTORY_2026-10-04.md` (branch) | every runtime LLM consumer and its refusal handling; admission preconditions |
+| `shared/config/appRegistry.js` | `APP_LIFECYCLE_REGISTRY['virtual-review-panel']` retirement record |
+| `shared/config/baseConfig.js` | `APP_MODELS` incl. new `integrity-screener` row |
+| `lib/services/integrity-service.js` | `analyzeWithHaiku` — haiku tier, sonnet 529 fallback, refusal guard |
+| `lib/services/model-resolver.js` | `resolveTierSync` / `isReviewedModel` — why registry admission is a fleet move |
+| `_archived/README.md` | what was archived and why (six S573 rows) |
+| `lib/services/transcription-pilot/zoom-vtt.js`, `lib/services/meeting-tracker-transcription/alignment-service.js` | Zoom alignment pipeline (S572) |
+| `scripts/probe-meeting-speaker-alignment.js` | owner-run live alignment diagnostic |
+
+## Testing
+
+```bash
+npx jest tests/unit/integrity-service-model-and-refusal.test.js tests/unit/integrity-service-strict-sources.test.js
+npx jest tests/unit/vrp-providers.test.js tests/unit/multi-llm-service.test.js tests/unit/review-panel-generation.test.js
+npx jest tests/unit/transcription-pilot tests/unit/meeting-tracker-transcription
+node scripts/probe-meeting-speaker-alignment.js            # owner shell; newest job with a VTT
+```
+
+## Earlier handoff — Session 572 (historical; its next items are carried above)
 
 ## Session 572 Summary — 2026-10-04 PT (Zoom caption speaker alignment shipped; Claude Fable orchestrating)
 
@@ -29,50 +98,6 @@ Owner directive: Fable orchestrates; Sonnet builds; Opus reviews; Fable final re
 
 ### Codex worktree
 `/Users/gallivan/Code/WMKF_Apps-codex-dashboards` on `codex/leadership-dashboard-testing` (synced with origin at `9fec71a97`, two commits: readiness test + assessment record; `package-lock.json` locally modified from npm install, not committed). Owner was given a paste-in brief; outcome not reviewed this session.
-
-## Next Items
-
-### Verified Open
-1. **Staff video-sharing acceptance** (owner order item 2 from Session 571). Evidence: untouched this session; `docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md`. Trace the sharing path and confirm intended staff can open the video.
-2. **Leadership dashboard readiness** (owner order item 3). Evidence: Codex worktree commits `a76b0f31a`, `9fec71a97` exist but were not read by this session. Start by reading the assessment record there; establish the target date.
-3. **Post-presentation materials transcript slot rejects plain VTT as malware** (`scan_infected` from Cloudmersive advanced scan on an 81 KB WEBVTT text file). Evidence: owner report; `lib/services/post-presentation-materials/material-service.js:1840-1852` discards the content flags. Minimum fix: record `contentFlags` on infected verdicts; then decide a text-file policy. Separate surface from the alignment VTT upload, which has no scan.
-4. **Jean on job `7c1c5643`** is a manual pick in the Detected speakers editor (suggestion offered). Stray one-word lines in rapid exchanges (~30) stay as diarized by design.
-
-### Owner Decision Needed
-1. **Sonnet 5.5 in the reviewed model registry** before the alignment prompt can be moved off the `sonnet` tier alias (resolves to claude-sonnet-5). Evidence: `check:model-registry` gate; prompt row editable in Admin › Prompts & budgets. **Reframed 2026-10-04 (S573):** admission is a fleet move, not a one-prompt pin. `resolveTierSync` in `lib/services/model-resolver.js` picks the newest *reviewed* family member from the live model list, so adding Sonnet 5.5 to the registries flips every `sonnet`-tier app in `shared/config/baseConfig.js` on the next model-list load. Owner decision 2026-10-04: inventory first. Read-only consumer inventory is on branch `audit/sonnet-55-consumer-inventory` (`docs/audits/SONNET_55_CONSUMER_INVENTORY_2026-10-04.md`); registry entries wait until the named blockers are fixed, the runbook §4 replay is run with owner authorization, and the owner approves the flip.
-2. **Dependabot: two high-severity alerts on the default branch** reported at push time; predate today. Evidence: GitHub push output 2026-10-04. **Checked 2026-10-04 (S573): both still upstream-blocked.** `http-cache-semantics` 4.3.0 was published 2026-10-04 02:56 UTC; a tarball diff against 4.2.0 shows only a Vary-header matching fix and a new `status()` accessor, nothing touching `max-stale` (GHSA-ch52-4w7c-c8xp), and GitHub still lists no patched version. `braces` 3.0.3 remains the latest release (GHSA-vfj7-8cjw-p6xm). Both are tooling-only in our tree (Tailwind watcher; swc binary downloader under `workflow`). Owner decision 2026-10-04: keep both alerts open, no package change.
-
-### Parked
-1. `feature/unsupported-stretch-split`, `feature/reassign-direct-overlap` — see plan § "Deliberately NOT merged". Re-open only on a new owner decision with a recording that exhibits the problem.
-2. Calibrated timing votes for sub-floor cues (clock agreement measured: median 0.00 s, p90 0.5 s) and streaming audio upload — `docs/CURRENT_WORK_QUEUE.md`.
-3. Items parked in Session 571 (#428 rehearsal, #328, #390, reminder cron) remain parked; not revalidated.
-
-### Verify Before Acting
-1. Before re-running the alignment seed or any Dataverse write from a local shell: the target interlock requires `DATAVERSE_PROD_WRITE_ACK="<purpose> <YYYY-MM-DD UTC>"`; the seed is create-only and refuses when a row exists.
-2. The auto-mode classifier blocked the agent from production reads/writes (Vercel env pull, migrations, seeds); the owner ran those via `!`. Expect the same.
-
-### Do Not Reopen Without New Decision
-1. Model-as-veto, dominance 0.2, rendered-slice attribution, backchannel exemption with its accepted residual risk (simultaneous "yes" over uninterrupted speech) — owner decisions recorded in the plan § 2.
-2. Time-split speaker editor — owner declined 2026-10-04 ("not worth the effort").
-
-## Key Files Reference
-
-| File | Purpose |
-|------|---------|
-| `lib/services/transcription-pilot/zoom-vtt.js` | parse VTT, sample, cue-exclusive support, verifier (veto), display names, short-utterance reassignment |
-| `lib/services/meeting-tracker-transcription/alignment-service.js` | claim → blobs → sample/serialize → Executor → verify → reassign → fenced complete |
-| `lib/services/meeting-tracker-transcription/alignment-samples.js` | pure sample rendering/budget (shared with the probe) |
-| `lib/services/transcription-pilot/transcript-format.js` | formatter versions, turn grouping, `applySpeakerReassignments` |
-| `lib/services/transcription-pilot/limits.js` | 200 MiB audio cap |
-| `scripts/probe-meeting-speaker-alignment.js` | owner-run live diagnostic |
-
-## Testing
-
-```bash
-npx jest tests/unit/transcription-pilot tests/unit/meeting-tracker-transcription
-TRANSCRIPTION_PILOT_PG_TEST_URL=postgres://postgres:contract@127.0.0.1:55432/transcription_pilot_test MEETING_TRACKER_TRANSCRIPTION_PG_TEST_URL=$TRANSCRIPTION_PILOT_PG_TEST_URL npx jest --runInBand tests/integration/transcription-pilot.pg.test.js tests/integration/meeting-tracker-transcription.pg.test.js
-node scripts/probe-meeting-speaker-alignment.js            # owner shell; newest job with a VTT
-```
 
 ## Earlier handoff — Session 571 (historical; items 1 of its order completed above, 2–3 still open)
 

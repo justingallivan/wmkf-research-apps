@@ -13,7 +13,7 @@ The chronological archive after the `Legacy chronological session log` divider c
 ## October 2026 — Legacy Virtual Review Panel retired (Session 573)
 
 **Milestone:** The original multi-LLM Virtual Review Panel app is retired; the source-built Review Panel is the only panel app.
-**Sessions:** 573 (owner decision 2026-10-04, branch `feature/retire-legacy-virtual-review-panel`).
+**Sessions:** 573 (owner decision 2026-10-04; PR #429 merged `9240042f0`, Production deployment 6848777180 success). Same session: Integrity Screener pinned to the haiku tier with a refusal guard (PR #430, `df274539c`).
 **Ship state:**
 - Page, SSE API route, `panel-review-service.js`, `literature-search-service.js`, prompt file and output schema moved to `_archived/` (mirrored paths); four legacy test suites deleted; `APP_LIFECYCLE_REGISTRY['virtual-review-panel']` recorded as `deprecated` with successor `review-panel`.
 - Retained: `panel_reviews` / `panel_review_items` history, existing user grants, `multi-llm-service.js` and `lib/utils/vrp-providers.js` (provider vocabulary for the successor), `VRP_ALLOWED_PROVIDERS`.
