@@ -1292,9 +1292,21 @@ function useTranscription(requestId, { onMaterialsChanged }) {
     }
   };
 
+  const savedDraft = (() => {
+    const artifact = collection?.currentArtifact;
+    if (!artifact?.bundleEditable) return null;
+    return (collection?.correctionDrafts || []).find((row) => row?.state === 'draft' && row.operationId && sameId(row.sourceArtifactId, artifact.id) && new Date(row.expiresAt).getTime() > collectionCheckedAt) || null;
+  })();
+
   const beginEditNames = async () => {
     const artifact = collection?.currentArtifact;
     if (!artifact?.bundleEditable || busy) return;
+    if (savedDraft) {
+      setSuggestionPicks({});
+      setNotice(null);
+      await loadCorrection(savedDraft.operationId);
+      return;
+    }
     const generation = generationRef.current;
     setBusy('create-draft');
     setError(null);
@@ -1500,7 +1512,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   };
 
   return {
-    basePath, collection, collectionCheckedAt, loading, jobs, publications, newestJob, focusJob, showReview, selectedJob,
+    basePath, collection, collectionCheckedAt, savedDraft, loading, jobs, publications, newestJob, focusJob, showReview, selectedJob,
     correction, correctionDetail, content, speakerIds, names, setNames: editNames, baseline, dirtyNames, suggestionPicks, setSuggestionPicks,
     detail, audioFile, vttFile, setVttFile, acknowledged, setAcknowledged, uploadProgress, busy, error, notice, conflict,
     closeAcknowledgedId, setCloseAcknowledgedId, confirmNoVtt, setNoVttConfirmation,
@@ -1833,7 +1845,7 @@ function TranscriptBlock({ m, t, transcriptInputRef }) {
   const openUrl = material ? safeMaterialUrl(material) : null;
   const featureEnabled = t.collection?.featureState === 'enabled';
   const generateReason = !t.collection ? 'Not available right now' : !featureEnabled ? 'Not enabled for this request' : null;
-  const active = t.newestJob && ACTIVE_STATUSES.has(t.newestJob.status) ? t.newestJob : null;
+  const active = t.jobs.find((job) => ACTIVE_STATUSES.has(job.status)) || null;
   const editing = Boolean(t.correction);
   const reviewOpen = editing || Boolean(t.showReview && t.focusJob && !ACTIVE_STATUSES.has(t.focusJob.status));
   const toggle = (form) => setOpenForm((value) => (value === form ? null : form));
@@ -1841,12 +1853,13 @@ function TranscriptBlock({ m, t, transcriptInputRef }) {
     <section className="mt-6 border-t border-gray-200 pt-5" aria-labelledby="recording-transcript-transcript-title">
       <h3 id="recording-transcript-transcript-title" className="text-base font-semibold text-gray-950">Transcript</h3>
       <p className="mt-2 text-sm leading-6 text-gray-900" data-testid="current-transcript-line">{line.text}</p>
+      {generated && !editing && t.savedDraft && <p className="mt-1 text-xs text-gray-600">Unpublished name edits saved {fmtDateTime(t.savedDraft.createdAt)}</p>}
       {line.kind === 'uploaded' && <p className="mt-1 text-xs text-gray-600">Uploaded file · speaker names cannot be edited here.</p>}
       {material && <div className="mt-2 flex flex-wrap items-center gap-2">
         {generated && artifact && <>
           <a className={BTN} href={`${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=txt`}>Download TXT</a>
           <a className={BTN} href={`${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=vtt`}>Download VTT</a>
-          {!editing && <button type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy)} className={BTN}>{t.busy === 'create-draft' ? 'Opening…' : 'Edit speaker names'}</button>}
+          {!editing && <button type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy)} className={BTN}>{t.busy === 'create-draft' ? 'Opening…' : t.savedDraft ? 'Continue editing names' : 'Edit speaker names'}</button>}
         </>}
         {!generated && openUrl && <a className={BTN} href={openUrl} target="_blank" rel="noopener noreferrer">Open</a>}
       </div>}

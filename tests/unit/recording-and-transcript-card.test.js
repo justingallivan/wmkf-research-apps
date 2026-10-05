@@ -347,3 +347,34 @@ test('the review block offers a transcript preview that shows live speaker names
   expect(within(preview).getByText('Hello from the site visit.')).toBeInTheDocument();
   expect(within(preview).getByText(/Alex Lee:/)).toBeInTheDocument();
 });
+
+test('a saved names draft is resumed with a GET instead of creating a second draft', async () => {
+  const artifact = { id: ARTIFACT_ID, fingerprint: 'd'.repeat(64), bundleEditable: true };
+  const draft = { operationId: OP_ID, state: 'draft', sourceArtifactId: ARTIFACT_ID, speakerNames: { A: 'Yara' }, createdAt: '2026-10-04T21:00:00.000Z', expiresAt: '2099-01-01T00:00:00.000Z' };
+  const state = { materials: [transcriptRow()], collection: collection({ currentArtifact: artifact, correctionDrafts: [draft] }), detail: detailFor({}) };
+  const correction = { operationId: OP_ID, state: 'draft', version: 1, speakerNames: { A: 'Yara' }, expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: artifact.fingerprint };
+  route(state, { [`/corrections/${OP_ID}`]: { method: 'GET', respond: () => response({ correction, content, currentArtifact: artifact, candidates: [] }) } });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  const button = await screen.findByRole('button', { name: 'Continue editing names' });
+  expect(screen.getByTestId('current-transcript-line').parentElement).toHaveTextContent('Unpublished name edits saved');
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
+  await waitFor(() => expect(screen.getByLabelText('Name for Speaker A')).toHaveValue('Yara'));
+  const calls = global.fetch.mock.calls.map(([url, options]) => `${(options && options.method) || 'GET'} ${url}`);
+  expect(calls.some((call) => call.startsWith('GET') && call.endsWith(`/corrections/${OP_ID}`))).toBe(true);
+  expect(calls.some((call) => call.startsWith('POST') && call.includes('/corrections'))).toBe(false);
+});
+
+test('an older active run still shows progress with Refresh while the newest run is ready', async () => {
+  const older = job({ id: '99999999-9999-4999-8999-999999999999', status: 'processing', created_at: '2026-10-04T19:00:00.000Z' });
+  const state = { collection: collection({ jobs: [job(), older] }), detail: detailFor({}) };
+  route(state);
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  const progress = await screen.findByTestId('transcript-progress');
+  expect(progress.textContent).toContain('Transcribing');
+  const refresh = within(progress).getByRole('button', { name: 'Refresh' });
+  await waitFor(() => expect(refresh).toBeEnabled());
+  const before = global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/transcriptions')).length;
+  fireEvent.click(refresh);
+  await waitFor(() => expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/transcriptions')).length).toBe(before + 1));
+});
