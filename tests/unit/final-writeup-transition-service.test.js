@@ -43,6 +43,9 @@ function createHarness({ actorId = LEAD_PD_ID, schemaReady = true } = {}) {
     wmkf_sharepointitemid: 'item-id',
     wmkf_sharepointweburl: 'https://sharepoint.test/site-visit.docx',
     wmkf_sharepointversionid: '1.0',
+    wmkf_milestoneversionid: '1.0',
+    wmkf_milestonecontenthash: 'gdc1:existing-milestone',
+    wmkf_milestonecreatedat: '2026-08-30T18:30:00Z',
     wmkf_sharepointetag: 'file-etag-1',
     wmkf_sharepointfolderpath: 'Requests/1002379/Artifacts/Pre-Site Visit',
     wmkf_filename: '1002379 Pre-Site Visit.docx',
@@ -51,6 +54,15 @@ function createHarness({ actorId = LEAD_PD_ID, schemaReady = true } = {}) {
     _etag: 'source-etag-1',
   };
   const rows = [source];
+  const siteVisit = {
+    activityid: '77777777-7777-4777-8777-777777777777',
+    _regardingobjectid_value: REQUEST_ID,
+    scheduledend: '2026-08-30T19:00:00.000Z',
+    modifiedon: '2026-08-30T18:00:00.000Z',
+    statecode: 10,
+    statuscode: 11,
+    _etag: 'site-visit-etag-1',
+  };
   const metadata = {
     siteId: 'site-id',
     driveId: 'drive-id',
@@ -69,6 +81,9 @@ function createHarness({ actorId = LEAD_PD_ID, schemaReady = true } = {}) {
     findByRequest: jest.fn().mockImplementation(async () => ({
       records: rows.map((row) => ({ ...row })),
     })),
+    findSiteVisits: jest.fn().mockImplementation(async () => ({ records: [{ ...siteVisit }] })),
+    getSiteVisit: jest.fn().mockImplementation(async () => ({ ...siteVisit })),
+    readSchedulePairs: jest.fn(() => [{ stateCode: 10, statusCode: 11, eligible: true }]),
     findByGenerationKey: jest.fn().mockImplementation(async (key) => ({
       records: rows.filter((row) => row.wmkf_generationkey === key).map((row) => ({ ...row })),
     })),
@@ -114,7 +129,7 @@ function createHarness({ actorId = LEAD_PD_ID, schemaReady = true } = {}) {
       reason: 'schema-not-ready',
     }),
   };
-  return { request, source, rows, metadata, dependencies, actorId };
+  return { request, source, siteVisit, rows, metadata, dependencies, actorId };
 }
 
 function finalStatusRow(overrides = {}) {
@@ -253,6 +268,13 @@ test('moves the same stable Word item into one Ready/Review Final row atomically
         key: REQUEST_ID,
         body: { 'wmkf_CurrentFinalWriteup@odata.bind': `/wmkf_requestdocuments(${FINAL_ID})` },
         ifMatch: 'request-etag-1',
+      },
+      {
+        method: 'PATCH',
+        entitySet: 'wmkf_sitevisits',
+        key: '77777777-7777-4777-8777-777777777777',
+        body: { statecode: 10, statuscode: 11 },
+        ifMatch: 'site-visit-etag-1',
       },
     ],
     { actingUserSystemId: LEAD_PD_ID },
@@ -395,6 +417,7 @@ test.each([true, false])('status projects the exact pending Final from populated
     available: true,
     phase: hasGenerating ? 'starting' : 'ready',
     canStart: true,
+    startBlockedReason: null,
     canAdvance: false,
     sourceArtifactId: SOURCE_ID,
     sourceFile: { webUrl: harness.source.wmkf_sharepointweburl, name: harness.source.wmkf_filename },
@@ -595,6 +618,15 @@ test('a rejected atomic activation leaves pointers and source lifecycle unchange
   expect(harness.source.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW);
   expect(harness.rows.find((row) => row.wmkf_requestdocumentid === FINAL_ID))
     .toMatchObject({ wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.FAILED });
+  const operations = harness.dependencies.commitChangeset.mock.calls[0][0];
+  expect(operations[3]).toMatchObject({
+    method: 'PATCH', entitySet: 'wmkf_sitevisits', key: harness.siteVisit.activityid,
+    body: { statecode: 10, statuscode: 11 }, ifMatch: 'site-visit-etag-1',
+  });
+  expect(operations[3].body).not.toHaveProperty('scheduledend');
+  expect(harness.siteVisit).toMatchObject({
+    scheduledend: '2026-08-30T19:00:00.000Z', statecode: 10, statuscode: 11, _etag: 'site-visit-etag-1',
+  });
 });
 
 test('a live deterministic claim returns in progress without a second write', async () => {
@@ -707,4 +739,109 @@ test('an expired claim for an older source version is failed before the current 
     });
   expect(harness.dependencies.createDocument).toHaveBeenCalledTimes(1);
   expect(harness.dependencies.commitChangeset).toHaveBeenCalledTimes(1);
+});
+
+test('GET readiness and POST both block group review before the scheduled end', async () => {
+  const h = createHarness();
+  h.dependencies.findSiteVisits.mockResolvedValue({ records: [{
+    activityid: '77777777-7777-4777-8777-777777777777',
+    _regardingobjectid_value: REQUEST_ID,
+    scheduledend: '2026-08-30T19:06:00Z',
+    statecode: 10,
+    statuscode: 11,
+  }] });
+  const status = await getFinalWriteupStatus({
+    requestId: REQUEST_ID, actingUserSystemId: LEAD_PD_ID,
+  }, h.dependencies);
+  expect(status).toMatchObject({ canStart: false, startBlockedReason: 'final_writeup_site_visit_not_ended' });
+  await expect(startFinalWriteup({
+    requestId: REQUEST_ID, expectedArtifactId: SOURCE_ID, actingUserSystemId: LEAD_PD_ID,
+  }, h.dependencies)).rejects.toMatchObject({ code: 'final_writeup_site_visit_not_ended' });
+  expect(h.dependencies.commitChangeset).not.toHaveBeenCalled();
+});
+
+test('accepts one ended eligible event alongside a known cancelled historical event', async () => {
+  const h = createHarness();
+  h.dependencies.findSiteVisits.mockResolvedValue({ records: [
+    { activityid: '77777777-7777-4777-8777-777777777777', _regardingobjectid_value: REQUEST_ID, scheduledend: '2026-08-30T19:00:00Z', statecode: 10, statuscode: 11 },
+    { activityid: '88888888-8888-4888-8888-888888888888', _regardingobjectid_value: REQUEST_ID, scheduledend: '2026-07-01T19:00:00Z', statecode: 2, statuscode: 12 },
+  ] });
+  h.dependencies.readSchedulePairs.mockReturnValue([
+    { stateCode: 10, statusCode: 11, eligible: true },
+    { stateCode: 2, statusCode: 12, eligible: false },
+  ]);
+  const status = await getFinalWriteupStatus({
+    requestId: REQUEST_ID, actingUserSystemId: LEAD_PD_ID,
+  }, h.dependencies);
+  expect(status).toMatchObject({ canStart: true, startBlockedReason: null });
+});
+
+test('preserves complete Review when schedule classification is absent and automation is inactive', async () => {
+  const h = createHarness();
+  h.dependencies.env = { NODE_ENV: 'test' };
+  h.dependencies.readSchedulePairs.mockReturnValue([]);
+  const status = await getFinalWriteupStatus({
+    requestId: REQUEST_ID, actingUserSystemId: LEAD_PD_ID,
+  }, h.dependencies);
+  expect(status).toMatchObject({
+    canStart: true,
+    startBlockedReason: null,
+    startCompatibilityReason: 'legacy_review_schedule_unverified',
+  });
+  await startFinalWriteup({
+    requestId: REQUEST_ID, expectedArtifactId: SOURCE_ID, actingUserSystemId: LEAD_PD_ID,
+  }, h.dependencies);
+  expect(h.dependencies.commitChangeset).toHaveBeenCalledTimes(1);
+  expect(h.dependencies.commitChangeset.mock.calls[0][0]).toHaveLength(3);
+});
+
+test('does not use absent-map legacy Review compatibility before a known future Site Visit end', async () => {
+  const h = createHarness();
+  h.dependencies.env = { NODE_ENV: 'test' };
+  h.dependencies.readSchedulePairs.mockReturnValue([]);
+  h.dependencies.findSiteVisits.mockResolvedValue({ records: [{
+    activityid: '77777777-7777-4777-8777-777777777777',
+    _regardingobjectid_value: REQUEST_ID,
+    scheduledend: '2026-08-30T19:06:00Z',
+    statecode: 10,
+    statuscode: 11,
+  }] });
+  const status = await getFinalWriteupStatus({
+    requestId: REQUEST_ID, actingUserSystemId: LEAD_PD_ID,
+  }, h.dependencies);
+  expect(status).toMatchObject({ canStart: false, startBlockedReason: 'final_writeup_site_visit_not_ended' });
+});
+
+test('retains explicit zero-event complete Review compatibility with a configured map', async () => {
+  const h = createHarness();
+  h.dependencies.env = { NODE_ENV: 'test', STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS: '[]' };
+  h.dependencies.readSchedulePairs.mockReturnValue([]);
+  h.dependencies.findSiteVisits.mockResolvedValue({ records: [] });
+  const status = await getFinalWriteupStatus({
+    requestId: REQUEST_ID, actingUserSystemId: LEAD_PD_ID,
+  }, h.dependencies);
+  expect(status).toMatchObject({
+    canStart: true,
+    startBlockedReason: null,
+    startCompatibilityReason: 'legacy_complete_review_without_schedule',
+  });
+});
+
+test('rechecks and atomically fences the schedule immediately before Final review activation', async () => {
+  const h = createHarness();
+  h.dependencies.findSiteVisits
+    .mockResolvedValueOnce({ records: [{
+      activityid: '77777777-7777-4777-8777-777777777777',
+      _regardingobjectid_value: REQUEST_ID,
+      scheduledend: '2026-08-30T19:00:00Z', statecode: 10, statuscode: 11,
+    }] })
+    .mockResolvedValueOnce({ records: [{
+      activityid: '77777777-7777-4777-8777-777777777777',
+      _regardingobjectid_value: REQUEST_ID,
+      scheduledend: '2026-08-30T19:06:00Z', statecode: 10, statuscode: 11,
+    }] });
+  await expect(startFinalWriteup({
+    requestId: REQUEST_ID, expectedArtifactId: SOURCE_ID, actingUserSystemId: LEAD_PD_ID,
+  }, h.dependencies)).rejects.toMatchObject({ code: 'final_writeup_site_visit_not_ended' });
+  expect(h.dependencies.commitChangeset).not.toHaveBeenCalled();
 });

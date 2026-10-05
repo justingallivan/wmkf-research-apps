@@ -102,6 +102,6 @@ test('actual summary adapter follows Dataverse pages and selects a later-page wi
   });
   expect(result.proposals[0].siteVisitNeedsReconciliation).toBe(true);
   const queryUrl = new URL(fetchWithTimeout.mock.calls[0][0]);
-  expect(queryUrl.searchParams.get('$select')).toBe('activityid,_regardingobjectid_value,scheduledstart,scheduledend,wmkf_visitformat,wmkf_locationorlink');
+  expect(queryUrl.searchParams.get('$select')).toBe('activityid,_regardingobjectid_value,scheduledstart,scheduledend,modifiedon,statecode,statuscode,wmkf_visitformat,wmkf_locationorlink');
   expect(queryUrl.searchParams.has('$expand')).toBe(false);
 });

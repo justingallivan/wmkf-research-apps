@@ -10,6 +10,7 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { isGuid } from '../../../lib/utils/guid';
 import { actorRefFromSession } from '../../../lib/utils/actor-ref';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
@@ -23,16 +24,26 @@ export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'reviewers');
   if (!access) return;
 
+  if (Array.isArray(req.query.cycleCode) || Array.isArray(req.query.programId) || Array.isArray(req.query.scope)) {
+    return res.status(400).json({ error: 'cycleCode, programId, and scope must be single values' });
+  }
   const cycleCode = req.query.cycleCode ? String(req.query.cycleCode).trim() : '';
+  const programId = req.query.programId ? String(req.query.programId).trim() : '';
   if (!/^[A-Za-z]\d{2}$/.test(cycleCode)) {
     return res.status(400).json({ error: 'cycleCode is invalid' });
   }
-  const scope = String(req.query.scope || '').trim() === 'my' ? 'my' : 'all';
+  if (!isGuid(programId)) {
+    return res.status(400).json({ error: 'programId must be a valid Grant Program GUID' });
+  }
+  const scope = String(req.query.scope || 'my').trim();
+  if (!['my', 'all'].includes(scope)) {
+    return res.status(400).json({ error: 'scope must be my or all' });
+  }
   const callerSystemId = actorRefFromSession(access.session);
 
   return withDalContext('workbench-staff-deliberations', async () => {
     try {
-      return res.status(200).json(await listPreSiteVisitDrafts({ cycleCode, scope, callerSystemId }));
+      return res.status(200).json(await listPreSiteVisitDrafts({ cycleCode, programId, scope, callerSystemId }));
     } catch (error) {
       if (error instanceof ServiceHttpError) {
         return res.status(error.httpStatus).json(error.body ?? { error: error.message });

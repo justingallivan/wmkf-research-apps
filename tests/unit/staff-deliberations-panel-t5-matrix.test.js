@@ -20,18 +20,18 @@ afterEach(() => jest.restoreAllMocks());
 
 test('non-2xx {error} surfaces the server message verbatim', async () => {
   global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 403, json: async () => ({ error: 'Forbidden' }) });
-  render(<StaffDeliberationsPanel cycleCode="D26" loadingCycles={false} scope="all" />);
+  render(<StaffDeliberationsPanel programId="11111111-1111-4111-8111-111111111111" cycleCode="D26" loadingCycles={false} scope="all" />);
   expect(await screen.findByText('Forbidden')).toBeInTheDocument();
 });
 
 test('network rejection is never silent', async () => {
   global.fetch = jest.fn().mockRejectedValue(new Error('offline'));
-  render(<StaffDeliberationsPanel cycleCode="D26" loadingCycles={false} scope="all" />);
+  render(<StaffDeliberationsPanel programId="11111111-1111-4111-8111-111111111111" cycleCode="D26" loadingCycles={false} scope="all" />);
   expect(await screen.findByText('offline')).toBeInTheDocument();
 });
 
 test('axis (e): non-2xx unparseable body falls to the fallback text, never silent', async () => {
   global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 502, json: unparseable });
-  render(<StaffDeliberationsPanel cycleCode="D26" loadingCycles={false} scope="all" />);
-  expect(await screen.findByText('Failed to load pre-site drafts')).toBeInTheDocument();
+  render(<StaffDeliberationsPanel programId="11111111-1111-4111-8111-111111111111" cycleCode="D26" loadingCycles={false} scope="all" />);
+  expect(await screen.findByText('Failed to load requests')).toBeInTheDocument();
 });

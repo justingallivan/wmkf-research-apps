@@ -19,6 +19,9 @@ import { getDeliberationSessionForRequest } from '../../../lib/services/delibera
 import { projectDeliberationSession } from '../../../shared/utils/deliberation-stage';
 import { getMaterialsSummaryForRequest } from '../../../lib/services/site-visit-materials/summary-reader';
 import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../../shared/config/requestDocument';
+import { REQUEST_DOCUMENT_LIFECYCLE_STATE } from '../../../shared/config/requestDocument';
+import { getPreparationForRequest } from '../../../lib/services/pre-site-visit/preparation-worker';
+import { readBriefFact, readFinalFact } from '../../../lib/services/pre-site-visit/status-facts';
 
 export const config = {
   api: {
@@ -53,6 +56,8 @@ function staffSafePayload(payload) {
   const pendingIsReopenAudit = Boolean(payload.pendingArtifact?.correction?.reasonCode);
   const sanitized = {
     ...payload,
+    correctionInProgress: payload.currentArtifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT
+      && Boolean(payload.currentArtifact?.correction?.cycleId),
     currentArtifact: withoutCorrection(payload.currentArtifact),
     pendingArtifact: pendingIsReopenAudit ? null : withoutCorrection(payload.pendingArtifact),
     artifact: withoutCorrection(payload.artifact),
@@ -86,17 +91,31 @@ export default async function handler(req, res) {
         // Applicant materials summary (plan §16.3, PR 3): counts and window
         // only, never the contributor link or contacts; null when off and an
         // unavailable sentinel when a runtime read fails.
-        const [stageLabels, session, materials] = await Promise.all([
+        const [stageLabels, session, materials, preparation, brief, final] = await Promise.all([
           readDeliberationStageLabels(),
           getDeliberationSessionForRequest(requestId).catch(() => null),
           getMaterialsSummaryForRequest({ requestId }),
+          getPreparationForRequest(requestId).catch(() => ({
+            timing: { availability: 'unavailable', startIso: null, endIso: null, timeZone: null },
+            preparation: { state: 'unavailable', due: false, availability: 'unavailable', automationActive: false, blockedBy: [] },
+            writeup: { availability: 'unavailable', artifactId: null, file: null, milestone: null },
+          })),
+          readBriefFact(requestId).catch(() => ({ availability: 'unavailable', artifactId: null, lifecycleState: null, file: null, milestone: null })),
+          readFinalFact({ requestId, currentArtifact: payload.currentArtifact, role,
+            actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null }),
         ]);
         // Tracker §5.6: the session's attendees are the Share email's default
         // recipients, so the tab gets their addresses alongside the card shape.
         const sessionAttendees = Array.isArray(session?.attendees)
           ? session.attendees.map((person) => ({ name: person?.name || '', email: String(person?.email || '').trim().toLowerCase() })).filter((person) => person.email)
           : [];
-        return res.status(200).json({ success: true, ...payload, stageLabels, session: projectDeliberationSession(session), sessionAttendees, materials });
+        const finalReview = final;
+        return res.status(200).json({ success: true, ...payload, stageLabels,
+          timing: preparation.timing, preparation: preparation.preparation,
+          writeup: preparation.writeup, brief, finalReview, finalPhase: finalReview.phase,
+          correctionInProgress: status.currentArtifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT
+            && Boolean(status.currentArtifact?.correction?.cycleId),
+          session: projectDeliberationSession(session), sessionAttendees, materials });
       }
 
       if (!req.body

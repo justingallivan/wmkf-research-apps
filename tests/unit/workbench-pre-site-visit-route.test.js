@@ -22,6 +22,14 @@ jest.mock('../../lib/services/deliberation-briefing/session-reader', () => ({
 jest.mock('../../lib/services/site-visit-materials/summary-reader', () => ({
   getMaterialsSummaryForRequest: jest.fn(async () => null),
 }));
+jest.mock('../../lib/dataverse/adapters/grant-request', () => ({ getById: jest.fn() }));
+jest.mock('../../lib/dataverse/adapters/request-document', () => ({ findByIds: jest.fn() }));
+jest.mock('../../lib/services/pre-site-visit/preparation-worker', () => ({ getPreparationForRequest: jest.fn() }));
+jest.mock('../../lib/services/final-writeup/transition-service', () => ({ getFinalWriteupStatus: jest.fn() }));
+import { getById } from '../../lib/dataverse/adapters/grant-request';
+import { findByIds } from '../../lib/dataverse/adapters/request-document';
+import { getPreparationForRequest } from '../../lib/services/pre-site-visit/preparation-worker';
+import { getFinalWriteupStatus } from '../../lib/services/final-writeup/transition-service';
 import { getMaterialsSummaryForRequest } from '../../lib/services/site-visit-materials/summary-reader';
 import { getDeliberationSessionForRequest } from '../../lib/services/deliberation-briefing/session-reader';
 
@@ -60,6 +68,10 @@ function get(requestId = REQUEST_ID) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  getById.mockResolvedValue({ akoya_requestid: REQUEST_ID });
+  findByIds.mockResolvedValue({ records: [] });
+  getPreparationForRequest.mockResolvedValue({ timing: { availability: 'missing' }, preparation: { state: 'none', due: false }, writeup: { availability: 'missing' } });
+  getFinalWriteupStatus.mockResolvedValue({ available: true, phase: 'ready', artifact: null });
   requireAppAccess.mockResolvedValue({
     profileId: PROFILE_ID,
     session: { user: { dynamicsSystemuserId: '22222222-2222-2222-2222-222222222222' } },
@@ -111,7 +123,7 @@ test('reads current/pending status without invoking generation', async () => {
   expect(getPreSiteVisitArtifactStatus).toHaveBeenCalledWith({ requestId: REQUEST_ID });
   expect(generatePreSiteVisitArtifact).not.toHaveBeenCalled();
   expect(res.statusCode).toBe(200);
-  expect(res.body).toEqual({
+  expect(res.body).toMatchObject({
     success: true,
     currentArtifact,
     pendingArtifact: null,
@@ -198,7 +210,7 @@ test('omits guarded-reopen audit history for non-superusers', async () => {
   await handler(get(), res);
 
   expect(res.statusCode).toBe(200);
-  expect(res.body).toEqual({
+  expect(res.body).toMatchObject({
     success: true,
     currentArtifact: { artifactId: 'current-artifact' },
     pendingArtifact: null,
@@ -224,7 +236,7 @@ test('keeps a regular pending generation visible to non-superusers without corre
   await handler(get(), res);
 
   expect(res.statusCode).toBe(200);
-  expect(res.body).toEqual({
+  expect(res.body).toMatchObject({
     success: true,
     currentArtifact: null,
     pendingArtifact: { artifactId: 'pending-generation' },
@@ -334,4 +346,33 @@ test('maps governed service errors', async () => {
     error: 'The governed prompt is unavailable.',
     code: 'prompt_unavailable',
   });
+});
+
+
+test('documentless request has missing Final rather than a false read failure', async () => {
+  getFinalWriteupStatus.mockRejectedValueOnce(new ServiceHttpError('No source', { code: 'final_writeup_source_missing', httpStatus: 409 }));
+  const res = mockRes();
+  await handler(get(), res);
+  expect(res.statusCode).toBe(200);
+  expect(res.body.finalReview).toEqual({ availability: 'missing', phase: 'none', artifactId: null, file: null });
+  expect(res.body.preparation).toMatchObject({ state: 'none', due: false });
+});
+
+test('a failed Final read remains unavailable rather than absent', async () => {
+  getFinalWriteupStatus.mockRejectedValueOnce(new Error('network failed'));
+  const res = mockRes();
+  await handler(get(), res);
+  expect(res.body.finalReview.availability).toBe('unavailable');
+});
+
+test('staff receive a safe correction flag without restricted audit details', async () => {
+  getUserRole.mockResolvedValueOnce('staff');
+  getPreSiteVisitArtifactStatus.mockResolvedValueOnce({ currentArtifact: { artifactId: 'current', lifecycleState: 100000000, correction: { cycleId: 'cycle', reasonNote: 'private' } }, pendingArtifact: null, reopenHistory: [{ private: true }] });
+  getPreparationForRequest.mockRejectedValueOnce(new Error('preparation read failed'));
+  const res = mockRes();
+  await handler(get(), res);
+  expect(res.body.correctionInProgress).toBe(true);
+  expect(res.body.currentArtifact).not.toHaveProperty('correction');
+  expect(res.body).not.toHaveProperty('reopenHistory');
+  expect(JSON.stringify(res.body)).not.toContain('private');
 });
