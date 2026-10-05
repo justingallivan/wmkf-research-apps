@@ -713,7 +713,11 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   (`bindPresentationTranscript`). Moving or clearing the boundary, or
   publishing a bundle from new audio, hides the derivative until it is
   regenerated; supersession alone is not relied on (plan §4.2, Codex §10
-  finding 1). Readers must opt into `includeMeetingTranscriptBundle: true`;
+  finding 1). The key binds the row; the bytes are bound by the SharePoint
+  eTag the writer pinned on the row: both outside `open` resolvers also require
+  the live item eTag (now returned by `resolveMediaDownloadUrl`) to equal
+  `wmkf_sharepointetag`, so a replaced file is never served (Codex review of
+  the build, plan §12). Readers must opt into `includeMeetingTranscriptBundle: true`;
   with the bundle readiness flag off the binding fails closed and nothing is
   served outside.
 - **Outside projection after Stage 1**: the Board presentation page and the
