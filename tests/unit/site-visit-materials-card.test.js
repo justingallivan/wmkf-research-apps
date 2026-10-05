@@ -255,6 +255,51 @@ describe('staff replacement upload (staff replacement plan §3.4)', () => {
     expect(global.fetch.mock.calls.filter(([url, o]) => url.endsWith('/materials') && o?.method !== 'POST').length).toBeGreaterThanOrEqual(2);
   });
 
+  // Codex adversarial review 2026-10-05: a retryable or lost finalize must be retried with the SAME staging id,
+  // so the generation key reuses the registry row and finishes retiring the predecessor.
+  const STAGING = '22222222-2222-4222-8222-222222222222';
+  function finalizeScript(outcomes) {
+    const posts = [];
+    global.fetch = jest.fn(async (url, options = {}) => {
+      if (options.method === 'POST') {
+        posts.push([url.split('/materials/')[1], JSON.parse(options.body)]);
+        if (url.endsWith('/staff-upload-token')) return response({ ok: true, stagingId: STAGING, pathname: 'p', clientToken: 'ct', contentType: 'application/pdf' });
+        const next = outcomes.shift();
+        if (next === 'lost') throw new TypeError('Failed to fetch');
+        return response(next.body, next.status);
+      }
+      return response({ success: true, collection: collection() });
+    });
+    return posts;
+  }
+  const choose = async () => {
+    render(<SiteVisitMaterialsCard requestId={REQUEST_ID} requestNumber="1003222" />);
+    await screen.findByRole('button', { name: 'Upload updated file' });
+    fireEvent.change(screen.getByTestId('staff-upload-input-presentation_pdf'), { target: { files: [new File(['%PDF'], 'd.pdf', { type: 'application/pdf' })] } });
+  };
+
+  test.each([
+    ['a lost response', 'lost'],
+    ['supersede_failed', { status: 503, body: { ok: false, reason: 'supersede_failed' } }],
+  ])('after %s, Retry re-finalizes the same staging id without minting or uploading again', async (_label, first) => {
+    const posts = finalizeScript([first, { status: 200, body: { ok: true, slot: 'presentation_pdf', filename: 'p.pdf' } }]);
+    await choose();
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Presentation (PDF) saved.'));
+    expect(posts.map(([path]) => path)).toEqual(['staff-upload-token', 'staff-finalize', 'staff-finalize']);
+    expect(posts[1][1]).toEqual({ stagingId: STAGING, slot: 'presentation_pdf' });
+    expect(posts[2][1]).toEqual({ stagingId: STAGING, slot: 'presentation_pdf' });
+    expect(mockPut).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+  });
+
+  test('a final rejection clears the staged upload: no Retry is offered', async () => {
+    finalizeScript([{ status: 422, body: { ok: false, reason: 'extension_not_allowed' } }]);
+    await choose();
+    expect(await screen.findByRole('alert')).toHaveTextContent('That file type is not accepted for this item.');
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+  });
+
   test('a refused finalize shows its reason and does not claim success', async () => {
     global.fetch = jest.fn(async (url, options = {}) => {
       if (options.method === 'POST') {

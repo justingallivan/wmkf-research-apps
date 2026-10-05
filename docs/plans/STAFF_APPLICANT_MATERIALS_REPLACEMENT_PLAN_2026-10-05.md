@@ -330,6 +330,24 @@ Branch `feature/staff-materials-replacement`, cut from `main` at `a93974cdf`.
 - Apply migration 071 (`node scripts/apply-migrations.js`). The new summary
   insert writes its columns.
 
+**Codex adversarial review (2026-10-05), round 1: needs-attention, one medium finding.**
+
+- **Finding:** after a retryable or lost `staff-finalize`, the card forgot the
+  staging id. The next attempt minted a new staging row, so a `supersede_failed`
+  partial success could leave the predecessor active, and a lost success
+  response could produce a duplicate row.
+- **Fix:** `StaffMaterialUpload` keeps `{stagingId, slot}` after any retryable
+  outcome and offers Retry, which re-finalizes the same staging row. Retryable
+  means a thrown/lost response, a 5xx, a 409 or a 429. A 4xx other than 409/429,
+  or a success, clears it. This is the same rule as the applicant page.
+- **Tests:** a lost response followed by Retry, and `supersede_failed`
+  followed by Retry; both show one blob upload and two finalizes with the same
+  staging id. A final 422 offers no Retry. Each retention guard was
+  mutation-checked.
+- **Limitation:** the staged id is held in component memory only. A page reload
+  loses it; the staging row then expires, and the slot shows the previous
+  file.
+
 **Behaviour notes for review:**
 - **`other` is add-only.** `finalizeMaterialUpload` supersedes nothing for
   `other`, and the slot lease does not serialize it against jobs

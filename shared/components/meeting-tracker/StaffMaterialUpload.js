@@ -23,10 +23,20 @@ const REASON_MESSAGE = {
   replay_ambiguous: 'This upload needs an administrator to reconcile it before it can be saved.',
 };
 
+// Same rule as the applicant page: a 4xx other than 409/429 means the server
+// rejected this staged upload for good; anything else (5xx, 409, 429, a lost
+// response) may have partly succeeded, so Retry re-finalizes the SAME staging
+// row. Its generation key reuses the registry row it may already have created
+// and finishes retiring the previous file, instead of uploading another copy.
+function isTerminalFinalize(status) {
+  return Number.isInteger(status) && status >= 400 && status < 500 && status !== 409 && status !== 429;
+}
+
 export default function StaffMaterialUpload({ requestId, slot, label, disabled = false, onUploaded }) {
   const [phase, setPhase] = useState(null);
   const [percent, setPercent] = useState(null);
   const [error, setError] = useState(null);
+  const [pending, setPending] = useState(null);
   const inputRef = useRef(null);
   const generationRef = useRef(0);
 
@@ -35,6 +45,7 @@ export default function StaffMaterialUpload({ requestId, slot, label, disabled =
     setPhase(null);
     setPercent(null);
     setError(null);
+    setPending(null);
     return () => { generationRef.current += 1; };
   }, [requestId, slot]);
 
@@ -49,9 +60,46 @@ export default function StaffMaterialUpload({ requestId, slot, label, disabled =
     setError(REASON_MESSAGE[reason] || fallback);
   };
 
+  const finalize = async (staged, generation) => {
+    setError(null);
+    setPercent(null);
+    setPhase('Checking and saving the file. Keep this page open…');
+    let saved;
+    try {
+      saved = await requestEnvelope(`${base}/staff-finalize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: { stagingId: staged.stagingId, slot: staged.slot },
+        tolerantBody: true,
+      });
+    } catch {
+      // The response was lost; the server may have saved the file. Keep the staging id.
+      fail(generation, null, 'The result could not be confirmed. Press Retry to finish saving this file.');
+      return;
+    }
+    if (generation !== generationRef.current) return;
+    if (saved.ok) {
+      setPending(null);
+      setPhase(null);
+      onUploaded?.(saved.data);
+      return;
+    }
+    if (isTerminalFinalize(saved.status)) setPending(null);
+    fail(generation, saved.data?.reason,
+      isTerminalFinalize(saved.status) ? 'The file could not be saved.' : 'The file could not be saved yet. Press Retry to finish saving it.',
+      saved.data || {});
+  };
+
+  const retry = () => {
+    if (!pending) return;
+    void finalize(pending, ++generationRef.current);
+  };
+
   const upload = async (file) => {
     if (!file) return;
     const generation = ++generationRef.current;
+    // Choosing a new file abandons any earlier unfinished upload; its staging row expires.
+    setPending(null);
     setError(null);
     setPercent(null);
     setPhase('Preparing…');
@@ -85,18 +133,9 @@ export default function StaffMaterialUpload({ requestId, slot, label, disabled =
         return;
       }
       if (generation !== generationRef.current) return;
-      setPercent(null);
-      setPhase('Checking and saving the file. Keep this page open…');
-      const saved = await requestEnvelope(`${base}/staff-finalize`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: { stagingId: token.data.stagingId, slot },
-        tolerantBody: true,
-      });
-      if (generation !== generationRef.current) return;
-      if (!saved.ok) { fail(generation, saved.data?.reason, 'The file could not be saved. Try again.', saved.data || {}); return; }
-      setPhase(null);
-      onUploaded?.(saved.data);
+      const staged = { stagingId: token.data.stagingId, slot };
+      setPending(staged);
+      await finalize(staged, generation);
     } catch {
       fail(generation, null, 'The upload could not be completed. Try again.');
     } finally {
@@ -126,6 +165,16 @@ export default function StaffMaterialUpload({ requestId, slot, label, disabled =
       </button>
       {busy && <p className="mt-1 text-xs text-blue-800" role="status">{phase}{percent !== null ? ` ${percent}%` : ''}</p>}
       {error && <p className="mt-1 text-xs text-red-800" role="alert">{error}</p>}
+      {pending && !busy && (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={retry}
+          className="mt-1 text-xs font-semibold text-blue-700 underline underline-offset-4 hover:text-blue-900 disabled:opacity-50"
+        >
+          Retry
+        </button>
+      )}
     </div>
   );
 }
