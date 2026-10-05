@@ -729,7 +729,8 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   keep the full files.
 - **Staff Discussion Transcript** (`100000013`, owner decision 2026-10-05,
   plan §7 decision 7, §13; **[SOURCE-BUILT on `feature/staff-discussion-transcript`;
-  NOT DEPLOYED; migration 069 and picklist insert pending]**): the exact
+  NOT DEPLOYED; migration 069 applied and picklist 100000013 inserted by the
+  owner 2026-10-05, ahead of the merge]**): the exact
   complement of the presentation cut (utterances ending after the boundary),
   written by the same `POST .../presentation-transcript` action under its own
   slot lease into `Site Visit - Staff Discussion Transcript/`, generation key
@@ -738,7 +739,12 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   Deliberations; neither outside page's allowlist names it, and it sits in the
   shared `POST_PRESENTATION_ARTIFACT_TYPES` set only because both outside
   pages select explicitly. A boundary at the last utterance yields a one-line
-  "no discussion recorded" file rather than no row.
+  "no discussion recorded" file rather than no row. The Staff Deliberations
+  feed (`lib/services/site-visit/logistics-service.js`) reads bundle metadata
+  and shows only the presentation and discussion rows bound to the current
+  revision and boundary (`withoutUnboundDerivatives`), so a stale half is
+  hidden rather than shown beside a newer one (Codex review 2026-10-05); the
+  full TRANSCRIPT stays listed.
 - **Boundary proposal**: advisory, computed from the applied speaker names and
   the name candidates (`presentation-boundary.js`): `pi`/`co_pi` and manual
   attendees are outside the foundation; saved staff and roster attendees are

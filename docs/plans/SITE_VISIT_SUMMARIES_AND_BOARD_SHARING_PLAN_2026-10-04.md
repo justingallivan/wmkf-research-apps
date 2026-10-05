@@ -601,4 +601,17 @@ by Codex adversarial review.
   admitting the type turned both tests red.
 - Not changed: the Pre-Site distribution email allowlist (owner decision
   still open).
+- Owner-run ahead of the merge, 2026-10-05: migration 069 applied; picklist
+  100000013 "Staff Discussion Transcript" inserted and re-read verified.
+
+**Codex adversarial review (2026-10-05), one medium finding, fixed:** the
+Staff Deliberations feed picked derivative winners by type without checking
+their generation keys. After a boundary move where the presentation half
+regenerated but the discussion write failed, staff would see a new
+presentation cut beside the old discussion cut, overlapping. Fix: the feed
+opts into bundle metadata and keeps only the presentation and discussion rows
+bound to the current revision and boundary (`withoutUnboundDerivatives`);
+without bundle metadata both are hidden and the full transcript stays. The
+regression test for that exact sequence, plus the readiness-off case, turned
+red with the filter removed. Outside-page exclusion was judged sound.
 
