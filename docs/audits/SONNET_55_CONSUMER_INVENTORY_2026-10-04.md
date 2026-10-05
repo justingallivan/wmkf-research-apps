@@ -3,7 +3,7 @@ title: Sonnet 5.5 admission — complete LLM consumer inventory
 domain: ai-runtime
 kind: report
 status: active
-summary: "Read-only inventory of every runtime LLM consumer ahead of Sonnet 5.5 registry admission; two sonnet-tier call sites still lack refusal handling, so admission stays blocked."
+summary: "Read-only inventory of every runtime LLM consumer ahead of Sonnet 5.5 registry admission. Amended 2026-10-05: both sonnet-tier blockers are closed and the presentation summary prompt is a new Executor-covered sonnet consumer; only the owner-authorized §4 replay remains before admission."
 canonical: false
 owner: product-engineering
 related:
@@ -145,14 +145,40 @@ Relevant only to a future Haiku admission. Listed so the enumeration is complete
   degrades to "No analysis returned".
 - `lib/utils/health-checker.js` — concrete Haiku liveness probe; response text unused.
 
+## Amendment — 2026-10-05 (Session 577)
+
+The sections above are the 2026-10-04 snapshot, and their counts are as of that date.
+Changes on `main` since then:
+
+1. **Integrity Screener blocker closed** [VERIFIED via `lib/services/integrity-service.js`
+   and `shared/config/baseConfig.js` on `main`; commit `fbf196810`, 2026-10-04].
+   `integrity-screener` is now in `APP_MODELS` as `{ model: 'haiku', fallback: 'sonnet' }`.
+   The `complete()` call is wrapped in `requireAcceptedLlmResponse`. The `sonnet` fallback
+   is an `LLMClient` 529-overload swap only, never a refusal retry, so it stays inside the
+   blast radius but is guarded.
+2. **Virtual Review Panel blocker closed** [VERIFIED via `ls` and grep on `main`; commits
+   `d276790da`, merge `9240042f0`, 2026-10-04]. `lib/services/panel-review-service.js` no
+   longer exists and the `virtual-review-panel` key is retired. The only remaining runtime
+   import of `MultiLLMService` is `lib/services/review-panel-generation.js`, which calls
+   `getAvailableProviders()` only. `_callClaude` therefore has no runtime caller, and the
+   first-block text extraction finding no longer gates admission. Fix or delete it if
+   `MultiLLMService.call` ever regains a caller.
+3. **New sonnet consumer: `meeting-transcript.presentation-summary`** [VERIFIED via
+   `scripts/seed-meeting-presentation-summary-prompt.js` on `feature/presentation-summary`,
+   PR #440, not yet merged; Production prompt row seeded 2026-10-05]. The row sets
+   `wmkf_ai_model: 'sonnet'` and `wmkf_ai_temperature: 0.2`. It runs through the Executor, so
+   `claude_output_refused` in `lib/services/execute-prompt.js` covers refusals. The temperature
+   is safe on Sonnet 5.5: `lib/services/llm-client.js` sends `temperature` only when
+   `capabilities.supportsTemperature === true`, and the planned 5.5 entry sets it `false`. The
+   Executor has no fallback model, so a 5.5 regression on this prompt surfaces as a failed
+   Summarize rather than a silent swap.
+
 ## Decision state
 
 - Owner decision 2026-10-04: inventory first; no registry change in this pass.
-- Admission remains **blocked** on: (1) refusal handling at the two sonnet-tier sites
-  above (or confirmation that integrity-screener is Haiku in production), (2) the
-  multi-LLM first-block extraction check, (3) the runbook §4 replay.
-- Fixing the two sites is a small runtime change (wrap with
-  `requireAcceptedLlmResponse` or read `result.refused`), Tier 1 branch + PR.
+- 2026-10-05: blockers (1) and (2) from the 2026-10-04 list are closed (see the amendment).
+  Admission remains **blocked** only on the runbook §4 replay below, which spends provider
+  credits and needs explicit owner authorization.
 
 ## Next gate after fixes
 
