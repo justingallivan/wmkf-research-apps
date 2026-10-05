@@ -150,6 +150,71 @@ describe('transcription pilot persistence contract', () => {
     ]);
   });
 
+  describe('correction draft presentation end', () => {
+    const ids = {
+      operationId: '00000000-0000-4000-8000-000000000001',
+      requestId: '00000000-0000-4000-8000-000000000002',
+      siteVisitActivityId: '00000000-0000-4000-8000-000000000003',
+    };
+    const end = { endMs: 90_000, confirmedBy: 12, confirmedAt: '2026-10-05T12:00:00.000Z' };
+
+    it('seeds the three boundary columns on create with typed parameters, null when absent', async () => {
+      const db = fakeDatabase();
+      const store = createTranscriptionPilotStore(db);
+      const draft = { ...ids, initiatorProfileId: 12, sourceArtifactId: NON_RFC_DOCUMENT_ID,
+        sourceRevisionId: '00000000-0000-4000-8000-000000000004', expectedCurrentArtifactId: NON_RFC_DOCUMENT_ID,
+        expectedCurrentFingerprint: 'a'.repeat(64), speakerNames: {}, expiresAt: new Date() };
+      await store.createMeetingCorrectionDraft({ ...draft, presentationEnd: end });
+      const [query, params] = db.query.mock.calls[0];
+      expect(query).toMatch(/presentation_end_ms, presentation_end_confirmed_by, presentation_end_confirmed_at/);
+      expect(query).toMatch(/\$11::integer,\$12::integer,\$13::timestamptz/);
+      expect(params.slice(-3)).toEqual([90_000, 12, '2026-10-05T12:00:00.000Z']);
+      await store.createMeetingCorrectionDraft(draft);
+      expect(db.query.mock.calls[1][1].slice(-3)).toEqual([null, null, null]);
+    });
+
+    it('leaves the boundary untouched when presentationEnd is undefined', async () => {
+      const db = fakeDatabase();
+      await createTranscriptionPilotStore(db).updateMeetingCorrectionDraft({ ...ids, actorProfileId: 12,
+        expectedVersion: 3, speakerNames: { A: 'Chair' } });
+      const [query, params] = db.query.mock.calls[0];
+      expect(query).not.toMatch(/presentation_end/);
+      expect(params).toHaveLength(5);
+    });
+
+    it('clears all three columns on null and sets all three on a boundary, keeping every guard', async () => {
+      const db = fakeDatabase();
+      const store = createTranscriptionPilotStore(db);
+      await store.updateMeetingCorrectionDraft({ ...ids, actorProfileId: 12, expectedVersion: 3,
+        speakerNames: { A: 'Chair' }, presentationEnd: null });
+      await store.updateMeetingCorrectionDraft({ ...ids, actorProfileId: 12, expectedVersion: 3,
+        speakerNames: { A: 'Chair' }, presentationEnd: { ...end, confirmedAt: new Date(end.confirmedAt) } });
+      const [clearSql, clearParams] = db.query.mock.calls[0];
+      const [setSql, setParams] = db.query.mock.calls[1];
+      expect(clearParams.slice(5)).toEqual([null, null, null]);
+      expect(setParams.slice(5)).toEqual([90_000, 12, '2026-10-05T12:00:00.000Z']);
+      for (const sql of [clearSql, setSql]) {
+        expect(sql).toMatch(/presentation_end_ms = \$6::integer, presentation_end_confirmed_by = \$7::integer/);
+        expect(sql).toMatch(/presentation_end_confirmed_at = \$8::timestamptz/);
+        expect(sql).toMatch(/state = 'draft' AND expires_at > NOW\(\)/);
+        expect(sql).toMatch(/AND version = \$5 RETURNING/);
+      }
+    });
+
+    it.each([
+      { endMs: -1, confirmedBy: 12, confirmedAt: '2026-10-05T12:00:00.000Z' },
+      { endMs: 1.5, confirmedBy: 12, confirmedAt: '2026-10-05T12:00:00.000Z' },
+      { endMs: 1, confirmedBy: 0, confirmedAt: '2026-10-05T12:00:00.000Z' },
+      { endMs: 1, confirmedBy: 12, confirmedAt: 'not a date' },
+    ])('rejects a malformed boundary before SQL: %j', async bad => {
+      const db = fakeDatabase();
+      await expect(createTranscriptionPilotStore(db).updateMeetingCorrectionDraft({ ...ids, actorProfileId: 12,
+        expectedVersion: 3, speakerNames: {}, presentationEnd: bad }))
+        .rejects.toMatchObject({ code: 'transcription_invalid_value', httpStatus: 400 });
+      expect(db.query).not.toHaveBeenCalled();
+    });
+  });
+
   it('accepts canonical Dataverse GUIDs with non-RFC nibbles but keeps internal UUIDs strict', async () => {
     const db = fakeDatabase();
     const store = createTranscriptionPilotStore(db);
@@ -171,6 +236,7 @@ describe('transcription pilot persistence contract', () => {
     expect(db.query.mock.calls[1][1]).toEqual([
       operationId, NON_RFC_REQUEST_ID, NON_RFC_SITE_VISIT_ID, 12, NON_RFC_DOCUMENT_ID,
       '00000000-0000-4000-8000-000000000002', NON_RFC_DOCUMENT_ID, 'a'.repeat(64), '{}', expect.any(Date),
+      null, null, null,
     ]);
 
     await store.transitionMeetingPublication({ operationId, requestId: NON_RFC_REQUEST_ID,

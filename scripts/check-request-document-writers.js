@@ -33,6 +33,7 @@ const WRITERS = Object.freeze([
   ['lib/services/pre-rp-brief/artifact-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
   ['lib/services/test-requests/run-runner.js', 'dependencies.createDocument(', 'SANDBOX_REHEARSAL'],
   ['lib/services/post-presentation-materials/material-service.js', 'dependencies.createDocument(', 'REQUIRED'],
+  ['lib/services/post-presentation-materials/presentation-transcript-service.js', 'dependencies.createDocument(', 'REQUIRED'],
   // seed_presite_draft (slice 4b): a second, distinct call site in the same
   // file -- named `presiteDeps` (not `dependencies`) so this row's needle
   // does not double-count the IA row above. Same sandbox-only, SANDBOX_REHEARSAL
