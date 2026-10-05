@@ -70,6 +70,7 @@ function boundaryArtifact(overrides = {}) {
     id: ARTIFACT_ID, fingerprint: 'e'.repeat(64), bundleEditable: true,
     presentationEnd: { endMs: 62900, confirmedBy: 42, confirmedAt: CONFIRMED_AT },
     presentationTranscript: { state: 'bound', artifactId: ARTIFACT_ID },
+    staffDiscussionTranscript: { state: 'bound', artifactId: ARTIFACT_ID },
     ...overrides,
   };
 }
@@ -482,18 +483,33 @@ describe('presentation end', () => {
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     expect(await screen.findByText(`Presentation ends at 01:02 · confirmed ${shortDate(CONFIRMED_AT)}`)).toBeInTheDocument();
     expect(screen.getByText('The Board link shows no transcript until the presentation transcript is generated.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Generate presentation transcript' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate presentation and discussion transcripts' }));
     await waitFor(() => expect(screen.getByText('Presentation transcript ready for the Board link.')).toBeInTheDocument());
     expect(postBody).toEqual({ expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: 'e'.repeat(64) });
-    expect(screen.queryByRole('button', { name: 'Generate presentation transcript' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Generate presentation and discussion transcripts' })).not.toBeInTheDocument();
   });
 
   test('confirmed and bound shows the ready line and no Generate button', async () => {
     route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     expect(await screen.findByText('Presentation transcript ready for the Board link.')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Generate presentation transcript' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Generate presentation and discussion transcripts' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Set presentation end' })).not.toBeInTheDocument();
+  });
+
+  test('both halves bound shows both ready lines; a missing discussion alone shows an info notice and Generate', async () => {
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
+    const view = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByText('Staff discussion transcript saved for staff.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Generate presentation and discussion transcripts' })).not.toBeInTheDocument();
+    view.unmount();
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [],
+      currentArtifact: boundaryArtifact({ staffDiscussionTranscript: { state: 'missing', artifactId: null } }) }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByText('The staff discussion transcript for this presentation end has not been generated.')).toBeInTheDocument();
+    expect(screen.getByText('Presentation transcript ready for the Board link.')).toBeInTheDocument();
+    expect(screen.queryByText('The Board link shows no transcript until the presentation transcript is generated.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Generate presentation and discussion transcripts' })).toBeInTheDocument();
   });
 
   test('a 409 on Generate shows the conflict notice and reloads', async () => {
@@ -502,7 +518,7 @@ describe('presentation end', () => {
       '/presentation-transcript': { method: 'POST', respond: () => response({ code: 'meeting_transcript_current_changed', message: 'The current transcript changed.' }, 409) },
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Generate presentation transcript' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate presentation and discussion transcripts' }));
     expect(await screen.findByText(/Another session changed this/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
   });
@@ -513,7 +529,7 @@ describe('presentation end', () => {
       '/presentation-transcript': { method: 'POST', respond: () => response({ code: 'presentation_end_not_confirmed', message: 'server words' }, 409) },
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Generate presentation transcript' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate presentation and discussion transcripts' }));
     expect(await screen.findByText(/Confirm where the presentation ends before generating/)).toBeInTheDocument();
     expect(screen.queryByText(/Another session changed this/)).not.toBeInTheDocument();
   });

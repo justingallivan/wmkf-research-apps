@@ -9,9 +9,9 @@ import { createHash } from 'node:crypto';
 import { bindPresentationTranscript } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
 import { projectPostPresentationMaterials } from '../../lib/services/post-presentation-materials/material-model.js';
 import { generatePresentationTranscript } from '../../lib/services/post-presentation-materials/presentation-transcript-service.js';
-import { presentationTranscriptGenerationKey } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
+import { presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
 import { buildMeetingTranscriptFiles, buildMeetingTranscriptManifest } from '../../lib/services/meeting-tracker-transcription/bundle.js';
-import { buildPresentationTranscriptText } from '../../lib/services/meeting-tracker-transcription/presentation-boundary.js';
+import { buildPresentationTranscriptText, buildStaffDiscussionTranscriptText } from '../../lib/services/meeting-tracker-transcription/presentation-boundary.js';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE, REQUEST_DOCUMENT_LIFECYCLE_STATE, REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument.js';
 import { REQUEST_DOCUMENT_ACTOR_POLICY } from '../../lib/services/request-document-actor-service.js';
 
@@ -21,11 +21,14 @@ const REVISION_ID = '33333333-3333-4333-8333-333333333333';
 const TRANSCRIPT_ID = '44444444-4444-4444-8444-444444444444';
 const OLD_ID = '55555555-5555-4555-8555-555555555555';
 const NEW_ID = '66666666-6666-4666-8666-666666666666';
+const DISC_ID = '99999999-9999-4999-8999-999999999999';
+const DISC_OLD_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const ACTOR = '77777777-7777-4777-8777-777777777777';
 const LEASE_TOKEN = '88888888-8888-4888-8888-888888888888';
 const boundary = { endMs: 2000, confirmedBy: 8, confirmedAt: '2026-10-04T09:30:00.000Z' };
 // The Board page shows this name, so it carries the boundary time and never a revision id.
 const PRESENTATION_FILENAME = '1002912-Presentation-Transcript-ends-0h00m02s.txt';
+const DISCUSSION_FILENAME = '1002912-Staff-Discussion-Transcript-from-0h00m02s.txt';
 const content = { text: 'x', utterances: [
   { speaker: 'A', start: 0, end: 1000, text: 'Welcome.' },
   { speaker: 'B', start: 1000, end: 2000, text: 'Our project.' },
@@ -35,9 +38,13 @@ const speakerNames = { A: 'Foundation Staff', B: 'Applicant Lead' };
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const oldEnv = { ...process.env };
 
-let generated; let transcriptRow; let state; let deps; let uploadedBytes;
+let generated; let transcriptRow; let state; let deps; let uploadedBytes; let uploads;
 const presentationKey = (endMs) => presentationTranscriptGenerationKey({
   requestId: REQUEST_ID, sourceRevisionId: REVISION_ID, presentationEndMs: endMs });
+const discussionKey = (endMs) => staffDiscussionTranscriptGenerationKey({
+  requestId: REQUEST_ID, sourceRevisionId: REVISION_ID, presentationEndMs: endMs });
+const discussionRow = (id, key, extra = {}) => presentationRow(id, key, {
+  wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT, ...extra });
 const presentationRow = (id, key, extra = {}) => ({ wmkf_requestdocumentid: id, _wmkf_request_value: REQUEST_ID,
   wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT,
   wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
@@ -68,6 +75,7 @@ beforeEach(() => {
     wmkf_slotversion: 3, createdon: '2026-10-04T10:00:00Z' };
   state = { rows: [transcriptRow], byKey: [] };
   uploadedBytes = null;
+  uploads = new Map();
   deps = {
     schemaReady: jest.fn(() => true), requestAllowed: jest.fn(() => true),
     loadBinding: jest.fn(async () => ({ requestId: REQUEST_ID, siteVisitActivityId: VISIT_ID })),
@@ -76,10 +84,11 @@ beforeEach(() => {
     findDocuments: jest.fn(async () => ({ records: state.rows })),
     findByGenerationKey: jest.fn(async () => ({ records: state.byKey })),
     createDocument: jest.fn(async (payload) => {
-      const row = presentationRow(NEW_ID, payload.wmkf_generationkey, { wmkf_slotversion: payload.wmkf_slotversion,
-        wmkf_createdon: undefined, createdon: '2026-10-05T11:00:00Z' });
+      const id = payload.wmkf_artifacttype === REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT ? DISC_ID : NEW_ID;
+      const row = presentationRow(id, payload.wmkf_generationkey, { wmkf_slotversion: payload.wmkf_slotversion,
+        wmkf_artifacttype: payload.wmkf_artifacttype, createdon: '2026-10-05T11:00:00Z' });
       state.rows = [...state.rows, row];
-      return { wmkf_requestdocumentid: NEW_ID };
+      return { wmkf_requestdocumentid: id };
     }),
     updateDocument: jest.fn(async (id, patch) => {
       state.rows = state.rows.map((row) => (row.wmkf_requestdocumentid === id ? { ...row, ...patch } : row));
@@ -87,15 +96,17 @@ beforeEach(() => {
     getSharePointBuckets: jest.fn(async () => [{ source: 'dynamics', library: 'akoya_request', folder: 'akoya_request/1002912_x' }]),
     ensureFolderPath: jest.fn(async () => {}),
     uploadFile: jest.fn(async (_library, _folder, filename, bytes) => {
-      uploadedBytes = bytes;
-      return { id: 'pres-item', driveId: 'drive', siteId: 'site', name: filename, size: bytes.length };
+      const id = filename.includes('Staff-Discussion') ? 'disc-item' : 'pres-item';
+      uploads.set(id, { filename, bytes });
+      if (id === 'pres-item') uploadedBytes = bytes;
+      return { id, driveId: 'drive', siteId: 'site', name: filename, size: bytes.length };
     }),
-    getFileMetadataById: jest.fn(async (_drive, itemId) => (itemId === 'pres-item'
-      ? { driveId: 'drive', id: 'pres-item', name: PRESENTATION_FILENAME,
-        size: uploadedBytes.length, eTag: 'e1', versionId: 'v1', siteId: 'site', webUrl: 'https://sp/pres',
+    getFileMetadataById: jest.fn(async (_drive, itemId) => (uploads.has(itemId)
+      ? { driveId: 'drive', id: itemId, name: uploads.get(itemId).filename,
+        size: uploads.get(itemId).bytes.length, eTag: 'e1', versionId: 'v1', siteId: 'site', webUrl: `https://sp/${itemId}`,
         lastModified: '2026-10-05T11:00:00Z' }
       : { eTag: 'tag-source', versionId: '1' })),
-    downloadFile: jest.fn(async (_drive, itemId) => ({ buffer: itemId === 'pres-item' ? uploadedBytes : generated.files.source.bytes })),
+    downloadFile: jest.fn(async (_drive, itemId) => ({ buffer: uploads.has(itemId) ? uploads.get(itemId).bytes : generated.files.source.bytes })),
     acquireSlotLease: jest.fn(async () => ({ fence_version: 5 })),
     getSlotLease: jest.fn(async () => null),
     renewSlotLease: jest.fn(async () => ({ fence_version: 5 })),
@@ -112,7 +123,7 @@ const call = (overrides = {}) => generatePresentationTranscript({ requestId: REQ
     expectedCurrentFingerprint: generated.inputSha256, ...overrides } }, deps);
 
 test('writes the presentation-only TXT, registers the row under the derivative key, supersedes the older row', async () => {
-  state.rows = [transcriptRow, presentationRow(OLD_ID, presentationKey(1000))];
+  state.rows = [transcriptRow, presentationRow(OLD_ID, presentationKey(1000)), discussionRow(DISC_ID, discussionKey(2000))];
   const outcome = await call();
   expect(outcome).toMatchObject({ presentationTranscript: { artifactId: NEW_ID, state: 'bound' },
     currentArtifact: { id: TRANSCRIPT_ID, presentationEnd: boundary,
@@ -147,8 +158,60 @@ test('writes the presentation-only TXT, registers the row under the derivative k
   expect(deps.releaseSlotLease).toHaveBeenCalledWith(expect.objectContaining({ fenceVersion: 5, leaseToken: LEASE_TOKEN }));
 });
 
-test('an already-bound row is returned without a lease, an upload, or a write', async () => {
+test('one action writes both halves: the presentation first, then the staff discussion, each under its own type, lease, folder, and key', async () => {
+  state.rows = [transcriptRow, presentationRow(OLD_ID, presentationKey(1000)), discussionRow(DISC_OLD_ID, discussionKey(1000))];
+  const outcome = await call();
+  expect(outcome).toMatchObject({ presentationTranscript: { artifactId: NEW_ID, state: 'bound' },
+    staffDiscussionTranscript: { artifactId: DISC_ID, state: 'bound' },
+    currentArtifact: { staffDiscussionTranscript: { artifactId: DISC_ID, state: 'bound' } } });
+  expect(deps.acquireSlotLease.mock.calls.map(([arg]) => arg.artifactType)).toEqual([
+    REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT, REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT]);
+  expect(deps.uploadFile.mock.calls.map((call) => [call[1], call[2]])).toEqual([
+    ['akoya_request/1002912_x/Site Visit - Presentation Transcript', PRESENTATION_FILENAME],
+    ['akoya_request/1002912_x/Site Visit - Staff Discussion Transcript', DISCUSSION_FILENAME],
+  ]);
+  const discussionText = uploads.get('disc-item').bytes.toString('utf8');
+  expect(discussionText).toBe(buildStaffDiscussionTranscriptText(content, speakerNames, 2000));
+  expect(discussionText).toContain('Staff only discussion.');
+  expect(discussionText).not.toContain('Our project.');
+  const [payload, options] = deps.createDocument.mock.calls[1];
+  expect(payload).toMatchObject({ wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT,
+    wmkf_generationkey: discussionKey(2000), wmkf_name: '1002912 site visit staff discussion transcript (staff only)',
+    wmkf_filename: DISCUSSION_FILENAME });
+  expect(payload).not.toHaveProperty('wmkf_transcriptbundlejson');
+  expect(options).toMatchObject({ actorPolicy: REQUEST_DOCUMENT_ACTOR_POLICY.REQUIRED,
+    actorContext: { operation: 'meeting-tracker-staff-discussion-transcript' } });
+  expect(deps.updateDocument).toHaveBeenCalledWith(DISC_OLD_ID, { wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED }, expect.anything());
+  expect(deps.downloadFile.mock.calls.filter(([, itemId]) => itemId === 'source')).toHaveLength(1);
+  expect(deps.releaseSlotLease).toHaveBeenCalledTimes(2);
+});
+
+test('a boundary at the last utterance writes a one-line discussion note, never an empty file', async () => {
+  const lastEnd = { ...boundary, endMs: 3000 };
+  generated = buildMeetingTranscriptFiles({ content, speakerNames, identity: { requestId: REQUEST_ID,
+    siteVisitActivityId: VISIT_ID, revisionId: REVISION_ID, operationId: REVISION_ID, sourceRevisionId: null, presentationEnd: lastEnd } });
+  const manifest = JSON.parse(transcriptRow.wmkf_transcriptbundlejson);
+  manifest.presentationEnd = lastEnd;
+  manifest.files.source = { ...manifest.files.source, sha256: generated.files.source.sha256, size: generated.files.source.bytes.length };
+  transcriptRow = { ...transcriptRow, wmkf_transcriptbundlejson: JSON.stringify(manifest), wmkf_inputfingerprint: generated.inputSha256 };
+  state.rows = [transcriptRow];
+  await call();
+  expect(uploads.get('disc-item').bytes.toString('utf8')).toBe('No discussion was recorded after the presentation ended at 0h00m03s.\n');
+});
+
+test('a bound presentation transcript with a missing discussion writes only the discussion', async () => {
   state.rows = [transcriptRow, presentationRow(OLD_ID, presentationKey(2000))];
+  await expect(call()).resolves.toMatchObject({ presentationTranscript: { artifactId: OLD_ID, state: 'bound' },
+    staffDiscussionTranscript: { artifactId: DISC_ID, state: 'bound' } });
+  expect(deps.acquireSlotLease).toHaveBeenCalledTimes(1);
+  expect(deps.acquireSlotLease.mock.calls[0][0].artifactType).toBe(REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT);
+  expect(deps.uploadFile).toHaveBeenCalledTimes(1);
+  expect(deps.createDocument).toHaveBeenCalledTimes(1);
+  expect(deps.createDocument.mock.calls[0][0].wmkf_artifacttype).toBe(REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT);
+});
+
+test('an already-bound row is returned without a lease, an upload, or a write', async () => {
+  state.rows = [transcriptRow, presentationRow(OLD_ID, presentationKey(2000)), discussionRow(DISC_ID, discussionKey(2000))];
   await expect(call()).resolves.toMatchObject({ presentationTranscript: { artifactId: OLD_ID, state: 'bound' } });
   expect(deps.acquireSlotLease).not.toHaveBeenCalled();
   expect(deps.uploadFile).not.toHaveBeenCalled();
@@ -158,7 +221,7 @@ test('an already-bound row is returned without a lease, an upload, or a write', 
 test('a same-key row outranked by a newer stale derivative is restored under the fence and the stale one superseded, with no upload', async () => {
   const prior = presentationRow(OLD_ID, presentationKey(2000), { wmkf_slotversion: 4 });
   const stale = presentationRow(NEW_ID, presentationKey(1000), { wmkf_slotversion: 4, createdon: '2026-10-05T12:00:00Z' });
-  state.rows = [transcriptRow, prior, stale];
+  state.rows = [transcriptRow, prior, stale, discussionRow(DISC_ID, discussionKey(2000))];
   state.byKey = [prior];
   await expect(call()).resolves.toMatchObject({ presentationTranscript: { artifactId: OLD_ID, state: 'bound' } });
   expect(deps.uploadFile).not.toHaveBeenCalled();
@@ -174,7 +237,7 @@ test('a same-key row outranked by a newer stale derivative is restored under the
 
 test('a same-key row that was superseded (boundary moved away and back) is restored rather than duplicated', async () => {
   const prior = presentationRow(OLD_ID, presentationKey(2000), { wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED, wmkf_slotversion: 2 });
-  state.rows = [transcriptRow, prior];
+  state.rows = [transcriptRow, prior, discussionRow(DISC_ID, discussionKey(2000))];
   state.byKey = [prior];
   await expect(call()).resolves.toMatchObject({ presentationTranscript: { artifactId: OLD_ID, state: 'bound' } });
   expect(deps.uploadFile).not.toHaveBeenCalled();
@@ -200,7 +263,7 @@ test('a registry failure after the upload records a reconciliation event naming 
 });
 
 test('a supersede failure after the row is registered is recorded and the bound result is still returned', async () => {
-  state.rows = [transcriptRow, presentationRow(OLD_ID, presentationKey(1000))];
+  state.rows = [transcriptRow, presentationRow(OLD_ID, presentationKey(1000)), discussionRow(DISC_ID, discussionKey(2000))];
   deps.updateDocument.mockRejectedValueOnce(Object.assign(new Error('patch failed'), { code: 'dataverse_patch_failed' }));
   await expect(call()).resolves.toMatchObject({ presentationTranscript: { artifactId: NEW_ID, state: 'bound' } });
   expect(deps.recordEvent).toHaveBeenCalledWith(expect.objectContaining({

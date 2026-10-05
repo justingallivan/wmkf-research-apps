@@ -1,6 +1,7 @@
 /** @jest-environment node */
 import {
-  buildPresentationTranscriptText, classifySpeakers, isFoundationCandidate, presentationContent, proposePresentationEnd,
+  buildPresentationTranscriptText, buildStaffDiscussionTranscriptText, classifySpeakers, isFoundationCandidate,
+  presentationContent, proposePresentationEnd, staffDiscussionContent,
 } from '../../lib/services/meeting-tracker-transcription/presentation-boundary.js';
 
 const candidates = [
@@ -58,3 +59,22 @@ test('the presentation TXT uses the turn layout and ends at the boundary', () =>
   expect(text).toBe('[00:00] Maria Lopez: Welcome.\n\n[00:10] Dana Reyes: Our results.\n\n[01:00] Speaker C: Any questions for us?\n\n[01:05] Dana Reyes: Thank you.\n');
   expect(text).not.toContain('among ourselves');
 });
+
+test('the staff discussion is the exact complement: the two halves are disjoint and reassemble every utterance in order', () => {
+  for (const endMs of [0, 10_000, 65_000, 70_000, 95_000]) {
+    const before = presentationContent({ text: 'all', utterances }, endMs).utterances;
+    const after = staffDiscussionContent({ text: 'all', utterances }, endMs).utterances;
+    expect(before.filter(row => after.includes(row))).toEqual([]);
+    expect([...before, ...after].sort((a, b) => a.start - b.start)).toEqual(utterances);
+  }
+  expect(staffDiscussionContent({ text: 'all', utterances }, 70_000).text).toBe('');
+  expect(() => staffDiscussionContent({ utterances }, -1)).toThrow('invalid_presentation_end');
+});
+
+test('the staff discussion TXT starts after the boundary, and is null when nothing follows it', () => {
+  const text = buildStaffDiscussionTranscriptText({ text: 'everything', utterances }, { A: 'Maria Lopez', B: 'Dana Reyes' }, 70_000);
+  expect(text).toBe('[01:10] Maria Lopez: Now, among ourselves.\n\n[01:30] Speaker D: Agreed.\n');
+  expect(text).not.toContain('Thank you.');
+  expect(buildStaffDiscussionTranscriptText({ text: 'everything', utterances }, {}, 95_000)).toBeNull();
+});
+

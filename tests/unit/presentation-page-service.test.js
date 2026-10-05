@@ -9,7 +9,7 @@ import {
   REQUEST_DOCUMENT_LIFECYCLE_STATE,
   REQUEST_DOCUMENT_OPERATION_STATUS,
 } from '../../shared/config/requestDocument.js';
-import { presentationTranscriptGenerationKey } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
+import { presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
 import * as requestDocumentAdapter from '../../lib/dataverse/adapters/request-document.js';
 
 jest.mock('../../lib/dataverse/adapters/request-document.js', () => ({
@@ -220,6 +220,22 @@ test('a derivative with no transcript winner, or from another producer, is omitt
   const foreign = dependencies([fullTranscript(), derivative(70_000, { wmkf_producer: 'someone-else' })], { resolveMediaDownloadUrl: textMedia() });
   expect((await buildPresentationContext({ requestId: REQUEST_ID }, foreign)).materials).toEqual([]);
   await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: `material:${PRESENTATION_ID}`, mode: 'open' }, foreign));
+});
+
+test('a Ready, file-backed Staff Discussion Transcript from the real producer is never listed or served, in any mode (staff-only)', async () => {
+  const DISCUSSION_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const discussion = fileRow(DISCUSSION_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT, PRODUCER, {
+    wmkf_filename: 'discussion.txt', wmkf_contenttype: 'text/plain', wmkf_filesize: 500, wmkf_sharepointetag: 'e1',
+    wmkf_generationkey: staffDiscussionTranscriptGenerationKey({ requestId: REQUEST_ID, sourceRevisionId: REVISION, presentationEndMs: 70_000 }),
+  });
+  const deps = dependencies([fullTranscript(), derivative(), discussion], { resolveMediaDownloadUrl: textMedia('discussion.txt') });
+  const context = await buildPresentationContext({ requestId: REQUEST_ID }, deps);
+  expect(context.materials.map((item) => item.member)).not.toContain(`material:${DISCUSSION_ID}`);
+  expect(JSON.stringify(context)).not.toMatch(/discussion/i);
+  for (const mode of ['open', 'download', 'watch']) {
+    await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: `material:${DISCUSSION_ID}`, mode }, deps));
+  }
+  expect(deps.resolveMediaDownloadUrl).not.toHaveBeenCalledWith(discussion.wmkf_sharepointdriveid, discussion.wmkf_sharepointitemid);
 });
 
 test('an external (Zoom) backing on a Presentation Transcript is never served', async () => {

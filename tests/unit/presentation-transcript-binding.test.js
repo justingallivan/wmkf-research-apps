@@ -1,6 +1,7 @@
 /** @jest-environment node */
 import {
-  bindPresentationTranscript, confirmedPresentationEnd, presentationTranscriptGenerationKey,
+  bindPresentationTranscript, bindStaffDiscussionTranscript, confirmedPresentationEnd, presentationTranscriptGenerationKey,
+  staffDiscussionTranscriptGenerationKey,
 } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../shared/config/requestDocument.js';
 
@@ -67,3 +68,28 @@ test('the derivative is bound only when its key matches the current transcript r
   // A derivative from another producer or request is never bound.
   expect(bindPresentationTranscript([transcriptRow(), { ...derivativeRow(key), wmkf_producer: 'someone-else' }], REQUEST_ID)).toMatchObject({ reason: 'presentation_transcript_missing' });
 });
+
+describe('staff discussion derivative', () => {
+  const discussionKey = staffDiscussionTranscriptGenerationKey({ requestId: REQUEST_ID, sourceRevisionId: REVISION, presentationEndMs: 70_000 });
+  const discussionRow = (generationKey) => ({ ...derivativeRow(generationKey), wmkf_requestdocumentid: 'doc-d',
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT });
+
+  test('its key differs from the presentation key for the same cut, so neither row can satisfy the other binding', () => {
+    expect(discussionKey).toMatch(/^[0-9a-f]{64}$/);
+    expect(discussionKey).not.toBe(key);
+    expect(bindPresentationTranscript([transcriptRow(), { ...derivativeRow(discussionKey) }], REQUEST_ID)).toMatchObject({ reason: 'presentation_transcript_stale' });
+    expect(bindStaffDiscussionTranscript([transcriptRow(), discussionRow(key)], REQUEST_ID)).toMatchObject({ reason: 'discussion_stale' });
+  });
+
+  test('bound, missing, stale, unconfirmed, and no transcript', () => {
+    expect(bindStaffDiscussionTranscript([transcriptRow(), discussionRow(discussionKey)], REQUEST_ID))
+      .toMatchObject({ reason: 'bound', staffDiscussionTranscript: { wmkf_requestdocumentid: 'doc-d' } });
+    expect(bindStaffDiscussionTranscript([transcriptRow()], REQUEST_ID)).toMatchObject({ reason: 'discussion_missing' });
+    const moved = manifest({ presentationEnd: { endMs: 65_000, confirmedBy: 5, confirmedAt: '2026-10-05T18:30:00.000Z' } });
+    expect(bindStaffDiscussionTranscript([transcriptRow(moved), discussionRow(discussionKey)], REQUEST_ID)).toMatchObject({ reason: 'discussion_stale' });
+    expect(bindStaffDiscussionTranscript([transcriptRow(manifest({ presentationEnd: null })), discussionRow(discussionKey)], REQUEST_ID))
+      .toMatchObject({ reason: 'boundary_not_confirmed' });
+    expect(bindStaffDiscussionTranscript([discussionRow(discussionKey)], REQUEST_ID)).toMatchObject({ reason: 'no_transcript' });
+  });
+});
+

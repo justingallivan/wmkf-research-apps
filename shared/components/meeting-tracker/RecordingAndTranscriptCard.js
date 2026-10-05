@@ -1327,7 +1327,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
       });
       if (!isCurrent(generation)) return;
       if (result?.currentArtifact) setCollection((state) => (state ? { ...state, currentArtifact: result.currentArtifact } : state));
-      setNotice('Presentation transcript generated.');
+      setNotice('Presentation and staff discussion transcripts generated.');
       setConflict(false);
       await loadCollection();
       await onMaterialsChangedRef.current?.();
@@ -1960,6 +1960,8 @@ function TranscriptBlock({ m, t, transcriptInputRef }) {
   const showBoundary = generated && Boolean(artifact?.bundleEditable) && !editing;
   const presentationEnd = artifact?.presentationEnd && Number.isSafeInteger(artifact.presentationEnd.endMs) ? artifact.presentationEnd : null;
   const boundaryState = artifact?.presentationTranscript?.state;
+  const discussionState = artifact?.staffDiscussionTranscript?.state;
+  const needsGenerate = ['missing', 'stale'].includes(boundaryState) || ['missing', 'stale'].includes(discussionState);
   const reviewOpen = editing || Boolean(t.showReview && t.focusJob && !ACTIVE_STATUSES.has(t.focusJob.status));
   const toggle = (form) => setOpenForm((value) => (value === form ? null : form));
   return (
@@ -1984,9 +1986,12 @@ function TranscriptBlock({ m, t, transcriptInputRef }) {
           </> : <>
             <p className="text-sm leading-6 text-gray-900">Presentation ends at {formatTranscriptTurnTime(presentationEnd.endMs)}{presentationEnd.confirmedAt ? ` · confirmed ${fmtDateTime(presentationEnd.confirmedAt)}` : ''}</p>
             {boundaryState === 'bound' && <p className="mt-1 text-sm text-gray-900">Presentation transcript ready for the Board link.</p>}
-            {(boundaryState === 'missing' || boundaryState === 'stale') && <div className="mt-2">
-              <Notice tone="warning">The Board link shows no transcript until the presentation transcript is generated.</Notice>
-              <button type="button" onClick={t.generatePresentationTranscript} disabled={Boolean(t.busy)} className={`mt-2 ${BTN_PRIMARY}`}>{t.busy === 'presentation-transcript' ? 'Generating…' : 'Generate presentation transcript'}</button>
+            {discussionState === 'bound' && <p className="mt-1 text-sm text-gray-900">Staff discussion transcript saved for staff.</p>}
+            {needsGenerate && <div className="mt-2">
+              {['missing', 'stale'].includes(boundaryState)
+                ? <Notice tone="warning">The Board link shows no transcript until the presentation transcript is generated.</Notice>
+                : <Notice tone="info">The staff discussion transcript for this presentation end has not been generated.</Notice>}
+              <button type="button" onClick={t.generatePresentationTranscript} disabled={Boolean(t.busy)} className={`mt-2 ${BTN_PRIMARY}`}>{t.busy === 'presentation-transcript' ? 'Generating…' : 'Generate presentation and discussion transcripts'}</button>
             </div>}
           </>}
         </div>

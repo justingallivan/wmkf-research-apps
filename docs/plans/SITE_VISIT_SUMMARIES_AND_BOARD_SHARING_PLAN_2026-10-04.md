@@ -168,9 +168,12 @@ be its own row:
   ending at or before the boundary, superseded on every re-confirmation or
   transcript republish.
   Staff-side it is informational; outside it is the only transcript served.
-- The staff discussion part is not a durable material. It is derived at
-  summarize time from the full bundle plus the boundary and lives only in
-  the summary draft's input snapshot.
+- ~~The staff discussion part is not a durable material.~~ **Superseded by
+  §7 decision 7 (2026-10-05):** the staff discussion is a durable, staff-only
+  `STAFF_DISCUSSION_TRANSCRIPT` (100000013) row, the exact complement of the
+  presentation cut (utterances ending after the boundary), written by the
+  same action and bound by the same generation-key recipe. Stage 3's summary
+  may read that row instead of re-deriving the cut.
 - The full `txt`/`vtt` stay as today for staff.
 
 **Boundary generation.** Every derivative (the presentation-transcript row,
@@ -291,7 +294,7 @@ outside ones:
 
 | Allowlist | File | Add `PRESENTATION_TRANSCRIPT` 100000012 | Add `BOARD_PRESENTATION_RECORDING` 100000011 | Add `STAFF_DISCUSSION_SUMMARY` 100000010 |
 |---|---|---|---|---|
-| Shared post-presentation projection `POST_PRESENTATION_ARTIFACT_TYPES` [VERIFIED `material-model.js:15-21`]; feeds the card, the Board page, and the briefing page | `lib/services/post-presentation-materials/material-model.js` | yes | yes | **no**; it would reach the Board page through `eligiblePresentationRows` [VERIFIED `presentation-page-service.js:81-84`] |
+| Shared post-presentation projection `POST_PRESENTATION_ARTIFACT_TYPES` [VERIFIED `material-model.js:15-21`]; feeds the card, the Board page, and the briefing page | `lib/services/post-presentation-materials/material-model.js` | yes | yes | **no** at plan time; it would have reached the Board page through `eligiblePresentationRows` [VERIFIED `presentation-page-service.js:81-84` as of 2026-10-04]. Stage 1 replaced that pass-through with explicit outside allowlists, so a staff-only type may now sit in this shared set; `STAFF_DISCUSSION_TRANSCRIPT` 100000013 does (§13), pinned by mutation-checked exclusion tests on both outside pages |
 | Board page file-mode check, denylist-shaped: any non-RECORDING type falls through to the transcript mime check [VERIFIED `presentation-page-service.js:142-152`] | same file | convert to an explicit allowlist of outside-servable types | same | excluded by the allowlist |
 | Briefing page allowlist [VERIFIED `briefing-page-service.js:91-99`] | `lib/services/deliberation-briefing/briefing-page-service.js` | yes, replacing TRANSCRIPT | yes, replacing RECORDING | **no** |
 | Staff Deliberations feed `MATERIAL_TYPES` [VERIFIED `logistics-service.js:52-58`] | `lib/services/site-visit/logistics-service.js` | yes | yes | yes, plus the summary text |
@@ -384,6 +387,11 @@ route that resolves a model.
   (product principle 1). The draft never leaves Postgres until published.
 - Audit: `wmkf_ai_run` rows with content-free retention; the request-document
   row binds to the run and prompt version like the Initial Assessment.
+- The Staff Discussion Transcript (§7 decision 7) adds no new disclosure:
+  its words are already in the full TRANSCRIPT files staff hold in the same
+  request SharePoint folder. It is a second, staff-only file of pure staff
+  deliberation, so its exclusion from both outside pages is enforced by
+  allowlist and pinned by tests (§13).
 
 ## 7. Owner decisions (all DECIDED 2026-10-05)
 
@@ -403,6 +411,13 @@ route that resolves a model.
    show no recording. Closing the exposure comes first.
 6. **Applicant presentation PDF is an input** to the presentation summary
    when one is on file; transcript only otherwise.
+7. **Staff discussion transcript is kept, staff-only (DECIDED 2026-10-05,
+   after Stage 1 acceptance).** Everything after the confirmed boundary is a
+   durable file for staff: artifact type `STAFF_DISCUSSION_TRANSCRIPT`
+   100000013, written alongside the presentation transcript by one action,
+   listed on Staff Deliberations, never served by either outside page.
+   Supersedes §4.2's "not a durable material". Owner chose a durable file
+   over a card-only download.
 
 ## 8. Open items for the sweep, not this plan
 
@@ -548,4 +563,42 @@ Verdict needs-attention, one high finding, verified and fixed on the branch:
    Consequence: a derivative whose file was replaced is hidden outside until
    it is regenerated; the writer's idempotent branch does not yet re-upload a
    replaced file (open item).
+
+## 13. Staff discussion transcript build record, 2026-10-05 (branch `feature/staff-discussion-transcript`)
+
+**Stage 1 acceptance (test request 1003222, owner, 2026-10-05):** the owner
+published the 7c1c5643 run with Speaker B named, opened the speaker-name and
+presentation-end editor, confirmed a boundary, generated the presentation
+transcript, and reported that the flow worked. The owner did not report
+which turn the proposal picked, so handoff S575 §9 (roster attendees count as
+inside the foundation) is still unconfirmed. The card's Save button sits only
+at the bottom of the review block; with eight speakers it was not found at
+first (layout follow-up offered, not decided).
+
+Built by Claude Opus 5.5 directly (one cohesive change); independent review
+by Codex adversarial review.
+
+- `STAFF_DISCUSSION_TRANSCRIPT = 100000013` (label, Wave 16 record). Migration
+  `069_staff_discussion_transcript_type.sql` adds it to both post-presentation
+  `artifact_type` CHECKs. Owner-run insert:
+  `scripts/extend-requestdocument-artifacttype-staff-discussion-transcript.mjs`.
+- `staffDiscussionContent` is the exact complement of `presentationContent`;
+  a test proves the halves are disjoint and reassemble every utterance.
+- The writer runs one spec per derivative under its own slot lease,
+  presentation first, sharing one verified source read; still one
+  `createDocument` call site. Folder `Site Visit - Staff Discussion
+  Transcript`, filename `…-Staff-Discussion-Transcript-from-<time>.txt`.
+- **Named deviation:** when nothing follows the boundary, the discussion row
+  is still written, containing one line ("No discussion was recorded after
+  the presentation ended at …"), instead of skipping the row and adding an
+  "empty" state across service, card, and tests.
+- Staff surfaces: overview DTO `staffDiscussionTranscript {state, artifactId}`;
+  the card shows both ready lines and one "Generate presentation and
+  discussion transcripts" action; Staff Deliberations lists the new slot.
+- Outside: unchanged allowlists; new tests drive a Ready, file-backed,
+  real-producer 100000013 row to omission at context and 404 on open,
+  download, and watch, on both pages and the legacy briefing path; a mutation
+  admitting the type turned both tests red.
+- Not changed: the Pre-Site distribution email allowlist (owner decision
+  still open).
 

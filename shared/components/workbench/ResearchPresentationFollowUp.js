@@ -5,6 +5,7 @@ const SLOTS = [
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING, label: 'Recording', action: 'Watch recording' },
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT, label: 'Transcript', action: 'Open transcript' },
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT, label: 'Presentation transcript', action: 'Open presentation transcript' },
+  { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT, label: 'Staff discussion transcript', action: 'Open staff discussion transcript' },
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, label: 'Transcript summary', action: 'Open transcript summary' },
 ];
 

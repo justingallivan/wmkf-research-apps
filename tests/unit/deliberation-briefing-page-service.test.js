@@ -11,7 +11,7 @@ import {
   _internal,
 } from '../../lib/services/deliberation-briefing/briefing-page-service';
 import { PRE_SITE_DISTRIBUTION_CONTRACT } from '../../shared/config/requestDocument.js';
-import { presentationTranscriptGenerationKey } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
+import { presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
 import * as requestDocumentAdapter from '../../lib/dataverse/adapters/request-document.js';
 import { REQUEST_DOCUMENT_ACTOR_POLICY } from '../../lib/services/request-document-actor-service.js';
 import { reviewSetFingerprint } from '../../lib/services/pre-site-visit/review-bundle-service.js';
@@ -1403,6 +1403,7 @@ function fileRow(id, artifactType, producer, overrides = {}) {
 }
 const REQUEST_DOCUMENT_ARTIFACT_TYPE = {
   RECORDING: 100000005, TRANSCRIPT: 100000006, TRANSCRIPT_SUMMARY: 100000007, PRESENTATION_TRANSCRIPT: 100000012,
+  STAFF_DISCUSSION_TRANSCRIPT: 100000013,
 };
 
 const PRESENTATION_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -1571,6 +1572,26 @@ test('briefing: a derivative with no transcript winner, or from another producer
   const foreign = enabledDeps([fullTranscript(), derivative(70_000, { wmkf_producer: 'someone-else' })], { resolveMediaDownloadUrl: textMedia() });
   expect((await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, foreign)).materials).toEqual([]);
   await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID), mode: 'open' }, foreign));
+});
+
+test('briefing: a Ready, file-backed Staff Discussion Transcript is never listed or served, on the enabled or the legacy path', async () => {
+  const DISCUSSION_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const discussion = fileRow(DISCUSSION_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT, PRODUCER, {
+    wmkf_filename: 'discussion.txt', wmkf_contenttype: 'text/plain', wmkf_filesize: 500, wmkf_sharepointetag: 'e1',
+    wmkf_generationkey: staffDiscussionTranscriptGenerationKey({ requestId: REQUEST_ID, sourceRevisionId: REVISION, presentationEndMs: 70_000 }),
+  });
+  const enabled = enabledDeps([fullTranscript(), derivative(), discussion], { resolveMediaDownloadUrl: textMedia('discussion.txt') });
+  const context = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, enabled);
+  expect(context.materials.map((item) => item.member)).not.toContain(briefingMember(DISCUSSION_ID));
+  for (const mode of ['open', 'download', 'watch']) {
+    await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(DISCUSSION_ID), mode }, enabled));
+  }
+  await expectBriefingNotFound(resolveBriefingMember({ requestId: REQUEST_ID, member: briefingMember(DISCUSSION_ID) }, enabled));
+  const legacy = deps({ findDocuments: jest.fn(async () => ({ records: [discussion, { ...discussion, wmkf_producer: 'legacy-producer' }] })) });
+  expect((await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, legacy)).materials).toEqual([]);
+  await expectBriefingNotFound(resolveBriefingMember({ requestId: REQUEST_ID, member: briefingMember(DISCUSSION_ID) }, legacy));
+  expect(legacy.downloadFile).not.toHaveBeenCalled();
+  expect(enabled.downloadFile).not.toHaveBeenCalled();
 });
 
 test('briefing: an external (Zoom) backing on a Presentation Transcript is never served', async () => {
