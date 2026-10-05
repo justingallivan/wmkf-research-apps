@@ -144,6 +144,21 @@ describe('correction draft presentation end', () => {
     expect(store.updateMeetingTranscriptCorrectionDraft.mock.calls[2][0].presentationEnd).toBeUndefined();
   });
 
+  test('PATCH with the boundary the draft already holds keeps who confirmed it and when (no re-stamp)', async () => {
+    store.getMeetingTranscriptPublication.mockResolvedValue(draft({ presentation_end_ms: 3000,
+      presentation_end_confirmed_by: 7, presentation_end_confirmed_at: new Date('2026-10-04T09:30:00Z') }));
+    store.updateMeetingTranscriptCorrectionDraft.mockResolvedValue(draft({ presentation_end_ms: 3000 }));
+    await updateMeetingCorrection({ requestId, ownerProfileId: 12, operationId: draftId,
+      body: { expectedVersion: 2, speakerNames, presentationEndMs: 3000 } });
+    expect(store.updateMeetingTranscriptCorrectionDraft.mock.calls[0][0].presentationEnd).toBeUndefined();
+    // Clearing an already-clear boundary is likewise a no-op on the columns.
+    store.getMeetingTranscriptPublication.mockResolvedValue(draft({ presentation_end_ms: null,
+      presentation_end_confirmed_by: null, presentation_end_confirmed_at: null }));
+    await updateMeetingCorrection({ requestId, ownerProfileId: 12, operationId: draftId,
+      body: { expectedVersion: 2, speakerNames, presentationEndMs: null } });
+    expect(store.updateMeetingTranscriptCorrectionDraft.mock.calls[1][0].presentationEnd).toBeUndefined();
+  });
+
   test.each([1500, -1, 1.5, '3000', 99_999])('PATCH rejects presentationEndMs %p that is not an utterance end', async value => {
     store.getMeetingTranscriptPublication.mockResolvedValue(draft());
     await expect(updateMeetingCorrection({ requestId, ownerProfileId: 12, operationId: draftId,

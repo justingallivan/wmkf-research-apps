@@ -933,6 +933,17 @@ function errorMessage(error, fallback) {
   if (error?.status === 409) return 'This draft changed elsewhere. Reload it before trying again; your current edits are preserved.';
   return error?.message || fallback;
 }
+const GENERATE_CONFLICT_COPY = {
+  presentation_end_not_confirmed: 'Confirm where the presentation ends before generating the presentation transcript.',
+  post_presentation_slot_busy: 'Another presentation transcript update is in progress. Try again in a moment.',
+  meeting_transcript_current_changed: 'The published transcript changed. Refresh and try again.',
+  meeting_transcript_site_visit_changed: 'The Site Visit changed. Refresh and try again.',
+};
+function generateErrorMessage(error, fallback) {
+  const code = error?.payload?.code;
+  if (error?.status === 409) return GENERATE_CONFLICT_COPY[code] || error?.message || 'The presentation transcript could not be generated. Refresh and try again.';
+  return error?.message || fallback;
+}
 function vttFormat(file) {
   if (!file) return null;
   if (!String(file.name || '').toLowerCase().endsWith('.vtt')) return 'Choose Zoom captions saved as a .vtt file.';
@@ -1219,7 +1230,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
       setNotice(null);
       try {
         const result = await requestJson(`${basePath}/corrections/${encodeURIComponent(correction.operationId)}`, {
-          method: 'PATCH', body: { expectedVersion: correction.version, speakerNames: names, presentationEndMs },
+          method: 'PATCH', body: { expectedVersion: correction.version, speakerNames: names, ...(dirtyEnd ? { presentationEndMs } : {}) },
           fallbackMessage: 'Your changes could not be saved.',
         });
         if (!isCurrent(generation)) return;
@@ -1324,8 +1335,8 @@ function useTranscription(requestId, { onMaterialsChanged }) {
       if (isCurrent(generation)) {
         await loadCollection();
         if (isCurrent(generation)) {
-          setConflict(generateError?.status === 409);
-          setError(errorMessage(generateError, 'The presentation transcript could not be generated.'));
+          setConflict(generateError?.status === 409 && generateError?.payload?.code === 'meeting_transcript_current_changed');
+          setError(generateErrorMessage(generateError, 'The presentation transcript could not be generated.'));
         }
       }
     } finally {

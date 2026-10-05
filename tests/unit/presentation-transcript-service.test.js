@@ -6,6 +6,8 @@ jest.mock('../../lib/services/portal-upload-staging.js', () => ({
 }));
 
 import { createHash } from 'node:crypto';
+import { bindPresentationTranscript } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
+import { projectPostPresentationMaterials } from '../../lib/services/post-presentation-materials/material-model.js';
 import { generatePresentationTranscript } from '../../lib/services/post-presentation-materials/presentation-transcript-service.js';
 import { presentationTranscriptGenerationKey } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
 import { buildMeetingTranscriptFiles, buildMeetingTranscriptManifest } from '../../lib/services/meeting-tracker-transcription/bundle.js';
@@ -22,6 +24,8 @@ const NEW_ID = '66666666-6666-4666-8666-666666666666';
 const ACTOR = '77777777-7777-4777-8777-777777777777';
 const LEASE_TOKEN = '88888888-8888-4888-8888-888888888888';
 const boundary = { endMs: 2000, confirmedBy: 8, confirmedAt: '2026-10-04T09:30:00.000Z' };
+// The Board page shows this name, so it carries the boundary time and never a revision id.
+const PRESENTATION_FILENAME = '1002912-Presentation-Transcript-ends-0h00m02s.txt';
 const content = { text: 'x', utterances: [
   { speaker: 'A', start: 0, end: 1000, text: 'Welcome.' },
   { speaker: 'B', start: 1000, end: 2000, text: 'Our project.' },
@@ -87,7 +91,7 @@ beforeEach(() => {
       return { id: 'pres-item', driveId: 'drive', siteId: 'site', name: filename, size: bytes.length };
     }),
     getFileMetadataById: jest.fn(async (_drive, itemId) => (itemId === 'pres-item'
-      ? { driveId: 'drive', id: 'pres-item', name: `1002912-Presentation-Transcript-${REVISION_ID}.txt`,
+      ? { driveId: 'drive', id: 'pres-item', name: PRESENTATION_FILENAME,
         size: uploadedBytes.length, eTag: 'e1', versionId: 'v1', siteId: 'site', webUrl: 'https://sp/pres',
         lastModified: '2026-10-05T11:00:00Z' }
       : { eTag: 'tag-source', versionId: '1' })),
@@ -119,7 +123,8 @@ test('writes the presentation-only TXT, registers the row under the derivative k
   expect(expectedText).toContain('Our project.');
   expect(expectedText).not.toContain('Staff only discussion.');
   expect(deps.uploadFile).toHaveBeenCalledWith('akoya_request', 'akoya_request/1002912_x/Site Visit - Presentation Transcript',
-    `1002912-Presentation-Transcript-${REVISION_ID}.txt`, uploadedBytes, 'text/plain; charset=utf-8', { conflictBehavior: 'replace' });
+    PRESENTATION_FILENAME, uploadedBytes, 'text/plain; charset=utf-8', { conflictBehavior: 'replace' });
+  expect(PRESENTATION_FILENAME).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/i);
 
   const [payload, options] = deps.createDocument.mock.calls[0];
   expect(payload).toMatchObject({
@@ -150,20 +155,56 @@ test('an already-bound row is returned without a lease, an upload, or a write', 
   expect(deps.createDocument).not.toHaveBeenCalled();
 });
 
-test('a row an earlier attempt registered under the same key is returned before any upload', async () => {
+test('a same-key row outranked by a newer stale derivative is restored under the fence and the stale one superseded, with no upload', async () => {
   const prior = presentationRow(OLD_ID, presentationKey(2000), { wmkf_slotversion: 4 });
+  const stale = presentationRow(NEW_ID, presentationKey(1000), { wmkf_slotversion: 4, createdon: '2026-10-05T12:00:00Z' });
+  state.rows = [transcriptRow, prior, stale];
   state.byKey = [prior];
-  // Not yet visible as the winner on the first read, as when the earlier attempt died before supersession.
   await expect(call()).resolves.toMatchObject({ presentationTranscript: { artifactId: OLD_ID, state: 'bound' } });
   expect(deps.uploadFile).not.toHaveBeenCalled();
   expect(deps.createDocument).not.toHaveBeenCalled();
+  expect(deps.updateDocument).toHaveBeenCalledWith(OLD_ID, expect.objectContaining({ wmkf_slotversion: 5,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT }), expect.objectContaining({ actorPolicy: REQUEST_DOCUMENT_ACTOR_POLICY.REQUIRED }));
+  expect(deps.updateDocument).toHaveBeenCalledWith(NEW_ID, { wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED }, expect.anything());
+  expect(deps.releaseSlotLease).toHaveBeenCalledTimes(1);
+  // After the restore the outside binding selects the restored row.
+  expect(bindPresentationTranscript(projectPostPresentationMaterials(state.rows, REQUEST_ID).winners, REQUEST_ID))
+    .toMatchObject({ reason: 'bound', presentationTranscript: { wmkf_requestdocumentid: OLD_ID } });
+});
+
+test('a same-key row that was superseded (boundary moved away and back) is restored rather than duplicated', async () => {
+  const prior = presentationRow(OLD_ID, presentationKey(2000), { wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED, wmkf_slotversion: 2 });
+  state.rows = [transcriptRow, prior];
+  state.byKey = [prior];
+  await expect(call()).resolves.toMatchObject({ presentationTranscript: { artifactId: OLD_ID, state: 'bound' } });
+  expect(deps.uploadFile).not.toHaveBeenCalled();
+  expect(deps.createDocument).not.toHaveBeenCalled();
+  expect(deps.updateDocument).toHaveBeenCalledTimes(1);
+});
+
+test('a same-key row for another request or producer fails closed', async () => {
+  state.byKey = [presentationRow(OLD_ID, presentationKey(2000), { wmkf_producer: 'someone-else' })];
+  await expect(call()).rejects.toMatchObject({ code: 'presentation_transcript_registry_conflict', httpStatus: 409 });
+  expect(deps.uploadFile).not.toHaveBeenCalled();
+  expect(deps.updateDocument).not.toHaveBeenCalled();
+});
+
+test('a registry failure after the upload records a reconciliation event naming the orphan file', async () => {
+  deps.createDocument.mockRejectedValueOnce(Object.assign(new Error('dataverse down'), { code: 'dataverse_unavailable' }));
+  await expect(call()).rejects.toMatchObject({ code: 'dataverse_unavailable' });
+  expect(deps.uploadFile).toHaveBeenCalledTimes(1);
+  expect(deps.recordEvent).toHaveBeenCalledWith(expect.objectContaining({
+    eventType: 'post_presentation_material_reconciliation_required', stage: 'presentation-transcript-register',
+    metadata: expect.objectContaining({ reason: 'dataverse_unavailable', filename: PRESENTATION_FILENAME }) }));
   expect(deps.releaseSlotLease).toHaveBeenCalledTimes(1);
 });
 
-test('a same-key row that is superseded or foreign fails closed', async () => {
-  state.byKey = [presentationRow(OLD_ID, presentationKey(2000), { wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED })];
-  await expect(call()).rejects.toMatchObject({ code: 'presentation_transcript_registry_conflict', httpStatus: 409 });
-  expect(deps.uploadFile).not.toHaveBeenCalled();
+test('a supersede failure after the row is registered is recorded and the bound result is still returned', async () => {
+  state.rows = [transcriptRow, presentationRow(OLD_ID, presentationKey(1000))];
+  deps.updateDocument.mockRejectedValueOnce(Object.assign(new Error('patch failed'), { code: 'dataverse_patch_failed' }));
+  await expect(call()).resolves.toMatchObject({ presentationTranscript: { artifactId: NEW_ID, state: 'bound' } });
+  expect(deps.recordEvent).toHaveBeenCalledWith(expect.objectContaining({
+    stage: 'presentation-transcript-supersede', entityRefs: expect.objectContaining({ predecessorIds: [OLD_ID] }) }));
 });
 
 test('an unconfirmed boundary is a 409 and writes nothing', async () => {
@@ -207,7 +248,7 @@ test.each([
 
 test('SharePoint reporting a different size fails closed without a row', async () => {
   deps.getFileMetadataById.mockImplementation(async (_drive, itemId) => (itemId === 'pres-item'
-    ? { name: `1002912-Presentation-Transcript-${REVISION_ID}.txt`, size: 1, eTag: 'e1', versionId: 'v1' }
+    ? { name: PRESENTATION_FILENAME, size: 1, eTag: 'e1', versionId: 'v1' }
     : { eTag: 'tag-source', versionId: '1' }));
   await expect(call()).rejects.toMatchObject({ code: 'presentation_transcript_file_mismatch' });
   expect(deps.createDocument).not.toHaveBeenCalled();

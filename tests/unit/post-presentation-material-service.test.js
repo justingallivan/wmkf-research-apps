@@ -343,6 +343,37 @@ test('bundle writer refuses to upload without mandatory durable receipt callback
   }
 });
 
+test('bundle writer refuses a manifest boundary that differs from the frozen source envelope', async () => {
+  const d = deps({ findDocuments: jest.fn(async () => ({ records: [] })) });
+  const prepared = await prepareMeetingTranscriptBundlePublication({ requestId: REQUEST_ID,
+    operationId: OPERATION_ID, siteVisitActivityId: VISIT_ID }, d);
+  // Frozen with no boundary; the publish identity then claims one.
+  const generated = buildMeetingTranscriptFiles({
+    content: { text: '', utterances: [{ speaker: 'A', start: 1000, end: 62900, text: 'Hello.' }] },
+    speakerNames: { A: 'Chair' },
+    identity: { requestId: REQUEST_ID, siteVisitActivityId: VISIT_ID,
+      revisionId: OPERATION_ID, operationId: OPERATION_ID, sourceRevisionId: null },
+  });
+  const oldFlag = process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY;
+  process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = 'on';
+  try {
+    await expect(publishMeetingTranscriptBundle({ requestId: REQUEST_ID, operationId: OPERATION_ID,
+      actorProfileId: 12, actingUserSystemId: ACTOR_ID,
+      identity: { requestId: REQUEST_ID, siteVisitActivityId: VISIT_ID, revisionId: OPERATION_ID,
+        operationId: OPERATION_ID, sourceRevisionId: null, formatterVersion: '4',
+        presentationEnd: { endMs: 62900, confirmedBy: 3, confirmedAt: '2026-10-05T10:00:00.000Z' } },
+      files: generated.files, frozenInputSha256: generated.inputSha256,
+      expectedCurrentArtifactId: null, expectedCurrentFingerprint: null,
+      prepared, candidatePaths: prepared.candidatePaths,
+      callbacks: { renew: jest.fn(async () => true), bindSlotFence: jest.fn(async () => true), recordCandidate: jest.fn(async () => true) },
+    }, d)).rejects.toMatchObject({ code: 'meeting_transcript_bundle_invalid' });
+    expect(d.acquireSlotLease).not.toHaveBeenCalled();
+    expect(d.uploadFile).not.toHaveBeenCalled();
+  } finally {
+    process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = oldFlag;
+  }
+});
+
 test('publishes all three byte-verified files only after each exact candidate is recorded in the receipt', async () => {
   const stored = new Map();
   let registered = null;

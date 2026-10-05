@@ -507,6 +507,17 @@ describe('presentation end', () => {
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
   });
 
+  test('a 409 on Generate for an unconfirmed boundary shows the specific reason, not the draft-conflict copy', async () => {
+    const artifact = boundaryArtifact({ presentationTranscript: { state: 'missing', artifactId: null } });
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) }, {
+      '/presentation-transcript': { method: 'POST', respond: () => response({ code: 'presentation_end_not_confirmed', message: 'server words' }, 409) },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate presentation transcript' }));
+    expect(await screen.findByText(/Confirm where the presentation ends before generating/)).toBeInTheDocument();
+    expect(screen.queryByText(/Another session changed this/)).not.toBeInTheDocument();
+  });
+
   test('job review mode shows nothing about the boundary', async () => {
     route({ collection: collection(), detail: detailFor({}) });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);

@@ -16,8 +16,8 @@ related:
 
 # Site Visit summaries, Staff Deliberations follow-up, and Board sharing
 
-Status: draft, owner decisions complete (§3, §7), Codex adversarial review
-pending. Nothing here is built.
+Status: Stage 1 source-built on `feature/site-visit-presentation-boundary`
+(2026-10-05, §11); Stages 2–4 not built. Owner decisions complete (§3, §7).
 
 ## 1. What the owner asked for (2026-10-04)
 
@@ -464,3 +464,68 @@ verified against source and folded in above:
    (§4.3 reasoning reworded); speaker candidates carry `staff`, `roster`,
    `manual`, with no Board class (§2, boundary rule now treats `staff` and
    `roster` as inside, flagged for confirmation).
+
+## 11. Stage 1 build record, 2026-10-05 (branch `feature/site-visit-presentation-boundary`)
+
+Orchestrated by Claude Fable; three Sonnet builders in parallel worktrees
+(service/store/routes/writer; outside pages and staff feed; card), merged,
+Opus review (nine findings, all addressed below), then Codex code review.
+Migration number: `067` was already claimed on
+`codex/staff-deliberations-rework`, so Stage 1 is `068`.
+
+Named changes from the design above:
+
+1. **The derivative row is written by an explicit action, not inside the
+   confirmation step** (§4.2 said "written by the boundary confirmation
+   step"). Confirmation publishes the v4 bundle through the normal correction
+   publish; the Presentation Transcript is then written by
+   `POST .../transcriptions/presentation-transcript` (the card's "Generate
+   presentation transcript"), idempotent on the generation key. One writer,
+   one path; a failed derivative write never leaves a published bundle
+   half-done, and the card shows "the Board link shows no transcript until
+   the presentation transcript is generated" until it succeeds.
+2. **Binding lives in `wmkf_generationkey`, not a snapshot field.** The Wave
+   16/30/31 schema has no generic input-snapshot attribute. The key is a
+   SHA-256 over producer, request, type, source `revisionId`, and `endMs`
+   (`presentation-transcript-binding.js`); both outside readers recompute it
+   from the current TRANSCRIPT winner's v4 manifest at context and open time.
+3. **No `scripts/setup-database.js` mirror for 068.** Since the 2026-09-30
+   bootstrap rewrite the fresh install runs every manifest migration for
+   real; the inline 055 text in the setup script is a parity fixture only.
+4. **A same-key derivative row that was superseded (boundary moved away and
+   back) is restored under the new fence**, not re-created: the generation
+   key is a Dataverse alternate key, so a second row cannot exist.
+5. **The derivative filename carries the boundary time
+   (`…-Presentation-Transcript-ends-1h02m14s.txt`), never a revision id**,
+   because the Board page shows filenames.
+6. **PATCHing the boundary the draft already holds does not re-stamp
+   `confirmedBy`/`confirmedAt`**; the card also omits the key when the
+   boundary is unchanged, so a names-only republish carries the original
+   confirmation forward (§4.1).
+7. **Manifest/source agreement is asserted in the publisher**
+   (`publishMeetingTranscriptBundle` refuses an identity boundary that differs
+   from the frozen source envelope).
+
+Open items recorded for the owner and later stages:
+
+- **Rollback caution.** Once any v4 bundle exists, rolling back to `main`
+  makes its validator (`[1,2,3]`) reject it: the card shows the transcript as
+  not editable and no correction draft can be created. Roll forward instead.
+- **Transcript Summary is served outside unbound** (no writer exists yet).
+  Stage 2 must bind it to the source revision and boundary (§4.2) before its
+  writer ships; a code note marks the spot in both outside services.
+- **Pre-Site distribution email material links**
+  (`lib/services/pre-site-visit/distribution/model.js` `MATERIAL_TYPES`)
+  still let staff select the full RECORDING and TRANSCRIPT rows as SharePoint
+  links. SharePoint requires tenant sign-in, so an outside recipient cannot
+  open them, but §4.7 did not list this allowlist. Owner decision: leave, or
+  trim to the Presentation Transcript.
+- **External briefing page empty-state copy** ("Slides, recordings, and
+  transcripts appear here…") no longer matches what the Board can see.
+- **Boundary rule confirmation** (handoff S575 §9): the proposal treats saved
+  staff and roster attendees as inside the foundation; confirm on 1003222
+  during acceptance.
+- **Owner-run before acceptance:** apply migration 068; dry-run then
+  `--execute` `scripts/extend-requestdocument-artifacttype-presentation-transcript.mjs`;
+  read `scripts/probe-outside-link-exposure.js`.
+
