@@ -38,7 +38,7 @@ Completed controls:
 - Redaction of bounded override values before writing `wmkf_ai_promptoverride`.
 - Raw-output retention modes (`full`, `hash`, `none`) for Executor and `DynamicsService.logAiRun()`.
 - `phase-i.summary` live prompt row activated with `rawOutputRetention: "hash"`.
-- Virtual Review Panel provider allowlist and production fail-closed behavior.
+- Review Panel provider allowlist and production fail-closed behavior (legacy Virtual Review Panel retired 2026-10-04; `vrp-providers.js` still serves the successor).
 - Reviewer Finder migration to `LLMClient`.
 - Dynamics Explorer model-context serializer for tool results, search highlights, and export AI-processing records.
 

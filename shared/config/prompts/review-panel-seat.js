@@ -12,7 +12,7 @@
  * (lib/services/review-panel-questions.js's buildSeatValidationSchema),
  * because the question set is admin-editable and not knowable at seed time.
  * Adapted from the retired interactive Virtual Review Panel's
- * createStructuredReviewPrompt (shared/config/prompts/virtual-review-panel.js).
+ * createStructuredReviewPrompt (archived 2026-10-04 to _archived/shared/config/prompts/virtual-review-panel.js).
  */
 export const PROMPT_NAME = 'review-panel.seat';
 

@@ -9,7 +9,7 @@ last_verified: 2026-03-30 via memory-content (not re-probed 2026-06-04)
 
 ## Recall Rule
 
-Read this when: writing or tuning Virtual Review Panel reviewer/synthesis prompts (or any LLM-reviewer proposal-evaluation prompt for Keck).
+Read this when: writing or tuning Review Panel seat/chair prompts (the legacy Virtual Review Panel they descend from retired 2026-10-04) or any (or any LLM-reviewer proposal-evaluation prompt for Keck).
 
 Do:
 - Evaluate upside and concerns with equal rigor; treat high risk as acceptable when payoff justifies it (Keck funds early-stage work).
@@ -21,7 +21,7 @@ Do not:
 
 Ground truth: CSO feedback 2026-03-30 (quoted in body); `docs/VIRTUAL_REVIEW_PANEL.md`.
 
-Virtual Review Panel prompts must NOT adopt a conservative NIH/NSF study-section posture.
+Review Panel prompts (and the retired legacy Virtual Review Panel's) must NOT adopt a conservative NIH/NSF study-section posture.
 
 **Why:** CSO feedback (2026-03-30): "All of the LLMs seem very focused on feasibility and require a high bar on innovation/novelty, i.e., negative about risk and lack of preliminary data for all elements of the proposed work, and overly extrapolating work in other systems that does not apply to this system as a reason to say this is not novel... Overall, the reviews read like a grumpy study section who thinks everything has been done before and expects the work to be 80% complete at time of proposal but also to be 100% different than any related idea or methodology."
 

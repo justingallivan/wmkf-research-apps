@@ -92,7 +92,7 @@ This document maps the full lifecycle of a grant application from submission thr
 | Integrity screening | 9 | Integrity Screener app | Built and running |
 | Reviewer finding | Post-approval | Workbench Reviewers tab | Built and running |
 | Review management | Post-approval | Workbench Reviewers tab | Built and running |
-| Panel review | During PD review | Virtual Review Panel app | Built and running |
+| Panel review | During PD review | Review Panel app (`review-panel`); legacy Virtual Review Panel retired 2026-10-04 | Successor built; legacy archived |
 | Expertise matching | 6 (PD assignment) | Expertise Finder app | Built and running |
 | Proposal summarization | Ad-hoc | Phase I/II Writeup apps | Built and running |
 
@@ -157,4 +157,4 @@ System/infrastructure data stays in Vercel Postgres:
 - Intake-portal drafts + audit (`intake_drafts`, `intake_audit`)
 - Dynamics Explorer per-user state (`dynamics_feedback`, `dynamics_query_log`, `dynamics_user_roles`, `dynamics_restrictions`)
 - Integrity Screener history (`integrity_screenings`, `screening_dismissals`)
-- Virtual Review Panel persistence (`panel_reviews`, `panel_review_items`)
+- Legacy Virtual Review Panel persistence (`panel_reviews`, `panel_review_items`; app retired 2026-10-04, tables retained)

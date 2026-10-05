@@ -120,15 +120,6 @@ export const APP_REGISTRY = [
     features: ['Staff Assignment', 'Consultant Matching', 'Board Interest', 'Roster Management'],
   },
   {
-    key: 'virtual-review-panel',
-    name: 'Virtual Review Panel',
-    href: '/virtual-review-panel',
-    icon: '🧑‍⚖️',
-    description: 'Multi-LLM review panel that evaluates grant proposals against WMKF reviewer criteria with claim verification and structured review synthesis',
-    categories: ['phase-ii'],
-    features: ['Multi-LLM Panel', 'Claim Verification', 'Structured Review', 'Panel Synthesis', 'Cost Tracking'],
-  },
-  {
     key: 'grant-reporting',
     name: 'Grant Reporting',
     href: '/grant-reporting',
@@ -229,6 +220,18 @@ export const APP_LIFECYCLE_REGISTRY = {
     notes:
       'Archived S291 (2026-06-26). Direct-URL legacy variant of phase-ii-writeup, which later became a sunset candidate in S344; not in nav and confirmed not in active use by the owner. Page + its API (/api/process-legacy) + prompt (proposal-summarizer-legacy) moved to _archived/. No dedicated grant key — the legacy page reused the phase-ii-writeup grant, so existing grants are unaffected.',
     lastVerified: '2026-06-26',
+  },
+  'virtual-review-panel': {
+    name: 'Virtual Review Panel (legacy multi-LLM)',
+    status: 'deprecated',
+    successorKey: 'review-panel',
+    deprecatedAt: '2026-10-04',
+    archivedTo: '_archived/pages/virtual-review-panel.js',
+    pagePath: '/virtual-review-panel',
+    grantsRetained: true,
+    notes:
+      'Retired S573 by owner decision 2026-10-04 (supersedes Phase A decision D5 "unchanged"). Page, SSE API route, panel-review-service, literature-search-service, prompt file and output schema archived to _archived/. Successor is the source-built Review Panel (key review-panel, Executor-governed seats/chair). Postgres tables panel_reviews / panel_review_items retained with their history; existing user_app_access grants left in place. multi-llm-service.js and vrp-providers.js stay live for the successor\'s provider vocabulary.',
+    lastVerified: '2026-10-04',
   },
   'phase-i-dynamics': {
     name: 'Phase I (Dynamics)',

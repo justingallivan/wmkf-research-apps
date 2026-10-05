@@ -110,7 +110,7 @@ These are DONE and reduce the next-model blast radius:
   `stopDetails`, `refused`) so Fable-style HTTP-200 refusals cannot disappear as an
   ordinary empty response.
 - `lib/services/multi-llm-service.js` now uses the same capability registry for its
-  Claude request body and preserves refusal metadata for virtual-review-panel calls.
+  Claude request body and preserves refusal metadata for multi-LLM-service calls (the legacy virtual-review-panel caller retired 2026-10-04).
 - `lib/services/execute-prompt.js` now resolves prompt-row models before execution
   and fails loud when a concrete Claude id is not reviewed in the capability/pricing
   registry.

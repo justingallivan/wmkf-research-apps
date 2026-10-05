@@ -172,11 +172,11 @@ does not authorize funding or gate later workflow progression. **[LIVE since 202
 **Read paths (verified 2026-05-07):** `lib/services/integrity-service.js` — searches `retractions.authors_normalized` for overlap with screened applicants, falls back to text match.
 **Write paths:** `scripts/import-retraction-watch.js` — DELETE all + INSERT bulk from Retraction Watch CSV. **No `/api/cron/refresh-retractions` route exists** (Atlas v1 mis-cited this).
 
-## Virtual Review Panel
+## Virtual Review Panel (legacy, retired 2026-10-04)
 
 ### `panel_reviews` (35 rows), `panel_review_items` (278 rows)
-**Source of truth:** Postgres. V24 migration.
-Multi-LLM review history. `panel_review_items` holds per-LLM responses.
+**Source of truth:** Postgres. Migration `003_virtual_review_panel.sql`.
+Legacy multi-LLM review history. The app and its only writer (`panel-review-service.js`) were archived to `_archived/` in S573; rows are retained as history with no live reader or writer. `panel_review_items` holds per-LLM responses.
 
 ## Intake Portal (pre-pilot)
 

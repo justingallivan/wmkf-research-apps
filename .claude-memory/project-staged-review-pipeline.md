@@ -43,7 +43,7 @@ Three-stage LLM-assisted proposal review pipeline for the new grant cycle (highe
 
 ## What Already Exists
 - Stage 0 intelligence pass (claim extraction → parallel search → collation → Perplexity synthesis) = Stage 2 sub-tasks
-- Virtual Review Panel pipeline = Stage 3 core
+- Virtual Review Panel pipeline = Stage 3 core (legacy panel retired 2026-10-04; its pipeline is archived, so Stage 3 would build on the successor Review Panel)
 - PI disambiguation fix (institution + field in search queries) = Stage 2 Sub-task C concern addressed
 
 ## What's New

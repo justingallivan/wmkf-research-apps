@@ -42,13 +42,13 @@ It complements `docs/API_ROUTE_SECURITY_MATRIX.md`: that document answers "who c
 - Some Dynamics AI-run paths intentionally store raw model output in Dataverse, especially `executePrompt()` and grant-reporting helpers. Output can contain proposal/report-derived content and should be treated as sensitive.
 - Several older service paths still call Anthropic with raw `fetch` instead of `LLMClient` / `safeFetch`.
 - Many proposal workflows send up to 80,000-100,000 characters of extracted text. That may be appropriate for staff workflows, but the code should make the size and source of transmitted text explicit, bounded, and testable.
-- The Virtual Review Panel may send the same proposal to multiple providers: Anthropic, OpenAI, Google, and Perplexity depending on configuration. The code threat is provider-boundary drift: a config/UI change could broaden provider exposure without being obvious to operators.
+- (Historical — legacy Virtual Review Panel retired 2026-10-04, route archived.) The Virtual Review Panel may send the same proposal to multiple providers: Anthropic, OpenAI, Google, and Perplexity depending on configuration. The code threat is provider-boundary drift: a config/UI change could broaden provider exposure without being obvious to operators.
 
 ## Current Findings And Disposition
 
 ### P1 - Large document payloads lack a shared, explicit send boundary
 
-Several routes send large extracted proposal/report payloads to external models. This includes reviewer finding, proposal summaries, Phase I/II summaries, grant reporting goals assessment, virtual review panel, and Q&A. This is an authorized staff workflow, but before this hardening pass the implementation expressed limits inconsistently across routes and prompt helpers.
+Several routes send large extracted proposal/report payloads to external models. This includes reviewer finding, proposal summaries, Phase I/II summaries, grant reporting goals assessment, virtual review panel (retired 2026-10-04), and Q&A. This is an authorized staff workflow, but before this hardening pass the implementation expressed limits inconsistently across routes and prompt helpers.
 
 Code threat: future changes can accidentally raise limits, send the wrong file text, duplicate payloads across multiple calls, or include fields the route did not actually need.
 
@@ -68,7 +68,7 @@ Recommended next step: keep this convention as the standard for new high-volume 
   - `handleRegenerate` (single-field regeneration): `grant-reporting.regenerate.reportText`, 100k cap
   - The grant-reporting prompt builders previously had no internal truncation — proposal and report text went straight to Claude. The boundary helper is the first explicit cap on this path.
 - `/api/analyze-funding-gap` (`funding-gap.extraction.proposalText`, 100k cap) before PI/institution/keyword extraction
-- `/api/virtual-review-panel` (`virtual-review-panel.run.proposalText`, 100k cap) — bounded once at the route boundary; the bounded text propagates to every prompt builder that embeds raw proposal text (Stage 0a claim extraction, claim verification, structured review, devil's advocate) across every configured provider. Two stages do **not** receive raw proposal text by design — Stage 0c (search collation) operates on extracted `claimData` plus raw search results, and synthesis operates on parsed reviewer outputs. Tests pin both invariants (six proposal-bearing calls when intelligence + DA are enabled; non-proposal calls verified to not contain the over-cap tail) so a future refactor that pipes raw proposal into either path would fail loudly.
+- `/api/virtual-review-panel` (retired 2026-10-04, archived; historical) (`virtual-review-panel.run.proposalText`, 100k cap) — bounded once at the route boundary; the bounded text propagates to every prompt builder that embeds raw proposal text (Stage 0a claim extraction, claim verification, structured review, devil's advocate) across every configured provider. Two stages do **not** receive raw proposal text by design — Stage 0c (search collation) operates on extracted `claimData` plus raw search results, and synthesis operates on parsed reviewer outputs. Tests pin both invariants (six proposal-bearing calls when intelligence + DA are enabled; non-proposal calls verified to not contain the over-cap tail) so a future refactor that pipes raw proposal into either path would fail loudly.
 - `/api/phase-i-dynamics/summarize` (`phase-i-dynamics.summarize.proposalText`, 100k cap) — single-request Phase I path with Dynamics writeback. Previously relied on an internal substring inside the prompt builder; now bounded at the route before `createPhaseISummarizationPrompt` is called.
 - `/api/phase-i-dynamics/summarize-v2` — bounded **inside the Prompt Executor** via the `phase-i.summary` prompt row's variable declaration (`dataClass: 'proposal_text'`, `maxChars: 100000` on `proposal_text`). Source string `executor.phase-i.summary.proposal_text`. The route hands raw `fileLoad.text` to `executePrompt`; the Executor enforces the cap uniformly for every current source kind. A future Power Automate caller would inherit the same contract only after implementing the Executor. See `lib/services/execute-prompt.js` and `docs/EXECUTOR_CONTRACT.md` § "Data classification + payload boundary".
 
@@ -93,7 +93,7 @@ Watch items that remain:
 - If token costs keep rising, add per-table default `select` behavior for `query_records` / `get_entity` / `get_related` when Claude omits one.
 - Continue monitoring for AI-summary loopback, especially if `wmkf_ai_summary` or similar fields become common in generic query results.
 
-### P1 - Virtual Review Panel provider boundaries are configuration-sensitive
+### P1 - Virtual Review Panel provider boundaries are configuration-sensitive (historical — legacy panel retired 2026-10-04)
 
 `/api/virtual-review-panel` can send full proposal text to multiple providers through `MultiLLMService`, including Claude, OpenAI, Gemini, and Perplexity. This materially expands vendor exposure compared with Claude-only routes.
 

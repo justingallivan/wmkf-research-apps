@@ -110,7 +110,7 @@ Prompt the model to return:
 ```
 
 #### Sub-task B: Field Landscape (Perplexity, parallel)
-Search for active groups, recent key papers, open problems, and competing approaches. See `virtual-review-panel.js` → `createFieldLandscapePrompt` for full prompt.
+Search for active groups, recent key papers, open problems, and competing approaches. See `virtual-review-panel.js` (archived 2026-10-04 under `_archived/shared/config/prompts/`) → `createFieldLandscapePrompt` for full prompt.
 
 Key outputs:
 - 5-8 active competing groups with recent publications
