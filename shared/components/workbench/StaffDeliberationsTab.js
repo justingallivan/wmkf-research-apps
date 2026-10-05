@@ -1265,7 +1265,7 @@ export default function StaffDeliberationsTab({
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {!due && !readyFile && !preSiteShared && !preSiteFinal && (
+            {(!due || ['disabled', 'blocked', 'none'].includes(preparationState)) && !readyFile && !preSiteShared && !preSiteFinal && (
               <button
                 type="button"
                 onClick={generate}
@@ -1280,6 +1280,9 @@ export default function StaffDeliberationsTab({
                 <a href={readyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
                   Edit in Word
                 </a>
+                {!correctionDraft && due && timing?.availability === 'available' && preparationState === 'disabled' && <button type="button" onClick={startSiteVisitAction} disabled={startingSiteVisit || generating} className={secondaryClass}>
+                  {startingSiteVisit ? 'Preparing…' : 'Prepare for post-visit editing'}
+                </button>}
                 {correctionDraft && <button type="button" onClick={startSiteVisitAction} disabled={startingSiteVisit || generating} className={secondaryClass}>
                   {startingSiteVisit ? 'Finishing…' : 'Finish corrections'}
                 </button>}

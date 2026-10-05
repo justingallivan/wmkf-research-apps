@@ -1393,3 +1393,18 @@ test('staff can finish corrections without receiving restricted correction audit
   expect(await screen.findByRole('button', { name: 'Finish corrections' })).toBeInTheDocument();
   expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('Corrections in progress');
 });
+
+
+test('paused preparation retains manual foundation generation after the presentation', async () => {
+  queueRoute('presiteGet', statusResponse({ preparation: { due: true, state: 'disabled' }, timing: { availability: 'available', endIso: '2026-09-28T18:00:00Z' } }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByRole('button', { name: 'Prepare working draft' })).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('Preparation paused'));
+});
+
+test('paused automation retains explicit preparation of an existing draft after the presentation', async () => {
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT), preparation: { due: true, state: 'disabled' }, timing: { availability: 'available', endIso: '2026-09-28T18:00:00Z' } }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByRole('button', { name: 'Prepare for post-visit editing' })).toBeInTheDocument();
+  expect(calls('startSiteVisit')).toHaveLength(0);
+});

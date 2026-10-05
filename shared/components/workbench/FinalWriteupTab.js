@@ -621,7 +621,7 @@ export default function FinalWriteupTab({ requestId }) {
         ) : status?.phase === 'ready' ? (
           <div className="mt-6 flex flex-col gap-5 rounded-xl border border-gray-200 bg-gray-50 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-2xl">
-              <h3 className="text-lg font-semibold text-gray-900">Ready for group review</h3>
+              <h3 className="text-lg font-semibold text-gray-900">{status.startBlockedReason ? 'Group review is not available yet' : 'Ready for group review'}</h3>
               <p className="mt-1 text-sm leading-6 text-gray-600">
                 This records the current Word version as the starting point for group review.
               </p>
@@ -630,7 +630,11 @@ export default function FinalWriteupTab({ requestId }) {
               )}
               {!status.canStart && (
                 <p className="mt-3 text-sm font-medium text-amber-800">
-                  Only the lead Program Director or a superuser can start this stage.
+                  {status.startBlockedReason === 'final_writeup_site_visit_not_ended'
+                    ? 'Group review becomes available after the scheduled presentation ends.'
+                    : status.startBlockedReason
+                      ? 'The presentation schedule could not be verified. Check Staff Deliberations before starting group review.'
+                      : 'Only the lead Program Director or a superuser can start this stage.'}
                 </p>
               )}
             </div>

@@ -573,3 +573,11 @@ test('T2 markReviewed(): malformed 2xx body reads as a stale-Final mismatch', as
   fireEvent.click(await screen.findByRole('button', { name: 'Mark reviewed' }));
   await waitFor(() => expect(screen.getByText(/current Final Writeup changed/i)).toBeInTheDocument());
 });
+
+
+test('schedule-blocked lead PD sees a timing explanation rather than a false permission error', async () => {
+  global.fetch.mockResolvedValue(response({ ...readyStatus(false), startBlockedReason: 'final_writeup_site_visit_not_ended' }));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  expect(await screen.findByText('Group review becomes available after the scheduled presentation ends.')).toBeInTheDocument();
+  expect(screen.queryByText('Only the lead Program Director or a superuser can start this stage.')).not.toBeInTheDocument();
+});
