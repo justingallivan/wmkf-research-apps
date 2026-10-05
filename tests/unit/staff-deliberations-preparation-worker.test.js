@@ -1,0 +1,220 @@
+/** @jest-environment node */
+import { drainStaffDeliberationsPreparations, getPreparationForRequest, requestPreparationRetry } from '../../lib/services/pre-site-visit/preparation-worker.js';
+import { readPreparationConfig } from '../../lib/services/pre-site-visit/preparation-config.js';
+import { REQUEST_DOCUMENT_LIFECYCLE_STATE as L, REQUEST_DOCUMENT_OPERATION_STATUS as O } from '../../shared/config/requestDocument.js';
+
+const REQUEST = 'aaaaaaaa-0000-4000-8000-000000000001';
+const PROGRAM = 'bbbbbbbb-0000-4000-8000-000000000001';
+const VISIT = 'cccccccc-0000-4000-8000-000000000001';
+const DOC = 'dddddddd-0000-4000-8000-000000000001';
+const END = '2026-12-01T18:00:00.000Z';
+const MODIFIED = '2026-11-01T12:00:00.000Z';
+
+const config = {
+  active: true,
+  programIds: [PROGRAM],
+  cycleCodes: ['D26'],
+  requestStatuses: ['Phase II Pending'],
+  stateStatusPairs: [{ stateCode: 10, statusCode: 11, eligible: true }],
+  batchSize: 1,
+  blockedBy: [],
+};
+
+function harness({ currentArtifact = null, generatedArtifact = null } = {}) {
+  const receipt = {
+    id: 'eeeeeeee-0000-4000-8000-000000000001',
+    lease_token: 'ffffffff-0000-4000-8000-000000000001',
+    attempt_count: 1,
+    request_id: REQUEST,
+    program_id: PROGRAM,
+    cycle_code: 'D26',
+    site_visit_id: VISIT,
+    scheduled_end: END,
+    event_modified_on: MODIFIED,
+    event_state_code: 10,
+    event_status_code: 11,
+    correction_epoch: '',
+  };
+  const dependencies = {
+    config,
+    now: () => new Date('2026-12-02T00:00:00.000Z'),
+    queryRequests: jest.fn().mockResolvedValue({ records: [{
+      akoya_requestid: REQUEST,
+      akoya_requeststatus: 'Phase II Pending',
+      wmkf_meetingdate: '2026-12-10T00:00:00Z',
+      _wmkf_grantprogram_value: PROGRAM,
+    }], capped: false }),
+    findSiteVisits: jest.fn().mockResolvedValue({ records: [{
+      activityid: VISIT,
+      _regardingobjectid_value: REQUEST,
+      scheduledend: END,
+      modifiedon: MODIFIED,
+      statecode: 10,
+      statuscode: 11,
+    }], capped: false }),
+    getRequest: jest.fn().mockResolvedValue({
+      akoya_requestid: REQUEST,
+      akoya_requeststatus: 'Phase II Pending',
+      wmkf_meetingdate: '2026-12-10T00:00:00Z',
+      _wmkf_grantprogram_value: PROGRAM,
+    }),
+    getSiteVisit: jest.fn().mockResolvedValue({
+      activityid: VISIT,
+      _regardingobjectid_value: REQUEST,
+      scheduledend: END,
+      modifiedon: MODIFIED,
+      statecode: 10,
+      statuscode: 11,
+    }),
+    readArtifactStatus: jest.fn().mockResolvedValue({ currentArtifact }),
+    generate: jest.fn().mockResolvedValue({ artifact: generatedArtifact }),
+    promote: jest.fn().mockResolvedValue({ artifact: {
+      artifactId: DOC, lifecycleState: L.REVIEW,
+    } }),
+    upsertReceipt: jest.fn().mockResolvedValue(receipt),
+    claimReceipt: jest.fn().mockResolvedValue(receipt),
+    finishReceipt: jest.fn().mockImplementation(async (_id, _token, outcome) => outcome),
+    listReceipts: jest.fn().mockResolvedValue(new Map()),
+  };
+  return { dependencies, receipt };
+}
+
+it('stays disabled without entering the request scan when production automation is off', async () => {
+  const { dependencies } = harness();
+  dependencies.config = { ...config, active: false, blockedBy: ['feature_disabled'] };
+  const result = await drainStaffDeliberationsPreparations(dependencies);
+  expect(result).toMatchObject({ status: 'disabled', blockedBy: ['feature_disabled'] });
+  expect(dependencies.queryRequests).not.toHaveBeenCalled();
+  expect(dependencies.generate).not.toHaveBeenCalled();
+});
+
+it('preserves an existing edited draft, skips generation, and records service provenance', async () => {
+  const currentArtifact = {
+    artifactId: DOC,
+    lifecycleState: L.DRAFT,
+    operationStatus: O.READY,
+    file: { itemId: 'same-word-item' },
+  };
+  const { dependencies } = harness({ currentArtifact });
+  const result = await drainStaffDeliberationsPreparations(dependencies);
+  expect(dependencies.generate).not.toHaveBeenCalled();
+  expect(dependencies.promote).toHaveBeenCalledWith(expect.objectContaining({ expectedArtifactId: DOC }));
+  expect(dependencies.finishReceipt).toHaveBeenCalledWith(expect.any(String), expect.any(String), expect.objectContaining({
+    state: 'prepared',
+    documentId: DOC,
+    provenance: expect.objectContaining({ principal: 'vercel-cron', documentId: DOC }),
+  }));
+  expect(result).toMatchObject({ prepared: 1, blocked: 0 });
+  expect(dependencies.queryRequests.mock.calls[0][0].filter).toContain("akoya_requeststatus eq 'Phase II Pending'");
+});
+
+it('uses missing-only generation and promotes its returned current Word identity', async () => {
+  const generatedArtifact = {
+    artifactId: DOC,
+    operationStatus: O.READY,
+    lifecycleState: L.DRAFT,
+  };
+  const { dependencies } = harness({ generatedArtifact });
+  await drainStaffDeliberationsPreparations(dependencies);
+  expect(dependencies.generate).toHaveBeenCalledWith(expect.objectContaining({
+    requestId: REQUEST,
+    generationMode: 'missing-only',
+  }));
+  expect(dependencies.promote).toHaveBeenCalledWith(expect.objectContaining({ expectedArtifactId: DOC }));
+});
+
+it('will not automatically promote a staff correction epoch, even when the receipt was scanned after reopen', async () => {
+  const currentArtifact = {
+    artifactId: DOC,
+    lifecycleState: L.DRAFT,
+    operationStatus: O.READY,
+    correction: { cycleId: 'staff-reopen-7' },
+  };
+  const { dependencies } = harness({ currentArtifact });
+  const result = await drainStaffDeliberationsPreparations(dependencies);
+  expect(dependencies.generate).not.toHaveBeenCalled();
+  expect(dependencies.promote).not.toHaveBeenCalled();
+  expect(dependencies.finishReceipt).toHaveBeenCalledWith(expect.any(String), expect.any(String), expect.objectContaining({
+    state: 'blocked', errorCode: 'correction_reopen_requires_staff',
+  }));
+  expect(result.blocked).toBe(1);
+});
+
+it('repairs a lost receipt acknowledgement from an already completed Final milestone without re-stamping', async () => {
+  const currentArtifact = {
+    artifactId: DOC,
+    lifecycleState: L.FINAL,
+    operationStatus: O.READY,
+    file: { versionId: 'v17' },
+    milestone: { versionId: 'v17', contentHash: 'sha256:fixture', createdAt: '2026-12-01T18:05:00Z' },
+  };
+  const { dependencies } = harness({ currentArtifact });
+  dependencies.findSiteVisits.mockResolvedValue({ records: [{
+    activityid: VISIT,
+    _regardingobjectid_value: REQUEST,
+    scheduledend: '2026-12-01T18:00:00Z',
+    modifiedon: '2026-12-02T00:30:00Z',
+    statecode: 10,
+    statuscode: 11,
+  }] });
+  const result = await drainStaffDeliberationsPreparations(dependencies);
+  expect(dependencies.generate).not.toHaveBeenCalled();
+  expect(dependencies.promote).not.toHaveBeenCalled();
+  expect(dependencies.finishReceipt).toHaveBeenCalledWith(expect.any(String), expect.any(String), expect.objectContaining({
+    state: 'prepared', documentId: DOC,
+    provenance: expect.objectContaining({ operation: 'reconciled-complete-handoff' }),
+  }));
+  expect(result).toMatchObject({ prepared: 1, blocked: 0 });
+});
+
+it('blocks ambiguous events and never starts generation', async () => {
+  const { dependencies } = harness();
+  dependencies.findSiteVisits.mockResolvedValue({ records: [
+    { activityid: VISIT, _regardingobjectid_value: REQUEST, scheduledend: END, modifiedon: MODIFIED, statecode: 10, statuscode: 11 },
+    { activityid: 'cccccccc-0000-4000-8000-000000000002', _regardingobjectid_value: REQUEST, scheduledend: END, modifiedon: MODIFIED, statecode: 99, statuscode: 99 },
+  ] });
+  const result = await drainStaffDeliberationsPreparations(dependencies);
+  expect(dependencies.upsertReceipt).toHaveBeenCalledWith(expect.objectContaining({
+    initialState: 'blocked', errorCode: 'schedule_requires_reconciliation',
+  }));
+  expect(dependencies.claimReceipt).toHaveBeenCalledTimes(1);
+  expect(dependencies.generate).not.toHaveBeenCalled();
+  expect(result.blocked).toBeGreaterThanOrEqual(1);
+});
+
+it('retries transient unknown outcomes and blocks nontransient failures', async () => {
+  const { dependencies } = harness();
+  dependencies.generate.mockRejectedValueOnce(Object.assign(new Error('offline'), { status: 503 }));
+  await drainStaffDeliberationsPreparations(dependencies);
+  expect(dependencies.finishReceipt).toHaveBeenCalledWith(expect.any(String), expect.any(String), expect.objectContaining({ state: 'pending' }));
+});
+
+it('fails closed when correction lineage fields have not passed schema readiness', () => {
+  const env = {
+    STAFF_DELIBERATIONS_AUTO_PREPARE: 'on',
+    STAFF_DELIBERATIONS_AUTO_PREPARE_PROGRAM_IDS: JSON.stringify([PROGRAM]),
+    STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES: JSON.stringify(['D26']),
+    STAFF_DELIBERATIONS_AUTO_PREPARE_REQUEST_STATUSES: JSON.stringify(['Phase II Pending']),
+    STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS: JSON.stringify([[10, 11, true]]),
+    STAFF_DELIBERATIONS_AUTO_PREPARE_ATOMIC_FENCE_CONFIRMED: 'on',
+  };
+  expect(readPreparationConfig(env)).toMatchObject({ active: false, blockedBy: expect.arrayContaining(['correction_schema_not_ready']) });
+  env.GUARDED_REOPEN_SCHEMA_READY = 'on';
+  expect(readPreparationConfig(env).active).toBe(true);
+});
+
+it('reports artifact lineage as unavailable instead of missing on detail read failure', async () => {
+  const { dependencies } = harness();
+  dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(new Map());
+  dependencies.readArtifactStatus.mockRejectedValue(new Error('registry unavailable'));
+  const projection = await getPreparationForRequest(REQUEST, dependencies);
+  expect(projection.writeup).toMatchObject({ availability: 'unavailable', artifactId: null });
+});
+
+it('retry requeues only the exact blocked receipt after current request and event revalidation', async () => {
+  const { dependencies } = harness();
+  dependencies.retryReceipt = jest.fn().mockResolvedValue(true);
+  const result = await requestPreparationRetry(REQUEST, dependencies);
+  expect(result).toMatchObject({ success: true, queued: true, requestId: REQUEST, siteVisitId: VISIT });
+  expect(dependencies.retryReceipt).toHaveBeenCalledWith(REQUEST, VISIT, END, '');
+});

@@ -2,8 +2,11 @@
 
 jest.mock('../../lib/dataverse/adapters/request-document.js', () => ({ findByRequests: jest.fn() }));
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({ queryAllRequests: jest.fn() }));
-jest.mock('../../lib/dataverse/adapters/site-visit.js', () => ({ findNonCancelledSummariesByRequests: jest.fn() }));
-jest.mock('../../lib/services/pre-site-visit/distribution-store.js', () => ({ sentSourceDocumentIds: jest.fn() }));
+jest.mock('../../lib/dataverse/adapters/site-visit.js', () => ({ findSummariesByRequests: jest.fn() }));
+jest.mock('../../lib/services/pre-site-visit/distribution-store.js', () => ({
+  sentSourceDocumentIds: jest.fn(), sentSourceVersionReceipts: jest.fn(),
+}));
+jest.mock('../../lib/services/pre-site-visit/preparation-store.js', () => ({ listPreparationsForSchedules: jest.fn() }));
 jest.mock('../../lib/services/deliberation-stage-labels.js', () => ({ readDeliberationStageLabels: jest.fn() }));
 jest.mock('../../lib/services/meeting-tracker/schedule-reader.js', () => ({ getDeliberationScheduleByRequestsWithAvailability: jest.fn() }));
 jest.mock('../../lib/services/site-visit-materials/summary-reader.js', () => ({ getMaterialsSummaryByRequestsWithAvailability: jest.fn() }));
@@ -12,7 +15,8 @@ jest.mock('../../lib/services/workbench/program-scope-service.js', () => ({ reso
 import * as requestDocumentAdapter from '../../lib/dataverse/adapters/request-document.js';
 import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
 import * as siteVisitAdapter from '../../lib/dataverse/adapters/site-visit.js';
-import { sentSourceDocumentIds } from '../../lib/services/pre-site-visit/distribution-store.js';
+import { sentSourceDocumentIds, sentSourceVersionReceipts } from '../../lib/services/pre-site-visit/distribution-store.js';
+import { listPreparationsForSchedules } from '../../lib/services/pre-site-visit/preparation-store.js';
 import { readDeliberationStageLabels } from '../../lib/services/deliberation-stage-labels.js';
 import { getDeliberationScheduleByRequestsWithAvailability } from '../../lib/services/meeting-tracker/schedule-reader.js';
 import { getMaterialsSummaryByRequestsWithAvailability } from '../../lib/services/site-visit-materials/summary-reader.js';
@@ -93,8 +97,10 @@ beforeEach(() => {
       ? [] : [doc('writeup-1', R1)],
     capped: false,
   }));
-  siteVisitAdapter.findNonCancelledSummariesByRequests.mockResolvedValue({ records: [], capped: false });
+  siteVisitAdapter.findSummariesByRequests.mockResolvedValue({ records: [], capped: false });
   sentSourceDocumentIds.mockResolvedValue(new Set());
+  sentSourceVersionReceipts.mockResolvedValue(new Map());
+  listPreparationsForSchedules.mockResolvedValue(new Map());
   getDeliberationScheduleByRequestsWithAvailability.mockImplementation(async (ids) => schedule(ids));
   getMaterialsSummaryByRequestsWithAvailability.mockImplementation(async ({ requestIds }) => materials(requestIds));
 });
@@ -143,7 +149,7 @@ it('does not promote an orphaned Ready Word row or a broken pointer to the curre
 
 it('marks schedule duplicates ambiguous and requires a valid end before reporting due', async () => {
   jest.useFakeTimers().setSystemTime(new Date('2026-12-02T00:00:00Z'));
-  siteVisitAdapter.findNonCancelledSummariesByRequests.mockResolvedValue({ records: [
+  siteVisitAdapter.findSummariesByRequests.mockResolvedValue({ records: [
     { _regardingobjectid_value: R1, activityid: 'v1', statecode: 1, statuscode: 2, scheduledstart: '2026-12-01T17:00:00Z', scheduledend: '2026-12-01T18:00:00Z' },
     { _regardingobjectid_value: R2, activityid: 'v2', statecode: 3, statuscode: 3, scheduledstart: '2026-12-01T17:00:00Z', scheduledend: null },
     { _regardingobjectid_value: R2, activityid: 'v3', statecode: 1, statuscode: 2, scheduledend: '2026-12-01T18:00:00Z' },
@@ -156,13 +162,13 @@ it('marks schedule duplicates ambiguous and requires a valid end before reportin
 
 it('fails closed on an unclassified Site Visit state/status pair', async () => {
   delete process.env.STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS;
-  siteVisitAdapter.findNonCancelledSummariesByRequests.mockResolvedValue({ records: [
+  siteVisitAdapter.findSummariesByRequests.mockResolvedValue({ records: [
     { _regardingobjectid_value: R1, activityid: 'v1', statecode: 0, statuscode: 1, scheduledend: '2026-12-01T18:00:00Z' },
   ], capped: false });
   const result = await list();
   expect(result.artifacts[0]).toMatchObject({
     timing: { availability: 'unavailable' },
-    preparation: { due: false, state: 'none' },
+    preparation: { due: false, state: 'none', availability: 'available' },
   });
 });
 
@@ -208,4 +214,36 @@ it('keeps the briefing and working writeup identities independent', async () => 
   const result = await list();
   expect(result.artifacts[0].brief.artifactId).toBe('brief-1');
   expect(result.artifacts[0].writeup.artifactId).toBe('writeup-1');
+});
+
+it('projects a committed group-review Final row using its real Review lifecycle', async () => {
+  grantRequestAdapter.queryAllRequests.mockResolvedValue({ records: [req(R1, {
+    _wmkf_currentpresitevisit_value: 'writeup-1',
+    _wmkf_currentfinalwriteup_value: 'final-1',
+  })], capped: false });
+  const source = doc('writeup-1', R1, {
+    wmkf_lifecyclestate: L.FINAL,
+    wmkf_sharepointdriveid: 'drive-1',
+    wmkf_sharepointitemid: 'item-1',
+  });
+  const final = {
+    ...doc('final-1', R1, {
+      wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.FINAL_WRITEUP,
+      wmkf_lifecyclestate: L.REVIEW,
+      wmkf_sharepointdriveid: 'drive-1',
+      wmkf_sharepointitemid: 'item-1',
+      wmkf_sharepointversionid: '2.0',
+      wmkf_groupreviewstartedat: '2026-12-02T00:00:00Z',
+      _wmkf_groupreviewstartedby_value: PD_A,
+      _wmkf_sourcedocument_value: 'writeup-1',
+    }),
+  };
+  requestDocumentAdapter.findByRequests.mockImplementation(async (_ids, { artifactType }) => ({
+    records: artifactType === REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_RESEARCH_PRESENTATION_BRIEF ? []
+      : artifactType === REQUEST_DOCUMENT_ARTIFACT_TYPE.FINAL_WRITEUP ? [final] : [source],
+    capped: false,
+  }));
+  const result = await list();
+  expect(result.artifacts[0].finalReview).toMatchObject({ availability: 'available', phase: 'group-review', artifactId: 'final-1' });
+  expect(result.artifacts[0].finalPhase).toBe('group-review');
 });
