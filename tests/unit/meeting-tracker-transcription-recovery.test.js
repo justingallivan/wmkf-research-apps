@@ -172,12 +172,12 @@ test.each([null, predecessor])('another authorized staff member recovers exact f
 
 const boundary = { endMs: 1000, confirmedBy: 12, confirmedAt: '2026-10-05T12:00:00.000Z' };
 
-test('recovery rebuilds a version-4 bundle from the receipt-frozen presentation end', async () => {
+test('recovery rebuilds a current-version bundle from the receipt-frozen presentation end', async () => {
   const receipt = fixture(null, boundary);
   const result = await reconcileMeetingTranscriptPublication({ requestId, operationId,
     actorProfileId: 12, actingUserSystemId: currentActor });
   expect(result).toMatchObject({ resumed: true, requiresAttention: false });
-  expect(receipt.formatter_version).toBe('4');
+  expect(receipt.formatter_version).toBe('5');
   expect(publisher.publishMeetingTranscriptBundle).toHaveBeenCalledWith(expect.objectContaining({
     frozenInputSha256: receipt.frozen_input_sha256,
     identity: expect.objectContaining({ presentationEnd: boundary }),
