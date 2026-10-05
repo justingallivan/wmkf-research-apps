@@ -625,6 +625,8 @@ The governed request-relative paths are
 `Site Visit/Transcript`, and `Site Visit/Transcript Summary`. Stage 1 of the
 summaries and Board sharing plan adds `Site Visit - Presentation Transcript`
 for the presentation-only transcript derivative (artifact type 100000012;
+Production-live 2026-10-05), and `Site Visit - Staff Discussion Transcript`
+for the staff-only discussion half (artifact type 100000013;
 Production-live 2026-10-05). Each file is one
 Request Document row with stable Graph identity; path and filename are not its
 durable key.
