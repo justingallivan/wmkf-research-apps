@@ -2129,6 +2129,9 @@ function SummaryBlock({ t }) {
     <div className="mt-4 border-t border-gray-100 pt-4" data-testid="presentation-summary-block">
       <h4 className="text-sm font-semibold text-gray-950">Presentation summary</h4>
       <p className="mt-1 text-sm leading-6 text-gray-900">{publishedLine}</p>
+      {(published?.state === 'bound' || published?.state === 'stale') && t.summary?.slidesChangedSinceSummary === true && (
+        <p className="mt-1 text-sm leading-6 text-amber-900" data-testid="summary-slides-changed">The applicant slides were updated after this summary was made. Summarize again to include them.</p>
+      )}
       {!presentationReady && <p className="mt-1 text-sm text-gray-700">Generate the presentation transcript to summarize it.</p>}
       {t.summary?.lastFailure && !draft && <p className="mt-1 text-sm text-gray-700">The last summary attempt did not produce a draft.</p>}
       {draft && (

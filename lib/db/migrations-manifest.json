@@ -68,6 +68,7 @@
     "066_transcription_audio_cap_200mib.sql",
     "068_presentation_transcript_boundary.sql",
     "069_staff_discussion_transcript_type.sql",
-    "070_meeting_transcript_summary_drafts.sql"
+    "070_meeting_transcript_summary_drafts.sql",
+    "071_summary_draft_slides_identity.sql"
   ]
 }

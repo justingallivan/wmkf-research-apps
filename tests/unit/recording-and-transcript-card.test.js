@@ -597,6 +597,22 @@ describe('presentation summary', () => {
     expect(screen.getByLabelText(/may be sent to Anthropic/)).not.toBeChecked();
   });
 
+  test('a published summary made from replaced slides says so; the same summary without the flag does not (staff replacement plan §3.5)', async () => {
+    const published = { state: 'bound', artifactId: DRAFT_ID, publishedAt: CONFIRMED_AT };
+    route({ materials: [transcriptRow()], collection: withSummary({ transcriptSummary: published }), detail: detailFor({}) }, {
+      '/summary-draft': { method: 'GET', respond: () => response(summaryState({ transcriptSummary: published, slidesChangedSinceSummary: true })) },
+    });
+    const view = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByTestId('summary-slides-changed')).toHaveTextContent('The applicant slides were updated after this summary was made.');
+    view.unmount();
+    route({ materials: [transcriptRow()], collection: withSummary({ transcriptSummary: published }), detail: detailFor({}) }, {
+      '/summary-draft': { method: 'GET', respond: () => response(summaryState({ transcriptSummary: published, slidesChangedSinceSummary: null })) },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByText(/The Board link and Staff Deliberations show it/)).toBeInTheDocument();
+    expect(screen.queryByTestId('summary-slides-changed')).toBeNull();
+  });
+
   test('a draft from an earlier transcript version cannot be published', async () => {
     route({ materials: [transcriptRow()], collection: withSummary(), detail: detailFor({}) }, {
       '/summary-draft': { method: 'GET', respond: () => response(summaryState({ draft: readyDraft(), draftMatchesTranscript: false })) },

@@ -283,18 +283,30 @@ describe('staff feed binds the transcript derivatives to the current boundary', 
     const summary = (endMs, extra = {}) => ({ ...derivative(SUMMARY_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, () => 'unique', endMs),
       wmkf_inputfingerprint: transcriptSummaryBindingFingerprint({ requestId: REQUEST_ID, sourceRevisionId: REVISION, presentationEndMs: endMs }),
       wmkf_contenthash: createHash('sha256').update(BYTES).digest('hex'), createdon: '2026-10-05T15:00:00Z', ...extra });
-    const summaryFeed = (records, { include = true, download = async () => ({ buffer: BYTES }) } = {}) => {
+    const summaryFeed = (records, { include = true, download = async () => ({ buffer: BYTES }), slidesChanged = async () => false } = {}) => {
       const downloadFile = jest.fn(download);
+      const summarySlidesChanged = jest.fn(slidesChanged);
       return getSiteVisitLogistics({ requestId: REQUEST_ID, includePresentationSummaryText: include }, dependencies({
         findDocumentsByRequest: jest.fn(async () => ({ records })),
-        presentationSchemaReady: () => true, presentationRequestAllowed: () => true, downloadFile,
-      })).then((result) => ({ result, downloadFile }));
+        presentationSchemaReady: () => true, presentationRequestAllowed: () => true, downloadFile, summarySlidesChanged,
+      })).then((result) => ({ result, downloadFile, summarySlidesChanged }));
     };
 
     test('a bound summary is returned with its text, BOM stripped', async () => {
       const { result, downloadFile } = await summaryFeed([transcript(1_800_000), summary(1_800_000)]);
-      expect(result.presentationSummary).toEqual({ text: TEXT, stale: false, publishedAt: '2026-10-05T15:00:00Z' });
+      expect(result.presentationSummary).toEqual({ text: TEXT, stale: false, publishedAt: '2026-10-05T15:00:00Z', slidesChanged: false });
       expect(downloadFile).toHaveBeenCalledWith('drive', `item-${SUMMARY_ID}`, { maxBytes: 256 * 1024 });
+    });
+
+    test('staff are told when the applicant slides changed after the summary; a failed check never breaks the feed (staff replacement plan §3.5)', async () => {
+      const records = [transcript(1_800_000), summary(1_800_000)];
+      const changed = await summaryFeed(records, { slidesChanged: async () => true });
+      expect(changed.result.presentationSummary.slidesChanged).toBe(true);
+      expect(changed.summarySlidesChanged).toHaveBeenCalledWith({ requestId: REQUEST_ID, rows: records, publishedArtifactId: SUMMARY_ID });
+      const unknown = await summaryFeed(records, { slidesChanged: async () => null });
+      expect(unknown.result.presentationSummary.slidesChanged).toBe(false);
+      const broken = await summaryFeed(records, { slidesChanged: async () => { throw new Error('db down'); } });
+      expect(broken.result.presentationSummary).toMatchObject({ text: TEXT, slidesChanged: false });
     });
 
     test('a summary from another boundary is still shown to staff, marked stale', async () => {

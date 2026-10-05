@@ -47,6 +47,15 @@ describe('inline presentation summary', () => {
     expect(screen.getByRole('button', { name: 'Show less' })).toHaveAttribute('aria-expanded', 'true');
   });
 
+  test('staff are told when the applicant slides changed after the summary (staff replacement plan §3.5)', () => {
+    const view = render(<ResearchPresentationFollowUp status="loaded" materials={[summaryRow]}
+      summary={{ text: TEXT, stale: false, publishedAt: '2026-10-05T15:00:00Z', slidesChanged: true }} />);
+    expect(screen.getByTestId('presentation-summary-text')).toHaveTextContent('the applicant slides were updated after this summary was made');
+    view.rerender(<ResearchPresentationFollowUp status="loaded" materials={[summaryRow]}
+      summary={{ text: TEXT, stale: false, publishedAt: '2026-10-05T15:00:00Z', slidesChanged: false }} />);
+    expect(screen.getByTestId('presentation-summary-text')).not.toHaveTextContent('slides were updated');
+  });
+
   test('a stale summary says the Board link no longer shows it', () => {
     render(<ResearchPresentationFollowUp status="loaded" materials={[summaryRow]}
       summary={{ text: TEXT, stale: true, publishedAt: '2026-10-05T15:00:00Z' }} />);
