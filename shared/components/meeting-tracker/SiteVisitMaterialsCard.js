@@ -3,14 +3,17 @@
  * (docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md §16, PR 1). The PC starts the
  * collection, sees each checklist item as received or missing, waives an
  * item, sends the invitation again or a reminder naming the missing items,
- * and confirms the files open. Files themselves arrive through the
- * applicant's contributor link (PR 2) and show on the briefing page.
+ * and confirms the files open. Files arrive through the applicant's
+ * contributor link (PR 2), or a coordinator uploads a file the PI sent, in any
+ * collection state and including waived items (staff replacement plan §3.4).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { requestEnvelope } from '../../utils/api-request';
 import { Button } from '../Layout';
 import EmailSendFeedback from '../EmailSendFeedback';
 import MaterialsEmailModal from './MaterialsEmailModal';
+import StaffMaterialUpload from './StaffMaterialUpload';
+import { SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED } from '../../config/siteVisitMaterials';
 import { siteVisitMaterialsScanRejectionMessage, siteVisitMaterialsScanRejectionReason } from '../../utils/site-visit-materials-scan-rejection';
 
 function formatDate(iso) {
@@ -264,13 +267,20 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
             {collection.checklist.map((item) => (
               <li key={item.key} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
                 <div>
-                  <p className={item.waived ? 'text-gray-400 line-through' : 'font-medium text-gray-900'}>{item.label}</p>
+                  <p className={item.waived && !item.received ? 'text-gray-400 line-through' : 'font-medium text-gray-900'}>{item.label}</p>
                   <p className="text-xs text-gray-500">
-                    {item.received ? `${uploadJobsForSlot(collection, item.key).some((job) => BLOCKING_UPLOAD_STATUSES.has(job.status)) ? 'Previously received' : 'Received'} ${formatDateTime(item.received.receivedAt)} · ${item.received.filename}` : item.waived ? 'Waived' : 'Missing'}
+                    {item.received ? `${uploadJobsForSlot(collection, item.key).some((job) => BLOCKING_UPLOAD_STATUSES.has(job.status)) ? 'Previously received' : 'Received'} ${formatDateTime(item.received.receivedAt)} · ${item.received.filename}${item.received.uploadedByStaff ? ' · staff upload' : ''}${item.waived ? ' · waived' : ''}` : item.waived ? 'Waived' : 'Missing'}
                   </p>
                   <UploadJobNotice jobs={uploadJobsForSlot(collection, item.key)} programCoordinator={collection.programCoordinator} />
                 </div>
                 <OpenFileLink file={item.received} />
+                <StaffMaterialUpload
+                  requestId={requestId}
+                  slot={item.key}
+                  label={item.received ? 'Upload updated file' : 'Upload file'}
+                  disabled={busy || uploadJobsForSlot(collection, item.key).some((job) => BLOCKING_UPLOAD_STATUSES.has(job.status))}
+                  onUploaded={() => { setNotice(`${item.label} saved.`); void load(); }}
+                />
                 {collection.state !== 'closed' && !item.received && (
                   <button type="button" disabled={busy} onClick={() => act('waive', { key: item.key, waived: !item.waived })} className="text-xs font-semibold text-gray-600 underline underline-offset-4 hover:text-gray-900 disabled:opacity-50">
                     {item.waived ? 'Require again' : 'Waive'}
@@ -280,7 +290,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
             ))}
             {collection.other.map((file) => (
               <li key={file.artifactId} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
-                <div><p className="font-medium text-gray-900">Other: {file.filename}</p><p className="text-xs text-gray-500">Received {formatDateTime(file.receivedAt)}</p></div>
+                <div><p className="font-medium text-gray-900">Other: {file.filename}</p><p className="text-xs text-gray-500">Received {formatDateTime(file.receivedAt)}{file.uploadedByStaff ? ' · staff upload' : ''}</p></div>
                 <OpenFileLink file={file} />
               </li>
             ))}
@@ -291,6 +301,11 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
               </li>
             ))}
           </ul>
+          {SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED && (
+            <div className="mt-2 flex justify-end">
+              <StaffMaterialUpload requestId={requestId} slot="other" label="Add other file" disabled={busy} onUploaded={() => { setNotice('Additional file saved.'); void load(); }} />
+            </div>
+          )}
 
           {collection.state !== 'closed' && (
             <div className="mt-4 flex flex-wrap items-center gap-2">

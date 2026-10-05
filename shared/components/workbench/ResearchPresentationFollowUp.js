@@ -37,6 +37,7 @@ function SummaryText({ summary }) {
       <p className="text-xs text-gray-500">
         {published ? `Published ${published}` : 'Published'}
         {summary.stale ? ' · from an earlier transcript version; the Board link no longer shows it' : ''}
+        {summary.slidesChanged === true ? ' · the applicant slides were updated after this summary was made' : ''}
       </p>
       {summary.text && (
         <>

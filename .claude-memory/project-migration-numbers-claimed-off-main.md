@@ -1,6 +1,6 @@
 ---
 name: project-migration-numbers-claimed-off-main
-description: "Before picking a Postgres migration number, check shared Production `schema_migrations` and numbers claimed on unmerged branches. 055 and 070 were applied to Production before merging; as of 2026-10-05 067 and 071 are claimed off main and the next free number is 072."
+description: "Before picking a Postgres migration number, check shared Production `schema_migrations` and numbers claimed on unmerged branches. 055 and 070 were applied to Production before merging; as of 2026-10-05 067 is on main (PR #432), 071 is claimed off main (PR #441), and the next free number is 072."
 status: active
 last_verified: 2026-10-05 via lib/db/migrations on main (68 files, ends at 069) and a scan of every remote branch for 065-079
 metadata:
@@ -65,7 +65,8 @@ origin/main`, 2026-09-30]. The episode shows why "the next number after
   (PR #440) and was applied to Production on 2026-10-05 before merge, the same pattern
   as 055. The owner's run reported 1 applied, 68 skipped from that branch's 69 files, so
   067 was not part of that run; whether Production holds 067 is [ASSUMED unknown].
-  070 merged in PR #440. **071 is claimed** by `071_summary_draft_slides_identity.sql`
+  067 has since merged to `main` in PR #432 (2026-10-05); commit `81fcfae6c` records it as
+  applied to Production. 070 merged in PR #440. **071 is claimed** by `071_summary_draft_slides_identity.sql`
   on `feature/staff-materials-replacement` (PR #441, not merged or applied as of
   2026-10-05). The next free number is 072.
 - Auto-mode permissions block Claude from running `apply-migrations.js` against

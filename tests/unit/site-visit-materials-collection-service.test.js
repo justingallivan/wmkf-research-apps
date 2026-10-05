@@ -747,3 +747,16 @@ test.each([null, '', 'not a URL', 'javascript:alert(1)', 'http://tenant.sharepoi
   const { collection } = await getMaterialsCollection({ requestId: REQUEST_ID }, d);
   expect(collection.checklist[0].received).toMatchObject({ filename: '1003222 Site Visit Presentation.pdf', webUrl: null });
 });
+
+test('the staff read marks a receipt as a staff upload only when its registry row records a staff actor (staff replacement plan §3.4)', async () => {
+  const d = deps();
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  d.findDocumentsByRequest.mockResolvedValue({ records: [
+    registryRow({ id: 'pdf', filename: '1003222 Site Visit Presentation.pdf', _wmkf_initiatedby_value: '66666666-6666-4666-8666-666666666666' }),
+    registryRow({ id: 'bios', filename: '1003222 Site Visit Participant Bios.pdf', wmkf_artifacttype: 100000004 }),
+  ] });
+  const { collection } = await getMaterialsCollection({ requestId: REQUEST_ID }, d);
+  const byKey = Object.fromEntries(collection.checklist.map((item) => [item.key, item]));
+  expect(byKey.presentation_pdf.received.uploadedByStaff).toBe(true);
+  expect(byKey.participant_bios.received.uploadedByStaff).toBe(false);
+});

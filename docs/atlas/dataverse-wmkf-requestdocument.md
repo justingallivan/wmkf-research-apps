@@ -367,6 +367,22 @@ Production Request Document row was created by this release smoke.
   the application. **Stage 1 (Production-live 2026-10-05) changes
   both outside readers to serve the bound Presentation Transcript and the
   Transcript Summary only; see "Presentation Transcript contract" below.**
+- Applicant materials writer (`lib/services/site-visit-materials/contributor-service.js`
+  `finalizeMaterialUpload`): the applicant contributor link writes Applicant
+  Slides / Other Applicant Materials rows under `EXTERNAL_CONTRIBUTOR` (no
+  actor). **[SOURCE-BUILT 2026-10-05 on `feature/staff-materials-replacement`;
+  not deployed]** A coordinator can also upload a file the PI sent, through
+  `.../materials/staff-upload-token` and `.../staff-finalize`. That path:
+  - runs inline only;
+  - may fill a waived slot;
+  - keeps producer `site-visit-materials-portal`, the folder, the canonical
+    filename and the supersede step, so every reader above and the summary
+    slides reader see it unchanged;
+  - writes under `REQUIRED` with the session's Dynamics system user, so
+    `_wmkf_initiatedby_value` marks a staff upload;
+  - ends `wmkf_name` in "(staff upload)" instead of "(applicant upload)".
+
+  See `docs/plans/STAFF_APPLICANT_MATERIALS_REPLACEMENT_PLAN_2026-10-05.md`.
 - `wmkf_requestdocument` owns the request/cycle relationship, typed artifact and
   lifecycle state, producer operation state, stable Graph site/drive/item
   identity, upload/finalization eTag/version snapshot, and

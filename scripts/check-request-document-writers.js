@@ -32,6 +32,10 @@ const WRITERS = Object.freeze([
   ['lib/services/pre-site-visit/reopen-service.js', 'dependencies.createDocument(', 'REQUIRED'],
   ['lib/services/pre-site-visit/distribution/retained-snapshot.js', 'dependencies.createDocument(', 'REQUIRED'],
   ['lib/services/final-writeup/transition-service.js', 'dependencies.createDocument(', 'REQUIRED'],
+  // One call, two literal option objects chosen by the explicit uploader kind:
+  // EXTERNAL_CONTRIBUTOR for the applicant link, REQUIRED (session system user)
+  // for a staff replacement upload (staff replacement plan §3.2). Both literals
+  // sit inside the scanned call window; this row asserts the contributor one.
   ['lib/services/site-visit-materials/contributor-service.js', 'dependencies.createDocument(', 'EXTERNAL_CONTRIBUTOR'],
   ['lib/services/consultant-feedback-attachment-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
   ['lib/services/pre-rp-brief/artifact-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],

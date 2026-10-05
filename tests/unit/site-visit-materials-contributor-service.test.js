@@ -568,3 +568,54 @@ test('contributor context omits stored SharePoint URLs for checklist and other r
   expect(result.checklist[0].received).not.toHaveProperty('webUrl');
   expect(result.other[0]).not.toHaveProperty('webUrl');
 });
+
+describe('staff replacement upload (staff replacement plan §3.2)', () => {
+  const STAFF_SYSTEM_USER = '66666666-6666-4666-8666-666666666666';
+  const STAFF = { kind: 'staff', actingUserSystemId: STAFF_SYSTEM_USER };
+
+  test('a staff upload writes the same producer and folder, records the staff actor, and supersedes the prior row', async () => {
+    const d = deps({ findDocumentsByRequest: async () => ({ records: [ROW_PDF] }) });
+    const closed = collection({ status: 'closed', closes_at: '2026-09-25T17:00:00Z' });
+    await finalizeMaterialUpload(finalizeArgs('presentation_pdf', { filename: 'Updated deck.pdf', buffer: PDF }, { collection: closed, uploader: STAFF }), d);
+    const [payload, options] = d.createDocument.mock.calls[0];
+    expect(payload.wmkf_producer).toBe('site-visit-materials-portal');
+    expect(payload.wmkf_sharepointfolderpath).toBe('Neural dust_ABC123/Site Visit - Slides');
+    expect(payload.wmkf_name).toMatch(/\(staff upload\)$/);
+    expect(options).toEqual(expect.objectContaining({ actorPolicy: 'required', actingUserSystemId: STAFF_SYSTEM_USER }));
+    expect(d.supersedeDocument).toHaveBeenCalledWith(ROW_PDF.wmkf_requestdocumentid);
+  });
+
+  test('the contributor default keeps the applicant name and the external-contributor policy with no acting user', async () => {
+    const d = deps();
+    await finalizeMaterialUpload(finalizeArgs(), d);
+    const [payload, options] = d.createDocument.mock.calls[0];
+    expect(payload.wmkf_name).toMatch(/\(applicant upload\)$/);
+    expect(options.actorPolicy).toBe('external-contributor');
+    expect(options).not.toHaveProperty('actingUserSystemId');
+  });
+
+  test('staff may fill a waived slot; the contributor is still refused on the same slot', async () => {
+    const waived = collection(); waived.checklist[0].waived = true;
+    const contributor = deps();
+    await expect(finalizeMaterialUpload(finalizeArgs('presentation_pdf', { filename: 'a.pdf', buffer: PDF }, { collection: waived }), contributor))
+      .rejects.toMatchObject({ code: 'slot_not_open' });
+    expect(contributor.uploadFile).not.toHaveBeenCalled();
+    const staff = deps();
+    await finalizeMaterialUpload(finalizeArgs('presentation_pdf', { filename: 'a.pdf', buffer: PDF }, { collection: waived, uploader: STAFF }), staff);
+    expect(staff.createDocument).toHaveBeenCalledTimes(1);
+  });
+
+  test('an unknown uploader, a staff uploader without a GUID system user, or a staff background job fails closed before any byte work', async () => {
+    for (const uploader of [{ kind: 'admin' }, null, { kind: 'staff' }, { kind: 'staff', actingUserSystemId: 'not-a-guid' }]) {
+      const d = deps();
+      await expect(finalizeMaterialUpload(finalizeArgs('presentation_pdf', undefined, { uploader }), d))
+        .rejects.toMatchObject({ code: 'uploader_invalid', httpStatus: 400 });
+      expect(d.getRequest).not.toHaveBeenCalled();
+      expect(d.scanBytes).not.toHaveBeenCalled();
+    }
+    const d = deps();
+    await expect(finalizeMaterialUpload(finalizeArgs('presentation_pdf', undefined, { uploader: STAFF, backgroundJob: { jobId: 'j' } }), d))
+      .rejects.toMatchObject({ code: 'uploader_invalid' });
+    expect(d.getRequest).not.toHaveBeenCalled();
+  });
+});

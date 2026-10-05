@@ -15,7 +15,9 @@ related:
 # Staff replacement upload for Site Visit applicant materials
 
 Drafted 2026-10-05 (Session 577) after Stage 2 acceptance on 1003222. Status:
-**PLANNED, not built.** This is Tier 1 runtime work: branch, PR, owner merge.
+**SOURCE-BUILT on `feature/staff-materials-replacement`
+(2026-10-05), not merged or deployed; see §7.** This is Tier 1 runtime work:
+branch, PR, owner merge.
 
 ## 1. What the owner asked for (2026-10-05)
 
@@ -223,8 +225,9 @@ try again once the applicant's upload finishes.
 **Staging scope:** reuse `site_visit_material` with the `profile:<id>`
 binding, so the existing candidate reconciler
 (`portal-upload-staging.js:870`) and cleanup cover staff rows unchanged.
-Before building, verify that the reconciler and maintenance never assume a
-`materials:` binding [ASSUMED until read]. If they do, add a
+The reconciler and maintenance never assume a `materials:` binding: the
+binding is only compared on claim [VERIFIED
+`lib/services/portal-upload-staging.js:188-227`]. If they do, add a
 `staff_site_visit_material` scope; that also requires a CHECK migration on
 `portal_upload_staging.scope`, last changed in 055.
 
@@ -290,3 +293,90 @@ No Dataverse schema change is needed: no new picklist value and no new column.
    adversarial round on the PR. The focus is the staff branch of
    `finalizeMaterialUpload`, which skips the collection-state and waiver
    checks, because exemptions are where fail-open hides.
+
+## 7. Build record, 2026-10-05 (Session 577)
+
+Branch `feature/staff-materials-replacement`, cut from `main` at `a93974cdf`.
+
+1. **Server** (`737249ed2`):
+   - `staff-upload-token` and `staff-finalize` under
+     `/api/meeting-tracker/visits/[requestId]/materials/`.
+   - `finalizeMaterialUpload` gains an explicit `uploader`. Anything other than
+     `contributor`, or `staff` with a GUID system user, fails closed, and a
+     staff uploader with a background job is refused.
+   - Writer-gate note, matrix rows, canonical counts.
+   - The waived-slot and unknown-uploader guards were mutation-checked: each
+     mutation turned the suite red.
+2. **Card** (`5c2f8354d`): `StaffMaterialUpload` on every checklist row, in
+   any collection state, disabled while that slot has a blocking applicant
+   job. The staff read exposes `uploadedByStaff` from `_wmkf_initiatedby_value`.
+3. **Slides-changed note** (`f99376e43`):
+   - Migration 071; `summary-slides-identity.js`.
+   - `slidesChangedSinceSummary` on the summary-draft GET, and `slidesChanged`
+     on the Staff Deliberations feed.
+   - The 071 CHECK was exercised against a throwaway Postgres 16 with seven
+     cases. It first accepted an id without a hash (`NULL ~ regex` is NULL);
+     fixed with an explicit `IS NOT NULL`.
+
+**Verification:**
+- Full unit suite: 1,239 suites, 20,090 tests passed.
+- Gates passed with sequential self-tests: `api-routes`,
+  `route-lifecycle-auth`, `trust-boundary-guid`, `request-document-writers`,
+  `route-service-boundary`, `dataverse-access-layer`,
+  `dynamics-context-boundary`, `model-override-warming`,
+  `migrations-manifest`, `types`, and the docs gates.
+
+**Before merge (owner-run):**
+- Apply migration 071 (`node scripts/apply-migrations.js`). The new summary
+  insert writes its columns.
+
+**Codex adversarial review (2026-10-05), round 1: needs-attention, one medium finding.**
+
+- **Finding:** after a retryable or lost `staff-finalize`, the card forgot the
+  staging id. The next attempt minted a new staging row, so a `supersede_failed`
+  partial success could leave the predecessor active, and a lost success
+  response could produce a duplicate row.
+- **Fix:** `StaffMaterialUpload` keeps `{stagingId, slot}` after any retryable
+  outcome and offers Retry, which re-finalizes the same staging row. Retryable
+  means a thrown/lost response, a 5xx, a 409 or a 429. A 4xx other than 409/429,
+  or a success, clears it. This is the same rule as the applicant page.
+- **Tests:** a lost response followed by Retry, and `supersede_failed`
+  followed by Retry; both show one blob upload and two finalizes with the same
+  staging id. A final 422 offers no Retry. Each retention guard was
+  mutation-checked.
+- **Round 2 (needs-attention, one medium):** the file chooser stayed enabled
+  beside Retry, so choosing file C discarded B's staging id. C then superseded
+  only B, and predecessor A stayed current.
+  - **Fix (implemented by Codex rescue, reviewed by Claude):** while a finalize
+    is unresolved, the upload button and file input are disabled, a line says
+    to press Retry first, and `upload()` refuses without minting a token.
+  - **Tests:** the regression covers 503 → choosing C → Retry with the original
+    staging id; after a terminal 422 the controls are enabled again. The
+    defensive guard and the disabled controls were each mutation-checked
+    separately.
+- **Limitation:** the staged id is held in component memory only. A page
+  reload, or switching to another request or slot, loses it. The staging row
+  then expires; the slot keeps whichever file is current. After a
+  `supersede_failed`, that can be the new file beside the old one, until a
+  later upload to the same slot supersedes the newest receipt only.
+
+**Behaviour notes for review:**
+- **`other` is add-only.** `finalizeMaterialUpload` supersedes nothing for
+  `other`, and the slot lease does not serialize it against jobs
+  [VERIFIED `collection-store.js:281`]. So "Add other file" appends a file and
+  never replaces a specific one. Per-file replacement of `other` would need its
+  own design. The slot is hidden in Production
+  (`SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED` false), and both staff routes
+  refuse it before minting.
+- **Non-staging load errors release the staging row.** When
+  `loadClaimedPortalImage` throws an error that is not a staging error,
+  `staff-finalize` releases the row and rethrows, so a Retry can claim it
+  again. The contributor route rethrows without releasing (`finalize.js:179-191`).
+  This difference is deliberate.
+
+**Known gap, not addressed here:**
+- `scripts/setup-database.js` already lacked the fresh-install shape for 061,
+  064, 070 and the 068/069 constraint changes. 071 follows that state rather
+  than half-fixing it. `apply-migrations.js` still applies every file after a
+  fresh install.
+

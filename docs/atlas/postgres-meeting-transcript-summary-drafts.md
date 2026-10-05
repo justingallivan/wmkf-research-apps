@@ -12,6 +12,8 @@ related:
   - docs/atlas/dataverse-wmkf-requestdocument.md
   - docs/plans/SITE_VISIT_SUMMARIES_AND_BOARD_SHARING_PLAN_2026-10-04.md
   - lib/db/migrations/070_meeting_transcript_summary_drafts.sql
+  - lib/db/migrations/071_summary_draft_slides_identity.sql
+  - lib/services/post-presentation-materials/summary-slides-identity.js
   - lib/services/post-presentation-materials/summary-draft-store.js
   - lib/services/post-presentation-materials/transcript-summary-service.js
 ---
@@ -24,6 +26,12 @@ related:
 Preview/Production database (1 applied, 68 skipped). PR #440 merged as
 `11ff96467` and is served by Production deployment `dpl_7Ci2zRWiMsWH5iZ5zoiBoR9JqnyD`. Stage 2 of the Site Visit summaries plan
 (§4.3, §6, §16).
+
+**[SOURCE-BUILT 2026-10-05 on `feature/staff-materials-replacement`; not applied
+or deployed.]** Migration 071 adds the slides-identity columns below
+(`docs/plans/STAFF_APPLICANT_MATERIALS_REPLACEMENT_PLAN_2026-10-05.md` §3.5).
+It must be applied before that branch merges, because the new insert writes
+these columns.
 
 ## Ownership and contract
 
@@ -42,6 +50,7 @@ adds 100000010). `request_id`, `source_revision_id`, `source_artifact_id`, and
 | `prompt_name`, `prompt_version`, `prompt_id`, `ai_run_id`, `failure_code` | Executor provenance; the run row keeps content-free audit only |
 | `publish_claim_token`, `publish_claimed_at`, `publish_registration_attempted` | The publishing request's token and claim time (required in state `publishing`), and a durable flag set just before the first registry write; `generating` and `ready` rows carry none of them (CHECK) |
 | `published_artifact_id` | The Transcript Summary request-document row, set exactly when state is `published` (CHECK) |
+| `slides_recorded`, `slides_artifact_id`, `slides_content_hash` (migration 071) | Which applicant slide PDF the run picked: its request-document row and SHA-256. `slides_recorded` is false for runs before 071 (unknown) and true afterwards; then both identity columns are set together, or both NULL when no slide PDF was on file (CHECK). These survive publish, so staff can be told when the slides changed after a published summary was made |
 
 States: `generating` → `ready` | `failed`; `ready` → `publishing` |
 `discarded` | `superseded` (a new Summarize) | `expired`; `publishing` →
@@ -83,7 +92,11 @@ those correction drafts are label-only (speaker names and the presentation end; 
 ## Readers and writers
 
 Only `lib/services/post-presentation-materials/summary-draft-store.js` reads or
-writes the table, called from `transcript-summary-service.js` (routes
-`/api/meeting-tracker/visits/[requestId]/transcriptions/summary-draft` and
-`.../summary-draft/publish`, `meeting-tracker` app access) and from the daily
-maintenance task.
+writes the table. Its callers:
+- `transcript-summary-service.js`, through the routes
+  `/api/meeting-tracker/visits/[requestId]/transcriptions/summary-draft` and
+  `.../summary-draft/publish` (`meeting-tracker` app access);
+- `summary-slides-identity.js`, which reads the published run's slides
+  identity for the summary-draft GET and for the Staff Deliberations feed
+  (`lib/services/site-visit/logistics-service.js`, `reviewers` app access);
+- the daily maintenance task.

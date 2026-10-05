@@ -7,7 +7,8 @@ jest.mock('../../lib/services/portal-upload-staging.js', () => ({
 
 import { createHash } from 'node:crypto';
 import {
-  createPresentationSummaryDraft, getPresentationSummaryDraft, publishPresentationSummaryDraft, updatePresentationSummaryDraft,
+  createPresentationSummaryDraft, getPresentationSummaryDraft, presentationSummarySlidesChanged, publishPresentationSummaryDraft,
+  updatePresentationSummaryDraft,
 } from '../../lib/services/post-presentation-materials/transcript-summary-service.js';
 import {
   bindTranscriptSummary, presentationTranscriptGenerationKey, transcriptSummaryBindingFingerprint,
@@ -86,6 +87,7 @@ beforeEach(() => {
     failSummaryDraft: jest.fn(async () => ({})),
     getActiveSummaryDraft: jest.fn(async () => draftRow()),
     getLatestSummaryRun: jest.fn(async () => null),
+    getPublishedSummaryDraft: jest.fn(async () => null),
     updateSummaryDraftText: jest.fn(async (args) => draftRow({ summary_text: args.text, version: 3, text_edited: true })),
     discardSummaryDraft: jest.fn(async () => ({})),
     // A stateful stand-in for the store's claim rules (the SQL itself is exercised against Postgres separately):
@@ -202,15 +204,21 @@ describe('create', () => {
 
   test('includes the newest Ready applicant slide PDF text when on file', async () => {
     state.rows = [...state.rows, row(SLIDES_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES, {
-      wmkf_producer: 'site-visit-materials-portal', wmkf_contenttype: 'application/pdf', wmkf_filename: 'slides.pdf' })];
+      wmkf_producer: 'site-visit-materials-portal', wmkf_contenttype: 'application/pdf', wmkf_filename: 'slides.pdf', wmkf_contenthash: sha('slides') })];
     const outcome = await create();
     expect(deps.executePrompt.mock.calls[0][0].overrideVariables.presentation_slides).toBe('Slide 1: Quantum dots');
     expect(outcome.slidesIncluded).toBe(true);
+    expect(drafts.beginSummaryDraft).toHaveBeenCalledWith(expect.objectContaining({ slidesArtifactId: SLIDES_ID, slidesContentHash: sha('slides') }));
+  });
+
+  test('a run with no slide PDF on file records that none was picked', async () => {
+    await create();
+    expect(drafts.beginSummaryDraft).toHaveBeenCalledWith(expect.objectContaining({ slidesArtifactId: null, slidesContentHash: null }));
   });
 
   test('a slide PDF that cannot be read is skipped, not fatal', async () => {
     state.rows = [...state.rows, row(SLIDES_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES, {
-      wmkf_producer: 'site-visit-materials-portal', wmkf_contenttype: 'application/pdf' })];
+      wmkf_producer: 'site-visit-materials-portal', wmkf_contenttype: 'application/pdf', wmkf_contenthash: sha('slides') })];
     deps.extractText.mockRejectedValueOnce(new Error('bad pdf'));
     await expect(create()).resolves.toMatchObject({ slidesIncluded: false });
   });
@@ -441,5 +449,33 @@ describe('read and edit', () => {
     drafts.updateSummaryDraftText.mockResolvedValueOnce(null);
     await expect(updatePresentationSummaryDraft({ requestId: REQUEST_ID, ownerProfileId: 12,
       body: { draftId: DRAFT_ID, expectedVersion: 1, text: 'New text' } }, deps)).rejects.toMatchObject({ code: 'summary_draft_changed' });
+  });
+});
+
+describe('slides changed since the published summary (staff replacement plan §3.5)', () => {
+  const PUBLISHED_ID = 'abababab-abab-4bab-8bab-abababababab';
+  const slidesRow = (id, hash) => row(id, REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES, {
+    wmkf_producer: 'site-visit-materials-portal', wmkf_contenttype: 'application/pdf', wmkf_contenthash: hash });
+  const run = (extra) => ({ state: 'published', published_artifact_id: PUBLISHED_ID, slides_recorded: true, slides_artifact_id: null, slides_content_hash: null, ...extra });
+  const changed = (rows) => presentationSummarySlidesChanged({ requestId: REQUEST_ID, rows, publishedArtifactId: PUBLISHED_ID }, deps);
+
+  test('the same slides are unchanged; a replacement, an addition, or a removal is a change', async () => {
+    drafts.getPublishedSummaryDraft.mockResolvedValue(run({ slides_artifact_id: SLIDES_ID, slides_content_hash: sha('v1') }));
+    expect(await changed([slidesRow(SLIDES_ID, sha('v1'))])).toBe(false);
+    expect(await changed([slidesRow('12121212-1212-4212-8212-121212121212', sha('v2'))])).toBe(true);
+    expect(await changed([])).toBe(true);
+    drafts.getPublishedSummaryDraft.mockResolvedValue(run());
+    expect(await changed([])).toBe(false);
+    expect(await changed([slidesRow(SLIDES_ID, sha('v1'))])).toBe(true);
+    expect(drafts.getPublishedSummaryDraft).toHaveBeenCalledWith({ requestId: REQUEST_ID, artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, publishedArtifactId: PUBLISHED_ID });
+  });
+
+  test('unknown without a published summary, its run, or a run recorded before migration 071', async () => {
+    expect(await presentationSummarySlidesChanged({ requestId: REQUEST_ID, rows: [], publishedArtifactId: null }, deps)).toBeNull();
+    expect(drafts.getPublishedSummaryDraft).not.toHaveBeenCalled();
+    drafts.getPublishedSummaryDraft.mockResolvedValueOnce(null);
+    expect(await changed([slidesRow(SLIDES_ID, sha('v1'))])).toBeNull();
+    drafts.getPublishedSummaryDraft.mockResolvedValueOnce(run({ slides_recorded: false }));
+    expect(await changed([slidesRow(SLIDES_ID, sha('v1'))])).toBeNull();
   });
 });
