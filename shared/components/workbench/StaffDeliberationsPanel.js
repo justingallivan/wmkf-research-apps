@@ -1,143 +1,150 @@
-/**
- * Staff deliberations panel — cycle-wide list of Pre-Site Visit drafts,
- * mounted inside the Request Workbench shell, which owns the cycle. One card
- * per request with a draft, grouped by stage (draft/shared/visit/final; PC
- * Meeting Tracker slice 3, docs/PC_MEETING_TRACKER_PLAN.md §5.4), each with
- * its own four-stop rail, visit line, and next-action link. Rows deep-link to
- * the per-request Staff Deliberations tab, which owns every write.
- *
- * Data: GET /api/workbench/staff-deliberations?cycleCode=…&scope=my|all
- */
+/** Request-first Staff Deliberations overview for the selected program/cycle. */
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { requestJson } from '../../utils/api-request';
 import { Card } from '../Layout';
-import DeliberationStageRail from './DeliberationStageRail';
 import ScopeSegment from './ScopeSegment';
-import {
-  DELIBERATION_STAGE_KEYS,
-  DELIBERATION_STAGE_DEFAULT_LABELS,
-  deliberationSessionLine,
-  deliberationStageSentence,
-  deliberationVisitLine,
-  visitExpected,
-} from '../../utils/deliberation-stage';
-import { siteVisitMaterialsLine } from '../../utils/site-visit-materials-line';
 import TestRequestBadge from '../TestRequestBadge';
+import { siteVisitMaterialsLine } from '../../utils/site-visit-materials-line';
+import {
+  REQUEST_DOCUMENT_LIFECYCLE_STATE,
+  REQUEST_DOCUMENT_OPERATION_STATUS,
+} from '../../config/requestDocument';
 
-const NOT_SCHEDULED_VISIT = Object.freeze({ status: 'not-scheduled', startIso: null });
-
-const EMPTY_COUNTS = Object.fromEntries(DELIBERATION_STAGE_KEYS.map((key) => [key, 0]));
-
-// draft/shared land back on the writeup tab; visit/final send staff on to the
-// Final Writeup tab, which owns the write for both of those next actions.
-const NEXT_ACTION_TAB = {
-  draft: 'staff-deliberations',
-  shared: 'staff-deliberations',
-  visit: 'final-writeup',
-  final: 'final-writeup',
-};
-
-function requestHref(artifact) {
-  const params = new URLSearchParams({ tab: NEXT_ACTION_TAB[artifact.stage] || 'staff-deliberations' });
-  if (artifact.requestNumber) params.set('n', artifact.requestNumber);
-  return `/workbench/${artifact.requestId}?${params.toString()}`;
+function requestHref(request, tab = 'staff-deliberations') {
+  const params = new URLSearchParams({ tab });
+  if (request.requestNumber) params.set('n', request.requestNumber);
+  return `/workbench/${request.requestId}?${params.toString()}`;
 }
 
-// D8/J27-083: at draft/shared the line is anticipatory ("not scheduled" as a PC
-// to-do); once a visit has actually happened or landed on Final, it is real
-// and always shown regardless of whether one was expected.
-function visitLineVisible(stage) {
-  return visitExpected() || stage === 'visit' || stage === 'final';
-}
-
-// Tab redesign (shape brief, owner 2026-09-10): the card carries the same
-// stage sentence and session/visit lines as the per-request tab; the old
-// registry block (lifecycle/operation labels, SharePoint-metadata sentence)
-// is gone. Draft-stage cards use the shorter sentence so a list of many stays
-// scannable.
-function cardSentence(artifact) {
-  if (artifact.stage === 'draft' && artifact.substate === 'ready') {
-    return 'Review and edit the AI draft in Word, then share it for the deliberation session.';
+function dateTime(value, timeZone = null) {
+  const ms = Date.parse(value || '');
+  if (!Number.isFinite(ms)) return null;
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      ...(timeZone ? { timeZone } : {}),
+    }).format(new Date(ms));
+  } catch {
+    return new Date(ms).toLocaleString();
   }
-  return deliberationStageSentence({
-    stage: artifact.stage,
-    substate: artifact.substate,
-    sharedAtIso: artifact.sharedAtIso || null,
-    visit: artifact.visit || NOT_SCHEDULED_VISIT,
-  });
 }
 
-function DeliberationCard({ artifact, stageLabels }) {
-  const keyed = DELIBERATION_STAGE_KEYS.includes(artifact.stage);
-  const showLines = keyed && artifact.stage !== 'final';
+function DocumentLine({ label, fact, href, wordDestination }) {
+  const available = fact?.availability === 'available' && fact?.file?.webUrl;
+  const state = fact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING ? 'Preparing'
+    : fact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED ? 'Needs attention'
+      : fact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW ? 'Ready for staff editing'
+        : fact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT ? 'Draft available'
+          : null;
+  return (
+    <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <p className="font-medium text-gray-900">{label}</p>
+        <p className="text-sm text-gray-600">
+          {state === 'Preparing' || state === 'Needs attention' ? state
+            : available ? (state || 'Document available') : fact?.availability === 'unavailable'
+            ? 'Status could not be read.'
+            : fact?.availability === 'ambiguous' ? 'Multiple current documents need reconciliation.'
+              : 'No document yet.'}
+        </p>
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center gap-3">
+        {available && (
+          <a href={fact.file.webUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-gray-800 underline underline-offset-2">
+            Open {wordDestination} in Word
+          </a>
+        )}
+        <Link href={href} className="text-sm font-medium text-blue-700 underline underline-offset-2">
+          {available ? 'Edit or review' : 'Open workbench'}
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function RequestCard({ request }) {
+  const end = dateTime(request.timing?.endIso, request.timing?.timeZone);
+  const start = dateTime(request.timing?.startIso, request.timing?.timeZone);
+  const due = request.preparation?.due === true;
+  const hasReviewReady = due
+    && request.writeup?.availability === 'available'
+    && request.writeup?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW
+    && request.writeup?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.READY;
+  const timingText = request.timing?.availability === 'ambiguous'
+    ? 'Schedule needs reconciliation; automatic preparation is paused.'
+    : request.timing?.availability === 'unavailable'
+      ? 'Schedule status is unavailable; automatic preparation is paused.'
+    : request.timing?.availability === 'missing'
+        ? 'Research presentation not scheduled.'
+        : request.timing?.availability === 'unavailable'
+          ? 'Presentation timing needs attention; automatic preparation is paused.'
+        : due
+          ? `Post-presentation editing · ended ${end}`
+          : `Before presentation · ${start || 'start time unavailable'}${end ? `–${end}` : ''}${request.timing?.timeZone ? ` (${request.timing.timeZone})` : ''}`;
+
   return (
     <Card hover={false}>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <Link
-            href={requestHref(artifact)}
-            className="font-semibold text-gray-900 hover:underline"
-          >
-            {artifact.requestNumber ? `#${artifact.requestNumber}` : artifact.requestId}
-            {artifact.title ? ` — ${artifact.title}` : ''}
-          </Link>
-          <TestRequestBadge isTestRequest={artifact.isTestRequest} className="ml-2" />
-          {artifact.institution && <p className="text-sm text-gray-600 mt-1">{artifact.institution}</p>}
-          {artifact.programDirector && <p className="text-xs text-gray-500 mt-1">PD: {artifact.programDirector}</p>}
-          {keyed && (
-            <DeliberationStageRail stage={artifact.stage} substate={artifact.substate} labels={stageLabels} />
-          )}
-          {keyed && (
-            <p className="mt-2 max-w-2xl text-sm text-gray-700" data-testid="deliberations-stage-sentence">
-              {cardSentence(artifact)}
-            </p>
-          )}
-          {!keyed && (
-            <p className="mt-2 text-sm text-gray-700">
-              {artifact.lifecycleLabel} · {artifact.operationLabel}
-            </p>
-          )}
-          {showLines && artifact.stage !== 'visit' && (
-            <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-session-line">
-              {deliberationSessionLine(artifact.session)}
-            </p>
-          )}
-          {showLines && artifact.stage !== 'visit' && visitLineVisible(artifact.stage) && (
-            <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-visit-line">
-              {deliberationVisitLine(artifact.visit || NOT_SCHEDULED_VISIT)}
-            </p>
-          )}
-          {showLines && artifact.materials && (
-            <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-materials-line">
-              {siteVisitMaterialsLine(artifact.materials)}
-            </p>
-          )}
-          {artifact.needsReconciliation && (
-            <p className="mt-1 text-xs font-semibold text-red-700" role="alert" data-testid="deliberations-reconciliation">
-              This document&apos;s pointer needs reconciliation. Contact an administrator.
-            </p>
-          )}
-          {!artifact.needsReconciliation && !artifact.isCurrent && (
-            <p className="mt-1 text-xs text-amber-700">Not the current draft.</p>
-          )}
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="break-words text-base font-semibold text-gray-900">
+              <Link href={requestHref(request)} className="underline-offset-2 hover:underline">
+                {request.requestNumber ? `#${request.requestNumber}` : request.requestId}
+                {request.title ? ` — ${request.title}` : ''}
+              </Link>
+            </h3>
+            {request.institution && <p className="mt-1 text-sm text-gray-600">{request.institution}</p>}
+            {request.programDirector && <p className="mt-1 text-xs text-gray-600">Lead PD: {request.programDirector}</p>}
+            <TestRequestBadge isTestRequest={request.isTestRequest} className="mt-2" />
+          </div>
+          <p className={`text-sm ${request.timing?.availability === 'ambiguous' || request.timing?.availability === 'unavailable' ? 'text-amber-800' : 'text-gray-600'}`}>
+            {timingText}
+          </p>
         </div>
-        <div className="text-right text-sm">
-          {artifact.file?.webUrl && (
-            <a
-              href={artifact.file.webUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              title={artifact.file.name || undefined}
-              className="block text-xs font-medium text-gray-700 hover:underline"
-            >
-              Open document →
-            </a>
-          )}
-          <Link href={requestHref(artifact)} className="mt-2 block text-xs font-medium text-indigo-600 hover:underline">
-            {NEXT_ACTION_TAB[artifact.stage] === 'final-writeup' ? 'Open Final Writeup →' : 'Open Staff Deliberations →'}
-          </Link>
+
+        <div className="mt-4 space-y-4 divide-y divide-gray-200">
+          <div className="pt-4 first:pt-0">
+            <DocumentLine label="Pre-site briefing" fact={request.brief} href={requestHref(request)} wordDestination="briefing" />
+          </div>
+          <div className="pt-4">
+            <DocumentLine label="Working writeup" fact={request.writeup} href={requestHref(request)} wordDestination="working writeup" />
+            {!due && request.writeup?.availability === 'missing' && request.timing?.availability === 'available' && (
+              <p className="mt-2 text-sm text-gray-600">Optional before the presentation · draft not started.</p>
+            )}
+            {due && request.writeup?.availability === 'missing' && (
+              <p className="mt-2 text-sm text-gray-600" role="status">
+                {request.preparation?.state === 'running' || request.preparation?.state === 'pending'
+                  ? 'Preparing a working writeup from the approved foundation inputs.'
+                  : 'Preparation is due. The scheduled worker will create a foundation only if no current draft exists.'}
+              </p>
+            )}
+            {hasReviewReady && (
+              <Link href={requestHref(request, 'final-writeup')} className="mt-2 inline-block text-sm font-semibold text-gray-900 underline underline-offset-2">
+                Review readiness for group review →
+              </Link>
+            )}
+          </div>
+          <div className="pt-4">
+            <p className="font-medium text-gray-900">Deliberation session</p>
+            <p className="text-sm text-gray-600">
+              {request.sessionAvailability === 'unavailable'
+                ? 'Session details are unavailable.'
+                : request.session?.scheduledStartIso
+                  ? dateTime(request.session.scheduledStartIso, request.session.ianaTimeZone) || 'Session time unavailable.'
+                  : 'Not yet scheduled.'}
+            </p>
+          </div>
+          <div className="pt-4">
+            <p className="font-medium text-gray-900">Research presentation materials</p>
+            <p className="text-sm text-gray-600">
+              {request.materialsAvailability === 'unavailable'
+                ? 'Materials status is unavailable.'
+                : siteVisitMaterialsLine(request.materials) || 'No materials recorded.'}
+            </p>
+          </div>
         </div>
       </div>
     </Card>
@@ -145,113 +152,93 @@ function DeliberationCard({ artifact, stageLabels }) {
 }
 
 export default function StaffDeliberationsPanel({
+  programId,
   cycleCode,
   loadingCycles,
   scope = 'my',
   onScopeChange = () => {},
 }) {
-  const [artifacts, setArtifacts] = useState([]);
-  const [counts, setCounts] = useState(EMPTY_COUNTS);
-  const [stageLabels, setStageLabels] = useState(DELIBERATION_STAGE_DEFAULT_LABELS);
+  const [requests, setRequests] = useState([]);
+  const [requestCounts, setRequestCounts] = useState({ ordinary: 0, test: 0, total: 0 });
   const [loading, setLoading] = useState(false);
+  const [serverNowIso, setServerNowIso] = useState(null);
+  const [clockRefresh, setClockRefresh] = useState(0);
   const [error, setError] = useState(null);
   const requestSequence = useRef(0);
 
   useEffect(() => {
-    if (!cycleCode) {
+    if (!programId || !cycleCode) {
       requestSequence.current += 1;
-      setArtifacts([]);
-      setCounts(EMPTY_COUNTS);
+      setRequests([]);
+      setRequestCounts({ ordinary: 0, test: 0, total: 0 });
       setError(null);
       setLoading(false);
       return undefined;
     }
     const sequence = ++requestSequence.current;
+    setRequests([]);
     setLoading(true);
     setError(null);
     (async () => {
       try {
+        const params = new URLSearchParams({ programId, cycleCode, scope });
         const body = await requestJson(
-          `/api/workbench/staff-deliberations?cycleCode=${encodeURIComponent(cycleCode)}&scope=${encodeURIComponent(scope)}`,
-          { fallbackMessage: 'Failed to load pre-site drafts', tolerantBody: true },
+          `/api/workbench/staff-deliberations?${params.toString()}`,
+          { fallbackMessage: 'Failed to load requests', tolerantBody: true },
         );
         if (requestSequence.current !== sequence) return;
-        setArtifacts(Array.isArray(body.artifacts) ? body.artifacts : []);
-        setCounts(body.counts || EMPTY_COUNTS);
-        if (body.stageLabels) setStageLabels(body.stageLabels);
+        setRequests(Array.isArray(body.artifacts) ? body.artifacts : []);
+        setRequestCounts(body.requestCounts || { ordinary: body.artifacts?.length || 0, test: 0, total: body.artifacts?.length || 0 });
+        setServerNowIso(body.serverNowIso || null);
       } catch (loadError) {
         if (requestSequence.current === sequence) {
           setError(loadError.message);
-          setArtifacts([]);
-          setCounts(EMPTY_COUNTS);
+          setRequests([]);
+          setRequestCounts({ ordinary: 0, test: 0, total: 0 });
+          setServerNowIso(null);
         }
       } finally {
         if (requestSequence.current === sequence) setLoading(false);
       }
     })();
     return () => { requestSequence.current += 1; };
-  }, [cycleCode, scope]);
+  }, [programId, cycleCode, scope, clockRefresh]);
+
+  useEffect(() => {
+    const serverNow = Date.parse(serverNowIso || '');
+    if (!Number.isFinite(serverNow)) return undefined;
+    const nextEnd = requests
+      .filter((request) => request.timing?.availability === 'available' && request.preparation?.due !== true)
+      .map((request) => Date.parse(request.timing.endIso || ''))
+      .filter((end) => Number.isFinite(end) && end > serverNow)
+      .sort((left, right) => left - right)[0];
+    if (!nextEnd) return undefined;
+    const timer = setTimeout(() => setClockRefresh((value) => value + 1), Math.max(1000, nextEnd - serverNow + 1000));
+    return () => clearTimeout(timer);
+  }, [requests, serverNowIso]);
 
   if (!cycleCode && !loadingCycles) return null;
 
-  // The service omits the 'visit' key from `counts` entirely when
-  // visitExpected() is false (D8/J27), rather than reporting a hollow "0
-  // visit" — mirror that omission here instead of re-deciding it client-side.
-  const leadLine = DELIBERATION_STAGE_KEYS
-    .filter((key) => Object.prototype.hasOwnProperty.call(counts, key))
-    .map((key) => `${counts[key] ?? 0} ${(stageLabels[key] || DELIBERATION_STAGE_DEFAULT_LABELS[key]).toLowerCase()}`)
-    .join(' · ');
-
-  const byStage = Object.fromEntries(DELIBERATION_STAGE_KEYS.map((key) => [
-    key,
-    artifacts.filter((artifact) => artifact.stage === key),
-  ]));
-  // A row whose stage isn't one of the four keyed stops (e.g. 'beyond' — Board
-  // Ready/Superseded/unknown lifecycle) never vanishes from the list; it lands
-  // in a trailing ungrouped block instead of being silently dropped.
-  const ungrouped = artifacts.filter((artifact) => !DELIBERATION_STAGE_KEYS.includes(artifact.stage));
-
   return (
-    <>
+    <section aria-labelledby="staff-deliberations-heading">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 id="staff-deliberations-heading" className="text-lg font-semibold text-gray-900">Staff Deliberations</h2>
+          {!loading && !loadingCycles && <p className="mt-1 text-sm text-gray-600">
+            {requestCounts.ordinary} requests in this program and cycle
+            {requestCounts.test > 0 ? ` · ${requestCounts.test} test requests also shown` : ''}
+          </p>}
+        </div>
         <ScopeSegment scope={scope} onChange={onScopeChange} allLabel="All program directors" />
-        {!loadingCycles && !loading && <p className="text-sm text-gray-600">{leadLine}</p>}
       </div>
-      {error && (
-        <div className="mb-4 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm" role="alert">
-          {error}
-        </div>
-      )}
-      {loadingCycles || loading ? (
-        <Card hover={false}><p className="text-gray-500">Loading pre-site drafts…</p></Card>
-      ) : artifacts.length === 0 ? (
-        <Card hover={false}><p className="text-gray-500">No pre-site drafts for this cycle.</p></Card>
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{error}</div>}
+      {loadingCycles || (loading && requests.length === 0) ? (
+        <Card hover={false}><p className="text-gray-600">Loading requests…</p></Card>
+      ) : requests.length === 0 ? (
+        <Card hover={false}><p className="text-gray-700">No requests in this program and cycle for this view.</p></Card>
       ) : (
-        <div className="space-y-6">
-          {DELIBERATION_STAGE_KEYS.filter((key) => byStage[key].length > 0).map((key) => (
-            <div key={key}>
-              <h3 className="mb-2 text-sm font-semibold text-gray-700">
-                {stageLabels[key] || DELIBERATION_STAGE_DEFAULT_LABELS[key]}
-              </h3>
-              <div className="space-y-3">
-                {byStage[key].map((artifact) => (
-                  <DeliberationCard key={artifact.artifactId} artifact={artifact} stageLabels={stageLabels} />
-                ))}
-              </div>
-            </div>
-          ))}
-          {ungrouped.length > 0 && (
-            <div>
-              <h3 className="mb-2 text-sm font-semibold text-gray-700">Other</h3>
-              <div className="space-y-3">
-                {ungrouped.map((artifact) => (
-                  <DeliberationCard key={artifact.artifactId} artifact={artifact} stageLabels={stageLabels} />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <div className="space-y-3">{requests.map((request) => <RequestCard key={request.requestId} request={request} />)}</div>
       )}
-    </>
+    </section>
   );
 }

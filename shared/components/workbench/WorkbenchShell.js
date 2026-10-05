@@ -306,6 +306,7 @@ export function WorkbenchShell({ previewReadOnly = false }) {
         />
       ) : location.view === 'staff-deliberations' ? (
         <StaffDeliberationsPanel
+          programId={programId}
           cycleCode={cycleCode}
           loadingCycles={!cyclesReady && !cyclesError}
           scope={location.scope}
