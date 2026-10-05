@@ -1435,14 +1435,14 @@ function fullTranscript(manifest = v4Manifest()) {
 }
 function derivative(endMs = 70_000, overrides = {}) {
   return fileRow(PRESENTATION_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT, PRODUCER, {
-    wmkf_filename: 'presentation.txt', wmkf_contenttype: 'text/plain', wmkf_filesize: 500,
+    wmkf_filename: 'presentation.txt', wmkf_contenttype: 'text/plain', wmkf_filesize: 500, wmkf_sharepointetag: 'e1',
     wmkf_generationkey: presentationTranscriptGenerationKey({ requestId: REQUEST_ID, sourceRevisionId: REVISION, presentationEndMs: endMs }),
     ...overrides,
   });
 }
 function summaryRow(overrides = {}) {
   return fileRow(SUMMARY_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, PRODUCER, {
-    wmkf_filename: 'summary.pdf', ...overrides,
+    wmkf_filename: 'summary.pdf', wmkf_sharepointetag: 'e1', ...overrides,
   });
 }
 function zoomRecording(overrides = {}) {
@@ -1457,9 +1457,9 @@ function fileRecording() {
     wmkf_filename: 'recording.mp4', wmkf_contenttype: 'video/mp4',
   });
 }
-function textMedia(filename = 'presentation.txt', mimeType = 'text/plain') {
+function textMedia(filename = 'presentation.txt', mimeType = 'text/plain', { eTag = 'e1' } = {}) {
   return jest.fn(async (driveId, itemId) => ({
-    driveId, itemId, filename, mimeType, malware: null, downloadUrl: 'https://tenant.sharepoint.com/download?short=1',
+    driveId, itemId, filename, mimeType, malware: null, eTag, downloadUrl: 'https://tenant.sharepoint.com/download?short=1',
   }));
 }
 
@@ -1519,6 +1519,18 @@ test('briefing: a bound Presentation Transcript opens by redirect, is never buff
   await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID), mode: 'watch' }, d));
   await expectBriefingNotFound(resolveBriefingMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID) }, d));
   expect(d.downloadFile).not.toHaveBeenCalled();
+});
+
+test('briefing: a replaced SharePoint file (live eTag differs from the pinned one) is never served, for the derivative or the summary (Codex finding)', async () => {
+  const replaced = enabledDeps([fullTranscript(), derivative(), summaryRow()], { resolveMediaDownloadUrl: textMedia('presentation.txt', 'text/plain', { eTag: 'e2' }) });
+  await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID), mode: 'open' }, replaced));
+  const replacedSummary = enabledDeps([summaryRow()], { resolveMediaDownloadUrl: textMedia('summary.pdf', 'application/pdf', { eTag: 'e2' }) });
+  await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(SUMMARY_ID), mode: 'open' }, replacedSummary));
+  // A row that never pinned an eTag fails closed too.
+  const unpinned = enabledDeps([fullTranscript(), derivative(70_000, { wmkf_sharepointetag: null })], { resolveMediaDownloadUrl: textMedia() });
+  await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID), mode: 'open' }, unpinned));
+  const noLiveTag = enabledDeps([fullTranscript(), derivative()], { resolveMediaDownloadUrl: textMedia('presentation.txt', 'text/plain', { eTag: null }) });
+  await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID), mode: 'open' }, noLiveTag));
 });
 
 test('briefing: the summary opens only as text/pdf/docx', async () => {

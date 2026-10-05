@@ -90,14 +90,14 @@ function fullTranscript(manifest = v4Manifest()) {
 }
 function derivative(endMs = 70_000, overrides = {}) {
   return fileRow(PRESENTATION_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT, PRODUCER, {
-    wmkf_filename: 'presentation.txt', wmkf_contenttype: 'text/plain', wmkf_filesize: 500,
+    wmkf_filename: 'presentation.txt', wmkf_contenttype: 'text/plain', wmkf_filesize: 500, wmkf_sharepointetag: 'e1',
     wmkf_generationkey: presentationTranscriptGenerationKey({ requestId: REQUEST_ID, sourceRevisionId: REVISION, presentationEndMs: endMs }),
     ...overrides,
   });
 }
 function summaryRow(overrides = {}) {
   return fileRow(SUMMARY_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, PRODUCER, {
-    wmkf_filename: 'summary.pdf', ...overrides,
+    wmkf_filename: 'summary.pdf', wmkf_sharepointetag: 'e1', ...overrides,
   });
 }
 function zoomRecording(overrides = {}) {
@@ -112,9 +112,9 @@ function fileRecording() {
     wmkf_filename: 'recording.mp4', wmkf_contenttype: 'video/mp4',
   });
 }
-function textMedia(filename = 'presentation.txt', mimeType = 'text/plain') {
+function textMedia(filename = 'presentation.txt', mimeType = 'text/plain', { eTag = 'e1' } = {}) {
   return jest.fn(async (driveId, itemId) => ({
-    driveId, itemId, filename, mimeType, malware: null, downloadUrl: 'https://tenant.sharepoint.com/download?short=1',
+    driveId, itemId, filename, mimeType, malware: null, eTag, downloadUrl: 'https://tenant.sharepoint.com/download?short=1',
   }));
 }
 
@@ -168,6 +168,18 @@ test('a bound Presentation Transcript opens and downloads by redirect, but never
     expect(result).not.toHaveProperty('buffer');
   }
   await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: `material:${PRESENTATION_ID}`, mode: 'watch' }, deps));
+});
+
+test('a replaced SharePoint file (live eTag differs from the pinned one) is never served, for the derivative or the summary (Codex finding)', async () => {
+  const replaced = dependencies([fullTranscript(), derivative(), summaryRow()], { resolveMediaDownloadUrl: textMedia('presentation.txt', 'text/plain', { eTag: 'e2' }) });
+  await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: `material:${PRESENTATION_ID}`, mode: 'open' }, replaced));
+  const replacedSummary = dependencies([summaryRow()], { resolveMediaDownloadUrl: textMedia('summary.pdf', 'application/pdf', { eTag: 'e2' }) });
+  await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: `material:${SUMMARY_ID}`, mode: 'open' }, replacedSummary));
+  // A row that never pinned an eTag fails closed too.
+  const unpinned = dependencies([fullTranscript(), derivative(70_000, { wmkf_sharepointetag: null })], { resolveMediaDownloadUrl: textMedia() });
+  await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: `material:${PRESENTATION_ID}`, mode: 'open' }, unpinned));
+  const noLiveTag = dependencies([fullTranscript(), derivative()], { resolveMediaDownloadUrl: textMedia('presentation.txt', 'text/plain', { eTag: null }) });
+  await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: `material:${PRESENTATION_ID}`, mode: 'open' }, noLiveTag));
 });
 
 test('the summary is served as text/pdf/docx only', async () => {

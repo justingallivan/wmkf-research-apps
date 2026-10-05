@@ -529,3 +529,22 @@ Open items recorded for the owner and later stages:
   `--execute` `scripts/extend-requestdocument-artifacttype-presentation-transcript.mjs`;
   read `scripts/probe-outside-link-exposure.js`.
 
+## 12. Codex adversarial review of the Stage 1 build, 2026-10-05
+
+Verdict needs-attention, one high finding, verified and fixed on the branch:
+
+1. **The generation key bound the row, not the bytes.** Both outside `open`
+   resolvers redirected to the latest SharePoint item after checking only
+   drive/item identity and MIME/extension, so a derivative file replaced in
+   SharePoint (any later version, including the full transcript) would still
+   be served while its row's key matched. Fix: `resolveMediaDownloadUrl` now
+   returns the live item `eTag`, and both outside resolvers refuse any
+   post-presentation row (Presentation Transcript and Transcript Summary)
+   whose live eTag differs from the one the registry row pinned, or whose row
+   pinned none. Tests drive a replaced version and an unpinned row to 404 on
+   both pages. Applicant-uploaded rows (`site-visit-materials-portal`) keep
+   their previous behavior; whether to pin them too is a follow-up decision.
+   Consequence: a derivative whose file was replaced is hidden outside until
+   it is regenerated; the writer's idempotent branch does not yet re-upload a
+   replaced file (open item).
+
