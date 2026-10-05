@@ -67,3 +67,22 @@ it('requeues only a staff-correction receipt when a complete Review checkpoint i
   expect(statement).toContain("last_error_code='correction_reopen_requires_staff'");
   expect(statement).toContain('AND $13::boolean THEN \'pending\'');
 });
+
+
+it('scopes a Factory test claim to one exact request and keeps normal claims unscoped', async () => {
+  const client = { query: jest.fn(async () => ({ rows: [] })) };
+  const requestId = 'aaaaaaaa-0000-4000-8000-000000000001';
+  await claimNextPreparation({ requestId }, client);
+  expect(client.query.mock.calls[0][0]).toContain('AND request_id=$3::uuid');
+  expect(client.query.mock.calls[0][1][2]).toBe(requestId);
+
+  await claimNextPreparation({}, client);
+  expect(client.query.mock.calls[1][0]).not.toContain('request_id=$3::uuid');
+  expect(client.query.mock.calls[1][1]).toHaveLength(2);
+});
+
+it('rejects an invalid scoped request ID instead of falling through to a global claim', async () => {
+  const client = { query: jest.fn(async () => ({ rows: [] })) };
+  await expect(claimNextPreparation({ requestId: null }, client)).rejects.toThrow('Scoped receipt claim requires a valid request GUID');
+  expect(client.query).not.toHaveBeenCalled();
+});

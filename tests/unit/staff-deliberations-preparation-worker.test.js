@@ -1,7 +1,7 @@
 /** @jest-environment node */
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({ getById: jest.fn(), queryAllRequests: jest.fn() }));
 import { getById } from '../../lib/dataverse/adapters/grant-request.js';
-import { drainStaffDeliberationsPreparations, getPreparationForRequest, requestPreparationRetry } from '../../lib/services/pre-site-visit/preparation-worker.js';
+import { drainStaffDeliberationsPreparations, getPreparationForRequest, requestPreparationRetry, runFactoryTestStaffDeliberationsPreparation } from '../../lib/services/pre-site-visit/preparation-worker.js';
 import { readPreparationConfig } from '../../lib/services/pre-site-visit/preparation-config.js';
 import { REQUEST_DOCUMENT_LIFECYCLE_STATE as L, REQUEST_DOCUMENT_OPERATION_STATUS as O } from '../../shared/config/requestDocument.js';
 
@@ -132,6 +132,7 @@ it('uses missing-only generation and promotes its returned current Word identity
   expect(dependencies.generate).toHaveBeenCalledWith(expect.objectContaining({
     requestId: REQUEST,
     generationMode: 'missing-only',
+    runSource: 'PowerAutomate Auto',
   }));
   expect(dependencies.promote).toHaveBeenCalledWith(expect.objectContaining({ expectedArtifactId: DOC }));
 });
@@ -381,4 +382,154 @@ it('selects the trusted lead-PD identity for authorization on the default servic
   expect(getById).toHaveBeenCalledWith(REQUEST, expect.objectContaining({
     select: expect.arrayContaining(['_wmkf_programdirector_value']),
   }));
+});
+
+
+const FACTORY_RUN = '11111111-0000-4000-8000-000000000001';
+const EXPECTED_APP_USER = '22222222-0000-4000-8000-000000000001';
+const OTHER_REQUEST = '33333333-0000-4000-8000-000000000001';
+const factoryRun = {
+  runId: FACTORY_RUN, destinationRequestId: REQUEST,
+  expectedAppUserId: EXPECTED_APP_USER, status: 'ready',
+  destinationEnvironment: 'production', recipe: 'basic',
+};
+const testRequestRow = {
+  akoya_requestid: REQUEST,
+  akoya_requeststatus: 'Phase II Pending',
+  wmkf_meetingdate: '2026-12-10T00:00:00Z',
+  _wmkf_grantprogram_value: PROGRAM,
+  wmkf_istestrequest: true,
+  wmkf_testcreationrunid: FACTORY_RUN,
+  _createdby_value: EXPECTED_APP_USER,
+  _ownerid_value: EXPECTED_APP_USER,
+};
+const testConfig = {
+  ...config, ready: true, active: false, guardedReopenSchemaReady: true,
+  testIsolationReady: true, blockedBy: [],
+};
+
+it('runs the real one-request worker path only for its ready Factory identity and keeps cron disabled', async () => {
+  const generatedArtifact = { artifactId: DOC, lifecycleState: L.DRAFT, operationStatus: O.READY };
+  const { dependencies } = harness({ generatedArtifact });
+  dependencies.config = testConfig;
+  dependencies.queryRequests.mockResolvedValue({ records: [testRequestRow], capped: false });
+  dependencies.getRequest.mockResolvedValue(testRequestRow);
+  const result = await runFactoryTestStaffDeliberationsPreparation(
+    { requestId: REQUEST, factoryRun }, dependencies,
+  );
+  expect(result).toMatchObject({ status: 'factory-test-completed', scanned: 1, prepared: 1 });
+  expect(dependencies.queryRequests).toHaveBeenCalledWith(expect.objectContaining({
+    filter: `akoya_requestid eq ${REQUEST}`,
+  }));
+  expect(dependencies.claimReceipt).toHaveBeenCalledWith({ requestId: REQUEST });
+  expect(dependencies.generate).toHaveBeenCalledWith(expect.objectContaining({
+    requestId: REQUEST, generationMode: 'missing-only', runSource: 'Vercel Test',
+  }));
+  expect(dependencies.promote).toHaveBeenCalledWith(expect.objectContaining({
+    eligibility: expect.objectContaining({ factoryTestScope: expect.objectContaining({
+      requestId: REQUEST, runId: FACTORY_RUN, expectedAppUserId: EXPECTED_APP_USER,
+    }) }),
+  }));
+  expect(dependencies.finishReceipt).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), expect.objectContaining({
+    state: 'prepared', provenance: expect.objectContaining({
+      principal: 'local-factory-test-operator', factoryRunId: FACTORY_RUN,
+    }),
+  }));
+  const ordinary = await drainStaffDeliberationsPreparations(dependencies);
+  expect(ordinary.status).toBe('disabled');
+  expect(dependencies.queryRequests).toHaveBeenCalledTimes(1);
+});
+
+it('rejects an unrelated row returned for the exact-scope query before receipts or work', async () => {
+  const { dependencies } = harness();
+  dependencies.config = testConfig;
+  dependencies.queryRequests.mockResolvedValue({ records: [{ ...testRequestRow, akoya_requestid: OTHER_REQUEST }], capped: false });
+  await expect(runFactoryTestStaffDeliberationsPreparation(
+    { requestId: REQUEST, factoryRun }, dependencies,
+  )).rejects.toMatchObject({ code: 'factory_preparation_test_request_mismatch' });
+  expect(dependencies.upsertReceipt).not.toHaveBeenCalled();
+  expect(dependencies.claimReceipt).not.toHaveBeenCalled();
+  expect(dependencies.generate).not.toHaveBeenCalled();
+});
+
+it('rejects invalid Factory scope before querying the request', async () => {
+  const { dependencies } = harness();
+  dependencies.config = testConfig;
+  await expect(runFactoryTestStaffDeliberationsPreparation(
+    { requestId: REQUEST, factoryRun: { ...factoryRun, destinationRequestId: OTHER_REQUEST } }, dependencies,
+  )).rejects.toMatchObject({ code: 'factory_preparation_test_run_mismatch' });
+  expect(dependencies.queryRequests).not.toHaveBeenCalled();
+});
+
+it('blocks when the TEST marker or Factory run changes on the fresh worker read', async () => {
+  const generatedArtifact = { artifactId: DOC, lifecycleState: L.DRAFT, operationStatus: O.READY };
+  const { dependencies } = harness({ generatedArtifact });
+  dependencies.config = testConfig;
+  dependencies.queryRequests.mockResolvedValue({ records: [testRequestRow], capped: false });
+  dependencies.getRequest.mockResolvedValue({ ...testRequestRow, wmkf_testcreationrunid: OTHER_REQUEST });
+  const result = await runFactoryTestStaffDeliberationsPreparation(
+    { requestId: REQUEST, factoryRun }, dependencies,
+  );
+  expect(result).toMatchObject({ blocked: 1, prepared: 0 });
+  expect(dependencies.generate).not.toHaveBeenCalled();
+  expect(dependencies.promote).not.toHaveBeenCalled();
+  expect(dependencies.finishReceipt).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), expect.objectContaining({
+    state: 'blocked', errorCode: 'request_eligibility_changed',
+  }));
+});
+
+it('does not process an unrelated receipt even if a claim dependency returns one', async () => {
+  const { dependencies, receipt } = harness();
+  dependencies.config = testConfig;
+  dependencies.queryRequests.mockResolvedValue({ records: [testRequestRow], capped: false });
+  dependencies.claimReceipt.mockResolvedValue({ ...receipt, request_id: OTHER_REQUEST });
+  await expect(runFactoryTestStaffDeliberationsPreparation(
+    { requestId: REQUEST, factoryRun }, dependencies,
+  )).rejects.toMatchObject({ code: 'factory_preparation_test_receipt_mismatch' });
+  expect(dependencies.finishReceipt).not.toHaveBeenCalled();
+  expect(dependencies.generate).not.toHaveBeenCalled();
+});
+
+it('keeps ordinary cron filtering marked TEST requests even when they are returned by a faulty query', async () => {
+  const priorIsolation = process.env.TEST_REQUEST_ISOLATION;
+  process.env.TEST_REQUEST_ISOLATION = 'on';
+  try {
+    const { dependencies } = harness();
+    dependencies.queryRequests.mockResolvedValue({ records: [testRequestRow], capped: false });
+    dependencies.claimReceipt.mockResolvedValue(null);
+    await drainStaffDeliberationsPreparations(dependencies);
+    expect(dependencies.queryRequests.mock.calls[0][0].filter).toContain('wmkf_istestrequest eq false');
+    expect(dependencies.findSiteVisits).not.toHaveBeenCalled();
+    expect(dependencies.upsertReceipt).not.toHaveBeenCalled();
+    expect(dependencies.claimReceipt).toHaveBeenCalled();
+  } finally {
+    if (priorIsolation === undefined) delete process.env.TEST_REQUEST_ISOLATION;
+    else process.env.TEST_REQUEST_ISOLATION = priorIsolation;
+  }
+});
+
+it('refuses the scoped run when any readiness prerequisite is absent', async () => {
+  const { dependencies } = harness();
+  dependencies.config = { ...testConfig, ready: false, blockedBy: ['test_request_isolation_not_ready'] };
+  await expect(runFactoryTestStaffDeliberationsPreparation(
+    { requestId: REQUEST, factoryRun }, dependencies,
+  )).rejects.toMatchObject({ code: 'factory_preparation_test_not_ready' });
+  expect(dependencies.queryRequests).not.toHaveBeenCalled();
+});
+
+
+it('does not create a receipt or invoke generation before the scheduled end', async () => {
+  const { dependencies } = harness();
+  dependencies.config = testConfig;
+  dependencies.now = () => new Date('2026-11-30T23:59:59.999Z');
+  dependencies.queryRequests.mockResolvedValue({ records: [testRequestRow], capped: false });
+  dependencies.claimReceipt.mockResolvedValue(null);
+  const result = await runFactoryTestStaffDeliberationsPreparation(
+    { requestId: REQUEST, factoryRun }, dependencies,
+  );
+  expect(result).toMatchObject({ status: 'factory-test-completed', scanned: 0, prepared: 0 });
+  expect(dependencies.upsertReceipt).not.toHaveBeenCalled();
+  expect(dependencies.claimReceipt).toHaveBeenCalledWith({ requestId: REQUEST });
+  expect(dependencies.generate).not.toHaveBeenCalled();
+  expect(dependencies.promote).not.toHaveBeenCalled();
 });

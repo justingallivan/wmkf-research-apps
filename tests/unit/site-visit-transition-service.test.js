@@ -211,6 +211,39 @@ it('automatically promotes the same Word item under request, schedule, and corre
   expect(h.row.wmkf_sharepointitemid).toBe('item-id');
 });
 
+it('permits only the exact Factory test identity at the automatic promotion fence', async () => {
+  const expectedAppUserId = '88888888-0000-4000-8000-000000000001';
+  const runId = '99999999-0000-4000-8000-000000000001';
+  const scope = { requestId: REQUEST_ID, runId, expectedAppUserId };
+  const h = createAutomaticHarness({ requestPatch: {
+    wmkf_istestrequest: true,
+    wmkf_testcreationrunid: runId,
+    _createdby_value: expectedAppUserId,
+    _ownerid_value: expectedAppUserId,
+  } });
+  await prepareSiteVisitStageAutomatically({
+    requestId: REQUEST_ID, expectedArtifactId: ARTIFACT_ID, siteVisitId: h.event.activityid,
+    scheduledEnd: h.event.scheduledend, eventModifiedOn: h.event.modifiedon,
+    stateCode: h.event.statecode, statusCode: h.event.statuscode,
+    eligibility: { ...AUTO_CONFIG, factoryTestScope: scope },
+  }, h.dependencies);
+  expect(h.dependencies.commitChangeset).toHaveBeenCalledTimes(1);
+
+  const changed = createAutomaticHarness({ requestPatch: {
+    wmkf_istestrequest: true,
+    wmkf_testcreationrunid: 'aaaaaaaa-0000-4000-8000-000000000001',
+    _createdby_value: expectedAppUserId,
+    _ownerid_value: expectedAppUserId,
+  } });
+  await expect(prepareSiteVisitStageAutomatically({
+    requestId: REQUEST_ID, expectedArtifactId: ARTIFACT_ID, siteVisitId: changed.event.activityid,
+    scheduledEnd: changed.event.scheduledend, eventModifiedOn: changed.event.modifiedon,
+    stateCode: changed.event.statecode, statusCode: changed.event.statuscode,
+    eligibility: { ...AUTO_CONFIG, factoryTestScope: scope },
+  }, changed.dependencies)).rejects.toMatchObject({ code: 'site_visit_automation_fence_changed' });
+  expect(changed.dependencies.commitChangeset).not.toHaveBeenCalled();
+});
+
 it('keeps the request and draft unchanged when the atomic event-status fence rejects', async () => {
   const h = createAutomaticHarness({ commitError: Object.assign(new Error('Dataverse 412'), { status: 412 }) });
   await expect(prepareSiteVisitStageAutomatically({
