@@ -31,7 +31,8 @@
         { "value": 100000007, "label": "Transcript Summary" },
         { "value": 100000008, "label": "Consultant Feedback" },
         { "value": 100000009, "label": "Pre-Research Presentation Brief" },
-        { "value": 100000012, "label": "Presentation Transcript" }
+        { "value": 100000012, "label": "Presentation Transcript" },
+        { "value": 100000013, "label": "Staff Discussion Transcript" }
       ]
     },
     {

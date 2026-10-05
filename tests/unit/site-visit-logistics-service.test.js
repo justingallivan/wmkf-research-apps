@@ -1,5 +1,6 @@
 import {
   getSiteVisitLogistics,
+  SITE_VISIT_LOGISTICS_DEPENDENCIES,
   saveSiteVisitLogistics,
 } from '../../lib/services/site-visit/logistics-service';
 import {
@@ -8,6 +9,9 @@ import {
   REQUEST_DOCUMENT_OPERATION_STATUS,
 } from '../../shared/config/requestDocument';
 import { SITE_VISIT_FORMAT } from '../../shared/config/siteVisit';
+import {
+  presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey,
+} from '../../lib/services/post-presentation-materials/presentation-transcript-binding';
 import { PARTY_NAVIGATION_PROPERTY } from '../../lib/dataverse/adapters/site-visit';
 import { TRIAGE_STATUS } from '../../shared/config/triageStatus';
 
@@ -205,23 +209,75 @@ test('returns only eligible ready non-superseded material links for the request'
   expect(result.applicantAttendeesUnavailable).toBe(false);
 });
 
-test('the staff material feed includes a Ready Presentation Transcript without a binding filter', async () => {
-  const presentation = {
-    wmkf_requestdocumentid: '66666666-6666-4666-8666-666666666667',
-    _wmkf_request_value: REQUEST_ID,
-    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT,
-    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
-    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
-    wmkf_filename: 'presentation.txt',
-    wmkf_sharepointweburl: 'https://example.sharepoint.com/presentation.txt',
+describe('staff feed binds the transcript derivatives to the current boundary', () => {
+  const REVISION = '33333333-3333-4333-8333-3333333333bb';
+  const VISIT = '22222222-2222-4222-8222-2222222222bb';
+  const PRODUCER = 'meeting-tracker-post-presentation';
+  const file = (role) => ({ siteId: 'site', driveId: 'drive', itemId: `item-${role}`, versionId: 'v1', eTag: 'e1',
+    sha256: 'a'.repeat(64), size: 10, filename: `t.${role}`,
+    contentType: { txt: 'text/plain; charset=utf-8', vtt: 'text/vtt; charset=utf-8', source: 'application/json' }[role] });
+  const transcript = (endMs) => {
+    const manifest = { schemaVersion: 4, requestId: REQUEST_ID, siteVisitActivityId: VISIT, revisionId: REVISION,
+      operationId: REVISION, sourceRevisionId: null, formatterVersion: '4',
+      files: { txt: file('txt'), vtt: file('vtt'), source: file('source') },
+      presentationEnd: { endMs, confirmedBy: 5, confirmedAt: '2026-10-05T18:00:00.000Z' } };
+    const txt = manifest.files.txt;
+    return { wmkf_requestdocumentid: '11111111-aaaa-4aaa-8aaa-000000000001', _wmkf_request_value: REQUEST_ID,
+      wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT, wmkf_producer: PRODUCER,
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY, wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+      wmkf_transcriptbundlejson: JSON.stringify(manifest), wmkf_slotversion: 3, createdon: '2026-10-05T10:00:00Z',
+      wmkf_sharepointsiteid: txt.siteId, wmkf_sharepointdriveid: txt.driveId, wmkf_sharepointitemid: txt.itemId,
+      wmkf_sharepointversionid: txt.versionId, wmkf_sharepointetag: txt.eTag, wmkf_filename: txt.filename,
+      wmkf_contenthash: txt.sha256, wmkf_contenttype: txt.contentType, wmkf_filesize: txt.size,
+      wmkf_sharepointweburl: 'https://example.sharepoint.com/transcript.txt' };
   };
-  const result = await getSiteVisitLogistics({ requestId: REQUEST_ID }, dependencies({
-    findDocumentsByRequest: jest.fn(async () => ({ records: [presentation] })),
+  const derivative = (id, artifactType, keyFn, endMs) => ({ wmkf_requestdocumentid: id, _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: artifactType, wmkf_producer: PRODUCER,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY, wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_generationkey: keyFn({ requestId: REQUEST_ID, sourceRevisionId: REVISION, presentationEndMs: endMs }),
+    wmkf_sharepointdriveid: 'drive', wmkf_sharepointitemid: `item-${id}`, wmkf_filename: `${id}.txt`,
+    wmkf_sharepointweburl: `https://example.sharepoint.com/${id}.txt`, wmkf_slotversion: 2, createdon: '2026-10-05T11:00:00Z' });
+  const PRES_30 = '66666666-6666-4666-8666-666666666667';
+  const DISC_30 = '66666666-6666-4666-8666-666666666668';
+  const PRES_40 = '66666666-6666-4666-8666-666666666669';
+  const feed = async (records) => getSiteVisitLogistics({ requestId: REQUEST_ID }, dependencies({
+    findDocumentsByRequest: jest.fn(async () => ({ records })),
+    presentationSchemaReady: () => true, presentationRequestAllowed: () => true,
   }));
-  expect(result.materials).toEqual([expect.objectContaining({
-    artifactId: presentation.wmkf_requestdocumentid,
-    artifactTypeLabel: 'Presentation Transcript',
-  })]);
+  const ids = (list) => list.map((item) => item.artifactId).sort();
+
+  test('both halves bound to the current boundary are shown, with the full transcript', async () => {
+    const result = await feed([transcript(1_800_000),
+      derivative(PRES_30, REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT, presentationTranscriptGenerationKey, 1_800_000),
+      derivative(DISC_30, REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT, staffDiscussionTranscriptGenerationKey, 1_800_000)]);
+    expect(ids(result.presentationMaterials)).toEqual(ids([{ artifactId: '11111111-aaaa-4aaa-8aaa-000000000001' }, { artifactId: PRES_30 }, { artifactId: DISC_30 }]));
+    expect(result.presentationMaterials.find((m) => m.artifactId === DISC_30)).toMatchObject({ artifactTypeLabel: 'Staff Discussion Transcript' });
+    expect(ids(result.materials)).toEqual(ids(result.presentationMaterials));
+  });
+
+  test('boundary moved to 40 min, presentation regenerated, discussion write failed: the old 30 min discussion is hidden (Codex finding)', async () => {
+    const result = await feed([transcript(2_400_000),
+      derivative(PRES_30, REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT, presentationTranscriptGenerationKey, 1_800_000),
+      derivative(DISC_30, REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT, staffDiscussionTranscriptGenerationKey, 1_800_000),
+      { ...derivative(PRES_40, REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT, presentationTranscriptGenerationKey, 2_400_000), wmkf_slotversion: 3 }]);
+    const shown = [...ids(result.presentationMaterials), ...ids(result.materials)];
+    expect(shown).toContain(PRES_40);
+    expect(shown).not.toContain(DISC_30);
+    expect(shown).not.toContain(PRES_30);
+    expect(shown).toContain('11111111-aaaa-4aaa-8aaa-000000000001');
+  });
+
+  test('without bundle metadata (readiness off) both derivatives are hidden and the full transcript stays', async () => {
+    const bare = { ...transcript(1_800_000), wmkf_transcriptbundlejson: undefined };
+    const result = await feed([bare,
+      derivative(PRES_30, REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT, presentationTranscriptGenerationKey, 1_800_000),
+      derivative(DISC_30, REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT, staffDiscussionTranscriptGenerationKey, 1_800_000)]);
+    expect(ids(result.presentationMaterials)).toEqual(['11111111-aaaa-4aaa-8aaa-000000000001']);
+  });
+
+  test('the default reader opts into bundle metadata', () => {
+    expect(String(SITE_VISIT_LOGISTICS_DEPENDENCIES.findDocumentsByRequest)).toContain('includeMeetingTranscriptBundle: true');
+  });
 });
 
 test('a failed applicant-contact read leaves the tracker visit usable and reports unavailable suggestions', async () => {

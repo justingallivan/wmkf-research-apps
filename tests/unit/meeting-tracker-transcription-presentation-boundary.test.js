@@ -24,7 +24,7 @@ import * as publisher from '../../lib/services/post-presentation-materials/mater
 import * as binding from '../../lib/services/meeting-tracker-transcription/binding.js';
 import * as store from '../../lib/services/transcription-pilot/store.js';
 import { buildMeetingTranscriptFiles, buildMeetingTranscriptManifest } from '../../lib/services/meeting-tracker-transcription/bundle.js';
-import { presentationTranscriptGenerationKey } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
+import { presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE, REQUEST_DOCUMENT_LIFECYCLE_STATE, REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument.js';
 import { getMeetingCorrectionDraft, createMeetingCorrection, updateMeetingCorrection, publishMeetingCorrection,
   getMeetingTranscriptionOverview } from '../../lib/services/meeting-tracker-transcription/service.js';
@@ -215,6 +215,23 @@ describe('overview currentArtifact', () => {
     documents.findByRequest.mockResolvedValue({ records: [transcriptRow, presentationRow(stale)] });
     expect((await getMeetingTranscriptionOverview({ requestId, ownerProfileId: 12 })).currentArtifact.presentationTranscript)
       .toEqual({ state: 'stale', artifactId: null });
+  });
+
+  test('the staff discussion state is reported alongside, bound only by its own key', async () => {
+    const discussionKey = staffDiscussionTranscriptGenerationKey({ requestId, sourceRevisionId: revisionId, presentationEndMs: 2000 });
+    const discussionRow = (key) => ({ ...presentationRow(key), wmkf_requestdocumentid: '99999999-9999-4999-8999-999999999990',
+      wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT });
+    documents.findByRequest.mockResolvedValue({ records: [transcriptRow, discussionRow(discussionKey)] });
+    expect((await getMeetingTranscriptionOverview({ requestId, ownerProfileId: 12 })).currentArtifact.staffDiscussionTranscript)
+      .toEqual({ state: 'bound', artifactId: '99999999-9999-4999-8999-999999999990' });
+    // The presentation key never satisfies the discussion binding.
+    const presentationKey = presentationTranscriptGenerationKey({ requestId, sourceRevisionId: revisionId, presentationEndMs: 2000 });
+    documents.findByRequest.mockResolvedValue({ records: [transcriptRow, discussionRow(presentationKey)] });
+    expect((await getMeetingTranscriptionOverview({ requestId, ownerProfileId: 12 })).currentArtifact.staffDiscussionTranscript)
+      .toEqual({ state: 'stale', artifactId: null });
+    documents.findByRequest.mockResolvedValue({ records: [transcriptRow] });
+    expect((await getMeetingTranscriptionOverview({ requestId, ownerProfileId: 12 })).currentArtifact.staffDiscussionTranscript)
+      .toEqual({ state: 'missing', artifactId: null });
   });
 
   test('not_confirmed: a bundle without a boundary', async () => {
