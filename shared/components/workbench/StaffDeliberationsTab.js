@@ -165,6 +165,7 @@ export default function StaffDeliberationsTab({
   const [, setStageLabels] = useState(EMPTY_STAGE_LABELS);
   const [preparation, setPreparation] = useState(null);
   const [correctionInProgress, setCorrectionInProgress] = useState(false);
+  const [finalReview, setFinalReview] = useState(null);
   const [timing, setTiming] = useState(null);
   const [preparationReadError, setPreparationReadError] = useState(null);
   const [retryingPreparation, setRetryingPreparation] = useState(false);
@@ -224,6 +225,7 @@ export default function StaffDeliberationsTab({
           if (generationSequence.current !== sequence || id !== requestId) return;
           setPreparation(status.preparation || null);
           setCorrectionInProgress(status.correctionInProgress === true);
+          setFinalReview(status.finalReview || null);
           setTiming(status.timing || null);
           setArtifact(status.currentArtifact || null);
           setPendingArtifact(status.pendingArtifact || null);
@@ -272,6 +274,7 @@ export default function StaffDeliberationsTab({
         if (disposed || sequence !== generationSequence.current) return;
         setPreparation(status.preparation || null);
           setCorrectionInProgress(status.correctionInProgress === true);
+          setFinalReview(status.finalReview || null);
         setTiming(status.timing || null);
         setPreparationReadError(null);
         if (!activeController.current) {
@@ -676,7 +679,7 @@ export default function StaffDeliberationsTab({
     siteVisitStartIso,
     everSent,
   });
-  const movedToFinal = preSiteFinal;
+  const movedToFinal = preSiteFinal && (!finalReview || ['group-review', 'leadership-review'].includes(finalReview.phase));
   // A lifecycle outside the four keyed stops (Board Ready/Superseded/unknown —
   // never produced for the *current* brief in practice). The rail has
   // nothing meaningful to show for it, so it stays hidden (fail closed).
@@ -996,7 +999,9 @@ export default function StaffDeliberationsTab({
   const editingReady = preSiteShared && milestoneComplete && !preparationReadError
     && timing?.availability === 'available';
   const preparationState = preparationReadError ? 'unavailable' : preparation?.state;
-  const phase = preSiteFinal ? 'In review'
+  const phase = finalReview?.phase === 'leadership-review' ? 'Leadership review'
+    : movedToFinal ? 'In review'
+      : preSiteFinal ? 'Needs attention'
     : correctionDraft ? 'Corrections in progress'
       : ['blocked', 'unavailable'].includes(preparationState) || preparationReadError
         || ['unavailable', 'ambiguous'].includes(timing?.availability) ? 'Needs attention'
@@ -1018,6 +1023,7 @@ export default function StaffDeliberationsTab({
       if (sequence !== generationSequence.current) return;
       setPreparation(status.preparation || null);
           setCorrectionInProgress(status.correctionInProgress === true);
+          setFinalReview(status.finalReview || null);
       setTiming(status.timing || null);
       setPreparationReadError(null);
     } catch (retryError) {
