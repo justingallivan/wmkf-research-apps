@@ -34,13 +34,16 @@ function dateTime(value, timeZone = null) {
 
 function taskFor(request) {
   if (request.finalPhase === 'leadership-review') return { label: 'Leadership review', bucket: 'review', action: 'Open Final Writeup', tab: 'final-writeup' };
-  if (request.finalPhase === 'group-review' || request.writeup?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL) return { label: 'In review', bucket: 'review', action: 'Open Final Writeup', tab: 'final-writeup' };
+  if (request.finalPhase === 'group-review') return { label: 'In review', bucket: 'review', action: 'Open Final Writeup', tab: 'final-writeup' };
   const attention = ['blocked', 'unavailable'].includes(request.preparation?.state)
+    || request.finalReview?.availability === 'unavailable'
+    || (request.writeup?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL && request.finalPhase !== 'group-review')
     || ['unavailable', 'ambiguous'].includes(request.timing?.availability)
     || [request.brief, request.writeup].some((fact) => ['unavailable', 'ambiguous'].includes(fact?.availability));
   if (attention) return { label: 'Needs attention', bucket: 'attention', action: 'Check request', tab: 'staff-deliberations' };
   if (request.preparation?.due) {
     const ready = request.preparation.state === 'prepared' || request.writeup?.milestoneComplete === true;
+    if (!ready && request.preparation.state === 'disabled') return { label: 'Preparation paused', bucket: 'attention', action: 'Check preparation', tab: 'staff-deliberations' };
     return { label: ready ? 'Post-visit editing' : 'Preparing writeup', bucket: 'post', action: ready ? 'Continue writeup' : 'Check preparation', tab: 'staff-deliberations' };
   }
   return { label: request.timing?.endIso ? 'Before presentation' : 'Schedule needed', bucket: request.timing?.endIso ? 'before' : 'attention', action: 'Review briefing', tab: 'staff-deliberations' };
@@ -62,7 +65,7 @@ function RequestCard({ request }) {
   const time = dateTime(request.timing?.endIso, request.timing?.timeZone);
   const briefing = <div key="brief"><dt className="font-medium text-gray-800">Pre-site briefing</dt><dd className="mt-1 text-gray-600">{documentState(request.brief, true)}</dd></div>;
   const writeup = <div key="writeup"><dt className="font-medium text-gray-800">Working writeup</dt><dd className="mt-1 text-gray-600">{documentState(request.writeup, false)}</dd></div>;
-  const receipt = request.brief?.sharing;
+  const receipt = request.briefSharing || request.brief?.sharing;
   const sharing = request.sharingAvailability === 'unavailable' || receipt?.availability === 'unavailable'
     ? 'Sharing history unavailable'
     : receipt?.sentAtIso ? `Sent through app · ${dateTime(receipt.sentAtIso)}` : 'No sharing recorded in this app';

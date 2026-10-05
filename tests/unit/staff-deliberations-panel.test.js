@@ -62,3 +62,19 @@ test('ordinary total excludes separately reported test rows', async () => {
   render(<StaffDeliberationsPanel {...props} />);
   expect(await screen.findByText(/1 requests in this program/)).toHaveTextContent('1 test requests also shown');
 });
+
+
+test('disabled preparation is visibly paused and exact sharing receipt is displayed', async () => {
+  global.fetch.mockResolvedValue(response([row({ preparation: { due: true, state: 'disabled' }, briefSharing: { availability: 'available', sentAtIso: '2026-09-27T18:00:00Z', sourceVersionId: '3.0' } })]));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText('Preparation paused')).toBeInTheDocument();
+  expect(screen.getByText(/Sent through app/)).toBeInTheDocument();
+  expect(screen.queryByText('Preparing writeup')).not.toBeInTheDocument();
+});
+
+test('a Final source without verified review lineage needs attention', async () => {
+  global.fetch.mockResolvedValue(response([row({ finalPhase: 'none', finalReview: { availability: 'unavailable' }, writeup: { availability: 'available', lifecycleState: 100000004 } })]));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText('Needs attention', { selector: 'p' })).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Open Final Writeup' })).not.toBeInTheDocument();
+});

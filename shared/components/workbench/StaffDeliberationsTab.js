@@ -990,13 +990,16 @@ export default function StaffDeliberationsTab({
   const due = preparation?.due === true;
   const correctionDraft = preSiteDraftReady && (Boolean(artifact?.correction?.cycleId) || reopenHistory.length > 0);
   const milestoneComplete = Boolean(artifact?.milestone?.versionId && artifact?.milestone?.contentHash && artifact?.milestone?.createdAt);
-  const editingReady = preSiteShared && milestoneComplete;
+  const editingReady = preSiteShared && milestoneComplete && !preparationReadError
+    && timing?.availability === 'available';
   const preparationState = preparationReadError ? 'unavailable' : preparation?.state;
   const phase = preSiteFinal ? 'In review'
     : correctionDraft ? 'Corrections in progress'
-      : preparationState === 'blocked' || preparationReadError ? 'Needs attention'
+      : ['blocked', 'unavailable'].includes(preparationState) || preparationReadError
+        || ['unavailable', 'ambiguous'].includes(timing?.availability) ? 'Needs attention'
         : due && editingReady ? 'Post-visit editing'
-          : due ? 'Preparing working writeup'
+          : due && preparationState === 'disabled' ? 'Preparation paused'
+            : due ? 'Preparing working writeup'
             : timing?.endIso ? 'Before presentation' : 'Schedule needed';
   const materialsLine = siteVisitMaterialsLine(materials);
   const timingLabel = presentationEndLabel(timing);
@@ -1244,7 +1247,9 @@ export default function StaffDeliberationsTab({
               )}
               {due && !preSiteShared && !preSiteFinal && (
                 <p className="mt-2 text-xs font-medium text-amber-800" data-testid="final-writeup-prerequisite">
-                  The working writeup is being prepared for post-visit editing. Group review starts only when you choose.
+                  {preparationState === 'disabled'
+                    ? 'Automatic preparation is paused. Your existing draft is preserved.'
+                    : 'The working writeup is awaiting preparation for post-visit editing. Group review starts only when you choose.'}
                 </p>
               )}
             </div>

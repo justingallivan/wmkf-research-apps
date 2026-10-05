@@ -1352,7 +1352,7 @@ test('a ready ordinary draft never requires a manual Start Site Visit', async ()
 
 test('confirmed post-visit draft leads to review navigation without starting review', async () => {
   const onSelectTab = jest.fn();
-  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(REVIEW), preparation: { due: true, state: 'prepared' } }));
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(REVIEW), preparation: { due: true, state: 'prepared' }, timing: { availability: 'available', endIso: '2026-09-28T18:00:00Z' } }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={onSelectTab} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Review readiness' }));
   expect(onSelectTab).toHaveBeenCalledWith('final-writeup');
