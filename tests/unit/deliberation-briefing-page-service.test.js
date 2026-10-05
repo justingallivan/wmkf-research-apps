@@ -11,7 +11,7 @@ import {
   _internal,
 } from '../../lib/services/deliberation-briefing/briefing-page-service';
 import { PRE_SITE_DISTRIBUTION_CONTRACT } from '../../shared/config/requestDocument.js';
-import { presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
+import { presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey, transcriptSummaryBindingFingerprint } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
 import * as requestDocumentAdapter from '../../lib/dataverse/adapters/request-document.js';
 import { REQUEST_DOCUMENT_ACTOR_POLICY } from '../../lib/services/request-document-actor-service.js';
 import { reviewSetFingerprint } from '../../lib/services/pre-site-visit/review-bundle-service.js';
@@ -1443,7 +1443,9 @@ function derivative(endMs = 70_000, overrides = {}) {
 }
 function summaryRow(overrides = {}) {
   return fileRow(SUMMARY_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, PRODUCER, {
-    wmkf_filename: 'summary.pdf', wmkf_sharepointetag: 'e1', ...overrides,
+    wmkf_filename: 'summary.pdf', wmkf_sharepointetag: 'e1',
+    wmkf_inputfingerprint: transcriptSummaryBindingFingerprint({ requestId: REQUEST_ID, sourceRevisionId: REVISION, presentationEndMs: 70_000 }),
+    ...overrides,
   });
 }
 function zoomRecording(overrides = {}) {
@@ -1525,7 +1527,7 @@ test('briefing: a bound Presentation Transcript opens by redirect, is never buff
 test('briefing: a replaced SharePoint file (live eTag differs from the pinned one) is never served, for the derivative or the summary (Codex finding)', async () => {
   const replaced = enabledDeps([fullTranscript(), derivative(), summaryRow()], { resolveMediaDownloadUrl: textMedia('presentation.txt', 'text/plain', { eTag: 'e2' }) });
   await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID), mode: 'open' }, replaced));
-  const replacedSummary = enabledDeps([summaryRow()], { resolveMediaDownloadUrl: textMedia('summary.pdf', 'application/pdf', { eTag: 'e2' }) });
+  const replacedSummary = enabledDeps([fullTranscript(), summaryRow()], { resolveMediaDownloadUrl: textMedia('summary.pdf', 'application/pdf', { eTag: 'e2' }) });
   await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(SUMMARY_ID), mode: 'open' }, replacedSummary));
   // A row that never pinned an eTag fails closed too.
   const unpinned = enabledDeps([fullTranscript(), derivative(70_000, { wmkf_sharepointetag: null })], { resolveMediaDownloadUrl: textMedia() });
@@ -1535,10 +1537,10 @@ test('briefing: a replaced SharePoint file (live eTag differs from the pinned on
 });
 
 test('briefing: the summary opens only as text/pdf/docx', async () => {
-  const ok = enabledDeps([summaryRow()], { resolveMediaDownloadUrl: textMedia('summary.pdf', 'application/pdf') });
+  const ok = enabledDeps([fullTranscript(), summaryRow()], { resolveMediaDownloadUrl: textMedia('summary.pdf', 'application/pdf') });
   await expect(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(SUMMARY_ID), mode: 'open' }, ok))
     .resolves.toMatchObject({ kind: 'file' });
-  const video = enabledDeps([summaryRow()], { resolveMediaDownloadUrl: textMedia('summary.mp4', 'video/mp4') });
+  const video = enabledDeps([fullTranscript(), summaryRow()], { resolveMediaDownloadUrl: textMedia('summary.mp4', 'video/mp4') });
   await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(SUMMARY_ID), mode: 'open' }, video));
 });
 
@@ -1623,3 +1625,21 @@ test('briefing: legacy (post-presentation disabled) path never serves a Presenta
   }
   expect(d.downloadFile).not.toHaveBeenCalled();
 });
+
+test.each([
+  ['has no binding fingerprint', () => [fullTranscript(), summaryRow({ wmkf_inputfingerprint: null })]],
+  ['was made from another revision', () => [fullTranscript(), summaryRow({ wmkf_inputfingerprint: transcriptSummaryBindingFingerprint({
+    requestId: REQUEST_ID, sourceRevisionId: '33333333-3333-4333-8333-3333333333bb', presentationEndMs: 70_000 }) })]],
+  ['was made at another boundary', () => [fullTranscript(), summaryRow({ wmkf_inputfingerprint: transcriptSummaryBindingFingerprint({
+    requestId: REQUEST_ID, sourceRevisionId: REVISION, presentationEndMs: 65_000 }) })]],
+  ['has no confirmed boundary to bind to', () => [fullTranscript(v4Manifest({ presentationEnd: null })), summaryRow()]],
+  ['has no transcript at all', () => [summaryRow()]],
+])('briefing: a summary that %s is omitted at context and 404s on open and download', async (_label, makeRows) => {
+  const deps = enabledDeps(makeRows(), { resolveMediaDownloadUrl: textMedia('summary.pdf', 'application/pdf') });
+  expect((await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, deps)).materials.map((item) => item.member)).not.toContain(`material:${SUMMARY_ID}`);
+  for (const mode of ['open', 'download']) {
+    await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(SUMMARY_ID), mode }, deps));
+  }
+  expect(deps.resolveMediaDownloadUrl).not.toHaveBeenCalled();
+});
+

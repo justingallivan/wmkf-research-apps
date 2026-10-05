@@ -1,7 +1,7 @@
 /** @jest-environment node */
 import {
   bindPresentationTranscript, bindStaffDiscussionTranscript, confirmedPresentationEnd, presentationTranscriptGenerationKey,
-  staffDiscussionTranscriptGenerationKey,
+  staffDiscussionTranscriptGenerationKey, bindTranscriptSummary, transcriptSummaryBindingFingerprint,
 } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../shared/config/requestDocument.js';
 
@@ -90,6 +90,35 @@ describe('staff discussion derivative', () => {
     expect(bindStaffDiscussionTranscript([transcriptRow(manifest({ presentationEnd: null })), discussionRow(discussionKey)], REQUEST_ID))
       .toMatchObject({ reason: 'boundary_not_confirmed' });
     expect(bindStaffDiscussionTranscript([discussionRow(discussionKey)], REQUEST_ID)).toMatchObject({ reason: 'no_transcript' });
+  });
+});
+
+describe('transcript summary binding', () => {
+  const fingerprint = transcriptSummaryBindingFingerprint({ requestId: REQUEST_ID, sourceRevisionId: REVISION, presentationEndMs: 70_000 });
+  const summary = (overrides = {}) => ({ ...derivativeRow('unique-per-publish'), wmkf_requestdocumentid: 'doc-s',
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, wmkf_inputfingerprint: fingerprint, ...overrides });
+
+  test('binds on the input fingerprint, not the generation key', () => {
+    expect(bindTranscriptSummary([transcriptRow(), summary()], REQUEST_ID)).toMatchObject({ reason: 'bound', summary: { wmkf_requestdocumentid: 'doc-s' } });
+  });
+
+  test.each([
+    ['missing fingerprint', { wmkf_inputfingerprint: null }],
+    ['empty fingerprint', { wmkf_inputfingerprint: '' }],
+    ['another boundary', { wmkf_inputfingerprint: transcriptSummaryBindingFingerprint({ requestId: REQUEST_ID, sourceRevisionId: REVISION, presentationEndMs: 60_000 }) }],
+    ['another producer', { wmkf_producer: 'someone-else' }],
+  ])('%s is never bound', (_label, overrides) => {
+    expect(bindTranscriptSummary([transcriptRow(), summary(overrides)], REQUEST_ID).summary).toBeNull();
+  });
+
+  test('the fingerprint is distinct from the derivative keys for the same identity', () => {
+    const identity = { requestId: REQUEST_ID, sourceRevisionId: REVISION, presentationEndMs: 70_000 };
+    expect(new Set([fingerprint, presentationTranscriptGenerationKey(identity), staffDiscussionTranscriptGenerationKey(identity)]).size).toBe(3);
+  });
+
+  test('no confirmed boundary leaves the summary unbound but reports the candidate', () => {
+    const result = bindTranscriptSummary([transcriptRow(manifest({ presentationEnd: null })), summary()], REQUEST_ID);
+    expect(result).toMatchObject({ reason: 'boundary_not_confirmed', summary: null, candidate: { wmkf_requestdocumentid: 'doc-s' } });
   });
 });
 
