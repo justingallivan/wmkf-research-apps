@@ -936,7 +936,7 @@ generation-key recipe (which already includes the type).
 |---|---|---|
 | `shared/config/requestDocument.js` | add `STAFF_DISCUSSION_SUMMARY: 100000010` and its label | [VERIFIED absent on `main`; only `STAFF_DISCUSSION_TRANSCRIPT: 100000013` exists] |
 | Dataverse picklist | owner-run `scripts/extend-requestdocument-artifacttype-staff-discussion-summary.mjs`, dry-run first, a sibling of `...-staff-discussion-transcript.mjs` | [VERIFIED sibling exists] |
-| Migration **071** | extend 070's `meeting_transcript_summary_drafts_artifact_type_check` to `IN (100000007, 100000010)`, and update `scripts/setup-database.js` to match. §4.7's "Stages 2–4 need no constraint migration" covers only the 055 tables, not the 070 drafts table | [VERIFIED 070 CHECK is `IN (100000007)`; next free number 071, see memory `project-migration-numbers-claimed-off-main`] |
+| Migration **072** (071 is taken by the staff replacement upload, PR #441) | extend 070's `meeting_transcript_summary_drafts_artifact_type_check` to `IN (100000007, 100000010)`, and update `scripts/setup-database.js` to match. §4.7's "Stages 2–4 need no constraint migration" covers only the 055 tables, not the 070 drafts table | [VERIFIED 070 CHECK is `IN (100000007)`; 071 claimed by PR #441, so next free is 072; see memory `project-migration-numbers-claimed-off-main`] |
 | Prompt and seed | `meeting-transcript.discussion-summary`, `wmkf_ai_model: 'sonnet'`, a seed script beside the Stage 2 seed, a standing Executor budget in `shared/config/executorBudgets.js`, an A7 registry entry (the transcript is untrusted input), and a line in the Sonnet 5.5 consumer inventory | §4.3; inventory amended `16ced436e` |
 | Input | text of the bound `STAFF_DISCUSSION_TRANSCRIPT` row through `bindStaffDiscussionTranscript` | [VERIFIED `presentation-transcript-binding.js:107` on `main`] |
 | Acknowledgment | a new versioned constant whose text names the **staff discussion**. Stage 2's text names only the presentation transcript and slides, so it cannot be reused | [VERIFIED `transcriptSummary.js` on PR #440] |
@@ -945,12 +945,12 @@ generation-key recipe (which already includes the type).
 | Staff Deliberations | logistics feed reads the bound staff summary `.txt` the same way as Stage 2's `readPresentationSummary`, using the same 256 KiB cap and falling back to the link. Renders in `ResearchPresentationFollowUp` | §16 decision D; PR #440 `logistics-service.js` |
 | Outside exclusion | add nothing to the Board page `OUTSIDE_POST_PRESENTATION_TYPE_LIST` or the briefing page `OUTSIDE_POST_PRESENTATION_TYPES`. Both are allowlists, so the type is excluded by construction. A mutation-checked test on each page builds a READY 100000010 row and asserts it is not listed and that `open` returns 404 | [VERIFIED allowlists at `presentation-page-service.js:35-39`, `briefing-page-service.js:100`] |
 | Pre-Site distribution | `MATERIAL_TYPES` in `lib/services/pre-site-visit/distribution/model.js` is an allowlist without 100000010, so the new type is never offered. Pin it with a test | [VERIFIED lines 23-30]; see 18.4 |
-| Gates and docs | `check:request-document-writers` (new writer row), `check:prompt-injection-tagging`, `check:model-override-warming` for any new route, `check:api-routes`, `check:atlas`. Docs to update: API matrix rows, the Atlas page for `wmkf_requestdocument`, and the summary-drafts Atlas page for the 071 CHECK | §5 gates |
+| Gates and docs | `check:request-document-writers` (new writer row), `check:prompt-injection-tagging`, `check:model-override-warming` for any new route, `check:api-routes`, `check:atlas`. Docs to update: API matrix rows, the Atlas page for `wmkf_requestdocument`, and the summary-drafts Atlas page for the 072 CHECK | §5 gates |
 
 ### 18.3 Owner-run steps (in order)
 
 1. Picklist extension for 100000010: dry-run, then apply with the Dataverse write ack.
-2. Migration 071 (`node scripts/apply-migrations.js`).
+2. Migration 072 (`node scripts/apply-migrations.js`).
 3. Seed `meeting-transcript.discussion-summary` with the write ack.
 4. Budget row through admin, if the standing budget needs a non-default value.
 
