@@ -551,8 +551,32 @@ describe('excluded request numbers', () => {
       TEST_REQUEST_ISOLATION: 'on',
     };
     expect(readPreparationConfig(env)).toMatchObject({ active: true, excludedRequestNumbers: [] });
-    env.STAFF_DELIBERATIONS_AUTO_PREPARE_EXCLUDED_REQUEST_NUMBERS = JSON.stringify(['1003220', 1003221, ' 1003222 ', 'abc', '', null, '1003220']);
+    env.STAFF_DELIBERATIONS_AUTO_PREPARE_EXCLUDED_REQUEST_NUMBERS = '[]';
+    expect(readPreparationConfig(env)).toMatchObject({ active: true, excludedRequestNumbers: [] });
+    env.STAFF_DELIBERATIONS_AUTO_PREPARE_EXCLUDED_REQUEST_NUMBERS = JSON.stringify(['1003220', 1003221, ' 1003222 ', '1003220']);
     expect(readPreparationConfig(env)).toMatchObject({ active: true, excludedRequestNumbers: ['1003220', '1003221', '1003222'] });
+  });
+
+  it.each([
+    ['a bare number', '1003220'],
+    ['malformed JSON', '["1003220"'],
+    ['an object', '{"1003220":true}'],
+    ['a non-numeric entry', '["1003220","abc"]'],
+    ['an empty entry', '["1003220",""]'],
+    ['a null entry', '["1003220",null]'],
+  ])('blocks automation when the exclusion list is %s', (_label, raw) => {
+    const config = readPreparationConfig({
+      STAFF_DELIBERATIONS_AUTO_PREPARE: 'on',
+      STAFF_DELIBERATIONS_AUTO_PREPARE_PROGRAM_IDS: JSON.stringify([PROGRAM]),
+      STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES: JSON.stringify(['D26']),
+      STAFF_DELIBERATIONS_AUTO_PREPARE_REQUEST_STATUSES: JSON.stringify(['Phase II Pending']),
+      STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS: JSON.stringify([[10, 11, true]]),
+      STAFF_DELIBERATIONS_AUTO_PREPARE_ATOMIC_FENCE_CONFIRMED: 'on',
+      GUARDED_REOPEN_SCHEMA_READY: 'on',
+      TEST_REQUEST_ISOLATION: 'on',
+      STAFF_DELIBERATIONS_AUTO_PREPARE_EXCLUDED_REQUEST_NUMBERS: raw,
+    });
+    expect(config).toMatchObject({ active: false, blockedBy: ['excluded_request_numbers_invalid'] });
   });
 
   it('never enqueues an excluded request during the due scan', async () => {
@@ -674,5 +698,52 @@ describe('automatic preparation attribution', () => {
     dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptFor({ documentId: 'dddddddd-0000-4000-8000-000000000099' }));
     expect((await getPreparationForRequest(REQUEST, dependencies)).preparation)
       .toMatchObject({ preparedByAutomation: false, preparedAtIso: null });
+  });
+});
+
+describe('existing receipts for requests automation no longer covers', () => {
+  const receiptMap = (state, overrides = {}) => new Map([[REQUEST, {
+    state, siteVisitId: VISIT, scheduledEndIso: END, documentId: null, attemptCount: 1, ...overrides,
+  }]]);
+  const excludedRequest = async (dependencies) => ({ ...(await dependencies.getRequest()), akoya_requestnum: '1003220' });
+
+  it.each(['pending', 'blocked'])('shows a %s receipt as disabled once the request is excluded', async (state) => {
+    const { dependencies } = harness();
+    dependencies.config = { ...config, excludedRequestNumbers: ['1003220'] };
+    dependencies.getRequest.mockResolvedValue(await excludedRequest(dependencies));
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptMap(state, { errorCode: 'request_eligibility_changed' }));
+    expect((await getPreparationForRequest(REQUEST, dependencies)).preparation).toMatchObject({ due: true, state: 'disabled' });
+  });
+
+  it('shows a blocked receipt as disabled when automation has been turned off', async () => {
+    const { dependencies } = harness();
+    dependencies.config = { ...config, active: false, blockedBy: ['feature_disabled'] };
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptMap('blocked'));
+    expect((await getPreparationForRequest(REQUEST, dependencies)).preparation).toMatchObject({ state: 'disabled' });
+  });
+
+  it.each(['pending', 'blocked'])('keeps a %s receipt for a covered request', async (state) => {
+    const { dependencies } = harness();
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptMap(state));
+    expect((await getPreparationForRequest(REQUEST, dependencies)).preparation).toMatchObject({ state });
+  });
+
+  it('keeps in-flight and completed receipts even when the request is excluded', async () => {
+    const { dependencies } = harness();
+    dependencies.config = { ...config, excludedRequestNumbers: ['1003220'] };
+    dependencies.getRequest.mockResolvedValue(await excludedRequest(dependencies));
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptMap('running'));
+    expect((await getPreparationForRequest(REQUEST, dependencies)).preparation).toMatchObject({ state: 'running' });
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptMap('prepared', { documentId: 'dddddddd-0000-4000-8000-000000000099' }));
+    dependencies.readArtifactStatus.mockResolvedValue({ currentArtifact: { artifactId: DOC, lifecycleState: L.REVIEW } });
+    expect((await getPreparationForRequest(REQUEST, dependencies)).preparation)
+      .toMatchObject({ state: 'blocked', errorCode: 'document_pointer_changed' });
+  });
+
+  it('keeps a pending receipt when the request read fails', async () => {
+    const { dependencies } = harness();
+    dependencies.getRequest.mockRejectedValue(new Error('dataverse down'));
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptMap('pending'));
+    expect((await getPreparationForRequest(REQUEST, dependencies)).preparation).toMatchObject({ state: 'pending' });
   });
 });

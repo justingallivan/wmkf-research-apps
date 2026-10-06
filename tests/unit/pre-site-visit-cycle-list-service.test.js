@@ -318,3 +318,19 @@ it('reports due as waiting only for requests active automation would scan', asyn
     }
   }
 });
+
+it('shows an unfinished receipt as disabled on the list once automation no longer covers the request', async () => {
+  jest.useFakeTimers().setSystemTime(new Date('2026-12-02T00:00:00Z'));
+  siteVisitAdapter.findSummariesByRequests.mockResolvedValue({ records: [
+    { _regardingobjectid_value: R1, activityid: 'v1', statecode: 1, statuscode: 2, scheduledend: '2026-12-01T18:00:00Z' },
+    { _regardingobjectid_value: R2, activityid: 'v2', statecode: 1, statuscode: 2, scheduledend: '2026-12-01T18:00:00Z' },
+  ], capped: false });
+  listPreparationsForSchedules.mockResolvedValue(new Map([
+    [R1, { state: 'blocked', siteVisitId: 'v1', documentId: null, errorCode: 'request_eligibility_changed' }],
+    [R2, { state: 'running', siteVisitId: 'v2', documentId: null }],
+  ]));
+  const result = await list();
+  const byNumber = Object.fromEntries(result.artifacts.map((row) => [row.requestNumber, row.preparation]));
+  expect(byNumber['1002959']).toMatchObject({ state: 'disabled' });
+  expect(byNumber['1003001']).toMatchObject({ state: 'running' });
+});
