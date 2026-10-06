@@ -215,6 +215,80 @@ horizontally scrollable when space is constrained. Workbench tabs use a simple
 bottom border for active state and preserve the request context above the tab
 strip.
 
+## Page Structure
+
+Adopted 2026-10-05 from the app-wide staff UX audit
+(`.impeccable/critique/2026-10-06T01-35-10Z__pages.md`). These rules bind every
+new or reworked staff page; existing pages conform when they are next reworked.
+Tokens and components above say how things look; these rules say how a page is
+put together.
+
+**Page types.** Every staff page is one of four types, and the type decides its
+width, header, and section order:
+
+- **Queue / List:** many records to triage or open (Workbench views, Meeting
+  Tracker home).
+- **Record Detail:** one request, visit, session, or writeup.
+- **Workspace / Tool:** a focused tool that takes input and produces output
+  (Integrity Screener, Grant Reporting, Cycle Dossier).
+- **Settings / Admin:** configuration and exceptions (Admin, Profile Settings).
+
+### Named Rules
+
+1. **The One Shell Rule.** Every authenticated page, the home page included,
+   uses the same shell. The shell and nav are always `max-w-7xl`. Settings and
+   reading pages may narrow only their main column (at most to `max-w-4xl`).
+   Width classes come from a written-out map of literal class strings, never an
+   interpolated `max-w-${...}` (Tailwind drops classes it cannot see literally).
+2. **The Left Header Rule.** Page headers are left-aligned: one muted back-link
+   or breadcrumb line, an H1 of at most `1.5rem`/600, and one metadata line.
+   Status chips sit inline with the H1; the page's primary action sits
+   right-aligned on the H1 row. Centered heroes, emoji in the H1, and multi-line
+   taglines are reserved for the suite home page.
+3. **The Content-First Queue Rule.** On Queue / List pages, filters and search
+   live in the header area and the first record starts within `240px` of the top
+   of the main area. Rows are at most about `64px` tall, are real links (so they
+   open in a new tab), and show the next action.
+4. **The Identity-Always Rule.** A Record Detail header always shows the
+   record's identity (number, title, program and cycle), including while loading
+   and after an error.
+5. **The Read-First Rule.** Record Detail pages open read-only, with editing
+   behind an explicit Edit control. A completed or closed record never opens as a
+   form.
+6. **The Section Order Rule.** Status and next action come first, then primary
+   content, then supporting evidence; history, audit, and technical detail come
+   last and start collapsed.
+7. **The Four-Card Rule.** At most four top-level cards before the first fold;
+   beyond that, use tabs, a stepper, or collapsible sections. Each card holds one
+   topic and at most one primary action.
+8. **The Finished-Work Rule.** A completed step collapses to one line: label,
+   check, timestamp, and a "…" menu. Re-run, replace, and regenerate live in that
+   menu, never as visible buttons beside a published or complete state.
+9. **The Stepper Rule.** Multi-step flows use the Cycle Dossier stepper pattern;
+   only the next incomplete step is expanded.
+10. **The Status-Once Rule.** A record's status appears once, as a header chip
+    using the chip meanings above. Green means confirmed success only; "moved" or
+    redirect notices are neutral or blue.
+11. **The One Button Vocabulary Rule.** Buttons come from the shared `Button`
+    component (primary, secondary, outline, danger); no hand-colored
+    `<button>`s. At most one ink primary per region. Text links are for
+    navigation only.
+12. **The Tab Level Rule.** Underline tabs for page sections, a segmented
+    control inside a section, chips for filters. At most seven tabs per level, in
+    lifecycle order; a tab may carry a status dot or count.
+13. **The Filter Rule.** Zero-count filter chips are hidden or disabled. More
+    than six filter values collapse into a select or a "More" menu.
+14. **The People Picker Rule.** More than eight selectable people means a
+    typeahead with a selected list. The same list is never rendered twice.
+15. **The State Rule.** Empty states say what is missing and offer the action
+    that fills it. Loading uses skeletons in place. Errors appear in the affected
+    region with plain wording and Retry, never replace page identity, and never
+    show raw exception text.
+16. **The No Internal Identifiers Rule.** Staff UI never shows UUIDs, raw
+    tokens, storage paths, or full meeting-URL query strings; use human labels
+    with an open or copy action.
+17. **The Quiet Footer Rule.** Operational pages carry no attribution footer.
+
 ## Elevation & Depth
 
 The system uses light structural layering. Borders and tonal contrast establish
@@ -289,8 +363,12 @@ and compact state, not ordinary buttons, fields, or large containers.
 
 ### Navigation
 
-- **Global:** Compact icon-and-label links in muted gray on white. Hover adds a
-  quiet gray surface and stronger text; mobile navigation becomes a menu.
+- **Global:** One row of at most seven text items in muted gray on white:
+  Workbench, Meeting Tracker, a Tools menu (focused tools grouped as on the home
+  page), Guide, Admin, and the user menu. The current item uses Foundation Ink
+  text with an underline; no emoji. Hover adds a quiet gray surface and stronger
+  text; mobile navigation becomes a menu. (Adopted 2026-10-05; the live nav
+  still shows one emoji link per app until the shell rework lands.)
 - **Workbench:** A horizontal, overflow-safe tab strip. The active tab uses
   Foundation Ink text and a two-pixel bottom border; inactive tabs remain
   borderless and muted.
