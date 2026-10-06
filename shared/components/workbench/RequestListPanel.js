@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter } from 'next/router';
+import Link from 'next/link';
 import { requestJson, requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
 import ReviewerStatusIndicator from './ReviewerStatusIndicator';
@@ -52,12 +52,12 @@ export function describeStageCounts(stages) {
 
 function StageChip({ stage }) {
   const m = STAGE_META[stage] || { label: stage, cls: 'bg-gray-100 text-gray-700' };
-  return <span className={`inline-flex min-h-7 items-center px-2.5 py-1 rounded-full text-xs font-semibold ${m.cls}`}>{m.label}</span>;
+  return <span className={`inline-flex items-center whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-semibold ${m.cls}`}>{m.label}</span>;
 }
 
-// Per-row triage flip (S261). The surrounding row navigates on click/keyboard,
-// so select interactions stop/prevent events before they can trigger navigation.
-// The server computes the visible canManage gate, and POST /api/workbench/triage
+// Per-row triage flip (S261). The row's request link is stretched over the
+// whole row, so the select sits above it (relative z-10) and stops events
+// before they can reach the link. The server computes the visible canManage gate, and POST /api/workbench/triage
 // remains the authoritative lead-PD/superuser gate.
 function TriageControl({ proposal, busy, onSet }) {
   const value = proposal.advancing ? 'advancing' : proposal.setAside ? 'setAside' : 'untriaged';
@@ -68,8 +68,9 @@ function TriageControl({ proposal, busy, onSet }) {
       disabled={busy}
       onClick={stop}
       onChange={(e) => { stop(e); onSet(proposal.requestId, e.target.value); }}
-      className="mt-1.5 text-xs border border-gray-300 rounded px-1.5 py-1 bg-white disabled:opacity-50"
+      className="relative z-10 h-9 w-full rounded-lg border border-gray-300 bg-white px-2 text-sm text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1 disabled:opacity-50"
       title="Set triage status"
+      aria-label={`Triage status for request ${proposal.requestNumber}`}
     >
       {value === 'untriaged' && <option value="untriaged" disabled>Set triage…</option>}
       <option value="advancing">Advancing</option>
@@ -107,7 +108,6 @@ export default function RequestListPanel({
   cycleMetadataReady = true,
   allowRowsWhileCyclesLoading = false,
 }) {
-  const router = useRouter();
   const [proposals, setProposals] = useState([]);
   const [rollup, setRollup] = useState(null);
   const [loadingProposals, setLoadingProposals] = useState(false);
@@ -319,60 +319,58 @@ export default function RequestListPanel({
           <p className="text-gray-500">No requests to show for this cycle and scope.</p>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <ul className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           {visibleProposals.map((p) => {
             const href = `/workbench/${p.requestId}?tab=reviewers&n=${encodeURIComponent(p.requestNumber)}`;
+            const people = [
+              p.projectLeader && `PI ${p.projectLeader}`,
+              p.programDirector && `PD ${p.programDirector}`,
+            ].filter(Boolean).join(' · ');
             return (
-              <div
+              <li
                 key={p.requestId}
-                role="button"
-                tabIndex={0}
-                className="block"
-                onClick={() => router.push(href)}
-                onKeyDown={(e) => {
-                  if (e.target?.closest?.('select,button,a,input,textarea')) return;
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    router.push(href);
-                  }
-                }}
+                className="relative grid grid-cols-1 gap-x-6 gap-y-2 px-4 py-3 transition-colors hover:bg-gray-50 focus-within:bg-gray-50 md:grid-cols-[minmax(0,1fr)_auto_12rem_9rem] md:items-center"
               >
-                <Card className="cursor-pointer">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-gray-900">#{p.requestNumber}</span>
-                        <TestRequestBadge isTestRequest={p.isTestRequest} />
-                        {p.cycleLabel && <span className="text-xs text-gray-500">{p.cycleLabel}</span>}
-                        {p.grantProgram && <span className="text-xs text-gray-500">· {p.grantProgram}</span>}
-                        {p.advancing && (
-                          <span className="inline-flex min-h-7 items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">
-                            going-forward
-                          </span>
-                        )}
-                        {p.setAside && (
-                          <span className="inline-flex min-h-7 items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-600">
-                            set aside
-                          </span>
-                        )}
-                      </div>
-                      {p.institution && <div className="text-sm text-gray-700 mt-1 truncate">{p.institution}</div>}
-                      {p.projectLeader && <div className="text-xs text-gray-500 mt-0.5">PI: {p.projectLeader}</div>}
-                      {p.programDirector && <div className="text-xs text-gray-500 mt-0.5">PD: {p.programDirector}</div>}
-                    </div>
-                    <div className="text-right shrink-0">
-                      <StageChip stage={p.workRemaining} />
-                      <ReviewerStatusIndicator reviewers={p.reviewers} />
-                      {cycleMetadataReady && p.canManage && (
-                        <TriageControl proposal={p} busy={savingIds.has(p.requestId)} onSet={setTriage} />
-                      )}
-                    </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Stretched link: the whole row opens the request, and it
+                        is a real link (new tab, copy address). */}
+                    <Link
+                      href={href}
+                      className="font-semibold text-gray-900 after:absolute after:inset-0 after:content-[''] focus:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-gray-500"
+                    >
+                      #{p.requestNumber}
+                    </Link>
+                    <TestRequestBadge isTestRequest={p.isTestRequest} />
+                    {p.institution && <span className="min-w-0 truncate text-sm text-gray-900">{p.institution}</span>}
+                    {p.advancing && (
+                      <span className="inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-xs font-semibold text-purple-800">
+                        Advancing
+                      </span>
+                    )}
+                    {p.setAside && (
+                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">
+                        Set aside
+                      </span>
+                    )}
                   </div>
-                </Card>
-              </div>
+                  {people && <div className="mt-0.5 truncate text-xs text-gray-500">{people}</div>}
+                </div>
+                <div className="md:text-right">
+                  <StageChip stage={p.workRemaining} />
+                </div>
+                <div className="md:[&>div]:items-end">
+                  <ReviewerStatusIndicator reviewers={p.reviewers} />
+                </div>
+                <div>
+                  {cycleMetadataReady && p.canManage && (
+                    <TriageControl proposal={p} busy={savingIds.has(p.requestId)} onSet={setTriage} />
+                  )}
+                </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
     </>
   );
