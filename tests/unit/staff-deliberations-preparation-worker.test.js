@@ -564,6 +564,8 @@ describe('excluded request numbers', () => {
     ['a non-numeric entry', '["1003220","abc"]'],
     ['an empty entry', '["1003220",""]'],
     ['a null entry', '["1003220",null]'],
+    ['an empty string', ''],
+    ['whitespace only', '   '],
   ])('blocks automation when the exclusion list is %s', (_label, raw) => {
     const config = readPreparationConfig({
       STAFF_DELIBERATIONS_AUTO_PREPARE: 'on',
@@ -577,6 +579,26 @@ describe('excluded request numbers', () => {
       STAFF_DELIBERATIONS_AUTO_PREPARE_EXCLUDED_REQUEST_NUMBERS: raw,
     });
     expect(config).toMatchObject({ active: false, blockedBy: ['excluded_request_numbers_invalid'] });
+  });
+
+  it('never scans requests when a present exclusion setting is blank', async () => {
+    const { dependencies } = harness();
+    dependencies.config = readPreparationConfig({
+      STAFF_DELIBERATIONS_AUTO_PREPARE: 'on',
+      STAFF_DELIBERATIONS_AUTO_PREPARE_PROGRAM_IDS: JSON.stringify([PROGRAM]),
+      STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES: JSON.stringify(['D26']),
+      STAFF_DELIBERATIONS_AUTO_PREPARE_REQUEST_STATUSES: JSON.stringify(['Phase II Pending']),
+      STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS: JSON.stringify([[10, 11, true]]),
+      STAFF_DELIBERATIONS_AUTO_PREPARE_ATOMIC_FENCE_CONFIRMED: 'on',
+      GUARDED_REOPEN_SCHEMA_READY: 'on',
+      TEST_REQUEST_ISOLATION: 'on',
+      STAFF_DELIBERATIONS_AUTO_PREPARE_EXCLUDED_REQUEST_NUMBERS: '',
+    });
+    const result = await drainStaffDeliberationsPreparations(dependencies);
+    expect(result).toMatchObject({ status: 'disabled', blockedBy: ['excluded_request_numbers_invalid'] });
+    expect(dependencies.queryRequests).not.toHaveBeenCalled();
+    expect(dependencies.generate).not.toHaveBeenCalled();
+    expect(dependencies.promote).not.toHaveBeenCalled();
   });
 
   it('never enqueues an excluded request during the due scan', async () => {
