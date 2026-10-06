@@ -428,6 +428,9 @@ test('does not transition when the Word item changes during verification', async
   }, harness.dependencies)).rejects.toMatchObject({
     code: 'site_visit_sharepoint_version_changed',
     httpStatus: 409,
+    // Only the fields that moved, for the operator receipt; not in the staff body.
+    diagnostic: `versionId ${JSON.stringify(harness.metadata.versionId)}->"3.0"; eTag ${JSON.stringify(harness.metadata.eTag)}->"file-etag-3"`,
+    body: { error: expect.not.stringContaining('->'), code: 'site_visit_sharepoint_version_changed' },
   });
 
   expect(harness.dependencies.updateDocument).not.toHaveBeenCalled();
