@@ -20,7 +20,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { requestEnvelope } from '../../utils/api-request';
-import Layout, { PageHeader } from '../Layout';
+import Layout from '../Layout';
 import ToolbarSelect from '../ToolbarSelect';
 import WorkbenchViewsNav, { VIEWS } from './WorkbenchViewsNav';
 import { RequestLocator } from './RequestLocator';
@@ -180,58 +180,65 @@ export function WorkbenchShell({ previewReadOnly = false }) {
   const activeViewMeta = VIEWS[location.view];
 
   return (
-    <Layout title="Request Workbench">
-      <PageHeader
-        title="Request Workbench"
-        subtitle="Manage requests and the work around them by grant program and cycle."
-        icon="🗂️"
-      />
-
-      <div className="flex flex-wrap items-start gap-4 mb-6">
-        <ToolbarSelect
-          id="workbench-program"
-          label="Grant program"
-          value={programId}
-          disabled={!cyclesReady || programs.length === 0}
-          onChange={(e) => changeProgram(e.target.value)}
-          hint={programHint}
-        >
-          {visiblePrograms.length === 0 && <option value="">Loading programs…</option>}
-          {visiblePrograms.map((program) => (
-            <option key={program.programId} value={program.programId}>{program.name}</option>
-          ))}
-        </ToolbarSelect>
-        <ToolbarSelect
-          id="workbench-cycle"
-          label="Grant cycle"
-          value={cycleCode || ''}
-          disabled={!cyclesReady || cycleOptions.length === 0}
-          onChange={(e) => navigate({ cycleCode: e.target.value, uncycled: false }, { push: true })}
-        >
-          {cyclesReady && !cycleCode && <option value="">Select a cycle…</option>}
-          {cycleOptions.map((c) => (
-            <option key={c.code} value={c.code}>{c.label || c.code}</option>
-          ))}
-        </ToolbarSelect>
-      </div>
-
-      <div className="mb-6">
-        <button
-          type="button"
-          id="workbench-locator-toggle"
-          aria-expanded={locatorOpen}
-          aria-controls="workbench-locator-panel"
-          onClick={() => setLocatorOpen((open) => !open)}
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-900 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 rounded"
-        >
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
-            className={`h-4 w-4 transition-transform ${locatorOpen ? 'rotate-180' : ''}`}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
-          </svg>
-          Find and open a request
-        </button>
+    <Layout title="Workbench">
+      {/* DESIGN.md Page Structure: left header with the program/cycle filters
+          and request search on the title row; content starts right below. */}
+      <div className="pt-6 pb-5">
+        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+          <h1 className="text-2xl font-semibold text-gray-900">Workbench</h1>
+          <div className="flex flex-wrap items-end gap-3">
+            <ToolbarSelect
+              id="workbench-program"
+              label="Grant program"
+              value={programId}
+              disabled={!cyclesReady || programs.length === 0}
+              onChange={(e) => changeProgram(e.target.value)}
+              aria-describedby={programHint ? 'workbench-program-hint' : undefined}
+              className="w-56"
+            >
+              {visiblePrograms.length === 0 && <option value="">Loading programs…</option>}
+              {visiblePrograms.map((program) => (
+                <option key={program.programId} value={program.programId}>{program.name}</option>
+              ))}
+            </ToolbarSelect>
+            <ToolbarSelect
+              id="workbench-cycle"
+              label="Grant cycle"
+              value={cycleCode || ''}
+              disabled={!cyclesReady || cycleOptions.length === 0}
+              onChange={(e) => navigate({ cycleCode: e.target.value, uncycled: false }, { push: true })}
+              className="w-48"
+            >
+              {cyclesReady && !cycleCode && <option value="">Select a cycle…</option>}
+              {cycleOptions.map((c) => (
+                <option key={c.code} value={c.code}>{c.label || c.code}</option>
+              ))}
+            </ToolbarSelect>
+            <button
+              type="button"
+              id="workbench-locator-toggle"
+              aria-expanded={locatorOpen}
+              aria-controls="workbench-locator-panel"
+              onClick={() => setLocatorOpen((open) => !open)}
+              className={`inline-flex h-12 items-center gap-2 rounded-xl border px-4 text-sm font-semibold shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 ${
+                locatorOpen
+                  ? 'border-gray-900 bg-gray-900 text-white'
+                  : 'border-gray-300 bg-white text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+                <circle cx="11" cy="11" r="6.5" />
+                <path strokeLinecap="round" d="m20 20-4.2-4.2" />
+              </svg>
+              Find and open a request
+            </button>
+          </div>
+        </div>
+        {programHint && (
+          <p id="workbench-program-hint" className="mt-2 text-right text-xs text-gray-500">{programHint}</p>
+        )}
         {locatorOpen && programId && (
-          <div id="workbench-locator-panel" role="region" aria-labelledby="workbench-locator-toggle" className="mt-3">
+          <div id="workbench-locator-panel" role="region" aria-labelledby="workbench-locator-toggle" className="mt-4 rounded-xl border border-gray-200 bg-white p-4">
             <p className="mb-3 text-sm text-gray-600">
               Search current and past requests. Search options do not change the Workbench context.
             </p>
@@ -250,10 +257,7 @@ export function WorkbenchShell({ previewReadOnly = false }) {
       <WorkbenchViewsNav activeKey={location.view} cycleCode={cycleCode} programId={location.programId} scope={location.scope} />
 
       {activeViewMeta?.description && (
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">{activeViewMeta.label}</h2>
-          <p className="mt-1 text-sm text-gray-600">{activeViewMeta.description}</p>
-        </div>
+        <p className="mb-5 text-sm text-gray-600">{activeViewMeta.description}</p>
       )}
 
       {cyclesReady && !cycleCode ? (
