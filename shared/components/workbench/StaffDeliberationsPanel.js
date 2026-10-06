@@ -101,8 +101,8 @@ function primaryDocument(request) {
 // Where the request is in the process. A problem never replaces the stage; it
 // is shown beneath it. An unconfirmed schedule is its own stage so an
 // unverified time is never presented as the scheduled one.
-// Chip tones follow DESIGN.md: blue for working stages, violet for review,
-// amber for an issue, gray for neutral. The icon and text carry the meaning.
+// Chip tones follow DESIGN.md: gray for upcoming, blue for active writeup work,
+// violet for review, amber for an issue. The icon and text carry the meaning.
 const STAGE_TONES = {
   blue: 'bg-blue-50 text-blue-800 ring-blue-200',
   violet: 'bg-violet-50 text-violet-800 ring-violet-200',
@@ -115,8 +115,8 @@ function stageFor(request) {
   if (request.finalPhase === 'group-review') return { label: 'Group review', tone: 'violet', Icon: Users };
   if (['unavailable', 'ambiguous'].includes(request.timing?.availability)) return { label: 'Presentation time not confirmed', tone: 'amber', Icon: CalendarClock };
   if (request.preparation?.due || request.writeup?.correctionInProgress) return { label: 'After presentation', tone: 'blue', Icon: PenLine };
-  if (request.timing?.availability === 'missing' || !request.timing?.endIso) return { label: 'Not scheduled', tone: 'gray', Icon: CalendarX2 };
-  return { label: 'Before presentation', tone: 'blue', Icon: CalendarClock };
+  if (request.timing?.availability === 'missing' || !request.timing?.endIso) return { label: 'Not scheduled', tone: 'amber', Icon: CalendarX2 };
+  return { label: 'Before presentation', tone: 'gray', Icon: CalendarClock };
 }
 
 function presentationWhen(request) {
