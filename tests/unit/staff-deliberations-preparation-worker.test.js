@@ -533,3 +533,239 @@ it('does not create a receipt or invoke generation before the scheduled end', as
   expect(dependencies.generate).not.toHaveBeenCalled();
   expect(dependencies.promote).not.toHaveBeenCalled();
 });
+
+describe('excluded request numbers', () => {
+  const EXCLUDED = '1003220';
+  const excludedConfig = { ...config, excludedRequestNumbers: [EXCLUDED] };
+  const withNumber = (row, number) => ({ ...row, akoya_requestnum: number });
+
+  it('parses only digit-string request numbers and is not a readiness input', () => {
+    const env = {
+      STAFF_DELIBERATIONS_AUTO_PREPARE: 'on',
+      STAFF_DELIBERATIONS_AUTO_PREPARE_PROGRAM_IDS: JSON.stringify([PROGRAM]),
+      STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES: JSON.stringify(['D26']),
+      STAFF_DELIBERATIONS_AUTO_PREPARE_REQUEST_STATUSES: JSON.stringify(['Phase II Pending']),
+      STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS: JSON.stringify([[10, 11, true]]),
+      STAFF_DELIBERATIONS_AUTO_PREPARE_ATOMIC_FENCE_CONFIRMED: 'on',
+      GUARDED_REOPEN_SCHEMA_READY: 'on',
+      TEST_REQUEST_ISOLATION: 'on',
+    };
+    expect(readPreparationConfig(env)).toMatchObject({ active: true, excludedRequestNumbers: [] });
+    env.STAFF_DELIBERATIONS_AUTO_PREPARE_EXCLUDED_REQUEST_NUMBERS = '[]';
+    expect(readPreparationConfig(env)).toMatchObject({ active: true, excludedRequestNumbers: [] });
+    env.STAFF_DELIBERATIONS_AUTO_PREPARE_EXCLUDED_REQUEST_NUMBERS = JSON.stringify(['1003220', 1003221, ' 1003222 ', '1003220']);
+    expect(readPreparationConfig(env)).toMatchObject({ active: true, excludedRequestNumbers: ['1003220', '1003221', '1003222'] });
+  });
+
+  it.each([
+    ['a bare number', '1003220'],
+    ['malformed JSON', '["1003220"'],
+    ['an object', '{"1003220":true}'],
+    ['a non-numeric entry', '["1003220","abc"]'],
+    ['an empty entry', '["1003220",""]'],
+    ['a null entry', '["1003220",null]'],
+    ['an empty string', ''],
+    ['whitespace only', '   '],
+  ])('blocks automation when the exclusion list is %s', (_label, raw) => {
+    const config = readPreparationConfig({
+      STAFF_DELIBERATIONS_AUTO_PREPARE: 'on',
+      STAFF_DELIBERATIONS_AUTO_PREPARE_PROGRAM_IDS: JSON.stringify([PROGRAM]),
+      STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES: JSON.stringify(['D26']),
+      STAFF_DELIBERATIONS_AUTO_PREPARE_REQUEST_STATUSES: JSON.stringify(['Phase II Pending']),
+      STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS: JSON.stringify([[10, 11, true]]),
+      STAFF_DELIBERATIONS_AUTO_PREPARE_ATOMIC_FENCE_CONFIRMED: 'on',
+      GUARDED_REOPEN_SCHEMA_READY: 'on',
+      TEST_REQUEST_ISOLATION: 'on',
+      STAFF_DELIBERATIONS_AUTO_PREPARE_EXCLUDED_REQUEST_NUMBERS: raw,
+    });
+    expect(config).toMatchObject({ active: false, blockedBy: ['excluded_request_numbers_invalid'] });
+  });
+
+  it('never scans requests when a present exclusion setting is blank', async () => {
+    const { dependencies } = harness();
+    dependencies.config = readPreparationConfig({
+      STAFF_DELIBERATIONS_AUTO_PREPARE: 'on',
+      STAFF_DELIBERATIONS_AUTO_PREPARE_PROGRAM_IDS: JSON.stringify([PROGRAM]),
+      STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES: JSON.stringify(['D26']),
+      STAFF_DELIBERATIONS_AUTO_PREPARE_REQUEST_STATUSES: JSON.stringify(['Phase II Pending']),
+      STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS: JSON.stringify([[10, 11, true]]),
+      STAFF_DELIBERATIONS_AUTO_PREPARE_ATOMIC_FENCE_CONFIRMED: 'on',
+      GUARDED_REOPEN_SCHEMA_READY: 'on',
+      TEST_REQUEST_ISOLATION: 'on',
+      STAFF_DELIBERATIONS_AUTO_PREPARE_EXCLUDED_REQUEST_NUMBERS: '',
+    });
+    const result = await drainStaffDeliberationsPreparations(dependencies);
+    expect(result).toMatchObject({ status: 'disabled', blockedBy: ['excluded_request_numbers_invalid'] });
+    expect(dependencies.queryRequests).not.toHaveBeenCalled();
+    expect(dependencies.generate).not.toHaveBeenCalled();
+    expect(dependencies.promote).not.toHaveBeenCalled();
+  });
+
+  it('never enqueues an excluded request during the due scan', async () => {
+    const { dependencies } = harness();
+    dependencies.config = excludedConfig;
+    const [row] = (await dependencies.queryRequests()).records;
+    dependencies.queryRequests.mockResolvedValue({ records: [withNumber(row, EXCLUDED)], capped: false });
+    dependencies.claimReceipt = jest.fn().mockResolvedValue(null);
+    const result = await drainStaffDeliberationsPreparations(dependencies);
+    expect(dependencies.upsertReceipt).not.toHaveBeenCalled();
+    expect(dependencies.generate).not.toHaveBeenCalled();
+    expect(dependencies.promote).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ scanned: 0 });
+  });
+
+  it('still enqueues a non-excluded request under the same configuration', async () => {
+    const { dependencies } = harness();
+    dependencies.config = excludedConfig;
+    const [row] = (await dependencies.queryRequests()).records;
+    dependencies.queryRequests.mockResolvedValue({ records: [withNumber(row, '1002963')], capped: false });
+    dependencies.claimReceipt = jest.fn().mockResolvedValue(null);
+    await drainStaffDeliberationsPreparations(dependencies);
+    expect(dependencies.upsertReceipt).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks an already-claimed receipt when the fresh request read is excluded', async () => {
+    const { dependencies } = harness({ currentArtifact: { artifactId: DOC, lifecycleState: L.DRAFT, operationStatus: O.READY } });
+    dependencies.config = excludedConfig;
+    dependencies.queryRequests.mockResolvedValue({ records: [], capped: false });
+    dependencies.getRequest.mockResolvedValue(withNumber(await dependencies.getRequest(), EXCLUDED));
+    await drainStaffDeliberationsPreparations(dependencies);
+    expect(dependencies.promote).not.toHaveBeenCalled();
+    expect(dependencies.generate).not.toHaveBeenCalled();
+    expect(dependencies.finishReceipt).toHaveBeenCalledWith(expect.any(String), expect.any(String), {
+      state: 'blocked', errorCode: 'request_eligibility_changed',
+    });
+  });
+
+  it('refuses retry for an excluded request', async () => {
+    const { dependencies } = harness();
+    dependencies.config = excludedConfig;
+    dependencies.getRequest.mockResolvedValue(withNumber(await dependencies.getRequest(), EXCLUDED));
+    dependencies.retryReceipt = jest.fn();
+    await expect(requestPreparationRetry(REQUEST, dependencies, { callerSystemId: LEAD_PD }))
+      .rejects.toMatchObject({ httpStatus: 409, code: 'preparation_request_ineligible' });
+    expect(dependencies.retryReceipt).not.toHaveBeenCalled();
+  });
+
+  it('reports an excluded due request as disabled so the manual action stays available', async () => {
+    const { dependencies } = harness();
+    dependencies.config = excludedConfig;
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(new Map());
+    dependencies.getRequest.mockResolvedValue(withNumber(await dependencies.getRequest(), EXCLUDED));
+    const projection = await getPreparationForRequest(REQUEST, dependencies);
+    expect(projection.preparation).toMatchObject({ due: true, state: 'disabled', automationActive: true });
+  });
+
+  it('reports a due request outside the program allowlist as disabled, not waiting', async () => {
+    const { dependencies } = harness();
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(new Map());
+    dependencies.getRequest.mockResolvedValue({ ...(await dependencies.getRequest()), _wmkf_grantprogram_value: LEAD_PD });
+    const projection = await getPreparationForRequest(REQUEST, dependencies);
+    expect(projection.preparation).toMatchObject({ due: true, state: 'disabled' });
+  });
+
+  it('keeps an eligible due request waiting for automation', async () => {
+    const { dependencies } = harness();
+    dependencies.config = excludedConfig;
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(new Map());
+    const projection = await getPreparationForRequest(REQUEST, dependencies);
+    expect(projection.preparation).toMatchObject({ due: true, state: 'due' });
+  });
+
+  it('reports unavailable when the request read fails while automation is active', async () => {
+    const { dependencies } = harness();
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(new Map());
+    dependencies.getRequest.mockRejectedValue(new Error('dataverse down'));
+    const projection = await getPreparationForRequest(REQUEST, dependencies);
+    expect(projection.preparation).toMatchObject({ due: true, state: 'unavailable' });
+  });
+});
+
+describe('automatic preparation attribution', () => {
+  const draft = { artifactId: DOC, lifecycleState: L.DRAFT, operationStatus: O.READY, file: { itemId: 'same-word-item' } };
+
+  it('records a reused promotion as a reconciled handoff, not automatic preparation', async () => {
+    const { dependencies } = harness({ currentArtifact: draft });
+    dependencies.promote.mockResolvedValue({ artifact: { artifactId: DOC, lifecycleState: L.REVIEW }, reused: true });
+    await drainStaffDeliberationsPreparations(dependencies);
+    expect(dependencies.finishReceipt).toHaveBeenCalledWith(expect.any(String), expect.any(String), expect.objectContaining({
+      state: 'prepared', provenance: expect.objectContaining({ operation: 'reconciled-complete-handoff' }),
+    }));
+  });
+
+  it('records a fresh promotion as scheduled-end preparation', async () => {
+    const { dependencies } = harness({ currentArtifact: draft });
+    dependencies.promote.mockResolvedValue({ artifact: { artifactId: DOC, lifecycleState: L.REVIEW }, reused: false });
+    await drainStaffDeliberationsPreparations(dependencies);
+    expect(dependencies.finishReceipt).toHaveBeenCalledWith(expect.any(String), expect.any(String), expect.objectContaining({
+      state: 'prepared', provenance: expect.objectContaining({ operation: 'scheduled-end-preparation' }),
+    }));
+  });
+
+  const receiptFor = (overrides) => new Map([[REQUEST, {
+    state: 'prepared', siteVisitId: VISIT, scheduledEndIso: END, documentId: DOC,
+    attemptCount: 1, preparedAtIso: '2026-12-01T18:05:00.000Z', preparedByAutomation: true, ...overrides,
+  }]]);
+
+  it('exposes automatic preparation only for a prepared receipt bound to the current document', async () => {
+    const { dependencies } = harness({ currentArtifact: { artifactId: DOC, lifecycleState: L.REVIEW } });
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptFor({}));
+    expect((await getPreparationForRequest(REQUEST, dependencies)).preparation)
+      .toMatchObject({ state: 'prepared', preparedByAutomation: true, preparedAtIso: '2026-12-01T18:05:00.000Z' });
+
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptFor({ preparedByAutomation: false }));
+    expect((await getPreparationForRequest(REQUEST, dependencies)).preparation)
+      .toMatchObject({ preparedByAutomation: false });
+
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptFor({ documentId: 'dddddddd-0000-4000-8000-000000000099' }));
+    expect((await getPreparationForRequest(REQUEST, dependencies)).preparation)
+      .toMatchObject({ preparedByAutomation: false, preparedAtIso: null });
+  });
+});
+
+describe('existing receipts for requests automation no longer covers', () => {
+  const receiptMap = (state, overrides = {}) => new Map([[REQUEST, {
+    state, siteVisitId: VISIT, scheduledEndIso: END, documentId: null, attemptCount: 1, ...overrides,
+  }]]);
+  const excludedRequest = async (dependencies) => ({ ...(await dependencies.getRequest()), akoya_requestnum: '1003220' });
+
+  it.each(['pending', 'blocked'])('shows a %s receipt as disabled once the request is excluded', async (state) => {
+    const { dependencies } = harness();
+    dependencies.config = { ...config, excludedRequestNumbers: ['1003220'] };
+    dependencies.getRequest.mockResolvedValue(await excludedRequest(dependencies));
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptMap(state, { errorCode: 'request_eligibility_changed' }));
+    expect((await getPreparationForRequest(REQUEST, dependencies)).preparation).toMatchObject({ due: true, state: 'disabled' });
+  });
+
+  it('shows a blocked receipt as disabled when automation has been turned off', async () => {
+    const { dependencies } = harness();
+    dependencies.config = { ...config, active: false, blockedBy: ['feature_disabled'] };
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptMap('blocked'));
+    expect((await getPreparationForRequest(REQUEST, dependencies)).preparation).toMatchObject({ state: 'disabled' });
+  });
+
+  it.each(['pending', 'blocked'])('keeps a %s receipt for a covered request', async (state) => {
+    const { dependencies } = harness();
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptMap(state));
+    expect((await getPreparationForRequest(REQUEST, dependencies)).preparation).toMatchObject({ state });
+  });
+
+  it('keeps in-flight and completed receipts even when the request is excluded', async () => {
+    const { dependencies } = harness();
+    dependencies.config = { ...config, excludedRequestNumbers: ['1003220'] };
+    dependencies.getRequest.mockResolvedValue(await excludedRequest(dependencies));
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptMap('running'));
+    expect((await getPreparationForRequest(REQUEST, dependencies)).preparation).toMatchObject({ state: 'running' });
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptMap('prepared', { documentId: 'dddddddd-0000-4000-8000-000000000099' }));
+    dependencies.readArtifactStatus.mockResolvedValue({ currentArtifact: { artifactId: DOC, lifecycleState: L.REVIEW } });
+    expect((await getPreparationForRequest(REQUEST, dependencies)).preparation)
+      .toMatchObject({ state: 'blocked', errorCode: 'document_pointer_changed' });
+  });
+
+  it('keeps a pending receipt when the request read fails', async () => {
+    const { dependencies } = harness();
+    dependencies.getRequest.mockRejectedValue(new Error('dataverse down'));
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptMap('pending'));
+    expect((await getPreparationForRequest(REQUEST, dependencies)).preparation).toMatchObject({ state: 'pending' });
+  });
+});

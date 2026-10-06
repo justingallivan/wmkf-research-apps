@@ -1082,6 +1082,13 @@ export default function StaffDeliberationsTab({
   const editingReady = preSiteShared && milestoneComplete && !preparationReadError
     && timing?.availability === 'available';
   const preparationState = preparationReadError ? 'unavailable' : preparation?.state;
+  // The worker's receipt says it moved this exact file to post-visit editing,
+  // and no staff member is recorded as having done so.
+  const preparedAutomatically = (preSiteShared || preSiteFinal) && !preparationReadError
+    && preparation?.preparedByAutomation === true && !artifact?.milestone?.actorId;
+  const preparedAutomaticallyWhen = preparedAutomatically
+    ? formatWhen(preparation.preparedAtIso || artifact?.milestone?.createdAt, timing?.timeZone || null)
+    : null;
   const phase = finalReview?.phase === 'leadership-review' ? 'Leadership review'
     : movedToFinal ? 'In review'
       : preSiteFinal ? 'Needs attention'
@@ -1420,6 +1427,11 @@ export default function StaffDeliberationsTab({
                   : 'Working writeup draft'}
             </span>
           </p>
+          {preparedAutomatically && (
+            <p className="mt-1 text-gray-600" data-testid="writeup-prepared-automatically">
+              {`Prepared automatically after the presentation${preparedAutomaticallyWhen ? ` · ${preparedAutomaticallyWhen}` : ''}`}
+            </p>
+          )}
           <FileDetails file={readyFile} />
           <Warnings warnings={warnings} label={preSiteShared || preSiteFinal ? 'Working document needs a quick edit check' : 'Draft needs a quick edit check'} />
         </div>

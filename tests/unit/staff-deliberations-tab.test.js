@@ -1543,3 +1543,25 @@ test('the deliberation session is its own step before the presentation, and is c
   expect(screen.getByRole('heading', { name: /Deliberation session \(current step\)/ })).toBeInTheDocument();
   expect(within(screen.getByTestId('deliberations-session-line').closest('li')).getByRole('heading', { name: /Deliberation session/ })).toBeInTheDocument();
 });
+
+test('a worker-prepared writeup says it was prepared automatically', async () => {
+  queueRoute('presiteGet', statusResponse({
+    currentArtifact: preSiteArtifact(REVIEW),
+    preparation: { due: true, state: 'prepared', preparedByAutomation: true, preparedAtIso: '2026-09-28T18:05:00Z' },
+    timing: { availability: 'available', endIso: '2026-09-28T18:00:00Z', timeZone: 'America/Los_Angeles' },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByTestId('writeup-prepared-automatically')).toHaveTextContent(/^Prepared automatically after the presentation · Sep 28, 11:05 AM PDT$/);
+});
+
+test('no automatic label when staff are recorded as preparing the writeup', async () => {
+  const artifact = preSiteArtifact(REVIEW);
+  queueRoute('presiteGet', statusResponse({
+    currentArtifact: { ...artifact, milestone: { ...artifact.milestone, actorId: '44444444-4444-4444-8444-444444444444' } },
+    preparation: { due: true, state: 'prepared', preparedByAutomation: true, preparedAtIso: '2026-09-28T18:05:00Z' },
+    timing: { availability: 'available', endIso: '2026-09-28T18:00:00Z' },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByText('Working writeup in Word')).toBeInTheDocument();
+  expect(screen.queryByTestId('writeup-prepared-automatically')).toBeNull();
+});
