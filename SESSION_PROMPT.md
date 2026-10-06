@@ -1,3 +1,68 @@
+# Session 578 Prompt: Staff Deliberations UI review in a separate session
+
+## Session 577 Codex close — 2026-10-05 PT
+
+**Owner decision:** close the infrastructure/workflow effort. Claude is undertaking a
+comprehensive Impeccable review; remaining UI work belongs in its own session.
+The prior Claude handoff is preserved verbatim below as historical context, not a
+freshly verified worklist. Do not overwrite concurrent Claude work or resume its
+carryovers without checking current source and release state.
+
+### Completed and released
+
+- **Workflow infrastructure:** PR #432 (`d8c658b2e112b2c81036df1ba0c48973b9c3cfce`)
+  deployed the request-first projection, scheduled-end preparation, durable receipts,
+  preserved Word document identity and explicit human review transitions. Migration
+  067 and bounded production acceptance are recorded in
+  `docs/plans/STAFF_DELIBERATIONS_STATUS_CLARITY_PLAN_2026-10-04.md`.
+- **Eligibility:** PR #442 (`88fa8caf2eb5200189747ff1ca9683a700580277`) restored the
+  ordinary Workbench cohort: Advancing OR Phase II Pending, including eligible
+  requests without documents, with mine/all-PD scope.
+- **UI revisions shipped, not accepted as finished:** PR #444
+  (`4d7b30b1a73336607cac521fbc8d51ab8a7f5e38`) and PR #445
+  (`ebbe9b031a360053d55297b70440a3bebbd1708d`; source `d204ed801`).
+  [VERIFIED via release checks and signed-in production browser, 2026-10-05]
+  latest deployment `dpl_6zTF4WVaFVXJtqC5XHF75roZAAno` was Ready; request 1002872
+  retained its original Word destination. All-program view showed 26 ordinary and
+  three marked TEST requests. All PR checks passed; 48 focused tests passed. Sol
+  approved and Claude Opus 5.5 subscription-OAuth review confirmed the fixes.
+
+### Boundaries and next items
+
+- **Parked pending separate activation decision:** broad automatic preparation is
+  OFF and unscheduled. The authorized one-shot TEST request 1003313 demonstrated
+  missing-only generation, preparation and idempotent rerun; it did not demonstrate
+  scheduled delivery/latency or broad-cohort operation. Do not enable a schedule or
+  catch-up run as part of UI work. Manual TEST request 1003312 demonstrated review
+  progression with the original Word item. See the status-clarity plan for receipts.
+- **Verified open by owner screenshot/feedback:** the full list remains hard to scan:
+  oversized cards, competing bold lines, excess whitespace and repeated instructions.
+  A successful single-card browser check did not establish usability of the list.
+  Claude's comprehensive Impeccable review owns the next design direction.
+- **Proposal only:** compact grouping by task was suggested, not approved or built.
+  Preview multiple requests together before another production UI revision.
+- **Audience invariant:** everyone is new to both the app and workflow. PD experience
+  does not imply knowledge of this application.
+- **No new runtime work in this closeout.** The feature branch is pushed and merged;
+  local preview server is stopped. No automation activation or email sending occurred
+  in the UI revisions. Claim-evidence pilot report was unavailable locally; no
+  observation row was invented.
+
+### Key files
+
+- `shared/components/workbench/StaffDeliberationsPanel.js`
+- `shared/components/workbench/StaffDeliberationsTab.js`
+- `shared/components/workbench/FinalWriteupTab.js`
+- `.impeccable/surfaces/ents-workbench-staffdeliberationspanel-js-1912c47b.md`
+- `docs/plans/STAFF_DELIBERATIONS_STATUS_CLARITY_PLAN_2026-10-04.md`
+
+Milestone determination: the infrastructure production cutover warrants a
+`DEVELOPMENT_LOG.md` entry; the later UI refinements are not separate milestones.
+
+---
+
+## Historical prior Claude handoff (preserved; verify before acting)
+
 # Session 577 Prompt: merge the presentation summary (PR #440), then accept it on 1003222
 
 ## Session 576 Summary — 2026-10-05 PT (Stage 2 built and reviewed; memory router diet)

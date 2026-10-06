@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Request-first Staff Deliberations workflow deployed (Session 577 Codex close)
+
+**Milestone:** Staff Deliberations separates eligible request membership, presentation timing, document preparation and explicit human review transitions.
+**Sessions:** Codex workflow/rehearsal effort closed by the owner on 2026-10-05; PR #432, eligibility correction #442, UI follow-ups #444–#445.
+**Ship state:**
+- Request-first program/cycle and lead-PD scope includes eligible documentless requests; ordinary eligibility is Advancing OR Phase II Pending.
+- Migration 067 and durable preparation/recovery infrastructure deployed; bounded TEST acceptance demonstrated generation, idempotent rerun and manual review progression while retaining the Word document.
+- Broad automatic preparation remains disabled and unscheduled; its activation and scheduled-delivery acceptance require a separate decision.
+- UI revisions deployed but owner acceptance remains open; comprehensive Impeccable review continues in a separate session.
+**Why it matters:** Missing documents no longer hide eligible requests, and elapsed schedule time is distinct from document and review progress.
+**Pointers:** `docs/plans/STAFF_DELIBERATIONS_STATUS_CLARITY_PLAN_2026-10-04.md`; merges `d8c658b2e`, `88fa8caf2`, `4d7b30b1a`, `ebbe9b031`; `SESSION_PROMPT.md`.
+
 ## October 2026 — Board links serve the presentation only; staff keep the discussion (Session 575)
 
 **Milestone:** Outside Board presentation and briefing links stop serving the full Site Visit transcript and recording (which contain the staff discussion). A coordinator-confirmed presentation end splits each published transcript into a Board-servable Presentation Transcript and a staff-only Staff Discussion Transcript.
