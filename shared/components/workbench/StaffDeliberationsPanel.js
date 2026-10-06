@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { ExternalLink, TriangleAlert } from 'lucide-react';
 import { requestJson } from '../../utils/api-request';
 import { Card } from '../Layout';
 import ScopeSegment from './ScopeSegment';
@@ -34,33 +35,56 @@ function dateTime(value, timeZone = null) {
   }
 }
 
+const RELOAD_THEN_ADMIN = 'Reload the page; if this continues, contact an administrator.';
+
+function writeupReady(request) {
+  return request.writeup?.availability === 'available'
+    && request.writeup.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW
+    && request.writeup.milestoneComplete === true;
+}
+
+// One plain-language reason per attention condition, in a fixed order so a row
+// with several problems names the most fundamental one. taskFor() uses the same
+// function, so the "Needs attention" filter and the row text cannot disagree.
+function attentionReason(request) {
+  if (request.timing?.availability === 'ambiguous') return 'More than one presentation is scheduled for this request, so the time can’t be confirmed.';
+  if (request.timing?.availability === 'unavailable') return `The system couldn’t confirm the presentation time. ${RELOAD_THEN_ADMIN}`;
+  if (request.preparation?.state === 'blocked') return 'Automatic writeup preparation stopped before it finished. Your existing document is preserved; open the request to retry.';
+  if (request.preparation?.state === 'unavailable') return `The system couldn’t load the writeup preparation status. ${RELOAD_THEN_ADMIN}`;
+  for (const [key, name] of [['brief', 'briefing'], ['writeup', 'writeup']]) {
+    const fact = request[key];
+    if (fact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) return `The ${name} couldn’t be generated. Open the request to try again.`;
+    if (fact?.availability === 'ambiguous') return `More than one ${name} is linked to this request. Contact an administrator.`;
+    if (fact?.availability === 'unavailable') return `The system couldn’t load the ${name}. ${RELOAD_THEN_ADMIN}`;
+  }
+  if (request.finalReview?.availability === 'unavailable') return `The system couldn’t load the review status. ${RELOAD_THEN_ADMIN}`;
+  if (request.writeup?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL && request.finalPhase !== 'group-review') {
+    return 'The writeup is marked final but hasn’t been through group review. Contact an administrator.';
+  }
+  if (request.preparation?.due && request.preparation.state === 'prepared' && !writeupReady(request)) {
+    return `The writeup was prepared but isn’t ready to edit yet. ${RELOAD_THEN_ADMIN}`;
+  }
+  return null;
+}
+
 function taskFor(request) {
-  if (request.finalPhase === 'leadership-review') return { label: 'Leadership review', bucket: 'review', action: 'Open review details', tab: 'final-writeup' };
-  if (request.finalPhase === 'group-review') return { label: 'Group review in progress', bucket: 'review', action: 'Open review details', tab: 'final-writeup' };
-  if (request.writeup?.correctionInProgress) return { label: 'Corrections in progress', bucket: 'attention', action: 'Open request details', tab: 'staff-deliberations' };
-  const attention = ['blocked', 'unavailable'].includes(request.preparation?.state)
-    || request.finalReview?.availability === 'unavailable'
-    || (request.writeup?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL && request.finalPhase !== 'group-review')
-    || ['unavailable', 'ambiguous'].includes(request.timing?.availability)
-    || [request.brief, request.writeup].some((fact) => ['unavailable', 'ambiguous'].includes(fact?.availability)
-      || fact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED);
-  if (attention) return { label: 'Needs attention', bucket: 'attention', action: 'Check request details', tab: 'staff-deliberations' };
+  if (request.finalPhase === 'leadership-review') return { label: 'Leadership review', bucket: 'review', tab: 'final-writeup' };
+  if (request.finalPhase === 'group-review') return { label: 'Group review in progress', bucket: 'review', tab: 'final-writeup' };
+  if (request.writeup?.correctionInProgress) return { label: 'Corrections in progress', bucket: 'attention', tab: 'staff-deliberations' };
+  if (attentionReason(request)) return { label: 'Needs attention', bucket: 'attention', tab: 'staff-deliberations' };
   if (request.preparation?.due) {
-    const ready = request.writeup?.availability === 'available'
-      && request.writeup.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW
-      && request.writeup.milestoneComplete === true;
-    if (!ready && request.preparation.state === 'prepared') return { label: 'Needs attention', bucket: 'attention', action: 'Check request details', tab: 'staff-deliberations' };
-    if (ready) return { label: 'Post-visit editing', bucket: 'post', action: 'Open request details', tab: 'staff-deliberations' };
+    const ready = writeupReady(request);
+    if (ready) return { label: 'Post-visit editing', bucket: 'post', tab: 'staff-deliberations' };
     if (request.preparation.state === 'disabled') {
-      return { label: request.writeup?.availability === 'available' ? 'Working draft available' : 'No working writeup yet', bucket: 'post', action: 'Open request details', tab: 'staff-deliberations' };
+      return { label: request.writeup?.availability === 'available' ? 'Working draft available' : 'No working writeup yet', bucket: 'post', tab: 'staff-deliberations' };
     }
-    if (request.preparation.state === 'running' || request.writeup?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) return { label: 'Preparing working writeup', bucket: 'post', action: 'Open request details', tab: 'staff-deliberations' };
-    if (request.preparation.state === 'due') return { label: 'Waiting for automatic preparation', bucket: 'post', action: 'Open request details', tab: 'staff-deliberations' };
-    if (request.preparation.state === 'pending') return { label: 'Queued for preparation', bucket: 'post', action: 'Open request details', tab: 'staff-deliberations' };
-    return { label: 'Working writeup needed', bucket: 'post', action: 'Open request details', tab: 'staff-deliberations' };
+    if (request.preparation.state === 'running' || request.writeup?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) return { label: 'Preparing working writeup', bucket: 'post', tab: 'staff-deliberations' };
+    if (request.preparation.state === 'due') return { label: 'Waiting for automatic preparation', bucket: 'post', tab: 'staff-deliberations' };
+    if (request.preparation.state === 'pending') return { label: 'Queued for preparation', bucket: 'post', tab: 'staff-deliberations' };
+    return { label: 'Working writeup needed', bucket: 'post', tab: 'staff-deliberations' };
   }
   const notScheduled = request.timing?.availability === 'missing' || !request.timing?.endIso;
-  return { label: notScheduled ? 'Schedule needed' : 'Before presentation', bucket: notScheduled ? 'attention' : 'before', action: 'Open request details', tab: 'staff-deliberations' };
+  return { label: notScheduled ? 'Schedule needed' : 'Before presentation', bucket: notScheduled ? 'attention' : 'before', tab: 'staff-deliberations' };
 }
 
 function primaryDocument(request) {
@@ -75,55 +99,59 @@ function primaryDocument(request) {
   return writeup?.availability === 'available' && writeup.file?.webUrl ? { key: 'writeup', fact: writeup } : null;
 }
 
-function presentationTiming(request) {
+// Where the request is in the process. A problem never replaces the stage; it
+// is shown beneath it. An unconfirmed schedule is its own stage so an
+// unverified time is never presented as the scheduled one.
+function stageFor(request) {
+  if (request.finalPhase === 'leadership-review') return 'Leadership review';
+  if (request.finalPhase === 'group-review') return 'Group review';
+  if (['unavailable', 'ambiguous'].includes(request.timing?.availability)) return 'Presentation time not confirmed';
+  if (request.preparation?.due || request.writeup?.correctionInProgress) return 'After presentation';
+  if (request.timing?.availability === 'missing' || !request.timing?.endIso) return 'Not scheduled';
+  return 'Before presentation';
+}
+
+function presentationWhen(request) {
   const time = dateTime(request.timing?.endIso, request.timing?.timeZone);
-  if (['unavailable', 'ambiguous'].includes(request.timing?.availability)) {
-    return time ? `Recorded presentation end (unverified) · ${time}` : 'Presentation schedule needs checking';
-  }
-  if (request.timing?.availability === 'missing') return 'Presentation end · Not scheduled';
-  if (request.timing?.availability !== 'available') return 'Presentation end · Not recorded';
-  return time ? `Scheduled presentation end · ${time}` : 'Presentation end · Not recorded';
+  if (!time) return null;
+  if (['unavailable', 'ambiguous'].includes(request.timing?.availability)) return `recorded ${time}, unverified`;
+  return request.timing?.availability === 'available' ? time : null;
 }
 
 function nextStep(request, task, document) {
-  if (task.bucket === 'review') return { instruction: 'Read the writeup and follow its review progress.', detailsFirst: true };
-  if (request.writeup?.correctionInProgress) return { instruction: 'Check the requested corrections and update the writeup.', detailsFirst: true };
-  if (task.label === 'Schedule needed') return { instruction: 'Add the presentation schedule in request details.', detailsFirst: true };
-  if (task.bucket === 'attention') return { instruction: 'Open request details to check what needs attention.', detailsFirst: true };
+  if (task.bucket === 'review') return 'Read the writeup and follow its review progress.';
+  if (request.writeup?.correctionInProgress) return 'Check the requested corrections on the request page, then update the writeup.';
+  if (task.label === 'Schedule needed') return 'Add the presentation schedule on the request page.';
   if (request.preparation?.state === 'running' || request.writeup?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) {
-    return { instruction: 'Your writeup is being prepared. Check back shortly.', detailsFirst: true };
+    return 'Your writeup is being prepared. Check back shortly.';
   }
   if (request.preparation?.due && ['due', 'pending'].includes(request.preparation?.state)) {
-    return { instruction: 'Preparation will run automatically. No action is needed now.', detailsFirst: true };
+    return 'Preparation will run automatically. No action is needed now.';
   }
   if (task.bucket === 'post') return document
-    ? { instruction: 'Add findings to your writeup after the presentation.', stage: 'After scheduled presentation' }
-    : { instruction: 'Open request details to prepare your writeup.', stage: 'Writeup needed', detailsFirst: true };
-  if (request.brief?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) {
-    return { instruction: 'The briefing is being prepared. Check back shortly.', stage: 'Preparing briefing', detailsFirst: true };
-  }
-  if (document?.key === 'brief') return { instruction: 'Check the briefing before sharing it for the presentation.' };
-  return { instruction: 'Open request details to prepare the pre-site briefing.', detailsFirst: true };
+    ? 'Add findings to your writeup after the presentation.'
+    : 'Open the request to prepare your writeup.';
+  if (request.brief?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) return 'The briefing is being prepared. Check back shortly.';
+  if (document?.key === 'brief') return 'Check the briefing before sharing it for the presentation.';
+  return 'Open the request to prepare the pre-site briefing.';
 }
 
 function RequestRow({ request }) {
   const task = taskFor(request);
   const document = primaryDocument(request);
-  const step = nextStep(request, task, document);
-  const documentAction = document?.key === 'writeup' ? 'Edit writeup in Word' : 'Edit briefing in Word';
-  const primaryClass = 'inline-flex h-9 items-center justify-center whitespace-nowrap rounded-lg border border-gray-300 bg-white px-3 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2';
-  const secondaryClass = 'whitespace-nowrap text-sm font-medium text-gray-600 underline underline-offset-4 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 rounded';
-  const stageClass = task.bucket === 'attention' ? 'bg-amber-50 text-amber-900' : task.bucket === 'review' ? 'bg-violet-50 text-violet-900' : 'bg-blue-50 text-blue-800';
+  const problem = task.label === 'Needs attention' ? attentionReason(request) : null;
+  const stage = stageFor(request);
+  const when = presentationWhen(request);
   const meta = [
     request.institution,
     request.programDirector && `Lead PD: ${request.programDirector}`,
   ].filter(Boolean);
   return (
-    <li className="grid grid-cols-1 gap-x-6 gap-y-2 px-4 py-3 lg:grid-cols-[minmax(16rem,1fr)_minmax(0,22rem)_15rem] lg:items-center">
+    <li className="grid grid-cols-1 gap-x-6 gap-y-2 px-4 py-3 lg:grid-cols-[minmax(16rem,1fr)_minmax(0,24rem)_11rem] lg:items-center">
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-2">
           <h3 className="min-w-0 truncate text-sm font-semibold text-gray-900" title={request.title || undefined}>
-            <Link href={requestHref(request)} className="underline-offset-2 hover:underline">
+            <Link href={requestHref(request, task.tab)} className="rounded underline decoration-gray-300 underline-offset-4 hover:decoration-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
               {request.requestNumber ? `#${request.requestNumber}` : request.requestId}{request.title ? ` — ${request.title}` : ''}
             </Link>
           </h3>
@@ -131,24 +159,29 @@ function RequestRow({ request }) {
         </div>
         <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500">
           {meta.map((item) => <span key={item}>{item}</span>)}
-          <span>{presentationTiming(request)}</span>
         </div>
       </div>
-      <div className="min-w-0">
-        <p className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${stageClass}`}>{step.stage || task.label}</p>
-        <p className="mt-1 text-sm text-gray-700">{step.instruction}</p>
-      </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 lg:justify-end">
-        {document && !step.detailsFirst ? (
-          <a href={document.fact.file.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>{documentAction}</a>
+      <div className="min-w-0 text-sm">
+        <p className="text-gray-900">
+          <span className="font-medium">{stage}</span>
+          {when && <span className="text-gray-500"> · {when}</span>}
+        </p>
+        {problem ? (
+          <p className="mt-0.5 flex gap-1.5 text-amber-800">
+            <TriangleAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{problem}</span>
+          </p>
         ) : (
-          <Link href={requestHref(request, task.tab)} className={primaryClass}>{task.action}</Link>
+          <p className="mt-0.5 text-gray-600">{nextStep(request, task, document)}</p>
         )}
-        {document && (step.detailsFirst ? (
-          <a href={document.fact.file.webUrl} target="_blank" rel="noopener noreferrer" className={secondaryClass}>{documentAction}</a>
-        ) : (
-          <Link href={requestHref(request, task.tab)} className={secondaryClass}>{task.action}</Link>
-        ))}
+      </div>
+      <div className="flex lg:justify-end">
+        {document && (
+          <a href={document.fact.file.webUrl} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
+            {document.key === 'writeup' ? 'Edit writeup in Word' : 'Edit briefing in Word'}
+            <ExternalLink aria-hidden="true" className="h-3.5 w-3.5 text-gray-500" />
+          </a>
+        )}
       </div>
     </li>
   );
