@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { CalendarClock, CalendarX2, ExternalLink, PenLine, TriangleAlert, Users } from 'lucide-react';
+import { CalendarClock, CalendarX2, PenLine, TriangleAlert, Users } from 'lucide-react';
 import { requestJson } from '../../utils/api-request';
 import { Card } from '../Layout';
 import ScopeSegment from './ScopeSegment';
@@ -128,7 +128,7 @@ function presentationWhen(request) {
 
 function nextStep(request, task, document) {
   if (task.bucket === 'review') return 'Read the writeup and follow its review progress.';
-  if (request.writeup?.correctionInProgress) return 'Check the requested corrections on the request page, then update the writeup.';
+  if (request.writeup?.correctionInProgress) return 'Make the requested corrections in the writeup, then choose Finish corrections.';
   if (task.label === 'Schedule needed') return 'Add the presentation schedule on the request page.';
   if (request.preparation?.state === 'running' || request.writeup?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) {
     return 'Your writeup is being prepared. Check back shortly.';
@@ -136,12 +136,13 @@ function nextStep(request, task, document) {
   if (request.preparation?.due && ['due', 'pending'].includes(request.preparation?.state)) {
     return 'Preparation will run automatically. No action is needed now.';
   }
+  if (task.label === 'Post-visit editing') return 'Add your presentation findings to the writeup, then open group review.';
   if (task.bucket === 'post') return document
-    ? 'Add findings to your writeup after the presentation.'
-    : 'Open the request to prepare your writeup.';
+    ? 'Prepare the writeup for post-visit editing.'
+    : 'Prepare your working writeup.';
   if (request.brief?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) return 'The briefing is being prepared. Check back shortly.';
-  if (document?.key === 'brief') return 'Check the briefing before sharing it for the presentation.';
-  return 'Open the request to prepare the pre-site briefing.';
+  if (document?.key === 'brief') return 'Check the briefing in Word, then share it for the presentation.';
+  return 'Generate the pre-site briefing.';
 }
 
 function RequestRow({ request }) {
@@ -155,11 +156,13 @@ function RequestRow({ request }) {
     request.programDirector && `Lead PD: ${request.programDirector}`,
   ].filter(Boolean);
   return (
-    <li className="group relative grid grid-cols-1 gap-x-6 gap-y-2 px-4 py-3 transition-colors duration-200 hover:bg-gray-50 lg:grid-cols-[minmax(16rem,1fr)_minmax(0,26rem)_11rem] lg:items-center">
+    <li className="group relative grid grid-cols-1 gap-x-8 gap-y-2 px-4 py-3 transition-colors duration-200 hover:bg-gray-50 focus-within:bg-gray-50 lg:grid-cols-[minmax(16rem,1fr)_minmax(0,32rem)] lg:items-center">
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-2">
           <h3 className="min-w-0 truncate text-sm font-semibold text-gray-900" title={request.title || undefined}>
-            <Link href={requestHref(request, task.tab)} className="rounded underline-offset-4 group-hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
+            {/* Stretched link: the whole row opens the request on the tab where
+                the next step's action lives, and stays a real link (new tab). */}
+            <Link href={requestHref(request, task.tab)} className="underline-offset-4 after:absolute after:inset-0 after:content-[''] group-hover:underline focus:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-gray-500">
               {request.requestNumber ? `#${request.requestNumber}` : request.requestId}{request.title ? ` — ${request.title}` : ''}
             </Link>
           </h3>
@@ -184,14 +187,6 @@ function RequestRow({ request }) {
           </p>
         ) : (
           <p className="mt-1 text-gray-700">{nextStep(request, task, document)}</p>
-        )}
-      </div>
-      <div className="flex lg:justify-end">
-        {document && (
-          <a href={document.fact.file.webUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded text-sm font-medium text-blue-700 underline-offset-4 hover:text-blue-900 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
-            {document.key === 'writeup' ? 'Edit writeup in Word' : 'Edit briefing in Word'}
-            <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
-          </a>
         )}
       </div>
     </li>

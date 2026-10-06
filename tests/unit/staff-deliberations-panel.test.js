@@ -21,12 +21,11 @@ test('documentless requests are visible and the query preserves program cycle an
   expect(screen.queryByText(/Materials status/)).not.toBeInTheDocument();
 });
 
-test('named Word links cannot confuse the briefing and full writeup', async () => {
+test('before the presentation the next step names the briefing, and the row has no Word shortcut', async () => {
   global.fetch.mockResolvedValue(response([row({ brief: { availability: 'available', lifecycleState: 100000001, file: { webUrl: 'https://sp/brief' } }, writeup: { availability: 'available', lifecycleState: 100000000, file: { webUrl: 'https://sp/full' } } })]));
   render(<StaffDeliberationsPanel {...props} />);
-  expect(await screen.findByRole('link', { name: 'Edit briefing in Word' })).toHaveAttribute('href','https://sp/brief');
-  expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual([expect.stringContaining('#1002903'), 'Edit briefing in Word']);
-  expect(screen.getByText('Check the briefing before sharing it for the presentation.')).toBeInTheDocument();
+  expect(await screen.findByText('Check the briefing in Word, then share it for the presentation.')).toBeInTheDocument();
+  expect(screen.getAllByRole('link')).toHaveLength(1);
 });
 
 test('due preparation never labels an absent document ready and never writes', async () => {
@@ -76,7 +75,7 @@ test('ordinary total excludes separately reported test rows', async () => {
 test('disabled preparation reports the draft fact without treating configuration as a task failure', async () => {
   global.fetch.mockResolvedValue(response([row({ preparation: { due: true, state: 'disabled' }, briefSharing: { availability: 'available', sentAtIso: '2026-09-27T18:00:00Z', sourceVersionId: '3.0' } })]));
   render(<StaffDeliberationsPanel {...props} />);
-  expect(await screen.findByText('Open the request to prepare your writeup.')).toBeInTheDocument();
+  expect(await screen.findByText('Prepare your working writeup.')).toBeInTheDocument();
   expect(screen.getByText('After presentation')).toBeInTheDocument();
   expect(screen.queryByText(/Sent through app/)).not.toBeInTheDocument();
   expect(screen.queryByText('Preparation paused')).not.toBeInTheDocument();
@@ -93,7 +92,7 @@ test('a Final source without verified review lineage needs attention', async () 
 test('reopened corrections remain a staff task even when an older preparation receipt is complete', async () => {
   global.fetch.mockResolvedValue(response([row({ preparation: { due: true, state: 'prepared' }, writeup: { availability: 'available', lifecycleState: 100000000, correctionInProgress: true } })]));
   render(<StaffDeliberationsPanel {...props} />);
-  expect(await screen.findByText(/Check the requested corrections/)).toBeInTheDocument();
+  expect(await screen.findByText('Make the requested corrections in the writeup, then choose Finish corrections.')).toBeInTheDocument();
   expect(screen.getByText('After presentation')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: /#1002903/ })).toHaveAttribute('href', expect.stringContaining('staff-deliberations'));
   expect(screen.queryByText('Post-visit editing')).not.toBeInTheDocument();
@@ -106,9 +105,8 @@ test('after presentation, a missing writeup never opens the pre-site briefing as
     writeup: { availability: 'missing' },
   })]));
   render(<StaffDeliberationsPanel {...props} />);
-  expect(await screen.findByText('Open the request to prepare your writeup.')).toBeInTheDocument();
-  expect(screen.getAllByRole('link')).toHaveLength(1);
-  expect(screen.queryByRole('link', { name: 'Edit briefing in Word' })).not.toBeInTheDocument();
+  expect(await screen.findByText('Prepare your working writeup.')).toBeInTheDocument();
+  expect(screen.queryByText(/briefing/)).not.toBeInTheDocument();
 });
 
 test('queued and running preparation have different labels', async () => {
@@ -121,47 +119,47 @@ test('queued and running preparation have different labels', async () => {
   expect(screen.getByText('Your writeup is being prepared. Check back shortly.')).toBeInTheDocument();
 });
 
-test('corrections open the writeup rather than the pre-site briefing', async () => {
+test('corrections point at the writeup rather than the pre-site briefing', async () => {
   global.fetch.mockResolvedValue(response([row({
     writeup: { availability: 'available', lifecycleState: 100000000, correctionInProgress: true, file: { webUrl: 'https://sp/writeup' } },
     brief: { availability: 'available', lifecycleState: 100000000, file: { webUrl: 'https://sp/brief' } },
   })]));
   render(<StaffDeliberationsPanel {...props} />);
-  expect(await screen.findByRole('link', { name: 'Edit writeup in Word' })).toHaveAttribute('href', 'https://sp/writeup');
-  expect(screen.queryByRole('link', { name: 'Edit briefing in Word' })).not.toBeInTheDocument();
+  expect(await screen.findByText(/corrections in the writeup/)).toBeInTheDocument();
+  expect(screen.queryByText(/briefing/)).not.toBeInTheDocument();
 });
 
  test('due automatic work waits without claiming a missing staff action', async () => {
   global.fetch.mockResolvedValue(response([row({ preparation: { due: true, state: 'due' } })]));
   render(<StaffDeliberationsPanel {...props} />);
   expect(await screen.findByText('Preparation will run automatically. No action is needed now.')).toBeInTheDocument();
-  expect(screen.queryByText(/prepare your writeup/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/working writeup/)).not.toBeInTheDocument();
 });
 
 test('a prepared receipt cannot make an incomplete document ready', async () => {
   global.fetch.mockResolvedValue(response([row({ preparation: { due: true, state: 'prepared' }, writeup: { availability: 'available', lifecycleState: 100000001, milestoneComplete: false } })]));
   render(<StaffDeliberationsPanel {...props} />);
   expect(await screen.findByText(/prepared but isn’t ready to edit yet/)).toBeInTheDocument();
-  expect(screen.queryByText('Add findings to your writeup after the presentation.')).not.toBeInTheDocument();
+  expect(screen.queryByText(/presentation findings/)).not.toBeInTheDocument();
 });
 
 
-test('an existing post-schedule draft leads with the editing task and one direct Word action', async () => {
+test('an existing post-schedule draft names the request-page step that follows, without a Word shortcut', async () => {
   global.fetch.mockResolvedValue(response([row({ preparation: { due: true, state: 'disabled' }, writeup: { availability: 'available', lifecycleState: 100000000, file: { webUrl: 'https://sp/full' } } })]));
   render(<StaffDeliberationsPanel {...props} />);
-  expect(await screen.findByText('Add findings to your writeup after the presentation.')).toBeInTheDocument();
+  expect(await screen.findByText('Prepare the writeup for post-visit editing.')).toBeInTheDocument();
   expect(screen.getByText('After presentation')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Edit writeup in Word' })).toHaveAttribute('href', 'https://sp/full');
+  expect(screen.getAllByRole('link')).toHaveLength(1);
   expect(screen.queryByText(/Working writeup:|Working draft available/)).not.toBeInTheDocument();
 });
 
-test.each(['group-review', 'leadership-review'])('%s points to review details while retaining Word access', async (finalPhase) => {
+test.each(['group-review', 'leadership-review'])('%s opens the review tab from the row', async (finalPhase) => {
   global.fetch.mockResolvedValue(response([row({ finalPhase, writeup: { availability: 'available', file: { webUrl: 'https://sp/full' } } })]));
   render(<StaffDeliberationsPanel {...props} />);
   expect(await screen.findByText('Read the writeup and follow its review progress.')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: /#1002903/ })).toHaveAttribute('href', expect.stringContaining('tab=final-writeup'));
-  expect(screen.getByRole('link', { name: 'Edit writeup in Word' })).toHaveAttribute('href', 'https://sp/full');
-  expect(screen.queryByText('Add findings to your writeup after the presentation.')).not.toBeInTheDocument();
+  expect(screen.getAllByRole('link')).toHaveLength(1);
+  expect(screen.queryByText(/presentation findings/)).not.toBeInTheDocument();
 });
 
 
@@ -170,10 +168,9 @@ test.each([null, 'https://sp/older-brief'])('a briefing being generated does not
   render(<StaffDeliberationsPanel {...props} />);
   expect(await screen.findByText('The briefing is being prepared. Check back shortly.')).toBeInTheDocument();
   expect(screen.getByText('Before presentation', { selector: 'span' })).toBeInTheDocument();
-  expect(screen.queryByText('Check the briefing before sharing it for the presentation.')).not.toBeInTheDocument();
-  expect(screen.queryByText('Open the request to prepare the pre-site briefing.')).not.toBeInTheDocument();
-  expect(screen.getAllByRole('link')).toHaveLength(webUrl ? 2 : 1);
-  if (webUrl) expect(screen.getByRole('link', { name: 'Edit briefing in Word' })).toHaveAttribute('href', webUrl);
+  expect(screen.queryByText(/share it for the presentation/)).not.toBeInTheDocument();
+  expect(screen.queryByText('Generate the pre-site briefing.')).not.toBeInTheDocument();
+  expect(screen.getAllByRole('link')).toHaveLength(1);
 });
 
 test('a problem is shown beneath the stage, and several problems name the first in precedence', async () => {
@@ -190,16 +187,24 @@ test('a problem is shown beneath the stage, and several problems name the first 
   expect(screen.getByText(/#1002903/)).toBeInTheDocument();
 });
 
-test('the Word link is always the last action in the row, whatever the next step', async () => {
+test('every row has exactly one link, to the request, whatever the stage', async () => {
   global.fetch.mockResolvedValue(response([
     row({ requestId: 'corr', requestNumber: '1002852', preparation: { due: true, state: 'prepared' }, writeup: { availability: 'available', lifecycleState: 100000000, correctionInProgress: true, file: { webUrl: 'https://sp/w1' } } }),
     row({ requestId: 'brief', requestNumber: '1002874', brief: { availability: 'available', lifecycleState: 100000000, file: { webUrl: 'https://sp/b2' } } }),
+    row({ requestId: 'review', requestNumber: '1002912', finalPhase: 'group-review', writeup: { availability: 'available', file: { webUrl: 'https://sp/w3' } } }),
   ]));
   render(<StaffDeliberationsPanel {...props} />);
   await screen.findByText(/#1002852/);
   for (const item of screen.getAllByRole('listitem')) {
     const links = Array.from(item.querySelectorAll('a'));
-    expect(links[0]).toHaveTextContent(/^#/);
-    expect(links[links.length - 1]).toHaveTextContent(/in Word$/);
+    expect(links).toHaveLength(1);
+    expect(links[0].getAttribute('href')).toMatch(/^\/workbench\//);
   }
+});
+
+test('a ready post-visit writeup points to group review as the next step', async () => {
+  global.fetch.mockResolvedValue(response([row({ preparation: { due: true, state: 'prepared' }, writeup: { availability: 'available', lifecycleState: 100000001, milestoneComplete: true, file: { webUrl: 'https://sp/full' } } })]));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText('Add your presentation findings to the writeup, then open group review.')).toBeInTheDocument();
+  expect(screen.getByText('After presentation')).toBeInTheDocument();
 });
