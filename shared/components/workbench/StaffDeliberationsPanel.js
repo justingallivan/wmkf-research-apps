@@ -6,7 +6,6 @@ import { requestJson } from '../../utils/api-request';
 import { Card } from '../Layout';
 import ScopeSegment from './ScopeSegment';
 import TestRequestBadge from '../TestRequestBadge';
-import { siteVisitMaterialsLine } from '../../utils/site-visit-materials-line';
 import {
   REQUEST_DOCUMENT_LIFECYCLE_STATE,
   REQUEST_DOCUMENT_OPERATION_STATUS,
@@ -23,9 +22,12 @@ function dateTime(value, timeZone = null) {
   if (!Number.isFinite(ms)) return null;
   try {
     return new Intl.DateTimeFormat(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-      ...(timeZone ? { timeZone } : {}),
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      ...(timeZone ? { timeZone, timeZoneName: 'short' } : {}),
     }).format(new Date(ms));
   } catch {
     return new Date(ms).toLocaleString();
@@ -33,46 +35,82 @@ function dateTime(value, timeZone = null) {
 }
 
 function taskFor(request) {
-  if (request.finalPhase === 'leadership-review') return { label: 'Leadership review', bucket: 'review', action: 'Open Final Writeup', tab: 'final-writeup' };
-  if (request.finalPhase === 'group-review') return { label: 'In review', bucket: 'review', action: 'Open Final Writeup', tab: 'final-writeup' };
-  if (request.writeup?.correctionInProgress) return { label: 'Corrections in progress', bucket: 'attention', action: 'Continue corrections', tab: 'staff-deliberations' };
+  if (request.finalPhase === 'leadership-review') return { label: 'Leadership review', bucket: 'review', action: 'Open review details', tab: 'final-writeup' };
+  if (request.finalPhase === 'group-review') return { label: 'Group review in progress', bucket: 'review', action: 'Open review details', tab: 'final-writeup' };
+  if (request.writeup?.correctionInProgress) return { label: 'Corrections in progress', bucket: 'attention', action: 'Open request details', tab: 'staff-deliberations' };
   const attention = ['blocked', 'unavailable'].includes(request.preparation?.state)
     || request.finalReview?.availability === 'unavailable'
     || (request.writeup?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL && request.finalPhase !== 'group-review')
     || ['unavailable', 'ambiguous'].includes(request.timing?.availability)
-    || [request.brief, request.writeup].some((fact) => ['unavailable', 'ambiguous'].includes(fact?.availability));
-  if (attention) return { label: 'Needs attention', bucket: 'attention', action: 'Check request', tab: 'staff-deliberations' };
+    || [request.brief, request.writeup].some((fact) => ['unavailable', 'ambiguous'].includes(fact?.availability)
+      || fact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED);
+  if (attention) return { label: 'Needs attention', bucket: 'attention', action: 'Check request details', tab: 'staff-deliberations' };
   if (request.preparation?.due) {
-    const ready = request.preparation.state === 'prepared' || request.writeup?.milestoneComplete === true;
-    if (!ready && request.preparation.state === 'disabled') return { label: 'Preparation paused', bucket: 'attention', action: 'Check preparation', tab: 'staff-deliberations' };
-    return { label: ready ? 'Post-visit editing' : 'Preparing writeup', bucket: 'post', action: ready ? 'Continue writeup' : 'Check preparation', tab: 'staff-deliberations' };
+    const ready = request.writeup?.availability === 'available'
+      && request.writeup.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW
+      && request.writeup.milestoneComplete === true;
+    if (!ready && request.preparation.state === 'prepared') return { label: 'Needs attention', bucket: 'attention', action: 'Check request details', tab: 'staff-deliberations' };
+    if (ready) return { label: 'Post-visit editing', bucket: 'post', action: 'Open request details', tab: 'staff-deliberations' };
+    if (request.preparation.state === 'disabled') {
+      return { label: request.writeup?.availability === 'available' ? 'Working draft available' : 'No working writeup yet', bucket: 'post', action: 'Open request details', tab: 'staff-deliberations' };
+    }
+    if (request.preparation.state === 'running' || request.writeup?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) return { label: 'Preparing working writeup', bucket: 'post', action: 'Open request details', tab: 'staff-deliberations' };
+    if (request.preparation.state === 'due') return { label: 'Waiting for automatic preparation', bucket: 'post', action: 'Open request details', tab: 'staff-deliberations' };
+    if (request.preparation.state === 'pending') return { label: 'Queued for preparation', bucket: 'post', action: 'Open request details', tab: 'staff-deliberations' };
+    return { label: 'Working writeup needed', bucket: 'post', action: 'Open request details', tab: 'staff-deliberations' };
   }
-  return { label: request.timing?.endIso ? 'Before presentation' : 'Schedule needed', bucket: request.timing?.endIso ? 'before' : 'attention', action: 'Review briefing', tab: 'staff-deliberations' };
+  const notScheduled = request.timing?.availability === 'missing' || !request.timing?.endIso;
+  return { label: notScheduled ? 'Schedule needed' : 'Before presentation', bucket: notScheduled ? 'attention' : 'before', action: 'Open request details', tab: 'staff-deliberations' };
 }
 
 function documentState(fact, isBrief) {
   if (fact?.availability === 'unavailable') return 'Status unavailable';
   if (fact?.availability === 'ambiguous') return 'Needs reconciliation';
-  if (fact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) return 'Preparing';
-  if (fact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) return 'Preparation failed';
-  if (fact?.availability !== 'available') return 'Not prepared';
-  if (fact.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW) return isBrief ? 'Working briefing' : fact.milestoneComplete ? 'Ready for visit findings' : 'Preparation checkpoint incomplete';
+  if (fact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) return 'Draft is being generated';
+  if (fact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) return 'Last preparation attempt failed';
+  if (fact?.availability !== 'available') return 'No current document';
+  if (fact.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW) return isBrief ? 'Briefing ready' : fact.milestoneComplete ? 'Ready for presentation findings' : 'Checkpoint needs attention';
   if (fact.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL) return 'In review';
   return 'Draft';
 }
 
+function primaryDocument(request) {
+  const afterPresentation = request.preparation?.due === true
+    || request.writeup?.correctionInProgress === true
+    || ['group-review', 'leadership-review'].includes(request.finalPhase);
+  const preferred = afterPresentation ? 'writeup' : 'brief';
+  const fact = request[preferred];
+  if (fact?.availability === 'available' && fact.file?.webUrl) return { key: preferred, fact };
+  if (afterPresentation) return null;
+  const writeup = request.writeup;
+  return writeup?.availability === 'available' && writeup.file?.webUrl ? { key: 'writeup', fact: writeup } : null;
+}
+
+function presentationTiming(request) {
+  const time = dateTime(request.timing?.endIso, request.timing?.timeZone);
+  if (['unavailable', 'ambiguous'].includes(request.timing?.availability)) {
+    return time ? `Recorded presentation end (unverified) · ${time}` : 'Presentation schedule needs checking';
+  }
+  if (request.timing?.availability === 'missing') return 'Presentation end · Not scheduled';
+  if (request.timing?.availability !== 'available') return 'Presentation end · Not recorded';
+  return time ? `Scheduled presentation end · ${time}` : 'Presentation end · Not recorded';
+}
+
 function RequestCard({ request }) {
   const task = taskFor(request);
-  const time = dateTime(request.timing?.endIso, request.timing?.timeZone);
-  const briefing = <div key="brief"><dt className="font-medium text-gray-800">Pre-site briefing</dt><dd className="mt-1 text-gray-600">{documentState(request.brief, true)}</dd></div>;
-  const writeup = <div key="writeup"><dt className="font-medium text-gray-800">Working writeup</dt><dd className="mt-1 text-gray-600">{documentState(request.writeup, false)}</dd></div>;
-  const receipt = request.briefSharing || request.brief?.sharing;
-  const sharing = request.sharingAvailability === 'unavailable' || receipt?.availability === 'unavailable'
-    ? 'Sharing history unavailable'
-    : receipt?.sentAtIso ? `Sent through app · ${dateTime(receipt.sentAtIso)}` : 'No sharing recorded in this app';
+  const document = primaryDocument(request);
+  const documentKey = request.preparation?.due === true
+    || request.writeup?.correctionInProgress === true
+    || ['group-review', 'leadership-review'].includes(request.finalPhase) ? 'writeup' : (document?.key || 'brief');
+  const documentName = documentKey === 'writeup' ? 'Working writeup' : 'Pre-site briefing';
+  const documentStatus = document
+    ? documentState(document.fact, document.key === 'brief')
+    : documentKey === 'writeup'
+      ? documentState(request.writeup, false)
+      : documentState(request.brief, true);
   return (
     <Card hover={false}>
-      <div className="flex flex-col gap-5 md:flex-row md:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 flex-1">
           <h3 className="break-words text-base font-semibold text-gray-900">
             <Link href={requestHref(request)} className="underline-offset-2 hover:underline">
@@ -82,20 +120,19 @@ function RequestCard({ request }) {
           {request.institution && <p className="mt-1 text-sm text-gray-600">{request.institution}</p>}
           {request.programDirector && <p className="mt-1 text-sm text-gray-600">Lead PD: {request.programDirector}</p>}
           <TestRequestBadge isTestRequest={request.isTestRequest} className="mt-2" />
-          <p className={`mt-3 text-sm font-semibold ${task.bucket === 'attention' ? 'text-amber-800' : 'text-gray-900'}`}>{task.label}</p>
-          <p className="mt-1 text-sm text-gray-600">{time ? `Scheduled presentation end · ${time}${request.timing?.timeZone ? ` (${request.timing.timeZone})` : ''}` : 'No presentation time available'}</p>
-          <dl className="mt-4 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">{request.preparation?.due ? [writeup, briefing] : [briefing, writeup]}</dl>
-          <p className="mt-2 text-sm text-gray-600">{sharing}</p>
-          <div className="mt-4 space-y-1 border-t border-gray-200 pt-3 text-sm text-gray-600">
-            <p>Deliberation session: {request.sessionAvailability === 'unavailable' ? 'Details unavailable' : dateTime(request.session?.scheduledStartIso, request.session?.ianaTimeZone) || 'Not yet scheduled'}</p>
-            <p>{request.materialsAvailability === 'unavailable' ? 'Materials status unavailable' : siteVisitMaterialsLine(request.materials) || 'No materials request recorded; check the request for existing files.'}</p>
-          </div>
+          <p className={`mt-2 text-sm font-semibold ${task.bucket === 'attention' ? 'text-amber-800' : 'text-gray-900'}`}>{task.label}</p>
+          <p className="mt-1 text-sm text-gray-600">{presentationTiming(request)}</p>
+          <p className="mt-1 text-sm text-gray-700"><span className="font-medium">{documentName}:</span> {documentStatus}</p>
         </div>
-        <div className="flex shrink-0 flex-col items-start gap-3 md:max-w-56 md:items-end">
-          <Link href={requestHref(request, task.tab)} className="inline-flex min-h-11 items-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2">{task.action}</Link>
-          {[['brief', 'briefing'], ['writeup', 'working writeup']].map(([key, name]) => request[key]?.availability === 'available' && request[key]?.file?.webUrl ? (
-            <a key={key} href={request[key].file.webUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-700 underline underline-offset-2">Open {name} in Word</a>
-          ) : null)}
+        <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
+          {document ? (
+            <a href={document.fact.file.webUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2">
+              Open {documentName} in Word
+            </a>
+          ) : (
+            <Link href={requestHref(request, task.tab)} className="inline-flex min-h-11 items-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2">{task.action}</Link>
+          )}
+          {document && <Link href={requestHref(request, task.tab)} className="inline-flex min-h-11 items-center rounded-lg px-4 py-2 text-sm font-medium text-gray-700 underline underline-offset-2 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2">{task.action}</Link>}
         </div>
       </div>
     </Card>
@@ -183,7 +220,7 @@ export default function StaffDeliberationsPanel({
     <section aria-labelledby="staff-deliberations-heading">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 id="staff-deliberations-heading" className="text-lg font-semibold text-gray-900">Staff Deliberations</h2>
+          <h2 id="staff-deliberations-heading" className="sr-only">Staff Deliberations</h2>
           {!loading && !loadingCycles && <p className="mt-1 text-sm text-gray-600">
             {requestCounts.ordinary} requests in this program and cycle
             {requestCounts.test > 0 ? ` · ${requestCounts.test} test requests also shown` : ''}
@@ -191,6 +228,7 @@ export default function StaffDeliberationsPanel({
         </div>
         <ScopeSegment scope={scope} onChange={onScopeChange} allLabel="All program directors" />
       </div>
+      <p className="mb-3 max-w-3xl text-sm text-gray-600">Use the briefing before the presentation and the working writeup to add findings afterward. Open request details for preparation, sharing, and review steps.</p>
       <div className="mb-4 flex flex-wrap gap-3">
         <label className="text-sm text-gray-700">Task
           <select value={filter} onChange={(event) => setFilter(event.target.value)} className="ml-2 min-h-11 rounded-lg border border-gray-300 bg-white px-3">

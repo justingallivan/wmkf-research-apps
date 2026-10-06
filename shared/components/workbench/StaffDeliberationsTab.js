@@ -33,7 +33,8 @@ function presentationEndLabel(timing) {
   const ms = Date.parse(timing?.endIso || '');
   if (!Number.isFinite(ms)) return 'Presentation schedule unavailable or not yet recorded.';
   try {
-    return `Scheduled presentation end: ${new Date(ms).toLocaleString(undefined, timing.timeZone ? { timeZone: timing.timeZone } : undefined)}${timing.timeZone ? ` (${timing.timeZone})` : ''}`;
+    const label = timing?.availability === 'available' ? 'Scheduled presentation end' : 'Recorded presentation end (unverified)';
+    return `${label}: ${new Date(ms).toLocaleString(undefined, timing.timeZone ? { timeZone: timing.timeZone } : undefined)}${timing.timeZone ? ` (${timing.timeZone})` : ''}`;
   } catch {
     return `Scheduled presentation end: ${new Date(ms).toISOString()} (recorded time zone unavailable)`;
   }
@@ -1005,9 +1006,13 @@ export default function StaffDeliberationsTab({
     : correctionDraft ? 'Corrections in progress'
       : ['blocked', 'unavailable'].includes(preparationState) || preparationReadError
         || ['unavailable', 'ambiguous'].includes(timing?.availability) ? 'Needs attention'
-        : due && editingReady ? 'Post-visit editing'
-          : due && preparationState === 'disabled' ? 'Preparation paused'
-            : due ? 'Preparing working writeup'
+        : due && editingReady ? 'Working writeup ready for post-visit editing'
+          : due && preparationState === 'disabled' ? (readyFile ? 'Working draft available' : 'No working writeup yet')
+            : due && preparationState === 'due' ? 'Waiting for automatic preparation'
+            : due && preparationState === 'pending' ? 'Queued for automatic preparation'
+              : due && (preparationState === 'running' || pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) ? 'Preparing working writeup'
+                : due && preparationState === 'prepared' ? 'Needs attention'
+                  : due ? 'Working writeup needed'
             : timing?.endIso ? 'Before presentation' : 'Schedule needed';
   const materialsLine = siteVisitMaterialsLine(materials);
   const timingLabel = presentationEndLabel(timing);
@@ -1088,6 +1093,7 @@ export default function StaffDeliberationsTab({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <h3 className="text-base font-semibold text-gray-900">Pre-site briefing</h3>
+            <p className="mt-1 text-sm text-gray-600">A concise summary to circulate before the presentation.</p>
             {briefError && (
               <p className="mt-2 text-sm text-red-800" role="alert">{briefError}</p>
             )}
@@ -1118,10 +1124,10 @@ export default function StaffDeliberationsTab({
                       className="font-medium text-green-800 underline"
                     >
                       {briefShared
-                        ? 'Word document'
+                        ? 'Briefing in Word'
                         : briefReadyFile.lastModified
-                          ? `Word draft · generated ${new Date(briefReadyFile.lastModified).toLocaleDateString()}`
-                          : 'Word draft'}
+                          ? `Briefing draft · generated ${new Date(briefReadyFile.lastModified).toLocaleDateString()}`
+                          : 'Briefing draft'}
                     </a>
                   </p>
                   <FileDetails file={briefReadyFile} />
@@ -1144,7 +1150,7 @@ export default function StaffDeliberationsTab({
             {briefReadyFile && briefDraftReady && (
               <>
                 <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
-                  Edit in Word
+                  Edit briefing in Word
                 </a>
                 {/* Codex adversarial review (2026-09-17, round 4): suppressed
                     while a regeneration is pending — see briefRegenerationPending
@@ -1182,14 +1188,14 @@ export default function StaffDeliberationsTab({
                   <p className="mt-1 basis-full text-xs text-gray-600">{briefShareBlockedReason}</p>
                 )}
                 <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={secondaryClass}>
-                  Open working document
+                  Open briefing in Word
                 </a>
               </>
             )}
             {briefReadyFile && briefShared && everSent && (
               <>
                 <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
-                  Open working document
+                  Open briefing in Word
                 </a>
                 {latestSendFailure && !briefRegenerationPending && (
                   <button type="button" onClick={openComposer} className={secondaryClass}>
@@ -1217,6 +1223,7 @@ export default function StaffDeliberationsTab({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <h3 className="text-base font-semibold text-gray-900">Working writeup</h3>
+            <p className="mt-1 text-sm text-gray-600">The fuller editable document for presentation findings. Your edits stay in this Word file.</p>
             {error && (
               <p className="mt-2 text-sm text-red-800" role="alert">{error}</p>
             )}
@@ -1246,10 +1253,10 @@ export default function StaffDeliberationsTab({
                       className="font-medium text-green-800 underline"
                     >
                       {preSiteShared || preSiteFinal
-                        ? 'Word document'
+                        ? 'Working writeup in Word'
                         : readyFile.lastModified
-                          ? `Word draft · generated ${new Date(readyFile.lastModified).toLocaleDateString()}`
-                          : 'Word draft'}
+                          ? `Working writeup draft · generated ${new Date(readyFile.lastModified).toLocaleDateString()}`
+                          : 'Working writeup draft'}
                     </a>
                   </p>
                   <FileDetails file={readyFile} />
@@ -1259,8 +1266,20 @@ export default function StaffDeliberationsTab({
               {due && !preSiteShared && !preSiteFinal && (
                 <p className="mt-2 text-xs font-medium text-amber-800" data-testid="final-writeup-prerequisite">
                   {preparationState === 'disabled'
-                    ? 'Automatic preparation is paused. Your existing draft is preserved.'
-                    : 'The working writeup is awaiting preparation for post-visit editing. Group review starts only when you choose.'}
+                    ? readyFile
+                      ? preSiteDraftReady && !correctionDraft && timing?.availability === 'available'
+                        ? 'Automatic preparation is off. Prepare for post-visit editing keeps this Word file and records its current version; it does not start review or send email.'
+                        : 'Automatic preparation is off. Your existing Word file is unchanged.'
+                      : unchangedRetryBlocked
+                        ? 'Automatic preparation is off. Draft preparation needs attention; see the message above before trying again.'
+                        : 'Automatic preparation is off. Use Prepare working draft to create the writeup; this does not start review or send email.'
+                    : preparationState === 'due'
+                      ? 'Waiting for automatic preparation. No preparation action is needed from you yet; group review starts only when you choose.'
+                    : preparationState === 'pending'
+                      ? 'This request is queued for automatic preparation. Group review starts only when you choose.'
+                      : preparationState === 'running' || pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING
+                        ? 'The working writeup is being prepared. Group review starts only when you choose.'
+                        : 'The scheduled presentation end has passed. The working writeup is not ready yet.'}
                 </p>
               )}
             </div>
@@ -1279,7 +1298,7 @@ export default function StaffDeliberationsTab({
             {readyFile && preSiteDraftReady && (
               <>
                 <a href={readyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
-                  Edit in Word
+                  Edit writeup in Word
                 </a>
                 {!correctionDraft && due && timing?.availability === 'available' && preparationState === 'disabled' && <button type="button" onClick={startSiteVisitAction} disabled={startingSiteVisit || generating} className={secondaryClass}>
                   {startingSiteVisit ? 'Preparing…' : 'Prepare for post-visit editing'}
@@ -1291,12 +1310,12 @@ export default function StaffDeliberationsTab({
             )}
             {readyFile && (preSiteShared || preSiteFinal) && (
               <a href={readyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
-                Open working document
+                Open writeup in Word
               </a>
             )}
             {due && editingReady && onSelectTab && (
               <button type="button" onClick={() => onSelectTab('final-writeup')} className={secondaryClass}>
-                Review readiness
+                Open group-review details
               </button>
             )}
             {preSiteMoreItems.length > 0 && <OverflowMenu label="More writeup actions" items={preSiteMoreItems} />}
@@ -1341,8 +1360,8 @@ export default function StaffDeliberationsTab({
             {materialsLine && <p className="mt-1 text-sm text-gray-600" data-testid="deliberations-materials-line">{materialsLine}</p>}
             <p className="mt-3 max-w-2xl text-sm text-gray-700">
               {preSiteFinal ? 'Continue the colleague and leadership review workflow in Final Writeup.'
-                : due ? 'Add findings from the research presentation to the working writeup. You decide when it is ready for group review.'
-                  : 'Circulate the briefing before the presentation. The fuller working writeup is optional now and carries forward afterward.'}
+                : due ? 'Add presentation findings to the working writeup. This continues the same document; start group review only when it is ready.'
+                  : 'The pre-site briefing is for circulation before the presentation. The fuller working writeup is optional now and continues afterward.'}
             </p>
             {preparationReadError && <p role="alert" className="mt-2 text-sm text-amber-800">{preparationReadError}</p>}
             {preparationState === 'blocked' && <div className="mt-3 text-sm text-amber-800">
@@ -1356,7 +1375,7 @@ export default function StaffDeliberationsTab({
           </div>
           {movedToFinal && onSelectTab && (
             <button type="button" onClick={() => onSelectTab('final-writeup')} className={primaryClass}>
-              Open Final Writeup
+              Open review details
             </button>
           )}
         </div>

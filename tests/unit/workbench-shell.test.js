@@ -302,10 +302,10 @@ test('the Staff deliberations view includes documentless requests in the selecte
   expect(screen.getByRole('link', { name: 'Staff deliberations' })).toHaveAttribute('aria-current', 'page');
   expect(screen.getByRole('link', { name: /#1002959/ })).toHaveAttribute('href', '/workbench/r9?tab=staff-deliberations&n=1002959');
   expect(screen.getByText('Schedule needed')).toBeInTheDocument();
-  expect(screen.getByText('No presentation time available')).toBeInTheDocument();
-  expect(screen.getByText('Pre-site briefing')).toBeInTheDocument();
-  expect(screen.getByText('Working writeup')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Review briefing' })).toHaveAttribute('href', '/workbench/r9?tab=staff-deliberations&n=1002959');
+  expect(screen.getByText(/Presentation end · (Not scheduled|Not recorded)/)).toBeInTheDocument();
+  expect(screen.getByText('Pre-site briefing:')).toBeInTheDocument();
+  expect(screen.getByText('No current document')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Open request details' })).toHaveAttribute('href', '/workbench/r9?tab=staff-deliberations&n=1002959');
 
   fireEvent.click(screen.getByRole('button', { name: 'All program directors' }));
   expect(replace).toHaveBeenLastCalledWith('/workbench?view=staff-deliberations&cycleCode=D26&scope=all', undefined, expect.any(Object));

@@ -30,7 +30,7 @@ const IN_REVIEW_PHASES = new Set(['group-review', 'leadership-review']);
 const STAGE_PRESENTATION = Object.freeze({
   'group-review': {
     chip: 'Group review',
-    heading: 'Final Writeup is ready',
+    heading: 'Group review is in progress',
     chipClass: 'bg-green-100 text-green-900',
     panelClass: 'border-green-200 bg-green-50',
     dividerClass: 'border-green-200',
@@ -481,7 +481,7 @@ export default function FinalWriteupTab({ requestId }) {
         <div className="max-w-3xl">
           <h2 className="text-xl font-semibold tracking-tight text-gray-900">Final Writeup</h2>
           <p className="mt-2 text-sm leading-6 text-gray-600">
-            Group review continues in the same Word document from Staff Deliberations.
+            This is the same editable working writeup. Starting a review records its current Word version; it does not send email.
           </p>
         </div>
 
@@ -525,7 +525,7 @@ export default function FinalWriteupTab({ requestId }) {
                     onClick={() => setConfirming('leadership')}
                     className="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Ready for leadership review
+                    Start leadership review
                   </button>
                 )}
                 <a
@@ -534,7 +534,7 @@ export default function FinalWriteupTab({ requestId }) {
                   rel="noopener noreferrer"
                   className="inline-flex min-h-11 items-center justify-center rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2"
                 >
-                  Edit writeup
+                  Edit working writeup in Word
                 </a>
               </div>
             </div>
@@ -621,9 +621,9 @@ export default function FinalWriteupTab({ requestId }) {
         ) : status?.phase === 'ready' ? (
           <div className="mt-6 flex flex-col gap-5 rounded-xl border border-gray-200 bg-gray-50 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-2xl">
-              <h3 className="text-lg font-semibold text-gray-900">{status.startBlockedReason ? 'Group review is not available yet' : 'Ready for group review'}</h3>
+              <h3 className="text-lg font-semibold text-gray-900">{status.startBlockedReason ? 'Group review is not available yet' : 'Group review has not started'}</h3>
               <p className="mt-1 text-sm leading-6 text-gray-600">
-                This records the current Word version as the starting point for group review.
+                Start group review when the writeup is ready. This records the current Word version and does not send email.
               </p>
               {status.sourceFile?.name && (
                 <p className="mt-2 text-xs text-gray-500">{status.sourceFile.name}</p>
@@ -648,7 +648,7 @@ export default function FinalWriteupTab({ requestId }) {
                 onClick={() => setConfirming('group')}
                 className="min-h-11 shrink-0 rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45"
               >
-                Ready for group review
+                Start group review
               </button>
             )}
           </div>
@@ -665,7 +665,7 @@ export default function FinalWriteupTab({ requestId }) {
             className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
           >
             <h3 id="final-writeup-confirm-title" className="text-xl font-semibold tracking-tight text-gray-900">
-              {confirming === 'leadership' ? 'Move to leadership review?' : 'Start group review?'}
+              {confirming === 'leadership' ? 'Start leadership review?' : 'Start group review?'}
             </h3>
             <div id="final-writeup-confirm-description" className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
               {confirming === 'leadership' ? (
@@ -698,8 +698,8 @@ export default function FinalWriteupTab({ requestId }) {
                 className="min-h-11 rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:opacity-50"
               >
                 {confirming === 'leadership'
-                  ? (advancing ? 'Moving…' : 'Ready for leadership review')
-                  : (starting ? 'Starting…' : 'Ready for group review')}
+                  ? (advancing ? 'Starting…' : 'Start leadership review')
+                  : (starting ? 'Starting…' : 'Start group review')}
               </button>
             </div>
           </div>
