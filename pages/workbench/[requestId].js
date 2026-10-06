@@ -188,7 +188,7 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
   return (
     <Layout title="Request Workbench">
       <div className="mb-4">
-        <Link href="/workbench" className="text-sm text-gray-500 hover:text-gray-700">← Back to dashboard</Link>
+        <Link href="/workbench" className="text-sm text-gray-500 hover:text-gray-700">← Back to Workbench</Link>
       </div>
 
       <div className="mb-6">

@@ -364,11 +364,12 @@ and compact state, not ordinary buttons, fields, or large containers.
 ### Navigation
 
 - **Global:** One row of at most seven text items in muted gray on white:
-  Workbench, Meeting Tracker, a Tools menu (focused tools grouped as on the home
-  page), Guide, Admin, and the user menu. The current item uses Foundation Ink
-  text with an underline; no emoji. Hover adds a quiet gray surface and stronger
-  text; mobile navigation becomes a menu. (Adopted 2026-10-05; the live nav
-  still shows one emoji link per app until the shell rework lands.)
+  Home, Workbench, Meeting Tracker, a Tools menu (every other app the user can
+  access, in registry order), Guide, Admin, and the user menu. The current item
+  uses Foundation Ink text with an underline, and the Tools trigger is marked
+  when the current page is one of its tools; no emoji. Hover adds a quiet gray
+  surface and stronger text; mobile navigation becomes a menu with Tools as a
+  labeled section.
 - **Workbench:** A horizontal, overflow-safe tab strip. The active tab uses
   Foundation Ink text and a two-pixel bottom border; inactive tabs remain
   borderless and muted.

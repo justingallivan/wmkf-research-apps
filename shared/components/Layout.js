@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { useState, useEffect, useMemo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useProfile } from '../context/ProfileContext';
@@ -9,6 +10,46 @@ import { getAuthEnabled } from '../utils/auth-enabled';
 import { APP_REGISTRY } from '../config/appRegistry';
 import ProfileSelector from './ProfileSelector';
 
+// Literal class strings so Tailwind generates them (an interpolated
+// `max-w-${maxWidth}` is dropped at build time). The header always uses the
+// shell width; only <main> narrows (DESIGN.md "The One Shell Rule").
+const SHELL_WIDTH_CLASS = 'max-w-7xl';
+const MAIN_WIDTH_CLASSES = {
+  '4xl': 'max-w-4xl',
+  '6xl': 'max-w-6xl',
+  '7xl': 'max-w-7xl',
+};
+
+// Apps shown as top-level nav items; every other accessible app goes in Tools.
+const PRIMARY_APP_KEYS = ['reviewers', 'meeting-tracker'];
+
+function isCurrentPath(pathname, href) {
+  if (href === '/') return pathname === '/';
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function ChevronIcon({ open, className = 'w-4 h-4 text-gray-400' }) {
+  return (
+    <svg
+      className={`${className} transition-transform ${open ? 'rotate-180' : ''}`}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  );
+}
+
+function navLinkClass(current) {
+  return `relative inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors duration-200 ${
+    current
+      ? 'text-gray-900 underline decoration-2 underline-offset-8'
+      : 'text-gray-600 hover:text-gray-900'
+  }`;
+}
+
 export default function Layout({
   children,
   title = 'Document Processing Suite',
@@ -17,7 +58,14 @@ export default function Layout({
   maxWidth = '7xl'
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [showUserMenu, setShowUserMenu] = useState(false);
+  // One open dropdown at a time: null | 'user' | 'tools'.
+  const [openMenu, setOpenMenu] = useState(null);
+  const showUserMenu = openMenu === 'user';
+  const showToolsMenu = openMenu === 'tools';
+  const toggleMenu = (name) => setOpenMenu((current) => (current === name ? null : name));
+  const closeMenus = () => setOpenMenu(null);
+  const router = useRouter();
+  const pathname = router?.pathname || '';
   const [authEnabled, setAuthEnabled] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
   const { data: session, status } = useSession();
@@ -40,27 +88,80 @@ export default function Layout({
       .catch(() => {});
   }, [isSuperuser]);
 
-  const navigationItems = useMemo(() => {
-    const items = [{ name: 'Home', href: '/', icon: '🏠' }];
+  // Escape closes any open dropdown.
+  useEffect(() => {
+    if (!openMenu) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setOpenMenu(null);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [openMenu]);
 
-    // Add app links filtered by access
-    APP_REGISTRY.forEach(app => {
-      if (hasAccess(app.key)) {
-        items.push({ name: app.name, href: app.href, icon: app.icon });
-      }
+  const { primaryItems, toolItems, trailingItems } = useMemo(() => {
+    const accessible = APP_REGISTRY.filter(app => hasAccess(app.key));
+    const primary = [{ name: 'Home', href: '/' }];
+    PRIMARY_APP_KEYS.forEach(key => {
+      const app = accessible.find(entry => entry.key === key);
+      if (app) primary.push({ name: app.name, href: app.href });
     });
 
-    // Guide link — always accessible
-    items.push({ name: 'Guide', href: '/guide', icon: '📖' });
+    const tools = accessible
+      .filter(app => !PRIMARY_APP_KEYS.includes(app.key))
+      .map(app => ({ name: app.name, href: app.href }));
+    if (isSuperuser) tools.push({ name: 'Cycle Dossier', href: '/cycle-dossier' });
 
-    // Admin link only for superusers
+    const trailing = [{ name: 'Guide', href: '/guide' }];
     if (isSuperuser) {
-      items.push({ name: 'Cycle Dossier', href: '/cycle-dossier', icon: '📚' });
-      items.push({ name: 'Admin', href: '/admin', icon: '⚙️', badge: alertCount > 0 ? alertCount : null });
+      trailing.push({ name: 'Admin', href: '/admin', badge: alertCount > 0 ? alertCount : null });
     }
 
-    return items;
+    return { primaryItems: primary, toolItems: tools, trailingItems: trailing };
   }, [hasAccess, isSuperuser, alertCount]);
+
+  const toolsCurrent = toolItems.some(item => isCurrentPath(pathname, item.href));
+  const mainWidthClass = MAIN_WIDTH_CLASSES[maxWidth] || SHELL_WIDTH_CLASS;
+
+  const renderNavLink = (item) => {
+    const current = isCurrentPath(pathname, item.href);
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        aria-current={current ? 'page' : undefined}
+        className={navLinkClass(current)}
+      >
+        <span>{item.name}</span>
+        {item.badge && (
+          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1">
+            {item.badge > 99 ? '99+' : item.badge}
+          </span>
+        )}
+      </Link>
+    );
+  };
+
+  const renderMobileLink = (item, indent = false) => {
+    const current = isCurrentPath(pathname, item.href);
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        aria-current={current ? 'page' : undefined}
+        className={`flex items-center justify-between ${indent ? 'pl-6 pr-3' : 'px-3'} py-2 text-base font-medium rounded-lg hover:bg-gray-50 transition-colors duration-200 ${
+          current ? 'text-gray-900 bg-gray-50' : 'text-gray-600 hover:text-gray-900'
+        }`}
+        onClick={() => setIsMobileMenuOpen(false)}
+      >
+        <span>{item.name}</span>
+        {item.badge && (
+          <span className="min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1">
+            {item.badge > 99 ? '99+' : item.badge}
+          </span>
+        )}
+      </Link>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -72,26 +173,48 @@ export default function Layout({
 
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className={`max-w-${maxWidth} mx-auto px-4`}>
-          <div className="flex justify-between items-center py-4">
+        <div className={`${SHELL_WIDTH_CLASS} mx-auto px-4`}>
+          <div className="flex justify-between items-center gap-4 py-3">
             {/* Desktop Navigation */}
             {showNavigation && (
-              <nav className="hidden md:flex items-center gap-1 flex-wrap flex-1">
-                {navigationItems.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="relative flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all duration-200"
-                  >
-                    <span className="text-base">{item.icon}</span>
-                    <span>{item.name}</span>
-                    {item.badge && (
-                      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1">
-                        {item.badge > 99 ? '99+' : item.badge}
-                      </span>
+              <nav aria-label="Main" className="hidden md:flex items-center gap-1 flex-1 min-w-0">
+                {primaryItems.map(renderNavLink)}
+                {toolItems.length > 0 && (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => toggleMenu('tools')}
+                      aria-haspopup="menu"
+                      aria-expanded={showToolsMenu}
+                      className={navLinkClass(toolsCurrent)}
+                    >
+                      <span>Tools</span>
+                      <ChevronIcon open={showToolsMenu} />
+                    </button>
+                    {showToolsMenu && (
+                      <div role="menu" className="absolute left-0 mt-2 w-72 bg-white rounded-xl shadow-lg border border-gray-200 z-50 py-2">
+                        {toolItems.map((item) => {
+                          const current = isCurrentPath(pathname, item.href);
+                          return (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              role="menuitem"
+                              aria-current={current ? 'page' : undefined}
+                              onClick={closeMenus}
+                              className={`block px-4 py-2 text-sm transition-colors hover:bg-gray-50 ${
+                                current ? 'font-semibold text-gray-900 bg-gray-50' : 'text-gray-600 hover:text-gray-900'
+                              }`}
+                            >
+                              {item.name}
+                            </Link>
+                          );
+                        })}
+                      </div>
                     )}
-                  </Link>
-                ))}
+                  </div>
+                )}
+                {trailingItems.map(renderNavLink)}
               </nav>
             )}
 
@@ -104,7 +227,7 @@ export default function Layout({
               {authEnabled && status === 'authenticated' && session?.user ? (
                 <div className="relative">
                   <button
-                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    onClick={() => toggleMenu('user')}
                     className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
                   >
                     <div
@@ -116,14 +239,7 @@ export default function Layout({
                     <span className="max-w-[120px] truncate">
                       {currentProfile?.displayName || currentProfile?.name || session.user.name || session.user.email}
                     </span>
-                    <svg
-                      className={`w-4 h-4 text-gray-400 transition-transform ${showUserMenu ? 'rotate-180' : ''}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                    <ChevronIcon open={showUserMenu} />
                   </button>
 
                   {/* User Dropdown */}
@@ -143,7 +259,7 @@ export default function Layout({
                       <div className="py-2">
                         <Link
                           href="/profile-settings"
-                          onClick={() => setShowUserMenu(false)}
+                          onClick={closeMenus}
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-600 hover:bg-gray-50 transition-colors"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -158,7 +274,7 @@ export default function Layout({
                       <div className="border-t border-gray-100 py-2">
                         <button
                           onClick={() => {
-                            setShowUserMenu(false);
+                            closeMenus();
                             signOut({ callbackUrl: '/' });
                           }}
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 transition-colors"
@@ -188,7 +304,7 @@ export default function Layout({
               {/* Show user avatar on mobile when auth is enabled and authenticated */}
               {authEnabled && status === 'authenticated' && session?.user && (
                 <button
-                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  onClick={() => toggleMenu('user')}
                   className="flex items-center gap-2 px-2 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg"
                 >
                   <div
@@ -221,7 +337,7 @@ export default function Layout({
               </div>
               <Link
                 href="/profile-settings"
-                onClick={() => setShowUserMenu(false)}
+                onClick={closeMenus}
                 className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -232,7 +348,7 @@ export default function Layout({
               </Link>
               <button
                 onClick={() => {
-                  setShowUserMenu(false);
+                  closeMenus();
                   signOut({ callbackUrl: '/' });
                 }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
@@ -248,18 +364,17 @@ export default function Layout({
           {/* Mobile Navigation */}
           {showNavigation && isMobileMenuOpen && (
             <div className="md:hidden border-t border-gray-200 py-4">
-              <nav className="space-y-2">
-                {navigationItems.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="flex items-center gap-3 px-3 py-2 text-base font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all duration-200"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <span className="text-lg">{item.icon}</span>
-                    <span>{item.name}</span>
-                  </Link>
-                ))}
+              <nav aria-label="Main" className="space-y-1">
+                {primaryItems.map((item) => renderMobileLink(item))}
+                {toolItems.length > 0 && (
+                  <div className="pt-2">
+                    <div className="px-3 pb-1 text-sm font-semibold text-gray-500">Tools</div>
+                    {toolItems.map((item) => renderMobileLink(item, true))}
+                  </div>
+                )}
+                <div className="pt-2">
+                  {trailingItems.map((item) => renderMobileLink(item))}
+                </div>
               </nav>
             </div>
           )}
@@ -268,14 +383,14 @@ export default function Layout({
 
       {/* Main Content */}
       <main className="flex-1">
-        <div className={`max-w-${maxWidth} mx-auto px-4`}>
+        <div className={`${mainWidthClass} mx-auto px-4`}>
           {children}
         </div>
       </main>
 
       {/* Footer */}
       <footer className="bg-white border-t border-gray-200 mt-auto">
-        <div className={`max-w-${maxWidth} mx-auto px-4 py-8`}>
+        <div className={`${SHELL_WIDTH_CLASS} mx-auto px-4 py-8`}>
           <div className="text-center">
             <p className="text-gray-600 mb-4">
               Written by <a href="mailto:justingallivan@me.com" className="hover:text-gray-800">Justin Gallivan</a> • Built with Claude AI • Powered by Next.js • Deployed on Vercel
@@ -314,7 +429,7 @@ export default function Layout({
       {showUserMenu && (
         <div
           className="fixed inset-0 z-40"
-          onClick={() => setShowUserMenu(false)}
+          onClick={closeMenus}
         />
       )}
     </div>

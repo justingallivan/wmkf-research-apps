@@ -49,7 +49,7 @@ export const APP_REGISTRY = [
   },
   {
     key: 'reviewers',
-    name: 'Reviewers',
+    name: 'Workbench',
     href: '/workbench',
     icon: '🗂️',
     description: 'Request Workbench — per-request reviewer dashboard consolidating finding, inviting, tracking, and completing peer reviews across the review lifecycle (successor to Reviewer Finder + Review Manager)',
