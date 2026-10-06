@@ -151,6 +151,8 @@ function Warnings({ warnings, label }) {
   );
 }
 
+const CARD_ANCHORS = new Set(['deliberations-status', 'deliberations-briefing', 'deliberations-writeup']);
+
 export default function StaffDeliberationsTab({
   requestId,
   requestNumber = '',
@@ -173,6 +175,17 @@ export default function StaffDeliberationsTab({
   // The workbench keys this tab by requestId, so a mounted instance never
   // changes request: the status read starts on mount, never on a switch.
   const [checkingStatus, setCheckingStatus] = useState(Boolean(requestId));
+  // A link from the Staff deliberations list names the card holding the row's
+  // next action (#deliberations-status|briefing|writeup). Scroll there once,
+  // after the status read has settled the card order.
+  const scrolledToCard = useRef(false);
+  useEffect(() => {
+    if (checkingStatus || scrolledToCard.current) return;
+    const id = window.location.hash.slice(1);
+    if (!CARD_ANCHORS.has(id)) return;
+    scrolledToCard.current = true;
+    window.requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: 'start' }));
+  }, [checkingStatus]);
   const [recoveryMessage, setRecoveryMessage] = useState(null);
   const [session, setSession] = useState(null);
   const [sessionAttendees, setSessionAttendees] = useState(EMPTY_LIST);
@@ -1089,7 +1102,7 @@ export default function StaffDeliberationsTab({
   ].filter(Boolean);
 
   const briefingCard = (
-<Card key="brief" hover={false}>
+<div key="brief" id="deliberations-briefing" className="scroll-mt-6"><Card hover={false}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <h3 className="text-base font-semibold text-gray-900">Pre-site briefing</h3>
@@ -1216,10 +1229,10 @@ export default function StaffDeliberationsTab({
             </p>
           </div>
         )}
-      </Card>
+      </Card></div>
   );
   const writeupCard = (
-<Card key="writeup" hover={false}>
+<div key="writeup" id="deliberations-writeup" className="scroll-mt-6"><Card hover={false}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <h3 className="text-base font-semibold text-gray-900">Working writeup</h3>
@@ -1330,7 +1343,7 @@ export default function StaffDeliberationsTab({
             </p>
           </div>
         )}
-      </Card>
+      </Card></div>
   );
 
   return (
@@ -1345,7 +1358,7 @@ export default function StaffDeliberationsTab({
           {briefRecoveryMessage}
         </div>
       )}
-      <Card hover={false}>
+      <div id="deliberations-status" className="scroll-mt-6"><Card hover={false}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <h2 className="text-lg font-semibold text-gray-900">Staff Deliberations</h2>
@@ -1397,7 +1410,7 @@ export default function StaffDeliberationsTab({
             </p>
           </div>
         )}
-      </Card>
+      </Card></div>
 
       {siteVisitContext?.presentationMaterialsStatus === 'loaded' && (
         <ResearchPresentationFollowUp

@@ -1425,3 +1425,39 @@ test('disabled automation does not name an unavailable action during corrections
   expect(screen.queryByText(/Prepare for post-visit editing keeps/)).not.toBeInTheDocument();
   expect(screen.getByText('Automatic preparation is off. Your existing Word file is unchanged.')).toBeInTheDocument();
 });
+
+test.each(['deliberations-status', 'deliberations-briefing', 'deliberations-writeup'])('a #%s link scrolls to that card once, after the status read', async (anchor) => {
+  const scrolled = [];
+  const original = Element.prototype.scrollIntoView;
+  Element.prototype.scrollIntoView = function scrollIntoView() { scrolled.push(this.id); };
+  const raf = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => { callback(0); return 0; });
+  window.history.replaceState(null, '', `/workbench/${REQUEST_ID}?tab=staff-deliberations#${anchor}`);
+  try {
+    queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT) }));
+    const { rerender } = render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+    await screen.findByRole('link', { name: /Edit (?:briefing|writeup) in Word/ });
+    await waitFor(() => expect(scrolled).toEqual([anchor]));
+    rerender(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+    expect(scrolled).toEqual([anchor]);
+  } finally {
+    Element.prototype.scrollIntoView = original;
+    raf.mockRestore();
+    window.history.replaceState(null, '', '/');
+  }
+});
+
+test('an unknown hash does not scroll', async () => {
+  const scrolled = jest.fn();
+  const original = Element.prototype.scrollIntoView;
+  Element.prototype.scrollIntoView = scrolled;
+  window.history.replaceState(null, '', `/workbench/${REQUEST_ID}#somewhere-else`);
+  try {
+    queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT) }));
+    render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+    await screen.findByRole('link', { name: /Edit (?:briefing|writeup) in Word/ });
+    expect(scrolled).not.toHaveBeenCalled();
+  } finally {
+    Element.prototype.scrollIntoView = original;
+    window.history.replaceState(null, '', '/');
+  }
+});
