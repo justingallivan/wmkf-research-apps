@@ -224,3 +224,12 @@ test('an unscheduled request opens the status card', async () => {
   expect(await screen.findByText('Not scheduled')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Open request' })).toHaveAttribute('href', expect.stringMatching(/#deliberations-status$/));
 });
+
+test('corrections reopened before the presentation keep the Before stage', async () => {
+  global.fetch.mockResolvedValue(response([row({ brief: { availability: 'available', lifecycleState: 100000001, file: { webUrl: 'https://sp/b' } }, writeup: { availability: 'available', lifecycleState: 100000000, correctionInProgress: true, file: { webUrl: 'https://sp/w' } } })]));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText('Make the requested corrections in the writeup, then choose Finish corrections.')).toBeInTheDocument();
+  expect(screen.getByText('Before presentation', { selector: 'span' })).toBeInTheDocument();
+  expect(screen.queryByText('After presentation')).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Open request' })).toHaveAttribute('href', expect.stringMatching(/#deliberations-writeup$/));
+});

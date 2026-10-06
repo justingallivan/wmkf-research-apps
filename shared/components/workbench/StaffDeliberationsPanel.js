@@ -123,7 +123,9 @@ function stageFor(request) {
   if (request.finalPhase === 'leadership-review') return { label: 'Leadership review', tone: 'violet', Icon: Users };
   if (request.finalPhase === 'group-review') return { label: 'Group review', tone: 'violet', Icon: Users };
   if (['unavailable', 'ambiguous'].includes(request.timing?.availability)) return { label: 'Presentation time not confirmed', tone: 'amber', Icon: CalendarClock };
-  if (request.preparation?.due || request.writeup?.correctionInProgress) return { label: 'After presentation', tone: 'blue', Icon: PenLine };
+  // Only a passed presentation end makes a request 'after'; corrections can
+  // be reopened before it.
+  if (request.preparation?.due) return { label: 'After presentation', tone: 'blue', Icon: PenLine };
   if (request.timing?.availability === 'missing' || !request.timing?.endIso) return { label: 'Not scheduled', tone: 'amber', Icon: CalendarX2 };
   return { label: 'Before presentation', tone: 'gray', Icon: CalendarClock };
 }
