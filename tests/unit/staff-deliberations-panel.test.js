@@ -1,5 +1,6 @@
 /** @jest-environment jsdom */
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument';
 import StaffDeliberationsPanel from '../../shared/components/workbench/StaffDeliberationsPanel';
 jest.mock('next/link', () => function MockLink({ children, href }) { return <a href={href}>{children}</a>; });
 const PROGRAM = '11111111-1111-4111-8111-111111111111';
@@ -22,9 +23,9 @@ test('documentless requests are visible and the query preserves program cycle an
 test('named Word links cannot confuse the briefing and full writeup', async () => {
   global.fetch.mockResolvedValue(response([row({ brief: { availability: 'available', lifecycleState: 100000001, file: { webUrl: 'https://sp/brief' } }, writeup: { availability: 'available', lifecycleState: 100000000, file: { webUrl: 'https://sp/full' } } })]));
   render(<StaffDeliberationsPanel {...props} />);
-  expect(await screen.findByRole('link', { name: 'Open Pre-site briefing in Word' })).toHaveAttribute('href','https://sp/brief');
+  expect(await screen.findByRole('link', { name: 'Edit briefing in Word' })).toHaveAttribute('href','https://sp/brief');
   expect(screen.getByRole('link', { name: 'Open request details' })).toBeInTheDocument();
-  expect(screen.getByText('Briefing ready')).toBeInTheDocument();
+  expect(screen.getByText('Check the briefing before sharing it for the presentation.')).toBeInTheDocument();
 });
 
 test('due preparation never labels an absent document ready and never writes', async () => {
@@ -70,7 +71,7 @@ test('ordinary total excludes separately reported test rows', async () => {
 test('disabled preparation reports the draft fact without treating configuration as a task failure', async () => {
   global.fetch.mockResolvedValue(response([row({ preparation: { due: true, state: 'disabled' }, briefSharing: { availability: 'available', sentAtIso: '2026-09-27T18:00:00Z', sourceVersionId: '3.0' } })]));
   render(<StaffDeliberationsPanel {...props} />);
-  expect(await screen.findByText('No working writeup yet')).toBeInTheDocument();
+  expect(await screen.findByText('Writeup needed')).toBeInTheDocument();
   expect(screen.queryByText(/Sent through app/)).not.toBeInTheDocument();
   expect(screen.queryByText('Preparation paused')).not.toBeInTheDocument();
 });
@@ -98,9 +99,9 @@ test('after presentation, a missing writeup never opens the pre-site briefing as
     writeup: { availability: 'missing' },
   })]));
   render(<StaffDeliberationsPanel {...props} />);
-  expect((await screen.findByText('No current document')).closest('p')).toHaveTextContent('Working writeup: No current document');
+  expect(await screen.findByText('Open request details to prepare your writeup.')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Open request details' })).toBeInTheDocument();
-  expect(screen.queryByRole('link', { name: 'Open Pre-site briefing in Word' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Edit briefing in Word' })).not.toBeInTheDocument();
 });
 
 test('queued and running preparation have different labels', async () => {
@@ -119,8 +120,8 @@ test('corrections open the writeup rather than the pre-site briefing', async () 
     brief: { availability: 'available', lifecycleState: 100000000, file: { webUrl: 'https://sp/brief' } },
   })]));
   render(<StaffDeliberationsPanel {...props} />);
-  expect(await screen.findByRole('link', { name: 'Open Working writeup in Word' })).toHaveAttribute('href', 'https://sp/writeup');
-  expect(screen.queryByRole('link', { name: 'Open Pre-site briefing in Word' })).not.toBeInTheDocument();
+  expect(await screen.findByRole('link', { name: 'Edit writeup in Word' })).toHaveAttribute('href', 'https://sp/writeup');
+  expect(screen.queryByRole('link', { name: 'Edit briefing in Word' })).not.toBeInTheDocument();
 });
 
  test('due automatic work waits without claiming a missing staff action', async () => {
@@ -135,4 +136,36 @@ test('a prepared receipt cannot make an incomplete document ready', async () => 
   render(<StaffDeliberationsPanel {...props} />);
   expect(await screen.findByText('Needs attention', { selector: 'p' })).toBeInTheDocument();
   expect(screen.queryByText('Post-visit editing')).not.toBeInTheDocument();
+});
+
+
+test('an existing post-schedule draft leads with the editing task and one direct Word action', async () => {
+  global.fetch.mockResolvedValue(response([row({ preparation: { due: true, state: 'disabled' }, writeup: { availability: 'available', lifecycleState: 100000000, file: { webUrl: 'https://sp/full' } } })]));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText('Add findings to your writeup after the presentation.')).toBeInTheDocument();
+  expect(screen.getByText('After scheduled presentation')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Edit writeup in Word' })).toHaveAttribute('href', 'https://sp/full');
+  expect(screen.queryByText(/Working writeup:|Working draft available/)).not.toBeInTheDocument();
+});
+
+test.each(['group-review', 'leadership-review'])('%s points to review details while retaining Word access', async (finalPhase) => {
+  global.fetch.mockResolvedValue(response([row({ finalPhase, writeup: { availability: 'available', file: { webUrl: 'https://sp/full' } } })]));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText('Read the writeup and follow its review progress.')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Open review details' })).toHaveAttribute('href', expect.stringContaining('tab=final-writeup'));
+  expect(screen.getByRole('link', { name: 'Edit writeup in Word' })).toHaveAttribute('href', 'https://sp/full');
+  expect(screen.queryByText('Add findings to your writeup after the presentation.')).not.toBeInTheDocument();
+});
+
+
+test.each([null, 'https://sp/older-brief'])('a briefing being generated does not ask staff to prepare or share it (file %s)', async (webUrl) => {
+  global.fetch.mockResolvedValue(response([row({ brief: { availability: webUrl ? 'available' : 'missing', operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING, file: webUrl ? { webUrl } : null } })]));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText('The briefing is being prepared. Check back shortly.')).toBeInTheDocument();
+  expect(screen.getByText('Preparing briefing')).toBeInTheDocument();
+  expect(screen.queryByText('Check the briefing before sharing it for the presentation.')).not.toBeInTheDocument();
+  expect(screen.queryByText('Open request details to prepare the pre-site briefing.')).not.toBeInTheDocument();
+  const links = screen.getAllByRole('link');
+  expect(links[1]).toHaveTextContent('Open request details');
+  if (webUrl) expect(screen.getByRole('link', { name: 'Edit briefing in Word' })).toHaveAttribute('href', webUrl);
 });

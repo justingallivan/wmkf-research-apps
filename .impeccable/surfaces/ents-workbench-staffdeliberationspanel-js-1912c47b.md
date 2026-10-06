@@ -18,7 +18,8 @@ The overview helps staff find a request and start its current task. Request deta
 ## Approved direction
 
 - Compact overview: request identity, institution/PD, accurately labelled presentation timing, relevant document/review status and clear next action.
-- Where a suitable editable document exists, opening it in Word is primary; request details are secondary. Do not hide genuine blockers or classify configuration-off as staff failure.
+- Owner refinement: give each card a colored stage label, one prominent next-task instruction, and a blue primary action. Keep identity and schedule quieter; omit redundant document-status lines. Blue signals action/information, violet review, and amber an issue to check, always accompanied by text.
+- Match the primary destination to the task: Word for editing a suitable document, request details for preparation or issues, and review details for active review. Retain existing Word access as secondary where appropriate. Do not classify configuration-off as staff failure.
 - Keep routine sharing history, secondary documents, session and materials details in request details. Preserve access to information; do not treat missing in-app records as proof an email was not sent or files do not exist.
 - Differentiate opening a destination from preparing a document or starting review. Explain consequences near the state-changing action.
 - A scheduled end is not proof a presentation occurred. Disabled automation is not proof a draft is ready or blocked. Distinguish queued, running, missing, unavailable and blocked states.

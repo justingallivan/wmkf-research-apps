@@ -63,17 +63,6 @@ function taskFor(request) {
   return { label: notScheduled ? 'Schedule needed' : 'Before presentation', bucket: notScheduled ? 'attention' : 'before', action: 'Open request details', tab: 'staff-deliberations' };
 }
 
-function documentState(fact, isBrief) {
-  if (fact?.availability === 'unavailable') return 'Status unavailable';
-  if (fact?.availability === 'ambiguous') return 'Needs reconciliation';
-  if (fact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) return 'Draft is being generated';
-  if (fact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) return 'Last preparation attempt failed';
-  if (fact?.availability !== 'available') return 'No current document';
-  if (fact.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW) return isBrief ? 'Briefing ready' : fact.milestoneComplete ? 'Ready for presentation findings' : 'Checkpoint needs attention';
-  if (fact.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL) return 'In review';
-  return 'Draft';
-}
-
 function primaryDocument(request) {
   const afterPresentation = request.preparation?.due === true
     || request.writeup?.correctionInProgress === true
@@ -96,43 +85,68 @@ function presentationTiming(request) {
   return time ? `Scheduled presentation end · ${time}` : 'Presentation end · Not recorded';
 }
 
+function nextStep(request, task, document) {
+  if (task.bucket === 'review') return { instruction: 'Read the writeup and follow its review progress.', detailsFirst: true };
+  if (request.writeup?.correctionInProgress) return { instruction: 'Check the requested corrections and update the writeup.', detailsFirst: true };
+  if (task.label === 'Schedule needed') return { instruction: 'Add the presentation schedule in request details.', detailsFirst: true };
+  if (task.bucket === 'attention') return { instruction: 'Open request details to check what needs attention.', detailsFirst: true };
+  if (request.preparation?.state === 'running' || request.writeup?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) {
+    return { instruction: 'Your writeup is being prepared. Check back shortly.', detailsFirst: true };
+  }
+  if (request.preparation?.due && ['due', 'pending'].includes(request.preparation?.state)) {
+    return { instruction: 'Preparation will run automatically. No action is needed now.', detailsFirst: true };
+  }
+  if (task.bucket === 'post') return document
+    ? { instruction: 'Add findings to your writeup after the presentation.', stage: 'After scheduled presentation' }
+    : { instruction: 'Open request details to prepare your writeup.', stage: 'Writeup needed', detailsFirst: true };
+  if (request.brief?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) {
+    return { instruction: 'The briefing is being prepared. Check back shortly.', stage: 'Preparing briefing', detailsFirst: true };
+  }
+  if (document?.key === 'brief') return { instruction: 'Check the briefing before sharing it for the presentation.' };
+  return { instruction: 'Open request details to prepare the pre-site briefing.', detailsFirst: true };
+}
+
 function RequestCard({ request }) {
   const task = taskFor(request);
   const document = primaryDocument(request);
-  const documentKey = request.preparation?.due === true
-    || request.writeup?.correctionInProgress === true
-    || ['group-review', 'leadership-review'].includes(request.finalPhase) ? 'writeup' : (document?.key || 'brief');
-  const documentName = documentKey === 'writeup' ? 'Working writeup' : 'Pre-site briefing';
-  const documentStatus = document
-    ? documentState(document.fact, document.key === 'brief')
-    : documentKey === 'writeup'
-      ? documentState(request.writeup, false)
-      : documentState(request.brief, true);
+  const step = nextStep(request, task, document);
+  const documentAction = document?.key === 'writeup' ? 'Edit writeup in Word' : 'Edit briefing in Word';
+  const primaryClass = 'inline-flex min-h-11 items-center justify-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2';
+  const secondaryClass = 'inline-flex min-h-11 items-center text-sm font-medium text-gray-600 underline underline-offset-4 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2';
+  const stageClass = task.bucket === 'attention' ? 'bg-amber-50 text-amber-900' : task.bucket === 'review' ? 'bg-violet-50 text-violet-900' : 'bg-blue-50 text-blue-800';
   return (
     <Card hover={false}>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 basis-72">
           <h3 className="break-words text-base font-semibold text-gray-900">
             <Link href={requestHref(request)} className="underline-offset-2 hover:underline">
               {request.requestNumber ? `#${request.requestNumber}` : request.requestId}{request.title ? ` — ${request.title}` : ''}
             </Link>
           </h3>
-          {request.institution && <p className="mt-1 text-sm text-gray-600">{request.institution}</p>}
-          {request.programDirector && <p className="mt-1 text-sm text-gray-600">Lead PD: {request.programDirector}</p>}
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
+            {request.institution && <p>{request.institution}</p>}
+            {request.programDirector && <p>Lead PD: {request.programDirector}</p>}
+          </div>
           <TestRequestBadge isTestRequest={request.isTestRequest} className="mt-2" />
-          <p className={`mt-2 text-sm font-semibold ${task.bucket === 'attention' ? 'text-amber-800' : 'text-gray-900'}`}>{task.label}</p>
+        </div>
+        <p className={`rounded-full px-3 py-1 text-xs font-semibold ${stageClass}`}>{step.stage || task.label}</p>
+      </div>
+      <div className="mt-5 flex flex-col gap-4 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <p className="max-w-2xl text-lg font-semibold leading-7 text-gray-900">{step.instruction}</p>
           <p className="mt-1 text-sm text-gray-600">{presentationTiming(request)}</p>
-          <p className="mt-1 text-sm text-gray-700"><span className="font-medium">{documentName}:</span> {documentStatus}</p>
         </div>
         <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
-          {document ? (
-            <a href={document.fact.file.webUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2">
-              Open {documentName} in Word
-            </a>
+          {document && !step.detailsFirst ? (
+            <a href={document.fact.file.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>{documentAction}</a>
           ) : (
-            <Link href={requestHref(request, task.tab)} className="inline-flex min-h-11 items-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2">{task.action}</Link>
+            <Link href={requestHref(request, task.tab)} className={primaryClass}>{task.action}</Link>
           )}
-          {document && <Link href={requestHref(request, task.tab)} className="inline-flex min-h-11 items-center rounded-lg px-4 py-2 text-sm font-medium text-gray-700 underline underline-offset-2 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2">{task.action}</Link>}
+          {document && (step.detailsFirst ? (
+            <a href={document.fact.file.webUrl} target="_blank" rel="noopener noreferrer" className={secondaryClass}>{documentAction}</a>
+          ) : (
+            <Link href={requestHref(request, task.tab)} className={secondaryClass}>{task.action}</Link>
+          ))}
         </div>
       </div>
     </Card>
@@ -228,7 +242,7 @@ export default function StaffDeliberationsPanel({
         </div>
         <ScopeSegment scope={scope} onChange={onScopeChange} allLabel="All program directors" />
       </div>
-      <p className="mb-3 max-w-3xl text-sm text-gray-600">Use the briefing before the presentation and the working writeup to add findings afterward. Open request details for preparation, sharing, and review steps.</p>
+      <p className="mb-3 max-w-3xl text-sm text-gray-600">Each request shows your next step. Use the briefing before the presentation; add findings to the writeup afterward.</p>
       <div className="mb-4 flex flex-wrap gap-3">
         <label className="text-sm text-gray-700">Task
           <select value={filter} onChange={(event) => setFilter(event.target.value)} className="ml-2 min-h-11 rounded-lg border border-gray-300 bg-white px-3">
