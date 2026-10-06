@@ -382,48 +382,11 @@ export default function Layout({
       </header>
 
       {/* Main Content */}
-      <main className="flex-1">
+      <main className="flex-1 pb-12">
         <div className={`${mainWidthClass} mx-auto px-4`}>
           {children}
         </div>
       </main>
-
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 mt-auto">
-        <div className={`${SHELL_WIDTH_CLASS} mx-auto px-4 py-8`}>
-          <div className="text-center">
-            <p className="text-gray-600 mb-4">
-              Written by <a href="mailto:justingallivan@me.com" className="hover:text-gray-800">Justin Gallivan</a> • Built with Claude AI • Powered by Next.js • Deployed on Vercel
-            </p>
-            <div className="flex justify-center items-center gap-4">
-              <Link
-                href="/guide"
-                className="text-gray-500 hover:text-gray-700 transition-colors duration-200"
-              >
-                Guide
-              </Link>
-              <span className="text-gray-300">•</span>
-              <a
-                href="https://github.com/justingallivan/wmkf-research-apps"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-500 hover:text-gray-700 transition-colors duration-200"
-              >
-                GitHub
-              </a>
-              <span className="text-gray-300">•</span>
-              <a
-                href="https://claude.ai"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-500 hover:text-gray-700 transition-colors duration-200"
-              >
-                Claude AI
-              </a>
-            </div>
-          </div>
-        </div>
-      </footer>
 
       {/* Click outside handler for user menu */}
       {showUserMenu && (
