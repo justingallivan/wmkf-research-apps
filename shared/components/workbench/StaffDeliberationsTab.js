@@ -78,8 +78,9 @@ function StepMarker({ status, number }) {
   );
 }
 
-// One lifecycle step. Finished steps collapse to their summary line and
-// actions; alerts and every action button render whatever the step's state.
+// One lifecycle step. Only the current step shows its details inline; other
+// steps fold them behind Details (never drop them). Alerts and every action
+// button render whatever the step's state.
 function Step({ id, number, title, status, summary, actions, details = null, children }) {
   return (
     <li id={id} className="scroll-mt-6 px-5 py-4 sm:px-6">
@@ -93,7 +94,7 @@ function Step({ id, number, title, status, summary, actions, details = null, chi
             </h3>
             {summary}
             {details && status === 'current' && details}
-            {details && status === 'upcoming' && (
+            {details && status !== 'current' && (
               <details className="mt-1">
                 <summary className="cursor-pointer select-none text-sm text-gray-600 hover:text-gray-900">Details</summary>
                 {details}
@@ -1178,7 +1179,8 @@ export default function StaffDeliberationsTab({
   // Stepper state, derived only from the facts the actions already use so the
   // steps, the stage sentence and the buttons cannot disagree.
   const reviewActive = movedToFinal || finalReview?.phase === 'leadership-review';
-  const currentStep = reviewActive || preSiteFinal ? 'review' : due ? 'writeup' : everSent ? 'presentation' : 'briefing';
+  // Corrections reopened before the presentation are current writeup work.
+  const currentStep = reviewActive || preSiteFinal ? 'review' : due || correctionDraft ? 'writeup' : everSent ? 'presentation' : 'briefing';
   const stepDone = { briefing: everSent, presentation: due, writeup: reviewActive, review: false };
   const stepStatus = (key) => (key === currentStep ? 'current' : stepDone[key] ? 'done' : 'upcoming');
   const briefStatus = stepStatus('briefing');

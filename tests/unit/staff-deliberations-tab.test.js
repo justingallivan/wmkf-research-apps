@@ -1471,7 +1471,29 @@ test('stepper: a sent briefing collapses to its share summary and keeps Open in 
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
   expect(await screen.findByText(/^Shared .* to 3 people$/)).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Open briefing in Word' })).toBeInTheDocument();
-  expect(screen.queryByText('A concise summary to circulate before the presentation.')).not.toBeInTheDocument();
+  expect(screen.getByText('A concise summary to circulate before the presentation.').closest('details').open).toBe(false);
   expect(screen.getByRole('heading', { name: /Pre-site briefing \(done\)/ })).toBeInTheDocument();
   expect(screen.getByRole('list', { name: 'Staff deliberations steps' }).querySelectorAll(':scope > li')).toHaveLength(4);
+});
+
+test('stepper: a finished briefing folds its warnings behind Details instead of dropping them', async () => {
+  distributionHistoryFeed = { attempts: [{ operationId: 'op-3', transportAccepted: true, createdAt: '2026-09-12T17:00:00Z', to: ['a@x.org'], cc: [] }], currentSourceEverSent: true };
+  queueRoute('briefGet', statusResponse({
+    currentArtifact: { ...briefArtifact(REVIEW), warnings: [{ code: 'section_over_target', message: 'A briefing section is longer than suggested.' }] },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByRole('heading', { name: /Pre-site briefing \(done\)/ })).toBeInTheDocument();
+  const warning = await screen.findByText('A briefing section is longer than suggested.');
+  expect(warning.closest('details')).not.toBeNull();
+  expect(warning.closest('details').open).toBe(false);
+});
+
+test('stepper: corrections reopened before the presentation make the writeup the current step', async () => {
+  distributionHistoryFeed = { attempts: [{ operationId: 'op-4', transportAccepted: true, createdAt: '2026-09-12T17:00:00Z', to: ['a@x.org'], cc: [] }], currentSourceEverSent: true };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  queueRoute('presiteGet', statusResponse({ currentArtifact: { ...preSiteArtifact(DRAFT), correction: { cycleId: 'correction-1' } } }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByRole('button', { name: 'Finish corrections' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /Working writeup \(current step\)/ })).toBeInTheDocument();
+  expect(screen.queryByText(/Nothing is needed until the presentation/)).not.toBeInTheDocument();
 });
