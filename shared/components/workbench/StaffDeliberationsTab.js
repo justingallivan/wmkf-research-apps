@@ -10,9 +10,10 @@ import useSiteVisitContext from './useSiteVisitContext';
 import ResearchPresentationFollowUp from './ResearchPresentationFollowUp';
 import OverflowMenu from './OverflowMenu';
 import ResearchPresentationMaterialsCard from './ResearchPresentationMaterialsCard';
+import Link from 'next/link';
+import { CalendarClock, CalendarX2, CheckCircle2, PenLine, TriangleAlert, Users } from 'lucide-react';
 import {
   DELIBERATION_STAGE_DEFAULT_LABELS,
-  deliberationSessionLine,
   deriveDeliberationStage,
 } from '../../utils/deliberation-stage';
 import { siteVisitMaterialsLine } from '../../utils/site-visit-materials-line';
@@ -29,15 +30,75 @@ const STATUS_POLL_ATTEMPTS = 20;
 const EMPTY_LIST = Object.freeze([]);
 const EMPTY_STAGE_LABELS = DELIBERATION_STAGE_DEFAULT_LABELS;
 
-function presentationEndLabel(timing) {
-  const ms = Date.parse(timing?.endIso || '');
-  if (!Number.isFinite(ms)) return 'Presentation schedule unavailable or not yet recorded.';
+// One date format for the tab, matching the Staff deliberations list:
+// "Oct 16, 11:00 AM PDT" in the record's own time zone when it has one.
+function formatWhen(iso, timeZone = null) {
+  const ms = Date.parse(iso || '');
+  if (!Number.isFinite(ms)) return null;
   try {
-    const label = timing?.availability === 'available' ? 'Scheduled presentation end' : 'Recorded presentation end (unverified)';
-    return `${label}: ${new Date(ms).toLocaleString(undefined, timing.timeZone ? { timeZone: timing.timeZone } : undefined)}${timing.timeZone ? ` (${timing.timeZone})` : ''}`;
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+      ...(timeZone ? { timeZone, timeZoneName: 'short' } : {}),
+    }).format(new Date(ms));
   } catch {
-    return `Scheduled presentation end: ${new Date(ms).toISOString()} (recorded time zone unavailable)`;
+    return new Date(ms).toLocaleString();
   }
+}
+
+function presentationEndLabel(timing) {
+  const when = formatWhen(timing?.endIso, timing?.timeZone);
+  if (!when) return 'Presentation not yet scheduled.';
+  return timing?.availability === 'available'
+    ? `Presentation ends ${when}`
+    : `Recorded presentation end (unverified): ${when}`;
+}
+
+function sessionLine(session) {
+  const when = formatWhen(session?.scheduledStartIso, session?.ianaTimeZone);
+  return when ? `PC deliberation session · ${when}` : 'PC deliberation session not yet scheduled.';
+}
+
+// Chip tones match the Staff deliberations list (StaffDeliberationsPanel.js).
+const STAGE_TONES = {
+  blue: 'bg-blue-50 text-blue-800 ring-blue-200',
+  violet: 'bg-violet-50 text-violet-800 ring-violet-200',
+  amber: 'bg-amber-50 text-amber-900 ring-amber-200',
+  gray: 'bg-gray-100 text-gray-700 ring-gray-200',
+};
+
+function StepMarker({ status, number }) {
+  if (status === 'done') return <CheckCircle2 aria-hidden="true" className="mt-0.5 h-6 w-6 shrink-0 text-green-600" />;
+  return (
+    <span
+      aria-hidden="true"
+      className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${status === 'current' ? 'bg-gray-900 text-white' : 'border border-gray-300 text-gray-500'}`}
+    >
+      {number}
+    </span>
+  );
+}
+
+// One lifecycle step. Finished steps collapse to their summary line and
+// actions; alerts and every action button render whatever the step's state.
+function Step({ id, number, title, status, summary, actions, children }) {
+  return (
+    <li id={id} className="scroll-mt-6 px-5 py-4 sm:px-6">
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div className="flex min-w-0 flex-1 gap-3">
+          <StepMarker status={status} number={number} />
+          <div className="min-w-0 flex-1">
+            <h3 className={`text-base font-semibold ${status === 'upcoming' ? 'text-gray-600' : 'text-gray-900'}`}>
+              {title}
+              <span className="sr-only">{status === 'done' ? ' (done)' : status === 'current' ? ' (current step)' : ''}</span>
+            </h3>
+            {summary}
+            {children}
+          </div>
+        </div>
+        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      </div>
+    </li>
+  );
 }
 
 // Both use requestEnvelope, not requestJson: the fallback message embeds
@@ -220,6 +281,9 @@ export default function StaffDeliberationsTab({
   // Shared composer/dialog state.
   const [composerOpen, setComposerOpen] = useState(false);
   const [latestSendFailure, setLatestSendFailure] = useState(null);
+  // Primitive values so an unchanged history report never re-renders the tab.
+  const [latestSentAt, setLatestSentAt] = useState(null);
+  const [latestSentRecipients, setLatestSentRecipients] = useState(0);
   const [confirmDialog, setConfirmDialog] = useState(null); // null | { kind: 'brief' | 'presite' }
   const [currentSourceEverSent, setCurrentSourceEverSent] = useState(false);
   const cancelDialogButtonRef = useRef(null);
@@ -667,6 +731,9 @@ export default function StaffDeliberationsTab({
   const onDistributionHistory = useCallback((historyInfo) => {
     setCurrentSourceEverSent(historyInfo?.currentSourceEverSent === true);
     setLatestSendFailure(historyInfo?.latestSendFailure || null);
+    const sent = (historyInfo?.attempts || []).find((attempt) => attempt?.transportAccepted);
+    setLatestSentAt(sent?.createdAt || null);
+    setLatestSentRecipients(sent ? (sent.to?.length || 0) + (sent.cc?.length || 0) : 0);
   }, []);
 
   // Headless read of the wmkf_sitevisit Activity (maintained outside this
@@ -1101,249 +1168,305 @@ export default function StaffDeliberationsTab({
     },
   ].filter(Boolean);
 
-  const briefingCard = (
-<div key="brief" id="deliberations-briefing" className="scroll-mt-6"><Card hover={false}>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h3 className="text-base font-semibold text-gray-900">Pre-site briefing</h3>
-            <p className="mt-1 text-sm text-gray-600">A concise summary to circulate before the presentation.</p>
-            {briefError && (
-              <p className="mt-2 text-sm text-red-800" role="alert">{briefError}</p>
-            )}
-            <div aria-live="polite">
-              {checkingBriefStatus && !briefArtifact && !briefPendingArtifact && (
-                <p className="mt-2 text-sm text-gray-600">Checking for an existing brief…</p>
-              )}
-              {briefRegenerationPending && briefReadyFile && (
-                <p className="mt-2 text-sm text-amber-800">
-                  A new brief is being generated; sharing is paused until it is ready. The
-                  current link stays available until it finishes.
-                </p>
-              )}
-              {briefUnchangedRetryBlocked && (
-                <p className="mt-2 text-sm text-amber-900">
-                  This attempt needs a prompt or application change before it can be retried.
-                </p>
-              )}
-              {briefReadyFile && (
-                <div className="mt-2 text-sm text-gray-700">
-                  <p>
-                    {briefShared ? 'Working document:' : 'Latest draft:'}{' '}
-                    <a
-                      href={briefReadyFile.webUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={briefReadyFile.name || undefined}
-                      className="font-medium text-green-800 underline"
-                    >
-                      {briefShared
-                        ? 'Briefing in Word'
-                        : briefReadyFile.lastModified
-                          ? `Briefing draft · generated ${new Date(briefReadyFile.lastModified).toLocaleDateString()}`
-                          : 'Briefing draft'}
-                    </a>
-                  </p>
-                  <FileDetails file={briefReadyFile} />
-                  <Warnings warnings={briefWarnings} label={briefShared ? 'Working document needs a quick edit check' : 'Draft needs a quick edit check'} />
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {!briefReadyFile && !briefShared && (
-              <button
-                type="button"
-                onClick={generateBrief}
-                disabled={briefGenerating || !requestId || briefUnchangedRetryBlocked}
-                className={primaryClass}
-              >
-                {briefGenerating ? 'Generating…' : 'Generate Brief'}
-              </button>
-            )}
-            {briefReadyFile && briefDraftReady && (
-              <>
-                <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
-                  Edit briefing in Word
-                </a>
-                {/* Codex adversarial review (2026-09-17, round 4): suppressed
-                    while a regeneration is pending — see briefRegenerationPending
-                    above and the amber note that replaces this affordance. */}
-                {!briefRegenerationPending && (
-                  <button
-                    type="button"
-                    onClick={openComposer}
-                    disabled={briefGenerating || briefShareBlocked}
-                    title={briefShareBlocked ? briefShareBlockedReason : undefined}
-                    className={secondaryClass}
-                  >
-                    Share…
-                  </button>
-                )}
-                {briefShareBlocked && !briefRegenerationPending && (
-                  <p className="mt-1 basis-full text-xs text-gray-600">{briefShareBlockedReason}</p>
-                )}
-              </>
-            )}
-            {briefReadyFile && briefShared && !everSent && (
-              <>
-                {!briefRegenerationPending && (
-                  <button
-                    type="button"
-                    onClick={openComposer}
-                    disabled={briefShareBlocked}
-                    title={briefShareBlocked ? briefShareBlockedReason : undefined}
-                    className={primaryClass}
-                  >
-                    {latestSendFailure ? 'Resend' : 'Share…'}
-                  </button>
-                )}
-                {briefShareBlocked && !briefRegenerationPending && (
-                  <p className="mt-1 basis-full text-xs text-gray-600">{briefShareBlockedReason}</p>
-                )}
-                <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={secondaryClass}>
-                  Open briefing in Word
-                </a>
-              </>
-            )}
-            {briefReadyFile && briefShared && everSent && (
-              <>
-                <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
-                  Open briefing in Word
-                </a>
-                {latestSendFailure && !briefRegenerationPending && (
-                  <button type="button" onClick={openComposer} className={secondaryClass}>
-                    Resend
-                  </button>
-                )}
-              </>
-            )}
-            {briefMoreItems.length > 0 && <OverflowMenu label="More brief actions" items={briefMoreItems} />}
-          </div>
-        </div>
-        {briefShared && !briefReadyFile && (
-          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-            <h3 className="font-semibold">Pre-Research Presentation Brief is read-only</h3>
-            <p className="mt-1">
-              No current Word link was returned for this record, so working controls are not
-              available. Reload to retry, or contact an administrator if this persists.
-            </p>
-          </div>
-        )}
-      </Card></div>
-  );
-  const writeupCard = (
-<div key="writeup" id="deliberations-writeup" className="scroll-mt-6"><Card hover={false}>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h3 className="text-base font-semibold text-gray-900">Working writeup</h3>
-            <p className="mt-1 text-sm text-gray-600">The fuller editable document for presentation findings. Your edits stay in this Word file.</p>
-            {error && (
-              <p className="mt-2 text-sm text-red-800" role="alert">{error}</p>
-            )}
-            <div aria-live="polite">
-              {checkingStatus && !artifact && !pendingArtifact && (
-                <p className="mt-2 text-sm text-gray-600">Checking for an existing writeup draft…</p>
-              )}
-              {pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING && readyFile && (
-                <p className="mt-2 text-sm text-amber-800">
-                  A new draft is being generated. The current Word link stays available until it finishes.
-                </p>
-              )}
-              {unchangedRetryBlocked && (
-                <p className="mt-2 text-sm text-amber-900">
-                  This attempt needs a prompt or application change before it can be retried.
-                </p>
-              )}
-              {readyFile && (
-                <div className="mt-2 text-sm text-gray-700">
-                  <p>
-                    {preSiteShared || preSiteFinal ? 'Working document:' : 'Latest draft:'}{' '}
-                    <a
-                      href={readyFile.webUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={readyFile.name || undefined}
-                      className="font-medium text-green-800 underline"
-                    >
-                      {preSiteShared || preSiteFinal
-                        ? 'Working writeup in Word'
-                        : readyFile.lastModified
-                          ? `Working writeup draft · generated ${new Date(readyFile.lastModified).toLocaleDateString()}`
-                          : 'Working writeup draft'}
-                    </a>
-                  </p>
-                  <FileDetails file={readyFile} />
-                  <Warnings warnings={warnings} label={preSiteShared || preSiteFinal ? 'Working document needs a quick edit check' : 'Draft needs a quick edit check'} />
-                </div>
-              )}
-              {due && !preSiteShared && !preSiteFinal && (
-                <p className="mt-2 text-xs font-medium text-amber-800" data-testid="final-writeup-prerequisite">
-                  {preparationState === 'disabled'
-                    ? readyFile
-                      ? preSiteDraftReady && !correctionDraft && timing?.availability === 'available'
-                        ? 'Automatic preparation is off. Prepare for post-visit editing keeps this Word file and records its current version; it does not start review or send email.'
-                        : 'Automatic preparation is off. Your existing Word file is unchanged.'
-                      : unchangedRetryBlocked
-                        ? 'Automatic preparation is off. Draft preparation needs attention; see the message above before trying again.'
-                        : 'Automatic preparation is off. Use Prepare working draft to create the writeup; this does not start review or send email.'
-                    : preparationState === 'due'
-                      ? 'Waiting for automatic preparation. No preparation action is needed from you yet; group review starts only when you choose.'
-                    : preparationState === 'pending'
-                      ? 'This request is queued for automatic preparation. Group review starts only when you choose.'
-                      : preparationState === 'running' || pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING
-                        ? 'The working writeup is being prepared. Group review starts only when you choose.'
-                        : 'The scheduled presentation end has passed. The working writeup is not ready yet.'}
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {(!due || ['disabled', 'blocked', 'none'].includes(preparationState)) && !readyFile && !preSiteShared && !preSiteFinal && (
-              <button
-                type="button"
-                onClick={generate}
-                disabled={generating || !requestId || unchangedRetryBlocked}
-                className={primaryClass}
-              >
-                {generating ? 'Preparing…' : 'Prepare working draft'}
-              </button>
-            )}
-            {readyFile && preSiteDraftReady && (
-              <>
-                <a href={readyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
-                  Edit writeup in Word
-                </a>
-                {!correctionDraft && due && timing?.availability === 'available' && preparationState === 'disabled' && <button type="button" onClick={startSiteVisitAction} disabled={startingSiteVisit || generating} className={secondaryClass}>
-                  {startingSiteVisit ? 'Preparing…' : 'Prepare for post-visit editing'}
-                </button>}
-                {correctionDraft && <button type="button" onClick={startSiteVisitAction} disabled={startingSiteVisit || generating} className={secondaryClass}>
-                  {startingSiteVisit ? 'Finishing…' : 'Finish corrections'}
-                </button>}
-              </>
-            )}
-            {readyFile && (preSiteShared || preSiteFinal) && (
-              <a href={readyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
-                Open writeup in Word
+  // Stepper state, derived only from the facts the actions already use so the
+  // steps, the stage sentence and the buttons cannot disagree.
+  const reviewActive = movedToFinal || finalReview?.phase === 'leadership-review';
+  const currentStep = reviewActive || preSiteFinal ? 'review' : due ? 'writeup' : everSent ? 'presentation' : 'briefing';
+  const stepDone = { briefing: everSent, presentation: due, writeup: reviewActive, review: false };
+  const stepStatus = (key) => (key === currentStep ? 'current' : stepDone[key] ? 'done' : 'upcoming');
+  const briefStatus = stepStatus('briefing');
+  const writeupStatus = stepStatus('writeup');
+  const stageChip = reviewActive
+    ? { label: finalReview?.phase === 'leadership-review' ? 'Leadership review' : 'Group review', tone: 'violet', Icon: Users }
+    : phase === 'Needs attention' ? { label: 'Needs attention', tone: 'amber', Icon: TriangleAlert }
+      : due ? { label: 'After presentation', tone: 'blue', Icon: PenLine }
+        : timing?.endIso ? { label: 'Before presentation', tone: 'gray', Icon: CalendarClock }
+          : { label: 'Not scheduled', tone: 'amber', Icon: CalendarX2 };
+  // The specific reason behind "Needs attention", in the list's wording.
+  const attentionReason = phase !== 'Needs attention' ? null
+    : timing?.availability === 'ambiguous' ? 'More than one presentation is scheduled for this request, so the time can’t be confirmed.'
+      : timing?.availability === 'unavailable' ? 'The system couldn’t confirm the presentation time. Reload the page; if this continues, contact an administrator.'
+        : preparationState === 'blocked' ? 'Automatic writeup preparation stopped before it finished.'
+          : preSiteFinal ? 'The writeup is marked final but hasn’t been through group review. Contact an administrator.'
+            : due && preparationState === 'prepared' ? 'The writeup was prepared but isn’t ready to edit yet. Reload the page; if this continues, contact an administrator.'
+              : null;
+  const briefSummary = everSent
+    ? latestSentAt
+      ? `Shared ${formatWhen(latestSentAt)}${latestSentRecipients ? ` to ${latestSentRecipients} ${latestSentRecipients === 1 ? 'person' : 'people'}` : ''}`
+      : 'Shared'
+    : briefShared ? 'Ready to share'
+      : briefGenerating || briefPendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING ? 'Generating…'
+        : briefDraftReady ? 'Draft ready to check'
+          : briefReadyFile ? 'Draft available' : 'Not generated yet';
+  const writeupSummary = reviewActive ? 'Moved to group review'
+    : preSiteShared || preSiteFinal ? 'Locked for review'
+      : correctionDraft ? 'Corrections in progress'
+        : generating || pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING ? 'Preparing…'
+          : readyFile && preSiteDraftReady ? `Draft ready${warnings?.length ? ` · ${warnings.length} ${warnings.length === 1 ? 'thing' : 'things'} to check` : ''}`
+            : due ? 'Not prepared yet' : 'Optional before the presentation';
+  const summaryClass = 'mt-0.5 text-sm text-gray-600';
+
+  const briefingStep = (
+    <Step
+      id="deliberations-briefing"
+      number={1}
+      title="Pre-site briefing"
+      status={briefStatus}
+      summary={<p className={summaryClass}>{briefSummary}</p>}
+      actions={(
+        <>
+          {!briefReadyFile && !briefShared && (
+            <button
+              type="button"
+              onClick={generateBrief}
+              disabled={briefGenerating || !requestId || briefUnchangedRetryBlocked}
+              className={primaryClass}
+            >
+              {briefGenerating ? 'Generating…' : 'Generate Brief'}
+            </button>
+          )}
+          {briefReadyFile && briefDraftReady && (
+            <>
+              <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
+                Edit briefing in Word
               </a>
-            )}
-            {due && editingReady && onSelectTab && (
-              <button type="button" onClick={() => onSelectTab('final-writeup')} className={secondaryClass}>
-                Open group-review details
-              </button>
-            )}
-            {preSiteMoreItems.length > 0 && <OverflowMenu label="More writeup actions" items={preSiteMoreItems} />}
-          </div>
-        </div>
-        {(preSiteShared || preSiteFinal) && !readyFile && (
-          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-            <h3 className="font-semibold">Pre-Site Visit Writeup is read-only</h3>
+              {/* Codex adversarial review (2026-09-17, round 4): suppressed
+                  while a regeneration is pending — see briefRegenerationPending
+                  above and the amber note that replaces this affordance. */}
+              {!briefRegenerationPending && (
+                <button
+                  type="button"
+                  onClick={openComposer}
+                  disabled={briefGenerating || briefShareBlocked}
+                  title={briefShareBlocked ? briefShareBlockedReason : undefined}
+                  className={secondaryClass}
+                >
+                  Share…
+                </button>
+              )}
+            </>
+          )}
+          {briefReadyFile && briefShared && !everSent && (
+            <>
+              {!briefRegenerationPending && (
+                <button
+                  type="button"
+                  onClick={openComposer}
+                  disabled={briefShareBlocked}
+                  title={briefShareBlocked ? briefShareBlockedReason : undefined}
+                  className={primaryClass}
+                >
+                  {latestSendFailure ? 'Resend' : 'Share…'}
+                </button>
+              )}
+              <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={secondaryClass}>
+                Open briefing in Word
+              </a>
+            </>
+          )}
+          {briefReadyFile && briefShared && everSent && (
+            <>
+              <a href={briefReadyFile.webUrl} target="_blank" rel="noopener noreferrer" className={secondaryClass}>
+                Open briefing in Word
+              </a>
+              {latestSendFailure && !briefRegenerationPending && (
+                <button type="button" onClick={openComposer} className={secondaryClass}>
+                  Resend
+                </button>
+              )}
+            </>
+          )}
+          {briefMoreItems.length > 0 && <OverflowMenu label="More brief actions" items={briefMoreItems} />}
+        </>
+      )}
+    >
+      {briefShareBlocked && !briefRegenerationPending && briefReadyFile && (briefDraftReady || (briefShared && !everSent)) && (
+        <p className="mt-1 text-xs text-gray-600">{briefShareBlockedReason}</p>
+      )}
+      {briefError && (
+        <p className="mt-2 text-sm text-red-800" role="alert">{briefError}</p>
+      )}
+      <div aria-live="polite">
+        {checkingBriefStatus && !briefArtifact && !briefPendingArtifact && (
+          <p className="mt-2 text-sm text-gray-600">Checking for an existing brief…</p>
+        )}
+        {briefRegenerationPending && briefReadyFile && (
+          <p className="mt-2 text-sm text-amber-800">
+            A new brief is being generated; sharing is paused until it is ready. The
+            current link stays available until it finishes.
+          </p>
+        )}
+        {briefUnchangedRetryBlocked && (
+          <p className="mt-2 text-sm text-amber-900">
+            This attempt needs a prompt or application change before it can be retried.
+          </p>
+        )}
+        {briefReadyFile && briefStatus !== 'done' && (
+          <div className="mt-2 text-sm text-gray-700">
+            <p className="text-gray-600">A concise summary to circulate before the presentation.</p>
             <p className="mt-1">
-              No current Word link was returned for this record, so working controls are not
-              available. Reload to retry, or contact an administrator if this persists.
+              {briefShared ? 'Working document:' : 'Latest draft:'}{' '}
+              <span title={briefReadyFile.name || undefined}>
+                {briefShared
+                  ? 'Briefing in Word'
+                  : briefReadyFile.lastModified
+                    ? `Briefing draft · generated ${new Date(briefReadyFile.lastModified).toLocaleDateString()}`
+                    : 'Briefing draft'}
+              </span>
             </p>
+            <FileDetails file={briefReadyFile} />
+            <Warnings warnings={briefWarnings} label={briefShared ? 'Working document needs a quick edit check' : 'Draft needs a quick edit check'} />
           </div>
         )}
-      </Card></div>
+      </div>
+      {briefShared && !briefReadyFile && (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <h4 className="font-semibold">Pre-Research Presentation Brief is read-only</h4>
+          <p className="mt-1">
+            No current Word link was returned for this record, so working controls are not
+            available. Reload to retry, or contact an administrator if this persists.
+          </p>
+        </div>
+      )}
+    </Step>
+  );
+
+  const presentationStep = (
+    <Step
+      number={2}
+      title="Presentation"
+      status={stepStatus('presentation')}
+      summary={<p className={summaryClass} data-testid="deliberations-visit-line">{timingLabel}</p>}
+    >
+      {materialsLine && <p className="mt-0.5 text-sm text-gray-600" data-testid="deliberations-materials-line">{materialsLine}</p>}
+    </Step>
+  );
+
+  const writeupStep = (
+    <Step
+      id="deliberations-writeup"
+      number={3}
+      title="Working writeup"
+      status={writeupStatus}
+      summary={<p className={summaryClass}>{writeupSummary}</p>}
+      actions={(
+        <>
+          {(!due || ['disabled', 'blocked', 'none'].includes(preparationState)) && !readyFile && !preSiteShared && !preSiteFinal && (
+            <button
+              type="button"
+              onClick={generate}
+              disabled={generating || !requestId || unchangedRetryBlocked}
+              className={due ? primaryClass : secondaryClass}
+            >
+              {generating ? 'Preparing…' : 'Prepare working draft'}
+            </button>
+          )}
+          {readyFile && preSiteDraftReady && (
+            <>
+              <a href={readyFile.webUrl} target="_blank" rel="noopener noreferrer" className={due || correctionDraft ? primaryClass : secondaryClass}>
+                Edit writeup in Word
+              </a>
+              {!correctionDraft && due && timing?.availability === 'available' && preparationState === 'disabled' && <button type="button" onClick={startSiteVisitAction} disabled={startingSiteVisit || generating} className={secondaryClass}>
+                {startingSiteVisit ? 'Preparing…' : 'Prepare for post-visit editing'}
+              </button>}
+              {correctionDraft && <button type="button" onClick={startSiteVisitAction} disabled={startingSiteVisit || generating} className={secondaryClass}>
+                {startingSiteVisit ? 'Finishing…' : 'Finish corrections'}
+              </button>}
+            </>
+          )}
+          {readyFile && (preSiteShared || preSiteFinal) && (
+            <a href={readyFile.webUrl} target="_blank" rel="noopener noreferrer" className={writeupStatus === 'current' ? primaryClass : secondaryClass}>
+              Open writeup in Word
+            </a>
+          )}
+          {preSiteMoreItems.length > 0 && <OverflowMenu label="More writeup actions" items={preSiteMoreItems} />}
+        </>
+      )}
+    >
+      {error && (
+        <p className="mt-2 text-sm text-red-800" role="alert">{error}</p>
+      )}
+      <div aria-live="polite">
+        {checkingStatus && !artifact && !pendingArtifact && (
+          <p className="mt-2 text-sm text-gray-600">Checking for an existing writeup draft…</p>
+        )}
+        {pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING && readyFile && (
+          <p className="mt-2 text-sm text-amber-800">
+            A new draft is being generated. The current Word link stays available until it finishes.
+          </p>
+        )}
+        {unchangedRetryBlocked && (
+          <p className="mt-2 text-sm text-amber-900">
+            This attempt needs a prompt or application change before it can be retried.
+          </p>
+        )}
+        {readyFile && writeupStatus !== 'done' && (
+          <div className="mt-2 text-sm text-gray-700">
+            <p className="text-gray-600">The fuller editable document for presentation findings. Your edits stay in this Word file.</p>
+            <p className="mt-1">
+              {preSiteShared || preSiteFinal ? 'Working document:' : 'Latest draft:'}{' '}
+              <span title={readyFile.name || undefined}>
+                {preSiteShared || preSiteFinal
+                  ? 'Working writeup in Word'
+                  : readyFile.lastModified
+                    ? `Working writeup draft · generated ${new Date(readyFile.lastModified).toLocaleDateString()}`
+                    : 'Working writeup draft'}
+              </span>
+            </p>
+            <FileDetails file={readyFile} />
+            <Warnings warnings={warnings} label={preSiteShared || preSiteFinal ? 'Working document needs a quick edit check' : 'Draft needs a quick edit check'} />
+          </div>
+        )}
+        {due && !preSiteShared && !preSiteFinal && (
+          <p className="mt-2 text-xs font-medium text-amber-800" data-testid="final-writeup-prerequisite">
+            {preparationState === 'disabled'
+              ? readyFile
+                ? preSiteDraftReady && !correctionDraft && timing?.availability === 'available'
+                  ? 'Automatic preparation is off. Prepare for post-visit editing keeps this Word file and records its current version; it does not start review or send email.'
+                  : 'Automatic preparation is off. Your existing Word file is unchanged.'
+                : unchangedRetryBlocked
+                  ? 'Automatic preparation is off. Draft preparation needs attention; see the message above before trying again.'
+                  : 'Automatic preparation is off. Use Prepare working draft to create the writeup; this does not start review or send email.'
+              : preparationState === 'due'
+                ? 'Waiting for automatic preparation. No preparation action is needed from you yet; group review starts only when you choose.'
+              : preparationState === 'pending'
+                ? 'This request is queued for automatic preparation. Group review starts only when you choose.'
+                : preparationState === 'running' || pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING
+                  ? 'The working writeup is being prepared. Group review starts only when you choose.'
+                  : 'The scheduled presentation end has passed. The working writeup is not ready yet.'}
+          </p>
+        )}
+      </div>
+      {(preSiteShared || preSiteFinal) && !readyFile && (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <h4 className="font-semibold">Pre-Site Visit Writeup is read-only</h4>
+          <p className="mt-1">
+            No current Word link was returned for this record, so working controls are not
+            available. Reload to retry, or contact an administrator if this persists.
+          </p>
+        </div>
+      )}
+    </Step>
+  );
+
+  const reviewStep = (
+    <Step
+      number={4}
+      title="Group review"
+      status={stepStatus('review')}
+      summary={<p className={summaryClass}>{reviewActive ? 'In review in Final writeup' : 'Starts in Final writeup when the writeup is ready'}</p>}
+      actions={due && editingReady && onSelectTab ? (
+        <button type="button" onClick={() => onSelectTab('final-writeup')} className={secondaryClass}>
+          Open group-review details
+        </button>
+      ) : null}
+    >
+      <p className="mt-0.5 text-sm text-gray-600" data-testid="deliberations-session-line">
+        {sessionLine(session)}
+        {' · '}
+        <Link href="/meeting-tracker" className="font-medium text-blue-700 underline-offset-4 hover:underline">Meeting Tracker</Link>
+      </p>
+    </Step>
   );
 
   return (
@@ -1358,33 +1481,37 @@ export default function StaffDeliberationsTab({
           {briefRecoveryMessage}
         </div>
       )}
-      <div id="deliberations-status" className="scroll-mt-6"><Card hover={false}>
+      <div id="deliberations-status" className="scroll-mt-6"><Card hover={false} padding="p-5 sm:p-6">
+        <h2 className="sr-only">Staff Deliberations status</h2>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-gray-900">Staff Deliberations</h2>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${STAGE_TONES[stageChip.tone]}`}>
+                <stageChip.Icon aria-hidden="true" className="h-3.5 w-3.5" />
+                {stageChip.label}
+              </span>
+              <span className="text-sm tabular-nums text-gray-600">{timingLabel}</span>
+            </div>
             {stageFetchFailed && (
               <p className="mt-2 max-w-2xl text-sm text-red-800" data-testid="deliberations-stage-error">
                 The deliberation stage could not be determined: {briefError}
               </p>
             )}
-            <p className="mt-2 font-medium text-gray-900" data-testid="deliberations-stage-sentence">{phase}</p>
-            <p className="mt-1 text-sm text-gray-600" data-testid="deliberations-visit-line">{timingLabel}</p>
-            <p className="mt-1 text-sm text-gray-600" data-testid="deliberations-session-line">{deliberationSessionLine(session)}</p>
-            {materialsLine && <p className="mt-1 text-sm text-gray-600" data-testid="deliberations-materials-line">{materialsLine}</p>}
-            <p className="mt-3 max-w-2xl text-sm text-gray-700">
-              {preSiteFinal ? 'Continue the colleague and leadership review workflow in Final Writeup.'
-                : due ? 'Add presentation findings to the working writeup. This continues the same document; start group review only when it is ready.'
-                  : 'The pre-site briefing is for circulation before the presentation. The fuller working writeup is optional now and continues afterward.'}
-            </p>
+            <p className="mt-2 text-base font-medium text-gray-900" data-testid="deliberations-stage-sentence">{phase}</p>
+            {attentionReason && (
+              <p className="mt-1 flex max-w-2xl gap-1.5 text-sm text-amber-800">
+                <TriangleAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{attentionReason}</span>
+              </p>
+            )}
             {preparationReadError && <p role="alert" className="mt-2 text-sm text-amber-800">{preparationReadError}</p>}
             {preparationState === 'blocked' && <div className="mt-3 text-sm text-amber-800">
               <p>Automatic preparation needs attention. Your existing document has been preserved.</p>
-              <button type="button" onClick={retryPreparation} disabled={retryingPreparation} className={secondaryClass}>
+              <button type="button" onClick={retryPreparation} disabled={retryingPreparation} className={`mt-2 ${secondaryClass}`}>
                 {retryingPreparation ? 'Retrying…' : 'Retry preparation'}
               </button>
             </div>}
             {briefShared && latestSendFailure && <p className="mt-2 text-sm text-red-700" role="alert" data-testid="deliberations-send-failure">The last send failed: {latestSendFailure.message}</p>}
-
           </div>
           {movedToFinal && onSelectTab && (
             <button type="button" onClick={() => onSelectTab('final-writeup')} className={primaryClass}>
@@ -1412,6 +1539,15 @@ export default function StaffDeliberationsTab({
         )}
       </Card></div>
 
+      <Card hover={false} padding="p-0">
+        <ol aria-label="Staff deliberations steps" className="divide-y divide-gray-200">
+          {briefingStep}
+          {presentationStep}
+          {writeupStep}
+          {reviewStep}
+        </ol>
+      </Card>
+
       {siteVisitContext?.presentationMaterialsStatus === 'loaded' && (
         <ResearchPresentationFollowUp
           status="loaded"
@@ -1419,8 +1555,6 @@ export default function StaffDeliberationsTab({
           summary={siteVisitContext.presentationSummary || null}
         />
       )}
-
-      {due ? [writeupCard, briefingCard] : [briefingCard, writeupCard]}
 
       {showDistributionPanel && (
         <PreSiteDistributionPanel

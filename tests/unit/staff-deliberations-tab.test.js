@@ -540,10 +540,10 @@ test('Pre-RP brief card shows "generated <date>" for a draft with a lastModified
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  const link = await screen.findByRole('link', {
-    name: `Briefing draft · generated ${new Date('2026-09-10T12:00:00Z').toLocaleDateString()}`,
-  });
-  expect(link).toHaveAttribute('href', 'https://sharepoint.test/brief.docx');
+  // The label is text; the step's single Word action links the file.
+  expect(await screen.findByText(`Briefing draft · generated ${new Date('2026-09-10T12:00:00Z').toLocaleDateString()}`)).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Edit briefing in Word' })).toHaveAttribute('href', 'https://sharepoint.test/brief.docx');
+  expect(screen.getAllByRole('link').filter((link) => link.getAttribute('href') === 'https://sharepoint.test/brief.docx')).toHaveLength(1);
 });
 
 test('Pre-RP brief card shows plain "Word draft" when lastModified is absent', async () => {
@@ -552,8 +552,8 @@ test('Pre-RP brief card shows plain "Word draft" when lastModified is absent', a
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  const link = await screen.findByRole('link', { name: 'Briefing draft' });
-  expect(link).toHaveAttribute('href', 'https://sharepoint.test/brief.docx');
+  expect(await screen.findByText('Briefing draft')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Edit briefing in Word' })).toHaveAttribute('href', 'https://sharepoint.test/brief.docx');
 });
 
 test('H3b/B12/NEW-1: Regenerate Brief is offered while the brief is shared but not yet sent, with replacement copy', async () => {
@@ -1460,4 +1460,18 @@ test('an unknown hash does not scroll', async () => {
     Element.prototype.scrollIntoView = original;
     window.history.replaceState(null, '', '/');
   }
+});
+
+test('stepper: a sent briefing collapses to its share summary and keeps Open in Word; the writeup is current after the presentation', async () => {
+  distributionHistoryFeed = {
+    attempts: [{ operationId: 'op-2', transportAccepted: true, createdAt: '2026-09-12T17:00:00Z', to: ['a@x.org', 'b@x.org'], cc: ['c@x.org'] }],
+    currentSourceEverSent: true,
+  };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByText(/^Shared .* to 3 people$/)).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Open briefing in Word' })).toBeInTheDocument();
+  expect(screen.queryByText('A concise summary to circulate before the presentation.')).not.toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /Pre-site briefing \(done\)/ })).toBeInTheDocument();
+  expect(screen.getByRole('list', { name: 'Staff deliberations steps' }).querySelectorAll(':scope > li')).toHaveLength(4);
 });
