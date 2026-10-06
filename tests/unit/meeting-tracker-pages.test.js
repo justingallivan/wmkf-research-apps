@@ -553,6 +553,7 @@ describe('SessionEditor optimistic reorder', () => {
     const mocks = mockFetch({ reorder: () => new Promise((resolve) => { resolveReorder = resolve; }) });
     const { container } = render(<SessionEditor />);
     await waitFor(() => expect(headers(container)).toEqual(['Position 1 · #A', 'Position 2 · #B', 'Position 3 · #C']));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit proposal order' }));
 
     drag(container, 2, 0, 5);
     // Discriminating: the PATCH is still pending, and the DOM already shows the new order.
@@ -571,12 +572,30 @@ describe('SessionEditor optimistic reorder', () => {
     mockFetch({ reorder: async () => ({ ok: false, status: 409, json: async () => ({ error: 'The session order changed.' }) }) });
     const { container } = render(<SessionEditor />);
     await waitFor(() => expect(headers(container)).toEqual(['Position 1 · #A', 'Position 2 · #B', 'Position 3 · #C']));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit proposal order' }));
 
     drag(container, 2, 0, 5);
     expect(headers(container)).toEqual(['Position 1 · #C', 'Position 2 · #A', 'Position 3 · #B']);
 
     await screen.findByText(/The session order changed\. Please try again\./);
     expect(headers(container)).toEqual(['Position 1 · #A', 'Position 2 · #B', 'Position 3 · #C']);
+  });
+
+  test('proposal order opens read-only; Edit proposal order shows the controls and Done hides them', async () => {
+    mockFetch({});
+    const { container } = render(<SessionEditor />);
+    await waitFor(() => expect(headers(container)).toEqual(['Position 1 · #A', 'Position 2 · #B', 'Position 3 · #C']));
+    expect(container.querySelectorAll('[title="Drag to reorder"]')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /More actions for #/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Proposal to add' })).not.toBeInTheDocument();
+    expect(container.querySelector('ol[aria-label="Proposal order"] input[type="number"]')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit proposal order' }));
+    expect(container.querySelectorAll('[title="Drag to reorder"]')).toHaveLength(3);
+    expect(screen.getByRole('combobox', { name: 'Proposal to add' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(container.querySelectorAll('[title="Drag to reorder"]')).toHaveLength(0);
   });
 });
 

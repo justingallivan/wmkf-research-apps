@@ -137,7 +137,7 @@ function sessionForm(session) {
   };
 }
 
-function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onChange, onMove, onRemove, onPositionChange, index, count, isDragging, dropEdge, onDragStart, onDragOver, onDrop, onDragEnd }) {
+function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onChange, onMove, onRemove, onPositionChange, index, count, isDragging, dropEdge, onDragStart, onDragOver, onDrop, onDragEnd, readOnly = false }) {
   const [minutes, setMinutes] = useState(slot.wmkf_minutes || 15);
   const [targetSessionId, setTargetSessionId] = useState('');
   const [panel, setPanel] = useState(null); // 'move' | 'remove' | null
@@ -153,7 +153,7 @@ function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onCh
       {dropEdge && (
         <span aria-hidden="true" className={`pointer-events-none absolute inset-x-0 z-10 h-1 bg-blue-600 ${dropEdge === 'top' ? 'top-0' : 'bottom-0'}`} />
       )}
-      <div
+      {!readOnly && <div
         aria-hidden="true"
         title="Drag to reorder"
         draggable={!busy}
@@ -165,11 +165,13 @@ function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onCh
           <circle cx="6" cy="4" r="1.3" /><circle cx="6" cy="10" r="1.3" /><circle cx="6" cy="16" r="1.3" />
           <circle cx="14" cy="4" r="1.3" /><circle cx="14" cy="10" r="1.3" /><circle cx="14" cy="16" r="1.3" />
         </svg>
-      </div>
+      </div>}
       <div className="min-w-0 flex-1 p-4">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <p className="flex min-w-0 items-center gap-2 font-semibold leading-9 text-gray-900"><span className="sr-only">Position </span><span className="tabular-nums text-gray-500">{index + 1}</span><span aria-hidden="true" className="text-gray-400"> · </span>#{requestNumber}<TestRequestBadge isTestRequest={proposal?.isTestRequest} /></p>
-          <div className="flex items-center gap-3">
+          {readOnly ? (
+            <p className="text-sm tabular-nums text-gray-700">{slot.wmkf_minutes || 15} minutes</p>
+          ) : <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
               Minutes
               <input type="number" min="1" max="1440" disabled={busy} value={minutes} onChange={(event) => setMinutes(event.target.value)} onBlur={() => Number(minutes) !== Number(slot.wmkf_minutes) && onChange(slot, { minutes: Number(minutes) })} className="h-9 w-20 rounded-lg border border-gray-300 bg-white px-2 text-sm tabular-nums text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50" />
@@ -183,7 +185,7 @@ function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onCh
                 { key: 'remove', label: 'Remove…', onSelect: () => setPanel('remove') },
               ]}
             />
-          </div>
+          </div>}
         </div>
         <p className="mt-1 text-sm text-gray-700">{proposal?.title || slot.wmkf_Request?.akoya_title || 'Request details are not available.'}</p>
         {(slot.institution || proposal?.institution) && <p className="mt-0.5 text-sm text-gray-600">{slot.institution || proposal.institution}</p>}
@@ -193,7 +195,7 @@ function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onCh
         ) : (
           <p className="mt-2 text-xs font-medium text-gray-500">{slotBriefingText(slot)}</p>
         )}
-      {panel === 'position' && (
+      {!readOnly && panel === 'position' && (
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
           <label className="text-sm font-medium text-gray-700">
             Position in this session
@@ -216,7 +218,7 @@ function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onCh
           </div>
         </div>
       )}
-      {panel === 'move' && (
+      {!readOnly && panel === 'move' && (
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
           <label className="text-sm font-medium text-gray-700">
             Move to another session
@@ -231,7 +233,7 @@ function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onCh
           </div>
         </div>
       )}
-      {panel === 'remove' && (
+      {!readOnly && panel === 'remove' && (
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
           <p className="text-sm text-gray-800">{`Remove #${requestNumber} from this session? Its minutes and lead assignment will be lost.`}</p>
           <div className="mt-3 flex gap-2">
@@ -245,7 +247,7 @@ function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onCh
   );
 }
 
-export function ProposalOrderList({ slots, proposalById, sessions, sessionId, busy, savingSlotId, onChange, onMove, onRemove, onReorder }) {
+export function ProposalOrderList({ slots, proposalById, sessions, sessionId, busy, savingSlotId, onChange, onMove, onRemove, onReorder, readOnly = false }) {
   const [draggingIndex, setDraggingIndex] = useState(null);
   const [overIndex, setOverIndex] = useState(null);
   const [overEdge, setOverEdge] = useState(null);
@@ -300,7 +302,7 @@ export function ProposalOrderList({ slots, proposalById, sessions, sessionId, bu
 
   return (
     <>
-      <p className="sr-only">Drag a proposal by the handle on its left edge, or open its More actions menu and choose Change position, to reorder. Choosing a position saves immediately.</p>
+      {!readOnly && <p className="sr-only">Drag a proposal by the handle on its left edge, or open its More actions menu and choose Change position, to reorder. Choosing a position saves immediately.</p>}
       <ol aria-label="Proposal order" className="mt-4 space-y-3" onKeyDown={handleKeyDown}>
         {slots.map((slot, index) => (
           <SlotRow
@@ -323,6 +325,7 @@ export function ProposalOrderList({ slots, proposalById, sessions, sessionId, bu
             onDragOver={handleDragOver(index)}
             onDrop={handleDrop(index)}
             onDragEnd={resetDrag}
+            readOnly={readOnly}
           />
         ))}
       </ol>
@@ -354,6 +357,10 @@ export default function SessionEditor() {
   // session id so moving to another session starts read-only again.
   const [editingFor, setEditingFor] = useState(null);
   const editing = Boolean(sessionId) && editingFor === sessionId;
+  // Proposal order opens read-only too (Read-First rule); each change in edit
+  // mode still saves immediately, so Done only leaves edit mode.
+  const [orderEditingFor, setOrderEditingFor] = useState(null);
+  const orderEditing = Boolean(sessionId) && orderEditingFor === sessionId;
 
   const loadDetail = useCallback(async (id) => {
     const { ok, data: body } = await readJson(`/api/meeting-tracker/sessions/${id}`);
@@ -573,8 +580,11 @@ export default function SessionEditor() {
         <section className="mt-8">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><h2 className="text-xl font-semibold text-gray-900">Proposal order</h2><p className="mt-1 text-sm text-gray-600">{slotMinutes} discussion minutes across {slots.length} proposal{slots.length === 1 ? '' : 's'}.</p></div>
-            <div className="flex min-w-[18rem] gap-2"><select aria-label="Proposal to add" value={selectedRequestId} onChange={(event) => setSelectedRequestId(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2"><option value="">Choose a proposal</option>{proposals.filter((proposal) => !slots.some((slot) => String(slot._wmkf_request_value).toLowerCase() === String(proposal.requestId).toLowerCase())).map((proposal) => <option key={proposal.requestId} value={proposal.requestId}>{proposal.isTestRequest ? 'TEST · ' : ''}#{proposal.requestNumber} · {proposal.title}</option>)}</select><Button type="button" size="sm" disabled={!selectedRequestId || busy} onClick={addSlot}>Add</Button></div>
+            {!orderEditing ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setOrderEditingFor(sessionId)}>Edit proposal order</Button>
+            ) : <div className="flex min-w-[18rem] gap-2"><select aria-label="Proposal to add" value={selectedRequestId} onChange={(event) => setSelectedRequestId(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2"><option value="">Choose a proposal</option>{proposals.filter((proposal) => !slots.some((slot) => String(slot._wmkf_request_value).toLowerCase() === String(proposal.requestId).toLowerCase())).map((proposal) => <option key={proposal.requestId} value={proposal.requestId}>{proposal.isTestRequest ? 'TEST · ' : ''}#{proposal.requestNumber} · {proposal.title}</option>)}</select><Button type="button" size="sm" disabled={!selectedRequestId || busy} onClick={addSlot}>Add</Button><Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => setOrderEditingFor(null)}>Done</Button></div>}
           </div>
+          {orderEditing && <p className="mt-2 text-xs text-gray-500">Changes to the order, minutes, and proposals save as you make them.</p>}
           {slots.length ? (
             <ProposalOrderList
               slots={slots}
@@ -587,6 +597,7 @@ export default function SessionEditor() {
               onMove={(row, targetSessionId) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'PATCH', { etag: row._etag, targetSessionId }), row.wmkf_deliberationslotid)}
               onRemove={(row) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'DELETE', { etag: row._etag }), row.wmkf_deliberationslotid)}
               onReorder={reorderSlots}
+              readOnly={!orderEditing}
             />
           ) : <div className="mt-4 rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-600">No proposals are in this session yet.</div>}
         </section>
