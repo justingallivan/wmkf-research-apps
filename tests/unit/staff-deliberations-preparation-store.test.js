@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { claimNextPreparation, upsertDuePreparation } from '../../lib/services/pre-site-visit/preparation-store.js';
+import { claimNextPreparation, listPreparationsForSchedules, upsertDuePreparation } from '../../lib/services/pre-site-visit/preparation-store.js';
 
 it('keeps a blocked receipt blocked until its source schedule revision changes', async () => {
   let statement = '';
@@ -85,4 +85,24 @@ it('rejects an invalid scoped request ID instead of falling through to a global 
   const client = { query: jest.fn(async () => ({ rows: [] })) };
   await expect(claimNextPreparation({ requestId: null }, client)).rejects.toThrow('Scoped receipt claim requires a valid request GUID');
   expect(client.query).not.toHaveBeenCalled();
+});
+
+it('marks only worker-performed preparation operations as automatic on the detail projection', async () => {
+  const base = {
+    state: 'prepared', site_visit_id: 'cccccccc-0000-4000-8000-000000000001', scheduled_end: '2026-12-01T18:00:00Z',
+    document_id: 'dddddddd-0000-4000-8000-000000000001', attempt_count: 1, prepared_at: '2026-12-01T18:05:00Z', updated_at: '2026-12-01T18:05:00Z',
+  };
+  const rows = [
+    { ...base, request_id: 'aaaaaaaa-0000-4000-8000-000000000001', provenance: { operation: 'scheduled-end-preparation' } },
+    { ...base, request_id: 'aaaaaaaa-0000-4000-8000-000000000002', provenance: { operation: 'reconciled-complete-handoff' } },
+    { ...base, request_id: 'aaaaaaaa-0000-4000-8000-000000000003', provenance: {} },
+    { ...base, request_id: 'aaaaaaaa-0000-4000-8000-000000000004', provenance: { operation: 'factory-test-one-shot-preparation' } },
+  ];
+  let statement = '';
+  const client = { query: jest.fn(async (sql) => { statement = sql; return { rows }; }) };
+  const map = await listPreparationsForSchedules(rows.map((row) => ({
+    requestId: row.request_id, siteVisitId: row.site_visit_id, scheduledEnd: row.scheduled_end,
+  })), client);
+  expect(statement).toContain('receipt.provenance');
+  expect([...map.values()].map((receipt) => receipt.preparedByAutomation)).toEqual([true, false, false, true]);
 });

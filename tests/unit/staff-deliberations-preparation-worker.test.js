@@ -634,3 +634,45 @@ describe('excluded request numbers', () => {
     expect(projection.preparation).toMatchObject({ due: true, state: 'unavailable' });
   });
 });
+
+describe('automatic preparation attribution', () => {
+  const draft = { artifactId: DOC, lifecycleState: L.DRAFT, operationStatus: O.READY, file: { itemId: 'same-word-item' } };
+
+  it('records a reused promotion as a reconciled handoff, not automatic preparation', async () => {
+    const { dependencies } = harness({ currentArtifact: draft });
+    dependencies.promote.mockResolvedValue({ artifact: { artifactId: DOC, lifecycleState: L.REVIEW }, reused: true });
+    await drainStaffDeliberationsPreparations(dependencies);
+    expect(dependencies.finishReceipt).toHaveBeenCalledWith(expect.any(String), expect.any(String), expect.objectContaining({
+      state: 'prepared', provenance: expect.objectContaining({ operation: 'reconciled-complete-handoff' }),
+    }));
+  });
+
+  it('records a fresh promotion as scheduled-end preparation', async () => {
+    const { dependencies } = harness({ currentArtifact: draft });
+    dependencies.promote.mockResolvedValue({ artifact: { artifactId: DOC, lifecycleState: L.REVIEW }, reused: false });
+    await drainStaffDeliberationsPreparations(dependencies);
+    expect(dependencies.finishReceipt).toHaveBeenCalledWith(expect.any(String), expect.any(String), expect.objectContaining({
+      state: 'prepared', provenance: expect.objectContaining({ operation: 'scheduled-end-preparation' }),
+    }));
+  });
+
+  const receiptFor = (overrides) => new Map([[REQUEST, {
+    state: 'prepared', siteVisitId: VISIT, scheduledEndIso: END, documentId: DOC,
+    attemptCount: 1, preparedAtIso: '2026-12-01T18:05:00.000Z', preparedByAutomation: true, ...overrides,
+  }]]);
+
+  it('exposes automatic preparation only for a prepared receipt bound to the current document', async () => {
+    const { dependencies } = harness({ currentArtifact: { artifactId: DOC, lifecycleState: L.REVIEW } });
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptFor({}));
+    expect((await getPreparationForRequest(REQUEST, dependencies)).preparation)
+      .toMatchObject({ state: 'prepared', preparedByAutomation: true, preparedAtIso: '2026-12-01T18:05:00.000Z' });
+
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptFor({ preparedByAutomation: false }));
+    expect((await getPreparationForRequest(REQUEST, dependencies)).preparation)
+      .toMatchObject({ preparedByAutomation: false });
+
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(receiptFor({ documentId: 'dddddddd-0000-4000-8000-000000000099' }));
+    expect((await getPreparationForRequest(REQUEST, dependencies)).preparation)
+      .toMatchObject({ preparedByAutomation: false, preparedAtIso: null });
+  });
+});
