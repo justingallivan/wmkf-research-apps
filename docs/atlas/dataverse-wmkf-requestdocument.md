@@ -370,8 +370,8 @@ Production Request Document row was created by this release smoke.
 - Applicant materials writer (`lib/services/site-visit-materials/contributor-service.js`
   `finalizeMaterialUpload`): the applicant contributor link writes Applicant
   Slides / Other Applicant Materials rows under `EXTERNAL_CONTRIBUTOR` (no
-  actor). **[SOURCE-BUILT 2026-10-05 on `feature/staff-materials-replacement`;
-  not deployed]** A coordinator can also upload a file the PI sent, through
+  actor). **[PRODUCTION-LIVE 2026-10-05; PR #441 merge `b4fa78819`;
+  owner-accepted on 1003222]** A coordinator can also upload a file the PI sent, through
   `.../materials/staff-upload-token` and `.../staff-finalize`. That path:
   - runs inline only;
   - may fill a waived slot;

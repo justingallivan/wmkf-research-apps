@@ -15,9 +15,10 @@ related:
 # Staff replacement upload for Site Visit applicant materials
 
 Drafted 2026-10-05 (Session 577) after Stage 2 acceptance on 1003222. Status:
-**SOURCE-BUILT on `feature/staff-materials-replacement`
-(2026-10-05), not merged or deployed; see §7.** This is Tier 1 runtime work:
-branch, PR, owner merge.
+**PRODUCTION-LIVE 2026-10-05** (PR #441 merged as `b4fa78819`; Production
+deployment `dpl_6kkxdv6oq8JLa4Xyx1T8SS5Szi1W`; migration 071 applied by the owner,
+1 applied, 70 skipped). Owner-accepted on 1003222; see §7. A row-layout fix
+followed in PR #443 (`d9a1cd81d`).
 
 ## 1. What the owner asked for (2026-10-05)
 
@@ -380,3 +381,21 @@ Branch `feature/staff-materials-replacement`, cut from `main` at `a93974cdf`.
   than half-fixing it. `apply-migrations.js` still applies every file after a
   fresh install.
 
+**Release and acceptance, 2026-10-05:**
+- The owner applied migration 071 to Production: 1 applied, 70 skipped,
+  71 total.
+- PR #441 merged as `b4fa78819` after all 12 checks passed. It had first been
+  re-merged with `main` (`967a09da6`) once PR #432 landed.
+  `applications.wmkeck.org` served `dpl_6kkxdv6oq8JLa4Xyx1T8SS5Szi1W`, the
+  deployment built from that merge.
+- On 1003222 the owner accepted:
+  - a staff upload on the closed collection;
+  - the slides-changed note after a post-071 summary, followed by a replaced
+    slide PDF;
+  - its clearing after a new Summarize and publish.
+- The owner reported that the card's row actions did not line up, getting
+  worse while a save was in progress. PR #443 (`d9a1cd81d`, deployment
+  `dpl_9BsPEuTeHR6s1F14QqNTXtqueSMa`) puts the actions in one fixed
+  right-hand column.
+- The owner also judged the visit page as a whole hard to use. That is out of
+  scope here; see the app-wide UX audit proposal in the Session 577 handoff.

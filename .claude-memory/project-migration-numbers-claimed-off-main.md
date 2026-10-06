@@ -1,6 +1,6 @@
 ---
 name: project-migration-numbers-claimed-off-main
-description: "Before picking a Postgres migration number, check shared Production `schema_migrations` and numbers claimed on unmerged branches. 055 and 070 were applied to Production before merging; as of 2026-10-05 067 is on main (PR #432), 071 is claimed off main (PR #441), and the next free number is 072."
+description: "Before picking a Postgres migration number, check shared Production `schema_migrations` and numbers claimed on unmerged branches. 055 and 070 were applied to Production before merging; as of 2026-10-05 main ends at 071 (067, 070 and 071 all applied before or at merge) and the next free number is 072."
 status: active
 last_verified: 2026-10-05 via lib/db/migrations on main (68 files, ends at 069) and a scan of every remote branch for 065-079
 metadata:
@@ -66,8 +66,8 @@ origin/main`, 2026-09-30]. The episode shows why "the next number after
   as 055. The owner's run reported 1 applied, 68 skipped from that branch's 69 files, so
   067 was not part of that run; whether Production holds 067 is [ASSUMED unknown].
   067 has since merged to `main` in PR #432 (2026-10-05); commit `81fcfae6c` records it as
-  applied to Production. 070 merged in PR #440. **071 is claimed** by `071_summary_draft_slides_identity.sql`
-  on `feature/staff-materials-replacement` (PR #441, not merged or applied as of
-  2026-10-05). The next free number is 072.
+  applied to Production. 070 merged in PR #440. 071 (`071_summary_draft_slides_identity.sql`) merged in
+  PR #441 and was applied before merge (owner run 2026-10-05: 1 applied, 70 skipped,
+  71 total). `main` now ends at 071; the next free number is 072.
 - Auto-mode permissions block Claude from running `apply-migrations.js` against
   the shared database even with owner authorization; the owner runs it with `!`.

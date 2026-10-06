@@ -300,7 +300,7 @@ The rehearsal added no table and did not itself enable Production processing.
   readback is summarized above; also exercised in disposable local PostgreSQL
   16 integration).
 - Store: `lib/services/transcription-pilot/store.js`.
-- Zoom VTT speaker alignment (branch-built 2026-10-04, not applied or deployed): `lib/db/migrations/065_transcription_zoom_transcript.sql`, `lib/services/transcription-pilot/zoom-vtt.js`, `lib/services/meeting-tracker-transcription/alignment-service.js`, and [Zoom VTT speaker mapping plan](../plans/ZOOM_VTT_SPEAKER_MAPPING_PLAN_2026-10-04.md).
+- Zoom VTT speaker alignment (merged; migration 065 is in Production `schema_migrations` [VERIFIED 2026-10-05 via the owner-run `apply-migrations.js` output, which skipped 065 as already applied]): `lib/db/migrations/065_transcription_zoom_transcript.sql`, `lib/services/transcription-pilot/zoom-vtt.js`, `lib/services/meeting-tracker-transcription/alignment-service.js`, and [Zoom VTT speaker mapping plan](../plans/ZOOM_VTT_SPEAKER_MAPPING_PLAN_2026-10-04.md).
 - Settled product and publication contract: [Meeting Tracker transcription plan](../plans/MEETING_TRACKER_TRANSCRIPTION_PLAN_2026-10-01.md).
 - Dedicated pilot deployment and isolated Neon evidence: [AssemblyAI transcription pilot Atlas](postgres-transcription-pilot.md).
 

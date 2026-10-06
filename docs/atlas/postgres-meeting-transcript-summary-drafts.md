@@ -27,11 +27,11 @@ Preview/Production database (1 applied, 68 skipped). PR #440 merged as
 `11ff96467` and is served by Production deployment `dpl_7Ci2zRWiMsWH5iZ5zoiBoR9JqnyD`. Stage 2 of the Site Visit summaries plan
 (§4.3, §6, §16).
 
-**[SOURCE-BUILT 2026-10-05 on `feature/staff-materials-replacement`; not applied
-or deployed.]** Migration 071 adds the slides-identity columns below
-(`docs/plans/STAFF_APPLICANT_MATERIALS_REPLACEMENT_PLAN_2026-10-05.md` §3.5).
-It must be applied before that branch merges, because the new insert writes
-these columns.
+**[PRODUCTION-LIVE 2026-10-05.]** Migration 071 adds the slides-identity
+columns below (`docs/plans/STAFF_APPLICANT_MATERIALS_REPLACEMENT_PLAN_2026-10-05.md`
+§3.5). The owner applied it to the shared Preview/Production database (1
+applied, 70 skipped). The code that writes and reads the columns shipped in
+PR #441 merge `b4fa78819`, deployment `dpl_6kkxdv6oq8JLa4Xyx1T8SS5Szi1W`.
 
 ## Ownership and contract
 
