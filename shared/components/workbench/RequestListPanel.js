@@ -329,7 +329,7 @@ export default function RequestListPanel({
             return (
               <li
                 key={p.requestId}
-                className="relative grid grid-cols-1 gap-x-6 gap-y-2 px-4 py-3 transition-colors hover:bg-gray-50 focus-within:bg-gray-50 md:grid-cols-[minmax(0,1fr)_10rem_16rem_9rem] md:items-center"
+                className="relative grid grid-cols-1 gap-x-6 gap-y-2 px-4 py-3 transition-colors hover:bg-gray-50 focus-within:bg-gray-50 lg:grid-cols-[minmax(14rem,1fr)_10rem_16rem_9rem] lg:items-center"
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -356,10 +356,10 @@ export default function RequestListPanel({
                   </div>
                   {people && <div className="mt-0.5 truncate text-xs text-gray-500">{people}</div>}
                 </div>
-                <div className="md:text-right">
+                <div className="lg:text-right">
                   <StageChip stage={p.workRemaining} />
                 </div>
-                <div className="md:[&>div]:items-end">
+                <div className="lg:[&>div]:items-end">
                   <ReviewerStatusIndicator reviewers={p.reviewers} />
                 </div>
                 <div>

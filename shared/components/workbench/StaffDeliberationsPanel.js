@@ -119,7 +119,7 @@ function RequestRow({ request }) {
     request.programDirector && `Lead PD: ${request.programDirector}`,
   ].filter(Boolean);
   return (
-    <li className="grid grid-cols-1 gap-x-6 gap-y-2 px-4 py-3 md:grid-cols-[minmax(0,1fr)_minmax(0,24rem)_17rem] md:items-center">
+    <li className="grid grid-cols-1 gap-x-6 gap-y-2 px-4 py-3 lg:grid-cols-[minmax(16rem,1fr)_minmax(0,22rem)_15rem] lg:items-center">
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-2">
           <h3 className="min-w-0 truncate text-sm font-semibold text-gray-900" title={request.title || undefined}>
@@ -138,7 +138,7 @@ function RequestRow({ request }) {
         <p className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${stageClass}`}>{step.stage || task.label}</p>
         <p className="mt-1 text-sm text-gray-700">{step.instruction}</p>
       </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 md:justify-end">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 lg:justify-end">
         {document && !step.detailsFirst ? (
           <a href={document.fact.file.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>{documentAction}</a>
         ) : (
