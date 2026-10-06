@@ -68,6 +68,59 @@ function sameRef(left, right) {
     && (left.kind === 'staff' ? left.profileId === right.profileId : left.rosterId === right.rosterId);
 }
 
+const SESSION_STATUS_LABEL = { 100000000: 'Planned', 100000001: 'Held', 100000002: 'Cancelled' };
+const SESSION_STATUS_CLASS = { 100000000: 'bg-blue-50 text-blue-800', 100000001: 'bg-green-50 text-green-800', 100000002: 'bg-gray-100 text-gray-700' };
+
+export function sessionWhen(session) {
+  const start = Date.parse(session?.scheduledStartIso || '');
+  const end = Date.parse(session?.scheduledEndIso || '');
+  if (!Number.isFinite(start)) return 'Not scheduled';
+  const zone = session.ianaTimeZone || undefined;
+  let label;
+  try {
+    label = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: zone, timeZoneName: 'short' }).format(new Date(start));
+  } catch {
+    label = new Date(start).toLocaleString();
+  }
+  const minutes = Number.isFinite(end) ? Math.round((end - start) / 60000) : null;
+  return minutes ? `${label} · ${minutes} minutes` : label;
+}
+
+function SessionSummary({ session, recipients, onEdit }) {
+  const people = [...(recipients.staff || []), ...(recipients.board || [])];
+  const names = (session.attendeeRefs || []).map((ref) => people.find((person) => sameRef(person.ref, ref))?.name || 'Person no longer in the directory');
+  let linkHost = null;
+  try { linkHost = session.meetingLink ? new URL(session.meetingLink).hostname : null; } catch { linkHost = null; }
+  const row = (label, value) => (
+    <div>
+      <dt className="text-sm font-medium text-gray-500">{label}</dt>
+      <dd className="mt-1 text-sm text-gray-900">{value}</dd>
+    </div>
+  );
+  return (
+    <section aria-labelledby="session-details-heading" className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="session-details-heading" className="text-base font-semibold text-gray-900">Session details</h2>
+        <Button type="button" variant="outline" size="sm" onClick={onEdit}>Edit session details</Button>
+      </div>
+      {session.attendeeIssues?.length > 0 && (
+        <ul className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="status">
+          {session.attendeeIssues.map((issue) => <li key={issue}>{issue} Saving attendees again replaces the saved list.</li>)}
+        </ul>
+      )}
+      <dl className="mt-4 grid gap-x-8 gap-y-4 md:grid-cols-2">
+        {row('When', sessionWhen(session))}
+        {row('Location', session.location || 'Not set')}
+        {row('Meeting link', session.meetingLink
+          ? <a href={session.meetingLink} target="_blank" rel="noopener noreferrer" className="font-medium text-gray-900 underline underline-offset-4 hover:text-gray-700">Open meeting link{linkHost ? ` (${linkHost})` : ''}</a>
+          : 'Not set')}
+        {row(`Attendees (${names.length})`, names.length ? names.join(', ') : 'None')}
+        {session.notes && <div className="md:col-span-2">{row('Notes', <span className="whitespace-pre-line">{session.notes}</span>)}</div>}
+      </dl>
+    </section>
+  );
+}
+
 function sessionForm(session) {
   const duration = Math.max(1, Math.round(
     (new Date(session.scheduledEndIso).getTime() - new Date(session.scheduledStartIso).getTime()) / 60000,
@@ -297,6 +350,10 @@ export default function SessionEditor() {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [warning, setWarning] = useState(null);
+  // A saved session opens read-only (DESIGN.md Read-First Rule); keyed to the
+  // session id so moving to another session starts read-only again.
+  const [editingFor, setEditingFor] = useState(null);
+  const editing = Boolean(sessionId) && editingFor === sessionId;
 
   const loadDetail = useCallback(async (id) => {
     const { ok, data: body } = await readJson(`/api/meeting-tracker/sessions/${id}`);
@@ -391,6 +448,7 @@ export default function SessionEditor() {
       } else {
         setSession(body.session);
         setForm(sessionForm(body.session));
+        setEditingFor(null);
         setNotice('Session saved.');
       }
     } catch (saveError) {
@@ -447,17 +505,28 @@ export default function SessionEditor() {
     }, movedSlot.wmkf_deliberationslotid);
   };
 
+  const cancelEdit = () => {
+    if (session) setForm(sessionForm(session));
+    setError(null);
+    setEditingFor(null);
+  };
+
   if (loading) {
     return <Layout title="Meeting Tracker"><div className="py-24 text-center text-gray-500">Loading the session workspace…</div></Layout>;
   }
 
   return (
     <Layout title={isNew ? 'Create session' : 'Meeting session'}>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div className="pt-6 mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <Link href={{ pathname: '/meeting-tracker', query: { ...(cycleCode ? { cycleCode } : {}), ...(programId ? { programId } : {}) } }} className="text-sm font-semibold text-gray-600 underline decoration-gray-300 underline-offset-4 hover:text-gray-900">Back to the cycle schedule</Link>
-          <h1 className="mt-3 text-3xl font-semibold text-gray-900">{isNew ? 'Create a deliberation session' : 'Deliberation session'}</h1>
-          <p className="mt-2 text-gray-600">Set the meeting details, attendees, and proposal order.</p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-semibold text-gray-900">{isNew ? 'Create a deliberation session' : 'Deliberation session'}</h1>
+            {!isNew && session && SESSION_STATUS_LABEL[session.status] && (
+              <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${SESSION_STATUS_CLASS[session.status]}`}>{SESSION_STATUS_LABEL[session.status]}</span>
+            )}
+          </div>
+          {(isNew || editing) && <p className="mt-2 text-sm text-gray-600">Set the meeting details, attendees, and proposal order.</p>}
         </div>
         {!isNew && session?.meetingLink && <a href={session.meetingLink} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-gray-900 px-5 py-3 text-sm font-semibold text-white hover:bg-gray-800">Join meeting</a>}
       </div>
@@ -466,6 +535,9 @@ export default function SessionEditor() {
       {notice && <div role="status" className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">{notice}</div>}
       {(warning || overFull) && <div role="status" className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{warning?.message || `Scheduled discussion time is ${slotMinutes - sessionMinutes} minutes longer than this session.`}</div>}
 
+      {!isNew && session && !editing ? (
+        <SessionSummary session={session} recipients={recipients} onEdit={() => { setNotice(null); setEditingFor(sessionId); }} />
+      ) : (
       <form onSubmit={saveSession} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
           <label className="text-sm font-medium text-gray-700">Date and start time<input required type="datetime-local" value={form.startLocal} onChange={(event) => updateForm('startLocal', event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
@@ -490,8 +562,12 @@ export default function SessionEditor() {
           </div>
         </fieldset>
 
-        <div className="mt-6 flex justify-end"><Button type="submit" loading={busy}>{isNew ? 'Create session' : 'Save session'}</Button></div>
+        <div className="mt-6 flex justify-end gap-3">
+          {!isNew && session && <Button type="button" variant="outline" disabled={busy} onClick={cancelEdit}>Cancel</Button>}
+          <Button type="submit" loading={busy}>{isNew ? 'Create session' : 'Save session'}</Button>
+        </div>
       </form>
+      )}
 
       {!isNew && (
         <section className="mt-8">

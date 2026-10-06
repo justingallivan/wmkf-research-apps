@@ -610,3 +610,44 @@ test('received materials link to review controls only when the visit is availabl
     expect(screen.queryByRole('link', { name: 'Review materials' })).not.toBeInTheDocument();
   }
 });
+
+test('a saved session opens as a read-only summary with its status; Edit opens the form and Cancel discards', async () => {
+  routerQuery = { id: SESSION_ID, cycleCode: 'D26', programId: 'p1' };
+  const session = {
+    sessionId: SESSION_ID, etag: 'W/"1"', status: 100000001,
+    scheduledStartIso: '2026-09-14T16:00:00.000Z', scheduledEndIso: '2026-09-14T17:30:00.000Z', ianaTimeZone: 'America/Los_Angeles',
+    location: 'Board room', meetingLink: 'https://zoom.example/j/9?pwd=secret', notes: 'Bring printouts',
+    attendeeRefs: [{ kind: 'staff', profileId: 7 }, { kind: 'roster', rosterId: 3 }],
+  };
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const target = String(url);
+    if (options.method && options.method !== 'GET') throw new Error('no write expected');
+    const body = target.includes('/recipients')
+      ? { staff: [{ ref: { kind: 'staff', profileId: 7 }, name: 'Duncan Staff', email: 'd@wmkeck.org' }], board: [{ ref: { kind: 'roster', rosterId: 3 }, name: 'Board Member', email: 'b@example.org' }] }
+      : target.endsWith(`/sessions/${SESSION_ID}`)
+        ? { session, slots: [] }
+        : target.includes('/sessions')
+          ? { sessions: [] }
+          : { proposals: [] };
+    return { ok: true, status: 200, json: async () => body };
+  });
+  render(<SessionEditor />);
+
+  const summary = await screen.findByRole('region', { name: 'Session details' });
+  expect(screen.getByText('Held')).toBeInTheDocument();
+  expect(summary).toHaveTextContent('Mon, Sep 14, 2026');
+  expect(summary).toHaveTextContent('90 minutes');
+  expect(summary).toHaveTextContent('Duncan Staff, Board Member');
+  expect(summary).toHaveTextContent('Board room');
+  expect(screen.getByRole('link', { name: 'Open meeting link (zoom.example)' })).toHaveAttribute('href', session.meetingLink);
+  expect(summary).not.toHaveTextContent('pwd=secret');
+  expect(screen.queryByRole('button', { name: 'Save session' })).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Edit session details' }));
+  fireEvent.change(screen.getByLabelText('Location'), { target: { value: 'Elsewhere' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(screen.getByRole('region', { name: 'Session details' })).toHaveTextContent('Board room');
+  fireEvent.click(screen.getByRole('button', { name: 'Edit session details' }));
+  expect(screen.getByLabelText('Location')).toHaveValue('Board room');
+  expect(screen.getByRole('button', { name: 'Save session' })).toBeInTheDocument();
+});

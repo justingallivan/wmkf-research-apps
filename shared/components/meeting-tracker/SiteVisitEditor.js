@@ -409,6 +409,10 @@ export default function SiteVisitEditor() {
 
       {!loading && visit && <SiteVisitMaterialsCard requestId={requestId} requestNumber={requestNumber} />}
       {!loading && visit && <RecordingAndTranscriptCard requestId={requestId} />}
+
+      {/* The page is long: the exit is reachable at the bottom as well as in
+          the header (owner, 2026-09-10, on the session page). */}
+      {!loading && visit && <div className="mt-8 border-t border-gray-200 pt-6">{backLink}</div>}
     </Layout>
   );
 }
