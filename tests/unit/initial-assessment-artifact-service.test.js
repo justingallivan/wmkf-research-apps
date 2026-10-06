@@ -349,29 +349,48 @@ it('rejects a package whose root relationship opens a main part other than word/
     .resolves.toBe(await hashGovernedDocxContent(DOCX));
 });
 
-it('rejects a governed document relationship that reaches outside word/, but tolerates external hyperlinks', async () => {
-  const outside = await buildDocx({
-    extraRelationships: ['<Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/swapped.png"/>'],
-    extraParts: { 'media/swapped.png': Buffer.from('png') },
+const IMAGE_TYPE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image';
+
+it('hashes a reachable image stored outside word/ (staff-edited packages), tolerating external hyperlinks', async () => {
+  // Production 2026-10-06: Word saved pasted images at /media/image*.png.
+  const withImage = (bytes, extra = {}) => buildDocx({
+    extraRelationships: [`<Relationship Id="rId7" Type="${IMAGE_TYPE}" Target="/media/image2.png"/>`],
+    extraParts: { 'media/image2.png': Buffer.from(bytes), ...extra },
   });
-  await expect(hashGovernedDocxContent(outside)).rejects.toThrow(/outside word\//);
+  const original = await hashGovernedDocxContent(await withImage('png-a'));
+  expect(original).toMatch(/^gdc1:/);
+  expect(original).not.toBe(await hashGovernedDocxContent(DOCX));
+  // Swapping the outside image changes the identity: the part is covered.
+  await expect(hashGovernedDocxContent(await withImage('png-b'))).resolves.not.toBe(original);
+  // An unreachable outside part (SharePoint metadata, trash) is not covered.
+  await expect(hashGovernedDocxContent(await withImage('png-a', { 'stray/unlinked.png': Buffer.from('x') })))
+    .resolves.toBe(original);
   const hyperlink = await buildDocx({
     extraRelationships: ['<Relationship Id="rId8" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.org/" TargetMode="External"/>'],
   });
   await expect(hashGovernedDocxContent(hyperlink)).resolves.toMatch(/^gdc1:/);
 });
 
-it('walks transitive relationships and rejects a nested part that reaches outside word/', async () => {
-  const outside = await buildDocx({
+it('walks transitive relationships and covers a nested part and its relationships outside word/', async () => {
+  const build = ({ banner = 'png', link = 'https://example.org/a' } = {}) => buildDocx({
     extraRelationships: ['<Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>'],
     extraParts: {
       'word/header1.xml': '<w:hdr/>',
-      'word/_rels/header1.xml.rels': '<Relationships><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../outside/banner.png"/></Relationships>',
-      'outside/banner.png': Buffer.from('png'),
+      'word/_rels/header1.xml.rels': `<Relationships><Relationship Id="rId1" Type="${IMAGE_TYPE}" Target="../outside/banner.xml"/></Relationships>`,
+      'outside/banner.xml': `<x>${banner}</x>`,
+      'outside/_rels/banner.xml.rels': '<Relationships>'
+        + `<Relationship Id="rId1" Type="${IMAGE_TYPE}" Target="logo.png"/>`
+        + `<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${link}" TargetMode="External"/>`
+        + '</Relationships>',
+      'outside/logo.png': Buffer.from('logo'),
     },
   });
-
-  await expect(hashGovernedDocxContent(outside)).rejects.toThrow(/outside word\/|unresolved part/);
+  const original = await hashGovernedDocxContent(await build());
+  expect(original).toMatch(/^gdc1:/);
+  await expect(hashGovernedDocxContent(await build({ banner: 'swapped' }))).resolves.not.toBe(original);
+  // The outside part's relationship file is covered even where it adds no
+  // new part (an external link target), exactly as word/_rels files are.
+  await expect(hashGovernedDocxContent(await build({ link: 'https://example.org/b' }))).resolves.not.toBe(original);
 });
 
 it('accepts a transitively reachable image under word/media using case-insensitive OPC part names', async () => {
@@ -390,13 +409,23 @@ it('accepts a transitively reachable image under word/media using case-insensiti
 it.each([
   '%2e%2e/outside/banner.png',
   '../OUTSIDE/banner.png',
-])('rejects an encoded or differently-cased relationship target that escapes word/: %s', async (target) => {
-  const outside = await buildDocx({
-    extraRelationships: [`<Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${target}"/>`],
-    extraParts: { 'outside/banner.png': Buffer.from('png') },
+])('resolves an encoded or differently-cased target outside word/ to the real part and covers it: %s', async (target) => {
+  const build = (bytes) => buildDocx({
+    extraRelationships: [`<Relationship Id="rId7" Type="${IMAGE_TYPE}" Target="${target}"/>`],
+    extraParts: { 'outside/banner.png': Buffer.from(bytes) },
   });
+  const original = await hashGovernedDocxContent(await build('png-a'));
+  await expect(hashGovernedDocxContent(await build('png-b'))).resolves.not.toBe(original);
+});
 
-  await expect(hashGovernedDocxContent(outside)).rejects.toThrow(/outside word\/|unresolved part/);
+it.each([
+  ['a missing part', '../outside/missing.png'],
+  ['a target above the package root', '../../escape.png'],
+])('rejects a relationship to %s', async (_label, target) => {
+  const unresolved = await buildDocx({
+    extraRelationships: [`<Relationship Id="rId7" Type="${IMAGE_TYPE}" Target="${target}"/>`],
+  });
+  await expect(hashGovernedDocxContent(unresolved)).rejects.toThrow(/unresolved part/);
 });
 
 it('accepts a reachable binary part declared by a content-type Override (media, fonts, embeddings)', async () => {

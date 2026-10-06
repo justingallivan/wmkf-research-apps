@@ -1309,7 +1309,12 @@ abstract edit and authorized the send and the download.
   `hashGovernedDocxContent` now requires `_rels/.rels` with exactly one officeDocument
   relationship resolving to `word/document.xml` and every non-customXml, non-External
   document relationship to resolve under `word/` (regression packages: substituted root,
-  out-of-tree image, missing root rels; an External hyperlink still hashes). (2) *high* — the
+  out-of-tree image, missing root rels; an External hyperlink still hashes).
+  *[Superseded 2026-10-06, Staff Deliberations status-clarity plan "Activation review": staff-edited
+  production files store pasted images at `/media/…`, so a reachable part outside `word/` is now
+  hashed into the digest instead of rejected; unresolved targets and root substitution still
+  refuse, and all-`word/` packages keep identical `gdc1:` hashes.]*
+  (2) *high* — the
   briefing route used the registry row only for its hash. It now loads and binds the row
   before any Graph read: this request, producer `request-workbench-distribution-docx`,
   Ready, not Superseded, and drive/item equal to the ledger's pointers; tests assert no

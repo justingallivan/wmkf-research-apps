@@ -769,3 +769,32 @@ describe('existing receipts for requests automation no longer covers', () => {
     expect((await getPreparationForRequest(REQUEST, dependencies)).preparation).toMatchObject({ state: 'pending' });
   });
 });
+
+describe('SharePoint metadata moving during the handoff', () => {
+  const draft = { artifactId: DOC, lifecycleState: L.DRAFT, operationStatus: O.READY, file: { itemId: 'same-word-item' } };
+  const versionChanged = () => Object.assign(new Error('The Word draft changed while the Site Visit handoff was being prepared.'), {
+    code: 'site_visit_sharepoint_version_changed', httpStatus: 409, diagnostic: 'eTag "a"->"b"',
+  });
+
+  it('requeues with backoff and records which fields moved', async () => {
+    const { dependencies } = harness({ currentArtifact: draft });
+    dependencies.promote.mockRejectedValue(versionChanged());
+    await drainStaffDeliberationsPreparations(dependencies);
+    expect(dependencies.finishReceipt).toHaveBeenCalledWith(expect.any(String), expect.any(String), expect.objectContaining({
+      state: 'pending',
+      retryAfterMs: expect.any(Number),
+      errorCode: 'site_visit_sharepoint_version_changed',
+      errorMessage: expect.stringContaining('eTag "a"->"b"'),
+    }));
+  });
+
+  it('blocks once the retry budget is spent', async () => {
+    const { dependencies, receipt } = harness({ currentArtifact: draft });
+    dependencies.claimReceipt.mockResolvedValue({ ...receipt, attempt_count: 5 });
+    dependencies.promote.mockRejectedValue(versionChanged());
+    await drainStaffDeliberationsPreparations(dependencies);
+    expect(dependencies.finishReceipt).toHaveBeenCalledWith(expect.any(String), expect.any(String), expect.objectContaining({
+      state: 'blocked', errorCode: 'site_visit_sharepoint_version_changed',
+    }));
+  });
+});
