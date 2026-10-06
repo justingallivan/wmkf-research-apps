@@ -533,3 +533,104 @@ it('does not create a receipt or invoke generation before the scheduled end', as
   expect(dependencies.generate).not.toHaveBeenCalled();
   expect(dependencies.promote).not.toHaveBeenCalled();
 });
+
+describe('excluded request numbers', () => {
+  const EXCLUDED = '1003220';
+  const excludedConfig = { ...config, excludedRequestNumbers: [EXCLUDED] };
+  const withNumber = (row, number) => ({ ...row, akoya_requestnum: number });
+
+  it('parses only digit-string request numbers and is not a readiness input', () => {
+    const env = {
+      STAFF_DELIBERATIONS_AUTO_PREPARE: 'on',
+      STAFF_DELIBERATIONS_AUTO_PREPARE_PROGRAM_IDS: JSON.stringify([PROGRAM]),
+      STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES: JSON.stringify(['D26']),
+      STAFF_DELIBERATIONS_AUTO_PREPARE_REQUEST_STATUSES: JSON.stringify(['Phase II Pending']),
+      STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS: JSON.stringify([[10, 11, true]]),
+      STAFF_DELIBERATIONS_AUTO_PREPARE_ATOMIC_FENCE_CONFIRMED: 'on',
+      GUARDED_REOPEN_SCHEMA_READY: 'on',
+      TEST_REQUEST_ISOLATION: 'on',
+    };
+    expect(readPreparationConfig(env)).toMatchObject({ active: true, excludedRequestNumbers: [] });
+    env.STAFF_DELIBERATIONS_AUTO_PREPARE_EXCLUDED_REQUEST_NUMBERS = JSON.stringify(['1003220', 1003221, ' 1003222 ', 'abc', '', null, '1003220']);
+    expect(readPreparationConfig(env)).toMatchObject({ active: true, excludedRequestNumbers: ['1003220', '1003221', '1003222'] });
+  });
+
+  it('never enqueues an excluded request during the due scan', async () => {
+    const { dependencies } = harness();
+    dependencies.config = excludedConfig;
+    const [row] = (await dependencies.queryRequests()).records;
+    dependencies.queryRequests.mockResolvedValue({ records: [withNumber(row, EXCLUDED)], capped: false });
+    dependencies.claimReceipt = jest.fn().mockResolvedValue(null);
+    const result = await drainStaffDeliberationsPreparations(dependencies);
+    expect(dependencies.upsertReceipt).not.toHaveBeenCalled();
+    expect(dependencies.generate).not.toHaveBeenCalled();
+    expect(dependencies.promote).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ scanned: 0 });
+  });
+
+  it('still enqueues a non-excluded request under the same configuration', async () => {
+    const { dependencies } = harness();
+    dependencies.config = excludedConfig;
+    const [row] = (await dependencies.queryRequests()).records;
+    dependencies.queryRequests.mockResolvedValue({ records: [withNumber(row, '1002963')], capped: false });
+    dependencies.claimReceipt = jest.fn().mockResolvedValue(null);
+    await drainStaffDeliberationsPreparations(dependencies);
+    expect(dependencies.upsertReceipt).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks an already-claimed receipt when the fresh request read is excluded', async () => {
+    const { dependencies } = harness({ currentArtifact: { artifactId: DOC, lifecycleState: L.DRAFT, operationStatus: O.READY } });
+    dependencies.config = excludedConfig;
+    dependencies.queryRequests.mockResolvedValue({ records: [], capped: false });
+    dependencies.getRequest.mockResolvedValue(withNumber(await dependencies.getRequest(), EXCLUDED));
+    await drainStaffDeliberationsPreparations(dependencies);
+    expect(dependencies.promote).not.toHaveBeenCalled();
+    expect(dependencies.generate).not.toHaveBeenCalled();
+    expect(dependencies.finishReceipt).toHaveBeenCalledWith(expect.any(String), expect.any(String), {
+      state: 'blocked', errorCode: 'request_eligibility_changed',
+    });
+  });
+
+  it('refuses retry for an excluded request', async () => {
+    const { dependencies } = harness();
+    dependencies.config = excludedConfig;
+    dependencies.getRequest.mockResolvedValue(withNumber(await dependencies.getRequest(), EXCLUDED));
+    dependencies.retryReceipt = jest.fn();
+    await expect(requestPreparationRetry(REQUEST, dependencies, { callerSystemId: LEAD_PD }))
+      .rejects.toMatchObject({ httpStatus: 409, code: 'preparation_request_ineligible' });
+    expect(dependencies.retryReceipt).not.toHaveBeenCalled();
+  });
+
+  it('reports an excluded due request as disabled so the manual action stays available', async () => {
+    const { dependencies } = harness();
+    dependencies.config = excludedConfig;
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(new Map());
+    dependencies.getRequest.mockResolvedValue(withNumber(await dependencies.getRequest(), EXCLUDED));
+    const projection = await getPreparationForRequest(REQUEST, dependencies);
+    expect(projection.preparation).toMatchObject({ due: true, state: 'disabled', automationActive: true });
+  });
+
+  it('reports a due request outside the program allowlist as disabled, not waiting', async () => {
+    const { dependencies } = harness();
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(new Map());
+    dependencies.getRequest.mockResolvedValue({ ...(await dependencies.getRequest()), _wmkf_grantprogram_value: LEAD_PD });
+    const projection = await getPreparationForRequest(REQUEST, dependencies);
+    expect(projection.preparation).toMatchObject({ due: true, state: 'disabled' });
+  });
+
+  it('keeps an eligible due request waiting for automation', async () => {
+    const { dependencies } = harness();
+    dependencies.config = excludedConfig;
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(new Map());
+    const projection = await getPreparationForRequest(REQUEST, dependencies);
+    expect(projection.preparation).toMatchObject({ due: true, state: 'due' });
+  });
+
+  it('reports unavailable when the request read fails while automation is active', async () => {
+    const { dependencies } = harness();
+    dependencies.listScheduleReceipts = jest.fn().mockResolvedValue(new Map());
+    dependencies.getRequest.mockRejectedValue(new Error('dataverse down'));
+    const projection = await getPreparationForRequest(REQUEST, dependencies);
+    expect(projection.preparation).toMatchObject({ due: true, state: 'unavailable' });
+  });
+});

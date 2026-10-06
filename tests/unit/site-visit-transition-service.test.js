@@ -505,3 +505,13 @@ test('fails closed on an unknown lifecycle before SharePoint work', async () => 
   expect(harness.dependencies.getFileMetadataById).not.toHaveBeenCalled();
   expect(harness.dependencies.updateDocument).not.toHaveBeenCalled();
 });
+
+it('rejects an excluded request number at the fresh automatic-promotion fence', async () => {
+  const h = createAutomaticHarness({ requestPatch: { akoya_requestnum: '1003220' } });
+  await expect(prepareSiteVisitStageAutomatically({
+    requestId: REQUEST_ID, expectedArtifactId: ARTIFACT_ID, siteVisitId: h.event.activityid,
+    scheduledEnd: h.event.scheduledend, eventModifiedOn: h.event.modifiedon,
+    stateCode: 10, statusCode: 11, eligibility: { ...AUTO_CONFIG, excludedRequestNumbers: ['1003220'] },
+  }, h.dependencies)).rejects.toMatchObject({ code: 'site_visit_automation_fence_changed' });
+  expect(h.dependencies.commitChangeset).not.toHaveBeenCalled();
+});
