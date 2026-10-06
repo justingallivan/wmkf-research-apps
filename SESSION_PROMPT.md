@@ -1,81 +1,82 @@
-# Session 578 Prompt: review the overnight Workbench / Meeting Tracker UX branch on localhost
+# Session 579 Prompt: merge the Workbench / Staff Deliberations UX branch, then Meeting Tracker follow-ups
 
-## Session 577 Claude overnight close — 2026-10-06 PT
+## Session 578 Summary — 2026-10-06 PT (Claude)
 
-**Owner ask (2026-10-05, deadline):** build the next UX-audit fixes in chunks
-overnight; review together on localhost in the morning. Nothing below is merged
-or deployed. Codex's Session 577 close (next section) handed the Staff
-Deliberations list design to this audit.
+Owner-led review of the overnight `feature/workbench-ux` branch on localhost,
+followed by a redesign of the Staff Deliberations list and request tab, plus
+dependency security fixes released to Production. **The UX branch is pushed and
+NOT merged** (`origin/feature/workbench-ux`, current `main` merged in at
+`419392a0a`). No PR is open yet.
 
-### Already released this session
+### What Was Completed
 
-- App-wide staff UX audit: `.impeccable/critique/2026-10-06T01-35-10Z__pages.md`
-  (19/40). DESIGN.md gained a **Page Structure** section (four page types,
-  17 named rules) and a **Desktop first** rule (owner: in-office desktop app;
-  phones only "in a pinch").
-- PR #446 merged `51ca71798`, Production `dpl_GZAhQuv7zL6WPXF69XbPCaDosWRP`
-  Ready: one-row nav (Home · Workbench · Meeting Tracker · Tools · Guide ·
-  Admin, Admin/Cycle Dossier superuser-only), literal width map (fixes the
-  Tailwind-dropped `max-w-${maxWidth}`), registry name Reviewers → Workbench
-  (key `reviewers` unchanged), Home inside the shell, attribution footer
-  removed. Codex adversarial review: two findings fixed, round 2 approve.
+1. **Released to Production (main)**
+   - `8d597ec94` J27 register: J27-083 rebound to a literal fragment (`check:j27-register` was red at start).
+   - PR #447 (merge `90468b68e`, deployment succeeded): http-cache-semantics 4.3.0, sharp override 0.35.5, proxy-addr 2.0.8, source-map-js 1.2.2. Dependabot #115/#117/#118 dismissed by the owner as tolerable risk (build-time only or no upstream fix); #116 auto-fixed. 0 open alerts. Record: `docs/CURRENT_WORK_QUEUE.md` (merged with this branch).
+2. **Staff deliberations list** (`StaffDeliberationsPanel.js`): Reviewer follow-up style cards — `#number` + full title; "Institution · PI · PD" (new `projectLeader`, read-only `_wmkf_projectleader_value` in `cycle-list-service.js`); stage chip (gray Before, blue After, violet review, amber issue/Not scheduled) + time; next step that names the request-page action, or the specific attention reason (`attentionReason()`, shared with the Needs-attention filter); one ink "Open request"/"Open review" button deep-linking to `#deliberations-status|briefing|writeup`. No Word shortcut (editing happens beside Share/Finish corrections on the request page). Corrections before the presentation keep the Before stage.
+3. **Request page Staff Deliberations tab** (`StaffDeliberationsTab.js`): no status card; five-step stepper — Pre-site briefing → Deliberation session → Presentation → Working writeup → Group review (renamed "Group and leadership review" during leadership review). Current step dark, done green; non-current steps fold description/file details/warnings behind Details; every action keeps its exact condition and label. Problem notice above the steps only when something is wrong. Briefing summary "Shared <date> to N people" from the email panel's accepted send. Recording, transcripts and the presentation summary render inside the Presentation step (`ResearchPresentationFollowUp.js`, published items only, no file names; summary clamped only when Read more exists). One-time scroll to the linked card after the status read. One date format ("Oct 16, 11:00 AM PDT").
+4. **Meeting Tracker session page** (`SessionEditor.js`): proposal order opens read-only with "Edit proposal order" / "Done" (changes still save immediately); briefing slot copy fixed.
+5. **Reviews:** Codex adversarial review ×2 — four medium findings, all fixed with mutation-checked tests.
+6. **Vocabulary held for a group decision:** `docs/NOMENCLATURE_GLOSSARY.md` → "Deliberations workflow vocabulary — OPEN, decide suite-wide after D26" (owner: no panel-by-panel renames). Memory `project-deliberation-session-precedes-site-visit`.
 
-### Overnight branch `feature/workbench-ux` (pushed, NOT merged; no PR yet)
+### Verification (branch head `37942a1d8` + docs commit)
 
-One commit per chunk; each chunk Codex-reviewed (chunks 1-3 round 1 found a
-narrow-window grid collapse → fixed → round 2 approve; chunk 4 approve). Full
-Jest 20927 passed; `check:types` clean. All presentation-only: no API,
-payload, persistence, or automation change.
+Full Jest 20948 passed / 157 skipped / 0 failed; `npm run build` passes; every
+`check:*` gate and self-test green; Impeccable detector clean on changed UI
+(one pre-existing gray-on-color warning in `SessionEditor.js` status pill).
+Real-data browser checks on localhost: #1002874, #1002852, TEST #1003222, the
+Sep 11 Meeting Tracker session (read-only only; nothing saved).
 
-1. **Workbench header** — left H1 "Workbench" with program, cycle and
-   "Find and open a request" on the title row; underline view tabs; the H2
-   that repeated the tab label removed.
-2. **Request list** — one bordered list of compact rows; the request number
-   is a real link stretched over the row (opens in a new tab); triage select
-   above it; "going-forward" chip reads "Advancing"; per-row cycle/program
-   labels (always equal to the header filters) dropped.
-3. **Staff deliberations list** — compact three-column rows (request ·
-   task chip + next-step sentence at body weight · one outline button + one
-   link); task filter, search and scope on one toolbar; generic intro
-   sentence removed. Same order and copy; **no task grouping** (still the
-   owner's call). Lists stack below 1024px.
-4. **Visit and session pages open read-only** — saved visit → "Visit details"
-   summary (when in the visit's zone, format, "Open meeting link (host)"
-   instead of the full URL, organizer, attendee names, notes) with "Edit visit
-   details"; saved session → "Session details" + status chip beside the title.
-   Cancel discards; save returns to the summary; new visits/sessions unchanged.
+### Local dev gotcha
 
-Fixture-backed screenshots (local only, not in the repo; every `/api` call
-answered with fake data): all five Workbench tabs at 1440px, Request list and
-Staff deliberations also at 1024 and 800px, and the visit and session pages
-at 1440px. Real-data rendering is unverified until the morning review.
+Localhost needs these readiness settings or Staff Deliberations hides data.
+On the command line (NOT in `.env.local`): `MEETING_TRACKER_SCHEMA_READY=on SITE_VISIT_MATERIALS_SCHEMA_READY=on npm run dev`;
+already in the owner's `.env.local`: `SITE_VISIT_LOGISTICS_SCHEMA_READY=on`, `STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS`
+and `POST_PRESENTATION_MATERIALS_SCHEMA_READY`/`_ACCESS` (values copied from Vercel Production; the state/status map is
+also recorded in `docs/plans/STAFF_DELIBERATIONS_STATUS_CLARITY_PLAN_2026-10-04.md:217`).
+Localhost reads Production; Dataverse writes are interlock-blocked, Postgres and
+email are not — never press Save/Send/Generate during reviews.
 
-### Morning review on localhost
+## Next Items
 
-1. `git checkout feature/workbench-ux && git pull`
-2. `MEETING_TRACKER_SCHEMA_READY=on SITE_VISIT_MATERIALS_SCHEMA_READY=on npm run dev`
-   (without the two flags the Meeting Tracker shows "not yet enabled" locally),
-   then sign in at `http://localhost:3000`.
-3. Look at: Workbench Request list, Staff deliberations, Final writeups,
-   Awardees (shared header); a visit page and a session page (read-only
-   summary → Edit → Cancel).
-4. **Caution:** localhost reads Production data. Dataverse writes from local
-   are blocked by the interlock (`lib/dataverse/core/interlock.js:354-374`;
-   `.env.local` has no `DATAVERSE_PROD_WRITE_ACK`) [VERIFIED], but Postgres
-   and email paths are not covered by it — do not press save/send/generate
-   buttons during the review.
-5. Revert paths if a chunk is unwanted: drop its commit on the branch; after
-   merge, Vercel Instant Rollback or revert the merge commit (UI-only, no data
-   to repair).
+### Verified Open
 
-### Open decisions for the owner
+1. **Open the PR for `feature/workbench-ux`, final Codex review, merge on owner OK.**
+   Evidence: `git log origin/main..origin/feature/workbench-ux` (29 non-merge commits). One PR (owner accepted the recommendation 2026-10-06). `main` auto-deploys; UI-only except the read-only PI select. Revert path: Vercel Instant Rollback or revert the merge.
+2. **Meeting Tracker follow-ups (owner: "more stuff on the meeting planner", later session).** Owner has not listed them yet — ask first. Known starting points:
+   - **A session that fails to load shows an empty, saveable form** (`SessionEditor.js`; reproduced with an invalid `cycleCode`). Saving could overwrite the session with blanks. Highest priority: data-loss shape.
+   - **Slot "Briefing not yet shared" can be stale:** TEST #1003222's session slot says not shared while its Workbench briefing shows "Shared Sep 18". The slot's briefing source differs from the Workbench sharing history.
+3. **Corrections flag mismatch (server contract).** Evidence: list uses document-row `wmkf_reopencycleid` (`lib/services/pre-site-visit/cycle-list-service.js:570`); request page uses `currentArtifact.correction.cycleId` (`pages/api/workbench/pre-site-visit.js:59`). #1002852 shows corrections on the list but not on the request page. Needs `/contract-reconcile`.
+4. **List next step for a ready briefing** could say "share it before the deliberation session"; needs the session date in the list payload (server change, small).
+5. **Server warning copy** "…generated before the Dataverse fill" (`lib/services/pre-site-visit/artifact-model.js:290-291`).
 
-- Merge as one PR or per chunk; Staff deliberations task grouping (yes/no).
-- Small inconsistency to settle: the visit summary shows the time zone as
-  `(America/Los_Angeles)`, the session summary as `PDT`.
-- Next audit items: Recording & Transcript card (collapse finished steps),
-  attendee typeahead (~48 chips), Awardee tab buttons/cards, request-page tab
-  stage cues, remaining centered `PageHeader` heroes on tool pages.
+### Owner Decision Needed
+
+1. **Deliberations vocabulary** — after D26, as a group; then rename suite-wide in one pass. Evidence: `docs/NOMENCLATURE_GLOSSARY.md` section above; `docs/CURRENT_WORK_QUEUE.md` item.
+2. **Task grouping on the Staff deliberations list** — not raised again after the card redesign; treat as dropped unless the owner reopens it.
+
+### Do Not Reopen Without New Decision
+
+1. **Deliberation sessions dated before the site visit are normal** (owner 2026-10-06; memory `project-deliberation-session-precedes-site-visit`). TEST #1003222's history gaps are expected.
+2. **No Word shortcut on the Staff deliberations list** (owner 2026-10-06: the next action after editing lives on the request page).
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `shared/components/workbench/StaffDeliberationsPanel.js` | Staff deliberations list cards, stage, attention reasons, deep links |
+| `shared/components/workbench/StaffDeliberationsTab.js` | Request-page stepper, notices, anchors, materials placement |
+| `shared/components/workbench/ResearchPresentationFollowUp.js` | Recording / transcripts / summary inside the Presentation step |
+| `lib/services/pre-site-visit/cycle-list-service.js` | List projection (now includes `projectLeader`) |
+| `shared/components/meeting-tracker/SessionEditor.js` | Session page: read-only details + proposal order |
+| `docs/NOMENCLATURE_GLOSSARY.md` | Open vocabulary register for the post-D26 decision |
+
+## Testing
+
+```bash
+npx jest tests/unit/staff-deliberations tests/unit/research-presentation-follow-up tests/unit/meeting-tracker tests/unit/workbench-shell tests/unit/pre-site-visit-cycle-list-service
+npm run check:types && npm run build
+```
 
 ---
 
