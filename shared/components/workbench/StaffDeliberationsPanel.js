@@ -113,7 +113,9 @@ function RequestCard({ request }) {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 flex-1">
           <h3 className="break-words text-base font-semibold text-gray-900">
-            {request.requestNumber ? `#${request.requestNumber}` : request.requestId}{request.title ? ` — ${request.title}` : ''}
+            <Link href={requestHref(request)} className="underline-offset-2 hover:underline">
+              {request.requestNumber ? `#${request.requestNumber}` : request.requestId}{request.title ? ` — ${request.title}` : ''}
+            </Link>
           </h3>
           {request.institution && <p className="mt-1 text-sm text-gray-600">{request.institution}</p>}
           {request.programDirector && <p className="mt-1 text-sm text-gray-600">Lead PD: {request.programDirector}</p>}
