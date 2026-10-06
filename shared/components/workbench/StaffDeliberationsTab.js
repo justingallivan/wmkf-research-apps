@@ -55,7 +55,7 @@ function presentationEndLabel(timing) {
 
 function sessionLine(session) {
   const when = formatWhen(session?.scheduledStartIso, session?.ianaTimeZone);
-  return when ? `PC deliberation session · ${when}` : 'PC deliberation session not yet scheduled.';
+  return when || 'Not yet scheduled.';
 }
 
 function StepMarker({ status, number }) {
