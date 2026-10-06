@@ -285,3 +285,36 @@ it('selects and returns the PI for rows with and without a current document', as
   expect(grantRequestAdapter.queryAllRequests.mock.calls[0][0].select).toContain('_wmkf_projectleader_value');
   expect(result.artifacts.map((item) => item.projectLeader)).toEqual(['PI One', 'PI Two']);
 });
+
+it('reports due as waiting only for requests active automation would scan', async () => {
+  jest.useFakeTimers().setSystemTime(new Date('2026-12-02T00:00:00Z'));
+  const env = {
+    STAFF_DELIBERATIONS_AUTO_PREPARE: 'on',
+    STAFF_DELIBERATIONS_AUTO_PREPARE_PROGRAM_IDS: JSON.stringify([PROGRAM]),
+    STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES: JSON.stringify(['D26']),
+    STAFF_DELIBERATIONS_AUTO_PREPARE_REQUEST_STATUSES: JSON.stringify(['Phase II Pending']),
+    STAFF_DELIBERATIONS_AUTO_PREPARE_ATOMIC_FENCE_CONFIRMED: 'on',
+    STAFF_DELIBERATIONS_AUTO_PREPARE_EXCLUDED_REQUEST_NUMBERS: JSON.stringify(['1003001']),
+    GUARDED_REOPEN_SCHEMA_READY: 'on',
+    TEST_REQUEST_ISOLATION: 'on',
+  };
+  const saved = Object.fromEntries(Object.keys(env).map((key) => [key, process.env[key]]));
+  Object.assign(process.env, env);
+  try {
+    const eligible = { akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2026-12-10T00:00:00Z', wmkf_istestrequest: false, wmkf_testcreationrunid: null };
+    grantRequestAdapter.queryAllRequests.mockResolvedValue({ records: [req(R1, eligible), req(R2, eligible)], capped: false });
+    siteVisitAdapter.findSummariesByRequests.mockResolvedValue({ records: [
+      { _regardingobjectid_value: R1, activityid: 'v1', statecode: 1, statuscode: 2, scheduledend: '2026-12-01T18:00:00Z' },
+      { _regardingobjectid_value: R2, activityid: 'v2', statecode: 1, statuscode: 2, scheduledend: '2026-12-01T18:00:00Z' },
+    ], capped: false });
+    const result = await list();
+    const byNumber = Object.fromEntries(result.artifacts.map((row) => [row.requestNumber, row.preparation]));
+    expect(byNumber['1002959']).toMatchObject({ due: true, state: 'due', automationActive: true });
+    expect(byNumber['1003001']).toMatchObject({ due: true, state: 'disabled', automationActive: true });
+  } finally {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
