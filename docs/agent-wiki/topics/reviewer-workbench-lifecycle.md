@@ -586,7 +586,7 @@ legacy free-text values visible, so no existing referral is lost. Until S349
     trouble accessing the server. This is usually a temporary blip. Please
     press retry and if the problem doesn't resolve, contact an administrator."
     The 403 (grant row genuinely absent) says "Your account does not have
-    access to the Reviewers app", named via `appDisplayName`: the first
+    access to the Workbench app" (registry name since 2026-10-05), named via `appDisplayName`: the first
     requested key present in `APP_REGISTRY` (legacy alternates like
     `review-manager` are registry-absent, so the canonical name wins), falling
     back to "this app" for unregistered namespaces or key-less guards.
