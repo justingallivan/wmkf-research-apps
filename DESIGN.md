@@ -223,6 +223,11 @@ new or reworked staff page; existing pages conform when they are next reworked.
 Tokens and components above say how things look; these rules say how a page is
 put together.
 
+**Desktop first.** Staff surfaces are used in the office on desktop screens.
+Design, review, and verify them at desktop width; narrow widths only need to
+stay usable in a pinch (no overflow, reachable navigation), never to drive a
+layout decision. External applicant and reviewer pages are out of this rule.
+
 **Page types.** Every staff page is one of four types, and the type decides its
 width, header, and section order:
 
