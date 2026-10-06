@@ -14,7 +14,7 @@ test('documentless requests are visible and the query preserves program cycle an
   expect(await screen.findByText(/#1002903/)).toBeInTheDocument();
   const url = global.fetch.mock.calls[0][0];
   expect(url).toContain(`programId=${PROGRAM}`); expect(url).toContain('cycleCode=D26'); expect(url).toContain('scope=my');
-  expect(screen.getByRole('link', { name: /#1002903/ })).toHaveAttribute('href', expect.stringContaining('tab=staff-deliberations'));
+  expect(screen.getByRole('link', { name: 'Open request' })).toHaveAttribute('href', expect.stringMatching(/tab=staff-deliberations.*#deliberations-briefing$/));
   expect(screen.getAllByRole('link')).toHaveLength(1);
   expect(screen.queryByText(/Sharing history|No sharing recorded/)).not.toBeInTheDocument();
   expect(screen.queryByText(/Deliberation session:/)).not.toBeInTheDocument();
@@ -32,7 +32,7 @@ test('due preparation never labels an absent document ready and never writes', a
   global.fetch.mockResolvedValue(response([row({ preparation: { due: true, state: 'pending' } })]));
   render(<StaffDeliberationsPanel {...props} />);
   expect(await screen.findByText('Preparation will run automatically. No action is needed now.')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: /#1002903/ })).toHaveAttribute('href',expect.stringContaining('staff-deliberations'));
+  expect(screen.getByRole('link', { name: 'Open request' })).toHaveAttribute('href', expect.stringMatching(/staff-deliberations.*#deliberations-writeup$/));
   expect(global.fetch.mock.calls.every(([,options]) => !options?.method || options.method === 'GET')).toBe(true);
 });
 
@@ -85,7 +85,7 @@ test('a Final source without verified review lineage needs attention', async () 
   global.fetch.mockResolvedValue(response([row({ finalPhase: 'none', finalReview: { availability: 'unavailable' }, writeup: { availability: 'available', lifecycleState: 100000004 } })]));
   render(<StaffDeliberationsPanel {...props} />);
   expect(await screen.findByText(/couldn’t load the review status/)).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: /#1002903/ })).not.toHaveAttribute('href', expect.stringContaining('final-writeup'));
+  expect(screen.getByRole('link', { name: 'Open request' })).toHaveAttribute('href', expect.stringMatching(/tab=staff-deliberations.*#deliberations-status$/));
 });
 
 
@@ -94,7 +94,7 @@ test('reopened corrections remain a staff task even when an older preparation re
   render(<StaffDeliberationsPanel {...props} />);
   expect(await screen.findByText('Make the requested corrections in the writeup, then choose Finish corrections.')).toBeInTheDocument();
   expect(screen.getByText('After presentation')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: /#1002903/ })).toHaveAttribute('href', expect.stringContaining('staff-deliberations'));
+  expect(screen.getByRole('link', { name: 'Open request' })).toHaveAttribute('href', expect.stringMatching(/staff-deliberations.*#deliberations-writeup$/));
   expect(screen.queryByText('Post-visit editing')).not.toBeInTheDocument();
 });
 
@@ -157,7 +157,7 @@ test.each(['group-review', 'leadership-review'])('%s opens the review tab from t
   global.fetch.mockResolvedValue(response([row({ finalPhase, writeup: { availability: 'available', file: { webUrl: 'https://sp/full' } } })]));
   render(<StaffDeliberationsPanel {...props} />);
   expect(await screen.findByText('Read the writeup and follow its review progress.')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: /#1002903/ })).toHaveAttribute('href', expect.stringContaining('tab=final-writeup'));
+  expect(screen.getByRole('link', { name: 'Open review' })).toHaveAttribute('href', expect.stringMatching(/tab=final-writeup[^#]*$/));
   expect(screen.getAllByRole('link')).toHaveLength(1);
   expect(screen.queryByText(/presentation findings/)).not.toBeInTheDocument();
 });
@@ -207,4 +207,20 @@ test('a ready post-visit writeup points to group review as the next step', async
   render(<StaffDeliberationsPanel {...props} />);
   expect(await screen.findByText('Add your presentation findings to the writeup, then open group review.')).toBeInTheDocument();
   expect(screen.getByText('After presentation')).toBeInTheDocument();
+});
+
+test('the row shows institution, PI and PD on one line, and search matches the PI', async () => {
+  global.fetch.mockResolvedValue(response([row({ projectLeader: 'Ada Lovelace' }), row({ requestId: 'r2', requestNumber: '1002912', projectLeader: 'Grace Hopper' })]));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText('University · PI: Ada Lovelace · PD: PD')).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'hopper' } });
+  expect(screen.queryByText(/#1002903/)).not.toBeInTheDocument();
+  expect(screen.getByText(/#1002912/)).toBeInTheDocument();
+});
+
+test('an unscheduled request opens the status card', async () => {
+  global.fetch.mockResolvedValue(response([row({ timing: { availability: 'missing' } })]));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText('Not scheduled')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Open request' })).toHaveAttribute('href', expect.stringMatching(/#deliberations-status$/));
 });

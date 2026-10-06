@@ -12,10 +12,19 @@ import {
   REQUEST_DOCUMENT_OPERATION_STATUS,
 } from '../../config/requestDocument';
 
-function requestHref(request, tab = 'staff-deliberations') {
+function requestHref(request, tab = 'staff-deliberations', card = null) {
   const params = new URLSearchParams({ tab });
   if (request.requestNumber) params.set('n', request.requestNumber);
-  return `/workbench/${request.requestId}?${params.toString()}`;
+  return `/workbench/${request.requestId}?${params.toString()}${card ? `#${card}` : ''}`;
+}
+
+// The request page's Staff deliberations tab scrolls to the card whose action
+// is this row's next step (anchors defined in StaffDeliberationsTab.js).
+function cardFor(request, task, stage) {
+  if (task.bucket === 'review') return null;
+  if (task.label === 'Needs attention' || stage.tone === 'amber') return 'deliberations-status';
+  if (request.preparation?.due || request.writeup?.correctionInProgress) return 'deliberations-writeup';
+  return 'deliberations-briefing';
 }
 
 function dateTime(value, timeZone = null) {
@@ -151,43 +160,47 @@ function RequestRow({ request }) {
   const problem = task.label === 'Needs attention' ? attentionReason(request) : null;
   const stage = stageFor(request);
   const when = presentationWhen(request);
-  const meta = [
+  const people = [
     request.institution,
-    request.programDirector && `Lead PD: ${request.programDirector}`,
-  ].filter(Boolean);
+    request.projectLeader && `PI: ${request.projectLeader}`,
+    request.programDirector && `PD: ${request.programDirector}`,
+  ].filter(Boolean).join(' · ');
   return (
-    <li className="group relative grid grid-cols-1 gap-x-8 gap-y-2 px-4 py-3 transition-colors duration-200 hover:bg-gray-50 focus-within:bg-gray-50 lg:grid-cols-[minmax(16rem,1fr)_minmax(0,32rem)] lg:items-center">
-      <div className="min-w-0">
-        <div className="flex min-w-0 items-center gap-2">
-          <h3 className="min-w-0 truncate text-sm font-semibold text-gray-900" title={request.title || undefined}>
-            {/* Stretched link: the whole row opens the request on the tab where
-                the next step's action lives, and stays a real link (new tab). */}
-            <Link href={requestHref(request, task.tab)} className="underline-offset-4 after:absolute after:inset-0 after:content-[''] group-hover:underline focus:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-gray-500">
-              {request.requestNumber ? `#${request.requestNumber}` : request.requestId}{request.title ? ` — ${request.title}` : ''}
-            </Link>
-          </h3>
-          <TestRequestBadge isTestRequest={request.isTestRequest} />
+    <li className="rounded-xl border border-gray-200 bg-white px-4 py-3.5 shadow-sm sm:px-5 sm:py-4">
+      <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="font-semibold tabular-nums text-gray-900">
+              {request.requestNumber ? `#${request.requestNumber}` : request.requestId}
+            </span>
+            <TestRequestBadge isTestRequest={request.isTestRequest} />
+            <h3 className="min-w-0 text-base font-semibold text-gray-900 sm:text-lg">{request.title || 'Untitled request'}</h3>
+          </div>
+          {people && <p className="mt-1 text-sm text-gray-600">{people}</p>}
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${STAGE_TONES[stage.tone]}`}>
+              <stage.Icon aria-hidden="true" className="h-3.5 w-3.5" />
+              {stage.label}
+            </span>
+            {when && <span className="text-xs tabular-nums text-gray-500">{when}</span>}
+          </div>
+          {problem ? (
+            <p className="mt-1.5 flex gap-1.5 text-sm text-amber-800">
+              <TriangleAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{problem}</span>
+            </p>
+          ) : (
+            <p className="mt-1.5 text-sm text-gray-700">{nextStep(request, task, document)}</p>
+          )}
         </div>
-        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500">
-          {meta.map((item) => <span key={item}>{item}</span>)}
+        <div className="flex shrink-0 lg:justify-end">
+          <Link
+            href={requestHref(request, task.tab, cardFor(request, task, stage))}
+            className="inline-flex min-h-11 items-center rounded-lg bg-gray-900 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
+          >
+            {task.bucket === 'review' ? 'Open review' : 'Open request'}
+          </Link>
         </div>
-      </div>
-      <div className="min-w-0 text-sm">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${STAGE_TONES[stage.tone]}`}>
-            <stage.Icon aria-hidden="true" className="h-3.5 w-3.5" />
-            {stage.label}
-          </span>
-          {when && <span className="text-xs tabular-nums text-gray-500">{when}</span>}
-        </div>
-        {problem ? (
-          <p className="mt-1 flex gap-1.5 text-amber-800">
-            <TriangleAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{problem}</span>
-          </p>
-        ) : (
-          <p className="mt-1 text-gray-700">{nextStep(request, task, document)}</p>
-        )}
       </div>
     </li>
   );
@@ -267,7 +280,7 @@ export default function StaffDeliberationsPanel({
   }, [requests, serverNowIso]);
 
   const visible = requests.filter((request) => (filter === 'all' || taskFor(request).bucket === filter)
-    && [request.requestNumber, request.title, request.institution, request.programDirector].filter(Boolean).join(' ').toLowerCase().includes(search.toLowerCase().trim()));
+    && [request.requestNumber, request.title, request.institution, request.projectLeader, request.programDirector].filter(Boolean).join(' ').toLowerCase().includes(search.toLowerCase().trim()));
   if (!cycleCode && !loadingCycles) return null;
 
   return (
@@ -281,7 +294,7 @@ export default function StaffDeliberationsPanel({
             </select>
           </label>
           <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">Search
-            <input value={search} onChange={(event) => setSearch(event.target.value)} type="search" placeholder="Request, title, institution or PD" className="h-11 w-72 rounded-lg border border-gray-300 px-3 text-sm font-normal text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} type="search" placeholder="Request, title, institution, PI or PD" className="h-11 w-72 rounded-lg border border-gray-300 px-3 text-sm font-normal text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2" />
           </label>
         </div>
         <ScopeSegment scope={scope} onChange={onScopeChange} allLabel="All program directors" />
@@ -296,7 +309,7 @@ export default function StaffDeliberationsPanel({
       ) : error ? null : visible.length === 0 ? (
         <Card hover={false}><p className="text-gray-700">No requests match this view. Try All tasks or clear the search.</p></Card>
       ) : (
-        <ul className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <ul className="space-y-3">
           {visible.map((request) => <RequestRow key={request.requestId} request={request} />)}
         </ul>
       )}
