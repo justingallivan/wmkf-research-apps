@@ -330,7 +330,7 @@ export default function Layout({
 
           {/* Mobile User Menu (only when auth enabled) */}
           {authEnabled && showUserMenu && status === 'authenticated' && (
-            <div className="md:hidden border-t border-gray-200 py-4">
+            <div className="md:hidden relative z-50 bg-white border-t border-gray-200 py-4">
               <div className="px-4 pb-3 border-b border-gray-100 mb-3">
                 <div className="text-sm font-medium text-gray-900">{session.user.name}</div>
                 <div className="text-xs text-gray-500">{session.user.email}</div>
@@ -388,8 +388,8 @@ export default function Layout({
         </div>
       </main>
 
-      {/* Click outside handler for user menu */}
-      {showUserMenu && (
+      {/* Click outside handler for the open dropdown */}
+      {openMenu && (
         <div
           className="fixed inset-0 z-40"
           onClick={closeMenus}

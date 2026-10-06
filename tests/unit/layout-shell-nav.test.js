@@ -119,3 +119,20 @@ test.each([
   expect(container.querySelector('header > div').className).toContain('max-w-7xl');
   expect(container.innerHTML).not.toMatch(/max-w-(undefined|unknown)/);
 });
+
+test('clicking outside closes the Tools menu; the mobile account menu sits above the outside-click layer', async () => {
+  const { container } = render(<Layout>content</Layout>);
+  await screen.findByText('content');
+  fireEvent.click(within(mainNav()).getByRole('button', { name: 'Tools' }));
+  expect(screen.getByRole('menu')).toBeInTheDocument();
+  const overlay = container.querySelector('div.fixed.inset-0');
+  expect(overlay).not.toBeNull();
+  fireEvent.click(overlay);
+  expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  expect(container.querySelector('div.fixed.inset-0')).toBeNull();
+
+  fireEvent.click((await screen.findAllByRole('button', { name: /Staff/ }))[0]);
+  const mobileSignOut = screen.getAllByRole('button', { name: 'Sign Out' })
+    .find(button => button.closest('div.md\\:hidden'));
+  expect(mobileSignOut.closest('div.md\\:hidden').className).toMatch(/\brelative\b.*\bz-50\b/);
+});
