@@ -113,6 +113,66 @@ legacy-live | deprecated | ambiguous | direct-url-test`. `migrationDecision` ∈
 - **notes:** Included to disambiguate from "candidate"/"potential reviewer" and to correct the easy "applicant-suggested" misread of the `app` prefix. Data-model term, not an app.
 - **lastVerified:** 2026-06-26
 
+## Deliberations workflow vocabulary — OPEN, decide suite-wide after D26
+
+**Owner direction (2026-10-06):** do not rename these panel by panel. The owner
+will settle the vocabulary with colleagues as a group after the D26 cycle; the
+chosen names then change across the whole suite (Workbench, Meeting Tracker,
+Board-facing pages, email, Admin, docs) in one pass. Until then, new copy reuses
+the wording already on the surface it touches and avoids introducing a further
+variant. Inventory taken 2026-10-06 on `feature/workbench-ux`; counts are
+user-facing `.js` in `shared/components` + `pages` (excluding `pages/api`).
+
+**The workflow as the owner describes it (2026-10-05/06):**
+
+1. A PD prepares the **pre-site briefing** and shares it with staff and select
+   Board members ahead of the deliberation session. It replaced the more formal
+   pre-site visit draft as the circulated document after a Board member read
+   that draft's polish as a decision already made (owner, 2026-10-05).
+2. **Deliberation session** (Meeting Tracker): an internal meeting held
+   **before** the site visit, where the briefing and the proposal are discussed
+   and staff agree what to address at the visit.
+3. **Site visit, a.k.a. research presentation:** the applicant presentation.
+   Information after the briefing can only come from it, so its scheduled end
+   is the trigger for post-visit editing.
+4. **Working writeup** (formerly the pre-site visit draft): the fuller document
+   staff amend after the site visit; it becomes the Final Writeup.
+5. **Group review → leadership review** in Final Writeup.
+
+### Terms in conflict
+
+| Concept | Variants in use (examples) | Where |
+|---|---|---|
+| PD's pre-deliberation document | "Pre-site briefing" (Workbench step), "briefing" (~96 UI hits), "Pre-Research Presentation Brief" (read-only notice; service docblocks), "Pre-RP Brief" (server/log text), "Brief" ("Generate Brief", "Regenerate Brief", "More brief actions"), "Deliberation briefing" (Board page header), "deliberation email" ("Send the deliberation email again…") | `StaffDeliberationsTab.js`; Board page `pages/external/briefing/[token].js`; `lib/services/pre-rp-brief/*` |
+| The applicant event | "Site Visit" / "site visit" (~54 hits: Meeting Tracker list, Admin "Site Visits", upload errors), "research presentation" / "Research Presentation" (~12: materials pages, follow-up card), "Presentation" (Workbench step, list stage "Before/After presentation"), "visit" ("Post-visit editing", "Edit visit") | `MeetingTrackerList.js`, `AdminWorkspaceNavigation.js`, `PostPresentationMaterialsCard.js`, `RecordingAndTranscriptCard.js`, `StaffDeliberationsPanel.js`, `pages/external/materials/[token].js` |
+| Applicant-supplied slides/bios | "Site visit materials" (magic-link page title), "Research presentation materials" (same page, body), "Research Presentation Materials" (Workbench card), "Materials" (list line) | `pages/external/materials/[token].js`; `ResearchPresentationMaterialsCard.js` |
+| Recording/transcripts after the event | "Post-presentation materials", "Research presentation follow-up" (old card title), "Recording and transcripts" (Workbench step), "Board presentation link" | `PostPresentationMaterialsCard.js`, `RecordingAndTranscriptCard.js`, `ResearchPresentationFollowUp.js` |
+| "Presentation end" | (a) the scheduled end of the site-visit event (Workbench "Presentation ends …"; triggers post-visit editing) vs (b) the point in the recording where the presentation stops and staff discussion begins (transcript split: "Presentation end not confirmed", "Choose the last turn of the presentation") | `StaffDeliberationsTab.js` vs `RecordingAndTranscriptCard.js` |
+| Staff's working document | "Working writeup" (~19), "working draft" / "Prepare working draft", "Word Draft" ("Regenerate Word Draft"), "Pre-Site Visit Writeup" (read-only notice), "Site Visit working document" (Final Writeup prerequisite), "Pre-Site artifact" (Meeting Tracker) | `StaffDeliberationsTab.js`, `FinalWriteupTab.js`, `MeetingTrackerList.js` |
+| The meeting | "Deliberation session" / "deliberation session" (~15), "PC deliberation session", "Meeting session" (browser tab title, `SessionEditor.js:526`), "session" | Meeting Tracker, `PreSiteDistributionPanel.js`, Workbench step |
+| The Workbench area | "Staff Deliberations" (request tab, ~19) vs "Staff deliberations" (list tab, ~9) — casing differs between the two tabs | `pages/workbench/[requestId].js`, Workbench list |
+
+**Contracts that a rename must not silently break (code identifiers, not UI
+copy):** API namespaces `/api/workbench/pre-site-visit*`, `/api/workbench/pre-rp-brief*`,
+`/api/workbench/site-visit/*`; services `lib/services/pre-site-visit/*`,
+`lib/services/pre-rp-brief/*`, `lib/services/site-visit-materials/*`; the
+Dataverse `wmkf_sitevisit` activity and Meeting Tracker session/slot records;
+Request Document artifact types in `shared/config/requestDocument.js`; card
+anchors `#deliberations-status|briefing|writeup`; SharePoint file names such as
+"… Site Visit Presentation.pdf". Treat these as LEAVE+DOCUMENT unless the group
+explicitly chooses a migration.
+
+**Decisions for the group:** one name each for (1) the PD's document, (2) the
+applicant event, (3) the pre-visit meeting, (4) the staff working document,
+(5) applicant slides/bios, (6) recording/transcripts, and (7) a second word for
+"presentation end" in the transcript sense. Then record each as a
+`canonicalName` entry above, with the variants as `legacyAliases`.
+
+- **status:** ambiguous
+- **ownerAppKey:** `reviewers` (Workbench), `meeting-tracker`
+- **migrationDecision:** — (open; owner group decision after D26)
+- **lastVerified:** 2026-10-06
+
 ## Concept Evaluator
 
 - **canonicalName:** Concept Evaluator (deprecated)

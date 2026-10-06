@@ -9,7 +9,9 @@ metadata:
   modified: 2026-10-06T20:45:32.159Z
 ---
 
-Owner, 2026-10-06: a Meeting Tracker deliberation session is an internal staff briefing held **before** the site visit (research presentation) to agree what staff should address there. Lifecycle order for a request: pre-site briefing → deliberation session (briefing is shared to the session's attendees) → site visit / presentation → working writeup → group review → leadership review.
+Owner, 2026-10-06: a Meeting Tracker deliberation session is an internal staff briefing held **before** the site visit (research presentation) to agree what staff should address there. Lifecycle order for a request: a PD prepares the pre-site briefing and shares it with staff and select Board members → deliberation session, where the briefing and the proposal are discussed → site visit (a.k.a. research presentation) → working writeup → group review → leadership review.
+
+Vocabulary is unsettled across the suite; the owner will fix it as a group decision after D26 and rename everywhere in one pass, not panel by panel. Inventory and open decisions: `docs/NOMENCLATURE_GLOSSARY.md` → "Deliberations workflow vocabulary". Reuse the wording already on a surface until then.
 
 **Why:** I misread a session dated weeks before the presentation as test residue and placed the session line under the Group review step of the Staff Deliberations stepper; both were wrong.
 
