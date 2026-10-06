@@ -1355,6 +1355,17 @@ export default function StaffDeliberationsTab({
       )}
     >
       {materialsLine && <p className="mt-0.5 text-sm text-gray-600" data-testid="deliberations-materials-line">{materialsLine}</p>}
+      {/* Recording, transcripts and summary stay visible on the finished step:
+          they are the sources for the working writeup. Shown once anything is
+          published, or after the presentation to say where they will appear. */}
+      {siteVisitContext?.presentationMaterialsStatus === 'loaded'
+        && (due || (siteVisitContext.presentationMaterials || EMPTY_LIST).length > 0) && (
+        <ResearchPresentationFollowUp
+          status="loaded"
+          materials={siteVisitContext.presentationMaterials || EMPTY_LIST}
+          summary={siteVisitContext.presentationSummary || null}
+        />
+      )}
     </Step>
   );
 
@@ -1552,13 +1563,6 @@ export default function StaffDeliberationsTab({
         </Card>
       </section>
 
-      {siteVisitContext?.presentationMaterialsStatus === 'loaded' && (
-        <ResearchPresentationFollowUp
-          status="loaded"
-          materials={siteVisitContext.presentationMaterials || EMPTY_LIST}
-          summary={siteVisitContext.presentationSummary || null}
-        />
-      )}
 
       {showDistributionPanel && (
         <PreSiteDistributionPanel

@@ -1166,9 +1166,19 @@ test('the presentation follow-up mounts only after the server enables its projec
   view.rerender(<StaffDeliberationsTab requestId={REQUEST_ID} />);
   expect(screen.queryByTestId('research-presentation-follow-up')).not.toBeInTheDocument();
 
+  // Loaded but empty before the presentation: nothing to show yet.
   siteVisitContextFeed = { presentationMaterialsStatus: 'loaded', presentationMaterials: [] };
   view.rerender(<StaffDeliberationsTab requestId={REQUEST_ID} />);
-  expect(screen.getByTestId('research-presentation-follow-up')).toBeInTheDocument();
+  expect(screen.queryByTestId('research-presentation-follow-up')).not.toBeInTheDocument();
+
+  // A published item shows inside the Presentation step.
+  siteVisitContextFeed = { presentationMaterialsStatus: 'loaded', presentationMaterials: [
+    { artifactType: 100000005, filename: 'Zoom recording', backing: 'external', externalUrl: 'https://zoom.us/rec/share/x' },
+  ] };
+  view.rerender(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  const followUp = screen.getByTestId('research-presentation-follow-up');
+  expect(within(followUp.closest('li')).getByRole('heading', { name: /^Presentation/ })).toBeInTheDocument();
+  expect(within(followUp).getByRole('link', { name: 'Watch recording' })).toHaveAttribute('href', 'https://zoom.us/rec/share/x');
 });
 
 test('once the brief is shared the materials card renders inside the panel, above Email history', async () => {
