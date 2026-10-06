@@ -918,6 +918,7 @@ test('M2: a Final document offers one action, Open review details, and no More m
   render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={onSelectTab} />);
 
   await waitFor(() => expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('In review'));
+  expect(within(screen.getByRole('button', { name: 'Open review details' }).closest('li')).getByRole('heading', { name: /Group review/ })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Open review details' }));
   expect(onSelectTab).toHaveBeenCalledWith('final-writeup');
   expect(screen.queryByRole('button', { name: 'More brief actions' })).not.toBeInTheDocument();
@@ -1496,4 +1497,13 @@ test('stepper: corrections reopened before the presentation make the writeup the
   expect(await screen.findByRole('button', { name: 'Finish corrections' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: /Working writeup \(current step\)/ })).toBeInTheDocument();
   expect(screen.queryByText(/Nothing is needed until the presentation/)).not.toBeInTheDocument();
+});
+
+test('no status notice renders when nothing needs attention; the stage sentence stays for screen readers', async () => {
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  await screen.findByRole('link', { name: /Edit (?:briefing|writeup) in Word/ });
+  expect(screen.getByTestId('deliberations-stage-sentence')).toHaveClass('sr-only');
+  expect(screen.queryByText(/Retry preparation|The last send failed|could not be determined/)).not.toBeInTheDocument();
+  expect(document.querySelector('#deliberations-status .bg-amber-50')).toBeNull();
 });

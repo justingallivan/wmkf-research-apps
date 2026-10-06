@@ -11,7 +11,7 @@ import ResearchPresentationFollowUp from './ResearchPresentationFollowUp';
 import OverflowMenu from './OverflowMenu';
 import ResearchPresentationMaterialsCard from './ResearchPresentationMaterialsCard';
 import Link from 'next/link';
-import { CalendarClock, CalendarX2, CheckCircle2, PenLine, TriangleAlert, Users } from 'lucide-react';
+import { CheckCircle2, TriangleAlert } from 'lucide-react';
 import {
   DELIBERATION_STAGE_DEFAULT_LABELS,
   deriveDeliberationStage,
@@ -57,14 +57,6 @@ function sessionLine(session) {
   const when = formatWhen(session?.scheduledStartIso, session?.ianaTimeZone);
   return when ? `PC deliberation session · ${when}` : 'PC deliberation session not yet scheduled.';
 }
-
-// Chip tones match the Staff deliberations list (StaffDeliberationsPanel.js).
-const STAGE_TONES = {
-  blue: 'bg-blue-50 text-blue-800 ring-blue-200',
-  violet: 'bg-violet-50 text-violet-800 ring-violet-200',
-  amber: 'bg-amber-50 text-amber-900 ring-amber-200',
-  gray: 'bg-gray-100 text-gray-700 ring-gray-200',
-};
 
 function StepMarker({ status, number }) {
   if (status === 'done') return <CheckCircle2 aria-hidden="true" className="mt-0.5 h-6 w-6 shrink-0 text-green-600" />;
@@ -1185,12 +1177,6 @@ export default function StaffDeliberationsTab({
   const stepStatus = (key) => (key === currentStep ? 'current' : stepDone[key] ? 'done' : 'upcoming');
   const briefStatus = stepStatus('briefing');
   const writeupStatus = stepStatus('writeup');
-  const stageChip = reviewActive
-    ? { label: finalReview?.phase === 'leadership-review' ? 'Leadership review' : 'Group review', tone: 'violet', Icon: Users }
-    : phase === 'Needs attention' ? { label: 'Needs attention', tone: 'amber', Icon: TriangleAlert }
-      : due ? { label: 'After presentation', tone: 'blue', Icon: PenLine }
-        : timing?.endIso ? { label: 'Before presentation', tone: 'gray', Icon: CalendarClock }
-          : { label: 'Not scheduled', tone: 'amber', Icon: CalendarX2 };
   // The specific reason behind "Needs attention", in the list's wording.
   const attentionReason = phase !== 'Needs attention' ? null
     : timing?.availability === 'ambiguous' ? 'More than one presentation is scheduled for this request, so the time can’t be confirmed.'
@@ -1214,8 +1200,10 @@ export default function StaffDeliberationsTab({
           : readyFile && preSiteDraftReady ? `Draft ready${warnings?.length ? ` · ${warnings.length} ${warnings.length === 1 ? 'thing' : 'things'} to check` : ''}`
             : due ? 'Not prepared yet' : 'Optional before the presentation';
   const summaryClass = 'mt-0.5 text-sm text-gray-600';
+  const hasProblemNotice = Boolean(stageFetchFailed || attentionReason || preparationReadError
+    || preparationState === 'blocked' || (briefShared && latestSendFailure));
   // What to do now, for the steps whose stage sentence does not already say it.
-  const nowLine = attentionReason ? null
+  const nowLine = hasProblemNotice ? null
     : currentStep === 'briefing'
       ? briefShared ? 'Share the briefing for the presentation.'
         : briefDraftReady ? 'Check the briefing in Word, then share it for the presentation.'
@@ -1230,7 +1218,12 @@ export default function StaffDeliberationsTab({
       number={1}
       title="Pre-site briefing"
       status={briefStatus}
-      summary={<p className={summaryClass}>{briefSummary}</p>}
+      summary={(
+        <>
+          <p className={summaryClass}>{briefSummary}</p>
+          {currentStep === 'briefing' && nowLine && <p className="mt-1 text-sm text-gray-900">{nowLine}</p>}
+        </>
+      )}
       details={briefReadyFile ? (
         <div className="mt-2 text-sm text-gray-700">
           <p className="text-gray-600">A concise summary to circulate before the presentation.</p>
@@ -1354,7 +1347,12 @@ export default function StaffDeliberationsTab({
       number={2}
       title="Presentation"
       status={stepStatus('presentation')}
-      summary={<p className={summaryClass} data-testid="deliberations-visit-line">{timingLabel}</p>}
+      summary={(
+        <>
+          <p className={summaryClass} data-testid="deliberations-visit-line">{timingLabel}</p>
+          {currentStep === 'presentation' && nowLine && <p className="mt-1 text-sm text-gray-900">{nowLine}</p>}
+        </>
+      )}
     >
       {materialsLine && <p className="mt-0.5 text-sm text-gray-600" data-testid="deliberations-materials-line">{materialsLine}</p>}
     </Step>
@@ -1473,10 +1471,19 @@ export default function StaffDeliberationsTab({
       title="Group review"
       status={stepStatus('review')}
       summary={<p className={summaryClass}>{reviewActive ? 'In review in Final writeup' : 'Starts in Final writeup when the writeup is ready'}</p>}
-      actions={due && editingReady && onSelectTab ? (
-        <button type="button" onClick={() => onSelectTab('final-writeup')} className={secondaryClass}>
-          Open group-review details
-        </button>
+      actions={(movedToFinal && onSelectTab) || (due && editingReady && onSelectTab) ? (
+        <>
+          {movedToFinal && onSelectTab && (
+            <button type="button" onClick={() => onSelectTab('final-writeup')} className={primaryClass}>
+              Open review details
+            </button>
+          )}
+          {due && editingReady && onSelectTab && (
+            <button type="button" onClick={() => onSelectTab('final-writeup')} className={secondaryClass}>
+              Open group-review details
+            </button>
+          )}
+        </>
       ) : null}
     >
       <p className="mt-0.5 text-sm text-gray-600" data-testid="deliberations-session-line">
@@ -1499,46 +1506,34 @@ export default function StaffDeliberationsTab({
           {briefRecoveryMessage}
         </div>
       )}
-      <div id="deliberations-status" className="scroll-mt-6"><Card hover={false} padding="p-5 sm:p-6">
-        <h2 className="sr-only">Staff Deliberations status</h2>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${STAGE_TONES[stageChip.tone]}`}>
-                <stageChip.Icon aria-hidden="true" className="h-3.5 w-3.5" />
-                {stageChip.label}
-              </span>
-            </div>
+      <section id="deliberations-status" aria-labelledby="deliberations-steps-heading" className="scroll-mt-6 space-y-3">
+        <h2 id="deliberations-steps-heading" className="sr-only">Staff Deliberations</h2>
+        <p className="sr-only" data-testid="deliberations-stage-sentence">{phase}</p>
+        {hasProblemNotice && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             {stageFetchFailed && (
-              <p className="mt-2 max-w-2xl text-sm text-red-800" data-testid="deliberations-stage-error">
+              <p className="text-red-800" data-testid="deliberations-stage-error">
                 The deliberation stage could not be determined: {briefError}
               </p>
             )}
-            <p className={phase === stageChip.label ? 'sr-only' : 'mt-2 text-base font-medium text-gray-900'} data-testid="deliberations-stage-sentence">{phase}</p>
-            {nowLine && <p className="mt-2 max-w-2xl text-base text-gray-900">{nowLine}</p>}
             {attentionReason && (
-              <p className="mt-1 flex max-w-2xl gap-1.5 text-sm text-amber-800">
+              <p className="flex gap-1.5">
                 <TriangleAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>{attentionReason}</span>
               </p>
             )}
-            {preparationReadError && <p role="alert" className="mt-2 text-sm text-amber-800">{preparationReadError}</p>}
-            {preparationState === 'blocked' && <div className="mt-3 text-sm text-amber-800">
+            {preparationReadError && <p role="alert" className="mt-1">{preparationReadError}</p>}
+            {preparationState === 'blocked' && <div className="mt-2">
               <p>Automatic preparation needs attention. Your existing document has been preserved.</p>
               <button type="button" onClick={retryPreparation} disabled={retryingPreparation} className={`mt-2 ${secondaryClass}`}>
                 {retryingPreparation ? 'Retrying…' : 'Retry preparation'}
               </button>
             </div>}
-            {briefShared && latestSendFailure && <p className="mt-2 text-sm text-red-700" role="alert" data-testid="deliberations-send-failure">The last send failed: {latestSendFailure.message}</p>}
+            {briefShared && latestSendFailure && <p className="mt-1 text-red-700" role="alert" data-testid="deliberations-send-failure">The last send failed: {latestSendFailure.message}</p>}
           </div>
-          {movedToFinal && onSelectTab && (
-            <button type="button" onClick={() => onSelectTab('final-writeup')} className={primaryClass}>
-              Open review details
-            </button>
-          )}
-        </div>
+        )}
         {unknownLifecycle && (
-          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
             <h3 className="font-semibold">Staff Deliberations is read-only</h3>
             <p className="mt-1">
               The Pre-Research Presentation Brief has moved beyond the deliberation stages.
@@ -1547,24 +1542,15 @@ export default function StaffDeliberationsTab({
             </p>
           </div>
         )}
-        {movedToFinal && (
-          <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-950">
-            <h3 className="font-semibold">Moved to Final Writeup</h3>
-            <p className="mt-1">
-              This tab now preserves the Staff Deliberations record. Open the Final Writeup tab to continue in Word.
-            </p>
-          </div>
-        )}
-      </Card></div>
-
-      <Card hover={false} padding="p-0">
-        <ol aria-label="Staff deliberations steps" className="divide-y divide-gray-200">
-          {briefingStep}
-          {presentationStep}
-          {writeupStep}
-          {reviewStep}
-        </ol>
-      </Card>
+        <Card hover={false} padding="p-0">
+          <ol aria-label="Staff deliberations steps" className="divide-y divide-gray-200">
+            {briefingStep}
+            {presentationStep}
+            {writeupStep}
+            {reviewStep}
+          </ol>
+        </Card>
+      </section>
 
       {siteVisitContext?.presentationMaterialsStatus === 'loaded' && (
         <ResearchPresentationFollowUp
