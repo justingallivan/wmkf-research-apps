@@ -248,7 +248,7 @@ test('M2: loads existing Ready actions without another generation request', asyn
   queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT) }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  const link = await screen.findByRole('link', { name: 'Edit in Word' });
+  const link = await screen.findByRole('link', { name: /Edit (?:briefing|writeup) in Word/ });
   expect(link).toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
   fireEvent.click(screen.getByRole('button', { name: 'More writeup actions' }));
   expect(screen.getByRole('menuitem', { name: 'Download' })).toBeInTheDocument();
@@ -267,7 +267,7 @@ test('Pre-Site card: Generate, then Edit in Word plus Start Site Visit; Download
   await waitFor(() => expect(calls('presitePost')).toHaveLength(1));
   expect(JSON.parse(calls('presitePost')[0][1].body)).toEqual({ requestId: REQUEST_ID });
 
-  const edit = await screen.findByRole('link', { name: 'Edit in Word' });
+  const edit = await screen.findByRole('link', { name: /Edit (?:briefing|writeup) in Word/ });
   expect(edit).toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
   expect(screen.queryByRole('button', { name: 'Finish corrections' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'More writeup actions' }));
@@ -289,7 +289,7 @@ test('Pre-Site card: Start Site Visit calls start-site-visit and moves the Pre-S
     requestId: REQUEST_ID,
     expectedArtifactId: PRESITE_ARTIFACT_ID,
   });
-  expect(await screen.findByRole('link', { name: 'Open working document' })).toBeInTheDocument();
+  expect(await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Finish corrections' })).not.toBeInTheDocument();
   // Share never calls start-site-visit and is not on this card at all.
   expect(screen.queryByRole('button', { name: 'Share…' })).not.toBeInTheDocument();
@@ -299,7 +299,7 @@ test('M4: Start Site Visit requires the Pre-Site row to be Draft (not offered on
   queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(REVIEW) }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  await screen.findByRole('link', { name: 'Open working document' });
+  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
   expect(screen.queryByRole('button', { name: 'Finish corrections' })).not.toBeInTheDocument();
   expect(calls('startSiteVisit')).toHaveLength(0);
 });
@@ -372,7 +372,7 @@ test('M2: recovers a Ready Word link after the generation connection is interrup
 
   fireEvent.click(screen.getByRole('button', { name: 'Prepare working draft' }));
 
-  const link = await screen.findByRole('link', { name: 'Edit in Word' });
+  const link = await screen.findByRole('link', { name: /Edit (?:briefing|writeup) in Word/ });
   expect(link).toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   expect(calls('presitePost')).toHaveLength(1);
@@ -427,7 +427,7 @@ test('M2: a late response after switching to another request (remount) cannot pu
   await act(async () => { resolveFirst(response({ success: true, artifact: preSiteArtifact(DRAFT) })); });
 
   await waitFor(() => expect(screen.getByRole('button', { name: 'Prepare working draft' })).toBeEnabled());
-  expect(screen.queryByRole('link', { name: 'Edit in Word' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /Edit (?:briefing|writeup) in Word/ })).not.toBeInTheDocument();
 });
 
 test('M2: refreshes durable failure state once and shows its support reference', async () => {
@@ -491,7 +491,7 @@ test('Brief card: Generate, then Edit in Word plus Share…; Download/Regenerate
   expect(briefBody.requestId).toBe(REQUEST_ID);
   expect(briefBody.clientOperationId).toEqual(expect.any(String));
 
-  const edit = await screen.findByRole('link', { name: 'Edit in Word' });
+  const edit = await screen.findByRole('link', { name: /Edit (?:briefing|writeup) in Word/ });
   expect(edit).toHaveAttribute('href', 'https://sharepoint.test/brief.docx');
   expect(screen.getByRole('button', { name: 'Share…' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
@@ -541,7 +541,7 @@ test('Pre-RP brief card shows "generated <date>" for a draft with a lastModified
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
   const link = await screen.findByRole('link', {
-    name: `Word draft · generated ${new Date('2026-09-10T12:00:00Z').toLocaleDateString()}`,
+    name: `Briefing draft · generated ${new Date('2026-09-10T12:00:00Z').toLocaleDateString()}`,
   });
   expect(link).toHaveAttribute('href', 'https://sharepoint.test/brief.docx');
 });
@@ -552,7 +552,7 @@ test('Pre-RP brief card shows plain "Word draft" when lastModified is absent', a
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  const link = await screen.findByRole('link', { name: 'Word draft' });
+  const link = await screen.findByRole('link', { name: 'Briefing draft' });
   expect(link).toHaveAttribute('href', 'https://sharepoint.test/brief.docx');
 });
 
@@ -575,7 +575,7 @@ test('NEW-1: Regenerate Brief is not offered once the shared brief has already b
   queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  await screen.findByRole('link', { name: 'Open working document' });
+  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
   fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
   expect(screen.queryByRole('menuitem', { name: 'Regenerate Brief' })).not.toBeInTheDocument();
 });
@@ -588,7 +588,7 @@ test('Regenerate sent brief… is hidden for a non-superuser even once the brief
   queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser={false} />);
 
-  await screen.findByRole('link', { name: 'Open working document' });
+  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
   fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
   expect(screen.queryByRole('menuitem', { name: 'Regenerate sent brief…' })).not.toBeInTheDocument();
 });
@@ -598,7 +598,7 @@ test('Regenerate sent brief… is shown for a superuser once sent, and hidden wh
   queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
 
-  await screen.findByRole('link', { name: 'Open working document' });
+  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
   fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
   expect(screen.getByRole('menuitem', { name: 'Regenerate sent brief…' })).toBeInTheDocument();
 });
@@ -608,7 +608,7 @@ test('Regenerate sent brief… is hidden for a superuser while the shared brief 
   queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
 
-  await screen.findByRole('link', { name: 'Open working document' });
+  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
   fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
   expect(screen.queryByRole('menuitem', { name: 'Regenerate sent brief…' })).not.toBeInTheDocument();
 });
@@ -618,7 +618,7 @@ test('the guarded brief-reopen dialog stays disabled until reason, a valid note,
   queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
 
-  await screen.findByRole('link', { name: 'Open working document' });
+  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
   fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
   fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate sent brief…' }));
 
@@ -681,7 +681,7 @@ test('a successful guarded brief regeneration remounts distribution history for 
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
 
-  await screen.findByRole('link', { name: 'Open working document' });
+  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
   expect(mountedSourceArtifactIds).toEqual([BRIEF_ARTIFACT_ID]);
   fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
   fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate sent brief…' }));
@@ -695,7 +695,7 @@ test('a successful guarded brief regeneration remounts distribution history for 
 
   await waitFor(() => expect(calls('briefReopen')).toHaveLength(1));
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Regenerate a brief the Board already received?' })).not.toBeInTheDocument());
-  expect(await screen.findByRole('link', { name: 'Edit in Word' })).toBeInTheDocument();
+  expect(await screen.findByRole('link', { name: /Edit (?:briefing|writeup) in Word/ })).toBeInTheDocument();
   // Proves an actual remount happened for the new artifact id (a second,
   // fresh history load) rather than the mock merely re-rendering with
   // updated props under a stale, already-mounted history load.
@@ -742,7 +742,7 @@ test('a 202 (still-generating) guarded regeneration suppresses every Share/send-
   }));
   const { rerender } = render(<StaffDeliberationsTab key="mount-1" requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
 
-  await screen.findByRole('link', { name: 'Open working document' });
+  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
   // The mocked panel's onHistory effect fires on every re-render (an
   // intentional simplification for tests exercising an actual data change,
   // per its own comment above), unlike the real panel, which only refires on
@@ -797,7 +797,7 @@ test('a 202 (still-generating) guarded regeneration suppresses every Share/send-
   queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(DRAFT, { artifactId: REOPENED_BRIEF_ARTIFACT_ID }) }));
   rerender(<StaffDeliberationsTab key="mount-2" requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
 
-  expect(await screen.findByRole('link', { name: 'Edit in Word' })).toBeInTheDocument();
+  expect(await screen.findByRole('link', { name: /Edit (?:briefing|writeup) in Word/ })).toBeInTheDocument();
   // Only now — once the successor is confirmed current — does history
   // remount for the new artifact id.
   await waitFor(() => expect(mountedSourceArtifactIds).toEqual([BRIEF_ARTIFACT_ID, REOPENED_BRIEF_ARTIFACT_ID]));
@@ -818,7 +818,7 @@ test('suppression lifts once a pending regeneration attempt FAILS, not just once
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
 
-  await screen.findByRole('link', { name: 'Open working document' });
+  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
   fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
   expect(screen.getByRole('menuitem', { name: 'Send the deliberation email again…' })).toBeInTheDocument();
   expect(screen.getByRole('menuitem', { name: 'Regenerate sent brief…' })).toBeInTheDocument();
@@ -840,7 +840,7 @@ test('suppression lifts once the pending artifact reports leaseActive: false, ev
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
 
-  await screen.findByRole('link', { name: 'Open working document' });
+  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
   expect(screen.queryByText(/sharing is paused until it is ready/i)).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'More brief actions' }));
   expect(screen.getByRole('menuitem', { name: 'Send the deliberation email again…' })).toBeInTheDocument();
@@ -912,13 +912,13 @@ test('a late lock response cannot publish workspace state after the request chan
 
 // ── Composite stage (brief drives stage; finalReached from the Pre-Site row) ─
 
-test('M2: a Final document offers one action, Open Final Writeup, and no More menu', async () => {
+test('M2: a Final document offers one action, Open review details, and no More menu', async () => {
   const onSelectTab = jest.fn();
   queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(FINAL) }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={onSelectTab} />);
 
   await waitFor(() => expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('In review'));
-  fireEvent.click(screen.getByRole('button', { name: 'Open Final Writeup' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Open review details' }));
   expect(onSelectTab).toHaveBeenCalledWith('final-writeup');
   expect(screen.queryByRole('button', { name: 'More brief actions' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'More writeup actions' })).not.toBeInTheDocument();
@@ -947,7 +947,7 @@ test('Final Writeup activation marks the Pre-Site row FINAL while the brief stay
   render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={onSelectTab} />);
 
   await waitFor(() => expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('In review'));
-  fireEvent.click(screen.getByRole('button', { name: 'Open Final Writeup' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Open review details' }));
   expect(onSelectTab).toHaveBeenCalledWith('final-writeup');
 });
 
@@ -977,8 +977,8 @@ test.each([
   // its own affordances, so the copy must not claim editing is locked.
   expect(screen.queryByText(/cannot be edited/i)).not.toBeInTheDocument();
   // L3: no Edit/Download/Regenerate affordances render alongside the read-only panel.
-  expect(screen.queryByRole('link', { name: 'Edit in Word' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('link', { name: 'Open working document' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /Edit (?:briefing|writeup) in Word/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /Open (?:briefing|writeup) in Word/ })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'More brief actions' })).not.toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'Download' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Regenerate/ })).not.toBeInTheDocument();
@@ -994,7 +994,7 @@ test('M1: a shared brief without a current Word URL fails closed with an explana
     .toBeInTheDocument();
   expect(screen.getByText(/No current Word link was returned/i)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Share…' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('link', { name: 'Open working document' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /Open (?:briefing|writeup) in Word/ })).not.toBeInTheDocument();
 });
 
 test('M1: a shared Pre-Site writeup without a current Word URL fails closed with an explanation', async () => {
@@ -1006,7 +1006,7 @@ test('M1: a shared Pre-Site writeup without a current Word URL fails closed with
   expect(await screen.findByRole('heading', { name: 'Pre-Site Visit Writeup is read-only' }))
     .toBeInTheDocument();
   expect(screen.getByText(/No current Word link was returned/i)).toBeInTheDocument();
-  expect(screen.queryByRole('link', { name: 'Open working document' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /Open (?:briefing|writeup) in Word/ })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Finish corrections' })).not.toBeInTheDocument();
 });
 
@@ -1015,7 +1015,7 @@ test('M1: a shared Pre-Site writeup without a current Word URL fails closed with
 test('only superusers can see the administration section and reopen control', async () => {
   queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(REVIEW) }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser={false} />);
-  await screen.findByRole('link', { name: 'Open working document' });
+  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
   expect(screen.queryByRole('button', { name: 'Reopen Pre-Site Draft' })).not.toBeInTheDocument();
   expect(screen.queryByText(/Administration — guarded reopen/)).not.toBeInTheDocument();
 });
@@ -1039,7 +1039,7 @@ test('validates confirmation and submits one guarded reopen, returning the write
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
 
-  await screen.findByRole('link', { name: 'Open working document' });
+  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
   fireEvent.click(screen.getByText(/Administration — guarded reopen/));
   fireEvent.click(screen.getByRole('button', { name: 'Reopen Pre-Site Draft' }));
   const submit = screen.getByRole('button', { name: 'Create Draft Successor' });
@@ -1068,7 +1068,7 @@ test('M2: a failed submit keeps one operation id and immutable audit inputs for 
   queueRoute('reopen', response({ error: 'The first attempt failed.', code: 'pre_site_reopen_copy_verification_failed' }, 409));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
 
-  await screen.findByRole('link', { name: 'Open working document' });
+  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
   fireEvent.click(screen.getByText(/Administration — guarded reopen/));
   fireEvent.click(screen.getByRole('button', { name: 'Reopen Pre-Site Draft' }));
   fireEvent.change(screen.getByLabelText('Reason'), { target: { value: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF } });
@@ -1111,7 +1111,7 @@ test('renders append-only guarded reopen history from the status contract', asyn
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
 
-  await screen.findByRole('link', { name: 'Open working document' });
+  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
   fireEvent.click(screen.getByText(/Administration — guarded reopen/));
   expect(screen.getByText('Guarded reopen attempts')).toBeInTheDocument();
   expect(screen.getByText('Needs reconciliation')).toBeInTheDocument();
@@ -1262,7 +1262,7 @@ test('T2: submitReopen non-2xx (readStatus route bytes unaffected) posts exact h
   queueRoute('reopen', response({ error: 'boom' }, 500));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
 
-  await screen.findByRole('link', { name: 'Open working document' });
+  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
   fireEvent.click(screen.getByText(/Administration — guarded reopen/));
   fireEvent.click(screen.getByRole('button', { name: 'Reopen Pre-Site Draft' }));
   fireEvent.change(screen.getByLabelText('Reason'), { target: { value: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF } });
@@ -1343,10 +1343,10 @@ test('T2: an abort mid-poll (readStatus rejects with AbortError) is swallowed by
 test('a ready ordinary draft never requires a manual Start Site Visit', async () => {
   queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT), preparation: { due: true, state: 'pending' }, timing: { endIso: '2026-09-28T18:00:00Z' } }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={jest.fn()} />);
-  await screen.findByRole('link', { name: 'Edit in Word' });
+  await screen.findByRole('link', { name: /Edit (?:briefing|writeup) in Word/ });
   expect(screen.queryByRole('button', { name: 'Start Site Visit' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Review readiness' })).not.toBeInTheDocument();
-  expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('Preparing working writeup');
+  expect(screen.queryByRole('button', { name: 'Open group-review details' })).not.toBeInTheDocument();
+  expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('Queued for automatic preparation');
   expect(calls('presitePost')).toHaveLength(0);
   expect(calls('startSiteVisit')).toHaveLength(0);
 });
@@ -1355,17 +1355,17 @@ test('confirmed post-visit draft leads to review navigation without starting rev
   const onSelectTab = jest.fn();
   queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(REVIEW), preparation: { due: true, state: 'prepared' }, timing: { availability: 'available', endIso: '2026-09-28T18:00:00Z' } }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={onSelectTab} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Review readiness' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Open group-review details' }));
   expect(onSelectTab).toHaveBeenCalledWith('final-writeup');
   expect(calls('startSiteVisit')).toHaveLength(0);
-  expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('Post-visit editing');
+  expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('Working writeup ready for post-visit editing');
 });
 
 test('an incomplete checkpoint cannot offer review readiness', async () => {
   queueRoute('presiteGet', statusResponse({ currentArtifact: { ...preSiteArtifact(REVIEW), milestone: null }, preparation: { due: true, state: 'blocked' } }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={jest.fn()} />);
   await screen.findByText('Automatic preparation needs attention. Your existing document has been preserved.');
-  expect(screen.queryByRole('button', { name: 'Review readiness' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Open group-review details' })).not.toBeInTheDocument();
 });
 
 test('a completed brief lock does not stand for a send receipt', async () => {
@@ -1399,7 +1399,7 @@ test('paused preparation retains manual foundation generation after the presenta
   queueRoute('presiteGet', statusResponse({ preparation: { due: true, state: 'disabled' }, timing: { availability: 'available', endIso: '2026-09-28T18:00:00Z' } }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
   expect(await screen.findByRole('button', { name: 'Prepare working draft' })).toBeInTheDocument();
-  await waitFor(() => expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('Preparation paused'));
+  await waitFor(() => expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('No working writeup yet'));
 });
 
 test('paused automation retains explicit preparation of an existing draft after the presentation', async () => {
@@ -1407,4 +1407,21 @@ test('paused automation retains explicit preparation of an existing draft after 
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
   expect(await screen.findByRole('button', { name: 'Prepare for post-visit editing' })).toBeInTheDocument();
   expect(calls('startSiteVisit')).toHaveLength(0);
+});
+
+
+test('due automation explains waiting without asking staff to prepare', async () => {
+  queueRoute('presiteGet', statusResponse({ preparation: { due: true, state: 'due' }, timing: { availability: 'available', endIso: '2026-09-28T18:00:00Z' } }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('Waiting for automatic preparation'));
+  expect(screen.getByText(/No preparation action is needed from you yet/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Prepare working draft' })).not.toBeInTheDocument();
+});
+
+test('disabled automation does not name an unavailable action during corrections', async () => {
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT), correctionInProgress: true, preparation: { due: true, state: 'disabled' }, timing: { availability: 'available', endIso: '2026-09-28T18:00:00Z' } }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByRole('button', { name: 'Finish corrections' })).toBeInTheDocument();
+  expect(screen.queryByText(/Prepare for post-visit editing keeps/)).not.toBeInTheDocument();
+  expect(screen.getByText('Automatic preparation is off. Your existing Word file is unchanged.')).toBeInTheDocument();
 });
