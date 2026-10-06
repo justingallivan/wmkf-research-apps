@@ -97,6 +97,67 @@ export const noEmailHint = (person) => person?.linked
   ? 'No email on file. The linked Dataverse contact is inactive, missing, or has no primary email; fix or relink the contact, or unlink the roster row.'
   : 'No email on file. Add a preferred email on the Expertise Finder roster before this person can be added.';
 
+// 'YYYY-MM-DDTHH:mm' wall-clock strings in the visit's own time zone; format
+// them as written (UTC on both sides) so the viewer's zone never shifts them.
+function wallClock(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value || '');
+  if (!match) return null;
+  const [, y, mo, d, h, mi] = match.map(Number);
+  return new Date(Date.UTC(y, mo - 1, d, h, mi));
+}
+
+export function visitWhen(visit) {
+  const start = wallClock(visit?.startLocal);
+  const end = wallClock(visit?.endLocal);
+  if (!start) return 'Not scheduled';
+  const day = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(start);
+  const time = (date) => new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }).format(date);
+  const sameDay = end && end.toISOString().slice(0, 10) === start.toISOString().slice(0, 10);
+  const range = end ? (sameDay ? `${time(start)} – ${time(end)}` : `${time(start)} – ${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(end)}, ${time(end)}`) : time(start);
+  return `${day} · ${range}${visit.timeZone ? ` (${visit.timeZone})` : ''}`;
+}
+
+function personName(ref, directory) {
+  if (!ref) return null;
+  if (ref.kind === 'manual') return ref.name || ref.email;
+  const people = ref.kind === 'staff' ? directory.staff : ref.kind === 'roster' ? directory.board : [];
+  return people.find((person) => sameRef(person.ref, ref))?.name || 'Person no longer in the directory';
+}
+
+function VisitSummary({ visit, directory, onEdit }) {
+  const link = /^https?:\/\//i.test(visit.locationOrLink || '') ? visit.locationOrLink : null;
+  let linkHost = null;
+  try { linkHost = link ? new URL(link).hostname : null; } catch { linkHost = null; }
+  const names = (refs) => (refs || []).map((ref) => personName(ref, directory)).filter(Boolean);
+  const required = names(visit.requiredAttendees);
+  const optional = names(visit.optionalAttendees);
+  const row = (label, value) => (
+    <div>
+      <dt className="text-sm font-medium text-gray-500">{label}</dt>
+      <dd className="mt-1 text-sm text-gray-900">{value}</dd>
+    </div>
+  );
+  return (
+    <section aria-labelledby="visit-details-heading" className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="visit-details-heading" className="text-base font-semibold text-gray-900">Visit details</h2>
+        <Button type="button" variant="outline" size="sm" onClick={onEdit}>Edit visit details</Button>
+      </div>
+      <dl className="mt-4 grid gap-x-8 gap-y-4 md:grid-cols-2">
+        {row('When', visitWhen(visit))}
+        {row('Format', SITE_VISIT_FORMAT_LABEL[visit.format] || 'Not set')}
+        {row(link ? 'Meeting link' : 'Location', link
+          ? <a href={link} target="_blank" rel="noopener noreferrer" className="font-medium text-gray-900 underline underline-offset-4 hover:text-gray-700">Open meeting link{linkHost ? ` (${linkHost})` : ''}</a>
+          : (visit.locationOrLink || 'Not set'))}
+        {row('Organizer', personName(visit.organizer, directory) || 'Not set')}
+        {row(`Required attendees (${required.length})`, required.length ? required.join(', ') : 'None')}
+        {row(`Optional attendees (${optional.length})`, optional.length ? optional.join(', ') : 'None')}
+        {visit.description && <div className="md:col-span-2">{row('Notes', <span className="whitespace-pre-line">{visit.description}</span>)}</div>}
+      </dl>
+    </section>
+  );
+}
+
 function Chip({ selected, onClick, children, disabled, title }) {
   return (
     <button
@@ -128,6 +189,10 @@ export default function SiteVisitEditor() {
   const [notice, setNotice] = useState(null);
   const [applicantAttendees, setApplicantAttendees] = useState([]);
   const [applicantAttendeesUnavailable, setApplicantAttendeesUnavailable] = useState(false);
+  // A saved visit opens read-only (DESIGN.md Read-First Rule). Keyed to the
+  // request so a client-side move to another visit starts read-only again.
+  const [editingFor, setEditingFor] = useState(null);
+  const editing = Boolean(requestId) && editingFor === requestId;
 
   const load = useCallback(async () => {
     if (!requestId) return;
@@ -208,6 +273,7 @@ export default function SiteVisitEditor() {
       }, 'The site visit could not be saved.');
       setVisit(body.siteVisit);
       setForm(formFromVisit(body.siteVisit, requestNumber));
+      setEditingFor(null);
       setNotice('Site visit saved.');
     } catch (saveError) {
       if (saveError.code === 'site_visit_write_conflict') {
@@ -222,6 +288,13 @@ export default function SiteVisitEditor() {
     }
   };
 
+  const cancelEdit = () => {
+    setForm(formFromVisit(visit, requestNumber));
+    setManual({ name: '', email: '', role: 'required' });
+    setError(null);
+    setEditingFor(null);
+  };
+
   const backHref = { pathname: '/meeting-tracker', query: { ...(cycleCode ? { cycleCode } : {}), ...(programId ? { programId } : {}) } };
   const backLink = <Link href={backHref} className="text-sm font-semibold text-gray-600 underline decoration-gray-300 underline-offset-4 hover:text-gray-900">Back to the cycle schedule</Link>;
   const manualRows = [...form.requiredAttendees, ...form.optionalAttendees].filter((ref) => ref.kind === 'manual');
@@ -230,10 +303,10 @@ export default function SiteVisitEditor() {
 
   return (
     <Layout title={visit ? 'Site visit' : 'Schedule site visit'}>
-      <div className="mb-6">
+      <div className="pt-6 mb-6">
         {backLink}
-        <h1 className="mt-3 text-3xl font-semibold text-gray-900">{visit ? 'Site visit' : 'Schedule the site visit'}{requestNumber ? ` · #${requestNumber}` : ''}</h1>
-        <p className="mt-2 text-gray-600">The date here feeds the Staff Deliberations rail, the cycle view, the briefing page, and the Share email's calendar entry.</p>
+        <h1 className="mt-3 text-2xl font-semibold text-gray-900">{visit ? 'Site visit' : 'Schedule the site visit'}{requestNumber ? ` · #${requestNumber}` : ''}</h1>
+        {(!visit || editing) && <p className="mt-2 text-sm text-gray-600">The date here feeds the Staff Deliberations rail, the cycle view, the briefing page, and the Share email's calendar entry.</p>}
       </div>
 
       {error && <div role="alert" className="mb-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div>}
@@ -241,6 +314,8 @@ export default function SiteVisitEditor() {
 
       {loading ? (
         <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">Loading the site visit…</div>
+      ) : visit && !editing ? (
+        <VisitSummary visit={visit} directory={recipients} onEdit={() => { setNotice(null); setEditingFor(requestId); }} />
       ) : (
         <form onSubmit={save} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
@@ -324,12 +399,10 @@ export default function SiteVisitEditor() {
             </div>
           </fieldset>
 
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-gray-200 pt-5">
-            {backLink}
-            <div className="flex items-center gap-4">
-              {notice && <p role="status" className="text-sm font-medium text-blue-800">{notice}</p>}
-              <Button type="submit" loading={busy} disabled={!canSave}>{visit ? 'Save site visit' : 'Schedule site visit'}</Button>
-            </div>
+          <div className="mt-6 flex flex-wrap items-center justify-end gap-4 border-t border-gray-200 pt-5">
+            {notice && <p role="status" className="text-sm font-medium text-blue-800">{notice}</p>}
+            {visit && <Button type="button" variant="outline" disabled={busy} onClick={cancelEdit}>Cancel</Button>}
+            <Button type="submit" loading={busy} disabled={!canSave}>{visit ? 'Save site visit' : 'Schedule site visit'}</Button>
           </div>
         </form>
       )}

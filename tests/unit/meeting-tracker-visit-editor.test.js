@@ -63,6 +63,7 @@ test('existing visit offers a missing applicant as one-click Add and includes th
   });
   render(<SiteVisitEditor />);
   expect(await screen.findByTestId('recording-transcript-in-editor')).toHaveTextContent(REQUEST_ID);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit visit details' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Add Franklin Cat (franklin@example.edu)' }));
   expect(screen.getByText(/Franklin Cat · franklin@example.edu/)).toBeInTheDocument();
   expect(screen.getByText(/Justin · justin@example.edu/)).toBeInTheDocument();
@@ -87,12 +88,14 @@ test('removing a saved applicant attendee and reopening shows Add without re-add
     return response({ success: true, siteVisit: visit, applicantAttendees: [{ kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' }] });
   });
   const first = render(<SiteVisitEditor />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit visit details' }));
   fireEvent.click(await screen.findByRole('button', { name: /Franklin Cat · franklin@example.edu.*×/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Save site visit' }));
   await waitFor(() => expect(visit.requiredAttendees).toEqual([]));
   first.unmount();
 
   render(<SiteVisitEditor />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit visit details' }));
   expect(await screen.findByRole('button', { name: 'Add Franklin Cat (franklin@example.edu)' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Franklin Cat · franklin@example.edu.*×/ })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Save site visit' }));
@@ -153,7 +156,9 @@ test('a new visit: the form posts the fields the logistics service expects, with
   expect(payload).not.toHaveProperty('requestId');
   expect(payload).not.toHaveProperty('activityId');
   expect(await screen.findAllByText('Site visit saved.')).not.toHaveLength(0);
-  expect(screen.getByRole('button', { name: 'Save site visit' })).toBeInTheDocument();
+  // Once saved, the visit returns to its read-only summary.
+  expect(screen.getByRole('button', { name: 'Edit visit details' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Save site visit' })).not.toBeInTheDocument();
 });
 
 test('an existing visit: the form loads it, sends activityId + etag, and a write conflict reloads with an explanation', async () => {
@@ -171,6 +176,7 @@ test('an existing visit: the form loads it, sends activityId + etag, and a write
   render(<SiteVisitEditor />);
 
   expect(await screen.findByRole('heading', { name: /^Site visit · #1003222/ })).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit visit details' }));
   expect(screen.getByLabelText('Location or meeting link')).toHaveValue('https://zoom.example/v');
   expect(screen.getByLabelText('Format')).toHaveValue('100000001');
   fireEvent.click(screen.getByRole('button', { name: 'Save site visit' }));
@@ -179,4 +185,36 @@ test('an existing visit: the form loads it, sends activityId + etag, and a write
   expect(JSON.parse(options.body)).toMatchObject({ activityId: 'a1', etag: 'W/"1"', requiredAttendees: [{ kind: 'roster', rosterId: 3 }], optionalAttendees: [{ kind: 'staff', profileId: 8 }] });
   expect(await screen.findByRole('alert')).toHaveTextContent('changed since this page loaded');
   await waitFor(() => expect(gets).toBe(2));
+});
+
+test('a saved visit opens as a read-only summary: names not ids, a short meeting link, editing only after Edit, Cancel discards', async () => {
+  const visit = { activityId: 'a1', etag: 'W/"1"', subject: 'Site Visit — #1003222', description: 'Bring slides', startLocal: '2026-10-01T09:00', endLocal: '2026-10-01T12:00', timeZone: 'America/Los_Angeles', format: 100000001, locationOrLink: 'https://zoom.example/j/123?pwd=secret', organizer: { kind: 'staff', profileId: 7 }, requiredAttendees: [{ kind: 'roster', rosterId: 3 }, { kind: 'manual', name: 'Franklin Cat', email: 'franklin@example.edu' }], optionalAttendees: [{ kind: 'staff', profileId: 8 }] };
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/recipients')) return response(recipients);
+    if (target.endsWith('/materials')) return response({ error: 'not enabled' }, 503);
+    if (options.method === 'PATCH') throw new Error('no save expected');
+    return response({ success: true, siteVisit: visit });
+  });
+  render(<SiteVisitEditor />);
+
+  const summary = await screen.findByRole('region', { name: 'Visit details' });
+  expect(summary).toHaveTextContent('Thu, Oct 1, 2026 · 9:00 AM – 12:00 PM (America/Los_Angeles)');
+  expect(summary).toHaveTextContent('Duncan Staff');
+  expect(summary).toHaveTextContent('Board Member, Franklin Cat');
+  expect(summary).toHaveTextContent('Chris Staff');
+  expect(summary).toHaveTextContent('Bring slides');
+  const link = screen.getByRole('link', { name: 'Open meeting link (zoom.example)' });
+  expect(link).toHaveAttribute('href', 'https://zoom.example/j/123?pwd=secret');
+  expect(summary).not.toHaveTextContent('pwd=secret');
+  expect(screen.queryByLabelText('Location or meeting link')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Save site visit' })).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Edit visit details' }));
+  fireEvent.change(screen.getByLabelText('Location or meeting link'), { target: { value: 'Campus' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(screen.getByRole('region', { name: 'Visit details' })).toHaveTextContent('Open meeting link (zoom.example)');
+  fireEvent.click(screen.getByRole('button', { name: 'Edit visit details' }));
+  expect(screen.getByLabelText('Location or meeting link')).toHaveValue('https://zoom.example/j/123?pwd=secret');
+  expect(global.fetch.mock.calls.some(([, options]) => options?.method === 'PATCH')).toBe(false);
 });
