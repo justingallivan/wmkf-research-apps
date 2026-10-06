@@ -80,7 +80,7 @@ function StepMarker({ status, number }) {
 
 // One lifecycle step. Finished steps collapse to their summary line and
 // actions; alerts and every action button render whatever the step's state.
-function Step({ id, number, title, status, summary, actions, children }) {
+function Step({ id, number, title, status, summary, actions, details = null, children }) {
   return (
     <li id={id} className="scroll-mt-6 px-5 py-4 sm:px-6">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
@@ -92,6 +92,13 @@ function Step({ id, number, title, status, summary, actions, children }) {
               <span className="sr-only">{status === 'done' ? ' (done)' : status === 'current' ? ' (current step)' : ''}</span>
             </h3>
             {summary}
+            {details && status === 'current' && details}
+            {details && status === 'upcoming' && (
+              <details className="mt-1">
+                <summary className="cursor-pointer select-none text-sm text-gray-600 hover:text-gray-900">Details</summary>
+                {details}
+              </details>
+            )}
             {children}
           </div>
         </div>
@@ -1205,6 +1212,15 @@ export default function StaffDeliberationsTab({
           : readyFile && preSiteDraftReady ? `Draft ready${warnings?.length ? ` · ${warnings.length} ${warnings.length === 1 ? 'thing' : 'things'} to check` : ''}`
             : due ? 'Not prepared yet' : 'Optional before the presentation';
   const summaryClass = 'mt-0.5 text-sm text-gray-600';
+  // What to do now, for the steps whose stage sentence does not already say it.
+  const nowLine = attentionReason ? null
+    : currentStep === 'briefing'
+      ? briefShared ? 'Share the briefing for the presentation.'
+        : briefDraftReady ? 'Check the briefing in Word, then share it for the presentation.'
+          : briefReadyFile ? null : 'Generate the pre-site briefing.'
+      : currentStep === 'presentation'
+        ? 'Nothing is needed until the presentation. You can start the working writeup now if you like.'
+        : null;
 
   const briefingStep = (
     <Step
@@ -1213,6 +1229,23 @@ export default function StaffDeliberationsTab({
       title="Pre-site briefing"
       status={briefStatus}
       summary={<p className={summaryClass}>{briefSummary}</p>}
+      details={briefReadyFile ? (
+        <div className="mt-2 text-sm text-gray-700">
+          <p className="text-gray-600">A concise summary to circulate before the presentation.</p>
+          <p className="mt-1">
+            {briefShared ? 'Working document:' : 'Latest draft:'}{' '}
+            <span title={briefReadyFile.name || undefined}>
+              {briefShared
+                ? 'Briefing in Word'
+                : briefReadyFile.lastModified
+                  ? `Briefing draft · generated ${new Date(briefReadyFile.lastModified).toLocaleDateString()}`
+                  : 'Briefing draft'}
+            </span>
+          </p>
+          <FileDetails file={briefReadyFile} />
+          <Warnings warnings={briefWarnings} label={briefShared ? 'Working document needs a quick edit check' : 'Draft needs a quick edit check'} />
+        </div>
+      ) : null}
       actions={(
         <>
           {!briefReadyFile && !briefShared && (
@@ -1301,23 +1334,6 @@ export default function StaffDeliberationsTab({
             This attempt needs a prompt or application change before it can be retried.
           </p>
         )}
-        {briefReadyFile && briefStatus !== 'done' && (
-          <div className="mt-2 text-sm text-gray-700">
-            <p className="text-gray-600">A concise summary to circulate before the presentation.</p>
-            <p className="mt-1">
-              {briefShared ? 'Working document:' : 'Latest draft:'}{' '}
-              <span title={briefReadyFile.name || undefined}>
-                {briefShared
-                  ? 'Briefing in Word'
-                  : briefReadyFile.lastModified
-                    ? `Briefing draft · generated ${new Date(briefReadyFile.lastModified).toLocaleDateString()}`
-                    : 'Briefing draft'}
-              </span>
-            </p>
-            <FileDetails file={briefReadyFile} />
-            <Warnings warnings={briefWarnings} label={briefShared ? 'Working document needs a quick edit check' : 'Draft needs a quick edit check'} />
-          </div>
-        )}
       </div>
       {briefShared && !briefReadyFile && (
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
@@ -1349,6 +1365,23 @@ export default function StaffDeliberationsTab({
       title="Working writeup"
       status={writeupStatus}
       summary={<p className={summaryClass}>{writeupSummary}</p>}
+      details={readyFile ? (
+        <div className="mt-2 text-sm text-gray-700">
+          <p className="text-gray-600">The fuller editable document for presentation findings. Your edits stay in this Word file.</p>
+          <p className="mt-1">
+            {preSiteShared || preSiteFinal ? 'Working document:' : 'Latest draft:'}{' '}
+            <span title={readyFile.name || undefined}>
+              {preSiteShared || preSiteFinal
+                ? 'Working writeup in Word'
+                : readyFile.lastModified
+                  ? `Working writeup draft · generated ${new Date(readyFile.lastModified).toLocaleDateString()}`
+                  : 'Working writeup draft'}
+            </span>
+          </p>
+          <FileDetails file={readyFile} />
+          <Warnings warnings={warnings} label={preSiteShared || preSiteFinal ? 'Working document needs a quick edit check' : 'Draft needs a quick edit check'} />
+        </div>
+      ) : null}
       actions={(
         <>
           {(!due || ['disabled', 'blocked', 'none'].includes(preparationState)) && !readyFile && !preSiteShared && !preSiteFinal && (
@@ -1399,23 +1432,6 @@ export default function StaffDeliberationsTab({
           <p className="mt-2 text-sm text-amber-900">
             This attempt needs a prompt or application change before it can be retried.
           </p>
-        )}
-        {readyFile && writeupStatus !== 'done' && (
-          <div className="mt-2 text-sm text-gray-700">
-            <p className="text-gray-600">The fuller editable document for presentation findings. Your edits stay in this Word file.</p>
-            <p className="mt-1">
-              {preSiteShared || preSiteFinal ? 'Working document:' : 'Latest draft:'}{' '}
-              <span title={readyFile.name || undefined}>
-                {preSiteShared || preSiteFinal
-                  ? 'Working writeup in Word'
-                  : readyFile.lastModified
-                    ? `Working writeup draft · generated ${new Date(readyFile.lastModified).toLocaleDateString()}`
-                    : 'Working writeup draft'}
-              </span>
-            </p>
-            <FileDetails file={readyFile} />
-            <Warnings warnings={warnings} label={preSiteShared || preSiteFinal ? 'Working document needs a quick edit check' : 'Draft needs a quick edit check'} />
-          </div>
         )}
         {due && !preSiteShared && !preSiteFinal && (
           <p className="mt-2 text-xs font-medium text-amber-800" data-testid="final-writeup-prerequisite">
@@ -1490,14 +1506,14 @@ export default function StaffDeliberationsTab({
                 <stageChip.Icon aria-hidden="true" className="h-3.5 w-3.5" />
                 {stageChip.label}
               </span>
-              <span className="text-sm tabular-nums text-gray-600">{timingLabel}</span>
             </div>
             {stageFetchFailed && (
               <p className="mt-2 max-w-2xl text-sm text-red-800" data-testid="deliberations-stage-error">
                 The deliberation stage could not be determined: {briefError}
               </p>
             )}
-            <p className="mt-2 text-base font-medium text-gray-900" data-testid="deliberations-stage-sentence">{phase}</p>
+            <p className={phase === stageChip.label ? 'sr-only' : 'mt-2 text-base font-medium text-gray-900'} data-testid="deliberations-stage-sentence">{phase}</p>
+            {nowLine && <p className="mt-2 max-w-2xl text-base text-gray-900">{nowLine}</p>}
             {attentionReason && (
               <p className="mt-1 flex max-w-2xl gap-1.5 text-sm text-amber-800">
                 <TriangleAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
