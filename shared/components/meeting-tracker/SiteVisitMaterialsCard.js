@@ -265,32 +265,34 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
 
           <ul className="mt-4 divide-y divide-gray-100 rounded-lg border border-gray-200">
             {collection.checklist.map((item) => (
-              <li key={item.key} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
-                <div>
+              <li key={item.key} className="flex flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                <div className="min-w-0 flex-1 break-words">
                   <p className={item.waived && !item.received ? 'text-gray-400 line-through' : 'font-medium text-gray-900'}>{item.label}</p>
                   <p className="text-xs text-gray-500">
                     {item.received ? `${uploadJobsForSlot(collection, item.key).some((job) => BLOCKING_UPLOAD_STATUSES.has(job.status)) ? 'Previously received' : 'Received'} ${formatDateTime(item.received.receivedAt)} · ${item.received.filename}${item.received.uploadedByStaff ? ' · staff upload' : ''}${item.waived ? ' · waived' : ''}` : item.waived ? 'Waived' : 'Missing'}
                   </p>
                   <UploadJobNotice jobs={uploadJobsForSlot(collection, item.key)} programCoordinator={collection.programCoordinator} />
                 </div>
-                <OpenFileLink file={item.received} />
-                <StaffMaterialUpload
-                  requestId={requestId}
-                  slot={item.key}
-                  label={item.received ? 'Upload updated file' : 'Upload file'}
-                  disabled={busy || uploadJobsForSlot(collection, item.key).some((job) => BLOCKING_UPLOAD_STATUSES.has(job.status))}
-                  onUploaded={() => { setNotice(`${item.label} saved.`); void load(); }}
-                />
-                {collection.state !== 'closed' && !item.received && (
-                  <button type="button" disabled={busy} onClick={() => act('waive', { key: item.key, waived: !item.waived })} className="text-xs font-semibold text-gray-600 underline underline-offset-4 hover:text-gray-900 disabled:opacity-50">
-                    {item.waived ? 'Require again' : 'Waive'}
-                  </button>
-                )}
+                <div className="flex shrink-0 items-start justify-end gap-4" data-testid={`materials-row-actions-${item.key}`}>
+                  <OpenFileLink file={item.received} />
+                  {collection.state !== 'closed' && !item.received && (
+                    <button type="button" disabled={busy} onClick={() => act('waive', { key: item.key, waived: !item.waived })} className="py-2 text-xs font-semibold text-gray-600 underline underline-offset-4 hover:text-gray-900 disabled:opacity-50">
+                      {item.waived ? 'Require again' : 'Waive'}
+                    </button>
+                  )}
+                  <StaffMaterialUpload
+                    requestId={requestId}
+                    slot={item.key}
+                    label={item.received ? 'Upload updated file' : 'Upload file'}
+                    disabled={busy || uploadJobsForSlot(collection, item.key).some((job) => BLOCKING_UPLOAD_STATUSES.has(job.status))}
+                    onUploaded={() => { setNotice(`${item.label} saved.`); void load(); }}
+                  />
+                </div>
               </li>
             ))}
             {collection.other.map((file) => (
-              <li key={file.artifactId} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
-                <div><p className="font-medium text-gray-900">Other: {file.filename}</p><p className="text-xs text-gray-500">Received {formatDateTime(file.receivedAt)}{file.uploadedByStaff ? ' · staff upload' : ''}</p></div>
+              <li key={file.artifactId} className="flex flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                <div className="min-w-0 flex-1 break-words"><p className="font-medium text-gray-900">Other: {file.filename}</p><p className="text-xs text-gray-500">Received {formatDateTime(file.receivedAt)}{file.uploadedByStaff ? ' · staff upload' : ''}</p></div>
                 <OpenFileLink file={file} />
               </li>
             ))}

@@ -329,6 +329,22 @@ describe('staff replacement upload (staff replacement plan §3.4)', () => {
     expect(screen.getByTestId('staff-upload-input-presentation_pdf')).toBeEnabled();
   });
 
+  test('each row keeps Open file and the upload control in one right-hand actions group; status text stays inside the fixed-width control', async () => {
+    finalizeScript([{ status: 503, body: { ok: false, reason: 'supersede_failed' } }]);
+    const linked = collection();
+    linked.checklist[0].received.webUrl = 'https://sp.example/deck.pdf';
+    const scripted = global.fetch;
+    global.fetch = jest.fn(async (url, options = {}) => (options.method === 'POST' ? scripted(url, options) : response({ success: true, collection: linked })));
+    await choose();
+    await screen.findByRole('button', { name: 'Retry' });
+    const actions = screen.getByTestId('materials-row-actions-presentation_pdf');
+    expect(actions).toContainElement(screen.getAllByRole('link', { name: /Open file/ })[0]);
+    expect(actions).toContainElement(screen.getByTestId('staff-upload-input-presentation_pdf'));
+    const control = screen.getByTestId('staff-upload-input-presentation_pdf').parentElement;
+    expect(control.className).toMatch(/\bw-44\b/);
+    expect(control).toContainElement(screen.getByRole('alert'));
+  });
+
   test('a refused finalize shows its reason and does not claim success', async () => {
     global.fetch = jest.fn(async (url, options = {}) => {
       if (options.method === 'POST') {
