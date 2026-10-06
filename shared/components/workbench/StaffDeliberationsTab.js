@@ -284,6 +284,8 @@ export default function StaffDeliberationsTab({
   // Primitive values so an unchanged history report never re-renders the tab.
   const [latestSentAt, setLatestSentAt] = useState(null);
   const [latestSentRecipients, setLatestSentRecipients] = useState(0);
+  // Page-open time for "has the deliberation session happened yet".
+  const [openedAtMs] = useState(() => Date.now());
   const [confirmDialog, setConfirmDialog] = useState(null); // null | { kind: 'brief' | 'presite' }
   const [currentSourceEverSent, setCurrentSourceEverSent] = useState(false);
   const cancelDialogButtonRef = useRef(null);
@@ -1172,8 +1174,16 @@ export default function StaffDeliberationsTab({
   // steps, the stage sentence and the buttons cannot disagree.
   const reviewActive = movedToFinal || finalReview?.phase === 'leadership-review';
   // Corrections reopened before the presentation are current writeup work.
-  const currentStep = reviewActive || preSiteFinal ? 'review' : due || correctionDraft ? 'writeup' : everSent ? 'presentation' : 'briefing';
-  const stepDone = { briefing: everSent, presentation: due, writeup: reviewActive, review: false };
+  // The PC deliberation session is an internal staff briefing held before the
+  // site visit (owner 2026-10-06); the pre-site briefing is shared for it.
+  const sessionStartMs = Date.parse(session?.scheduledStartIso || '');
+  const sessionUpcoming = Number.isFinite(sessionStartMs) && sessionStartMs > openedAtMs;
+  const sessionPassed = Number.isFinite(sessionStartMs) && !sessionUpcoming;
+  const currentStep = reviewActive || preSiteFinal ? 'review'
+    : due || correctionDraft ? 'writeup'
+      : everSent ? (sessionUpcoming ? 'session' : 'presentation')
+        : 'briefing';
+  const stepDone = { briefing: everSent, session: sessionPassed || due, presentation: due, writeup: reviewActive, review: false };
   const stepStatus = (key) => (key === currentStep ? 'current' : stepDone[key] ? 'done' : 'upcoming');
   const briefStatus = stepStatus('briefing');
   const writeupStatus = stepStatus('writeup');
@@ -1206,9 +1216,11 @@ export default function StaffDeliberationsTab({
   // What to do now, for the steps whose stage sentence does not already say it.
   const nowLine = hasProblemNotice ? null
     : currentStep === 'briefing'
-      ? briefShared ? 'Share the briefing for the presentation.'
-        : briefDraftReady ? 'Check the briefing in Word, then share it for the presentation.'
+      ? briefShared ? `Share the briefing ${sessionUpcoming ? 'before the deliberation session' : 'for the presentation'}.`
+        : briefDraftReady ? `Check the briefing in Word, then share it ${sessionUpcoming ? 'before the deliberation session' : 'for the presentation'}.`
           : briefReadyFile ? null : 'Generate the pre-site briefing.'
+      : currentStep === 'session'
+        ? 'The briefing is shared. Nothing else is needed before the deliberation session.'
       : currentStep === 'presentation'
         ? 'Nothing is needed until the presentation. You can start the working writeup now if you like.'
         : null;
@@ -1343,9 +1355,27 @@ export default function StaffDeliberationsTab({
     </Step>
   );
 
-  const presentationStep = (
+  const sessionStep = (
     <Step
       number={2}
+      title="Deliberation session"
+      status={stepStatus('session')}
+      summary={(
+        <>
+          <p className={summaryClass} data-testid="deliberations-session-line">
+            {sessionLine(session)}
+            {' · '}
+            <Link href="/meeting-tracker" className="font-medium text-blue-700 underline-offset-4 hover:underline">Meeting Tracker</Link>
+          </p>
+          {currentStep === 'session' && nowLine && <p className="mt-1 text-sm text-gray-900">{nowLine}</p>}
+        </>
+      )}
+    />
+  );
+
+  const presentationStep = (
+    <Step
+      number={3}
       title="Presentation"
       status={stepStatus('presentation')}
       summary={(
@@ -1373,7 +1403,7 @@ export default function StaffDeliberationsTab({
   const writeupStep = (
     <Step
       id="deliberations-writeup"
-      number={3}
+      number={4}
       title="Working writeup"
       status={writeupStatus}
       summary={<p className={summaryClass}>{writeupSummary}</p>}
@@ -1479,7 +1509,7 @@ export default function StaffDeliberationsTab({
 
   const reviewStep = (
     <Step
-      number={4}
+      number={5}
       title={leadershipReview ? 'Group and leadership review' : 'Group review'}
       status={stepStatus('review')}
       summary={(
@@ -1503,13 +1533,7 @@ export default function StaffDeliberationsTab({
           )}
         </>
       ) : null}
-    >
-      <p className="mt-0.5 text-sm text-gray-600" data-testid="deliberations-session-line">
-        {sessionLine(session)}
-        {' · '}
-        <Link href="/meeting-tracker" className="font-medium text-blue-700 underline-offset-4 hover:underline">Meeting Tracker</Link>
-      </p>
-    </Step>
+    />
   );
 
   return (
@@ -1563,6 +1587,7 @@ export default function StaffDeliberationsTab({
         <Card hover={false} padding="p-0">
           <ol aria-label="Staff deliberations steps" className="divide-y divide-gray-200">
             {briefingStep}
+            {sessionStep}
             {presentationStep}
             {writeupStep}
             {reviewStep}
