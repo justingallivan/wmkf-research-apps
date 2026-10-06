@@ -329,7 +329,7 @@ export default function RequestListPanel({
             return (
               <li
                 key={p.requestId}
-                className="relative grid grid-cols-1 gap-x-6 gap-y-2 px-4 py-3 transition-colors hover:bg-gray-50 focus-within:bg-gray-50 md:grid-cols-[minmax(0,1fr)_auto_12rem_9rem] md:items-center"
+                className="relative grid grid-cols-1 gap-x-6 gap-y-2 px-4 py-3 transition-colors hover:bg-gray-50 focus-within:bg-gray-50 md:grid-cols-[minmax(0,1fr)_10rem_16rem_9rem] md:items-center"
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
