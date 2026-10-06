@@ -25,7 +25,7 @@ async function main() {
   const host = (() => { try { return new URL(process.env.POSTGRES_URL).host; } catch { return 'unknown'; } })();
   const { rows } = await sql.query(`
     SELECT DISTINCT ON (request_id) request_id, state, attempt_count, last_error_code,
-      left(last_error_message, 160) AS last_error_message, scheduled_end, updated_at,
+      left(last_error_message, 400) AS last_error_message, scheduled_end, updated_at,
       provenance->>'operation' AS operation
     FROM staff_deliberations_preparations
     WHERE cycle_code = $1
