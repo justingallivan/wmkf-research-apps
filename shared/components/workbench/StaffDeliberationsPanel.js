@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ExternalLink, TriangleAlert } from 'lucide-react';
+import { CalendarClock, CalendarX2, ExternalLink, PenLine, TriangleAlert, Users } from 'lucide-react';
 import { requestJson } from '../../utils/api-request';
 import { Card } from '../Layout';
 import ScopeSegment from './ScopeSegment';
@@ -23,7 +23,6 @@ function dateTime(value, timeZone = null) {
   if (!Number.isFinite(ms)) return null;
   try {
     return new Intl.DateTimeFormat(undefined, {
-      year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
@@ -102,13 +101,22 @@ function primaryDocument(request) {
 // Where the request is in the process. A problem never replaces the stage; it
 // is shown beneath it. An unconfirmed schedule is its own stage so an
 // unverified time is never presented as the scheduled one.
+// Chip tones follow DESIGN.md: blue for working stages, violet for review,
+// amber for an issue, gray for neutral. The icon and text carry the meaning.
+const STAGE_TONES = {
+  blue: 'bg-blue-50 text-blue-800 ring-blue-200',
+  violet: 'bg-violet-50 text-violet-800 ring-violet-200',
+  amber: 'bg-amber-50 text-amber-900 ring-amber-200',
+  gray: 'bg-gray-100 text-gray-700 ring-gray-200',
+};
+
 function stageFor(request) {
-  if (request.finalPhase === 'leadership-review') return 'Leadership review';
-  if (request.finalPhase === 'group-review') return 'Group review';
-  if (['unavailable', 'ambiguous'].includes(request.timing?.availability)) return 'Presentation time not confirmed';
-  if (request.preparation?.due || request.writeup?.correctionInProgress) return 'After presentation';
-  if (request.timing?.availability === 'missing' || !request.timing?.endIso) return 'Not scheduled';
-  return 'Before presentation';
+  if (request.finalPhase === 'leadership-review') return { label: 'Leadership review', tone: 'violet', Icon: Users };
+  if (request.finalPhase === 'group-review') return { label: 'Group review', tone: 'violet', Icon: Users };
+  if (['unavailable', 'ambiguous'].includes(request.timing?.availability)) return { label: 'Presentation time not confirmed', tone: 'amber', Icon: CalendarClock };
+  if (request.preparation?.due || request.writeup?.correctionInProgress) return { label: 'After presentation', tone: 'blue', Icon: PenLine };
+  if (request.timing?.availability === 'missing' || !request.timing?.endIso) return { label: 'Not scheduled', tone: 'gray', Icon: CalendarX2 };
+  return { label: 'Before presentation', tone: 'blue', Icon: CalendarClock };
 }
 
 function presentationWhen(request) {
@@ -147,11 +155,11 @@ function RequestRow({ request }) {
     request.programDirector && `Lead PD: ${request.programDirector}`,
   ].filter(Boolean);
   return (
-    <li className="grid grid-cols-1 gap-x-6 gap-y-2 px-4 py-3 lg:grid-cols-[minmax(16rem,1fr)_minmax(0,24rem)_11rem] lg:items-center">
+    <li className="group relative grid grid-cols-1 gap-x-6 gap-y-2 px-4 py-3 transition-colors duration-200 hover:bg-gray-50 lg:grid-cols-[minmax(16rem,1fr)_minmax(0,26rem)_11rem] lg:items-center">
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-2">
           <h3 className="min-w-0 truncate text-sm font-semibold text-gray-900" title={request.title || undefined}>
-            <Link href={requestHref(request, task.tab)} className="rounded underline decoration-gray-300 underline-offset-4 hover:decoration-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
+            <Link href={requestHref(request, task.tab)} className="rounded underline-offset-4 group-hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
               {request.requestNumber ? `#${request.requestNumber}` : request.requestId}{request.title ? ` — ${request.title}` : ''}
             </Link>
           </h3>
@@ -162,24 +170,27 @@ function RequestRow({ request }) {
         </div>
       </div>
       <div className="min-w-0 text-sm">
-        <p className="text-gray-900">
-          <span className="font-medium">{stage}</span>
-          {when && <span className="text-gray-500"> · {when}</span>}
-        </p>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${STAGE_TONES[stage.tone]}`}>
+            <stage.Icon aria-hidden="true" className="h-3.5 w-3.5" />
+            {stage.label}
+          </span>
+          {when && <span className="text-xs tabular-nums text-gray-500">{when}</span>}
+        </div>
         {problem ? (
-          <p className="mt-0.5 flex gap-1.5 text-amber-800">
+          <p className="mt-1 flex gap-1.5 text-amber-800">
             <TriangleAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{problem}</span>
           </p>
         ) : (
-          <p className="mt-0.5 text-gray-600">{nextStep(request, task, document)}</p>
+          <p className="mt-1 text-gray-700">{nextStep(request, task, document)}</p>
         )}
       </div>
       <div className="flex lg:justify-end">
         {document && (
-          <a href={document.fact.file.webUrl} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
+          <a href={document.fact.file.webUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded text-sm font-medium text-blue-700 underline-offset-4 hover:text-blue-900 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
             {document.key === 'writeup' ? 'Edit writeup in Word' : 'Edit briefing in Word'}
-            <ExternalLink aria-hidden="true" className="h-3.5 w-3.5 text-gray-500" />
+            <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
           </a>
         )}
       </div>
