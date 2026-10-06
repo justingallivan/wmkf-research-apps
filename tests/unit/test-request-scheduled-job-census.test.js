@@ -54,7 +54,7 @@ const RECORDED_CRONS = {
   'secret-check': { scheduled: true, class: 'operational' },
   'send-review-thankyous': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/reviewer-thankyou-sweep.js'] },
   'site-visit-materials-reminders': { scheduled: false, class: 'guarded', guardFiles: ['lib/services/site-visit-materials/reminder-sweep.js'] },
-  'staff-deliberations-preparation': { scheduled: false, class: 'guarded', guardFiles: ['lib/services/pre-site-visit/preparation-worker.js'], note: 'disabled pending approved pilot; request selection and retry exclude test requests' },
+  'staff-deliberations-preparation': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/pre-site-visit/preparation-worker.js'], note: 'every 15 minutes; acts only when enabled, and request selection, claim, promotion fence and retry exclude test requests' },
   'spend-check': { scheduled: true, class: 'operational', note: 'aggregate spend alarm; counts all spend, test requests included' },
   'sweep-stale-invites': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/reviewer-suggestion-sweep.js'] },
 };
@@ -70,8 +70,8 @@ test('every cron route is recorded', () => {
 
 test('the recorded schedule matches vercel.json', () => {
   const crons = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8')).crons;
-  expect(crons).toHaveLength(24);
-  expect(new Set(crons.map(({ path: cronPath }) => cronPath.split('?')[0])).size).toBe(23);
+  expect(crons).toHaveLength(25);
+  expect(new Set(crons.map(({ path: cronPath }) => cronPath.split('?')[0])).size).toBe(24);
   const transcriptionCrons = crons.filter((cron) =>
     typeof cron.path === 'string' && cron.path.split('?')[0] === '/api/cron/drain-transcriptions'
   ).map(({ path: cronPath, schedule }) => ({ path: cronPath, schedule })).sort((a, b) => a.path.localeCompare(b.path));
