@@ -63,6 +63,18 @@ sequence.
   mechanisms in bounded changes. Requirements and remaining follow-ups:
   `docs/plans/PERSONAL_EMAIL_DEFAULTS_TODO_2026-09-20.md`.
 
+- **Settle the deliberations vocabulary suite-wide (2026-10-06).** [OPEN —
+  owner group decision after the D26 cycle; do not rename panel by panel]
+  The PD's pre-deliberation document, the applicant event (site visit /
+  research presentation), the pre-visit meeting, the staff working document,
+  applicant slides/bios, recording/transcripts, and the two meanings of
+  "presentation end" each carry several names across the Workbench, Meeting
+  Tracker, Board-facing pages, Admin and email. The owner will settle one name
+  per concept with colleagues after D26; the change then lands across the suite
+  in one pass. Inventory, workflow order, code-identifier contracts and the
+  decision list: `docs/NOMENCLATURE_GLOSSARY.md` → "Deliberations workflow
+  vocabulary".
+
 - **Stream transcription audio instead of buffering it (2026-10-04).** [OPEN —
   owner decision, not yet built] The transcription worker reads the whole
   recording from private Blob into Function memory, copies it into a worker

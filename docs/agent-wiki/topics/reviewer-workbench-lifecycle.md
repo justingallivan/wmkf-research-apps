@@ -2057,6 +2057,7 @@ One Final Writeup row per request over the same stable SharePoint Word item; the
   `tests/unit/workbench-shell.test.js`, `workbench-location.test.js`, `workbench-views-nav.test.js`,
   and the request-locator suite (stateful router mock). Remaining panels and the Awardees
   cycle question: `docs/CURRENT_WORK_QUEUE.md` audit follow-ups.
+- **Staff Deliberations redesign (S578, 2026-10-06, `feature/workbench-ux`; supersedes the row/rail descriptions above for current UI).** The list is Reviewer-follow-up-style cards: `#number` + title, "Institution · PI · PD" (`projectLeader` from `cycle-list-service.js`), a stage chip with time, the next step naming the request-page action or the specific `attentionReason()`, and one "Open request"/"Open review" button deep-linking to `#deliberations-status|briefing|writeup`; no Word shortcut on the list (owner). The request tab is a five-step stepper (Pre-site briefing → Deliberation session → Presentation → Working writeup → Group review) with a problem notice only when needed; recording/transcripts/summary sit in the Presentation step. Deliberation sessions precede the site visit (memory `project-deliberation-session-precedes-site-visit`). Vocabulary is held for a post-D26 group decision (`docs/NOMENCLATURE_GLOSSARY.md`).
 - **Reviewer follow-up polish (Codex worktree branch, merged `f0494607` + `d0a5fc07`, production
   2026-09-06).** Owner requested and approved the changes, including edits to the shared reviewer
   components used by both `/workbench/reviewer-follow-up` and the request page Reviewers tab.

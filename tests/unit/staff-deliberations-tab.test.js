@@ -162,6 +162,7 @@ function statusResponse({
   preparation = null,
   timing = null,
   correctionInProgress = false,
+  finalReview = null,
 } = {}) {
   return response({
     success: true,
@@ -174,6 +175,7 @@ function statusResponse({
     ...(session ? { session } : {}),
     ...(sessionAttendees ? { sessionAttendees } : {}),
     ...(hasBriefRows === undefined ? {} : { hasBriefRows }),
+    ...(finalReview ? { finalReview } : {}),
   });
 }
 
@@ -540,10 +542,10 @@ test('Pre-RP brief card shows "generated <date>" for a draft with a lastModified
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  const link = await screen.findByRole('link', {
-    name: `Briefing draft · generated ${new Date('2026-09-10T12:00:00Z').toLocaleDateString()}`,
-  });
-  expect(link).toHaveAttribute('href', 'https://sharepoint.test/brief.docx');
+  // The label is text; the step's single Word action links the file.
+  expect(await screen.findByText(`Briefing draft · generated ${new Date('2026-09-10T12:00:00Z').toLocaleDateString()}`)).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Edit briefing in Word' })).toHaveAttribute('href', 'https://sharepoint.test/brief.docx');
+  expect(screen.getAllByRole('link').filter((link) => link.getAttribute('href') === 'https://sharepoint.test/brief.docx')).toHaveLength(1);
 });
 
 test('Pre-RP brief card shows plain "Word draft" when lastModified is absent', async () => {
@@ -552,8 +554,8 @@ test('Pre-RP brief card shows plain "Word draft" when lastModified is absent', a
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  const link = await screen.findByRole('link', { name: 'Briefing draft' });
-  expect(link).toHaveAttribute('href', 'https://sharepoint.test/brief.docx');
+  expect(await screen.findByText('Briefing draft')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Edit briefing in Word' })).toHaveAttribute('href', 'https://sharepoint.test/brief.docx');
 });
 
 test('H3b/B12/NEW-1: Regenerate Brief is offered while the brief is shared but not yet sent, with replacement copy', async () => {
@@ -918,6 +920,7 @@ test('M2: a Final document offers one action, Open review details, and no More m
   render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={onSelectTab} />);
 
   await waitFor(() => expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('In review'));
+  expect(within(screen.getByRole('button', { name: 'Open review details' }).closest('li')).getByRole('heading', { name: /Group review/ })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Open review details' }));
   expect(onSelectTab).toHaveBeenCalledWith('final-writeup');
   expect(screen.queryByRole('button', { name: 'More brief actions' })).not.toBeInTheDocument();
@@ -1165,9 +1168,19 @@ test('the presentation follow-up mounts only after the server enables its projec
   view.rerender(<StaffDeliberationsTab requestId={REQUEST_ID} />);
   expect(screen.queryByTestId('research-presentation-follow-up')).not.toBeInTheDocument();
 
+  // Loaded but empty before the presentation: nothing to show yet.
   siteVisitContextFeed = { presentationMaterialsStatus: 'loaded', presentationMaterials: [] };
   view.rerender(<StaffDeliberationsTab requestId={REQUEST_ID} />);
-  expect(screen.getByTestId('research-presentation-follow-up')).toBeInTheDocument();
+  expect(screen.queryByTestId('research-presentation-follow-up')).not.toBeInTheDocument();
+
+  // A published item shows inside the Presentation step.
+  siteVisitContextFeed = { presentationMaterialsStatus: 'loaded', presentationMaterials: [
+    { artifactType: 100000005, filename: 'Zoom recording', backing: 'external', externalUrl: 'https://zoom.us/rec/share/x' },
+  ] };
+  view.rerender(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  const followUp = screen.getByTestId('research-presentation-follow-up');
+  expect(within(followUp.closest('li')).getByRole('heading', { name: /^Presentation/ })).toBeInTheDocument();
+  expect(within(followUp).getByRole('link', { name: 'Watch recording' })).toHaveAttribute('href', 'https://zoom.us/rec/share/x');
 });
 
 test('once the brief is shared the materials card renders inside the panel, above Email history', async () => {
@@ -1424,4 +1437,109 @@ test('disabled automation does not name an unavailable action during corrections
   expect(await screen.findByRole('button', { name: 'Finish corrections' })).toBeInTheDocument();
   expect(screen.queryByText(/Prepare for post-visit editing keeps/)).not.toBeInTheDocument();
   expect(screen.getByText('Automatic preparation is off. Your existing Word file is unchanged.')).toBeInTheDocument();
+});
+
+test.each(['deliberations-status', 'deliberations-briefing', 'deliberations-writeup'])('a #%s link scrolls to that card once, after the status read', async (anchor) => {
+  const scrolled = [];
+  const original = Element.prototype.scrollIntoView;
+  Element.prototype.scrollIntoView = function scrollIntoView() { scrolled.push(this.id); };
+  const raf = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => { callback(0); return 0; });
+  window.history.replaceState(null, '', `/workbench/${REQUEST_ID}?tab=staff-deliberations#${anchor}`);
+  try {
+    queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT) }));
+    const { rerender } = render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+    await screen.findByRole('link', { name: /Edit (?:briefing|writeup) in Word/ });
+    await waitFor(() => expect(scrolled).toEqual([anchor]));
+    rerender(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+    expect(scrolled).toEqual([anchor]);
+  } finally {
+    Element.prototype.scrollIntoView = original;
+    raf.mockRestore();
+    window.history.replaceState(null, '', '/');
+  }
+});
+
+test('an unknown hash does not scroll', async () => {
+  const scrolled = jest.fn();
+  const original = Element.prototype.scrollIntoView;
+  Element.prototype.scrollIntoView = scrolled;
+  window.history.replaceState(null, '', `/workbench/${REQUEST_ID}#somewhere-else`);
+  try {
+    queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT) }));
+    render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+    await screen.findByRole('link', { name: /Edit (?:briefing|writeup) in Word/ });
+    expect(scrolled).not.toHaveBeenCalled();
+  } finally {
+    Element.prototype.scrollIntoView = original;
+    window.history.replaceState(null, '', '/');
+  }
+});
+
+test('stepper: a sent briefing collapses to its share summary and keeps Open in Word; the writeup is current after the presentation', async () => {
+  distributionHistoryFeed = {
+    attempts: [{ operationId: 'op-2', transportAccepted: true, createdAt: '2026-09-12T17:00:00Z', to: ['a@x.org', 'b@x.org'], cc: ['c@x.org'] }],
+    currentSourceEverSent: true,
+  };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByText(/^Shared .* to 3 people$/)).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Open briefing in Word' })).toBeInTheDocument();
+  expect(screen.getByText('A concise summary to circulate before the presentation.').closest('details').open).toBe(false);
+  expect(screen.getByRole('heading', { name: /Pre-site briefing \(done\)/ })).toBeInTheDocument();
+  expect(screen.getByRole('list', { name: 'Staff deliberations steps' }).querySelectorAll(':scope > li')).toHaveLength(5);
+});
+
+test('stepper: a finished briefing folds its warnings behind Details instead of dropping them', async () => {
+  distributionHistoryFeed = { attempts: [{ operationId: 'op-3', transportAccepted: true, createdAt: '2026-09-12T17:00:00Z', to: ['a@x.org'], cc: [] }], currentSourceEverSent: true };
+  queueRoute('briefGet', statusResponse({
+    currentArtifact: { ...briefArtifact(REVIEW), warnings: [{ code: 'section_over_target', message: 'A briefing section is longer than suggested.' }] },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByRole('heading', { name: /Pre-site briefing \(done\)/ })).toBeInTheDocument();
+  const warning = await screen.findByText('A briefing section is longer than suggested.');
+  expect(warning.closest('details')).not.toBeNull();
+  expect(warning.closest('details').open).toBe(false);
+});
+
+test('stepper: corrections reopened before the presentation make the writeup the current step', async () => {
+  distributionHistoryFeed = { attempts: [{ operationId: 'op-4', transportAccepted: true, createdAt: '2026-09-12T17:00:00Z', to: ['a@x.org'], cc: [] }], currentSourceEverSent: true };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  queueRoute('presiteGet', statusResponse({ currentArtifact: { ...preSiteArtifact(DRAFT), correction: { cycleId: 'correction-1' } } }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByRole('button', { name: 'Finish corrections' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /Working writeup \(current step\)/ })).toBeInTheDocument();
+  expect(screen.queryByText(/Nothing is needed until the presentation/)).not.toBeInTheDocument();
+});
+
+test('no status notice renders when nothing needs attention; the stage sentence stays for screen readers', async () => {
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  await screen.findByRole('link', { name: /Edit (?:briefing|writeup) in Word/ });
+  expect(screen.getByTestId('deliberations-stage-sentence')).toHaveClass('sr-only');
+  expect(screen.queryByText(/Retry preparation|The last send failed|could not be determined/)).not.toBeInTheDocument();
+  expect(document.querySelector('#deliberations-status .bg-amber-50')).toBeNull();
+});
+
+test.each([
+  ['group-review', 'Group review', /Group review is in progress/],
+  ['leadership-review', 'Group and leadership review', /leadership review is in progress/],
+])('the visible review step names the %s phase', async (phase, title, summary) => {
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(FINAL), finalReview: { phase } }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={jest.fn()} />);
+  expect(await screen.findByText(summary)).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: new RegExp(`^${title}`) })).toBeInTheDocument();
+  if (phase === 'leadership-review') expect(screen.getByText(/now in leadership review/)).toBeInTheDocument();
+});
+
+test('the deliberation session is its own step before the presentation, and is current once the briefing is shared', async () => {
+  distributionHistoryFeed = { attempts: [{ operationId: 'op-5', transportAccepted: true, createdAt: '2026-09-12T17:00:00Z', to: ['a@x.org'], cc: [] }], currentSourceEverSent: true };
+  queueRoute('briefGet', statusResponse({ currentArtifact: briefArtifact(REVIEW) }));
+  queueRoute('presiteGet', statusResponse({ session: { scheduledStartIso: '2099-01-15T17:00:00Z', ianaTimeZone: 'America/Los_Angeles' } }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByText(/Nothing else is needed before the deliberation session/)).toBeInTheDocument();
+  const steps = Array.from(screen.getByRole('list', { name: 'Staff deliberations steps' }).querySelectorAll(':scope > li h3'))
+    .map((heading) => heading.textContent.replace(/\s*\(.*\)$/, ''));
+  expect(steps).toEqual(['Pre-site briefing', 'Deliberation session', 'Presentation', 'Working writeup', 'Group review']);
+  expect(screen.getByRole('heading', { name: /Deliberation session \(current step\)/ })).toBeInTheDocument();
+  expect(within(screen.getByTestId('deliberations-session-line').closest('li')).getByRole('heading', { name: /Deliberation session/ })).toBeInTheDocument();
 });

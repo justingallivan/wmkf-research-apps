@@ -167,7 +167,7 @@ test('SessionEditor uses the schedule projection for its proposal lookup', async
 });
 
 test('a slot without a live briefing link says who shares it; with one it offers Open briefing', () => {
-  expect(slotBriefingText({ briefing: null })).toMatch(/not yet shared.*lead PD shares the writeup/);
+  expect(slotBriefingText({ briefing: null })).toMatch(/not yet shared.*lead PD shares it from Staff Deliberations/);
   expect(slotBriefingText({ briefing: { url: 'https://apps.test/external/briefing/t' } })).toBe('Open briefing');
 });
 
@@ -553,6 +553,7 @@ describe('SessionEditor optimistic reorder', () => {
     const mocks = mockFetch({ reorder: () => new Promise((resolve) => { resolveReorder = resolve; }) });
     const { container } = render(<SessionEditor />);
     await waitFor(() => expect(headers(container)).toEqual(['Position 1 · #A', 'Position 2 · #B', 'Position 3 · #C']));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit proposal order' }));
 
     drag(container, 2, 0, 5);
     // Discriminating: the PATCH is still pending, and the DOM already shows the new order.
@@ -571,12 +572,30 @@ describe('SessionEditor optimistic reorder', () => {
     mockFetch({ reorder: async () => ({ ok: false, status: 409, json: async () => ({ error: 'The session order changed.' }) }) });
     const { container } = render(<SessionEditor />);
     await waitFor(() => expect(headers(container)).toEqual(['Position 1 · #A', 'Position 2 · #B', 'Position 3 · #C']));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit proposal order' }));
 
     drag(container, 2, 0, 5);
     expect(headers(container)).toEqual(['Position 1 · #C', 'Position 2 · #A', 'Position 3 · #B']);
 
     await screen.findByText(/The session order changed\. Please try again\./);
     expect(headers(container)).toEqual(['Position 1 · #A', 'Position 2 · #B', 'Position 3 · #C']);
+  });
+
+  test('proposal order opens read-only; Edit proposal order shows the controls and Done hides them', async () => {
+    mockFetch({});
+    const { container } = render(<SessionEditor />);
+    await waitFor(() => expect(headers(container)).toEqual(['Position 1 · #A', 'Position 2 · #B', 'Position 3 · #C']));
+    expect(container.querySelectorAll('[title="Drag to reorder"]')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /More actions for #/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Proposal to add' })).not.toBeInTheDocument();
+    expect(container.querySelector('ol[aria-label="Proposal order"] input[type="number"]')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit proposal order' }));
+    expect(container.querySelectorAll('[title="Drag to reorder"]')).toHaveLength(3);
+    expect(screen.getByRole('combobox', { name: 'Proposal to add' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(container.querySelectorAll('[title="Drag to reorder"]')).toHaveLength(0);
   });
 });
 
@@ -609,4 +628,45 @@ test('received materials link to review controls only when the visit is availabl
     rerender(row(overrides));
     expect(screen.queryByRole('link', { name: 'Review materials' })).not.toBeInTheDocument();
   }
+});
+
+test('a saved session opens as a read-only summary with its status; Edit opens the form and Cancel discards', async () => {
+  routerQuery = { id: SESSION_ID, cycleCode: 'D26', programId: 'p1' };
+  const session = {
+    sessionId: SESSION_ID, etag: 'W/"1"', status: 100000001,
+    scheduledStartIso: '2026-09-14T16:00:00.000Z', scheduledEndIso: '2026-09-14T17:30:00.000Z', ianaTimeZone: 'America/Los_Angeles',
+    location: 'Board room', meetingLink: 'https://zoom.example/j/9?pwd=secret', notes: 'Bring printouts',
+    attendeeRefs: [{ kind: 'staff', profileId: 7 }, { kind: 'roster', rosterId: 3 }],
+  };
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const target = String(url);
+    if (options.method && options.method !== 'GET') throw new Error('no write expected');
+    const body = target.includes('/recipients')
+      ? { staff: [{ ref: { kind: 'staff', profileId: 7 }, name: 'Duncan Staff', email: 'd@wmkeck.org' }], board: [{ ref: { kind: 'roster', rosterId: 3 }, name: 'Board Member', email: 'b@example.org' }] }
+      : target.endsWith(`/sessions/${SESSION_ID}`)
+        ? { session, slots: [] }
+        : target.includes('/sessions')
+          ? { sessions: [] }
+          : { proposals: [] };
+    return { ok: true, status: 200, json: async () => body };
+  });
+  render(<SessionEditor />);
+
+  const summary = await screen.findByRole('region', { name: 'Session details' });
+  expect(screen.getByText('Held')).toBeInTheDocument();
+  expect(summary).toHaveTextContent('Mon, Sep 14, 2026');
+  expect(summary).toHaveTextContent('90 minutes');
+  expect(summary).toHaveTextContent('Duncan Staff, Board Member');
+  expect(summary).toHaveTextContent('Board room');
+  expect(screen.getByRole('link', { name: 'Open meeting link (zoom.example)' })).toHaveAttribute('href', session.meetingLink);
+  expect(summary).not.toHaveTextContent('pwd=secret');
+  expect(screen.queryByRole('button', { name: 'Save session' })).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Edit session details' }));
+  fireEvent.change(screen.getByLabelText('Location'), { target: { value: 'Elsewhere' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(screen.getByRole('region', { name: 'Session details' })).toHaveTextContent('Board room');
+  fireEvent.click(screen.getByRole('button', { name: 'Edit session details' }));
+  expect(screen.getByLabelText('Location')).toHaveValue('Board room');
+  expect(screen.getByRole('button', { name: 'Save session' })).toBeInTheDocument();
 });

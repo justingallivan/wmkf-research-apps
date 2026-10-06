@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { CalendarClock, CalendarX2, PenLine, TriangleAlert, Users } from 'lucide-react';
 import { requestJson } from '../../utils/api-request';
 import { Card } from '../Layout';
 import ScopeSegment from './ScopeSegment';
@@ -11,10 +12,19 @@ import {
   REQUEST_DOCUMENT_OPERATION_STATUS,
 } from '../../config/requestDocument';
 
-function requestHref(request, tab = 'staff-deliberations') {
+function requestHref(request, tab = 'staff-deliberations', card = null) {
   const params = new URLSearchParams({ tab });
   if (request.requestNumber) params.set('n', request.requestNumber);
-  return `/workbench/${request.requestId}?${params.toString()}`;
+  return `/workbench/${request.requestId}?${params.toString()}${card ? `#${card}` : ''}`;
+}
+
+// The request page's Staff deliberations tab scrolls to the card whose action
+// is this row's next step (anchors defined in StaffDeliberationsTab.js).
+function cardFor(request, task, stage) {
+  if (task.bucket === 'review') return null;
+  if (task.label === 'Needs attention' || stage.tone === 'amber') return 'deliberations-status';
+  if (request.preparation?.due || request.writeup?.correctionInProgress) return 'deliberations-writeup';
+  return 'deliberations-briefing';
 }
 
 function dateTime(value, timeZone = null) {
@@ -22,7 +32,6 @@ function dateTime(value, timeZone = null) {
   if (!Number.isFinite(ms)) return null;
   try {
     return new Intl.DateTimeFormat(undefined, {
-      year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
@@ -34,33 +43,56 @@ function dateTime(value, timeZone = null) {
   }
 }
 
+const RELOAD_THEN_ADMIN = 'Reload the page; if this continues, contact an administrator.';
+
+function writeupReady(request) {
+  return request.writeup?.availability === 'available'
+    && request.writeup.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW
+    && request.writeup.milestoneComplete === true;
+}
+
+// One plain-language reason per attention condition, in a fixed order so a row
+// with several problems names the most fundamental one. taskFor() uses the same
+// function, so the "Needs attention" filter and the row text cannot disagree.
+function attentionReason(request) {
+  if (request.timing?.availability === 'ambiguous') return 'More than one presentation is scheduled for this request, so the time can’t be confirmed.';
+  if (request.timing?.availability === 'unavailable') return `The system couldn’t confirm the presentation time. ${RELOAD_THEN_ADMIN}`;
+  if (request.preparation?.state === 'blocked') return 'Automatic writeup preparation stopped before it finished. Your existing document is preserved; open the request to retry.';
+  if (request.preparation?.state === 'unavailable') return `The system couldn’t load the writeup preparation status. ${RELOAD_THEN_ADMIN}`;
+  for (const [key, name] of [['brief', 'briefing'], ['writeup', 'writeup']]) {
+    const fact = request[key];
+    if (fact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) return `The ${name} couldn’t be generated. Open the request to try again.`;
+    if (fact?.availability === 'ambiguous') return `More than one ${name} is linked to this request. Contact an administrator.`;
+    if (fact?.availability === 'unavailable') return `The system couldn’t load the ${name}. ${RELOAD_THEN_ADMIN}`;
+  }
+  if (request.finalReview?.availability === 'unavailable') return `The system couldn’t load the review status. ${RELOAD_THEN_ADMIN}`;
+  if (request.writeup?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL && request.finalPhase !== 'group-review') {
+    return 'The writeup is marked final but hasn’t been through group review. Contact an administrator.';
+  }
+  if (request.preparation?.due && request.preparation.state === 'prepared' && !writeupReady(request)) {
+    return `The writeup was prepared but isn’t ready to edit yet. ${RELOAD_THEN_ADMIN}`;
+  }
+  return null;
+}
+
 function taskFor(request) {
-  if (request.finalPhase === 'leadership-review') return { label: 'Leadership review', bucket: 'review', action: 'Open review details', tab: 'final-writeup' };
-  if (request.finalPhase === 'group-review') return { label: 'Group review in progress', bucket: 'review', action: 'Open review details', tab: 'final-writeup' };
-  if (request.writeup?.correctionInProgress) return { label: 'Corrections in progress', bucket: 'attention', action: 'Open request details', tab: 'staff-deliberations' };
-  const attention = ['blocked', 'unavailable'].includes(request.preparation?.state)
-    || request.finalReview?.availability === 'unavailable'
-    || (request.writeup?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL && request.finalPhase !== 'group-review')
-    || ['unavailable', 'ambiguous'].includes(request.timing?.availability)
-    || [request.brief, request.writeup].some((fact) => ['unavailable', 'ambiguous'].includes(fact?.availability)
-      || fact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED);
-  if (attention) return { label: 'Needs attention', bucket: 'attention', action: 'Check request details', tab: 'staff-deliberations' };
+  if (request.finalPhase === 'leadership-review') return { label: 'Leadership review', bucket: 'review', tab: 'final-writeup' };
+  if (request.finalPhase === 'group-review') return { label: 'Group review in progress', bucket: 'review', tab: 'final-writeup' };
+  if (request.writeup?.correctionInProgress) return { label: 'Corrections in progress', bucket: 'attention', tab: 'staff-deliberations' };
+  if (attentionReason(request)) return { label: 'Needs attention', bucket: 'attention', tab: 'staff-deliberations' };
   if (request.preparation?.due) {
-    const ready = request.writeup?.availability === 'available'
-      && request.writeup.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW
-      && request.writeup.milestoneComplete === true;
-    if (!ready && request.preparation.state === 'prepared') return { label: 'Needs attention', bucket: 'attention', action: 'Check request details', tab: 'staff-deliberations' };
-    if (ready) return { label: 'Post-visit editing', bucket: 'post', action: 'Open request details', tab: 'staff-deliberations' };
+    const ready = writeupReady(request);
+    if (ready) return { label: 'Post-visit editing', bucket: 'post', tab: 'staff-deliberations' };
     if (request.preparation.state === 'disabled') {
-      return { label: request.writeup?.availability === 'available' ? 'Working draft available' : 'No working writeup yet', bucket: 'post', action: 'Open request details', tab: 'staff-deliberations' };
+      return { label: request.writeup?.availability === 'available' ? 'Working draft available' : 'No working writeup yet', bucket: 'post', tab: 'staff-deliberations' };
     }
-    if (request.preparation.state === 'running' || request.writeup?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) return { label: 'Preparing working writeup', bucket: 'post', action: 'Open request details', tab: 'staff-deliberations' };
-    if (request.preparation.state === 'due') return { label: 'Waiting for automatic preparation', bucket: 'post', action: 'Open request details', tab: 'staff-deliberations' };
-    if (request.preparation.state === 'pending') return { label: 'Queued for preparation', bucket: 'post', action: 'Open request details', tab: 'staff-deliberations' };
-    return { label: 'Working writeup needed', bucket: 'post', action: 'Open request details', tab: 'staff-deliberations' };
+    if (request.preparation.state === 'running' || request.writeup?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) return { label: 'Preparing working writeup', bucket: 'post', tab: 'staff-deliberations' };
+    if (request.preparation.state === 'due') return { label: 'Waiting for automatic preparation', bucket: 'post', tab: 'staff-deliberations' };
+    if (request.preparation.state === 'pending') return { label: 'Queued for preparation', bucket: 'post', tab: 'staff-deliberations' };
+    return { label: 'Working writeup needed', bucket: 'post', tab: 'staff-deliberations' };
   }
   const notScheduled = request.timing?.availability === 'missing' || !request.timing?.endIso;
-  return { label: notScheduled ? 'Schedule needed' : 'Before presentation', bucket: notScheduled ? 'attention' : 'before', action: 'Open request details', tab: 'staff-deliberations' };
+  return { label: notScheduled ? 'Schedule needed' : 'Before presentation', bucket: notScheduled ? 'attention' : 'before', tab: 'staff-deliberations' };
 }
 
 function primaryDocument(request) {
@@ -75,81 +107,104 @@ function primaryDocument(request) {
   return writeup?.availability === 'available' && writeup.file?.webUrl ? { key: 'writeup', fact: writeup } : null;
 }
 
-function presentationTiming(request) {
+// Where the request is in the process. A problem never replaces the stage; it
+// is shown beneath it. An unconfirmed schedule is its own stage so an
+// unverified time is never presented as the scheduled one.
+// Chip tones follow DESIGN.md: gray for upcoming, blue for active writeup work,
+// violet for review, amber for an issue. The icon and text carry the meaning.
+const STAGE_TONES = {
+  blue: 'bg-blue-50 text-blue-800 ring-blue-200',
+  violet: 'bg-violet-50 text-violet-800 ring-violet-200',
+  amber: 'bg-amber-50 text-amber-900 ring-amber-200',
+  gray: 'bg-gray-100 text-gray-700 ring-gray-200',
+};
+
+function stageFor(request) {
+  if (request.finalPhase === 'leadership-review') return { label: 'Leadership review', tone: 'violet', Icon: Users };
+  if (request.finalPhase === 'group-review') return { label: 'Group review', tone: 'violet', Icon: Users };
+  if (['unavailable', 'ambiguous'].includes(request.timing?.availability)) return { label: 'Presentation time not confirmed', tone: 'amber', Icon: CalendarClock };
+  // Only a passed presentation end makes a request 'after'; corrections can
+  // be reopened before it.
+  if (request.preparation?.due) return { label: 'After presentation', tone: 'blue', Icon: PenLine };
+  if (request.timing?.availability === 'missing' || !request.timing?.endIso) return { label: 'Not scheduled', tone: 'amber', Icon: CalendarX2 };
+  return { label: 'Before presentation', tone: 'gray', Icon: CalendarClock };
+}
+
+function presentationWhen(request) {
   const time = dateTime(request.timing?.endIso, request.timing?.timeZone);
-  if (['unavailable', 'ambiguous'].includes(request.timing?.availability)) {
-    return time ? `Recorded presentation end (unverified) · ${time}` : 'Presentation schedule needs checking';
-  }
-  if (request.timing?.availability === 'missing') return 'Presentation end · Not scheduled';
-  if (request.timing?.availability !== 'available') return 'Presentation end · Not recorded';
-  return time ? `Scheduled presentation end · ${time}` : 'Presentation end · Not recorded';
+  if (!time) return null;
+  if (['unavailable', 'ambiguous'].includes(request.timing?.availability)) return `recorded ${time}, unverified`;
+  return request.timing?.availability === 'available' ? time : null;
 }
 
 function nextStep(request, task, document) {
-  if (task.bucket === 'review') return { instruction: 'Read the writeup and follow its review progress.', detailsFirst: true };
-  if (request.writeup?.correctionInProgress) return { instruction: 'Check the requested corrections and update the writeup.', detailsFirst: true };
-  if (task.label === 'Schedule needed') return { instruction: 'Add the presentation schedule in request details.', detailsFirst: true };
-  if (task.bucket === 'attention') return { instruction: 'Open request details to check what needs attention.', detailsFirst: true };
+  if (task.bucket === 'review') return 'Read the writeup and follow its review progress.';
+  if (request.writeup?.correctionInProgress) return 'Make the requested corrections in the writeup, then choose Finish corrections.';
+  if (task.label === 'Schedule needed') return 'Add the presentation schedule on the request page.';
   if (request.preparation?.state === 'running' || request.writeup?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) {
-    return { instruction: 'Your writeup is being prepared. Check back shortly.', detailsFirst: true };
+    return 'Your writeup is being prepared. Check back shortly.';
   }
   if (request.preparation?.due && ['due', 'pending'].includes(request.preparation?.state)) {
-    return { instruction: 'Preparation will run automatically. No action is needed now.', detailsFirst: true };
+    return 'Preparation will run automatically. No action is needed now.';
   }
+  if (task.label === 'Post-visit editing') return 'Add your presentation findings to the writeup, then open group review.';
   if (task.bucket === 'post') return document
-    ? { instruction: 'Add findings to your writeup after the presentation.', stage: 'After scheduled presentation' }
-    : { instruction: 'Open request details to prepare your writeup.', stage: 'Writeup needed', detailsFirst: true };
-  if (request.brief?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) {
-    return { instruction: 'The briefing is being prepared. Check back shortly.', stage: 'Preparing briefing', detailsFirst: true };
-  }
-  if (document?.key === 'brief') return { instruction: 'Check the briefing before sharing it for the presentation.' };
-  return { instruction: 'Open request details to prepare the pre-site briefing.', detailsFirst: true };
+    ? 'Prepare the writeup for post-visit editing.'
+    : 'Prepare your working writeup.';
+  if (request.brief?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) return 'The briefing is being prepared. Check back shortly.';
+  if (document?.key === 'brief') return 'Check the briefing in Word, then share it for the presentation.';
+  return 'Generate the pre-site briefing.';
 }
 
-function RequestCard({ request }) {
+function RequestRow({ request }) {
   const task = taskFor(request);
   const document = primaryDocument(request);
-  const step = nextStep(request, task, document);
-  const documentAction = document?.key === 'writeup' ? 'Edit writeup in Word' : 'Edit briefing in Word';
-  const primaryClass = 'inline-flex min-h-11 items-center justify-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2';
-  const secondaryClass = 'inline-flex min-h-11 items-center text-sm font-medium text-gray-600 underline underline-offset-4 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2';
-  const stageClass = task.bucket === 'attention' ? 'bg-amber-50 text-amber-900' : task.bucket === 'review' ? 'bg-violet-50 text-violet-900' : 'bg-blue-50 text-blue-800';
+  const problem = task.label === 'Needs attention' ? attentionReason(request) : null;
+  const stage = stageFor(request);
+  const when = presentationWhen(request);
+  const people = [
+    request.institution,
+    request.projectLeader && `PI: ${request.projectLeader}`,
+    request.programDirector && `PD: ${request.programDirector}`,
+  ].filter(Boolean).join(' · ');
   return (
-    <Card hover={false}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1 basis-72">
-          <h3 className="break-words text-base font-semibold text-gray-900">
-            <Link href={requestHref(request)} className="underline-offset-2 hover:underline">
-              {request.requestNumber ? `#${request.requestNumber}` : request.requestId}{request.title ? ` — ${request.title}` : ''}
-            </Link>
-          </h3>
-          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
-            {request.institution && <p>{request.institution}</p>}
-            {request.programDirector && <p>Lead PD: {request.programDirector}</p>}
+    <li className="rounded-xl border border-gray-200 bg-white px-4 py-3.5 shadow-sm sm:px-5 sm:py-4">
+      <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="font-semibold tabular-nums text-gray-900">
+              {request.requestNumber ? `#${request.requestNumber}` : request.requestId}
+            </span>
+            <TestRequestBadge isTestRequest={request.isTestRequest} />
+            <h3 className="min-w-0 text-base font-semibold text-gray-900 sm:text-lg">{request.title || 'Untitled request'}</h3>
           </div>
-          <TestRequestBadge isTestRequest={request.isTestRequest} className="mt-2" />
-        </div>
-        <p className={`rounded-full px-3 py-1 text-xs font-semibold ${stageClass}`}>{step.stage || task.label}</p>
-      </div>
-      <div className="mt-5 flex flex-col gap-4 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 flex-1">
-          <p className="max-w-2xl text-lg font-semibold leading-7 text-gray-900">{step.instruction}</p>
-          <p className="mt-1 text-sm text-gray-600">{presentationTiming(request)}</p>
-        </div>
-        <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
-          {document && !step.detailsFirst ? (
-            <a href={document.fact.file.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>{documentAction}</a>
+          {people && <p className="mt-1 text-sm text-gray-600">{people}</p>}
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${STAGE_TONES[stage.tone]}`}>
+              <stage.Icon aria-hidden="true" className="h-3.5 w-3.5" />
+              {stage.label}
+            </span>
+            {when && <span className="text-xs tabular-nums text-gray-500">{when}</span>}
+          </div>
+          {problem ? (
+            <p className="mt-1.5 flex gap-1.5 text-sm text-amber-800">
+              <TriangleAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{problem}</span>
+            </p>
           ) : (
-            <Link href={requestHref(request, task.tab)} className={primaryClass}>{task.action}</Link>
+            <p className="mt-1.5 text-sm text-gray-700">{nextStep(request, task, document)}</p>
           )}
-          {document && (step.detailsFirst ? (
-            <a href={document.fact.file.webUrl} target="_blank" rel="noopener noreferrer" className={secondaryClass}>{documentAction}</a>
-          ) : (
-            <Link href={requestHref(request, task.tab)} className={secondaryClass}>{task.action}</Link>
-          ))}
+        </div>
+        <div className="flex shrink-0 lg:justify-end">
+          <Link
+            href={requestHref(request, task.tab, cardFor(request, task, stage))}
+            className="inline-flex min-h-11 items-center rounded-lg bg-gray-900 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
+          >
+            {task.bucket === 'review' ? 'Open review' : 'Open request'}
+          </Link>
         </div>
       </div>
-    </Card>
+    </li>
   );
 }
 
@@ -227,39 +282,38 @@ export default function StaffDeliberationsPanel({
   }, [requests, serverNowIso]);
 
   const visible = requests.filter((request) => (filter === 'all' || taskFor(request).bucket === filter)
-    && [request.requestNumber, request.title, request.institution, request.programDirector].filter(Boolean).join(' ').toLowerCase().includes(search.toLowerCase().trim()));
+    && [request.requestNumber, request.title, request.institution, request.projectLeader, request.programDirector].filter(Boolean).join(' ').toLowerCase().includes(search.toLowerCase().trim()));
   if (!cycleCode && !loadingCycles) return null;
 
   return (
     <section aria-labelledby="staff-deliberations-heading">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 id="staff-deliberations-heading" className="sr-only">Staff Deliberations</h2>
-          {!loading && !loadingCycles && <p className="mt-1 text-sm text-gray-600">
-            {requestCounts.ordinary} requests in this program and cycle
-            {requestCounts.test > 0 ? ` · ${requestCounts.test} test requests also shown` : ''}
-          </p>}
+      <h2 id="staff-deliberations-heading" className="sr-only">Staff Deliberations</h2>
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">Task
+            <select value={filter} onChange={(event) => setFilter(event.target.value)} className="h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm font-normal text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
+              <option value="all">All tasks</option><option value="before">Before presentation</option><option value="post">Post-visit work</option><option value="review">In review</option><option value="attention">Needs attention</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">Search
+            <input value={search} onChange={(event) => setSearch(event.target.value)} type="search" placeholder="Request, title, institution, PI or PD" className="h-11 w-72 rounded-lg border border-gray-300 px-3 text-sm font-normal text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2" />
+          </label>
         </div>
         <ScopeSegment scope={scope} onChange={onScopeChange} allLabel="All program directors" />
       </div>
-      <p className="mb-3 max-w-3xl text-sm text-gray-600">Each request shows your next step. Use the briefing before the presentation; add findings to the writeup afterward.</p>
-      <div className="mb-4 flex flex-wrap gap-3">
-        <label className="text-sm text-gray-700">Task
-          <select value={filter} onChange={(event) => setFilter(event.target.value)} className="ml-2 min-h-11 rounded-lg border border-gray-300 bg-white px-3">
-            <option value="all">All tasks</option><option value="before">Before presentation</option><option value="post">Post-visit work</option><option value="review">In review</option><option value="attention">Needs attention</option>
-          </select>
-        </label>
-        <label className="flex w-full min-w-0 items-center gap-2 text-sm text-gray-700 sm:w-auto sm:flex-1">Search
-          <input value={search} onChange={(event) => setSearch(event.target.value)} type="search" placeholder="Request, title, institution or PD" className="min-h-11 min-w-0 flex-1 rounded-lg border border-gray-300 px-3" />
-        </label>
-      </div>
+      {!loading && !loadingCycles && <p className="mb-3 text-sm text-gray-600">
+        {requestCounts.ordinary} requests in this program and cycle
+        {requestCounts.test > 0 ? ` · ${requestCounts.test} test requests also shown` : ''}
+      </p>}
       {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{error}</div>}
       {loadingCycles || (loading && requests.length === 0) ? (
         <Card hover={false}><p className="text-gray-600">Loading requests…</p></Card>
       ) : error ? null : visible.length === 0 ? (
         <Card hover={false}><p className="text-gray-700">No requests match this view. Try All tasks or clear the search.</p></Card>
       ) : (
-        <div className="space-y-3">{visible.map((request) => <RequestCard key={request.requestId} request={request} />)}</div>
+        <ul className="space-y-3">
+          {visible.map((request) => <RequestRow key={request.requestId} request={request} />)}
+        </ul>
       )}
     </section>
   );

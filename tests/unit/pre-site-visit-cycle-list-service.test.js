@@ -270,3 +270,18 @@ it('projects a committed group-review Final row using its real Review lifecycle'
   expect(result.artifacts[0].finalReview).toMatchObject({ availability: 'available', phase: 'group-review', artifactId: 'final-1' });
   expect(result.artifacts[0].finalPhase).toBe('group-review');
 });
+
+it('selects and returns the PI for rows with and without a current document', async () => {
+  grantRequestAdapter.queryAllRequests.mockResolvedValue({ records: [
+    req(R1, { _wmkf_currentpresitevisit_value: 'writeup-1', _wmkf_projectleader_value_formatted: 'PI One' }),
+    req(R2, { _wmkf_projectleader_value_formatted: 'PI Two' }),
+  ], capped: false });
+  requestDocumentAdapter.findByRequests.mockImplementation(async (_ids, { artifactType }) => ({
+    records: artifactType === REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_RESEARCH_PRESENTATION_BRIEF
+      ? [] : [doc('writeup-1', R1)],
+    capped: false,
+  }));
+  const result = await list({ scope: 'all' });
+  expect(grantRequestAdapter.queryAllRequests.mock.calls[0][0].select).toContain('_wmkf_projectleader_value');
+  expect(result.artifacts.map((item) => item.projectLeader)).toEqual(['PI One', 'PI Two']);
+});

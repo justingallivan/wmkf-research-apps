@@ -45,7 +45,7 @@ export async function reorderSessionSlots({ sessionId, slots, fetchImpl = fetch 
 // D11: the slot's link is the request's live briefing page (writeup, reviews,
 // proposal, materials). It exists only once the PD has shared the writeup.
 export function slotBriefingText(slot) {
-  return slot?.briefing?.url ? 'Open briefing' : 'Briefing not yet shared — the lead PD shares the writeup from Staff Deliberations.';
+  return slot?.briefing?.url ? 'Open briefing' : 'Briefing not yet shared — the lead PD shares it from Staff Deliberations.';
 }
 
 // Returns a new array with the item at `from` moved to `to`; returns the same
@@ -68,6 +68,59 @@ function sameRef(left, right) {
     && (left.kind === 'staff' ? left.profileId === right.profileId : left.rosterId === right.rosterId);
 }
 
+const SESSION_STATUS_LABEL = { 100000000: 'Planned', 100000001: 'Held', 100000002: 'Cancelled' };
+const SESSION_STATUS_CLASS = { 100000000: 'bg-blue-50 text-blue-800', 100000001: 'bg-green-50 text-green-800', 100000002: 'bg-gray-100 text-gray-700' };
+
+export function sessionWhen(session) {
+  const start = Date.parse(session?.scheduledStartIso || '');
+  const end = Date.parse(session?.scheduledEndIso || '');
+  if (!Number.isFinite(start)) return 'Not scheduled';
+  const zone = session.ianaTimeZone || undefined;
+  let label;
+  try {
+    label = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: zone, timeZoneName: 'short' }).format(new Date(start));
+  } catch {
+    label = new Date(start).toLocaleString();
+  }
+  const minutes = Number.isFinite(end) ? Math.round((end - start) / 60000) : null;
+  return minutes ? `${label} · ${minutes} minutes` : label;
+}
+
+function SessionSummary({ session, recipients, onEdit }) {
+  const people = [...(recipients.staff || []), ...(recipients.board || [])];
+  const names = (session.attendeeRefs || []).map((ref) => people.find((person) => sameRef(person.ref, ref))?.name || 'Person no longer in the directory');
+  let linkHost = null;
+  try { linkHost = session.meetingLink ? new URL(session.meetingLink).hostname : null; } catch { linkHost = null; }
+  const row = (label, value) => (
+    <div>
+      <dt className="text-sm font-medium text-gray-500">{label}</dt>
+      <dd className="mt-1 text-sm text-gray-900">{value}</dd>
+    </div>
+  );
+  return (
+    <section aria-labelledby="session-details-heading" className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="session-details-heading" className="text-base font-semibold text-gray-900">Session details</h2>
+        <Button type="button" variant="outline" size="sm" onClick={onEdit}>Edit session details</Button>
+      </div>
+      {session.attendeeIssues?.length > 0 && (
+        <ul className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="status">
+          {session.attendeeIssues.map((issue) => <li key={issue}>{issue} Saving attendees again replaces the saved list.</li>)}
+        </ul>
+      )}
+      <dl className="mt-4 grid gap-x-8 gap-y-4 md:grid-cols-2">
+        {row('When', sessionWhen(session))}
+        {row('Location', session.location || 'Not set')}
+        {row('Meeting link', session.meetingLink
+          ? <a href={session.meetingLink} target="_blank" rel="noopener noreferrer" className="font-medium text-gray-900 underline underline-offset-4 hover:text-gray-700">Open meeting link{linkHost ? ` (${linkHost})` : ''}</a>
+          : 'Not set')}
+        {row(`Attendees (${names.length})`, names.length ? names.join(', ') : 'None')}
+        {session.notes && <div className="md:col-span-2">{row('Notes', <span className="whitespace-pre-line">{session.notes}</span>)}</div>}
+      </dl>
+    </section>
+  );
+}
+
 function sessionForm(session) {
   const duration = Math.max(1, Math.round(
     (new Date(session.scheduledEndIso).getTime() - new Date(session.scheduledStartIso).getTime()) / 60000,
@@ -84,7 +137,7 @@ function sessionForm(session) {
   };
 }
 
-function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onChange, onMove, onRemove, onPositionChange, index, count, isDragging, dropEdge, onDragStart, onDragOver, onDrop, onDragEnd }) {
+function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onChange, onMove, onRemove, onPositionChange, index, count, isDragging, dropEdge, onDragStart, onDragOver, onDrop, onDragEnd, readOnly = false }) {
   const [minutes, setMinutes] = useState(slot.wmkf_minutes || 15);
   const [targetSessionId, setTargetSessionId] = useState('');
   const [panel, setPanel] = useState(null); // 'move' | 'remove' | null
@@ -100,7 +153,7 @@ function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onCh
       {dropEdge && (
         <span aria-hidden="true" className={`pointer-events-none absolute inset-x-0 z-10 h-1 bg-blue-600 ${dropEdge === 'top' ? 'top-0' : 'bottom-0'}`} />
       )}
-      <div
+      {!readOnly && <div
         aria-hidden="true"
         title="Drag to reorder"
         draggable={!busy}
@@ -112,11 +165,13 @@ function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onCh
           <circle cx="6" cy="4" r="1.3" /><circle cx="6" cy="10" r="1.3" /><circle cx="6" cy="16" r="1.3" />
           <circle cx="14" cy="4" r="1.3" /><circle cx="14" cy="10" r="1.3" /><circle cx="14" cy="16" r="1.3" />
         </svg>
-      </div>
+      </div>}
       <div className="min-w-0 flex-1 p-4">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <p className="flex min-w-0 items-center gap-2 font-semibold leading-9 text-gray-900"><span className="sr-only">Position </span><span className="tabular-nums text-gray-500">{index + 1}</span><span aria-hidden="true" className="text-gray-400"> · </span>#{requestNumber}<TestRequestBadge isTestRequest={proposal?.isTestRequest} /></p>
-          <div className="flex items-center gap-3">
+          {readOnly ? (
+            <p className="text-sm tabular-nums text-gray-700">{slot.wmkf_minutes || 15} minutes</p>
+          ) : <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
               Minutes
               <input type="number" min="1" max="1440" disabled={busy} value={minutes} onChange={(event) => setMinutes(event.target.value)} onBlur={() => Number(minutes) !== Number(slot.wmkf_minutes) && onChange(slot, { minutes: Number(minutes) })} className="h-9 w-20 rounded-lg border border-gray-300 bg-white px-2 text-sm tabular-nums text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50" />
@@ -130,7 +185,7 @@ function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onCh
                 { key: 'remove', label: 'Remove…', onSelect: () => setPanel('remove') },
               ]}
             />
-          </div>
+          </div>}
         </div>
         <p className="mt-1 text-sm text-gray-700">{proposal?.title || slot.wmkf_Request?.akoya_title || 'Request details are not available.'}</p>
         {(slot.institution || proposal?.institution) && <p className="mt-0.5 text-sm text-gray-600">{slot.institution || proposal.institution}</p>}
@@ -140,7 +195,7 @@ function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onCh
         ) : (
           <p className="mt-2 text-xs font-medium text-gray-500">{slotBriefingText(slot)}</p>
         )}
-      {panel === 'position' && (
+      {!readOnly && panel === 'position' && (
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
           <label className="text-sm font-medium text-gray-700">
             Position in this session
@@ -163,7 +218,7 @@ function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onCh
           </div>
         </div>
       )}
-      {panel === 'move' && (
+      {!readOnly && panel === 'move' && (
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
           <label className="text-sm font-medium text-gray-700">
             Move to another session
@@ -178,7 +233,7 @@ function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onCh
           </div>
         </div>
       )}
-      {panel === 'remove' && (
+      {!readOnly && panel === 'remove' && (
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
           <p className="text-sm text-gray-800">{`Remove #${requestNumber} from this session? Its minutes and lead assignment will be lost.`}</p>
           <div className="mt-3 flex gap-2">
@@ -192,7 +247,7 @@ function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onCh
   );
 }
 
-export function ProposalOrderList({ slots, proposalById, sessions, sessionId, busy, savingSlotId, onChange, onMove, onRemove, onReorder }) {
+export function ProposalOrderList({ slots, proposalById, sessions, sessionId, busy, savingSlotId, onChange, onMove, onRemove, onReorder, readOnly = false }) {
   const [draggingIndex, setDraggingIndex] = useState(null);
   const [overIndex, setOverIndex] = useState(null);
   const [overEdge, setOverEdge] = useState(null);
@@ -247,7 +302,7 @@ export function ProposalOrderList({ slots, proposalById, sessions, sessionId, bu
 
   return (
     <>
-      <p className="sr-only">Drag a proposal by the handle on its left edge, or open its More actions menu and choose Change position, to reorder. Choosing a position saves immediately.</p>
+      {!readOnly && <p className="sr-only">Drag a proposal by the handle on its left edge, or open its More actions menu and choose Change position, to reorder. Choosing a position saves immediately.</p>}
       <ol aria-label="Proposal order" className="mt-4 space-y-3" onKeyDown={handleKeyDown}>
         {slots.map((slot, index) => (
           <SlotRow
@@ -270,6 +325,7 @@ export function ProposalOrderList({ slots, proposalById, sessions, sessionId, bu
             onDragOver={handleDragOver(index)}
             onDrop={handleDrop(index)}
             onDragEnd={resetDrag}
+            readOnly={readOnly}
           />
         ))}
       </ol>
@@ -297,6 +353,14 @@ export default function SessionEditor() {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [warning, setWarning] = useState(null);
+  // A saved session opens read-only (DESIGN.md Read-First Rule); keyed to the
+  // session id so moving to another session starts read-only again.
+  const [editingFor, setEditingFor] = useState(null);
+  const editing = Boolean(sessionId) && editingFor === sessionId;
+  // Proposal order opens read-only too (Read-First rule); each change in edit
+  // mode still saves immediately, so Done only leaves edit mode.
+  const [orderEditingFor, setOrderEditingFor] = useState(null);
+  const orderEditing = Boolean(sessionId) && orderEditingFor === sessionId;
 
   const loadDetail = useCallback(async (id) => {
     const { ok, data: body } = await readJson(`/api/meeting-tracker/sessions/${id}`);
@@ -391,6 +455,7 @@ export default function SessionEditor() {
       } else {
         setSession(body.session);
         setForm(sessionForm(body.session));
+        setEditingFor(null);
         setNotice('Session saved.');
       }
     } catch (saveError) {
@@ -447,17 +512,28 @@ export default function SessionEditor() {
     }, movedSlot.wmkf_deliberationslotid);
   };
 
+  const cancelEdit = () => {
+    if (session) setForm(sessionForm(session));
+    setError(null);
+    setEditingFor(null);
+  };
+
   if (loading) {
     return <Layout title="Meeting Tracker"><div className="py-24 text-center text-gray-500">Loading the session workspace…</div></Layout>;
   }
 
   return (
     <Layout title={isNew ? 'Create session' : 'Meeting session'}>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div className="pt-6 mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <Link href={{ pathname: '/meeting-tracker', query: { ...(cycleCode ? { cycleCode } : {}), ...(programId ? { programId } : {}) } }} className="text-sm font-semibold text-gray-600 underline decoration-gray-300 underline-offset-4 hover:text-gray-900">Back to the cycle schedule</Link>
-          <h1 className="mt-3 text-3xl font-semibold text-gray-900">{isNew ? 'Create a deliberation session' : 'Deliberation session'}</h1>
-          <p className="mt-2 text-gray-600">Set the meeting details, attendees, and proposal order.</p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-semibold text-gray-900">{isNew ? 'Create a deliberation session' : 'Deliberation session'}</h1>
+            {!isNew && session && SESSION_STATUS_LABEL[session.status] && (
+              <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${SESSION_STATUS_CLASS[session.status]}`}>{SESSION_STATUS_LABEL[session.status]}</span>
+            )}
+          </div>
+          {(isNew || editing) && <p className="mt-2 text-sm text-gray-600">Set the meeting details, attendees, and proposal order.</p>}
         </div>
         {!isNew && session?.meetingLink && <a href={session.meetingLink} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-gray-900 px-5 py-3 text-sm font-semibold text-white hover:bg-gray-800">Join meeting</a>}
       </div>
@@ -466,6 +542,9 @@ export default function SessionEditor() {
       {notice && <div role="status" className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">{notice}</div>}
       {(warning || overFull) && <div role="status" className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{warning?.message || `Scheduled discussion time is ${slotMinutes - sessionMinutes} minutes longer than this session.`}</div>}
 
+      {!isNew && session && !editing ? (
+        <SessionSummary session={session} recipients={recipients} onEdit={() => { setNotice(null); setEditingFor(sessionId); }} />
+      ) : (
       <form onSubmit={saveSession} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
           <label className="text-sm font-medium text-gray-700">Date and start time<input required type="datetime-local" value={form.startLocal} onChange={(event) => updateForm('startLocal', event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
@@ -490,15 +569,22 @@ export default function SessionEditor() {
           </div>
         </fieldset>
 
-        <div className="mt-6 flex justify-end"><Button type="submit" loading={busy}>{isNew ? 'Create session' : 'Save session'}</Button></div>
+        <div className="mt-6 flex justify-end gap-3">
+          {!isNew && session && <Button type="button" variant="outline" disabled={busy} onClick={cancelEdit}>Cancel</Button>}
+          <Button type="submit" loading={busy}>{isNew ? 'Create session' : 'Save session'}</Button>
+        </div>
       </form>
+      )}
 
       {!isNew && (
         <section className="mt-8">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div><h2 className="text-xl font-semibold text-gray-900">Proposal order</h2><p className="mt-1 text-sm text-gray-600">{slotMinutes} discussion minutes across {slots.length} proposal{slots.length === 1 ? '' : 's'}.</p></div>
-            <div className="flex min-w-[18rem] gap-2"><select aria-label="Proposal to add" value={selectedRequestId} onChange={(event) => setSelectedRequestId(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2"><option value="">Choose a proposal</option>{proposals.filter((proposal) => !slots.some((slot) => String(slot._wmkf_request_value).toLowerCase() === String(proposal.requestId).toLowerCase())).map((proposal) => <option key={proposal.requestId} value={proposal.requestId}>{proposal.isTestRequest ? 'TEST · ' : ''}#{proposal.requestNumber} · {proposal.title}</option>)}</select><Button type="button" size="sm" disabled={!selectedRequestId || busy} onClick={addSlot}>Add</Button></div>
+            {!orderEditing ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setOrderEditingFor(sessionId)}>Edit proposal order</Button>
+            ) : <div className="flex min-w-[18rem] gap-2"><select aria-label="Proposal to add" value={selectedRequestId} onChange={(event) => setSelectedRequestId(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2"><option value="">Choose a proposal</option>{proposals.filter((proposal) => !slots.some((slot) => String(slot._wmkf_request_value).toLowerCase() === String(proposal.requestId).toLowerCase())).map((proposal) => <option key={proposal.requestId} value={proposal.requestId}>{proposal.isTestRequest ? 'TEST · ' : ''}#{proposal.requestNumber} · {proposal.title}</option>)}</select><Button type="button" size="sm" disabled={!selectedRequestId || busy} onClick={addSlot}>Add</Button><Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => setOrderEditingFor(null)}>Done</Button></div>}
           </div>
+          {orderEditing && <p className="mt-2 text-xs text-gray-500">Changes to the order, minutes, and proposals save as you make them.</p>}
           {slots.length ? (
             <ProposalOrderList
               slots={slots}
@@ -511,6 +597,7 @@ export default function SessionEditor() {
               onMove={(row, targetSessionId) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'PATCH', { etag: row._etag, targetSessionId }), row.wmkf_deliberationslotid)}
               onRemove={(row) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'DELETE', { etag: row._etag }), row.wmkf_deliberationslotid)}
               onReorder={reorderSlots}
+              readOnly={!orderEditing}
             />
           ) : <div className="mt-4 rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-600">No proposals are in this session yet.</div>}
         </section>

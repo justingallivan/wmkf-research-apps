@@ -10,7 +10,8 @@ test('renders loading, unavailable, loaded-empty, Zoom, SharePoint transcript, a
   view.rerender(<ResearchPresentationFollowUp status="unavailable" />);
   expect(screen.getByRole('alert')).toHaveTextContent('Presentation materials could not be loaded.');
   view.rerender(<ResearchPresentationFollowUp status="loaded" materials={[]} />);
-  expect(screen.getAllByText('Not added yet')).toHaveLength(5);
+  expect(screen.getByText(/appear here after the Meeting Tracker publishes them/)).toBeInTheDocument();
+  expect(screen.queryByText('Not added yet')).not.toBeInTheDocument();
 
   view.rerender(<ResearchPresentationFollowUp status="loaded" materials={[
     { artifactType: 100000005, filename: 'Zoom recording', backing: 'external', externalUrl: 'https://zoom.us/rec/share/x?pwd=y' },
@@ -24,6 +25,16 @@ test('renders loading, unavailable, loaded-empty, Zoom, SharePoint transcript, a
   expect(screen.getByRole('link', { name: 'Open presentation transcript' })).toHaveAttribute('href', 'https://tenant.sharepoint.com/presentation.txt');
   expect(screen.getByRole('link', { name: 'Open staff discussion transcript' })).toHaveAttribute('href', 'https://tenant.sharepoint.com/discussion.txt');
   expect(screen.getByRole('link', { name: 'Open presentation summary' })).toHaveAttribute('href', 'https://tenant.sharepoint.com/summary.docx');
+  // Internal file names are not shown.
+  expect(screen.queryByText('transcript.pdf')).not.toBeInTheDocument();
+});
+
+test('only published items are listed', () => {
+  render(<ResearchPresentationFollowUp status="loaded" materials={[
+    { artifactType: 100000006, filename: 'x-Transcript-guid.txt', backing: 'file', webUrl: 'https://tenant.sharepoint.com/t.txt' },
+  ]} />);
+  expect(screen.getAllByRole('listitem')).toHaveLength(1);
+  expect(screen.queryByRole('link', { name: 'Watch recording' })).not.toBeInTheDocument();
 });
 
 test('disabled projection does not masquerade as an empty collection', () => {
@@ -71,3 +82,14 @@ describe('inline presentation summary', () => {
   });
 });
 
+
+test('a short summary without the Q&A heading is shown whole, never clamped without Read more', () => {
+  const shortText = 'Line one.\nLine two.\nLine three.\nLine four.\nLine five.\nLine six.';
+  render(<ResearchPresentationFollowUp status="loaded"
+    materials={[{ artifactType: 100000007, filename: 's.txt', backing: 'file', webUrl: 'https://tenant.sharepoint.com/s.txt' }]}
+    summary={{ text: shortText, stale: false, publishedAt: '2026-10-05T15:00:00Z' }} />);
+  const paragraph = screen.getByText(/Line one\./);
+  expect(paragraph).toHaveTextContent('Line six.');
+  expect(paragraph.className).not.toMatch(/line-clamp/);
+  expect(screen.queryByRole('button', { name: 'Read more' })).not.toBeInTheDocument();
+});

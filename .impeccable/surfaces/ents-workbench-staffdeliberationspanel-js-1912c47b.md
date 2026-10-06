@@ -25,6 +25,12 @@ The overview helps staff find a request and start its current task. Request deta
 - A scheduled end is not proof a presentation occurred. Disabled automation is not proof a draft is ready or blocked. Distinguish queued, running, missing, unavailable and blocked states.
 - Preserve eligible request cohort, mine/all-PD scope, TEST badges, Word identity, authorization, readiness checks, confirmations and all backend behavior. Do not activate automation.
 
+## Owner refinements, 2026-10-06 (S578; supersede the bullets above where they conflict)
+- List matches Reviewer follow-up: one card per request with #number + title, "Institution · PI · PD", stage chip (gray Before presentation, blue After presentation, violet review, amber issue / Not scheduled) with time, then the next step or the specific problem. One ink "Open request" / "Open review" button that deep-links to the request-page card holding the next action. No Word link on the list: the step after editing (Share, Finish corrections, group review) lives on the request page.
+- Request tab: no status card. A five-step stepper — Pre-site briefing → Deliberation session → Presentation → Working writeup → Group review — with only the current step expanded; finished and upcoming steps fold details but keep actions and alerts. A problem notice appears above the steps only when something is wrong. Recording, transcripts and summary sit in the Presentation step.
+- Deliberation sessions come before the site visit; the pre-site briefing is shared with staff and select Board members for that session.
+- Do not rename workflow terms on this surface alone; vocabulary is held for a suite-wide decision after D26 (`docs/NOMENCLATURE_GLOSSARY.md`).
+
 ## Verification boundary
 
 One complete implementation, independent Sol review, parent integration/visual review and OAuth Claude Opus adversarial review. Batch desktop/narrow-screen and keyboard inspection; fix substantive issues together, then one confirmation pass. No unrelated design-system cleanup, new infrastructure or repeated cosmetic review loops.

@@ -295,16 +295,15 @@ test('the Staff deliberations view includes documentless requests in the selecte
   routerState.query = { view: 'staff-deliberations', cycleCode: 'D26' };
   routerState.asPath = '/workbench?view=staff-deliberations&cycleCode=D26';
   render(<WorkbenchShell />);
-  expect(await screen.findByText(/#1002959 — Drafted proposal/)).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Drafted proposal' })).toBeInTheDocument();
+  expect(screen.getByText('#1002959')).toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledWith('/api/workbench/staff-deliberations?programId=p1&cycleCode=D26&scope=my', expect.objectContaining({ method: 'GET' }));
   expect(screen.getByRole('heading', { name: 'Staff Deliberations' })).toBeInTheDocument();
   expect(screen.getByText('1 requests in this program and cycle')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Staff deliberations' })).toHaveAttribute('aria-current', 'page');
-  expect(screen.getByRole('link', { name: /#1002959/ })).toHaveAttribute('href', '/workbench/r9?tab=staff-deliberations&n=1002959');
-  expect(screen.getByText('Schedule needed')).toBeInTheDocument();
-  expect(screen.getByText(/Presentation end · (Not scheduled|Not recorded)/)).toBeInTheDocument();
-  expect(screen.getByText('Add the presentation schedule in request details.')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Open request details' })).toHaveAttribute('href', '/workbench/r9?tab=staff-deliberations&n=1002959');
+  expect(screen.getByText('Not scheduled', { selector: 'span' })).toBeInTheDocument();
+  expect(screen.getByText('Add the presentation schedule on the request page.')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Open request' })).toHaveAttribute('href', '/workbench/r9?tab=staff-deliberations&n=1002959#deliberations-status');
 
   fireEvent.click(screen.getByRole('button', { name: 'All program directors' }));
   expect(replace).toHaveBeenLastCalledWith('/workbench?view=staff-deliberations&cycleCode=D26&scope=all', undefined, expect.any(Object));
