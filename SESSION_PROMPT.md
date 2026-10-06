@@ -1,4 +1,81 @@
-# Session 578 Prompt: Staff Deliberations UI review in a separate session
+# Session 578 Prompt: review the overnight Workbench / Meeting Tracker UX branch on localhost
+
+## Session 577 Claude overnight close — 2026-10-06 PT
+
+**Owner ask (2026-10-05, deadline):** build the next UX-audit fixes in chunks
+overnight; review together on localhost in the morning. Nothing below is merged
+or deployed. Codex's Session 577 close (next section) handed the Staff
+Deliberations list design to this audit.
+
+### Already released this session
+
+- App-wide staff UX audit: `.impeccable/critique/2026-10-06T01-35-10Z__pages.md`
+  (19/40). DESIGN.md gained a **Page Structure** section (four page types,
+  17 named rules) and a **Desktop first** rule (owner: in-office desktop app;
+  phones only "in a pinch").
+- PR #446 merged `51ca71798`, Production `dpl_GZAhQuv7zL6WPXF69XbPCaDosWRP`
+  Ready: one-row nav (Home · Workbench · Meeting Tracker · Tools · Guide ·
+  Admin, Admin/Cycle Dossier superuser-only), literal width map (fixes the
+  Tailwind-dropped `max-w-${maxWidth}`), registry name Reviewers → Workbench
+  (key `reviewers` unchanged), Home inside the shell, attribution footer
+  removed. Codex adversarial review: two findings fixed, round 2 approve.
+
+### Overnight branch `feature/workbench-ux` (pushed, NOT merged; no PR yet)
+
+One commit per chunk; each chunk Codex-reviewed (chunks 1-3 round 1 found a
+narrow-window grid collapse → fixed → round 2 approve; chunk 4 approve). Full
+Jest 20927 passed; `check:types` clean. All presentation-only: no API,
+payload, persistence, or automation change.
+
+1. **Workbench header** — left H1 "Workbench" with program, cycle and
+   "Find and open a request" on the title row; underline view tabs; the H2
+   that repeated the tab label removed.
+2. **Request list** — one bordered list of compact rows; the request number
+   is a real link stretched over the row (opens in a new tab); triage select
+   above it; "going-forward" chip reads "Advancing"; per-row cycle/program
+   labels (always equal to the header filters) dropped.
+3. **Staff deliberations list** — compact three-column rows (request ·
+   task chip + next-step sentence at body weight · one outline button + one
+   link); task filter, search and scope on one toolbar; generic intro
+   sentence removed. Same order and copy; **no task grouping** (still the
+   owner's call). Lists stack below 1024px.
+4. **Visit and session pages open read-only** — saved visit → "Visit details"
+   summary (when in the visit's zone, format, "Open meeting link (host)"
+   instead of the full URL, organizer, attendee names, notes) with "Edit visit
+   details"; saved session → "Session details" + status chip beside the title.
+   Cancel discards; save returns to the summary; new visits/sessions unchanged.
+
+Fixture-backed screenshots (local only, not in the repo) were checked at 1440,
+1024 and 800px.
+
+### Morning review on localhost
+
+1. `git checkout feature/workbench-ux && git pull`
+2. `MEETING_TRACKER_SCHEMA_READY=on SITE_VISIT_MATERIALS_SCHEMA_READY=on npm run dev`
+   (without the two flags the Meeting Tracker shows "not yet enabled" locally),
+   then sign in at `http://localhost:3000`.
+3. Look at: Workbench Request list, Staff deliberations, Final writeups,
+   Awardees (shared header); a visit page and a session page (read-only
+   summary → Edit → Cancel).
+4. **Caution:** localhost reads Production data. Dataverse writes from local
+   are blocked by the interlock (`lib/dataverse/core/interlock.js:354-374`;
+   `.env.local` has no `DATAVERSE_PROD_WRITE_ACK`) [VERIFIED], but Postgres
+   and email paths are not covered by it — do not press save/send/generate
+   buttons during the review.
+5. Revert paths if a chunk is unwanted: drop its commit on the branch; after
+   merge, Vercel Instant Rollback or revert the merge commit (UI-only, no data
+   to repair).
+
+### Open decisions for the owner
+
+- Merge as one PR or per chunk; Staff deliberations task grouping (yes/no).
+- Next audit items: Recording & Transcript card (collapse finished steps),
+  attendee typeahead (~48 chips), Awardee tab buttons/cards, request-page tab
+  stage cues, remaining centered `PageHeader` heroes on tool pages.
+
+---
+
+# Prior handoff: Staff Deliberations UI review in a separate session
 
 ## Session 577 Codex close — 2026-10-05 PT
 
