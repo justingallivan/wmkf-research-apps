@@ -106,50 +106,51 @@ function nextStep(request, task, document) {
   return { instruction: 'Open request details to prepare the pre-site briefing.', detailsFirst: true };
 }
 
-function RequestCard({ request }) {
+function RequestRow({ request }) {
   const task = taskFor(request);
   const document = primaryDocument(request);
   const step = nextStep(request, task, document);
   const documentAction = document?.key === 'writeup' ? 'Edit writeup in Word' : 'Edit briefing in Word';
-  const primaryClass = 'inline-flex min-h-11 items-center justify-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2';
-  const secondaryClass = 'inline-flex min-h-11 items-center text-sm font-medium text-gray-600 underline underline-offset-4 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2';
+  const primaryClass = 'inline-flex h-9 items-center justify-center whitespace-nowrap rounded-lg border border-gray-300 bg-white px-3 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2';
+  const secondaryClass = 'whitespace-nowrap text-sm font-medium text-gray-600 underline underline-offset-4 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 rounded';
   const stageClass = task.bucket === 'attention' ? 'bg-amber-50 text-amber-900' : task.bucket === 'review' ? 'bg-violet-50 text-violet-900' : 'bg-blue-50 text-blue-800';
+  const meta = [
+    request.institution,
+    request.programDirector && `Lead PD: ${request.programDirector}`,
+  ].filter(Boolean);
   return (
-    <Card hover={false}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1 basis-72">
-          <h3 className="break-words text-base font-semibold text-gray-900">
+    <li className="grid grid-cols-1 gap-x-6 gap-y-2 px-4 py-3 md:grid-cols-[minmax(0,1fr)_minmax(0,24rem)_auto] md:items-center">
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
+          <h3 className="min-w-0 truncate text-sm font-semibold text-gray-900" title={request.title || undefined}>
             <Link href={requestHref(request)} className="underline-offset-2 hover:underline">
               {request.requestNumber ? `#${request.requestNumber}` : request.requestId}{request.title ? ` — ${request.title}` : ''}
             </Link>
           </h3>
-          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
-            {request.institution && <p>{request.institution}</p>}
-            {request.programDirector && <p>Lead PD: {request.programDirector}</p>}
-          </div>
-          <TestRequestBadge isTestRequest={request.isTestRequest} className="mt-2" />
+          <TestRequestBadge isTestRequest={request.isTestRequest} />
         </div>
-        <p className={`rounded-full px-3 py-1 text-xs font-semibold ${stageClass}`}>{step.stage || task.label}</p>
-      </div>
-      <div className="mt-5 flex flex-col gap-4 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 flex-1">
-          <p className="max-w-2xl text-lg font-semibold leading-7 text-gray-900">{step.instruction}</p>
-          <p className="mt-1 text-sm text-gray-600">{presentationTiming(request)}</p>
-        </div>
-        <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
-          {document && !step.detailsFirst ? (
-            <a href={document.fact.file.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>{documentAction}</a>
-          ) : (
-            <Link href={requestHref(request, task.tab)} className={primaryClass}>{task.action}</Link>
-          )}
-          {document && (step.detailsFirst ? (
-            <a href={document.fact.file.webUrl} target="_blank" rel="noopener noreferrer" className={secondaryClass}>{documentAction}</a>
-          ) : (
-            <Link href={requestHref(request, task.tab)} className={secondaryClass}>{task.action}</Link>
-          ))}
+        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500">
+          {meta.map((item) => <span key={item}>{item}</span>)}
+          <span>{presentationTiming(request)}</span>
         </div>
       </div>
-    </Card>
+      <div className="min-w-0">
+        <p className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${stageClass}`}>{step.stage || task.label}</p>
+        <p className="mt-1 text-sm text-gray-700">{step.instruction}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 md:justify-end">
+        {document && !step.detailsFirst ? (
+          <a href={document.fact.file.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>{documentAction}</a>
+        ) : (
+          <Link href={requestHref(request, task.tab)} className={primaryClass}>{task.action}</Link>
+        )}
+        {document && (step.detailsFirst ? (
+          <a href={document.fact.file.webUrl} target="_blank" rel="noopener noreferrer" className={secondaryClass}>{documentAction}</a>
+        ) : (
+          <Link href={requestHref(request, task.tab)} className={secondaryClass}>{task.action}</Link>
+        ))}
+      </div>
+    </li>
   );
 }
 
@@ -232,34 +233,33 @@ export default function StaffDeliberationsPanel({
 
   return (
     <section aria-labelledby="staff-deliberations-heading">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 id="staff-deliberations-heading" className="sr-only">Staff Deliberations</h2>
-          {!loading && !loadingCycles && <p className="mt-1 text-sm text-gray-600">
-            {requestCounts.ordinary} requests in this program and cycle
-            {requestCounts.test > 0 ? ` · ${requestCounts.test} test requests also shown` : ''}
-          </p>}
+      <h2 id="staff-deliberations-heading" className="sr-only">Staff Deliberations</h2>
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">Task
+            <select value={filter} onChange={(event) => setFilter(event.target.value)} className="h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm font-normal text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
+              <option value="all">All tasks</option><option value="before">Before presentation</option><option value="post">Post-visit work</option><option value="review">In review</option><option value="attention">Needs attention</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">Search
+            <input value={search} onChange={(event) => setSearch(event.target.value)} type="search" placeholder="Request, title, institution or PD" className="h-11 w-72 rounded-lg border border-gray-300 px-3 text-sm font-normal text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2" />
+          </label>
         </div>
         <ScopeSegment scope={scope} onChange={onScopeChange} allLabel="All program directors" />
       </div>
-      <p className="mb-3 max-w-3xl text-sm text-gray-600">Each request shows your next step. Use the briefing before the presentation; add findings to the writeup afterward.</p>
-      <div className="mb-4 flex flex-wrap gap-3">
-        <label className="text-sm text-gray-700">Task
-          <select value={filter} onChange={(event) => setFilter(event.target.value)} className="ml-2 min-h-11 rounded-lg border border-gray-300 bg-white px-3">
-            <option value="all">All tasks</option><option value="before">Before presentation</option><option value="post">Post-visit work</option><option value="review">In review</option><option value="attention">Needs attention</option>
-          </select>
-        </label>
-        <label className="flex w-full min-w-0 items-center gap-2 text-sm text-gray-700 sm:w-auto sm:flex-1">Search
-          <input value={search} onChange={(event) => setSearch(event.target.value)} type="search" placeholder="Request, title, institution or PD" className="min-h-11 min-w-0 flex-1 rounded-lg border border-gray-300 px-3" />
-        </label>
-      </div>
+      {!loading && !loadingCycles && <p className="mb-3 text-sm text-gray-600">
+        {requestCounts.ordinary} requests in this program and cycle
+        {requestCounts.test > 0 ? ` · ${requestCounts.test} test requests also shown` : ''}
+      </p>}
       {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">{error}</div>}
       {loadingCycles || (loading && requests.length === 0) ? (
         <Card hover={false}><p className="text-gray-600">Loading requests…</p></Card>
       ) : error ? null : visible.length === 0 ? (
         <Card hover={false}><p className="text-gray-700">No requests match this view. Try All tasks or clear the search.</p></Card>
       ) : (
-        <div className="space-y-3">{visible.map((request) => <RequestCard key={request.requestId} request={request} />)}</div>
+        <ul className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          {visible.map((request) => <RequestRow key={request.requestId} request={request} />)}
+        </ul>
       )}
     </section>
   );
