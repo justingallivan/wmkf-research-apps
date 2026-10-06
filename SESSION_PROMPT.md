@@ -45,8 +45,10 @@ payload, persistence, or automation change.
    details"; saved session → "Session details" + status chip beside the title.
    Cancel discards; save returns to the summary; new visits/sessions unchanged.
 
-Fixture-backed screenshots (local only, not in the repo) were checked at 1440,
-1024 and 800px.
+Fixture-backed screenshots (local only, not in the repo; every `/api` call
+answered with fake data): all five Workbench tabs at 1440px, Request list and
+Staff deliberations also at 1024 and 800px, and the visit and session pages
+at 1440px. Real-data rendering is unverified until the morning review.
 
 ### Morning review on localhost
 
@@ -69,6 +71,8 @@ Fixture-backed screenshots (local only, not in the repo) were checked at 1440,
 ### Open decisions for the owner
 
 - Merge as one PR or per chunk; Staff deliberations task grouping (yes/no).
+- Small inconsistency to settle: the visit summary shows the time zone as
+  `(America/Los_Angeles)`, the session summary as `PDT`.
 - Next audit items: Recording & Transcript card (collapse finished steps),
   attendee typeahead (~48 chips), Awardee tab buttons/cards, request-page tab
   stage cues, remaining centered `PageHeader` heroes on tool pages.
