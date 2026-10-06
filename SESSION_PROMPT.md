@@ -4,9 +4,9 @@
 
 Owner-led review of the overnight `feature/workbench-ux` branch on localhost,
 followed by a redesign of the Staff Deliberations list and request tab, plus
-dependency security fixes released to Production. **The UX branch is pushed and
-NOT merged** (`origin/feature/workbench-ux`, current `main` merged in at
-`419392a0a`). No PR is open yet.
+dependency security fixes released to Production. **The UX branch is merged and
+deployed:** PR #448, merge `edb885f89`, Production deployment succeeded
+2026-10-06 after a third Codex adversarial review approved it.
 
 ### What Was Completed
 
@@ -41,8 +41,7 @@ email are not — never press Save/Send/Generate during reviews.
 
 ### Verified Open
 
-1. **Open the PR for `feature/workbench-ux`, final Codex review, merge on owner OK.**
-   Evidence: `git log origin/main..origin/feature/workbench-ux` (29 non-merge commits). One PR (owner accepted the recommendation 2026-10-06). `main` auto-deploys; UI-only except the read-only PI select. Revert path: Vercel Instant Rollback or revert the merge.
+1. **DONE — PR #448 merged** (`edb885f89`, Production deployment succeeded 2026-10-06). Owner may want a quick Production look at the Staff deliberations list and one request tab. Revert path: Vercel Instant Rollback or revert the merge.
 2. **Meeting Tracker follow-ups (owner: "more stuff on the meeting planner", later session).** Owner has not listed them yet — ask first. Known starting points:
    - **A session that fails to load shows an empty, saveable form** (`SessionEditor.js`; reproduced with an invalid `cycleCode`). Saving could overwrite the session with blanks. Highest priority: data-loss shape.
    - **Slot "Briefing not yet shared" can be stale:** TEST #1003222's session slot says not shared while its Workbench briefing shows "Shared Sep 18". The slot's briefing source differs from the Workbench sharing history.

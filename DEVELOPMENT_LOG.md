@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Staff Deliberations redesigned as a five-step lifecycle; Meeting Tracker pages read-first (Session 578)
+
+**Milestone:** The owner-reviewed UX pass closes the open owner acceptance from S577: the Staff deliberations list and request tab now show where a request stands and what to do next, and Meeting Tracker visits, sessions and proposal order open read-only.
+**Sessions:** 577 overnight build, 578 owner review and redesign; PR #448 (merge `edb885f89`, Production deployment succeeded 2026-10-06).
+**Ship state:**
+- List: Reviewer-follow-up-style cards (number, title, institution · PI · PD, stage chip, next step or specific problem) with one "Open request" button deep-linking to the request-page card holding the next action; no Word shortcut on the list.
+- Request tab: Pre-site briefing → Deliberation session → Presentation → Working writeup → Group review; recording, transcripts and summary inside the Presentation step; every action keeps its prior condition and label.
+- Meeting Tracker visit, session and proposal order open read-only with explicit Edit; UI-only except a read-only PI field in the list projection.
+- Vocabulary held for a suite-wide group decision after D26 (`docs/NOMENCLATURE_GLOSSARY.md`).
+**Why it matters:** Staff new to the app can see the stage, the specific problem, and the one place to act, without opening every request.
+**Pointers:** PR #448; `SESSION_PROMPT.md`; `.impeccable/surfaces/ents-workbench-staffdeliberationspanel-js-1912c47b.md`; `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`.
+
 ## October 2026 — Request-first Staff Deliberations workflow deployed (Session 577 Codex close)
 
 **Milestone:** Staff Deliberations separates eligible request membership, presentation timing, document preparation and explicit human review transitions.
