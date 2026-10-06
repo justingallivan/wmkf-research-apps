@@ -162,6 +162,7 @@ function statusResponse({
   preparation = null,
   timing = null,
   correctionInProgress = false,
+  finalReview = null,
 } = {}) {
   return response({
     success: true,
@@ -174,6 +175,7 @@ function statusResponse({
     ...(session ? { session } : {}),
     ...(sessionAttendees ? { sessionAttendees } : {}),
     ...(hasBriefRows === undefined ? {} : { hasBriefRows }),
+    ...(finalReview ? { finalReview } : {}),
   });
 }
 
@@ -1516,4 +1518,15 @@ test('no status notice renders when nothing needs attention; the stage sentence 
   expect(screen.getByTestId('deliberations-stage-sentence')).toHaveClass('sr-only');
   expect(screen.queryByText(/Retry preparation|The last send failed|could not be determined/)).not.toBeInTheDocument();
   expect(document.querySelector('#deliberations-status .bg-amber-50')).toBeNull();
+});
+
+test.each([
+  ['group-review', 'Group review', /Group review is in progress/],
+  ['leadership-review', 'Group and leadership review', /leadership review is in progress/],
+])('the visible review step names the %s phase', async (phase, title, summary) => {
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(FINAL), finalReview: { phase } }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={jest.fn()} />);
+  expect(await screen.findByText(summary)).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: new RegExp(`^${title}`) })).toBeInTheDocument();
+  if (phase === 'leadership-review') expect(screen.getByText(/now in leadership review/)).toBeInTheDocument();
 });

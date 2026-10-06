@@ -167,7 +167,7 @@ test('SessionEditor uses the schedule projection for its proposal lookup', async
 });
 
 test('a slot without a live briefing link says who shares it; with one it offers Open briefing', () => {
-  expect(slotBriefingText({ briefing: null })).toMatch(/not yet shared.*lead PD shares the writeup/);
+  expect(slotBriefingText({ briefing: null })).toMatch(/not yet shared.*lead PD shares it from Staff Deliberations/);
   expect(slotBriefingText({ briefing: { url: 'https://apps.test/external/briefing/t' } })).toBe('Open briefing');
 });
 

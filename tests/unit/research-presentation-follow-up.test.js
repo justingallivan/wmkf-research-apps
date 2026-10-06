@@ -82,3 +82,14 @@ describe('inline presentation summary', () => {
   });
 });
 
+
+test('a short summary without the Q&A heading is shown whole, never clamped without Read more', () => {
+  const shortText = 'Line one.\nLine two.\nLine three.\nLine four.\nLine five.\nLine six.';
+  render(<ResearchPresentationFollowUp status="loaded"
+    materials={[{ artifactType: 100000007, filename: 's.txt', backing: 'file', webUrl: 'https://tenant.sharepoint.com/s.txt' }]}
+    summary={{ text: shortText, stale: false, publishedAt: '2026-10-05T15:00:00Z' }} />);
+  const paragraph = screen.getByText(/Line one\./);
+  expect(paragraph).toHaveTextContent('Line six.');
+  expect(paragraph.className).not.toMatch(/line-clamp/);
+  expect(screen.queryByRole('button', { name: 'Read more' })).not.toBeInTheDocument();
+});

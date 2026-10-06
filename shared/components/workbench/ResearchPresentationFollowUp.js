@@ -41,7 +41,8 @@ function SummaryText({ summary }) {
       </p>
       {summary.text && (
         <>
-          <p className={`mt-1 whitespace-pre-line text-sm leading-6 text-gray-800 ${expanded ? '' : 'line-clamp-4'}`}>{expanded ? summary.text : collapsed}</p>
+          {/* Clamp only when Read more can reveal the rest; a short summary is shown whole. */}
+          <p className={`mt-1 whitespace-pre-line text-sm leading-6 text-gray-800 ${canExpand && !expanded ? 'line-clamp-4' : ''}`}>{expanded ? summary.text : collapsed}</p>
           {canExpand && (
             <button type="button" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded}
               className="mt-1 text-sm font-semibold text-blue-800 underline">

@@ -1193,7 +1193,8 @@ export default function StaffDeliberationsTab({
       : briefGenerating || briefPendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING ? 'Generating…'
         : briefDraftReady ? 'Draft ready to check'
           : briefReadyFile ? 'Draft available' : 'Not generated yet';
-  const writeupSummary = reviewActive ? 'Moved to group review'
+  const leadershipReview = finalReview?.phase === 'leadership-review';
+  const writeupSummary = reviewActive ? (leadershipReview ? 'Moved to review; now in leadership review' : 'Moved to group review')
     : preSiteShared || preSiteFinal ? 'Locked for review'
       : correctionDraft ? 'Corrections in progress'
         : generating || pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING ? 'Preparing…'
@@ -1479,9 +1480,15 @@ export default function StaffDeliberationsTab({
   const reviewStep = (
     <Step
       number={4}
-      title="Group review"
+      title={leadershipReview ? 'Group and leadership review' : 'Group review'}
       status={stepStatus('review')}
-      summary={<p className={summaryClass}>{reviewActive ? 'In review in Final writeup' : 'Starts in Final writeup when the writeup is ready'}</p>}
+      summary={(
+        <p className={summaryClass}>
+          {leadershipReview ? 'Group review is done; leadership review is in progress in Final writeup.'
+            : reviewActive ? 'Group review is in progress in Final writeup.'
+              : 'Starts in Final writeup when the writeup is ready'}
+        </p>
+      )}
       actions={(movedToFinal && onSelectTab) || (due && editingReady && onSelectTab) ? (
         <>
           {movedToFinal && onSelectTab && (

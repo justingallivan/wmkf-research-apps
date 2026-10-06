@@ -45,7 +45,7 @@ export async function reorderSessionSlots({ sessionId, slots, fetchImpl = fetch 
 // D11: the slot's link is the request's live briefing page (writeup, reviews,
 // proposal, materials). It exists only once the PD has shared the writeup.
 export function slotBriefingText(slot) {
-  return slot?.briefing?.url ? 'Open briefing' : 'Briefing not yet shared — the lead PD shares the writeup from Staff Deliberations.';
+  return slot?.briefing?.url ? 'Open briefing' : 'Briefing not yet shared — the lead PD shares it from Staff Deliberations.';
 }
 
 // Returns a new array with the item at `from` moved to `to`; returns the same
