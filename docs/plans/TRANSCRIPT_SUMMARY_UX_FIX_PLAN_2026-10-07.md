@@ -3,7 +3,7 @@ title: Meeting Tracker transcript and summary UX fixes
 kind: plan
 domain: transcription
 status: built-in-branch
-summary: "Minimal R1–R8 fixes implemented by Luna and reviewed READY by Sol; local tests and gates recorded, owner merge pending."
+summary: "R1–R8 and the Opus follow-up are built in PR 455, with Sol review and local verification complete; hosted acceptance and owner merge remain pending."
 owner: product-engineering
 related:
   - docs/plans/TRANSCRIPT_SUMMARY_UX_AUDIT_2026-10-07.md
@@ -14,7 +14,7 @@ related:
 
 ## Scope and authority
 
-The owner requested a fix plan, execution by Luna, and review by Sol on October 7, 2026. This plan selects the smallest R1–R8 variants in the [source audit](TRANSCRIPT_SUMMARY_UX_AUDIT_2026-10-07.md). The implementation specification below is completed in this branch as recorded in the completion evidence; hosted acceptance and owner merge remain pending. Work stays in `/Users/gallivan/Code/WMKF_Apps-codex` on `codex/transcript-summary-ux-audit`. The existing lockfile edit belongs to prior work and is excluded.
+The owner requested a fix plan, execution by Luna, and review by Sol on October 7, 2026. This plan selects the smallest R1–R8 variants in the [source audit](TRANSCRIPT_SUMMARY_UX_AUDIT_2026-10-07.md). The original R1–R8 specification was completed at `a14c8ccee` in PR 455. The owner has authorized the Opus follow-up below; its implementation and independent review are complete. Hosted acceptance and owner merge remain pending. Work stays in `/Users/gallivan/Code/WMKF_Apps-codex` on `codex/transcript-summary-ux-audit`. The existing lockfile edit belongs to prior work and is excluded.
 
 Change surface: Meeting Tracker session loading, navigation, transcript correction and presentation-summary controls. Entry points: `SessionEditor.js`, `MeetingTrackerList.js`, and `RecordingAndTranscriptCard.js`. Persistence: existing session/slot routes and transcript/summary routes retain their contracts; no new persisted fields, routes, migrations, environment settings or external writes are part of development verification. Consumers: these screens, existing staff and Board readers, and their tests. Prior findings: audit R1–R8.
 
@@ -59,7 +59,7 @@ Protected files: `ResearchPresentationFollowUp.js` and the session reader in `St
 - Inspect the final diff for protected-file changes, secrets, unrelated lockfile edits and invented route contracts. Record exact test/review results and remaining limitations here.
 - Commit completed work descriptively, push only this branch, open and attach a PR. Do not merge or claim deployed acceptance. The owner merges.
 
-## Completion evidence
+## Original implementation evidence (a14c8ccee)
 
 [VERIFIED via source, focused tests and Sol final review, 2026-10-07] Luna (`gpt-6-luna`) implemented the three UI components and two test files. Sol (`gpt-6.1-sol`) reviewed the plan and implementation independently; final verdict **READY**, no remaining blocking finding. The review corrected route-scoped creation recovery, fresh draft validity, discard acknowledgment, persisted summaries without a confirmed boundary, and preservation across successive publishing-state refreshes. Deferred-response tests now wait for response-driven metadata or consumed JSON rather than pre-existing text.
 
@@ -81,3 +81,28 @@ Contract reconciliation: existing route/service/version fences and outside allow
 Bounded documentation reconciliation: the audit is explicitly a historical base snapshot; this plan owns current branch status. The PC Meeting Tracker plan's briefing and navigation restatements now describe branch behavior without claiming deployment. Broader pre-existing document discrepancies listed in the audit remain outside this fix; no whole-repository sweep completion is claimed.
 
 Release: commit and push only this branch and open a PR for owner merge. No new Production reads/writes, provider calls, email, environment changes or migrations were performed in Phase B. Protected Workbench readers, final-writeup ownership and shared primitives remain unchanged; the pre-existing lockfile edit is excluded.
+
+
+## Opus follow-up — authorized October 7
+
+[VERIFIED via OAuth Claude Code review of `a14c8ccee`] Claude Opus 5.5 returned READY with non-blocking P2 findings: missing transcript status was treated as a manual upload; preserved text from a changed/deleted draft retained misleading live-draft guidance; failed summary reads had no retry and could leave stale Checking/not-checked copy. The hash-scroll finding was initially [ASSUMED] and was subsequently reproduced by the browser probe below. The review used only Read/Grep/Glob; `apiKeySource` was `none`. The owner authorized this patch after reviewing the findings.
+
+Change surface: `RecordingAndTranscriptCard.js` and its focused tests. Persistence: none new; existing summary draft GET/PATCH/DELETE/publish version fences remain unchanged. Consumer: the local card and visit navigation. Luna owns runtime/tests; root owns browser verification/docs; independent review follows the frozen patch. Protected files and Production boundaries above remain in force.
+
+| Follow-up invariant | Verification before completion |
+|---|---|
+| Absent/unavailable artifact metadata cannot be called a manual upload; only explicit `bundleEditable === false` supports that explanation. | Transcript material present + absent/failed collection; explicit manual artifact complement |
+| Local recovery text is distinct from the authoritative server draft; changed/missing draft must not masquerade as a live publishing draft or enable obsolete mutations. | Ready and publishing local text against null/replaced/new-version server draft; accurate conflict and disabled obsolete actions |
+| Load latest is an explicit replacement of local text, succeeds only after a successful current response, and preserves text on failure. | Successful load, failed load, delayed stale load, expected-version fence preserved before replacement |
+| Summary status is retryable and current-context loading cannot stick after moving to a state where no GET is needed. | Failure → Check again success; known absent metadata; deferred GET across changed context; newer read not cleared by old response |
+| A fragment navigation reaches the asynchronously mounted card, without scrolling ordinary visits or repeatedly stealing scroll position. | Real browser with delayed mocked visit response, matching/no fragment; source change only if failure is reproduced |
+
+[VERIFIED via `/tmp/transcript-anchor-baseline.json`] A temporary Chrome profile rendered the real `SiteVisitEditor` and baseline `RecordingAndTranscriptCard` from `a14c8ccee`, with synthetic router/chrome/applicant-materials area and all requests intercepted. The visit GET was delayed 800 ms. With the exact fragment, `scrollY` remained 0 and the card top was 2238.78 px in a 720 px viewport; no fragment also stayed at 0. No page/request errors occurred. This proves the delayed-mount failure in that browser harness, not hosted authentication or real materials access. The fix is confined to the card.
+
+[VERIFIED via final source and Sol review, 2026-10-07] Luna implemented all four follow-ups. Unknown transcript metadata remains distinct from explicit manual uploads. Concurrent draft changes retain local text in a separate recovery buffer with explicit Load latest; failed reads preserve that text and obsolete mutations stay unavailable. Summary reads expose Check again. Sol identified an additional compact correction-publish DTO case: missing summary metadata cannot establish publication absence. The corrected card shows unavailable status with collection refresh while preserving access to existing summary material; its failed-refresh regression passed. Sol's final verdict is **READY**, with no remaining blocker.
+
+[VERIFIED via `/tmp/transcript-anchor-fixed.json`] Chrome 154.0.8037.98 scrolled the delayed-mounted card to the viewport top (`scrollY: 2239`, card top −0.22 px) for the matching fragment. No-fragment navigation stayed at 0; manually scrolling to 0 followed by a parent rerender stayed at 0. No page/request errors occurred. The card owns a one-time exact-fragment scroll. This synthetic local browser probe is not hosted acceptance.
+
+[VERIFIED via `/tmp/transcript-ux-followup-tests.log`, `/tmp/transcript-ux-followup-lint.log`, `/tmp/transcript-ux-followup-build.log`] Final follow-up verification passed **158 tests in 5 suites**: meeting-tracker-pages, recording-and-transcript-card, site-visit-editor-t5-matrix, transcript-summary-service, and presentation-transcript-binding. These overlap the original implementation run above and are not additional disjoint coverage. Final build and scoped ESLint passed (six advisory warnings, zero errors); types passed during this follow-up. The original full-lint limitation remains unchanged.
+
+Release remains PR 455 on this branch for owner merge. No hosted acceptance, merge, deployment, or Production operation is claimed.
