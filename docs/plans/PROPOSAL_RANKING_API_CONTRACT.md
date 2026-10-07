@@ -3,8 +3,8 @@
 Status: implementation contract for the first Proposal Ranking release. It is
 derived from revision 3 of `PROPOSAL_RANKING_DESIGN_2026-10-07.md`. Runtime
 activation remains pending. Sandbox schema and application-role setup are verified;
-bounded persistence checks passed. Environment/identity configuration, direct-user
-privacy and browser rehearsal remain open. See
+bounded persistence checks and direct-table denial for the tested sandbox staff
+identity passed. Environment/identity configuration and browser rehearsal remain open. See
 `docs/atlas/dataverse-proposal-ranking.md` for target-specific status.
 
 ## Route

@@ -171,6 +171,19 @@ async function getWhoAmI(client, callerId = null) {
   return { ok: true, status: result.status, userId: String(result.body?.UserId || '').toLowerCase() };
 }
 
+async function getEffectiveUserIds(client, callerId) {
+  const result = await client.get(
+    "/systemusers?$select=systemuserid&$filter=Microsoft.Dynamics.CRM.EqualUserId(PropertyName=@p1)&@p1='systemuserid'",
+    callerId ? { MSCRMCallerID: callerId } : undefined,
+  );
+  if (!result.ok || !Array.isArray(result.body?.value)) return { ok: false, status: result.status, userIds: [] };
+  return {
+    ok: true,
+    status: result.status,
+    userIds: result.body.value.map((row) => String(row.systemuserid || '').toLowerCase()).filter(Boolean),
+  };
+}
+
 async function inspectSearchStatus(client) {
   const result = await client.get('/searchstatus');
   if (!result.ok) return { available: false, httpStatus: result.status, status: 'unverified', rankingEntityStatusListed: null, rankingTablesAbsentFromSearchStatus: null };
@@ -194,12 +207,13 @@ async function findOrdinaryStaffCandidate(client, appUserId, requestedId = null)
   return { candidate: null, reason: 'no-verified-enabled-nonapp-user-without-elevated-or-ranking-role' };
 }
 
-async function verifyStaffFixtureReadDenial(client, staffUserId, entitySets, ids) {
+async function verifyStaffFixtureReadDenial(client, staffUserId, entitySets, ids, appSystemUserId) {
   if (!staffUserId) return { attempted: false, reason: 'no-verified-staff-candidate' };
   const canonical = staffUserId.toLowerCase();
-  const who = await getWhoAmI(client, canonical);
-  if (!who.ok || who.userId !== canonical) {
-    return { attempted: true, impersonationVerified: false, whoAmIStatus: who.status, fixtureReadStatuses: null };
+  const effective = await getEffectiveUserIds(client, canonical);
+  if (!effective.ok || effective.userIds.length !== 1 || effective.userIds[0] !== canonical
+    || effective.userIds[0] === String(appSystemUserId || '').toLowerCase()) {
+    return { attempted: true, impersonationVerified: false, equalUserIdStatus: effective.status, fixtureReadStatuses: null };
   }
   const fixtureReadStatuses = {};
   for (const [key, entitySet] of Object.entries(entitySets)) {
@@ -212,7 +226,7 @@ async function verifyStaffFixtureReadDenial(client, staffUserId, entitySets, ids
     attempted: true,
     impersonationVerified: true,
     scope: 'specific-retained-fixture-rows-via-MSCRMCallerID; not a delegated staff OAuth session',
-    whoAmIStatus: who.status,
+    equalUserIdStatus: effective.status,
     fixtureReadStatuses,
     allFixtureReadsDenied: Object.values(fixtureReadStatuses).every((entry) => entry.denied),
   };
@@ -321,7 +335,7 @@ async function run() {
       || JSON.stringify(initialOrder) !== JSON.stringify(FIXTURE_REQUEST_IDS)) {
       throw new Error('Initialization readback attribution or synthetic order did not match the fixture.');
     }
-    staffRead = await verifyStaffFixtureReadDenial(client, staffCandidate.candidate, adapter.ENTITY_SETS, ids);
+    staffRead = await verifyStaffFixtureReadDenial(client, staffCandidate.candidate, adapter.ENTITY_SETS, ids, identity.userId);
     staffRead.candidateSystemUserId = staffCandidate.candidate;
     staffRead.candidateRoleCheck = staffCandidate.roleCheck || staffCandidate.reason;
 
@@ -431,4 +445,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, makeFixture, assertRankingOnly, parseSearchStatus, isDuplicateCycleConflict, REHEARSAL_CYCLE, FIXTURE_REQUEST_IDS };
+module.exports = { parseArgs, makeFixture, assertRankingOnly, parseSearchStatus, isDuplicateCycleConflict, getEffectiveUserIds, verifyStaffFixtureReadDenial, REHEARSAL_CYCLE, FIXTURE_REQUEST_IDS };

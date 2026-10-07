@@ -2,10 +2,12 @@
 
 Date: 2026-10-07. Status: source implemented; sandbox schema and application-role
 provisioning and bounded persistence rehearsal verified. Runtime activation and
-multi-identity browser rehearsal remain pending.
+multi-identity browser rehearsal remain pending. Direct-table denial is verified
+for the tested sandbox staff identity.
 Production has not been provisioned or enabled. Evidence:
 `docs/audits/PROPOSAL_RANKING_SANDBOX_SETUP_2026-10-07.md` and
-`docs/audits/PROPOSAL_RANKING_PERSISTENCE_REHEARSAL_2026-10-07.md`.
+`docs/audits/PROPOSAL_RANKING_PERSISTENCE_REHEARSAL_2026-10-07.md` and
+`docs/audits/PROPOSAL_RANKING_STAFF_PRIVACY_2026-10-07.md`.
 
 ## Source and persistence
 
@@ -65,8 +67,9 @@ with the visible order. No automatic budget cutoff is applied.
    fields/Memo bounds and active alternate keys passed readback.
 2. [VERIFIED via role apply and assignment readback] The dedicated role is assigned
    only by this setup to the sandbox application identity, with nine Create/Read/Write
-   privileges. Ordinary PD direct-table denial remains unverified: the bounded probe could not
-   verify impersonation. Sandbox GET on the `searchstatus` platform endpoint (HTTP
+   privileges. Direct-table denial is verified for the tested enabled nonapp staff
+   identity: effective-user query matched, three exact rows returned 403, and app
+   controls returned 200. This is impersonation evidence, not a staff OAuth login. Sandbox GET on the `searchstatus` platform endpoint (HTTP
    `/searchstatus`) confirms all three entities absent
    from the provisioned search index. Verify indirect audit/navigation paths are denied.
 3. Verify test-request and synthetic-reviewer isolation schemas/switches on that
@@ -101,5 +104,7 @@ source scan returned zero proposals. The bounded persistence receipt above prove
 initialization, conditional save, stale-write rollback, duplicate-key rollback and
 current sandbox search exclusion using only new-table synthetic snapshot data.
 It does not prove authenticated meeting behavior. Staff grants/default identity,
-isolation/runtime flags, direct-user denial and browser rehearsal remain open.
+isolation/runtime flags and browser rehearsal remain open. The selected-staff
+direct-table denial proof is limited to the sandbox identity and retained records
+in the linked privacy receipt; production permissions require their own verification.
 Advanced Find visibility is not proof of relevance-search exclusion.

@@ -165,7 +165,9 @@ Use existing app registration and authenticated route/service/adapter boundaries
 Dataverse is the implemented persistence target. The three table definitions and
 application role are checked in under `lib/dataverse/schema/wave32-proposal-ranking/`
 and `lib/dataverse/schema/roles/proposal-ranking-app.json`. Sandbox schema and application-role provisioning have passed readback. Runtime
-configuration, direct-user privacy and multi-identity verification remain open. See
+configuration and multi-identity browser verification remain open. Direct-table
+denial is verified for the tested sandbox staff identity; see
+`docs/audits/PROPOSAL_RANKING_STAFF_PRIVACY_2026-10-07.md`. See
 `docs/atlas/dataverse-proposal-ranking.md` for the activation boundary.
 
 Use three logical tables (`wmkf_proposalrankingcycle`, `wmkf_proposalrankinground`,
@@ -358,7 +360,9 @@ focused tests provide implementation evidence. Bounded live storage checks passe
 (initialization, conditional save, stale-write and duplicate-key rollback); current
 sandbox search exclusion is verified. See
 `docs/audits/PROPOSAL_RANKING_PERSISTENCE_REHEARSAL_2026-10-07.md`.
-Direct-user privacy and authenticated browser lifecycle remain unverified.
+Direct-table denial for the tested sandbox staff identity is now verified in
+`docs/audits/PROPOSAL_RANKING_STAFF_PRIVACY_2026-10-07.md`.
+Authenticated browser lifecycle and production privacy remain unverified.
 
 Revision-2 Opus outcome: **READY WITH NAMED CHANGES**, returned by
 `claude-opus-5-5` on 2026-10-07. Receipt:

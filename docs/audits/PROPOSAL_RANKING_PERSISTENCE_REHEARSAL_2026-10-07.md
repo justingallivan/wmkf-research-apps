@@ -1,7 +1,10 @@
 # Proposal Ranking bounded persistence rehearsal
 
 Date: 2026-10-07. Target: `orgd9e66399.crm.dynamics.com` (sandbox).
-Status: storage checks passed; application activation and direct-user privacy remain unverified.
+Historical persistence checkpoint: storage checks passed; staff identity verification
+was inconclusive at this point. Follow-up direct-table privacy evidence is in
+`docs/audits/PROPOSAL_RANKING_STAFF_PRIVACY_2026-10-07.md`; current activation status is in
+`docs/atlas/dataverse-proposal-ranking.md`.
 
 ## Scope and live evidence
 

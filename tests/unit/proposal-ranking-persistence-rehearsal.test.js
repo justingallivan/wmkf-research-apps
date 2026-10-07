@@ -4,8 +4,16 @@ const {
   assertRankingOnly,
   parseSearchStatus,
   isDuplicateCycleConflict,
+  getEffectiveUserIds,
   FIXTURE_REQUEST_IDS,
 } = require('../../scripts/probe-proposal-ranking-persistence');
+const {
+  readFixtureReceipt,
+  effectiveUserMatches,
+  exactFixtureReadDenied,
+  hasCompletePrivilegeList,
+  privilegeNamesPresent,
+} = require('../../scripts/probe-proposal-ranking-staff-privacy');
 
 const IDS = {
   cycleId: '10000000-0000-4000-8000-000000000001',
@@ -72,5 +80,64 @@ describe('Proposal Ranking persistence rehearsal safeguards', () => {
     expect(isDuplicateCycleConflict({ status: 400, dataverseMessage: 'Alternate key constraint violation' })).toBe(true);
     expect(isDuplicateCycleConflict({ status: 403, dataverseMessage: 'Duplicate key' })).toBe(false);
     expect(isDuplicateCycleConflict({ status: 409, message: 'Request failed' })).toBe(false);
+  });
+
+  test('staff identity uses EqualUserId rather than WhoAmI and rejects app identity', async () => {
+    const client = { get: jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: { value: [{ systemuserid: '20000000-0000-4000-8000-000000000001' }] },
+    }) };
+    const result = await getEffectiveUserIds(client, '20000000-0000-4000-8000-000000000001');
+    expect(client.get).toHaveBeenCalledWith(
+      expect.stringContaining('EqualUserId(PropertyName=@p1)'),
+      { MSCRMCallerID: '20000000-0000-4000-8000-000000000001' },
+    );
+    expect(result.userIds).toEqual(['20000000-0000-4000-8000-000000000001']);
+    expect(effectiveUserMatches([{ systemuserid: result.userIds[0] }], result.userIds[0], '30000000-0000-4000-8000-000000000001')).toBe(true);
+    expect(effectiveUserMatches([{ systemuserid: '30000000-0000-4000-8000-000000000001' }], result.userIds[0], '30000000-0000-4000-8000-000000000001')).toBe(false);
+    expect(effectiveUserMatches([
+      { systemuserid: result.userIds[0] },
+      { systemuserid: '30000000-0000-4000-8000-000000000001' },
+    ], result.userIds[0], '30000000-0000-4000-8000-000000000001')).toBe(false);
+  });
+
+  test('exact fixture privacy proof accepts only a 403 after successful app baselines', () => {
+    expect(exactFixtureReadDenied(403)).toBe(true);
+    expect(exactFixtureReadDenied(404)).toBe(false);
+    expect(exactFixtureReadDenied(401)).toBe(false);
+    expect(exactFixtureReadDenied(200)).toBe(false);
+  });
+
+  test('effective privilege report recognizes table Read privilege names', () => {
+    expect(hasCompletePrivilegeList([])).toBe(false);
+    expect(hasCompletePrivilegeList([{ PrivilegeName: 'prvReadwmkf_proposalrankingcycle' }, {}])).toBe(false);
+    expect(hasCompletePrivilegeList([{ PrivilegeName: 'prvReadwmkf_proposalrankingcycle' }])).toBe(true);
+    expect(privilegeNamesPresent([
+      { PrivilegeName: 'prvReadwmkf_proposalrankinground' },
+      { PrivilegeName: 'prvCreatewmkf_proposalrankinglist' },
+    ])).toEqual({
+      prvReadwmkf_proposalrankingcycle: false,
+      prvReadwmkf_proposalrankinground: true,
+      prvReadwmkf_proposalrankinglist: false,
+    });
+  });
+
+  test('staff privacy probe requires the completed D99 sandbox receipt and exact retained IDs', () => {
+    const receipt = {
+      target: 'orgd9e66399.crm.dynamics.com',
+      cycleCode: 'D99',
+      result: 'verified-persistence',
+      staffRead: { candidateSystemUserId: '20000000-0000-4000-8000-000000000001' },
+      retained: {
+        cycleId: '30000000-0000-4000-8000-000000000001',
+        roundId: '30000000-0000-4000-8000-000000000002',
+        listId: '30000000-0000-4000-8000-000000000003',
+      },
+    };
+    expect(readFixtureReceipt(receipt)).toMatchObject({ staffUserId: receipt.staffRead.candidateSystemUserId });
+    expect(() => readFixtureReceipt({ ...receipt, target: 'wmkf.crm.dynamics.com' })).toThrow(/completed rehearsal receipt/i);
+    expect(() => readFixtureReceipt({ ...receipt, cycleCode: 'D26' })).toThrow(/completed rehearsal receipt/i);
+    expect(() => readFixtureReceipt({ ...receipt, retained: { ...receipt.retained, roundId: null } })).toThrow(/valid retained round/i);
   });
 });

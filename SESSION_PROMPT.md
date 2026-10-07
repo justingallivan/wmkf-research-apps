@@ -45,8 +45,12 @@ The complete eligible-source scan returned zero proposals. The owner chose a min
 rehearsal restricted to the new ranking tables. D99 now retains two synthetic cards
 in its snapshot only; no source proposals were created or changed. Initialization,
 conditional save, stale ETag rollback and duplicate-key rollback passed. Search
-status confirms the three entities absent from the sandbox search index. Staff
-impersonation could not be verified, so direct-table denial remains unverified.
+status confirms the three entities absent from the sandbox search index. The follow-up
+GET-only probe verified effective staff identity via EqualUserId and denied all
+three exact fixture reads with 403 under both impersonation headers, with app-200
+controls and absent effective Read privileges. WhoAmI returned the app identity
+even under effective impersonation; do not use it as that identity assertion.
+Bounded proof: `docs/audits/PROPOSAL_RANKING_STAFF_PRIVACY_2026-10-07.md`.
 Actual Beth Pruitt identity selection and app grants, readiness configuration and
 multi-identity browser rehearsal remain unperformed. Do not recreate the D99 fixture.
 Evidence and retained IDs: `docs/audits/PROPOSAL_RANKING_PERSISTENCE_REHEARSAL_2026-10-07.md`.
@@ -63,7 +67,9 @@ Canonical production build passed after the source corrections. The two live-sou
 in 10 suites plus lint/type/data gates and Sol/Opus review. The earlier full GitHub Jest run had an unrelated transcript-card failure. The later
 run at `8d8b10872` passed (run `37698207467`); no transcript runtime changes were made
 here. The ETag correction and rehearsal pass 116 tests in 12 suites, plus lint and
-the DAL gate/self-test. New commit CI must be checked independently.
+the DAL gate/self-test. Full GitHub Jest also passed at `8be9f57a1`.
+The follow-up GET-only privacy probe passed live, with 9 focused safeguard tests
+and relevant documentation gates/self-tests passing. New commit CI is separate.
 Feature/Explorer integration regression command:
 
 ```bash
