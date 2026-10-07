@@ -190,6 +190,12 @@ The automatic preparation worker is a system actor and is unaffected.
 
 **Before merge (owner-run probe):** read the Production `final_writeup.matrix_audiences` setting.
 The PCs must hold the Program Coordinator persona, or they lose sight of drafts when this deploys.
+**Done 2026-10-06:** the owner published Program Coordinator for Connor, Sarah and Duncan.
+
+**Accepted gap (owner 2026-10-06):** Dynamics Explorer still lists and downloads files in the
+request's `Artifacts/Pre-Site Visit` folder (`lib/services/dynamics-explorer/tools/documents.js`,
+`pages/api/dynamics-explorer/download-document.js`). The owner treats it like browsing SharePoint
+directly, so it is not guarded (Codex re-review finding, 2026-10-06).
 
 ### Stage 3 — Sign-off view for the lead PD
 - Rename "Mark reviewed" → "Sign off".
