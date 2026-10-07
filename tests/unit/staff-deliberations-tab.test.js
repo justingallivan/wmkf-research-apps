@@ -1400,6 +1400,33 @@ test('post-visit drafting: a failed group-review start shows the server message'
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 
+test('post-visit drafting: no handoff when the review status names a different document than the one shown', async () => {
+  queueRoute('presiteGet', statusResponse({ ...POST_VISIT_STATUS, finalReview: readyFinalReview({ sourceArtifactId: '33333333-3333-4333-8333-333333333333' }) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  await screen.findByRole('link', { name: 'Edit writeup in Word' });
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).not.toBeInTheDocument();
+});
+
+test('post-visit drafting: a refresh that swaps the document while confirming disables confirmation', async () => {
+  jest.useFakeTimers();
+  try {
+    const successor = { ...preSiteArtifact(REVIEW), artifactId: '33333333-3333-4333-8333-333333333333' };
+    queueRoute('presiteGet', statusResponse({ ...POST_VISIT_STATUS, finalReview: readyFinalReview() }));
+    queueRoute('presiteGet', statusResponse({ ...POST_VISIT_STATUS, currentArtifact: successor, finalReview: readyFinalReview({ sourceArtifactId: successor.artifactId }) }));
+    render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Ready for group review' }));
+    const dialog = screen.getByRole('dialog', { name: 'Ready for group review?' });
+    await act(async () => { jest.advanceTimersByTime(15000); });
+    await waitFor(() => expect(within(dialog).getByText(/The writeup changed while you were confirming/)).toBeInTheDocument());
+    const confirm = within(dialog).getByRole('button', { name: 'Ready for group review' });
+    expect(confirm).toBeDisabled();
+    fireEvent.click(confirm);
+    expect(calls('finalStart')).toHaveLength(0);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
 test('post-visit drafting: an in-progress start (202) shows Starting group review without an error', async () => {
   queueRoute('presiteGet', statusResponse({ ...POST_VISIT_STATUS, finalReview: readyFinalReview() }));
   queueRoute('finalStart', response({ success: true, inProgress: true }, 202));

@@ -28,6 +28,10 @@ import {
 const STATUS_POLL_INTERVAL_MS = 3000;
 const STATUS_POLL_ATTEMPTS = 20;
 const EMPTY_LIST = Object.freeze([]);
+
+function sameArtifactId(left, right) {
+  return Boolean(left && right) && String(left).toLowerCase() === String(right).toLowerCase();
+}
 const EMPTY_STAGE_LABELS = DELIBERATION_STAGE_DEFAULT_LABELS;
 
 // One date format for the tab, matching the Staff deliberations list:
@@ -1033,6 +1037,10 @@ export default function StaffDeliberationsTab({
     }
   };
 
+  const groupReviewDialogCurrent = confirmDialog?.kind === 'group-review'
+    && sameArtifactId(confirmDialog.artifactId, artifact?.artifactId)
+    && sameArtifactId(confirmDialog.artifactId, finalReview?.sourceArtifactId)
+    && finalReview?.phase === 'ready' && finalReview?.canStart === true;
   const confirmDialogContent = confirmDialog?.kind === 'brief'
     ? {
       title: 'Regenerate this brief?',
@@ -1076,8 +1084,13 @@ export default function StaffDeliberationsTab({
           title: 'Ready for group review?',
           confirmLabel: startingGroupReview ? 'Starting…' : 'Ready for group review',
           busy: startingGroupReview,
-          onConfirm: startGroupReview,
-          body: (
+          // Bound to the writeup shown when the dialog opened: a refresh that
+          // swaps the document or eligibility disables confirmation.
+          confirmDisabled: !groupReviewDialogCurrent,
+          onConfirm: () => startGroupReview(confirmDialog.artifactId),
+          body: !groupReviewDialogCurrent && !startingGroupReview ? (
+            <p>The writeup changed while you were confirming. Cancel and check it again.</p>
+          ) : (
             <>
               <p>The current Word version becomes the starting point for group review.</p>
               <p className="mt-2">The Word file stays the same, including your edits, and colleagues can then review and edit it.</p>
@@ -1123,15 +1136,15 @@ export default function StaffDeliberationsTab({
   const timingLabel = presentationEndLabel(timing);
   // Same route, authorization and schedule fence as the Final writeup tab;
   // canStart and sourceArtifactId come from that tab's status (status-facts).
-  async function startGroupReview() {
-    if (!requestId || !finalReview?.sourceArtifactId || startingGroupReview) return;
+  async function startGroupReview(expectedArtifactId) {
+    if (!requestId || !expectedArtifactId || startingGroupReview) return;
     const sequence = generationSequence.current;
     setStartingGroupReview(true);
     setGroupReviewError(null);
     try {
       await requestJson('/api/workbench/final-writeup', {
         method: 'POST',
-        body: { requestId, expectedArtifactId: finalReview.sourceArtifactId },
+        body: { requestId, expectedArtifactId },
         fallbackMessage: 'Group review could not be started.',
         tolerantBody: true,
       });
@@ -1268,7 +1281,8 @@ export default function StaffDeliberationsTab({
             : due ? 'Not prepared yet' : 'Optional before the presentation';
   // Post-visit drafting hands off to group review from step 4 (owner 2026-10-06).
   const handOffOpen = preSiteShared && milestoneComplete && !preSiteFinal && !correctionDraft && finalReview?.phase === 'ready';
-  const canHandOff = handOffOpen && finalReview.canStart === true && Boolean(finalReview.sourceArtifactId);
+  const canHandOff = handOffOpen && finalReview.canStart === true
+    && sameArtifactId(finalReview.sourceArtifactId, artifact?.artifactId);
   const handOffNote = !handOffOpen ? null
     : canHandOff ? 'When the draft is ready for colleagues, choose Ready for group review. Editing continues in this Word file.'
       : finalReview.startBlockedReason === 'final_writeup_site_visit_not_ended'
@@ -1526,7 +1540,7 @@ export default function StaffDeliberationsTab({
             </a>
           )}
           {canHandOff && (
-            <button type="button" onClick={() => { setGroupReviewError(null); setConfirmDialog({ kind: 'group-review' }); }} disabled={startingGroupReview} className={secondaryClass}>
+            <button type="button" onClick={() => { setGroupReviewError(null); setConfirmDialog({ kind: 'group-review', artifactId: artifact.artifactId }); }} disabled={startingGroupReview} className={secondaryClass}>
               {startingGroupReview ? 'Starting…' : 'Ready for group review'}
             </button>
           )}
@@ -1799,7 +1813,7 @@ export default function StaffDeliberationsTab({
               <button
                 ref={confirmDialogButtonRef}
                 type="button"
-                disabled={confirmDialogContent.busy}
+                disabled={confirmDialogContent.busy || confirmDialogContent.confirmDisabled}
                 onClick={confirmDialogContent.onConfirm}
                 className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
               >
