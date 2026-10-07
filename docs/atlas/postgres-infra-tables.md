@@ -381,8 +381,7 @@ recovery. States: `pending` → `sent`, or terminal `skipped` with a
 `no_longer_in_group_review`, `final_withdrawn`, `request_changed`, `transition_not_committed`
 after 14 days (a later valid staging for the same draft reopens only this kind
 of skip),
-`program_not_configured`, `staffing_not_configured`, `no_recipients`,
-`test_request_refused`). A five-minute lease (`lease_token` + `locked_until`)
+`program_not_configured`, `staffing_not_configured`, `no_recipients`). A five-minute lease (`lease_token` + `locked_until`)
 lets one call send; every write requires the current token, and the lease is
 renewed as a fence before creating an activity and before `SendEmail`, so a
 worker whose lease expired and was taken over stops (fifth Codex review); the Dynamics activity id and frozen `to_recipients` are stored before

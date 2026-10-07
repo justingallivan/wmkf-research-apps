@@ -609,11 +609,17 @@ describe('delivery', () => {
     expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'sent' });
   });
 
-  test('a TEST-request refusal is terminal, not retried', async () => {
+  test('a transport guard refusal (including an unreadable marker) stays pending; recovery then sends', async () => {
     const { deps, getRow } = harness({ existingRow: pendingRow() });
-    deps.createEmailActivity.mockRejectedValueOnce(Object.assign(new Error('refused'), { code: 'test_request_email_denied' }));
-    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'skipped', reason: 'test_request_refused' });
-    expect(getRow().state).toBe('skipped');
+    deps.createEmailActivity.mockRejectedValueOnce(Object.assign(
+      new Error('Email refused: request is not a verified ordinary request (read_failed).'),
+      { code: 'test_request_email_denied' },
+    ));
+    const spy = quiet();
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'failed', code: 'test_request_email_denied' });
+    spy.mockRestore();
+    expect(getRow()).toMatchObject({ state: 'pending', last_error_code: 'test_request_email_denied' });
+    expect(await recoverPendingHandoffEmails({}, deps)).toEqual([{ sourceDocumentId: SOURCE_ID, status: 'sent' }]);
   });
 
   test('a PD who no longer exists (404) is dropped and the others are emailed', async () => {
