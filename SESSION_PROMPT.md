@@ -1,4 +1,64 @@
-# Session 583 Prompt: resume Proposal Ranking from its feature branch
+# Session 584 Prompt: release and verify transcript speaker fix; preserve Proposal Ranking handoff
+
+## Session 583 transcript handoff — 2026-10-07 PT (Codex)
+
+**[VERIFIED via Git] Built and pushed, NOT merged or deployed:**
+`codex/meeting-transcript-fixes`, tip `5ee323aaa`.
+Owner requested that this handoff land on main. This is a documentation-only handoff;
+it does not authorize or perform production promotion of the runtime changes.
+The existing Proposal Ranking handoff is preserved below.
+
+### Completed on the feature branch
+
+- `c7067f3df`: full-recording Zoom timing/wording reconciliation for reused audio speaker IDs.
+- `5ee323aaa`: preserve valid global names and prior short-reply corrections; prune metadata
+  for vanished IDs; retain recovery of unnamed IDs, including 3:1 evidence with a singleton.
+- Names and per-turn corrections persist together in the existing bounded alignment JSON.
+  The central content read applies them to preview, manual naming, download and publication.
+  No schema migration or saved-job repair was performed.
+- Claude Opus reviewed through subscription OAuth. Its three findings were fixed. The follow-up
+  accepted those fixes and identified an unnamed-ID recovery regression; that and the singleton
+  edge case were then fixed and independently reviewed with no remaining actionable findings.
+- Verification: 30 suites / 725 tests passed before the last singleton regression; final focused
+  rerun passed 69 tests including that new case. Types, scoped lint and documentation currency
+  checks passed. This is mocked/local verification, not hosted end-to-end acceptance.
+- Offline VTT replay retained four Allison corrections with zero existing names removed.
+  It reconstructs IDs from display names, so it does NOT prove raw-provider generation behavior.
+
+### Verified open and next-session sequence
+
+1. Fetch and resume `codex/meeting-transcript-fixes`; do not rebuild from main. Read the branch's
+   generation-fix section in `docs/plans/ZOOM_VTT_SPEAKER_MAPPING_PLAN_2026-10-04.md` and its tests.
+2. Review current-head integration/CI and arrange a deliberate release. **Owner decision needed:**
+   runtime merge/promotion; stopping and pushing this handoff did not authorize that release.
+3. After confirming the deployed revision includes the fix, regenerate and inspect request
+   **1003038**, especially **01:02:04** and **01:02:12**, against Zoom's Allison captions.
+   Verify the actual raw-provider output, saved alignment and displayed/downloaded transcript;
+   do not substitute the offline VTT probe for acceptance of the real generation path.
+
+**[VERIFIED via signed-in UI and fetched main source]** The owner tested production and still
+saw evaan / jingli at those times. New draft job: `ac090b3e-dd49-4719-b3db-c81718865f46`,
+ready Oct 7 at 4:23 PM. At inspection, main `afb99fee3` still returned the old verdict without
+`reconcileZoomSpeakerTurns`; this run therefore did not test the branch fix. Do not describe
+that production result as a failure of deployed new code. Conversely, the branch is not yet
+proven by a real hosted generation run. Original earlier job: `adba2697-5c75-4847-bae4-c544ef7a3ca3`.
+
+### Resume references and limits
+
+- Branch source: `lib/services/transcription-pilot/zoom-vtt.js`,
+  `lib/services/meeting-tracker-transcription/alignment-service.js`,
+  `lib/services/transcription-pilot/runtime.js`, and `transcript-format.js` in that directory.
+- Branch regressions: `tests/unit/transcription-zoom-speaker-turns.test.js` and alignment-service tests.
+- Branch-only reproducible local probe: `scripts/probe-transcript-speaker-turns.mjs` (two local VTTs).
+  Downloads and temporary review reports do not travel between machines; obtain authorized inputs
+  afresh if needed. Transcript wording was not committed.
+- Feature worktree retained; unrelated worktrees untouched. No new production milestone shipped,
+  so no DEVELOPMENT_LOG entry is required. The current-session claim-evidence report was unavailable
+  because its local state could not be read; no observation row was invented.
+
+---
+
+## Previous Session 583 Prompt: resume Proposal Ranking from its feature branch
 
 ## Proposal Ranking handoff — 2026-10-07 (Codex)
 
