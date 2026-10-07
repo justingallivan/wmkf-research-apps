@@ -30,6 +30,8 @@ describe('Proposal Ranking calculations', () => {
       .toEqual({ rating: 4, scaleReady: true });
     expect(readSavedOverallAssessment({ overallAssessment: 4, overallAssessmentLabel: 'Good' }))
       .toEqual({ rating: null, scaleReady: false });
+    expect(readSavedOverallAssessment({ answerValue: 5, answerText: 'Excellent', questionOptions: null, questionOptionsUnreadable: true }))
+      .toEqual({ rating: null, scaleReady: false });
     expect(readSavedOverallAssessment({ overallAssessment: 4, questionOptions: [{ label: 'Low', value: 4 }] }))
       .toEqual({ rating: null, scaleReady: false });
   });
@@ -47,6 +49,9 @@ describe('Proposal Ranking calculations', () => {
     expect(summarizeProposalReviews([
       { received: true, synthetic: false, answer: { overallAssessment: 2, questionOptions: [{ label: 'Bad', value: 2 }] } },
     ])).toMatchObject({ ready: false, reason: 'unknown-rating-scale' });
+    expect(summarizeProposalReviews([
+      { received: true, answer: { overallAssessment: 5, questionOptions: savedScale } },
+    ])).toMatchObject({ ready: false, reason: 'unknown-synthetic-reviewer-marker' });
   });
 
   test('sorts unrounded means and then numeric-aware request numbers deterministically', () => {

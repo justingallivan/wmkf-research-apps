@@ -66,6 +66,15 @@ export const APP_REGISTRY = [
     features: ['Session Planning', 'Proposal Schedule', 'Attendee Directory', 'Zoom Links'],
   },
   {
+    key: 'proposal-ranking',
+    name: 'Proposal Ranking',
+    href: '/proposal-ranking',
+    icon: '↕️',
+    description: 'Prepare private Program Director rankings and facilitate a shared proposal order by funding cycle',
+    categories: ['phase-ii'],
+    features: ['Private PD Rankings', 'SE and MR Lists', 'Facilitated Composite', 'Meeting Order'],
+  },
+  {
     key: 'peer-review-summarizer',
     name: 'Summarize Peer Reviews',
     href: '/peer-review-summarizer',

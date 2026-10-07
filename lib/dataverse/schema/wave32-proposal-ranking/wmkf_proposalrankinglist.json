@@ -1,0 +1,43 @@
+{
+  "name": "wmkf_proposalrankinglist",
+  "kind": "new-entity",
+  "schemaName": "wmkf_ProposalRankingList",
+  "displayName": "Proposal Ranking List",
+  "displayCollectionName": "Proposal Ranking Lists",
+  "description": "One private participant list or program meeting list. Whole ordered GUID arrays are atomically stored on this row. Application-only data.",
+  "ownershipType": "OrganizationOwned",
+  "primaryNameAttribute": {
+    "schemaName": "wmkf_Name",
+    "displayName": "Name",
+    "description": "Round, list key, and program label.",
+    "maxLength": 200,
+    "requiredLevel": "ApplicationRequired"
+  },
+  "attributes": [
+    { "type": "String", "schemaName": "wmkf_RoundId", "displayName": "Round GUID", "maxLength": 36, "requiredLevel": "ApplicationRequired" },
+    { "type": "String", "schemaName": "wmkf_ListKey", "displayName": "List Key", "description": "Server-derived participant or meeting-list key.", "maxLength": 100, "requiredLevel": "ApplicationRequired" },
+    { "type": "String", "schemaName": "wmkf_ProgramKey", "displayName": "Program Key", "maxLength": 2, "requiredLevel": "ApplicationRequired" },
+    { "type": "String", "schemaName": "wmkf_ParticipantSystemUserId", "displayName": "Participant System User ID", "description": "Canonical GUID text for an individual PD list; null for meeting lists.", "maxLength": 36 },
+    { "type": "Memo", "schemaName": "wmkf_OrderJson", "displayName": "Ordered Proposal GUIDs", "description": "Complete proposal GUID permutation. Refuse writes above 64 KiB.", "maxLength": 65536, "requiredLevel": "ApplicationRequired" },
+    { "type": "Picklist", "schemaName": "wmkf_Status", "displayName": "Status", "requiredLevel": "ApplicationRequired", "defaultValue": 100000000, "options": [
+      { "value": 100000000, "label": "Draft" },
+      { "value": 100000001, "label": "Submitted" },
+      { "value": 100000002, "label": "Collecting" },
+      { "value": 100000003, "label": "Composite Draft" },
+      { "value": 100000004, "label": "Published" }
+    ] },
+    { "type": "Integer", "schemaName": "wmkf_Version", "displayName": "Version", "minValue": 1, "maxValue": 2147483647, "requiredLevel": "ApplicationRequired" },
+    { "type": "Memo", "schemaName": "wmkf_CompositeJson", "displayName": "Immutable Composite Calculation", "description": "Saved source submission IDs, exact rank sums, ranges, and baseline order; null for individual lists.", "maxLength": 65536 },
+    { "type": "String", "schemaName": "wmkf_LastOperationId", "displayName": "Last Operation ID", "maxLength": 36, "requiredLevel": "ApplicationRequired" },
+    { "type": "String", "schemaName": "wmkf_UpdatedByActorSystemUserId", "displayName": "Updated By Actor System User ID", "maxLength": 36, "requiredLevel": "ApplicationRequired" },
+    { "type": "DateTime", "schemaName": "wmkf_UpdatedAt", "displayName": "Updated At", "format": "DateAndTime", "behavior": "TimeZoneIndependent", "requiredLevel": "ApplicationRequired" },
+    { "type": "DateTime", "schemaName": "wmkf_SubmittedAt", "displayName": "Submitted At", "format": "DateAndTime", "behavior": "TimeZoneIndependent" },
+    { "type": "String", "schemaName": "wmkf_SubmittedOperationId", "displayName": "Submitted Operation ID", "maxLength": 36 },
+    { "type": "DateTime", "schemaName": "wmkf_PublishedAt", "displayName": "Published At", "format": "DateAndTime", "behavior": "TimeZoneIndependent" },
+    { "type": "String", "schemaName": "wmkf_PublishedOperationId", "displayName": "Published Operation ID", "maxLength": 36 }
+  ],
+  "relationships": [],
+  "alternateKeys": [
+    { "schemaName": "wmkf_proposalrankinglist_round_listkey", "displayName": "Round + List Key", "keyAttributes": ["wmkf_roundid", "wmkf_listkey"] }
+  ]
+}
