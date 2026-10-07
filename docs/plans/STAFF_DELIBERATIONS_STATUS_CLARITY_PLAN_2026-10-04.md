@@ -71,7 +71,7 @@ At scheduled end, move the working-writeup section into the primary position. Th
 
 On Final Writeup, retain the explicit **Ready for group review** confirmation, actor restrictions, and later **Ready for leadership review** confirmation. Update prerequisite copy to point to preparation progress or a recoverable error, not “Start Site Visit”. Before scheduled end, do not offer group-review initiation for this workflow. The matching server rule must agree with the UI. Already-started legacy reviews remain usable; no automatic downgrade.
 
-Illustrative states (not production readbacks):
+Illustrative states (not production readbacks; historical — step 4's handoff and draft visibility were superseded on 2026-10-06 by `docs/plans/FINAL_WRITEUP_GROUP_REVIEW_HANDOFF_PLAN_2026-10-06.md`):
 
 ```text
 Before presentation · Sep 28, 10:00–11:00 AM [meeting timezone]

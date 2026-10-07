@@ -1588,7 +1588,7 @@ export default function StaffDeliberationsTab({
           </p>
         )}
       </div>
-      {writeupHidden ? (
+      {writeupHidden || writeupAccess?.identityLinked === false ? (
         <p className="mt-2 text-sm text-gray-700" data-testid="writeup-hidden-note">
           {writeupAccess?.identityLinked === false
             ? 'Your staff account isn’t linked to a Dynamics user, so the app can’t confirm you’re the lead Program Director. Contact an administrator.'

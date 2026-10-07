@@ -1698,3 +1698,10 @@ describe('draft writeup hidden before group review', () => {
     expect(screen.queryByRole('button', { name: 'Prepare working draft' })).not.toBeInTheDocument();
   });
 });
+
+test('an unlinked account with no draft yet is told why it cannot prepare one', async () => {
+  queueRoute('presiteGet', statusResponse({ writeupAccess: { canChange: false, identityLinked: false } }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByTestId('writeup-hidden-note')).toHaveTextContent(/isn’t linked to a Dynamics user/);
+  expect(screen.queryByRole('button', { name: 'Prepare working draft' })).not.toBeInTheDocument();
+});
