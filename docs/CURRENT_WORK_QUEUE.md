@@ -83,9 +83,11 @@ sequence.
   buttons renamed "Ready for group review" / "Send to leadership". Stage 2 (the
   draft is hidden in the apps from everyone but the lead PD, PCs and superusers
   until group review; changes are lead PD or superuser only) is live (PR #453,
-  merge `b47a70eae`, 2026-10-06). Stages 3–5
-  (lead-PD sign-off view, PD handoff email,
-  leadership daily digest) are planned, not built:
+  merge `b47a70eae`, 2026-10-06). Stage 3 (lead-PD sign-off view; "Mark
+  reviewed" renamed "Sign off"; Send to leadership names unsigned PDs) is live
+  (PR #454, merge `b2bc23b95`, 2026-10-07). Stages 4–5 (PD handoff email,
+  leadership daily digest) are planned, not built; SoCal is parked by the
+  owner (2026-10-07):
   `docs/plans/FINAL_WRITEUP_GROUP_REVIEW_HANDOFF_PLAN_2026-10-06.md`.
 - **Deferred to next session (2026-10-06):** (a) the list's next step for a
   ready briefing should name the deliberation session date (UI only; the

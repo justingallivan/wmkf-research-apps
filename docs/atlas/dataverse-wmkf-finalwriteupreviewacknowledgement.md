@@ -101,7 +101,7 @@ session-derived reviewer identity and exact request/current-Final fences.
 group review, shows positive reviewer initials and the non-PD caller's personal
 state, and treats expected schema-not-ready as an unavailable optional panel so
 the Word action remains independent.
-**[BUILT ON BRANCH `feature/writeup-signoff-view`, NOT LIVE.]** For the lead PD
+**[LIVE 2026-10-07 — PR #454, merge `b2bc23b95`, group-review handoff Stage 3.]** For the lead PD
 and superusers the same GET/POST also return a names-only sign-off roster:
 expected Program Directors from `final_writeup.matrix_audiences` (program
 audience ∩ PD persona, minus the lead) with signed / signed-edited-since /

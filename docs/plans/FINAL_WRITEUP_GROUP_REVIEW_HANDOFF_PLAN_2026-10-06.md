@@ -1,6 +1,6 @@
 ---
 title: Final Writeup group-review handoff — PD drafting, PD sign-off, leadership digest
-status: approved 2026-10-06 — Stages 1–2 live; Stages 3–5 not built
+status: approved 2026-10-06 — Stages 1–3 live; Stages 4–5 not built; SoCal parked
 created: 2026-10-06
 owner: Justin Gallivan
 related:
@@ -197,9 +197,9 @@ request's `Artifacts/Pre-Site Visit` folder (`lib/services/dynamics-explorer/too
 `pages/api/dynamics-explorer/download-document.js`). The owner treats it like browsing SharePoint
 directly, so it is not guarded (Codex re-review finding, 2026-10-06).
 
-### Stage 3 — Sign-off view for the lead PD
+### Stage 3 — Sign-off view for the lead PD — live 2026-10-07 (PR #454, merge `b2bc23b95`)
 
-**Built on branch `feature/writeup-signoff-view` (Session 581, 2026-10-07); not merged or live.**
+**Live in Production 2026-10-07 (Session 581). Codex adversarial review: approve, no findings.**
 - The acknowledgement GET and POST return `signOffRoster` for the lead PD and superusers only.
 - Roster statuses separate "no list for this program" and "staffing not published" from an
   empty list, so a request outside a configured program never reads as fully signed off.

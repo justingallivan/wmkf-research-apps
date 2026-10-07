@@ -138,7 +138,10 @@ user-facing `.js` in `shared/components` + `pages` (excluding `pages/api`).
 4. **Post-presentation writeup** (Workbench step title since 2026-10-06; formerly
    "Working writeup", originally the pre-site visit draft): the fuller document
    staff amend after the site visit; it becomes the Final Writeup.
-5. **Group review → leadership review** in Final Writeup.
+5. **Group review → leadership review** in Final Writeup. Colleagues **Sign off**
+   (since 2026-10-07; formerly "Mark reviewed") during group review; the lead PD
+   **Sends to leadership**. The Final writeups app's view names ("Needs my review",
+   "Reviewed by me") still use review wording.
 
 ### Terms in conflict
 

@@ -13,13 +13,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 ## October 2026 — PD drafts alone, then hands off to group review from Staff Deliberations (Session 580)
 
 **Milestone:** The post-presentation writeup now follows the owner's model: the lead PD drafts privately and hands off with "Ready for group review" on Staff Deliberations step 4. Until handoff, the apps show the draft only to the lead PD, Program Coordinators and superusers.
-**Sessions:** 580. PR #452 (Stage 1, merge `40b70a145`) and PR #453 (Stage 2, merge `b47a70eae`), each through Codex adversarial review (Stage 1: one finding; Stage 2: two rounds).
+**Sessions:** 580–581. PR #452 (Stage 1, merge `40b70a145`), PR #453 (Stage 2, merge `b47a70eae`) and PR #454 (Stage 3, merge `b2bc23b95`, 2026-10-07), each through Codex adversarial review (Stage 1: one finding; Stage 2: two rounds; Stage 3: none).
 **Ship state:**
 - Step 4 is "Post-presentation writeup". It reuses `POST /api/workbench/final-writeup`; the confirmation is bound to the displayed document. The Final writeup buttons now read "Ready for group review" and "Send to leadership".
 - `lib/services/pre-site-visit/writeup-visibility.js` withholds the Draft/Review file on the request page, the Final writeup tab, the deliberations list and logistics. Generate, regenerate and post-visit editing are lead PD or superuser only.
 - PCs come from the Final Writeup staffing personas (owner published Connor, Sarah, Duncan). Dynamics Explorer is an accepted gap.
+- Stage 3: "Sign off" replaces "Mark reviewed". The lead PD and superusers see which expected Program Directors have signed off, and Send to leadership names those who haven't.
 **Why it matters:** The writeup is only shared with colleagues when the lead PD decides it is ready, and the apps no longer advertise a private draft to every reviewer.
-**Pointers:** `docs/plans/FINAL_WRITEUP_GROUP_REVIEW_HANDOFF_PLAN_2026-10-06.md` (Stages 3–5 planned: sign-off view, PD handoff email, leadership digest).
+**Pointers:** `docs/plans/FINAL_WRITEUP_GROUP_REVIEW_HANDOFF_PLAN_2026-10-06.md` (Stages 4–5 planned: PD handoff email, leadership digest; SoCal parked).
 
 ## October 2026 — Staff Deliberations automatic preparation live; D26 caught up (Session 579)
 
