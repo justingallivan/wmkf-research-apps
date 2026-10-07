@@ -39,6 +39,11 @@ beforeEach(() => {
   useSession.mockReturnValue({ data: { user: { profileId: 73 } }, status: 'authenticated' });
 });
 
+// The page drops transcript content once `expires_at` is past the real clock,
+// so fixtures use a far-future expiry. Expiry behavior is driven by job status
+// in the tests below. A fixed near date broke these tests when it passed.
+const FIXTURE_EXPIRES_AT = '2099-01-01T00:00:00.000Z';
+
 function readyJob(id, filename, overrides = {}) {
   return {
     id,
@@ -50,7 +55,7 @@ function readyJob(id, filename, overrides = {}) {
     audio_duration_ms: 30_000,
     requested_model: 'universal-3-pro',
     returned_model: 'universal-3-pro',
-    expires_at: '2026-10-07T12:00:00.000Z',
+    expires_at: FIXTURE_EXPIRES_AT,
     receipt_expires_at: '2026-10-30T12:00:00.000Z',
     word_accuracy_score: null,
     speaker_accuracy_score: null,
@@ -116,7 +121,7 @@ test('renders transcript strings as text and exposes the owner-safe downloads', 
     audio_duration_ms: 30_000,
     requested_model: 'universal-3-pro',
     returned_model: 'universal-3-pro',
-    expires_at: '2026-10-07T12:00:00.000Z',
+    expires_at: FIXTURE_EXPIRES_AT,
     receipt_expires_at: '2026-10-30T12:00:00.000Z',
     word_accuracy_score: null,
     speaker_accuracy_score: null,
