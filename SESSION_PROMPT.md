@@ -1,4 +1,70 @@
-# Session 581 Prompt: hand the transcript/summary UX audit to Codex; build Stage 3 (lead-PD sign-off view); check 1003010
+# Session 583 Prompt: resume Proposal Ranking from its feature branch
+
+## Proposal Ranking handoff — 2026-10-07 (Codex)
+
+Owner requested this docs-only pointer on main so `/start` on the home machine can
+find the unmerged work. The implementation remains on **`codex/proposal-ranking`**,
+latest handoff commit **`283f02a19`**, in
+[PR #457](https://github.com/justingallivan/wmkf-research-apps/pull/457).
+This main commit does not merge or enable the app.
+
+### Resume at home
+
+1. Fetch origin and inspect the current checkout for unrelated changes.
+2. Continue on the existing remote branch `codex/proposal-ranking` (create a local
+   tracking branch if absent); do not rebuild the feature from main.
+3. Read that branch's `SESSION_PROMPT.md` and its linked Atlas/audit receipts for
+   the detailed handoff. Use the home machine's own credentials for live checks.
+
+### Verified progress
+
+- Separate ranking app built by Luna, reviewed by Sol and the orchestrator, with
+  bounded Claude Opus subscription-OAuth reviews. No Fable or agent API-key use.
+- Sandbox schema and role provisioned. Storage initialization, conditional save,
+  stale-edit atomic rejection and duplicate-cycle rejection passed.
+- GET-only privacy check verified direct-table denial for one enabled nonapp
+  sandbox staff identity: effective-user query matched, all three retained records
+  returned 403, and application control reads returned 200. This is impersonation
+  evidence, not an all-staff or production claim.
+- Existing proposal/review fields were unchanged. D99 synthetic cards exist only
+  inside retained ranking snapshot data. Do not rerun fixture creation.
+- Runtime app remains disabled; production ranking schema/activation is pending.
+
+### Next items
+
+**Verified open:** in-app walkthrough of private rankings, submission, composite
+publication, meeting reordering and full-requested budget totals. Facilitator
+configuration, participant grants and approved-environment readiness remain open.
+The earlier sandbox source scan found zero eligible ordinary proposals; resolve
+that acceptance-data limitation without silently copying/creating source proposals
+or weakening test exclusion. See feature-branch evidence before acting.
+
+**Owner decision needed:** deliberate production promotion after acceptance and
+current-head CI review. No production activation is authorized by this pointer.
+
+**Work constraints:** keep the solution simple; Luna builds/reconnoiters, Sol
+reviews, orchestrator finishes, bounded Opus OAuth review. No review loops over
+minor polish. Temporary local probe files do not travel between Macs; sanitized
+results and retained IDs are committed on the feature branch.
+
+### Commits and milestone determination
+
+- `8d8b10872`: sandbox schema verification and source-field corrections.
+- `8be9f57a1`: ETag fix and persistence rehearsal.
+- `3f5c6cf10`: effective-user privacy verification.
+- `283f02a19`: detailed feature-branch session handoff.
+
+No new production milestone shipped; no DEVELOPMENT_LOG entry is required.
+
+---
+
+## Prior main handoff — historical context, not a freshly verified worklist
+
+The earlier main handoff is preserved below for other workstreams. Its open/closed
+claims were not reverified by this ranking session. Check current source and owner
+context before resuming any item, especially cleanup or production actions.
+
+## Previous Session 581 Prompt: hand the transcript/summary UX audit to Codex; build Stage 3 (lead-PD sign-off view); check 1003010
 
 ## Session 580 Summary — 2026-10-06 PT (Claude)
 
