@@ -1087,7 +1087,7 @@ export default function StaffDeliberationsTab({
           // Bound to the writeup shown when the dialog opened: a refresh that
           // swaps the document or eligibility disables confirmation.
           confirmDisabled: !groupReviewDialogCurrent,
-          onConfirm: () => startGroupReview(confirmDialog.artifactId),
+          onConfirm: startGroupReview,
           body: !groupReviewDialogCurrent && !startingGroupReview ? (
             <p>The writeup changed while you were confirming. Cancel and check it again.</p>
           ) : (
@@ -1136,7 +1136,8 @@ export default function StaffDeliberationsTab({
   const timingLabel = presentationEndLabel(timing);
   // Same route, authorization and schedule fence as the Final writeup tab;
   // canStart and sourceArtifactId come from that tab's status (status-facts).
-  async function startGroupReview(expectedArtifactId) {
+  async function startGroupReview() {
+    const expectedArtifactId = confirmDialog?.kind === 'group-review' ? confirmDialog.artifactId : null;
     if (!requestId || !expectedArtifactId || startingGroupReview) return;
     const sequence = generationSequence.current;
     setStartingGroupReview(true);
@@ -1813,6 +1814,7 @@ export default function StaffDeliberationsTab({
               <button
                 ref={confirmDialogButtonRef}
                 type="button"
+                // eslint-disable-next-line react-hooks/refs -- same false positive as the dialog guard above
                 disabled={confirmDialogContent.busy || confirmDialogContent.confirmDisabled}
                 onClick={confirmDialogContent.onConfirm}
                 className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
