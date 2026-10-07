@@ -354,9 +354,9 @@ object-key-order defect fixed in commit `f5b7efc2`; they are not additional
 sends. This receipt proves Dynamics transport acceptance, not independent
 inbox/calendar-client delivery.
 
-### `final_writeup_handoff_emails` — BUILT ON BRANCH; MIGRATION 072 NOT APPLIED
+### `final_writeup_handoff_emails` — PRODUCTION-LIVE; MIGRATION 072 APPLIED
 
-**[BUILT ON BRANCH `feature/writeup-handoff-email`, 2026-10-07; NOT MERGED, NOT APPLIED, NOT LIVE.]**
+**[PRODUCTION-LIVE: PR #456, merge `8bc5b466b`, 2026-10-07; migration 072 applied; copy seeded; Production list = Research `c247b11a-a7cb-ee11-9078-000d3a341e8f` only; first real send not yet observed. Production schema read back 2026-10-07: 19 columns, 4 indexes, 5 checks, 0 rows.]**
 **Source of truth:** Postgres send ledger for the group-review handoff email
 (Final Writeup group-review handoff Stage 4). Dataverse owns the documents and
 request; Dynamics owns the email activity and transport. Migration

@@ -1,6 +1,6 @@
 ---
 title: Final Writeup group-review handoff — PD drafting, PD sign-off, leadership digest
-status: approved 2026-10-06 — Stages 1–3 live; Stage 4 built on branch; Stage 5 not built; SoCal parked
+status: approved 2026-10-06 — Stages 1–4 live; Stage 5 not built; SoCal parked
 created: 2026-10-06
 owner: Justin Gallivan
 related:
@@ -231,10 +231,9 @@ well enough to design this now." Do not design SoCal behavior until the owner ra
 Stage 4 ships, show the owner what the live setting would send for SoCal requests; do not
 silently include or exclude them. **Resolved 2026-10-07:** the owner chose Research only.
 
-**Built on branch `feature/writeup-handoff-email` (Session 581, 2026-10-07); not merged, migration
-072 not applied, not live.** As built:
-- `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS` lists the Grant Programs that email (set it to the
-  Research GUID only). Unset means no email, so the code can merge dark.
+**Live (Session 581, 2026-10-07): PR #456, merge `8bc5b466b`, 2026-10-07; migration 072 applied; copy seeded; Production list = Research `c247b11a-a7cb-ee11-9078-000d3a341e8f` only; first real send not yet observed.** As built:
+- `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS` lists the Grant Programs that email (Production:
+  the Research GUID only). Unset means no email, so the code merged dark.
 - Ledger `final_writeup_handoff_emails` (migration 072), one row per handed-off draft. The POST
   stages the row before the transition runs, only for the lead PD or a superuser and only for the
   request's current draft (second Codex review), and only while the request has no current Final, so
@@ -277,8 +276,10 @@ silently include or exclude them. **Resolved 2026-10-07:** the owner chose Resea
   atomic against the current staging time and is reopened by a committed start; recovery takes the
   least recently attempted rows first. The store SQL is proven by
   `tests/integration/final-writeup-handoff-email.pg.test.js` in the CI Postgres job.
-- Owner-run sequence: apply migration 072; seed the copy with `scripts/seed-email-defaults.mjs`;
-  then set the env variable in Production and redeploy.
+- Rollout (done 2026-10-07): the owner applied migration 072 and seeded the copy with
+  `scripts/seed-email-defaults.mjs` (it also seeded the unseeded `email.deliberation_share.review_bundle_link_text`
+  with its existing default); PR #456 merged; the Production env list was set to Research and
+  Production redeployed. Remaining: verify the first real send in `final_writeup_handoff_emails`.
 
 Original Stage 4 requirements:
 - Sent after the transition is recorded, never inside the transition changeset. It has its own
