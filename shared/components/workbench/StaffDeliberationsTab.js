@@ -1485,7 +1485,7 @@ export default function StaffDeliberationsTab({
     <Step
       id="deliberations-writeup"
       number={4}
-      title="Working writeup"
+      title="Post-presentation writeup"
       status={writeupStatus}
       summary={<p className={summaryClass}>{writeupSummary}</p>}
       details={readyFile ? (

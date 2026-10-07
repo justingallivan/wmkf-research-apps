@@ -1615,7 +1615,7 @@ test('the deliberation session is its own step before the presentation, and is c
   expect(await screen.findByText(/Nothing else is needed before the deliberation session/)).toBeInTheDocument();
   const steps = Array.from(screen.getByRole('list', { name: 'Staff deliberations steps' }).querySelectorAll(':scope > li h3'))
     .map((heading) => heading.textContent.replace(/\s*\(.*\)$/, ''));
-  expect(steps).toEqual(['Pre-site briefing', 'Deliberation session', 'Presentation', 'Working writeup', 'Group review']);
+  expect(steps).toEqual(['Pre-site briefing', 'Deliberation session', 'Presentation', 'Post-presentation writeup', 'Group review']);
   expect(screen.getByRole('heading', { name: /Deliberation session \(current step\)/ })).toBeInTheDocument();
   expect(within(screen.getByTestId('deliberations-session-line').closest('li')).getByRole('heading', { name: /Deliberation session/ })).toBeInTheDocument();
 });
