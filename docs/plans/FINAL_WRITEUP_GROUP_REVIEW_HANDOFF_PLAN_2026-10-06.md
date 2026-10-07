@@ -1,6 +1,6 @@
 ---
 title: Final Writeup group-review handoff — PD drafting, PD sign-off, leadership digest
-status: draft — owner decisions A and B open
+status: approved 2026-10-06 — Stage 1 in progress
 created: 2026-10-06
 owner: Justin Gallivan
 related:
@@ -65,14 +65,14 @@ Checked in source on 2026-10-06:
     lease, frozen membership receipts, system sender `NOTIFICATION_EMAIL_FROM`.
   - The staff-send recovery pattern in `lib/services/meeting-tracker/agenda-service.js`.
 
-## 3. Open owner decisions
+## 3. Owner decisions (resolved 2026-10-06: A yes, B as recommended, C defaults accepted)
 
 **A. Edits made after a sign-off.** In group editing, almost every sign-off will be followed by
 someone's edit. Recommendation (simplest): keep the stored model unchanged, and change only how
 it is displayed and counted. A sign-off on an earlier version still counts, with an "edited
-since" note. Yes / no?
+since" note. **Decided: yes.**
 
-**B. How "Research only for now" is realized.** Recommendation: no new allowlist (per the
+**B. How "Research only for now" is realized.** **Decided as recommended:** no new allowlist (per the
 minimal per-cycle configuration rule).
 - Handoff email recipients = the request's Grant Program entry in the staffing setting ∩ PD
   persona, minus the lead PD.
@@ -82,7 +82,7 @@ minimal per-cycle configuration rule).
   requests would email too. Pre-build probe (owner-run, since it reads Production): read
   `final_writeup.matrix_audiences`.
 
-**C. Smaller choices, with recommended defaults:**
+**C. Smaller choices (defaults accepted):**
 - **Handoff email sender:** the system mailbox (`NOTIFICATION_EMAIL_FROM`), naming the lead PD in
   the body. The alternative is sending as the lead PD, which requires their Dynamics sender
   identity.
