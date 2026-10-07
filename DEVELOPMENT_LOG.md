@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Group-review handoff emails the other Research PDs from the lead PD (Session 581)
+
+**Milestone:** When a lead PD marks a Research writeup "Ready for group review", the other Research Program Directors get an email from the lead PD's own address with a link to the writeup. This is the first email the Final Writeup workflow sends.
+**Sessions:** 581. PR #456 (Stage 4, merge `8bc5b466b`) and PR #458 (lead-PD sender, merge `b14651597`), 2026-10-07; Codex adversarial review through many rounds, final verdicts approve.
+**Ship state:**
+- Ledger `final_writeup_handoff_emails` (migration 072, applied and read back in Production). The intent is staged before the transition, so a lost response still gets its email; a 15-minute cron retries; ops is alerted after three failures.
+- Fail-closed program list `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`, Production = Research Grant Program only. SoCal is parked by the owner.
+- Recipients: the program's PD audience minus the lead, exact `@wmkeck.org` only. Sent as the current lead PD (impersonation, no fallback to the system mailbox). Copy is the admin-editable `email.final_writeup_handoff.*`, seeded.
+**Why it matters:** Colleagues learn a writeup is ready without the lead PD having to tell each one, and the email is never silently dropped.
+**Pointers:** `docs/plans/FINAL_WRITEUP_GROUP_REVIEW_HANDOFF_PLAN_2026-10-06.md` (Stage 5 leadership digest: system-sent, not built); `lib/services/final-writeup/handoff-email-service.js`; `docs/atlas/postgres-infra-tables.md`.
+
 ## October 2026 — PD drafts alone, then hands off to group review from Staff Deliberations (Session 580)
 
 **Milestone:** The post-presentation writeup now follows the owner's model: the lead PD drafts privately and hands off with "Ready for group review" on Staff Deliberations step 4. Until handoff, the apps show the draft only to the lead PD, Program Coordinators and superusers.
