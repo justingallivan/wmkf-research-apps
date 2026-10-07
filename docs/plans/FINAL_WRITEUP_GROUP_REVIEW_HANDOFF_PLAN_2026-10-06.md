@@ -1,6 +1,6 @@
 ---
 title: Final Writeup group-review handoff — PD drafting, PD sign-off, leadership digest
-status: approved 2026-10-06 — Stages 1–3 live; Stages 4–5 not built; SoCal parked
+status: approved 2026-10-06 — Stages 1–3 live; Stage 4 built on branch; Stage 5 not built; SoCal parked
 created: 2026-10-06
 owner: Justin Gallivan
 related:
@@ -81,6 +81,9 @@ minimal per-cycle configuration rule).
 - Not yet checked: whether the live setting already has a SoCal entry. If it does, SoCal
   requests would email too. Pre-build probe (owner-run, since it reads Production): read
   `final_writeup.matrix_audiences`.
+- **Superseded for the email (owner, 2026-10-07):** the setting reportedly has a SoCal entry, and
+  the owner answered "Research" for Stage 4. The email is therefore gated by a fail-closed program
+  list, `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`. Recipients still come from the staffing setting.
 
 **C. Smaller choices (defaults accepted):**
 - **Handoff email sender:** the system mailbox (`NOTIFICATION_EMAIL_FROM`), naming the lead PD in
@@ -226,7 +229,31 @@ SoCal requests would also get the handoff email under decision B.
 **SoCal is parked (owner, 2026-10-07):** "I don't know the Southern California program workflow
 well enough to design this now." Do not design SoCal behavior until the owner raises it. Before
 Stage 4 ships, show the owner what the live setting would send for SoCal requests; do not
-silently include or exclude them.
+silently include or exclude them. **Resolved 2026-10-07:** the owner chose Research only.
+
+**Built on branch `feature/writeup-handoff-email` (Session 581, 2026-10-07); not merged, migration
+072 not applied, not live.** As built:
+- `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS` lists the Grant Programs that email (set it to the
+  Research GUID only). Unset means no email, so the code can merge dark.
+- Ledger `final_writeup_handoff_emails` (migration 072), one row per Final document. The row is
+  the intent and is created only by the POST that committed the transition, so writeups already in
+  group review before deployment are never emailed.
+- Recipients: program audience ∩ PD persona, minus the lead PD, with addresses read separately.
+  Sent from `NOTIFICATION_EMAIL_FROM`, regarding the request, so the TEST-request guard applies.
+- Copy: `email.final_writeup_handoff.subject` / `.body`. Blank copy leaves the send pending.
+- `email-automation-preferences.js` does not apply: it controls scheduled-email review, not
+  notifications.
+- Recovery: the next POST for that Final, or owner-run
+  `scripts/recover-final-writeup-handoff-emails.mjs`. No new cron; Stage 5's cron can call
+  `recoverPendingHandoffEmails`.
+- Both "Ready for group review" confirmations say whether PDs will be emailed, from the server's
+  `handoffEmailEnabled`.
+- Known gap: a crash between the Dataverse commit and the Postgres insert leaves no intent, so that
+  handoff sends no email.
+- Owner-run sequence: apply migration 072; seed the copy with `scripts/seed-email-defaults.mjs`;
+  then set the env variable in Production and redeploy.
+
+Original Stage 4 requirements:
 - Sent after the transition is recorded, never inside the transition changeset. It has its own
   claim/receipt row with recovery, so a failed send never undoes or blocks the handoff, and a
   retry never sends twice.

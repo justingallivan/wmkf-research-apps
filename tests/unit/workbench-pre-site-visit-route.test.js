@@ -385,13 +385,13 @@ test('staff receive a safe correction flag without restricted audit details', as
 test('a not-yet-started Final carries the start permission and source for step 4', async () => {
   getFinalWriteupStatus.mockResolvedValueOnce({
     available: true, phase: 'ready', canStart: true, startBlockedReason: null,
-    canAdvance: false, sourceArtifactId: 'source-1', artifact: null, pendingArtifact: null,
+    canAdvance: false, sourceArtifactId: 'source-1', artifact: null, pendingArtifact: null, handoffEmailEnabled: true,
   });
   const res = mockRes();
   await handler(get(), res);
   expect(res.body.finalReview).toEqual({
     availability: 'missing', phase: 'ready', artifactId: null, file: null,
-    canStart: true, startBlockedReason: null, sourceArtifactId: 'source-1',
+    canStart: true, startBlockedReason: null, sourceArtifactId: 'source-1', handoffEmailEnabled: true,
   });
   expect(getFinalWriteupStatus).toHaveBeenCalledWith(expect.objectContaining({ actingUserSystemId: expect.anything() }));
 });

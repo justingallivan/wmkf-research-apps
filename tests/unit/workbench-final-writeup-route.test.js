@@ -10,6 +10,9 @@ jest.mock('../../lib/dataverse/core/context', () => ({
 jest.mock('../../lib/services/final-writeup/persona-service', () => ({
   resolveFinalWriteupPersonas: jest.fn(async () => ({ enabled: true, personas: ['program-coordinator'] })),
 }));
+jest.mock('../../lib/services/final-writeup/handoff-email-service', () => ({
+  notifyGroupReviewHandoff: jest.fn(async () => ({ status: 'sent' })),
+}));
 jest.mock('../../lib/services/final-writeup/transition-service', () => ({
   getFinalWriteupStatus: jest.fn(),
   startFinalWriteup: jest.fn(),
@@ -22,6 +25,7 @@ import {
   getFinalWriteupStatus,
   startFinalWriteup,
 } from '../../lib/services/final-writeup/transition-service';
+import { notifyGroupReviewHandoff } from '../../lib/services/final-writeup/handoff-email-service';
 import handler from '../../pages/api/workbench/final-writeup';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -119,4 +123,50 @@ test('rejects unsupported methods before authentication', async () => {
   expect(res.statusCode).toBe(405);
   expect(res.headers.Allow).toBe('GET, POST');
   expect(requireAppAccess).not.toHaveBeenCalled();
+});
+
+describe('group-review handoff email (Stage 4)', () => {
+  const FINAL_ID = '44444444-4444-4444-8444-444444444444';
+  const post = () => ({ method: 'POST', query: {}, body: { requestId: REQUEST_ID, expectedArtifactId: SOURCE_ID } });
+
+  test('the committing call creates the send intent for the new Final', async () => {
+    startFinalWriteup.mockResolvedValueOnce({ artifact: { artifactId: FINAL_ID }, reused: false, inProgress: false });
+    const res = mockRes();
+    await handler(post(), res);
+    expect(res.statusCode).toBe(200);
+    expect(notifyGroupReviewHandoff).toHaveBeenCalledWith({
+      requestId: REQUEST_ID, finalDocumentId: FINAL_ID, committedByThisCall: true,
+    });
+  });
+
+  test('a repeat call that finds the Final already committed only retries', async () => {
+    startFinalWriteup.mockResolvedValueOnce({ artifact: { artifactId: FINAL_ID }, reused: true, inProgress: false });
+    await handler(post(), mockRes());
+    expect(notifyGroupReviewHandoff).toHaveBeenCalledWith({
+      requestId: REQUEST_ID, finalDocumentId: FINAL_ID, committedByThisCall: false,
+    });
+  });
+
+  test('an in-progress claim sends nothing', async () => {
+    startFinalWriteup.mockResolvedValueOnce({ artifact: { artifactId: FINAL_ID }, reused: true, inProgress: true });
+    const res = mockRes();
+    await handler(post(), res);
+    expect(res.statusCode).toBe(202);
+    expect(notifyGroupReviewHandoff).not.toHaveBeenCalled();
+  });
+
+  test('a failed email never changes the transition response', async () => {
+    startFinalWriteup.mockResolvedValueOnce({ artifact: { artifactId: FINAL_ID }, reused: false, inProgress: false });
+    notifyGroupReviewHandoff.mockResolvedValueOnce({ status: 'failed', code: 'handoff_email_failed' });
+    const res = mockRes();
+    await handler(post(), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ success: true, reused: false, artifact: { artifactId: FINAL_ID } });
+    expect(res.body).not.toHaveProperty('handoffEmail');
+  });
+
+  test('GET never sends', async () => {
+    await handler({ method: 'GET', query: { requestId: REQUEST_ID } }, mockRes());
+    expect(notifyGroupReviewHandoff).not.toHaveBeenCalled();
+  });
 });

@@ -3,7 +3,10 @@
  *
  * GET ?requestId=... reads the governed Final Writeup transition state.
  * POST { requestId, expectedArtifactId } starts group review on the same stable
- * SharePoint Word item. Authorization is resolved server-side.
+ * SharePoint Word item. Authorization is resolved server-side. When this call
+ * commits the transition for a Grant Program listed in
+ * FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS, the other Program Directors are
+ * emailed (handoff-email-service.js); a send failure never changes the response.
  */
 
 import { getUserRole, requireAppAccess } from '../../../lib/utils/auth';
@@ -15,6 +18,7 @@ import {
   startFinalWriteup,
 } from '../../../lib/services/final-writeup/transition-service';
 import { resolveWriteupViewer } from '../../../lib/services/pre-site-visit/writeup-visibility';
+import { notifyGroupReviewHandoff } from '../../../lib/services/final-writeup/handoff-email-service';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '16kb' } },
@@ -84,6 +88,17 @@ export default async function handler(req, res) {
         isSuperuser,
         actingUserSystemId,
       });
+      if (!result.inProgress && result.artifact?.artifactId) {
+        // Stage 4: email the other Program Directors. Only the call that
+        // committed the transition (reused === false) creates the send intent;
+        // a repeat call only retries an existing pending one. Never throws, so
+        // a send failure cannot change this response.
+        await notifyGroupReviewHandoff({
+          requestId,
+          finalDocumentId: result.artifact.artifactId,
+          committedByThisCall: result.reused === false,
+        });
+      }
       return res.status(result.inProgress ? 202 : 200).json({ success: true, ...result });
     } catch (error) {
       return sendError(res, error);

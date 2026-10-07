@@ -584,7 +584,7 @@ export default function FinalWriteupTab({ requestId }) {
         <div className="max-w-3xl">
           <h2 className="text-xl font-semibold tracking-tight text-gray-900">Final Writeup</h2>
           <p className="mt-2 text-sm leading-6 text-gray-600">
-            This is the same editable working writeup. Starting a review records its current Word version; it does not send email.
+            This is the same editable working writeup. Starting a review records its current Word version.
           </p>
         </div>
 
@@ -730,7 +730,10 @@ export default function FinalWriteupTab({ requestId }) {
             <div className="max-w-2xl">
               <h3 className="text-lg font-semibold text-gray-900">{status.startBlockedReason ? 'Group review is not available yet' : 'Group review has not started'}</h3>
               <p className="mt-1 text-sm leading-6 text-gray-600">
-                Mark the writeup ready for group review when colleagues should see it. This records the current Word version and does not send email.
+                Mark the writeup ready for group review when colleagues should see it. This records the current Word version.
+                {status.handoffEmailEnabled === true
+                  ? ' The other Program Directors for this grant program are emailed a link.'
+                  : ' No email is sent.'}
               </p>
               {status.sourceFile?.name && (
                 <p className="mt-2 text-xs text-gray-500">{status.sourceFile.name}</p>
@@ -792,6 +795,11 @@ export default function FinalWriteupTab({ requestId }) {
                 <>
                   <p>The current Word version becomes the starting point for group review.</p>
                   <p>The Word file stays the same, including your edits. This step begins group review.</p>
+                  <p>
+                    {status?.handoffEmailEnabled === true
+                      ? 'The other Program Directors for this grant program are emailed a link to the writeup.'
+                      : 'No email is sent. Let colleagues know it is ready.'}
+                  </p>
                 </>
               )}
             </div>

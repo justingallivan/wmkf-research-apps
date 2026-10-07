@@ -1101,6 +1101,11 @@ export default function StaffDeliberationsTab({
             <>
               <p>The current Word version becomes the starting point for group review.</p>
               <p className="mt-2">The Word file stays the same, including your edits, and colleagues can then review and edit it.</p>
+              <p className="mt-2">
+                {finalReview?.handoffEmailEnabled === true
+                  ? 'The other Program Directors for this grant program are emailed a link to the writeup.'
+                  : 'No email is sent. Let colleagues know it is ready.'}
+              </p>
             </>
           ),
         }
