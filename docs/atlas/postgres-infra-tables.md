@@ -370,8 +370,9 @@ request's current draft (`_wmkf_currentpresitevisit_value`), only when the
 request has no current Final, and only when its Grant Program is listed in
 `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`, so writeups already in group review
 before deployment never get a row. If the insert fails for a request that
-should email, the route returns 503 `final_writeup_handoff_email_unavailable`
-before the transition starts. Delivery sends only when the
+should email, or the request cannot be read while any program is listed, the
+route returns 503 `final_writeup_handoff_email_unavailable` before the
+transition starts. With no program listed, staging reads nothing. Delivery sends only when the
 request's current Final has this draft as its source and is in group review;
 until then the row stays `pending` without an error (`awaiting_transition`),
 so a commit whose response was lost is still sent by a retry POST or by

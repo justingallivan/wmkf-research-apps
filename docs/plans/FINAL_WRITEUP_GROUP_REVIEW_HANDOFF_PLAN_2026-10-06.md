@@ -253,8 +253,9 @@ silently include or exclude them. **Resolved 2026-10-07:** the owner chose Resea
   `recoverPendingHandoffEmails`.
 - Both "Ready for group review" confirmations say whether PDs will be emailed, from the server's
   `handoffEmailEnabled`.
-- If the intent cannot be saved for a Research request, the POST returns 503 and group review does
-  not start, so the email is never silently lost (second Codex review). Trade-off: during a
+- If the intent cannot be saved for a Research request, or the request cannot be read while any
+  program is listed, the POST returns 503 and group review does not start, so the email is never
+  silently lost (second and third Codex reviews). Trade-off: during a
   Postgres outage the lead PD has to retry later. A staged intent whose transition never commits
   is skipped after 14 days.
 - Owner-run sequence: apply migration 072; seed the copy with `scripts/seed-email-defaults.mjs`;

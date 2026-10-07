@@ -185,8 +185,8 @@ describe('group-review handoff email (Stage 4)', () => {
     expect(res.body).toMatchObject({ success: true, reused: false, artifact: { artifactId: FINAL_ID } });
   });
 
-  test('if the email intent cannot be persisted, nothing starts and the user is told to retry', async () => {
-    stageGroupReviewHandoff.mockResolvedValueOnce({ status: 'failed', code: 'handoff_email_stage_failed' });
+  test.each(['handoff_email_stage_failed', 'handoff_email_request_read_failed'])('if staging fails (%s), nothing starts and the user is told to retry', async (code) => {
+    stageGroupReviewHandoff.mockResolvedValueOnce({ status: 'failed', code });
     const res = mockRes();
     await handler(post(), res);
     expect(res.statusCode).toBe(503);

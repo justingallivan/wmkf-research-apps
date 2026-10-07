@@ -150,6 +150,7 @@ function harness({
     recordFailure: jest.fn(async (_id, code) => { row.last_error_code = code; row.locked = false; }),
     listPending: jest.fn(async () => (row && row.state === 'pending' && !row.locked ? [{ ...row }] : [])),
     programEnabled: (id) => enabledPrograms.includes(String(id).toLowerCase()),
+    anyProgramEnabled: () => enabledPrograms.length > 0,
     sender: () => 'alerts@wmkeck.org',
     baseUrl: () => 'https://apps.example.org',
     now: () => NOW,
@@ -227,12 +228,21 @@ describe('stageGroupReviewHandoff', () => {
     expect(getRow()).toMatchObject({ source_document_id: SOURCE_ID, request_id: REQUEST_ID });
   });
 
-  test('a request read failure stages nothing and does not block the transition', async () => {
+  test('a request read failure while a program is listed reports failed so the route refuses', async () => {
     const { deps } = harness();
     deps.getRequest.mockRejectedValue(new Error('dataverse down'));
     const spy = quiet();
-    expect(await stageGroupReviewHandoff(stage(), deps)).toEqual({ status: 'request_unavailable' });
+    expect(await stageGroupReviewHandoff(stage(), deps)).toEqual({
+      status: 'failed', code: 'handoff_email_request_read_failed',
+    });
     spy.mockRestore();
+  });
+
+  test('with no program listed nothing is read and nothing can block', async () => {
+    const { deps } = harness({ enabledPrograms: [] });
+    deps.getRequest.mockRejectedValue(new Error('dataverse down'));
+    expect(await stageGroupReviewHandoff(stage(), deps)).toEqual({ status: 'not_enabled' });
+    expect(deps.getRequest).not.toHaveBeenCalled();
   });
 
   test('a persistence failure for a listed program reports failed so the route can refuse', async () => {
