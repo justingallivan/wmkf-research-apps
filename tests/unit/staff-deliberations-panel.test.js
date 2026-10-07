@@ -209,6 +209,13 @@ test('a ready post-visit writeup points to group review as the next step', async
   expect(screen.getByText('After presentation')).toBeInTheDocument();
 });
 
+test('someone else\'s hidden draft says the lead PD is drafting instead of asking the viewer to act', async () => {
+  global.fetch.mockResolvedValue(response([row({ preparation: { due: true, state: 'prepared' }, writeup: { availability: 'available', lifecycleState: 100000001, milestoneComplete: true, file: null, fileHidden: true } })]));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText('The lead Program Director is drafting this writeup.')).toBeInTheDocument();
+  expect(screen.queryByText('Add your presentation findings to the writeup, then open group review.')).not.toBeInTheDocument();
+});
+
 test('the row shows institution, PI and PD on one line, and search matches the PI', async () => {
   global.fetch.mockResolvedValue(response([row({ projectLeader: 'Ada Lovelace' }), row({ requestId: 'r2', requestNumber: '1002912', projectLeader: 'Grace Hopper' })]));
   render(<StaffDeliberationsPanel {...props} />);

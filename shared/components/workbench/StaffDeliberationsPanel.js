@@ -139,6 +139,8 @@ function presentationWhen(request) {
 
 function nextStep(request, task, document) {
   if (task.bucket === 'review') return 'Read the writeup and follow its review progress.';
+  // Someone else's draft before group review: the lead PD drafts alone.
+  if (request.writeup?.fileHidden === true) return 'The lead Program Director is drafting this writeup.';
   if (request.writeup?.correctionInProgress) return 'Make the requested corrections in the writeup, then choose Finish corrections.';
   if (task.label === 'Schedule needed') return 'Add the presentation schedule on the request page.';
   if (request.preparation?.state === 'running' || request.writeup?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) {

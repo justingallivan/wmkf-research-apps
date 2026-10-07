@@ -121,6 +121,7 @@ describe('governed document lifecycle public boundaries (Stage 0)', () => {
     );
 
     expect(result).toEqual({
+      leadProgramDirectorId: null,
       currentArtifact: null,
       pendingArtifact: null,
       reopenHistory: [],
@@ -237,7 +238,8 @@ describe('real routes compose default services and nonempty projections', () => 
   });
 
   test('Pre-Site GET uses defaults and removes a present correction from staff output', async () => {
-    requestAdapter.getById.mockResolvedValue({ akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: ARTIFACT_ID });
+    // The session actor leads the request, so the draft file is visible.
+    requestAdapter.getById.mockResolvedValue({ akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: ARTIFACT_ID, _wmkf_programdirector_value: ACTOR_ID });
     documentAdapter.findByRequest.mockResolvedValue({ records: [registryRow({ wmkf_reopenreasoncode: 'fixture_reason' })] });
     const res = response();
     await preSiteRoute({ method: 'GET', query: { requestId: REQUEST_ID } }, res);

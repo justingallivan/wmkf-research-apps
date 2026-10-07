@@ -22,6 +22,9 @@ import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../../shared/config/reques
 import { REQUEST_DOCUMENT_LIFECYCLE_STATE } from '../../../shared/config/requestDocument';
 import { getPreparationForRequest } from '../../../lib/services/pre-site-visit/preparation-worker';
 import { readBriefFact, readFinalFact } from '../../../lib/services/pre-site-visit/status-facts';
+import {
+  canChangeDraftWriteup, redactDraftWriteup, resolveWriteupViewer,
+} from '../../../lib/services/pre-site-visit/writeup-visibility';
 
 export const config = {
   api: {
@@ -84,8 +87,18 @@ export default async function handler(req, res) {
         if (!isGuid(requestId)) {
           return res.status(400).json({ error: 'requestId is required and must be a GUID' });
         }
-        const status = await getPreSiteVisitArtifactStatus({ requestId });
-        const payload = includeCorrectionAudit ? status : staffSafePayload(status);
+        const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
+        const [status, viewer] = await Promise.all([
+          getPreSiteVisitArtifactStatus({ requestId }),
+          resolveWriteupViewer({ isSuperuser: role === 'superuser', actingUserSystemId }),
+        ]);
+        const { leadProgramDirectorId, ...statusWithoutLead } = status;
+        const visibleStatus = {
+          ...statusWithoutLead,
+          currentArtifact: redactDraftWriteup(status.currentArtifact, viewer, leadProgramDirectorId),
+          pendingArtifact: redactDraftWriteup(status.pendingArtifact, viewer, leadProgramDirectorId),
+        };
+        const payload = includeCorrectionAudit ? visibleStatus : staffSafePayload(visibleStatus);
         // Session line (tracker §5.4 via the briefing seam): fail-open null
         // until the tracker is enabled or a slot exists.
         // Applicant materials summary (plan §16.3, PR 3): counts and window
@@ -101,8 +114,7 @@ export default async function handler(req, res) {
             writeup: { availability: 'unavailable', artifactId: null, file: null, milestone: null },
           })),
           readBriefFact(requestId).catch(() => ({ availability: 'unavailable', artifactId: null, lifecycleState: null, file: null, milestone: null })),
-          readFinalFact({ requestId, currentArtifact: payload.currentArtifact, role,
-            actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null }),
+          readFinalFact({ requestId, currentArtifact: payload.currentArtifact, role, actingUserSystemId }),
         ]);
         // Tracker §5.6: the session's attendees are the Share email's default
         // recipients, so the tab gets their addresses alongside the card shape.
@@ -112,7 +124,16 @@ export default async function handler(req, res) {
         const finalReview = final;
         return res.status(200).json({ success: true, ...payload, stageLabels,
           timing: preparation.timing, preparation: preparation.preparation,
-          writeup: preparation.writeup, brief, finalReview, finalPhase: finalReview.phase,
+          // A separate read: redacted on its own lifecycle so a draft
+          // published between the two reads is never returned.
+          writeup: redactDraftWriteup(preparation.writeup, viewer, leadProgramDirectorId),
+          brief, finalReview, finalPhase: finalReview.phase,
+          // Mirrors the POST and start-site-visit guards so the page offers
+          // only the actions the server will accept.
+          writeupAccess: {
+            canChange: canChangeDraftWriteup(viewer, leadProgramDirectorId),
+            identityLinked: Boolean(viewer.actingUserSystemId) || viewer.isSuperuser,
+          },
           correctionInProgress: status.currentArtifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT
             && Boolean(status.currentArtifact?.correction?.cycleId),
           session: projectDeliberationSession(session), sessionAttendees, materials });
@@ -129,10 +150,18 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'requestId is required and must be a GUID' });
       }
 
-      const result = await generatePreSiteVisitArtifact({
-        requestId,
-        actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
-      });
+      const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
+      const [{ leadProgramDirectorId }, viewer] = await Promise.all([
+        getPreSiteVisitArtifactStatus({ requestId }),
+        resolveWriteupViewer({ isSuperuser: role === 'superuser', actingUserSystemId }),
+      ]);
+      if (!canChangeDraftWriteup(viewer, leadProgramDirectorId)) {
+        throw new ServiceHttpError('Only the lead Program Director or a superuser can prepare this writeup.', {
+          httpStatus: 403,
+          code: 'pre_site_writeup_lead_only',
+        });
+      }
+      const result = await generatePreSiteVisitArtifact({ requestId, actingUserSystemId });
       const generating = result.artifact.operationStatus
         === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING;
       const payload = includeCorrectionAudit ? result : staffSafePayload(result);

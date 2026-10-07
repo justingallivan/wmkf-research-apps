@@ -1,7 +1,10 @@
 /**
  * @jest-environment node
  */
-jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
+jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn(), getUserRole: jest.fn(async () => 'staff') }));
+jest.mock('../../lib/services/pre-site-visit/writeup-visibility', () => ({
+  resolveWriteupViewer: jest.fn(async (input) => ({ ...input, isCoordinator: false })),
+}));
 jest.mock('../../lib/dataverse/core/context', () => ({
   withDalContext: jest.fn(async (_label, callback) => callback()),
 }));
@@ -41,6 +44,7 @@ it('guards with the reviewers app and returns the service body for a valid cycle
     programId: PROGRAM,
     scope: 'all',
     callerSystemId: 'cccccccc-0000-4000-8000-000000000001',
+    writeupViewer: expect.objectContaining({ isSuperuser: false }),
   });
   expect(res.statusCode).toBe(200);
   expect(res.body).toEqual({ success: true, cycleCode: 'D26', programId: PROGRAM, scope: 'my', stageLabels: {}, counts: {}, artifacts: [] });
@@ -62,6 +66,7 @@ it('passes scope=my through and resolves callerSystemId from the session (actorR
     programId: PROGRAM,
     scope: 'my',
     callerSystemId: 'cccccccc-0000-4000-8000-000000000001',
+    writeupViewer: expect.objectContaining({ isSuperuser: false }),
   });
 });
 

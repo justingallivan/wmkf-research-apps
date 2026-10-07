@@ -411,6 +411,7 @@ test.each([true, false])('status projects the exact pending Final from populated
     requestId: REQUEST_ID,
     isSuperuser: false,
     actingUserSystemId: LEAD_PD_ID,
+    writeupViewer: { isSuperuser: false, actingUserSystemId: LEAD_PD_ID.toLowerCase(), isCoordinator: false },
   }, harness.dependencies);
 
   expect(result).toEqual({
@@ -844,4 +845,28 @@ test('rechecks and atomically fences the schedule immediately before Final revie
     requestId: REQUEST_ID, expectedArtifactId: SOURCE_ID, actingUserSystemId: LEAD_PD_ID,
   }, h.dependencies)).rejects.toMatchObject({ code: 'final_writeup_site_visit_not_ended' });
   expect(h.dependencies.commitChangeset).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['no viewer', null, false],
+  ['another staff member', { isSuperuser: false, actingUserSystemId: '12121212-1212-4212-8212-121212121212', isCoordinator: false }, false],
+  ['a Program Coordinator', { isSuperuser: false, actingUserSystemId: '12121212-1212-4212-8212-121212121212', isCoordinator: true }, true],
+  ['a superuser', { isSuperuser: true, actingUserSystemId: null, isCoordinator: false }, true],
+])('before group review the source file is shown only to draft viewers (%s)', async (_label, writeupViewer, visible) => {
+  const harness = createHarness();
+  const pendingId = '77777777-7777-4777-8777-777777777777';
+  harness.rows.push(finalStatusRow({ wmkf_requestdocumentid: pendingId }));
+  const result = await getFinalWriteupStatus({
+    requestId: REQUEST_ID, isSuperuser: false, actingUserSystemId: LEAD_PD_ID, writeupViewer,
+  }, harness.dependencies);
+  expect(result.phase).toBe('starting');
+  if (visible) {
+    expect(result.sourceFile?.webUrl).toBeTruthy();
+    expect(result.pendingArtifact.file?.webUrl).toBeTruthy();
+    expect(result).not.toHaveProperty('sourceFileHidden');
+  } else {
+    expect(result.sourceFile).toBeNull();
+    expect(result.sourceFileHidden).toBe(true);
+    expect(result.pendingArtifact.file).toBeNull();
+  }
 });

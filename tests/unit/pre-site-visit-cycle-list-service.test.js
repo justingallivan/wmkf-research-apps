@@ -334,3 +334,44 @@ it('shows an unfinished receipt as disabled on the list once automation no longe
   expect(byNumber['1002959']).toMatchObject({ state: 'disabled' });
   expect(byNumber['1003001']).toMatchObject({ state: 'running' });
 });
+
+describe('draft writeup visibility per row', () => {
+  const setup = (lifecycleState) => {
+    grantRequestAdapter.queryAllRequests.mockResolvedValue({ records: [
+      req(R1, { _wmkf_currentpresitevisit_value: 'writeup-1' }),
+    ], capped: false });
+    requestDocumentAdapter.findByRequests.mockImplementation(async (_ids, { artifactType }) => ({
+      records: artifactType === REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT
+        ? [doc('writeup-1', R1, { wmkf_lifecyclestate: lifecycleState })]
+        : [],
+      capped: false,
+    }));
+  };
+  const viewer = (overrides) => ({ isSuperuser: false, actingUserSystemId: null, isCoordinator: false, ...overrides });
+
+  it.each([
+    ['another staff member', viewer({ actingUserSystemId: String(PD_B).toLowerCase() }), false],
+    ['no viewer', null, false],
+    ['the lead PD', viewer({ actingUserSystemId: String(PD_A).toLowerCase() }), true],
+    ['a Program Coordinator', viewer({ isCoordinator: true }), true],
+    ['a superuser', viewer({ isSuperuser: true }), true],
+  ])('a Review-lifecycle writeup for %s', async (_label, writeupViewer, visible) => {
+    setup(L.REVIEW);
+    const [row] = (await list({ writeupViewer })).artifacts;
+    if (visible) {
+      expect(row.writeup.file.webUrl).toBe('https://sharepoint.test/writeup-1.docx');
+      expect(row.writeup.fileHidden).toBeUndefined();
+    } else {
+      expect(row.writeup).toMatchObject({ availability: 'available', artifactId: 'writeup-1', file: null, fileHidden: true });
+      expect(row.file).toBeNull();
+      expect(row.fileHidden).toBe(true);
+      expect(JSON.stringify(row)).not.toContain('writeup-1.docx');
+    }
+  });
+
+  it('keeps the file once the writeup is in group review (Final)', async () => {
+    setup(L.FINAL);
+    const [row] = (await list({ writeupViewer: null })).artifacts;
+    expect(row.writeup.file?.webUrl).toBe('https://sharepoint.test/writeup-1.docx');
+  });
+});

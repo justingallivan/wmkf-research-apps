@@ -12,11 +12,18 @@ jest.mock('../../lib/dataverse/core/context', () => ({
 jest.mock('../../lib/services/pre-site-visit/site-visit-transition-service', () => ({
   startSiteVisitStage: jest.fn(),
 }));
+jest.mock('../../lib/services/pre-site-visit/artifact-service', () => ({
+  getPreSiteVisitArtifactStatus: jest.fn(),
+}));
+jest.mock('../../lib/services/final-writeup/persona-service', () => ({
+  resolveFinalWriteupPersonas: jest.fn(async () => ({ enabled: true, personas: ['program-coordinator'] })),
+}));
 
 import { getUserRole, requireAppAccess } from '../../lib/utils/auth';
 import { withDalContext } from '../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import { startSiteVisitStage } from '../../lib/services/pre-site-visit/site-visit-transition-service';
+import { getPreSiteVisitArtifactStatus } from '../../lib/services/pre-site-visit/artifact-service';
 import handler from '../../pages/api/workbench/pre-site-visit/start-site-visit';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -38,6 +45,8 @@ beforeEach(() => {
     session: { user: { dynamicsSystemuserId: USER_ID } },
   });
   getUserRole.mockResolvedValue('read_write');
+  // The session user leads the request unless a test says otherwise.
+  getPreSiteVisitArtifactStatus.mockResolvedValue({ leadProgramDirectorId: USER_ID });
   startSiteVisitStage.mockResolvedValue({
     artifact: {
       artifactId: ARTIFACT_ID,
@@ -128,4 +137,13 @@ test('maps governed transition errors without losing the machine code', async ()
     error: 'Reload and retry.',
     code: 'site_visit_transition_conflict',
   });
+});
+
+test('a Program Coordinator who is not the lead PD cannot change the writeup', async () => {
+  getPreSiteVisitArtifactStatus.mockResolvedValueOnce({ leadProgramDirectorId: '44444444-4444-4444-8444-444444444444' });
+  const res = mockRes();
+  await handler({ method: 'POST', body: { requestId: REQUEST_ID, expectedArtifactId: ARTIFACT_ID } }, res);
+  expect(res.statusCode).toBe(403);
+  expect(res.body.code).toBe('pre_site_writeup_lead_only');
+  expect(startSiteVisitStage).not.toHaveBeenCalled();
 });
