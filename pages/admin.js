@@ -8,6 +8,7 @@ import PromptTemplatesSection from '../shared/components/admin/PromptTemplatesSe
 import EmailDefaultsSection from '../shared/components/admin/EmailDefaultsSection';
 import SiteVisitRecipientsSection from '../shared/components/admin/SiteVisitRecipientsSection';
 import MeetingTrackerDefaultsSection from '../shared/components/admin/MeetingTrackerDefaultsSection';
+import DefaultFacilitatorSettings from '../shared/components/proposal-ranking/DefaultFacilitatorSettings';
 import SiteVisitMaterialsDefaultsSection from '../shared/components/admin/SiteVisitMaterialsDefaultsSection';
 import FinalWriteupMatrixAudiencesSection from '../shared/components/admin/FinalWriteupMatrixAudiencesSection';
 import ReviewerRepairAlertDetails from '../shared/components/admin/ReviewerRepairAlertDetails';
@@ -3261,6 +3262,17 @@ export function OperationsWorkspace({ view }) {
 
 export function WorkflowsWorkspace({ view }) {
   switch (view) {
+    case 'proposal-ranking':
+      return (
+        <AdminEditorPanel
+          id="proposal-ranking-default-facilitator"
+          title="Proposal Ranking facilitator"
+          description="Choose the active staff member who can preview and open each cycle. Participants still need separate Proposal Ranking app access."
+          scope="Global setting"
+        >
+          <DefaultFacilitatorSettings />
+        </AdminEditorPanel>
+      );
     case 'review-form':
       return (
         <AdminEditorPanel

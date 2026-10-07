@@ -9,7 +9,9 @@ function settingsError(data, status) {
   return error;
 }
 
-export default function DefaultFacilitatorSettings({ isSuperuser }) {
+export default function DefaultFacilitatorSettings() {
+  const [isSuperuser, setIsSuperuser] = useState(false);
+  const [authorizationChecked, setAuthorizationChecked] = useState(false);
   const [settings, setSettings] = useState(null);
   const [selectedId, setSelectedId] = useState('');
   const [busy, setBusy] = useState(false);
@@ -18,7 +20,24 @@ export default function DefaultFacilitatorSettings({ isSuperuser }) {
   const generationRef = useRef(0);
 
   useEffect(() => {
-    if (!isSuperuser) return undefined;
+    let active = true;
+    requestEnvelope('/api/app-access?all=true')
+      .then(({ ok, data }) => {
+        if (!active) return;
+        setIsSuperuser(ok && data?.isSuperuser === true);
+        setAuthorizationChecked(true);
+      })
+      .catch(() => {
+        if (active) {
+          setError('Could not verify administrator access. Reload this section to try again.');
+          setAuthorizationChecked(true);
+        }
+      });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!authorizationChecked || !isSuperuser) return undefined;
     const generation = ++generationRef.current;
     let active = true;
     (async () => {
@@ -34,7 +53,7 @@ export default function DefaultFacilitatorSettings({ isSuperuser }) {
       }
     })();
     return () => { active = false; generationRef.current += 1; };
-  }, [isSuperuser]);
+  }, [authorizationChecked, isSuperuser]);
 
   if (!isSuperuser) return null;
 

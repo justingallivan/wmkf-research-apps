@@ -328,6 +328,7 @@ export default function ProposalRankingApp() {
   const [cancelConfirmed, setCancelConfirmed] = useState(false);
   const [openingConfirmed, setOpeningConfirmed] = useState(false);
   const [operationNotice, setOperationNotice] = useState(null);
+  const [pendingOpen, setPendingOpen] = useState(null);
   const scopeRef = useRef(0);
   const scopeKeyRef = useRef(null);
   const loadRef = useRef(0);
@@ -517,6 +518,7 @@ export default function ProposalRankingApp() {
       const next = await sendProposalRankingAction(action);
       if (!mountedRef.current || scope !== scopeRef.current) return null;
       applyMutationResponse(next, scope);
+      if (action.action === 'open') setPendingOpen(null);
       if (operationId) lastOperationRef.current = null;
       if (operationId) setOperationNotice(`Saved (${next.operation?.result || action.action}).`);
       setPendingConfirmation(null);
@@ -531,6 +533,7 @@ export default function ProposalRankingApp() {
       if (err.status !== 403 && current) applyMutationResponse(current, scope);
       setError(errorMessage(err));
       const uncertain = err.code === 'uncertain_outcome' || !err.status || err.status >= 500;
+      if (action.action === 'open') setPendingOpen(uncertain ? action : null);
       if (uncertain && action.roundId && operationId) {
         lastOperationRef.current = { roundId: action.roundId, operationId };
         setOperationNotice('Checking whether the save reached the server…');
@@ -562,7 +565,7 @@ export default function ProposalRankingApp() {
   const isFacilitator = responseForCurrentScope?.viewer?.isFacilitator === true;
   const capabilities = responseForCurrentScope?.viewer?.capabilities || EMPTY_CAPABILITIES;
   const hasPendingSave = Object.values(saveStates).some((state) => state === 'saving');
-  const hasUnresolvedSave = Object.values(saveStates).some((state) => state === 'saving' || state === 'unsaved' || state === 'conflict');
+  const hasUnresolvedSave = Boolean(pendingOpen) || Object.values(saveStates).some((state) => state === 'saving' || state === 'unsaved' || state === 'conflict');
 
   const invalidateVisibleScope = useCallback(() => {
     if (actionBusy || hasUnresolvedSave) return false;
@@ -643,6 +646,13 @@ export default function ProposalRankingApp() {
             applyMutationResponse(next, job.scope);
             lastOperationRef.current = null;
             if (queuesRef.current.has(list.listKey)) continue;
+            const currentOrder = findListOrder(next, list.listKey);
+            if (!currentOrder || !sameOrder(currentOrder, job.order)) {
+              if (currentOrder) setRemoteOrder(list.listKey, currentOrder, job.scope);
+              assignSaveState(list.listKey, 'conflict', job.scope);
+              setOperationNotice('Your save completed, but a newer order is now current. Compare the orders before retrying.');
+              break;
+            }
             clearLocalOrder(list.listKey, job.scope);
             setRemoteOrder(list.listKey, null, job.scope);
             assignSaveState(list.listKey, 'saved', job.scope);
@@ -723,7 +733,7 @@ export default function ProposalRankingApp() {
 
   const openRound = () => {
     const preview = responseRef.current?.preview;
-    if (!preview || !openingConfirmed) return;
+    if (!preview || !openingConfirmed || pendingOpen || actionBusy) return;
     void runAction({ action: 'open', cycleCode, previewFingerprint: preview.previewFingerprint, operationId: createOperationId() });
   };
 
@@ -787,6 +797,7 @@ export default function ProposalRankingApp() {
     <div className="space-y-4">
       {error && <StatusBanner kind="error">{error}</StatusBanner>}
       {operationNotice && <StatusBanner>{operationNotice}</StatusBanner>}
+      {pendingOpen && <StatusBanner kind="warning">Opening may have completed. Resolve this attempt before opening another round. <Button type="button" variant="outline" size="sm" disabled={actionBusy} onClick={() => runAction(pendingOpen)}>Resolve opening attempt</Button></StatusBanner>}
       {loading && <StatusBanner>Loading the {cycleCode} cycle…</StatusBanner>}
       {!loading && !activeResponse && !error && <StatusBanner>The cycle is not available yet.</StatusBanner>}
 
@@ -815,7 +826,7 @@ export default function ProposalRankingApp() {
               <input type="checkbox" checked={openingConfirmed} onChange={(event) => setOpeningConfirmed(event.target.checked)} disabled={actionBusy} className="mt-0.5 rounded border-gray-300" />
               I reviewed the proposal pool, roster, warnings and starting order.
             </label>
-            {capabilities.open && <Button type="button" disabled={actionBusy || !openingConfirmed || !preview?.canOpen} loading={actionBusy} onClick={openRound}>Open round</Button>}
+            {capabilities.open && <Button type="button" disabled={actionBusy || Boolean(pendingOpen) || !openingConfirmed || !preview?.canOpen} loading={actionBusy} onClick={openRound}>Open round</Button>}
           </div>
         </Card>
         <div className="grid gap-4 lg:grid-cols-2">

@@ -84,7 +84,7 @@ type Response = {
     meeting: null | MeetingView;
     meetingStatus: ListStatus | null;
   }>;
-  operation: null | { operationId: string; status: 'confirmed' | 'uncertain'; result: string };
+  operation: null | { operationId: string; status: 'confirmed' | 'uncertain' | 'superseded'; result: string };
 };
 
 type ProposalCard = {
@@ -195,3 +195,9 @@ for an enabled Dynamics user, and stores only that GUID in
 Proposal Ranking app access and superuser authority. Missing configuration,
 disabled identity, or failed configuration reads block preview/open with a
 user-readable message.
+
+A successful transfer by a facilitator outside the captured roster returns a
+`mode: "waiting"` receipt with no round snapshot or lists; subsequent round reads
+are denied. An uncertain opening retains its original action payload and operation
+ID in the UI's “Resolve opening attempt” control, so retry cannot create a
+replacement for the original round after cancellation.

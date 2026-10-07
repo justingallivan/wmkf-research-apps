@@ -1,6 +1,6 @@
 # Proposal Ranking — design for review
 
-Date: 2026-10-07. Revision: 3 (Opus revision-2 findings incorporated). Status: **PLANNED; not implemented.**
+Date: 2026-10-07. Revision: 3 (Opus revision-2 findings incorporated). Status: **Implementation present on the feature branch; integration review in progress; not deployed or provisioned.**
 Owner: Justin. Design consolidation: Codex. Requested reviewer: Claude Opus.
 Authority: owner decisions in the Proposal Ranking planning conversation.
 
@@ -85,7 +85,7 @@ Approved defaults:
   initial order when the round opens. New peer reviews or assignment changes must
   not silently change that round's inputs.
 
-Calculation contract [PLANNED implementation of approved workflow]:
+Calculation contract [implemented in `lib/services/proposal-ranking/calculations.js`; focused tests]:
 
 - Seed order: descending arithmetic mean of submitted external reviews'
   `overallAssessment`, not risk ratings or categorical selections. Use unrounded
@@ -122,7 +122,7 @@ These are source observations, not new production probes or deployment claims.
 | The existing matrix rounds averages to one decimal, so its displayed average must not become the sorting input. | `shared/utils/review-matrix.js` | VERIFIED via source |
 | Requested amount is `akoya_request`; total project budget is `akoya_expenses`; either may be null. | `lib/services/workbench/resolve-request-service.js` | VERIFIED via source |
 
-## Explicit pool and opening contract [PLANNED]
+## Explicit pool and opening contract
 
 Open only through a deliberate facilitator action after preview. The configured
 CSO identity can preview/open before a roster exists. The preview shows proposal
@@ -159,13 +159,17 @@ transaction. Once captured, it supplies every PD's initial list. Later withdrawa
 or data correction does not mutate it; the unpublished cancel/reopen control is
 available. Published pools stay fixed in v1.
 
-## Architecture and permissions [PLANNED; not provisioned]
+## Architecture and permissions [source implemented; not provisioned]
 
 Use existing app registration and authenticated route/service/adapter boundaries.
-Dataverse remains the proposed durable home. No schema, security role, configuration,
-or ranking app has been provisioned by this design work.
+Dataverse is the implemented persistence target. The three table definitions and
+application role are checked in under `lib/dataverse/schema/wave32-proposal-ranking/`
+and `lib/dataverse/schema/roles/proposal-ranking-app.json`. Live schema, role,
+configuration and multi-identity verification remain unperformed. See
+`docs/atlas/dataverse-proposal-ranking.md` for the activation boundary.
 
-Use three new logical tables (final entity names established with schema-as-code):
+Use three logical tables (`wmkf_proposalrankingcycle`, `wmkf_proposalrankinground`,
+and `wmkf_proposalrankinglist`):
 
 1. **Cycle coordinator:** unique cycle key, active round GUID, version. A stable
    per-cycle row prevents two concurrent opens creating different active rounds.
@@ -285,7 +289,7 @@ bypass, privilege broadening, or silent fallback is authorized by this design.
 
 `app -> authenticated API -> ranking service -> adapter -> conditional durable
 write/read -> permission-filtered response -> card stack and cumulative totals`.
-Use app key `proposal-ranking` (planned). Named operations are preview/open, read
+Use app key `proposal-ranking`. Named operations are preview/open, read
 round, save own list, submit own list, generate/edit/publish program meeting list,
 transfer facilitator, excuse participant, cancel unpublished round. All request
 actors are session-derived. Program/round selectors are validated; errors use
@@ -322,7 +326,9 @@ it. No WebSocket service, polling infrastructure, or silent multi-user merging.
 
 Existing baseline validation: 20 tests passed across `review-matrix.test.js` and
 `meeting-tracker-slot-service.test.js` during this planning conversation. These
-tests verify existing building blocks, not this unimplemented feature.
+tests verify existing building blocks. Feature-specific tests are now under
+`tests/unit/proposal-ranking-*.test.js`; final integrated results and review are
+recorded separately from this historical planning baseline.
 
 ## Review reconciliation
 
@@ -345,8 +351,8 @@ Original review: `docs/audits/PROPOSAL_RANKING_OPUS_DESIGN_REVIEW_2026-10-07.md`
 
 Runtime/schema/security-role provisioning and real multi-identity rehearsal remain
 unperformed. Source assertions are bounded to the cited code; no production-read
-permission is inferred from design approval. Engineering contracts above are
-planned requirements, not verified implementations.
+permission is inferred from design approval. Engineering contracts above remain the acceptance requirements; source code and
+focused tests provide implementation evidence, while live behavior remains unverified.
 
 Revision-2 Opus outcome: **READY WITH NAMED CHANGES**, returned by
 `claude-opus-5-5` on 2026-10-07. Receipt:

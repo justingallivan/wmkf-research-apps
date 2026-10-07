@@ -25,6 +25,7 @@
     ] },
     { "type": "Memo", "schemaName": "wmkf_AdministrationLogJson", "displayName": "Administration Log", "description": "Append-only facilitator transfer, excusal, and cancellation events. Refuse writes above 128 KiB.", "maxLength": 131072 },
     { "type": "String", "schemaName": "wmkf_LastOperationId", "displayName": "Last Operation ID", "maxLength": 36, "requiredLevel": "ApplicationRequired" },
+    { "type": "String", "schemaName": "wmkf_LastOperationKind", "displayName": "Last Operation Kind", "description": "Action associated with the last operation identifier, preventing cross-action retries.", "maxLength": 16, "requiredLevel": "ApplicationRequired" },
     { "type": "String", "schemaName": "wmkf_CreatedByActorSystemUserId", "displayName": "Created By Actor System User ID", "maxLength": 36, "requiredLevel": "ApplicationRequired" },
     { "type": "DateTime", "schemaName": "wmkf_CreatedAt", "displayName": "Created At", "format": "DateAndTime", "behavior": "TimeZoneIndependent", "requiredLevel": "ApplicationRequired" },
     { "type": "String", "schemaName": "wmkf_UpdatedByActorSystemUserId", "displayName": "Updated By Actor System User ID", "maxLength": 36, "requiredLevel": "ApplicationRequired" },

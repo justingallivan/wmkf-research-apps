@@ -287,6 +287,35 @@ describe('Proposal Ranking page', () => {
     await waitFor(() => expect(mockLoad).toHaveBeenLastCalledWith({ cycleCode: CYCLE, roundId: undefined }));
   });
 
+  test('an uncertain opening retries the exact original operation and preview', async () => {
+    mockLoad.mockResolvedValue({ mode: 'preview', cycleCode: CYCLE, viewer: { capabilities: { open: true } },
+      preview: { proposals: REQUESTS, seedOrders: { se: INITIAL_ORDER, mr: [] }, roster: [],
+        outstandingReviewCount: 0, canOpen: true, warnings: [], previewFingerprint: 'frozen-preview' } });
+    mockSend.mockRejectedValueOnce(Object.assign(new Error('Opening uncertain'), { status: 409, code: 'uncertain_outcome' }))
+      .mockResolvedValueOnce(roundResponse({ facilitator: true }));
+    render(<ProposalRankingApp />);
+    fireEvent.click(await screen.findByRole('checkbox', { name: /I reviewed the proposal pool/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open round' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Resolve opening attempt' }));
+    await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(2));
+    expect(mockSend.mock.calls[1][0]).toEqual(mockSend.mock.calls[0][0]);
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Resolve opening attempt' })).not.toBeInTheDocument());
+  });
+
+  test('a confirmed save with a newer server order stays visibly conflicted', async () => {
+    mockLoad.mockResolvedValue(roundResponse());
+    const newer = roundResponse({ order: [...INITIAL_ORDER].reverse(), etag: 'list-v3' });
+    newer.operation = { status: 'confirmed', result: 'save' };
+    mockSend.mockResolvedValue(newer);
+    render(<ProposalRankingApp />);
+    const own = await screen.findByRole('region', { name: 'Current PD SE ranking' });
+    fireEvent.click(within(own).getByRole('button', { name: 'Move proposal 1001 down' }));
+    expect(await screen.findByText(/Your save completed, but a newer order is now current/)).toBeInTheDocument();
+    expect(within(own).getByRole('button', { name: 'Submit and lock list' })).toBeDisabled();
+    expect(within(own).getByText(/Position 1 of 4 · #1002/)).toBeInTheDocument();
+    expect(screen.queryByText('Order saved.')).not.toBeInTheDocument();
+  });
+
   test('a published participant gets named PD ranks and can reorder the shared meeting order', async () => {
     mockLoad.mockResolvedValue(roundResponse({ published: true }));
     mockSend.mockImplementation((action) => Promise.resolve(roundResponse({ published: true, order: action.order, etag: 'meeting-v2' })));

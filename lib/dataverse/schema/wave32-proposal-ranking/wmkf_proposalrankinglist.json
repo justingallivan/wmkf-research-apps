@@ -29,6 +29,7 @@
     { "type": "Integer", "schemaName": "wmkf_Version", "displayName": "Version", "minValue": 1, "maxValue": 2147483647, "requiredLevel": "ApplicationRequired" },
     { "type": "Memo", "schemaName": "wmkf_CompositeJson", "displayName": "Immutable Composite Calculation", "description": "Saved source submission IDs, exact rank sums, ranges, and baseline order; null for individual lists.", "maxLength": 65536 },
     { "type": "String", "schemaName": "wmkf_LastOperationId", "displayName": "Last Operation ID", "maxLength": 36, "requiredLevel": "ApplicationRequired" },
+    { "type": "String", "schemaName": "wmkf_LastOperationKind", "displayName": "Last Operation Kind", "description": "Action associated with the last operation identifier for this list.", "maxLength": 16, "requiredLevel": "ApplicationRequired" },
     { "type": "String", "schemaName": "wmkf_UpdatedByActorSystemUserId", "displayName": "Updated By Actor System User ID", "maxLength": 36, "requiredLevel": "ApplicationRequired" },
     { "type": "DateTime", "schemaName": "wmkf_UpdatedAt", "displayName": "Updated At", "format": "DateAndTime", "behavior": "TimeZoneIndependent", "requiredLevel": "ApplicationRequired" },
     { "type": "DateTime", "schemaName": "wmkf_SubmittedAt", "displayName": "Submitted At", "format": "DateAndTime", "behavior": "TimeZoneIndependent" },

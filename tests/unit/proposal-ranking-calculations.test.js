@@ -2,6 +2,7 @@ import {
   buildSeedOrder,
   calculateComposite,
   calculateCumulativeTotals,
+  canonicalGuid,
   moneyToMinorUnits,
   readSavedOverallAssessment,
   summarizeProposalReviews,
@@ -23,6 +24,12 @@ const savedScale = [
 ];
 
 describe('Proposal Ranking calculations', () => {
+  test('normalizes GUID-shaped Dataverse IDs without requiring RFC version/variant bits', () => {
+    expect(canonicalGuid(' {EE11EEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE} ')).toBe('ee11eeee-eeee-eeee-eeee-eeeeeeeeeeee');
+    expect(canonicalGuid('F1111111-1111-1111-1111-111111111111')).toBe('f1111111-1111-1111-1111-111111111111');
+    expect(canonicalGuid('not-a-guid')).toBeNull();
+  });
+
   test('accepts only the recognized saved scale and exact legacy label/value pairs', () => {
     expect(readSavedOverallAssessment({ overallAssessment: 5, questionOptions: savedScale }))
       .toEqual({ rating: 5, scaleReady: true });
