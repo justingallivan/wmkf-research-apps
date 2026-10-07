@@ -1,6 +1,6 @@
-# Session 582 Prompt: Proposal Ranking persistence verified; activation pending
+# Session 583 Prompt: Proposal Ranking walkthrough and activation pending
 
-## Session 581 Summary — 2026-10-07 (Codex)
+## Session 582 Summary — 2026-10-07 (Codex)
 
 Owner-approved Proposal Ranking was built on `codex/proposal-ranking` in the
 isolated worktree. Luna performed reconnaissance/build work, Sol reviewed its
@@ -25,7 +25,16 @@ The app remains disabled; production is unchanged.
 - Atlas, API matrix, service catalog, app/route registration, canonical counts,
   reviewed design/API contract, and full Opus source-review receipt.
 
-### Commits
+### Latest session commits
+
+- `458d7248f`: merged main into the isolated feature branch.
+- `8d8b10872`: sandbox schema/role evidence and live source-field corrections.
+- `8be9f57a1`: ETag normalization fix and successful bounded persistence rehearsal.
+- `3f5c6cf10`: reproducible GET-only staff privacy proof and documentation.
+- Session-close documentation follows these commits; all work stays on
+  `codex/proposal-ranking`, draft PR https://github.com/justingallivan/wmkf-research-apps/pull/457.
+
+### Earlier implementation commits
 
 - `042ec90b0`: reviewed product/design contract.
 - `5279c92cc`: owner-approved transcript-doc gate annotations.
@@ -36,7 +45,7 @@ The app remains disabled; production is unchanged.
 - `a1f4e0f4e`: authorized lifecycle, recovery, Admin and reviewed corrections.
 - Final receipt/message-tag and handoff documentation follow these commits.
 
-## Verified open — operator-controlled activation
+## Next items — verified open
 
 Source evidence and exact steps: `docs/atlas/dataverse-proposal-ranking.md`.
 Sandbox schema/role provisioning is complete and readback passed: three tables,
@@ -57,7 +66,41 @@ Evidence and retained IDs: `docs/audits/PROPOSAL_RANKING_PERSISTENCE_REHEARSAL_2
 Luna corrected the processed ETag adapter contract; Sol and bounded OAuth Opus
 approved. No new production milestone entry is required.
 No production read, write, deployment or activation is authorized by this handoff.
-Owner performs deliberate promotion after the rehearsal evidence is reviewed.
+### Next session: in-app walkthrough
+
+[VERIFIED OPEN via Atlas and rehearsal receipts] Configure the verified facilitator
+identity and participant app access in the approved environment, then walk through
+private ranking, submit, composite generation/publication, meeting reordering and
+budget totals. The sandbox has zero eligible ordinary source proposals; resolve
+that acceptance-data limitation before claiming an end-to-end live meeting. Do not
+silently create or copy source proposals, relax test exclusion, or reuse the D99
+storage fixture as a valid source-backed round.
+
+### Owner decision needed
+
+Deliberate production promotion/activation remains pending after acceptance evidence
+and current-head CI review. No production action is inferred from this handoff.
+
+### Do not reopen without a new decision
+
+No realtime infrastructure, ranking notes, combined SE/MR list, funding writeback,
+or changes to existing proposal fields. Continue Luna build/recon → Sol review →
+orchestrator final review → bounded Opus OAuth review when further builds are needed;
+no Fable or API-key agent sessions. Avoid review churn over minor improvements.
+
+### Key files
+
+- `docs/atlas/dataverse-proposal-ranking.md`: current activation checklist.
+- `docs/audits/PROPOSAL_RANKING_STAFF_PRIVACY_2026-10-07.md`: bounded privacy evidence.
+- `scripts/probe-proposal-ranking-staff-privacy.js`: repeatable GET-only proof.
+- `scripts/probe-proposal-ranking-persistence.js`: retained D99 storage rehearsal;
+  do not repeat its write mode.
+
+Local `/private/tmp` receipts are not portable between Macs. Retained record IDs
+and sanitized results are checked into the audit receipts; if re-running a probe
+on another machine, reconstruct only its required receipt input from that evidence,
+then verify the target and rows by GET. Never copy credentials between machines.
+
 
 ## Testing and review evidence
 
