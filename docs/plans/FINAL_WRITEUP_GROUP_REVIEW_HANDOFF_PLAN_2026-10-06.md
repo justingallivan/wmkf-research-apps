@@ -1,6 +1,6 @@
 ---
 title: Final Writeup group-review handoff — PD drafting, PD sign-off, leadership digest
-status: approved 2026-10-06 — Stage 1 live; Stages 2–5 not built
+status: approved 2026-10-06 — Stages 1–2 live; Stages 3–5 not built
 created: 2026-10-06
 owner: Justin Gallivan
 related:
@@ -117,7 +117,7 @@ runtime work. Stage 1 is the original ask and ships first.
   → "Send to leadership".
 - Stage 1 hides nothing; Stage 2 does.
 
-### Stage 2 — Hide the draft before handoff (server-side) — built on branch `feature/writeup-hide-before-handoff`
+### Stage 2 — Hide the draft before handoff (server-side) — live 2026-10-06 (PR #453, merge `b47a70eae`)
 
 **Owner decisions (2026-10-06):**
 - Program Coordinators can see the draft.

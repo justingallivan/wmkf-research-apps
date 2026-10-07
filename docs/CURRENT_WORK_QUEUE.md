@@ -82,8 +82,8 @@ sequence.
   `POST /api/workbench/final-writeup` route and authorization); Final writeup
   buttons renamed "Ready for group review" / "Send to leadership". Stage 2 (the
   draft is hidden in the apps from everyone but the lead PD, PCs and superusers
-  until group review; changes are lead PD or superuser only) is built on branch
-  `feature/writeup-hide-before-handoff`, pending review and promotion. Stages 3–5
+  until group review; changes are lead PD or superuser only) is live (PR #453,
+  merge `b47a70eae`, 2026-10-06). Stages 3–5
   (lead-PD sign-off view, PD handoff email,
   leadership daily digest) are planned, not built:
   `docs/plans/FINAL_WRITEUP_GROUP_REVIEW_HANDOFF_PLAN_2026-10-06.md`.
