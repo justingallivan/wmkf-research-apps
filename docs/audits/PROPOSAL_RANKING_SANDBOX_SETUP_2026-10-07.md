@@ -1,7 +1,10 @@
 # Proposal Ranking sandbox setup receipt
 
 Date: 2026-10-07. Target: `orgd9e66399.crm.dynamics.com` (registered sandbox).
-Status: PARTIAL — schema/role provisioned; runtime meeting rehearsal pending.
+Historical setup checkpoint, before the bounded persistence rehearsal. Its remaining-work
+list below records that earlier state; current status is in
+`docs/atlas/dataverse-proposal-ranking.md` and
+`docs/audits/PROPOSAL_RANKING_PERSISTENCE_REHEARSAL_2026-10-07.md`.
 No production mutation, source-request mutation, application grant, facilitator
 setting, or activation flag was performed by this setup.
 

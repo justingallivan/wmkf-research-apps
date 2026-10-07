@@ -1,6 +1,6 @@
 # Proposal Ranking — design for review
 
-Date: 2026-10-07. Revision: 3 (Opus revision-2 findings incorporated). Status: **Source implemented; sandbox schema/role provisioned; runtime rehearsal and production activation pending.**
+Date: 2026-10-07. Revision: 3 (Opus revision-2 findings incorporated). Status: **Source implemented; sandbox schema/role and persistence rehearsal verified; browser rehearsal and production activation pending.**
 Owner: Justin. Design consolidation: Codex. Requested reviewer: Claude Opus.
 Authority: owner decisions in the Proposal Ranking planning conversation.
 
@@ -354,7 +354,11 @@ Sandbox schema/security-role provisioning is verified in
 and real multi-identity rehearsal remain unperformed; no eligible sandbox proposals
 were found by the complete source scan. Source assertions are bounded to the cited code; no production-read
 permission is inferred from design approval. Engineering contracts above remain the acceptance requirements; source code and
-focused tests provide implementation evidence, while live behavior remains unverified.
+focused tests provide implementation evidence. Bounded live storage checks passed
+(initialization, conditional save, stale-write and duplicate-key rollback); current
+sandbox search exclusion is verified. See
+`docs/audits/PROPOSAL_RANKING_PERSISTENCE_REHEARSAL_2026-10-07.md`.
+Direct-user privacy and authenticated browser lifecycle remain unverified.
 
 Revision-2 Opus outcome: **READY WITH NAMED CHANGES**, returned by
 `claude-opus-5-5` on 2026-10-07. Receipt:

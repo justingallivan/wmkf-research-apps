@@ -1,4 +1,4 @@
-# Session 582 Prompt: Proposal Ranking sandbox schema ready; rehearsal data pending
+# Session 582 Prompt: Proposal Ranking persistence verified; activation pending
 
 ## Session 581 Summary — 2026-10-07 (Codex)
 
@@ -41,11 +41,17 @@ The app remains disabled; production is unchanged.
 Source evidence and exact steps: `docs/atlas/dataverse-proposal-ranking.md`.
 Sandbox schema/role provisioning is complete and readback passed: three tables,
 expected fields/bounds, three Active alternate keys and app-only role assignment.
-The complete eligible-source scan returned zero proposals. Owner was asked whether
-to prepare a sandbox-only rehearsal set or supply a cycle; no data was seeded.
-Actual Beth Pruitt identity selection and app grants, readiness configuration,
-relevance-search exclusion, ordinary-staff direct-table denial and multi-identity/
-live-concurrency rehearsal remain unperformed.
+The complete eligible-source scan returned zero proposals. The owner chose a minimal
+rehearsal restricted to the new ranking tables. D99 now retains two synthetic cards
+in its snapshot only; no source proposals were created or changed. Initialization,
+conditional save, stale ETag rollback and duplicate-key rollback passed. Search
+status confirms the three entities absent from the sandbox search index. Staff
+impersonation could not be verified, so direct-table denial remains unverified.
+Actual Beth Pruitt identity selection and app grants, readiness configuration and
+multi-identity browser rehearsal remain unperformed. Do not recreate the D99 fixture.
+Evidence and retained IDs: `docs/audits/PROPOSAL_RANKING_PERSISTENCE_REHEARSAL_2026-10-07.md`.
+Luna corrected the processed ETag adapter contract; Sol and bounded OAuth Opus
+approved. No new production milestone entry is required.
 No production read, write, deployment or activation is authorized by this handoff.
 Owner performs deliberate promotion after the rehearsal evidence is reviewed.
 
@@ -54,9 +60,10 @@ Owner performs deliberate promotion after the rehearsal evidence is reviewed.
 `docs/audits/PROPOSAL_RANKING_OPUS_IMPLEMENTATION_REVIEW_2026-10-07.md` records the
 review text, accepted corrections, local build/tests and bounded evidence limits.
 Canonical production build passed after the source corrections. The two live-source corrections passed 110 tests
-in 10 suites plus lint/type/data gates and Sol/Opus review. Full GitHub Jest has one
-unrelated transcript-card failure, reproduced locally; test/component are unchanged
-from main. See sandbox receipt for the exact test and evidence boundary.
+in 10 suites plus lint/type/data gates and Sol/Opus review. The earlier full GitHub Jest run had an unrelated transcript-card failure. The later
+run at `8d8b10872` passed (run `37698207467`); no transcript runtime changes were made
+here. The ETag correction and rehearsal pass 116 tests in 12 suites, plus lint and
+the DAL gate/self-test. New commit CI must be checked independently.
 Feature/Explorer integration regression command:
 
 ```bash

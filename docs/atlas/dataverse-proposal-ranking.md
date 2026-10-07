@@ -1,9 +1,11 @@
 # Proposal Ranking storage and activation
 
 Date: 2026-10-07. Status: source implemented; sandbox schema and application-role
-provisioning verified. Runtime activation and multi-identity rehearsal remain pending.
+provisioning and bounded persistence rehearsal verified. Runtime activation and
+multi-identity browser rehearsal remain pending.
 Production has not been provisioned or enabled. Evidence:
-`docs/audits/PROPOSAL_RANKING_SANDBOX_SETUP_2026-10-07.md`.
+`docs/audits/PROPOSAL_RANKING_SANDBOX_SETUP_2026-10-07.md` and
+`docs/audits/PROPOSAL_RANKING_PERSISTENCE_REHEARSAL_2026-10-07.md`.
 
 ## Source and persistence
 
@@ -63,8 +65,10 @@ with the visible order. No automatic budget cutoff is applied.
    fields/Memo bounds and active alternate keys passed readback.
 2. [VERIFIED via role apply and assignment readback] The dedicated role is assigned
    only by this setup to the sandbox application identity, with nine Create/Read/Write
-   privileges. Ordinary PD direct-table denial remains untested. Confirm exclusion
-   from Dataverse relevance search. Verify indirect audit/navigation paths are denied.
+   privileges. Ordinary PD direct-table denial remains unverified: the bounded probe could not
+   verify impersonation. Sandbox GET on the `searchstatus` platform endpoint (HTTP
+   `/searchstatus`) confirms all three entities absent
+   from the provisioned search index. Verify indirect audit/navigation paths are denied.
 3. Verify test-request and synthetic-reviewer isolation schemas/switches on that
    target. Set `PROPOSAL_RANKING_SCHEMA_READY=on` only after schema/role proof;
    set `PROPOSAL_RANKING_ENABLED=on` only for the approved environment. Missing flags
@@ -91,8 +95,11 @@ wire shapes are in `docs/plans/PROPOSAL_RANKING_API_CONTRACT.md`. Local regressi
 suites cover calculations, preview/schema, service behavior, UI and generic-reader
 privacy. Verification and Opus review are recorded in
 `docs/audits/PROPOSAL_RANKING_OPUS_IMPLEMENTATION_REVIEW_2026-10-07.md`.
-Live claims are limited to the sandbox setup receipt and reproducible GET-only
+Live setup claims are supported by the historical setup receipt and GET-only
 `scripts/probe-proposal-ranking-readiness.mjs`. Its uncapped, all-date eligible
-source scan returned zero proposals. Rehearsal data, staff grants/default identity,
-isolation/runtime flags, direct-user denial, search exclusion and browser rehearsal
-remain open. Advanced Find visibility is not proof of relevance-search exclusion.
+source scan returned zero proposals. The bounded persistence receipt above proves
+initialization, conditional save, stale-write rollback, duplicate-key rollback and
+current sandbox search exclusion using only new-table synthetic snapshot data.
+It does not prove authenticated meeting behavior. Staff grants/default identity,
+isolation/runtime flags, direct-user denial and browser rehearsal remain open.
+Advanced Find visibility is not proof of relevance-search exclusion.
