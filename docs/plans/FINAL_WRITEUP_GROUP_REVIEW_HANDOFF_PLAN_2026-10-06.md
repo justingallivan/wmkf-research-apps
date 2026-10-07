@@ -250,9 +250,8 @@ silently include or exclude them. **Resolved 2026-10-07:** the owner chose Resea
   emailed, and refusing one raises an ops alert. A 2026-10-07 owner-authorized Production read
   found the Research recipients to be Justin Gallivan, John Sader, Jean Kim and Beth Pruitt (Beth
   is both PD and CSO, by design), each minus the request's lead.
-  Sent as the request's current lead PD (owner, 2026-10-07; branch
-  `feature/handoff-email-from-lead-pd`, not yet live — Production still sends from
-  `NOTIFICATION_EMAIL_FROM` until it merges): created and sent with `MSCRMCallerID` impersonation
+  Sent as the request's current lead PD (owner, 2026-10-07; live via PR #458, merge
+  `b14651597`, 2026-10-07): created and sent with `MSCRMCallerID` impersonation
   and `noFallback: true`, regarding the request, so the TEST-request guard applies. A missing,
   disabled, or non-foundation lead, or impersonation switched off, keeps the send pending and
   retryable and alerts ops after three attempts; it never falls back to the system mailbox. An
