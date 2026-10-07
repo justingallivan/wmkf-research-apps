@@ -1,6 +1,6 @@
 ---
 name: feedback-codex-model-gpt56-sol
-description: "Owner directive 2026-10-01 (S561): Codex default is gpt-6-astra at medium (set in ~/.codex/config.toml; accepted on ChatGPT OAuth). Supersedes the 2026-09-08 gpt-5.6-sol rule. Catalog lives in ~/.codex/models_cache.json"
+description: "Codex default is gpt-6-astra (config ~/.codex/config.toml; accepted on ChatGPT OAuth). Effort: owner accepts low for Astra (2026-10-07, S581; the 2026-10-01 rule said medium). Supersedes the 2026-09-08 gpt-5.6-sol rule. Catalog lives in ~/.codex/models_cache.json"
 status: active
 metadata:
   node_type: memory
@@ -9,7 +9,9 @@ metadata:
   modified: 2026-09-08T15:42:51.670Z
 ---
 
-**2026-10-01 (Session 561), CURRENT RULE:** the Codex catalog was refreshed (models_cache.json, 13:23). It lists `gpt-6-astra` ("Frontier intelligence"), `gpt-5.6-sol` ("Older generation workhorse"), `gpt-5.6-terra`, `gpt-5.6-luna` and `gpt-5.5`. The owner directed Astra at medium. A read-only `task --model gpt-6-astra --effort medium` started on ChatGPT OAuth without refusal. With the owner's authorization, `~/.codex/config.toml` now reads `model = "gpt-6-astra"`, `model_reasoning_effort = "medium"`. Use those; pass `--model gpt-6-astra` explicitly anyway. Everything below about Sol, and "never gpt-6-astra", is history. Still applies: never pass `--help` or unknown flags to companion `review`/`adversarial-review`/`task`; if a model is refused, stop and show the catalog rather than substituting one.
+**2026-10-07 (Session 581), CURRENT EFFORT RULE:** `~/.codex/config.toml` read `model = "gpt-6-astra"`, `model_reasoning_effort = "low"`. Asked whether to restore medium, the owner said: "That's fine for astra." Leave the effort at low and do not flag it again. The companion `review`/`adversarial-review` commands accept `--model` but no `--effort`, so reviews always run at the config effort. Everything else in the 2026-10-01 rule below still applies.
+
+**2026-10-01 (Session 561), CURRENT RULE (except effort, see above):** the Codex catalog was refreshed (models_cache.json, 13:23). It lists `gpt-6-astra` ("Frontier intelligence"), `gpt-5.6-sol` ("Older generation workhorse"), `gpt-5.6-terra`, `gpt-5.6-luna` and `gpt-5.5`. The owner directed Astra at medium. A read-only `task --model gpt-6-astra --effort medium` started on ChatGPT OAuth without refusal. With the owner's authorization, `~/.codex/config.toml` now reads `model = "gpt-6-astra"`, `model_reasoning_effort = "medium"`. Use those; pass `--model gpt-6-astra` explicitly anyway. Everything below about Sol, and "never gpt-6-astra", is history. Still applies: never pass `--help` or unknown flags to companion `review`/`adversarial-review`/`task`; if a model is refused, stop and show the catalog rather than substituting one.
 
 **2026-09-28 (Session 547):** a review launched without `--model` fell back to the config default `gpt-6-luna` (not in the catalog) and was refused on ChatGPT auth. The config's effort had drifted to `"low"`; with owner authorization for this one edit, line 2 was set to `model_reasoning_effort = "high"` and the owner said to keep it. Codex's log (`~/.codex/logs_2.sqlite`, the thread's rows) confirmed the rerun used `gpt-5.6-sol` with `effort=Some(High)`. Before a review, check that the config still says `high`; if it doesn't, ask the owner rather than editing.
 
