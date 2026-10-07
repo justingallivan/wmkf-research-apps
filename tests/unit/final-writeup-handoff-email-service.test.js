@@ -32,6 +32,10 @@ const LEAD_ID = '44444444-4444-4444-8444-444444444441';
 const BEA_ID = '44444444-4444-4444-8444-444444444442';
 const CY_ID = '44444444-4444-4444-8444-444444444443';
 const EMAIL_ID = '55555555-5555-4555-8555-555555555555';
+const REBUILT_EMAIL_ID = '55555555-5555-4555-8555-555555555556';
+// An activity that already exists before the test (a stored draft or orphan).
+const PRIOR_ID = '55555555-5555-4555-8555-555555555550';
+const CREATED_IDS = [EMAIL_ID, REBUILT_EMAIL_ID, '55555555-5555-4555-8555-555555555557'];
 const NOW = new Date('2026-10-07T20:00:00Z');
 
 function request(overrides = {}) {
@@ -67,6 +71,8 @@ function pendingRow(overrides = {}) {
     lead_systemuser_id: LEAD_ID,
     state: 'pending',
     dynamics_email_id: null,
+    recipient_generation: 0,
+    attempt_count: 1,
     created_at: '2026-10-07T19:00:00Z',
     locked: false,
     ...overrides,
@@ -96,6 +102,7 @@ function harness({
 } = {}) {
   let row = existingRow ? { ...existingRow } : null;
   let tokenSeq = 0;
+  let createdCount = 0;
   const owns = (token) => Boolean(row && row.state === 'pending' && row.locked && row.lease_token === token);
   const state = { requestRow, documentRow };
   const calls = [];
@@ -115,17 +122,35 @@ function harness({
     }),
     createEmailActivity: jest.fn(async (input) => {
       calls.push('create');
+      const id = CREATED_IDS[createdCount];
+      createdCount += 1;
       // Same shape as the adapter's expanded read: To parties are mask 2.
-      activities.set(EMAIL_ID, {
-        activityid: EMAIL_ID,
+      activities.set(id, {
+        activityid: id,
         statuscode: 1,
         input,
         email_activity_parties: input.to.map((addressused) => ({ participationtypemask: 2, addressused })),
       });
-      return EMAIL_ID;
+      return id;
     }),
     getEmailActivity: jest.fn(async (id) => activities.get(id) || null),
-    findEmailByCorrelation: jest.fn(async () => correlationMatches),
+    // Generation 0 answers with the fixture's correlation matches; later
+    // generations find only activities created under that key.
+    findEmailByCorrelation: jest.fn(async (key) => (
+      key === handoffCorrelationKey(SOURCE_ID)
+        ? correlationMatches
+        : [...activities.values()].filter((activity) => activity.input?.correlationKey === key)
+    )),
+    rebuild: jest.fn(async (_id, token) => {
+      if (!owns(token)) return null;
+      Object.assign(row, {
+        recipient_generation: Number(row.recipient_generation || 0) + 1,
+        dynamics_email_id: null,
+        to_recipients: null,
+      });
+      return { ...row };
+    }),
+    notify: jest.fn(async () => ({ id: 'alert-1' })),
     sendEmail: jest.fn(async (id) => {
       calls.push('send');
       activities.set(id, { ...activities.get(id), statuscode: 3 });
@@ -155,6 +180,7 @@ function harness({
       if (!row || row.state !== 'pending' || row.locked) return null;
       tokenSeq += 1;
       row.locked = true;
+      row.attempt_count = Number(row.attempt_count || 0) + 1;
       row.lease_token = `token-${tokenSeq}`;
       return { ...row };
     }),
@@ -517,20 +543,25 @@ describe('delivery', () => {
   test.each([
     ['program', { requestRow: request({ _wmkf_grantprogram_value: SOCAL_ID }), audience: { status: 'configured', programDirectors: [{ reviewerId: CY_ID, name: 'Cy Director' }] } }],
     ['lead', { requestRow: request({ _wmkf_programdirector_value: BEA_ID }) }],
-  ])('a stored unsent draft is dropped when the %s changed, never sent to stale recipients', async (_label, change) => {
+  ])('a stored unsent draft built before the %s changed is abandoned, and a fresh email goes to the current recipients', async (_label, change) => {
     const { deps, activities } = harness({
-      existingRow: pendingRow({ dynamics_email_id: EMAIL_ID }),
+      existingRow: pendingRow({ dynamics_email_id: PRIOR_ID }),
       enabledPrograms: [RESEARCH_ID, SOCAL_ID],
       ...change,
     });
     // Built for the original lead and program: Bea and Cy.
-    activities.set(EMAIL_ID, {
-      activityid: EMAIL_ID,
+    activities.set(PRIOR_ID, {
+      activityid: PRIOR_ID,
       statuscode: 1,
       email_activity_parties: ['bea@wmkeck.org', 'cy@wmkeck.org'].map((addressused) => ({ participationtypemask: 2, addressused })),
     });
-    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'skipped', reason: 'request_changed' });
-    expect(deps.sendEmail).not.toHaveBeenCalled();
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'sent' });
+    // The stale draft is never sent; the fresh one has its own correlation key.
+    expect(deps.sendEmail).toHaveBeenCalledTimes(1);
+    expect(deps.sendEmail).not.toHaveBeenCalledWith(PRIOR_ID);
+    const fresh = deps.createEmailActivity.mock.calls[0][0];
+    expect(fresh.correlationKey).toBe(handoffCorrelationKey(SOURCE_ID, 1));
+    expect(fresh.to).not.toEqual(['bea@wmkeck.org', 'cy@wmkeck.org']);
   });
 
   test('lead reassigned before delivery, then a transport failure: recovery sends the draft once', async () => {
@@ -550,16 +581,19 @@ describe('delivery', () => {
   });
 
   test.each([
-    ['a PD was removed from the program audience', { audience: { status: 'configured', programDirectors: [{ reviewerId: BEA_ID, name: 'Bea Director' }] } }],
+    ['a PD was removed from the program audience', {
+      audience: { status: 'configured', programDirectors: [{ reviewerId: BEA_ID, name: 'Bea Director' }] },
+      expectedTo: ['bea@wmkeck.org'],
+    }],
     ['a PD account was disabled', { users: {
       [BEA_ID]: { systemuserid: BEA_ID, internalemailaddress: 'bea@wmkeck.org', isdisabled: false },
       [CY_ID]: { systemuserid: CY_ID, internalemailaddress: 'cy@wmkeck.org', isdisabled: true },
-    } }],
+    }, expectedTo: ['bea@wmkeck.org'] }],
     ['a PD address changed', { users: {
       [BEA_ID]: { systemuserid: BEA_ID, internalemailaddress: 'bea@wmkeck.org', isdisabled: false },
       [CY_ID]: { systemuserid: CY_ID, internalemailaddress: 'cy.new@wmkeck.org', isdisabled: false },
-    } }],
-  ])('a recorded draft whose send failed is not resent after %s', async (_label, later) => {
+    }, expectedTo: ['bea@wmkeck.org', 'cy.new@wmkeck.org'] }],
+  ])('a recorded draft whose send failed is not resent after %s; a fresh email goes to the current recipients', async (_label, later) => {
     const { deps, getRow } = harness({ existingRow: pendingRow() });
     deps.sendEmail.mockRejectedValueOnce(Object.assign(new Error('transport'), { code: 'dynamics_send_failed' }));
     const spy = quiet();
@@ -567,11 +601,11 @@ describe('delivery', () => {
     spy.mockRestore();
     if (later.audience) deps.resolveAudience.mockResolvedValue(later.audience);
     if (later.users) deps.getSystemUser.mockImplementation(async (id) => later.users[id] || null);
-    expect(await recoverPendingHandoffEmails({}, deps)).toEqual([
-      { sourceDocumentId: SOURCE_ID, status: 'skipped', reason: 'request_changed' },
-    ]);
-    expect(deps.sendEmail).toHaveBeenCalledTimes(1);
-    expect(getRow().state).toBe('skipped');
+    expect(await recoverPendingHandoffEmails({}, deps)).toEqual([{ sourceDocumentId: SOURCE_ID, status: 'sent' }]);
+    // The first draft (old recipients) was only attempted once and never resent.
+    expect(deps.sendEmail.mock.calls.map(([id]) => id)).toEqual([EMAIL_ID, REBUILT_EMAIL_ID]);
+    expect(getRow()).toMatchObject({ state: 'sent', recipient_generation: 1 });
+    expect(deps.createEmailActivity.mock.calls[1][0].to).toEqual(later.expectedTo);
   });
 
   test('a recorded draft is not resent when the recipient lookup fails (fail closed, retryable)', async () => {
@@ -593,7 +627,7 @@ describe('delivery', () => {
   });
 
   const orphan = (addresses) => ({
-    activityid: EMAIL_ID,
+    activityid: PRIOR_ID,
     statuscode: 1,
     email_activity_parties: addresses.map((addressused) => ({ participationtypemask: 2, addressused })),
   });
@@ -603,12 +637,12 @@ describe('delivery', () => {
       existingRow: pendingRow(),
       correlationMatches: [orphan(['CY@wmkeck.org', 'bea@wmkeck.org'])],
     });
-    deps.getEmailActivity.mockResolvedValue({ activityid: EMAIL_ID, statuscode: 3 });
+    deps.getEmailActivity.mockResolvedValue({ activityid: PRIOR_ID, statuscode: 3 });
     expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'sent' });
     expect(deps.createEmailActivity).not.toHaveBeenCalled();
     expect(deps.recordActivity).toHaveBeenCalledWith(
       SOURCE_ID,
-      expect.objectContaining({ emailId: EMAIL_ID, toRecipients: ['bea@wmkeck.org', 'cy@wmkeck.org'], leadSystemUserId: LEAD_ID }),
+      expect.objectContaining({ emailId: PRIOR_ID, toRecipients: ['bea@wmkeck.org', 'cy@wmkeck.org'], leadSystemUserId: LEAD_ID }),
       expect.any(String),
     );
     expect(getRow().state).toBe('sent');
@@ -621,17 +655,57 @@ describe('delivery', () => {
       requestRow: request({ _wmkf_grantprogram_value: SOCAL_ID }),
       audience: { status: 'configured', programDirectors: [{ reviewerId: CY_ID, name: 'Cy Director' }] },
     }],
-  ])('an orphan built before %s is never sent to its stale recipients', async (_label, options) => {
+  ])('an orphan built before %s is never sent; a fresh email goes to the current recipients', async (_label, options) => {
     // Created for Bea + Cy under the old lead/program; the ledger never recorded it.
     const { deps, getRow } = harness({
       existingRow: pendingRow(),
       correlationMatches: [orphan(['bea@wmkeck.org', 'cy@wmkeck.org'])],
       ...options,
     });
-    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'skipped', reason: 'request_changed' });
-    expect(deps.sendEmail).not.toHaveBeenCalled();
-    expect(deps.createEmailActivity).not.toHaveBeenCalled();
-    expect(getRow().state).toBe('skipped');
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'sent' });
+    expect(deps.sendEmail).not.toHaveBeenCalledWith(PRIOR_ID);
+    expect(deps.createEmailActivity).toHaveBeenCalledTimes(1);
+    expect(deps.createEmailActivity.mock.calls[0][0].correlationKey).toBe(handoffCorrelationKey(SOURCE_ID, 1));
+    expect(getRow()).toMatchObject({ state: 'sent', recipient_generation: 1 });
+  });
+
+  test.each([
+    ['program_not_configured', { audience: { status: 'program-not-configured', programDirectors: [] } }],
+    ['staffing_not_configured', { audience: { status: 'staffing-not-configured', programDirectors: [] } }],
+    ['no_recipients', { audience: { status: 'configured', programDirectors: [{ reviewerId: LEAD_ID, name: 'Lee Lead' }] } }],
+  ])('an owed email that cannot be sent (%s) raises an ops alert', async (reason, options) => {
+    const { deps } = harness({ existingRow: pendingRow(), ...options });
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'skipped', reason });
+    expect(deps.notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'final_writeup_handoff_email_undelivered',
+      severity: 'error',
+      category: 'ops',
+      autoResolveKey: `final-writeup-handoff-email:${SOURCE_ID}`,
+      metadata: expect.objectContaining({ reason, requestId: REQUEST_ID }),
+    }));
+  });
+
+  test('repeated failures raise an ops alert from the third attempt; earlier ones do not', async () => {
+    const { deps } = harness({ existingRow: pendingRow({ attempt_count: 0 }) });
+    deps.sendEmail.mockRejectedValue(Object.assign(new Error('transport'), { code: 'dynamics_send_failed' }));
+    const spy = quiet();
+    await deliverHandoffEmail(SOURCE_ID, deps);
+    await deliverHandoffEmail(SOURCE_ID, deps);
+    expect(deps.notify).not.toHaveBeenCalled();
+    await deliverHandoffEmail(SOURCE_ID, deps);
+    spy.mockRestore();
+    expect(deps.notify).toHaveBeenCalledWith(expect.objectContaining({
+      metadata: expect.objectContaining({ reason: 'dynamics_send_failed' }),
+    }));
+  });
+
+  test.each([
+    ['program_not_enabled', { enabledPrograms: [] }],
+    ['no_longer_in_group_review', { documentRow: finalDocument({ wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL }) }],
+  ])('a deliberate no-email outcome (%s) raises no alert', async (_label, options) => {
+    const { deps } = harness({ existingRow: pendingRow(), ...options });
+    await deliverHandoffEmail(SOURCE_ID, deps);
+    expect(deps.notify).not.toHaveBeenCalled();
   });
 
   test('an orphan whose recipients cannot be resolved stays pending (fail closed)', async () => {

@@ -249,7 +249,8 @@ silently include or exclude them. **Resolved 2026-10-07:** the owner chose Resea
 - `email-automation-preferences.js` does not apply: it controls scheduled-email review, not
   notifications.
 - Recovery: the next POST for that draft, or owner-run
-  `scripts/recover-final-writeup-handoff-emails.mjs`. No new cron; Stage 5's cron can call
+  `scripts/recover-final-writeup-handoff-emails.mjs`. Superseded the same day: a 15-minute retry
+  cron, `/api/cron/final-writeup-handoff-emails`, now calls
   `recoverPendingHandoffEmails`.
 - Both "Ready for group review" confirmations say whether PDs will be emailed, from the server's
   `handoffEmailEnabled`.
@@ -258,6 +259,13 @@ silently include or exclude them. **Resolved 2026-10-07:** the owner chose Resea
   silently lost (second and third Codex reviews). Trade-off: during a
   Postgres outage the lead PD has to retry later. A staged intent whose transition never commits
   is skipped after 14 days.
+- **Owner decision (2026-10-07): "we should always make sure that an email is sent."** So:
+  - the 503 above stays; a listed program never hands off without a saved intent;
+  - pending emails retry automatically every 15 minutes (`/api/cron/final-writeup-handoff-emails`);
+  - an unsent email whose recipients have changed is rebuilt for the current recipients under a new
+    recipient generation instead of being dropped;
+  - an owed email that cannot be sent (no staffing entry, no recipients, or three failed attempts)
+    raises an `error` ops alert so someone tells the PDs directly.
 - Codex adversarial review took 14 rounds and ended with "approve, no material findings". Fixes
   beyond the ones above: a lease token fences every write and both side effects; every unsent
   activity is re-checked against the recipients the request would get now; a draft carries the

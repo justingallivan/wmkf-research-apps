@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS final_writeup_handoff_emails (
   to_recipients JSONB,
   skipped_recipient_count INTEGER NOT NULL DEFAULT 0,
   dynamics_email_id UUID,
+  -- Bumped when an unsent activity no longer matches the current recipients
+  -- and a fresh one is built; part of the Dynamics correlation key.
+  recipient_generation INTEGER NOT NULL DEFAULT 0,
   attempt_count INTEGER NOT NULL DEFAULT 0,
   lease_token UUID,
   locked_until TIMESTAMPTZ,

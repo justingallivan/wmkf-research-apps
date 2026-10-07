@@ -165,6 +165,24 @@ describeIf('final_writeup_handoff_emails ledger (live Postgres, migration 072)',
     expect(await store.getHandoffEmail(SOURCE)).toMatchObject({ state: 'skipped', skip_reason: 'transition_not_committed', lease_token: null });
   });
 
+  test('rebuild forgets a stale activity and advances the recipient generation, owner only', async () => {
+    await store.insertHandoffEmailIntent(intent());
+    const claim = await store.claimHandoffEmail(SOURCE);
+    expect(claim.recipient_generation).toBe(0);
+    await store.recordHandoffEmailActivity(SOURCE, {
+      emailId: EMAIL, toRecipients: ['old@wmkeck.org'], skippedRecipientCount: 1, grantProgramId: PROGRAM, leadSystemUserId: LEAD,
+    }, claim.lease_token);
+    expect(await store.rebuildHandoffEmail(SOURCE, '99999999-9999-4999-8999-999999999999')).toBeNull();
+    const rebuilt = await store.rebuildHandoffEmail(SOURCE, claim.lease_token);
+    expect(rebuilt).toMatchObject({
+      recipient_generation: 1, dynamics_email_id: null, to_recipients: null, skipped_recipient_count: 0, state: 'pending',
+    });
+    const NEXT = '77777777-7777-4777-8777-777777777777';
+    expect(await store.recordHandoffEmailActivity(SOURCE, {
+      emailId: NEXT, toRecipients: ['new@wmkeck.org'], skippedRecipientCount: 0, grantProgramId: PROGRAM, leadSystemUserId: LEAD,
+    }, claim.lease_token)).toEqual({ recorded: true });
+  });
+
   test('a commit reopens an intent expired as transition_not_committed', async () => {
     await store.insertHandoffEmailIntent(intent());
     const claim = await store.claimHandoffEmail(SOURCE);

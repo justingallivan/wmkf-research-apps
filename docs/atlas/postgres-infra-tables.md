@@ -378,7 +378,7 @@ until then the row stays `pending` without an error (`awaiting_transition`),
 so a commit whose response was lost is still sent by a retry POST or by
 recovery. States: `pending` → `sent`, or terminal `skipped` with a
 `skip_reason` (`program_not_enabled`, `final_from_other_draft`,
-`no_longer_in_group_review`, `final_withdrawn`, `request_changed`, `transition_not_committed`
+`no_longer_in_group_review`, `final_withdrawn`, `transition_not_committed`
 after 14 days (each new staging of the same draft restarts that wait, and a
 later staging or a committed start for the draft reopens only this kind of skip),
 `program_not_configured`, `staffing_not_configured`, `no_recipients`). A five-minute lease (`lease_token` + `locked_until`)
@@ -394,14 +394,18 @@ exclusion use the request's current Grant Program and lead PD. Any existing
 unsent activity (a recorded draft whose send failed, or an orphan found by correlation key
 and never recorded) is sent only if its To list matches exactly the recipients the request
 would get now, re-resolved from the current audience, persona, role, account state and
-address; otherwise it is skipped (`request_changed`), and a failed lookup keeps the row
-pending. The program and lead used to build a draft are saved with its activity id. Store SQL is proven by
+address; otherwise it is abandoned unsent and a fresh activity is built for the current
+recipients under the next `recipient_generation` (part of the correlation key), so the email
+still goes out. A failed lookup keeps the row pending. The program and lead used to build a
+draft are saved with its activity id. An owed email that cannot be delivered
+(`program_not_configured`, `staffing_not_configured`, `no_recipients`, or a third failed
+attempt) raises an `error` ops alert (`final_writeup_handoff_email_undelivered`). Store SQL is proven by
 `tests/integration/final-writeup-handoff-email.pg.test.js` in the CI Postgres job. Recipient lookups that
 fail for any reason other than 404 keep the whole send pending. Failures keep
-`pending` with `last_error_code` and are retried by the next POST for that
-draft or by owner-run `scripts/recover-final-writeup-handoff-emails.mjs`, which takes the
-least recently attempted rows first so repeated failures rotate to the back
-(Stage 5's cron will reuse `recoverPendingHandoffEmails`). Read/write paths:
+`pending` with `last_error_code` and are retried automatically every 15 minutes by
+`/api/cron/final-writeup-handoff-emails` (25 rows per pass), by the next POST for that draft,
+or by owner-run `scripts/recover-final-writeup-handoff-emails.mjs`; recovery takes the least
+recently attempted rows first so repeated failures rotate to the back. Read/write paths:
 `lib/services/final-writeup/handoff-email-store.js` and
 `lib/services/final-writeup/handoff-email-service.js`. Trade-off: while
 Postgres is unavailable, an enabled program's handoff cannot start; the lead PD

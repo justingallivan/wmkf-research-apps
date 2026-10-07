@@ -134,6 +134,10 @@
     {
       "path": "/api/cron/staff-deliberations-preparation",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/final-writeup-handoff-emails",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

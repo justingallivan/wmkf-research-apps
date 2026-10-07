@@ -3,6 +3,8 @@
  * Owner-run recovery for group-review handoff emails
  * (final_writeup_handoff_emails, migration 072; Stage 4).
  *
+ * The 15-minute cron /api/cron/final-writeup-handoff-emails retries pending
+ * rows automatically; use this for inspection or an immediate retry.
  * Default is a dry run: it lists pending rows and performs no writes.
  * `--execute` retries each pending row through the same lease, stored
  * activity id and correlation key as the route, so it never sends twice. A row
