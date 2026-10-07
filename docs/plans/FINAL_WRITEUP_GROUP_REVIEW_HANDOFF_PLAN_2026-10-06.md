@@ -258,6 +258,13 @@ silently include or exclude them. **Resolved 2026-10-07:** the owner chose Resea
   silently lost (second and third Codex reviews). Trade-off: during a
   Postgres outage the lead PD has to retry later. A staged intent whose transition never commits
   is skipped after 14 days.
+- Codex adversarial review took 14 rounds and ended with "approve, no material findings". Fixes
+  beyond the ones above: a lease token fences every write and both side effects; every unsent
+  activity is re-checked against the recipients the request would get now; a draft carries the
+  program and lead it was built for; transport-guard refusals stay retryable; 14-day expiry is
+  atomic against the current staging time and is reopened by a committed start; recovery takes the
+  least recently attempted rows first. The store SQL is proven by
+  `tests/integration/final-writeup-handoff-email.pg.test.js` in the CI Postgres job.
 - Owner-run sequence: apply migration 072; seed the copy with `scripts/seed-email-defaults.mjs`;
   then set the env variable in Production and redeploy.
 
