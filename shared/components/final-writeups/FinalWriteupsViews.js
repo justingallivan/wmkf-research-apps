@@ -970,7 +970,7 @@ function AcknowledgementPanel({ writeup, viewer, saving, error, onAcknowledge })
               ? 'Your acknowledgement is recorded. It does not approve the writeup or prevent later edits.'
               : updated
                 ? 'Your earlier acknowledgement remains in history. Record the latest version after you have reviewed the changes.'
-                : 'After reading the current version, mark it reviewed. This is personal tracking, not an approval.'}
+                : 'After reading the current version, sign off. This is personal tracking, not an approval.'}
           </p>
           {writeup.acknowledgedAt && (
             <p className="mt-2 text-xs text-gray-500">

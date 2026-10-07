@@ -12,6 +12,7 @@ import { Card } from '../Layout';
 import {
   FINAL_WRITEUP_SIGN_OFF_ROSTER_STATUS,
   FINAL_WRITEUP_SIGN_OFF_STATE,
+  isFinalWriteupSignedOff,
 } from '../../config/finalWriteupSignOff';
 
 const POLL_INTERVAL_MS = 2000;
@@ -182,10 +183,7 @@ function SignOffRoster({ roster }) {
   const configured = isConfiguredRoster(roster);
   const expected = configured ? roster.expected : [];
   const others = Array.isArray(roster.others) ? roster.others : [];
-  const signedCount = expected.filter((person) => (
-    person.state === FINAL_WRITEUP_SIGN_OFF_STATE.SIGNED
-    || person.state === FINAL_WRITEUP_SIGN_OFF_STATE.SIGNED_EDITED_SINCE
-  )).length;
+  const signedCount = expected.filter((person) => isFinalWriteupSignedOff(person.state)).length;
   const note = configured ? null : (SIGN_OFF_ROSTER_NOTE[roster.status]
     || SIGN_OFF_ROSTER_NOTE[FINAL_WRITEUP_SIGN_OFF_ROSTER_STATUS.UNAVAILABLE]);
 
@@ -199,7 +197,9 @@ function SignOffRoster({ roster }) {
               {signedCount} of {expected.length} Program Director{expected.length === 1 ? '' : 's'} signed off.
             </p>
             <ul className="mt-2 max-w-xl divide-y divide-gray-200">
-              {expected.map((person) => <SignOffPerson key={`expected-${person.name}`} person={person} />)}
+              {expected.map((person, index) => (
+                <SignOffPerson key={`expected-${index}-${person.name}`} person={person} />
+              ))}
             </ul>
           </>
         ) : (
@@ -213,7 +213,9 @@ function SignOffRoster({ roster }) {
             {configured ? 'Also signed off' : 'Signed off'}
           </h5>
           <ul className="mt-1 max-w-xl divide-y divide-gray-200">
-            {others.map((person) => <SignOffPerson key={`other-${person.name}`} person={person} />)}
+            {others.map((person, index) => (
+              <SignOffPerson key={`other-${index}-${person.name}`} person={person} />
+            ))}
           </ul>
         </>
       )}
