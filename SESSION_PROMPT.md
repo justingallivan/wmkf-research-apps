@@ -1,146 +1,183 @@
-# Session 580 Prompt: put "Start group review" back on the Staff Deliberations writeup step; watch the first scheduled preparation
+# Session 581 Prompt: hand the transcript/summary UX audit to Codex; build Stage 3 (lead-PD sign-off view); check 1003010
 
-## Session 579 Summary — 2026-10-06 PT (Claude)
+## Session 580 Summary — 2026-10-06 PT (Claude)
 
-Staff Deliberations automatic preparation went from "built but off" to **live in
-Production, every 15 minutes**, and D26 was caught up. Three PRs, each through a
-Codex adversarial review, merged and deployed. Planning work started on cycle
-rollover with minimal per-cycle configuration.
+The owner's item 1 grew into a planned group-review handoff. **Stages 1 and 2 are live in
+Production.** Plan: `docs/plans/FINAL_WRITEUP_GROUP_REVIEW_HANDOFF_PLAN_2026-10-06.md`, which
+records the owner decisions A, B and C.
 
 ### What Was Completed
 
-1. **Activation review (read-only).** `scripts/review-staff-deliberations-preparation-cohort.mjs`
-   (owner-run) showed J26 has nothing due and D26's oldest due presentation was 8 days old —
-   no reach into earlier cycles. The worker itself has no age bound; only the cycle allowlist
-   bounds it.
-2. **PR #449** (merge `1d64af529`): `STAFF_DELIBERATIONS_AUTO_PREPARE_EXCLUDED_REQUEST_NUMBERS`
-   (hand-made test copies 1003220–1003222 lack the Factory TEST marker; owner chose exclusion over
-   marking them, which would classify them `anomaly` and refuse all their email). One shared
-   predicate `requestMatchesPreparationAllowlists` at scan, claim, promotion fence, retry and
-   list/detail status. Status no longer strands requests: `due` only when the worker will scan
-   it; uncovered `pending`/`blocked` receipts read `disabled` (manual button). Blank/malformed
-   exclusion values block automation. Attribution (owner decision: staff page, not Dataverse):
-   "Prepared automatically after the presentation · <when>"; reused promotions recorded as
-   `reconciled-complete-handoff`.
-3. **Production configuration** (Config, readable via `vercel env ls`): program
-   `["c247b11a-a7cb-ee11-9078-000d3a341e8f"]` (Research), cycle `["D26"]`, status
-   `["Phase II Pending"]`, exclusions, `_PRODUCTION=on`, `_ATOMIC_FENCE_CONFIRMED=on`, and the
-   switch `STAFF_DELIBERATIONS_AUTO_PREPARE=on`.
-4. **First runs found two real blockers → PR #450** (merge `8268a13d4`):
-   - Staff-edited files store pasted images at `/media/image*.png`; the governed DOCX hash rejected
-     any reachable part outside `word/`. Now those parts and their rels are appended to the digest
-     only when present (all previously hashable packages keep identical `gdc1:` hashes;
-     `/contract-reconcile` over 17 consumers). Supersedes Pre-RP Brief Codex round 1's rule.
-   - `site_visit_sharepoint_version_changed` is now transient (backoff, 5 attempts) with the moved
-     fields recorded in the receipt. Cause established: SharePoint's one-time property-promotion
-     rewrite on a file's first read (eTag +1, +2,537 bytes, version and lastModified unchanged).
-5. **D26 caught up:** 12 prepared (11 by the worker, 1002912 staff-made). 7 blocked receipts were
-   requeued through the authenticated retry route under the owner's signed-in session. No AI,
-   email or review transitions. 11 real D26 requests remain, presentations Oct 7–16; all have
-   drafts, so no AI cost expected.
-6. **PR #451** (merge `60b079c3c`): `vercel.json` cron `*/15 * * * *`; scheduled-job census
-   updated; route matrix, Atlas and service catalog corrected (they still said "not deployed").
-   Cost estimate well under $1/month (Vercel Fluid compute Pro rates, `iad1`, 2 GB assumed).
-7. **Planning:** `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md` (owner
-   principle: almost no per-cycle "care and feeding"; daylight-saving analogy), linked to the J27
-   single-phase register; register row **J27-084** (add `J27` to the preparation cycle setting).
-   Memory `feedback-minimize-per-cycle-configuration`.
-8. **Corrections flag mismatch (S578 item): not a bug.** Production list and detail agree on all
-   29 D26 requests (only 1002852 flagged, both sides). Localhost lacked
-   `GUARDED_REOPEN_SCHEMA_READY`, so the detail reader never selected the field.
+1. **Process design with the owner.**
+   - The lead PD drafts alone, then hands off.
+   - Research PDs get an email at handoff, and the writeup appears in their Final writeups view.
+   - Sign-off is not required; the lead PD can send to leadership at any time.
+   - A sign-off still counts after later edits, shown as "edited since".
+   - Leadership gets a daily digest at midnight Pacific.
+   - There is no pull-back from group review.
+   - Program Coordinators can see the draft.
+   - Wording: "Ready for group review", "Sign off", "Send to leadership".
+2. **Stage 1: PR #452, merge `40b70a145`, live.**
+   - Step 4 is titled "Post-presentation writeup" and reads "Post-visit drafting". It offers **Edit
+     writeup in Word** and **Ready for group review**, using the same `POST
+     /api/workbench/final-writeup` route.
+   - The `finalReview` fact carries `canStart`, `startBlockedReason` and `sourceArtifactId`
+     (`status-facts.js`).
+   - The confirmation is bound to the displayed document (Codex finding).
+   - Step 5 lost the button that only switched tabs. The panel copy was trimmed after owner review.
+3. **Stage 2: PR #453, merge `b47a70eae`, live.**
+   - `lib/services/pre-site-visit/writeup-visibility.js` hides the Draft/Review file except from
+     the lead PD, Program Coordinator persona holders and superusers. Covered surfaces:
+     - pre-site GET: `currentArtifact`, `pendingArtifact`, and `writeup`, each redacted on its own
+       lifecycle;
+     - final-writeup GET: `sourceFile` and the pending file, via the facade's `canSeeDraft`;
+     - the deliberations list, per row;
+     - logistics materials.
+   - Generate/regenerate and start-site-visit return 403 `pre_site_writeup_lead_only` to anyone
+     who isn't the lead PD or a superuser.
+   - The pre-site GET returns `writeupAccess`. Unlinked accounts get an explanation.
+   - Codex round 1 found the race between the two artifact reads; fixed with a test that failed on
+     the old code. Round 2 found only Dynamics Explorer, which the owner accepted as a gap.
+   - The owner published the Program Coordinator persona for Connor, Sarah and Duncan.
+4. **Durable docs:**
+   - route security matrix rows and Auth column;
+   - service catalog;
+   - glossary (new step title);
+   - work queue entry;
+   - agent wiki;
+   - a historical note on the 2026-10-04 status-clarity mock-ups;
+   - DEVELOPMENT_LOG milestone;
+   - claim-evidence pilot row.
 
 ### Commits (main)
-`8a6d33afa`…`b41099a29` (PR #449), `2097b56dc`, `a6b280d0f`, `e89e68880` (PR #450), `ffc302f79`,
-`a81cd019e`, `bb2077a9a` (PR #451), `71b84304b`, `7bc981b50`, `4a1911655`, `5ce5f98a7`,
-`5d78a1416`; handoff commit follows.
+- Plan: `f1a0fe52f`, `1b7a49c97`.
+- PR #452: `74a15afa2`…`ebc217151`, merged as `40b70a145`. Docs: `cd847a585`.
+- PR #453: `dcd2c99a6`…`36faa9fd6`, merged as `b47a70eae`. Docs: `fe7d19329`.
+- The handoff commit follows.
 
 ## Next Items
 
 ### Verified Open
 
-1. **No visible way to start group review from the writeup step — owner priority.**
-   Evidence: live page for 1002963 and the detail API for all 12 prepared requests (2026-10-06);
-   `docs/CURRENT_WORK_QUEUE.md` entry. Step 4 shows only "Open writeup in Word" under the stale
-   summary "Locked for review" (`StaffDeliberationsTab.js:1215`); step 5 (greyed) has "Open
-   group-review details", which only switches tabs. Real action: `FinalWriteupTab.js:651` "Start
-   group review". PR #448 moved the navigation button from step 4 to step 5. Proposed: step 4 reads
-   "Post-visit editing" with "Edit writeup in Word" + "Start group review". **Ask the owner first**
-   (see Owner Decision 1). Workaround today: Final writeup tab → Start group review.
-2. **Watch the first scheduled preparation:** 1003010, presentation ends Wed 2026-10-07 15:30 PDT;
-   expect prepared by ~15:45 (one extra 15-min run if SharePoint's first-read rewrite hits).
-   Owner-run check:
-   `DATAVERSE_ALLOW_PROD_READS=yes node --import ./scripts/lib/use-extensionless.mjs scripts/report-staff-deliberations-preparation-receipts.mjs --cycle=D26`
-3. **Deferred small items** (queue entry): (a) list next step for a ready briefing names the
-   deliberation session date — UI only, session already in the list payload
-   (`cycle-list-service.js:618`); (b) reword the two "generated before the Dataverse fill"
-   warnings (`artifact-model.js:290-291`; a test at
-   `tests/unit/pre-site-visit-artifact-service.test.js:837` pins old wording).
-4. **Meeting Tracker follow-ups** (carried from S578, not re-verified this session; owner said more
-   to come): a session that fails to load shows an empty, saveable form (`SessionEditor.js`,
-   reproduced with an invalid `cycleCode` — data-loss shape, highest priority); a slot's "Briefing
-   not yet shared" can disagree with the Workbench sharing history (TEST 1003222).
-5. **Before J27 research presentations:** add `J27` to `STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES`
-   (register J27-084), unless the cycle-rollover work replaces it. The status filter stays valid:
-   in J27 `Phase II Pending` is the internal advancing marker (C-5; owner 2026-10-06).
+1. **Codex workstream: transcript and summary UX audit, Meeting Tracker side.**
+   - Owner, 2026-10-06: "we have built infrastructure, but it doesn't seem integrated well into
+     UI/UX"; confusing or missing screens are the starting point.
+   - Run it in a parallel worktree (`/parallel-agent-worktree`, base `main`).
+   - **Phase A, read-only:**
+     - inventory every built transcript/summary capability (recording upload, transcription,
+       speaker names, presentation/discussion split, presentation summary and its
+       republish/stale rules, staff and Board-facing pieces);
+     - map each to the screen where staff can see or use it (Meeting Tracker session and visit
+       pages, the Staff Deliberations Presentation step, Admin);
+     - flag what has no screen, what is reachable only by script or Admin, and confusing wording
+       or state;
+     - propose ranked screen changes, then **stop for owner selection**.
+   - **Phase B:** build the approved items with tests, a Codex adversarial review and a PR.
+   - Include the two S578 bugs:
+     - a session that fails to load shows an empty, saveable form (`SessionEditor.js`; data-loss
+       shape; reproduced with an invalid `cycleCode`);
+     - a slot's "Briefing not yet shared" disagrees with Workbench history (TEST 1003222).
+   - **Boundary:** do not change the Staff Deliberations reads of session or summary data
+     (`ResearchPresentationFollowUp.js`, the session line in `StaffDeliberationsTab.js`) without
+     flagging it.
+   - **Sources:**
+     - `docs/plans/SITE_VISIT_SUMMARIES_AND_BOARD_SHARING_PLAN_2026-10-04.md` (Stage 2 shipped S577;
+       Stage 3 discussion summary and Stage 4 Board recording not started);
+     - `docs/plans/SITE_VISIT_TRANSCRIPT_CARD_REDESIGN_PLAN_2026-10-04.md`;
+     - `docs/plans/MEETING_TRACKER_TRANSCRIPTION_PLAN_2026-10-01.md`;
+     - `docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md` and its runbook.
+2. **Stage 3: the lead PD's sign-off view** (plan §4, Stage 3).
+   - Rename "Mark reviewed" → "Sign off" (`FinalWriteupTab.js`; tests pin the old name).
+   - Per-request projection for the lead PD and superusers: expected PDs = the request's program
+     audience in `final_writeup.matrix_audiences` ∩ PD persona, minus the lead.
+   - States: signed / signed (edited since) / not yet. Names only.
+   - The confirmation on **Send to leadership** names the PDs who haven't signed off.
+   - Today only superusers and PCs see the matrix (`dashboard-service.js:676-678`).
+   - Run `/contract-reconcile` first.
+3. **Stage 4: handoff email to Research PDs.** Send after the transition with its own receipt.
+   Copy from settings keys, sent from the system mailbox. Needs a migration. Run
+   `/contract-reconcile` first.
+4. **Stage 5: leadership daily digest.** Cron `0 7 * * *` (midnight PDT), modelled on
+   `scheduled-email-service.js:754`. Needs the census, matrix and Atlas updates.
+5. **Watch the first scheduled preparation:** 1003010.
+   - Its presentation ends Wed 2026-10-07 15:30 PDT; expect it prepared by ~15:45.
+   - Owner-run check:
+     `DATAVERSE_ALLOW_PROD_READS=yes node --import ./scripts/lib/use-extensionless.mjs scripts/report-staff-deliberations-preparation-receipts.mjs --cycle=D26`
+   - This is the first real request to show the new step 4 and the hidden-draft rules.
+6. **Deferred small items** (from S579, not touched):
+   - the list's next step for a ready briefing should name the deliberation session date
+     (`cycle-list-service.js:618`);
+   - reword the two "generated before the Dataverse fill" warnings (`artifact-model.js`; a test
+     pins them).
+7. **Before J27 research presentations:** add `J27` to `STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES`
+   (J27-084), unless the cycle-rollover work replaces it.
 
 ### Owner Decision Needed
 
-1. **Start group review placement:** confirm inline on Staff Deliberations (same route, records the
-   Word version, no email) vs. opening Final writeup with the confirmation already open.
-2. **Cycle rollover** (plan §9): who gets the twice-yearly confirmation and when; roll a forgotten
-   choice forward or hold; is portal opening the right "new cycle" anchor. Waiting on the owner's
-   colleagues' briefing on future cycle dates.
-3. **Deliberations vocabulary** — after D26, suite-wide (`docs/NOMENCLATURE_GLOSSARY.md`).
+1. **Cycle rollover** (`docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md` §9).
+   Waiting on the colleagues' briefing on future cycle dates.
+2. **Deliberations vocabulary:** after D26, suite-wide (`docs/NOMENCLATURE_GLOSSARY.md`).
 
 ### Parked
 
-1. The orange "Automatic preparation is off" copy: accurate wherever it shows (excluded/TEST
-   requests, uncovered cycles/programs, paused automation). Re-open with the cycle-rollover work.
-2. Merged branches `feature/deliberations-prep-exclusions`, `-handoff-robustness`,
-   `-prep-schedule` still exist locally and on GitHub; delete when convenient.
+1. The orange "Automatic preparation is off" copy. Re-open with the cycle-rollover work.
+2. Merged branches still exist locally and on GitHub:
+   - `feature/deliberations-prep-exclusions`, `-handoff-robustness`, `-prep-schedule`;
+   - `feature/writeup-group-review-handoff`, `feature/writeup-hide-before-handoff`.
+   Delete when convenient, after confirming each is merged.
 
 ### Verify Before Acting
 
-1. Older S577 items (presentation-summary Stage 3/4, memory hygiene, Sonnet 5.5 inventory,
-   PR #431 remainder, pre-site distribution email rows) were not touched this session:
-   `git show e6666ae68:SESSION_PROMPT.md` for their last recorded state.
-2. Production reads/writes/env changes are owner-run (`!`). The auto-mode classifier blocks agent
-   writes of production feature flags; staging non-switch Config values via the CLI was allowed.
-3. To pause automation: `vercel env rm STAFF_DELIBERATIONS_AUTO_PREPARE production --yes` then
-   redeploy the current Production deployment; the cron keeps running as a no-op.
+1. Older S577 items were not touched in S579–S580: memory hygiene, the Sonnet 5.5 inventory, the
+   PR #431 remainder, and the pre-site distribution email rows. Their last state is in
+   `git show e6666ae68:SESSION_PROMPT.md`.
+2. Production reads, writes and env changes are owner-run (`!`). The auto-mode classifier blocks
+   agent PR merges ("Merge Without Review"); the owner merges.
+3. To pause automatic preparation: `vercel env rm STAFF_DELIBERATIONS_AUTO_PREPARE production --yes`,
+   then redeploy.
 
 ### Do Not Reopen Without New Decision
 
-1. Exclusion list over Dataverse TEST-marking for 1003220–1003222 (owner 2026-10-06).
-2. Attribution of automatic promotion is on the staff page, not Dataverse (owner 2026-10-06).
-3. 15-minute schedule (owner 2026-10-06, conditional on no AI cost for empty runs — verified).
-4. Deliberation sessions dated before the site visit are normal; no Word shortcut on the list (S578).
+1. Sign-off is not required before leadership. A sign-off counts after later edits ("edited
+   since"). No pull-back from group review (owner 2026-10-06).
+2. Hiding is app-level only, with no SharePoint permission changes. PCs = Program Coordinator
+   persona holders, global, not per-program. Dynamics Explorer is an accepted gap (owner
+   2026-10-06).
+3. Handoff email recipients: Research PDs from the staffing setting (program audience ∩ PD
+   persona), with no new allowlist. SoCal is added later by publishing a program entry.
+4. Leadership is notified by a daily digest at midnight Pacific, not per event.
+5. S579 decisions:
+   - the exclusion list for 1003220–1003222;
+   - staff-page attribution;
+   - the 15-minute schedule;
+   - deliberation sessions before the site visit are normal.
 
 ## Local dev
 
 `GUARDED_REOPEN_SCHEMA_READY=on MEETING_TRACKER_SCHEMA_READY=on SITE_VISIT_MATERIALS_SCHEMA_READY=on npm run dev`
-(the first flag is new: without it the request page never reads correction state). Localhost reads
-Production; Dataverse writes are interlock-blocked, Postgres and email are not.
+
+Localhost reads Production. Dataverse writes are blocked by the interlock; Postgres and email are
+not. The owner is a superuser, so localhost always shows the draft. The view for other staff is
+covered by route tests.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `shared/components/workbench/StaffDeliberationsTab.js` | Request-page stepper; step 4/5 actions (next item 1) |
-| `shared/components/workbench/FinalWriteupTab.js` | "Start group review" confirmation (line ~651) |
-| `lib/services/pre-site-visit/preparation-config.js` | Settings, exclusions, `requestMatchesPreparationAllowlists` |
-| `lib/services/pre-site-visit/preparation-worker.js` | Scan/claim/promote, retry, detail status |
-| `lib/services/documents/governed-docx-hash.js` | Governed hash; reachable outside-`word/` parts |
-| `scripts/review-staff-deliberations-preparation-cohort.mjs` | Read-only activation preview |
-| `scripts/report-staff-deliberations-preparation-receipts.mjs` | Read-only run-record report |
-| `scripts/probe-staff-deliberations-handoff-file.mjs` | Read-only SharePoint/hash probe |
-| `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md` | Rollover investigation |
+| `docs/plans/FINAL_WRITEUP_GROUP_REVIEW_HANDOFF_PLAN_2026-10-06.md` | Handoff plan, decisions, Stages 1–5 |
+| `lib/services/pre-site-visit/writeup-visibility.js` | Draft visibility and change rights before group review |
+| `shared/components/workbench/StaffDeliberationsTab.js` | Step 4 handoff, hidden-draft states |
+| `shared/components/workbench/FinalWriteupTab.js` | Group review, "Mark reviewed" (→ Sign off), Send to leadership |
+| `lib/services/final-writeup/transition-service.js` | Facade: status (with `writeupViewer`), start, advance |
+| `lib/services/final-writeup/acknowledgement-service.js` | Sign-off records keyed to the SharePoint version |
+| `lib/services/final-writeup/matrix-audience-service.js` | Staffing setting: personas, program audiences |
+| `tests/unit/pre-site-writeup-visibility.test.js` | Predicate tests and the list of surfaces |
 
 ## Testing
 
 ```bash
-npx jest tests/unit/staff-deliberations tests/unit/site-visit-transition tests/unit/pre-site-visit tests/unit/initial-assessment-artifact-service.test.js tests/unit/test-request-scheduled-job-census.test.js
+npx jest tests/unit/staff-deliberations tests/unit/pre-site tests/unit/final-writeup tests/unit/workbench- tests/unit/site-visit tests/unit/document-lifecycle
 npm run check:types && npm run build
 ```
 
-(Session 578 and earlier handoffs: `git show e6666ae68:SESSION_PROMPT.md`.)
+(Session 579 and earlier handoffs: `git show fb0b90195:SESSION_PROMPT.md`.)
