@@ -477,16 +477,59 @@ describe('delivery', () => {
     expect(deps.createEmailActivity).not.toHaveBeenCalled();
   });
 
-  test('an activity found by correlation key is reused, not duplicated', async () => {
+  const orphan = (addresses) => ({
+    activityid: EMAIL_ID,
+    statuscode: 1,
+    email_activity_parties: addresses.map((addressused) => ({ participationtypemask: 2, addressused })),
+  });
+
+  test('an orphan found by correlation that addresses the current recipients is adopted, not duplicated', async () => {
     const { deps, getRow } = harness({
       existingRow: pendingRow(),
-      correlationMatches: [{ activityid: EMAIL_ID, statuscode: 1, email_activity_parties: [{ participationtypemask: 2, addressused: 'bea@wmkeck.org' }] }],
+      correlationMatches: [orphan(['CY@wmkeck.org', 'bea@wmkeck.org'])],
     });
     deps.getEmailActivity.mockResolvedValue({ activityid: EMAIL_ID, statuscode: 3 });
     expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'sent' });
     expect(deps.createEmailActivity).not.toHaveBeenCalled();
-    expect(deps.recordActivity).toHaveBeenCalledWith(SOURCE_ID, expect.objectContaining({ emailId: EMAIL_ID, toRecipients: ['bea@wmkeck.org'] }), expect.any(String));
+    expect(deps.recordActivity).toHaveBeenCalledWith(
+      SOURCE_ID,
+      expect.objectContaining({ emailId: EMAIL_ID, toRecipients: ['bea@wmkeck.org', 'cy@wmkeck.org'], leadSystemUserId: LEAD_ID }),
+      expect.any(String),
+    );
     expect(getRow().state).toBe('sent');
+  });
+
+  test.each([
+    ['the lead was reassigned', { requestRow: request({ _wmkf_programdirector_value: BEA_ID }) }],
+    ['the program was reassigned', {
+      enabledPrograms: [RESEARCH_ID, SOCAL_ID],
+      requestRow: request({ _wmkf_grantprogram_value: SOCAL_ID }),
+      audience: { status: 'configured', programDirectors: [{ reviewerId: CY_ID, name: 'Cy Director' }] },
+    }],
+  ])('an orphan built before %s is never sent to its stale recipients', async (_label, options) => {
+    // Created for Bea + Cy under the old lead/program; the ledger never recorded it.
+    const { deps, getRow } = harness({
+      existingRow: pendingRow(),
+      correlationMatches: [orphan(['bea@wmkeck.org', 'cy@wmkeck.org'])],
+      ...options,
+    });
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'skipped', reason: 'request_changed' });
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+    expect(deps.createEmailActivity).not.toHaveBeenCalled();
+    expect(getRow().state).toBe('skipped');
+  });
+
+  test('an orphan whose recipients cannot be resolved stays pending (fail closed)', async () => {
+    const { deps, getRow } = harness({
+      existingRow: pendingRow(),
+      correlationMatches: [orphan(['bea@wmkeck.org', 'cy@wmkeck.org'])],
+      audience: null,
+    });
+    const spy = quiet();
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'failed', code: 'handoff_email_audience_unavailable' });
+    spy.mockRestore();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+    expect(getRow().state).toBe('pending');
   });
 
   test('a stored activity already accepted is marked sent without another SendEmail', async () => {

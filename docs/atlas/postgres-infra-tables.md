@@ -392,7 +392,11 @@ accepted by Dynamics is recorded as sent without further checks; one that is
 not yet sent is re-checked against the current Final and group-review state
 before `SendEmail`, so a stale invitation is never sent. Eligibility, audience and lead
 exclusion use the request's current Grant Program and lead PD; a stored unsent
-draft whose program or lead changed since staging is skipped (`request_changed`). Store SQL is proven by
+draft whose program or lead changed since it was built is skipped (`request_changed`). The
+program and lead used to build a draft are saved with its activity id. An orphan (found by
+correlation key, never recorded) is adopted only if its To list matches exactly the
+recipients the request would get now; otherwise it is skipped, and if recipients cannot be
+resolved the row stays pending. Store SQL is proven by
 `tests/integration/final-writeup-handoff-email.pg.test.js` in the CI Postgres job. Recipient lookups that
 fail for any reason other than 404 keep the whole send pending. Failures keep
 `pending` with `last_error_code` and are retried by the next POST for that
