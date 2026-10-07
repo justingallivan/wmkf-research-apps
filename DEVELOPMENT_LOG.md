@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Staff Deliberations automatic preparation live; D26 caught up (Session 579)
+
+**Milestone:** The scheduled-end preparation worker built in S573–577 is now on in Production, every 15 minutes, for D26 Research `Phase II Pending` requests; the 12 D26 writeups whose presentations had ended were prepared for post-visit editing without AI, email, or review changes.
+**Sessions:** 579; PRs #449 (exclusions, status, attribution), #450 (governed DOCX hash covers parts outside `word/`; SharePoint first-read rewrite retried), #451 (schedule), each through Codex adversarial review.
+**Ship state:**
+- Owner-run cohort preview showed no reach into earlier cycles; hand-made test copies 1003220–1003222 excluded by `STAFF_DELIBERATIONS_AUTO_PREPARE_EXCLUDED_REQUEST_NUMBERS` (invalid or blank values block automation).
+- Writeups the worker prepares read "Prepared automatically after the presentation"; staff-made handoffs are never labelled automatic.
+- First production runs exposed two real blockers, both fixed: staff-edited files with images at `/media/…`, and SharePoint's one-time property-promotion rewrite on a file's first read (eTag +1, ~2.5 KB, version unchanged).
+**Why it matters:** Program directors no longer have to hand off every writeup after a presentation; the run records name every block reason for an operator.
+**Pointers:** `docs/plans/STAFF_DELIBERATIONS_STATUS_CLARITY_PLAN_2026-10-04.md` (Activation review); `scripts/review-staff-deliberations-preparation-cohort.mjs`, `scripts/report-staff-deliberations-preparation-receipts.mjs`; merges `1d64af529`, `8268a13d4`, `60b079c3c`.
+
 ## October 2026 — Staff Deliberations redesigned as a five-step lifecycle; Meeting Tracker pages read-first (Session 578)
 
 **Milestone:** The owner-reviewed UX pass closes the open owner acceptance from S577: the Staff deliberations list and request tab now show where a request stands and what to do next, and Meeting Tracker visits, sessions and proposal order open read-only.
