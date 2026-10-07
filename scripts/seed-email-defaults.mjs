@@ -8,6 +8,10 @@ import {
   EDITABLE_TEXT_DEFAULTS,
 } from '../shared/config/editableTextDefaults.js';
 import {
+  FINAL_WRITEUP_HANDOFF_SEED_BODY,
+  FINAL_WRITEUP_HANDOFF_SEED_SUBJECT,
+} from '../lib/seed/email-defaults/final-writeup-handoff.js';
+import {
   GRANTEE_INVITE_SEED_BODY,
   GRANTEE_INVITE_SEED_SUBJECT,
 } from '../lib/seed/email-defaults/grantee-invite.js';
@@ -99,6 +103,8 @@ export const EMAIL_DEFAULT_SEED_TEXT = Object.freeze({
   'email.deliberation_share.review_bundle_link_text': DELIBERATION_SHARE_SEED_BRIEFING_COPY.reviewBundleLinkText,
   'email.deliberation_agenda.subject': DELIBERATION_AGENDA_SEED_SUBJECT,
   'email.deliberation_agenda.body': DELIBERATION_AGENDA_SEED_BODY,
+  'email.final_writeup_handoff.subject': FINAL_WRITEUP_HANDOFF_SEED_SUBJECT,
+  'email.final_writeup_handoff.body': FINAL_WRITEUP_HANDOFF_SEED_BODY,
 });
 
 export function loadEnvLocal() {

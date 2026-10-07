@@ -1,6 +1,6 @@
 ---
 title: Final Writeup group-review handoff — PD drafting, PD sign-off, leadership digest
-status: approved 2026-10-06 — Stages 1–3 live; Stages 4–5 not built; SoCal parked
+status: approved 2026-10-06 — Stages 1–3 live; Stage 4 built on branch; Stage 5 not built; SoCal parked
 created: 2026-10-06
 owner: Justin Gallivan
 related:
@@ -81,6 +81,9 @@ minimal per-cycle configuration rule).
 - Not yet checked: whether the live setting already has a SoCal entry. If it does, SoCal
   requests would email too. Pre-build probe (owner-run, since it reads Production): read
   `final_writeup.matrix_audiences`.
+- **Superseded for the email (owner, 2026-10-07):** the setting reportedly has a SoCal entry, and
+  the owner answered "Research" for Stage 4. The email is therefore gated by a fail-closed program
+  list, `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`. Recipients still come from the staffing setting.
 
 **C. Smaller choices (defaults accepted):**
 - **Handoff email sender:** the system mailbox (`NOTIFICATION_EMAIL_FROM`), naming the lead PD in
@@ -226,7 +229,58 @@ SoCal requests would also get the handoff email under decision B.
 **SoCal is parked (owner, 2026-10-07):** "I don't know the Southern California program workflow
 well enough to design this now." Do not design SoCal behavior until the owner raises it. Before
 Stage 4 ships, show the owner what the live setting would send for SoCal requests; do not
-silently include or exclude them.
+silently include or exclude them. **Resolved 2026-10-07:** the owner chose Research only.
+
+**Built on branch `feature/writeup-handoff-email` (Session 581, 2026-10-07); not merged, migration
+072 not applied, not live.** As built:
+- `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS` lists the Grant Programs that email (set it to the
+  Research GUID only). Unset means no email, so the code can merge dark.
+- Ledger `final_writeup_handoff_emails` (migration 072), one row per handed-off draft. The POST
+  stages the row before the transition runs, only for the lead PD or a superuser and only for the
+  request's current draft (second Codex review), and only while the request has no current Final, so
+  writeups already in group review before deployment are never emailed. Delivery waits until the
+  current Final is confirmed to come from that draft and is in group review. A commit whose
+  response was lost is therefore still emailed (Codex review finding, 2026-10-07).
+- A recipient lookup that fails for any reason other than "not found" keeps the whole send
+  pending, so an outage never causes a partial or skipped email (Codex review finding).
+- Recipients: program audience ∩ PD persona, minus the lead PD, with addresses read separately.
+  Internal staff only (owner, 2026-10-07): an address outside exactly `@wmkeck.org` is never
+  emailed, and refusing one raises an ops alert. A 2026-10-07 owner-authorized Production read
+  found the Research recipients to be Justin Gallivan, John Sader, Jean Kim and Beth Pruitt (Beth
+  is both PD and CSO, by design), each minus the request's lead.
+  Sent from `NOTIFICATION_EMAIL_FROM`, regarding the request, so the TEST-request guard applies.
+- Copy: `email.final_writeup_handoff.subject` / `.body`. Blank copy leaves the send pending.
+- `email-automation-preferences.js` does not apply: it controls scheduled-email review, not
+  notifications.
+- Recovery: the next POST for that draft, or owner-run
+  `scripts/recover-final-writeup-handoff-emails.mjs`. Superseded the same day: a 15-minute retry
+  cron, `/api/cron/final-writeup-handoff-emails`, now calls
+  `recoverPendingHandoffEmails`.
+- Both "Ready for group review" confirmations say whether PDs will be emailed, from the server's
+  `handoffEmailEnabled`.
+- If the intent cannot be saved for a Research request, or the request cannot be read while any
+  program is listed, the POST returns 503 and group review does not start, so the email is never
+  silently lost (second and third Codex reviews). Trade-off: during a
+  Postgres outage the lead PD has to retry later. A staged intent whose transition never commits
+  is skipped after 14 days.
+- **Owner decision (2026-10-07): "we should always make sure that an email is sent."** So:
+  - the 503 above stays; a listed program never hands off without a saved intent;
+  - pending emails retry automatically every 15 minutes (`/api/cron/final-writeup-handoff-emails`);
+  - an unsent email whose recipients have changed is rebuilt for the current recipients under a new
+    recipient generation instead of being dropped;
+  - an owed email that cannot be sent (no staffing entry, no recipients, or three failed attempts)
+    raises an `error` ops alert so someone tells the PDs directly.
+- Codex adversarial review took 14 rounds and ended with "approve, no material findings". Fixes
+  beyond the ones above: a lease token fences every write and both side effects; every unsent
+  activity is re-checked against the recipients the request would get now; a draft carries the
+  program and lead it was built for; transport-guard refusals stay retryable; 14-day expiry is
+  atomic against the current staging time and is reopened by a committed start; recovery takes the
+  least recently attempted rows first. The store SQL is proven by
+  `tests/integration/final-writeup-handoff-email.pg.test.js` in the CI Postgres job.
+- Owner-run sequence: apply migration 072; seed the copy with `scripts/seed-email-defaults.mjs`;
+  then set the env variable in Production and redeploy.
+
+Original Stage 4 requirements:
 - Sent after the transition is recorded, never inside the transition changeset. It has its own
   claim/receipt row with recovery, so a failed send never undoes or blocks the handoff, and a
   retry never sends twice.
