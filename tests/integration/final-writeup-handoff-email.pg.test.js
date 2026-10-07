@@ -117,6 +117,19 @@ describeIf('final_writeup_handoff_emails ledger (live Postgres, migration 072)',
     expect(await store.listPendingHandoffEmails()).toHaveLength(0);
   });
 
+  test('a row that keeps failing rotates behind untried rows in recovery batches', async () => {
+    const sources = ['a', 'b', 'c'].map((c, i) => `1111111${i}-1111-4111-8111-11111111111${i}`);
+    for (const source of sources) {
+      await store.insertHandoffEmailIntent(intent({ sourceDocumentId: source }));
+      await mockPg.client.query('SELECT pg_sleep(0.01)');
+    }
+    // The oldest row is attempted and fails.
+    const claim = await store.claimHandoffEmail(sources[0]);
+    await store.recordHandoffEmailFailure(sources[0], 'handoff_email_recipient_lookup_failed', claim.lease_token);
+    const batch = await store.listPendingHandoffEmails({ limit: 2 });
+    expect(batch.map((row) => row.source_document_id)).toEqual([sources[1], sources[2]]);
+  });
+
   test('only a transition_not_committed skip is reopened by a new intent', async () => {
     await store.insertHandoffEmailIntent(intent());
     await mockPg.client.query("UPDATE final_writeup_handoff_emails SET created_at = NOW() - interval '20 days'");

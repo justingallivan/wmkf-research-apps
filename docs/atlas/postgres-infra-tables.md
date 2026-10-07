@@ -400,7 +400,8 @@ pending. The program and lead used to build a draft are saved with its activity 
 `tests/integration/final-writeup-handoff-email.pg.test.js` in the CI Postgres job. Recipient lookups that
 fail for any reason other than 404 keep the whole send pending. Failures keep
 `pending` with `last_error_code` and are retried by the next POST for that
-draft or by owner-run `scripts/recover-final-writeup-handoff-emails.mjs`
+draft or by owner-run `scripts/recover-final-writeup-handoff-emails.mjs`, which takes the
+least recently attempted rows first so repeated failures rotate to the back
 (Stage 5's cron will reuse `recoverPendingHandoffEmails`). Read/write paths:
 `lib/services/final-writeup/handoff-email-store.js` and
 `lib/services/final-writeup/handoff-email-service.js`. Trade-off: while
