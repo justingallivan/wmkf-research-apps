@@ -72,8 +72,10 @@ describeIf('final_writeup_handoff_emails ledger (live Postgres, migration 072)',
   });
 
   test('insert is idempotent; a lease admits one claimant; a stale token cannot write', async () => {
-    expect(await store.insertHandoffEmailIntent(intent())).toEqual({ inserted: true });
-    expect(await store.insertHandoffEmailIntent(intent())).toEqual({ inserted: false });
+    expect(await store.insertHandoffEmailIntent(intent())).toEqual({ inserted: true, refreshed: true });
+    await mockPg.client.query("UPDATE final_writeup_handoff_emails SET created_at = NOW() - interval '20 days'");
+    expect(await store.insertHandoffEmailIntent(intent())).toEqual({ inserted: false, refreshed: true });
+    expect(Date.now() - new Date((await store.getHandoffEmail(SOURCE)).created_at).getTime()).toBeLessThan(60_000);
     const first = await store.claimHandoffEmail(SOURCE);
     expect(first).toMatchObject({ source_document_id: SOURCE, attempt_count: 1, state: 'pending' });
     expect(first.lease_token).toMatch(/^[0-9a-f-]{36}$/);
@@ -135,15 +137,25 @@ describeIf('final_writeup_handoff_emails ledger (live Postgres, migration 072)',
     await mockPg.client.query("UPDATE final_writeup_handoff_emails SET created_at = NOW() - interval '20 days'");
     const claim = await store.claimHandoffEmail(SOURCE);
     await store.markHandoffEmailSkipped(SOURCE, 'transition_not_committed', claim.lease_token);
-    expect(await store.insertHandoffEmailIntent(intent({ leadSystemUserId: null }))).toEqual({ inserted: true });
+    expect(await store.insertHandoffEmailIntent(intent({ leadSystemUserId: null }))).toEqual({ inserted: false, refreshed: true });
     const reopened = await store.getHandoffEmail(SOURCE);
-    expect(reopened).toMatchObject({ state: 'pending', skip_reason: null, lead_systemuser_id: null });
+    expect(reopened).toMatchObject({ state: 'pending', skip_reason: null });
     expect(Date.now() - new Date(reopened.created_at).getTime()).toBeLessThan(60_000);
 
     const again = await store.claimHandoffEmail(SOURCE);
     await store.markHandoffEmailSkipped(SOURCE, 'test_request_refused', again.lease_token);
-    expect(await store.insertHandoffEmailIntent(intent())).toEqual({ inserted: false });
+    expect(await store.insertHandoffEmailIntent(intent())).toEqual({ inserted: false, refreshed: false });
     expect(await store.getHandoffEmail(SOURCE)).toMatchObject({ state: 'skipped', skip_reason: 'test_request_refused' });
+    await store.reopenExpiredHandoffEmail(SOURCE);
+    expect(await store.getHandoffEmail(SOURCE)).toMatchObject({ state: 'skipped' });
+  });
+
+  test('a commit reopens an intent expired as transition_not_committed', async () => {
+    await store.insertHandoffEmailIntent(intent());
+    const claim = await store.claimHandoffEmail(SOURCE);
+    await store.markHandoffEmailSkipped(SOURCE, 'transition_not_committed', claim.lease_token);
+    await store.reopenExpiredHandoffEmail(SOURCE);
+    expect(await store.getHandoffEmail(SOURCE)).toMatchObject({ state: 'pending', skip_reason: null });
   });
 
   test('constraints: sent needs its email and Final; one row per Final; skip needs a reason; lease fields pair', async () => {

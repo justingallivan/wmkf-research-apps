@@ -131,8 +131,13 @@ function harness({
       activities.set(id, { ...activities.get(id), statuscode: 3 });
     }),
     insertIntent: jest.fn(async (intent) => {
-      // Mirrors the store: reopen only a transition_not_committed skip.
-      if (row && !(row.state === 'skipped' && row.skip_reason === 'transition_not_committed')) {
+      // Mirrors the store: a pending row's wait restarts; a
+      // transition_not_committed skip reopens; anything else is untouched.
+      if (row) {
+        if (row.state === 'pending'
+          || (row.state === 'skipped' && row.skip_reason === 'transition_not_committed')) {
+          Object.assign(row, { state: 'pending', skip_reason: null, created_at: NOW.toISOString() });
+        }
         return { inserted: false };
       }
       row = pendingRow({
@@ -177,6 +182,11 @@ function harness({
     }),
     markSkipped: jest.fn(async (_id, reason, token) => {
       if (owns(token)) Object.assign(row, { state: 'skipped', skip_reason: reason, locked: false, lease_token: null });
+    }),
+    reopenExpired: jest.fn(async () => {
+      if (row && row.state === 'skipped' && row.skip_reason === 'transition_not_committed') {
+        Object.assign(row, { state: 'pending', skip_reason: null });
+      }
     }),
     release: jest.fn(async (_id, token) => {
       if (owns(token)) Object.assign(row, { locked: false, lease_token: null });
@@ -348,10 +358,37 @@ describe('delivery', () => {
     });
     expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'skipped', reason: 'transition_not_committed' });
     const stageArgs = { requestId: REQUEST_ID, sourceDocumentId: SOURCE_ID, actingUserSystemId: LEAD_ID };
-    expect(await stageGroupReviewHandoff(stageArgs, deps)).toEqual({ status: 'staged' });
+    expect(await stageGroupReviewHandoff(stageArgs, deps)).toEqual({ status: 'already_staged' });
     expect(getRow()).toMatchObject({ state: 'pending' });
     state.requestRow = request();
     expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'sent' });
+  });
+
+  test('an aged intent is not expired by recovery while its retried handoff commits', async () => {
+    const { deps, state, getRow } = harness({
+      requestRow: request({ _wmkf_currentfinalwriteup_value: null }),
+      existingRow: pendingRow({ created_at: '2026-09-20T00:00:00Z' }),
+    });
+    // The lead PD retries: staging restarts the 14-day wait...
+    await stageGroupReviewHandoff({ requestId: REQUEST_ID, sourceDocumentId: SOURCE_ID, actingUserSystemId: LEAD_ID }, deps);
+    // ...so recovery running before the commit leaves it waiting.
+    expect(await recoverPendingHandoffEmails({}, deps)).toEqual([{ sourceDocumentId: SOURCE_ID, status: 'awaiting_transition' }]);
+    state.requestRow = request();
+    expect(await deliverGroupReviewHandoff({ sourceDocumentId: SOURCE_ID }, deps)).toEqual({ status: 'sent' });
+    expect(getRow().state).toBe('sent');
+  });
+
+  test('an intent already expired by recovery is reopened when its transition then commits', async () => {
+    const { deps, state, getRow } = harness({
+      requestRow: request({ _wmkf_currentfinalwriteup_value: null }),
+      existingRow: pendingRow({ created_at: '2026-09-20T00:00:00Z' }),
+    });
+    expect(await recoverPendingHandoffEmails({}, deps)).toEqual([
+      { sourceDocumentId: SOURCE_ID, status: 'skipped', reason: 'transition_not_committed' },
+    ]);
+    state.requestRow = request();
+    expect(await deliverGroupReviewHandoff({ sourceDocumentId: SOURCE_ID }, deps)).toEqual({ status: 'sent' });
+    expect(getRow().state).toBe('sent');
   });
 
   test('a sent intent is never reopened by staging', async () => {
