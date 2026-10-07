@@ -748,7 +748,8 @@ describe('presentation summary', () => {
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     expect(await screen.findByRole('link', { name: 'Open published summary' })).toHaveAttribute('href', summaryMaterial.webUrl);
-    expect(screen.getByText(/Available to staff and eligible for the Board link/)).toBeInTheDocument();
+    // The link comes from the material list; the status line waits for the summary read.
+    expect(await screen.findByText(/Available to staff and eligible for the Board link/)).toBeInTheDocument();
   });
 
   test('a draft from an earlier transcript version cannot be published', async () => {
