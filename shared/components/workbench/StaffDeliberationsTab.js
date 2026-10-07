@@ -28,6 +28,10 @@ import {
 const STATUS_POLL_INTERVAL_MS = 3000;
 const STATUS_POLL_ATTEMPTS = 20;
 const EMPTY_LIST = Object.freeze([]);
+
+function sameArtifactId(left, right) {
+  return Boolean(left && right) && String(left).toLowerCase() === String(right).toLowerCase();
+}
 const EMPTY_STAGE_LABELS = DELIBERATION_STAGE_DEFAULT_LABELS;
 
 // One date format for the tab, matching the Staff deliberations list:
@@ -286,7 +290,9 @@ export default function StaffDeliberationsTab({
   const [latestSentRecipients, setLatestSentRecipients] = useState(0);
   // Page-open time for "has the deliberation session happened yet".
   const [openedAtMs] = useState(() => Date.now());
-  const [confirmDialog, setConfirmDialog] = useState(null); // null | { kind: 'brief' | 'presite' }
+  const [confirmDialog, setConfirmDialog] = useState(null); // null | { kind: 'brief' | 'presite' | 'group-review' }
+  const [startingGroupReview, setStartingGroupReview] = useState(false);
+  const [groupReviewError, setGroupReviewError] = useState(null);
   const [currentSourceEverSent, setCurrentSourceEverSent] = useState(false);
   const cancelDialogButtonRef = useRef(null);
   const confirmDialogButtonRef = useRef(null);
@@ -426,7 +432,8 @@ export default function StaffDeliberationsTab({
     if (!confirmDialog) return undefined;
     const previouslyFocused = document.activeElement;
     confirmDialogButtonRef.current?.focus();
-    const busy = confirmDialog.kind === 'brief' ? briefGenerating : generating;
+    const busy = confirmDialog.kind === 'brief' ? briefGenerating
+      : confirmDialog.kind === 'group-review' ? startingGroupReview : generating;
     const handleModalKey = (event) => {
       if (event.key === 'Escape' && !busy) {
         setConfirmDialog(null);
@@ -448,7 +455,7 @@ export default function StaffDeliberationsTab({
       document.removeEventListener('keydown', handleModalKey);
       if (previouslyFocused?.focus) previouslyFocused.focus();
     };
-  }, [confirmDialog, generating, briefGenerating]);
+  }, [confirmDialog, generating, briefGenerating, startingGroupReview]);
 
   const pollForArtifact = async ({ id, sequence, controller, targetArtifactId, baselineArtifactId }) => {
     for (let attempt = 0; attempt < STATUS_POLL_ATTEMPTS; attempt += 1) {
@@ -1030,6 +1037,10 @@ export default function StaffDeliberationsTab({
     }
   };
 
+  const groupReviewDialogCurrent = confirmDialog?.kind === 'group-review'
+    && sameArtifactId(confirmDialog.artifactId, artifact?.artifactId)
+    && sameArtifactId(confirmDialog.artifactId, finalReview?.sourceArtifactId)
+    && finalReview?.phase === 'ready' && finalReview?.canStart === true;
   const confirmDialogContent = confirmDialog?.kind === 'brief'
     ? {
       title: 'Regenerate this brief?',
@@ -1068,7 +1079,25 @@ export default function StaffDeliberationsTab({
           </p>
         ),
       }
-      : null;
+      : confirmDialog?.kind === 'group-review'
+        ? {
+          title: 'Ready for group review?',
+          confirmLabel: startingGroupReview ? 'Starting…' : 'Ready for group review',
+          busy: startingGroupReview,
+          // Bound to the writeup shown when the dialog opened: a refresh that
+          // swaps the document or eligibility disables confirmation.
+          confirmDisabled: !groupReviewDialogCurrent,
+          onConfirm: startGroupReview,
+          body: !groupReviewDialogCurrent && !startingGroupReview ? (
+            <p>The writeup changed while you were confirming. Cancel and check it again.</p>
+          ) : (
+            <>
+              <p>The current Word version becomes the starting point for group review.</p>
+              <p className="mt-2">The Word file stays the same, including your edits, and colleagues can then review and edit it.</p>
+            </>
+          ),
+        }
+        : null;
 
   const primaryClass = 'rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50';
   const secondaryClass = 'rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50';
@@ -1105,6 +1134,39 @@ export default function StaffDeliberationsTab({
             : timing?.endIso ? 'Before presentation' : 'Schedule needed';
   const materialsLine = siteVisitMaterialsLine(materials);
   const timingLabel = presentationEndLabel(timing);
+  // Same route, authorization and schedule fence as the Final writeup tab;
+  // canStart and sourceArtifactId come from that tab's status (status-facts).
+  async function startGroupReview() {
+    const expectedArtifactId = confirmDialog?.kind === 'group-review' ? confirmDialog.artifactId : null;
+    if (!requestId || !expectedArtifactId || startingGroupReview) return;
+    const sequence = generationSequence.current;
+    setStartingGroupReview(true);
+    setGroupReviewError(null);
+    try {
+      await requestJson('/api/workbench/final-writeup', {
+        method: 'POST',
+        body: { requestId, expectedArtifactId },
+        fallbackMessage: 'Group review could not be started.',
+        tolerantBody: true,
+      });
+      if (sequence !== generationSequence.current) return;
+      setConfirmDialog(null);
+      const status = await readStatus(requestId);
+      if (sequence !== generationSequence.current) return;
+      setPreparation(status.preparation || null);
+      setFinalReview(status.finalReview || null);
+      setTiming(status.timing || null);
+      setArtifact(status.currentArtifact || null);
+      setPendingArtifact(status.pendingArtifact || null);
+    } catch (startError) {
+      if (sequence === generationSequence.current) {
+        setConfirmDialog(null);
+        setGroupReviewError(startError.message);
+      }
+    } finally {
+      if (sequence === generationSequence.current) setStartingGroupReview(false);
+    }
+  }
   const retryPreparation = async () => {
     const sequence = generationSequence.current;
     setRetryingPreparation(true);
@@ -1212,11 +1274,23 @@ export default function StaffDeliberationsTab({
           : briefReadyFile ? 'Draft available' : 'Not generated yet';
   const leadershipReview = finalReview?.phase === 'leadership-review';
   const writeupSummary = reviewActive ? (leadershipReview ? 'Moved to review; now in leadership review' : 'Moved to group review')
-    : preSiteShared || preSiteFinal ? 'Locked for review'
+    : preSiteFinal ? 'Locked for review'
+      : preSiteShared ? (finalReview?.phase === 'starting' ? 'Starting group review…' : 'Post-visit drafting')
       : correctionDraft ? 'Corrections in progress'
         : generating || pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING ? 'Preparing…'
           : readyFile && preSiteDraftReady ? `Draft ready${warnings?.length ? ` · ${warnings.length} ${warnings.length === 1 ? 'thing' : 'things'} to check` : ''}`
             : due ? 'Not prepared yet' : 'Optional before the presentation';
+  // Post-visit drafting hands off to group review from step 4 (owner 2026-10-06).
+  const handOffOpen = preSiteShared && milestoneComplete && !preSiteFinal && !correctionDraft && finalReview?.phase === 'ready';
+  const canHandOff = handOffOpen && finalReview.canStart === true
+    && sameArtifactId(finalReview.sourceArtifactId, artifact?.artifactId);
+  const handOffNote = !handOffOpen ? null
+    : canHandOff ? 'When the draft is ready for colleagues, choose Ready for group review. They’ll edit this same file.'
+      : finalReview.startBlockedReason === 'final_writeup_site_visit_not_ended'
+        ? 'Group review becomes available after the scheduled presentation ends.'
+        : finalReview.startBlockedReason
+          ? 'The presentation schedule could not be verified, so group review can’t start yet. Contact an administrator if this continues.'
+          : 'The lead Program Director marks this ready for group review when the draft is done.';
   const summaryClass = 'mt-0.5 text-sm text-gray-600';
   const hasProblemNotice = Boolean(stageFetchFailed || attentionReason || preparationReadError
     || preparationState === 'blocked' || (briefShared && latestSendFailure));
@@ -1411,29 +1485,22 @@ export default function StaffDeliberationsTab({
     <Step
       id="deliberations-writeup"
       number={4}
-      title="Working writeup"
+      title="Post-presentation writeup"
       status={writeupStatus}
       summary={<p className={summaryClass}>{writeupSummary}</p>}
       details={readyFile ? (
         <div className="mt-2 text-sm text-gray-700">
-          <p className="text-gray-600">The fuller editable document for presentation findings. Your edits stay in this Word file.</p>
-          <p className="mt-1">
-            {preSiteShared || preSiteFinal ? 'Working document:' : 'Latest draft:'}{' '}
-            <span title={readyFile.name || undefined}>
-              {preSiteShared || preSiteFinal
-                ? 'Working writeup in Word'
-                : readyFile.lastModified
-                  ? `Working writeup draft · generated ${new Date(readyFile.lastModified).toLocaleDateString()}`
-                  : 'Working writeup draft'}
-            </span>
-          </p>
+          <p className="text-gray-600">Findings from the presentation. All edits go into this one file.</p>
+          {!preSiteShared && !preSiteFinal && readyFile.lastModified && (
+            <p className="mt-1">{`Draft generated ${new Date(readyFile.lastModified).toLocaleDateString()}`}</p>
+          )}
           {preparedAutomatically && (
             <p className="mt-1 text-gray-600" data-testid="writeup-prepared-automatically">
               {`Prepared automatically after the presentation${preparedAutomaticallyWhen ? ` · ${preparedAutomaticallyWhen}` : ''}`}
             </p>
           )}
           <FileDetails file={readyFile} />
-          <Warnings warnings={warnings} label={preSiteShared || preSiteFinal ? 'Working document needs a quick edit check' : 'Draft needs a quick edit check'} />
+          <Warnings warnings={warnings} label={preSiteShared || preSiteFinal ? 'Writeup needs a quick edit check' : 'Draft needs a quick edit check'} />
         </div>
       ) : null}
       actions={(
@@ -1463,8 +1530,13 @@ export default function StaffDeliberationsTab({
           )}
           {readyFile && (preSiteShared || preSiteFinal) && (
             <a href={readyFile.webUrl} target="_blank" rel="noopener noreferrer" className={writeupStatus === 'current' ? primaryClass : secondaryClass}>
-              Open writeup in Word
+              {preSiteFinal ? 'Open writeup in Word' : 'Edit writeup in Word'}
             </a>
+          )}
+          {canHandOff && (
+            <button type="button" onClick={() => { setGroupReviewError(null); setConfirmDialog({ kind: 'group-review', artifactId: artifact.artifactId }); }} disabled={startingGroupReview} className={secondaryClass}>
+              {startingGroupReview ? 'Starting…' : 'Ready for group review'}
+            </button>
           )}
           {preSiteMoreItems.length > 0 && <OverflowMenu label="More writeup actions" items={preSiteMoreItems} />}
         </>
@@ -1507,6 +1579,12 @@ export default function StaffDeliberationsTab({
           </p>
         )}
       </div>
+      {handOffNote && (
+        <p className="mt-2 text-sm text-gray-700" data-testid="group-review-handoff-note">{handOffNote}</p>
+      )}
+      {groupReviewError && (
+        <p className="mt-2 text-sm text-red-800" role="alert">{groupReviewError}</p>
+      )}
       {(preSiteShared || preSiteFinal) && !readyFile && (
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
           <h4 className="font-semibold">Pre-Site Visit Writeup is read-only</h4>
@@ -1528,22 +1606,13 @@ export default function StaffDeliberationsTab({
         <p className={summaryClass}>
           {leadershipReview ? 'Group review is done; leadership review is in progress in Final writeup.'
             : reviewActive ? 'Group review is in progress in Final writeup.'
-              : 'Starts in Final writeup when the writeup is ready'}
+              : 'Starts when the writeup is marked ready for group review'}
         </p>
       )}
-      actions={(movedToFinal && onSelectTab) || (due && editingReady && onSelectTab) ? (
-        <>
-          {movedToFinal && onSelectTab && (
-            <button type="button" onClick={() => onSelectTab('final-writeup')} className={primaryClass}>
-              Open review details
-            </button>
-          )}
-          {due && editingReady && onSelectTab && (
-            <button type="button" onClick={() => onSelectTab('final-writeup')} className={secondaryClass}>
-              Open group-review details
-            </button>
-          )}
-        </>
+      actions={movedToFinal && onSelectTab ? (
+        <button type="button" onClick={() => onSelectTab('final-writeup')} className={primaryClass}>
+          Open review details
+        </button>
       ) : null}
     />
   );
@@ -1738,7 +1807,8 @@ export default function StaffDeliberationsTab({
               <button
                 ref={confirmDialogButtonRef}
                 type="button"
-                disabled={confirmDialogContent.busy}
+                // eslint-disable-next-line react-hooks/refs -- same false positive as the dialog guard above
+                disabled={confirmDialogContent.busy || confirmDialogContent.confirmDisabled}
                 onClick={confirmDialogContent.onConfirm}
                 className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
               >

@@ -135,7 +135,8 @@ user-facing `.js` in `shared/components` + `pages` (excluding `pages/api`).
 3. **Site visit, a.k.a. research presentation:** the applicant presentation.
    Information after the briefing can only come from it, so its scheduled end
    is the trigger for post-visit editing.
-4. **Working writeup** (formerly the pre-site visit draft): the fuller document
+4. **Post-presentation writeup** (Workbench step title since 2026-10-06; formerly
+   "Working writeup", originally the pre-site visit draft): the fuller document
    staff amend after the site visit; it becomes the Final Writeup.
 5. **Group review → leadership review** in Final Writeup.
 
@@ -148,7 +149,7 @@ user-facing `.js` in `shared/components` + `pages` (excluding `pages/api`).
 | Applicant-supplied slides/bios | "Site visit materials" (magic-link page title), "Research presentation materials" (same page, body), "Research Presentation Materials" (Workbench card), "Materials" (list line) | `pages/external/materials/[token].js`; `ResearchPresentationMaterialsCard.js` |
 | Recording/transcripts after the event | "Post-presentation materials", "Research presentation follow-up" (old card title), "Recording and transcripts" (Workbench step), "Board presentation link" | `PostPresentationMaterialsCard.js`, `RecordingAndTranscriptCard.js`, `ResearchPresentationFollowUp.js` |
 | "Presentation end" | (a) the scheduled end of the site-visit event (Workbench "Presentation ends …"; triggers post-visit editing) vs (b) the point in the recording where the presentation stops and staff discussion begins (transcript split: "Presentation end not confirmed", "Choose the last turn of the presentation") | `StaffDeliberationsTab.js` vs `RecordingAndTranscriptCard.js` |
-| Staff's working document | "Working writeup" (~19), "working draft" / "Prepare working draft", "Word Draft" ("Regenerate Word Draft"), "Pre-Site Visit Writeup" (read-only notice), "Site Visit working document" (Final Writeup prerequisite), "Pre-Site artifact" (Meeting Tracker) | `StaffDeliberationsTab.js`, `FinalWriteupTab.js`, `MeetingTrackerList.js` |
+| Staff's working document | "Post-presentation writeup" (Workbench step title), "Working writeup" (~19), "working draft" / "Prepare working draft", "Word Draft" ("Regenerate Word Draft"), "Pre-Site Visit Writeup" (read-only notice), "Site Visit working document" (Final Writeup prerequisite), "Pre-Site artifact" (Meeting Tracker) | `StaffDeliberationsTab.js`, `FinalWriteupTab.js`, `MeetingTrackerList.js` |
 | The meeting | "Deliberation session" / "deliberation session" (~15), "PC deliberation session", "Meeting session" (browser tab title, `SessionEditor.js:526`), "session" | Meeting Tracker, `PreSiteDistributionPanel.js`, Workbench step |
 | The Workbench area | "Staff Deliberations" (request tab, ~19) vs "Staff deliberations" (list tab, ~9) — casing differs between the two tabs | `pages/workbench/[requestId].js`, Workbench list |
 
