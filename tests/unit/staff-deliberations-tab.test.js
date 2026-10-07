@@ -1638,6 +1638,6 @@ test('no automatic label when staff are recorded as preparing the writeup', asyn
     timing: { availability: 'available', endIso: '2026-09-28T18:00:00Z' },
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
-  expect(await screen.findByText('Working writeup in Word')).toBeInTheDocument();
+  expect(await screen.findByRole('link', { name: 'Edit writeup in Word' })).toBeInTheDocument();
   expect(screen.queryByTestId('writeup-prepared-automatically')).toBeNull();
 });

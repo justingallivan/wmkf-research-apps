@@ -1285,7 +1285,7 @@ export default function StaffDeliberationsTab({
   const canHandOff = handOffOpen && finalReview.canStart === true
     && sameArtifactId(finalReview.sourceArtifactId, artifact?.artifactId);
   const handOffNote = !handOffOpen ? null
-    : canHandOff ? 'When the draft is ready for colleagues, choose Ready for group review. Editing continues in this Word file.'
+    : canHandOff ? 'When the draft is ready for colleagues, choose Ready for group review. They’ll edit this same file.'
       : finalReview.startBlockedReason === 'final_writeup_site_visit_not_ended'
         ? 'Group review becomes available after the scheduled presentation ends.'
         : finalReview.startBlockedReason
@@ -1490,24 +1490,17 @@ export default function StaffDeliberationsTab({
       summary={<p className={summaryClass}>{writeupSummary}</p>}
       details={readyFile ? (
         <div className="mt-2 text-sm text-gray-700">
-          <p className="text-gray-600">The fuller editable document for presentation findings. Your edits stay in this Word file.</p>
-          <p className="mt-1">
-            {preSiteShared || preSiteFinal ? 'Working document:' : 'Latest draft:'}{' '}
-            <span title={readyFile.name || undefined}>
-              {preSiteShared || preSiteFinal
-                ? 'Working writeup in Word'
-                : readyFile.lastModified
-                  ? `Working writeup draft · generated ${new Date(readyFile.lastModified).toLocaleDateString()}`
-                  : 'Working writeup draft'}
-            </span>
-          </p>
+          <p className="text-gray-600">Findings from the presentation. All edits go into this one file.</p>
+          {!preSiteShared && !preSiteFinal && readyFile.lastModified && (
+            <p className="mt-1">{`Draft generated ${new Date(readyFile.lastModified).toLocaleDateString()}`}</p>
+          )}
           {preparedAutomatically && (
             <p className="mt-1 text-gray-600" data-testid="writeup-prepared-automatically">
               {`Prepared automatically after the presentation${preparedAutomaticallyWhen ? ` · ${preparedAutomaticallyWhen}` : ''}`}
             </p>
           )}
           <FileDetails file={readyFile} />
-          <Warnings warnings={warnings} label={preSiteShared || preSiteFinal ? 'Working document needs a quick edit check' : 'Draft needs a quick edit check'} />
+          <Warnings warnings={warnings} label={preSiteShared || preSiteFinal ? 'Writeup needs a quick edit check' : 'Draft needs a quick edit check'} />
         </div>
       ) : null}
       actions={(
