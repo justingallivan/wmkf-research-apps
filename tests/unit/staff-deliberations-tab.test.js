@@ -1707,7 +1707,7 @@ test('an unlinked account with no draft yet is told why it cannot prepare one', 
 });
 
 test.each([
-  [true, 'The other Program Directors for this grant program are emailed a link to the writeup.', /No email is sent/],
+  [true, 'The other Program Directors for this grant program get an email from the lead Program Director with a link to the writeup.', /No email is sent/],
   [false, 'No email is sent. Let colleagues know it is ready.', /are emailed/],
 ])('post-visit drafting: handoffEmailEnabled=%s, the step 4 confirmation states the email behavior', async (enabled, shown, absent) => {
   queueRoute('presiteGet', statusResponse({ ...POST_VISIT_STATUS, finalReview: readyFinalReview({ handoffEmailEnabled: enabled }) }));
