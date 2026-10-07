@@ -401,7 +401,10 @@ draft are saved with its activity id. An owed email that cannot be delivered
 (`program_not_configured`, `staffing_not_configured`, `no_recipients`, or a third failed
 attempt) raises an `error` ops alert (`final_writeup_handoff_email_undelivered`). Store SQL is proven by
 `tests/integration/final-writeup-handoff-email.pg.test.js` in the CI Postgres job. Recipient lookups that
-fail for any reason other than 404 keep the whole send pending. Failures keep
+fail for any reason other than 404 keep the whole send pending. Recipients are internal staff
+only (owner, 2026-10-07): an address whose domain is not exactly `wmkeck.org`
+(`FOUNDATION_EMAIL_DOMAIN`) is never emailed, and refusing one raises an
+`final_writeup_handoff_email_outside_domain` ops alert. Failures keep
 `pending` with `last_error_code` and are retried automatically every 15 minutes by
 `/api/cron/final-writeup-handoff-emails` (25 rows per pass), by the next POST for that draft,
 or by owner-run `scripts/recover-final-writeup-handoff-emails.mjs`; recovery takes the least

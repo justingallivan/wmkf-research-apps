@@ -244,6 +244,10 @@ silently include or exclude them. **Resolved 2026-10-07:** the owner chose Resea
 - A recipient lookup that fails for any reason other than "not found" keeps the whole send
   pending, so an outage never causes a partial or skipped email (Codex review finding).
 - Recipients: program audience ∩ PD persona, minus the lead PD, with addresses read separately.
+  Internal staff only (owner, 2026-10-07): an address outside exactly `@wmkeck.org` is never
+  emailed, and refusing one raises an ops alert. A 2026-10-07 owner-authorized Production read
+  found the Research recipients to be Justin Gallivan, John Sader, Jean Kim and Beth Pruitt (Beth
+  is both PD and CSO, by design), each minus the request's lead.
   Sent from `NOTIFICATION_EMAIL_FROM`, regarding the request, so the TEST-request guard applies.
 - Copy: `email.final_writeup_handoff.subject` / `.body`. Blank copy leaves the send pending.
 - `email-automation-preferences.js` does not apply: it controls scheduled-email review, not

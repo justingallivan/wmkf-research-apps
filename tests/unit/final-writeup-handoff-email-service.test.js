@@ -620,6 +620,42 @@ describe('delivery', () => {
     expect(getRow().state).toBe('pending');
   });
 
+  test.each([
+    ['an outside domain', 'cy@gmail.com'],
+    ['a lookalike domain', 'cy@wmkeck.org.example.com'],
+    ['a subdomain', 'cy@mail.wmkeck.org'],
+  ])('a staff address at %s is never emailed; the others are, and ops is alerted', async (_label, address) => {
+    const { deps } = harness({
+      existingRow: pendingRow(),
+      users: {
+        [BEA_ID]: { systemuserid: BEA_ID, internalemailaddress: 'Bea@WMKECK.ORG', isdisabled: false },
+        [CY_ID]: { systemuserid: CY_ID, internalemailaddress: address, isdisabled: false },
+      },
+    });
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'sent' });
+    const input = deps.createEmailActivity.mock.calls[0][0];
+    expect(input.to).toEqual(['Bea@WMKECK.ORG']);
+    expect(input.to).not.toContain(address);
+    expect(deps.notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'final_writeup_handoff_email_outside_domain',
+      metadata: expect.objectContaining({ refused: 1 }),
+    }));
+  });
+
+  test('when every address is outside the foundation, nothing is sent and ops is alerted', async () => {
+    const { deps } = harness({
+      existingRow: pendingRow(),
+      users: {
+        [BEA_ID]: { systemuserid: BEA_ID, internalemailaddress: 'bea@example.com', isdisabled: false },
+        [CY_ID]: { systemuserid: CY_ID, internalemailaddress: 'cy@example.org', isdisabled: false },
+      },
+    });
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'skipped', reason: 'no_recipients' });
+    expect(deps.createEmailActivity).not.toHaveBeenCalled();
+    const types = deps.notify.mock.calls.map(([options]) => options.type);
+    expect(types).toEqual(['final_writeup_handoff_email_outside_domain', 'final_writeup_handoff_email_undelivered']);
+  });
+
   test('a held lease means another call is sending: nothing is created', async () => {
     const { deps } = harness({ existingRow: pendingRow({ locked: true }) });
     expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'not_claimed' });
