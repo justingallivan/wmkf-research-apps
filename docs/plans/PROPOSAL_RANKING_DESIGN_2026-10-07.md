@@ -1,6 +1,6 @@
 # Proposal Ranking — design for review
 
-Date: 2026-10-07. Revision: 3 (Opus revision-2 findings incorporated). Status: **Implementation present on the feature branch; integration review in progress; not deployed or provisioned.**
+Date: 2026-10-07. Revision: 3 (Opus revision-2 findings incorporated). Status: **Source implementation and local verification complete; not deployed or provisioned.**
 Owner: Justin. Design consolidation: Codex. Requested reviewer: Claude Opus.
 Authority: owner decisions in the Proposal Ranking planning conversation.
 
@@ -360,7 +360,9 @@ Revision-2 Opus outcome: **READY WITH NAMED CHANGES**, returned by
 Revision 3 incorporates N1–N6: create-only coordinator, explicit app-owned writes,
 operation IDs/uncertain outcome classification, metadata-resolved generic-reader
 exclusions, escape-hatch warnings and explicit excusal/transfer edge cases.
-The revision-3 edits have not themselves received a separate Opus verdict.
+The implementation against revision 3 received an Opus source review and bounded
+correction review (APPROVE WITH NONBLOCKING NOTES). Receipt:
+`docs/audits/PROPOSAL_RANKING_OPUS_IMPLEMENTATION_REVIEW_2026-10-07.md`.
 
 ## Review request
 

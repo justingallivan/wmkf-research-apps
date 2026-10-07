@@ -1,7 +1,11 @@
 import { syntheticReviewerVisibilityDto } from '../../lib/services/test-requests/isolation.js';
-import { countOutstandingOrdinaryReviews, stableFingerprint } from '../../lib/services/proposal-ranking/preview-service.js';
+import { assertPreviewCanOpen, countOutstandingOrdinaryReviews, stableFingerprint } from '../../lib/services/proposal-ranking/preview-service.js';
 
 describe('Proposal Ranking preview review progress', () => {
+  test('marks deliberate preview validation messages as safe for the API', () => {
+    expect(() => assertPreviewCanOpen({ canOpen: false, warnings: ['Assign every proposal a lead PD.'] }))
+      .toThrow(expect.objectContaining({ status: 409, code: 'incomplete_preview', publicMessage: true }));
+  });
   test('counts only explicitly ordinary pending reviews after synthetic isolation is enabled', () => {
     const env = { SYNTHETIC_REVIEWER_ISOLATION: 'on' };
     const ordinaryNullMarker = syntheticReviewerVisibilityDto({ wmkf_issyntheticreviewer: null }, env);

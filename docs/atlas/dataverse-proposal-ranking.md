@@ -1,7 +1,6 @@
 # Proposal Ranking storage and activation
 
-Date: 2026-10-07. Status: source implemented on the feature branch; integration
-review in progress. No live Dataverse schema, role, app grant, setting or deployment
+Date: 2026-10-07. Status: source implemented on the feature branch; local validation and source reviews complete. No live Dataverse schema, role, app grant, setting or deployment
 has been applied or probed for this feature.
 
 ## Source and persistence
@@ -87,5 +86,6 @@ The facilitator confirms named outstanding submissions before those transitions.
 The approved contract is `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md`;
 wire shapes are in `docs/plans/PROPOSAL_RANKING_API_CONTRACT.md`. Local regression
 suites cover calculations, preview/schema, service behavior, UI and generic-reader
-privacy. Final verification and Opus implementation-review results are pending.
+privacy. Verification and Opus review are recorded in
+`docs/audits/PROPOSAL_RANKING_OPUS_IMPLEMENTATION_REVIEW_2026-10-07.md`.
 No live-state claim is made by this page.
