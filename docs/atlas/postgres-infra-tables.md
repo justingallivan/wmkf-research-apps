@@ -382,8 +382,10 @@ recovery. States: `pending` → `sent`, or terminal `skipped` with a
 after 14 days (a later valid staging for the same draft reopens only this kind
 of skip),
 `program_not_configured`, `staffing_not_configured`, `no_recipients`,
-`test_request_refused`). A five-minute lease (`locked_until`) lets one call
-send; the Dynamics activity id and frozen `to_recipients` are stored before
+`test_request_refused`). A five-minute lease (`lease_token` + `locked_until`)
+lets one call send; every write requires the current token, and the lease is
+renewed as a fence before creating an activity and before `SendEmail`, so a
+worker whose lease expired and was taken over stops (fifth Codex review); the Dynamics activity id and frozen `to_recipients` are stored before
 `SendEmail`, and correlation key `wmkf-final-writeup-handoff:<sourceDocumentId>`
 recovers an activity created before the id was stored. An activity already
 accepted by Dynamics is recorded as sent without further checks; one that is

@@ -71,28 +71,46 @@ describeIf('final_writeup_handoff_emails ledger (live Postgres, migration 072)',
     await mockPg.client.query('DELETE FROM final_writeup_handoff_emails');
   });
 
-  test('insert is idempotent and a lease admits exactly one claimant', async () => {
+  test('insert is idempotent; a lease admits one claimant; a stale token cannot write', async () => {
     expect(await store.insertHandoffEmailIntent(intent())).toEqual({ inserted: true });
     expect(await store.insertHandoffEmailIntent(intent())).toEqual({ inserted: false });
     const first = await store.claimHandoffEmail(SOURCE);
     expect(first).toMatchObject({ source_document_id: SOURCE, attempt_count: 1, state: 'pending' });
+    expect(first.lease_token).toMatch(/^[0-9a-f-]{36}$/);
     expect(await store.claimHandoffEmail(SOURCE)).toBeNull();
-    await store.releaseHandoffEmail(SOURCE);
-    expect(await store.claimHandoffEmail(SOURCE)).toMatchObject({ attempt_count: 2 });
+    expect(await store.renewHandoffEmailLease(SOURCE, first.lease_token)).toMatchObject({ source_document_id: SOURCE });
+
+    // The lease expires and a second worker takes over.
+    await mockPg.client.query("UPDATE final_writeup_handoff_emails SET locked_until = NOW() - interval '1 minute'");
+    expect(await store.renewHandoffEmailLease(SOURCE, first.lease_token)).toBeNull();
+    const second = await store.claimHandoffEmail(SOURCE);
+    expect(second.lease_token).not.toBe(first.lease_token);
+    expect(await store.recordHandoffEmailActivity(SOURCE, { emailId: EMAIL, toRecipients: ['a@wmkeck.org'], skippedRecipientCount: 0 }, first.lease_token))
+      .toEqual({ recorded: false });
+    await store.markHandoffEmailSent(SOURCE, EMAIL, first.lease_token);
+    expect(await store.getHandoffEmail(SOURCE)).toMatchObject({ state: 'pending', dynamics_email_id: null });
+
+    expect(await store.recordHandoffEmailActivity(SOURCE, { emailId: EMAIL, toRecipients: ['a@wmkeck.org'], skippedRecipientCount: 0 }, second.lease_token))
+      .toEqual({ recorded: true });
+    const OTHER_EMAIL = '77777777-7777-4777-8777-777777777777';
+    expect(await store.recordHandoffEmailActivity(SOURCE, { emailId: OTHER_EMAIL, toRecipients: [], skippedRecipientCount: 0 }, second.lease_token))
+      .toEqual({ recorded: false });
+    await store.releaseHandoffEmail(SOURCE, second.lease_token);
+    expect(await store.getHandoffEmail(SOURCE)).toMatchObject({ lease_token: null, locked_until: null });
   });
 
   test('a failure keeps the row pending and claimable; sent is terminal', async () => {
     await store.insertHandoffEmailIntent(intent());
-    await store.claimHandoffEmail(SOURCE);
-    await store.recordHandoffEmailFailure(SOURCE, 'dynamics_send_failed');
+    const a = await store.claimHandoffEmail(SOURCE);
+    await store.recordHandoffEmailFailure(SOURCE, 'dynamics_send_failed', a.lease_token);
     expect(await store.listPendingHandoffEmails()).toHaveLength(1);
-    await store.claimHandoffEmail(SOURCE);
-    await store.recordHandoffEmailFinal(SOURCE, FINAL);
-    await store.recordHandoffEmailActivity(SOURCE, { emailId: EMAIL, toRecipients: ['a@wmkeck.org'], skippedRecipientCount: 1 });
-    await store.markHandoffEmailSent(SOURCE, EMAIL);
+    const b = await store.claimHandoffEmail(SOURCE);
+    await store.recordHandoffEmailFinal(SOURCE, FINAL, b.lease_token);
+    await store.recordHandoffEmailActivity(SOURCE, { emailId: EMAIL, toRecipients: ['a@wmkeck.org'], skippedRecipientCount: 1 }, b.lease_token);
+    await store.markHandoffEmailSent(SOURCE, EMAIL, b.lease_token);
     const row = await store.getHandoffEmail(SOURCE);
     expect(row).toMatchObject({
-      state: 'sent', final_document_id: FINAL, dynamics_email_id: EMAIL,
+      state: 'sent', final_document_id: FINAL, dynamics_email_id: EMAIL, lease_token: null,
       to_recipients: ['a@wmkeck.org'], skipped_recipient_count: 1, locked_until: null, last_error_code: null,
     });
     expect(await store.claimHandoffEmail(SOURCE)).toBeNull();
@@ -102,18 +120,20 @@ describeIf('final_writeup_handoff_emails ledger (live Postgres, migration 072)',
   test('only a transition_not_committed skip is reopened by a new intent', async () => {
     await store.insertHandoffEmailIntent(intent());
     await mockPg.client.query("UPDATE final_writeup_handoff_emails SET created_at = NOW() - interval '20 days'");
-    await store.markHandoffEmailSkipped(SOURCE, 'transition_not_committed');
+    const claim = await store.claimHandoffEmail(SOURCE);
+    await store.markHandoffEmailSkipped(SOURCE, 'transition_not_committed', claim.lease_token);
     expect(await store.insertHandoffEmailIntent(intent({ leadSystemUserId: null }))).toEqual({ inserted: true });
     const reopened = await store.getHandoffEmail(SOURCE);
     expect(reopened).toMatchObject({ state: 'pending', skip_reason: null, lead_systemuser_id: null });
     expect(Date.now() - new Date(reopened.created_at).getTime()).toBeLessThan(60_000);
 
-    await store.markHandoffEmailSkipped(SOURCE, 'test_request_refused');
+    const again = await store.claimHandoffEmail(SOURCE);
+    await store.markHandoffEmailSkipped(SOURCE, 'test_request_refused', again.lease_token);
     expect(await store.insertHandoffEmailIntent(intent())).toEqual({ inserted: false });
     expect(await store.getHandoffEmail(SOURCE)).toMatchObject({ state: 'skipped', skip_reason: 'test_request_refused' });
   });
 
-  test('constraints: sent needs its email and Final; one row per Final; skip needs a reason', async () => {
+  test('constraints: sent needs its email and Final; one row per Final; skip needs a reason; lease fields pair', async () => {
     await store.insertHandoffEmailIntent(intent());
     await expect(mockPg.client.query(
       "UPDATE final_writeup_handoff_emails SET state = 'sent', sent_at = NOW() WHERE source_document_id = $1", [SOURCE],
@@ -121,10 +141,14 @@ describeIf('final_writeup_handoff_emails ledger (live Postgres, migration 072)',
     await expect(mockPg.client.query(
       "UPDATE final_writeup_handoff_emails SET state = 'skipped' WHERE source_document_id = $1", [SOURCE],
     )).rejects.toThrow(/final_writeup_handoff_email_skip_shape/);
-    await store.recordHandoffEmailFinal(SOURCE, FINAL);
+    const claim = await store.claimHandoffEmail(SOURCE);
+    await store.recordHandoffEmailFinal(SOURCE, FINAL, claim.lease_token);
     await store.insertHandoffEmailIntent(intent({ sourceDocumentId: OTHER_SOURCE }));
     await expect(mockPg.client.query(
       'UPDATE final_writeup_handoff_emails SET final_document_id = $1 WHERE source_document_id = $2', [FINAL, OTHER_SOURCE],
     )).rejects.toThrow(/uq_final_writeup_handoff_emails_final/);
+    await expect(mockPg.client.query(
+      'UPDATE final_writeup_handoff_emails SET lease_token = gen_random_uuid(), locked_until = NULL WHERE source_document_id = $1', [OTHER_SOURCE],
+    )).rejects.toThrow(/final_writeup_handoff_email_lease_shape/);
   });
 });

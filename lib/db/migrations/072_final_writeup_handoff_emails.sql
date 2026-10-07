@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS final_writeup_handoff_emails (
   skipped_recipient_count INTEGER NOT NULL DEFAULT 0,
   dynamics_email_id UUID,
   attempt_count INTEGER NOT NULL DEFAULT 0,
+  lease_token UUID,
   locked_until TIMESTAMPTZ,
   last_error_code TEXT,
   last_failed_at TIMESTAMPTZ,
@@ -40,6 +41,10 @@ CREATE TABLE IF NOT EXISTS final_writeup_handoff_emails (
   ),
   CONSTRAINT final_writeup_handoff_email_recipient_shape CHECK (
     to_recipients IS NULL OR jsonb_typeof(to_recipients) = 'array'
+  ),
+  CONSTRAINT final_writeup_handoff_email_lease_shape CHECK (
+    (lease_token IS NULL AND locked_until IS NULL)
+    OR (lease_token IS NOT NULL AND locked_until IS NOT NULL)
   )
 );
 

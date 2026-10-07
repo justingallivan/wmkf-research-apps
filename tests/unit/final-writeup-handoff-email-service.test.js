@@ -95,6 +95,8 @@ function harness({
   correlationMatches = [],
 } = {}) {
   let row = existingRow ? { ...existingRow } : null;
+  let tokenSeq = 0;
+  const owns = (token) => Boolean(row && row.state === 'pending' && row.locked && row.lease_token === token);
   const state = { requestRow, documentRow };
   const calls = [];
   const activities = new Map();
@@ -136,21 +138,40 @@ function harness({
       return { inserted: true };
     }),
     getRow: jest.fn(async () => (row ? { ...row } : null)),
+    // Mirrors the store: a claim mints a token; every write needs the
+    // current token and an unexpired lease (`expire()` simulates expiry).
     claim: jest.fn(async () => {
       if (!row || row.state !== 'pending' || row.locked) return null;
+      tokenSeq += 1;
       row.locked = true;
+      row.lease_token = `token-${tokenSeq}`;
       return { ...row };
     }),
-    recordFinal: jest.fn(async (_id, finalId) => { row.final_document_id = finalId; }),
-    recordActivity: jest.fn(async (_id, { emailId, toRecipients }) => {
+    renew: jest.fn(async (_id, token) => (
+      row && row.state === 'pending' && row.locked && row.lease_token === token ? { ...row } : null
+    )),
+    recordFinal: jest.fn(async (_id, finalId, token) => {
+      if (owns(token)) row.final_document_id = finalId;
+    }),
+    recordActivity: jest.fn(async (_id, { emailId, toRecipients }, token) => {
+      if (!owns(token) || (row.dynamics_email_id && row.dynamics_email_id !== emailId)) return { recorded: false };
       calls.push('record');
       row.dynamics_email_id = emailId;
       row.to_recipients = toRecipients;
+      return { recorded: true };
     }),
-    markSent: jest.fn(async () => { row.state = 'sent'; row.locked = false; }),
-    markSkipped: jest.fn(async (_id, reason) => { row.state = 'skipped'; row.skip_reason = reason; row.locked = false; }),
-    release: jest.fn(async () => { row.locked = false; }),
-    recordFailure: jest.fn(async (_id, code) => { row.last_error_code = code; row.locked = false; }),
+    markSent: jest.fn(async (_id, emailId, token) => {
+      if (owns(token)) Object.assign(row, { state: 'sent', locked: false, lease_token: null });
+    }),
+    markSkipped: jest.fn(async (_id, reason, token) => {
+      if (owns(token)) Object.assign(row, { state: 'skipped', skip_reason: reason, locked: false, lease_token: null });
+    }),
+    release: jest.fn(async (_id, token) => {
+      if (owns(token)) Object.assign(row, { locked: false, lease_token: null });
+    }),
+    recordFailure: jest.fn(async (_id, code, token) => {
+      if (owns(token)) Object.assign(row, { last_error_code: code, locked: false, lease_token: null });
+    }),
     listPending: jest.fn(async () => (row && row.state === 'pending' && !row.locked ? [{ ...row }] : [])),
     programEnabled: (id) => enabledPrograms.includes(String(id).toLowerCase()),
     anyProgramEnabled: () => enabledPrograms.length > 0,
@@ -158,7 +179,8 @@ function harness({
     baseUrl: () => 'https://apps.example.org',
     now: () => NOW,
   };
-  return { deps, calls, state, getRow: () => row, activities };
+  const expire = () => { row.locked = false; };
+  return { deps, calls, state, getRow: () => row, activities, expire };
 }
 
 const quiet = () => jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -360,6 +382,37 @@ describe('delivery', () => {
     expect(deps.sendEmail).toHaveBeenCalledTimes(1);
   });
 
+  test('a worker whose lease expired and was taken over neither creates nor sends a second email', async () => {
+    const { deps, expire, getRow } = harness({ existingRow: pendingRow() });
+    let resumeA;
+    const stalled = new Promise((resolve) => { resumeA = resolve; });
+    const realLookup = deps.getSystemUser.getMockImplementation();
+    deps.getSystemUser.mockImplementationOnce(async (id) => { await stalled; return realLookup(id); });
+    // Worker A claims and stalls in its first recipient lookup.
+    const workerA = deliverHandoffEmail(SOURCE_ID, deps);
+    await new Promise((resolve) => setImmediate(resolve));
+    // A's lease expires; worker B claims, creates and sends.
+    expire();
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'sent' });
+    // A resumes and must stop at its fence.
+    resumeA();
+    expect(await workerA).toEqual({ status: 'lease_lost' });
+    expect(deps.createEmailActivity).toHaveBeenCalledTimes(1);
+    expect(deps.sendEmail).toHaveBeenCalledTimes(1);
+    expect(getRow().state).toBe('sent');
+  });
+
+  test('a lease lost between create and record does not send the extra activity', async () => {
+    const { deps, expire } = harness({ existingRow: pendingRow() });
+    deps.createEmailActivity.mockImplementationOnce(async (input) => {
+      expire();
+      await deliverHandoffEmail(SOURCE_ID, deps); // B takes over (finds nothing, creates its own)
+      return '77777777-7777-4777-8777-777777777777';
+    });
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'lease_lost' });
+    expect(deps.sendEmail).toHaveBeenCalledTimes(1);
+  });
+
   test('a held lease means another call is sending: nothing is created', async () => {
     const { deps } = harness({ existingRow: pendingRow({ locked: true }) });
     expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'not_claimed' });
@@ -374,7 +427,7 @@ describe('delivery', () => {
     deps.getEmailActivity.mockResolvedValue({ activityid: EMAIL_ID, statuscode: 3 });
     expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'sent' });
     expect(deps.createEmailActivity).not.toHaveBeenCalled();
-    expect(deps.recordActivity).toHaveBeenCalledWith(SOURCE_ID, expect.objectContaining({ emailId: EMAIL_ID, toRecipients: ['bea@wmkeck.org'] }));
+    expect(deps.recordActivity).toHaveBeenCalledWith(SOURCE_ID, expect.objectContaining({ emailId: EMAIL_ID, toRecipients: ['bea@wmkeck.org'] }), expect.any(String));
     expect(getRow().state).toBe('sent');
   });
 
