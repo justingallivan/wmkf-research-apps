@@ -99,7 +99,8 @@ Each stage ships separately, on a branch, with a Codex adversarial review; this 
 runtime work. Stage 1 is the original ask and ships first.
 
 ### Stage 1 — Step 4 handoff action (UI only, no new route)
-- Step 4 title: "Draft the writeup".
+- Step 4 title stays "Working writeup" (matches the other noun-phrase step titles); the summary
+  reads "Post-visit drafting" instead of "Locked for review".
 - Step 4 summary during post-visit editing: "Only you are working on this. Share it with
   colleagues when it's ready." This replaces "Locked for review".
 - Step 4 actions: **Edit writeup in Word** and **Ready for group review**.

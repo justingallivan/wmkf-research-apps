@@ -106,7 +106,7 @@ test('presents one governed transition action with concise eligibility guidance'
 
   expect(await screen.findByRole('heading', { name: 'Group review has not started' })).toBeInTheDocument();
   expect(screen.getByText(/same editable working writeup/i)).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Start group review' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Ready for group review' })).toBeEnabled();
   expect(screen.queryByRole('link', { name: 'Edit working writeup in Word' })).not.toBeInTheDocument();
 });
 
@@ -115,16 +115,16 @@ test('hides the governed transition from a staff member who is not authorized', 
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
   expect(await screen.findByText(/Only the lead Program Director or a superuser/i)).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Start group review' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).not.toBeInTheDocument();
 });
 
 test('contains keyboard focus inside the confirmation dialog', async () => {
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Start group review' }));
-  const dialog = screen.getByRole('dialog', { name: 'Start group review?' });
+  fireEvent.click(await screen.findByRole('button', { name: 'Ready for group review' }));
+  const dialog = screen.getByRole('dialog', { name: 'Ready for group review?' });
   const cancel = within(dialog).getByRole('button', { name: 'Cancel' });
-  const confirm = within(dialog).getByRole('button', { name: 'Start group review' });
+  const confirm = within(dialog).getByRole('button', { name: 'Ready for group review' });
 
   expect(confirm).toHaveFocus();
   fireEvent.keyDown(document, { key: 'Tab' });
@@ -148,10 +148,10 @@ test('confirms the irreversible handoff and then exposes only the separate Word 
     }, 503));
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Start group review' }));
-  const dialog = screen.getByRole('dialog', { name: 'Start group review?' });
+  fireEvent.click(await screen.findByRole('button', { name: 'Ready for group review' }));
+  const dialog = screen.getByRole('dialog', { name: 'Ready for group review?' });
   expect(dialog).toHaveTextContent('Word file stays the same');
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Start group review' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for group review' }));
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
     '/api/workbench/final-writeup',
@@ -164,7 +164,7 @@ test('confirms the irreversible handoff and then exposes only the separate Word 
   const open = await screen.findByRole('link', { name: 'Edit working writeup in Word' });
   expect(open).toHaveAttribute('href', 'https://sharepoint.test/site-visit.docx');
   expect(open).toHaveAttribute('target', '_blank');
-  expect(screen.queryByRole('button', { name: 'Start group review' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).not.toBeInTheDocument();
 });
 
 test('names the Site Visit prerequisite when the initial status load reports no source document', async () => {
@@ -188,9 +188,9 @@ test('names the Site Visit prerequisite when the server reports no source docume
     }, 409));
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Start group review' }));
-  const dialog = screen.getByRole('dialog', { name: 'Start group review?' });
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Start group review' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Ready for group review' }));
+  const dialog = screen.getByRole('dialog', { name: 'Ready for group review?' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for group review' }));
 
   const alert = await screen.findByRole('alert');
   expect(alert).toHaveTextContent(/Check working-writeup preparation in Staff Deliberations/);
@@ -337,7 +337,7 @@ test('shows schema-off state without offering an action', async () => {
 
   expect(await screen.findByRole('heading', { name: 'Final Writeup setup is not active' }))
     .toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Start group review' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).not.toBeInTheDocument();
 });
 
 describe('leadership review stage', () => {
@@ -369,7 +369,7 @@ describe('leadership review stage', () => {
     expect(await screen.findByText('Reviewed by')).toBeInTheDocument();
     expect(screen.getByLabelText(/Allison Keller/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Mark reviewed' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Start leadership review' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send to leadership' })).not.toBeInTheDocument();
   });
 
   test('offers the leadership handoff to the authorized PD only', async () => {
@@ -378,14 +378,14 @@ describe('leadership review stage', () => {
       .mockResolvedValueOnce(response(acknowledgementState({ mayAcknowledge: false, personalState: 'not-applicable' })));
     const { unmount } = render(<FinalWriteupTab requestId={REQUEST_ID} />);
     expect(await screen.findByText('Group review is in progress')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Start leadership review' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send to leadership' })).not.toBeInTheDocument();
     unmount();
 
     global.fetch = jest.fn()
       .mockResolvedValueOnce(response(groupReviewStatus(true)))
       .mockResolvedValueOnce(response(acknowledgementState({ mayAcknowledge: false, personalState: 'not-applicable' })));
     render(<FinalWriteupTab requestId={REQUEST_ID} />);
-    expect(await screen.findByRole('button', { name: 'Start leadership review' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Send to leadership' })).toBeInTheDocument();
   });
 
   test('confirms the leadership handoff with only request and current-Final fences, then shows the new stage', async () => {
@@ -401,11 +401,11 @@ describe('leadership review stage', () => {
       .mockResolvedValueOnce(response(acknowledgementState({ mayAcknowledge: false, personalState: 'not-applicable' })));
     render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Start leadership review' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Start leadership review?' });
+    fireEvent.click(await screen.findByRole('button', { name: 'Send to leadership' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Send to leadership?' });
     expect(within(dialog).getByText(/appears for the President and CSO/)).toBeInTheDocument();
     expect(within(dialog).getByText(/Nobody is notified by this step/)).toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Start leadership review' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Send to leadership' }));
 
     expect(await screen.findByText('Leadership review')).toBeInTheDocument();
     const [url, init] = global.fetch.mock.calls[2];
@@ -413,7 +413,7 @@ describe('leadership review stage', () => {
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body)).toEqual({ requestId: REQUEST_ID, expectedFinalArtifactId: FINAL_ID });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Start leadership review' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send to leadership' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Edit working writeup in Word' })).toBeInTheDocument();
     // Review tracking reloads for the new stage.
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(4));
@@ -430,9 +430,9 @@ describe('leadership review stage', () => {
       }, 409));
     render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Start leadership review' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Start leadership review?' });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Start leadership review' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Send to leadership' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Send to leadership?' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Send to leadership' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/Reload and retry/);
     expect(screen.getByText('Group review')).toBeInTheDocument();
@@ -465,7 +465,7 @@ test('T2 fetchStatus: malformed 2xx body is tolerated as {} (no error, nothing t
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Start group review' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).not.toBeInTheDocument();
 });
 
 test('T2 fetchAcknowledgementState: network rejection is isolated to the review-tracking panel', async () => {
@@ -492,9 +492,9 @@ test('T2 start(): network rejection surfaces the raw error message', async () =>
     .mockResolvedValueOnce(response(readyStatus()))
     .mockRejectedValueOnce(new Error('network down'));
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Start group review' }));
-  const dialog = screen.getByRole('dialog', { name: 'Start group review?' });
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Start group review' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Ready for group review' }));
+  const dialog = screen.getByRole('dialog', { name: 'Ready for group review?' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for group review' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('network down');
 });
 
@@ -504,9 +504,9 @@ test('T2 start(): malformed 2xx body is tolerated as {} (no crash, no Edit link)
     .mockResolvedValueOnce(malformed())
     .mockResolvedValueOnce(response({ error: 'Temporary review service failure.' }, 500));
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Start group review' }));
-  const dialog = screen.getByRole('dialog', { name: 'Start group review?' });
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Start group review' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Ready for group review' }));
+  const dialog = screen.getByRole('dialog', { name: 'Ready for group review?' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for group review' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   expect(screen.queryByRole('link', { name: 'Edit working writeup in Word' })).not.toBeInTheDocument();
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -520,9 +520,9 @@ test('T2 start(): a 202 response polls status until the phase leaves the review 
     .mockResolvedValueOnce(response(groupReviewStatus()))
     .mockResolvedValueOnce(response(acknowledgementState({ mayAcknowledge: false, personalState: 'not-applicable' })));
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Start group review' }));
-  const dialog = screen.getByRole('dialog', { name: 'Start group review?' });
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Start group review' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Ready for group review' }));
+  const dialog = screen.getByRole('dialog', { name: 'Ready for group review?' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for group review' }));
   expect(await screen.findByText(/starting group review/i)).toBeInTheDocument();
   expect(await screen.findByRole('link', { name: 'Edit working writeup in Word' }, { timeout: 5000 })).toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledTimes(5);
@@ -534,9 +534,9 @@ test('T2 advance(): network rejection surfaces the raw error message', async () 
     .mockResolvedValueOnce(response(acknowledgementState({ mayAcknowledge: false, personalState: 'not-applicable' })))
     .mockRejectedValueOnce(new Error('network down'));
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Start leadership review' }));
-  const dialog = await screen.findByRole('dialog', { name: 'Start leadership review?' });
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Start leadership review' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Send to leadership' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Send to leadership?' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Send to leadership' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('network down');
 });
 
@@ -546,9 +546,9 @@ test('T2 advance(): malformed 2xx body reads as a stale-Final mismatch', async (
     .mockResolvedValueOnce(response(acknowledgementState({ mayAcknowledge: false, personalState: 'not-applicable' })))
     .mockResolvedValueOnce(malformed());
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Start leadership review' }));
-  const dialog = await screen.findByRole('dialog', { name: 'Start leadership review?' });
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Start leadership review' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Send to leadership' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Send to leadership?' });
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Send to leadership' }));
   expect(await screen.findByRole('alert')).toHaveTextContent(/current Final Writeup changed/i);
   expect(screen.getByText('Group review')).toBeInTheDocument();
 });
@@ -587,5 +587,5 @@ test('legacy review compatibility is disclosed without disabling an authorized r
   global.fetch.mockResolvedValue(response({ ...readyStatus(true), startCompatibilityReason: 'legacy_review_schedule_unverified' }));
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
   expect(await screen.findByText('This uses the existing completed writeup. Presentation timing has not been verified.')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Start group review' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Ready for group review' })).toBeInTheDocument();
 });

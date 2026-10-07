@@ -186,6 +186,7 @@ function statusResponse({
 const ROUTE_DEFS = [
   { key: 'briefLock', test: (u, m) => m === 'POST' && u.includes('/pre-rp-brief/lock-for-share') },
   { key: 'briefReopen', test: (u, m) => m === 'POST' && u.includes('/pre-rp-brief/reopen') },
+  { key: 'finalStart', test: (u, m) => m === 'POST' && u.includes('/api/workbench/final-writeup') },
   { key: 'startSiteVisit', test: (u, m) => m === 'POST' && u.includes('/pre-site-visit/start-site-visit') },
   { key: 'reopen', test: (u, m) => m === 'POST' && u.includes('/pre-site-visit/reopen') },
   { key: 'briefGet', test: (u, m) => m === 'GET' && u.includes('/pre-rp-brief') },
@@ -202,6 +203,7 @@ function queueRoute(key, resp) {
 const defaultFor = {
   briefLock: () => response({ success: true, artifact: briefArtifact(REVIEW), reused: false }),
   briefReopen: () => response({ success: true, artifact: briefArtifact(DRAFT), reused: false }),
+  finalStart: () => response({ success: true, artifact: { artifactId: 'final-1' } }),
   startSiteVisit: () => response({ success: true, artifact: preSiteArtifact(REVIEW) }),
   reopen: () => response({ success: true, artifact: preSiteArtifact(DRAFT), reused: false }),
   // NEW-5 (Opus round 2): the default brief GET reports no brief rows at
@@ -291,8 +293,8 @@ test('Pre-Site card: Start Site Visit calls start-site-visit and moves the Pre-S
     requestId: REQUEST_ID,
     expectedArtifactId: PRESITE_ARTIFACT_ID,
   });
-  expect(await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ })).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Finish corrections' })).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Finish corrections' })).not.toBeInTheDocument());
+  expect(screen.getByRole('link', { name: 'Edit writeup in Word' })).toBeInTheDocument();
   // Share never calls start-site-visit and is not on this card at all.
   expect(screen.queryByRole('button', { name: 'Share…' })).not.toBeInTheDocument();
 });
@@ -301,7 +303,7 @@ test('M4: Start Site Visit requires the Pre-Site row to be Draft (not offered on
   queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(REVIEW) }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
+  await screen.findByRole('link', { name: /Edit writeup in Word/ });
   expect(screen.queryByRole('button', { name: 'Finish corrections' })).not.toBeInTheDocument();
   expect(calls('startSiteVisit')).toHaveLength(0);
 });
@@ -1009,7 +1011,7 @@ test('M1: a shared Pre-Site writeup without a current Word URL fails closed with
   expect(await screen.findByRole('heading', { name: 'Pre-Site Visit Writeup is read-only' }))
     .toBeInTheDocument();
   expect(screen.getByText(/No current Word link was returned/i)).toBeInTheDocument();
-  expect(screen.queryByRole('link', { name: /Open (?:briefing|writeup) in Word/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /(?:Open|Edit) (?:briefing|writeup) in Word/ })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Finish corrections' })).not.toBeInTheDocument();
 });
 
@@ -1018,7 +1020,7 @@ test('M1: a shared Pre-Site writeup without a current Word URL fails closed with
 test('only superusers can see the administration section and reopen control', async () => {
   queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(REVIEW) }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser={false} />);
-  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
+  await screen.findByRole('link', { name: /Edit writeup in Word/ });
   expect(screen.queryByRole('button', { name: 'Reopen Pre-Site Draft' })).not.toBeInTheDocument();
   expect(screen.queryByText(/Administration — guarded reopen/)).not.toBeInTheDocument();
 });
@@ -1042,7 +1044,7 @@ test('validates confirmation and submits one guarded reopen, returning the write
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
 
-  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
+  await screen.findByRole('link', { name: /Edit writeup in Word/ });
   fireEvent.click(screen.getByText(/Administration — guarded reopen/));
   fireEvent.click(screen.getByRole('button', { name: 'Reopen Pre-Site Draft' }));
   const submit = screen.getByRole('button', { name: 'Create Draft Successor' });
@@ -1071,7 +1073,7 @@ test('M2: a failed submit keeps one operation id and immutable audit inputs for 
   queueRoute('reopen', response({ error: 'The first attempt failed.', code: 'pre_site_reopen_copy_verification_failed' }, 409));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
 
-  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
+  await screen.findByRole('link', { name: /Edit writeup in Word/ });
   fireEvent.click(screen.getByText(/Administration — guarded reopen/));
   fireEvent.click(screen.getByRole('button', { name: 'Reopen Pre-Site Draft' }));
   fireEvent.change(screen.getByLabelText('Reason'), { target: { value: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF } });
@@ -1114,7 +1116,7 @@ test('renders append-only guarded reopen history from the status contract', asyn
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
 
-  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
+  await screen.findByRole('link', { name: /Edit writeup in Word/ });
   fireEvent.click(screen.getByText(/Administration — guarded reopen/));
   expect(screen.getByText('Guarded reopen attempts')).toBeInTheDocument();
   expect(screen.getByText('Needs reconciliation')).toBeInTheDocument();
@@ -1275,7 +1277,7 @@ test('T2: submitReopen non-2xx (readStatus route bytes unaffected) posts exact h
   queueRoute('reopen', response({ error: 'boom' }, 500));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
 
-  await screen.findByRole('link', { name: /Open (?:briefing|writeup) in Word/ });
+  await screen.findByRole('link', { name: /Edit writeup in Word/ });
   fireEvent.click(screen.getByText(/Administration — guarded reopen/));
   fireEvent.click(screen.getByRole('button', { name: 'Reopen Pre-Site Draft' }));
   fireEvent.change(screen.getByLabelText('Reason'), { target: { value: PRE_SITE_REOPEN_REASON.ACCIDENTAL_HANDOFF } });
@@ -1364,14 +1366,49 @@ test('a ready ordinary draft never requires a manual Start Site Visit', async ()
   expect(calls('startSiteVisit')).toHaveLength(0);
 });
 
-test('confirmed post-visit draft leads to review navigation without starting review', async () => {
-  const onSelectTab = jest.fn();
-  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(REVIEW), preparation: { due: true, state: 'prepared' }, timing: { availability: 'available', endIso: '2026-09-28T18:00:00Z' } }));
-  render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={onSelectTab} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Open group-review details' }));
-  expect(onSelectTab).toHaveBeenCalledWith('final-writeup');
+const POST_VISIT_STATUS = { currentArtifact: preSiteArtifact(REVIEW), preparation: { due: true, state: 'prepared' }, timing: { availability: 'available', endIso: '2026-09-28T18:00:00Z' } };
+const readyFinalReview = (overrides = {}) => ({
+  availability: 'missing', phase: 'ready', artifactId: null, file: null,
+  canStart: true, startBlockedReason: null, sourceArtifactId: PRESITE_ARTIFACT_ID, ...overrides,
+});
+
+test('post-visit drafting: the lead PD marks the writeup ready for group review from step 4', async () => {
+  queueRoute('presiteGet', statusResponse({ ...POST_VISIT_STATUS, finalReview: readyFinalReview() }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={jest.fn()} />);
+  const step = (await screen.findByRole('link', { name: 'Edit writeup in Word' })).closest('li');
+  expect(within(step).getByText('Post-visit drafting')).toBeInTheDocument();
+  expect(within(step).queryByText('Locked for review')).not.toBeInTheDocument();
+  fireEvent.click(within(step).getByRole('button', { name: 'Ready for group review' }));
+  const dialog = screen.getByRole('dialog', { name: 'Ready for group review?' });
+  expect(calls('finalStart')).toHaveLength(0);
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for group review' }));
+  await waitFor(() => expect(calls('finalStart')).toHaveLength(1));
+  expect(JSON.parse(calls('finalStart')[0][1].body)).toEqual({ requestId: REQUEST_ID, expectedArtifactId: PRESITE_ARTIFACT_ID });
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(calls('presiteGet').length).toBeGreaterThan(1);
   expect(calls('startSiteVisit')).toHaveLength(0);
-  expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('Working writeup ready for post-visit editing');
+  expect(screen.queryByRole('button', { name: 'Open group-review details' })).not.toBeInTheDocument();
+});
+
+test('post-visit drafting: a failed group-review start shows the server message', async () => {
+  queueRoute('presiteGet', statusResponse({ ...POST_VISIT_STATUS, finalReview: readyFinalReview() }));
+  queueRoute('finalStart', response({ error: 'The Word file changed while starting. Try again.' }, 409));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Ready for group review' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Ready for group review' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('The Word file changed while starting. Try again.');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test.each([
+  [{ canStart: false, startBlockedReason: null }, 'The lead Program Director marks this ready for group review when the draft is done.'],
+  [{ canStart: false, startBlockedReason: 'final_writeup_site_visit_not_ended' }, 'Group review becomes available after the scheduled presentation ends.'],
+  [{ canStart: false, startBlockedReason: 'final_writeup_schedule_unavailable' }, /presentation schedule could not be verified/],
+])('post-visit drafting without start permission explains who hands off (%o)', async (overrides, note) => {
+  queueRoute('presiteGet', statusResponse({ ...POST_VISIT_STATUS, finalReview: readyFinalReview(overrides) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  expect(await screen.findByTestId('group-review-handoff-note')).toHaveTextContent(note);
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).not.toBeInTheDocument();
 });
 
 test('an incomplete checkpoint cannot offer review readiness', async () => {
