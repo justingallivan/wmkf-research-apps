@@ -76,8 +76,8 @@ sequence.
   vocabulary".
 
 - **Staff Deliberations: group-review handoff from the writeup step
-  (2026-10-06).** [BUILT ON BRANCH `feature/writeup-group-review-handoff` —
-  Stage 1, pending review and promotion] Step 4 now reads "Post-visit drafting"
+  (2026-10-06).** [STAGE 1 LIVE — PR #452, merge `40b70a145`, Production 2026-10-06]
+  Step 4 now reads "Post-visit drafting"
   with "Edit writeup in Word" and "Ready for group review" (same
   `POST /api/workbench/final-writeup` route and authorization); Final writeup
   buttons renamed "Ready for group review" / "Send to leadership". Stages 2–5

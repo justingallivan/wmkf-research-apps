@@ -1,6 +1,6 @@
 ---
 title: Final Writeup group-review handoff — PD drafting, PD sign-off, leadership digest
-status: approved 2026-10-06 — Stage 1 in progress
+status: approved 2026-10-06 — Stage 1 live; Stages 2–5 not built
 created: 2026-10-06
 owner: Justin Gallivan
 related:
@@ -98,7 +98,7 @@ minimal per-cycle configuration rule).
 Each stage ships separately, on a branch, with a Codex adversarial review; this is Tier 1–3
 runtime work. Stage 1 is the original ask and ships first.
 
-### Stage 1 — Step 4 handoff action (UI only, no new route) — built on branch 2026-10-06
+### Stage 1 — Step 4 handoff action (UI only, no new route) — live 2026-10-06 (PR #452, merge `40b70a145`)
 - Step 4 title: "Post-presentation writeup" (owner 2026-10-06). During
   post-visit drafting the summary reads "Post-visit drafting" instead of "Locked for review".
 - Step 4 actions: **Edit writeup in Word** and **Ready for group review**.
