@@ -3,7 +3,11 @@
  *
  * GET ?requestId=... reads the governed Final Writeup transition state.
  * POST { requestId, expectedArtifactId } starts group review on the same stable
- * SharePoint Word item. Authorization is resolved server-side.
+ * SharePoint Word item. Authorization is resolved server-side. For a Grant
+ * Program listed in FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS, a handoff email
+ * intent is staged before the transition and sent to the other Program
+ * Directors once the transition is confirmed (handoff-email-service.js); email
+ * work never changes the response.
  */
 
 import { getUserRole, requireAppAccess } from '../../../lib/utils/auth';
@@ -15,6 +19,10 @@ import {
   startFinalWriteup,
 } from '../../../lib/services/final-writeup/transition-service';
 import { resolveWriteupViewer } from '../../../lib/services/pre-site-visit/writeup-visibility';
+import {
+  deliverGroupReviewHandoff,
+  stageGroupReviewHandoff,
+} from '../../../lib/services/final-writeup/handoff-email-service';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '16kb' } },
@@ -78,12 +86,30 @@ export default async function handler(req, res) {
           error: 'requestId and expectedArtifactId are required and must be GUIDs',
         });
       }
+      // Stage 4: stage the handoff email for this draft BEFORE the transition,
+      // so a commit whose response is lost is still emailed by a retry or by
+      // recovery. If the intent cannot be persisted for a listed program,
+      // refuse before anything commits rather than lose the email. Otherwise
+      // email work never changes this response.
+      const staged = await stageGroupReviewHandoff({
+        requestId, sourceDocumentId: expectedArtifactId, actingUserSystemId, isSuperuser,
+      });
+      if (staged.status === 'failed') {
+        return res.status(503).json({
+          error: 'I had trouble preparing the email to your colleagues, so group review has not started and nothing was changed. This is usually a temporary blip. Please try again, and if it keeps happening, contact an administrator.',
+          code: 'final_writeup_handoff_email_unavailable',
+        });
+      }
       const result = await startFinalWriteup({
         requestId,
         expectedArtifactId,
         isSuperuser,
         actingUserSystemId,
       });
+      if (!result.inProgress) {
+        // Sends only when the current Final is confirmed to come from this draft.
+        await deliverGroupReviewHandoff({ sourceDocumentId: expectedArtifactId });
+      }
       return res.status(result.inProgress ? 202 : 200).json({ success: true, ...result });
     } catch (error) {
       return sendError(res, error);

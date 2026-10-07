@@ -6,7 +6,7 @@ metadata:
   type: project
   status: active
   scope: repo
-  last_verified: 2026-10-07 via owner statement in Session 581
+  last_verified: 2026-10-07 via owner statements in Session 581 (parked; Stage 4 Research only)
 ---
 
 ## Recall Rule
@@ -26,11 +26,12 @@ would be guesswork.
 **How to apply:**
 - Do not propose or build SoCal-specific behavior. Do not raise it as a next
   step; wait for the owner.
-- Hazard for Stage 4 and 5: decision B derives recipients from the staffing
-  setting's program entries with no allowlist. The service catalog records a
-  six-person SoCal audience published 2026-09-01 (not live-read). If that entry
-  is still published, SoCal requests would get the handoff email. Surface this
-  to the owner before Stage 4 ships; do not silently include or exclude SoCal.
+- Stage 4 resolved (owner, 2026-10-07: "Research"): the handoff email is gated
+  by the fail-closed `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS` list, so the
+  SoCal staffing entry alone sends nothing. Do not add SoCal to that list
+  without the owner.
+- Stage 5 (leadership digest) is still exposed: it would list SoCal writeups
+  that reach leadership review. Ask the owner before Stage 5 ships.
 - Stage 3 (sign-off view) already shows a SoCal request's PD list from that
   entry. It is display-only and was left as is.
 

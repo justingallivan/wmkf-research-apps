@@ -354,6 +354,66 @@ object-key-order defect fixed in commit `f5b7efc2`; they are not additional
 sends. This receipt proves Dynamics transport acceptance, not independent
 inbox/calendar-client delivery.
 
+### `final_writeup_handoff_emails` — PRODUCTION-LIVE; MIGRATION 072 APPLIED
+
+**[PRODUCTION-LIVE: PR #456, merge `8bc5b466b`, 2026-10-07; migration 072 applied; copy seeded; Production list = Research `c247b11a-a7cb-ee11-9078-000d3a341e8f` only; first real send not yet observed. Production schema read back 2026-10-07: 19 columns, 4 indexes, 5 checks, 0 rows.]**
+**Source of truth:** Postgres send ledger for the group-review handoff email
+(Final Writeup group-review handoff Stage 4). Dataverse owns the documents and
+request; Dynamics owns the email activity and transport. Migration
+`072_final_writeup_handoff_emails.sql`; fresh installs run it as a numbered
+migration (no setup-database fixture). One row per handed-off draft (primary
+key `source_document_id`, the Site Visit / Pre-Site source document);
+`final_document_id` is bound once the transition is confirmed (unique when
+set). `POST /api/workbench/final-writeup` stages the row BEFORE the transition
+runs, only for the lead PD or a superuser, only when the submitted draft is the
+request's current draft (`_wmkf_currentpresitevisit_value`), only when the
+request has no current Final, and only when its Grant Program is listed in
+`FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`, so writeups already in group review
+before deployment never get a row. If the insert fails for a request that
+should email, or the request cannot be read while any program is listed, the
+route returns 503 `final_writeup_handoff_email_unavailable` before the
+transition starts. With no program listed, staging reads nothing. Delivery sends only when the
+request's current Final has this draft as its source and is in group review;
+until then the row stays `pending` without an error (`awaiting_transition`),
+so a commit whose response was lost is still sent by a retry POST or by
+recovery. States: `pending` → `sent`, or terminal `skipped` with a
+`skip_reason` (`program_not_enabled`, `final_from_other_draft`,
+`no_longer_in_group_review`, `final_withdrawn`, `transition_not_committed`
+after 14 days (each new staging of the same draft restarts that wait, and a
+later staging or a committed start for the draft reopens only this kind of skip),
+`program_not_configured`, `staffing_not_configured`, `no_recipients`). A five-minute lease (`lease_token` + `locked_until`)
+lets one call send; every write requires the current token, and the lease is
+renewed as a fence before creating an activity and before `SendEmail`, so a
+worker whose lease expired and was taken over stops (fifth Codex review); the Dynamics activity id and frozen `to_recipients` are stored before
+`SendEmail`, and correlation key `wmkf-final-writeup-handoff:<sourceDocumentId>`
+recovers an activity created before the id was stored. An activity already
+accepted by Dynamics is recorded as sent without further checks; one that is
+not yet sent is re-checked against the current Final and group-review state
+before `SendEmail`, so a stale invitation is never sent. Eligibility, audience and lead
+exclusion use the request's current Grant Program and lead PD. Any existing
+unsent activity (a recorded draft whose send failed, or an orphan found by correlation key
+and never recorded) is sent only if its To list matches exactly the recipients the request
+would get now, re-resolved from the current audience, persona, role, account state and
+address; otherwise it is abandoned unsent and a fresh activity is built for the current
+recipients under the next `recipient_generation` (part of the correlation key), so the email
+still goes out. A failed lookup keeps the row pending. The program and lead used to build a
+draft are saved with its activity id. An owed email that cannot be delivered
+(`program_not_configured`, `staffing_not_configured`, `no_recipients`, or a third failed
+attempt) raises an `error` ops alert (`final_writeup_handoff_email_undelivered`). Store SQL is proven by
+`tests/integration/final-writeup-handoff-email.pg.test.js` in the CI Postgres job. Recipient lookups that
+fail for any reason other than 404 keep the whole send pending. Recipients are internal staff
+only (owner, 2026-10-07): an address whose domain is not exactly `wmkeck.org`
+(`FOUNDATION_EMAIL_DOMAIN`) is never emailed, and refusing one raises an
+`final_writeup_handoff_email_outside_domain` ops alert. Failures keep
+`pending` with `last_error_code` and are retried automatically every 15 minutes by
+`/api/cron/final-writeup-handoff-emails` (25 rows per pass), by the next POST for that draft,
+or by owner-run `scripts/recover-final-writeup-handoff-emails.mjs`; recovery takes the least
+recently attempted rows first so repeated failures rotate to the back. Read/write paths:
+`lib/services/final-writeup/handoff-email-store.js` and
+`lib/services/final-writeup/handoff-email-service.js`. Trade-off: while
+Postgres is unavailable, an enabled program's handoff cannot start; the lead PD
+retries. No cleanup is scheduled; rows remain audit history.
+
 ### `deliberation_agenda_sends` — DEPLOYED; MIGRATION 041 APPLIED
 
 **Source of truth:** Postgres exact-email and cross-system recovery ledger for

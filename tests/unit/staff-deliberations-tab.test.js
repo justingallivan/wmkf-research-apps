@@ -1705,3 +1705,16 @@ test('an unlinked account with no draft yet is told why it cannot prepare one', 
   expect(await screen.findByTestId('writeup-hidden-note')).toHaveTextContent(/isn’t linked to a Dynamics user/);
   expect(screen.queryByRole('button', { name: 'Prepare working draft' })).not.toBeInTheDocument();
 });
+
+test.each([
+  [true, 'The other Program Directors for this grant program are emailed a link to the writeup.', /No email is sent/],
+  [false, 'No email is sent. Let colleagues know it is ready.', /are emailed/],
+])('post-visit drafting: handoffEmailEnabled=%s, the step 4 confirmation states the email behavior', async (enabled, shown, absent) => {
+  queueRoute('presiteGet', statusResponse({ ...POST_VISIT_STATUS, finalReview: readyFinalReview({ handoffEmailEnabled: enabled }) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={jest.fn()} />);
+  const step = (await screen.findByRole('link', { name: 'Edit writeup in Word' })).closest('li');
+  fireEvent.click(within(step).getByRole('button', { name: 'Ready for group review' }));
+  const dialog = screen.getByRole('dialog', { name: 'Ready for group review?' });
+  expect(dialog).toHaveTextContent(shown);
+  expect(dialog).not.toHaveTextContent(absent);
+});

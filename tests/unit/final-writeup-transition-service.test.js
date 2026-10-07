@@ -421,6 +421,7 @@ test.each([true, false])('status projects the exact pending Final from populated
     startBlockedReason: null,
     canAdvance: false,
     sourceArtifactId: SOURCE_ID,
+    handoffEmailEnabled: false,
     sourceFile: { webUrl: harness.source.wmkf_sharepointweburl, name: harness.source.wmkf_filename },
     artifact: null,
     pendingArtifact: {
@@ -869,4 +870,28 @@ test.each([
     expect(result.sourceFileHidden).toBe(true);
     expect(result.pendingArtifact.file).toBeNull();
   }
+});
+
+describe('handoff email flag (group-review Stage 4)', () => {
+  const RESEARCH_ID = '30303030-3030-4030-8030-303030303030';
+  const original = process.env.FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS;
+  afterEach(() => {
+    if (original === undefined) delete process.env.FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS;
+    else process.env.FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS = original;
+  });
+
+  test.each([
+    ['the request program is listed', JSON.stringify([RESEARCH_ID]), RESEARCH_ID, true],
+    ['another program is listed', JSON.stringify(['40404040-4040-4040-8040-404040404040']), RESEARCH_ID, false],
+    ['the list is unset', undefined, RESEARCH_ID, false],
+  ])('ready status says whether PDs will be emailed: %s', async (_label, envValue, programId, expected) => {
+    if (envValue === undefined) delete process.env.FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS;
+    else process.env.FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS = envValue;
+    const harness = createHarness();
+    harness.request._wmkf_grantprogram_value = programId;
+    const result = await getFinalWriteupStatus({
+      requestId: REQUEST_ID, isSuperuser: false, actingUserSystemId: LEAD_PD_ID, writeupViewer: null,
+    }, harness.dependencies);
+    expect(result.handoffEmailEnabled).toBe(expected);
+  });
 });
