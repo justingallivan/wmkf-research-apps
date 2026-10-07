@@ -2,7 +2,9 @@
 
 Status: implementation contract for the first Proposal Ranking release. It is
 derived from revision 3 of `PROPOSAL_RANKING_DESIGN_2026-10-07.md`. Runtime
-activation still requires schema, role, environment, and identity provisioning.
+activation remains pending. Sandbox schema and application-role setup are verified;
+environment/identity configuration and live rehearsal remain open. See
+`docs/atlas/dataverse-proposal-ranking.md` for target-specific status.
 
 ## Route
 

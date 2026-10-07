@@ -1,6 +1,6 @@
 # Proposal Ranking — design for review
 
-Date: 2026-10-07. Revision: 3 (Opus revision-2 findings incorporated). Status: **Source implementation and local verification complete; not deployed or provisioned.**
+Date: 2026-10-07. Revision: 3 (Opus revision-2 findings incorporated). Status: **Source implemented; sandbox schema/role provisioned; runtime rehearsal and production activation pending.**
 Owner: Justin. Design consolidation: Codex. Requested reviewer: Claude Opus.
 Authority: owner decisions in the Proposal Ranking planning conversation.
 
@@ -159,13 +159,13 @@ transaction. Once captured, it supplies every PD's initial list. Later withdrawa
 or data correction does not mutate it; the unpublished cancel/reopen control is
 available. Published pools stay fixed in v1.
 
-## Architecture and permissions [source implemented; not provisioned]
+## Architecture and permissions [source implemented; sandbox storage provisioned]
 
 Use existing app registration and authenticated route/service/adapter boundaries.
 Dataverse is the implemented persistence target. The three table definitions and
 application role are checked in under `lib/dataverse/schema/wave32-proposal-ranking/`
-and `lib/dataverse/schema/roles/proposal-ranking-app.json`. Live schema, role,
-configuration and multi-identity verification remain unperformed. See
+and `lib/dataverse/schema/roles/proposal-ranking-app.json`. Sandbox schema and application-role provisioning have passed readback. Runtime
+configuration, direct-user privacy and multi-identity verification remain open. See
 `docs/atlas/dataverse-proposal-ranking.md` for the activation boundary.
 
 Use three logical tables (`wmkf_proposalrankingcycle`, `wmkf_proposalrankinground`,
@@ -349,8 +349,10 @@ Original review: `docs/audits/PROPOSAL_RANKING_OPUS_DESIGN_REVIEW_2026-10-07.md`
 | S5 totals | Requested amount snapshot, common verified currency, integer minor units, missing-data indicator. |
 | S6 ties | Exact rank sums, then seed order; numeric-aware request-number seed ties. |
 
-Runtime/schema/security-role provisioning and real multi-identity rehearsal remain
-unperformed. Source assertions are bounded to the cited code; no production-read
+Sandbox schema/security-role provisioning is verified in
+`docs/audits/PROPOSAL_RANKING_SANDBOX_SETUP_2026-10-07.md`. Runtime activation
+and real multi-identity rehearsal remain unperformed; no eligible sandbox proposals
+were found by the complete source scan. Source assertions are bounded to the cited code; no production-read
 permission is inferred from design approval. Engineering contracts above remain the acceptance requirements; source code and
 focused tests provide implementation evidence, while live behavior remains unverified.
 

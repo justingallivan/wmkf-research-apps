@@ -1,7 +1,9 @@
 # Proposal Ranking storage and activation
 
-Date: 2026-10-07. Status: source implemented on the feature branch; local validation and source reviews complete. No live Dataverse schema, role, app grant, setting or deployment
-has been applied or probed for this feature.
+Date: 2026-10-07. Status: source implemented; sandbox schema and application-role
+provisioning verified. Runtime activation and multi-identity rehearsal remain pending.
+Production has not been provisioned or enabled. Evidence:
+`docs/audits/PROPOSAL_RANKING_SANDBOX_SETUP_2026-10-07.md`.
 
 ## Source and persistence
 
@@ -54,13 +56,14 @@ reconciles uncertain outcomes, and invalidates stale responses on scope/access
 changes. Cumulative requested amounts use frozen integer minor units and update
 with the visible order. No automatic budget cutoff is applied.
 
-## Activation checklist — not yet performed
+## Activation checklist — sandbox setup partially complete
 
-1. Authorize and run schema dry-run/apply against the intended rehearsal target
-   using the existing `apply-dataverse-schema.js` workflow and wave
-   `32-proposal-ranking`; verify exact fields, Memo bounds and active alternate keys.
-2. Apply the dedicated application-user role only to the application identity.
-   Verify ordinary PD direct table reads fail, and confirm these tables are excluded
+1. [VERIFIED via sandbox apply and readiness probe] Wave `32-proposal-ranking`
+   is applied on `orgd9e66399.crm.dynamics.com`; all three entity identities, expected
+   fields/Memo bounds and active alternate keys passed readback.
+2. [VERIFIED via role apply and assignment readback] The dedicated role is assigned
+   only by this setup to the sandbox application identity, with nine Create/Read/Write
+   privileges. Ordinary PD direct-table denial remains untested. Confirm exclusion
    from Dataverse relevance search. Verify indirect audit/navigation paths are denied.
 3. Verify test-request and synthetic-reviewer isolation schemas/switches on that
    target. Set `PROPOSAL_RANKING_SCHEMA_READY=on` only after schema/role proof;
@@ -88,4 +91,8 @@ wire shapes are in `docs/plans/PROPOSAL_RANKING_API_CONTRACT.md`. Local regressi
 suites cover calculations, preview/schema, service behavior, UI and generic-reader
 privacy. Verification and Opus review are recorded in
 `docs/audits/PROPOSAL_RANKING_OPUS_IMPLEMENTATION_REVIEW_2026-10-07.md`.
-No live-state claim is made by this page.
+Live claims are limited to the sandbox setup receipt and reproducible GET-only
+`scripts/probe-proposal-ranking-readiness.mjs`. Its uncapped, all-date eligible
+source scan returned zero proposals. Rehearsal data, staff grants/default identity,
+isolation/runtime flags, direct-user denial, search exclusion and browser rehearsal
+remain open. Advanced Find visibility is not proof of relevance-search exclusion.

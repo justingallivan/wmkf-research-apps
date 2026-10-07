@@ -1,5 +1,8 @@
 # Proposal Ranking — Opus implementation review
 
+Historical pre-provisioning receipt. Subsequent sandbox setup and bounded source-field
+correction review are recorded in `PROPOSAL_RANKING_SANDBOX_SETUP_2026-10-07.md`.
+
 Date: 2026-10-07. Reviewer: `claude-opus-5-5`, authenticated through the
 Claude subscription OAuth session, with API-key environment variables removed.
 Read-only file tools; no Fable, model API, live data or deployment used.

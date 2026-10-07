@@ -1,4 +1,4 @@
-# Session 582 Prompt: Proposal Ranking source complete; operator rehearsal pending
+# Session 582 Prompt: Proposal Ranking sandbox schema ready; rehearsal data pending
 
 ## Session 581 Summary — 2026-10-07 (Codex)
 
@@ -7,7 +7,9 @@ isolated worktree. Luna performed reconnaissance/build work, Sol reviewed its
 slices, and the orchestrator integrated and corrected the implementation. Claude
 Opus reviewed through subscription OAuth only: R1 requested four concrete fixes;
 R2 approved with a nonblocking validation-message note, which was corrected.
-No Fable was used. The source is complete and locally tested, not deployed.
+No Fable was used. Subsequent sandbox provisioning and live-field corrections are
+recorded in `docs/audits/PROPOSAL_RANKING_SANDBOX_SETUP_2026-10-07.md`.
+The app remains disabled; production is unchanged.
 
 ### Completed source
 
@@ -37,9 +39,13 @@ No Fable was used. The source is complete and locally tested, not deployed.
 ## Verified open — operator-controlled activation
 
 Source evidence and exact steps: `docs/atlas/dataverse-proposal-ranking.md`.
-Schema/role provisioning, actual Beth Pruitt identity selection and app grants,
-readiness configuration, relevance-search exclusion, ordinary-staff direct-table
-denial and multi-identity/live-concurrency rehearsal have not been performed.
+Sandbox schema/role provisioning is complete and readback passed: three tables,
+expected fields/bounds, three Active alternate keys and app-only role assignment.
+The complete eligible-source scan returned zero proposals. Owner was asked whether
+to prepare a sandbox-only rehearsal set or supply a cycle; no data was seeded.
+Actual Beth Pruitt identity selection and app grants, readiness configuration,
+relevance-search exclusion, ordinary-staff direct-table denial and multi-identity/
+live-concurrency rehearsal remain unperformed.
 No production read, write, deployment or activation is authorized by this handoff.
 Owner performs deliberate promotion after the rehearsal evidence is reviewed.
 
@@ -47,8 +53,11 @@ Owner performs deliberate promotion after the rehearsal evidence is reviewed.
 
 `docs/audits/PROPOSAL_RANKING_OPUS_IMPLEMENTATION_REVIEW_2026-10-07.md` records the
 review text, accepted corrections, local build/tests and bounded evidence limits.
-Canonical production build and relevant type/security/data/documentation gates
-passed. Feature/Explorer integration regression command:
+Canonical production build passed after the source corrections. The two live-source corrections passed 110 tests
+in 10 suites plus lint/type/data gates and Sol/Opus review. Full GitHub Jest has one
+unrelated transcript-card failure, reproduced locally; test/component are unchanged
+from main. See sandbox receipt for the exact test and evidence boundary.
+Feature/Explorer integration regression command:
 
 ```bash
 ./node_modules/.bin/jest --runInBand tests/unit/proposal-ranking-*.test.js tests/integration/dynamics-explorer-tool-serialization.test.js
