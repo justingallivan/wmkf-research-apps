@@ -153,11 +153,17 @@ function harness({
     recordFinal: jest.fn(async (_id, finalId, token) => {
       if (owns(token)) row.final_document_id = finalId;
     }),
-    recordActivity: jest.fn(async (_id, { emailId, toRecipients }, token) => {
+    recordActivity: jest.fn(async (_id, {
+      emailId, toRecipients, grantProgramId, leadSystemUserId,
+    }, token) => {
       if (!owns(token) || (row.dynamics_email_id && row.dynamics_email_id !== emailId)) return { recorded: false };
       calls.push('record');
-      row.dynamics_email_id = emailId;
-      row.to_recipients = toRecipients;
+      Object.assign(row, {
+        dynamics_email_id: emailId,
+        to_recipients: toRecipients,
+        grant_program_id: grantProgramId,
+        lead_systemuser_id: leadSystemUserId,
+      });
       return { recorded: true };
     }),
     markSent: jest.fn(async (_id, emailId, token) => {
@@ -447,6 +453,22 @@ describe('delivery', () => {
     activities.set(EMAIL_ID, { activityid: EMAIL_ID, statuscode: 1 });
     expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'skipped', reason: 'request_changed' });
     expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('lead reassigned before delivery, then a transport failure: recovery sends the draft once', async () => {
+    const { deps, getRow } = harness({
+      existingRow: pendingRow(),
+      requestRow: request({ _wmkf_programdirector_value: BEA_ID }),
+    });
+    deps.sendEmail.mockRejectedValueOnce(Object.assign(new Error('transport'), { code: 'dynamics_send_failed' }));
+    const spy = quiet();
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'failed', code: 'dynamics_send_failed' });
+    spy.mockRestore();
+    // The draft was built for the current lead, and the ledger says so.
+    expect(getRow()).toMatchObject({ lead_systemuser_id: BEA_ID, grant_program_id: RESEARCH_ID });
+    expect(await recoverPendingHandoffEmails({}, deps)).toEqual([{ sourceDocumentId: SOURCE_ID, status: 'sent' }]);
+    expect(deps.createEmailActivity).toHaveBeenCalledTimes(1);
+    expect(deps.sendEmail).toHaveBeenCalledTimes(2);
   });
 
   test('a held lease means another call is sending: nothing is created', async () => {

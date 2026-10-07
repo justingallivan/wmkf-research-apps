@@ -85,15 +85,15 @@ describeIf('final_writeup_handoff_emails ledger (live Postgres, migration 072)',
     expect(await store.renewHandoffEmailLease(SOURCE, first.lease_token)).toBeNull();
     const second = await store.claimHandoffEmail(SOURCE);
     expect(second.lease_token).not.toBe(first.lease_token);
-    expect(await store.recordHandoffEmailActivity(SOURCE, { emailId: EMAIL, toRecipients: ['a@wmkeck.org'], skippedRecipientCount: 0 }, first.lease_token))
+    expect(await store.recordHandoffEmailActivity(SOURCE, { emailId: EMAIL, toRecipients: ['a@wmkeck.org'], skippedRecipientCount: 0, grantProgramId: PROGRAM, leadSystemUserId: LEAD }, first.lease_token))
       .toEqual({ recorded: false });
     await store.markHandoffEmailSent(SOURCE, EMAIL, first.lease_token);
     expect(await store.getHandoffEmail(SOURCE)).toMatchObject({ state: 'pending', dynamics_email_id: null });
 
-    expect(await store.recordHandoffEmailActivity(SOURCE, { emailId: EMAIL, toRecipients: ['a@wmkeck.org'], skippedRecipientCount: 0 }, second.lease_token))
+    expect(await store.recordHandoffEmailActivity(SOURCE, { emailId: EMAIL, toRecipients: ['a@wmkeck.org'], skippedRecipientCount: 0, grantProgramId: PROGRAM, leadSystemUserId: LEAD }, second.lease_token))
       .toEqual({ recorded: true });
     const OTHER_EMAIL = '77777777-7777-4777-8777-777777777777';
-    expect(await store.recordHandoffEmailActivity(SOURCE, { emailId: OTHER_EMAIL, toRecipients: [], skippedRecipientCount: 0 }, second.lease_token))
+    expect(await store.recordHandoffEmailActivity(SOURCE, { emailId: OTHER_EMAIL, toRecipients: [], skippedRecipientCount: 0, grantProgramId: PROGRAM, leadSystemUserId: LEAD }, second.lease_token))
       .toEqual({ recorded: false });
     await store.releaseHandoffEmail(SOURCE, second.lease_token);
     expect(await store.getHandoffEmail(SOURCE)).toMatchObject({ lease_token: null, locked_until: null });
@@ -106,7 +106,7 @@ describeIf('final_writeup_handoff_emails ledger (live Postgres, migration 072)',
     expect(await store.listPendingHandoffEmails()).toHaveLength(1);
     const b = await store.claimHandoffEmail(SOURCE);
     await store.recordHandoffEmailFinal(SOURCE, FINAL, b.lease_token);
-    await store.recordHandoffEmailActivity(SOURCE, { emailId: EMAIL, toRecipients: ['a@wmkeck.org'], skippedRecipientCount: 1 }, b.lease_token);
+    await store.recordHandoffEmailActivity(SOURCE, { emailId: EMAIL, toRecipients: ['a@wmkeck.org'], skippedRecipientCount: 1, grantProgramId: PROGRAM, leadSystemUserId: LEAD }, b.lease_token);
     await store.markHandoffEmailSent(SOURCE, EMAIL, b.lease_token);
     const row = await store.getHandoffEmail(SOURCE);
     expect(row).toMatchObject({
