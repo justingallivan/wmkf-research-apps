@@ -49,6 +49,7 @@
 - Dataverse / Dynamics / Explorer / CRM facts / SharePoint DOCX-XLSX byte identity: ../docs/agent-wiki/topics/dataverse-dynamics.md (Durable Memory)
 - Dynamics Explorer behavior campaign / SoCal vernacular / telemetry+eval: ../docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md
 - Prompt / Executor / prompt governance / thinking-budget truncation: ../docs/agent-wiki/topics/prompt-executor.md (Durable Memory)
+- Final Writeup SoCal workflow (parked by owner; Stage 4/5 recipient hazard): project-socal-writeup-workflow-parked.md
 - Initial Assessment registry/controls and Final Writeup lineage/review: ../docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md; ../docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md; ../docs/agent-wiki/topics/intake-portal.md (J27)
 - BILL / honoraria / payment semantics: ../docs/agent-wiki/topics/finance-honoraria.md
 - Auth / admin / access / org-open reviewer access / private Blob: ../docs/agent-wiki/topics/security-auth.md; ../docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md

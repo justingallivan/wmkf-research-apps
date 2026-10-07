@@ -221,8 +221,12 @@ directly, so it is not guarded (Codex re-review finding, 2026-10-06).
 **Decision B probe, partly answered:** `docs/SERVICE_AND_UTILITY_CATALOG.md` records the v2 setting
 published 2026-09-01 with a nine-person Research audience and a six-person Southern California
 audience [VERIFIED via catalog entry, not a live read]. If that SoCal entry is still published,
-SoCal requests would also get the handoff email under decision B. Confirm with the owner, or
-read the live setting (owner-run), before building Stage 4.
+SoCal requests would also get the handoff email under decision B.
+
+**SoCal is parked (owner, 2026-10-07):** "I don't know the Southern California program workflow
+well enough to design this now." Do not design SoCal behavior until the owner raises it. Before
+Stage 4 ships, show the owner what the live setting would send for SoCal requests; do not
+silently include or exclude them.
 - Sent after the transition is recorded, never inside the transition changeset. It has its own
   claim/receipt row with recovery, so a failed send never undoes or blocks the handoff, and a
   retry never sends twice.
@@ -264,4 +268,4 @@ read the live setting (owner-run), before building Stage 4.
 - Required sign-off counts.
 - An email to the lead PD when the last PD signs off. This was not requested; revisit if wanted.
 - Anything after leadership review: final/complete state, board package.
-- SoCal configuration. Under decision B that is a settings publish, not code.
+- SoCal workflow and configuration. Parked by the owner on 2026-10-07 until they raise it again.
