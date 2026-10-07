@@ -578,3 +578,30 @@ describe('request-schedulable gate (tracker slice 0)', () => {
     expect(deps.replaceSiteVisitWithParties).not.toHaveBeenCalled();
   });
 });
+
+describe('draft writeup stays out of materials until group review', () => {
+  const LEAD = '77777777-7777-4777-8777-777777777777';
+  const writeupRow = (lifecycleState) => ({
+    wmkf_requestdocumentid: '88888888-8888-4888-8888-888888888888',
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: lifecycleState,
+    wmkf_filename: 'writeup.docx',
+    wmkf_sharepointweburl: 'https://example.sharepoint.com/writeup.docx',
+  });
+  const run = (lifecycleState, writeupViewer) => getSiteVisitLogistics({ requestId: REQUEST_ID, writeupViewer }, dependencies({
+    getArtifactStatus: jest.fn(async () => ({ currentArtifact: null, leadProgramDirectorId: LEAD })),
+    findDocumentsByRequest: jest.fn(async () => ({ records: [writeupRow(lifecycleState)] })),
+  }));
+
+  test.each([
+    ['no viewer', REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW, null, 0],
+    ['another staff member', REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT, { isSuperuser: false, actingUserSystemId: REQUEST_ID, isCoordinator: false }, 0],
+    ['the lead PD', REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW, { isSuperuser: false, actingUserSystemId: LEAD, isCoordinator: false }, 1],
+    ['anyone once in group review', REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL, null, 1],
+  ])('%s', async (_label, lifecycleState, writeupViewer, count) => {
+    const result = await run(lifecycleState, writeupViewer);
+    expect(result.materials).toHaveLength(count);
+  });
+});

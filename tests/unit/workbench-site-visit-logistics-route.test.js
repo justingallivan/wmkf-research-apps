@@ -1,5 +1,8 @@
 /** @jest-environment node */
-jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
+jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn(), getUserRole: jest.fn(async () => 'staff') }));
+jest.mock('../../lib/services/pre-site-visit/writeup-visibility', () => ({
+  resolveWriteupViewer: jest.fn(async (input) => ({ ...input, isCoordinator: false })),
+}));
 jest.mock('../../lib/dataverse/core/context', () => ({ withDalContext: jest.fn((_label, fn) => fn()) }));
 jest.mock('../../lib/services/site-visit/logistics-service', () => ({
   getSiteVisitLogistics: jest.fn(),
@@ -27,7 +30,7 @@ test('Workbench GET returns only visit and materials, even if the service gains 
   await handler({ method: 'GET', query: { requestId: REQUEST_ID } }, res);
 
   expect(requireAppAccess).toHaveBeenCalledWith(expect.anything(), res, 'reviewers');
-  expect(getSiteVisitLogistics).toHaveBeenCalledWith({ requestId: REQUEST_ID, includePresentationSummaryText: true });
+  expect(getSiteVisitLogistics).toHaveBeenCalledWith({ requestId: REQUEST_ID, includePresentationSummaryText: true, writeupViewer: expect.objectContaining({ isSuperuser: false }) });
   expect(res.statusCode).toBe(200);
   expect(res.body).toEqual({ success: true, siteVisit: { activityId: 'a1' }, materials: [{ artifactId: 'm1' }] });
 });

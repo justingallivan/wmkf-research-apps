@@ -9,12 +9,13 @@
  * Same `reviewers` app gate as the sibling initial-assessment route.
  */
 
-import { requireAppAccess } from '../../../lib/utils/auth';
+import { getUserRole, requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
 import { actorRefFromSession } from '../../../lib/utils/actor-ref';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { listPreSiteVisitDrafts } from '../../../lib/services/pre-site-visit/cycle-list-service';
+import { resolveWriteupViewer } from '../../../lib/services/pre-site-visit/writeup-visibility';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -43,7 +44,14 @@ export default async function handler(req, res) {
 
   return withDalContext('workbench-staff-deliberations', async () => {
     try {
-      return res.status(200).json(await listPreSiteVisitDrafts({ cycleCode, programId, scope, callerSystemId }));
+      const role = access.profileId === null ? 'superuser' : await getUserRole(access.profileId);
+      const writeupViewer = await resolveWriteupViewer({
+        isSuperuser: role === 'superuser',
+        actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
+      });
+      return res.status(200).json(await listPreSiteVisitDrafts({
+        cycleCode, programId, scope, callerSystemId, writeupViewer,
+      }));
     } catch (error) {
       if (error instanceof ServiceHttpError) {
         return res.status(error.httpStatus).json(error.body ?? { error: error.message });

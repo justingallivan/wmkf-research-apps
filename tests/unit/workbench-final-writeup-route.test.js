@@ -7,6 +7,9 @@ jest.mock('../../lib/utils/auth', () => ({
 jest.mock('../../lib/dataverse/core/context', () => ({
   withDalContext: jest.fn((_label, fn) => fn()),
 }));
+jest.mock('../../lib/services/final-writeup/persona-service', () => ({
+  resolveFinalWriteupPersonas: jest.fn(async () => ({ enabled: true, personas: ['program-coordinator'] })),
+}));
 jest.mock('../../lib/services/final-writeup/transition-service', () => ({
   getFinalWriteupStatus: jest.fn(),
   startFinalWriteup: jest.fn(),
@@ -59,6 +62,7 @@ test('GET reads status in authenticated DAL context with server-derived identity
     requestId: REQUEST_ID,
     isSuperuser: false,
     actingUserSystemId: USER_ID,
+    writeupViewer: { isSuperuser: false, actingUserSystemId: USER_ID, isCoordinator: true },
   });
   expect(res.statusCode).toBe(200);
   expect(res.body).toMatchObject({ success: true, phase: 'ready' });

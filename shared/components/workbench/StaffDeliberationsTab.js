@@ -292,6 +292,7 @@ export default function StaffDeliberationsTab({
   const [openedAtMs] = useState(() => Date.now());
   const [confirmDialog, setConfirmDialog] = useState(null); // null | { kind: 'brief' | 'presite' | 'group-review' }
   const [startingGroupReview, setStartingGroupReview] = useState(false);
+  const [writeupAccess, setWriteupAccess] = useState(null);
   const [groupReviewError, setGroupReviewError] = useState(null);
   const [currentSourceEverSent, setCurrentSourceEverSent] = useState(false);
   const cancelDialogButtonRef = useRef(null);
@@ -312,6 +313,7 @@ export default function StaffDeliberationsTab({
           setPreparation(status.preparation || null);
           setCorrectionInProgress(status.correctionInProgress === true);
           setFinalReview(status.finalReview || null);
+          setWriteupAccess(status.writeupAccess || null);
           setTiming(status.timing || null);
           setArtifact(status.currentArtifact || null);
           setPendingArtifact(status.pendingArtifact || null);
@@ -361,6 +363,7 @@ export default function StaffDeliberationsTab({
         setPreparation(status.preparation || null);
           setCorrectionInProgress(status.correctionInProgress === true);
           setFinalReview(status.finalReview || null);
+          setWriteupAccess(status.writeupAccess || null);
         setTiming(status.timing || null);
         setPreparationReadError(null);
         if (!activeController.current) {
@@ -674,6 +677,10 @@ export default function StaffDeliberationsTab({
   const preSiteDraftReady = artifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT;
   const preSiteFinal = artifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL;
   const downloadUrl = downloadUrlFor(readyFile);
+  // Before group review only the lead PD, PCs and superusers get the file;
+  // changing it is the lead PD's or a superuser's (writeup-visibility.js).
+  const writeupHidden = artifact?.fileHidden === true;
+  const canChangeWriteup = writeupAccess?.canChange === true;
 
   const briefReadyFile = briefArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.READY
     && briefArtifact.file?.webUrl
@@ -1125,7 +1132,7 @@ export default function StaffDeliberationsTab({
       : ['blocked', 'unavailable'].includes(preparationState) || preparationReadError
         || ['unavailable', 'ambiguous'].includes(timing?.availability) ? 'Needs attention'
         : due && editingReady ? 'Working writeup ready for post-visit editing'
-          : due && preparationState === 'disabled' ? (readyFile ? 'Working draft available' : 'No working writeup yet')
+          : due && preparationState === 'disabled' ? (readyFile || writeupHidden ? 'Working draft available' : 'No working writeup yet')
             : due && preparationState === 'due' ? 'Waiting for automatic preparation'
             : due && preparationState === 'pending' ? 'Queued for automatic preparation'
               : due && (preparationState === 'running' || pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) ? 'Preparing working writeup'
@@ -1155,6 +1162,7 @@ export default function StaffDeliberationsTab({
       if (sequence !== generationSequence.current) return;
       setPreparation(status.preparation || null);
       setFinalReview(status.finalReview || null);
+          setWriteupAccess(status.writeupAccess || null);
       setTiming(status.timing || null);
       setArtifact(status.currentArtifact || null);
       setPendingArtifact(status.pendingArtifact || null);
@@ -1180,6 +1188,7 @@ export default function StaffDeliberationsTab({
       setPreparation(status.preparation || null);
           setCorrectionInProgress(status.correctionInProgress === true);
           setFinalReview(status.finalReview || null);
+          setWriteupAccess(status.writeupAccess || null);
       setTiming(status.timing || null);
       setPreparationReadError(null);
     } catch (retryError) {
@@ -1234,7 +1243,7 @@ export default function StaffDeliberationsTab({
     readyFile && !preSiteFinal && {
       key: 'download', label: 'Download', href: downloadUrl, download: readyFile.name || true, title: readyFile.name || undefined,
     },
-    readyFile && preSiteDraftReady && {
+    readyFile && preSiteDraftReady && canChangeWriteup && {
       key: 'regenerate', label: 'Regenerate Word Draft', onSelect: () => setConfirmDialog({ kind: 'presite' }), disabled: generating || unchangedRetryBlocked,
     },
   ].filter(Boolean);
@@ -1278,7 +1287,7 @@ export default function StaffDeliberationsTab({
       : preSiteShared ? (finalReview?.phase === 'starting' ? 'Starting group review…' : 'Post-visit drafting')
       : correctionDraft ? 'Corrections in progress'
         : generating || pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING ? 'Preparing…'
-          : readyFile && preSiteDraftReady ? `Draft ready${warnings?.length ? ` · ${warnings.length} ${warnings.length === 1 ? 'thing' : 'things'} to check` : ''}`
+          : (readyFile || writeupHidden) && preSiteDraftReady ? `Draft ready${warnings?.length ? ` · ${warnings.length} ${warnings.length === 1 ? 'thing' : 'things'} to check` : ''}`
             : due ? 'Not prepared yet' : 'Optional before the presentation';
   // Post-visit drafting hands off to group review from step 4 (owner 2026-10-06).
   const handOffOpen = preSiteShared && milestoneComplete && !preSiteFinal && !correctionDraft && finalReview?.phase === 'ready';
@@ -1505,7 +1514,7 @@ export default function StaffDeliberationsTab({
       ) : null}
       actions={(
         <>
-          {(!due || ['disabled', 'blocked', 'none'].includes(preparationState)) && !readyFile && !preSiteShared && !preSiteFinal && (
+          {(!due || ['disabled', 'blocked', 'none'].includes(preparationState)) && !readyFile && !writeupHidden && canChangeWriteup && !preSiteShared && !preSiteFinal && (
             <button
               type="button"
               onClick={generate}
@@ -1520,10 +1529,10 @@ export default function StaffDeliberationsTab({
               <a href={readyFile.webUrl} target="_blank" rel="noopener noreferrer" className={due || correctionDraft ? primaryClass : secondaryClass}>
                 Edit writeup in Word
               </a>
-              {!correctionDraft && due && timing?.availability === 'available' && preparationState === 'disabled' && <button type="button" onClick={startSiteVisitAction} disabled={startingSiteVisit || generating} className={secondaryClass}>
+              {canChangeWriteup && !correctionDraft && due && timing?.availability === 'available' && preparationState === 'disabled' && <button type="button" onClick={startSiteVisitAction} disabled={startingSiteVisit || generating} className={secondaryClass}>
                 {startingSiteVisit ? 'Preparing…' : 'Prepare for post-visit editing'}
               </button>}
-              {correctionDraft && <button type="button" onClick={startSiteVisitAction} disabled={startingSiteVisit || generating} className={secondaryClass}>
+              {canChangeWriteup && correctionDraft && <button type="button" onClick={startSiteVisitAction} disabled={startingSiteVisit || generating} className={secondaryClass}>
                 {startingSiteVisit ? 'Finishing…' : 'Finish corrections'}
               </button>}
             </>
@@ -1579,13 +1588,19 @@ export default function StaffDeliberationsTab({
           </p>
         )}
       </div>
-      {handOffNote && (
+      {writeupHidden ? (
+        <p className="mt-2 text-sm text-gray-700" data-testid="writeup-hidden-note">
+          {writeupAccess?.identityLinked === false
+            ? 'Your staff account isn’t linked to a Dynamics user, so the app can’t confirm you’re the lead Program Director. Contact an administrator.'
+            : 'The lead Program Director is drafting this writeup. You’ll see it when it’s ready for group review.'}
+        </p>
+      ) : handOffNote && (
         <p className="mt-2 text-sm text-gray-700" data-testid="group-review-handoff-note">{handOffNote}</p>
       )}
       {groupReviewError && (
         <p className="mt-2 text-sm text-red-800" role="alert">{groupReviewError}</p>
       )}
-      {(preSiteShared || preSiteFinal) && !readyFile && (
+      {(preSiteShared || preSiteFinal) && !readyFile && !writeupHidden && (
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
           <h4 className="font-semibold">Pre-Site Visit Writeup is read-only</h4>
           <p className="mt-1">

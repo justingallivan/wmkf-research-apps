@@ -857,6 +857,7 @@ test('read-only status projects current Ready plus milestone and newer pending r
     retryable: false, warnings, provenance, correction: null, lastError: null,
   };
   expect(status).toEqual({
+    leadProgramDirectorId: null,
     currentArtifact: {
       ...common, artifactId: ARTIFACT_ID,
       operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY, file: currentFile, milestone,
@@ -980,6 +981,7 @@ test.each([2, 3, 4])('matching persisted core and input snapshot schema v%s reta
   const legacyWarnings = schemaVersion === 2 ? [{ code: 'funding_history_manual', message: 'Institutional Funding History was not filled automatically (this document was generated before the Dataverse fill). Check that it is completed in Word; this note stays until the document is regenerated.' }] : [];
   const refereeWarnings = schemaVersion === 4 ? [] : [{ code: 'referee_section_manual', message: 'The Reviews paragraph was not filled automatically (no submitted reviews at generation, or generated before the Dataverse fill). Check that it is completed in Word; this note stays until the document is regenerated.' }];
   expect(status).toEqual({
+    leadProgramDirectorId: null,
     pendingArtifact: null,
     currentArtifact: {
       artifactId: ARTIFACT_ID,

@@ -117,13 +117,79 @@ runtime work. Stage 1 is the original ask and ships first.
   → "Send to leadership".
 - Stage 1 hides nothing; Stage 2 does.
 
-### Stage 2 — Hide the draft before handoff (server-side)
-- The Pre-Site projection omits `webUrl` before the writeup becomes FINAL, unless the viewer is
-  the lead PD or a superuser. The UI follows the payload.
-  - Applies to every surface that renders the Pre-Site Word link: grep all consumers of the
-    projection before building.
-  - A request with no lead PD set: only superusers see it.
-- Non-lead viewers see "The lead PD is drafting this writeup."
+### Stage 2 — Hide the draft before handoff (server-side) — built on branch `feature/writeup-hide-before-handoff`
+
+**Owner decisions (2026-10-06):**
+- Program Coordinators can see the draft.
+- The optional draft made before the presentation is private too.
+
+**Defaults, stated to the owner:**
+- **PCs** = anyone holding the Program Coordinator persona in the published Final Writeup staffing
+  setting. This is the same rule the Final writeups dashboard already uses, with no per-program list
+  that could leave a PC out. Built 2026-10-06.
+- **Read vs. change.** PCs can read the draft. Changes stay with the lead PD and superusers:
+  - generate and regenerate (AI cost; replaces the file);
+  - "Prepare for post-visit editing";
+  - linking the draft into a distribution email.
+- **Lifecycles.** Hidden in DRAFT (including a correction DRAFT) and REVIEW. Unchanged from FINAL
+  (group review) onward.
+- **No lead PD on the request:** only superusers and PCs see the draft.
+- **Distribution snapshots** of the Pre-Site row stay visible. They are frozen copies that were
+  already sent.
+
+**Viewer and predicate.** One shared module resolves the viewer once per request:
+`{ isSuperuser, actingUserSystemId, coordinatorProgramIds }`.
+- PC persona resolution fails closed: an error or a disabled setting means "not a coordinator".
+  The lead PD and superuser paths are unaffected.
+- `canSeeDraftWriteup(viewer, { leadPdId, grantProgramId })` is true for a superuser, for the
+  lead PD by `sameId`, or for a PC of that program.
+- `redactDraftWriteup(artifact, …)` returns the artifact with `file: null` and `fileHidden: true`
+  when the viewer can't see it and the lifecycle is DRAFT or REVIEW (not a distribution snapshot).
+
+**Producers to route through the redactor.** From the 2026-10-06 exposure survey:
+1. `GET /api/workbench/pre-site-visit`:
+   - `currentArtifact`;
+   - `pendingArtifact`;
+   - `writeup.file` (from `getPreparationForRequest`).
+2. `GET /api/workbench/final-writeup` in phase ready or starting: `sourceFile` and `pendingArtifact`.
+3. `GET /api/workbench/staff-deliberations`: per-row `writeup.file`, plus the legacy top-level
+   `file` when the row is the Pre-Site writeup. The list already selects
+   `_wmkf_programdirector_value` and `_wmkf_grantprogram_value`.
+4. `GET /api/workbench/site-visit/logistics`: drop non-snapshot DRAFT and REVIEW Pre-Site rows from
+   `materials`.
+5. Distribution `prepare` / `send`: no change needed. Email material links were retired on
+   2026-09-10, and the server refuses any selection (`distribution/composition.js:188-196`).
+
+**Changes gated to the lead PD or a superuser (403 with a code):**
+- `POST /api/workbench/pre-site-visit` (generate/regenerate);
+- `POST /api/workbench/pre-site-visit/start-site-visit`.
+
+The automatic preparation worker is a system actor and is unaffected.
+
+**UI.**
+- When `fileHidden` is set, Staff Deliberations step 4 shows:
+  - status from `lifecycleState`, not from whether a file is present;
+  - "The lead Program Director is drafting this writeup.";
+  - no Word, download or regenerate actions.
+- The existing "No current Word link was returned" read-only notice must not fire for
+  hidden-by-design.
+- A lead PD whose account has no linked Dynamics user gets an explicit message, not silent hiding.
+
+**Tests.**
+- For each producer, a discriminating case for each of:
+  - a non-lead viewer (no `webUrl`, `fileHidden`);
+  - the lead PD;
+  - a PC;
+  - a superuser.
+- The change routes return 403 for others.
+- The predicate is mutation-checked.
+- A test enumerates the producers, so a new surface must be added deliberately.
+
+**Gates.** `docs/API_ROUTE_SECURITY_MATRIX.md`, `check:api-routes`, `check:route-lifecycle-auth`,
+`check:trust-boundary-guid`.
+
+**Before merge (owner-run probe):** read the Production `final_writeup.matrix_audiences` setting.
+The PCs must hold the Program Coordinator persona, or they lose sight of drafts when this deploys.
 
 ### Stage 3 — Sign-off view for the lead PD
 - Rename "Mark reviewed" → "Sign off".

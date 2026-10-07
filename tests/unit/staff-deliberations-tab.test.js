@@ -163,6 +163,7 @@ function statusResponse({
   timing = null,
   correctionInProgress = false,
   finalReview = null,
+  writeupAccess = { canChange: true, identityLinked: true },
 } = {}) {
   return response({
     success: true,
@@ -176,6 +177,7 @@ function statusResponse({
     ...(sessionAttendees ? { sessionAttendees } : {}),
     ...(hasBriefRows === undefined ? {} : { hasBriefRows }),
     ...(finalReview ? { finalReview } : {}),
+    ...(writeupAccess ? { writeupAccess } : {}),
   });
 }
 
@@ -266,7 +268,7 @@ test('Pre-Site card: Generate, then Edit in Word plus Start Site Visit; Download
 
   expect(await screen.findByTestId('deliberations-stage-sentence'))
     .toHaveTextContent('Schedule needed');
-  fireEvent.click(screen.getByRole('button', { name: 'Prepare working draft' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Prepare working draft' }));
 
   await waitFor(() => expect(calls('presitePost')).toHaveLength(1));
   expect(JSON.parse(calls('presitePost')[0][1].body)).toEqual({ requestId: REQUEST_ID });
@@ -353,7 +355,7 @@ test('Pre-Site card: a server error on generate shows an alert without creating 
   queueRoute('presitePost', response({ error: 'No usable AI proposal narrative was found.' }, 409));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  fireEvent.click(screen.getByRole('button', { name: 'Prepare working draft' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Prepare working draft' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('No usable AI proposal narrative was found.');
 });
 
@@ -374,7 +376,7 @@ test('M2: recovers a Ready Word link after the generation connection is interrup
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
   await waitFor(() => expect(calls('presiteGet')).toHaveLength(1));
 
-  fireEvent.click(screen.getByRole('button', { name: 'Prepare working draft' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Prepare working draft' }));
 
   const link = await screen.findByRole('link', { name: /Edit (?:briefing|writeup) in Word/ });
   expect(link).toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
@@ -400,7 +402,7 @@ test('M2: unmounting mid-generate aborts the in-flight request and publishes not
   const { unmount } = render(<StaffDeliberationsTab key={REQUEST_ID} requestId={REQUEST_ID} />);
 
   await waitFor(() => expect(calls('presiteGet')).toHaveLength(1));
-  fireEvent.click(screen.getByRole('button', { name: 'Prepare working draft' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Prepare working draft' }));
   await waitFor(() => expect(capturedSignal).not.toBeNull());
   expect(capturedSignal.aborted).toBe(false);
 
@@ -425,7 +427,7 @@ test('M2: a late response after switching to another request (remount) cannot pu
   const { rerender } = render(<StaffDeliberationsTab key={REQUEST_ID} requestId={REQUEST_ID} />);
 
   await waitFor(() => expect(calls('presiteGet')).toHaveLength(1));
-  fireEvent.click(screen.getByRole('button', { name: 'Prepare working draft' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Prepare working draft' }));
   // The workbench keys the tab by requestId; mirror that so the switch remounts.
   rerender(<StaffDeliberationsTab key={OTHER_REQUEST_ID} requestId={OTHER_REQUEST_ID} />);
   await act(async () => { resolveFirst(response({ success: true, artifact: preSiteArtifact(DRAFT) })); });
@@ -460,7 +462,7 @@ test('M2: refreshes durable failure state once and shows its support reference',
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
   await waitFor(() => expect(calls('presiteGet')).toHaveLength(1));
 
-  fireEvent.click(screen.getByRole('button', { name: 'Prepare working draft' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Prepare working draft' }));
 
   expect(await screen.findByRole('alert')).toHaveTextContent('The governed output was invalid.');
   expect(screen.getByRole('alert')).toHaveTextContent('Support reference: durable-run-id');
@@ -1292,6 +1294,7 @@ test('T2: submitReopen non-2xx (readStatus route bytes unaffected) posts exact h
 });
 
 test('T2: readStatus (GET /pre-site-visit) non-2xx thrown message during pollForArtifact propagates verbatim', async () => {
+  let presiteReads = 0;
   global.fetch = jest.fn(async (url, options = {}) => {
     const method = options.method || 'GET';
     const route = ROUTE_DEFS.find((r) => r.test(url, method));
@@ -1299,6 +1302,9 @@ test('T2: readStatus (GET /pre-site-visit) non-2xx thrown message during pollFor
       return response({ success: true, artifact: { ...preSiteArtifact(DRAFT), operationStatus: GENERATING } });
     }
     if (route?.key === 'presiteGet') {
+      // The first read grants the actions; reads during the poll fail.
+      presiteReads += 1;
+      if (presiteReads === 1) return statusResponse();
       return response({ error: 'Status lookup is temporarily unavailable.' }, 503);
     }
     const queue = queues[route.key];
@@ -1307,7 +1313,7 @@ test('T2: readStatus (GET /pre-site-visit) non-2xx thrown message during pollFor
   });
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  fireEvent.click(screen.getByRole('button', { name: 'Prepare working draft' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Prepare working draft' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Status lookup is temporarily unavailable.');
 });
 
@@ -1332,6 +1338,7 @@ test('T2: readBriefStatus (GET /pre-rp-brief) non-2xx thrown message during poll
 });
 
 test('T2: an abort mid-poll (readStatus rejects with AbortError) is swallowed by the existing AbortError branch, not surfaced as an error', async () => {
+  let presiteReads = 0;
   global.fetch = jest.fn(async (url, options = {}) => {
     const method = options.method || 'GET';
     const route = ROUTE_DEFS.find((r) => r.test(url, method));
@@ -1339,6 +1346,9 @@ test('T2: an abort mid-poll (readStatus rejects with AbortError) is swallowed by
       return response({ success: true, artifact: { ...preSiteArtifact(DRAFT), operationStatus: GENERATING } });
     }
     if (route?.key === 'presiteGet') {
+      // The first read grants the actions; reads during the poll abort.
+      presiteReads += 1;
+      if (presiteReads === 1) return statusResponse();
       const abortError = new Error('The operation was aborted.');
       abortError.name = 'AbortError';
       throw abortError;
@@ -1349,8 +1359,8 @@ test('T2: an abort mid-poll (readStatus rejects with AbortError) is swallowed by
   });
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  fireEvent.click(screen.getByRole('button', { name: 'Prepare working draft' }));
-  await waitFor(() => expect(calls('presiteGet').length).toBeGreaterThan(0));
+  fireEvent.click(await screen.findByRole('button', { name: 'Prepare working draft' }));
+  await waitFor(() => expect(calls('presiteGet').length).toBeGreaterThan(1));
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
@@ -1640,4 +1650,51 @@ test('no automatic label when staff are recorded as preparing the writeup', asyn
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
   expect(await screen.findByRole('link', { name: 'Edit writeup in Word' })).toBeInTheDocument();
   expect(screen.queryByTestId('writeup-prepared-automatically')).toBeNull();
+});
+
+describe('draft writeup hidden before group review', () => {
+  const hiddenArtifact = { ...preSiteArtifact(REVIEW), file: null, fileHidden: true };
+
+  test('another staff member sees drafting status, not the document or its actions', async () => {
+    queueRoute('presiteGet', statusResponse({
+      ...POST_VISIT_STATUS, currentArtifact: hiddenArtifact,
+      writeupAccess: { canChange: false, identityLinked: true },
+    }));
+    render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+    expect(await screen.findByTestId('writeup-hidden-note')).toHaveTextContent('The lead Program Director is drafting this writeup.');
+    expect(screen.getByText('Post-visit drafting')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /(?:Edit|Open) writeup in Word/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Pre-Site Visit Writeup is read-only' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Prepare working draft' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('group-review-handoff-note')).not.toBeInTheDocument();
+  });
+
+  test('an unlinked account is told why instead of silently hidden', async () => {
+    queueRoute('presiteGet', statusResponse({
+      ...POST_VISIT_STATUS, currentArtifact: hiddenArtifact,
+      writeupAccess: { canChange: false, identityLinked: false },
+    }));
+    render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+    expect(await screen.findByTestId('writeup-hidden-note')).toHaveTextContent(/isn’t linked to a Dynamics user/);
+  });
+
+  test('a viewer who may see but not change the draft gets the Word link but no change actions', async () => {
+    queueRoute('presiteGet', statusResponse({
+      currentArtifact: { ...preSiteArtifact(DRAFT), correction: { cycleId: 'correction-1' } },
+      writeupAccess: { canChange: false, identityLinked: true },
+    }));
+    render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+    await screen.findByRole('link', { name: 'Edit writeup in Word' });
+    expect(screen.queryByRole('button', { name: 'Finish corrections' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'More writeup actions' }));
+    expect(screen.queryByRole('menuitem', { name: 'Regenerate Word Draft' })).not.toBeInTheDocument();
+  });
+
+  test('no Prepare working draft for someone who cannot change the writeup', async () => {
+    queueRoute('presiteGet', statusResponse({ writeupAccess: { canChange: false, identityLinked: true } }));
+    render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+    await screen.findByTestId('deliberations-stage-sentence');
+    await waitFor(() => expect(calls('presiteGet').length).toBeGreaterThan(0));
+    expect(screen.queryByRole('button', { name: 'Prepare working draft' })).not.toBeInTheDocument();
+  });
 });

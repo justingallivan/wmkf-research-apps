@@ -1,6 +1,6 @@
 /** GET/PATCH the single active Site Visit logistics activity for a Request. */
 
-import { requireAppAccess } from '../../../../lib/utils/auth';
+import { getUserRole, requireAppAccess } from '../../../../lib/utils/auth';
 import { withDalContext } from '../../../../lib/dataverse/core/context';
 import { isGuid } from '../../../../lib/utils/guid';
 import { ServiceHttpError } from '../../../../lib/services/service-http-error';
@@ -8,6 +8,7 @@ import {
   getSiteVisitLogistics,
   saveSiteVisitLogistics,
 } from '../../../../lib/services/site-visit/logistics-service';
+import { resolveWriteupViewer } from '../../../../lib/services/pre-site-visit/writeup-visibility';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '64kb' } },
@@ -57,7 +58,14 @@ export default async function handler(req, res) {
         if (!isGuid(requestId)) {
           return res.status(400).json({ error: 'requestId is required and must be a GUID' });
         }
-        const result = await getSiteVisitLogistics({ requestId, includePresentationSummaryText: true });
+        const role = access.profileId === null ? 'superuser' : await getUserRole(access.profileId);
+        const writeupViewer = await resolveWriteupViewer({
+          isSuperuser: role === 'superuser',
+          actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
+        });
+        const result = await getSiteVisitLogistics({
+          requestId, includePresentationSummaryText: true, writeupViewer,
+        });
         return res.status(200).json({
           success: true,
           siteVisit: result.siteVisit,

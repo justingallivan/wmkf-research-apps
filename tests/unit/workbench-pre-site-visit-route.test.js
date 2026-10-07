@@ -26,6 +26,9 @@ jest.mock('../../lib/dataverse/adapters/grant-request', () => ({ getById: jest.f
 jest.mock('../../lib/dataverse/adapters/request-document', () => ({ findByIds: jest.fn() }));
 jest.mock('../../lib/services/pre-site-visit/preparation-worker', () => ({ getPreparationForRequest: jest.fn() }));
 jest.mock('../../lib/services/final-writeup/transition-service', () => ({ getFinalWriteupStatus: jest.fn() }));
+jest.mock('../../lib/services/final-writeup/persona-service', () => ({
+  resolveFinalWriteupPersonas: jest.fn(async () => ({ enabled: true, personas: [] })),
+}));
 import { getById } from '../../lib/dataverse/adapters/grant-request';
 import { findByIds } from '../../lib/dataverse/adapters/request-document';
 import { getPreparationForRequest } from '../../lib/services/pre-site-visit/preparation-worker';
@@ -74,7 +77,7 @@ beforeEach(() => {
   getFinalWriteupStatus.mockResolvedValue({ available: true, phase: 'ready', artifact: null });
   requireAppAccess.mockResolvedValue({
     profileId: PROFILE_ID,
-    session: { user: { dynamicsSystemuserId: '22222222-2222-2222-2222-222222222222' } },
+    session: { user: { dynamicsSystemuserId: '22222222-2222-4222-8222-222222222222' } },
   });
   getUserRole.mockResolvedValue('superuser');
   generatePreSiteVisitArtifact.mockResolvedValue({
@@ -89,7 +92,9 @@ beforeEach(() => {
     reused: false,
     recovered: false,
   });
+  // The session user leads the request unless a test says otherwise.
   getPreSiteVisitArtifactStatus.mockResolvedValue({
+    leadProgramDirectorId: '22222222-2222-4222-8222-222222222222',
     currentArtifact: null,
     pendingArtifact: null,
     reopenHistory: [],
@@ -308,7 +313,7 @@ test('generates through the durable service and returns the governed artifact id
   expect(withDalContext).toHaveBeenCalledWith('workbench-pre-site-visit', expect.any(Function));
   expect(generatePreSiteVisitArtifact).toHaveBeenCalledWith({
     requestId: REQUEST_ID,
-    actingUserSystemId: '22222222-2222-2222-2222-222222222222',
+    actingUserSystemId: '22222222-2222-4222-8222-222222222222',
   });
   expect(res.statusCode).toBe(200);
   expect(res.body).toMatchObject({
@@ -389,4 +394,53 @@ test('a not-yet-started Final carries the start permission and source for step 4
     canStart: true, startBlockedReason: null, sourceArtifactId: 'source-1',
   });
   expect(getFinalWriteupStatus).toHaveBeenCalledWith(expect.objectContaining({ actingUserSystemId: expect.anything() }));
+});
+
+describe('draft writeup visibility before group review', () => {
+  const OTHER_ID = '99999999-9999-4999-8999-999999999999';
+  const draftArtifact = (lifecycleState) => ({
+    artifactId: 'current', operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY, lifecycleState,
+    file: { name: 'w.docx', webUrl: 'https://sharepoint.test/w.docx', versionId: '3.0' },
+  });
+  const asStaff = (systemUserId) => {
+    getUserRole.mockResolvedValueOnce('staff');
+    requireAppAccess.mockResolvedValueOnce({ profileId: PROFILE_ID, session: { user: { dynamicsSystemuserId: systemUserId } } });
+  };
+
+  test.each([
+    ['another staff member', OTHER_ID, false, false],
+    ['the lead PD', '22222222-2222-4222-8222-222222222222', true, true],
+  ])('GET for %s', async (_label, systemUserId, visible, canChange) => {
+    asStaff(systemUserId);
+    getPreSiteVisitArtifactStatus.mockResolvedValueOnce({
+      leadProgramDirectorId: '22222222-2222-4222-8222-222222222222',
+      currentArtifact: draftArtifact(100000001), pendingArtifact: null, reopenHistory: [],
+    });
+    getPreparationForRequest.mockResolvedValueOnce({
+      timing: { availability: 'available' }, preparation: { state: 'prepared', due: true },
+      writeup: { availability: 'available', artifactId: 'current', file: { webUrl: 'https://sharepoint.test/w.docx' } },
+    });
+    const res = mockRes();
+    await handler(get(), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).not.toHaveProperty('leadProgramDirectorId');
+    expect(res.body.writeupAccess).toEqual({ canChange, identityLinked: true });
+    if (visible) {
+      expect(res.body.currentArtifact.file.webUrl).toBe('https://sharepoint.test/w.docx');
+      expect(res.body.writeup.file.webUrl).toBe('https://sharepoint.test/w.docx');
+    } else {
+      expect(res.body.currentArtifact).toMatchObject({ file: null, fileHidden: true, lifecycleState: 100000001 });
+      expect(res.body.writeup).toMatchObject({ file: null, fileHidden: true });
+      expect(JSON.stringify(res.body)).not.toContain('sharepoint.test/w.docx');
+    }
+  });
+
+  test('POST from someone other than the lead PD is refused before generation', async () => {
+    asStaff(OTHER_ID);
+    const res = mockRes();
+    await handler(post(), res);
+    expect(res.statusCode).toBe(403);
+    expect(res.body.code).toBe('pre_site_writeup_lead_only');
+    expect(generatePreSiteVisitArtifact).not.toHaveBeenCalled();
+  });
 });

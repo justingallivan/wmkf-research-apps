@@ -14,6 +14,7 @@ import {
   getFinalWriteupStatus,
   startFinalWriteup,
 } from '../../../lib/services/final-writeup/transition-service';
+import { resolveWriteupViewer } from '../../../lib/services/pre-site-visit/writeup-visibility';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '16kb' } },
@@ -50,10 +51,12 @@ export default async function handler(req, res) {
         if (!isGuid(requestId)) {
           return res.status(400).json({ error: 'requestId is required and must be a GUID' });
         }
+        const writeupViewer = await resolveWriteupViewer({ isSuperuser, actingUserSystemId });
         const status = await getFinalWriteupStatus({
           requestId,
           isSuperuser,
           actingUserSystemId,
+          writeupViewer,
         });
         return res.status(200).json({ success: true, ...status });
       }

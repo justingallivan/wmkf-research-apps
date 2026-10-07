@@ -9,6 +9,8 @@ import { withDalContext } from '../../../../lib/dataverse/core/context';
 import { isGuid } from '../../../../lib/utils/guid';
 import { ServiceHttpError } from '../../../../lib/services/service-http-error';
 import { startSiteVisitStage } from '../../../../lib/services/pre-site-visit/site-visit-transition-service';
+import { getPreSiteVisitArtifactStatus } from '../../../../lib/services/pre-site-visit/artifact-service';
+import { canChangeDraftWriteup, resolveWriteupViewer } from '../../../../lib/services/pre-site-visit/writeup-visibility';
 
 export const config = {
   api: {
@@ -18,7 +20,10 @@ export const config = {
 
 function sendError(res, error) {
   if (error instanceof ServiceHttpError) {
-    return res.status(error.httpStatus).json(error.body ?? { error: error.message });
+    return res.status(error.httpStatus).json(error.body ?? {
+      error: error.message,
+      ...(error.code ? { code: error.code } : {}),
+    });
   }
   console.error('workbench start-site-visit error:', error);
   return res.status(500).json({
@@ -65,11 +70,18 @@ export default async function handler(req, res) {
         });
       }
 
-      const result = await startSiteVisitStage({
-        requestId,
-        expectedArtifactId,
-        actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
-      });
+      const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
+      const [{ leadProgramDirectorId }, viewer] = await Promise.all([
+        getPreSiteVisitArtifactStatus({ requestId }),
+        resolveWriteupViewer({ isSuperuser: role === 'superuser', actingUserSystemId }),
+      ]);
+      if (!canChangeDraftWriteup(viewer, leadProgramDirectorId)) {
+        throw new ServiceHttpError('Only the lead Program Director or a superuser can change this writeup.', {
+          httpStatus: 403,
+          code: 'pre_site_writeup_lead_only',
+        });
+      }
+      const result = await startSiteVisitStage({ requestId, expectedArtifactId, actingUserSystemId });
       const payload = includeCorrectionAudit
         ? result
         : { ...result, artifact: withoutCorrection(result.artifact) };
