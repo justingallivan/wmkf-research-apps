@@ -29,6 +29,7 @@
 - Migration numbers / schema_migrations / branch-applied migrations: project-migration-numbers-claimed-off-main.md
 - Action affordances / UI gating: feedback-ui-gates-must-mirror-server-guards.md
 - Tunables / mutable parameters: feedback-mutable-parameters-not-in-code.md
+- Cycle-scoped settings / per-cycle allowlists / cycle literals: feedback-minimize-per-cycle-configuration.md
 - Test Request Factory safety vs fidelity / rehearsal venue: feedback-factory-safe-not-full-fidelity.md; feedback-question-the-rehearsal-venue.md
 - Reviewer product decisions: ../docs/agent-wiki/topics/reviewer-identity.md (Durable Memory); feedback-prioritize-contact-recall-over-identity-precision.md
 - Audits / completion: feedback-vacuous-clean-results-print-the-denominator.md; feedback-apply-measurement-artifacts-in-both-directions.md; feedback-briefs-are-snapshots-not-ship-state.md

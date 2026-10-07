@@ -75,6 +75,17 @@ sequence.
   decision list: `docs/NOMENCLATURE_GLOSSARY.md` → "Deliberations workflow
   vocabulary".
 
+- **Cycle rollover with minimal configuration (2026-10-06).** [OPEN —
+  investigation designed, not started] Owner principle: very few parameters may
+  need human care each cycle; prefer settings that derive from the record or the
+  J/D calendar, with at most a twice-yearly confirmation (the daylight-saving
+  analogy) and a loud drift check for anything still pinned to an old cycle.
+  Plan, seed inventory and owner questions:
+  `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md`.
+  **Interim safeguard:** before J27 research presentations begin, add `J27` to
+  `STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES` in Production, or J27 requests
+  silently fall back to manual preparation.
+
 - **Stream transcription audio instead of buffering it (2026-10-04).** [OPEN —
   owner decision, not yet built] The transcription worker reads the whole
   recording from private Blob into Function memory, copies it into a worker
