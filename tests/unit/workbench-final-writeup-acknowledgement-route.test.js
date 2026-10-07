@@ -1,6 +1,7 @@
 /** @jest-environment node */
 
 jest.mock('../../lib/utils/auth', () => ({
+  getUserRole: jest.fn(),
   requireAppAccess: jest.fn(),
 }));
 jest.mock('../../lib/dataverse/core/context', () => ({
@@ -17,7 +18,7 @@ import {
   markFinalWriteupReviewed,
 } from '../../lib/services/final-writeup/acknowledgement-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
-import { requireAppAccess } from '../../lib/utils/auth';
+import { getUserRole, requireAppAccess } from '../../lib/utils/auth';
 import handler from '../../pages/api/workbench/final-writeup/acknowledgement';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -34,6 +35,7 @@ function mockRes() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  getUserRole.mockResolvedValue('user');
   requireAppAccess.mockResolvedValue({
     profileId: 7,
     session: { user: { dynamicsSystemuserId: USER_ID } },
@@ -67,6 +69,7 @@ test('GET reads review state with only the session-derived reviewer identity', a
   expect(getFinalWriteupAcknowledgementState).toHaveBeenCalledWith({
     requestId: REQUEST_ID,
     actingUserSystemId: USER_ID,
+    isSuperuser: false,
   });
   expect(res.statusCode).toBe(200);
   expect(res.body).toMatchObject({ success: true, personalState: 'unreviewed' });
@@ -84,6 +87,7 @@ test('POST accepts only request and current-Final fences', async () => {
     requestId: REQUEST_ID,
     expectedFinalArtifactId: FINAL_ID,
     actingUserSystemId: USER_ID,
+    isSuperuser: false,
   });
   expect(res.statusCode).toBe(200);
   expect(res.body).toMatchObject({ success: true, personalState: 'reviewed' });
@@ -122,6 +126,7 @@ test('fails closed when the authenticated session has no Dataverse identity', as
   expect(getFinalWriteupAcknowledgementState).toHaveBeenCalledWith({
     requestId: REQUEST_ID,
     actingUserSystemId: null,
+    isSuperuser: false,
   });
   expect(res.statusCode).toBe(403);
   expect(res.body.code).toBe('final_writeup_acknowledgement_actor_required');
@@ -175,4 +180,26 @@ test('rejects invalid identities and unsupported methods before service work', a
   expect(unsupported.statusCode).toBe(405);
   expect(unsupported.headers.Allow).toBe('GET, POST');
   expect(requireAppAccess).toHaveBeenCalledTimes(1);
+});
+
+test('passes the server-derived superuser role so the service can return the sign-off roster', async () => {
+  getUserRole.mockResolvedValueOnce('superuser');
+  const res = mockRes();
+  await handler({ method: 'GET', query: { requestId: REQUEST_ID, isSuperuser: 'true' } }, res);
+  expect(getUserRole).toHaveBeenCalledWith(7);
+  expect(getFinalWriteupAcknowledgementState).toHaveBeenCalledWith({
+    requestId: REQUEST_ID,
+    actingUserSystemId: USER_ID,
+    isSuperuser: true,
+  });
+});
+
+test('a client-supplied superuser flag never grants the roster', async () => {
+  const res = mockRes();
+  await handler({ method: 'GET', query: { requestId: REQUEST_ID, isSuperuser: 'true' } }, res);
+  expect(getFinalWriteupAcknowledgementState).toHaveBeenCalledWith({
+    requestId: REQUEST_ID,
+    actingUserSystemId: USER_ID,
+    isSuperuser: false,
+  });
 });

@@ -970,7 +970,7 @@ function AcknowledgementPanel({ writeup, viewer, saving, error, onAcknowledge })
               ? 'Your acknowledgement is recorded. It does not approve the writeup or prevent later edits.'
               : updated
                 ? 'Your earlier acknowledgement remains in history. Record the latest version after you have reviewed the changes.'
-                : 'After reading the current version, mark it reviewed. This is personal tracking, not an approval.'}
+                : 'After reading the current version, sign off. This is personal tracking, not an approval.'}
           </p>
           {writeup.acknowledgedAt && (
             <p className="mt-2 text-xs text-gray-500">
@@ -991,7 +991,7 @@ function AcknowledgementPanel({ writeup, viewer, saving, error, onAcknowledge })
             disabled={saving}
             className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
           >
-            {saving ? 'Recording…' : updated ? 'Mark latest version reviewed' : 'Mark reviewed'}
+            {saving ? 'Signing off…' : updated ? 'Sign off latest version' : 'Sign off'}
           </button>
         )}
       </div>

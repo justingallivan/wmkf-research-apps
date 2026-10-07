@@ -455,3 +455,138 @@ describe('leadership checkpoint (shared with the transition and dashboard reader
     expect(dependencies.updateAcknowledgement).not.toHaveBeenCalled();
   });
 });
+
+describe('sign-off roster for the lead PD and superusers (group-review Stage 3)', () => {
+  const PROGRAM_ID = '77777777-7777-4777-8777-777777777777';
+  const BEA_ID = '88888888-8888-4888-8888-888888888881';
+  const CY_ID = '88888888-8888-4888-8888-888888888882';
+  const DEE_ID = '88888888-8888-4888-8888-888888888883';
+  const SUPERUSER_ID = '99999999-9999-4999-8999-999999999999';
+  const GUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+  // Lead PD is in the program audience too, and must not be expected.
+  const CONFIGURED_AUDIENCE = Object.freeze({
+    status: 'configured',
+    programDirectors: [
+      { reviewerId: BEA_ID, name: 'Bea Director' },
+      { reviewerId: CY_ID, name: 'Cy Director' },
+      { reviewerId: DEE_ID, name: 'Dee Director' },
+      { reviewerId: PD_ID, name: 'Lead Director' },
+    ],
+  });
+
+  function ackRow(reviewerId, name, versionId, suffix) {
+    return acknowledgement({
+      wmkf_finalwriteupreviewacknowledgementid: `66666666-6666-4666-8666-66666666666${suffix}`,
+      _wmkf_reviewer_value: reviewerId,
+      _wmkf_reviewer_value_formatted: name,
+      wmkf_publicationversionid: versionId,
+    });
+  }
+
+  function rosterHarness({ actingId, audience = CONFIGURED_AUDIENCE } = {}) {
+    const { dependencies } = harness({ requestRow: request({ _wmkf_grantprogram_value: PROGRAM_ID }) });
+    dependencies.getReviewer.mockResolvedValue({
+      systemuserid: actingId, fullname: 'Viewer', isdisabled: false,
+    });
+    // Current publication is 1.0. Bea signed it; Cy signed 0.9 (edited since);
+    // Dee has not signed; Ada (a coordinator, not an expected PD) signed 1.0.
+    dependencies.findAcknowledgements.mockResolvedValue({
+      records: [
+        ackRow(BEA_ID, 'Bea Director', '1.0', '1'),
+        ackRow(CY_ID, 'Cy Director', '0.9', '2'),
+        ackRow(REVIEWER_ID, 'Ada Reviewer', '1.0', '3'),
+      ],
+    });
+    dependencies.resolveProgramDirectorAudience = typeof audience === 'function'
+      ? jest.fn(audience)
+      : jest.fn(async () => audience);
+    return dependencies;
+  }
+
+  const readArgs = (actingUserSystemId, isSuperuser = false) => ({
+    requestId: REQUEST_ID, actingUserSystemId, isSuperuser,
+  });
+
+  test('the lead PD sees expected PDs with signed, edited-since and not-yet states, names only', async () => {
+    const dependencies = rosterHarness({ actingId: PD_ID });
+    const state = await getFinalWriteupAcknowledgementState(readArgs(PD_ID), dependencies);
+    expect(dependencies.resolveProgramDirectorAudience).toHaveBeenCalledWith(PROGRAM_ID);
+    expect(state.signOffRoster).toEqual({
+      status: 'configured',
+      expected: [
+        { name: 'Bea Director', state: 'signed', signedAt: '2026-08-31T11:05:00.000Z' },
+        { name: 'Cy Director', state: 'signed-edited-since', signedAt: '2026-08-31T11:05:00.000Z' },
+        { name: 'Dee Director', state: 'not-yet', signedAt: null },
+      ],
+      others: [
+        { name: 'Ada Reviewer', state: 'signed', signedAt: '2026-08-31T11:05:00.000Z' },
+      ],
+    });
+    expect(JSON.stringify(state.signOffRoster)).not.toMatch(GUID_PATTERN);
+  });
+
+  test('a superuser who is not the lead also sees the roster', async () => {
+    const dependencies = rosterHarness({ actingId: SUPERUSER_ID });
+    const state = await getFinalWriteupAcknowledgementState(readArgs(SUPERUSER_ID, true), dependencies);
+    expect(state.signOffRoster.status).toBe('configured');
+    expect(state.signOffRoster.expected.map((person) => person.name))
+      .toEqual(['Bea Director', 'Cy Director', 'Dee Director']);
+  });
+
+  test('an ordinary reviewer gets no roster even when the program is configured', async () => {
+    const dependencies = rosterHarness({ actingId: REVIEWER_ID });
+    const state = await getFinalWriteupAcknowledgementState(readArgs(REVIEWER_ID), dependencies);
+    expect(state.signOffRoster).toBeNull();
+    expect(dependencies.resolveProgramDirectorAudience).not.toHaveBeenCalled();
+    expect(state.reviewers).toHaveLength(3);
+  });
+
+  test.each([
+    ['program-not-configured', { status: 'program-not-configured', programDirectors: [] }, 'program-not-configured'],
+    ['staffing-not-configured', { status: 'staffing-not-configured', programDirectors: [] }, 'staffing-not-configured'],
+    ['an unknown status', { status: 'everyone', programDirectors: [] }, 'unavailable'],
+    ['a malformed audience', { status: 'configured' }, 'unavailable'],
+    ['a resolver failure', async () => { throw new Error('settings down'); }, 'unavailable'],
+  ])('%s yields no expected list and lists every signer as other', async (_label, audience, status) => {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const dependencies = rosterHarness({ actingId: PD_ID, audience });
+    const state = await getFinalWriteupAcknowledgementState(readArgs(PD_ID), dependencies);
+    spy.mockRestore();
+    expect(state.signOffRoster.status).toBe(status);
+    expect(state.signOffRoster.expected).toEqual([]);
+    expect(state.signOffRoster.others.map((person) => person.name))
+      .toEqual(['Ada Reviewer', 'Bea Director', 'Cy Director']);
+    expect(state.mayAcknowledge).toBe(false);
+  });
+
+  test('a superuser sign-off returns the roster, and a roster failure never fails the recorded sign-off', async () => {
+    const { dependencies, getDurable } = harness({
+      requestRow: request({ _wmkf_grantprogram_value: PROGRAM_ID }),
+    });
+    dependencies.resolveProgramDirectorAudience = jest.fn(async () => CONFIGURED_AUDIENCE);
+    const signed = await markFinalWriteupReviewed(markArgs({ isSuperuser: true }), dependencies);
+    expect(signed.personalState).toBe('reviewed');
+    expect(signed.signOffRoster.status).toBe('configured');
+
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const failing = harness({ requestRow: request({ _wmkf_grantprogram_value: PROGRAM_ID }) });
+    failing.dependencies.resolveProgramDirectorAudience = jest.fn(async () => {
+      throw new Error('settings down');
+    });
+    const recorded = await markFinalWriteupReviewed(markArgs({ isSuperuser: true }), failing.dependencies);
+    spy.mockRestore();
+    expect(failing.getDurable()).not.toBeNull();
+    expect(recorded.personalState).toBe('reviewed');
+    expect(recorded.signOffRoster.status).toBe('unavailable');
+    expect(getDurable()).not.toBeNull();
+  });
+
+  test('an ordinary reviewer sign-off returns no roster', async () => {
+    const { dependencies } = harness({ requestRow: request({ _wmkf_grantprogram_value: PROGRAM_ID }) });
+    dependencies.resolveProgramDirectorAudience = jest.fn(async () => CONFIGURED_AUDIENCE);
+    const signed = await markFinalWriteupReviewed(markArgs(), dependencies);
+    expect(signed.signOffRoster).toBeNull();
+    expect(dependencies.resolveProgramDirectorAudience).not.toHaveBeenCalled();
+  });
+});
