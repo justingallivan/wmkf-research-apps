@@ -378,7 +378,7 @@ until then the row stays `pending` without an error (`awaiting_transition`),
 so a commit whose response was lost is still sent by a retry POST or by
 recovery. States: `pending` → `sent`, or terminal `skipped` with a
 `skip_reason` (`program_not_enabled`, `final_from_other_draft`,
-`no_longer_in_group_review`, `final_withdrawn`, `transition_not_committed`
+`no_longer_in_group_review`, `final_withdrawn`, `request_changed`, `transition_not_committed`
 after 14 days (a later valid staging for the same draft reopens only this kind
 of skip),
 `program_not_configured`, `staffing_not_configured`, `no_recipients`,
@@ -390,7 +390,9 @@ worker whose lease expired and was taken over stops (fifth Codex review); the Dy
 recovers an activity created before the id was stored. An activity already
 accepted by Dynamics is recorded as sent without further checks; one that is
 not yet sent is re-checked against the current Final and group-review state
-before `SendEmail`, so a stale invitation is never sent. Store SQL is proven by
+before `SendEmail`, so a stale invitation is never sent. Eligibility, audience and lead
+exclusion use the request's current Grant Program and lead PD; a stored unsent
+draft whose program or lead changed since staging is skipped (`request_changed`). Store SQL is proven by
 `tests/integration/final-writeup-handoff-email.pg.test.js` in the CI Postgres job. Recipient lookups that
 fail for any reason other than 404 keep the whole send pending. Failures keep
 `pending` with `last_error_code` and are retried by the next POST for that

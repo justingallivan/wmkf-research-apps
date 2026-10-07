@@ -413,6 +413,42 @@ describe('delivery', () => {
     expect(deps.sendEmail).toHaveBeenCalledTimes(1);
   });
 
+  test('a program reassigned after staging is checked as it is now: no email for an unlisted program', async () => {
+    const { deps } = harness({
+      existingRow: pendingRow(),
+      requestRow: request({ _wmkf_grantprogram_value: SOCAL_ID }),
+    });
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'skipped', reason: 'program_not_enabled' });
+    expect(deps.resolveAudience).not.toHaveBeenCalled();
+    expect(deps.createEmailActivity).not.toHaveBeenCalled();
+  });
+
+  test('a reassignment between listed programs uses the current audience and lead', async () => {
+    const { deps } = harness({
+      existingRow: pendingRow(),
+      enabledPrograms: [RESEARCH_ID, SOCAL_ID],
+      requestRow: request({ _wmkf_grantprogram_value: SOCAL_ID, _wmkf_programdirector_value: BEA_ID }),
+    });
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'sent' });
+    expect(deps.resolveAudience).toHaveBeenCalledWith(SOCAL_ID);
+    // Bea is now the lead, so she is excluded; Lee is no longer the lead, so he is included.
+    expect(deps.createEmailActivity.mock.calls[0][0].to).toEqual(['cy@wmkeck.org', 'lee@wmkeck.org']);
+  });
+
+  test.each([
+    ['program', { _wmkf_grantprogram_value: SOCAL_ID }],
+    ['lead', { _wmkf_programdirector_value: BEA_ID }],
+  ])('a stored unsent draft is dropped when the %s changed, never sent to stale recipients', async (_label, change) => {
+    const { deps, activities } = harness({
+      existingRow: pendingRow({ dynamics_email_id: EMAIL_ID }),
+      enabledPrograms: [RESEARCH_ID, SOCAL_ID],
+      requestRow: request(change),
+    });
+    activities.set(EMAIL_ID, { activityid: EMAIL_ID, statuscode: 1 });
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'skipped', reason: 'request_changed' });
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+  });
+
   test('a held lease means another call is sending: nothing is created', async () => {
     const { deps } = harness({ existingRow: pendingRow({ locked: true }) });
     expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'not_claimed' });
