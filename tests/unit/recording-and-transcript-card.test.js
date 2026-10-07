@@ -64,6 +64,31 @@ function route(state, handlers = {}) {
   });
 }
 
+test('the visit fragment scrolls to the card once after it mounts', async () => {
+  const scrollIntoView = jest.fn();
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView });
+  window.history.replaceState({}, '', '/visit#recording-and-transcript-card');
+  route({ materials: [], collection: collection({ jobs: [], currentArtifact: null }), detail: detailFor({}) });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  await screen.findByTestId('recording-and-transcript-card');
+  await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+  fireEvent.click(screen.getByRole('button', { name: 'Upload a transcript' }));
+  expect(scrollIntoView).toHaveBeenCalledTimes(1);
+});
+
+test('the card does not scroll for a different or absent fragment', async () => {
+  const scrollIntoView = jest.fn();
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView });
+  window.history.replaceState({}, '', '/visit#other-section');
+  route({ materials: [], collection: collection({ jobs: [], currentArtifact: null }), detail: detailFor({}) });
+  const view = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  await screen.findByTestId('recording-and-transcript-card');
+  expect(scrollIntoView).not.toHaveBeenCalled();
+  window.history.replaceState({}, '', '/visit');
+  view.rerender(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  expect(scrollIntoView).not.toHaveBeenCalled();
+});
+
 const CONFIRMED_AT = '2026-10-04T23:30:00.000Z';
 function boundaryArtifact(overrides = {}) {
   return {
@@ -88,7 +113,26 @@ function correctionDetail(artifact, overrides = {}) {
 const shortDate = (iso) => new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 const detailFor = (jobOverrides) => () => ({ job: job(jobOverrides), content, candidates: [] });
 
-afterEach(() => { jest.restoreAllMocks(); put.mockReset(); });
+let originalScrollIntoViewDescriptor;
+beforeEach(() => { originalScrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView'); });
+afterEach(() => {
+  jest.restoreAllMocks();
+  put.mockReset();
+  window.history.replaceState({}, '', '/');
+  if (originalScrollIntoViewDescriptor) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', originalScrollIntoViewDescriptor);
+  else delete HTMLElement.prototype.scrollIntoView;
+});
+
+test('an existing Board page can be opened and its included and excluded material scope is clear', async () => {
+  route({ materials: [], collection: collection({ jobs: [], currentArtifact: null }), detail: detailFor({}) }, {
+    '/presentation-link': { respond: () => response({ link: { url: 'https://example.test/external/presentation/token', expiresAt: '2026-11-01T00:00:00.000Z' } }) },
+  });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  expect(await screen.findByRole('link', { name: 'Open Board page' })).toHaveAttribute('href', 'https://example.test/external/presentation/token');
+  expect(screen.getByText(/can include applicant materials and current presentation transcript and summary/)).toBeInTheDocument();
+  expect(screen.getByText(/excludes the full recording and staff discussion/)).toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false);
+});
 
 test('seeds names from the job on load, then adopts names that arrive when matching finishes', async () => {
   let current = { speaker_names: { A: 'Alex Lee' } };
@@ -283,6 +327,22 @@ test('a generated transcript with no collection is not labelled uploaded', async
   const line = await screen.findByTestId('current-transcript-line');
   expect(line.textContent).toBe(`Saved ${shortDate('2026-10-04T22:24:00.000Z')}`);
   expect(screen.queryByText(/cannot be edited here/)).not.toBeInTheDocument();
+});
+
+test('the summary section remains visible with no transcript and explains the first prerequisite', async () => {
+  route({ materials: [], collection: collection({ jobs: [], currentArtifact: null }), detail: detailFor({}) });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  expect(await screen.findByTestId('presentation-summary-block')).toBeInTheDocument();
+  expect(screen.getByText('Add a transcript first. Upload a transcript file or generate one from audio.')).toBeInTheDocument();
+});
+
+test('a manual transcript keeps the summary task visible but explains that timed generated turns are required', async () => {
+  route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: { id: ARTIFACT_ID, bundleEditable: false } }), detail: detailFor({}) });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  expect(await screen.findByTestId('presentation-summary-block')).toBeInTheDocument();
+  expect(screen.getByText(/A generated transcript with timed speaker turns is required/)).toBeInTheDocument();
+  expect(screen.getByText(/Uploaded transcript files cannot be split/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Summarize presentation' })).not.toBeInTheDocument();
 });
 
 test('finalize 422 transcript_text_invalid shows the server message and no Retry button', async () => {
@@ -515,6 +575,45 @@ describe('presentation end', () => {
     expect(screen.queryByRole('button', { name: 'Set presentation end' })).not.toBeInTheDocument();
   });
 
+  test('the explicit Edit presentation end action opens the existing correction draft', async () => {
+    const artifact = boundaryArtifact();
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) }, {
+      '/corrections': { method: 'POST', respond: () => response(correctionDetail(artifact, { correction: draftCorrection({ presentationEndMs: 62900 }) })) },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit presentation end' }));
+    expect(await screen.findByRole('heading', { name: 'Edit speaker names and presentation end' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Presentation ends after')).toHaveValue('62900');
+  });
+
+  test('a names-only correction warns before publish and explains the manual regeneration steps after success', async () => {
+    const artifact = boundaryArtifact();
+    const summaryArtifactId = '99999999-9999-4999-8999-999999999999';
+    const staleArtifact = boundaryArtifact({
+      presentationTranscript: { state: 'stale', artifactId: null },
+      staffDiscussionTranscript: { state: 'stale', artifactId: null },
+      transcriptSummary: { state: 'stale', artifactId: summaryArtifactId, publishedAt: CONFIRMED_AT },
+    });
+    const state = { materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) };
+    route(state, {
+      [`/corrections/${CORRECTION_ID}/publish`]: { method: 'POST', respond: () => {
+        state.collection = collection({ jobs: [], currentArtifact: staleArtifact });
+        return response({ publication: { state: 'published' }, currentArtifact: staleArtifact });
+      } },
+      '/corrections': { method: 'POST', respond: () => response(correctionDetail(artifact, { correction: draftCorrection({ speakerNames: { A: '' } }) })) },
+      [`/corrections/${CORRECTION_ID}`]: { method: 'PATCH', respond: (path, options) => response({ correction: draftCorrection({ version: 2, speakerNames: JSON.parse(options.body).speakerNames }) }) },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit speaker names' }));
+    expect(await screen.findByText(/including a names-only change, withholds the Board presentation transcript and summary/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Name for Speaker A'), { target: { value: 'Alex' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await screen.findByText('Saved');
+    expect(screen.getByText(/including a names-only change/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Publish transcript' }));
+    expect(await screen.findByText(/Generate the presentation and staff discussion transcripts, then summarize again/)).toBeInTheDocument();
+  });
+
   test('both halves bound shows both ready lines; a missing discussion alone shows an info notice and Generate', async () => {
     route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
     const view = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
@@ -571,6 +670,33 @@ describe('presentation summary', () => {
   const withSummary = (artifactOverrides = {}) => collection({ jobs: [], currentArtifact: boundaryArtifact({
     transcriptSummary: { state: 'missing', artifactId: null, publishedAt: null }, ...artifactOverrides }) });
 
+  test('compact correction-publish state stays unknown when collection refresh fails', async () => {
+    const summaryId = '99999999-9999-4999-8999-999999999999';
+    const compactArtifact = { id: ARTIFACT_ID, fingerprint: 'e'.repeat(64), bundleEditable: true };
+    const state = { materials: [transcriptRow(), transcriptRow({ artifactId: summaryId,
+      artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, artifactTypeLabel: 'Presentation summary', filename: 'summary.md' })],
+      collection: collection({ jobs: [], currentArtifact: compactArtifact }), detail: detailFor({}) };
+    let collectionReads = 0;
+    route(state, {
+      '/transcriptions/materials': { method: 'GET', respond: () => response({ materials: state.materials, uploads: [] }) },
+      '/transcriptions': { method: 'GET', respond: () => {
+        collectionReads += 1;
+        if (collectionReads === 1) return response(state.collection);
+        return response({ error: 'temporarily unavailable' }, 503);
+      } },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    const summaryBlock = await screen.findByTestId('presentation-summary-block');
+    await waitFor(() => expect(collectionReads).toBe(1));
+    await screen.findByRole('button', { name: 'Refresh transcription status' });
+    expect(summaryBlock.textContent).toContain('Summary status unavailable.');
+    expect(screen.queryByText('No summary published yet.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh transcription status' }));
+    await waitFor(() => expect(collectionReads).toBe(2));
+    expect(summaryBlock.textContent).toContain('Summary status unavailable.');
+    expect(screen.queryByText('No summary published yet.')).toBeNull();
+  });
+
   test('Summarize stays disabled until the acknowledgment is ticked, then posts the version and both expectations', async () => {
     let postBody = null;
     route({ materials: [transcriptRow()], collection: withSummary(), detail: detailFor({}) }, {
@@ -592,7 +718,7 @@ describe('presentation summary', () => {
     fireEvent.click(button);
     expect(await screen.findByLabelText(/^Draft/)).toHaveValue('What was presented\nQuantum dots.');
     expect(postBody).toEqual({ acknowledgmentVersion: ACK, expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: 'e'.repeat(64) });
-    expect(screen.getByText(/no slide PDF on file/)).toBeInTheDocument();
+    expect(screen.getByText(/Slide text was not included/)).toBeInTheDocument();
     // The acknowledgment is per request: it is cleared after a run.
     expect(screen.getByLabelText(/may be sent to Anthropic/)).not.toBeChecked();
   });
@@ -609,8 +735,20 @@ describe('presentation summary', () => {
       '/summary-draft': { method: 'GET', respond: () => response(summaryState({ transcriptSummary: published, slidesChangedSinceSummary: null })) },
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    expect(await screen.findByText(/The Board link and Staff Deliberations show it/)).toBeInTheDocument();
+    expect(await screen.findByText(/Available to staff and eligible for the Board link/)).toBeInTheDocument();
     expect(screen.queryByTestId('summary-slides-changed')).toBeNull();
+  });
+
+  test('a published summary opens from its existing material descriptor', async () => {
+    const published = { state: 'bound', artifactId: DRAFT_ID, publishedAt: CONFIRMED_AT };
+    const summaryMaterial = { artifactId: DRAFT_ID, artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY,
+      webUrl: 'https://example.sharepoint.com/published-summary.docx', filename: 'summary.docx' };
+    route({ materials: [transcriptRow(), summaryMaterial], collection: withSummary({ transcriptSummary: published }), detail: detailFor({}) }, {
+      '/summary-draft': { method: 'GET', respond: () => response(summaryState({ transcriptSummary: published })) },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByRole('link', { name: 'Open published summary' })).toHaveAttribute('href', summaryMaterial.webUrl);
+    expect(screen.getByText(/Available to staff and eligible for the Board link/)).toBeInTheDocument();
   });
 
   test('a draft from an earlier transcript version cannot be published', async () => {
@@ -622,15 +760,338 @@ describe('presentation summary', () => {
     expect(screen.getByRole('button', { name: 'Publish summary' })).toBeDisabled();
   });
 
+  test('a refresh invalidates a same-version draft when its presentation transcript became stale', async () => {
+    const state = { materials: [transcriptRow()], collection: collection({
+      jobs: [job({ status: 'queued', contentAccessAllowed: false })],
+      currentArtifact: boundaryArtifact({ transcriptSummary: { state: 'bound', artifactId: DRAFT_ID } }),
+    }), detail: detailFor({}) };
+    let summaryReads = 0;
+    route(state, {
+      '/summary-draft': { method: 'GET', respond: () => {
+        summaryReads += 1;
+        return response(summaryState({ draft: readyDraft(), draftMatchesTranscript: summaryReads === 1,
+          transcriptSummary: { state: summaryReads === 1 ? 'bound' : 'stale', artifactId: DRAFT_ID } }));
+      } },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    const editor = await screen.findByLabelText(/^Draft/);
+    fireEvent.change(editor, { target: { value: 'Unsaved edit' } });
+    state.collection = collection({ jobs: [job({ status: 'queued', contentAccessAllowed: false })],
+      currentArtifact: boundaryArtifact({ transcriptSummary: { state: 'stale', artifactId: DRAFT_ID } }) });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    expect(await screen.findByText(/This draft was made from an earlier transcript version/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Draft/)).toHaveValue('Unsaved edit');
+    expect(screen.getByRole('button', { name: 'Publish summary' })).toBeDisabled();
+  });
+
+  test('successive same-version refreshes retain unsaved text after adopting publishing state', async () => {
+    const state = { materials: [transcriptRow()], collection: collection({
+      jobs: [job({ status: 'queued', contentAccessAllowed: false })],
+      currentArtifact: boundaryArtifact({ transcriptSummary: { state: 'bound', artifactId: DRAFT_ID } }),
+    }), detail: detailFor({}) };
+    let summaryReads = 0;
+    route(state, {
+      '/summary-draft': { method: 'GET', respond: () => {
+        summaryReads += 1;
+        return response(summaryState({ draft: readyDraft({ state: summaryReads === 1 ? 'ready' : 'publishing' }),
+          draftMatchesTranscript: true, transcriptSummary: { state: 'bound', artifactId: DRAFT_ID },
+          slidesChangedSinceSummary: summaryReads === 3 }));
+      } },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    const editor = await screen.findByLabelText(/^Draft/);
+    fireEvent.change(editor, { target: { value: 'Unsaved edit' } });
+    state.collection = collection({ jobs: [job({ status: 'queued', contentAccessAllowed: false })],
+      currentArtifact: boundaryArtifact({ transcriptSummary: { state: 'stale', artifactId: DRAFT_ID } }) });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    expect(await screen.findByText(/Publishing this draft did not finish/)).toBeInTheDocument();
+    expect(screen.getByText(/The text shown includes unsaved edits, but this draft is already publishing/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Draft/)).toHaveValue('Unsaved edit');
+    expect(screen.getByLabelText(/^Draft/)).toBeDisabled();
+
+    state.collection = collection({ jobs: [job({ status: 'queued', contentAccessAllowed: false })],
+      currentArtifact: boundaryArtifact({ fingerprint: 'f'.repeat(64), transcriptSummary: { state: 'stale', artifactId: DRAFT_ID } }) });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect(summaryReads).toBe(3));
+    expect(await screen.findByTestId('summary-slides-changed')).toBeInTheDocument();
+    expect(screen.getByText(/The text shown includes unsaved edits, but this draft is already publishing/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Draft/)).toHaveValue('Unsaved edit');
+  });
+
+  test.each(['ready', 'publishing'])('a server-removed %s draft becomes a recoverable conflict, not a live draft', async (initialState) => {
+    const state = { materials: [transcriptRow()], collection: collection({
+      jobs: [job({ status: 'queued', contentAccessAllowed: false })],
+      currentArtifact: boundaryArtifact({ transcriptSummary: { state: 'bound', artifactId: DRAFT_ID } }),
+    }), detail: detailFor({}) };
+    let summaryReads = 0;
+    route(state, {
+      '/summary-draft': { method: 'GET', respond: () => {
+        summaryReads += 1;
+        if (summaryReads === 1) return response(summaryState({ draft: readyDraft(), draftMatchesTranscript: true,
+          transcriptSummary: { state: 'bound', artifactId: DRAFT_ID } }));
+        if (initialState === 'publishing' && summaryReads === 2) return response(summaryState({ draft: readyDraft({ state: 'publishing' }),
+          draftMatchesTranscript: true, transcriptSummary: { state: 'bound', artifactId: DRAFT_ID } }));
+        return response(summaryState({ draft: null, draftMatchesTranscript: false,
+          transcriptSummary: { state: 'bound', artifactId: DRAFT_ID } }));
+      } },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    const editor = await screen.findByLabelText(/^Draft/);
+    fireEvent.change(editor, { target: { value: `Unsaved ${initialState} edits` } });
+    state.collection = collection({ jobs: [job({ status: 'queued', contentAccessAllowed: false })],
+      currentArtifact: boundaryArtifact({ transcriptSummary: { state: 'stale', artifactId: DRAFT_ID } }) });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    if (initialState === 'publishing') {
+      expect(await screen.findByText(/Publishing this draft did not finish/)).toBeInTheDocument();
+      state.collection = collection({ jobs: [job({ status: 'queued', contentAccessAllowed: false })],
+        currentArtifact: boundaryArtifact({ fingerprint: 'f'.repeat(64), transcriptSummary: { state: 'stale', artifactId: DRAFT_ID } }) });
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    }
+    await waitFor(() => expect(summaryReads).toBe(initialState === 'ready' ? 2 : 3));
+    expect(await screen.findByTestId('summary-draft-conflict')).toHaveTextContent('This draft is no longer current.');
+    expect(screen.getByLabelText('Preserved unsaved edits')).toHaveValue(`Unsaved ${initialState} edits`);
+    expect(screen.queryByText(/Publishing this draft did not finish/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Publish summary' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Discard draft' })).toBeNull();
+  });
+
+  test('a failed summary read offers Check again and clears the old error on success', async () => {
+    let reads = 0;
+    route({ materials: [transcriptRow()], collection: withSummary(), detail: detailFor({}) }, {
+      '/summary-draft': { method: 'GET', respond: () => {
+        reads += 1;
+        return reads === 1 ? response({ error: 'temporarily unavailable' }, 500)
+          : response(summaryState({ draft: readyDraft(), draftMatchesTranscript: true }));
+      } },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByRole('button', { name: 'Check again' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
+    expect(await screen.findByLabelText(/^Draft/)).toHaveValue(readyDraft().text);
+    expect(screen.queryByRole('button', { name: 'Check again' })).toBeNull();
+    expect(screen.queryByText(/temporarily unavailable/)).toBeNull();
+  });
+
+  test('collection-known missing summary is reported without a summary GET', async () => {
+    const notPublished = { state: 'missing', artifactId: null, publishedAt: null };
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact({
+      presentationTranscript: { state: 'missing', artifactId: null }, transcriptSummary: notPublished,
+    }) }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByText('No summary published yet.')).toBeInTheDocument();
+    expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/summary-draft'))).toBe(false);
+  });
+
+  test('a summary read dropped after losing its artifact does not leave Checking status', async () => {
+    const state = { materials: [transcriptRow()], collection: collection({
+      jobs: [job({ status: 'queued', contentAccessAllowed: false })],
+      currentArtifact: boundaryArtifact({ transcriptSummary: { state: 'bound', artifactId: DRAFT_ID } }),
+    }), detail: detailFor({}) };
+    let resolveSummaryRead;
+    route(state, {
+      '/summary-draft': { method: 'GET', respond: () => new Promise((resolve) => { resolveSummaryRead = resolve; }) },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    await waitFor(() => expect(typeof resolveSummaryRead).toBe('function'));
+    state.collection = collection({ jobs: [job({ status: 'queued', contentAccessAllowed: false })], currentArtifact: null });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    expect(await screen.findByText('Summary status cannot be checked until transcript status is available.')).toBeInTheDocument();
+    await act(async () => {
+      resolveSummaryRead(response(summaryState({ draft: readyDraft(), draftMatchesTranscript: true })));
+      await Promise.resolve();
+    });
+    expect(screen.getByText('Summary status cannot be checked until transcript status is available.')).toBeInTheDocument();
+    expect(screen.queryByText(/Checking summary status/)).toBeNull();
+  });
+
+  test('losing the confirmed boundary preserves dirty text in recovery when no summary read is needed', async () => {
+    const state = { materials: [transcriptRow()], collection: collection({
+      jobs: [job({ status: 'queued', contentAccessAllowed: false })],
+      currentArtifact: boundaryArtifact({ transcriptSummary: { state: 'bound', artifactId: DRAFT_ID } }),
+    }), detail: detailFor({}) };
+    let summaryReads = 0;
+    route(state, {
+      '/summary-draft': { method: 'GET', respond: () => {
+        summaryReads += 1;
+        return response(summaryState({ draft: readyDraft(), draftMatchesTranscript: true,
+          transcriptSummary: { state: 'bound', artifactId: DRAFT_ID } }));
+      } },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    const editor = await screen.findByLabelText(/^Draft/);
+    fireEvent.change(editor, { target: { value: 'Recover this edit' } });
+    state.collection = collection({ jobs: [job({ status: 'queued', contentAccessAllowed: false })],
+      currentArtifact: boundaryArtifact({ presentationEnd: null,
+        presentationTranscript: { state: 'not_confirmed', artifactId: null },
+        transcriptSummary: { state: 'not_confirmed', artifactId: null } }) });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    expect(await screen.findByTestId('summary-draft-conflict')).toHaveTextContent('This draft is no longer current.');
+    expect(screen.getByLabelText('Preserved unsaved edits')).toHaveValue('Recover this edit');
+    expect(screen.queryByLabelText(/^Draft/)).toBeNull();
+    expect(screen.getByText('No summary published yet.')).toBeInTheDocument();
+    expect(summaryReads).toBe(1);
+  });
+
+  test('transient collection failure gives truthful transcript status and a working retry', async () => {
+    let collectionReads = 0;
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: null }), detail: detailFor({}) }, {
+      '/transcriptions': { method: 'GET', respond: () => {
+        collectionReads += 1;
+        return collectionReads === 1 ? response({ error: 'temporarily unavailable' }, 503)
+          : response(collection({ jobs: [], currentArtifact: null }));
+      } },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByText('Transcript status is unavailable. Refresh transcription status to check whether this transcript can be summarized.')).toBeInTheDocument();
+    expect(screen.getByText('Summary status unavailable.')).toBeInTheDocument();
+    expect(screen.queryByText(/Uploaded transcript files cannot be split/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh transcription status' }));
+    expect(await screen.findByText('Summary status cannot be checked until transcript status is available.')).toBeInTheDocument();
+    expect(collectionReads).toBe(2);
+  });
+
+  test('discard success removes the draft immediately even if the follow-up read is unavailable', async () => {
+    let summaryReads = 0;
+    route({ materials: [transcriptRow()], collection: withSummary(), detail: detailFor({}) }, {
+      '/summary-draft': { respond: (_path, options) => {
+        if (options.method === 'DELETE') return response({});
+        summaryReads += 1;
+        return summaryReads === 1
+          ? response(summaryState({ draft: readyDraft(), draftMatchesTranscript: true }))
+          : response({ error: 'unavailable' }, 503);
+      } },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    await screen.findByLabelText(/^Draft/);
+    fireEvent.click(screen.getByRole('button', { name: 'Discard draft' }));
+    expect(await screen.findByText('Draft discarded.')).toBeInTheDocument();
+    await screen.findByText(/Summary status unavailable/);
+    expect(screen.queryByLabelText(/^Draft/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Discard draft' })).toBeNull();
+  });
+
+  test('an unconfirmed summary artifact stays visible when the boundary is cleared', async () => {
+    const summaryMaterial = { artifactId: DRAFT_ID, artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY,
+      webUrl: 'https://example.sharepoint.com/published-summary.docx', filename: 'summary.docx' };
+    const notConfirmed = { state: 'not_confirmed', artifactId: DRAFT_ID, publishedAt: CONFIRMED_AT };
+    route({ materials: [summaryMaterial], collection: withSummary({ presentationEnd: null,
+      presentationTranscript: { state: 'not_confirmed', artifactId: null }, transcriptSummary: notConfirmed }), detail: detailFor({}) }, {
+      '/summary-draft': { method: 'GET', respond: () => response(summaryState({ transcriptSummary: notConfirmed })) },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByText(/A summary artifact exists. Its eligibility for the Board link is not confirmed/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open published summary' })).toHaveAttribute('href', summaryMaterial.webUrl);
+    expect(screen.queryByText('No summary published yet.')).toBeNull();
+  });
+
+  test('an older background summary GET cannot restore a stale draft version after saving local edits', async () => {
+    const state = { materials: [transcriptRow()], collection: collection({
+      jobs: [job({ status: 'queued', contentAccessAllowed: false })],
+      currentArtifact: boundaryArtifact({ transcriptSummary: { state: 'bound', artifactId: DRAFT_ID } }),
+    }) };
+    let summaryReads = 0;
+    let resolveBackgroundRead;
+    let resolveBackgroundReadConsumed;
+    const backgroundReadConsumed = new Promise((resolve) => { resolveBackgroundReadConsumed = resolve; });
+    const publishBodies = [];
+    route(state, {
+      '/summary-draft': { method: 'GET', respond: () => {
+        summaryReads += 1;
+        if (summaryReads === 1) return response(summaryState({ draft: readyDraft(), draftMatchesTranscript: true, transcriptSummary: { state: 'bound', artifactId: DRAFT_ID } }));
+        if (summaryReads === 2) return new Promise((resolve) => { resolveBackgroundRead = resolve; });
+        return response(summaryState({ draft: readyDraft({ version: 3, text: 'Local edit', edited: true }), draftMatchesTranscript: true, transcriptSummary: { state: 'bound', artifactId: DRAFT_ID } }));
+      } },
+    });
+    const original = global.fetch.getMockImplementation();
+    global.fetch.mockImplementation(async (url, options = {}) => {
+      const path = String(url);
+      if (path.endsWith('/summary-draft') && options.method === 'PATCH') return response({ draft: readyDraft({ version: 3, text: 'Local edit', edited: true }) });
+      if (path.endsWith('/summary-draft/publish')) { publishBodies.push(JSON.parse(options.body)); return response({}); }
+      return original(url, options);
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    const editor = await screen.findByLabelText(/^Draft/);
+    fireEvent.change(editor, { target: { value: 'Local edit' } });
+
+    state.collection = collection({
+      jobs: [job({ status: 'queued', contentAccessAllowed: false })],
+      currentArtifact: boundaryArtifact({ transcriptSummary: { state: 'stale', artifactId: DRAFT_ID } }),
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect(summaryReads).toBe(2));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Draft saved.');
+    await act(async () => {
+      resolveBackgroundRead({ ok: true, status: 200, json: async () => {
+        resolveBackgroundReadConsumed();
+        return summaryState({ draft: readyDraft({ version: 8, text: 'Older GET text' }), draftMatchesTranscript: true,
+          transcriptSummary: { state: 'bound', artifactId: DRAFT_ID } });
+      } });
+      await backgroundReadConsumed;
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(screen.getByLabelText(/^Draft/)).toHaveValue('Local edit'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Publish summary' }));
+    await waitFor(() => expect(publishBodies).toHaveLength(1));
+    expect(publishBodies[0]).toEqual({ draftId: DRAFT_ID, expectedVersion: 3 });
+  });
+
+  test('a background GET for a replacement draft keeps an unsaved local text paired with its original version', async () => {
+    const state = { materials: [transcriptRow()], collection: collection({
+      jobs: [job({ status: 'queued', contentAccessAllowed: false })],
+      currentArtifact: boundaryArtifact({ transcriptSummary: { state: 'bound', artifactId: DRAFT_ID } }),
+    }) };
+    let summaryReads = 0;
+    let resolveBackgroundRead;
+    route(state, {
+      '/summary-draft': { method: 'GET', respond: () => {
+        summaryReads += 1;
+        if (summaryReads === 1) return response(summaryState({ draft: readyDraft(), draftMatchesTranscript: true, transcriptSummary: { state: 'bound', artifactId: DRAFT_ID } }));
+        if (summaryReads === 2) return new Promise((resolve) => { resolveBackgroundRead = resolve; });
+        if (summaryReads === 3) return response({ error: 'unavailable' }, 503);
+        return response(summaryState({ draft: readyDraft({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', version: 9, text: 'Replacement server draft' }), draftMatchesTranscript: true }));
+      } },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    const editor = await screen.findByLabelText(/^Draft/);
+    fireEvent.change(editor, { target: { value: 'Unsaved local text' } });
+    state.collection = collection({
+      jobs: [job({ status: 'queued', contentAccessAllowed: false })],
+      currentArtifact: boundaryArtifact({ transcriptSummary: { state: 'stale', artifactId: DRAFT_ID } }),
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect(summaryReads).toBe(2));
+    resolveBackgroundRead(response(summaryState({
+      draft: readyDraft({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', version: 9, text: 'Replacement server draft' }),
+      draftMatchesTranscript: true, transcriptSummary: { state: 'stale', artifactId: DRAFT_ID },
+    })));
+    expect(await screen.findByTestId('summary-draft-conflict')).toHaveTextContent('This draft is no longer current.');
+    expect(screen.getByLabelText('Preserved unsaved edits')).toHaveValue('Unsaved local text');
+    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Publish summary' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load latest' }));
+    await screen.findByRole('button', { name: 'Check again' });
+    expect(screen.getByLabelText('Preserved unsaved edits')).toHaveValue('Unsaved local text');
+    fireEvent.click(screen.getByRole('button', { name: 'Load latest' }));
+    expect(await screen.findByLabelText(/^Draft/)).toHaveValue('Replacement server draft');
+    expect(screen.queryByTestId('summary-draft-conflict')).toBeNull();
+  });
+
   test('publishing an edited draft saves it first, then publishes the saved version and reloads', async () => {
     const calls = [];
     route({ materials: [transcriptRow()], collection: withSummary(), detail: detailFor({}) });
     const base = global.fetch.getMockImplementation();
+    let summaryReads = 0;
     global.fetch.mockImplementation(async (url, options = {}) => {
       const path = String(url); const method = options.method || 'GET';
       if (path.endsWith('/summary-draft/publish')) { calls.push(['publish', JSON.parse(options.body)]); return response({ transcriptSummary: { state: 'bound' }, draft: null }); }
       if (path.endsWith('/summary-draft') && method === 'PATCH') { calls.push(['save', JSON.parse(options.body)]); return response({ draft: readyDraft({ version: 3, text: 'Edited', edited: true }) }); }
-      if (path.endsWith('/summary-draft') && method === 'GET') return response(summaryState({ draft: readyDraft(), draftMatchesTranscript: true }));
+      if (path.endsWith('/summary-draft') && method === 'GET') {
+        summaryReads += 1;
+        return response(summaryState({ draft: summaryReads === 1 ? readyDraft() : readyDraft({ version: 3, text: 'Edited', edited: true }), draftMatchesTranscript: true }));
+      }
       return base(url, options);
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
@@ -641,6 +1102,35 @@ describe('presentation summary', () => {
     expect(calls[0][1]).toEqual({ draftId: DRAFT_ID, expectedVersion: 2, text: 'Edited' });
     expect(calls[1][1]).toEqual({ draftId: DRAFT_ID, expectedVersion: 3 });
     expect(await screen.findByText(/Summary published/)).toBeInTheDocument();
+  });
+
+  test('an ambiguous summary publish refreshes collection, summary, and material projections', async () => {
+    const stale = { state: 'stale', artifactId: DRAFT_ID, publishedAt: CONFIRMED_AT };
+    const bound = { state: 'bound', artifactId: DRAFT_ID, publishedAt: CONFIRMED_AT };
+    const summaryMaterial = { artifactId: DRAFT_ID, artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY,
+      webUrl: 'https://example.sharepoint.com/published-after-response-loss.docx', filename: 'summary.docx' };
+    const state = { materials: [transcriptRow()], collection: withSummary({ transcriptSummary: stale }) };
+    let summaryReads = 0;
+    route(state, {
+      '/summary-draft/publish': { method: 'POST', respond: () => {
+        state.materials = [transcriptRow(), summaryMaterial];
+        return response({ error: 'Response was lost after publish.' }, 500);
+      } },
+      '/summary-draft': { method: 'GET', respond: () => {
+        summaryReads += 1;
+        return summaryReads === 1
+          ? response(summaryState({ draft: readyDraft(), draftMatchesTranscript: true, transcriptSummary: stale }))
+          : response(summaryState({ draft: null, transcriptSummary: bound }));
+      } },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Publish summary' }));
+    expect(await screen.findByText(/Available to staff and eligible for the Board link/)).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Open published summary' })).toHaveAttribute('href', summaryMaterial.webUrl);
+    expect(screen.getByTestId('presentation-summary-block')).not.toHaveTextContent('The published summary is from an earlier transcript version');
+    expect(screen.getAllByRole('alert').some((node) => node.textContent.includes('Response was lost after publish.'))).toBe(true);
+    expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/transcriptions'))).toHaveLength(2);
+    expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/presentation-materials'))).toHaveLength(2);
   });
 
   test('an unfinished publish is read-only and offers Publish again or a fresh summary', async () => {
@@ -666,12 +1156,12 @@ describe('presentation summary', () => {
     expect(screen.getByRole('button', { name: 'Replace draft with a new summary' })).not.toBeDisabled();
   });
 
-  test('a stale published summary says the Board link no longer shows it; the block shows no ids', async () => {
+  test('a stale published summary remains available to staff and is withheld from the Board link', async () => {
     route({ materials: [transcriptRow()], collection: withSummary({ transcriptSummary: { state: 'stale', artifactId: DRAFT_ID, publishedAt: CONFIRMED_AT } }), detail: detailFor({}) }, {
       '/summary-draft': { method: 'GET', respond: () => response(summaryState({ transcriptSummary: { state: 'stale', artifactId: DRAFT_ID, publishedAt: CONFIRMED_AT } })) },
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    expect(await screen.findByText(/The Board link no longer shows it/)).toBeInTheDocument();
+    expect(await screen.findByText(/remains available to staff; it is withheld from the Board link/)).toBeInTheDocument();
     expect(screen.getByTestId('presentation-summary-block').textContent).not.toContain(DRAFT_ID);
   });
 });

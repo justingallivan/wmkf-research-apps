@@ -54,6 +54,14 @@ test('list row links to the tracker\'s visit editor with the request number and 
     .toHaveAttribute('data-full-page-navigation', 'true');
 });
 
+test('a saved visit is labeled as the workspace entry, while a missing visit only offers scheduling', () => {
+  const { rerender } = render(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: { activityId: 'visit-1' } })} cycleCode="D26" programId="p1" />);
+  expect(screen.getByRole('link', { name: 'Open visit' })).toHaveAttribute('href', expect.stringContaining('/meeting-tracker/visits/'));
+  rerender(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: null })} cycleCode="D26" programId="p1" />);
+  expect(screen.getByRole('link', { name: 'Schedule visit' })).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Open visit' })).not.toBeInTheDocument();
+});
+
 test('list row shows scheduling and missing-link cues when either meeting is missing', () => {
   const { rerender } = render(<MeetingTrackerRequestRow proposal={proposal()} cycleCode="D26" programId={SESSION_ID} />);
 
@@ -167,8 +175,17 @@ test('SessionEditor uses the schedule projection for its proposal lookup', async
 });
 
 test('a slot without a live briefing link says who shares it; with one it offers Open briefing', () => {
-  expect(slotBriefingText({ briefing: null })).toMatch(/not yet shared.*lead PD shares it from Staff Deliberations/);
+  expect(slotBriefingText({ briefing: null })).toBe('Briefing link unavailable');
   expect(slotBriefingText({ briefing: { url: 'https://apps.test/external/briefing/t' } })).toBe('Open briefing');
+});
+
+test('a saved site visit offers the recording workspace with request and cycle context', () => {
+  const row = proposal({ siteVisit: { activityId: 'visit-1' } });
+  const slot = { wmkf_deliberationslotid: FIRST_SLOT_ID, _wmkf_request_value: row.requestId, wmkf_minutes: 15, briefing: null };
+  render(<ProposalOrderList slots={[slot]} proposalById={new Map([[row.requestId.toLowerCase(), row]])} sessions={[]} sessionId={SESSION_ID} cycleCode="D26" programId="p1" busy={false} savingSlotId={null} readOnly />);
+  expect(screen.getByRole('link', { name: 'Open visit · recording and transcript' })).toHaveAttribute('href',
+    `/meeting-tracker/visits/${row.requestId}?cycleCode=D26&programId=p1&n=1002003#recording-and-transcript-card`);
+  expect(screen.getByRole('link', { name: 'Check Staff Deliberations' })).toHaveAttribute('href', `/workbench/${row.requestId}?tab=staff-deliberations&n=1002003`);
 });
 
 test('session attendee chip hints distinguish linked Contact failures from manual roster email', () => {
@@ -669,4 +686,195 @@ test('a saved session opens as a read-only summary with its status; Edit opens t
   fireEvent.click(screen.getByRole('button', { name: 'Edit session details' }));
   expect(screen.getByLabelText('Location')).toHaveValue('Board room');
   expect(screen.getByRole('button', { name: 'Save session' })).toBeInTheDocument();
+});
+
+test('a failed existing-session load gates edits and retry opens the session after prerequisites recover', async () => {
+  routerQuery = { id: SESSION_ID, cycleCode: 'nope' };
+  let failDashboard = true;
+  const session = {
+    sessionId: SESSION_ID, etag: 'W/"1"', status: 100000000,
+    scheduledStartIso: '2026-09-14T16:00:00.000Z', scheduledEndIso: '2026-09-14T17:00:00.000Z', ianaTimeZone: 'America/Los_Angeles',
+    location: 'Loaded location', meetingLink: '', notes: '', attendeeRefs: [],
+  };
+  global.fetch = jest.fn(async (url) => {
+    const target = String(url);
+    if (target.includes('/dashboard') && failDashboard) return { ok: false, status: 400, json: async () => ({ error: 'Unknown cycle.' }) };
+    const body = target.includes('/recipients') ? { staff: [], board: [] }
+      : target.endsWith(`/sessions/${SESSION_ID}`) ? { session, slots: [] }
+        : target.endsWith('/sessions') ? { sessions: [] } : { proposals: [] };
+    return { ok: true, status: 200, json: async () => body };
+  });
+  render(<SessionEditor />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Unknown cycle.');
+  expect(screen.queryByRole('button', { name: 'Save session' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Edit proposal order' })).not.toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith(`/sessions/${SESSION_ID}`))).toBe(false);
+
+  failDashboard = false;
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  expect(await screen.findByRole('region', { name: 'Session details' })).toHaveTextContent('Loaded location');
+});
+
+test('a delayed old session detail cannot populate or be saved under the new route context', async () => {
+  const secondId = '77777777-7777-4777-8777-777777777777';
+  const baseSession = (id, location) => ({
+    sessionId: id, etag: `W/"${location}"`, status: 100000000,
+    scheduledStartIso: '2026-09-14T16:00:00.000Z', scheduledEndIso: '2026-09-14T17:00:00.000Z', ianaTimeZone: 'America/Los_Angeles',
+    location, meetingLink: '', notes: '', attendeeRefs: [],
+  });
+  let resolveFirst;
+  const firstDetail = new Promise((resolve) => { resolveFirst = resolve; });
+  const writes = [];
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const target = String(url);
+    if (options.method === 'PATCH') {
+      writes.push(JSON.parse(options.body));
+      return { ok: true, status: 200, json: async () => ({ session: baseSession(secondId, 'B saved') }) };
+    }
+    const body = target.includes('/recipients') ? { staff: [], board: [] }
+      : target.endsWith('/sessions') ? { sessions: [] }
+        : target.endsWith(`/sessions/${SESSION_ID}`) ? null
+          : target.endsWith(`/sessions/${secondId}`) ? { session: baseSession(secondId, 'B location'), slots: [] }
+            : { proposals: [] };
+    if (target.endsWith(`/sessions/${SESSION_ID}`)) return firstDetail;
+    return { ok: true, status: 200, json: async () => body };
+  });
+  routerQuery = { id: SESSION_ID };
+  const view = render(<SessionEditor />);
+  await waitFor(() => expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith(`/sessions/${SESSION_ID}`))).toBe(true));
+
+  routerQuery = { id: secondId };
+  view.rerender(<SessionEditor />);
+  expect(await screen.findByRole('region', { name: 'Session details' })).toHaveTextContent('B location');
+  resolveFirst({ ok: true, status: 200, json: async () => ({ session: baseSession(SESSION_ID, 'A stale location'), slots: [] }) });
+  await waitFor(() => expect(screen.getByRole('region', { name: 'Session details' })).toHaveTextContent('B location'));
+  fireEvent.click(screen.getByRole('button', { name: 'Edit session details' }));
+  expect(screen.getByLabelText('Location')).toHaveValue('B location');
+  fireEvent.change(screen.getByLabelText('Location'), { target: { value: 'B changed' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save session' }));
+  await waitFor(() => expect(writes).toHaveLength(1));
+  expect(writes[0]).toMatchObject({ etag: 'W/"B location"', location: 'B changed' });
+  expect(writes[0].etag).not.toBe('W/"A stale location"');
+});
+
+test('retry after a failed post-create navigation reuses the created session', async () => {
+  routerQuery = { id: 'new' };
+  routerReplace.mockReset().mockResolvedValueOnce(false).mockResolvedValue(true);
+  let sessionPosts = 0;
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const target = String(url);
+    if (target.endsWith('/recipients')) return { ok: true, status: 200, json: async () => ({ staff: [], board: [] }) };
+    if (target.endsWith('/sessions') && options.method === 'POST') {
+      sessionPosts += 1;
+      return { ok: true, status: 200, json: async () => ({ session: { sessionId: SESSION_ID } }) };
+    }
+    if (target.endsWith('/sessions')) return { ok: true, status: 200, json: async () => ({ sessions: [] }) };
+    return { ok: true, status: 200, json: async () => ({ proposals: [] }) };
+  });
+  render(<SessionEditor />);
+  const start = await screen.findByLabelText('Date and start time');
+  await waitFor(() => expect(start).toBeEnabled());
+  fireEvent.change(start, { target: { value: '2026-10-10T10:00' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create session' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('The created session could not be opened. Please try again.');
+  expect(screen.getByLabelText('Date and start time')).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Continue to created session' }));
+  await waitFor(() => expect(routerReplace).toHaveBeenCalledTimes(2));
+  expect(sessionPosts).toBe(1);
+});
+
+test('retry after an ambiguous initial-slot failure checks saved slots before creating one again', async () => {
+  const requestId = proposal().requestId;
+  routerQuery = { id: 'new', cycleCode: 'D26', requestId };
+  routerReplace.mockReset().mockResolvedValue(true);
+  let sessionPosts = 0;
+  let slotPosts = 0;
+  let detailReads = 0;
+  const slot = { wmkf_deliberationslotid: FIRST_SLOT_ID, _wmkf_request_value: requestId, _etag: 'W/"slot"', wmkf_minutes: 15 };
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const target = String(url);
+    if (target.endsWith('/recipients')) return { ok: true, status: 200, json: async () => ({ staff: [], board: [] }) };
+    if (target.includes('/dashboard')) return { ok: true, status: 200, json: async () => ({ proposals: [{ ...proposal(), leadPdId: null }] }) };
+    if (target.endsWith('/sessions') && options.method === 'POST') {
+      sessionPosts += 1;
+      return { ok: true, status: 200, json: async () => ({ session: { sessionId: SESSION_ID } }) };
+    }
+    if (target.endsWith('/sessions')) return { ok: true, status: 200, json: async () => ({ sessions: [] }) };
+    if (target.endsWith('/slots') && options.method === 'POST') {
+      slotPosts += 1;
+      return { ok: false, status: 503, json: async () => ({ error: 'The slot response was lost.' }) };
+    }
+    if (target.endsWith(`/sessions/${SESSION_ID}`)) {
+      detailReads += 1;
+      return { ok: true, status: 200, json: async () => ({ session: { sessionId: SESSION_ID }, slots: [slot] }) };
+    }
+    return { ok: true, status: 200, json: async () => ({}) };
+  });
+  render(<SessionEditor />);
+  fireEvent.change(await screen.findByLabelText('Date and start time'), { target: { value: '2026-10-10T10:00' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create session' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('The slot response was lost.');
+  expect(screen.getByRole('button', { name: 'Continue to created session' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Continue to created session' }));
+  await waitFor(() => expect(routerReplace).toHaveBeenCalledTimes(1));
+  expect(sessionPosts).toBe(1);
+  expect(slotPosts).toBe(1);
+  expect(detailReads).toBe(1);
+});
+
+test('partial session creation recovery is scoped to its route across saved and new sessions', async () => {
+  const requestA = proposal().requestId;
+  const requestB = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const secondSessionId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  routerQuery = { id: 'new', cycleCode: 'D26', requestId: requestA };
+  routerReplace.mockReset().mockResolvedValue(true);
+  let sessionPosts = 0;
+  let slotPosts = 0;
+  const slotRequests = [];
+  global.fetch = jest.fn(async (url, options = {}) => {
+    const target = String(url);
+    if (target.endsWith('/recipients')) return { ok: true, status: 200, json: async () => ({ staff: [], board: [] }) };
+    if (target.includes('/dashboard')) {
+      const requestId = target.includes('D27') ? requestB : requestA;
+      return { ok: true, status: 200, json: async () => ({ proposals: [{ ...proposal({ requestId }), leadPdId: null }] }) };
+    }
+    if (target.endsWith('/sessions') && options.method === 'POST') {
+      sessionPosts += 1;
+      return { ok: true, status: 200, json: async () => ({ session: { sessionId: sessionPosts === 1 ? SESSION_ID : secondSessionId } }) };
+    }
+    if (target.endsWith('/sessions')) return { ok: true, status: 200, json: async () => ({ sessions: [] }) };
+    if (target.endsWith('/slots') && options.method === 'POST') {
+      slotPosts += 1;
+      slotRequests.push(JSON.parse(options.body).requestId);
+      return slotPosts === 1
+        ? { ok: false, status: 503, json: async () => ({ error: 'The slot response was lost.' }) }
+        : { ok: true, status: 200, json: async () => ({}) };
+    }
+    if (target.endsWith(`/sessions/${SESSION_ID}`)) return { ok: true, status: 200, json: async () => ({
+      session: { sessionId: SESSION_ID, etag: 'W/"1"', status: 100000000,
+        scheduledStartIso: '2026-10-10T17:00:00.000Z', scheduledEndIso: '2026-10-10T18:00:00.000Z',
+        ianaTimeZone: 'America/Los_Angeles', location: '', meetingLink: '', notes: '', attendeeRefs: [] }, slots: [],
+    }) };
+    return { ok: true, status: 200, json: async () => ({ proposals: [] }) };
+  });
+  const view = render(<SessionEditor />);
+  fireEvent.change(await screen.findByLabelText('Date and start time'), { target: { value: '2026-10-10T10:00' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create session' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('The slot response was lost.');
+  expect(screen.getByLabelText('Date and start time')).toBeDisabled();
+
+  routerQuery = { id: SESSION_ID };
+  view.rerender(<SessionEditor />);
+  expect(await screen.findByRole('region', { name: 'Session details' })).toBeInTheDocument();
+
+  routerQuery = { id: 'new', cycleCode: 'D27', requestId: requestB };
+  view.rerender(<SessionEditor />);
+  const start = await screen.findByLabelText('Date and start time');
+  await waitFor(() => expect(start).toBeEnabled());
+  expect(screen.queryByText(/The session has been created/)).toBeNull();
+  fireEvent.change(start, { target: { value: '2026-10-11T10:00' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create session' }));
+  await waitFor(() => expect(routerReplace).toHaveBeenCalledTimes(1));
+  expect(sessionPosts).toBe(2);
+  expect(slotRequests).toEqual([requestA, requestB]);
 });

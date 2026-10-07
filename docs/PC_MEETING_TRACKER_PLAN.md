@@ -9,6 +9,7 @@ cataloged: 2026-09-09
 last_verified: 2026-10-05
 owner: product-engineering
 related:
+  - docs/plans/TRANSCRIPT_SUMMARY_UX_FIX_PLAN_2026-10-07.md
   - docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md
   - docs/atlas/dataverse-wmkf-sitevisit.md
   - lib/services/site-visit/logistics-service.js
@@ -25,6 +26,8 @@ related:
 This document began as the 2026-09-09 Session 501 plan and now records the
 shipped implementation. Production Wave 28 is exact, the readiness flag is on,
 and the routes/UI are live; explicitly historical build notes remain dated.
+The October 7 UX corrections are separate branch work, not a deployment claim;
+see `docs/plans/TRANSCRIPT_SUMMARY_UX_FIX_PLAN_2026-10-07.md` for implementation and review status.
 
 ## 1. The process this serves (owner, 2026-09-09)
 
@@ -275,7 +278,7 @@ that link is the carrier for reviews and the proposal narrative, which are never
 | 0 | **[BUILT 2026-09-09 on `claude/site-visit-schedulable-gate`.]** Replace `assertActiveStage` with the request precondition; keep the Workbench route green; tests for both preconditions. | 1 (branch + PR) |
 | 1 | **[PRODUCTION EXACT; REVERIFIED 2026-09-15.]** Wave 28 declares session + slot with no alternate keys, required explicit Updated By actor lookups, a read-only 22-check preflight, Atlas pages, and the literal-on readiness flag contract. Production readback reported 22 exact, 0 absent, and 0 divergent. | 2 |
 | 2 | **[PRODUCTION-LIVE; REVERIFIED 2026-09-15.]** App registry/grant, advancing-request cycle list, session editor, staff-plus-Board attendee picker, Zoom link, ordered slot add/remove/reorder/move, Site Visit and share-state joins, and the fixed §5.4 reader. The readiness flag is exact-on. | 2 |
-| 2b | **[BUILT 2026-09-10, S503]** Site-visit editor in the tracker via the existing logistics service (`pages/meeting-tracker/visits/[requestId].js`, `shared/components/meeting-tracker/SiteVisitEditor.js`, route `/api/meeting-tracker/visits/[requestId]` guarded by the tracker grant; "Schedule visit" / "Edit visit" on every list row). The slot's briefing link no longer waits on this slice: read it with `getLiveBriefingLink({ requestId })` from `lib/services/deliberation-briefing/briefing-link-service.js` (built S502 on `feature/deliberation-briefing-page`, `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`; null until the owner sets `DELIBERATION_BRIEFING_SCHEMA_READY=on`). | 2 |
+| 2b | **[BUILT 2026-09-10, S503]** Site-visit editor in the tracker via the existing logistics service (`pages/meeting-tracker/visits/[requestId].js`, `shared/components/meeting-tracker/SiteVisitEditor.js`, route `/api/meeting-tracker/visits/[requestId]` guarded by the tracker grant; "Schedule visit" / "Open visit" on each applicable list row in the October 7 UX branch (formerly "Edit visit")). The slot's briefing link no longer waits on this slice: read it with `getLiveBriefingLink({ requestId })` from `lib/services/deliberation-briefing/briefing-link-service.js` (built S502 on `feature/deliberation-briefing-page`, `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`; null until the owner sets `DELIBERATION_BRIEFING_SCHEMA_READY=on`). | 2 |
 | 3 | **[PRODUCTION-LIVE.]** Rail and cycle view read both dates; stage-key catalog with editable labels; parity test. The deliberation-session line consumes the enabled Wave 28 reader. | 1 |
 | 4 | (Retired 2026-09-09: §5.5 decided; stop 3's three displays fold into slice 3.) | — |
 
@@ -303,15 +306,14 @@ schema readback and the readiness flip are complete.
 2. ~~Who attends deliberation sessions by default?~~ **Decided 2026-09-09 (D10):** a fixed staff
    list plus per-session Board members. The staff list is an admin-editable setting, not code.
 3. ~~Should the session page open the review bundle directly, or link to Workbench tabs?~~
-   **Decided 2026-09-09 (D11):** neither. Each slot carries one link, the request's **external
+   **Decided 2026-09-09 (D11), with October 7 UX follow-up:** the primary slot link is the request's **external
    briefing room** from the Site Visit Materials plan (one read-only page per request behind a
    shared expiring link; Board members and consultants have no Dataverse login). The same link
-   goes in the Share email. Staff who want the full request open the Workbench themselves. Built
+   goes in the Share email. The October 7 UX branch also provides a Staff Deliberations navigation action for history and request context. Built
    S502 as the deliberation briefing page (`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`, D13–D16);
    the slot reads `getLiveBriefingLink({ requestId })` (wired 2026-09-10, S503: the session read
    attaches `briefing` to every slot, one link read per request, fail-open per slot) and renders
-   "Open briefing" or "Briefing not yet shared — the lead PD shares the writeup from Staff
-   Deliberations." for null.
+   "Open briefing" when a URL is available. The October 7 UX branch renders "Briefing link unavailable" for null: link availability is not evidence of send history. No automatic reissue or resend is introduced.
 4. ~~App key and name.~~ **Decided 2026-09-09 (D12):** key `meeting-tracker`, name "Meeting Tracker".
 5. **Session agenda email — decided 2026-09-10 (D21–D25, S503).** Board members often join for
    part of a session and need to know when their proposals come up; the per-proposal Share email
