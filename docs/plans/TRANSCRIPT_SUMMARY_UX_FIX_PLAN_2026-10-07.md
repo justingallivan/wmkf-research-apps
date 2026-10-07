@@ -2,8 +2,8 @@
 title: Meeting Tracker transcript and summary UX fixes
 kind: plan
 domain: transcription
-status: implementing
-summary: "Owner-authorized minimal R1–R8 fixes from the October 7 UX audit; Luna implements, Sol reviews, owner merges."
+status: built-in-branch
+summary: "Minimal R1–R8 fixes implemented by Luna and reviewed READY by Sol; local tests and gates recorded, owner merge pending."
 owner: product-engineering
 related:
   - docs/plans/TRANSCRIPT_SUMMARY_UX_AUDIT_2026-10-07.md
@@ -14,7 +14,7 @@ related:
 
 ## Scope and authority
 
-The owner requested a fix plan, execution by Luna, and review by Sol on October 7, 2026. This plan selects the smallest R1–R8 variants in the [source audit](TRANSCRIPT_SUMMARY_UX_AUDIT_2026-10-07.md). All implementation items below are [PLANNED] until the completion evidence is recorded. Work stays in `/Users/gallivan/Code/WMKF_Apps-codex` on `codex/transcript-summary-ux-audit`. The existing lockfile edit belongs to prior work and is excluded.
+The owner requested a fix plan, execution by Luna, and review by Sol on October 7, 2026. This plan selects the smallest R1–R8 variants in the [source audit](TRANSCRIPT_SUMMARY_UX_AUDIT_2026-10-07.md). The implementation specification below is completed in this branch as recorded in the completion evidence; hosted acceptance and owner merge remain pending. Work stays in `/Users/gallivan/Code/WMKF_Apps-codex` on `codex/transcript-summary-ux-audit`. The existing lockfile edit belongs to prior work and is excluded.
 
 Change surface: Meeting Tracker session loading, navigation, transcript correction and presentation-summary controls. Entry points: `SessionEditor.js`, `MeetingTrackerList.js`, and `RecordingAndTranscriptCard.js`. Persistence: existing session/slot routes and transcript/summary routes retain their contracts; no new persisted fields, routes, migrations, environment settings or external writes are part of development verification. Consumers: these screens, existing staff and Board readers, and their tests. Prior findings: audit R1–R8.
 
@@ -23,6 +23,7 @@ Change surface: Meeting Tracker session loading, navigation, transcript correcti
 | Invariant | Files likely touched | Verification |
 |---|---|---|
 | Existing sessions expose mutations only after all required data for the current route context loads successfully. New-session creation remains supported. | SessionEditor; meeting-tracker-pages test | Invalid cycle, failed detail/recipients, retry, new session, delayed A → B responses and mutations |
+| A successful session creation is retained if initial slot creation or navigation subsequently fails; retry cannot duplicate it. | SessionEditor; page test | Session POST succeeds then slot POST fails; router.replace fails or returns false |
 | Missing briefing URL makes no assertion about send history. | SessionEditor; page test | Null URL and readable URL; existing Workbench route contract |
 | Summary section explains prerequisites even without a generated bundle or confirmed end; published material remains independently accessible to staff. | RecordingAndTranscriptCard; card test | Absent/manual/generated transcript, stale/unconfirmed boundary, editing, unavailable API, published and draft coexistence |
 | Correction drafts do not invalidate publication; republishing does. Boundary editing uses the existing correction route. | Card; card test | Explicit boundary action, names-only warning, resumed draft, failed publish, final-turn boundary |
@@ -30,8 +31,9 @@ Change surface: Meeting Tracker session loading, navigation, transcript correcti
 | Visit navigation preserves the actual request/cycle/program context and does not mislabel a deliberation session as a recorded visit. | List, SessionEditor, card anchor; page test | Known saved visit versus no visit; real route and query assertions |
 | Optional slide extraction failure is not described as absence of a PDF. | Card; card test | Existing slidesIncluded true/false contract |
 | Ambiguous publication refreshes summary, collection and materials; background reads never erase local edits or resurrect obsolete state. | Card; card test | Deferred responses, response loss, refresh failure, draft versions, request changes |
+| Dirty summary text retains its original draft ID/version fence; refreshing cannot grant old text authority over another editor's newer draft. | Card; card test | Same draft/newer version; replacement draft; GET begun before save/generate/discard/publish |
 
-## Ordered implementation
+## Implementation specification (completed in branch)
 
 1. **R1 — Load safety (S–M, medium risk).** Add explicit successful-context/load status and retry. Gate rendering and mutation handlers; guard every post-await update from loads, saves and slot changes against obsolete route generations. Preserve ETags and valid creation, including initial proposal slot behavior. The visit-editor sibling is recorded in the audit but excluded from this minimal batch.
 2. **R2 — Briefing truthfulness (S, low risk).** Replace the unavailable-URL assertion with “Briefing link unavailable.” Add an existing Workbench navigation action using source-derived routing. Do not add a richer DTO, reissue a link or send anything.
@@ -46,6 +48,8 @@ Change surface: Meeting Tracker session loading, navigation, transcript correcti
 
 Luna owns implementation and focused tests in the three named components and their existing test files. The coordinating agent owns this plan, verification and Git operations. Sol performs a fresh, read-only adversarial review after Luna's tests, tracing caller → existing route/service → persistence → consumer and examining negative branches, partial success, ETags and async races. Luna resolves actionable findings; Sol rechecks material fixes. No other checkout or branch is involved.
 
+[VERIFIED via Sol plan review, 2026-10-07] Initial verdict: ready with the two named execution requirements above. Session creation and initial slot creation are separate writes (`lib/services/meeting-tracker/session-service.js:247`, `lib/services/meeting-tracker/slot-service.js:124`). Summary draft updates use an expected-version fence (`lib/services/post-presentation-materials/summary-draft-store.js:120`); preserving text while silently adopting a refreshed version defeats its purpose. The regression evidence for these requirements is recorded below.
+
 Protected files: `ResearchPresentationFollowUp.js` and the session reader in `StaffDeliberationsTab.js` require advance flagging for any change; no changes are planned. `FinalWriteupTab.js`, `lib/services/final-writeup/**`, and shared primitives including `Layout.js` are excluded. Stage 3 discussion summaries, Stage 4 Board recordings, richer briefing/slide-reason projections, and cycle readiness dashboards remain deferred.
 
 ## Acceptance and release
@@ -57,4 +61,23 @@ Protected files: `ResearchPresentationFollowUp.js` and the session reader in `St
 
 ## Completion evidence
 
-[PLANNED] Implementation, fresh Sol review, final gates and PR are pending.
+[VERIFIED via source, focused tests and Sol final review, 2026-10-07] Luna (`gpt-6-luna`) implemented the three UI components and two test files. Sol (`gpt-6.1-sol`) reviewed the plan and implementation independently; final verdict **READY**, no remaining blocking finding. The review corrected route-scoped creation recovery, fresh draft validity, discard acknowledgment, persisted summaries without a confirmed boundary, and preservation across successive publishing-state refreshes. Deferred-response tests now wait for response-driven metadata or consumed JSON rather than pre-existing text.
+
+| Completed item | Source evidence |
+|---|---|
+| R1: matching-context load gate, Retry/Back, stale-response guards, retained and route-scoped partial creation | `shared/components/meeting-tracker/SessionEditor.js:381`, `shared/components/meeting-tracker/SessionEditor.js:467`, `shared/components/meeting-tracker/SessionEditor.js:600` |
+| R2/R6: truthful unavailable-link copy, Workbench fallback, saved-visit transcript link, Open visit label | `shared/components/meeting-tracker/SessionEditor.js:48`, `shared/components/meeting-tracker/SessionEditor.js:200`, `shared/components/meeting-tracker/MeetingTrackerList.js:66` |
+| R3/R4/R5/R7: stable summary section and published-file action, explicit boundary editing and publication consequences, Board page link and eligibility copy, honest optional-slide copy | `shared/components/meeting-tracker/RecordingAndTranscriptCard.js:1657`, `shared/components/meeting-tracker/RecordingAndTranscriptCard.js:2140`, `shared/components/meeting-tracker/RecordingAndTranscriptCard.js:2420` |
+| R8: draft text/ID/version preservation, context/sequence guards, explicit discard and three-projection publish recovery | `shared/components/meeting-tracker/RecordingAndTranscriptCard.js:1588`, `shared/components/meeting-tracker/RecordingAndTranscriptCard.js:1705`, `shared/components/meeting-tracker/RecordingAndTranscriptCard.js:1733` |
+
+[VERIFIED via local commands] **260 tests passed in 13 suites**. Final UI run: 99 tests across `meeting-tracker-pages`, `recording-and-transcript-card`, and `site-visit-editor-t5-matrix`. Backend/consumer run: 161 tests across `workbench-dashboard-service`, `meeting-tracker-session-service`, `transcript-summary-service`, `presentation-transcript-binding`, `presentation-transcript-service`, `meeting-tracker-transcription-presentation-boundary`, `meeting-tracker-transcription-routes`, `site-visit-summary-batch`, `presentation-link-service`, and `external-presentation-page`. Commands used `./node_modules/.bin/jest --runInBand` with these files under `tests/unit/`; logs: `/tmp/transcript-ux-ui-final.log`, `/tmp/transcript-ux-contract-tests.log`.
+
+[VERIFIED via local commands] Final `npm run build`, `npm run check:types`, changed-file ESLint, and `git diff --check` passed. Build retained two existing dynamic-filesystem tracing warnings. Full `npm run lint` failed on the pre-existing Git-ignored `tmp/b4-inactive-fix/probe.js` (`@next/next/no-assign-module-variable`); the file was not changed. `npm run lint -- --ignore-pattern tmp/b4-inactive-fix/probe.js` passed with warnings, and changed-file ESLint passed again after the final correction (six advisory React-compiler warnings, zero errors). No lint configuration was weakened.
+
+[VERIFIED via `/tmp/transcript-ux-final-gates.log`] API-route security, doc currency, fact consistency, canonical pointers, doc symbol refs, build-claim freshness, status-enum parity, trust-boundary GUID, secret scan and scaffolding checks passed with their self-tests run serially; docs catalog and agent invariants also passed. No migration or route was added. Factory-ledger/live deployment checks were not run because they could read Production outside authorized scope.
+
+Contract reconciliation: existing route/service/version fences and outside allowlists were traced; there are no new persisted fields/enums/helpers requiring consumer migration. UI complement checks include failed versus loaded/new routes, delayed contexts, successful create with failed follow-up, manual versus generated transcript, current versus stale/unconfirmed publication, ready versus publishing drafts, mismatched server draft IDs/versions, and failed post-discard refresh. Local tests plus source review cover these states; this is not proof of hosted publication or byte access. Distinct deferred old-GET tests were not added for every generation/discard action; their shared sequence guards were source-reviewed, with explicit discard-success/GET-failure and save-race regressions.
+
+Bounded documentation reconciliation: the audit is explicitly a historical base snapshot; this plan owns current branch status. The PC Meeting Tracker plan's briefing and navigation restatements now describe branch behavior without claiming deployment. Broader pre-existing document discrepancies listed in the audit remain outside this fix; no whole-repository sweep completion is claimed.
+
+Release: commit and push only this branch and open a PR for owner merge. No new Production reads/writes, provider calls, email, environment changes or migrations were performed in Phase B. Protected Workbench readers, final-writeup ownership and shared primitives remain unchanged; the pre-existing lockfile edit is excluded.

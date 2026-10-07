@@ -63,7 +63,7 @@ export function MeetingTrackerRequestRow({ proposal, cycleCode, programId }) {
             {proposal.deliberation ? 'Open session' : 'Schedule session'}
           </Link>
           <a href={visitHref} data-full-page-navigation="true" className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
-            {proposal.siteVisit ? 'Edit visit' : 'Schedule visit'}
+            {proposal.siteVisit ? 'Open visit' : 'Schedule visit'}
           </a>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Layout, { Button } from '../Layout';
@@ -42,10 +42,10 @@ export async function reorderSessionSlots({ sessionId, slots, fetchImpl = fetch 
   }, fetchImpl);
 }
 
-// D11: the slot's link is the request's live briefing page (writeup, reviews,
-// proposal, materials). It exists only once the PD has shared the writeup.
+// D11: the slot's available link is the request's live briefing page
+// (writeup, reviews, proposal, materials); URL absence does not describe send history.
 export function slotBriefingText(slot) {
-  return slot?.briefing?.url ? 'Open briefing' : 'Briefing not yet shared — the lead PD shares it from Staff Deliberations.';
+  return slot?.briefing?.url ? 'Open briefing' : 'Briefing link unavailable';
 }
 
 // Returns a new array with the item at `from` moved to `to`; returns the same
@@ -137,11 +137,12 @@ function sessionForm(session) {
   };
 }
 
-function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onChange, onMove, onRemove, onPositionChange, index, count, isDragging, dropEdge, onDragStart, onDragOver, onDrop, onDragEnd, readOnly = false }) {
+function SlotRow({ slot, proposal, sessions, sessionId, cycleCode, programId, busy, savingSlotId, onChange, onMove, onRemove, onPositionChange, index, count, isDragging, dropEdge, onDragStart, onDragOver, onDrop, onDragEnd, readOnly = false }) {
   const [minutes, setMinutes] = useState(slot.wmkf_minutes || 15);
   const [targetSessionId, setTargetSessionId] = useState('');
   const [panel, setPanel] = useState(null); // 'move' | 'remove' | null
   const requestNumber = proposal?.requestNumber || slot.wmkf_Request?.akoya_requestnum || slot._wmkf_request_value;
+  const requestId = proposal?.requestId || slot._wmkf_request_value;
   const isSaving = savingSlotId === slot.wmkf_deliberationslotid;
 
   return (
@@ -191,10 +192,16 @@ function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onCh
         {(slot.institution || proposal?.institution) && <p className="mt-0.5 text-sm text-gray-600">{slot.institution || proposal.institution}</p>}
         <p className="mt-1 text-xs text-gray-500">Lead PD: {slot.wmkf_LeadPd?.fullname || 'Not assigned'}</p>
         {slot.briefing?.url ? (
-          <a href={slot.briefing.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-semibold text-blue-800 underline">Open briefing</a>
+          <a href={slot.briefing.url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-blue-800 underline">Open briefing</a>
         ) : (
-          <p className="mt-2 text-xs font-medium text-gray-500">{slotBriefingText(slot)}</p>
+          <p className="text-xs font-medium text-gray-500">{slotBriefingText(slot)}</p>
         )}
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+          {!slot.briefing?.url && requestId && <a href={`/workbench/${encodeURIComponent(requestId)}?tab=staff-deliberations${requestNumber ? `&n=${encodeURIComponent(requestNumber)}` : ''}`} className="text-xs font-semibold text-blue-800 underline">Check Staff Deliberations</a>}
+          {proposal?.siteVisit?.activityId && proposal?.requestId && (
+            <a href={`/meeting-tracker/visits/${encodeURIComponent(proposal.requestId)}?${new URLSearchParams({ ...(cycleCode ? { cycleCode } : {}), ...(programId ? { programId } : {}), ...(proposal.requestNumber ? { n: proposal.requestNumber } : {}) })}#recording-and-transcript-card`} data-full-page-navigation="true" className="text-xs font-semibold text-blue-800 underline">Open visit · recording and transcript</a>
+          )}
+        </div>
       {!readOnly && panel === 'position' && (
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
           <label className="text-sm font-medium text-gray-700">
@@ -247,7 +254,7 @@ function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onCh
   );
 }
 
-export function ProposalOrderList({ slots, proposalById, sessions, sessionId, busy, savingSlotId, onChange, onMove, onRemove, onReorder, readOnly = false }) {
+export function ProposalOrderList({ slots, proposalById, sessions, sessionId, cycleCode, programId, busy, savingSlotId, onChange, onMove, onRemove, onReorder, readOnly = false }) {
   const [draggingIndex, setDraggingIndex] = useState(null);
   const [overIndex, setOverIndex] = useState(null);
   const [overEdge, setOverEdge] = useState(null);
@@ -311,6 +318,8 @@ export function ProposalOrderList({ slots, proposalById, sessions, sessionId, bu
             proposal={proposalById.get(String(slot._wmkf_request_value).toLowerCase())}
             sessions={sessions}
             sessionId={sessionId}
+            cycleCode={cycleCode}
+            programId={programId}
             busy={busy}
             savingSlotId={savingSlotId}
             index={index}
@@ -340,14 +349,20 @@ export default function SessionEditor() {
   const cycleCode = Array.isArray(router.query.cycleCode) ? '' : router.query.cycleCode || '';
   const programId = Array.isArray(router.query.programId) ? '' : router.query.programId || '';
   const initialRequestId = Array.isArray(router.query.requestId) ? '' : router.query.requestId || '';
+  const routeKey = JSON.stringify([router.isReady, sessionId, isNew, cycleCode, programId, initialRequestId]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [session, setSession] = useState(null);
+  const [createdSessionId, setCreatedSessionId] = useState(null);
+  const [initialSlotCreated, setInitialSlotCreated] = useState(false);
+  const creationRecoveryRouteRef = useRef(routeKey);
   const [slots, setSlots] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [recipients, setRecipients] = useState({ staff: [], board: [] });
   const [proposals, setProposals] = useState([]);
   const [selectedRequestId, setSelectedRequestId] = useState(initialRequestId);
   const [loading, setLoading] = useState(true);
+  const [loadedRouteKey, setLoadedRouteKey] = useState(null);
+  const [reloadCount, setReloadCount] = useState(0);
   const [busy, setBusy] = useState(false);
   const [savingSlotId, setSavingSlotId] = useState(null);
   const [error, setError] = useState(null);
@@ -361,63 +376,97 @@ export default function SessionEditor() {
   // mode still saves immediately, so Done only leaves edit mode.
   const [orderEditingFor, setOrderEditingFor] = useState(null);
   const orderEditing = Boolean(sessionId) && orderEditingFor === sessionId;
+  const loadGenerationRef = useRef(0);
+  const currentLoadRef = useRef({ routeKey: null, generation: 0, ready: false });
+  const contextReady = loadedRouteKey === routeKey && currentLoadRef.current.routeKey === routeKey && currentLoadRef.current.ready;
 
-  const loadDetail = useCallback(async (id) => {
+  useEffect(() => {
+    if (creationRecoveryRouteRef.current === routeKey) return;
+    creationRecoveryRouteRef.current = routeKey;
+    setCreatedSessionId(null);
+    setInitialSlotCreated(false);
+  }, [routeKey]);
+
+  const loadDetail = useCallback(async (id, isCurrent) => {
     const { ok, data: body } = await readJson(`/api/meeting-tracker/sessions/${id}`);
     if (!ok) throw new Error(body.error || 'The meeting session could not be loaded.');
+    if (!isCurrent()) return false;
     setSession(body.session);
     setForm(sessionForm(body.session));
     setSlots(body.slots || []);
+    return true;
   }, []);
 
   useEffect(() => {
     if (!router.isReady) return undefined;
     let current = true;
+    const generation = ++loadGenerationRef.current;
+    const isCurrent = () => current && loadGenerationRef.current === generation && currentLoadRef.current.routeKey === routeKey;
+    currentLoadRef.current = { routeKey, generation, ready: false };
+    setLoadedRouteKey(null);
+    setSession(null);
+    setSlots([]);
+    setForm(EMPTY_FORM);
     const timer = window.setTimeout(async () => {
       setLoading(true);
       setError(null);
+      setBusy(false);
+      setSavingSlotId(null);
+      setEditingFor(null);
+      setOrderEditingFor(null);
+      setNotice(null);
+      setWarning(null);
       try {
         const dashboardQuery = new URLSearchParams({ projection: 'schedule', ...(cycleCode ? { cycleCode } : {}), ...(programId ? { programId } : {}), scope: 'all' });
         const requests = [readJson('/api/meeting-tracker/recipients'), readJson('/api/meeting-tracker/sessions')];
         if (cycleCode) requests.push(readJson(`/api/meeting-tracker/dashboard?${dashboardQuery}`));
         const envelopes = await Promise.all(requests);
         const bodies = envelopes.map((envelope) => envelope.data);
-        if (!current) return;
+        if (!isCurrent()) return;
         const failedIndex = envelopes.findIndex((envelope) => !envelope.ok);
         if (failedIndex >= 0) throw new Error(bodies[failedIndex].error || 'The session workspace could not be loaded.');
         setRecipients(bodies[0]);
         setSessions(bodies[1].sessions || []);
         setProposals(bodies[2]?.proposals || []);
+        setSelectedRequestId(initialRequestId);
         if (isNew) {
           setForm((value) => ({ ...value, attendees: bodies[0].defaultAttendeeRefs || [] }));
           setNotice(bodies[0].notice || null);
         } else if (sessionId) {
-          await loadDetail(sessionId);
+          const detailLoaded = await loadDetail(sessionId, isCurrent);
+          if (!detailLoaded || !isCurrent()) return;
         }
+        if (!isCurrent()) return;
+        currentLoadRef.current = { routeKey, generation, ready: true };
+        setLoadedRouteKey(routeKey);
       } catch (loadError) {
-        if (current) setError(loadError.message);
+        if (isCurrent()) setError(loadError.message);
       } finally {
-        if (current) setLoading(false);
+        if (isCurrent()) setLoading(false);
       }
     }, 0);
     return () => {
       current = false;
+      if (currentLoadRef.current.generation === generation) currentLoadRef.current = { routeKey, generation, ready: false };
       window.clearTimeout(timer);
     };
-  }, [router.isReady, sessionId, isNew, cycleCode, programId, loadDetail]);
+  }, [router.isReady, sessionId, isNew, cycleCode, programId, initialRequestId, routeKey, reloadCount, loadDetail]);
 
   const proposalById = useMemo(() => new Map(proposals.map((proposal) => [String(proposal.requestId).toLowerCase(), proposal])), [proposals]);
   const sessionMinutes = session ? Math.round((new Date(session.scheduledEndIso) - new Date(session.scheduledStartIso)) / 60000) : Number(form.durationMinutes);
   const slotMinutes = slots.reduce((sum, slot) => sum + Number(slot.wmkf_minutes || 0), 0);
   const overFull = slotMinutes > sessionMinutes;
 
-  const updateForm = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+  const updateForm = (field, value) => { if (contextReady) setForm((current) => ({ ...current, [field]: value })); };
   const toggleAttendee = (ref) => updateForm('attendees', form.attendees.some((row) => sameRef(row, ref))
     ? form.attendees.filter((row) => !sameRef(row, ref))
     : [...form.attendees, ref]);
 
   const saveSession = async (event) => {
     event.preventDefault();
+    if (!contextReady || (!isNew && (!session || session.sessionId !== sessionId))) return;
+    const generation = currentLoadRef.current.generation;
+    const isCurrent = () => currentLoadRef.current.routeKey === routeKey && currentLoadRef.current.generation === generation && currentLoadRef.current.ready;
     setBusy(true);
     setError(null);
     setWarning(null);
@@ -438,47 +487,73 @@ export default function SessionEditor() {
       };
       const body = sessionId
         ? await sendJson(`/api/meeting-tracker/sessions/${sessionId}`, 'PATCH', { etag: session.etag, ...payload })
-        : await sendJson('/api/meeting-tracker/sessions', 'POST', payload);
+        : createdSessionId
+          ? { session: { sessionId: createdSessionId } }
+          : await sendJson('/api/meeting-tracker/sessions', 'POST', payload);
+      if (!isCurrent()) return;
       const savedId = body.session.sessionId;
-      if (!sessionId && initialRequestId) {
+      if (!sessionId && !createdSessionId) setCreatedSessionId(savedId);
+      if (!sessionId && initialRequestId && !initialSlotCreated) {
         const proposal = proposalById.get(String(initialRequestId).toLowerCase());
-        const slotResult = await sendJson('/api/meeting-tracker/slots', 'POST', {
-          sessionId: savedId,
-          requestId: initialRequestId,
-          minutes: 15,
-          ...(proposal?.leadPdId ? { leadPdId: proposal.leadPdId } : {}),
-        });
-        setWarning(slotResult.warning || null);
+        let slotExists = false;
+        if (createdSessionId) {
+          const detail = await readJson(`/api/meeting-tracker/sessions/${savedId}`);
+          if (!isCurrent()) return;
+          if (!detail.ok) throw new Error(detail.data.error || 'The created session could not be checked.');
+          slotExists = (detail.data.slots || []).some((slot) => String(slot._wmkf_request_value || '').toLowerCase() === String(initialRequestId).toLowerCase());
+        }
+        if (slotExists) {
+          setInitialSlotCreated(true);
+        } else {
+          const slotResult = await sendJson('/api/meeting-tracker/slots', 'POST', {
+            sessionId: savedId,
+            requestId: initialRequestId,
+            minutes: 15,
+            ...(proposal?.leadPdId ? { leadPdId: proposal.leadPdId } : {}),
+          });
+          if (!isCurrent()) return;
+          setInitialSlotCreated(true);
+          setWarning(slotResult.warning || null);
+        }
       }
       if (!sessionId) {
-        await router.replace({ pathname: `/meeting-tracker/sessions/${savedId}`, query: { ...(cycleCode ? { cycleCode } : {}), ...(programId ? { programId } : {}) } });
+        const navigated = await router.replace({ pathname: `/meeting-tracker/sessions/${savedId}`, query: { ...(cycleCode ? { cycleCode } : {}), ...(programId ? { programId } : {}) } });
+        if (!isCurrent()) return;
+        if (navigated === false) throw new Error('The created session could not be opened. Please try again.');
       } else {
+        if (!isCurrent()) return;
         setSession(body.session);
         setForm(sessionForm(body.session));
         setEditingFor(null);
         setNotice('Session saved.');
       }
     } catch (saveError) {
-      setError(`${saveError.message} Please try again. If the problem continues, contact an administrator.`);
+      if (isCurrent()) setError(`${saveError.message} Please try again. If the problem continues, contact an administrator.`);
     } finally {
-      setBusy(false);
+      if (isCurrent()) setBusy(false);
     }
   };
 
   const runSlotChange = async (operation, slotId = null) => {
+    if (!contextReady || !session || session.sessionId !== sessionId) return;
+    const generation = currentLoadRef.current.generation;
+    const isCurrent = () => currentLoadRef.current.routeKey === routeKey && currentLoadRef.current.generation === generation && currentLoadRef.current.ready;
     setSavingSlotId(slotId);
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
       const result = await operation();
+      if (!isCurrent()) return;
       setWarning(result?.warning || null);
-      await loadDetail(sessionId);
+      await loadDetail(sessionId, isCurrent);
     } catch (slotError) {
-      setError(`${slotError.message} Please try again. If the problem continues, contact an administrator.`);
+      if (isCurrent()) setError(`${slotError.message} Please try again. If the problem continues, contact an administrator.`);
     } finally {
-      setBusy(false);
-      setSavingSlotId(null);
+      if (isCurrent()) {
+        setBusy(false);
+        setSavingSlotId(null);
+      }
     }
   };
 
@@ -494,6 +569,9 @@ export default function SessionEditor() {
   };
 
   const reorderSlots = (next, movedSlot, targetIndex) => {
+    if (!contextReady) return;
+    const generation = currentLoadRef.current.generation;
+    const isCurrent = () => currentLoadRef.current.routeKey === routeKey && currentLoadRef.current.generation === generation && currentLoadRef.current.ready;
     const movedProposal = proposalById.get(String(movedSlot._wmkf_request_value).toLowerCase());
     const requestNumber = movedProposal?.requestNumber || movedSlot.wmkf_Request?.akoya_requestnum || movedSlot._wmkf_request_value;
     // Optimistic: the row moves now; the save and the ETag-refreshing reload
@@ -503,10 +581,11 @@ export default function SessionEditor() {
     return runSlotChange(async () => {
       try {
         const result = await reorderSessionSlots({ sessionId, slots: next });
+        if (!isCurrent()) return result;
         setNotice(`Moved #${requestNumber} to position ${targetIndex + 1}.`);
         return result;
       } catch (error) {
-        setSlots(previous);
+        if (isCurrent()) setSlots(previous);
         throw error;
       }
     }, movedSlot.wmkf_deliberationslotid);
@@ -518,8 +597,16 @@ export default function SessionEditor() {
     setEditingFor(null);
   };
 
-  if (loading) {
+  if (loading || (!contextReady && !error)) {
     return <Layout title="Meeting Tracker"><div className="py-24 text-center text-gray-500">Loading the session workspace…</div></Layout>;
+  }
+
+  if (!contextReady) {
+    return <Layout title="Meeting Tracker"><div className="mx-auto max-w-2xl py-16">
+      <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error || 'The session details are not available yet.'}</div>
+      <div className="mt-4 flex gap-3"><Button type="button" onClick={() => setReloadCount((count) => count + 1)}>Try again</Button>
+        <Link href={{ pathname: '/meeting-tracker', query: { ...(cycleCode ? { cycleCode } : {}), ...(programId ? { programId } : {}) } }} className="text-sm font-semibold text-gray-700 underline">Back to the cycle schedule</Link></div>
+    </div></Layout>;
   }
 
   return (
@@ -546,14 +633,15 @@ export default function SessionEditor() {
         <SessionSummary session={session} recipients={recipients} onEdit={() => { setNotice(null); setEditingFor(sessionId); }} />
       ) : (
       <form onSubmit={saveSession} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        {createdSessionId && <p role="status" className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">The session has been created. Its details are locked while you continue to the saved session.</p>}
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-          <label className="text-sm font-medium text-gray-700">Date and start time<input required type="datetime-local" value={form.startLocal} onChange={(event) => updateForm('startLocal', event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
-          <label className="text-sm font-medium text-gray-700">Duration in minutes<input required type="number" min="1" value={form.durationMinutes} onChange={(event) => updateForm('durationMinutes', event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
-          <label className="text-sm font-medium text-gray-700">Time zone<input required value={form.ianaTimeZone} onChange={(event) => updateForm('ianaTimeZone', event.target.value)} placeholder="America/Los_Angeles" className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
-          <label className="text-sm font-medium text-gray-700">Status<select value={form.status} onChange={(event) => updateForm('status', Number(event.target.value))} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2"><option value="100000000">Planned</option><option value="100000001">Held</option><option value="100000002">Cancelled</option></select></label>
-          <label className="text-sm font-medium text-gray-700 md:col-span-2">Location<input value={form.location} onChange={(event) => updateForm('location', event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
-          <label className="text-sm font-medium text-gray-700 md:col-span-2">Zoom link<input type="url" value={form.meetingLink} onChange={(event) => updateForm('meetingLink', event.target.value)} placeholder="https://zoom.us/…" className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
-          <label className="text-sm font-medium text-gray-700 md:col-span-2 lg:col-span-4">Notes<textarea rows="3" value={form.notes} onChange={(event) => updateForm('notes', event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
+          <label className="text-sm font-medium text-gray-700">Date and start time<input required type="datetime-local" disabled={Boolean(createdSessionId)} value={form.startLocal} onChange={(event) => updateForm('startLocal', event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
+          <label className="text-sm font-medium text-gray-700">Duration in minutes<input required type="number" min="1" disabled={Boolean(createdSessionId)} value={form.durationMinutes} onChange={(event) => updateForm('durationMinutes', event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
+          <label className="text-sm font-medium text-gray-700">Time zone<input required disabled={Boolean(createdSessionId)} value={form.ianaTimeZone} onChange={(event) => updateForm('ianaTimeZone', event.target.value)} placeholder="America/Los_Angeles" className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
+          <label className="text-sm font-medium text-gray-700">Status<select disabled={Boolean(createdSessionId)} value={form.status} onChange={(event) => updateForm('status', Number(event.target.value))} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2"><option value="100000000">Planned</option><option value="100000001">Held</option><option value="100000002">Cancelled</option></select></label>
+          <label className="text-sm font-medium text-gray-700 md:col-span-2">Location<input disabled={Boolean(createdSessionId)} value={form.location} onChange={(event) => updateForm('location', event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
+          <label className="text-sm font-medium text-gray-700 md:col-span-2">Zoom link<input type="url" disabled={Boolean(createdSessionId)} value={form.meetingLink} onChange={(event) => updateForm('meetingLink', event.target.value)} placeholder="https://zoom.us/…" className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
+          <label className="text-sm font-medium text-gray-700 md:col-span-2 lg:col-span-4">Notes<textarea rows="3" disabled={Boolean(createdSessionId)} value={form.notes} onChange={(event) => updateForm('notes', event.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
         </div>
 
         <fieldset className="mt-6 border-t border-gray-100 pt-5">
@@ -565,13 +653,13 @@ export default function SessionEditor() {
           )}
           <p className="mt-1 text-sm text-gray-600">The fixed staff list is selected for new sessions. Add Board members for this meeting.</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            {[['Staff', recipients.staff], ['Board', recipients.board]].map(([label, rows]) => <div key={label}><h2 className="text-sm font-semibold text-gray-700">{label}</h2><div className="mt-2 flex flex-wrap gap-2">{rows.map((person) => { const selected = form.attendees.some((ref) => sameRef(ref, person.ref)); const noEmail = !person.email; return <button key={`${person.ref.kind}-${person.ref.profileId || person.ref.rosterId}`} type="button" aria-pressed={selected} disabled={noEmail && !selected} title={noEmail ? noEmailHint(person) : undefined} onClick={() => toggleAttendee(person.ref)} className={`rounded-full border px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${selected ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>{person.name}{noEmail ? ' · no email' : ''}</button>; })}{rows.length === 0 && <p className="text-sm text-gray-500">No eligible people found.</p>}{rows.some((person) => !person.email) && <p className="w-full text-xs text-gray-500">{NO_EMAIL_SECTION_HINT}</p>}</div></div>)}
+            {[['Staff', recipients.staff], ['Board', recipients.board]].map(([label, rows]) => <div key={label}><h2 className="text-sm font-semibold text-gray-700">{label}</h2><div className="mt-2 flex flex-wrap gap-2">{rows.map((person) => { const selected = form.attendees.some((ref) => sameRef(ref, person.ref)); const noEmail = !person.email; return <button key={`${person.ref.kind}-${person.ref.profileId || person.ref.rosterId}`} type="button" aria-pressed={selected} disabled={Boolean(createdSessionId) || (noEmail && !selected)} title={noEmail ? noEmailHint(person) : undefined} onClick={() => toggleAttendee(person.ref)} className={`rounded-full border px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${selected ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>{person.name}{noEmail ? ' · no email' : ''}</button>; })}{rows.length === 0 && <p className="text-sm text-gray-500">No eligible people found.</p>}{rows.some((person) => !person.email) && <p className="w-full text-xs text-gray-500">{NO_EMAIL_SECTION_HINT}</p>}</div></div>)}
           </div>
         </fieldset>
 
         <div className="mt-6 flex justify-end gap-3">
           {!isNew && session && <Button type="button" variant="outline" disabled={busy} onClick={cancelEdit}>Cancel</Button>}
-          <Button type="submit" loading={busy}>{isNew ? 'Create session' : 'Save session'}</Button>
+          <Button type="submit" loading={busy}>{createdSessionId ? 'Continue to created session' : isNew ? 'Create session' : 'Save session'}</Button>
         </div>
       </form>
       )}
@@ -591,6 +679,8 @@ export default function SessionEditor() {
               proposalById={proposalById}
               sessions={sessions}
               sessionId={sessionId}
+              cycleCode={cycleCode}
+              programId={programId}
               busy={busy}
               savingSlotId={savingSlotId}
               onChange={(row, patch) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'PATCH', { etag: row._etag, ...patch }), row.wmkf_deliberationslotid)}
