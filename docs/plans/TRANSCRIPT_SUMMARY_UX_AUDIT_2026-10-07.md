@@ -2,10 +2,11 @@
 title: Transcript and summary UX audit — Meeting Tracker
 kind: audit
 domain: transcription
-status: awaiting-owner-selection
-summary: "Phase A source audit of Meeting Tracker transcript, presentation summary, staff and Board screens; includes failed-session reproduction, scoped 1003222 briefing evidence, and ranked changes. No runtime changes approved."
+status: historical-audit
+summary: "Phase A source audit of Meeting Tracker transcript, presentation summary, staff and Board screens; includes failed-session reproduction, scoped 1003222 briefing evidence, and ranked changes. Phase A baseline; subsequent authorized implementation is tracked in the linked fix plan."
 owner: product-engineering
 related:
+  - docs/plans/TRANSCRIPT_SUMMARY_UX_FIX_PLAN_2026-10-07.md
   - docs/APPLICATION_STATE_ATLAS.md
   - docs/atlas/postgres-meeting-transcript-publications.md
   - docs/atlas/postgres-meeting-transcript-summary-drafts.md
@@ -15,9 +16,9 @@ related:
 
 # Transcript and summary UX audit — 2026-10-07
 
-## Decision requested
+## Historical Phase A baseline
 
-Choose items R1–R8 below for Phase B. Recommended first batch: **R1 failed-load safety, R2 truthful briefing status, R3 visible transcript-to-summary workflow, and R4 explicit boundary editing/republish consequences**. These are proposals, not implemented changes. R5 makes Board sharing reviewable; R6–R8 address navigation, misleading input copy, and refresh recovery.
+This audit records the source and observations at the base commit below. Its capability tables, defects and ranked proposals describe that historical baseline. The owner subsequently requested a fix plan, execution by Luna and review by Sol. Current scope and implementation evidence belong to the [R1–R8 fix plan](TRANSCRIPT_SUMMARY_UX_FIX_PLAN_2026-10-07.md); this audit is not a current implementation-status report.
 
 [VERIFIED via `git rev-parse HEAD`, `git status --short --branch`] Audited source: `444a2d8f0b8d51b111bfd7faf45a71d890c456a8`, branch `codex/transcript-summary-ux-audit`, checkout `/Users/gallivan/Code/WMKF_Apps-codex`. This is a source/DOM audit, not a new end-to-end acceptance of deployed transcription. The existing `package-lock.json` change is outside this audit and is not included. No application code, environment setting, migration, external content, or other checkout was changed.
 
@@ -131,7 +132,7 @@ Recommended behavior: display “Briefing link unavailable” for the existing n
 
 ## 6. Ranked changes for owner selection
 
-All changes below are **proposed**. Sizes are [ASSUMED] implementation estimates: S ≈ half to one day; M ≈ one to three days including meaningful tests; L = separate design/build. File lists name intended scope, not approved edits. All can use existing routes; richer DTOs require their existing route contract tests/matrix review, not a new endpoint.
+At the audited baseline, all changes below were **proposed**; the linked fix plan records subsequent authorization and scope. Sizes are [ASSUMED] implementation estimates: S ≈ half to one day; M ≈ one to three days including meaningful tests; L = separate design/build. File lists name intended scope, not approved edits. All can use existing routes; richer DTOs require their existing route contract tests/matrix review, not a new endpoint.
 
 | Rank | Problem and proposed change | Files likely touched | Size / risk and acceptance |
 |---|---|---|---|
@@ -194,4 +195,4 @@ This is a bounded UX audit, **not a completed whole-repo documentation reconcili
 
 Fresh source review was completed through the built-in subagent under `/contract-reconcile`; its corrections are incorporated (notably the existing automatic reload after split-generation failure). This is review of the audit's evidence, not Phase B's required adversarial implementation review.
 
-After this audit's docs gates, commit and push **only** `codex/transcript-summary-ux-audit`, then stop. Phase B begins only after owner selection; it requires approved implementation/tests, surface gates, adversarial code review and a PR. Owner merges. Preserve the Staff Deliberations reader boundary, other agent's final-writeup ownership, shared primitives and explicit approval for Production/env/migration work.
+Phase A was committed and pushed as `6c1ded2c7`. The owner subsequently authorized Phase B planning, Luna implementation and Sol review; follow the linked fix plan for current work. The owner merges. The Staff Deliberations reader boundary, other agent's final-writeup ownership, shared primitives and explicit approval for Production/env/migration work remain in force.
