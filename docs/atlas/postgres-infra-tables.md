@@ -378,12 +378,18 @@ until then the row stays `pending` without an error (`awaiting_transition`),
 so a commit whose response was lost is still sent by a retry POST or by
 recovery. States: `pending` → `sent`, or terminal `skipped` with a
 `skip_reason` (`program_not_enabled`, `final_from_other_draft`,
-`no_longer_in_group_review`, `transition_not_committed` after 14 days,
+`no_longer_in_group_review`, `final_withdrawn`, `transition_not_committed`
+after 14 days (a later valid staging for the same draft reopens only this kind
+of skip),
 `program_not_configured`, `staffing_not_configured`, `no_recipients`,
 `test_request_refused`). A five-minute lease (`locked_until`) lets one call
 send; the Dynamics activity id and frozen `to_recipients` are stored before
 `SendEmail`, and correlation key `wmkf-final-writeup-handoff:<sourceDocumentId>`
-recovers an activity created before the id was stored. Recipient lookups that
+recovers an activity created before the id was stored. An activity already
+accepted by Dynamics is recorded as sent without further checks; one that is
+not yet sent is re-checked against the current Final and group-review state
+before `SendEmail`, so a stale invitation is never sent. Store SQL is proven by
+`tests/integration/final-writeup-handoff-email.pg.test.js` in the CI Postgres job. Recipient lookups that
 fail for any reason other than 404 keep the whole send pending. Failures keep
 `pending` with `last_error_code` and are retried by the next POST for that
 draft or by owner-run `scripts/recover-final-writeup-handoff-emails.mjs`

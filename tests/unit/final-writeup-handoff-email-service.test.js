@@ -123,7 +123,10 @@ function harness({
       activities.set(id, { ...activities.get(id), statuscode: 3 });
     }),
     insertIntent: jest.fn(async (intent) => {
-      if (row) return { inserted: false };
+      // Mirrors the store: reopen only a transition_not_committed skip.
+      if (row && !(row.state === 'skipped' && row.skip_reason === 'transition_not_committed')) {
+        return { inserted: false };
+      }
       row = pendingRow({
         source_document_id: intent.sourceDocumentId,
         request_id: intent.requestId,
@@ -288,6 +291,51 @@ describe('delivery', () => {
     // A retry POST (reused) or recovery now finds the committed Final.
     expect(await deliverGroupReviewHandoff({ sourceDocumentId: SOURCE_ID }, deps)).toEqual({ status: 'sent' });
     expect(deps.createEmailActivity).toHaveBeenCalledTimes(1);
+  });
+
+  test('a transport failure, then the writeup moves to leadership: recovery does not send the stale email', async () => {
+    const { deps, state, getRow } = harness({ existingRow: pendingRow() });
+    deps.sendEmail.mockRejectedValueOnce(Object.assign(new Error('transport'), { code: 'dynamics_send_failed' }));
+    const spy = quiet();
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'failed', code: 'dynamics_send_failed' });
+    spy.mockRestore();
+    state.documentRow = finalDocument({ wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL });
+    expect(await recoverPendingHandoffEmails({}, deps)).toEqual([
+      { sourceDocumentId: SOURCE_ID, status: 'skipped', reason: 'no_longer_in_group_review' },
+    ]);
+    expect(deps.sendEmail).toHaveBeenCalledTimes(1);
+    expect(getRow().state).toBe('skipped');
+  });
+
+  test('an expired intent is reopened by a later valid handoff, which then emails', async () => {
+    const { deps, state, getRow } = harness({
+      requestRow: request({ _wmkf_currentfinalwriteup_value: null }),
+      existingRow: pendingRow({ created_at: '2026-09-20T00:00:00Z' }),
+    });
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'skipped', reason: 'transition_not_committed' });
+    const stageArgs = { requestId: REQUEST_ID, sourceDocumentId: SOURCE_ID, actingUserSystemId: LEAD_ID };
+    expect(await stageGroupReviewHandoff(stageArgs, deps)).toEqual({ status: 'staged' });
+    expect(getRow()).toMatchObject({ state: 'pending' });
+    state.requestRow = request();
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'sent' });
+  });
+
+  test('a sent intent is never reopened by staging', async () => {
+    const { deps, getRow } = harness({
+      requestRow: request({ _wmkf_currentfinalwriteup_value: null }),
+      existingRow: pendingRow({ state: 'sent', dynamics_email_id: EMAIL_ID }),
+    });
+    const stageArgs = { requestId: REQUEST_ID, sourceDocumentId: SOURCE_ID, actingUserSystemId: LEAD_ID };
+    expect(await stageGroupReviewHandoff(stageArgs, deps)).toEqual({ status: 'already_staged' });
+    expect(getRow().state).toBe('sent');
+  });
+
+  test('an email already accepted is recorded as sent even if its program was later removed', async () => {
+    const { deps, activities, getRow } = harness({ existingRow: pendingRow({ dynamics_email_id: EMAIL_ID }), enabledPrograms: [] });
+    activities.set(EMAIL_ID, { activityid: EMAIL_ID, statuscode: 3 });
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'sent' });
+    expect(getRow().state).toBe('sent');
+    expect(deps.getRequest).not.toHaveBeenCalled();
   });
 
   test('recovery sends a pending intent whose transition committed', async () => {
