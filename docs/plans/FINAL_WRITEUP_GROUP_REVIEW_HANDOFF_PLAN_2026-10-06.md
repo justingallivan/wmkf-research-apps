@@ -99,7 +99,7 @@ Each stage ships separately, on a branch, with a Codex adversarial review; this 
 runtime work. Stage 1 is the original ask and ships first.
 
 ### Stage 1 — Step 4 handoff action (UI only, no new route) — built on branch 2026-10-06
-- Step 4 title stays "Working writeup", matching the other noun-phrase step titles. During
+- Step 4 title: "Post-presentation writeup" (owner 2026-10-06). During
   post-visit drafting the summary reads "Post-visit drafting" instead of "Locked for review".
 - Step 4 actions: **Edit writeup in Word** and **Ready for group review**.
   - The button reuses `POST /api/workbench/final-writeup`.

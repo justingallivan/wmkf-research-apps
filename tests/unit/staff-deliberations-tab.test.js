@@ -1583,7 +1583,7 @@ test('stepper: corrections reopened before the presentation make the writeup the
   queueRoute('presiteGet', statusResponse({ currentArtifact: { ...preSiteArtifact(DRAFT), correction: { cycleId: 'correction-1' } } }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
   expect(await screen.findByRole('button', { name: 'Finish corrections' })).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: /Working writeup \(current step\)/ })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: /Post-presentation writeup \(current step\)/ })).toBeInTheDocument();
   expect(screen.queryByText(/Nothing is needed until the presentation/)).not.toBeInTheDocument();
 });
 
