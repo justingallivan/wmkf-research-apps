@@ -5,7 +5,9 @@
  *
  * Default is a dry run: it lists pending rows and performs no writes.
  * `--execute` retries each pending row through the same lease, stored
- * activity id and correlation key as the route, so it never sends twice.
+ * activity id and correlation key as the route, so it never sends twice. A row
+ * whose transition has not committed reports `awaiting_transition` and is
+ * left pending (skipped after 14 days).
  * Sending creates a Dynamics email activity, which is a Production Dataverse
  * write and needs the same-day write acknowledgement:
  *
@@ -36,7 +38,7 @@ async function main() {
   console.log(`Postgres host: ${host}`);
   console.log(`Pending handoff emails: ${pending.length}`);
   for (const row of pending) {
-    console.log(`  final ${row.final_document_id} request ${row.request_id} attempts ${row.attempt_count} last error ${row.last_error_code || '-'} created ${new Date(row.created_at).toISOString()}`);
+    console.log(`  draft ${row.source_document_id} final ${row.final_document_id || '-'} request ${row.request_id} attempts ${row.attempt_count} last error ${row.last_error_code || '-'} created ${new Date(row.created_at).toISOString()}`);
   }
   if (!execute) {
     console.log('Dry run. Pass --execute to retry these sends.');
@@ -48,7 +50,7 @@ async function main() {
     recoverPendingHandoffEmails({ limit: 100 })
   ));
   for (const result of results) {
-    console.log(`  final ${result.finalDocumentId}: ${result.status}${result.reason ? ` (${result.reason})` : ''}${result.code ? ` [${result.code}]` : ''}`);
+    console.log(`  draft ${result.sourceDocumentId}: ${result.status}${result.reason ? ` (${result.reason})` : ''}${result.code ? ` [${result.code}]` : ''}`);
   }
 }
 

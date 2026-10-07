@@ -358,28 +358,34 @@ inbox/calendar-client delivery.
 
 **[BUILT ON BRANCH `feature/writeup-handoff-email`, 2026-10-07; NOT MERGED, NOT APPLIED, NOT LIVE.]**
 **Source of truth:** Postgres send ledger for the group-review handoff email
-(Final Writeup group-review handoff Stage 4). Dataverse owns the Final
-document and request; Dynamics owns the email activity and transport.
-Migration `072_final_writeup_handoff_emails.sql`; fresh installs run it as a
-numbered migration (no setup-database fixture). One row per Final document
-(primary key `final_document_id`). The row is the send intent and is inserted
-only by the `POST /api/workbench/final-writeup` call that committed the
-group-review transition (`reused === false`), and only when the request's
-Grant Program is listed in `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`, so
-writeups already in group review before deployment are never emailed. States:
-`pending` → `sent`, or terminal `skipped` with a `skip_reason`
-(`program_not_enabled`, `program_not_configured`, `staffing_not_configured`,
-`no_recipients`, `final_not_current`, `test_request_refused`). A five-minute
-lease (`locked_until`) lets one call send; the Dynamics activity id and frozen
-`to_recipients` are stored before `SendEmail`, and correlation key
-`wmkf-final-writeup-handoff:<finalDocumentId>` recovers an activity created
-before the id was stored. Failures keep `pending` with `last_error_code` and
-are retried by the next POST for that Final or by owner-run
-`scripts/recover-final-writeup-handoff-emails.mjs` (Stage 5's cron will reuse
-`recoverPendingHandoffEmails`). Read/write paths:
+(Final Writeup group-review handoff Stage 4). Dataverse owns the documents and
+request; Dynamics owns the email activity and transport. Migration
+`072_final_writeup_handoff_emails.sql`; fresh installs run it as a numbered
+migration (no setup-database fixture). One row per handed-off draft (primary
+key `source_document_id`, the Site Visit / Pre-Site source document);
+`final_document_id` is bound once the transition is confirmed (unique when
+set). `POST /api/workbench/final-writeup` stages the row BEFORE the transition
+runs, and only when the request has no current Final and its Grant Program is
+listed in `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`, so writeups already in
+group review before deployment never get a row. Delivery sends only when the
+request's current Final has this draft as its source and is in group review;
+until then the row stays `pending` without an error (`awaiting_transition`),
+so a commit whose response was lost is still sent by a retry POST or by
+recovery. States: `pending` → `sent`, or terminal `skipped` with a
+`skip_reason` (`program_not_enabled`, `final_from_other_draft`,
+`no_longer_in_group_review`, `transition_not_committed` after 14 days,
+`program_not_configured`, `staffing_not_configured`, `no_recipients`,
+`test_request_refused`). A five-minute lease (`locked_until`) lets one call
+send; the Dynamics activity id and frozen `to_recipients` are stored before
+`SendEmail`, and correlation key `wmkf-final-writeup-handoff:<sourceDocumentId>`
+recovers an activity created before the id was stored. Recipient lookups that
+fail for any reason other than 404 keep the whole send pending. Failures keep
+`pending` with `last_error_code` and are retried by the next POST for that
+draft or by owner-run `scripts/recover-final-writeup-handoff-emails.mjs`
+(Stage 5's cron will reuse `recoverPendingHandoffEmails`). Read/write paths:
 `lib/services/final-writeup/handoff-email-store.js` and
-`lib/services/final-writeup/handoff-email-service.js`. Known gap: a crash
-between the Dataverse commit and the intent insert leaves no row, so that
+`lib/services/final-writeup/handoff-email-service.js`. Known gap: if Postgres
+is unavailable when the lead PD presses the button, no row is staged and that
 handoff sends no email. No cleanup is scheduled; rows remain audit history.
 
 ### `deliberation_agenda_sends` — DEPLOYED; MIGRATION 041 APPLIED

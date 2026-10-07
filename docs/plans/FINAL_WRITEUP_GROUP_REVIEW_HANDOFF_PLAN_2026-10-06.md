@@ -235,21 +235,26 @@ silently include or exclude them. **Resolved 2026-10-07:** the owner chose Resea
 072 not applied, not live.** As built:
 - `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS` lists the Grant Programs that email (set it to the
   Research GUID only). Unset means no email, so the code can merge dark.
-- Ledger `final_writeup_handoff_emails` (migration 072), one row per Final document. The row is
-  the intent and is created only by the POST that committed the transition, so writeups already in
-  group review before deployment are never emailed.
+- Ledger `final_writeup_handoff_emails` (migration 072), one row per handed-off draft. The POST
+  stages the row before the transition runs, and only while the request has no current Final, so
+  writeups already in group review before deployment are never emailed. Delivery waits until the
+  current Final is confirmed to come from that draft and is in group review. A commit whose
+  response was lost is therefore still emailed (Codex review finding, 2026-10-07).
+- A recipient lookup that fails for any reason other than "not found" keeps the whole send
+  pending, so an outage never causes a partial or skipped email (Codex review finding).
 - Recipients: program audience ∩ PD persona, minus the lead PD, with addresses read separately.
   Sent from `NOTIFICATION_EMAIL_FROM`, regarding the request, so the TEST-request guard applies.
 - Copy: `email.final_writeup_handoff.subject` / `.body`. Blank copy leaves the send pending.
 - `email-automation-preferences.js` does not apply: it controls scheduled-email review, not
   notifications.
-- Recovery: the next POST for that Final, or owner-run
+- Recovery: the next POST for that draft, or owner-run
   `scripts/recover-final-writeup-handoff-emails.mjs`. No new cron; Stage 5's cron can call
   `recoverPendingHandoffEmails`.
 - Both "Ready for group review" confirmations say whether PDs will be emailed, from the server's
   `handoffEmailEnabled`.
-- Known gap: a crash between the Dataverse commit and the Postgres insert leaves no intent, so that
-  handoff sends no email.
+- Known gap: if Postgres is unavailable when the lead PD presses the button, no intent is staged
+  and that handoff sends no email. A staged intent whose transition never commits is skipped after
+  14 days.
 - Owner-run sequence: apply migration 072; seed the copy with `scripts/seed-email-defaults.mjs`;
   then set the env variable in Production and redeploy.
 

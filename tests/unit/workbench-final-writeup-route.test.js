@@ -11,7 +11,8 @@ jest.mock('../../lib/services/final-writeup/persona-service', () => ({
   resolveFinalWriteupPersonas: jest.fn(async () => ({ enabled: true, personas: ['program-coordinator'] })),
 }));
 jest.mock('../../lib/services/final-writeup/handoff-email-service', () => ({
-  notifyGroupReviewHandoff: jest.fn(async () => ({ status: 'sent' })),
+  stageGroupReviewHandoff: jest.fn(async () => ({ status: 'staged' })),
+  deliverGroupReviewHandoff: jest.fn(async () => ({ status: 'sent' })),
 }));
 jest.mock('../../lib/services/final-writeup/transition-service', () => ({
   getFinalWriteupStatus: jest.fn(),
@@ -25,7 +26,10 @@ import {
   getFinalWriteupStatus,
   startFinalWriteup,
 } from '../../lib/services/final-writeup/transition-service';
-import { notifyGroupReviewHandoff } from '../../lib/services/final-writeup/handoff-email-service';
+import {
+  deliverGroupReviewHandoff,
+  stageGroupReviewHandoff,
+} from '../../lib/services/final-writeup/handoff-email-service';
 import handler from '../../pages/api/workbench/final-writeup';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -129,44 +133,60 @@ describe('group-review handoff email (Stage 4)', () => {
   const FINAL_ID = '44444444-4444-4444-8444-444444444444';
   const post = () => ({ method: 'POST', query: {}, body: { requestId: REQUEST_ID, expectedArtifactId: SOURCE_ID } });
 
-  test('the committing call creates the send intent for the new Final', async () => {
-    startFinalWriteup.mockResolvedValueOnce({ artifact: { artifactId: FINAL_ID }, reused: false, inProgress: false });
+  test('stages the intent for the draft before the transition, then delivers', async () => {
+    const order = [];
+    stageGroupReviewHandoff.mockImplementationOnce(async () => { order.push('stage'); return { status: 'staged' }; });
+    startFinalWriteup.mockImplementationOnce(async () => {
+      order.push('start');
+      return { artifact: { artifactId: FINAL_ID }, reused: false, inProgress: false };
+    });
+    deliverGroupReviewHandoff.mockImplementationOnce(async () => { order.push('deliver'); return { status: 'sent' }; });
     const res = mockRes();
     await handler(post(), res);
     expect(res.statusCode).toBe(200);
-    expect(notifyGroupReviewHandoff).toHaveBeenCalledWith({
-      requestId: REQUEST_ID, finalDocumentId: FINAL_ID, committedByThisCall: true,
-    });
+    expect(order).toEqual(['stage', 'start', 'deliver']);
+    expect(stageGroupReviewHandoff).toHaveBeenCalledWith({ requestId: REQUEST_ID, sourceDocumentId: SOURCE_ID });
+    expect(deliverGroupReviewHandoff).toHaveBeenCalledWith({ sourceDocumentId: SOURCE_ID });
   });
 
-  test('a repeat call that finds the Final already committed only retries', async () => {
+  test('a retry after a lost commit response delivers the staged intent', async () => {
     startFinalWriteup.mockResolvedValueOnce({ artifact: { artifactId: FINAL_ID }, reused: true, inProgress: false });
     await handler(post(), mockRes());
-    expect(notifyGroupReviewHandoff).toHaveBeenCalledWith({
-      requestId: REQUEST_ID, finalDocumentId: FINAL_ID, committedByThisCall: false,
-    });
+    expect(deliverGroupReviewHandoff).toHaveBeenCalledWith({ sourceDocumentId: SOURCE_ID });
   });
 
-  test('an in-progress claim sends nothing', async () => {
+  test('an in-progress claim stages but does not deliver yet', async () => {
     startFinalWriteup.mockResolvedValueOnce({ artifact: { artifactId: FINAL_ID }, reused: true, inProgress: true });
     const res = mockRes();
     await handler(post(), res);
     expect(res.statusCode).toBe(202);
-    expect(notifyGroupReviewHandoff).not.toHaveBeenCalled();
+    expect(stageGroupReviewHandoff).toHaveBeenCalled();
+    expect(deliverGroupReviewHandoff).not.toHaveBeenCalled();
   });
 
-  test('a failed email never changes the transition response', async () => {
+  test('a failed transition keeps its error and does not deliver', async () => {
+    startFinalWriteup.mockRejectedValueOnce(new ServiceHttpError('Only the lead', {
+      httpStatus: 403, code: 'final_writeup_forbidden', body: { error: 'Only the lead', code: 'final_writeup_forbidden' },
+    }));
+    const res = mockRes();
+    await handler(post(), res);
+    expect(res.statusCode).toBe(403);
+    expect(deliverGroupReviewHandoff).not.toHaveBeenCalled();
+  });
+
+  test('email failures never change the transition response', async () => {
     startFinalWriteup.mockResolvedValueOnce({ artifact: { artifactId: FINAL_ID }, reused: false, inProgress: false });
-    notifyGroupReviewHandoff.mockResolvedValueOnce({ status: 'failed', code: 'handoff_email_failed' });
+    stageGroupReviewHandoff.mockResolvedValueOnce({ status: 'failed', code: 'handoff_email_stage_failed' });
+    deliverGroupReviewHandoff.mockResolvedValueOnce({ status: 'failed', code: 'handoff_email_failed' });
     const res = mockRes();
     await handler(post(), res);
     expect(res.statusCode).toBe(200);
     expect(res.body).toMatchObject({ success: true, reused: false, artifact: { artifactId: FINAL_ID } });
-    expect(res.body).not.toHaveProperty('handoffEmail');
   });
 
-  test('GET never sends', async () => {
+  test('GET never stages or sends', async () => {
     await handler({ method: 'GET', query: { requestId: REQUEST_ID } }, mockRes());
-    expect(notifyGroupReviewHandoff).not.toHaveBeenCalled();
+    expect(stageGroupReviewHandoff).not.toHaveBeenCalled();
+    expect(deliverGroupReviewHandoff).not.toHaveBeenCalled();
   });
 });

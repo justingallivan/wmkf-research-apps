@@ -1,13 +1,17 @@
 -- Group-review handoff email ledger (Final Writeup group-review handoff
--- Stage 4). One row per Final document. The row is the send intent: it is
--- created only by the call that committed the group-review transition, for a
--- Grant Program listed in FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS, so writeups
--- that entered group review before this shipped are never emailed.
--- Dataverse owns the Final document; Dynamics owns the email activity and
--- transport. This row coordinates one send, its retries and its receipt.
+-- Stage 4). One row per handed-off draft (the Site Visit / Pre-Site source
+-- document). The row is the send intent. It is staged by
+-- POST /api/workbench/final-writeup BEFORE the transition runs, and only when
+-- the request has no current Final yet and its Grant Program is listed in
+-- FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS. Writeups already in group review
+-- before this shipped therefore never get a row. Delivery waits until the
+-- request's current Final is confirmed to come from this draft, so a commit
+-- whose response was lost is still emailed by a retry or by recovery.
+-- Dataverse owns the documents; Dynamics owns the email activity and transport.
 
 CREATE TABLE IF NOT EXISTS final_writeup_handoff_emails (
-  final_document_id UUID PRIMARY KEY,
+  source_document_id UUID PRIMARY KEY,
+  final_document_id UUID,
   request_id UUID NOT NULL,
   grant_program_id UUID NOT NULL,
   lead_systemuser_id UUID,
@@ -27,7 +31,9 @@ CREATE TABLE IF NOT EXISTS final_writeup_handoff_emails (
   CONSTRAINT final_writeup_handoff_email_state_check
     CHECK (state IN ('pending', 'sent', 'skipped')),
   CONSTRAINT final_writeup_handoff_email_sent_shape CHECK (
-    state <> 'sent' OR (sent_at IS NOT NULL AND dynamics_email_id IS NOT NULL)
+    state <> 'sent' OR (
+      sent_at IS NOT NULL AND dynamics_email_id IS NOT NULL AND final_document_id IS NOT NULL
+    )
   ),
   CONSTRAINT final_writeup_handoff_email_skip_shape CHECK (
     (state = 'skipped') = (skip_reason IS NOT NULL)
@@ -36,6 +42,10 @@ CREATE TABLE IF NOT EXISTS final_writeup_handoff_emails (
     to_recipients IS NULL OR jsonb_typeof(to_recipients) = 'array'
   )
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_final_writeup_handoff_emails_final
+  ON final_writeup_handoff_emails (final_document_id)
+  WHERE final_document_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_final_writeup_handoff_emails_pending
   ON final_writeup_handoff_emails (created_at)
