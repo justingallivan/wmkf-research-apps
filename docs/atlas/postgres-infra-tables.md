@@ -365,9 +365,13 @@ migration (no setup-database fixture). One row per handed-off draft (primary
 key `source_document_id`, the Site Visit / Pre-Site source document);
 `final_document_id` is bound once the transition is confirmed (unique when
 set). `POST /api/workbench/final-writeup` stages the row BEFORE the transition
-runs, and only when the request has no current Final and its Grant Program is
-listed in `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`, so writeups already in
-group review before deployment never get a row. Delivery sends only when the
+runs, only for the lead PD or a superuser, only when the submitted draft is the
+request's current draft (`_wmkf_currentpresitevisit_value`), only when the
+request has no current Final, and only when its Grant Program is listed in
+`FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`, so writeups already in group review
+before deployment never get a row. If the insert fails for a request that
+should email, the route returns 503 `final_writeup_handoff_email_unavailable`
+before the transition starts. Delivery sends only when the
 request's current Final has this draft as its source and is in group review;
 until then the row stays `pending` without an error (`awaiting_transition`),
 so a commit whose response was lost is still sent by a retry POST or by
@@ -384,9 +388,9 @@ fail for any reason other than 404 keep the whole send pending. Failures keep
 draft or by owner-run `scripts/recover-final-writeup-handoff-emails.mjs`
 (Stage 5's cron will reuse `recoverPendingHandoffEmails`). Read/write paths:
 `lib/services/final-writeup/handoff-email-store.js` and
-`lib/services/final-writeup/handoff-email-service.js`. Known gap: if Postgres
-is unavailable when the lead PD presses the button, no row is staged and that
-handoff sends no email. No cleanup is scheduled; rows remain audit history.
+`lib/services/final-writeup/handoff-email-service.js`. Trade-off: while
+Postgres is unavailable, an enabled program's handoff cannot start; the lead PD
+retries. No cleanup is scheduled; rows remain audit history.
 
 ### `deliberation_agenda_sends` — DEPLOYED; MIGRATION 041 APPLIED
 

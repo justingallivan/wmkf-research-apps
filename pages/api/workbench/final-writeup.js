@@ -88,9 +88,18 @@ export default async function handler(req, res) {
       }
       // Stage 4: stage the handoff email for this draft BEFORE the transition,
       // so a commit whose response is lost is still emailed by a retry or by
-      // recovery. Staging is skipped once the request already has a Final.
-      // Neither step throws, so email work cannot change this response.
-      await stageGroupReviewHandoff({ requestId, sourceDocumentId: expectedArtifactId });
+      // recovery. If the intent cannot be persisted for a listed program,
+      // refuse before anything commits rather than lose the email. Otherwise
+      // email work never changes this response.
+      const staged = await stageGroupReviewHandoff({
+        requestId, sourceDocumentId: expectedArtifactId, actingUserSystemId, isSuperuser,
+      });
+      if (staged.status === 'failed') {
+        return res.status(503).json({
+          error: 'I had trouble preparing the email to your colleagues, so group review has not started and nothing was changed. This is usually a temporary blip. Please try again, and if it keeps happening, contact an administrator.',
+          code: 'final_writeup_handoff_email_unavailable',
+        });
+      }
       const result = await startFinalWriteup({
         requestId,
         expectedArtifactId,

@@ -236,7 +236,8 @@ silently include or exclude them. **Resolved 2026-10-07:** the owner chose Resea
 - `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS` lists the Grant Programs that email (set it to the
   Research GUID only). Unset means no email, so the code can merge dark.
 - Ledger `final_writeup_handoff_emails` (migration 072), one row per handed-off draft. The POST
-  stages the row before the transition runs, and only while the request has no current Final, so
+  stages the row before the transition runs, only for the lead PD or a superuser and only for the
+  request's current draft (second Codex review), and only while the request has no current Final, so
   writeups already in group review before deployment are never emailed. Delivery waits until the
   current Final is confirmed to come from that draft and is in group review. A commit whose
   response was lost is therefore still emailed (Codex review finding, 2026-10-07).
@@ -252,9 +253,10 @@ silently include or exclude them. **Resolved 2026-10-07:** the owner chose Resea
   `recoverPendingHandoffEmails`.
 - Both "Ready for group review" confirmations say whether PDs will be emailed, from the server's
   `handoffEmailEnabled`.
-- Known gap: if Postgres is unavailable when the lead PD presses the button, no intent is staged
-  and that handoff sends no email. A staged intent whose transition never commits is skipped after
-  14 days.
+- If the intent cannot be saved for a Research request, the POST returns 503 and group review does
+  not start, so the email is never silently lost (second Codex review). Trade-off: during a
+  Postgres outage the lead PD has to retry later. A staged intent whose transition never commits
+  is skipped after 14 days.
 - Owner-run sequence: apply migration 072; seed the copy with `scripts/seed-email-defaults.mjs`;
   then set the env variable in Production and redeploy.
 

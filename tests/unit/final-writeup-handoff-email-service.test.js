@@ -43,6 +43,7 @@ function request(overrides = {}) {
     _wmkf_programdirector_value: LEAD_ID,
     _wmkf_programdirector_value_formatted: 'Lee Lead',
     _wmkf_grantprogram_value: RESEARCH_ID,
+    _wmkf_currentpresitevisit_value: SOURCE_ID,
     _wmkf_currentfinalwriteup_value: FINAL_ID,
     ...overrides,
   };
@@ -174,7 +175,9 @@ describe('program list', () => {
 });
 
 describe('stageGroupReviewHandoff', () => {
-  const stage = () => ({ requestId: REQUEST_ID, sourceDocumentId: SOURCE_ID });
+  const stage = (overrides = {}) => ({
+    requestId: REQUEST_ID, sourceDocumentId: SOURCE_ID, actingUserSystemId: LEAD_ID, isSuperuser: false, ...overrides,
+  });
 
   test('stages the intent for the draft while the request has no Final', async () => {
     const { deps } = harness({ requestRow: request({ _wmkf_currentfinalwriteup_value: null }) });
@@ -200,9 +203,41 @@ describe('stageGroupReviewHandoff', () => {
     expect(deps.insertIntent).not.toHaveBeenCalled();
   });
 
-  test('never throws', async () => {
+  test('a superuser who is not the lead may stage', async () => {
+    const { deps } = harness({ requestRow: request({ _wmkf_currentfinalwriteup_value: null }) });
+    expect(await stageGroupReviewHandoff(stage({ actingUserSystemId: BEA_ID, isSuperuser: true }), deps))
+      .toEqual({ status: 'staged' });
+  });
+
+  test('someone who is neither the lead nor a superuser cannot stage', async () => {
+    const { deps } = harness({ requestRow: request({ _wmkf_currentfinalwriteup_value: null }) });
+    expect(await stageGroupReviewHandoff(stage({ actingUserSystemId: BEA_ID }), deps)).toEqual({ status: 'not_authorized' });
+    expect(deps.insertIntent).not.toHaveBeenCalled();
+  });
+
+  test("another request's draft cannot be staged, so the real handoff still emails", async () => {
+    const OTHER_DRAFT = '22222222-2222-4222-8222-222222222229';
+    const { deps, getRow } = harness({ requestRow: request({ _wmkf_currentfinalwriteup_value: null }) });
+    // A mismatched request/draft pair is refused without a row...
+    expect(await stageGroupReviewHandoff(stage({ sourceDocumentId: OTHER_DRAFT }), deps)).toEqual({ status: 'not_current_draft' });
+    expect(deps.insertIntent).not.toHaveBeenCalled();
+    expect(getRow()).toBeNull();
+    // ...and the legitimate handoff for the request's own draft stages normally.
+    expect(await stageGroupReviewHandoff(stage(), deps)).toEqual({ status: 'staged' });
+    expect(getRow()).toMatchObject({ source_document_id: SOURCE_ID, request_id: REQUEST_ID });
+  });
+
+  test('a request read failure stages nothing and does not block the transition', async () => {
     const { deps } = harness();
     deps.getRequest.mockRejectedValue(new Error('dataverse down'));
+    const spy = quiet();
+    expect(await stageGroupReviewHandoff(stage(), deps)).toEqual({ status: 'request_unavailable' });
+    spy.mockRestore();
+  });
+
+  test('a persistence failure for a listed program reports failed so the route can refuse', async () => {
+    const { deps } = harness({ requestRow: request({ _wmkf_currentfinalwriteup_value: null }) });
+    deps.insertIntent.mockRejectedValue(new Error('postgres down'));
     const spy = quiet();
     expect(await stageGroupReviewHandoff(stage(), deps)).toEqual({ status: 'failed', code: 'handoff_email_stage_failed' });
     spy.mockRestore();
@@ -231,7 +266,9 @@ describe('delivery', () => {
 
   test('a lost commit response: the staged intent waits, then a retry sends it', async () => {
     const { deps, state, getRow } = harness({ requestRow: request({ _wmkf_currentfinalwriteup_value: null }) });
-    await stageGroupReviewHandoff({ requestId: REQUEST_ID, sourceDocumentId: SOURCE_ID }, deps);
+    await stageGroupReviewHandoff({
+      requestId: REQUEST_ID, sourceDocumentId: SOURCE_ID, actingUserSystemId: LEAD_ID,
+    }, deps);
     // The transition committed, but this call saw no Final yet.
     expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'awaiting_transition' });
     expect(deps.release).toHaveBeenCalled();

@@ -145,7 +145,9 @@ describe('group-review handoff email (Stage 4)', () => {
     await handler(post(), res);
     expect(res.statusCode).toBe(200);
     expect(order).toEqual(['stage', 'start', 'deliver']);
-    expect(stageGroupReviewHandoff).toHaveBeenCalledWith({ requestId: REQUEST_ID, sourceDocumentId: SOURCE_ID });
+    expect(stageGroupReviewHandoff).toHaveBeenCalledWith({
+      requestId: REQUEST_ID, sourceDocumentId: SOURCE_ID, actingUserSystemId: USER_ID, isSuperuser: false,
+    });
     expect(deliverGroupReviewHandoff).toHaveBeenCalledWith({ sourceDocumentId: SOURCE_ID });
   });
 
@@ -176,13 +178,34 @@ describe('group-review handoff email (Stage 4)', () => {
 
   test('email failures never change the transition response', async () => {
     startFinalWriteup.mockResolvedValueOnce({ artifact: { artifactId: FINAL_ID }, reused: false, inProgress: false });
-    stageGroupReviewHandoff.mockResolvedValueOnce({ status: 'failed', code: 'handoff_email_stage_failed' });
     deliverGroupReviewHandoff.mockResolvedValueOnce({ status: 'failed', code: 'handoff_email_failed' });
     const res = mockRes();
     await handler(post(), res);
     expect(res.statusCode).toBe(200);
     expect(res.body).toMatchObject({ success: true, reused: false, artifact: { artifactId: FINAL_ID } });
   });
+
+  test('if the email intent cannot be persisted, nothing starts and the user is told to retry', async () => {
+    stageGroupReviewHandoff.mockResolvedValueOnce({ status: 'failed', code: 'handoff_email_stage_failed' });
+    const res = mockRes();
+    await handler(post(), res);
+    expect(res.statusCode).toBe(503);
+    expect(res.body.code).toBe('final_writeup_handoff_email_unavailable');
+    expect(res.body.error).toMatch(/nothing was changed/);
+    expect(startFinalWriteup).not.toHaveBeenCalled();
+    expect(deliverGroupReviewHandoff).not.toHaveBeenCalled();
+  });
+
+  test.each(['not_enabled', 'not_authorized', 'not_current_draft', 'already_in_review', 'request_unavailable'])(
+    'staging result %s never blocks the transition',
+    async (status) => {
+      stageGroupReviewHandoff.mockResolvedValueOnce({ status });
+      const res = mockRes();
+      await handler(post(), res);
+      expect(startFinalWriteup).toHaveBeenCalledTimes(1);
+      expect(res.statusCode).toBe(200);
+    },
+  );
 
   test('GET never stages or sends', async () => {
     await handler({ method: 'GET', query: { requestId: REQUEST_ID } }, mockRes());
