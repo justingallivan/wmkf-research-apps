@@ -19,16 +19,23 @@ evidence. Substantial turns require at least 80% ordered word coverage and two
 matching content words. Replies of five words or fewer require an exact caption
 prefix and onset within 500 ms. Competing claims to the same caption words,
 including consecutive echoes, abstain. A newly assigned name needs corroboration
-from two substantial turns and two distinct cues. A substantial contradiction
-alone is sufficient to remove an unsafe global name, even without enough evidence
-to name the replacement.
+from two substantial turns and two distinct cues. Removing a global name requires
+at least two substantial contrary turns on that ID after prior short-turn corrections.
+A single local contradiction can be corrected without stripping the global name
+from the ID's other, potentially uncaptioned turns.
+IDs without an applied global name still recover when multiple names have
+exclusive substantial turn evidence, including a 3:1 split. Only corroborated
+names are applied; a singleton minority stays unnamed. No existing global name
+is at risk in that case.
 
 Mixed audio IDs lose their global name. Supported turns move to an unambiguous
 existing identity or a collision-free `zoom_N` identity; unresolved turns remain
 unnamed. Text, order, boundaries and word timings are preserved. This also means
 that a whole-ID conflict in the older verifier can now be resolved at the turn
-level. The old short-backchannel pass remains, but assignments involving a mixed
-ID are replaced by the more conservative split result.
+level. The old short-backchannel pass remains. Its incoming corrections follow
+the original name's split target; if no target is supported, they retain the now
+unnamed ID instead of reverting to a wrong source name. Suggestions and reasons
+are pruned along with names when an ID no longer occurs in the corrected content.
 
 Persistence remains `speaker_names` plus bounded `speaker_alignment` under the
 same lease/version fence. `reassigned` carries utterance-index → ID; the new
@@ -40,7 +47,7 @@ metadata becomes a minimal abstention. No schema migration is needed.
 
 | Invariant | Source | Verification |
 |---|---|---|
-| A late arrival cannot inherit a verified mixed ID's global name | `reconcileZoomSpeakerTurns` | synthetic late arrival across two IDs; unresolved turn and single contradictory turn cases |
+| Local corrections do not strip consistent global names | `reconcileZoomSpeakerTurns` | synthetic late arrival across two IDs; uncaptioned turns; single contradiction; incoming/outgoing short corrections |
 | Timing alone and repeated wording cannot establish identity | same helper | shifted/unrelated VTT, simultaneous captions, short and substantive echoes, missing words, silent gaps |
 | Names and added identities survive the real read boundary | `runtime.js`, `transcript-format.js` | runtime reconstruction and projection test; serialized overlay → VTT and frozen bundle source |
 | Source words and timing remain unchanged | same helper | exact utterance comparison excluding only speaker ID; original object unchanged |
@@ -52,7 +59,8 @@ Regression suites: `tests/unit/transcription-zoom-speaker-turns.test.js`,
 `scripts/probe-transcript-speaker-turns.mjs DRAFT.vtt ZOOM.vtt` reads local files
 only and prints label changes without transcript wording. On the supplied
 1003038 files, it corrects the labels at 01:02:04.560, 01:02:12.880 and
-01:02:26.648 to `allisonkeller`; ambiguous turns remain unnamed. VTT replay
+01:02:26.648 to `allisonkeller`; the review revision removes no existing names in
+this replay. Ambiguous turns on confirmed mixed IDs remain unnamed. VTT replay
 reconstructs IDs from display names, so it is not a raw-provider replay or a
 hosted end-to-end test. No saved job was modified, and no provider/model call
 was made for this verification. Statements below about whole-ID conflict

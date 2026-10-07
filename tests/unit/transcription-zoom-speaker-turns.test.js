@@ -1,4 +1,4 @@
-import { reconcileZoomSpeakerTurns } from '../../lib/services/transcription-pilot/zoom-vtt';
+import { reconcileZoomSpeakerTurns, reassignShortUtterances } from '../../lib/services/transcription-pilot/zoom-vtt';
 import { applySpeakerReassignments, formatTranscriptVtt } from '../../lib/services/transcription-pilot/transcript-format';
 import { buildMeetingTranscriptFiles } from '../../lib/services/meeting-tracker-transcription/bundle';
 
@@ -38,7 +38,8 @@ test('splits reused IDs, unifies the late arrival, preserves earlier speakers an
   expect(result.labels).toEqual(['Presenter', 'Collaborator', 'Presenter', 'Collaborator', 'Late arrival', 'Late arrival', 'Late arrival', null]);
   expect(result.content.utterances[4].speaker).toBe(result.content.utterances[5].speaker);
   expect(result.alignment.status).toBe('partial');
-  expect(result.alignment.reasons).toMatchObject({ A: 'mixed_speakers', C: 'mixed_speakers' });
+  expect(result.alignment.reasons).toEqual({ A: 'mixed_speakers' });
+  expect(result.names.C).toBe('Collaborator');
   expect(JSON.stringify(f)).toBe(before);
   expect(result.content.utterances.map(({ speaker: _speaker, ...row }) => row)).toEqual(f.content.utterances.map(({ speaker: _speaker, ...row }) => row));
   expect(result.content.text).toBe(f.content.text);
@@ -110,12 +111,12 @@ test('distinct consecutive phrases within one Zoom cue can belong to the same ne
   expect(result.labels.at(-1)).toBe('Late arrival');
 });
 
-test('one contradictory substantial turn removes the global label without inventing an uncorroborated identity', () => {
+test('one contradictory substantial turn does not strip the global label', () => {
   const f = fixture();
   f.cues = f.cues.filter(cue => cue.start !== 60000);
   const result = run(f);
-  expect(result.labels[4]).toBeNull();
-  expect(result.names).not.toHaveProperty('A');
+  expect(result.labels[4]).toBe('Presenter');
+  expect(result.names.A).toBe('Presenter');
   expect(Object.values(result.names)).not.toContain('Late arrival');
 });
 
@@ -130,7 +131,7 @@ test('budget overflow drops the split atomically and keeps mixed speaker IDs unn
 
 test('a near-limit existing alignment cannot make the fallback exceed its storage bound', () => {
   const f = fixture();
-  f.verdict.alignment.suggestions.large = ['x'.repeat(65300)];
+  f.verdict.alignment.suggestions.A = ['x'.repeat(65300)];
   const result = run(f);
   expect(Buffer.byteLength(JSON.stringify(result.alignment))).toBeLessThanOrEqual(32768);
   expect(result.names).toEqual({});
@@ -178,4 +179,117 @@ test('a persisted reassignment cannot introduce IDs without the server-recorded 
   const f = fixture();
   expect(applySpeakerReassignments(f.content, { 0: 'zoom_42' }).utterances[0].speaker).toBe('A');
   expect(applySpeakerReassignments(f.content, { 0: 'bad id' }, ['bad id']).utterances[0].speaker).toBe('A');
+});
+
+function withShortCorrection(f, target = 'C') {
+  const index = f.content.utterances.length;
+  const start = 120000;
+  const name = f.verdict.names[target];
+  const source = target === 'A' ? 'C' : 'A';
+  f.content.utterances.push({ speaker: target, start, end: start + 3000, text: 'We should continue this discussion about the proposed methods.' },
+    { speaker: source, start: start + 3000, end: start + 3500, text: 'Right.' });
+  f.cues.push({ name, start, end: start + 4000, text: 'We should continue this discussion about the proposed methods.' });
+  const pass = reassignShortUtterances(f.content.utterances, f.cues, f.verdict.names);
+  expect(pass.reassigned[String(index + 1)]).toBe(target);
+  f.verdict.alignment.reassigned = pass.reassigned;
+  f.verdict.alignment.reassignedCount = pass.reassignedCount;
+  return index + 1;
+}
+
+test('a corrected short reply does not strip a consistent ID or its uncaptioned turns', () => {
+  const f = fixture();
+  f.content.utterances = f.content.utterances.slice(0, 4);
+  f.cues = f.cues.slice(0, 4);
+  f.content.utterances.push({ speaker: 'A', start: 80000, end: 84000, text: 'These uncaptioned remarks should keep the verified presenter name.' });
+  const index = withShortCorrection(f);
+  const result = run(f);
+  expect(result.names).toEqual(f.verdict.names);
+  expect(result.labels[4]).toBe('Presenter');
+  expect(result.labels[index]).toBe('Collaborator');
+  expect(result.alignment.reasons).toEqual({});
+});
+
+test('a captioned short contradiction alone does not split an otherwise consistent ID', () => {
+  const f = fixture();
+  f.content.utterances = f.content.utterances.slice(0, 4);
+  f.cues = f.cues.slice(0, 4);
+  f.content.utterances.push({ speaker: 'A', text: 'Yes, exactly.', start: 80000, end: 81000 },
+    { speaker: 'A', text: 'Uncaptioned remarks retain their existing name.', start: 90000, end: 92000 });
+  f.cues.push({ name: 'Collaborator', text: 'Yes, exactly.', start: 80000, end: 81000 });
+  const result = run(f);
+  expect(result.names).toEqual(f.verdict.names);
+  expect(result.labels[4]).toBe('Collaborator');
+  expect(result.labels[5]).toBe('Presenter');
+  expect(result.alignment.reasons).toEqual({});
+});
+
+test('a previous short correction into a mixed ID follows its named split target', () => {
+  const f = fixture();
+  const index = withShortCorrection(f, 'A');
+  const result = run(f);
+  expect(result.labels[index]).toBe('Presenter');
+  expect(result.content.utterances[index].speaker).toBe(result.content.utterances[0].speaker);
+  expect(result.labels[4]).toBe('Late arrival');
+});
+
+test('a previous correction out of a mixed ID stays corrected', () => {
+  const f = fixture();
+  const index = withShortCorrection(f);
+  expect(run(f).labels[index]).toBe('Collaborator');
+});
+
+test('an incoming correction stays on the unnamed target when its original name has no supported split', () => {
+  const f = fixture();
+  const index = withShortCorrection(f, 'A');
+  f.cues = f.cues.filter(cue => cue.name !== 'Presenter' || cue.start === 120000);
+  const result = run(f);
+  expect(result.content.utterances[index].speaker).toBe('A');
+  expect(result.labels[index]).toBeNull();
+  expect(result.labels[4]).toBe('Late arrival');
+});
+
+test('budget fallback preserves an incoming short correction even without a split', () => {
+  const f = fixture();
+  const index = withShortCorrection(f, 'A');
+  const result = run(f, { maxAlignmentBytes: 650 });
+  expect(result.alignment.reassignedDropped).toBe(true);
+  expect(result.content.utterances[index].speaker).toBe('A');
+  expect(result.labels[index]).toBeNull();
+});
+
+test('vanished IDs leave no suggestions or reasons, surviving mixed IDs keep theirs', () => {
+  const f = fixture();
+  f.verdict.alignment.suggestions = { A: ['Presenter', 'Late arrival'], C: ['Collaborator'] };
+  f.content.utterances.pop();
+  const result = run(f);
+  expect(result.alignment.suggestions).not.toHaveProperty('A');
+  expect(result.alignment.reasons).not.toHaveProperty('A');
+  expect(result.alignment.suggestions.C).toEqual(['Collaborator']);
+});
+
+test('legacy corrections alone prune an emptied ID and recompute status', () => {
+  const f = fixture();
+  f.content.utterances = f.content.utterances.slice(0, 4);
+  f.cues = f.cues.slice(0, 4);
+  f.content.utterances.push({ speaker: 'F', start: 80000, end: 81000, text: 'Right.' });
+  f.verdict.alignment.status = 'partial';
+  f.verdict.alignment.reassigned = { 4: 'A' };
+  f.verdict.alignment.suggestions.F = ['Presenter'];
+  f.verdict.alignment.reasons.F = 'conflict';
+  const result = run(f);
+  expect(result.alignment.status).toBe('applied');
+  expect(result.alignment.suggestions).not.toHaveProperty('F');
+  expect(result.alignment.reasons).not.toHaveProperty('F');
+});
+
+test('an unnamed 3:1 ID recovers its corroborated majority and leaves the singleton unnamed', () => {
+  const f = fixture();
+  f.content.utterances = f.content.utterances.slice(0, 4).map(row => ({ ...row, speaker: 'A' }));
+  f.cues = f.cues.slice(0, 4).map((cue, index) => ({ ...cue, name: index === 3 ? 'Singleton' : 'Presenter' }));
+  f.verdict.names = {};
+  f.verdict.alignment.speakers = {};
+  f.verdict.alignment.status = 'abstained';
+  const result = run(f);
+  expect(result.labels).toEqual(['Presenter', 'Presenter', 'Presenter', null]);
+  expect(result.alignment.status).toBe('partial');
 });

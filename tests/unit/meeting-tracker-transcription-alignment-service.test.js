@@ -318,7 +318,7 @@ test('(a) 8 speakers x 4 reserved, 25 long-name cues per sample, contrary fourth
   expect(store.failTranscriptionAlignment).toHaveBeenCalledWith(expect.objectContaining({ terminal: true, code: 'samples_over_budget' }));
 });
 
-test('(a2) 3:1 contrary names never apply globally; exclusive turn evidence splits the identities', async () => {
+test('(a2) 3:1 contrary names never apply globally; unnamed IDs still recover from exclusive turn evidence', async () => {
   const { content, vtt, verdict, names } = genFixture({ contrary: true });
   arrange({ content, vtt });
   executePrompt.mockResolvedValue({ blocked: false, parsed: verdict });
@@ -328,7 +328,7 @@ test('(a2) 3:1 contrary names never apply globally; exclusive turn evidence spli
   const split = applySpeakerReassignments(JSON.parse(content), alignment.reassigned, alignment.additionalSpeakerIds);
   expect(split.utterances.map(row => speakerNames[row.speaker])).toEqual(names.flatMap((name, s) => [name, name, name, names[(s + 1) % 8]]));
   expect(alignment.status).toBe('applied');
-  expect(alignment.suggestions.S0).toEqual(expect.arrayContaining([names[0], names[1]]));
+  expect(alignment.suggestions.S0).toBeUndefined();
 });
 
 test('(b) control: same fixture without contrary names applies all eight names', async () => {
@@ -368,7 +368,7 @@ const shownIds = text => (text.match(/^\[S\d+-\d+\]/gm) || []).map(id => id.slic
 
 test('contrary evidence on a dropped EXTRA sample still forces abstention (support is computed on the full sampled set)', async () => {
   // Two contrary samples of six (4:2) stay a conflict under dominanceRatio 0.2; one of six (5:1) would not.
-  const { content, vtt, verdict, names } = genFixture({ ...EXTRA_FIXTURE, contraryCount: 2 });
+  const { content, vtt, verdict } = genFixture({ ...EXTRA_FIXTURE, contraryCount: 2 });
   arrange({ content, vtt });
   executePrompt.mockResolvedValue({ blocked: false, parsed: verdict });
   await alignMeetingTranscriptionSpeakers({ jobId });
@@ -381,8 +381,8 @@ test('contrary evidence on a dropped EXTRA sample still forces abstention (suppo
   const droppedSpeakers = Object.entries(verdict).filter(([, v]) => !shown.includes(v.pairIds.at(-1))).map(([id]) => id);
   for (const id of droppedSpeakers) {
     expect(speakerNames).not.toHaveProperty(id);
-    const index = Number(id.slice(1));
-    expect(alignment.suggestions[id]).toEqual(expect.arrayContaining([names[index], names[(index + 1) % 8]]));
+    expect(alignment.suggestions).not.toHaveProperty(id);
+    expect(alignment.reasons).not.toHaveProperty(id);
   }
 });
 
