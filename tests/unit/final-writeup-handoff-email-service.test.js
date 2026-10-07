@@ -115,7 +115,13 @@ function harness({
     }),
     createEmailActivity: jest.fn(async (input) => {
       calls.push('create');
-      activities.set(EMAIL_ID, { activityid: EMAIL_ID, statuscode: 1, input });
+      // Same shape as the adapter's expanded read: To parties are mask 2.
+      activities.set(EMAIL_ID, {
+        activityid: EMAIL_ID,
+        statuscode: 1,
+        input,
+        email_activity_parties: input.to.map((addressused) => ({ participationtypemask: 2, addressused })),
+      });
       return EMAIL_ID;
     }),
     getEmailActivity: jest.fn(async (id) => activities.get(id) || null),
@@ -442,15 +448,20 @@ describe('delivery', () => {
   });
 
   test.each([
-    ['program', { _wmkf_grantprogram_value: SOCAL_ID }],
-    ['lead', { _wmkf_programdirector_value: BEA_ID }],
+    ['program', { requestRow: request({ _wmkf_grantprogram_value: SOCAL_ID }), audience: { status: 'configured', programDirectors: [{ reviewerId: CY_ID, name: 'Cy Director' }] } }],
+    ['lead', { requestRow: request({ _wmkf_programdirector_value: BEA_ID }) }],
   ])('a stored unsent draft is dropped when the %s changed, never sent to stale recipients', async (_label, change) => {
     const { deps, activities } = harness({
       existingRow: pendingRow({ dynamics_email_id: EMAIL_ID }),
       enabledPrograms: [RESEARCH_ID, SOCAL_ID],
-      requestRow: request(change),
+      ...change,
     });
-    activities.set(EMAIL_ID, { activityid: EMAIL_ID, statuscode: 1 });
+    // Built for the original lead and program: Bea and Cy.
+    activities.set(EMAIL_ID, {
+      activityid: EMAIL_ID,
+      statuscode: 1,
+      email_activity_parties: ['bea@wmkeck.org', 'cy@wmkeck.org'].map((addressused) => ({ participationtypemask: 2, addressused })),
+    });
     expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'skipped', reason: 'request_changed' });
     expect(deps.sendEmail).not.toHaveBeenCalled();
   });
@@ -469,6 +480,43 @@ describe('delivery', () => {
     expect(await recoverPendingHandoffEmails({}, deps)).toEqual([{ sourceDocumentId: SOURCE_ID, status: 'sent' }]);
     expect(deps.createEmailActivity).toHaveBeenCalledTimes(1);
     expect(deps.sendEmail).toHaveBeenCalledTimes(2);
+  });
+
+  test.each([
+    ['a PD was removed from the program audience', { audience: { status: 'configured', programDirectors: [{ reviewerId: BEA_ID, name: 'Bea Director' }] } }],
+    ['a PD account was disabled', { users: {
+      [BEA_ID]: { systemuserid: BEA_ID, internalemailaddress: 'bea@wmkeck.org', isdisabled: false },
+      [CY_ID]: { systemuserid: CY_ID, internalemailaddress: 'cy@wmkeck.org', isdisabled: true },
+    } }],
+    ['a PD address changed', { users: {
+      [BEA_ID]: { systemuserid: BEA_ID, internalemailaddress: 'bea@wmkeck.org', isdisabled: false },
+      [CY_ID]: { systemuserid: CY_ID, internalemailaddress: 'cy.new@wmkeck.org', isdisabled: false },
+    } }],
+  ])('a recorded draft whose send failed is not resent after %s', async (_label, later) => {
+    const { deps, getRow } = harness({ existingRow: pendingRow() });
+    deps.sendEmail.mockRejectedValueOnce(Object.assign(new Error('transport'), { code: 'dynamics_send_failed' }));
+    const spy = quiet();
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'failed', code: 'dynamics_send_failed' });
+    spy.mockRestore();
+    if (later.audience) deps.resolveAudience.mockResolvedValue(later.audience);
+    if (later.users) deps.getSystemUser.mockImplementation(async (id) => later.users[id] || null);
+    expect(await recoverPendingHandoffEmails({}, deps)).toEqual([
+      { sourceDocumentId: SOURCE_ID, status: 'skipped', reason: 'request_changed' },
+    ]);
+    expect(deps.sendEmail).toHaveBeenCalledTimes(1);
+    expect(getRow().state).toBe('skipped');
+  });
+
+  test('a recorded draft is not resent when the recipient lookup fails (fail closed, retryable)', async () => {
+    const { deps, getRow } = harness({ existingRow: pendingRow() });
+    deps.sendEmail.mockRejectedValueOnce(Object.assign(new Error('transport'), { code: 'dynamics_send_failed' }));
+    const spy = quiet();
+    await deliverHandoffEmail(SOURCE_ID, deps);
+    deps.getSystemUser.mockRejectedValue(Object.assign(new Error('throttled'), { status: 429 }));
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'failed', code: 'handoff_email_recipient_lookup_failed' });
+    spy.mockRestore();
+    expect(deps.sendEmail).toHaveBeenCalledTimes(1);
+    expect(getRow().state).toBe('pending');
   });
 
   test('a held lease means another call is sending: nothing is created', async () => {

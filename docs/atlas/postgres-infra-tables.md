@@ -391,12 +391,12 @@ recovers an activity created before the id was stored. An activity already
 accepted by Dynamics is recorded as sent without further checks; one that is
 not yet sent is re-checked against the current Final and group-review state
 before `SendEmail`, so a stale invitation is never sent. Eligibility, audience and lead
-exclusion use the request's current Grant Program and lead PD; a stored unsent
-draft whose program or lead changed since it was built is skipped (`request_changed`). The
-program and lead used to build a draft are saved with its activity id. An orphan (found by
-correlation key, never recorded) is adopted only if its To list matches exactly the
-recipients the request would get now; otherwise it is skipped, and if recipients cannot be
-resolved the row stays pending. Store SQL is proven by
+exclusion use the request's current Grant Program and lead PD. Any existing
+unsent activity (a recorded draft whose send failed, or an orphan found by correlation key
+and never recorded) is sent only if its To list matches exactly the recipients the request
+would get now, re-resolved from the current audience, persona, role, account state and
+address; otherwise it is skipped (`request_changed`), and a failed lookup keeps the row
+pending. The program and lead used to build a draft are saved with its activity id. Store SQL is proven by
 `tests/integration/final-writeup-handoff-email.pg.test.js` in the CI Postgres job. Recipient lookups that
 fail for any reason other than 404 keep the whole send pending. Failures keep
 `pending` with `last_error_code` and are retried by the next POST for that
