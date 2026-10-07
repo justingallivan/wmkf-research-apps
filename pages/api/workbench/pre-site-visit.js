@@ -99,7 +99,6 @@ export default async function handler(req, res) {
           pendingArtifact: redactDraftWriteup(status.pendingArtifact, viewer, leadProgramDirectorId),
         };
         const payload = includeCorrectionAudit ? visibleStatus : staffSafePayload(visibleStatus);
-        const writeupHidden = visibleStatus.currentArtifact?.fileHidden === true;
         // Session line (tracker §5.4 via the briefing seam): fail-open null
         // until the tracker is enabled or a slot exists.
         // Applicant materials summary (plan §16.3, PR 3): counts and window
@@ -125,9 +124,9 @@ export default async function handler(req, res) {
         const finalReview = final;
         return res.status(200).json({ success: true, ...payload, stageLabels,
           timing: preparation.timing, preparation: preparation.preparation,
-          writeup: writeupHidden && preparation.writeup
-            ? { ...preparation.writeup, file: null, fileHidden: true }
-            : preparation.writeup,
+          // A separate read: redacted on its own lifecycle so a draft
+          // published between the two reads is never returned.
+          writeup: redactDraftWriteup(preparation.writeup, viewer, leadProgramDirectorId),
           brief, finalReview, finalPhase: finalReview.phase,
           // Mirrors the POST and start-site-visit guards so the page offers
           // only the actions the server will accept.

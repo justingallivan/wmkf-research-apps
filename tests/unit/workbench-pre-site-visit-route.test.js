@@ -418,7 +418,7 @@ describe('draft writeup visibility before group review', () => {
     });
     getPreparationForRequest.mockResolvedValueOnce({
       timing: { availability: 'available' }, preparation: { state: 'prepared', due: true },
-      writeup: { availability: 'available', artifactId: 'current', file: { webUrl: 'https://sharepoint.test/w.docx' } },
+      writeup: { availability: 'available', artifactId: 'current', lifecycleState: 100000001, file: { webUrl: 'https://sharepoint.test/w.docx' } },
     });
     const res = mockRes();
     await handler(get(), res);
@@ -443,4 +443,25 @@ describe('draft writeup visibility before group review', () => {
     expect(res.body.code).toBe('pre_site_writeup_lead_only');
     expect(generatePreSiteVisitArtifact).not.toHaveBeenCalled();
   });
+});
+
+test('a draft published between the status read and the preparation read stays hidden', async () => {
+  getUserRole.mockResolvedValueOnce('staff');
+  requireAppAccess.mockResolvedValueOnce({ profileId: PROFILE_ID, session: { user: { dynamicsSystemuserId: '99999999-9999-4999-8999-999999999999' } } });
+  getPreSiteVisitArtifactStatus.mockResolvedValueOnce({
+    leadProgramDirectorId: '22222222-2222-4222-8222-222222222222',
+    currentArtifact: null, pendingArtifact: null, reopenHistory: [],
+  });
+  getPreparationForRequest.mockResolvedValueOnce({
+    timing: { availability: 'available' }, preparation: { state: 'none', due: false },
+    writeup: {
+      availability: 'available', artifactId: 'new', lifecycleState: 100000000, operationStatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      file: { webUrl: 'https://sharepoint.test/new.docx', itemId: 'item-new', driveId: 'drive' },
+    },
+  });
+  const res = mockRes();
+  await handler(get(), res);
+  expect(res.statusCode).toBe(200);
+  expect(res.body.writeup).toMatchObject({ artifactId: 'new', file: null, fileHidden: true });
+  expect(JSON.stringify(res.body)).not.toContain('item-new');
 });
