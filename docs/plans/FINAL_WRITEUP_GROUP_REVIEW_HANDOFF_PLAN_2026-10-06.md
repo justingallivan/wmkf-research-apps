@@ -98,18 +98,24 @@ minimal per-cycle configuration rule).
 Each stage ships separately, on a branch, with a Codex adversarial review; this is Tier 1–3
 runtime work. Stage 1 is the original ask and ships first.
 
-### Stage 1 — Step 4 handoff action (UI only, no new route)
-- Step 4 title stays "Working writeup" (matches the other noun-phrase step titles); the summary
-  reads "Post-visit drafting" instead of "Locked for review".
-- Step 4 summary during post-visit editing: "Only you are working on this. Share it with
-  colleagues when it's ready." This replaces "Locked for review".
+### Stage 1 — Step 4 handoff action (UI only, no new route) — built on branch 2026-10-06
+- Step 4 title stays "Working writeup", matching the other noun-phrase step titles. During
+  post-visit drafting the summary reads "Post-visit drafting" instead of "Locked for review".
 - Step 4 actions: **Edit writeup in Word** and **Ready for group review**.
-  - The button reuses the existing route, `status.canStart`, `expectedArtifactId` and the
-    confirmation dialog, with no duplicated preconditions.
-  - It is shown only when `canStart`. For anyone else it reads "Waiting for the lead PD".
-- Rename "Start group review" → "Ready for group review" on the Final writeup tab, and
-  "Start leadership review" → "Send to leadership".
-- Step 5 summary: "With colleagues for review" plus the sign-off count once Stage 3 lands.
+  - The button reuses `POST /api/workbench/final-writeup`.
+  - The pre-site-visit status's `finalReview` fact now carries `canStart`,
+    `startBlockedReason` and `sourceArtifactId` from `getFinalWriteupStatus`
+    (`lib/services/pre-site-visit/status-facts.js`), so there are no duplicated preconditions.
+  - It is shown only when `canStart`.
+- Other viewers see one of:
+  - "The lead Program Director marks this ready for group review when the draft is done.";
+  - the schedule-block reason.
+- An in-progress (202) start shows "Starting group review…".
+- Step 5 summary: "Starts when the writeup is marked ready for group review"; the tab-switch-only
+  "Open group-review details" button is removed.
+- Final writeup tab: "Start group review" → "Ready for group review"; "Start leadership review"
+  → "Send to leadership".
+- Stage 1 hides nothing; Stage 2 does.
 
 ### Stage 2 — Hide the draft before handoff (server-side)
 - The Pre-Site projection omits `webUrl` before the writeup becomes FINAL, unless the viewer is
@@ -160,7 +166,9 @@ runtime work. Stage 1 is the original ask and ships first.
     still shows it);
   - status contradiction (header :37 "awaiting Production promotion" vs body :627 "live
     2026-09-07").
-- `docs/CURRENT_WORK_QUEUE.md` entry for the missing start-group-review action.
+- `docs/CURRENT_WORK_QUEUE.md` entry for the group-review handoff: update it at each promotion.
+- Button wording now diverges from `FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`
+  ("Ready for leadership review"); owner chose "Send to leadership" (2026-10-06).
 - Agent wiki topic covering Final Writeup / Staff Deliberations.
 
 ## 6. Out of scope

@@ -1133,6 +1133,7 @@ export default function StaffDeliberationsTab({
         method: 'POST',
         body: { requestId, expectedArtifactId: finalReview.sourceArtifactId },
         fallbackMessage: 'Group review could not be started.',
+        tolerantBody: true,
       });
       if (sequence !== generationSequence.current) return;
       setConfirmDialog(null);

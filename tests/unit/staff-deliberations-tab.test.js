@@ -1400,6 +1400,18 @@ test('post-visit drafting: a failed group-review start shows the server message'
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 
+test('post-visit drafting: an in-progress start (202) shows Starting group review without an error', async () => {
+  queueRoute('presiteGet', statusResponse({ ...POST_VISIT_STATUS, finalReview: readyFinalReview() }));
+  queueRoute('finalStart', response({ success: true, inProgress: true }, 202));
+  queueRoute('presiteGet', statusResponse({ ...POST_VISIT_STATUS, finalReview: readyFinalReview({ phase: 'starting', canStart: true }) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Ready for group review' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Ready for group review' }));
+  expect(await screen.findByText('Starting group review…')).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).not.toBeInTheDocument();
+});
+
 test.each([
   [{ canStart: false, startBlockedReason: null }, 'The lead Program Director marks this ready for group review when the draft is done.'],
   [{ canStart: false, startBlockedReason: 'final_writeup_site_visit_not_ended' }, 'Group review becomes available after the scheduled presentation ends.'],

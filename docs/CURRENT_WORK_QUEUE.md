@@ -75,20 +75,15 @@ sequence.
   decision list: `docs/NOMENCLATURE_GLOSSARY.md` → "Deliberations workflow
   vocabulary".
 
-- **Staff Deliberations: no visible way to start group review from the
-  writeup step (2026-10-06).** [OPEN — owner priority; next session]
-  [VERIFIED via the live request page for 1002963 and the request-detail API
-  for all 12 prepared D26 requests] Every prepared request meets the data
-  conditions, but the Staff Deliberations tab offers no advance action: step 4
-  (current) shows only "Open writeup in Word" under the stale summary "Locked
-  for review" (`shared/components/workbench/StaffDeliberationsTab.js:1215`),
-  and step 5 (greyed) shows "Starts in Final writeup when the writeup is
-  ready" with "Open group-review details", which only switches tabs. The real
-  "Start group review" lives in `FinalWriteupTab.js:651`. PR #448 moved the
-  navigation button from step 4 to step 5. Proposed: step 4 reads "Post-visit
-  editing" with "Edit writeup in Word" and "Start group review". Owner
-  decision: run the confirmation inline (same route, records the Word
-  version, no email) or open Final writeup with it already open.
+- **Staff Deliberations: group-review handoff from the writeup step
+  (2026-10-06).** [BUILT ON BRANCH `feature/writeup-group-review-handoff` —
+  Stage 1, pending review and promotion] Step 4 now reads "Post-visit drafting"
+  with "Edit writeup in Word" and "Ready for group review" (same
+  `POST /api/workbench/final-writeup` route and authorization); Final writeup
+  buttons renamed "Ready for group review" / "Send to leadership". Stages 2–5
+  (hide the draft before handoff, lead-PD sign-off view, PD handoff email,
+  leadership daily digest) are planned, not built:
+  `docs/plans/FINAL_WRITEUP_GROUP_REVIEW_HANDOFF_PLAN_2026-10-06.md`.
 - **Deferred to next session (2026-10-06):** (a) the list's next step for a
   ready briefing should name the deliberation session date (UI only; the
   session is already in the list payload, `cycle-list-service.js:618`);
