@@ -84,7 +84,9 @@ sequence.
   `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md`.
   **Interim safeguard:** before J27 research presentations begin, add `J27` to
   `STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES` in Production, or J27 requests
-  silently fall back to manual preparation.
+  silently fall back to manual preparation (register row J27-084). Coordinate with
+  the J27 single-phase transition (row 8 above) so J27 changes land rollover-free
+  where practical. Waiting on: colleagues' briefing on future cycle dates.
 
 - **Stream transcription audio instead of buffering it (2026-10-04).** [OPEN —
   owner decision, not yet built] The transcription worker reads the whole

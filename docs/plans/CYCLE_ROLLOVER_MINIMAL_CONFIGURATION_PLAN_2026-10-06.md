@@ -11,6 +11,8 @@ related:
   - docs/WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md
   - docs/CREDENTIALS_RUNBOOK.md
   - docs/CURRENT_WORK_QUEUE.md
+  - docs/J27_TRANSITION_REGISTER.md
+  - docs/J27_SINGLE_PHASE_TRANSITION_INVENTORY_PLAN.md
 ---
 
 # Cycle Rollover with Minimal Configuration — Investigation Plan
@@ -36,6 +38,20 @@ plan targets.
   "current cycle"; several cycles are live at once, each in a different phase.
 - Other filters already decide when proposals can be entered (the submission portal opens to a
   cycle). Build around those signals rather than adding new switches.
+
+## 2a. Relationship to the J27 single-phase transition
+
+J27 (June 2027 board) is the first single-submission cycle; many D26 accommodations were patches
+for the dual-phase process and will be revisited for J27 regardless. Those sites are already
+tracked one by one in `docs/J27_TRANSITION_REGISTER.md` (Retire / Persist / Change / Build / Scale,
+gated by `check:j27-register`). This plan does not duplicate that register. It adds the
+recurring question the register does not ask: once J27 is built, what still has to be touched
+for D27, J28 and every cycle after? Sequence the work so the J27 changes land in their
+rollover-free form where practical, rather than as a second round of `J27` literals.
+Staff Deliberations preparation's cycle and status allowlists are recorded as register row J27-084.
+
+**Pending input** [OWNER, 2026-10-06]: the owner has asked colleagues for a briefing on future
+cycle dates. The milestone model in §5 should be built from that briefing, not inferred.
 
 ## 3. Seed inventory (orientation only, 2026-10-06 — the investigation must complete it)
 
@@ -127,7 +143,8 @@ design, and an ordered migration plan for owner review.
 
 Before J27 research presentations begin, add `J27` to
 `STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES` in Production (and confirm the program and status
-allowlists still apply). Tracked in `docs/CURRENT_WORK_QUEUE.md`.
+allowlists still apply to the single-phase status flow). Tracked in `docs/CURRENT_WORK_QUEUE.md`
+and register row J27-084.
 
 ## 9. Questions for the owner
 
