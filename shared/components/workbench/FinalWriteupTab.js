@@ -732,7 +732,7 @@ export default function FinalWriteupTab({ requestId }) {
               <p className="mt-1 text-sm leading-6 text-gray-600">
                 Mark the writeup ready for group review when colleagues should see it. This records the current Word version.
                 {status.handoffEmailEnabled === true
-                  ? ' The other Program Directors for this grant program are emailed a link.'
+                  ? ' The other Program Directors for this grant program get an email from the lead Program Director with a link.'
                   : ' No email is sent.'}
               </p>
               {status.sourceFile?.name && (
@@ -797,7 +797,7 @@ export default function FinalWriteupTab({ requestId }) {
                   <p>The Word file stays the same, including your edits. This step begins group review.</p>
                   <p>
                     {status?.handoffEmailEnabled === true
-                      ? 'The other Program Directors for this grant program are emailed a link to the writeup.'
+                      ? 'The other Program Directors for this grant program get an email from the lead Program Director with a link to the writeup.'
                       : 'No email is sent. Let colleagues know it is ready.'}
                   </p>
                 </>

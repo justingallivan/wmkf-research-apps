@@ -129,7 +129,10 @@ function harness({
         activityid: id,
         statuscode: 1,
         input,
-        email_activity_parties: input.to.map((addressused) => ({ participationtypemask: 2, addressused })),
+        email_activity_parties: [
+          { participationtypemask: 1, addressused: input.from },
+          ...input.to.map((addressused) => ({ participationtypemask: 2, addressused })),
+        ],
       });
       return id;
     }),
@@ -231,7 +234,7 @@ function harness({
     listPending: jest.fn(async () => (row && row.state === 'pending' && !row.locked ? [{ ...row }] : [])),
     programEnabled: (id) => enabledPrograms.includes(String(id).toLowerCase()),
     anyProgramEnabled: () => enabledPrograms.length > 0,
-    sender: () => 'alerts@wmkeck.org',
+    impersonationEnabled: jest.fn(() => true),
     baseUrl: () => 'https://apps.example.org',
   };
   const expire = () => { row.locked = false; };
@@ -341,7 +344,9 @@ describe('delivery', () => {
     const input = deps.createEmailActivity.mock.calls[0][0];
     expect(input).toMatchObject({
       to: ['bea@wmkeck.org', 'cy@wmkeck.org'],
-      from: 'alerts@wmkeck.org',
+      from: 'lee@wmkeck.org',
+      actingUserSystemId: LEAD_ID,
+      noFallback: true,
       regardingId: REQUEST_ID,
       regardingType: 'akoya_request',
       correlationKey: handoffCorrelationKey(SOURCE_ID),
@@ -351,6 +356,7 @@ describe('delivery', () => {
     expect(input.body).toContain('Quantum &lt;Widgets&gt;');
     expect(input.body).toContain(`https://apps.example.org/workbench/${REQUEST_ID}?tab=final-writeup&amp;n=1003010`);
     expect(calls).toEqual(['create', 'record', 'send']);
+    expect(deps.sendEmail).toHaveBeenCalledWith(EMAIL_ID, { actingUserSystemId: LEAD_ID, noFallback: true });
     expect(getRow()).toMatchObject({ state: 'sent', final_document_id: FINAL_ID });
   });
 
@@ -553,7 +559,10 @@ describe('delivery', () => {
     activities.set(PRIOR_ID, {
       activityid: PRIOR_ID,
       statuscode: 1,
-      email_activity_parties: ['bea@wmkeck.org', 'cy@wmkeck.org'].map((addressused) => ({ participationtypemask: 2, addressused })),
+      email_activity_parties: [
+        { participationtypemask: 1, addressused: 'lee@wmkeck.org' },
+        ...['bea@wmkeck.org', 'cy@wmkeck.org'].map((addressused) => ({ participationtypemask: 2, addressused })),
+      ],
     });
     expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'sent' });
     // The stale draft is never sent; the fresh one has its own correlation key.
@@ -588,10 +597,12 @@ describe('delivery', () => {
     ['a PD account was disabled', { users: {
       [BEA_ID]: { systemuserid: BEA_ID, internalemailaddress: 'bea@wmkeck.org', isdisabled: false },
       [CY_ID]: { systemuserid: CY_ID, internalemailaddress: 'cy@wmkeck.org', isdisabled: true },
+      [LEAD_ID]: { systemuserid: LEAD_ID, internalemailaddress: 'lee@wmkeck.org', isdisabled: false },
     }, expectedTo: ['bea@wmkeck.org'] }],
     ['a PD address changed', { users: {
       [BEA_ID]: { systemuserid: BEA_ID, internalemailaddress: 'bea@wmkeck.org', isdisabled: false },
       [CY_ID]: { systemuserid: CY_ID, internalemailaddress: 'cy.new@wmkeck.org', isdisabled: false },
+      [LEAD_ID]: { systemuserid: LEAD_ID, internalemailaddress: 'lee@wmkeck.org', isdisabled: false },
     }, expectedTo: ['bea@wmkeck.org', 'cy.new@wmkeck.org'] }],
   ])('a recorded draft whose send failed is not resent after %s; a fresh email goes to the current recipients', async (_label, later) => {
     const { deps, getRow } = harness({ existingRow: pendingRow() });
@@ -630,6 +641,7 @@ describe('delivery', () => {
       users: {
         [BEA_ID]: { systemuserid: BEA_ID, internalemailaddress: 'Bea@WMKECK.ORG', isdisabled: false },
         [CY_ID]: { systemuserid: CY_ID, internalemailaddress: address, isdisabled: false },
+        [LEAD_ID]: { systemuserid: LEAD_ID, internalemailaddress: 'lee@wmkeck.org', isdisabled: false },
       },
     });
     expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'sent' });
@@ -648,6 +660,7 @@ describe('delivery', () => {
       users: {
         [BEA_ID]: { systemuserid: BEA_ID, internalemailaddress: 'bea@example.com', isdisabled: false },
         [CY_ID]: { systemuserid: CY_ID, internalemailaddress: 'cy@example.org', isdisabled: false },
+        [LEAD_ID]: { systemuserid: LEAD_ID, internalemailaddress: 'lee@wmkeck.org', isdisabled: false },
       },
     });
     expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'skipped', reason: 'no_recipients' });
@@ -662,10 +675,13 @@ describe('delivery', () => {
     expect(deps.createEmailActivity).not.toHaveBeenCalled();
   });
 
-  const orphan = (addresses) => ({
+  const orphan = (addresses, from = 'lee@wmkeck.org') => ({
     activityid: PRIOR_ID,
     statuscode: 1,
-    email_activity_parties: addresses.map((addressused) => ({ participationtypemask: 2, addressused })),
+    email_activity_parties: [
+      { participationtypemask: 1, addressused: from },
+      ...addresses.map((addressused) => ({ participationtypemask: 2, addressused })),
+    ],
   });
 
   test('an orphan found by correlation that addresses the current recipients is adopted, not duplicated', async () => {
@@ -805,6 +821,7 @@ describe('delivery', () => {
       users: {
         [BEA_ID]: Object.assign(new Error('not found'), { status: 404 }),
         [CY_ID]: { systemuserid: CY_ID, internalemailaddress: 'cy@wmkeck.org', isdisabled: false },
+        [LEAD_ID]: { systemuserid: LEAD_ID, internalemailaddress: 'lee@wmkeck.org', isdisabled: false },
       },
     });
     expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'sent' });
@@ -815,10 +832,12 @@ describe('delivery', () => {
     ['a partial lookup outage', {
       [BEA_ID]: Object.assign(new Error('throttled'), { status: 429 }),
       [CY_ID]: { systemuserid: CY_ID, internalemailaddress: 'cy@wmkeck.org', isdisabled: false },
+      [LEAD_ID]: { systemuserid: LEAD_ID, internalemailaddress: 'lee@wmkeck.org', isdisabled: false },
     }],
     ['a total lookup outage', {
       [BEA_ID]: Object.assign(new Error('down'), { status: 503 }),
       [CY_ID]: new Error('network'),
+      [LEAD_ID]: { systemuserid: LEAD_ID, internalemailaddress: 'lee@wmkeck.org', isdisabled: false },
     }],
   ])('%s keeps the whole send pending instead of a partial or skipped send', async (_label, users) => {
     const { deps, getRow } = harness({ existingRow: pendingRow(), users });
@@ -841,6 +860,7 @@ describe('delivery', () => {
       users: {
         [BEA_ID]: { systemuserid: BEA_ID, internalemailaddress: 'bea@wmkeck.org', isdisabled: true },
         [CY_ID]: { systemuserid: CY_ID, internalemailaddress: '', isdisabled: false },
+        [LEAD_ID]: { systemuserid: LEAD_ID, internalemailaddress: 'lee@wmkeck.org', isdisabled: false },
       },
     }, 'no_recipients'],
     ['the lead is the only PD', { audience: { status: 'configured', programDirectors: [{ reviewerId: LEAD_ID, name: 'Lee Lead' }] } }, 'no_recipients'],
@@ -876,4 +896,112 @@ test('render resolves tokens, escapes HTML and adds the writeup link', () => {
   expect(html).toContain('<p>First Quantum &lt;Widgets&gt;.</p>');
   expect(html).toContain('<p>Second line.</p>');
   expect(html).toContain('href="https://apps.example.org/w?a=1&amp;b=2"');
+});
+
+describe('lead PD sender (owner, 2026-10-07: from the lead PD, never the system mailbox)', () => {
+  test('the current lead sends: after a reassignment the new lead is the sender and is not a recipient', async () => {
+    const { deps } = harness({
+      existingRow: pendingRow(),
+      requestRow: request({ _wmkf_programdirector_value: BEA_ID }),
+    });
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'sent' });
+    const input = deps.createEmailActivity.mock.calls[0][0];
+    expect(input).toMatchObject({ from: 'bea@wmkeck.org', actingUserSystemId: BEA_ID, noFallback: true });
+    expect(input.to).toEqual(['cy@wmkeck.org', 'lee@wmkeck.org']);
+    expect(deps.sendEmail).toHaveBeenCalledWith(EMAIL_ID, { actingUserSystemId: BEA_ID, noFallback: true });
+  });
+
+  test.each([
+    ['no lead on the request', { requestRow: request({ _wmkf_programdirector_value: null }) }, 'handoff_email_lead_missing'],
+    ['a disabled lead', { users: {
+      [BEA_ID]: { systemuserid: BEA_ID, internalemailaddress: 'bea@wmkeck.org', isdisabled: false },
+      [LEAD_ID]: { systemuserid: LEAD_ID, internalemailaddress: 'lee@wmkeck.org', isdisabled: true },
+    } }, 'handoff_email_lead_unavailable'],
+    ['a lead without an address', { users: {
+      [BEA_ID]: { systemuserid: BEA_ID, internalemailaddress: 'bea@wmkeck.org', isdisabled: false },
+      [LEAD_ID]: { systemuserid: LEAD_ID, internalemailaddress: '', isdisabled: false },
+    } }, 'handoff_email_lead_unavailable'],
+    ['a lead outside the foundation', { users: {
+      [BEA_ID]: { systemuserid: BEA_ID, internalemailaddress: 'bea@wmkeck.org', isdisabled: false },
+      [LEAD_ID]: { systemuserid: LEAD_ID, internalemailaddress: 'lee@wmkeck.org.example.com', isdisabled: false },
+    } }, 'handoff_email_lead_unavailable'],
+    ['a lead that no longer exists', { users: {
+      [BEA_ID]: { systemuserid: BEA_ID, internalemailaddress: 'bea@wmkeck.org', isdisabled: false },
+      [LEAD_ID]: Object.assign(new Error('not found'), { status: 404 }),
+    } }, 'handoff_email_lead_unavailable'],
+    ['a lead lookup outage', { users: {
+      [BEA_ID]: { systemuserid: BEA_ID, internalemailaddress: 'bea@wmkeck.org', isdisabled: false },
+      [LEAD_ID]: Object.assign(new Error('throttled'), { status: 429 }),
+    } }, 'handoff_email_lead_lookup_failed'],
+  ])('%s keeps the send pending with nothing created, and never falls back to the system mailbox', async (_label, options, code) => {
+    const { deps, getRow } = harness({ existingRow: pendingRow(), ...options });
+    const spy = quiet();
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'failed', code });
+    spy.mockRestore();
+    expect(deps.createEmailActivity).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+    expect(getRow()).toMatchObject({ state: 'pending', last_error_code: code });
+  });
+
+  test('a lead that cannot send is alerted once the attempts run out, and the row stays retryable', async () => {
+    const { deps, getRow } = harness({
+      existingRow: pendingRow({ attempt_count: 2 }),
+      requestRow: request({ _wmkf_programdirector_value: null }),
+    });
+    const spy = quiet();
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'failed', code: 'handoff_email_lead_missing' });
+    spy.mockRestore();
+    expect(deps.notify).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'final_writeup_handoff_email_undelivered',
+      metadata: expect.objectContaining({ reason: 'handoff_email_lead_missing' }),
+    }));
+    expect(getRow().state).toBe('pending');
+  });
+
+  test('with impersonation off nothing is created, so the email can never go out as the service account', async () => {
+    const { deps, getRow } = harness({ existingRow: pendingRow() });
+    deps.impersonationEnabled.mockReturnValue(false);
+    const spy = quiet();
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'failed', code: 'handoff_email_impersonation_disabled' });
+    spy.mockRestore();
+    expect(deps.createEmailActivity).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+    expect(getRow().state).toBe('pending');
+  });
+
+  test('an unsent draft from another sender (the old system mailbox) is never sent; a fresh one goes from the lead', async () => {
+    const { deps, activities, getRow } = harness({ existingRow: pendingRow({ dynamics_email_id: PRIOR_ID }) });
+    activities.set(PRIOR_ID, {
+      activityid: PRIOR_ID,
+      statuscode: 1,
+      email_activity_parties: [
+        { participationtypemask: 1, addressused: 'alerts@wmkeck.org' },
+        ...['bea@wmkeck.org', 'cy@wmkeck.org'].map((addressused) => ({ participationtypemask: 2, addressused })),
+      ],
+    });
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'sent' });
+    expect(deps.sendEmail).not.toHaveBeenCalledWith(PRIOR_ID, expect.anything());
+    expect(deps.sendEmail.mock.calls.map(([id]) => id)).toEqual([EMAIL_ID]);
+    expect(deps.createEmailActivity.mock.calls[0][0]).toMatchObject({
+      from: 'lee@wmkeck.org',
+      correlationKey: handoffCorrelationKey(SOURCE_ID, 1),
+    });
+    expect(getRow()).toMatchObject({ state: 'sent', recipient_generation: 1 });
+  });
+
+  test('an already accepted email is recorded as sent whoever sent it, never resent', async () => {
+    const { deps, getRow } = harness({ existingRow: pendingRow() });
+    deps.findEmailByCorrelation.mockResolvedValue([{
+      activityid: PRIOR_ID,
+      statuscode: 3,
+      email_activity_parties: [
+        { participationtypemask: 1, addressused: 'alerts@wmkeck.org' },
+        { participationtypemask: 2, addressused: 'bea@wmkeck.org' },
+      ],
+    }]);
+    expect(await deliverHandoffEmail(SOURCE_ID, deps)).toEqual({ status: 'sent' });
+    expect(deps.createEmailActivity).not.toHaveBeenCalled();
+    expect(deps.sendEmail).not.toHaveBeenCalled();
+    expect(getRow().state).toBe('sent');
+  });
 });
