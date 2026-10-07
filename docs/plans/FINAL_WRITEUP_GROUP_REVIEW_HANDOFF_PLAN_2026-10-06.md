@@ -257,6 +257,8 @@ silently include or exclude them. **Resolved 2026-10-07:** the owner chose Resea
   disabled, or non-foundation lead, or impersonation switched off, keeps the send pending and
   retryable and alerts ops after three attempts; it never falls back to the system mailbox. An
   unsent activity from any other sender is abandoned and rebuilt.
+  [VERIFIED by owner statement, 2026-10-07] Every PD can send from Dynamics, so the lead-PD
+  sender has no known mailbox blocker.
 - Copy: `email.final_writeup_handoff.subject` / `.body`. Blank copy leaves the send pending.
 - `email-automation-preferences.js` does not apply: it controls scheduled-email review, not
   notifications.
