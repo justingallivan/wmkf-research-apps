@@ -109,7 +109,7 @@ test('acknowledge axis (e): non-2xx unparseable body falls to the fallback text 
     .mockResolvedValueOnce({ ok: true, status: 200, json: async () => dashboard() })
     .mockResolvedValue({ ok: false, status: 502, json: unparseable });
   render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Mark reviewed' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Sign off' }));
   expect(await screen.findByText('Failed to record review (502)')).toBeInTheDocument();
 });
 
@@ -118,6 +118,6 @@ test('acknowledge: non-2xx empty body ({}) falls to the fallback text with statu
     .mockResolvedValueOnce({ ok: true, status: 200, json: async () => dashboard() })
     .mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
   render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Mark reviewed' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Sign off' }));
   expect(await screen.findByText('Failed to record review (500)')).toBeInTheDocument();
 });

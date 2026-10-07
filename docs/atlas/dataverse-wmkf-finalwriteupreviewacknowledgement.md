@@ -101,6 +101,12 @@ session-derived reviewer identity and exact request/current-Final fences.
 group review, shows positive reviewer initials and the non-PD caller's personal
 state, and treats expected schema-not-ready as an unavailable optional panel so
 the Word action remains independent.
+**[BUILT ON BRANCH `feature/writeup-signoff-view`, NOT LIVE.]** For the lead PD
+and superusers the same GET/POST also return a names-only sign-off roster:
+expected Program Directors from `final_writeup.matrix_audiences` (program
+audience ∩ PD persona, minus the lead) with signed / signed-edited-since /
+not-yet states, and other signers listed separately. The tab shows it in place
+of the initials and names unsigned PDs in the Send to leadership confirmation.
 
 `lib/services/final-writeup/dashboard-service.js` and
 `pages/api/workbench/final-writeups.js` are also Production-deployed for the

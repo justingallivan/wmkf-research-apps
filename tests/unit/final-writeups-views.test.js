@@ -306,20 +306,20 @@ test('a PD acknowledging a leadership-stage writeup is warned, not locked; Leade
   global.fetch.mockResolvedValueOnce(response(dashboard({ viewer: pdViewer, selected: movedOn, navigation: null })));
   const { unmount } = render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
   expect(await screen.findByText(warningCopy)).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Mark reviewed' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Sign off' })).toBeEnabled();
   unmount();
 
   global.fetch.mockResolvedValueOnce(response(dashboard({
     viewer: { ...pdViewer, personas: ['leadership'] }, selected: movedOn, navigation: null,
   })));
   const leadership = render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
-  expect(await screen.findByRole('button', { name: 'Mark reviewed' })).toBeEnabled();
+  expect(await screen.findByRole('button', { name: 'Sign off' })).toBeEnabled();
   expect(screen.queryByText(warningCopy)).not.toBeInTheDocument();
   leadership.unmount();
 
   global.fetch.mockResolvedValueOnce(response(dashboard({ viewer: pdViewer, selected: writeup(), navigation: null })));
   render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
-  expect(await screen.findByRole('button', { name: 'Mark reviewed' })).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: 'Sign off' })).toBeInTheDocument();
   expect(screen.queryByText(warningCopy)).not.toBeInTheDocument();
 });
 
@@ -454,7 +454,7 @@ test('focused review keeps Word external, exposes collapsed context, and records
   expect(screen.getByText('Supporting materials')).toBeInTheDocument();
   expect(screen.queryByRole('navigation', { name: 'Request sections' })).not.toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Mark reviewed' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Sign off' }));
   await waitFor(() => expect(global.fetch).toHaveBeenNthCalledWith(
     2,
     '/api/workbench/final-writeup/acknowledgement',
@@ -467,7 +467,7 @@ test('focused review keeps Word external, exposes collapsed context, and records
     }),
   ));
   expect(await screen.findByRole('heading', { name: 'You reviewed this version' })).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Mark reviewed' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Sign off' })).not.toBeInTheDocument();
 });
 
 test('focused review ignores a late response after its request changes', async () => {
@@ -499,7 +499,7 @@ test('responsible PD focused view offers editing but never self-acknowledgement'
   global.fetch.mockResolvedValueOnce(response(dashboard({ selected: owner, navigation: null })));
   render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
   expect(await screen.findByRole('link', { name: 'Edit in Word' })).toHaveAttribute('target', '_blank');
-  expect(screen.queryByRole('button', { name: /Mark .*reviewed/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /^Sign off/ })).not.toBeInTheDocument();
 });
 
 describe('views, Program director filter, and version context (Slices 6B/6C)', () => {

@@ -6,6 +6,7 @@ import {
   getFinalWriteupPersonaRuntimeState,
   replaceFinalWriteupMatrixAudienceConfigByRevision,
   resolveFinalWriteupMatrixAudiences,
+  resolveFinalWriteupProgramDirectorAudience,
   validateFinalWriteupMatrixAudienceConfig,
   writeFinalWriteupMatrixAudienceConfig,
 } from '../../lib/services/final-writeup/matrix-audience-service.js';
@@ -321,4 +322,54 @@ test('validator rejects unknown keys, duplicates, empty audiences, and unknown r
     ...v2Config(),
     programs: [{ grantProgramId: RESEARCH_ID, reviewerIds: [] }],
   })).toThrow(/at least one reviewer/);
+});
+
+describe('resolveFinalWriteupProgramDirectorAudience (group-review Stage 3)', () => {
+  test('returns the program audience intersected with the Program Director persona, by name', async () => {
+    const result = await resolveFinalWriteupProgramDirectorAudience(
+      SOCAL_ID.toUpperCase(),
+      harness(v2Config()),
+    );
+    // Saskia is in the SoCal audience without the PD persona, so she is not expected.
+    expect(result).toEqual({
+      status: 'configured',
+      programDirectors: [{ reviewerId: ANNELI_ID, name: 'Anneli Stone' }],
+    });
+  });
+
+  test('a configured program with no Program Directors is configured-and-empty, not unconfigured', async () => {
+    const result = await resolveFinalWriteupProgramDirectorAudience(RESEARCH_ID, harness(v2Config()));
+    expect(result).toEqual({ status: 'configured', programDirectors: [] });
+  });
+
+  test('a Program Director who left the reviewer role is dropped', async () => {
+    const dependencies = harness(v2Config());
+    dependencies.listReviewers.mockResolvedValue({
+      records: [
+        { systemuserid: ALLISON_ID, fullname: 'Allison Keller', isdisabled: false },
+        { systemuserid: SASKIA_ID, fullname: 'Saskia Pallais', isdisabled: false },
+      ],
+      totalCount: 2,
+      hasMore: false,
+    });
+    const result = await resolveFinalWriteupProgramDirectorAudience(SOCAL_ID, dependencies);
+    expect(result).toEqual({ status: 'configured', programDirectors: [] });
+  });
+
+  test.each([
+    ['an unlisted Grant Program', '10000000-0000-4000-8000-000000000009'],
+    ['a request with no Grant Program', null],
+    ['a malformed Grant Program id', 'research'],
+  ])('%s is program-not-configured', async (_label, grantProgramId) => {
+    const result = await resolveFinalWriteupProgramDirectorAudience(grantProgramId, harness(v2Config()));
+    expect(result).toEqual({ status: 'program-not-configured', programDirectors: [] });
+  });
+
+  test.each([
+    ['an absent setting', null],
+    ['a v1 setting without personas', v1Config()],
+  ])('%s is staffing-not-configured', async (_label, stored) => {
+    const result = await resolveFinalWriteupProgramDirectorAudience(SOCAL_ID, harness(stored));
+    expect(result).toEqual({ status: 'staffing-not-configured', programDirectors: [] });
+  });
 });

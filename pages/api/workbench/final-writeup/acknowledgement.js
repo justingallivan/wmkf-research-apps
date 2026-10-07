@@ -3,7 +3,9 @@
  *
  * GET ?requestId=... reads the signed-in staff member's acknowledgement state
  * and positive reviewer projection. POST records the current publication for
- * the signed-in staff member. Reviewer identity and publication metadata are
+ * the signed-in staff member. Both responses carry `signOffRoster` (expected
+ * Program Directors and their sign-off state) for the lead Program Director
+ * and superusers only; it is null for everyone else. Reviewer identity and publication metadata are
  * always resolved server-side.
  */
 
@@ -13,7 +15,7 @@ import {
   markFinalWriteupReviewed,
 } from '../../../../lib/services/final-writeup/acknowledgement-service';
 import { ServiceHttpError } from '../../../../lib/services/service-http-error';
-import { requireAppAccess } from '../../../../lib/utils/auth';
+import { getUserRole, requireAppAccess } from '../../../../lib/utils/auth';
 import { isGuid } from '../../../../lib/utils/guid';
 
 export const config = {
@@ -41,6 +43,10 @@ export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'reviewers');
   if (!access) return;
   const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
+  // Superusers (and the lead PD, resolved in the service) also receive the
+  // sign-off roster. Same derivation as /api/workbench/final-writeup.
+  const role = access.profileId === null ? 'superuser' : await getUserRole(access.profileId);
+  const isSuperuser = role === 'superuser';
 
   return withDalContext('workbench-final-writeup-acknowledgement', async () => {
     try {
@@ -52,6 +58,7 @@ export default async function handler(req, res) {
         const state = await getFinalWriteupAcknowledgementState({
           requestId,
           actingUserSystemId,
+          isSuperuser,
         });
         return res.status(200).json({ success: true, ...state });
       }
@@ -77,6 +84,7 @@ export default async function handler(req, res) {
         requestId,
         expectedFinalArtifactId,
         actingUserSystemId,
+        isSuperuser,
       });
       return res.status(200).json({ success: true, ...state });
     } catch (error) {

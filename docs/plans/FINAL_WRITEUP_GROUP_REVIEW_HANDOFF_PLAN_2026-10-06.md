@@ -198,6 +198,14 @@ request's `Artifacts/Pre-Site Visit` folder (`lib/services/dynamics-explorer/too
 directly, so it is not guarded (Codex re-review finding, 2026-10-06).
 
 ### Stage 3 — Sign-off view for the lead PD
+
+**Built on branch `feature/writeup-signoff-view` (Session 581, 2026-10-07); not merged or live.**
+- The acknowledgement GET and POST return `signOffRoster` for the lead PD and superusers only.
+- Roster statuses separate "no list for this program" and "staffing not published" from an
+  empty list, so a request outside a configured program never reads as fully signed off.
+- "Mark reviewed" became "Sign off" on the Workbench tab and on the Final writeups action
+  button. The Final writeups view names ("Needs my review", "Reviewed by me") and matrix labels
+  are unchanged and remain an open wording question.
 - Rename "Mark reviewed" → "Sign off".
 - Per-request projection visible to the lead PD and superusers:
   - expected PDs = program audience ∩ PD persona, minus the lead;
@@ -209,6 +217,12 @@ directly, so it is not guarded (Codex re-review finding, 2026-10-06).
   confirmation names them ("2 PDs haven't signed off — send anyway?").
 
 ### Stage 4 — Handoff email to Research PDs
+
+**Decision B probe, partly answered:** `docs/SERVICE_AND_UTILITY_CATALOG.md` records the v2 setting
+published 2026-09-01 with a nine-person Research audience and a six-person Southern California
+audience [VERIFIED via catalog entry, not a live read]. If that SoCal entry is still published,
+SoCal requests would also get the handoff email under decision B. Confirm with the owner, or
+read the live setting (owner-run), before building Stage 4.
 - Sent after the transition is recorded, never inside the transition changeset. It has its own
   claim/receipt row with recovery, so a failed send never undoes or blocks the handoff, and a
   retry never sends twice.

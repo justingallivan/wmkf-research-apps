@@ -9,6 +9,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
+import {
+  FINAL_WRITEUP_SIGN_OFF_ROSTER_STATUS,
+  FINAL_WRITEUP_SIGN_OFF_STATE,
+} from '../../config/finalWriteupSignOff';
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_ATTEMPTS = 10;
@@ -102,38 +106,131 @@ function formatReviewDate(value) {
 function personalReviewPresentation(state) {
   if (state === 'unreviewed') {
     return {
-      label: 'Needs review',
-      detail: 'Open the writeup, then return here to record that you reviewed this version.',
-      action: 'Mark reviewed',
+      label: 'Not signed off yet',
+      detail: 'Open the writeup in Word, then return here to sign off.',
+      action: 'Sign off',
       tone: 'gray',
     };
   }
   if (state === 'reviewed') {
     return {
-      label: 'Reviewed',
-      detail: 'You reviewed the current version.',
+      label: 'Signed off',
+      detail: 'You signed off on the current version.',
       action: null,
       tone: 'green',
     };
   }
   if (state === 'updated') {
     return {
-      label: 'Updated since your review',
-      detail: 'The writeup has a newer version. Review the latest changes before updating your mark.',
-      action: 'Mark latest version reviewed',
+      label: 'Edited since your sign-off',
+      detail: 'Your sign-off still counts. Sign off again if you want it to cover the latest edits.',
+      action: 'Sign off latest version',
       tone: 'amber',
     };
   }
   return null;
 }
 
+const SIGN_OFF_STATE_PRESENTATION = Object.freeze({
+  [FINAL_WRITEUP_SIGN_OFF_STATE.SIGNED]: { label: 'Signed off', className: 'text-green-800' },
+  [FINAL_WRITEUP_SIGN_OFF_STATE.SIGNED_EDITED_SINCE]: { label: 'Signed off, edited since', className: 'text-amber-800' },
+  [FINAL_WRITEUP_SIGN_OFF_STATE.NOT_YET]: { label: 'Not yet', className: 'text-gray-600' },
+});
+
+// Why there is no Program Director count. Configured rosters render a count.
+const SIGN_OFF_ROSTER_NOTE = Object.freeze({
+  [FINAL_WRITEUP_SIGN_OFF_ROSTER_STATUS.PROGRAM_NOT_CONFIGURED]:
+    'This grant program has no Program Director list in Final Writeup staffing, so sign-offs are not counted.',
+  [FINAL_WRITEUP_SIGN_OFF_ROSTER_STATUS.STAFFING_NOT_CONFIGURED]:
+    'Program Director assignments are not published in Final Writeup staffing, so sign-offs are not counted.',
+  [FINAL_WRITEUP_SIGN_OFF_ROSTER_STATUS.UNAVAILABLE]:
+    'The Program Director list could not be loaded. Sign-offs recorded so far are listed below.',
+});
+
+function isConfiguredRoster(roster) {
+  return roster?.status === FINAL_WRITEUP_SIGN_OFF_ROSTER_STATUS.CONFIGURED
+    && Array.isArray(roster.expected);
+}
+
+// Expected Program Directors who have not signed off. Null when there is no
+// configured list, so callers never read "nobody is missing" from a gap.
+function programDirectorsNotSignedOff(roster) {
+  if (!isConfiguredRoster(roster)) return null;
+  return roster.expected
+    .filter((person) => person.state === FINAL_WRITEUP_SIGN_OFF_STATE.NOT_YET)
+    .map((person) => person.name);
+}
+
+function SignOffPerson({ person }) {
+  const presentation = SIGN_OFF_STATE_PRESENTATION[person.state]
+    || { label: 'Unknown', className: 'text-red-800' };
+  const signedAt = person.state === FINAL_WRITEUP_SIGN_OFF_STATE.NOT_YET
+    ? null
+    : formatReviewDate(person.signedAt);
+  return (
+    <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2 text-sm">
+      <span className="font-medium text-gray-900">{person.name}</span>
+      <span className={presentation.className}>
+        {presentation.label}
+        {signedAt ? <span className="text-gray-500"> · {signedAt}</span> : null}
+      </span>
+    </li>
+  );
+}
+
+function SignOffRoster({ roster }) {
+  const configured = isConfiguredRoster(roster);
+  const expected = configured ? roster.expected : [];
+  const others = Array.isArray(roster.others) ? roster.others : [];
+  const signedCount = expected.filter((person) => (
+    person.state === FINAL_WRITEUP_SIGN_OFF_STATE.SIGNED
+    || person.state === FINAL_WRITEUP_SIGN_OFF_STATE.SIGNED_EDITED_SINCE
+  )).length;
+  const note = configured ? null : (SIGN_OFF_ROSTER_NOTE[roster.status]
+    || SIGN_OFF_ROSTER_NOTE[FINAL_WRITEUP_SIGN_OFF_ROSTER_STATUS.UNAVAILABLE]);
+
+  return (
+    <div className="min-w-0 flex-1" aria-label="Sign-offs">
+      <h4 className="text-sm font-semibold text-gray-900">Sign-offs</h4>
+      {configured && (
+        expected.length > 0 ? (
+          <>
+            <p className="mt-1 text-sm text-gray-700">
+              {signedCount} of {expected.length} Program Director{expected.length === 1 ? '' : 's'} signed off.
+            </p>
+            <ul className="mt-2 max-w-xl divide-y divide-gray-200">
+              {expected.map((person) => <SignOffPerson key={`expected-${person.name}`} person={person} />)}
+            </ul>
+          </>
+        ) : (
+          <p className="mt-1 text-sm text-gray-600">No other Program Directors are listed for this grant program.</p>
+        )
+      )}
+      {note && <p className="mt-1 max-w-xl text-sm text-gray-600">{note}</p>}
+      {others.length > 0 && (
+        <>
+          <h5 className="mt-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            {configured ? 'Also signed off' : 'Signed off'}
+          </h5>
+          <ul className="mt-1 max-w-xl divide-y divide-gray-200">
+            {others.map((person) => <SignOffPerson key={`other-${person.name}`} person={person} />)}
+          </ul>
+        </>
+      )}
+      {!configured && others.length === 0 && (
+        <p className="mt-2 text-sm text-gray-600">No sign-offs yet.</p>
+      )}
+    </div>
+  );
+}
+
 function ReviewerInitial({ reviewer }) {
   const name = reviewer.name || 'Reviewer';
   const reviewedAt = formatReviewDate(reviewer.acknowledgedAt);
   const freshness = reviewer.state === 'updated'
-    ? 'The writeup has changed since this review.'
-    : 'Reviewed the current version.';
-  const description = `${name}. ${reviewedAt ? `Reviewed ${reviewedAt}. ` : ''}${freshness}`;
+    ? 'The writeup has been edited since this sign-off.'
+    : 'Signed off on the current version.';
+  const description = `${name}. ${reviewedAt ? `Signed off ${reviewedAt}. ` : ''}${freshness}`;
 
   return (
     <span className="group relative inline-flex">
@@ -149,9 +246,9 @@ function ReviewerInitial({ reviewer }) {
         className="pointer-events-none invisible absolute bottom-full start-1/2 z-10 mb-2 w-max max-w-64 -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs font-normal leading-5 text-white opacity-0 shadow-lg transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
       >
         <span className="block font-semibold">{name}</span>
-        {reviewedAt && <span className="block text-gray-200">Reviewed {reviewedAt}</span>}
+        {reviewedAt && <span className="block text-gray-200">Signed off {reviewedAt}</span>}
         {reviewer.state === 'updated' && (
-          <span className="block text-amber-200">Updated since this review</span>
+          <span className="block text-amber-200">Edited since this sign-off</span>
         )}
       </span>
     </span>
@@ -232,7 +329,7 @@ export default function FinalWriteupTab({ requestId }) {
         .then((next) => {
           if (acknowledgementController.current !== controller) return;
           if (next.available !== false && next.finalArtifactId !== acknowledgementArtifactId) {
-            throw new Error('The current Final Writeup changed. Reload this tab before recording review.');
+            throw new Error('The current Final Writeup changed. Reload this tab before signing off.');
           }
           setAcknowledgement(next);
         })
@@ -413,7 +510,7 @@ export default function FinalWriteupTab({ requestId }) {
       }
       if (acknowledgementController.current !== controller) return;
       if (body.finalArtifactId !== acknowledgementArtifactId) {
-        throw new Error('The current Final Writeup changed. Reload this tab before recording review.');
+        throw new Error('The current Final Writeup changed. Reload this tab before signing off.');
       }
       setAcknowledgement(body);
     } catch (reviewError) {
@@ -439,6 +536,10 @@ export default function FinalWriteupTab({ requestId }) {
   const reviewers = Array.isArray(acknowledgement?.reviewers)
     ? acknowledgement.reviewers
     : [];
+  const signOffRoster = acknowledgement?.available === true && acknowledgement?.signOffRoster
+    ? acknowledgement.signOffRoster
+    : null;
+  const notSignedOff = programDirectorsNotSignedOff(signOffRoster);
 
   return (
     <div className="space-y-4">
@@ -544,33 +645,37 @@ export default function FinalWriteupTab({ requestId }) {
               || acknowledgement?.available === true) && (
               <div className={`mt-5 border-t pt-5 ${stage.dividerClass}`}>
                 {acknowledgementLoading ? (
-                  <p className="text-sm text-gray-600" role="status">Checking review activity…</p>
+                  <p className="text-sm text-gray-600" role="status">Checking sign-offs…</p>
                 ) : acknowledgementError ? (
                   <div className="text-sm text-red-800" role="alert">
-                    <p>Review tracking could not be loaded. The writeup is still available.</p>
+                    <p>Sign-offs could not be loaded. The writeup is still available.</p>
                     <p className="mt-1 text-xs text-red-700">{acknowledgementError}</p>
                     <button
                       type="button"
                       onClick={() => setAcknowledgementReload((value) => value + 1)}
                       className="mt-2 font-semibold underline decoration-red-300 underline-offset-4 hover:decoration-red-700 focus:outline-none focus:ring-2 focus:ring-red-700 focus:ring-offset-2"
                     >
-                      Try review tracking again
+                      Try loading sign-offs again
                     </button>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-                    <div className="min-w-0">
-                      <h4 className="text-sm font-semibold text-gray-900">Reviewed by</h4>
-                      {reviewers.length > 0 ? (
-                        <div className="mt-3 flex flex-wrap gap-2" aria-label="Review participants">
-                          {reviewers.map((reviewer) => (
-                            <ReviewerInitial key={reviewer.reviewerId} reviewer={reviewer} />
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="mt-1 text-sm text-gray-600">No reviews recorded yet.</p>
-                      )}
-                    </div>
+                    {signOffRoster ? (
+                      <SignOffRoster roster={signOffRoster} />
+                    ) : (
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-semibold text-gray-900">Signed off by</h4>
+                        {reviewers.length > 0 ? (
+                          <div className="mt-3 flex flex-wrap gap-2" aria-label="Sign-off participants">
+                            {reviewers.map((reviewer) => (
+                              <ReviewerInitial key={reviewer.reviewerId} reviewer={reviewer} />
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-sm text-gray-600">No sign-offs yet.</p>
+                        )}
+                      </div>
+                    )}
 
                     {acknowledgement.mayAcknowledge && (
                       <div className="max-w-md sm:text-end" aria-live="polite">
@@ -598,13 +703,13 @@ export default function FinalWriteupTab({ requestId }) {
                                 onClick={markReviewed}
                                 className="mt-3 min-h-11 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                               >
-                                {acknowledging ? 'Recording review…' : personalReview.action}
+                                {acknowledging ? 'Signing off…' : personalReview.action}
                               </button>
                             )}
                           </>
                         ) : (
                           <p className="text-sm font-medium text-red-800" role="alert">
-                            Review tracking returned an unsupported state. Try again before recording review.
+                            Sign-off tracking returned an unsupported state. Try again before signing off.
                           </p>
                         )}
                       </div>
@@ -670,6 +775,14 @@ export default function FinalWriteupTab({ requestId }) {
             <div id="final-writeup-confirm-description" className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
               {confirming === 'leadership' ? (
                 <>
+                  {notSignedOff && notSignedOff.length > 0 && (
+                    <p className="font-medium text-amber-900">
+                      {notSignedOff.length} Program Director{notSignedOff.length === 1 ? ' hasn’t' : 's haven’t'} signed off: {notSignedOff.join(', ')}. You can send anyway.
+                    </p>
+                  )}
+                  {notSignedOff && notSignedOff.length === 0 && signOffRoster.expected.length > 0 && (
+                    <p className="font-medium text-green-900">All Program Directors have signed off.</p>
+                  )}
                   <p>The current Word version is recorded as the version leadership starts from, and the writeup appears for the President and CSO in Final writeups.</p>
                   <p>Editing continues in the same document. Nobody is notified by this step, and group review does not reopen from here.</p>
                 </>
