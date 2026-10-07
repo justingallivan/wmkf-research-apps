@@ -136,7 +136,7 @@ describeIf('final_writeup_handoff_emails ledger (live Postgres, migration 072)',
     await store.insertHandoffEmailIntent(intent());
     await mockPg.client.query("UPDATE final_writeup_handoff_emails SET created_at = NOW() - interval '20 days'");
     const claim = await store.claimHandoffEmail(SOURCE);
-    await store.markHandoffEmailSkipped(SOURCE, 'transition_not_committed', claim.lease_token);
+    expect(await store.expireHandoffEmail(SOURCE, claim.lease_token, 14)).toEqual({ expired: true });
     expect(await store.insertHandoffEmailIntent(intent({ leadSystemUserId: null }))).toEqual({ inserted: false, refreshed: true });
     const reopened = await store.getHandoffEmail(SOURCE);
     expect(reopened).toMatchObject({ state: 'pending', skip_reason: null });
@@ -148,6 +148,21 @@ describeIf('final_writeup_handoff_emails ledger (live Postgres, migration 072)',
     expect(await store.getHandoffEmail(SOURCE)).toMatchObject({ state: 'skipped', skip_reason: 'test_request_refused' });
     await store.reopenExpiredHandoffEmail(SOURCE);
     expect(await store.getHandoffEmail(SOURCE)).toMatchObject({ state: 'skipped' });
+  });
+
+  test('expiry is atomic against the current created_at and the lease token', async () => {
+    await store.insertHandoffEmailIntent(intent());
+    await mockPg.client.query("UPDATE final_writeup_handoff_emails SET created_at = NOW() - interval '20 days'");
+    const stale = await store.claimHandoffEmail(SOURCE);
+    // A retry refreshes the wait after the claim.
+    await store.insertHandoffEmailIntent(intent());
+    expect(await store.expireHandoffEmail(SOURCE, stale.lease_token, 14)).toEqual({ expired: false });
+    expect(await store.getHandoffEmail(SOURCE)).toMatchObject({ state: 'pending' });
+    // Without a refresh, only the lease owner can expire it.
+    await mockPg.client.query("UPDATE final_writeup_handoff_emails SET created_at = NOW() - interval '20 days'");
+    expect(await store.expireHandoffEmail(SOURCE, '99999999-9999-4999-8999-999999999999', 14)).toEqual({ expired: false });
+    expect(await store.expireHandoffEmail(SOURCE, stale.lease_token, 14)).toEqual({ expired: true });
+    expect(await store.getHandoffEmail(SOURCE)).toMatchObject({ state: 'skipped', skip_reason: 'transition_not_committed', lease_token: null });
   });
 
   test('a commit reopens an intent expired as transition_not_committed', async () => {

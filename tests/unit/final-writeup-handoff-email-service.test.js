@@ -183,6 +183,14 @@ function harness({
     markSkipped: jest.fn(async (_id, reason, token) => {
       if (owns(token)) Object.assign(row, { state: 'skipped', skip_reason: reason, locked: false, lease_token: null });
     }),
+    // Mirrors the store: expire only the lease owner, against the row's
+    // CURRENT created_at.
+    expire: jest.fn(async (_id, token, days) => {
+      const age = NOW.getTime() - new Date(row.created_at).getTime();
+      if (!owns(token) || age <= days * 24 * 60 * 60 * 1000) return { expired: false };
+      Object.assign(row, { state: 'skipped', skip_reason: 'transition_not_committed', locked: false, lease_token: null });
+      return { expired: true };
+    }),
     reopenExpired: jest.fn(async () => {
       if (row && row.state === 'skipped' && row.skip_reason === 'transition_not_committed') {
         Object.assign(row, { state: 'pending', skip_reason: null });
@@ -199,7 +207,6 @@ function harness({
     anyProgramEnabled: () => enabledPrograms.length > 0,
     sender: () => 'alerts@wmkeck.org',
     baseUrl: () => 'https://apps.example.org',
-    now: () => NOW,
   };
   const expire = () => { row.locked = false; };
   return { deps, calls, state, getRow: () => row, activities, expire };
@@ -376,6 +383,29 @@ describe('delivery', () => {
     state.requestRow = request();
     expect(await deliverGroupReviewHandoff({ sourceDocumentId: SOURCE_ID }, deps)).toEqual({ status: 'sent' });
     expect(getRow().state).toBe('sent');
+  });
+
+  test('a stale recovery worker cannot expire an intent a concurrent retry refreshed and committed', async () => {
+    const { deps, state, getRow } = harness({
+      requestRow: request({ _wmkf_currentfinalwriteup_value: null }),
+      existingRow: pendingRow({ created_at: '2026-09-20T00:00:00Z' }),
+    });
+    const stageArgs = { requestId: REQUEST_ID, sourceDocumentId: SOURCE_ID, actingUserSystemId: LEAD_ID };
+    let postDelivery;
+    deps.getRequest.mockImplementationOnce(async () => {
+      // Recovery has claimed the aged row and read "no Final"...
+      const snapshot = request({ _wmkf_currentfinalwriteup_value: null });
+      // ...while the lead PD's retry refreshes the intent and commits.
+      await stageGroupReviewHandoff(stageArgs, deps);
+      state.requestRow = request();
+      postDelivery = await deliverGroupReviewHandoff({ sourceDocumentId: SOURCE_ID }, deps);
+      return snapshot;
+    });
+    expect(await recoverPendingHandoffEmails({}, deps)).toEqual([{ sourceDocumentId: SOURCE_ID, status: 'awaiting_transition' }]);
+    expect(postDelivery).toEqual({ status: 'not_claimed' });
+    expect(getRow().state).toBe('pending');
+    // The next recovery run sends it.
+    expect(await recoverPendingHandoffEmails({}, deps)).toEqual([{ sourceDocumentId: SOURCE_ID, status: 'sent' }]);
   });
 
   test('an intent already expired by recovery is reopened when its transition then commits', async () => {
