@@ -18,6 +18,7 @@ jest.mock('../../lib/services/transcription-pilot/store.js', () => ({
 import { executePrompt } from '../../lib/services/execute-prompt.js';
 import * as runtime from '../../lib/services/transcription-pilot/runtime.js';
 import * as store from '../../lib/services/transcription-pilot/store.js';
+import { applySpeakerReassignments } from '../../lib/services/transcription-pilot/transcript-format.js';
 import {
   alignMeetingTranscriptionSpeakers, recoverPendingAlignments, serializeSpeakerSamples,
 } from '../../lib/services/meeting-tracker-transcription/alignment-service.js';
@@ -317,14 +318,16 @@ test('(a) 8 speakers x 4 reserved, 25 long-name cues per sample, contrary fourth
   expect(store.failTranscriptionAlignment).toHaveBeenCalledWith(expect.objectContaining({ terminal: true, code: 'samples_over_budget' }));
 });
 
-test('(a2) when every reserved sample is kept, 3:1 contrary names abstain with both suggestions even at confidence 0.99', async () => {
+test('(a2) 3:1 contrary names never apply globally; exclusive turn evidence splits the identities', async () => {
   const { content, vtt, verdict, names } = genFixture({ contrary: true });
   arrange({ content, vtt });
   executePrompt.mockResolvedValue({ blocked: false, parsed: verdict });
   await alignMeetingTranscriptionSpeakers({ jobId });
   const { speakerNames, alignment } = store.completeTranscriptionAlignment.mock.calls[0][0];
-  expect(speakerNames).toEqual({});
-  expect(alignment.status).toBe('abstained');
+  for (let s = 0; s < 8; s++) expect(speakerNames).not.toHaveProperty(`S${s}`);
+  const split = applySpeakerReassignments(JSON.parse(content), alignment.reassigned, alignment.additionalSpeakerIds);
+  expect(split.utterances.map(row => speakerNames[row.speaker])).toEqual(names.flatMap((name, s) => [name, name, name, names[(s + 1) % 8]]));
+  expect(alignment.status).toBe('applied');
   expect(alignment.suggestions.S0).toEqual(expect.arrayContaining([names[0], names[1]]));
 });
 
@@ -494,4 +497,23 @@ test('records Zoom-evidence reassignment of a misdiarized one-word utterance alo
   expect(speakerNames).toEqual({ A: NAME_A, B: NAME_B });
   expect(alignment.reassigned).toEqual({ 1: 'A' });
   expect(alignment.reassignedCount).toBe(1);
+});
+
+test('automatic generation discovers a late participant inside an earlier audio speaker ID', async () => {
+  const { content, vtt } = fixture();
+  const parsed = JSON.parse(content);
+  const later = [
+    { speaker: 'A', start: 100000, end: 104000, text: 'I think I can leave this conference call right now.' },
+    { speaker: 'B', start: 110000, end: 111000, text: 'Wow.' },
+    { speaker: 'A', start: 120000, end: 124000, text: 'I am returning to our investment discussion for today.' },
+  ];
+  parsed.utterances.push(...later);
+  arrange({ content: JSON.stringify(parsed), vtt: `${vtt}\n${later.map(u => `${ts(u.start)} --> ${ts(u.end)}\nLate Person: ${u.text}`).join('\n\n')}\n` });
+  executePrompt.mockResolvedValue({ blocked: false, parsed: goodVerdict });
+  await alignMeetingTranscriptionSpeakers({ jobId });
+  expect(store.failTranscriptionAlignment).not.toHaveBeenCalled();
+  const { speakerNames, alignment } = store.completeTranscriptionAlignment.mock.calls[0][0];
+  const split = applySpeakerReassignments(parsed, alignment.reassigned, alignment.additionalSpeakerIds);
+  expect(split.utterances.slice(-3).map(u => speakerNames[u.speaker])).toEqual(['Late Person', 'Late Person', 'Late Person']);
+  expect(split.utterances.slice(0, 6).map(u => speakerNames[u.speaker])).toEqual([NAME_A, NAME_B, NAME_A, NAME_B, NAME_A, NAME_B]);
 });

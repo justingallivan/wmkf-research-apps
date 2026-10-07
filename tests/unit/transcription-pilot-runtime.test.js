@@ -328,4 +328,25 @@ describe('getMeetingTranscriptionJobContent applies recorded short-utterance rea
     expect(content.utterances.map((u) => u.speaker)).toEqual(['A', 'A', 'A']);
     expect(JSON.parse(raw).utterances[1].speaker).toBe('D');
   });
+
+  it('reconstructs server-created Zoom identities before projecting content to downstream consumers', async () => {
+    require('../../lib/services/transcription-pilot/model').projectOwnerTranscriptionJob.mockImplementationOnce(
+      jest.requireActual('../../lib/services/transcription-pilot/model').projectOwnerTranscriptionJob);
+    const raw = JSON.stringify({ text: '', utterances: [
+      { speaker: 'A', start: 0, end: 5000, text: 'Earlier participant.' },
+      { speaker: 'A', start: 6000, end: 9000, text: 'Later participant.' },
+    ] });
+    const buffer = Buffer.from(raw);
+    const row = { id: 'job-1', status: 'ready', output_pathname: 'private/output.json', expires_at: new Date(Date.now() + 86400000),
+      output_sha256: crypto.createHash('sha256').update(buffer).digest('hex'), speaker_names: { A: 'Earlier', zoom_1: 'Later' },
+      speaker_alignment: { status: 'applied', reassigned: { 1: 'zoom_1' }, additionalSpeakerIds: ['zoom_1'], reassignedCount: 1 } };
+    store.getMeetingTranscriptionJob.mockResolvedValue(row);
+    process.env.UPLOADS_BLOB_RW_TOKEN = 'token';
+    get.mockResolvedValueOnce({ statusCode: 200, stream: ReadableStream.from([buffer]), blob: {} });
+    const { content, job } = await runtime.getMeetingTranscriptionJobContent({ requestId: 'r', siteVisitActivityId: 's', jobId: 'job-1' });
+    expect(content.utterances.map(u => u.speaker)).toEqual(['A', 'zoom_1']);
+    expect(job.speaker_names.zoom_1).toBe('Later');
+    expect(job.speaker_alignment).not.toHaveProperty('additionalSpeakerIds');
+    expect(JSON.parse(raw).utterances[1].speaker).toBe('A');
+  });
 });
