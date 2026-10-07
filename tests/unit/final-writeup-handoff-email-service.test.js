@@ -188,6 +188,20 @@ describe('notifyGroupReviewHandoff', () => {
     expect(deps.sendEmail).toHaveBeenCalledTimes(1);
   });
 
+  test('a non-committing call delivers an existing pending intent without inserting one', async () => {
+    const { deps, getRow } = harness({
+      existingRow: {
+        final_document_id: FINAL_ID, request_id: REQUEST_ID, grant_program_id: RESEARCH_ID,
+        lead_systemuser_id: LEAD_ID, state: 'pending', dynamics_email_id: null, locked: false,
+      },
+    });
+    const outcome = await notifyGroupReviewHandoff({ ...committed(), committedByThisCall: false }, deps);
+    expect(outcome).toEqual({ status: 'sent' });
+    expect(deps.insertIntent).not.toHaveBeenCalled();
+    expect(deps.createEmailActivity).toHaveBeenCalledTimes(1);
+    expect(getRow().state).toBe('sent');
+  });
+
   test('never throws, even when the request read fails', async () => {
     const { deps } = harness();
     deps.getRequest.mockRejectedValue(new Error('dataverse down'));
