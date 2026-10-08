@@ -76,17 +76,6 @@ function ProposalCardRow({ proposal, position, programCount, total, score, rank,
                 {rank?.disagreement && <span className="rounded-md bg-amber-100 px-2 py-0.5 text-amber-900">Disagreement</span>}
               </div>
               <div className="mt-3 space-y-3">
-                <div className="flex flex-wrap items-start gap-x-6 gap-y-2 border-t border-gray-100 pt-3 text-sm">
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-gray-600">Requested</p>
-                    <p className="mt-1 font-semibold tabular-nums text-gray-900">{amount}</p>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-gray-600">Cumulative Budget</p>
-                    <p className="mt-1 font-semibold tabular-nums text-gray-900">{accumulated}</p>
-                    {!total?.complete && <p className="mt-1 text-xs text-amber-800">A requested amount is missing or incompatible.</p>}
-                  </div>
-                </div>
                 <div className="flex flex-wrap items-center gap-1.5 text-sm">
                   <span className="mr-1 font-medium text-gray-700">Reviews</span>
                   {proposal.score?.ratedCount > 0 && proposal.score?.distribution
@@ -113,6 +102,17 @@ function ProposalCardRow({ proposal, position, programCount, total, score, rank,
                     </li>}
                   </ul>
                 )}
+                <div className="flex flex-wrap justify-end items-start gap-x-6 gap-y-2 border-t border-gray-100 pt-3 text-right text-sm">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-gray-600">Requested</p>
+                    <p className="mt-1 font-semibold tabular-nums text-gray-900">{amount}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-gray-600">Cumulative Budget</p>
+                    <p className="mt-1 font-semibold tabular-nums text-gray-900">{accumulated}</p>
+                    {!total?.complete && <p className="mt-1 text-xs text-amber-800">A requested amount is missing or incompatible.</p>}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
