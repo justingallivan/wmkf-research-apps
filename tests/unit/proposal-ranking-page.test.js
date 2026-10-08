@@ -371,7 +371,7 @@ describe('Proposal Ranking page', () => {
     });
     expect(scored).toHaveStyle({ backgroundColor: reviewerScoreIndicator(REQUESTS[0].score).color });
     expect(scored).toHaveAttribute('title', 'Average reviewer score: 4.2 out of 5 (approximate color)');
-    expect(screen.getByText('4.2 · 3/3 rated')).toBeInTheDocument();
+    expect(screen.getByLabelText('Average reviewer grade: 4.2')).toHaveTextContent('4.2');
 
     const unscored = await screen.findAllByRole('img', { name: 'Average reviewer score: unscored' });
     expect(unscored[0]).toHaveStyle({ backgroundColor: '#9ca3af' });
