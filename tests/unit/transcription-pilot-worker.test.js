@@ -156,6 +156,37 @@ describe('transcription worker submission safety', () => {
     });
   });
 
+  it('saves a completed result whose single utterance exceeds the former 20,000-character cap', async () => {
+    // Regression (2026-10-08): a 24,213-character presentation utterance was rejected with an uncoded
+    // error, and the job retried in 'saving' indefinitely while holding the global transcription slot.
+    const long = 'x'.repeat(24_213);
+    store.claimNextTranscriptionJob.mockReset().mockResolvedValue(null);
+    const processing = { ...queued, status: 'processing', provider_transcript_id: 'provider-1', version: 7 };
+    store.claimNextDueTranscriptionJob.mockReset().mockResolvedValueOnce({ job: processing, leaseToken: queued.lease_token }).mockResolvedValue(null);
+    const saving = { ...processing, status: 'saving', version: 8,
+      output_pathname: `transcription-pilot/9/${processing.id}/output/transcript.json` };
+    store.getLeasedTranscriptionJob.mockResolvedValueOnce(processing).mockResolvedValueOnce(processing)
+      .mockResolvedValueOnce(saving).mockResolvedValueOnce({ ...processing, status: 'ready', version: 10 })
+      .mockResolvedValueOnce({ ...processing, status: 'ready', version: 10 });
+    store.mutateLeasedTranscriptionJob.mockResolvedValue(saving);
+    const bytes = Buffer.from(JSON.stringify({ text: long, utterances: [{ start: 0, end: 500, text: long, speaker: null }], outcome: 'complete' }));
+    runtime.readPrivateContentIfPresent.mockResolvedValueOnce(null).mockResolvedValueOnce({ buffer: bytes, blob: {
+      size: 0, pathname: `transcription-pilot/9/${processing.id}/output/transcript.json`,
+    } });
+    runtime.writePrivateContent.mockResolvedValue({
+      pathname: `transcription-pilot/9/${processing.id}/output/transcript.json`,
+    });
+    store.publishReadyTranscriptionJob.mockResolvedValue({ ...processing, status: 'ready', version: 9,
+      provider_transcript_id: null, audio_pathname: null });
+    getAssemblyAITranscript.mockResolvedValue({ status: 'completed', text: long,
+      utterances: [{ start: 0, end: 500, text: long, speaker: null }], speech_model_used: 'universal-2' });
+
+    const summary = await drainTranscriptionPilot({ maxJobs: 1 });
+    expect(runtime.writePrivateContent).toHaveBeenCalled();
+    expect(store.publishReadyTranscriptionJob).toHaveBeenCalled();
+    expect(summary.ready).toBe(1);
+  });
+
   it('releases a ready worker lease even when provider or Blob cleanup fails', async () => {
     store.claimNextTranscriptionJob.mockReset().mockResolvedValue(null);
     const processing = { ...queued, status: 'processing', provider_transcript_id: 'provider-1', version: 7 };

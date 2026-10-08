@@ -41,6 +41,17 @@ describe('Meeting Tracker generated transcript bundle', () => {
     { speaker: 'B', start: 125000, end: 127300, text: 'WEBVTT and --> are transcript text.' },
   ] };
 
+  it('accepts an utterance over the former 20,000-character cap and rejects one over the shared cap', () => {
+    const long = { utterances: [{ speaker: 'A', start: 0, end: 600000, text: 'y'.repeat(24_213) }] };
+    const generated = buildMeetingTranscriptFiles({ content: long, speakerNames: { A: 'PI' }, identity });
+    const parsed = parseVerifiedMeetingTranscriptSource(generated.files.source.bytes, {
+      size: generated.files.source.bytes.length, sha256: generated.files.source.sha256,
+    }, identity);
+    expect(parsed.content.utterances[0].text).toHaveLength(24_213);
+    const tooLong = { utterances: [{ speaker: 'A', start: 0, end: 600000, text: 'y'.repeat(200_001) }] };
+    expect(() => buildMeetingTranscriptFiles({ content: tooLong, speakerNames: {}, identity })).toThrow();
+  });
+
   it('round-trips exact bounded source bytes and hash for later corrections', () => {
     const generated = buildMeetingTranscriptFiles({ content, speakerNames: { A: 'PI', B: 'Co-PI' }, identity });
     expect(generated.files.source.bytes.length).toBeLessThanOrEqual(4_000_000);
