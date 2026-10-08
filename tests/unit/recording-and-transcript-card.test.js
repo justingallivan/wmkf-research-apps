@@ -1258,11 +1258,37 @@ describe('cancelling a queued transcription', () => {
     expect(container.textContent).not.toContain('Cancel this transcription');
   });
 
-  test('the control is absent while cancellation is already pending', async () => {
-    route({ collection: collection({ jobs: [job({ status: 'queued', cleanupPending: true })] }), detail: detailFor({}) });
+  test('a cancelled run does not block a replacement, shows as cancelled, and has no cancel button', async () => {
+    const cancelled = job({ status: 'queued', cleanupPending: true });
+    route({ collection: collection({ jobs: [cancelled] }), detail: detailFor({}) });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    expect((await screen.findByTestId('transcript-progress')).textContent).toContain('Cancelling Oregon State recording');
+    expect(await screen.findByTestId('generate-form')).toBeInTheDocument();
+    expect(screen.queryByTestId('transcript-progress')).toBeNull();
     expect(screen.queryByRole('button', CANCEL)).toBeNull();
+    const earlier = screen.getByTestId('earlier-runs');
+    fireEvent.click(within(earlier).getByText(/Earlier runs/));
+    expect(within(earlier).getByText('Cancelled')).toBeInTheDocument();
+  });
+
+  test('after a cancel the refreshed list shows the run as cancelled and offers a new transcription', async () => {
+    globalThis.confirm = jest.fn(() => true);
+    let cancelledOnServer = false;
+    route({ collection: collection({ jobs: [job({ status: 'queued', version: 3 })] }), detail: detailFor({}) }, {
+      '/transcriptions': { respond: (path, options) => {
+        if (options?.method === 'DELETE') { cancelledOnServer = true; return response({ job: {} }); }
+        if (!path.endsWith('/transcriptions')) return response({});
+        return response(collection({ jobs: [job({ status: 'queued', version: cancelledOnServer ? 4 : 3, cleanupPending: cancelledOnServer })] }));
+      } },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(screen.queryByTestId('generate-form')).toBeNull();
+    fireEvent.click(await screen.findByRole('button', CANCEL));
+    expect(await screen.findByText('Transcription cancelled.')).toBeInTheDocument();
+    expect(await screen.findByTestId('generate-form')).toBeInTheDocument();
+    expect(screen.queryByRole('button', CANCEL)).toBeNull();
+    expect(screen.queryByTestId('transcript-progress')).toBeNull();
+    fireEvent.click(within(screen.getByTestId('earlier-runs')).getByText(/Earlier runs/));
+    expect(within(screen.getByTestId('earlier-runs')).getByText('Cancelled')).toBeInTheDocument();
   });
 
   test('confirming sends DELETE with only the expected version, then shows a notice', async () => {
@@ -1273,6 +1299,7 @@ describe('cancelling a queued transcription', () => {
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     fireEvent.click(await screen.findByRole('button', CANCEL));
     expect(await screen.findByText(/Transcription cancelled\./)).toBeInTheDocument();
+    expect(screen.queryByText(/clear from this list/)).toBeNull();
     expect(globalThis.confirm.mock.calls[0][0]).toMatch(/audio file you chose for it is deleted/);
     const calls = deleteCalls();
     expect(calls).toHaveLength(1);

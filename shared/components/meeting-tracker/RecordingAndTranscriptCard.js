@@ -890,6 +890,9 @@ function isRetiredUploading(job) {
 // Mirrors the server guard on DELETE: only a queued run (not already being cleaned up) can be cancelled here. A run
 // that has been sent for transcription, or whose submission is uncertain, is deliberately left to its own flows.
 const canCancelRun = (job) => job?.status === 'queued' && job.cleanupPending !== true;
+// A cancelled queued run stays 'queued' until its audio is cleaned up, which can take days for an uploaded file. It no
+// longer blocks a new transcription.
+const isCancelledRun = (job) => job?.status === 'queued' && job.cleanupPending === true;
 const CANCEL_CONFIRM = 'Cancel this transcription? The audio file you chose for it is deleted, so you will need to choose it again to start over. A published transcript is not affected.';
 const UNRESOLVED_PUBLICATION = new Set(['publishing', 'retryable', 'unknown', 'published_reconcile']);
 const PUBLISHED_FOR_JOB = new Set(['published', 'published_reconcile', 'unknown']);
@@ -1402,7 +1405,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
       if (!isCurrent(generation)) return;
       if (detail?.job?.id === job.id) setDetail(null);
       if (focusId === job.id) setFocusId(null);
-      setNotice(cancelling ? 'Transcription cancelled. It can take a minute to clear from this list.' : 'Draft discarded.');
+      setNotice(cancelling ? 'Transcription cancelled.' : 'Draft discarded.');
       await loadCollection();
     } catch (discardError) {
       if (isCurrent(generation)) {
@@ -2214,7 +2217,8 @@ function AttentionBlock({ t }) {
 }
 
 function EarlierRuns({ t }) {
-  const runs = t.showReview ? t.jobs.filter((job) => job.id !== t.focusJob?.id) : t.jobs.filter((job) => job.id !== t.newestJob?.id);
+  const shownAbove = t.showReview ? t.focusJob?.id : t.newestJob?.id;
+  const runs = t.jobs.filter((job) => job.id !== shownAbove || isCancelledRun(job));
   if (!runs.length) return null;
   return (
     <details className="mt-5" data-testid="earlier-runs">
@@ -2226,7 +2230,7 @@ function EarlierRuns({ t }) {
               <p className="break-words text-sm font-medium text-gray-900">{displayName(job)}</p>
               <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-600">
                 {job.ready_at && <Chip>Ready {fmtDateTime(job.ready_at)}</Chip>}
-                <Chip tone={job.status === 'ready' ? 'green' : ACTIVE_STATUSES.has(job.status) ? 'blue' : job.status === 'submission_uncertain' ? 'amber' : 'gray'}>{RUN_STATE_LABELS[job.status] || 'Unknown'}</Chip>
+                <Chip tone={job.status === 'ready' ? 'green' : ACTIVE_STATUSES.has(job.status) && !isCancelledRun(job) ? 'blue' : job.status === 'submission_uncertain' ? 'amber' : 'gray'}>{isCancelledRun(job) ? 'Cancelled' : RUN_STATE_LABELS[job.status] || 'Unknown'}</Chip>
               </p>
             </div>
             {job.status === 'ready' && <div className="flex items-center gap-3">
@@ -2534,7 +2538,7 @@ function TranscriptWorkflow({ m, t, z, transcriptInputRef }) {
   const generateReason = !t.collection ? 'Not available right now' : !featureEnabled ? 'Not enabled for this request' : null;
   // Only queued or running work blocks step 1. A stranded 'uploading' job (failed import or abandoned upload) never
   // does; it only shows progress while this browser is uploading and the job is not retired or past its window.
-  const active = t.jobs.find((job) => BLOCKING_STATUSES.has(job.status)) || null;
+  const active = t.jobs.find((job) => BLOCKING_STATUSES.has(job.status) && !isCancelledRun(job)) || null;
   const uploadingHere = ['upload', 'upload-captions', 'starting'].includes(t.busy)
     ? t.jobs.find((job) => job.status === 'uploading' && !isRetiredUploading(job)) || null : null;
   const progressJob = active || uploadingHere;
@@ -2600,7 +2604,7 @@ function TranscriptWorkflow({ m, t, z, transcriptInputRef }) {
         </div>
         {progressJob && !editing && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-800" aria-live="polite" data-testid="transcript-progress">
-            <p>{progressJob.status === 'queued' && progressJob.cleanupPending ? 'Cancelling' : PROGRESS_VERBS[progressJob.status]} {displayName(progressJob)}{progressJob.created_at ? ` · started ${fmtTime(progressJob.created_at)}` : ''}</p>
+            <p>{PROGRESS_VERBS[progressJob.status]} {displayName(progressJob)}{progressJob.created_at ? ` · started ${fmtTime(progressJob.created_at)}` : ''}</p>
             <span className="flex items-center gap-3">
               {canCancelRun(progressJob) && <button type="button" onClick={() => void t.discardRun(progressJob)} disabled={Boolean(t.busy)} className={BTN_LINK}>{t.busy === 'cancel' ? 'Cancelling…' : 'Cancel this transcription'}</button>}
               <button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={BTN}>{t.loading ? 'Refreshing…' : 'Refresh'}</button>
