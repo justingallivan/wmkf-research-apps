@@ -398,3 +398,13 @@ The full live read-only preview reports 23 names, zero missing/placeholder names
 `canOpen=true`, four PDs, 11 SE / 12 MR and unchanged 9 East / 14 West. Luna built;
 Sol and one bounded subscription-OAuth Opus review found no substantive blocker.
 No source writes, new round, score edits or snapshot backfill occurred.
+
+[VERIFIED deployed and browser-checked] PR #462 merged as
+`f7a75fc5358649ab30765504ea6e6b35cdf00bb4`; Production deployment
+`dpl_FNFvVWUzPaiNgdQ7Uh1DgK526hHx` is READY with live aliases. Justin's refreshed
+D26 facilitator preview displays names on all 23 cards, no unavailable/N/A labels,
+including Johns Hopkins, UT Southwestern and UC Santa Barbara. Open acknowledgement
+remains unchecked; no round was opened. Full CI passed on `e9d40cfc5`; the final
+merge `cc6ef1823` changed only SESSION_PROMPT.md to retain the concurrently restored
+main handoff, passed documentation gates, and had identical runtime/test source.
+The mandatory unpublished-trial reset before colleague use remains in force.
