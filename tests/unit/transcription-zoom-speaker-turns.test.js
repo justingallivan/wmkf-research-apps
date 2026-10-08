@@ -293,3 +293,81 @@ test('an unnamed 3:1 ID recovers its corroborated majority and leaves the single
   expect(result.labels).toEqual(['Presenter', 'Presenter', 'Presenter', null]);
   expect(result.alignment.status).toBe('partial');
 });
+
+// Single-match path: a strong uncorroborated match moves a turn only if the label's own name has no caption there.
+function absentFixture(text = 'Superconducting qubits require careful calibration across several cryogenic temperature stages.') {
+  const rows = [
+    ['A', 'Presenter', 'Our laboratory studies unusual patterns in magnetic materials.'],
+    ['A', 'Presenter', 'The next experiment will measure electronic transport across layers.'],
+    ['A', 'Visitor', text],
+  ];
+  const utterances = rows.map(([speaker, , t], index) => ({ speaker, text: t, start: index * 10000, end: index * 10000 + 4000 }));
+  const cues = rows.map(([, name, t], index) => ({ name, text: t, start: utterances[index].start, end: utterances[index].end }));
+  cues.push({ name: 'Visitor', text: 'A later remark with enough words to count.', start: 60000, end: 64000 });
+  const verdict = { names: { A: 'Presenter' }, alignment: {
+    status: 'applied', speakers: { A: { name: 'Presenter', confidence: 0.95 } },
+    reasons: {}, suggestions: {}, reassigned: {}, reassignedCount: 0,
+  } };
+  return { content: { text: rows.map(row => row[2]).join(' '), utterances }, cues, verdict };
+}
+
+test('a single strong match moves a turn when its label name has no overlapping caption', () => {
+  const result = run(absentFixture());
+  expect(result.labels).toEqual(['Presenter', 'Presenter', 'Visitor']);
+  expect(result.content.utterances[2].speaker).toBe('zoom_1');
+  expect(result.alignment.additionalSpeakerIds).toEqual(['zoom_1']);
+  expect(result.alignment.reassignedCount).toBe(1);
+  expect(result.alignment.status).toBe('applied');
+  expect(result.names.A).toBe('Presenter');
+});
+
+test('a label-name caption overlapping the turn keeps the two-turn rule', () => {
+  const f = absentFixture();
+  f.cues.push({ name: 'Presenter', text: 'Talking over the visitor at the same time.', start: 20500, end: 23000 });
+  expect(run(f).labels).toEqual(['Presenter', 'Presenter', 'Presenter']);
+});
+
+test('a label-name caption just inside the tolerance blocks the move, one beyond it does not', () => {
+  const near = absentFixture();
+  near.cues.push({ name: 'Presenter', text: 'Earlier remark.', start: 17000, end: 18900 });
+  expect(run(near).labels[2]).toBe('Presenter');
+  const far = absentFixture();
+  far.cues.push({ name: 'Presenter', text: 'Earlier remark.', start: 16000, end: 18400 });
+  expect(run(far).labels[2]).toBe('Visitor');
+});
+
+test.each([
+  ['coverage below 0.85', 'Superconducting qubits require careful calibration across several cryogenic temperature stages indeed truly.',
+    'Superconducting qubits require careful calibration across several cryogenic temperature stages.'],
+  ['fewer than four shared content words', 'Superconducting qubits require careful calibration across several cryogenic temperature stages.',
+    'Superconducting qubits require careful calibration across several cryogenic temperature stages.'],
+])('a weak single match does not move the turn: %s', (label, heard, captioned) => {
+  const f = absentFixture(heard);
+  f.cues[2].text = captioned;
+  if (label.startsWith('fewer')) f.content.utterances[2].text = 'Yes so then we are going to see this one and also that.';
+  if (label.startsWith('fewer')) f.cues[2].text = 'Yes so then we are going to see this one and also that.';
+  expect(run(f).labels[2]).toBe('Presenter');
+});
+
+test('a short turn with an absent label name is not moved', () => {
+  const f = absentFixture('Calibration looks good.');
+  expect(run(f).labels[2]).toBe('Presenter');
+});
+
+test('a single strong match moves to an existing speaker ID for that name without creating zoom_N', () => {
+  const f = absentFixture();
+  f.content.utterances.push({ speaker: 'B', text: 'Unrelated closing sentence without any caption.', start: 30000, end: 34000 });
+  f.verdict.names.B = 'Visitor';
+  f.verdict.alignment.speakers.B = { name: 'Visitor', confidence: 0.95 };
+  const result = run(f);
+  expect(result.content.utterances[2].speaker).toBe('B');
+  expect(result.alignment.additionalSpeakerIds ?? []).toEqual([]);
+  expect(result.labels).toEqual(['Presenter', 'Presenter', 'Visitor', 'Visitor']);
+});
+
+test('a name with exactly two substantial cues anywhere (one overlapping) is established; with one it is not', () => {
+  expect(run(absentFixture()).labels[2]).toBe('Visitor');
+  const f = absentFixture();
+  f.cues = f.cues.filter(cue => cue.start !== 60000);
+  expect(run(f).labels[2]).toBe('Presenter');
+});
