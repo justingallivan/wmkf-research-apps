@@ -887,6 +887,10 @@ function isRetiredUploading(job) {
   return job.status === 'uploading' && (job.cleanupPending === true
     || (job.expires_at != null && new Date(job.expires_at).getTime() <= Date.now()));
 }
+// Mirrors the server guard on DELETE: only a queued run (not already being cleaned up) can be cancelled here. A run
+// that has been sent for transcription, or whose submission is uncertain, is deliberately left to its own flows.
+const canCancelRun = (job) => job?.status === 'queued' && job.cleanupPending !== true;
+const CANCEL_CONFIRM = 'Cancel this transcription? The audio file you chose for it is deleted, so you will need to choose it again to start over. A published transcript is not affected.';
 const UNRESOLVED_PUBLICATION = new Set(['publishing', 'retryable', 'unknown', 'published_reconcile']);
 const PUBLISHED_FOR_JOB = new Set(['published', 'published_reconcile', 'unknown']);
 const ALIGNMENT_REASONS = {
@@ -1388,21 +1392,28 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   const cancelEditNames = () => { detailSeqRef.current += 1; setCorrectionDetail(null); setConflict(false); setError(null); setSuggestionPicks({}); };
 
   const discardRun = async (job) => {
-    if (!job || busy || !globalThis.confirm?.('Discard this draft?')) return;
+    const cancelling = canCancelRun(job);
+    if (!job || busy || !globalThis.confirm?.(cancelling ? CANCEL_CONFIRM : 'Discard this draft?')) return;
     const generation = generationRef.current;
-    setBusy('discard');
+    setBusy(cancelling ? 'cancel' : 'discard');
     setError(null);
     try {
-      await requestJson(`${basePath}/${encodeURIComponent(job.id)}`, { method: 'DELETE', body: { expectedVersion: job.version }, fallbackMessage: 'The draft could not be discarded.' });
+      await requestJson(`${basePath}/${encodeURIComponent(job.id)}`, { method: 'DELETE', body: { expectedVersion: job.version }, fallbackMessage: cancelling ? 'The transcription could not be cancelled.' : 'The draft could not be discarded.' });
       if (!isCurrent(generation)) return;
       if (detail?.job?.id === job.id) setDetail(null);
       if (focusId === job.id) setFocusId(null);
-      setNotice('Draft discarded.');
+      setNotice(cancelling ? 'Transcription cancelled. It can take a minute to clear from this list.' : 'Draft discarded.');
       await loadCollection();
     } catch (discardError) {
       if (isCurrent(generation)) {
-        setConflict(discardError?.status === 409);
-        setError(errorMessage(discardError, 'The draft could not be discarded.'));
+        const stale = discardError?.status === 409;
+        if (stale && cancelling) {
+          await loadCollection();
+          if (!isCurrent(generation)) return;
+        }
+        setConflict(stale);
+        setError(stale && cancelling ? 'This transcription changed. The latest status is shown; try again if it is still waiting.'
+          : errorMessage(discardError, cancelling ? 'The transcription could not be cancelled.' : 'The draft could not be discarded.'));
       }
     } finally {
       if (isCurrent(generation)) setBusy(null);
@@ -2222,6 +2233,7 @@ function EarlierRuns({ t }) {
               <button type="button" onClick={() => t.reviewRun(job)} disabled={Boolean(t.busy) && t.busy !== 'speakers'} className={BTN}>Review</button>
               <button type="button" onClick={() => void t.discardRun(job)} disabled={Boolean(t.busy)} className={BTN_LINK}>Discard this draft</button>
             </div>}
+            {canCancelRun(job) && <button type="button" onClick={() => void t.discardRun(job)} disabled={Boolean(t.busy)} className={BTN_LINK}>{t.busy === 'cancel' ? 'Cancelling…' : 'Cancel this transcription'}</button>}
           </li>
         ))}
       </ul>
@@ -2588,8 +2600,11 @@ function TranscriptWorkflow({ m, t, z, transcriptInputRef }) {
         </div>
         {progressJob && !editing && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-800" aria-live="polite" data-testid="transcript-progress">
-            <p>{PROGRESS_VERBS[progressJob.status]} {displayName(progressJob)}{progressJob.created_at ? ` · started ${fmtTime(progressJob.created_at)}` : ''}</p>
-            <button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={BTN}>{t.loading ? 'Refreshing…' : 'Refresh'}</button>
+            <p>{progressJob.status === 'queued' && progressJob.cleanupPending ? 'Cancelling' : PROGRESS_VERBS[progressJob.status]} {displayName(progressJob)}{progressJob.created_at ? ` · started ${fmtTime(progressJob.created_at)}` : ''}</p>
+            <span className="flex items-center gap-3">
+              {canCancelRun(progressJob) && <button type="button" onClick={() => void t.discardRun(progressJob)} disabled={Boolean(t.busy)} className={BTN_LINK}>{t.busy === 'cancel' ? 'Cancelling…' : 'Cancel this transcription'}</button>}
+              <button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={BTN}>{t.loading ? 'Refreshing…' : 'Refresh'}</button>
+            </span>
           </div>
         )}
         {step1Expanded && <>
