@@ -125,7 +125,8 @@ inventory of hosted Preview configuration. No configuration or data was changed.
 12 suites pass. API routes, Atlas and route lifecycle auth gates and their self-tests
 pass sequentially; types pass. All local startup gates pass after repairing this
 worktree's memory symlink. The live factory-ledger check was excluded from the run
-because Production reads are outside the owner's authorization.
+because Production reads were outside that run's authorization. The later narrow
+owner-approved Production inventory is recorded below.
 
 The browser lifecycle remains unperformed: private rankings, locked submission,
 composite publication, meeting reordering and full-requested budget totals. Participant
@@ -147,6 +148,36 @@ receipt is `/private/tmp/ranking-opus-merge-review.txt` (not portable); the verd
 scope and disposition here are the durable receipt. The fresh probe and tests were
 run by the orchestrator, separately from the review.
 
+
+## Owner-approved Production read-only inventory — 2026-10-07
+
+[VERIFIED via `scripts/probe-proposal-ranking-production-readiness.mjs` against
+`wmkf.crm.dynamics.com`] The owner explicitly approved eligible-source counts and
+ranking-table/application-role presence checks. All Dataverse operations were GETs;
+the target interlock remained on. No Production writes or activation occurred.
+
+| Source cycle | Science & Engineering | Medical Research | Total |
+|---|---:|---:|---:|
+| D26 (December 2026) | 16 | 12 | 28 |
+| J26 (June 2026) | 1 | 0 | 1 |
+
+The source scan returned HTTP 200, completed all pages, and had zero unmapped meeting
+dates. It used the canonical ordinary/test exclusion, Phase II Pending and research
+program filters. It selected only meeting date and program; no proposal titles,
+institutions or business rows were printed. These counts do not establish review
+completeness, full snapshot eligibility, participant grants or facilitator readiness.
+
+Metadata lookups for `wmkf_proposalrankingcycle`, `wmkf_proposalrankinground` and
+`wmkf_proposalrankinglist` each returned HTTP 404, code `0x80060888`: the ranking
+tables are absent. Exact role-name and current-application assignment queries both
+returned HTTP 200 with no match for `WMKF Proposal Ranking Application User`.
+The probe exits 2 / `inventoryComplete: false` for these missing prerequisites;
+this is not a failed source scan. Activation flags were not inventoried.
+
+Production's D26 source pool resolves the sandbox-only zero-proposal concern, but
+Production schema, role provisioning, grants/settings and activation still require
+explicit owner approval. Source proposals stay read-only; ranking workflow actions
+write dedicated ranking tables. The source-backed in-app lifecycle remains unverified.
 
 ## Institution geography discovery — 2026-10-07
 

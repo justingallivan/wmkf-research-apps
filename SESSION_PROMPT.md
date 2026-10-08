@@ -12,7 +12,7 @@ All 69 local startup check scripts/self-tests passed, with each gate and self-te
 run sequentially; the missing per-worktree Claude memory symlink was repaired and
 its gate rerun successfully. This includes API routes, Atlas, route lifecycle auth,
 and types. The live factory-ledger check was excluded because Production reads
-are not authorized. Claim-evidence report remains unavailable; no observation invented.
+were not authorized for that run; the later narrow Production inventory is below. Claim-evidence report remains unavailable; no observation invented.
 
 [VERIFIED via fresh GET-only sandbox readiness probe] All three entity identities,
 fields/bounds and Active keys pass; application role assignment and isolation marker
@@ -23,7 +23,8 @@ inspected. No environment settings, grants, source records or ranking rows chang
 
 Luna reconnoitered and Sol reviewed the merge without substantive blockers.
 Review closure and retained evidence are recorded in the Atlas continuation section.
-Production was neither read nor changed; the app remains disabled. No production
+Production was unchanged; a later owner-approved read-only inventory is recorded below.
+The app remains disabled. No production
 milestone entry is required. Only `codex/proposal-ranking` is authorized for pushing.
 
 ### Follow-up: institution East-West metadata found
@@ -60,19 +61,31 @@ component renders confirm all colors, gray fallback and no overflow. Luna built;
 Sol and OAuth-only Opus approved. The hover label uses the same rounding as the
 visible score after correcting Opus's nonblocking note. No milestone entry required.
 
+### Follow-up: owner-approved read-only Production inventory
+
+[VERIFIED via `scripts/probe-proposal-ranking-production-readiness.mjs`, GET-only,
+2026-10-07] Production has 29 ordinary Phase II Pending SE/MR requests: D26 has
+28 (16 SE, 12 MR), J26 has one SE. The scan completed without a cap or unmapped
+meeting dates. Only meeting date and program were selected; no business rows printed.
+All three ranking entity metadata lookups returned 404 (`0x80060888`). The exact
+application-role query and assignment query returned 200 with no matching role.
+No Production writes, provisioning, settings or activation occurred. Exit 2 denotes
+missing readiness prerequisites. The Atlas records scope and limits.
+
 ### Owner choice before further work
 
-1. Prepare the facilitator/grants/readiness prerequisites for the approved sandbox,
-   starting with verified identities and an exact participant list. Activation stays
-   a separate explicit choice; no settings or grants have been written here.
-2. Resolve acceptance data first: owner supplies an existing eligible sandbox cycle
-   or explicitly authorizes a bounded source-data preparation/copy plan. The current
-   scan found none. No source-data writes are authorized by this handoff.
-3. Review the implemented UI and automated evidence while deferring the live meeting.
+The sandbox's zero-proposal gap does not apply to Production's D26 source pool.
+Production still needs the three dedicated ranking tables and application role;
+provisioning requires separate explicit owner approval. Facilitator selection,
+participant grants, environment readiness and activation remain separate open work.
+Source proposals remain read-only; ranking lists, submissions and meeting order do
+persist in dedicated ranking tables. The owner approved only the narrow Production
+readiness inventory, not setup or activation. No source creation/copy is authorized.
 
 Private ranking, submission, composite publication, meeting reordering and full-requested
-budget totals still need a source-backed, multi-identity in-app walkthrough. Do not
-relax test exclusion or treat D99's retained synthetic snapshot as eligible proposals.
+budget totals still need a source-backed, multi-identity in-app walkthrough. Counts
+alone do not verify review completeness or full snapshot eligibility. Do not relax
+test exclusion or treat D99's retained synthetic snapshot as eligible proposals.
 The Session 582 history below remains the implementation and prior live-proof record.
 
 ## Session 582 Summary — 2026-10-07 (Codex)
