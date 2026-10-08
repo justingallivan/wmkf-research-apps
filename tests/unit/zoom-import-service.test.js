@@ -27,7 +27,7 @@ import { getMeetingTranscriptionJob, retireMeetingTranscriptionUploadingJob } fr
 import { ZoomClientError, listHostRecordings, getMeetingRecordings, downloadRecordingFile } from '../../lib/services/meeting-tracker-recordings/zoom-client.js';
 import * as store from '../../lib/services/meeting-tracker-recordings/import-store.js';
 import { ServiceHttpError } from '../../lib/services/service-http-error.js';
-import { importZoomRecording, listZoomRecordingsForVisit, readZoomImportConfig } from '../../lib/services/meeting-tracker-recordings/import-service.js';
+import { importZoomRecording, listZoomRecordingsForVisit, readZoomImportConfig, zoomImportFilename } from '../../lib/services/meeting-tracker-recordings/import-service.js';
 
 const REQUEST = '11111111-1111-4111-8111-111111111111';
 const VISIT = '22222222-2222-4222-8222-222222222222';
@@ -125,6 +125,18 @@ afterEach(() => { for (const k of ENV_KEYS) { if (saved[k] === undefined) delete
 async function rejection(promise) { try { await promise; } catch (error) { return error; } throw new Error('expected rejection'); }
 const onlyRow = () => [...rows.values()][0];
 
+describe('imported file name', () => {
+  test.each([
+    ['2026-10-07T20:48:28Z', 'Zoom Oct 7, 2026 1.48 PM PT.m4a'],
+    ['2027-01-15T08:05:00Z', 'Zoom Jan 15, 2027 12.05 AM PT.m4a'],
+    ['2026-07-04T19:30:00Z', 'Zoom Jul 4, 2026 12.30 PM PT.m4a'],
+  ])('%s is Pacific time (DST-aware), SharePoint-safe', (iso, expected) => {
+    const name = zoomImportFilename(new Date(iso));
+    expect(name).toBe(expected);
+    expect(name).not.toMatch(/["*:<>?/\\|]/);
+  });
+});
+
 describe('config', () => {
   test('parses, lower-cases and de-duplicates hosts and drops invalid entries', () => {
     expect(readZoomImportConfig({ ZOOM_S2S_ACCOUNT_ID: 'a', ZOOM_S2S_CLIENT_ID: 'c', ZOOM_S2S_CLIENT_SECRET: 's',
@@ -203,7 +215,7 @@ describe('import: validation and provenance', () => {
     expect(claim.meetingStart).not.toContain('2030');
     const upload = uploadMeetingTranscription.mock.calls[0][0];
     expect(upload.ownerProfileId).toBe(9);
-    expect(upload.body).toEqual({ filename: `Zoom ${new Date(START).toISOString()}.m4a`, contentType: 'audio/mp4', bytes: 5,
+    expect(upload.body).toEqual({ filename: 'Zoom Oct 5, 2026 10.00 AM PT.m4a', contentType: 'audio/mp4', bytes: 5,
       idempotencyKey: onlyRow().id, providerRegion: 'us', zoomTranscript: { contentType: 'text/vtt', bytes: 3 } });
     expect(result.import).toEqual({ id: onlyRow().id, state: 'started', failureCode: null });
     expect(onlyRow()).toMatchObject({ state: 'started', transcription_job_id: JOB, lease_token: null });
