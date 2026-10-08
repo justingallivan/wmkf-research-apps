@@ -1,6 +1,6 @@
 # Proposal Ranking — design for review
 
-Date: 2026-10-07. Revision: 3 (Opus revision-2 findings incorporated). Status: **Source implemented; sandbox/Production schema and role setup verified; sandbox persistence rehearsal verified; browser rehearsal and production activation pending.**
+Date: 2026-10-07. Revision: 3 (Opus revision-2 findings incorporated). Status: **Source implemented; sandbox/Production schema and role setup verified; sandbox persistence rehearsal verified; Production deployed/enabled; full browser rehearsal pending.**
 Owner: Justin. Design consolidation: Codex. Requested reviewer: Claude Opus.
 Authority: owner decisions in the Proposal Ranking planning conversation.
 
@@ -383,8 +383,9 @@ Direct-table denial for the tested sandbox staff identity is now verified in
 `docs/audits/PROPOSAL_RANKING_STAFF_PRIVACY_2026-10-07.md`.
 Production facilitator/grants and four-participant direct-table/search privacy are
 verified in `docs/audits/PROPOSAL_RANKING_PRODUCTION_ACCESS_PRIVACY_2026-10-07.md`.
-Authenticated browser lifecycle, populated audit/navigation proof and deployment of
-branch generic-reader guards remain pending; the app stays disabled.
+Generic-reader guards are now deployed and Production ranking is enabled. Justin
+verified the waiting state; full authenticated lifecycle and populated indirect
+privacy proof remain pending. Current release receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTION_RELEASE_2026-10-07.md`.
 
 Revision-2 Opus outcome: **READY WITH NAMED CHANGES**, returned by
 `claude-opus-5-5` on 2026-10-07. Receipt:

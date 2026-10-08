@@ -1,16 +1,14 @@
 # Proposal Ranking storage and activation
 
-Date: 2026-10-07. Status: source implemented; sandbox schema and application-role
-provisioning and bounded persistence rehearsal verified. Runtime activation and
-multi-identity browser rehearsal remain pending. Direct-table denial is verified
-for the tested sandbox staff identity and all four Production participants.
-Production schema and dedicated application-role setup are now verified; the app
-remains disabled. Production facilitator/grants and direct-table/search privacy are
-verified in `docs/audits/PROPOSAL_RANKING_PRODUCTION_ACCESS_PRIVACY_2026-10-07.md`. Production setup receipt:
-`docs/audits/PROPOSAL_RANKING_PRODUCTION_SETUP_2026-10-07.md`. Sandbox evidence:
-`docs/audits/PROPOSAL_RANKING_SANDBOX_SETUP_2026-10-07.md` and
-`docs/audits/PROPOSAL_RANKING_PERSISTENCE_REHEARSAL_2026-10-07.md` and
-`docs/audits/PROPOSAL_RANKING_STAFF_PRIVACY_2026-10-07.md`.
+Date: 2026-10-07. Status: **Production deployed and enabled**, with schema, dedicated
+role, Beth's default facilitator setting and four participant grants verified.
+[VERIFIED via Vercel and Chrome] PR #457 merge `10c079c8` is deployed as
+`dpl_F5ewaS8DRDhABRVyhrG5XHuSRvwf`; Justin's D26 page shows “Round not open”.
+No live ranking round was created. Beth's session and the full multi-identity
+submission/publication/reordering/budget walkthrough remain pending.
+Current release and rollback receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTION_RELEASE_2026-10-07.md`.
+Earlier dated sections below retain historical setup checkpoints; disabled-state
+statements in those checkpoints are superseded by this release.
 
 ## Source and persistence
 
@@ -333,3 +331,18 @@ The app is disabled and tables empty. Git comparison shows origin/main lacks the
 branch generic-reader privacy guards: deploy these before opening a live round.
 Promotion/activation and full browser acceptance remain owner decisions. Effective
 impersonation is not staff OAuth browser proof or populated audit/navigation proof.
+
+## Production activation — 2026-10-07
+
+[VERIFIED via full preview builder, single-variable config readback and Chrome]
+Both ranking flags are on; both isolation flags and Dataverse controls remain on.
+The deployed source includes unconditional generic-reader privacy guards before
+activation. D26 full preview passes: 23 requests (11 SE / 12 MR), four grants,
+USD with no missing amounts, 9 East / 14 West, no unscored proposals, and 51
+outstanding review assignments. Opening freezes the then-current inputs.
+
+Justin's signed-in view is correctly waiting for Beth to open D26. No browser
+session for Beth or other PDs was available, so full lifecycle acceptance and
+populated indirect-reader verification remain open. No source or ranking rows
+were written during release. See the current release receipt above for exact
+artifacts, CI, review, authorization and the disabled-with-privacy rollback.

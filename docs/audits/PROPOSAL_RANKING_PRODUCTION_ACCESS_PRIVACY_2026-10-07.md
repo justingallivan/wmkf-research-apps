@@ -1,5 +1,8 @@
 # Proposal Ranking Production access and privacy receipt
 
+Historical pre-activation checkpoint. Subsequent release/activation:
+`docs/audits/PROPOSAL_RANKING_PRODUCTION_RELEASE_2026-10-07.md`.
+
 Date: 2026-10-07 (owner local date). Target: `wmkf.crm.dynamics.com`.
 The owner approved facilitator/participant configuration and privacy checks. The app
 remains disabled; no source proposals or ranking business rows were written.

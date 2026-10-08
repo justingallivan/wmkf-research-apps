@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Proposal Ranking activated for Production; D26 preview ready
+
+**Milestone:** Proposal Ranking is enabled in Production after a complete read-only preview verified the 23 ordinary D26 proposals.
+**Sessions:** PR #457 merged as `10c079c8652b4184404b4cb8ee8479f370a56c79`; full CI candidate `a935ccc64` passed 21,357 tests (169 skipped) and 129 Postgres tests.
+**Ship state:**
+- Initial disabled deployment returned the expected readiness 503; same-SHA redeploy `dpl_F5ewaS8DRDhABRVyhrG5XHuSRvwf` is READY on `applications.wmkeck.org`, with both ranking flags verified on.
+- Preview: 11 SE / 12 MR, 9 East / 14 West, USD, no missing amounts, four assigned leads granted access, `canOpen=true`, and 51 outstanding review assignments.
+- Justin's authenticated Production view shows “Round not open”; the facilitator has not opened it, and no round or submissions exist. Beth/PD multi-identity browser and publication/budget lifecycle acceptance remain pending.
+**Why it matters:** Production is enabled with a complete D26 pool ready for the facilitator to open; the ballot and publication lifecycle still awaits staff acceptance.
+**Pointers:** `docs/audits/PROPOSAL_RANKING_PRODUCTION_RELEASE_2026-10-07.md`; PR #457; deployment `dpl_F5ewaS8DRDhABRVyhrG5XHuSRvwf`.
+
 ## October 2026 — Group-review handoff emails the other Research PDs from the lead PD (Session 581)
 
 **Milestone:** When a lead PD marks a Research writeup "Ready for group review", the other Research Program Directors get an email from the lead PD's own address with a link to the writeup. This is the first email the Final Writeup workflow sends.

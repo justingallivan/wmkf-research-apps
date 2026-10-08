@@ -1,4 +1,24 @@
-# Session 584 Prompt: Proposal Ranking owner choice pending
+# Session 584 Prompt: Proposal Ranking live; facilitator walkthrough next
+
+## Latest: Production deployed and enabled — 2026-10-07
+
+[VERIFIED via GitHub, Vercel and signed-in Chrome] Owner approved release. PR #457
+merged at `10c079c8652b4184404b4cb8ee8479f370a56c79`; privacy guards deployed while
+disabled, then both ranking flags enabled and the same source rebuilt. Active
+Production deployment: `dpl_F5ewaS8DRDhABRVyhrG5XHuSRvwf`. Justin's D26 view shows
+“Round not open”; Beth must sign in to open it. No ranking rows or staff votes were
+created. Full preview: 23 requests, 11 SE / 12 MR, four grants, all USD amounts present,
+9 East / 14 West, all scored; 51 outstanding review assignments. Opening freezes
+current scores. Full candidate CI passed (21,357 tests plus 129 PG tests); Sol and
+OAuth Opus found no release blocker.
+
+Current receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTION_RELEASE_2026-10-07.md`.
+Next: Beth's facilitator session and separate PD sessions for the full private-list,
+submission, publication, meeting-reordering and budget walkthrough. Do not silently
+change facilitator or submit other people's rankings to manufacture acceptance.
+For rollback keep the deployed privacy guards: disable ranking or return to the
+verified disabled deployment `dpl_8CVM7KUdKhPh2bTHDKdaqVcAA14J`.
+Earlier sections below are historical checkpoints superseded by this release.
 
 ## Session 583 Summary — ranking branch continuation, 2026-10-07
 
