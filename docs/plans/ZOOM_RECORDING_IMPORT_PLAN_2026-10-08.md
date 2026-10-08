@@ -2,7 +2,7 @@
 title: Zoom recording import (Stage 3a)
 kind: plan
 domain: transcription
-status: proposed
+status: approved
 summary: "Server-side Import from Zoom for the site-visit card: list approved hosts' cloud recordings, import one meeting's audio and Zoom transcript into the existing transcription pipeline, recorded by one new Postgres table and two new routes."
 owner: product-engineering
 related:
@@ -15,7 +15,7 @@ related:
 
 ## Scope and authority
 
-The owner approved the import direction on October 7 and asked on October 8 for Stage 3 to be planned by Claude, built by a Sonnet agent, reviewed by Claude and then adversarially reviewed by Codex. This plan is **proposed** until the owner approves the schema, routes and environment settings below. No migration is applied to any live database, no Vercel environment is changed and nothing merges by this plan.
+The owner approved the import direction on October 7 and asked on October 8 for Stage 3 to be planned by Claude, built by a Sonnet agent, reviewed by Claude and then adversarially reviewed by Codex. The owner approved the schema, routes and environment settings below on 2026-10-08. No migration is applied to any live database, no Vercel environment is changed and nothing merges by this plan.
 
 Stage 3 is split. **3a (this plan)** imports the meeting's audio and Zoom transcript into the existing transcription pipeline, which removes the manual download and upload. **3b (later)** copies the MP4 video into SharePoint. That copy needs chunked Zoom→Graph streaming in a background job and changes to the MP4 finalize path, and Stage 4 video splitting depends on it. Until 3b, the Recording slot keeps today's Zoom link and MP4 inputs.
 
@@ -31,7 +31,10 @@ Work happens on `codex/meeting-transcript-ux` in `/Users/gallivan/Code/WMKF_Apps
 - [VERIFIED via local `parseZoomVtt` run on the pilot meeting's files, 2026-10-08] Zoom's `audio_transcript` VTT parsed to 521 cues, all named, 7 distinct names. The `closed_caption` VTT parsed to 400 cues with no names. The import therefore uses `audio_transcript` and never `closed_caption`.
 - [VERIFIED via `git ls-tree` of every remote branch, 2026-10-08] The highest migration on `origin/main` is 073 and no remote branch has 074–079. Per `.claude-memory/project-migration-numbers-claimed-off-main.md`, re-check remote branches and ask the owner about Production `schema_migrations` immediately before choosing the final number.
 
-## Owner decisions requested
+## Owner decisions
+
+**Approved by the owner on 2026-10-08:** the `zoom_recording_imports` table (migration 074, written on the branch only), both routes, `ZOOM_RECORDING_HOSTS` as an env var, and credentials for Production and local only (no Preview). Applying the migration to any database, setting Vercel variables and merging each still need a separate go-ahead.
+
 
 1. **Environment variables** (Vercel Preview and Production, set by the owner after merge approval):
    - `ZOOM_S2S_ACCOUNT_ID`, `ZOOM_S2S_CLIENT_ID`, `ZOOM_S2S_CLIENT_SECRET`: already in local `.env.local` and the credentials runbook.
