@@ -117,6 +117,15 @@ fence. A publication that exists for the job, a hand edit, or a held lease makes
 alignment yield (`superseded` / 409), never overwrite. Service:
 `lib/services/meeting-tracker-transcription/alignment-service.js`.
 
+**[DEPLOYED 2026-10-07 via PR #459 (`f48fba1ab`).]**
+The alignment stage also checks full-recording Zoom evidence to split reused
+audio speaker IDs. The existing alignment JSON holds the turn reassignment map
+and server-only `additionalSpeakerIds`; `getMeetingTranscriptionJobContent`
+applies both before preview, saved-name validation, download and publication.
+Bundle source therefore freezes the corrected IDs with the names, and later
+correction/recovery uses that frozen source. No publication schema, formatter
+version, cleanup policy, route or authorization change is required.
+
 An index supports recent request-bound job listing. Migration 063 leaves the
 global active provider-slot index from migration 060 unchanged: jobs in
 `submitting`, `processing`, `saving`, or `submission_uncertain` continue to

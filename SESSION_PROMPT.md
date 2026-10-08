@@ -1,4 +1,45 @@
-# Session 583 Prompt: Proposal Ranking walkthrough and activation pending
+# Session 584 Prompt: Proposal Ranking owner choice pending
+
+## Session 583 Summary — ranking branch continuation, 2026-10-07
+
+[VERIFIED via Git] Resumed the existing ranking worktree and merged the 23 incoming
+commits through `origin/main` at `27ed1684d`, without rebasing or rebuilding the app.
+Kept this branch's ranking handoff and accepted main's transcript-audit annotations.
+Main's unrelated handoff remains available at `git show 27ed1684d:SESSION_PROMPT.md`.
+
+[VERIFIED via local commands] Ranking/Explorer regression: 12 suites, 120 tests pass.
+All 69 local startup check scripts/self-tests passed, with each gate and self-test
+run sequentially; the missing per-worktree Claude memory symlink was repaired and
+its gate rerun successfully. This includes API routes, Atlas, route lifecycle auth,
+and types. The live factory-ledger check was excluded because Production reads
+are not authorized. Claim-evidence report remains unavailable; no observation invented.
+
+[VERIFIED via fresh GET-only sandbox readiness probe] All three entity identities,
+fields/bounds and Active keys pass; application role assignment and isolation marker
+schemas pass. The uncapped eligible ordinary Phase II Pending SE/MR scan still returns
+zero proposals. No default facilitator setting exists. All four readiness switches
+are off in this checkout's loaded configuration; hosted Preview settings were not
+inspected. No environment settings, grants, source records or ranking rows changed.
+
+Luna reconnoitered and Sol reviewed the merge without substantive blockers.
+Review closure and retained evidence are recorded in the Atlas continuation section.
+Production was neither read nor changed; the app remains disabled. No production
+milestone entry is required. Only `codex/proposal-ranking` is authorized for pushing.
+
+### Owner choice before further work
+
+1. Prepare the facilitator/grants/readiness prerequisites for the approved sandbox,
+   starting with verified identities and an exact participant list. Activation stays
+   a separate explicit choice; no settings or grants have been written here.
+2. Resolve acceptance data first: owner supplies an existing eligible sandbox cycle
+   or explicitly authorizes a bounded source-data preparation/copy plan. The current
+   scan found none. No source-data writes are authorized by this handoff.
+3. Review the implemented UI and automated evidence while deferring the live meeting.
+
+Private ranking, submission, composite publication, meeting reordering and full-requested
+budget totals still need a source-backed, multi-identity in-app walkthrough. Do not
+relax test exclusion or treat D99's retained synthetic snapshot as eligible proposals.
+The Session 582 history below remains the implementation and prior live-proof record.
 
 ## Session 582 Summary — 2026-10-07 (Codex)
 

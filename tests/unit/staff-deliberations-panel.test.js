@@ -28,6 +28,18 @@ test('before the presentation the next step names the briefing, and the row has 
   expect(screen.getAllByRole('link')).toHaveLength(1);
 });
 
+test.each([
+  ['upcoming', '2099-03-04T17:00:00Z', /^Check the briefing in Word, then share it before the deliberation session on Mar 4, 9:00\sAM PST\.$/],
+  ['passed', '2020-03-04T17:00:00Z', /^Check the briefing in Word, then share it for the presentation\.$/],
+])('a ready briefing with a %s deliberation session', async (_label, scheduledStartIso, expected) => {
+  global.fetch.mockResolvedValue(response([row({
+    brief: { availability: 'available', lifecycleState: 100000001, file: { webUrl: 'https://sp/brief' } },
+    session: { scheduledStartIso, ianaTimeZone: 'America/Los_Angeles' },
+  })]));
+  render(<StaffDeliberationsPanel {...props} />);
+  expect(await screen.findByText(expected)).toBeInTheDocument();
+});
+
 test('due preparation never labels an absent document ready and never writes', async () => {
   global.fetch.mockResolvedValue(response([row({ preparation: { due: true, state: 'pending' } })]));
   render(<StaffDeliberationsPanel {...props} />);

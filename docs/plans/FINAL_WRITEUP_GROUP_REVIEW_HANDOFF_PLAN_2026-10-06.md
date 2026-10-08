@@ -86,9 +86,12 @@ minimal per-cycle configuration rule).
   list, `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`. Recipients still come from the staffing setting.
 
 **C. Smaller choices (defaults accepted):**
-- **Handoff email sender:** the system mailbox (`NOTIFICATION_EMAIL_FROM`), naming the lead PD in
-  the body. The alternative is sending as the lead PD, which requires their Dynamics sender
-  identity.
+- **Handoff email sender:** ~~the system mailbox (`NOTIFICATION_EMAIL_FROM`)~~. **Superseded
+  (owner, 2026-10-07):** PD-to-PD mail comes from the lead PD, not the system. The handoff email is
+  created and sent as the request's current lead PD (`MSCRMCallerID` impersonation,
+  `noFallback: true`) and never falls back to the system mailbox; see Stage 4.
+- **Leadership digest sender (owner, 2026-10-07):** the system mailbox (`NOTIFICATION_EMAIL_FROM`),
+  because it is scheduled and covers requests led by different PDs. See Stage 5.
 - **"Midnight":** Pacific time. Vercel cron is UTC, so this is `0 7 * * *` (midnight PDT; 11pm
   PST). The digest day is computed in Pacific time.
 - **Final writeup tab:** the "Start group review" button becomes a secondary entry with the same
@@ -247,7 +250,14 @@ silently include or exclude them. **Resolved 2026-10-07:** the owner chose Resea
   emailed, and refusing one raises an ops alert. A 2026-10-07 owner-authorized Production read
   found the Research recipients to be Justin Gallivan, John Sader, Jean Kim and Beth Pruitt (Beth
   is both PD and CSO, by design), each minus the request's lead.
-  Sent from `NOTIFICATION_EMAIL_FROM`, regarding the request, so the TEST-request guard applies.
+  Sent as the request's current lead PD (owner, 2026-10-07; live via PR #458, merge
+  `b14651597`, 2026-10-07): created and sent with `MSCRMCallerID` impersonation
+  and `noFallback: true`, regarding the request, so the TEST-request guard applies. A missing,
+  disabled, or non-foundation lead, or impersonation switched off, keeps the send pending and
+  retryable and alerts ops after three attempts; it never falls back to the system mailbox. An
+  unsent activity from any other sender is abandoned and rebuilt.
+  [VERIFIED by owner statement, 2026-10-07] Every PD can send from Dynamics, so the lead-PD
+  sender has no known mailbox blocker.
 - Copy: `email.final_writeup_handoff.subject` / `.body`. Blank copy leaves the send pending.
 - `email-automation-preferences.js` does not apply: it controls scheduled-email review, not
   notifications.
@@ -294,6 +304,11 @@ Original Stage 4 requirements:
 ### Stage 5 — Leadership daily digest
 - Daily cron at 00:00 Pacific. Each leadership-persona recipient gets one email listing writeups
   that entered leadership review since their last digest.
+- **Research only (owner, 2026-10-07, S584):** include only writeups whose request's Grant
+  Program is in `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`, the same fail-closed list that gates
+  Stage 4. Owner, 2026-10-07 (S584): "SoCal is not using this app suite yet and may never do so. We can limit to research to keep the programs separate, as the CSO does not review SoCal work."
+- Sender: the system mailbox (`NOTIFICATION_EMAIL_FROM`), not a PD (owner, 2026-10-07): it is
+  scheduled and lists requests led by different PDs.
 - No email when the list is empty.
 - Modelled on the scheduled-email digest:
   - per-(recipient, Pacific day) run row with a lease;

@@ -1907,7 +1907,7 @@ function SpeakerEditor({ t, alignment, readOnly }) {
         })}
       </div>
       {Number.isInteger(alignment?.reassignedCount) && alignment.reassignedCount > 0 && (
-        <p className="mt-2 text-xs text-gray-600">{alignment.reassignedCount === 1 ? 'One short utterance was' : `${alignment.reassignedCount} short utterances were`} reattributed to the speaker the Zoom captions show at that moment.</p>
+        <p className="mt-2 text-xs text-gray-600">{alignment.reassignedCount === 1 ? 'One transcript turn was' : `${alignment.reassignedCount} transcript turns were`} reattributed to the speaker the Zoom captions show at that moment.</p>
       )}
     </div>
   );

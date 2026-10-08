@@ -6,7 +6,7 @@ metadata:
   type: project
   status: active
   scope: repo
-  last_verified: 2026-10-07 via owner statements in Session 581 (parked; Stage 4 Research only)
+  last_verified: 2026-10-07 via owner statements in Sessions 581 and 584 (parked; Stages 4 and 5 Research only)
 ---
 
 ## Recall Rule
@@ -30,8 +30,8 @@ would be guesswork.
   by the fail-closed `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS` list, so the
   SoCal staffing entry alone sends nothing. Do not add SoCal to that list
   without the owner.
-- Stage 5 (leadership digest) is still exposed: it would list SoCal writeups
-  that reach leadership review. Ask the owner before Stage 5 ships.
+- Stage 5 resolved: the leadership digest is Research only, filtered by the
+  same `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS` list. Owner, 2026-10-07 (S584): "SoCal is not using this app suite yet and may never do so. We can limit to research to keep the programs separate, as the CSO does not review SoCal work."
 - Stage 3 (sign-off view) already shows a SoCal request's PD list from that
   entry. It is display-only and was left as is.
 

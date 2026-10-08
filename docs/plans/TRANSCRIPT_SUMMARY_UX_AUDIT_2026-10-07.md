@@ -8,7 +8,7 @@ owner: product-engineering
 related:
   - docs/plans/TRANSCRIPT_SUMMARY_UX_FIX_PLAN_2026-10-07.md
   - docs/APPLICATION_STATE_ATLAS.md
-  - docs/atlas/postgres-meeting-transcript-publications.md # historical audit reference; transcript storage, not the drained reviewer-domain table
+  - docs/atlas/postgres-meeting-transcript-publications.md <!-- drain-table:ignore reason=transcript-publications-atlas-path -->
   - docs/atlas/postgres-meeting-transcript-summary-drafts.md
   - docs/plans/SITE_VISIT_SUMMARIES_AND_BOARD_SHARING_PLAN_2026-10-04.md
   - docs/plans/SITE_VISIT_TRANSCRIPT_CARD_REDESIGN_PLAN_2026-10-04.md
@@ -73,7 +73,7 @@ In this table, `T` abbreviates the existing route prefix `/api/meeting-tracker/v
 | Uncertain/stuck operations | [VERIFIED via `lib/services/meeting-tracker-transcription/service.js:597`, `lib/services/meeting-tracker-transcription/service.js:741`, `lib/services/meeting-tracker-transcription/service.js:799`] Publication reconciliation/close and uncertain-job reconcile/abandon paths, plus cron recovery. | [VERIFIED via `shared/components/meeting-tracker/RecordingAndTranscriptCard.js:1983`] Needs attention disclosure and job review recovery controls. Closing does not delete partially saved SharePoint files. Ordinary recovery is already on the visit; do not send everyone to Admin. |
 | Pilot evaluation and operator setup | [VERIFIED via `pages/admin/transcription-pilot.js:264`, `pages/api/admin/transcription-pilot/evaluation-export.js:1`] Pilot evaluation form/CSV behind Admin. Prompt seed source is `shared/config/prompts/meeting-presentation-summary.js:1`, provisioned by its seed script. | [VERIFIED via `pages/admin/transcription-pilot.js:529`] Pilot-only evaluation; no Meeting Tracker evaluation form found. Prompt seeding, schema enablement and database maintenance are operator work, not missing ordinary publishing buttons. |
 
-[VERIFIED via `docs/APPLICATION_STATE_ATLAS.md:108`, `docs/atlas/postgres-meeting-transcript-publications.md:68`, `docs/atlas/postgres-meeting-transcript-summary-drafts.md:37`, `docs/atlas/dataverse-wmkf-requestdocument.md:690`] Atlas ownership agrees with the source separation: temporary jobs/publication metadata versus governed files; summary drafts versus published TXT; request-document identities bridge Postgres and Dataverse. These citations support the recorded storage contract, not a fresh live schema inspection. <!-- drain-table:ignore reason=Historical audit cites transcript storage, not the drained reviewer-domain table. -->
+[VERIFIED via `docs/APPLICATION_STATE_ATLAS.md:108`, `docs/atlas/postgres-meeting-transcript-publications.md:68`, `docs/atlas/postgres-meeting-transcript-summary-drafts.md:37`, `docs/atlas/dataverse-wmkf-requestdocument.md:690`] Atlas ownership agrees with the source separation: temporary jobs/publication metadata versus governed files; summary drafts versus published TXT; request-document identities bridge Postgres and Dataverse. These citations support the recorded storage contract, not a fresh live schema inspection. <!-- drain-table:ignore reason=transcript-publications-atlas-path -->
 
 ### Republish and stale rules staff need to understand
 

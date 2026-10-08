@@ -826,7 +826,7 @@ test('a name typed during matching survives completion', async () => {
   expect(screen.getByText('Unsaved speaker-name changes')).toBeInTheDocument();
 });
 
-test('applied alignment reports how many short utterances were reattributed from the Zoom captions', async () => {
+test('applied alignment reports how many transcript turns were reattributed from the Zoom captions', async () => {
   await openReadyJob({ status: 'applied', speakers: { A: { name: 'Dana Ortiz', confidence: 0.92, basis: 'model' } }, reassignedCount: 2 }, { speaker_names: { A: 'Dana Ortiz' } });
-  expect(screen.getByText(/2 short utterances were reattributed to the speaker the Zoom captions show at that moment\./)).toBeInTheDocument();
+  expect(screen.getByText(/2 transcript turns were reattributed to the speaker the Zoom captions show at that moment\./)).toBeInTheDocument();
 });

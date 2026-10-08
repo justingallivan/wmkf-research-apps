@@ -89,15 +89,17 @@ sequence.
   Research only via `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`) is live
   (PR #456, merge `8bc5b466b`, 2026-10-07; migration 072 applied, copy seeded,
   Production list = Research only); verify the first real send. Stage 5 (leadership daily digest) is planned,
-  not built; SoCal is parked by the owner (2026-10-07). Program-list reminder:
+  not built; scope is Research only, via the same program list (owner, S584);
+  SoCal is parked by the owner (2026-10-07). Program-list reminder:
   when SoCal (or another program) adopts group review, add its Grant Program
   GUID to `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS` or it sends no email:
   `docs/plans/FINAL_WRITEUP_GROUP_REVIEW_HANDOFF_PLAN_2026-10-06.md`.
-- **Deferred to next session (2026-10-06):** (a) the list's next step for a
-  ready briefing should name the deliberation session date (UI only; the
-  session is already in the list payload, `cycle-list-service.js:618`);
-  (b) reword the two "generated before the Dataverse fill" warnings
-  (`lib/services/pre-site-visit/artifact-model.js:290-291`).
+- **Deferred items from 2026-10-06, live S584 via PR #460 (merge
+  `ea1e09a0d`):** (a) the Staff Deliberations
+  list's next step for a ready briefing names the deliberation session date while the
+  session is upcoming, matching the request tab's rule (`StaffDeliberationsPanel.js`);
+  (b) the two writeup "check in Word" warnings no longer say "the Dataverse fill"
+  (`lib/services/pre-site-visit/artifact-model.js`). Owner approved both wordings.
 
 - **Cycle rollover with minimal configuration (2026-10-06).** [OPEN —
   investigation designed, not started] Owner principle: very few parameters may

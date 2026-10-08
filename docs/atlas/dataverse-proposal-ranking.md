@@ -108,3 +108,41 @@ isolation/runtime flags and browser rehearsal remain open. The selected-staff
 direct-table denial proof is limited to the sandbox identity and retained records
 in the linked privacy receipt; production permissions require their own verification.
 Advanced Find visibility is not proof of relevance-search exclusion.
+
+
+## Ranking branch continuation — 2026-10-07
+
+[VERIFIED via `scripts/probe-proposal-ranking-readiness.mjs`, GET-only rerun]
+The registered sandbox `orgd9e66399.crm.dynamics.com` still passes all three entity
+identity/attribute/key checks, application-role assignment and both isolation-marker
+schema checks. The uncapped ordinary Phase II Pending SE/MR scan returns **0** eligible
+proposals and no cycles. The default-facilitator setting row remains absent.
+The four readiness switches are false in the local loaded environment, not an
+inventory of hosted Preview configuration. No configuration or data was changed.
+
+[VERIFIED via local tests/gates] The merge of 23 incoming main commits through
+`27ed1684d` preserves ranking source and contracts. Ranking/Explorer: 120 tests in
+12 suites pass. API routes, Atlas and route lifecycle auth gates and their self-tests
+pass sequentially; types pass. All local startup gates pass after repairing this
+worktree's memory symlink. The live factory-ledger check was excluded from the run
+because Production reads are outside the owner's authorization.
+
+The browser lifecycle remains unperformed: private rankings, locked submission,
+composite publication, meeting reordering and full-requested budget totals. Participant
+grants and verified Beth Pruitt facilitator selection remain open per the prior
+setup receipt; this readiness probe does not inventory participant grants. Owner
+choice is required between preparing these prerequisites, resolving the zero-proposal
+acceptance-data gap, or deferring live acceptance. Source creation/copy and activation
+are not inferred. D99 remains storage-only evidence; test exclusion stays intact.
+
+
+Review: Luna reconnaissance and Sol merge review found no substantive blockers.
+One bounded `claude-opus-5-5` subscription-OAuth source review returned **APPROVE**;
+API-key environment variables were removed, and review tools were read-only.
+Opus did not run tests or live probes. Its only nonblocking note was the Admin
+route's matrix wording: `handleProposalRankingAdminSettings` permits guarded
+facilitator configuration before activation. The matrix now reflects that source;
+no runtime check was added. No second review loop was run. The full local review
+receipt is `/private/tmp/ranking-opus-merge-review.txt` (not portable); the verdict,
+scope and disposition here are the durable receipt. The fresh probe and tests were
+run by the orchestrator, separately from the review.

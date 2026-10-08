@@ -1103,7 +1103,7 @@ export default function StaffDeliberationsTab({
               <p className="mt-2">The Word file stays the same, including your edits, and colleagues can then review and edit it.</p>
               <p className="mt-2">
                 {finalReview?.handoffEmailEnabled === true
-                  ? 'The other Program Directors for this grant program are emailed a link to the writeup.'
+                  ? 'The other Program Directors for this grant program get an email from the lead Program Director with a link to the writeup.'
                   : 'No email is sent. Let colleagues know it is ready.'}
               </p>
             </>

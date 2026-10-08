@@ -2,6 +2,70 @@
 
 Status: **PRODUCTION-LIVE (merged to main as `c99f8d966` on 2026-10-04, S572; migration 065 applied; prompt row `meeting-transcript.speaker-alignment` v1 seeded; first rehearsal on Request 1003222 completed the same day).** Follow-up verifier revision (support decides, model vetoes) is **BUILT ON BRANCH `feature/speaker-alignment-dominance`, NOT MERGED** — see section 2. Plan rounds: Codex 1 to 3 NEEDS REWORK, round 4 READY WITH NAMED CHANGES (applied). Build stages 1 to 5b each passed a Sonnet build → Opus review loop (stage 5a required one reject-and-fix round for a wrong import source and claim shape that mocked tests had hidden). Build-time refinements recorded below: cue-exclusive support, Sonnet tier alias (D7), sample budget 160 000 / name budget 20 000, Executor `auditRetention`. Codex adversarial review of the branch (code): rounds 1 to 4 NEEDS REWORK, each a verified identity bypass in attribution or verification, fixed in commits `882bb077b`, `af4c618cd`, `22d86dc03`, `9694dc789` (details inline in section 2); round 5 READY with no material findings at `9694dc789`. Merge, 065, seed and the first production rehearsal all completed 2026-10-04; the rehearsal exposed the conflict-rule and model-gate defects fixed in the follow-up branch.
 
+## Reused speaker IDs — generation fix (2026-10-07)
+
+**[DEPLOYED 2026-10-07 via PR #459 (`f48fba1ab`); owner reported 1003038 regeneration looks correct.]** The owner reported
+Request 1003038: Zoom captions identify a late participant whose audio-derived
+turns inherit earlier participants' names. Signed-in inspection and an offline
+comparison of the downloaded VTTs verified that this is not just one incorrectly
+named ID: the late participant spans multiple audio IDs. The owner requested a
+generation-pipeline fix, not a repair to this saved transcript.
+
+The existing sampled verifier below still decides names for whole audio IDs.
+It is now followed by `reconcileZoomSpeakerTurns` in `zoom-vtt.js`, which examines
+the complete recording. Each candidate needs continuous timing coverage and
+ordered wording agreement; another caption merely touching the turn is not
+evidence. Substantial turns require at least 80% ordered word coverage and two
+matching content words. Replies of five words or fewer require an exact caption
+prefix and onset within 500 ms. Competing claims to the same caption words,
+including consecutive echoes, abstain. A newly assigned name needs corroboration
+from two substantial turns and two distinct cues. Removing a global name requires
+at least two substantial contrary turns on that ID after prior short-turn corrections.
+A single local contradiction can be corrected without stripping the global name
+from the ID's other, potentially uncaptioned turns.
+IDs without an applied global name still recover when multiple names have
+exclusive substantial turn evidence, including a 3:1 split. Only corroborated
+names are applied; a singleton minority stays unnamed. No existing global name
+is at risk in that case.
+
+Mixed audio IDs lose their global name. Supported turns move to an unambiguous
+existing identity or a collision-free `zoom_N` identity; unresolved turns remain
+unnamed. Text, order, boundaries and word timings are preserved. This also means
+that a whole-ID conflict in the older verifier can now be resolved at the turn
+level. The old short-backchannel pass remains. Its incoming corrections follow
+the original name's split target; if no target is supported, they retain the now
+unnamed ID instead of reverting to a wrong source name. Suggestions and reasons
+are pruned along with names when an ID no longer occurs in the corrected content.
+
+Persistence remains `speaker_names` plus bounded `speaker_alignment` under the
+same lease/version fence. `reassigned` carries utterance-index → ID; the new
+server-only `additionalSpeakerIds` authorizes generated IDs on read. The combined
+map is capped at 2,000 entries and the new result at 32 KiB serialized JSON to
+reserve JSONB overhead under the existing 64 KiB database CHECK. An oversized
+split is dropped atomically while mixed IDs remain unnamed; oversized fallback
+metadata becomes a minimal abstention. No schema migration is needed.
+
+| Invariant | Source | Verification |
+|---|---|---|
+| Local corrections do not strip consistent global names | `reconcileZoomSpeakerTurns` | synthetic late arrival across two IDs; uncaptioned turns; single contradiction; incoming/outgoing short corrections |
+| Timing alone and repeated wording cannot establish identity | same helper | shifted/unrelated VTT, simultaneous captions, short and substantive echoes, missing words, silent gaps |
+| Names and added identities survive the real read boundary | `runtime.js`, `transcript-format.js` | runtime reconstruction and projection test; serialized overlay → VTT and frozen bundle source |
+| Source words and timing remain unchanged | same helper | exact utterance comparison excluding only speaker ID; original object unchanged |
+| Storage limits never produce a partial identity map | same helper | count limit, oversized split, oversized fallback, ID-collision tests |
+
+Regression suites: `tests/unit/transcription-zoom-speaker-turns.test.js`,
+`tests/unit/meeting-tracker-transcription-alignment-service.test.js`, and
+`tests/unit/transcription-pilot-runtime.test.js`. The deterministic offline probe
+`scripts/probe-transcript-speaker-turns.mjs DRAFT.vtt ZOOM.vtt` reads local files
+only and prints label changes without transcript wording. On the supplied
+1003038 files, it corrects the labels at 01:02:04.560, 01:02:12.880 and
+01:02:26.648 to `allisonkeller`; the review revision removes no existing names in
+this replay. Ambiguous turns on confirmed mixed IDs remain unnamed. VTT replay
+reconstructs IDs from display names, so it is not a raw-provider replay or a
+hosted end-to-end test. No saved job was modified, and no provider/model call
+was made for this verification. Statements below about whole-ID conflict
+abstention describe the sampled verifier stage, not the final combined result.
+
 ## Problem
 
 Meeting Tracker transcription jobs (`transcription_jobs`, AssemblyAI provider) return diarized speaker IDs (`A`, `B`, …). Staff currently name those speakers by hand through an owner-editable overlay (`speaker_names`, migration 062). Zoom now produces a WebVTT transcript with real display names per cue. The owner wants the program coordinator to upload the Zoom VTT alongside the audio, and the system to map Zoom names onto the AssemblyAI speaker IDs automatically, with the manual editor remaining as the fallback. The owner states that the existing transcripts without a VTT (owner-reported figure: four, 2026-10-04) will always need the manual path.
@@ -137,7 +201,7 @@ New store functions, all in `store.js`, all following the lease templates:
 - `expireExhaustedAlignments({ limit })`: the terminal transition for the gap the claim cannot reach. `UPDATE ... SET speaker_alignment = jsonb(status 'failed', code 'attempts_exhausted'), lease_token = NULL, lease_expires_at = NULL, version = version + 1 WHERE status = 'ready' AND speaker_alignment->>'status' = 'running' AND (lease_token IS NULL OR lease_expires_at <= NOW()) AND (speaker_alignment->>'attempts')::int >= 3`. No model call. Runs in the recovery handler before the scan. A live lease is never touched.
 - `updateMeetingSpeakerNames` (`store.js:263-270`) gains `speaker_alignment = CASE WHEN speaker_alignment->>'status' IN ('pending','running') THEN jsonb_set(status 'superseded') ELSE speaker_alignment END`. Because PATCH already requires a free lease, `running` here means an expired lease only.
 
-Service `alignMeetingTranscriptionSpeakers({ jobId })` in `lib/services/meeting-tracker-transcription/alignment-service.js` [RECHECKED after lib/services/meeting-tracker-transcription/alignment-service.js change: file created in stage 5a (uncommitted at the time of this note); orchestrator trace found it importing the five alignment store functions from `runtime.js`, which does not export them (`store.js:2095-2099` does), and reading `claimed.lease_token` where the store returns `{ job, leaseToken }` (`store.js:812`); both are queued as stage 5a review fixes before commit]: claim → read transcript JSON and VTT from private Blob with a step-local deadline and verify both hashes → `buildAlignmentPrior`, `sampleAlignmentPairs`, `computeNameSupport` → `executePrompt` → parse → `verifyAlignmentVerdict` → `completeAlignment`. Any throw → `failAlignment` with `terminal` true for `zoom_transcript_missing`, hash mismatch, invalid verdict shape, or `stop_reason: 'refusal'`, and false for Executor transport or deadline errors. The job's `status` column never changes in this stage.
+Service `alignMeetingTranscriptionSpeakers({ jobId })` in `lib/services/meeting-tracker-transcription/alignment-service.js` [RECHECKED after lib/services/meeting-tracker-transcription/alignment-service.js change: 2026-10-07, reused speaker-ID generation fix]: claim → read transcript JSON and VTT from private Blob with a step-local deadline and verify both hashes → `buildAlignmentPrior`, `sampleAlignmentPairs`, `computeNameSupport` → `executePrompt` → parse → `verifyAlignmentVerdict` → short-utterance reassignment → `reconcileZoomSpeakerTurns` → `completeAlignment`. Errors use the service's fixed terminal/non-terminal classification and `failAlignment`; the job's `status` column never changes in this stage.
 
 Workflow wiring: `alignSpeakersStep(jobId)` in `workflow.js`, `'use step'`, `maxRetries` 2, called after `finishStep` when `advanceJobStep` reports `complete`. A step retry re-enters through the claim, so a stale claim from a crashed step is reclaimed only after its lease expires. The hourly recovery handler (`drain-transcriptions.js:72-88`) additionally runs `expireExhaustedAlignments` and then `claimNextPendingAlignmentJob` with a small limit and the same service, within the existing deadline budget.
 
@@ -171,7 +235,7 @@ Workflow wiring: `alignSpeakersStep(jobId)` in `workflow.js`, `'use step'`, `max
 | Conflict detection is independent of the verdict and uses a dominance ratio, not any-second-name | `computeNameSupport`, `verifyAlignmentVerdict` | unit: 2:2 and 3:1 splits abstain with both suggestions even at 0.99; 30:4 and 50:1 apply (Oregon State observed tables); a conflict only in full-set support still blocks |
 | Recovery predicates match a released lease, not only an expired one | `claimNextPendingAlignmentJob`, `expireExhaustedAlignments` | pg integration: crashed attempt, cleanup claims and releases the lease, recovery still reaches the row; live cleanup lease untouched |
 | Recovery reaches stranded jobs | `claimNextPendingAlignmentJob` in the cron handler | pg integration: crash simulated after `finishStep` → cron claims and completes |
-| Shifted, unrelated, repeated-phrase, and merged-speaker inputs never auto-apply; the model can veto but never add a name | `verifyAlignmentVerdict` | unit fixtures for each; a confident different-name verdict withholds with both suggested; a fabricated citation neither applies an unsupported name nor withholds a verified one; stored pairIds come from support only |
+| The sampled whole-ID verifier abstains on unsupported/ambiguous names; full-recording turn evidence may resolve a merged ID | `verifyAlignmentVerdict`, `reconcileZoomSpeakerTurns` | sampled-verifier fixtures plus separate turn-level shift, echo, late-arrival and bounded-overlay tests |
 | Low-talk speakers get reserved samples | `sampleAlignmentPairs` | unit: eight speakers with one dominant → every ID has ≥ `minPerSpeaker` samples |
 | VTT survives ready-time audio deletion; deleted at purge | `worker.js:142-147, 319-328` | worker unit: deletedPaths for ready non-purge excludes VTT; purge includes it |
 | Cleanup completion never set while VTT blob exists | `store.js finishLocalCleanup`, migration CHECK | pg integration: purge with VTT present → `content_purged_at` only after VTT path acknowledged |
@@ -186,7 +250,7 @@ Workflow wiring: `alignSpeakersStep(jobId)` in `workflow.js`, `'use step'`, `max
 ## Tests that fail if the feature is broken
 
 - Split: one Zoom name across two provider IDs, each with verified pairs → both IDs get the name.
-- Merge: two Zoom names with verified samples inside one ID, at 2:2 and at 3:1 → that ID abstains; both names become suggestions; nothing applied even at confidence 0.99, and even when the verdict cites only one name's pairs.
+- Merge: the sampled verifier abstains for a mixed ID at 2:2 and 3:1 even at confidence 0.99; the full-recording pass may assign separate identities to independently supported turns, never a majority name to the mixed ID.
 - Crash after the third claim, lease expired → recovery marks `failed` with `attempts_exhausted`; the panel re-enables Save names and Publish.
 - Repeated short phrase ("Yes, thank you") as the only evidence → below `minContentWords` → suggestion only.
 - Fabricated citation: verdict cites a pair whose cue does not match the utterance → pair discarded → below `minVerifiedPairs` → not applied.
