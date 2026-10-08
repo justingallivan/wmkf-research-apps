@@ -18,6 +18,7 @@ import { SANDBOX_HOSTS } from '../lib/dataverse/core/target-registry.js';
 import { RESEARCH_PROGRAM_IDS } from '../shared/config/researchPrograms.js';
 import { PHASE_II_PENDING } from '../shared/config/workbenchVisibility.js';
 import { meetingDateToCycleCode } from '../lib/utils/cycle-code.js';
+import { applyProposalRankingTrialCutoff } from '../lib/services/proposal-ranking/trial-cutoff.js';
 import cycleSchema from '../lib/dataverse/schema/wave32-proposal-ranking/wmkf_proposalrankingcycle.json' with { type: 'json' };
 import roundSchema from '../lib/dataverse/schema/wave32-proposal-ranking/wmkf_proposalrankinground.json' with { type: 'json' };
 import listSchema from '../lib/dataverse/schema/wave32-proposal-ranking/wmkf_proposalrankinglist.json' with { type: 'json' };
@@ -208,9 +209,10 @@ async function inspectSource(client) {
   if (!requests.ok || requests.capped) {
     return { selects, requestScan: { available: requests.ok, status: requests.status, errorCode: requests.errorCode, capped: requests.capped }, activeSystemUserCount: null, cycles: {} };
   }
+  const { requests: trialRequests, excludedRequestCount } = applyProposalRankingTrialCutoff(requests.records);
   const activeStaff = await pages(client, 'systemusers?$select=systemuserid&$filter=isdisabled eq false');
   const grouped = new Map();
-  for (const row of requests.records) {
+  for (const row of trialRequests) {
     const cycle = meetingDateToCycleCode(row.wmkf_meetingdate);
     if (!cycle) continue;
     const group = grouped.get(cycle) || { eligibleProposalCount: 0, se: 0, mr: 0, missingLead: 0, missingAmount: 0, missingCurrency: 0 };
@@ -224,7 +226,7 @@ async function inspectSource(client) {
   }
   return {
     selects,
-    requestScan: { available: true, status: requests.status, capped: false, eligibleOrdinaryPhaseIIPendingCount: requests.records.length, missingJuneDecemberDateCount: requests.records.filter((row) => !meetingDateToCycleCode(row.wmkf_meetingdate)).length },
+    requestScan: { available: true, status: requests.status, capped: false, scannedOrdinaryPhaseIIPendingCount: requests.records.length, eligibleOrdinaryPhaseIIPendingCount: trialRequests.length, excludedByD26RequestNumberCutoffCount: excludedRequestCount, missingJuneDecemberDateCount: trialRequests.filter((row) => !meetingDateToCycleCode(row.wmkf_meetingdate)).length },
     activeSystemUserCount: activeStaff.ok && !activeStaff.capped ? activeStaff.records.length : null,
     cycles: Object.fromEntries([...grouped.entries()].sort(([left], [right]) => left.localeCompare(right))),
   };

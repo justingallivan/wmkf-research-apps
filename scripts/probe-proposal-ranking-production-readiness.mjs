@@ -2,9 +2,9 @@
 
 /**
  * Read-only Production inventory for Proposal Ranking storage and eligible
- * source counts. Every Dataverse request is GET-only. No business fields are
- * selected beyond meeting date and research-program lookup; output contains
- * aggregate counts and readiness booleans only.
+ * source counts. Every Dataverse request is GET-only. Request number is read
+ * only to apply the December 2026 trial cutoff; output contains aggregate
+ * counts and readiness booleans only.
  *
  * Requires an explicit target and local read grant:
  *   DATAVERSE_ALLOW_PROD_READS=yes DATAVERSE_TARGET_INTERLOCK=on \
@@ -19,6 +19,7 @@ import { RESEARCH_PROGRAM_IDS } from '../shared/config/researchPrograms.js';
 import { PHASE_II_PENDING } from '../shared/config/workbenchVisibility.js';
 import { TEST_REQUEST_ORDINARY_OData_FILTER } from '../lib/services/test-requests/isolation.js';
 import { meetingDateToCycleCode } from '../lib/utils/cycle-code.js';
+import { applyProposalRankingTrialCutoff } from '../lib/services/proposal-ranking/trial-cutoff.js';
 import cycleSchema from '../lib/dataverse/schema/wave32-proposal-ranking/wmkf_proposalrankingcycle.json' with { type: 'json' };
 import roundSchema from '../lib/dataverse/schema/wave32-proposal-ranking/wmkf_proposalrankinground.json' with { type: 'json' };
 import listSchema from '../lib/dataverse/schema/wave32-proposal-ranking/wmkf_proposalrankinglist.json' with { type: 'json' };
@@ -88,7 +89,7 @@ async function inspectTable(client, spec) {
 async function scanEligibleSource(client, resourceOrigin) {
   const programFilter = RESEARCH_PROGRAM_IDS.map((id) => `_akoya_programid_value eq ${id}`).join(' or ');
   const filter = `(${programFilter}) and akoya_requeststatus eq '${PHASE_II_PENDING}' and ${TEST_REQUEST_ORDINARY_OData_FILTER}`;
-  const initialPath = `${API_PATH}?$select=wmkf_meetingdate,_akoya_programid_value&$filter=${encodeURIComponent(filter)}&$orderby=wmkf_meetingdate asc`;
+  const initialPath = `${API_PATH}?$select=akoya_requestnum,wmkf_meetingdate,_akoya_programid_value&$filter=${encodeURIComponent(filter)}&$orderby=wmkf_meetingdate asc`;
   let nextUrl = new URL(initialPath, resourceOrigin).href;
   const records = [];
   let pageCount = 0;
@@ -101,10 +102,10 @@ async function scanEligibleSource(client, resourceOrigin) {
     const result = await getJson(client, parsed.href);
     lastStatus = result.status;
     if (!result.ok) {
-      return { complete: false, status: result.status, errorCode: result.errorCode, capped: false, eligibleProposalCount: null, byCycle: null, unmappedMeetingDateCount: null };
+      return { complete: false, status: result.status, errorCode: result.errorCode, capped: false, scannedProposalCount: null, eligibleProposalCount: null, excludedByD26RequestNumberCutoffCount: null, byCycle: null, unmappedMeetingDateCount: null };
     }
     if (!Array.isArray(result.body?.value)) {
-      return { complete: false, status: result.status, capped: false, eligibleProposalCount: null, byCycle: null, unmappedMeetingDateCount: null };
+      return { complete: false, status: result.status, capped: false, scannedProposalCount: null, eligibleProposalCount: null, excludedByD26RequestNumberCutoffCount: null, byCycle: null, unmappedMeetingDateCount: null };
     }
     records.push(...result.body.value);
     const continuation = result.body['@odata.nextLink'];
@@ -112,12 +113,13 @@ async function scanEligibleSource(client, resourceOrigin) {
     pageCount += 1;
   }
   if (nextUrl) {
-    return { complete: false, status: lastStatus, capped: true, eligibleProposalCount: null, byCycle: null, unmappedMeetingDateCount: null };
+    return { complete: false, status: lastStatus, capped: true, scannedProposalCount: null, eligibleProposalCount: null, excludedByD26RequestNumberCutoffCount: null, byCycle: null, unmappedMeetingDateCount: null };
   }
 
+  const { requests: trialRecords, excludedRequestCount } = applyProposalRankingTrialCutoff(records);
   const byCycle = {};
   let unmappedMeetingDateCount = 0;
-  for (const row of records) {
+  for (const row of trialRecords) {
     const cycleCode = meetingDateToCycleCode(row.wmkf_meetingdate);
     const programId = String(row._akoya_programid_value || '').toLowerCase();
     const programKey = programId === RESEARCH_PROGRAM_IDS[0] ? 'se' : programId === RESEARCH_PROGRAM_IDS[1] ? 'mr' : null;
@@ -134,7 +136,9 @@ async function scanEligibleSource(client, resourceOrigin) {
     complete: true,
     status: lastStatus,
     capped: false,
-    eligibleProposalCount: records.length,
+    scannedProposalCount: records.length,
+    eligibleProposalCount: trialRecords.length,
+    excludedByD26RequestNumberCutoffCount: excludedRequestCount,
     byCycle: Object.fromEntries(Object.entries(byCycle).sort(([left], [right]) => left.localeCompare(right))),
     unmappedMeetingDateCount,
   };
@@ -183,7 +187,7 @@ async function main() {
   console.log(JSON.stringify({
     target: new URL(resourceUrl).hostname,
     writesPerformed: false,
-    selectedProposalFields: ['wmkf_meetingdate', '_akoya_programid_value'],
+    selectedProposalFields: ['akoya_requestnum', 'wmkf_meetingdate', '_akoya_programid_value'],
     businessRowsPrinted: false,
     activationChecked: false,
     rankingTables: tableResults,

@@ -148,6 +148,11 @@ must belong to the captured PD roster.
 Pool predicate: selected cycle from `wmkf_meetingdate`, exact SE/MR internal
 `_akoya_programid_value`, exact stored `akoya_requeststatus = Phase II Pending`,
 non-test marker and null test-creation-run marker. Ignore dashboard triage flags.
+Owner-approved December 2026 trial exception: for D26 only, also exclude request
+numbers 1003220 and higher, which the owner identified as test data. Compare the
+verified string field `akoya_requestnum` numerically; an unreadable D26 number
+blocks the scan. Keep the existing test-marker exclusions. Other cycles are
+unaffected; existing frozen snapshots are not rewritten by this source filter.
 The pending-status literal must be shared/exported instead of duplicated. A future
 source-status rename requires a reviewed change to this predicate, not a UI edit.
 Deferred, withdrawn, declined and other status values do not match. Flag unexpected

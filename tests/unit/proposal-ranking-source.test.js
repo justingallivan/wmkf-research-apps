@@ -149,3 +149,58 @@ test('staff readiness treats only explicit isdisabled false as active', async ()
   await expect(readEnabledProposalRankingStaff(LEAD_ID)).resolves.toBeNull();
   await expect(readEnabledProposalRankingStaff(LEAD_ID)).resolves.toBeNull();
 });
+
+test('December 2026 trial excludes request numbers at or above the cutoff before downstream reads', async () => {
+  const rows = [
+    { akoya_requestid: REQUEST_ID, akoya_requestnum: '1003219' },
+    { akoya_requestid: LEAD_ID, akoya_requestnum: '1003220' },
+    { akoya_requestid: CURRENCY_ID, akoya_requestnum: '1003221' },
+  ].map((row) => ({
+    ...row,
+    akoya_title: 'Proposal',
+    akoya_request: null,
+    wmkf_organizationname: 'Institute',
+    wmkf_meetingdate: '2026-12-15T00:00:00Z',
+    akoya_requeststatus: 'Phase II Pending',
+    wmkf_istestrequest: null,
+    wmkf_testcreationrunid: null,
+    _akoya_programid_value: RESEARCH_PROGRAM_IDS[0],
+    _wmkf_programdirector_value: null,
+    _transactioncurrencyid_value: null,
+  }));
+  DynamicsService.queryAllRecords.mockImplementation(async (entitySet) => {
+    if (entitySet === 'akoya_requests') return { records: rows };
+    if (entitySet === 'wmkf_appreviewersuggestions') return { records: [] };
+    throw new Error(`Unexpected source entity set: ${entitySet}`);
+  });
+
+  const source = await readProposalRankingSource('D26', {
+    TEST_REQUEST_ISOLATION: 'on',
+    SYNTHETIC_REVIEWER_ISOLATION: 'on',
+  });
+
+  expect(source.proposals.map((proposal) => proposal.requestNumber)).toEqual(['1003219']);
+  expect(source.sourceRequestCount).toBe(1);
+  expect(source.scannedRequestCount).toBe(3);
+  expect(DynamicsService.queryAllRecords).toHaveBeenCalledTimes(2);
+  expect(DynamicsService.queryAllRecords).toHaveBeenLastCalledWith('wmkf_appreviewersuggestions', expect.objectContaining({
+    filter: expect.stringContaining(REQUEST_ID),
+  }));
+  const suggestionFilter = DynamicsService.queryAllRecords.mock.calls[1][1].filter;
+  expect(suggestionFilter).not.toContain(LEAD_ID);
+  expect(suggestionFilter).not.toContain(CURRENCY_ID);
+});
+
+test('December 2026 trial fails clearly for a malformed request number before downstream reads', async () => {
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [{
+    akoya_requestid: REQUEST_ID,
+    akoya_requestnum: 'D26-unknown',
+    wmkf_meetingdate: '2026-12-15T00:00:00Z',
+  }] });
+
+  await expect(readProposalRankingSource('D26', {
+    TEST_REQUEST_ISOLATION: 'on',
+    SYNTHETIC_REVIEWER_ISOLATION: 'on',
+  })).rejects.toThrow('December 2026 Proposal Ranking trial encountered a missing or malformed request number.');
+  expect(DynamicsService.queryAllRecords).toHaveBeenCalledTimes(1);
+});

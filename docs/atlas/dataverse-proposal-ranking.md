@@ -38,7 +38,14 @@ synchronization service is introduced.
 
 [VERIFIED via source] The frozen inputs come from exact current-cycle, SE/MR,
 `Phase II Pending` ordinary requests; `akoya_request` supplies full requested amount,
-not total project expenses. The source adapter paginates and rejects capped reads.
+not total project expenses. For the owner-approved D26 trial only, the shared
+`lib/services/proposal-ranking/trial-cutoff.js` also excludes numeric request numbers
+1003220 and higher before downstream reads/new snapshots. Missing/malformed D26
+numbers abort; other cycles and existing frozen snapshots are unchanged. The verified
+`akoya_requestnum` is a string (metadata receipt in
+`docs/plans/evidence/test-request-factory/metadata-2026-09-20.json`), so comparison
+is numeric after validation. Both readiness probes share this additional exclusion.
+The source adapter paginates and rejects capped reads.
 External received nonsynthetic answer snapshots supply the saved overall-assessment
 scale. Lead PDs must resolve to enabled staff with app access. Missing assignments,
 invalid saved scales and mixed currencies block opening; unscored proposals and
@@ -158,12 +165,15 @@ the target interlock remained on. No Production writes or activation occurred.
 
 | Source cycle | Science & Engineering | Medical Research | Total |
 |---|---:|---:|---:|
-| D26 (December 2026) | 16 | 12 | 28 |
+| D26 (December 2026), after trial cutoff | 11 | 12 | 23 |
 | J26 (June 2026) | 1 | 0 | 1 |
 
 The source scan returned HTTP 200, completed all pages, and had zero unmapped meeting
 dates. It used the canonical ordinary/test exclusion, Phase II Pending and research
-program filters. It selected only meeting date and program; no proposal titles,
+program filters plus the owner-approved D26 request-number cutoff. The complete
+scan found 29 rows; five D26 SE requests numbered 1003220 or higher were excluded,
+leaving 24 across both cycles. This replaces the earlier pre-cutoff D26 count of 28.
+It selected only request number, meeting date and program; no proposal titles,
 institutions or business rows were printed. These counts do not establish review
 completeness, full snapshot eligibility, participant grants or facilitator readiness.
 
@@ -173,6 +183,16 @@ tables are absent. Exact role-name and current-application assignment queries bo
 returned HTTP 200 with no match for `WMKF Proposal Ranking Application User`.
 The probe exits 2 / `inventoryComplete: false` for these missing prerequisites;
 this is not a failed source scan. Activation flags were not inventoried.
+
+Validation of the trial cutoff: 134 tests across 13 ranking/Explorer suites passed,
+including the threshold boundary, malformed D26 input and exclusion before downstream
+reads. Types and Dataverse/OData/Atlas/documentation gates and self-tests passed
+sequentially. Luna implemented; Sol and bounded subscription-OAuth Opus source
+reviews found no substantive bug. The orchestrator ran the tests and live probe.
+Opus noted the intentional strict failure for malformed D26 numbers, including
+nonpending rows in the app's cycle scan; no change was required. Local review receipt:
+`/private/tmp/ranking-cutoff-opus-review.txt` (nonportable); this paragraph retains
+its verdict and scope. No Production write, setup or activation was performed.
 
 Production's D26 source pool resolves the sandbox-only zero-proposal concern, but
 Production schema, role provisioning, grants/settings and activation still require

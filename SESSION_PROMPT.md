@@ -64,13 +64,21 @@ visible score after correcting Opus's nonblocking note. No milestone entry requi
 ### Follow-up: owner-approved read-only Production inventory
 
 [VERIFIED via `scripts/probe-proposal-ranking-production-readiness.mjs`, GET-only,
-2026-10-07] Production has 29 ordinary Phase II Pending SE/MR requests: D26 has
-28 (16 SE, 12 MR), J26 has one SE. The scan completed without a cap or unmapped
-meeting dates. Only meeting date and program were selected; no business rows printed.
+2026-10-07] After the owner-approved December-only cutoff, Production has 24 matching
+requests: D26 has 23 (11 SE, 12 MR), J26 has one SE. Five D26 SE requests were
+excluded from the original 29-row scan. The shared trial cutoff excludes numeric
+`akoya_requestnum >= 1003220` for D26 only before downstream reads/new snapshots;
+malformed D26 numbers abort. Other cycles and existing frozen snapshots are unchanged.
+Both readiness probes use the same rule; existing test-marker exclusion stays intact.
+The scan completed without a cap or unmapped meeting dates. Request number,
+meeting date and program were selected; no business rows printed.
 All three ranking entity metadata lookups returned 404 (`0x80060888`). The exact
 application-role query and assignment query returned 200 with no matching role.
 No Production writes, provisioning, settings or activation occurred. Exit 2 denotes
 missing readiness prerequisites. The Atlas records scope and limits.
+Cutoff validation: 134 tests / 13 suites, types and relevant data/documentation gates
+and sequential self-tests pass. Luna built; Sol and bounded OAuth-only Opus reviewed
+without substantive findings. Production remains unchanged and disabled.
 
 ### Owner choice before further work
 
