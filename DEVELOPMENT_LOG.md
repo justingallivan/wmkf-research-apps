@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Transcription queue hardened; staff can cancel stuck runs (Session 587)
+
+**Milestone:** A transcript that fails validation no longer blocks the transcription queue, and staff can cancel a queued or stuck transcription from the Meeting Tracker card.
+**Sessions:** 587. PRs #467 (`e2e6ef6f4`), #468 (`c5030df33`), #469 (`99ca8d413`), #470 (`ee773977b`). Sonnet built; Claude reviewed; Codex adversarial passes (#468: high, medium, then approve; #469: high, medium, high, then approve; #470: approve).
+**Ship state:**
+- Deterministic save-validation errors fail the job and free the global slot. A provider-ID conflict mid-save goes to `submission_uncertain`. Logs carry only allowlisted error codes.
+- Staff can cancel queued, processing and saving runs. The confirm text warns that AssemblyAI may still finish and bill. A cancelled queued run no longer blocks a replacement or a Zoom re-import, and an in-flight cancel keeps its Zoom claim until the job ends.
+- Imported Zoom audio gets a Pacific-time name. The runbook now records the recovery recipe for Workflow runs pinned to an old deployment.
+**Why it matters:** this closes the S586 outage class (one bad transcript blocking all transcription) and gives staff a way out of a stuck job without the browser console.
+**Pointers:** `lib/services/transcription-pilot/worker.js`; `shared/components/meeting-tracker/RecordingAndTranscriptCard.js`; `lib/services/meeting-tracker-recordings/import-service.js`; `docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_RUNBOOK_2026-09-30.md` (Recovery and abandonment).
+
 ## October 2026 — Import from Zoom ships; transcription queue incident fixed (Session 586)
 
 **Milestone:** Staff can import a site visit's audio and Zoom transcript directly from WMKF's Zoom account into Meeting Tracker transcription. The recording card is now a three-step flow.
