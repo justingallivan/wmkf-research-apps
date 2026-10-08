@@ -363,20 +363,12 @@ describe('Proposal Ranking page', () => {
     expect(screen.getAllByRole('img', { name: /institution$/ })).toHaveLength(2);
   });
 
-  test('renders the reviewer score circle without changing its numeric card score', async () => {
-    const response = roundResponse();
-    mockLoad.mockResolvedValue(response);
+  test('shows numeric reviewer grades without a redundant score disk', async () => {
+    mockLoad.mockResolvedValue(roundResponse());
     render(<ProposalRankingApp />);
 
-    const scored = await screen.findByRole('img', {
-      name: 'Average reviewer score: 4.2 out of 5 (approximate color)',
-    });
-    expect(scored).toHaveStyle({ backgroundColor: reviewerScoreIndicator(REQUESTS[0].score).color });
-    expect(scored).toHaveAttribute('title', 'Average reviewer score: 4.2 out of 5 (approximate color)');
-    expect(screen.getByLabelText('Average reviewer grade: 4.2')).toHaveTextContent('4.2');
-
-    const unscored = await screen.findAllByRole('img', { name: 'Average reviewer score: unscored' });
-    expect(unscored[0]).toHaveStyle({ backgroundColor: '#9ca3af' });
+    expect(await screen.findByLabelText('Average reviewer grade: 4.2')).toHaveTextContent('4.2');
+    expect(screen.queryByRole('img', { name: /Average reviewer score:/ })).not.toBeInTheDocument();
   });
 
   test('a facilitator who is a PD can save and submit only their own list', async () => {

@@ -3,7 +3,7 @@ import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
 import { Button, Card, PageHeader } from '../Layout';
 import { conventionalCycles, cycleCodeToLabel, resolveWorkingCycle } from '../../../lib/utils/cycle-code';
 import { createOperationId, loadProposalRanking, sendProposalRankingAction } from './client';
-import { buildCumulativeTotals, errorMessage, formatMoney, moveProposal, PROGRAMS, pdRankColor, reviewerScoreIndicator } from './model';
+import { buildCumulativeTotals, errorMessage, formatMoney, moveProposal, PROGRAMS, pdRankColor } from './model';
 
 const EMPTY_CAPABILITIES = {
   preview: false, open: false, saveOwnList: false, submitOwnList: false,
@@ -41,7 +41,6 @@ function ProposalCardRow({ proposal, position, programCount, total, score, rank,
     ? formatMoney(total.cumulativeMinorUnits, proposal.currency, { incomplete: !total.complete })
     : 'Total incomplete';
   const rankNames = rank?.participants || [];
-  const scoreIndicator = reviewerScoreIndicator(proposal.score);
   return (
     <li
       ref={dragProvided?.innerRef}
@@ -58,9 +57,9 @@ function ProposalCardRow({ proposal, position, programCount, total, score, rank,
           <svg aria-hidden="true" width="16" height="24" viewBox="0 0 16 24" fill="currentColor"><circle cx="5" cy="6" r="1.5" /><circle cx="11" cy="6" r="1.5" /><circle cx="5" cy="12" r="1.5" /><circle cx="11" cy="12" r="1.5" /><circle cx="5" cy="18" r="1.5" /><circle cx="11" cy="18" r="1.5" /></svg>
         </div>}
         <div className="min-w-0 flex-1 space-y-3 p-4">
-          <div className="grid grid-cols-[1fr_auto] items-start gap-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+          <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[auto_minmax(0,1fr)]">
             <span aria-label={`Rank ${position + 1}: ${proposal.title || 'Untitled proposal'}`} className="min-w-8 shrink-0 text-3xl font-bold leading-none tabular-nums text-gray-900">{position + 1}</span>
-            <div className="order-3 col-span-2 min-w-0 sm:order-2 sm:col-span-1">
+            <div className="min-w-0">
               <h3 className="break-words text-base font-semibold leading-snug text-gray-900">{proposal.organization || 'Organization unavailable'}</h3>
               <p className="mt-1 break-words text-sm">
                 <a href={`/workbench/${encodeURIComponent(proposal.requestId)}`} className="text-blue-800 underline underline-offset-2 hover:text-blue-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">{proposal.title || 'Untitled proposal'}</a>
@@ -116,13 +115,6 @@ function ProposalCardRow({ proposal, position, programCount, total, score, rank,
                 )}
               </div>
             </div>
-            <span
-              role="img"
-              aria-label={scoreIndicator.label}
-              title={scoreIndicator.label}
-              className="order-2 h-6 w-6 shrink-0 rounded-full border border-gray-600 sm:order-3"
-              style={{ backgroundColor: scoreIndicator.color }}
-            />
           </div>
         </div>
       </div>
