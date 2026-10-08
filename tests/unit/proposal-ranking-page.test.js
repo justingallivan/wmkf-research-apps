@@ -175,6 +175,38 @@ describe('Proposal Ranking page', () => {
     expect(await screen.findByText('Submitted—waiting for the facilitator.')).toBeInTheDocument();
   });
 
+  test('keyboard dragging previews the destination and saves only on drop', async () => {
+    mockLoad.mockResolvedValue(roundResponse());
+    mockSend.mockImplementation((action) => Promise.resolve(roundResponse({ order: action.order, etag: 'list-v2' })));
+    render(<ProposalRankingApp />);
+    const handle = await screen.findByRole('button', { name: 'Drag proposal 1001 to reorder' });
+    handle.focus();
+    fireEvent.keyDown(handle, { key: ' ', keyCode: 32 });
+    expect(await screen.findByText('Drop at position 1 of 4')).toBeInTheDocument();
+    fireEvent.keyDown(handle, { key: 'ArrowDown', keyCode: 40 });
+    expect(await screen.findByText('Drop at position 2 of 4')).toBeInTheDocument();
+    expect(mockSend).not.toHaveBeenCalled();
+    fireEvent.keyDown(handle, { key: ' ', keyCode: 32 });
+    await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(1));
+    expect(mockSend.mock.calls[0][0]).toMatchObject({ action: 'save', order: ['request-2', 'request-1', 'request-3', 'request-4'], etag: 'list-v1' });
+    expect(await screen.findByText('Order saved.')).toBeInTheDocument();
+  });
+
+  test('canceling a keyboard drag preserves the order without saving', async () => {
+    mockLoad.mockResolvedValue(roundResponse());
+    render(<ProposalRankingApp />);
+    const handle = await screen.findByRole('button', { name: 'Drag proposal 1001 to reorder' });
+    handle.focus();
+    fireEvent.keyDown(handle, { key: ' ', keyCode: 32 });
+    await screen.findByText('Drop at position 1 of 4');
+    fireEvent.keyDown(handle, { key: 'ArrowDown', keyCode: 40 });
+    await screen.findByText('Drop at position 2 of 4');
+    fireEvent.keyDown(handle, { key: 'Escape', keyCode: 27 });
+    await waitFor(() => expect(screen.queryByText(/Drop at position/)).not.toBeInTheDocument());
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(screen.getByText(/Position 1 of 4 · #1001/)).toBeInTheDocument();
+  });
+
   test('serializes saves and keeps the latest queued drag order visible', async () => {
     const firstSave = deferred();
     mockLoad.mockResolvedValue(roundResponse());

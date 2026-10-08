@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
 import { Button, Card, PageHeader } from '../Layout';
 import { conventionalCycles, cycleCodeToLabel, resolveWorkingCycle } from '../../../lib/utils/cycle-code';
 import { createOperationId, loadProposalRanking, sendProposalRankingAction } from './client';
@@ -32,7 +33,7 @@ function StatusBanner({ kind = 'info', children, className = '' }) {
   return <div role={kind === 'error' ? 'alert' : 'status'} className={`rounded-lg border px-4 py-3 text-sm ${classes[kind]} ${className}`}>{children}</div>;
 }
 
-function ProposalCardRow({ proposal, position, count, total, score, rank, editable, onMove, dragging, onDragStart, onDragOver, onDrop, onDragEnd }) {
+function ProposalCardRow({ proposal, position, count, total, score, rank, editable, onMove, dragging, dragProvided }) {
   const amount = proposal.amountMinorUnits == null
     ? 'Requested amount unavailable'
     : formatMoney(proposal.amountMinorUnits, proposal.currency);
@@ -43,17 +44,14 @@ function ProposalCardRow({ proposal, position, count, total, score, rank, editab
   const scoreIndicator = reviewerScoreIndicator(proposal.score);
   return (
     <li
-      className={`rounded-xl border border-gray-200 bg-white shadow-sm ${dragging ? 'opacity-50' : ''}`}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
+      ref={dragProvided?.innerRef}
+      {...dragProvided?.draggableProps}
+      className={`mb-3 rounded-xl border bg-white ${dragging ? 'border-blue-600 shadow-xl ring-2 ring-blue-500' : 'border-gray-200 shadow-sm'}`}
     >
       <div className="flex min-w-0 items-stretch">
         {editable && <div
           aria-label={`Drag proposal ${proposal.requestNumber} to reorder`}
-          aria-hidden="true"
-          draggable
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
+          {...dragProvided?.dragHandleProps}
           title="Drag to reorder"
           className="flex w-8 shrink-0 cursor-grab items-center justify-center border-r border-gray-200 bg-gray-50 text-gray-400 active:cursor-grabbing"
         >
@@ -126,7 +124,8 @@ function ProposalCardRow({ proposal, position, count, total, score, rank, editab
 }
 
 function ProposalOrder({ list, proposals, order, editable, saveState, composite, remoteOrder, onMove, onRetry }) {
-  const [draggingIndex, setDraggingIndex] = useState(null);
+  const [dropPosition, setDropPosition] = useState(null);
+  const previewId = useId();
   const byId = useMemo(() => new Map(proposals.map((proposal) => [proposal.requestId, proposal])), [proposals]);
   const activeOrder = order || list?.order || EMPTY_ORDER;
   const totals = useMemo(() => buildCumulativeTotals(activeOrder, proposals), [activeOrder, proposals]);
@@ -146,38 +145,39 @@ function ProposalOrder({ list, proposals, order, editable, saveState, composite,
           <p className="mt-1">{remoteOrder.map((requestId) => `#${byId.get(requestId)?.requestNumber || requestId}`).join(' → ')}</p>
         </details>}
       </div>}
-      <ol className="space-y-3" aria-label="Proposal ranking order">
-        {activeOrder.map((requestId, position) => {
-          const proposal = byId.get(requestId);
-          if (!proposal) return null;
-          const score = composite?.scores?.[requestId];
-          return <ProposalCardRow
-            key={requestId}
-            proposal={proposal}
-            position={position}
-            count={activeOrder.length}
-            total={totalsById.get(requestId)}
-            score={score || null}
-            rank={ranksById.get(requestId)}
-            editable={editable}
-            dragging={draggingIndex === position}
-            onMove={onMove}
-            onDragStart={(event) => {
-              setDraggingIndex(position);
-              try { event.dataTransfer?.setData('text/plain', String(position)); } catch { /* test/browser may omit dataTransfer */ }
-              try { if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'; } catch { /* test/browser may omit dataTransfer */ }
-            }}
-            onDragOver={(event) => { if (draggingIndex !== null) event.preventDefault(); }}
-            onDrop={(event) => {
-              event.preventDefault();
-              const from = draggingIndex;
-              if (from !== null && from !== position) onMove(from, position);
-              setDraggingIndex(null);
-            }}
-            onDragEnd={() => setDraggingIndex(null)}
-          />;
-        })}
-      </ol>
+      <DragDropContext
+        onDragStart={({ source }) => setDropPosition(source.index)}
+        onDragUpdate={({ destination }) => setDropPosition(destination?.index ?? null)}
+        onDragEnd={({ source, destination, reason }) => {
+          setDropPosition(null);
+          if (editable && reason === 'DROP' && destination && destination.droppableId === source.droppableId && destination.index !== source.index) onMove(source.index, destination.index);
+        }}
+      >
+        {dropPosition !== null && <p className="pointer-events-none fixed bottom-6 right-6 z-50 rounded-md bg-blue-800 px-3 py-2 text-sm font-semibold text-white">Drop at position {dropPosition + 1} of {activeOrder.length}</p>}
+        <Droppable droppableId={list?.listKey || previewId} isDropDisabled={!editable}>
+          {(provided, snapshot) => <ol ref={provided.innerRef} {...provided.droppableProps} className={`rounded-xl ${snapshot.isDraggingOver ? 'bg-blue-100 ring-2 ring-blue-400' : ''}`} aria-label="Proposal ranking order">
+            {activeOrder.map((requestId, position) => {
+              const proposal = byId.get(requestId);
+              if (!proposal) return null;
+              return <Draggable key={requestId} draggableId={requestId} index={position} isDragDisabled={!editable}>
+                {(dragProvided, dragSnapshot) => <ProposalCardRow
+                  proposal={proposal}
+                  position={position}
+                  count={activeOrder.length}
+                  total={totalsById.get(requestId)}
+                  score={composite?.scores?.[requestId] || null}
+                  rank={ranksById.get(requestId)}
+                  editable={editable}
+                  dragging={dragSnapshot.isDragging}
+                  dragProvided={dragProvided}
+                  onMove={onMove}
+                />}
+              </Draggable>;
+            })}
+            {provided.placeholder}
+          </ol>}
+        </Droppable>
+      </DragDropContext>
     </div>
   );
 }
