@@ -1,4 +1,67 @@
-# Session 585 Prompt: transcript workflow and Proposal Ranking (owner plan for 2026-10-08)
+# Session 586 Prompt: resume office transcript work and Proposal Ranking rehearsal
+
+## Session 585 close — Proposal Ranking office handoff (2026-10-08)
+
+**Current ranking handoff; older ranking checkpoints below are historical.**
+Owner asked to resume at the office. Implementation and detailed Atlas remain on
+**`codex/proposal-ranking`**, not main. Do not rebuild from main. Draft
+[PR #463](https://github.com/justingallivan/wmkf-research-apps/pull/463) remains
+unmerged; this main handoff is documentation only, not runtime promotion.
+
+### Completed and verified
+
+- `8643d9645`: isolated local rehearsal using the real ranking screen/service with
+  six fictional proposals and three fictional PDs, simulated submissions, role
+  views, publication, meeting reordering and reset after publication. Memory only;
+  no environment file, live Dataverse service or real staff votes. Reset rejects
+  delayed requests from the previous rehearsal generation.
+- Same commit swaps the card markers: rating dot upper right, E/W lower right.
+- `cd8928bbc`: merged main documentation while preserving both workstream handoffs.
+- 42 focused tests and scoped gates/self-tests passed sequentially. Browser checked
+  submission, SE composite publication, meeting edits, participant privacy, full
+  requested totals and reset; desktop/mobile marker checks passed. Sol findings
+  fixed; one bounded subscription-OAuth Opus source review found no blockers.
+- [VERIFIED via GitHub, 2026-10-08] PR #463 at `cd8928bbc` has passing Jest,
+  Postgres integration, Claude review and security checks. Recheck new-head CI
+  before any future promotion. The claim-evidence advisory report was unavailable
+  because local state could not be read; no observation row was invented.
+
+### Resume on the office Mac — verified open
+
+Fetch origin and resume the existing `codex/proposal-ranking` checkout. If absent,
+create a separate worktree tracking that remote branch; preserve other worktrees.
+Read the branch's `SESSION_PROMPT.md` and `docs/atlas/dataverse-proposal-ranking.md`.
+With repository dependencies installed, run:
+
+```bash
+node scripts/rehearse-proposal-ranking.js
+```
+
+Then open **http://127.0.0.1:3133/** on that Mac. No credentials or `.env.local` are
+needed for this rehearsal. The current Mac's localhost server and temporary memory
+cannot travel through Git; restarting gives a blank slate. Open a round, submit
+both own lists, simulate the other PD submissions, generate/publish each program,
+and reorder the meeting lists. Reset clears only rehearsal memory, even after
+publication. The fixture supports D26; select D26 if a later date changes the default.
+
+### Owner decision and live-state preflight
+
+- **Owner decision needed:** acceptance and promotion of PR #463. This stop request
+  does not merge runtime changes. No Production change was performed by rehearsal.
+- **Verify before acting:** before colleagues use the live app, inspect current
+  live round/configuration. Last verified default facilitator was Justin, temporarily
+  replacing Beth. Cancel any unpublished trial, restore Beth and verify a fresh
+  round has no trial submissions/composites/meeting edits. Preserve external-review
+  scores. Existing cancellation refuses a round after either program is published;
+  if that happened since the last check, stop and agree a reset plan with the owner.
+- **Do not reopen:** no fake staff votes, no source-proposal copies, no weakening
+  test exclusion, no agent API keys/Fable/Ultrareview.
+
+No new Production milestone shipped in the rehearsal/stop work; no additional
+DEVELOPMENT_LOG entry is required. The earlier Production activation milestone
+remains recorded. Root instructions need no change for this local-only script.
+
+---
 
 ## Owner plan for 2026-10-08 (set by the owner, Session 584)
 
@@ -6,10 +69,9 @@ Work on two things, on the other computer:
 1. **Meeting Tracker transcript workflow:** resume `codex/meeting-transcript-ux` (pushed at
    `3fa20089f`; planning only, nothing merged). Handoff directly below. The owner meets WMKF's
    Zoom administrator the morning of 2026-10-08.
-2. **Proposal Ranking:** live in Production since PR #457 (merge `10c079c86`). A Codex session is
-   still working on it and will hand off later; its handoff is the next section after the
-   transcript one. When that session writes its handoff, keep both sections: do not replace
-   this file wholesale (the PR #457 merge did that once, restored in `c7e6417f8`).
+2. **Proposal Ranking:** resume the isolated rehearsal using the current office handoff
+   at the top of this file and `codex/proposal-ranking` / draft PR #463. Preserve both
+   workstream handoffs; do not replace this file wholesale.
 
 Setting up the transcript worktree on a new machine:
 ```
@@ -49,7 +111,7 @@ No runtime code, credentials, database/schema, Production data or account settin
 
 ---
 
-## Proposal Ranking handoff (Codex): Proposal Ranking live; facilitator walkthrough next
+## Historical Proposal Ranking handoff — superseded by the office handoff above
 
 ## Current owner-only trial — restore a clean start before colleague use
 
