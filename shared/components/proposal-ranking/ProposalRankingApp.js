@@ -33,7 +33,7 @@ function StatusBanner({ kind = 'info', children, className = '' }) {
   return <div role={kind === 'error' ? 'alert' : 'status'} className={`rounded-lg border px-4 py-3 text-sm ${classes[kind]} ${className}`}>{children}</div>;
 }
 
-function ProposalCardRow({ proposal, position, count, programCount, total, score, rank, editable, dragging, dragProvided }) {
+function ProposalCardRow({ proposal, position, programCount, total, score, rank, editable, dragging, dragProvided }) {
   const amount = proposal.amountMinorUnits == null
     ? 'Requested amount unavailable'
     : formatMoney(proposal.amountMinorUnits, proposal.currency);
@@ -50,7 +50,7 @@ function ProposalCardRow({ proposal, position, count, programCount, total, score
     >
       <div className="flex min-w-0 items-stretch">
         {editable && <div
-          aria-label={`Drag proposal ${proposal.requestNumber} to reorder`}
+          aria-label={`Drag ${proposal.title || 'Untitled proposal'} to reorder`}
           {...dragProvided?.dragHandleProps}
           title="Drag to reorder"
           className="flex w-8 shrink-0 cursor-grab items-center justify-center border-r border-gray-200 bg-gray-50 text-gray-400 active:cursor-grabbing"
@@ -69,10 +69,13 @@ function ProposalCardRow({ proposal, position, count, programCount, total, score
           </div>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                {proposal.programKey.toUpperCase()} · Position {position + 1} of {count} · #{proposal.requestNumber}
-              </p>
-              <h3 className="mt-1 break-words text-base font-semibold text-gray-900">{proposal.title || 'Untitled proposal'}</h3>
+              <div className="mb-2 flex items-center gap-3">
+                <span aria-label={`Rank ${position + 1}: ${proposal.title || 'Untitled proposal'}`} className="text-3xl font-bold tabular-nums text-gray-900">{position + 1}</span>
+                <span className="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">{proposal.programKey.toUpperCase()}</span>
+              </div>
+              <h3 className="mt-1 break-words text-base font-semibold">
+                <a href={`/workbench/${encodeURIComponent(proposal.requestId)}`} className="text-blue-800 underline underline-offset-2 hover:text-blue-950">{proposal.title || 'Untitled proposal'}</a>
+              </h3>
               <p className="mt-1 text-sm text-gray-600">{proposal.organization || 'Organization unavailable'}</p>
               {proposal.leadName && <p className="mt-1 text-sm text-gray-600">Lead PD: {proposal.leadName}</p>}
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
@@ -101,10 +104,7 @@ function ProposalCardRow({ proposal, position, count, programCount, total, score
                   </li>)}
                 </ul>
               )}
-              <a
-                href={`/workbench/${encodeURIComponent(proposal.requestId)}`}
-                className="mt-2 inline-flex text-sm font-semibold text-blue-800 underline underline-offset-2 hover:text-blue-950"
-              >Open proposal #{proposal.requestNumber}</a>
+
             </div>
             <div className="w-full rounded-lg bg-gray-50 p-3 text-sm sm:w-52">
               <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Cumulative Budget</p>
@@ -167,7 +167,6 @@ function ProposalOrder({ list, proposals, order, editable, saveState, composite,
                 {(dragProvided, dragSnapshot) => <ProposalCardRow
                   proposal={proposal}
                   position={position}
-                  count={activeOrder.length}
                   programCount={proposals.filter((item) => item.programKey === proposal.programKey).length}
                   total={totalsById.get(requestId)}
                   score={composite?.scores?.[requestId] || null}

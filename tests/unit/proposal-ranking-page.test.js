@@ -188,7 +188,7 @@ describe('Proposal Ranking page', () => {
     mockLoad.mockResolvedValue(roundResponse());
     mockSend.mockImplementation((action) => Promise.resolve(roundResponse({ order: action.order, etag: 'list-v2' })));
     render(<ProposalRankingApp />);
-    const handle = await screen.findByRole('button', { name: 'Drag proposal 1001 to reorder' });
+    const handle = await screen.findByRole('button', { name: 'Drag First proposal to reorder' });
     expect(screen.queryByRole('button', { name: /Move proposal/ })).not.toBeInTheDocument();
     expect(screen.getAllByText('Cumulative Budget')).toHaveLength(INITIAL_ORDER.length);
     handle.focus();
@@ -206,7 +206,7 @@ describe('Proposal Ranking page', () => {
   test('canceling a keyboard drag preserves the order without saving', async () => {
     mockLoad.mockResolvedValue(roundResponse());
     render(<ProposalRankingApp />);
-    const handle = await screen.findByRole('button', { name: 'Drag proposal 1001 to reorder' });
+    const handle = await screen.findByRole('button', { name: 'Drag First proposal to reorder' });
     handle.focus();
     fireEvent.keyDown(handle, { key: ' ', keyCode: 32 });
     await screen.findByText('Drop at position 1 of 4');
@@ -215,7 +215,7 @@ describe('Proposal Ranking page', () => {
     fireEvent.keyDown(handle, { key: 'Escape', keyCode: 27 });
     await waitFor(() => expect(screen.queryByText(/Drop at position/)).not.toBeInTheDocument());
     expect(mockSend).not.toHaveBeenCalled();
-    expect(screen.getByText(/Position 1 of 4 · #1001/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Rank 1: First proposal')).toBeInTheDocument();
   });
 
   test('published dry-run erasure requires explicit confirmation and clears displayed ranking content', async () => {
@@ -251,15 +251,15 @@ describe('Proposal Ranking page', () => {
     render(<ProposalRankingApp />);
 
     let list = await screen.findByRole('region', { name: 'Current PD SE ranking' });
-    await dragDown(within(list).getByRole('button', { name: 'Drag proposal 1001 to reorder' }));
+    await dragDown(within(list).getByRole('button', { name: 'Drag First proposal to reorder' }));
     await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(1));
     const firstOrder = ['request-2', 'request-1', 'request-3', 'request-4'];
     expect(mockSend.mock.calls[0][0]).toMatchObject({ action: 'save', order: firstOrder, etag: 'list-v1', policyRevision: 4 });
 
-    await dragDown(within(list).getByRole('button', { name: 'Drag proposal 1003 to reorder' }));
+    await dragDown(within(list).getByRole('button', { name: 'Drag Third proposal to reorder' }));
     const latestOrder = ['request-2', 'request-1', 'request-4', 'request-3'];
-    expect(within(list).getByText(/Position 3 of 4 · #1004/)).toBeInTheDocument();
-    expect(within(list).getByText(/Position 4 of 4 · #1003/)).toBeInTheDocument();
+    expect(within(list).getByLabelText('Rank 3: Fourth proposal')).toBeInTheDocument();
+    expect(within(list).getByLabelText('Rank 4: Third proposal')).toBeInTheDocument();
 
     await act(async () => {
       firstSave.resolve(roundResponse({ order: firstOrder, etag: 'list-v2' }));
@@ -268,7 +268,7 @@ describe('Proposal Ranking page', () => {
     await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(2));
     expect(mockSend.mock.calls[1][0]).toMatchObject({ action: 'save', order: latestOrder, etag: 'list-v2', policyRevision: 4 });
     await screen.findByText('Order saved.');
-    expect(within(list).getByText(/Position 3 of 4 · #1004/)).toBeInTheDocument();
+    expect(within(list).getByLabelText('Rank 3: Fourth proposal')).toBeInTheDocument();
   });
 
   test('a failed save stays visible as unsaved until refresh and retry use the current ETag', async () => {
@@ -279,7 +279,7 @@ describe('Proposal Ranking page', () => {
     render(<ProposalRankingApp />);
 
     let list = await screen.findByRole('region', { name: 'Current PD SE ranking' });
-    await dragDown(within(list).getByRole('button', { name: 'Drag proposal 1001 to reorder' }));
+    await dragDown(within(list).getByRole('button', { name: 'Drag First proposal to reorder' }));
     expect(await screen.findByText(/Another change is newer than this order/)).toBeInTheDocument();
     expect(within(list).getByRole('button', { name: 'Submit and lock list' })).toBeDisabled();
 
@@ -304,7 +304,7 @@ describe('Proposal Ranking page', () => {
     render(<ProposalRankingApp />);
 
     const list = await screen.findByRole('region', { name: 'Current PD SE ranking' });
-    await dragDown(within(list).getByRole('button', { name: 'Drag proposal 1001 to reorder' }));
+    await dragDown(within(list).getByRole('button', { name: 'Drag First proposal to reorder' }));
     await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(2));
     fireEvent.click(await screen.findByRole('button', { name: 'Refresh current state' }));
     await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(3));
@@ -336,7 +336,7 @@ describe('Proposal Ranking page', () => {
       .mockImplementationOnce(() => lateReadback.promise)
       .mockResolvedValueOnce(erased);
     render(<ProposalRankingApp />);
-    await dragDown(await screen.findByRole('button', { name: 'Drag proposal 1001 to reorder' }));
+    await dragDown(await screen.findByRole('button', { name: 'Drag First proposal to reorder' }));
     await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(2));
     fireEvent.click(screen.getByRole('button', { name: 'Refresh current state' }));
     await screen.findByText(/Dry-run rankings permanently erased/);
@@ -396,7 +396,7 @@ describe('Proposal Ranking page', () => {
     const own = await screen.findByRole('region', { name: 'Current PD SE ranking' });
     expect(screen.queryByRole('region', { name: 'Private Other PD SE ranking' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Generate SE draft' })).not.toBeInTheDocument();
-    await dragDown(within(own).getByRole('button', { name: 'Drag proposal 1001 to reorder' }));
+    await dragDown(within(own).getByRole('button', { name: 'Drag First proposal to reorder' }));
     await screen.findByText('Order saved.');
     fireEvent.click(within(own).getByRole('button', { name: 'Submit and lock list' }));
     await waitFor(() => expect(mockSend).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'submit', etag: 'list-v2' })));
@@ -470,15 +470,15 @@ describe('Proposal Ranking page', () => {
       .mockImplementationOnce((action) => Promise.resolve(roundResponse({ order: action.order, etag: 'list-v3' })));
     render(<ProposalRankingApp />);
     const own = await screen.findByRole('region', { name: 'Current PD SE ranking' });
-    await dragDown(within(own).getByRole('button', { name: 'Drag proposal 1001 to reorder' }));
+    await dragDown(within(own).getByRole('button', { name: 'Drag First proposal to reorder' }));
     await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(2));
     fireEvent.click(screen.getByRole('button', { name: 'Refresh current state' }));
     await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(3));
     await act(async () => { readback.resolve(roundResponse({ order: savedOrder, etag: 'list-v2' })); await readback.promise; });
     await act(async () => { lateRefresh.resolve(roundResponse()); await lateRefresh.promise; });
     const current = await screen.findByRole('region', { name: 'Current PD SE ranking' });
-    expect(within(current).getByText(/Position 1 of 4 · #1002/)).toBeInTheDocument();
-    await dragDown(within(current).getByRole('button', { name: 'Drag proposal 1003 to reorder' }));
+    expect(within(current).getByLabelText('Rank 1: Second proposal')).toBeInTheDocument();
+    await dragDown(within(current).getByRole('button', { name: 'Drag Third proposal to reorder' }));
     await waitFor(() => expect(mockSend).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'save', etag: 'list-v2' })));
   });
 
@@ -546,10 +546,10 @@ describe('Proposal Ranking page', () => {
     mockSend.mockResolvedValue(newer);
     render(<ProposalRankingApp />);
     const own = await screen.findByRole('region', { name: 'Current PD SE ranking' });
-    await dragDown(within(own).getByRole('button', { name: 'Drag proposal 1001 to reorder' }));
+    await dragDown(within(own).getByRole('button', { name: 'Drag First proposal to reorder' }));
     expect(await screen.findByText(/Your save completed, but a newer order is now current/)).toBeInTheDocument();
     expect(within(own).getByRole('button', { name: 'Submit and lock list' })).toBeDisabled();
-    expect(within(own).getByText(/Position 1 of 4 · #1002/)).toBeInTheDocument();
+    expect(within(own).getByLabelText('Rank 1: Second proposal')).toBeInTheDocument();
     expect(screen.queryByText('Order saved.')).not.toBeInTheDocument();
   });
 
@@ -561,7 +561,7 @@ describe('Proposal Ranking page', () => {
     expect(await screen.findByText('Shared meeting order')).toBeInTheDocument();
     expect(screen.queryByText('Your private ranking')).not.toBeInTheDocument();
     expect(screen.getByText('Disagreement')).toBeInTheDocument();
-    await dragDown(screen.getByRole('button', { name: 'Drag proposal 1001 to reorder' }));
+    await dragDown(screen.getByRole('button', { name: 'Drag First proposal to reorder' }));
     await waitFor(() => expect(mockSend).toHaveBeenCalledWith(expect.objectContaining({ action: 'edit', programKey: 'se', etag: 'meeting-v1' })));
   });
 });
@@ -687,4 +687,17 @@ test('combined cards color PD ranks against the original program length', async 
   fireEvent.click(await screen.findByRole('button', { name: 'SE + MR' }));
   const badge = await screen.findByLabelText('Other PD: rank 2 of 3');
   expect(badge).toHaveStyle({ backgroundColor: '#eab30833' });
+});
+
+
+test('uses the linked project title, a prominent rank and a program badge without proposal numbers', async () => {
+  mockLoad.mockResolvedValue(roundResponse());
+  render(<ProposalRankingApp />);
+  const own = await screen.findByRole('region', { name: 'Current PD SE ranking' });
+  expect(within(own).getByRole('link', { name: 'First proposal' })).toHaveAttribute('href', '/workbench/request-1');
+  expect(within(own).getByLabelText('Rank 1: First proposal')).toHaveClass('text-3xl', 'font-bold');
+  expect(within(own).getAllByText('SE')).toHaveLength(4);
+  expect(own).not.toHaveTextContent('1001');
+  expect(own).not.toHaveTextContent('Position');
+  expect(within(own).queryByRole('link', { name: /Open proposal/ })).not.toBeInTheDocument();
 });
