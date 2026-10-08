@@ -716,3 +716,16 @@ test('shows the fractional average after PD ranks in a matching colored badge', 
   expect(screen.queryByText('Composite:')).not.toBeInTheDocument();
   expect(pdRankColor(2.5, 4)).toBe('#eab308');
 });
+
+
+test('places the prominent institution heading above the smaller linked proposal title', async () => {
+  mockLoad.mockResolvedValue(roundResponse());
+  render(<ProposalRankingApp />);
+  const own = await screen.findByRole('region', { name: 'Current PD SE ranking' });
+  const institution = within(own).getByRole('heading', { name: 'North Institute' });
+  const title = within(own).getByRole('link', { name: 'First proposal' });
+  expect(institution).toHaveClass('text-base', 'font-semibold');
+  expect(title.parentElement).toHaveClass('text-sm');
+  expect(institution.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(title).toHaveAttribute('href', '/workbench/request-1');
+});

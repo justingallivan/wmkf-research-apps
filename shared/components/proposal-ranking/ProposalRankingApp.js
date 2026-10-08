@@ -73,10 +73,10 @@ function ProposalCardRow({ proposal, position, programCount, total, score, rank,
                 <span aria-label={`Rank ${position + 1}: ${proposal.title || 'Untitled proposal'}`} className="text-3xl font-bold tabular-nums text-gray-900">{position + 1}</span>
                 <span className="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">{proposal.programKey.toUpperCase()}</span>
               </div>
-              <h3 className="mt-1 break-words text-base font-semibold">
+              <h3 className="mt-1 break-words text-base font-semibold text-gray-900">{proposal.organization || 'Organization unavailable'}</h3>
+              <p className="mt-1 break-words text-sm">
                 <a href={`/workbench/${encodeURIComponent(proposal.requestId)}`} className="text-blue-800 underline underline-offset-2 hover:text-blue-950">{proposal.title || 'Untitled proposal'}</a>
-              </h3>
-              <p className="mt-1 text-sm text-gray-600">{proposal.organization || 'Organization unavailable'}</p>
+              </p>
               {proposal.leadName && <p className="mt-1 text-sm text-gray-600">Lead PD: {proposal.leadName}</p>}
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                 <span><span className="font-medium text-gray-700">Requested:</span> {amount}</span>
