@@ -1,3 +1,37 @@
+# Session 585 Prompt: resume Meeting Tracker recording workflow planning after Zoom admin meeting
+
+## Session 584 transcript UX planning handoff — October 7, 2026 (Codex)
+
+**[VERIFIED via remote Git refs]** Planning branch `codex/meeting-transcript-ux` is pushed at `3fa20089f389acfb59b000628df9831c8a1439d3`. The branch contains the implementation plan, two-slide Zoom admin brief and detailed handoff. This main handoff does not merge the branch or enable any new runtime behavior.
+
+### Resume on the work computer
+
+Fetch origin, then resume `origin/codex/meeting-transcript-ux` in a dedicated checkout, preserving unrelated local work. Do not rebuild from main or use `codex/meeting-transcript-fixes`. On the planning branch, read:
+
+- [Implementation plan](https://github.com/justingallivan/wmkf-research-apps/blob/codex/meeting-transcript-ux/docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md)
+- [Two-slide Zoom admin brief](https://github.com/justingallivan/wmkf-research-apps/blob/codex/meeting-transcript-ux/docs/plans/briefs/WMKF-Zoom-Admin-Brief.pptx) — download and open in PowerPoint; exact permission names and official references are in speaker notes.
+- The branch's `SESSION_PROMPT.md` for the detailed handoff.
+
+### Decisions and next steps
+
+**Owner-approved direction:** import the full WMKF Zoom recording and available audio/captions; reconcile speakers across the full transcript; review names and confirm the split; create presentation/discussion videos and transcripts; generate both summaries with one click; review and publish. Archive presentation-only products for Board sharing. Automatically delete discussion products and full originals at the Board meeting deadline, including Zoom originals if supported.
+
+**Next:** the owner meets WMKF's Zoom administrator on October 8, 2026 in the morning (Pacific). Seek an internal Server-to-Server OAuth app with recording read access, approved hosts, a secure app-credential handoff and one test recording. Account setup and the import pilot have not been performed. The shared-account 2FA stays enabled; the integration uses its own server-side credentials after administrator authorization.
+
+**Owner decisions still needed:** implementation stage/file scope, schema/auth/Production steps, exact deletion cutoff, reschedules/holds, archive-incomplete handling and permanent erasure versus Zoom/SharePoint recoverable deletion. No deletion or provider execution is authorized by this handoff. Recheck live callers and owned file identities before implementing retention.
+
+**Critical source finding:** current Board transcript/summary binding depends on the full TRANSCRIPT manifest. Source deletion must wait for a reviewed content-free archive proof and tests that the presentation remains available afterward. Preserve the PR #459 speaker fix; the owner accepted it on 1003038.
+
+### Verification and boundaries
+
+Planning-only commit `3fa20089f`: documentation gates and self-tests passed sequentially; both slides passed package/layout checks and visual inspection. A fresh source review added no-discussion handling and content-free AI audit requirements. The checkout-specific memory symlink was repaired; agent invariants passed. The claim-evidence advisory report could not read local state; no observation was invented.
+
+No runtime code, credentials, database/schema, Production data or account settings changed. No new production milestone shipped, so no DEVELOPMENT_LOG entry is required. UX and feature implementation must be separate commits. Push only the feature branch for future work; owner decides merge. The main handoff is the only main change authorized by tonight's stop request.
+
+## Prior handoffs preserved below
+
+The prior S584 notes retain unrelated Proposal Ranking and Final Writeup work. Earlier transcript acceptance TODOs below are historical; the owner acceptance recorded above supersedes them. Historical cleanup suggestions are not authorization to delete anything.
+
 # Session 584 Prompt: transcript speaker fix released (PR #459), owner-accepted; UX follow-up with Codex; preserve Proposal Ranking handoff; group-review handoff email live (S581)
 
 ## Session 583 transcript handoff — 2026-10-07 PT (Codex)
