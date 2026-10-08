@@ -95,6 +95,7 @@ type ProposalCard = {
   requestNumber: string;
   title: string;
   organization: string;
+  institutionGeography?: 'East' | 'West' | null; // absent in older frozen snapshots
   programKey: ProgramKey;
   amountMinorUnits: number | null;
   currency: null | { code: string; name: string; precision: number };
@@ -122,6 +123,12 @@ type MeetingView = ListView & {
   };
 };
 ```
+
+`institutionGeography` comes from the applicant account's `wmkf_eastwest` choice
+(East `100000000`, West `100000001`), is frozen with the card at opening, and
+participates in the preview fingerprint. Unknown or missing values become null;
+older snapshots may omit the field. Only known values render an E/W marker.
+Geography does not affect ranking calculations or eligibility.
 
 Privacy rules shape the response, not the client. Before a program is published,
 a roster participant receives only their own individual list and that program's

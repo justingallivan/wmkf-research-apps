@@ -162,6 +162,26 @@ inferred from state/address or institution name.
 
 The probe reads metadata only, refuses non-sandbox targets and requires the target
 interlock on. It reads no business rows and performs no writes. Institution value
-population and Production metadata were not inspected. The owner wants geography
-noted on proposal cards; card/snapshot integration has not been implemented by this
-probe-only change. Missing-value behavior must remain explicit when that work begins.
+population and Production metadata were not inspected.
+
+[VERIFIED via source and mocked regression tests] The source adapter now batches
+reads of eligible requests' applicant accounts and maps only the two verified
+choice values to `institutionGeography: 'East' | 'West' | null`. The preview carries
+that field into its fingerprint and frozen snapshot. The shared proposal card shows
+a prominent E/W in the upper-right corner, with an accessible East/West institution
+label. Unknown/missing values and older snapshots show no letter. Existing snapshots
+are not rewritten or live-refreshed; ranking calculations and eligibility are unchanged.
+Failed/capped account queries reject the preview through the existing complete-read
+contract. No schema, environment, grant or live data changes were made.
+
+
+Geography validation: 123 tests across 12 ranking/Explorer suites pass, including
+raw account choices, unknown values, frozen preview/fingerprint and legacy-card
+omission. Changed-file lint, types, Dataverse/OData and Atlas/doc gates pass with
+self-tests run sequentially. The actual card component was rendered in isolated
+Chrome with synthetic fixtures at 1100px and 390px: markers are 24px, at the upper
+right, with no horizontal overflow. This is a component layout check, not live
+sandbox acceptance. Luna implemented; Sol and the orchestrator reviewed without
+substantive blockers. Automatic approval review rejected another Opus invocation
+because the session had already used its one authorized bounded review; no new
+Opus review ran for the geography change and no retry was attempted.

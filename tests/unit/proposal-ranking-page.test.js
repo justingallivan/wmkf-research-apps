@@ -217,6 +217,20 @@ describe('Proposal Ranking page', () => {
     expect(screen.queryByText('Current PD')).not.toBeInTheDocument();
   });
 
+  test('shows East and West on shared cards and omits geography for unknown or older snapshot values', async () => {
+    const response = roundResponse();
+    response.round.snapshot.proposals[0].institutionGeography = 'East';
+    response.round.snapshot.proposals[1].institutionGeography = 'West';
+    response.round.snapshot.proposals[2].institutionGeography = 'North';
+    delete response.round.snapshot.proposals[3].institutionGeography;
+    mockLoad.mockResolvedValue(response);
+    const { container } = render(<ProposalRankingApp />);
+
+    expect(await screen.findByLabelText('East institution')).toHaveTextContent('E');
+    expect(screen.getByLabelText('West institution')).toHaveTextContent('W');
+    expect(container.querySelectorAll('[aria-label$=" institution"]')).toHaveLength(2);
+  });
+
   test('a facilitator who is a PD can save and submit only their own list', async () => {
     const response = roundResponse({ facilitator: true });
     response.viewer.systemUserId = 'pd-self';

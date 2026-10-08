@@ -83,6 +83,48 @@ test('reads Dataverse currency precision and active staff using their verified r
   expect(DynamicsService.queryAllRecords.mock.calls.some(([, options]) => options.select?.includes('statecode'))).toBe(false);
 });
 
+test('maps only the verified applicant-account East and West options; unknown or missing stays null', async () => {
+  const eastId = '44444444-4444-4444-8444-444444444444';
+  const westId = '55555555-5555-4555-8555-555555555555';
+  const unknownId = '66666666-6666-4666-8666-666666666666';
+  const rows = [
+    { akoya_requestid: REQUEST_ID, _akoya_applicantid_value: eastId, wmkf_eastwest: undefined },
+    { akoya_requestid: '77777777-7777-4777-8777-777777777777', _akoya_applicantid_value: westId },
+    { akoya_requestid: '88888888-8888-4888-8888-888888888888', _akoya_applicantid_value: unknownId },
+    { akoya_requestid: '99999999-9999-4999-8999-999999999999' },
+  ].map((row) => ({
+    akoya_requestnum: '1001', akoya_title: 'Proposal', akoya_request: null,
+    wmkf_organizationname: 'Institute', wmkf_meetingdate: '2026-06-15T00:00:00Z',
+    akoya_requeststatus: 'Phase II Pending', wmkf_istestrequest: null,
+    wmkf_testcreationrunid: null, _akoya_programid_value: RESEARCH_PROGRAM_IDS[0],
+    _wmkf_programdirector_value: null, _transactioncurrencyid_value: null, ...row,
+  }));
+  DynamicsService.queryAllRecords.mockImplementation(async (entitySet) => {
+    if (entitySet === 'akoya_requests') return { records: rows };
+    if (entitySet === 'wmkf_appreviewersuggestions') return { records: [] };
+    if (entitySet === 'accounts') return { records: [
+      { accountid: eastId, wmkf_eastwest: 100000000 },
+      { accountid: westId, wmkf_eastwest: 100000001 },
+      { accountid: unknownId, wmkf_eastwest: 100000099 },
+    ] };
+    throw new Error(`Unexpected source entity set: ${entitySet}`);
+  });
+
+  const source = await readProposalRankingSource('J26', {
+    TEST_REQUEST_ISOLATION: 'on',
+    SYNTHETIC_REVIEWER_ISOLATION: 'on',
+  });
+
+  expect(source.proposals.map((proposal) => proposal.institutionGeography)).toEqual(['East', 'West', null, null]);
+  expect(DynamicsService.queryAllRecords).toHaveBeenCalledWith('akoya_requests', expect.objectContaining({
+    select: expect.stringContaining('_akoya_applicantid_value'),
+  }));
+  expect(DynamicsService.queryAllRecords).toHaveBeenCalledWith('accounts', expect.objectContaining({
+    select: 'accountid,wmkf_eastwest',
+    filter: expect.stringContaining('accountid eq'),
+  }));
+});
+
 test('staff readiness treats only explicit isdisabled false as active', async () => {
   DynamicsService.queryAllRecords.mockResolvedValue({ records: [
     { systemuserid: LEAD_ID, fullname: 'Active staff', isdisabled: false },

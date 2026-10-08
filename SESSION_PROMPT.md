@@ -32,10 +32,17 @@ milestone entry is required. Only `codex/proposal-ranking` is authorized for pus
 `scripts/probe-proposal-ranking-geography.mjs`: request `akoya_applicantid` links to
 `account`; `account.wmkf_eastwest` is the **East-West** Picklist, with
 **East = 100000000**, **West = 100000001**. Only metadata GETs were performed.
-No business records or Production metadata were read. The owner wants this displayed
-on cards; this request delivered discovery only, not card/snapshot implementation.
-Exact evidence and remaining boundary are in the Atlas geography section. Syntax,
-Dataverse-access and OData gates/self-tests passed. No milestone entry is required.
+No business records or Production metadata were read. The subsequent owner-approved
+card change carries `institutionGeography` into new frozen snapshots and the preview
+fingerprint and displays a prominent E/W at the card's upper right. Missing/unknown
+values and older snapshots show no letter; there is no live refresh or backfill.
+The implementation uses the same eligibility and ranking rules. Exact evidence and
+remaining live-acceptance boundary are in the Atlas geography section. Geography
+regression: 123 tests / 12 suites, lint, types and relevant gates/self-tests pass;
+synthetic desktop/mobile component render confirms 24px E/W at upper right without
+overflow. Luna built and Sol reviewed. An additional Opus request was rejected by
+automatic review because the session's one authorized review had already run; no
+new Opus review is claimed. No milestone entry is required.
 
 ### Owner choice before further work
 

@@ -64,6 +64,11 @@ grant approvals, award amounts, or change proposal lifecycle status.
 
 Each row shows current position, organization, proposal title, full amount
 requested, external peer-review score summary, and a link to the proposal.
+Owner addition (2026-10-07): show a prominent **E** or **W** at the card's upper
+right for the applicant institution's East/West classification. Use the verified
+`account.wmkf_eastwest` field through `akoya_applicantid`, not state or name inference.
+Freeze it with the other card details; missing, unknown or older absent values show
+no letter. This is a deliberation cue, not an automatic score or funding adjustment.
 The right side shows the sum of that proposal's full requested amount and all
 higher-ranked proposals in that program list. Reordering updates totals immediately.
 Published meeting rows additionally show named submitted PD positions and a
