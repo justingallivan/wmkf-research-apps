@@ -81,10 +81,18 @@ function ProposalCardRow({ proposal, position, count, total, score, rank, editab
                 {score && <span><span className="font-medium text-gray-700">Composite:</span> {score.averageRank.toFixed(2)}{score.tied ? ' · tied' : ''}</span>}
                 {rank?.disagreement && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">Disagreement</span>}
               </div>
-              {proposal.score?.distribution && <details className="mt-2 text-xs text-gray-600">
-                <summary className="cursor-pointer font-medium">Review rating distribution</summary>
-                <p className="mt-1">{Object.entries(proposal.score.distribution).map(([rating, count]) => `${rating}: ${count}`).join(' · ') || 'No scored reviews'}</p>
-              </details>}
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-sm">
+                <span className="mr-1 font-medium text-gray-700">Reviews</span>
+                {proposal.score?.ratedCount > 0 && proposal.score?.distribution
+                  ? [['Excellent', 'E'], ['Very Good', 'VG'], ['Good', 'G'], ['Fair', 'F'], ['Poor', 'P']].flatMap(([rating, grade]) =>
+                    Array.from({ length: proposal.score.distribution[rating] || 0 }, (_, index) => <span
+                      key={`${rating}-${index}`}
+                      title={rating}
+                      aria-label={rating}
+                      className="inline-flex min-w-7 items-center justify-center rounded-md bg-gray-100 px-2 py-0.5 font-semibold text-gray-800"
+                    >{grade}</span>))
+                  : <span className="text-gray-500">Not scored</span>}
+              </div>
               {rankNames.length > 0 && (
                 <details className="mt-2 text-sm text-gray-700">
                   <summary className="cursor-pointer font-medium">Named PD ranks ({rankNames.length})</summary>

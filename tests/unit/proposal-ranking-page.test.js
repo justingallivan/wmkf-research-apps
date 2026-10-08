@@ -635,3 +635,15 @@ test('creates the combined list without ballots or a second publication and fall
   expect(await screen.findByRole('heading', { name: 'Your private ranking' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'SE + MR' })).not.toBeInTheDocument();
 });
+
+
+test('shows each external review as an inline letter grade without a distribution dropdown', async () => {
+  mockLoad.mockResolvedValue(roundResponse());
+  render(<ProposalRankingApp />);
+  const own = await screen.findByRole('region', { name: 'Current PD SE ranking' });
+  expect(within(own).getAllByText('Reviews')).toHaveLength(4);
+  expect(within(own).getAllByLabelText('Excellent')).toHaveLength(2);
+  expect(within(own).getByLabelText('Good')).toHaveTextContent('G');
+  expect(within(own).queryByText('Review rating distribution')).not.toBeInTheDocument();
+  expect(within(own).getAllByText('Not scored').length).toBeGreaterThanOrEqual(3);
+});
