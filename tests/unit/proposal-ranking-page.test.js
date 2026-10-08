@@ -737,14 +737,17 @@ test('groups budget and ranking details in the institution column', async () => 
   expect(within(column).queryByLabelText('Rank 1: First proposal')).not.toBeInTheDocument();
 });
 
-test('places the budget after the review and PD details at the right edge', async () => {
+test('bottom-aligns staff rankings and budget without a divider', async () => {
   mockLoad.mockResolvedValue(roundResponse({ published: true }));
   render(<ProposalRankingApp />);
   const institution = await screen.findByRole('heading', { name: 'North Institute' });
   const column = institution.parentElement;
   const budget = within(column).getByText('Requested').parentElement.parentElement;
   const ranks = within(column).getByRole('list', { name: 'PD ranks' });
-  expect(budget).toHaveClass('justify-end', 'text-right');
+  expect(budget).toHaveClass('justify-end', 'text-right', 'ml-auto');
+  expect(budget).not.toHaveClass('border-t');
+  expect(budget.parentElement).toBe(ranks.parentElement);
+  expect(budget.parentElement).toHaveClass('flex', 'items-end', 'justify-between');
   expect(ranks.compareDocumentPosition(budget) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(within(budget).getByText('Cumulative Budget')).toBeInTheDocument();
 });

@@ -89,28 +89,30 @@ function ProposalCardRow({ proposal, position, programCount, total, score, rank,
                     : <span className="text-gray-500">Not scored</span>}
                   {proposal.score?.ratedCount > 0 && Number.isFinite(proposal.score?.displayMean) && <span title="Average reviewer grade" aria-label={`Average reviewer grade: ${proposal.score.displayMean.toFixed(1)}`} className="ml-1 inline-flex min-w-7 items-center justify-center rounded-md bg-gray-100 px-2 py-0.5 font-semibold text-gray-800">{proposal.score.displayMean.toFixed(1)}</span>}
                 </div>
-                {rankNames.length > 0 && (
-                  <ul aria-label="PD ranks" className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-700">
-                    {rankNames.map((entry) => <li key={entry.systemUserId} className="flex items-center gap-1.5 font-semibold" title={`${entry.name}: rank ${entry.rank} of ${programCount}`}>
-                      {entry.name.trim().split(/\s+/)[0] || 'PD'}
-                      <span aria-label={`${entry.name}: rank ${entry.rank} of ${programCount}`} style={{ backgroundColor: `${pdRankColor(entry.rank, programCount)}33` }} className="inline-flex min-w-7 items-center justify-center rounded-md px-2 py-0.5 font-semibold text-gray-900">{entry.rank}</span>
-                    </li>)}
-                    {score && <li className="flex items-center gap-1.5 font-semibold">
-                      Average
-                      <span aria-label={`Average PD rank: ${score.averageRank.toFixed(2)}`} title={`Average PD rank within ${proposal.programKey.toUpperCase()}${score.tied ? ' · tied' : ''}`} style={{ backgroundColor: `${pdRankColor(score.averageRank, programCount)}33` }} className="inline-flex min-w-7 items-center justify-center rounded-md px-2 py-0.5 font-semibold text-gray-900">{score.averageRank.toFixed(2)}</span>
-                      {score.tied && <span className="text-xs font-normal text-gray-500">tied</span>}
-                    </li>}
-                  </ul>
-                )}
-                <div className="flex flex-wrap justify-end items-start gap-x-6 gap-y-2 border-t border-gray-100 pt-3 text-right text-sm">
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-gray-600">Requested</p>
-                    <p className="mt-1 font-semibold tabular-nums text-gray-900">{amount}</p>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-gray-600">Cumulative Budget</p>
-                    <p className="mt-1 font-semibold tabular-nums text-gray-900">{accumulated}</p>
-                    {!total?.complete && <p className="mt-1 text-xs text-amber-800">A requested amount is missing or incompatible.</p>}
+                <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+                  {rankNames.length > 0 && (
+                    <ul aria-label="PD ranks" className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-700">
+                      {rankNames.map((entry) => <li key={entry.systemUserId} className="flex items-center gap-1.5 font-semibold" title={`${entry.name}: rank ${entry.rank} of ${programCount}`}>
+                        {entry.name.trim().split(/\s+/)[0] || 'PD'}
+                        <span aria-label={`${entry.name}: rank ${entry.rank} of ${programCount}`} style={{ backgroundColor: `${pdRankColor(entry.rank, programCount)}33` }} className="inline-flex min-w-7 items-center justify-center rounded-md px-2 py-0.5 font-semibold text-gray-900">{entry.rank}</span>
+                      </li>)}
+                      {score && <li className="flex items-center gap-1.5 font-semibold">
+                        Average
+                        <span aria-label={`Average PD rank: ${score.averageRank.toFixed(2)}`} title={`Average PD rank within ${proposal.programKey.toUpperCase()}${score.tied ? ' · tied' : ''}`} style={{ backgroundColor: `${pdRankColor(score.averageRank, programCount)}33` }} className="inline-flex min-w-7 items-center justify-center rounded-md px-2 py-0.5 font-semibold text-gray-900">{score.averageRank.toFixed(2)}</span>
+                        {score.tied && <span className="text-xs font-normal text-gray-500">tied</span>}
+                      </li>}
+                    </ul>
+                  )}
+                  <div className="ml-auto flex flex-wrap justify-end items-start gap-x-6 gap-y-2 text-right text-sm">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-gray-600">Requested</p>
+                      <p className="mt-1 font-semibold tabular-nums text-gray-900">{amount}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-gray-600">Cumulative Budget</p>
+                      <p className="mt-1 font-semibold tabular-nums text-gray-900">{accumulated}</p>
+                      {!total?.complete && <p className="mt-1 text-xs text-amber-800">A requested amount is missing or incompatible.</p>}
+                    </div>
                   </div>
                 </div>
               </div>
