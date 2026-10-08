@@ -88,8 +88,9 @@ sequence.
   (PR #454, merge `b2bc23b95`, 2026-10-07). Stage 4 (PD handoff email,
   Research only via `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`) is live
   (PR #456, merge `8bc5b466b`, 2026-10-07; migration 072 applied, copy seeded,
-  Production list = Research only); verify the first real send. Stage 5 (leadership daily digest) is planned,
-  not built; scope is Research only, via the same program list (owner, S584);
+  Production list = Research only); verify the first real send. Stage 5 (leadership daily digest) is live
+  (PR #461, merge `ddeb1b401`, S584; migration 073 applied, copy seeded; first digest not
+  yet observed); scope is Research only, via the same program list (owner, S584);
   SoCal is parked by the owner (2026-10-07). Program-list reminder:
   when SoCal (or another program) adopts group review, add its Grant Program
   GUID to `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS` or it sends no email:
@@ -108,11 +109,13 @@ sequence.
   analogy) and a loud drift check for anything still pinned to an old cycle.
   Plan, seed inventory and owner questions:
   `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md`.
-  **Interim safeguard:** before J27 research presentations begin, add `J27` to
-  `STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES` in Production, or J27 requests
-  silently fall back to manual preparation (register row J27-084). Coordinate with
-  the J27 single-phase transition (row 8 above) so J27 changes land rollover-free
-  where practical. Waiting on: colleagues' briefing on future cycle dates.
+  **Interim safeguard done 2026-10-07 (S584):** Production
+  `STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES=["D26","J27"]`, redeployed; the status
+  allowlist needs no change (register row J27-084). Coordinate with the J27 single-phase
+  transition (row 8 above) so J27 changes land rollover-free where practical. Partial
+  answer from ops (Connor, 2026-10-07): a planned Grant Cycle table (`wmkf_grantcycle`)
+  with a placeholder meeting date and other ops-maintained dates; see the plan §2a.
+  Owner priority 2026-10-07: a to-do, not the highest priority.
 
 - **Stream transcription audio instead of buffering it (2026-10-04).** [OPEN —
   owner decision, not yet built] The transcription worker reads the whole

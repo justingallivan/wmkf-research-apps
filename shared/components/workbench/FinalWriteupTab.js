@@ -789,7 +789,12 @@ export default function FinalWriteupTab({ requestId }) {
                     <p className="font-medium text-green-900">All Program Directors have signed off.</p>
                   )}
                   <p>The current Word version is recorded as the version leadership starts from, and the writeup appears for the President and CSO in Final writeups.</p>
-                  <p>Editing continues in the same document. Nobody is notified by this step, and group review does not reopen from here.</p>
+                  <p>
+                    {status?.handoffEmailEnabled === true
+                      ? 'Leadership is told in the next daily summary email, sent at midnight. '
+                      : 'Nobody is notified by this step. '}
+                    Editing continues in the same document, and group review does not reopen from here.
+                  </p>
                 </>
               ) : (
                 <>

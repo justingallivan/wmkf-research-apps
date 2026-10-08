@@ -138,6 +138,10 @@
     {
       "path": "/api/cron/final-writeup-handoff-emails",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/final-writeup-leadership-digest",
+      "schedule": "0 7 * * *"
     }
   ]
 }

@@ -414,6 +414,48 @@ recently attempted rows first so repeated failures rotate to the back. Read/writ
 Postgres is unavailable, an enabled program's handoff cannot start; the lead PD
 retries. No cleanup is scheduled; rows remain audit history.
 
+### `final_writeup_leadership_digests` — PRODUCTION-LIVE; MIGRATION 073 APPLIED
+
+**[PRODUCTION-LIVE: PR #461, merge `ddeb1b401`, 2026-10-07 PT; migration 073 applied; copy seeded; first digest not yet observed.]**
+**Source of truth:** Postgres send ledger for the leadership daily digest
+(Final Writeup group-review handoff Stage 5). Dataverse owns the requests and
+documents; Dynamics owns the email activity and transport. Migration
+`073_final_writeup_leadership_digests.sql`; fresh installs run it as a numbered
+migration (no setup-database fixture). One row per (`recipient_systemuser_id`,
+`digest_day`); the digest day is the UTC day before the run, so the 07:00 UTC
+cron (`/api/cron/final-writeup-leadership-digest`) keys the Pacific day that is
+ending, and consecutive daily runs get consecutive keys across daylight-saving
+changes. Writeups: requests in Grant Programs listed in
+`FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS` (owner 2026-10-07: Research only;
+unset means no digest) with a current Final in lifecycle FINAL whose leadership
+checkpoint is complete (`leadership-checkpoint.js`) and started within the last
+7 days; test requests are excluded in the request query. Recipients: the
+Leadership persona in the published Final Writeup staffing setting, pruned to the
+current reviewer roster; addresses outside exactly `wmkeck.org` are never
+emailed. Sender: `NOTIFICATION_EMAIL_FROM`. `membership` (JSONB array of item
+snapshots: final document id, request id and number, title, institution, lead PD,
+leadership start time) is frozen at insert and never rewritten, so retries render
+the same email; only an accepted row's membership counts as already told
+(10-day window), so writeups listed by a digest that never went out appear the
+next day. A ten-minute lease (`lease_token` + `locked_until`) admits one claimant;
+every write requires the current token and the lease is renewed as a fence before
+creating the activity and before `SendEmail`. The activity id is stored before
+transport, and correlation key
+`wmkf-final-writeup-leadership-digest:<recipient>:<digestDay>` recovers an activity
+created before its id was stored. `accepted_at` is terminal. No row is created when
+nothing is new. Failures keep the row unaccepted with `last_error_code` and raise an
+`error` ops alert (`final_writeup_leadership_digest_undelivered`), as do a blank
+subject or message (`email.final_writeup_leadership_digest.subject` / `.body`), an
+unusable recipient address, writeups waiting with no Leadership persona, and a run-wide
+fault (writeup scan, staffing read or missing sender/base URL), which also fails the cron. A
+same-day retry reclaims the row with its own stored membership. Known
+direction: a digest whose transport was accepted but whose acceptance was never
+recorded lists its writeups again the next day (duplicate, never a drop). Read/write
+paths: `lib/services/final-writeup/leadership-digest-store.js` and
+`lib/services/final-writeup/leadership-digest-service.js`. Store SQL is proven by
+`tests/integration/final-writeup-leadership-digest.pg.test.js` in the CI Postgres job.
+No cleanup: one small row per Leadership recipient per day with new writeups.
+
 ### `deliberation_agenda_sends` — DEPLOYED; MIGRATION 041 APPLIED
 
 **Source of truth:** Postgres exact-email and cross-system recovery ledger for
