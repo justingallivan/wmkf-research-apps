@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import ProposalRankingApp from '../../shared/components/proposal-ranking/ProposalRankingApp';
-import { buildCumulativeTotals, formatMoney, formatScore, moveProposal, reviewerScoreIndicator } from '../../shared/components/proposal-ranking/model';
+import { buildCumulativeTotals, formatMoney, formatScore, moveProposal, pdRankColor, reviewerScoreIndicator } from '../../shared/components/proposal-ranking/model';
 import { conventionalCycles, resolveWorkingCycle } from '../../lib/utils/cycle-code';
 
 async function dragDown(handle) {
@@ -660,8 +660,31 @@ test('shows published PD names and ranks inline without a disclosure', async () 
   mockLoad.mockResolvedValue(roundResponse({ published: true }));
   render(<ProposalRankingApp />);
   const ranks = await screen.findByRole('list', { name: 'PD ranks' });
-  expect(within(ranks).getByText('Current PD:')).toHaveTextContent('Current PD: 1');
-  expect(within(ranks).getByText('Other PD:')).toHaveTextContent('Other PD: 2');
+  expect(within(ranks).getByText('Current')).toBeInTheDocument();
+  expect(within(ranks).getByText('Other')).toBeInTheDocument();
+  expect(within(ranks).getByLabelText('Current PD: rank 1 of 4')).toHaveTextContent('1');
+  expect(within(ranks).getByLabelText('Current PD: rank 1 of 4')).toHaveStyle({ backgroundColor: '#15803d33' });
+  expect(within(ranks).getByLabelText('Other PD: rank 2 of 4')).toHaveTextContent('2');
   expect(ranks.closest('details')).toBeNull();
   expect(screen.queryByText(/Named PD ranks/)).not.toBeInTheDocument();
+});
+
+
+test('PD rank colors normalize within each program from green first to red last', () => {
+  expect(pdRankColor(1, 12)).toBe('#15803d');
+  expect(pdRankColor(12, 12)).toBe('#b91c1c');
+  expect(pdRankColor(1, 1)).toBe('#15803d');
+  expect(pdRankColor(2, 3)).toBe('#eab308');
+  expect(pdRankColor(0, 12)).toBe('#9ca3af');
+});
+
+test('combined cards color PD ranks against the original program length', async () => {
+  const response = roundResponse({ published: true });
+  response.round.snapshot.proposals = REQUESTS.map((proposal, index) => ({ ...proposal, programKey: index === 3 ? 'mr' : 'se' }));
+  response.programs.co = { ...response.programs.se, available: true, ownList: null, meeting: { ...response.programs.se.meeting, programKey: 'co', listKey: 'meeting:co' } };
+  mockLoad.mockResolvedValue(response);
+  render(<ProposalRankingApp />);
+  fireEvent.click(await screen.findByRole('button', { name: 'SE + MR' }));
+  const badge = await screen.findByLabelText('Other PD: rank 2 of 3');
+  expect(badge).toHaveStyle({ backgroundColor: '#eab30833' });
 });

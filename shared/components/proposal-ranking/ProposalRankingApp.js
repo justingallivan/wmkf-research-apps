@@ -3,7 +3,7 @@ import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
 import { Button, Card, PageHeader } from '../Layout';
 import { conventionalCycles, cycleCodeToLabel, resolveWorkingCycle } from '../../../lib/utils/cycle-code';
 import { createOperationId, loadProposalRanking, sendProposalRankingAction } from './client';
-import { buildCumulativeTotals, errorMessage, formatMoney, moveProposal, PROGRAMS, reviewerScoreIndicator } from './model';
+import { buildCumulativeTotals, errorMessage, formatMoney, moveProposal, PROGRAMS, pdRankColor, reviewerScoreIndicator } from './model';
 
 const EMPTY_CAPABILITIES = {
   preview: false, open: false, saveOwnList: false, submitOwnList: false,
@@ -33,7 +33,7 @@ function StatusBanner({ kind = 'info', children, className = '' }) {
   return <div role={kind === 'error' ? 'alert' : 'status'} className={`rounded-lg border px-4 py-3 text-sm ${classes[kind]} ${className}`}>{children}</div>;
 }
 
-function ProposalCardRow({ proposal, position, count, total, score, rank, editable, dragging, dragProvided }) {
+function ProposalCardRow({ proposal, position, count, programCount, total, score, rank, editable, dragging, dragProvided }) {
   const amount = proposal.amountMinorUnits == null
     ? 'Requested amount unavailable'
     : formatMoney(proposal.amountMinorUnits, proposal.currency);
@@ -95,7 +95,10 @@ function ProposalCardRow({ proposal, position, count, total, score, rank, editab
               </div>
               {rankNames.length > 0 && (
                 <ul aria-label="PD ranks" className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-700">
-                  {rankNames.map((entry) => <li key={entry.systemUserId}>{entry.name}: <span className="font-semibold">{entry.rank}</span></li>)}
+                  {rankNames.map((entry) => <li key={entry.systemUserId} className="flex items-center gap-1.5 font-semibold" title={`${entry.name}: rank ${entry.rank} of ${programCount}`}>
+                    {entry.name.trim().split(/\s+/)[0] || 'PD'}
+                    <span aria-label={`${entry.name}: rank ${entry.rank} of ${programCount}`} style={{ backgroundColor: `${pdRankColor(entry.rank, programCount)}33` }} className="inline-flex min-w-7 items-center justify-center rounded-md px-2 py-0.5 font-semibold text-gray-900">{entry.rank}</span>
+                  </li>)}
                 </ul>
               )}
               <a
@@ -165,6 +168,7 @@ function ProposalOrder({ list, proposals, order, editable, saveState, composite,
                   proposal={proposal}
                   position={position}
                   count={activeOrder.length}
+                  programCount={proposals.filter((item) => item.programKey === proposal.programKey).length}
                   total={totalsById.get(requestId)}
                   score={composite?.scores?.[requestId] || null}
                   rank={ranksById.get(requestId)}
