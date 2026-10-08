@@ -218,8 +218,9 @@ Final Writeup group-review handoff: **Stages 1–4 are live in Production.** Pla
 2. **S580 deferred small items: live S584** via PR #460 (merge `ea1e09a0d`;
    owner-approved wording). The list's briefing next step names the upcoming
    deliberation session date; the two writeup warnings drop "the Dataverse fill".
-3. **J27:** add `J27` to `STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES` before J27 research
-   presentations unless the cycle-rollover work replaces it.
+3. **J27: done S584.** The owner set Production `STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES=["D26","J27"]`
+   and redeployed; the status list needs no change (register J27-084). Connor's Grant Cycle table note
+   is recorded in the cycle rollover plan §2a; the rollover design is a to-do, not top priority.
 4. Older S577 items: last state in `git show e6666ae68:SESSION_PROMPT.md`.
 
 ### Owner Decision Needed

@@ -53,6 +53,20 @@ Staff Deliberations preparation's cycle and status allowlists are recorded as re
 **Pending input** [OWNER, 2026-10-06]: the owner has asked colleagues for a briefing on future
 cycle dates. The milestone model in §5 should be built from that briefing, not inferred.
 
+**Partial answer** [OWNER-SUPPLIED, email from Connor, 2026-10-07; not verified in Dataverse]:
+- Application deadlines are anchored on holidays: the first Monday after Memorial Day and the
+  second Monday after Thanksgiving.
+- New application requests will carry a lookup to a Grant Cycle table (`wmkf_grantcycle`, planned
+  by ops). Each Grant Cycle record holds a placeholder board meeting date (`wmkf_meetingdate`) that
+  is updated once the board date is finalized, and probably other dates (leadership and
+  chairs/committee contact dates) that ops (Sarah or Connor) updates as they are finalized.
+- When those dates are actually finalized is not yet known.
+This Grant Cycle record is the natural "one cycle record" for §5: ops already intends to maintain
+it, so the rollover design should read it rather than add a new table. Not yet checked: whether the
+table exists in any environment, and how it relates to the reviewer-side `wmkf_appgrantcycle`.
+
+**Priority** [OWNER, 2026-10-07]: keep this as a to-do; it is not the highest priority now.
+
 ## 3. Seed inventory (orientation only, 2026-10-06 — the investigation must complete it)
 
 **Cycle-scoped environment settings** [VERIFIED via grep of `env.*` readers in `lib/`, `shared/`, `pages/`; not exhaustive — Dataverse/Postgres-held settings were not searched]:
@@ -141,10 +155,11 @@ design, and an ordered migration plan for owner review.
 
 ## 8. Interim safeguard until this lands
 
-Before J27 research presentations begin, add `J27` to
-`STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES` in Production (and confirm the program and status
-allowlists still apply to the single-phase status flow). Tracked in `docs/CURRENT_WORK_QUEUE.md`
-and register row J27-084.
+**Done 2026-10-07 (Session 584):** the owner set Production
+`STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES=["D26","J27"]` and redeployed. The status allowlist
+(`["Phase II Pending"]`) needs no change: in J27 that status marks a proposal staff advanced, and only
+advanced proposals hold research presentations (register row J27-084, owner-confirmed 2026-10-06).
+D27 and later cycles still need this edit until the rollover design replaces the list.
 
 ## 9. Questions for the owner
 
