@@ -834,7 +834,7 @@ test('read-only status projects current Ready plus milestone and newer pending r
     { code: 'personnel_name_not_matched', message: 'A roster name was not found exactly in Personnel Overview.', rosterDisplayName: 'Casey Collaborator', section: 'personnelOverview' },
     { code: 'personnel_name_not_matched', message: 'A roster name was not found exactly in Personnel Details.', rosterDisplayName: 'Ada Principal', section: 'personnelDetails' },
     { code: 'personnel_name_not_matched', message: 'A roster name was not found exactly in Personnel Details.', rosterDisplayName: 'Casey Collaborator', section: 'personnelDetails' },
-    { code: 'referee_section_manual', message: 'The Reviews paragraph was not filled automatically (no submitted reviews at generation, or generated before the Dataverse fill). Check that it is completed in Word; this note stays until the document is regenerated.' },
+    { code: 'referee_section_manual', message: 'The Reviews paragraph wasn\'t filled in automatically (no reviews had been submitted when this version was generated, or it was generated before reviews were added automatically). Check that it is complete in Word; this note stays until the document is regenerated.' },
   ];
   const provenance = {
     inputFingerprint: 'input-fingerprint', renderInputFingerprint: 'render-fingerprint',
@@ -978,8 +978,8 @@ test.each([2, 3, 4])('matching persisted core and input snapshot schema v%s reta
     { code: 'personnel_name_not_matched', message: 'A roster name was not found exactly in Personnel Details.', rosterDisplayName: 'Ada Principal', section: 'personnelDetails' },
     { code: 'personnel_name_not_matched', message: 'A roster name was not found exactly in Personnel Details.', rosterDisplayName: 'Casey Collaborator', section: 'personnelDetails' },
   ];
-  const legacyWarnings = schemaVersion === 2 ? [{ code: 'funding_history_manual', message: 'Institutional Funding History was not filled automatically (this document was generated before the Dataverse fill). Check that it is completed in Word; this note stays until the document is regenerated.' }] : [];
-  const refereeWarnings = schemaVersion === 4 ? [] : [{ code: 'referee_section_manual', message: 'The Reviews paragraph was not filled automatically (no submitted reviews at generation, or generated before the Dataverse fill). Check that it is completed in Word; this note stays until the document is regenerated.' }];
+  const legacyWarnings = schemaVersion === 2 ? [{ code: 'funding_history_manual', message: 'Institutional Funding History wasn\'t filled in automatically for this version. Check that it is complete in Word; this note stays until the document is regenerated.' }] : [];
+  const refereeWarnings = schemaVersion === 4 ? [] : [{ code: 'referee_section_manual', message: 'The Reviews paragraph wasn\'t filled in automatically (no reviews had been submitted when this version was generated, or it was generated before reviews were added automatically). Check that it is complete in Word; this note stays until the document is regenerated.' }];
   expect(status).toEqual({
     leadProgramDirectorId: null,
     pendingArtifact: null,
@@ -1024,7 +1024,7 @@ test('snapshot-v2 Ready documents surface the manual funding-history task; v3 do
   expect(legacy.currentArtifact.warnings).toEqual(expect.arrayContaining([
     expect.objectContaining({
       code: 'funding_history_manual',
-      message: expect.stringContaining('not filled automatically'),
+      message: expect.stringContaining("wasn't filled in automatically"),
     }),
   ]));
 });
