@@ -1,7 +1,7 @@
 # Proposal Ranking API contract
 
 Status: implementation contract for the first Proposal Ranking release. It is
-updated for the 2026-10-08 owner decisions removing excusal and adding explicit dry-run erasure, after revision 3 of `PROPOSAL_RANKING_DESIGN_2026-10-07.md`. Runtime
+updated for the 2026-10-08 owner decisions removing excusal, adding explicit dry-run erasure and combined meeting orders, after revision 3 of `PROPOSAL_RANKING_DESIGN_2026-10-07.md`. Runtime
 activation is now enabled in Production; multi-identity acceptance remains pending. Sandbox and Production schema/application-role setup are verified;
 bounded persistence checks and direct-table denial for the tested sandbox staff
 identity passed. Production facilitator/grants and four-participant direct-table/search
@@ -30,6 +30,7 @@ uses it to resolve repeat and uncertain outcomes.
 
 ```ts
 type ProgramKey = 'se' | 'mr';
+type MeetingKey = ProgramKey | 'co';
 type ListStatus = 'draft' | 'submitted' | 'collecting' | 'composite-draft' | 'published';
 
 type Response = {
@@ -79,20 +80,21 @@ type Response = {
     previewFingerprint: string;
   };
   confirmations: {
-    generate: Record<ProgramKey, null | { fingerprint: string; message: string; outstandingNames: string[] }>;
+    generate: Record<ProgramKey, null | { fingerprint: string; message: string; outstandingNames: string[] }> & { co?: { fingerprint: string; message: string } };
     publish: Record<ProgramKey, null | { fingerprint: string; message: string; outstandingNames: string[] }>;
     excuse: null; // retained wire field
     cancel: null | { fingerprint: string; message: string };
     resetDryRun: null | { fingerprint: string; message: string };
   };
-  programs: Record<ProgramKey, {
+  programs: Partial<Record<MeetingKey, {
+    available?: boolean; // co only; no combined ballots
     proposalIds: string[];
     progress: { required: number; submitted: number; outstandingNames: string[] };
     ownList: null | ListView;
     facilitatorLists: null | ListView[];
     meeting: null | MeetingView;
     meetingStatus: ListStatus | null;
-  }>;
+  }>>;
   operation: null | { operationId: string; status: 'confirmed' | 'uncertain' | 'superseded'; result: string };
 };
 
@@ -110,7 +112,7 @@ type ProposalCard = {
 
 type ListView = {
   listKey: string;
-  programKey: ProgramKey;
+  programKey: MeetingKey;
   owner: null | { systemUserId: string; name: string };
   status: ListStatus;
   order: string[];
@@ -122,7 +124,8 @@ type ListView = {
 
 type MeetingView = ListView & {
   composite: null | {
-    sourceSubmissionIds: string[];
+    sourceSubmissionIds?: string[]; // per-program composites
+    sourceMeetingOrders?: Array<{ programKey: ProgramKey; version: number; order: string[] }>; // combined provenance
     baselineOrder: string[];
     scores: Record<string, { rankSum: number; averageRank: number; tied: boolean }>;
     ranks: Array<{ requestId: string; participants: Array<{ systemUserId: string; name: string; rank: number }>; minRank: number; maxRank: number; disagreement: boolean }>;
@@ -155,8 +158,9 @@ type Action =
   | { action: 'save'; roundId: string; programKey: ProgramKey; order: string[]; etag: string; policyRevision: number; operationId: string }
   | { action: 'submit'; roundId: string; programKey: ProgramKey; order: string[]; etag: string; policyRevision: number; operationId: string }
   | { action: 'generate'; roundId: string; programKey: ProgramKey; etag: string; policyRevision: number; confirmationFingerprint: string; operationId: string }
-  | { action: 'edit'; roundId: string; programKey: ProgramKey; order: string[]; etag: string; policyRevision: number; operationId: string }
+  | { action: 'edit'; roundId: string; programKey: MeetingKey; order: string[]; etag: string; policyRevision: number; operationId: string }
   | { action: 'publish'; roundId: string; programKey: ProgramKey; etag: string; policyRevision: number; confirmationFingerprint: string; operationId: string }
+  | { action: 'combine'; roundId: string; policyRevision: number; confirmationFingerprint: string; operationId: string }
   | { action: 'transfer'; roundId: string; successorSystemUserId: string; policyRevision: number; operationId: string }
   | { action: 'resetDryRun'; roundId: string; policyRevision: number; confirmationFingerprint: string; operationId: string }
   | { action: 'cancel'; roundId: string; policyRevision: number; confirmationFingerprint: string; operationId: string };
@@ -184,6 +188,28 @@ retained; a round containing a legacy excusal cannot generate or publish another
 composite (`409 legacy_excusal`). No stored history is rewritten. Opening uses a
 single Open round button without an acknowledgment checkbox; readiness and the
 fresh-preview fingerprint still gate the operation.
+
+## Combined meeting list (feature branch; not yet promoted)
+
+`combine` is facilitator-only after every nonempty SE/MR program is published.
+Its token is `confirmations.generate.co`; it binds the round ETag as well as policy,
+so an intervening meeting edit requires fresh confirmation. One conditional round
+PATCH plus list POST creates the unique `meeting:co` row with `wmkf_programkey: co`
+and published status. Existing two-character schema and application role suffice.
+A repeated creation operation returns current state without overwriting edits; a
+new creation operation rejects an already-existing combined list.
+
+The seed compares the average PD rank at the head of each remaining program order,
+lower first, SE first on equal values. Taking only the head preserves both current
+within-program meeting orders. It is a discussion starting point, not a new ballot
+or external-review score sort. The immutable composite preserves source orders and
+versions, original scores/named ranks and the combined baseline. Subsequent edits
+to SE, MR and combined orders are independent; no regeneration is provided.
+
+`programs.co.available` enables the combined tab for the roster/current facilitator.
+It has no individual ballots. The shared row uses normal published-list visibility,
+ETag-guarded `edit` and totals over the full union of frozen proposals. `save`,
+`submit`, `generate` and `publish` reject `co`. Dry-run erasure includes this row.
 
 ## Explicit dry runs (feature branch; not yet promoted)
 

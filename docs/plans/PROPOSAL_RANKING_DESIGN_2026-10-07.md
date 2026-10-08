@@ -18,8 +18,14 @@ grant approvals, award amounts, or change proposal lifecycle status.
   stage name will change; one explicit source-status rule must be used independently
   of UI wording. No reconsidered/deferred proposals and no test requests.
 - Separate Science and Engineering (SE) and Medical Research (MR) lists initially.
-  A cross-program combined list is deferred. Concatenating two program lists is
-  not a valid cross-program preference ranking.
+  After every nonempty program is published, the facilitator can create a shared
+  combined SE + MR meeting list (2026-10-08 owner decision; branch-only).
+  Interleave the current program orders by comparing the next proposal's average
+  PD rank, lower first, SE first on equal values. Preserve each program's current
+  internal order even if meeting edits made scores nonmonotonic. This is a starting
+  point for discussion, not a claim that within-program ranks establish absolute
+  cross-program merit. Staff can then freely reorder the combined list. No new
+  ballots are collected; later edits to the three meeting lists are independent.
 - Participants: distinct lead PDs assigned to the eligible proposals across both
   programs. Every participant ranks every proposal in each program, not just their
   own assigned proposals. No manual participant selection is required in v1.
@@ -205,7 +211,7 @@ and `wmkf_proposalrankinglist`):
    score/seed/roster snapshot, current facilitator GUID, policy revision, active or
    canceled state, timestamped administration events. Cancel never deletes data.
 3. **List:** unique (round, listKey), where server-derived listKey identifies either
-   an individual program+PD list or the program meeting list. An ordered request-ID
+   an individual program+PD list, program meeting list, or `meeting:co` combined list. An ordered request-ID
    JSON array lives on ONE row. Individual status: draft/submitted. Meeting status:
    collecting/draft/published. Immutable composite calculation and source submission
    IDs sit beside the separately mutable meeting order. Empty programs have no rows.
@@ -259,7 +265,7 @@ Delete privilege on ranking lists only for dry-run erasure; live application is 
 
 - Every mutation re-reads the round, validates current actor permissions/state and
   client policy revision, and includes a conditional round PATCH and conditional
-  list PATCH in one changeset. This fences facilitator/cancellation races
+  list PATCH (or POST for combined creation) in one changeset. This fences facilitator/cancellation races
   as well as stale orders. Increment policy revision only for policy changes;
   ordinary list saves still conditionally touch the round version.
 - For another participant's unrelated save, a bounded server retry is permitted
@@ -315,6 +321,7 @@ Delete privilege on ranking lists only for dry-run erasure; live application is 
 write/read -> permission-filtered response -> card stack and cumulative totals`.
 Use app key `proposal-ranking`. Named operations are preview/open, read
 round, save own list, submit own list, generate/edit/publish program meeting list,
+combine published program orders, edit the combined meeting list,
 transfer facilitator, cancel unpublished ordinary round, erase explicit dry run. All request
 actors are session-derived. Program/round selectors are validated; errors use
 400 invalid, 403 denied, 409 stale/incomplete, and 503 dependency unavailable.
@@ -329,7 +336,9 @@ Owner-approved UI organization (2026-10-08): My rankings contains only the
 participant's own lists, including for a facilitator who votes. Facilitate is the
 facilitator's preparation view: progress, generate/review/publish, collapsed
 read-only individual lists, and collapsed administration. Meeting list contains
-published working orders only, independently per program. Default to My rankings
+published working orders, independently per program and in the combined SE + MR tab.
+The combined tab appears once every nonempty program is published, has no My rankings
+view, and creates a directly shared list without a second publication step. Default to My rankings
 before publication and Meeting list for a published program. Do not permit view
 switching while saves are pending or unresolved. Rehearsal-only identity links
 open separately labeled tabs; they are not part of the signed-in production UI.

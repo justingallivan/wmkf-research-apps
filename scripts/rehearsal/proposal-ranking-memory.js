@@ -217,3 +217,17 @@ export async function eraseDryRunChangeset(round, roundLists, roundPatch, coordi
   stamp(storedCoordinator, 'cycle', storedCoordinator.wmkf_proposalrankingcycleid);
   return { ok: true };
 }
+
+export async function createCombinedMeeting(round, roundPatch, list) {
+  const stored = currentMapRow(rounds, round.wmkf_proposalrankingroundid, 'round');
+  checkEtag(stored, round['@odata.etag']);
+  if (list.wmkf_roundid !== stored.wmkf_proposalrankingroundid || list.wmkf_listkey !== 'meeting:co'
+    || [...lists.values()].some((row) => row.wmkf_roundid === list.wmkf_roundid && row.wmkf_listkey === list.wmkf_listkey)) {
+    const error = new Error('Combined list already exists or belongs to another round.'); error.status = 409; throw error;
+  }
+  Object.assign(stored, clone(roundPatch));
+  stamp(stored, 'round', stored.wmkf_proposalrankingroundid);
+  const created = clone(list);
+  lists.set(created.wmkf_proposalrankinglistid, stamp(created, 'list', created.wmkf_proposalrankinglistid));
+  return { ok: true };
+}

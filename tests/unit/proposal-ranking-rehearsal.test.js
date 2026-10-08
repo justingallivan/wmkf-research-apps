@@ -273,3 +273,62 @@ test('a save after reset confirmation requires fresh confirmation, and loss of t
     expect(await listRoundRows(roundId)).toEqual([]);
   } finally { spy.mockRestore(); }
 });
+
+test('combined list requires publication, preserves program order, retries safely, and permits independent shared edits', async () => {
+  const { facilitator, roundId, generation } = await openRehearsal(true);
+  const participant = getRehearsalProfiles()[1];
+  let current = await handleProposalRankingRehearsalGet({ profileId: facilitator.profileId, roundId });
+  const act = (action, extra = {}, profileId = facilitator.profileId) => handleProposalRankingRehearsalAction({ profileId, action, body: { roundId, policyRevision: current.round.policyRevision, operationId: operationId(), ...extra } });
+  expect(current.programs.co.available).toBe(false);
+  await expect(act('combine', { confirmationFingerprint: 'x' })).rejects.toMatchObject({ code: 'invalid_transition' });
+  await submitOwnPrograms(facilitator, roundId);
+  await simulateOtherSubmissions({ roundId }, generation);
+  current = await handleProposalRankingRehearsalGet({ profileId: facilitator.profileId, roundId });
+  for (const programKey of ['se', 'mr']) {
+    current = await act('generate', { programKey, etag: current.programs[programKey].meeting.etag, confirmationFingerprint: current.confirmations.generate[programKey].fingerprint });
+    current = await act('publish', { programKey, etag: current.programs[programKey].meeting.etag, confirmationFingerprint: current.confirmations.publish[programKey].fingerprint });
+    if (programKey === 'se') expect(current.programs.co.available).toBe(false);
+  }
+  const stale = current.confirmations.generate.co.fingerprint;
+  const seOrder = [...current.programs.se.meeting.order].reverse();
+  current = await act('edit', { programKey: 'se', order: seOrder, etag: current.programs.se.meeting.etag });
+  await expect(act('combine', { confirmationFingerprint: stale })).rejects.toMatchObject({ code: 'confirmation_stale' });
+  const combineBody = { confirmationFingerprint: current.confirmations.generate.co.fingerprint, operationId: operationId() };
+  await expect(act('combine', combineBody, participant.profileId)).rejects.toMatchObject({ status: 403 });
+  const original = current;
+  const adapter = require('../../lib/dataverse/adapters/proposal-ranking.js');
+  const realCreate = adapter.createCombinedMeeting;
+  const spy = jest.spyOn(adapter, 'createCombinedMeeting').mockImplementationOnce(async (...args) => {
+    await realCreate(...args);
+    throw new Error('Lost creation response');
+  });
+  try { current = await act('combine', combineBody); } finally { spy.mockRestore(); }
+  expect(current.operation.status).toBe('confirmed');
+  expect(current.programs.co.meeting.status).toBe('published');
+  const order = current.programs.co.meeting.order;
+  expect(order).toHaveLength(6);
+  expect(order.filter((id) => seOrder.includes(id))).toEqual(seOrder);
+  expect(order.filter((id) => original.programs.mr.proposalIds.includes(id))).toEqual(original.programs.mr.meeting.order);
+  expect(current.programs.co.meeting.composite.ranks).toHaveLength(6);
+  expect(current.programs.co.meeting.totals.at(-1).complete).toBe(true);
+  expect(current.programs.se.meeting).toEqual(original.programs.se.meeting);
+  const participantView = await handleProposalRankingRehearsalGet({ profileId: participant.profileId, roundId });
+  expect(participantView.programs.co.meeting.order).toEqual(order);
+  expect(participantView.programs.co.ownList).toBeNull();
+  expect(participantView.programs.co.facilitatorLists).toBeNull();
+  await expect(act('edit', { programKey: 'co', order: order.slice(1), etag: current.programs.co.meeting.etag })).rejects.toMatchObject({ code: 'invalid_order' });
+  current = await act('edit', { programKey: 'co', order: [...order].reverse(), etag: current.programs.co.meeting.etag }, participant.profileId);
+  const combinedEtag = current.programs.co.meeting.etag;
+  current = await act('combine', combineBody);
+  expect(current.operation.status).toBe('confirmed');
+  expect(current.programs.co.meeting.etag).toBe(combinedEtag);
+  expect(current.programs.co.meeting.order).toEqual([...order].reverse());
+  await expect(act('combine', { confirmationFingerprint: stale })).rejects.toMatchObject({ code: 'already_completed' });
+  await expect(act('generate', { programKey: 'co' })).rejects.toMatchObject({ code: 'invalid_request' });
+  await expect(act('submit', { programKey: 'co', order })).rejects.toMatchObject({ code: 'invalid_request' });
+  current = await act('edit', { programKey: 'se', order: [...seOrder].reverse(), etag: current.programs.se.meeting.etag });
+  expect(current.programs.co.meeting.etag).toBe(combinedEtag);
+  expect(await listRoundRows(roundId)).toHaveLength(9);
+  await act('resetDryRun', { confirmationFingerprint: current.confirmations.resetDryRun.fingerprint });
+  expect(await listRoundRows(roundId)).toEqual([]);
+});

@@ -120,6 +120,25 @@ verify role/readiness and current round/default facilitator, resolve any existin
 ordinary trial using its existing unpublished cancellation contract, then explicitly
 open a new dry run. Do not publish an old ordinary trial expecting this reset to work.
 
+## Combined SE + MR meeting order — 2026-10-08 (branch-only)
+
+[VERIFIED via source and focused memory tests] After every nonempty program is
+published, the facilitator can create `meeting:co` in the existing list entity.
+The two-character `wmkf_programkey` is `co`; no schema change is required. A round
+ETag-conditional PATCH and unique-key list POST commit together. Confirmation also
+binds that ETag, preventing a stale preview from silently using changed orders.
+
+The seed interleaves the latest SE/MR meeting orders by the next proposal's average
+PD rank (lower first, SE first on equality), preserving each program's internal
+order. It stores source orders/versions and original named ranks alongside its
+baseline. The list is shared immediately with the captured roster; later edits
+are independent of SE/MR. It adds no individual ballots and no source writes.
+Creation retries preserve edits. Dry-run reset deletes the combined row too.
+The UI shows an SE + MR tab after publication, with no individual-ranking view.
+
+This is local/feature-branch implementation, not a Production deployment or live
+Dataverse transaction verification. Existing release/preflight boundaries remain.
+
 ## Source and persistence
 
 [VERIFIED via source] `/proposal-ranking` calls `/api/proposal-ranking`, which
@@ -132,7 +151,7 @@ changesets under trusted DAL context and the existing target interlock.
 |---|---|---|
 | `wmkf_proposalrankingcycle` | `wmkf_proposalrankingcycles` | One coordinator per cycle, unique cycle key, active-round UUID text and version. Initial creation is POST, not upsert. |
 | `wmkf_proposalrankinground` | `wmkf_proposalrankingrounds` | Frozen proposal cards, score basis, seed orders and roster; facilitator, policy revision, active/canceled state, action receipts and administration events. Unique creation-operation key. |
-| `wmkf_proposalrankinglist` | `wmkf_proposalrankinglists` | One complete order per PD/program or meeting/program. Unique round/list key, ETag, immutable submitted inputs/composite beside mutable meeting order, terminal operation receipts. |
+| `wmkf_proposalrankinglist` | `wmkf_proposalrankinglists` | One complete order per PD/program, meeting/program, or combined `meeting:co`. Unique round/list key, ETag, immutable submitted inputs/composite beside mutable meeting order, terminal operation receipts. |
 
 Schema source: `lib/dataverse/schema/wave32-proposal-ranking/`. Application-only
 role: `lib/dataverse/schema/roles/proposal-ranking-app.json` (Create/Read/Write on
