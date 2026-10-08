@@ -174,7 +174,7 @@ applicant event, (3) the pre-visit meeting, (4) the staff working document,
 
 - **status:** ambiguous
 - **ownerAppKey:** `reviewers` (Workbench), `meeting-tracker`
-- **migrationDecision:** — (open; owner group decision after D26)
+- **migrationDecision:** — (open; owner group decision after D26). Options sheet with suggested names and current counts: `docs/plans/DELIBERATIONS_VOCABULARY_OPTIONS_2026-10-08.md` (owner to pick up mid-November 2026).
 - **lastVerified:** 2026-10-06
 
 ## Concept Evaluator

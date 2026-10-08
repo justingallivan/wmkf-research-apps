@@ -102,6 +102,11 @@ sequence.
   (b) the two writeup "check in Word" warnings no longer say "the Dataverse fill"
   (`lib/services/pre-site-visit/artifact-model.js`). Owner approved both wordings.
 
+- **Deliberations vocabulary: owner to pick up mid-November 2026 (owner request, 2026-10-07).**
+  The options sheet is ready: `docs/plans/DELIBERATIONS_VOCABULARY_OPTIONS_2026-10-08.md`
+  (eight concepts, current counts, a suggested name for each). The group decides after D26;
+  then one suite-wide rename on a branch. Nothing to do before then.
+
 - **Cycle rollover with minimal configuration (2026-10-06).** [OPEN —
   investigation designed, not started] Owner principle: very few parameters may
   need human care each cycle; prefer settings that derive from the record or the

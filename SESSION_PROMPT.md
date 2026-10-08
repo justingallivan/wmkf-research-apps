@@ -309,6 +309,13 @@ not the sparse request wmkf_organizationname field. Live metadata and all23accou
 names were verified. Release/browser confirmation is recorded in the Atlas below.
 ---
 
+## Owner reminder (set 2026-10-07, Session 584)
+
+**Mid-November 2026:** remind the owner to pick up the deliberations vocabulary options sheet,
+`docs/plans/DELIBERATIONS_VOCABULARY_OPTIONS_2026-10-08.md`, before the after-D26 group decision.
+
+---
+
 # Restored main handoff (Session 584, Claude)
 
 The PR #457 merge (`10c079c86`) replaced this file with the ranking branch's copy, dropping
