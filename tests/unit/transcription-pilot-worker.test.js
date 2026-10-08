@@ -436,6 +436,36 @@ describe('transcription worker submission safety', () => {
       expect(console.warn).toHaveBeenCalledWith('[transcription-pilot] retry scheduled:', logged, job.id);
     });
 
+    it.each([['confidential message', new Error('confidential'), 'Error'],
+      ['secret_value code', Object.assign(new Error('x'), { code: 'secret_value' }), 'Error'],
+      ['unlisted name', Object.assign(new Error('confidential'), { name: 'Confidential' }), 'unknown'],
+      ['unlisted name and code', Object.assign(new Error('y z'), { name: 'Confidential', code: 'secret_value' }), 'unknown']])('never logs an unlisted identity: %s', async (_l, error, logged) => {
+      const job = setup(error);
+      await drainTranscriptionPilot({ maxJobs: 1 });
+      expect(console.warn).toHaveBeenCalledWith('[transcription-pilot] retry scheduled:', logged, job.id);
+    });
+
+    it('logs worker_deadline_exhausted distinctly from its generic code', async () => {
+      const job = setup(Object.assign(new Error('worker_deadline_exhausted'), { code: 'provider_request_failed' }));
+      await drainTranscriptionPilot({ maxJobs: 1 });
+      expect(console.warn).toHaveBeenCalledWith('[transcription-pilot] retry scheduled:', 'worker_deadline_exhausted', job.id);
+    });
+
+    it('moves to submission_uncertain, not failed, when a provider-ID conflict lands during the save', async () => {
+      const job = setup({ status: 'completed', text: 'x', utterances: 'bad' });
+      const conflicted = { ...job, version: job.version + 1, provider_id_conflict: true };
+      store.getLeasedTranscriptionJob.mockReset().mockResolvedValueOnce(job).mockResolvedValueOnce(job).mockResolvedValue(conflicted);
+      store.mutateLeasedTranscriptionJob.mockResolvedValue({ ...conflicted, status: 'submission_uncertain', version: 3 });
+      await drainTranscriptionPilot({ maxJobs: 1 });
+      expect(store.mutateLeasedTranscriptionJob).toHaveBeenCalledWith(expect.objectContaining({
+        expectedVersion: conflicted.version, fields: { status: 'submission_uncertain' },
+      }));
+      expect(store.mutateLeasedTranscriptionJob).not.toHaveBeenCalledWith(expect.objectContaining({
+        fields: expect.objectContaining({ status: 'failed' }),
+      }));
+      expect(store.releaseTranscriptionLease).toHaveBeenCalledWith(expect.objectContaining({ expectedStatuses: ['submission_uncertain'] }));
+    });
+
     it('still schedules a retry for output_write_verification_failed', async () => {
       setup({ status: 'completed', text: 'hello' });
       runtime.readPrivateContentIfPresent.mockResolvedValue(null);
