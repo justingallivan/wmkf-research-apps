@@ -55,6 +55,7 @@ const RECORDED_CRONS = {
   'send-review-thankyous': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/reviewer-thankyou-sweep.js'] },
   'site-visit-materials-reminders': { scheduled: false, class: 'guarded', guardFiles: ['lib/services/site-visit-materials/reminder-sweep.js'] },
   'staff-deliberations-preparation': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/pre-site-visit/preparation-worker.js'], note: 'every 15 minutes; acts only when enabled, and request selection, claim, promotion fence and retry exclude test requests' },
+  'final-writeup-handoff-emails': { scheduled: true, class: 'allowed', note: 'every 15 minutes; retries the group-review email a lead PD started on a chosen request; email is regarding the request, so the delivery seam applies test-request policy' },
   'spend-check': { scheduled: true, class: 'operational', note: 'aggregate spend alarm; counts all spend, test requests included' },
   'sweep-stale-invites': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/reviewer-suggestion-sweep.js'] },
 };
@@ -64,14 +65,14 @@ test('every cron route is recorded', () => {
     .filter((name) => name.endsWith('.js'))
     .map((name) => name.replace(/\.js$/, ''))
     .sort();
-  expect(routes).toHaveLength(26);
+  expect(routes).toHaveLength(27);
   expect(routes).toEqual(Object.keys(RECORDED_CRONS).sort());
 });
 
 test('the recorded schedule matches vercel.json', () => {
   const crons = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8')).crons;
-  expect(crons).toHaveLength(25);
-  expect(new Set(crons.map(({ path: cronPath }) => cronPath.split('?')[0])).size).toBe(24);
+  expect(crons).toHaveLength(26);
+  expect(new Set(crons.map(({ path: cronPath }) => cronPath.split('?')[0])).size).toBe(25);
   const transcriptionCrons = crons.filter((cron) =>
     typeof cron.path === 'string' && cron.path.split('?')[0] === '/api/cron/drain-transcriptions'
   ).map(({ path: cronPath, schedule }) => ({ path: cronPath, schedule })).sort((a, b) => a.path.localeCompare(b.path));

@@ -85,9 +85,13 @@ sequence.
   until group review; changes are lead PD or superuser only) is live (PR #453,
   merge `b47a70eae`, 2026-10-06). Stage 3 (lead-PD sign-off view; "Mark
   reviewed" renamed "Sign off"; Send to leadership names unsigned PDs) is live
-  (PR #454, merge `b2bc23b95`, 2026-10-07). Stages 4–5 (PD handoff email,
-  leadership daily digest) are planned, not built; SoCal is parked by the
-  owner (2026-10-07):
+  (PR #454, merge `b2bc23b95`, 2026-10-07). Stage 4 (PD handoff email,
+  Research only via `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`) is live
+  (PR #456, merge `8bc5b466b`, 2026-10-07; migration 072 applied, copy seeded,
+  Production list = Research only); verify the first real send. Stage 5 (leadership daily digest) is planned,
+  not built; SoCal is parked by the owner (2026-10-07). Program-list reminder:
+  when SoCal (or another program) adopts group review, add its Grant Program
+  GUID to `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS` or it sends no email:
   `docs/plans/FINAL_WRITEUP_GROUP_REVIEW_HANDOFF_PLAN_2026-10-06.md`.
 - **Deferred to next session (2026-10-06):** (a) the list's next step for a
   ready briefing should name the deliberation session date (UI only; the

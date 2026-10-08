@@ -671,3 +671,17 @@ describe('lead PD sign-off roster (group-review Stage 3)', () => {
     expect(dialog).not.toHaveTextContent(/All Program Directors/);
   });
 });
+
+describe('handoff email copy (group-review Stage 4)', () => {
+  test.each([
+    [true, 'The other Program Directors for this grant program get an email from the lead Program Director with a link to the writeup.', /No email is sent/],
+    [false, 'No email is sent. Let colleagues know it is ready.', /are emailed/],
+  ])('handoffEmailEnabled=%s: the confirmation states what the server will do', async (enabled, shown, absent) => {
+    global.fetch = jest.fn().mockResolvedValue(response({ ...readyStatus(), handoffEmailEnabled: enabled }));
+    render(<FinalWriteupTab requestId={REQUEST_ID} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Ready for group review' }));
+    const dialog = screen.getByRole('dialog', { name: 'Ready for group review?' });
+    expect(dialog).toHaveTextContent(shown);
+    expect(dialog).not.toHaveTextContent(absent);
+  });
+});

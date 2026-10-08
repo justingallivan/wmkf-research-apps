@@ -31,6 +31,8 @@ const SENDER_PATTERN = /\.createAndSendEmail\(|\.createEmailActivity\(|DynamicsS
 // it).
 const RECORDED_SENDERS = {
   'lib/services/admin/test-email-service.js': { audience: 'staff', early: [] },
+  // Group-review handoff (Stage 4): regarding the request, so the delivery seam refuses test requests.
+  'lib/services/final-writeup/handoff-email-service.js': { audience: 'staff', early: [] },
   'lib/services/meeting-tracker/agenda-service.js': { audience: 'staff', early: [] },
   'lib/services/notification-service.js': { audience: 'staff', early: [] },
   'lib/services/pre-site-visit/distribution/dependencies.js': { audience: 'request-distribution', early: [] },
