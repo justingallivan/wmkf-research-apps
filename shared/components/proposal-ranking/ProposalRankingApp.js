@@ -56,25 +56,27 @@ function ProposalCardRow({ proposal, position, programCount, total, score, rank,
         >
           <svg aria-hidden="true" width="16" height="24" viewBox="0 0 16 24" fill="currentColor"><circle cx="5" cy="6" r="1.5" /><circle cx="11" cy="6" r="1.5" /><circle cx="5" cy="12" r="1.5" /><circle cx="11" cy="12" r="1.5" /><circle cx="5" cy="18" r="1.5" /><circle cx="11" cy="18" r="1.5" /></svg>
         </div>}
-        <div className="min-w-0 flex-1 space-y-3 p-4">
+        <div className="relative min-w-0 flex-1 space-y-3 p-4">
+          <div className="absolute right-4 top-4 flex gap-2">
+            <span aria-label={`Program: ${proposal.programKey.toUpperCase()}`} className="inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-gray-500 text-sm font-semibold text-gray-800">{proposal.programKey.toUpperCase()}</span>
+            {(proposal.institutionGeography === 'East' || proposal.institutionGeography === 'West') && <span
+              role="img"
+              aria-label={`${proposal.institutionGeography} institution`}
+              title={`${proposal.institutionGeography} institution`}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-gray-500 text-sm font-semibold text-gray-800"
+            >{proposal.institutionGeography[0]}</span>}
+          </div>
           <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[auto_minmax(0,1fr)]">
             <span aria-label={`Rank ${position + 1}: ${proposal.title || 'Untitled proposal'}`} className="min-w-8 shrink-0 text-3xl font-bold leading-none tabular-nums text-gray-900">{position + 1}</span>
             <div className="min-w-0">
-              <h3 className="break-words text-base font-semibold leading-snug text-gray-900">{proposal.organization || 'Organization unavailable'}</h3>
-              <p className="mt-1 break-words text-sm">
+              <h3 className="break-words pr-24 text-base font-semibold leading-snug text-gray-900">{proposal.organization || 'Organization unavailable'}</h3>
+              <p className="mt-1 break-words pr-24 text-sm">
                 <a href={`/workbench/${encodeURIComponent(proposal.requestId)}`} className="text-blue-800 underline underline-offset-2 hover:text-blue-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">{proposal.title || 'Untitled proposal'}</a>
               </p>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-600">
-                <span>{proposal.programKey.toUpperCase()}</span>
-                {(proposal.institutionGeography === 'East' || proposal.institutionGeography === 'West') && <span
-                  role="img"
-                  aria-label={`${proposal.institutionGeography} institution`}
-                  title={`${proposal.institutionGeography} institution`}
-                  className="border-l border-gray-300 pl-2 text-xs font-medium text-gray-600"
-                >{proposal.institutionGeography[0]}</span>}
+              {(proposal.leadName || rank?.disagreement) && <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-600">
                 {proposal.leadName && <span>Lead PD: {proposal.leadName}</span>}
                 {rank?.disagreement && <span className="rounded-md bg-amber-100 px-2 py-0.5 text-amber-900">Disagreement</span>}
-              </div>
+              </div>}
               <div className="mt-3 space-y-3">
                 <div className="flex flex-wrap items-center gap-1.5 text-sm">
                   <span className="mr-1 font-medium text-gray-700">Reviews</span>

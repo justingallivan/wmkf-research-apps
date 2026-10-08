@@ -358,7 +358,7 @@ describe('Proposal Ranking page', () => {
 
     expect(await screen.findByRole('img', { name: 'East institution' })).toHaveTextContent('E');
     expect(screen.getByRole('img', { name: 'West institution' })).toHaveTextContent('W');
-    expect(screen.getByRole('img', { name: 'East institution' })).toHaveClass('text-xs', 'font-medium');
+    expect(screen.getByRole('img', { name: 'East institution' })).toHaveClass('rounded-full', 'border-2', 'text-sm', 'font-semibold');
     expect(screen.getByLabelText('Rank 1: First proposal')).toHaveClass('text-3xl');
     expect(screen.getAllByRole('img', { name: /institution$/ })).toHaveLength(2);
   });
@@ -750,4 +750,12 @@ test('bottom-aligns staff rankings and budget without a divider', async () => {
   expect(budget.parentElement).toHaveClass('flex', 'items-end', 'justify-between');
   expect(ranks.compareDocumentPosition(budget) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(within(budget).getByText('Cumulative Budget')).toBeInTheDocument();
+});
+
+test('groups program and geography in outlined upper-right badges', async () => {
+  mockLoad.mockResolvedValue(roundResponse());
+  render(<ProposalRankingApp />);
+  const east = await screen.findByRole('img', { name: 'East institution' });
+  expect(east.parentElement).toHaveClass('absolute', 'right-4', 'top-4');
+  expect(within(east.parentElement).getByLabelText('Program: SE')).toHaveClass('rounded-full', 'border-2', 'h-10', 'w-10');
 });
