@@ -176,3 +176,19 @@ Surface: the step 1 import panel → two new visit routes → import service →
 | Symbol fan-out | New table only; no existing enum or status changes. `transcription_jobs` rows are expired, never deleted (no `DELETE FROM transcription_jobs` in `lib/` or `scripts/`, checked with grep), so the FK `ON DELETE SET NULL` is a safety net only. |
 
 Verdict: **ready to implement with the named changes already folded in above**, subject to owner approval of the three decisions.
+
+## Review record (2026-10-08)
+
+- **Claude review of the Sonnet build** found two defects. A `started` row blocked re-import forever even after its job failed or expired. A job queued just before a later error was recorded as `failed`, so a retry would pay twice. Both were fixed in `b877fc293`.
+- **Codex adversarial review 1** (`gpt-6-astra`, base `c1ffd09cc`): needs-attention, one high finding. Failed imports left live `uploading` jobs, which blocked the card for up to 24 hours and could later be started. Fixed in `1cef46de3`:
+  - A conditional `retireMeetingUploadingJob` (`lib/services/transcription-pilot/store.js`) fenced against `queueMeetingJob`.
+  - Retire-before-release in the import catch path and the stale-lease takeover.
+  - The card treats only queued and later statuses as blocking. This also removes a Stage 1 regression where any `uploading` job hid the audio form.
+- **Codex adversarial review 2**: needs-attention, one medium finding. The picker never refreshed cached import states. Fixed in `b46117553` with a Refresh list button and a quiet reload when the job signature changes, but only after the panel is opened.
+- **Codex adversarial review 3**: approve, no material findings. Codex reviewed source only; its sandbox could not run Jest.
+- [VERIFIED via local commands at `b46117553`] 1,026 tests passed in 57 related suites (Zoom import, card, all `transcription-pilot-*` and `meeting-tracker-*`, `site-visit-editor-t5-matrix`). The gates and self-tests passed sequentially: migrations-manifest, atlas, api-routes, route-service-boundary, fact-consistency, canonical-pointers, secret-scan, doc-currency, doc-symbol-refs, build-claim-freshness, trust-boundary-guid, dataverse-access-layer, dynamics-context-boundary, model-override-warming, prompt-injection-tagging, scaffolding-tokens, docs-catalog, agent-invariants and types.
+- Not yet done:
+  - Migration 074 is not applied to any database.
+  - No Vercel variables are set.
+  - There has been no live import against Zoom; one manual local import needs owner approval because it spends transcription credits.
+  - Nothing is merged.
