@@ -1,4 +1,4 @@
-# Session 584 Prompt: transcript speaker fix released (PR #459), hosted acceptance pending; preserve Proposal Ranking handoff; group-review handoff email live (S581)
+# Session 584 Prompt: transcript speaker fix released (PR #459), owner-accepted; UX follow-up with Codex; preserve Proposal Ranking handoff; group-review handoff email live (S581)
 
 ## Session 583 transcript handoff — 2026-10-07 PT (Codex)
 
@@ -6,8 +6,11 @@
 [PR #459](https://github.com/justingallivan/wmkf-research-apps/pull/459), merge
 `f48fba1ab`. All CI passed after main was merged in. [VERIFIED via GitHub deployments +
 `vercel inspect`] The Production deployment `wmkfresearchapps-bmhqc863s` was built from
-`f48fba1ab` and serves the production domains. Steps 1–2 below are done. **Step 3, hosted
-acceptance on 1003038, is still open and is the owner's** (it needs Production reads).
+`f48fba1ab` and serves the production domains. Steps 1–2 below are done. **Step 3: the owner
+reported after regenerating that the fix "looks like it worked"** (owner report; Claude did
+not read the job itself). Remaining transcript-page UI/UX issues and a new feature request
+were handed to Codex on worktree `../WMKF_Apps-codex-transcript-ux`, branch
+`codex/meeting-transcript-ux` (not merged).
 
 Original S583 status: built and pushed on `codex/meeting-transcript-fixes`, tip `5ee323aaa`.
 The existing Proposal Ranking handoff is preserved below.
