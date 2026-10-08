@@ -1,3 +1,31 @@
+# Transcript UX branch handoff — October 7, 2026
+
+## Current task
+
+Branch `codex/meeting-transcript-ux`, dedicated `WMKF_Apps-codex-transcript-ux` checkout. Stay here. The sibling main checkout and `WMKF_Apps-codex` belong to other work.
+
+Planning and a two-slide Zoom-admin brief are prepared in:
+- `docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md`
+- `docs/plans/briefs/WMKF-Zoom-Admin-Brief.pptx` (exact read scopes and sources in speaker notes)
+
+The owner meets the Zoom administrator October 8, 2026 in the morning, Pacific time. WMKF owns the Zoom account; another person receives its 2FA email. Recommended first step: admin-authorized internal Server-to-Server OAuth read access, approved host list, secure app-credential handoff and one import test. No credentials or accounts were accessed this session.
+
+## Accepted direction and remaining approvals
+
+Import full meeting, preserve full-meeting speaker reconciliation, review names and confirm the boundary, generate presentation/discussion videos and transcripts, generate both summaries in one action, review and publish. Presentation products stay archived. Discussion products and full originals expire automatically at the Board meeting deadline; Zoom-original deletion is desired if supported. Exact cutoff, reschedule/hold rules, archive-incomplete failure policy and permanent-erasure semantics remain open.
+
+PR #459 speaker fix is accepted by the owner on 1003038; do not reopen it. No runtime changes, migrations or Production operations occurred. Implementation file scope/order and all schema/auth/Production steps require the owner's agreement. The plan identifies the critical archive-binding change: Board outputs currently depend on the full TRANSCRIPT manifest, so source deletion cannot ship until content-free archive proof keeps those outputs usable.
+
+Keep UX and feature commits separate. Push only this branch. Merging is the owner's call. No new Production milestone shipped; no DEVELOPMENT_LOG entry is required.
+
+## Verification
+
+Documentation checks and sequential self-tests passed. Both slides passed package/layout validation and visual inspection. Read-only source review corrections are included in the plan. This checkout’s missing memory symlink was created and `check:agent-invariants` passed. The claim-evidence advisory report could not read local state; no observation row was invented.
+
+## Previous S584 handoff preserved as history
+
+The transcript acceptance item below is superseded by the owner's October 7 confirmation. Unrelated Proposal Ranking and Final Writeup work remains outside this branch task. Any inherited deletion/cleanup instruction requires fresh verification and authorization.
+
 # Session 584 Prompt: transcript speaker fix released (PR #459), hosted acceptance pending; preserve Proposal Ranking handoff; group-review handoff email live (S581)
 
 ## Session 583 transcript handoff — 2026-10-07 PT (Codex)
