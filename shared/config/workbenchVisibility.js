@@ -6,7 +6,7 @@
 import { TRIAGE_STATUS } from './triageStatus.js';
 
 // The one status literal both functions below must agree on.
-const PHASE_II_PENDING = 'Phase II Pending';
+export const PHASE_II_PENDING = 'Phase II Pending';
 
 export function buildVisibilityFilter(includeSetAside) {
   const base = `akoya_requeststatus eq '${PHASE_II_PENDING}' or wmkf_triagestatus eq ${TRIAGE_STATUS.ADVANCING}`;

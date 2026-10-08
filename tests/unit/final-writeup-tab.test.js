@@ -685,3 +685,19 @@ describe('handoff email copy (group-review Stage 4)', () => {
     expect(dialog).not.toHaveTextContent(absent);
   });
 });
+
+describe('leadership digest copy (group-review Stage 5)', () => {
+  test.each([
+    [true, 'Leadership is told in the next daily summary email, sent at midnight.', /Nobody is notified/],
+    [false, 'Nobody is notified by this step.', /daily summary email/],
+  ])('handoffEmailEnabled=%s: Send to leadership states whether leadership is emailed', async (enabled, shown, absent) => {
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce(response({ ...groupReviewStatus(true), handoffEmailEnabled: enabled }))
+      .mockResolvedValueOnce(response(acknowledgementState({ mayAcknowledge: false, personalState: 'not-applicable' })));
+    render(<FinalWriteupTab requestId={REQUEST_ID} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Send to leadership' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Send to leadership?' });
+    expect(dialog).toHaveTextContent(shown);
+    expect(dialog).not.toHaveTextContent(absent);
+  });
+});

@@ -1,0 +1,14 @@
+{
+  "name": "WMKF Proposal Ranking Application User",
+  "description": "Least-privilege application-user role for the private Proposal Ranking coordinator, round, and list tables. Ordinary staff roles receive no privileges on these tables.",
+  "businessUnit": "root",
+  "addToSolution": "wmkfResearchReviewAppSuite",
+  "_depthLegend": {
+    "Global": "Organization-wide; assignment is limited to the Proposal Ranking application user."
+  },
+  "privileges": [
+    { "table": "wmkf_ProposalRankingCycle", "_note": "Application-only cycle concurrency row.", "depth": "Global", "ops": ["Create", "Read", "Write"] },
+    { "table": "wmkf_ProposalRankingRound", "_note": "Application-only round snapshot and lifecycle.", "depth": "Global", "ops": ["Create", "Read", "Write"] },
+    { "table": "wmkf_ProposalRankingList", "_note": "Application-only private submissions and meeting orders.", "depth": "Global", "ops": ["Create", "Read", "Write"] }
+  ]
+}

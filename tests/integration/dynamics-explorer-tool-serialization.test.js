@@ -13,6 +13,8 @@ const mockAggregateRecords = jest.fn();
 const mockQueryAllRecords = jest.fn();
 const mockSearchRecords = jest.fn();
 const mockResolveEntitySetName = jest.fn();
+const mockGetEntityDefinitions = jest.fn();
+const mockGetMetadataBatch = jest.fn();
 const mockGetEntityAttributes = jest.fn();
 const mockBuildResolvedTaxonomyPromptBlock = jest.fn(() => Promise.resolve('resolved taxonomy'));
 const mockStartRequest = jest.fn(() => Promise.resolve(true));
@@ -68,6 +70,7 @@ jest.mock('../../lib/services/dynamics-service', () => ({
     // entity-set name → logical name (the real method is a static map lookup);
     // A5 classifyToolError normalizes table_name through this.
     resolveLogicalName: (s) => (s === 'akoya_requests' ? 'akoya_request' : s),
+    getEntityDefinitions: (...args) => mockGetEntityDefinitions(...args),
     resolveEntitySetName: (...args) => mockResolveEntitySetName(...args),
     queryRecords: (...args) => mockQueryRecords(...args),
     countRecords: (...args) => mockCountRecords(...args),
@@ -76,6 +79,10 @@ jest.mock('../../lib/services/dynamics-service', () => ({
     searchRecords: (...args) => mockSearchRecords(...args),
     getEntityAttributes: (...args) => mockGetEntityAttributes(...args),
   },
+}));
+
+jest.mock('../../lib/dataverse/adapters/metadata', () => ({
+  getMetadataBatch: (...args) => mockGetMetadataBatch(...args),
 }));
 
 jest.mock('../../lib/services/dynamics-explorer-taxonomy', () => ({
@@ -133,6 +140,30 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
 
     mockAuthenticatedUser(9, ['dynamics-explorer']);
     mockResolveEntitySetName.mockResolvedValue('akoya_requests');
+    mockGetEntityDefinitions.mockResolvedValue([
+      { logicalName: 'akoya_request', entitySetName: 'akoya_requests' },
+      { logicalName: 'account', entitySetName: 'accounts' },
+    ]);
+    mockGetMetadataBatch.mockImplementation(async (paths) => {
+      const logicalName = paths[0].match(/LogicalName='([^']+)'/)?.[1];
+      if (logicalName === 'akoya_request') {
+        return [
+          { value: [{ LogicalName: 'akoya_requestid' }, { LogicalName: 'akoya_requestnum' }] },
+          { value: [{ ReferencingEntity: 'akoya_request', ReferencedEntity: 'account', ReferencingEntityNavigationPropertyName: 'akoya_applicantid' }] },
+          { value: [] },
+          { value: [] },
+        ];
+      }
+      if (logicalName === 'account') {
+        return [
+          { value: [{ LogicalName: 'name' }, { LogicalName: 'wmkf_secret' }] },
+          { value: [{ ReferencingEntity: 'account', ReferencedEntity: 'account', ReferencingEntityNavigationPropertyName: 'parentaccountid' }] },
+          { value: [] },
+          { value: [] },
+        ];
+      }
+      throw new Error(`Unexpected metadata request for ${logicalName}`);
+    });
     mockGetEntityAttributes.mockResolvedValue([
       { logicalName: 'akoya_requestid', displayName: 'Request', type: 'Uniqueidentifier', description: '' },
       { logicalName: 'akoya_requestnum', displayName: 'Request Number', type: 'String', description: '' },
@@ -914,7 +945,7 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
         expand: '_akoya_applicantid_value',
       });
       expect(mockQueryRecords).not.toHaveBeenCalled();
-      expect(expanded).toContain('akoya_applicantid');
+      expect(expanded).toContain('Unsupported $expand navigation path');
 
       mockQueryRecords.mockClear();
       await runTool('query_records', {
@@ -1039,14 +1070,14 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
     // nested-$select case has. None of them may reach Dynamics while a field
     // restriction exists, because the expanded target cannot be resolved here.
     test('every $expand shape fails closed while a field restriction exists', async () => {
-      for (const expand of [
-        'akoya_applicantid',
-        'akoya_applicantid($orderby=name desc)',
-        'akoya_applicantid($top=5)',
-        'akoya_applicantid($expand=parentaccountid)',
-        // A provably-wrong path root still answers with the BLANKET denial while
-        // a restriction exists — the fail-closed rule runs first.
-        'akoya_requestid/child',
+      for (const { expand, expected } of [
+        { expand: 'akoya_applicantid', expected: 'DENIED' },
+        { expand: 'akoya_applicantid($orderby=name desc)', expected: 'DENIED' },
+        { expand: 'akoya_applicantid($top=5)', expected: 'DENIED' },
+        { expand: 'akoya_applicantid($expand=parentaccountid)', expected: 'DENIED' },
+        // Unknown relationship metadata is denied by the private-navigation
+        // guard before the ordinary field-restriction validator runs.
+        { expand: 'akoya_requestid/child', expected: 'not available' },
       ]) {
         setMockSqlResults({
           dynamics_restrictions: {
@@ -1067,7 +1098,7 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
         });
 
         expect(mockQueryRecords).not.toHaveBeenCalled();
-        expect(toolResult).toContain('DENIED');
+        expect(toolResult).toContain(expected);
         expect(toolResult).not.toContain('wmkf_secret');
       }
     });
@@ -1081,7 +1112,7 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
           expand,
         });
         expect(mockQueryRecords).not.toHaveBeenCalled();
-        expect(toolResult).toContain('relationship metadata');
+        expect(toolResult).toMatch(/not available|Unsupported \$expand navigation path/i);
       }
     });
 
@@ -1108,19 +1139,19 @@ describe('/api/dynamics-explorer/chat tool-result serialization', () => {
           expand,
         });
         expect(mockQueryRecords).not.toHaveBeenCalled();
-        expect(toolResult).toContain('relationship metadata');
+        expect(toolResult).toMatch(/not available|Unsupported \$expand navigation path/i);
       }
     });
 
-    test('a path-shaped $expand with an unknown plausible root is forwarded unchanged', async () => {
+    test('a path-shaped $expand with an unknown plausible root fails closed', async () => {
       mockQueryRecords.mockClear();
-      await runTool('query_records', {
+      const toolResult = await runTool('query_records', {
         table_name: 'akoya_request',
         select: 'akoya_requestnum',
         expand: 'Unknown_Nav/child',
       });
-      expect(mockQueryRecords).toHaveBeenCalledTimes(1);
-      expect(mockQueryRecords.mock.calls[0][1].expand).toBe('Unknown_Nav/child');
+      expect(mockQueryRecords).not.toHaveBeenCalled();
+      expect(toolResult).toContain('not available');
     });
 
     test('grouped and reversed invalid Guid comparisons never reach queryRecords', async () => {

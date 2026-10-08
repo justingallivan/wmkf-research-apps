@@ -1,6 +1,6 @@
 ---
 title: Final Writeup group-review handoff — PD drafting, PD sign-off, leadership digest
-status: approved 2026-10-06 — Stages 1–4 live; Stage 5 not built; SoCal parked
+status: approved 2026-10-06 — Stages 1–5 live; SoCal parked
 created: 2026-10-06
 owner: Justin Gallivan
 related:
@@ -302,8 +302,32 @@ Original Stage 4 requirements:
   (partial success, background send).
 
 ### Stage 5 — Leadership daily digest
+
+**Live 2026-10-07 PT (Session 584): PR #461, merge `ddeb1b401`; migration 073 applied and copy seeded
+by the owner; first digest not yet observed. Codex adversarial review: round 1 two high findings
+(same-day retry hit the membership CHECK before ON CONFLICT; run-wide faults raised no alert), fixed in
+`c16c30092`; round 2 approve, no material findings.** As built:
+- Selection: requests in listed programs with a current Final in lifecycle FINAL whose leadership
+  checkpoint is complete and started within the last 7 days (`LOOKBACK_DAYS`), minus writeups an
+  accepted digest already listed to that recipient. No backlog decision was needed: the owner
+  confirmed on 2026-10-07 that no writeup had yet been sent to leadership.
+- Copy from settings keys `email.final_writeup_leadership_digest.subject` / `.body` (owner choice,
+  2026-10-07), seeded by `scripts/seed-email-defaults.mjs`; the list is rendered by the service.
+- Ledger `final_writeup_leadership_digests` (migration 073); the digest day is the UTC day before the
+  run. Cron `/api/cron/final-writeup-leadership-digest`, `0 7 * * *`.
+- The "Send to leadership" confirmation says leadership is told in the next daily summary when the
+  request's program is listed (`handoffEmailEnabled`, now also returned in the review phases).
+- Rollout (done 2026-10-07): `node scripts/apply-migrations.js` (073 applied), then
+  `DATAVERSE_PROD_WRITE_ACK="<purpose> <today's UTC date>" node scripts/seed-email-defaults.mjs --execute`
+  (the Dataverse target interlock refuses a local Production write without that same-day
+  acknowledgement), then merge. Remaining: after the first writeup is sent to leadership, confirm the
+  next night's `final_writeup_leadership_digests` rows have `accepted_at`.
+
 - Daily cron at 00:00 Pacific. Each leadership-persona recipient gets one email listing writeups
   that entered leadership review since their last digest.
+- **Research only (owner, 2026-10-07, S584):** include only writeups whose request's Grant
+  Program is in `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`, the same fail-closed list that gates
+  Stage 4. Owner, 2026-10-07 (S584): "SoCal is not using this app suite yet and may never do so. We can limit to research to keep the programs separate, as the CSO does not review SoCal work."
 - Sender: the system mailbox (`NOTIFICATION_EMAIL_FROM`), not a PD (owner, 2026-10-07): it is
   scheduled and lists requests led by different PDs.
 - No email when the list is empty.

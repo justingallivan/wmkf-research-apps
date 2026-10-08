@@ -484,6 +484,7 @@ test('status ignores pending rows after a valid committed Final pointer and rema
     canStart: false,
     canAdvance: true,
     sourceArtifactId: SOURCE_ID,
+    handoffEmailEnabled: false,
     artifact: {
       artifactId: FINAL_ID,
       sourceArtifactId: SOURCE_ID,

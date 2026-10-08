@@ -88,16 +88,24 @@ sequence.
   (PR #454, merge `b2bc23b95`, 2026-10-07). Stage 4 (PD handoff email,
   Research only via `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`) is live
   (PR #456, merge `8bc5b466b`, 2026-10-07; migration 072 applied, copy seeded,
-  Production list = Research only); verify the first real send. Stage 5 (leadership daily digest) is planned,
-  not built; SoCal is parked by the owner (2026-10-07). Program-list reminder:
+  Production list = Research only); verify the first real send. Stage 5 (leadership daily digest) is live
+  (PR #461, merge `ddeb1b401`, S584; migration 073 applied, copy seeded; first digest not
+  yet observed); scope is Research only, via the same program list (owner, S584);
+  SoCal is parked by the owner (2026-10-07). Program-list reminder:
   when SoCal (or another program) adopts group review, add its Grant Program
   GUID to `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS` or it sends no email:
   `docs/plans/FINAL_WRITEUP_GROUP_REVIEW_HANDOFF_PLAN_2026-10-06.md`.
-- **Deferred to next session (2026-10-06):** (a) the list's next step for a
-  ready briefing should name the deliberation session date (UI only; the
-  session is already in the list payload, `cycle-list-service.js:618`);
-  (b) reword the two "generated before the Dataverse fill" warnings
-  (`lib/services/pre-site-visit/artifact-model.js:290-291`).
+- **Deferred items from 2026-10-06, live S584 via PR #460 (merge
+  `ea1e09a0d`):** (a) the Staff Deliberations
+  list's next step for a ready briefing names the deliberation session date while the
+  session is upcoming, matching the request tab's rule (`StaffDeliberationsPanel.js`);
+  (b) the two writeup "check in Word" warnings no longer say "the Dataverse fill"
+  (`lib/services/pre-site-visit/artifact-model.js`). Owner approved both wordings.
+
+- **Deliberations vocabulary: owner to pick up November 1, 2026 (owner request, 2026-10-07).**
+  The options sheet is ready: `docs/plans/DELIBERATIONS_VOCABULARY_OPTIONS_2026-10-08.md`
+  (eight concepts, current counts, a suggested name for each). The group decides after D26;
+  then one suite-wide rename on a branch. Nothing to do before then.
 
 - **Cycle rollover with minimal configuration (2026-10-06).** [OPEN —
   investigation designed, not started] Owner principle: very few parameters may
@@ -106,11 +114,13 @@ sequence.
   analogy) and a loud drift check for anything still pinned to an old cycle.
   Plan, seed inventory and owner questions:
   `docs/plans/CYCLE_ROLLOVER_MINIMAL_CONFIGURATION_PLAN_2026-10-06.md`.
-  **Interim safeguard:** before J27 research presentations begin, add `J27` to
-  `STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES` in Production, or J27 requests
-  silently fall back to manual preparation (register row J27-084). Coordinate with
-  the J27 single-phase transition (row 8 above) so J27 changes land rollover-free
-  where practical. Waiting on: colleagues' briefing on future cycle dates.
+  **Interim safeguard done 2026-10-07 (S584):** Production
+  `STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES=["D26","J27"]`, redeployed; the status
+  allowlist needs no change (register row J27-084). Coordinate with the J27 single-phase
+  transition (row 8 above) so J27 changes land rollover-free where practical. Partial
+  answer from ops (Connor, 2026-10-07): a planned Grant Cycle table (`wmkf_grantcycle`)
+  with a placeholder meeting date and other ops-maintained dates; see the plan §2a.
+  Owner priority 2026-10-07: a to-do, not the highest priority.
 
 - **Stream transcription audio instead of buffering it (2026-10-04).** [OPEN —
   owner decision, not yet built] The transcription worker reads the whole
@@ -126,20 +136,16 @@ sequence.
   200 MiB cap first with a real two-to-three-hour recording in production.
 
 ## Audit follow-ups — verified open, not silently prioritized
-- **Hard-coded late-2026 `expiresAt` dates in unit-test fixtures (2026-09-27, S546).**
-  `reviewer-roster-endpoint.test.js` failed on `main` when its fixed
-  `2026-09-28T00:00Z` expiry passed; fixed in `5ced59d3b` (far-future date).
-  Seven more files hard-code `expiresAt` dates in late 2026 and may fail the
-  same way when those dates pass: `pre-site-distribution-panel` (10-08, 12-17),
-  `reviewer-institution-evidence-attestation` (09-28, 10-14; uses fake timers),
-  `external-briefing-page` (10-08), `workbench-briefing-link-route` (10-08),
-  `reviewer-institution-auto-resolution-policy` (09-28, 09-29; passed on
-  09-28 UTC, so it may not compare against the clock),
-  `pre-site-distribution-service` (10-08, 11-14, 12-18) and
-  `meeting-tracker-session-service` (12-18), all under `tests/unit/`. Not
-  checked whether each value is compared with the current time. Next: per file,
-  confirm clock dependence; replace clock-compared values with a far-future
-  date or a fake clock. Earliest risk date: 2026-10-08.
+- **Hard-coded late-2026 `expiresAt` dates in unit-test fixtures (2026-09-27, S546).** **[CLOSED
+  2026-10-08 UTC, S584: no clock dependence.]** All seven files pass at 05:48 UTC on 2026-10-08
+  (236 tests), after four of the dates had passed. Each remaining value is display-only or under a fake
+  clock: `external-briefing-page` and `pre-site-distribution-service` (10-08T20:00, 11-14) only format
+  the date (`pages/external/briefing/[token].js:298-299`, `distributionBodyHtml`);
+  `pre-site-distribution-panel` (12-17) goes through `briefingExpiryLabel`, a formatter
+  (`PreSiteDistributionPanel.js:71-76`); `meeting-tracker-session-service` (12-18) is an equality
+  fixture; `reviewer-institution-evidence-attestation` (10-14) sets `jest.useFakeTimers().setSystemTime`
+  (line 52); `workbench-briefing-link-route` and `reviewer-institution-auto-resolution-policy` already
+  pass with their dates in the past. The original failure was fixed in `5ced59d3b`.
 - **Preview CSRF origin check rejects alias-hosted POSTs (2026-09-19, integration
   smoke).** `lib/utils/auth.js validateOrigin` derives the Preview allowed origin from
   `VERCEL_URL` (the immutable deployment host), so any state-changing request made

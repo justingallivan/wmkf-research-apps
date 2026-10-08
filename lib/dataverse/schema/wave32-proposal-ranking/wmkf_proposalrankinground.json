@@ -1,0 +1,38 @@
+{
+  "name": "wmkf_proposalrankinground",
+  "kind": "new-entity",
+  "schemaName": "wmkf_ProposalRankingRound",
+  "displayName": "Proposal Ranking Round",
+  "displayCollectionName": "Proposal Ranking Rounds",
+  "description": "Immutable source snapshot and lifecycle policy for one Proposal Ranking round. Application-only data.",
+  "ownershipType": "OrganizationOwned",
+  "primaryNameAttribute": {
+    "schemaName": "wmkf_Name",
+    "displayName": "Name",
+    "description": "Funding-cycle code and creation operation identifier.",
+    "maxLength": 200,
+    "requiredLevel": "ApplicationRequired"
+  },
+  "attributes": [
+    { "type": "String", "schemaName": "wmkf_CycleCode", "displayName": "Cycle Code", "maxLength": 4, "requiredLevel": "ApplicationRequired" },
+    { "type": "String", "schemaName": "wmkf_CreationOperationId", "displayName": "Creation Operation ID", "description": "Canonical UUID for resolving repeated or uncertain opens.", "maxLength": 36, "requiredLevel": "ApplicationRequired" },
+    { "type": "Memo", "schemaName": "wmkf_SnapshotJson", "displayName": "Frozen Round Snapshot", "description": "Proposal membership, card fields, scores, seed orders, and captured PD roster. Refuse writes above 512 KiB.", "maxLength": 524288, "requiredLevel": "ApplicationRequired" },
+    { "type": "String", "schemaName": "wmkf_FacilitatorSystemUserId", "displayName": "Facilitator System User ID", "maxLength": 36, "requiredLevel": "ApplicationRequired" },
+    { "type": "Integer", "schemaName": "wmkf_PolicyRevision", "displayName": "Policy Revision", "minValue": 1, "maxValue": 2147483647, "requiredLevel": "ApplicationRequired" },
+    { "type": "Picklist", "schemaName": "wmkf_State", "displayName": "State", "requiredLevel": "ApplicationRequired", "defaultValue": 100000000, "options": [
+      { "value": 100000000, "label": "Active" },
+      { "value": 100000001, "label": "Canceled" }
+    ] },
+    { "type": "Memo", "schemaName": "wmkf_AdministrationLogJson", "displayName": "Administration Log", "description": "Append-only facilitator transfer, excusal, and cancellation events. Refuse writes above 128 KiB.", "maxLength": 131072 },
+    { "type": "String", "schemaName": "wmkf_LastOperationId", "displayName": "Last Operation ID", "maxLength": 36, "requiredLevel": "ApplicationRequired" },
+    { "type": "String", "schemaName": "wmkf_LastOperationKind", "displayName": "Last Operation Kind", "description": "Action associated with the last operation identifier, preventing cross-action retries.", "maxLength": 16, "requiredLevel": "ApplicationRequired" },
+    { "type": "String", "schemaName": "wmkf_CreatedByActorSystemUserId", "displayName": "Created By Actor System User ID", "maxLength": 36, "requiredLevel": "ApplicationRequired" },
+    { "type": "DateTime", "schemaName": "wmkf_CreatedAt", "displayName": "Created At", "format": "DateAndTime", "behavior": "TimeZoneIndependent", "requiredLevel": "ApplicationRequired" },
+    { "type": "String", "schemaName": "wmkf_UpdatedByActorSystemUserId", "displayName": "Updated By Actor System User ID", "maxLength": 36, "requiredLevel": "ApplicationRequired" },
+    { "type": "DateTime", "schemaName": "wmkf_UpdatedAt", "displayName": "Updated At", "format": "DateAndTime", "behavior": "TimeZoneIndependent", "requiredLevel": "ApplicationRequired" }
+  ],
+  "relationships": [],
+  "alternateKeys": [
+    { "schemaName": "wmkf_proposalrankinground_creationoperation", "displayName": "Creation Operation", "keyAttributes": ["wmkf_creationoperationid"] }
+  ]
+}

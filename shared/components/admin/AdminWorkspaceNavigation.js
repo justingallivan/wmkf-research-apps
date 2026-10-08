@@ -32,11 +32,12 @@ export const ADMIN_WORKSPACES = Object.freeze([
     key: 'workflows',
     label: 'Workflows',
     title: 'Grant workflow configuration',
-    description: 'Settings organized around external review, Final Writeups, Site Visits, and governed workflow content.',
+    description: 'Settings organized around external review, Proposal Ranking, Final Writeups, Site Visits, and governed workflow content.',
     defaultView: 'external-review',
     views: [
       { key: 'external-review', label: 'External review' },
       { key: 'review-form', label: 'Review form' },
+      { key: 'proposal-ranking', label: 'Proposal Ranking' },
       { key: 'final-writeups', label: 'Final Writeups' },
       { key: 'site-visits', label: 'Site Visits' },
       { key: 'governance', label: 'Messages & policies' },
