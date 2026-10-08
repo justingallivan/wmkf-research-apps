@@ -596,3 +596,31 @@ describe('proposal ranking list calculations', () => {
     expect(formatScore({ displayMean: 4.25, ratedCount: 2, receivedCount: 4 })).toBe('4.3 · 2/4 rated');
   });
 });
+
+
+test('creates the combined list without ballots or a second publication and falls back to SE for a fresh round', async () => {
+  const ready = roundResponse({ facilitator: true, published: true });
+  ready.programs.co = { available: true, proposalIds: INITIAL_ORDER, meeting: null, meetingStatus: null };
+  ready.confirmations.generate.co = { fingerprint: 'combine-current', message: 'Create a shared combined meeting list.' };
+  ready.viewer.capabilities.generate = true;
+  const combined = JSON.parse(JSON.stringify(ready));
+  combined.programs.co.meeting = { ...combined.programs.se.meeting, programKey: 'co', listKey: 'meeting:co' };
+  combined.programs.co.meetingStatus = 'published';
+  combined.confirmations.generate.co = null;
+  mockLoad.mockResolvedValue(ready);
+  mockSend.mockResolvedValueOnce(combined);
+  render(<ProposalRankingApp />);
+  fireEvent.click(await screen.findByRole('button', { name: 'SE + MR' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Create combined meeting list' }));
+  expect(screen.queryByRole('button', { name: 'My rankings' })).not.toBeInTheDocument();
+  expect(screen.queryByText('Individual PD rankings')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm create the shared combined meeting list' }));
+  expect(await screen.findByRole('heading', { name: 'Shared meeting order' })).toBeInTheDocument();
+  expect(mockSend.mock.calls[0][0]).toMatchObject({ action: 'combine', confirmationFingerprint: 'combine-current' });
+  expect(mockSend.mock.calls[0][0]).not.toHaveProperty('programKey');
+  expect(screen.queryByRole('button', { name: /Publish/ })).not.toBeInTheDocument();
+  mockLoad.mockResolvedValue(roundResponse());
+  fireEvent.click(screen.getByRole('button', { name: /Refresh/ }));
+  expect(await screen.findByRole('heading', { name: 'Your private ranking' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'SE + MR' })).not.toBeInTheDocument();
+});

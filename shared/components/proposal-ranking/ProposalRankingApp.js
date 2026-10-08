@@ -234,6 +234,7 @@ function ConfirmationBox({ confirmation, label, busy, onConfirm, onCancel }) {
 }
 
 function ProgramPanel({ response, program, isFacilitator, view, localOrders, remoteOrders, saveStates, actionBusy, hasUnresolvedSave, submitting, onMove, onSubmit, onGenerate, onPublish, pendingConfirmation, setPendingConfirmation, confirmations, onRetry }) {
+  const combined = program.key === 'co';
   const programData = response.programs?.[program.key] || {};
   const proposalById = new Map((response.round?.snapshot.proposals || []).map((proposal) => [proposal.requestId, proposal]));
   const proposals = (programData.proposalIds || []).map((id) => proposalById.get(id)).filter(Boolean);
@@ -250,26 +251,26 @@ function ProgramPanel({ response, program, isFacilitator, view, localOrders, rem
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h2 id={`program-heading-${program.key}`} className="text-xl font-semibold text-gray-900">{program.label}</h2>
-        {programData.proposalIds?.length > 0 && <p className="mt-1 text-sm text-gray-600">{totalSubmissions.submitted} of {totalSubmissions.required} required PD submissions received.</p>}
+        {!combined && programData.proposalIds?.length > 0 && <p className="mt-1 text-sm text-gray-600">{totalSubmissions.submitted} of {totalSubmissions.required} required PD submissions received.</p>}
       </div>
       <div className="flex flex-wrap gap-2">
-        {view === 'facilitate' && response.round.state === 'active' && response.viewer.capabilities.generate && meetingStatus === 'collecting' && <Button type="button" size="sm" disabled={actionBusy || hasUnresolvedSave || !currentConfirmations.generate?.[program.key]} onClick={() => setPendingConfirmation({ action: 'generate', programKey: program.key })}>Generate {program.shortLabel} draft</Button>}
+        {view === 'facilitate' && response.round.state === 'active' && response.viewer.capabilities.generate && (meetingStatus === 'collecting' || (combined && !meeting)) && <Button type="button" size="sm" disabled={actionBusy || hasUnresolvedSave || !currentConfirmations.generate?.[program.key]} onClick={() => setPendingConfirmation({ action: 'generate', programKey: program.key })}>{combined ? 'Create combined meeting list' : `Generate ${program.shortLabel} draft`}</Button>}
         {view === 'facilitate' && response.round.state === 'active' && response.viewer.capabilities.publish && meetingStatus === 'composite-draft' && <Button type="button" size="sm" disabled={actionBusy || hasUnresolvedSave || !currentConfirmations.publish?.[program.key]} onClick={() => setPendingConfirmation({ action: 'publish', programKey: program.key })}>Publish {program.shortLabel}</Button>}
       </div>
     </div>
-      {activeConfirmation?.action === 'generate' && <ConfirmationBox confirmation={currentConfirmations.generate?.[program.key]} label={`generate the ${program.label} draft`} busy={actionBusy} onConfirm={() => onGenerate(program.key)} onCancel={() => setPendingConfirmation(null)} />}
+      {activeConfirmation?.action === 'generate' && <ConfirmationBox confirmation={currentConfirmations.generate?.[program.key]} label={combined ? 'create the shared combined meeting list' : `generate the ${program.label} draft`} busy={actionBusy} onConfirm={() => onGenerate(program.key)} onCancel={() => setPendingConfirmation(null)} />}
       {activeConfirmation?.action === 'publish' && <ConfirmationBox confirmation={currentConfirmations.publish?.[program.key]} label={`publish the ${program.label} order`} busy={actionBusy} onConfirm={() => onPublish(program.key)} onCancel={() => setPendingConfirmation(null)} />}
     {programData.proposalIds?.length === 0 ? <p className="mt-4 rounded-lg bg-gray-50 p-4 text-sm text-gray-600">No proposals in this program. No individual lists or composite are required.</p> : <>
-      {view === 'meeting' && !published && <StatusBanner className="mt-3">This program has not been published yet. Your own list is in My rankings.</StatusBanner>}
+      {view === 'meeting' && !published && <StatusBanner className="mt-3">{combined ? 'Waiting for the facilitator to create the combined meeting list.' : 'This program has not been published yet. Your own list is in My rankings.'}</StatusBanner>}
       {view === 'facilitate' && published && <StatusBanner className="mt-3">Published. Continue the discussion in Meeting list.</StatusBanner>}
-      {view === 'facilitate' && programData.progress && <div className="mt-3 flex flex-wrap gap-2 text-xs">
+      {view === 'facilitate' && !combined && programData.progress && <div className="mt-3 flex flex-wrap gap-2 text-xs">
         <span className={`rounded-full px-2.5 py-1 font-semibold ${published ? 'bg-green-100 text-green-900' : 'bg-gray-100 text-gray-700'}`}>{published ? 'Published meeting order' : meetingStatus === 'composite-draft' ? 'Review the draft, then publish' : totalSubmissions.required > 0 && totalSubmissions.submitted === totalSubmissions.required ? (isFacilitator ? 'All rankings submitted. Generate the draft to continue.' : 'All rankings submitted. Waiting for the facilitator to prepare the meeting list.') : 'Collecting submissions'}</span>
       </div>}
       {meeting && generated && ((view === 'facilitate' && isFacilitator && !published) || (view === 'meeting' && published && (isFacilitator || response.viewer.isRosterParticipant))) && <div className="mt-6 border-t border-gray-200 pt-5">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold text-gray-900">{published ? 'Shared meeting order' : 'Facilitator composite draft'}</h3>
-            <p className="mt-1 text-sm text-gray-600">The original PD rankings remain separate from this meeting order.</p>
+            <p className="mt-1 text-sm text-gray-600">{combined ? 'Starting order compares PD average ranks while preserving each program’s order at creation. Edits here and in SE or MR are independent.' : 'The original PD rankings remain separate from this meeting order.'}</p>
           </div>
           {published && <p className="text-sm text-green-800">Changes save to the shared order. Refresh on other devices to see updates.</p>}
         </div>
@@ -285,7 +286,7 @@ function ProgramPanel({ response, program, isFacilitator, view, localOrders, rem
           onRetry={() => onRetry(meeting)}
         />
       </div>}
-      {view === 'facilitate' && isFacilitator && <details key={program.key} className="mt-5">
+      {view === 'facilitate' && isFacilitator && !combined && <details key={program.key} className="mt-5">
         <summary className="mb-3 cursor-pointer text-base font-semibold text-gray-900">Individual PD rankings</summary>
         <SubmissionLists
           response={response}
@@ -381,6 +382,9 @@ export default function ProposalRankingApp() {
       setLocalOrders({});
       setSaveStates({});
       setRemoteOrders({});
+    }
+    if (!next.round?.erased && !next.programs?.co?.available) {
+      setSelectedProgram((key) => key === 'co' ? 'se' : key);
     }
     responseRef.current = next;
     setResponse(next);
@@ -694,7 +698,7 @@ export default function ProposalRankingApp() {
             clearLocalOrder(list.listKey, job.scope);
             setRemoteOrder(list.listKey, null, job.scope);
             assignSaveState(list.listKey, 'saved', job.scope);
-            setOperationNotice(`Saved ${job.programKey.toUpperCase()} order.`);
+            setOperationNotice(`Saved ${job.programKey === 'co' ? 'SE + MR' : job.programKey.toUpperCase()} order.`);
           } catch (err) {
             if (!mountedRef.current || job.scope !== scopeRef.current) continue;
             const currentResponse = responseError(err);
@@ -780,8 +784,13 @@ export default function ProposalRankingApp() {
     const current = responseRef.current;
     const token = current?.confirmations?.generate?.[programKey];
     const meeting = current?.programs?.[programKey]?.meeting;
-    if (!current?.roundId || !token || !meeting) return;
+    if (!current?.roundId || !token || (!meeting && programKey !== 'co')) return;
     setPendingConfirmation(null);
+    if (programKey === 'co') {
+      setViewChoice(null);
+      void runAction({ action: 'combine', roundId: current.roundId, policyRevision: current.round.policyRevision, confirmationFingerprint: token.fingerprint, operationId: createOperationId() });
+      return;
+    }
     void runAction({ action: 'generate', roundId: current.roundId, programKey, etag: meeting.etag, policyRevision: current.round.policyRevision, confirmationFingerprint: token.fingerprint, operationId: createOperationId() });
   };
 
@@ -824,11 +833,11 @@ export default function ProposalRankingApp() {
   const hasPublishedProgram = Object.values(activeResponse?.programs || {}).some((data) => (data.meetingStatus || data.meeting?.status) === 'published');
   const selectedPublished = (activeResponse?.programs?.[selectedProgram]?.meetingStatus || activeResponse?.programs?.[selectedProgram]?.meeting?.status) === 'published';
   const availableViews = [
-    ...(activeResponse?.viewer?.isRosterParticipant ? [{ key: 'mine', label: 'My rankings' }] : []),
+    ...(selectedProgram !== 'co' && activeResponse?.viewer?.isRosterParticipant ? [{ key: 'mine', label: 'My rankings' }] : []),
     ...(isFacilitator ? [{ key: 'facilitate', label: 'Facilitate' }] : []),
     ...(hasPublishedProgram && (isFacilitator || activeResponse?.viewer?.isRosterParticipant) ? [{ key: 'meeting', label: 'Meeting list' }] : []),
   ];
-  const defaultView = selectedPublished ? 'meeting' : activeResponse?.viewer?.isRosterParticipant ? 'mine' : 'facilitate';
+  const defaultView = selectedPublished ? 'meeting' : selectedProgram === 'co' ? (isFacilitator ? 'facilitate' : 'meeting') : activeResponse?.viewer?.isRosterParticipant ? 'mine' : 'facilitate';
   const view = viewChoice?.scope === viewScope && availableViews.some((item) => item.key === viewChoice.key) ? viewChoice.key : defaultView;
   const preview = activeResponse?.preview;
   const unscoredCount = (preview?.proposals || []).filter((proposal) => !proposal.score?.ratedCount).length;
@@ -881,7 +890,7 @@ export default function ProposalRankingApp() {
           </div>
         </Card>
         <div className="grid gap-4 lg:grid-cols-2">
-          {PROGRAMS.map((program) => {
+          {PROGRAMS.filter((program) => program.key !== 'co').map((program) => {
             const ids = activeResponse.preview?.seedOrders?.[program.key] || [];
             const programCards = ids.map((id) => currentProposalById.get(id)).filter(Boolean).map((proposal) => ({
               ...proposal,
@@ -907,7 +916,7 @@ export default function ProposalRankingApp() {
               <p className="mt-1 text-sm text-gray-600">Facilitator: {round.facilitator.name} · {round.snapshot.proposals.length} frozen proposals · {round.snapshot.roster.length} PDs</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {PROGRAMS.map((program) => <Button key={program.key} type="button" variant={selectedProgram === program.key ? 'primary' : 'outline'} size="sm" aria-pressed={selectedProgram === program.key} disabled={loading || actionBusy || hasUnresolvedSave} onClick={() => changeProgram(program.key)}>{program.shortLabel}</Button>)}
+              {PROGRAMS.filter((program) => program.key !== 'co' || activeResponse.programs?.co?.available).map((program) => <Button key={program.key} type="button" variant={selectedProgram === program.key ? 'primary' : 'outline'} size="sm" aria-pressed={selectedProgram === program.key} disabled={loading || actionBusy || hasUnresolvedSave} onClick={() => changeProgram(program.key)}>{program.shortLabel}</Button>)}
             </div>
           </div>
         </Card>
@@ -940,7 +949,7 @@ export default function ProposalRankingApp() {
             <Card hover={false} padding="p-4">
               <h2 className="font-semibold text-gray-900">Round progress</h2>
               <ul className="mt-3 space-y-3">
-                {PROGRAMS.map((program) => {
+                {PROGRAMS.filter((program) => program.key !== 'co').map((program) => {
                   const data = activeResponse.programs?.[program.key];
                   return <li key={program.key} className="rounded-lg bg-gray-50 p-3 text-sm">
                     <p className="font-semibold text-gray-900">{program.shortLabel}</p>

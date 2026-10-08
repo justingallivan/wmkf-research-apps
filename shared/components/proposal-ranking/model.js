@@ -1,6 +1,7 @@
 export const PROGRAMS = [
   { key: 'se', label: 'Science & Engineering', shortLabel: 'SE' },
   { key: 'mr', label: 'Medical Research', shortLabel: 'MR' },
+  { key: 'co', label: 'Combined SE + MR', shortLabel: 'SE + MR' },
 ];
 
 export const REVIEWER_SCORE_COLORS = Object.freeze([
