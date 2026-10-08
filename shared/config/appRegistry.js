@@ -66,6 +66,15 @@ export const APP_REGISTRY = [
     features: ['Session Planning', 'Proposal Schedule', 'Attendee Directory', 'Zoom Links'],
   },
   {
+    key: 'proposal-ranking',
+    name: 'Proposal Ranking',
+    href: '/proposal-ranking',
+    icon: '↕️',
+    description: 'Prepare private Program Director rankings and facilitate a shared proposal order by funding cycle',
+    categories: ['phase-ii'],
+    features: ['Private PD Rankings', 'SE and MR Lists', 'Facilitated Composite', 'Meeting Order'],
+  },
+  {
     key: 'peer-review-summarizer',
     name: 'Summarize Peer Reviews',
     href: '/peer-review-summarizer',
@@ -350,6 +359,20 @@ export const APP_LIFECYCLE_REGISTRY = {
  *   'live-cross-cutting' — live, persists/serves durable state across apps; recognize & skip
  */
 export const ROUTE_NAMESPACE_LIFECYCLE = {
+  '/api/proposal-ranking': {
+    status: 'canonical',
+    ownerAppKey: 'proposal-ranking',
+    guardAppKeys: ['proposal-ranking'],
+    notes: 'Private PD rankings and program meeting orders. Runtime activation requires explicit schema and feature readiness.',
+    lastVerified: '2026-10-07',
+  },
+  '/api/admin/proposal-ranking-facilitator': {
+    status: 'canonical',
+    ownerAppKey: 'proposal-ranking',
+    guardAppKeys: ['proposal-ranking'],
+    notes: 'Default facilitator configuration additionally requires superuser authority and an explicit app grant.',
+    lastVerified: '2026-10-07',
+  },
   '/api/workbench': {
     status: 'canonical',
     ownerAppKey: 'reviewers',

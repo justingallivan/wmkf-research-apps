@@ -1,0 +1,25 @@
+{
+  "name": "wmkf_proposalrankingcycle",
+  "kind": "new-entity",
+  "schemaName": "wmkf_ProposalRankingCycle",
+  "displayName": "Proposal Ranking Cycle Coordinator",
+  "displayCollectionName": "Proposal Ranking Cycle Coordinators",
+  "description": "One stable concurrency row per funding cycle. Application-only data; the active round pointer is canonical GUID text so it can be conditionally cleared.",
+  "ownershipType": "OrganizationOwned",
+  "primaryNameAttribute": {
+    "schemaName": "wmkf_Name",
+    "displayName": "Name",
+    "description": "Funding-cycle code.",
+    "maxLength": 20,
+    "requiredLevel": "ApplicationRequired"
+  },
+  "attributes": [
+    { "type": "String", "schemaName": "wmkf_CycleCode", "displayName": "Cycle Code", "description": "June/December funding-cycle key.", "maxLength": 4, "requiredLevel": "ApplicationRequired" },
+    { "type": "String", "schemaName": "wmkf_ActiveRoundId", "displayName": "Active Round GUID", "description": "Canonical round GUID text; null when no round is active.", "maxLength": 36 },
+    { "type": "Integer", "schemaName": "wmkf_Version", "displayName": "Version", "description": "Application version incremented on coordinator updates.", "minValue": 1, "maxValue": 2147483647, "requiredLevel": "ApplicationRequired" }
+  ],
+  "relationships": [],
+  "alternateKeys": [
+    { "schemaName": "wmkf_proposalrankingcycle_cyclecode", "displayName": "Funding Cycle", "keyAttributes": ["wmkf_cyclecode"] }
+  ]
+}
