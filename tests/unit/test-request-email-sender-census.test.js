@@ -33,6 +33,8 @@ const RECORDED_SENDERS = {
   'lib/services/admin/test-email-service.js': { audience: 'staff', early: [] },
   // Group-review handoff (Stage 4): regarding the request, so the delivery seam refuses test requests.
   'lib/services/final-writeup/handoff-email-service.js': { audience: 'staff', early: [] },
+  // Leadership digest (Stage 5): not regarding one request, so test requests are excluded in its request query.
+  'lib/services/final-writeup/leadership-digest-service.js': { audience: 'staff', early: [] },
   'lib/services/meeting-tracker/agenda-service.js': { audience: 'staff', early: [] },
   'lib/services/notification-service.js': { audience: 'staff', early: [] },
   'lib/services/pre-site-visit/distribution/dependencies.js': { audience: 'request-distribution', early: [] },

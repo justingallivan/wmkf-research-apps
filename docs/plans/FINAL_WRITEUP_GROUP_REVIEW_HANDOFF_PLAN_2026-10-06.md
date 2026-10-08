@@ -1,6 +1,6 @@
 ---
 title: Final Writeup group-review handoff — PD drafting, PD sign-off, leadership digest
-status: approved 2026-10-06 — Stages 1–4 live; Stage 5 not built; SoCal parked
+status: approved 2026-10-06 — Stages 1–4 live; Stage 5 branch-built (claude/leadership-digest); SoCal parked
 created: 2026-10-06
 owner: Justin Gallivan
 related:
@@ -302,6 +302,21 @@ Original Stage 4 requirements:
   (partial success, background send).
 
 ### Stage 5 — Leadership daily digest
+
+**Branch-built 2026-10-07 (Session 584), `claude/leadership-digest`; not merged, migration 073 not
+applied, copy not seeded.** As built:
+- Selection: requests in listed programs with a current Final in lifecycle FINAL whose leadership
+  checkpoint is complete and started within the last 7 days (`LOOKBACK_DAYS`), minus writeups an
+  accepted digest already listed to that recipient. No backlog decision was needed: the owner
+  confirmed on 2026-10-07 that no writeup had yet been sent to leadership.
+- Copy from settings keys `email.final_writeup_leadership_digest.subject` / `.body` (owner choice,
+  2026-10-07), seeded by `scripts/seed-email-defaults.mjs`; the list is rendered by the service.
+- Ledger `final_writeup_leadership_digests` (migration 073); the digest day is the UTC day before the
+  run. Cron `/api/cron/final-writeup-leadership-digest`, `0 7 * * *`.
+- The "Send to leadership" confirmation says leadership is told in the next daily summary when the
+  request's program is listed (`handoffEmailEnabled`, now also returned in the review phases).
+- Rollout: apply migration 073, seed the copy, merge, confirm the first digest row is accepted.
+
 - Daily cron at 00:00 Pacific. Each leadership-persona recipient gets one email listing writeups
   that entered leadership review since their last digest.
 - **Research only (owner, 2026-10-07, S584):** include only writeups whose request's Grant
