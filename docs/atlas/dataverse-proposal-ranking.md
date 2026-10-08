@@ -78,6 +78,22 @@ remain. The owner required all participants to submit, so the UI no longer offer
 excusal and the service rejects the action. Source and focused mocked tests are
 the evidence; no live reads, writes or deployment are part of this change.
 
+### Separate working views
+
+[VERIFIED via source and local UI tests] My rankings shows only the current
+participant's own SE/MR lists, including when that participant is the facilitator.
+Facilitate shows progress, generation and publication, with individual lists as
+collapsed read-only reference material and administration collapsed separately.
+Meeting list shows only the selected program's published order; publishing SE
+never exposes MR. Before publication the default is My rankings for participants;
+a published program defaults to Meeting list. View changes remain blocked during
+pending or unresolved saves. Authorization and persisted ranking contracts are unchanged.
+
+The memory-only rehearsal uses named identity links opening separate tabs. Each
+tab retains its fictional identity on reload, and simulation/reset controls are
+under Rehearsal tools. Reset clears shared rehearsal memory; other tabs must reload.
+These UI changes remain on the unmerged feature branch, not promoted runtime.
+
 ## Source and persistence
 
 [VERIFIED via source] `/proposal-ranking` calls `/api/proposal-ranking`, which

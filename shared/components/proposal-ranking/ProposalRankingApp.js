@@ -182,7 +182,7 @@ function ProposalOrder({ list, proposals, order, editable, saveState, composite,
   );
 }
 
-function SubmissionLists({ response, program, proposals, isFacilitator, onSubmit, submitting, saveStates, localOrders, remoteOrders, onMove, onRetry }) {
+function SubmissionLists({ response, program, proposals, isFacilitator, readOnly = false, onSubmit, submitting, saveStates, localOrders, remoteOrders, onMove, onRetry }) {
   const data = response.programs?.[program.key];
   const lists = isFacilitator
     ? (data?.facilitatorLists || [])
@@ -193,7 +193,7 @@ function SubmissionLists({ response, program, proposals, isFacilitator, onSubmit
   return <div className="space-y-4">
     {lists.map((list) => {
       const localOrder = localOrders[list.listKey];
-      const editable = list.owner?.systemUserId === response.viewer.systemUserId
+      const editable = !readOnly && list.owner?.systemUserId === response.viewer.systemUserId
         && response.viewer.capabilities.saveOwnList
         && list.status === 'draft'
         && response.round.state === 'active';
@@ -233,7 +233,7 @@ function ConfirmationBox({ confirmation, label, busy, onConfirm, onCancel }) {
   </div>;
 }
 
-function ProgramPanel({ response, program, isFacilitator, localOrders, remoteOrders, saveStates, actionBusy, hasUnresolvedSave, submitting, onMove, onSubmit, onGenerate, onPublish, pendingConfirmation, setPendingConfirmation, confirmations, onRetry }) {
+function ProgramPanel({ response, program, isFacilitator, view, localOrders, remoteOrders, saveStates, actionBusy, hasUnresolvedSave, submitting, onMove, onSubmit, onGenerate, onPublish, pendingConfirmation, setPendingConfirmation, confirmations, onRetry }) {
   const programData = response.programs?.[program.key] || {};
   const proposalById = new Map((response.round?.snapshot.proposals || []).map((proposal) => [proposal.requestId, proposal]));
   const proposals = (programData.proposalIds || []).map((id) => proposalById.get(id)).filter(Boolean);
@@ -242,7 +242,7 @@ function ProgramPanel({ response, program, isFacilitator, localOrders, remoteOrd
   const generated = meetingStatus === 'composite-draft' || meetingStatus === 'published';
   const published = meetingStatus === 'published';
   const totalSubmissions = programData.progress || { required: 0, submitted: 0, outstandingNames: [] };
-  const activeConfirmation = pendingConfirmation?.programKey === program.key ? pendingConfirmation : null;
+  const activeConfirmation = view === 'facilitate' && pendingConfirmation?.programKey === program.key ? pendingConfirmation : null;
   const currentConfirmations = confirmations || response.confirmations;
   const meetingCanEdit = Boolean(response.round.state === 'active' && response.viewer.capabilities.editMeetingOrder && (meetingStatus === 'composite-draft' || published));
   const listKey = meeting?.listKey;
@@ -253,17 +253,19 @@ function ProgramPanel({ response, program, isFacilitator, localOrders, remoteOrd
         {programData.proposalIds?.length > 0 && <p className="mt-1 text-sm text-gray-600">{totalSubmissions.submitted} of {totalSubmissions.required} required PD submissions received.</p>}
       </div>
       <div className="flex flex-wrap gap-2">
-        {response.round.state === 'active' && response.viewer.capabilities.generate && meetingStatus === 'collecting' && <Button type="button" size="sm" disabled={actionBusy || hasUnresolvedSave || !currentConfirmations.generate?.[program.key]} onClick={() => setPendingConfirmation({ action: 'generate', programKey: program.key })}>Generate {program.shortLabel} draft</Button>}
-        {response.round.state === 'active' && response.viewer.capabilities.publish && meetingStatus === 'composite-draft' && <Button type="button" size="sm" disabled={actionBusy || hasUnresolvedSave || !currentConfirmations.publish?.[program.key]} onClick={() => setPendingConfirmation({ action: 'publish', programKey: program.key })}>Publish {program.shortLabel}</Button>}
+        {view === 'facilitate' && response.round.state === 'active' && response.viewer.capabilities.generate && meetingStatus === 'collecting' && <Button type="button" size="sm" disabled={actionBusy || hasUnresolvedSave || !currentConfirmations.generate?.[program.key]} onClick={() => setPendingConfirmation({ action: 'generate', programKey: program.key })}>Generate {program.shortLabel} draft</Button>}
+        {view === 'facilitate' && response.round.state === 'active' && response.viewer.capabilities.publish && meetingStatus === 'composite-draft' && <Button type="button" size="sm" disabled={actionBusy || hasUnresolvedSave || !currentConfirmations.publish?.[program.key]} onClick={() => setPendingConfirmation({ action: 'publish', programKey: program.key })}>Publish {program.shortLabel}</Button>}
       </div>
     </div>
       {activeConfirmation?.action === 'generate' && <ConfirmationBox confirmation={currentConfirmations.generate?.[program.key]} label={`generate the ${program.label} draft`} busy={actionBusy} onConfirm={() => onGenerate(program.key)} onCancel={() => setPendingConfirmation(null)} />}
       {activeConfirmation?.action === 'publish' && <ConfirmationBox confirmation={currentConfirmations.publish?.[program.key]} label={`publish the ${program.label} order`} busy={actionBusy} onConfirm={() => onPublish(program.key)} onCancel={() => setPendingConfirmation(null)} />}
     {programData.proposalIds?.length === 0 ? <p className="mt-4 rounded-lg bg-gray-50 p-4 text-sm text-gray-600">No proposals in this program. No individual lists or composite are required.</p> : <>
-      {programData.progress && <div className="mt-3 flex flex-wrap gap-2 text-xs">
+      {view === 'meeting' && !published && <StatusBanner className="mt-3">This program has not been published yet. Your own list is in My rankings.</StatusBanner>}
+      {view === 'facilitate' && published && <StatusBanner className="mt-3">Published. Continue the discussion in Meeting list.</StatusBanner>}
+      {view === 'facilitate' && programData.progress && <div className="mt-3 flex flex-wrap gap-2 text-xs">
         <span className={`rounded-full px-2.5 py-1 font-semibold ${published ? 'bg-green-100 text-green-900' : 'bg-gray-100 text-gray-700'}`}>{published ? 'Published meeting order' : meetingStatus === 'composite-draft' ? 'Review the draft, then publish' : totalSubmissions.required > 0 && totalSubmissions.submitted === totalSubmissions.required ? (isFacilitator ? 'All rankings submitted. Generate the draft to continue.' : 'All rankings submitted. Waiting for the facilitator to prepare the meeting list.') : 'Collecting submissions'}</span>
       </div>}
-      {meeting && generated && (isFacilitator || (published && response.viewer.isRosterParticipant)) && <div className="mt-6 border-t border-gray-200 pt-5">
+      {meeting && generated && ((view === 'facilitate' && isFacilitator && !published) || (view === 'meeting' && published && (isFacilitator || response.viewer.isRosterParticipant))) && <div className="mt-6 border-t border-gray-200 pt-5">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold text-gray-900">{published ? 'Shared meeting order' : 'Facilitator composite draft'}</h3>
@@ -283,13 +285,14 @@ function ProgramPanel({ response, program, isFacilitator, localOrders, remoteOrd
           onRetry={() => onRetry(meeting)}
         />
       </div>}
-      {isFacilitator && <details key={generated ? 'generated' : 'collecting'} open={!generated} className="mt-5">
+      {view === 'facilitate' && isFacilitator && <details key={program.key} className="mt-5">
         <summary className="mb-3 cursor-pointer text-base font-semibold text-gray-900">Individual PD rankings</summary>
         <SubmissionLists
           response={response}
           program={program}
           proposals={proposals}
           isFacilitator
+          readOnly
           onSubmit={onSubmit}
           submitting={submitting}
           saveStates={saveStates}
@@ -299,8 +302,9 @@ function ProgramPanel({ response, program, isFacilitator, localOrders, remoteOrd
           onRetry={onRetry}
         />
       </details>}
-      {!isFacilitator && response.viewer.isRosterParticipant && !published && <div className="mt-5">
+      {view === 'mine' && response.viewer.isRosterParticipant && <div className="mt-5">
         <h3 className="mb-3 text-base font-semibold text-gray-900">Your private ranking</h3>
+        {programData.ownList?.status === 'submitted' && <StatusBanner className="mb-3">{published ? 'Your ranking is submitted. The published order is in Meeting list.' : isFacilitator ? 'Your ranking is submitted. Continue in Facilitate when everyone has submitted.' : 'Submitted—waiting for the facilitator.'}</StatusBanner>}
         <SubmissionLists
           response={response}
           program={program}
@@ -325,6 +329,7 @@ export default function ProposalRankingApp() {
   const options = useMemo(() => cycleOptions(), []);
   const [cycleCode, setCycleCode] = useState(() => resolveWorkingCycle(conventionalCycles()) || options[0]?.code || '');
   const [selectedProgram, setSelectedProgram] = useState('se');
+  const [viewChoice, setViewChoice] = useState(null);
   const [response, setResponse] = useState(null);
   const responseRef = useRef(null);
   const [responseScopeKey, setResponseScopeKey] = useState(null);
@@ -784,6 +789,16 @@ export default function ProposalRankingApp() {
   const activeResponse = responseForCurrentScope;
   const currentProposalData = activeResponse?.mode === 'preview' ? activeResponse.preview : activeResponse?.mode === 'round' ? activeResponse.round?.snapshot : null;
   const currentProposalById = new Map((currentProposalData?.proposals || []).map((proposal) => [proposal.requestId, proposal]));
+  const viewScope = `${activeResponse?.roundId}:${activeResponse?.viewer?.systemUserId}:${selectedProgram}`;
+  const hasPublishedProgram = Object.values(activeResponse?.programs || {}).some((data) => (data.meetingStatus || data.meeting?.status) === 'published');
+  const selectedPublished = (activeResponse?.programs?.[selectedProgram]?.meetingStatus || activeResponse?.programs?.[selectedProgram]?.meeting?.status) === 'published';
+  const availableViews = [
+    ...(activeResponse?.viewer?.isRosterParticipant ? [{ key: 'mine', label: 'My rankings' }] : []),
+    ...(isFacilitator ? [{ key: 'facilitate', label: 'Facilitate' }] : []),
+    ...(hasPublishedProgram && (isFacilitator || activeResponse?.viewer?.isRosterParticipant) ? [{ key: 'meeting', label: 'Meeting list' }] : []),
+  ];
+  const defaultView = selectedPublished ? 'meeting' : activeResponse?.viewer?.isRosterParticipant ? 'mine' : 'facilitate';
+  const view = viewChoice?.scope === viewScope && availableViews.some((item) => item.key === viewChoice.key) ? viewChoice.key : defaultView;
   const preview = activeResponse?.preview;
   const unscoredCount = (preview?.proposals || []).filter((proposal) => !proposal.score?.ratedCount).length;
 
@@ -859,13 +874,16 @@ export default function ProposalRankingApp() {
             </div>
           </div>
         </Card>
-        {activeResponse.viewer.isRosterParticipant && !isFacilitator && <StatusBanner>Before publication, only your own ranking is shown. Published program orders include named PD ranks.</StatusBanner>}
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <nav aria-label="Ranking views" className="flex flex-wrap gap-2">
+          {availableViews.map((item) => <Button key={item.key} type="button" variant={view === item.key ? 'primary' : 'outline'} aria-pressed={view === item.key} disabled={loading || actionBusy || hasUnresolvedSave} onClick={() => { setViewChoice({ scope: viewScope, key: item.key }); setPendingConfirmation(null); }}>{item.label}</Button>)}
+        </nav>
+        <div className={view === 'facilitate' ? 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]' : 'space-y-4'}>
           <Card hover={false}>
             <ProgramPanel
               response={activeResponse}
               program={PROGRAMS.find((program) => program.key === selectedProgram)}
               isFacilitator={isFacilitator}
+              view={view}
               localOrders={localOrders}
               remoteOrders={remoteOrders}
               saveStates={saveStates}
@@ -881,7 +899,7 @@ export default function ProposalRankingApp() {
               onRetry={retryUnsaved}
             />
           </Card>
-          <aside className="space-y-4">
+          {view === 'facilitate' && <aside className="space-y-4">
             <Card hover={false} padding="p-4">
               <h2 className="font-semibold text-gray-900">Round progress</h2>
               <ul className="mt-3 space-y-3">
@@ -892,7 +910,7 @@ export default function ProposalRankingApp() {
                     {data?.proposalIds?.length === 0 ? <p className="mt-1 text-gray-600">No proposals</p> : <>
                       <p className="mt-1 text-gray-700">{data?.progress?.submitted || 0} / {data?.progress?.required || 0} submissions</p>
                       {data?.progress?.outstandingNames?.length > 0 && <p className="mt-1 text-xs text-gray-600">Waiting for {data.progress.outstandingNames.join(', ')}</p>}
-                      <p className="mt-1 text-xs text-gray-600">{(data?.meetingStatus || data?.meeting?.status) === 'published' ? 'Published' : (data?.meetingStatus || data?.meeting?.status) === 'composite-draft' ? 'Draft ready' : 'Collecting'}</p>
+                      <p className="mt-1 text-xs text-gray-600">{(data?.meetingStatus || data?.meeting?.status) === 'published' ? 'Published' : (data?.meetingStatus || data?.meeting?.status) === 'composite-draft' ? 'Draft ready' : data?.progress?.required > 0 && data.progress.submitted === data.progress.required ? 'Ready to generate' : 'Waiting for submissions'}</p>
                     </>}
                   </li>;
                 })}
@@ -907,10 +925,10 @@ export default function ProposalRankingApp() {
                 </li>)}
               </ul>
             </Card>
-          </aside>
+          </aside>}
         </div>
-        {(capabilities.transferFacilitator || capabilities.cancelRound) && <Card hover={false}>
-          <h2 className="font-semibold text-gray-900">Round administration</h2>
+        {(view === 'facilitate' || !isFacilitator) && (capabilities.transferFacilitator || capabilities.cancelRound) && <Card hover={false}>
+          <details><summary className="cursor-pointer font-semibold text-gray-900">Round administration</summary>
           {capabilities.transferFacilitator && <div className="mt-3 space-y-3">
             <label className="block text-sm font-medium text-gray-700">Transfer facilitation to
               <select value={transferSelection} onChange={(event) => { setTransferSelection(event.target.value); setTransferConfirmed(false); }} disabled={actionBusy || hasUnresolvedSave} className="mt-1 h-10 w-full max-w-md rounded-lg border border-gray-300 bg-white px-3">
@@ -936,6 +954,7 @@ export default function ProposalRankingApp() {
               <Button type="button" variant="danger" size="sm" disabled={actionBusy || hasUnresolvedSave || !cancelConfirmed} onClick={confirmCancel} className="mt-3">Cancel round</Button>
             </> : <p className="mt-2 text-sm text-gray-600">Cancellation is unavailable after a program is published.</p>}
           </div>}
+          </details>
         </Card>}
         {Object.entries(saveStates).some(([, state]) => state === 'unsaved' || state === 'conflict') && <div className="flex flex-wrap items-center gap-3">
           <StatusBanner kind="warning">An order has unconfirmed changes. Refresh the round, compare the current list, then retry the displayed order before submitting or continuing.</StatusBanner>

@@ -316,6 +316,15 @@ with a generation token for cycle/round/program changes; clear private data when
 permissions change. A transfer cannot erase data already seen by a former
 facilitator, but subsequent reads/writes must use their new rights.
 
+Owner-approved UI organization (2026-10-08): My rankings contains only the
+participant's own lists, including for a facilitator who votes. Facilitate is the
+facilitator's preparation view: progress, generate/review/publish, collapsed
+read-only individual lists, and collapsed administration. Meeting list contains
+published working orders only, independently per program. Default to My rankings
+before publication and Meeting list for a published program. Do not permit view
+switching while saves are pending or unresolved. Rehearsal-only identity links
+open separately labeled tabs; they are not part of the signed-in production UI.
+
 Move cards optimistically; sum snapshot amounts locally. Serialize saves, retaining
 only the latest queued drag, with submission/publication disabled until confirmed.
 Use returned versions for subsequent writes. On conflict require refresh; on a

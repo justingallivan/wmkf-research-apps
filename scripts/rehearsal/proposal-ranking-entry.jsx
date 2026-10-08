@@ -5,7 +5,15 @@ import ProposalRankingApp from '../../shared/components/proposal-ranking/Proposa
 const originalFetch = window.fetch.bind(window);
 const token = document.querySelector('meta[name="rehearsal-token"]').content;
 let generation = Number(document.querySelector('meta[name="rehearsal-generation"]').content);
-let profileId = 1;
+const requestedProfile = Number(new URLSearchParams(window.location.search).get('profile') || 1);
+const profileId = [1, 2, 3].includes(requestedProfile) ? requestedProfile : 1;
+const identities = [
+  { id: 1, name: 'Alex Rehearsal', role: 'Facilitator and PD' },
+  { id: 2, name: 'Casey Sample', role: 'PD' },
+  { id: 3, name: 'Morgan Example', role: 'PD' },
+];
+const identity = identities.find((person) => person.id === profileId);
+document.title = `${identity.name} · Ranking rehearsal`;
 let currentRoundId = null;
 // This wrapper belongs only to the standalone bundle, never the live app.
 window.fetch = async (input, init = {}) => {
@@ -23,7 +31,6 @@ window.fetch = async (input, init = {}) => {
 };
 
 function Rehearsal() {
-  const [actor, setActor] = useState(1);
   const [version, setVersion] = useState(0);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -37,7 +44,7 @@ function Rehearsal() {
       const response = await window.fetch(`/rehearsal/${kind}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roundId: currentRoundId }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error?.message || 'The rehearsal action failed.');
-      if (kind === 'reset') { generation = data.generation; currentRoundId = null; profileId = 1; setActor(1); }
+      if (kind === 'reset') { generation = data.generation; currentRoundId = null; }
       setVersion((value) => value + 1);
       setMessage(kind === 'reset' ? 'Rehearsal cleared. Start again with a blank slate.' : 'The two simulated PDs submitted both programs. Submit your own lists, then generate and publish each composite.');
     } catch (failure) { setError(failure.message); }
@@ -47,28 +54,23 @@ function Rehearsal() {
     <section aria-label="Rehearsal controls" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950">
       <h1 className="text-xl font-semibold">Isolated Proposal Ranking rehearsal</h1>
       <p className="mt-2 text-sm">All proposals and participants here are fictional. The real ranking screen and service run against temporary memory. Nothing here changes December 2026 or colleagues’ submissions.</p>
-      <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm">
-        <li>Review the sample pool and open a round.</li>
-        <li>Rank and submit your SE and MR lists. Use <strong>Simulate other PD submissions</strong> for the other two participants.</li>
-        <li>Generate and publish each composite, then reorder the meeting list.</li>
-        <li><strong>Reset rehearsal</strong> clears everything here, even after publication.</li>
-      </ol>
-      <div className="mt-4 flex flex-wrap items-end gap-3">
-        <label className="text-sm font-medium">Rehearsal view
-          <select aria-label="Rehearsal view" value={actor} disabled={busy} onChange={(event) => { const id = Number(event.target.value); profileId = id; setActor(id); setVersion((value) => value + 1); setMessage(''); setError(''); }} className="mt-1 block rounded-md border border-amber-700 bg-white px-3 py-2 text-gray-900">
-            <option value={1}>You — simulated facilitator and PD</option>
-            <option value={2}>Simulated PD A</option>
-            <option value={3}>Simulated PD B</option>
-          </select>
-        </label>
+      <p className="mt-3 font-semibold">You are {identity.name} · {identity.role}</p>
+      <p className="mt-1 text-sm">Use My rankings for your own lists, Facilitate to prepare drafts, and Meeting list for published orders.</p>
+      <nav aria-label="Open rehearsal identities" className="mt-3 flex flex-wrap gap-3 text-sm">
+        {identities.filter((person) => person.id !== profileId).map((person) => <a key={person.id} href={`/?profile=${person.id}`} target="_blank" rel="noopener noreferrer" className="font-semibold underline">Open {person.name} in a new tab</a>)}
+      </nav>
+      <details className="mt-3"><summary className="cursor-pointer text-sm font-medium">Rehearsal tools</summary>
+      <p className="mt-2 text-sm">Simulate submits Casey’s and Morgan’s lists. Reset clears all rehearsal tabs; reload other tabs afterward.</p>
+      <div className="mt-3 flex flex-wrap gap-3">
         <button type="button" disabled={busy} onClick={() => control('simulate')} className="rounded-md bg-blue-800 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-900 disabled:opacity-50">Simulate other PD submissions</button>
         <button type="button" disabled={busy} onClick={() => control('reset')} className="rounded-md border border-amber-700 bg-white px-4 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-100 disabled:opacity-50">Reset rehearsal</button>
       </div>
+      </details>
       {message && <p role="status" className="mt-3 text-sm">{message}</p>}
       {error && <p role="alert" className="mt-3 text-sm font-medium text-red-800">{error}</p>}
     </section>
-    {/* A reset or view switch discards component-local queues and reloads memory state. */}
-    {!busy && <ProposalRankingApp key={`${actor}:${version}`} />}
+    {/* A reset or simulation discards component-local queues and reloads memory state. */}
+    {!busy && <ProposalRankingApp key={`${profileId}:${version}`} />}
   </main>;
 }
 createRoot(document.getElementById('root')).render(<Rehearsal />);

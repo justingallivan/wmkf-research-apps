@@ -152,7 +152,7 @@ describe('Proposal Ranking page', () => {
     const individual = screen.getByText('Individual PD rankings');
     const confirmGenerate = screen.getByRole('button', { name: 'Confirm generate the Science & Engineering draft' });
     expect(confirmGenerate.compareDocumentPosition(individual) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(individual.closest('details')).toHaveAttribute('open');
+    expect(individual.closest('details')).not.toHaveAttribute('open');
     fireEvent.click(confirmGenerate);
     const draftHeading = await screen.findByRole('heading', { name: 'Facilitator composite draft' });
     const collapsed = screen.getByText('Individual PD rankings').closest('details');
@@ -169,9 +169,10 @@ describe('Proposal Ranking page', () => {
   test('tells a participant when all lists are submitted and the facilitator is next', async () => {
     const response = roundResponse();
     response.programs.se.progress = { required: 2, submitted: 2, outstandingNames: [] };
+    response.programs.se.ownList.status = 'submitted';
     mockLoad.mockResolvedValue(response);
     render(<ProposalRankingApp />);
-    expect(await screen.findByText('All rankings submitted. Waiting for the facilitator to prepare the meeting list.')).toBeInTheDocument();
+    expect(await screen.findByText('Submitted—waiting for the facilitator.')).toBeInTheDocument();
   });
 
   test('serializes saves and keeps the latest queued drag order visible', async () => {
@@ -290,22 +291,66 @@ describe('Proposal Ranking page', () => {
     response.viewer.isRosterParticipant = true;
     response.viewer.capabilities.saveOwnList = true;
     response.viewer.capabilities.submitOwnList = true;
+    response.programs.se.ownList = response.programs.se.facilitatorLists[0];
     mockLoad.mockResolvedValue(response);
     mockSend.mockImplementation((action) => {
       const next = JSON.parse(JSON.stringify(response));
       next.programs.se.facilitatorLists[0].order = action.order;
       next.programs.se.facilitatorLists[0].etag = 'list-v2';
+      next.programs.se.ownList = next.programs.se.facilitatorLists[0];
       return Promise.resolve(next);
     });
     render(<ProposalRankingApp />);
     const own = await screen.findByRole('region', { name: 'Current PD SE ranking' });
-    const other = screen.getByRole('region', { name: 'Private Other PD SE ranking' });
-    expect(within(other).queryByRole('button', { name: /Move proposal/ })).not.toBeInTheDocument();
-    expect(within(other).queryByRole('button', { name: 'Submit and lock list' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Private Other PD SE ranking' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Generate SE draft' })).not.toBeInTheDocument();
     fireEvent.click(within(own).getByRole('button', { name: 'Move proposal 1001 down' }));
     await screen.findByText('Order saved.');
     fireEvent.click(within(own).getByRole('button', { name: 'Submit and lock list' }));
     await waitFor(() => expect(mockSend).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'submit', etag: 'list-v2' })));
+  });
+
+  test('facilitator separates own work, read-only reference lists, and collapsed administration', async () => {
+    const response = roundResponse({ facilitator: true });
+    response.viewer.systemUserId = 'pd-self';
+    response.viewer.isRosterParticipant = true;
+    response.viewer.capabilities.saveOwnList = true;
+    response.viewer.capabilities.submitOwnList = true;
+    response.programs.se.ownList = response.programs.se.facilitatorLists[0];
+    mockLoad.mockResolvedValue(response);
+    render(<ProposalRankingApp />);
+    expect(await screen.findByRole('button', { name: 'My rankings' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByText('Individual PD rankings')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Facilitate', exact: true }));
+    expect(screen.getByRole('button', { name: 'Generate SE draft' })).toBeInTheDocument();
+    const references = screen.getByText('Individual PD rankings').closest('details');
+    expect(references).not.toHaveAttribute('open');
+    expect(within(references).queryByRole('button', { name: /Move proposal/, hidden: true })).not.toBeInTheDocument();
+    expect(within(references).queryByRole('button', { name: 'Submit and lock list', hidden: true })).not.toBeInTheDocument();
+    expect(screen.getByText('Round administration').closest('details')).not.toHaveAttribute('open');
+    fireEvent.click(screen.getByRole('button', { name: 'My rankings' }));
+    expect(screen.getByRole('button', { name: 'Submit and lock list' })).toBeInTheDocument();
+    expect(screen.queryByText('Round administration')).not.toBeInTheDocument();
+  });
+
+  test('published meeting view stays separate from own ranking and unpublished MR', async () => {
+    const response = roundResponse({ published: true });
+    response.programs.se.ownList.status = 'submitted';
+    response.programs.mr.proposalIds = INITIAL_ORDER;
+    response.programs.mr.ownList = { ...response.programs.se.ownList, listKey: 'mr-self', status: 'draft' };
+    mockLoad.mockResolvedValue(response);
+    render(<ProposalRankingApp />);
+    expect(await screen.findByRole('button', { name: 'Meeting list' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('button', { name: 'Facilitate', exact: true })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'My rankings' }));
+    expect(screen.getByText('Your private ranking')).toBeInTheDocument();
+    expect(screen.queryByText('Shared meeting order')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'MR', exact: true }));
+    await screen.findByText('Your private ranking');
+    expect(screen.getByRole('button', { name: 'My rankings' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Meeting list' }));
+    expect(screen.getByText('This program has not been published yet. Your own list is in My rankings.')).toBeInTheDocument();
+    expect(screen.queryByText('Shared meeting order')).not.toBeInTheDocument();
   });
 
   test('opening preview shows the roster, lead assignments and review completeness', async () => {
