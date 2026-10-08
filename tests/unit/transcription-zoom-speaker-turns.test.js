@@ -371,3 +371,17 @@ test('a name with exactly two substantial cues anywhere (one overlapping) is est
   f.cues = f.cues.filter(cue => cue.start !== 60000);
   expect(run(f).labels[2]).toBe('Presenter');
 });
+
+test('an absent-label move does not pull a second substantial turn that fails the absence guard', () => {
+  const f = absentFixture();
+  const first = 'Superconducting qubits require careful calibration across several cryogenic temperature stages.';
+  const second = 'Dilution refrigerators maintain stable millikelvin environments throughout extended measurement campaigns.';
+  f.cues[2].text = `${first} ${second}`;
+  f.cues[2].end = 28000;
+  f.content.utterances[2].text = first;
+  f.content.utterances[2].end = 24000;
+  f.content.utterances.push({ speaker: 'A', text: second, start: 24500, end: 28000 });
+  f.cues.push({ name: 'Presenter', text: 'Brief aside.', start: 26500, end: 27500 });
+  const result = run(f);
+  expect(result.labels).toEqual(['Presenter', 'Presenter', 'Visitor', 'Presenter']);
+});
