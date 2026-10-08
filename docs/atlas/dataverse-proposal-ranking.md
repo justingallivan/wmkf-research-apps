@@ -161,7 +161,8 @@ run by the orchestrator, separately from the review.
 [VERIFIED via `scripts/probe-proposal-ranking-production-readiness.mjs` against
 `wmkf.crm.dynamics.com`] The owner explicitly approved eligible-source counts and
 ranking-table/application-role presence checks. All Dataverse operations were GETs;
-the target interlock remained on. No Production writes or activation occurred.
+the target interlock remained on. This inventory was read-only; the later owner-approved
+three-record marker correction is recorded below. No ranking activation occurred.
 
 | Source cycle | Science & Engineering | Medical Research | Total |
 |---|---:|---:|---:|
@@ -171,8 +172,9 @@ the target interlock remained on. No Production writes or activation occurred.
 The source scan returned HTTP 200, completed all pages, and had zero unmapped meeting
 dates. It used the canonical ordinary/test exclusion, Phase II Pending and research
 program filters plus the owner-approved D26 request-number cutoff. The complete
-scan found 29 rows; five D26 SE requests numbered 1003220 or higher were excluded,
-leaving 24 across both cycles. This replaces the earlier pre-cutoff D26 count of 28.
+scan after the legacy flag correction found 26 rows; two additional D26 requests
+numbered 1003220 or higher were excluded, leaving 24 across both cycles. Before
+that correction the scan found 29 rows and excluded five. The D26 total stays 23.
 It selected only request number, meeting date and program; no proposal titles,
 institutions or business rows were printed. These counts do not establish review
 completeness, full snapshot eligibility, participant grants or facilitator readiness.
@@ -192,12 +194,43 @@ reviews found no substantive bug. The orchestrator ran the tests and live probe.
 Opus noted the intentional strict failure for malformed D26 numbers, including
 nonpending rows in the app's cycle scan; no change was required. Local review receipt:
 `/private/tmp/ranking-cutoff-opus-review.txt` (nonportable); this paragraph retains
-its verdict and scope. No Production write, setup or activation was performed.
+its verdict and scope. No Production write was part of cutoff implementation; the subsequent exact-row
+marker correction below was separately authorized. Ranking setup/activation remain pending.
 
 Production's D26 source pool resolves the sandbox-only zero-proposal concern, but
 Production schema, role provisioning, grants/settings and activation still require
 explicit owner approval. Source proposals stay read-only; ranking workflow actions
 write dedicated ranking tables. The source-backed in-app lifecycle remains unverified.
+
+## Legacy test-marker correction — 2026-10-07
+
+[VERIFIED via `scripts/maintain-proposal-ranking-d26-test-markers.mjs --apply`]
+The owner explicitly authorized setting only `wmkf_istestrequest=true` on Production
+requests **1003220, 1003221, 1003222**. Each conditional PATCH succeeded and exact-row
+GET readback verified true plus unchanged null `wmkf_testcreationrunid`. No other
+request fields, factory ledger/provenance, ranking schema/roles or activation were
+changed by the command. Under the existing classifier these marker-only legacy rows
+are anomalies, display as tests and are excluded from ordinary flows; no fake run
+ID was assigned. The subsequent complete source count is recorded above. Two other
+rows still need the owner-approved D26 numeric exclusion; the cutoff remains.
+
+The command defaults to GET-only inspection. The separate local-only client method
+accepts only those three request numbers on the registered Production host, internally
+resolves each unique GUID and ETag, and permits only the true-only marker PATCH using
+a private proof. Normal marker writes remain denied, including generic factory-option
+PATCH. The Dataverse interlock and dated write acknowledgement remain required.
+Each result is emitted immediately; transport uncertainty triggers readback, not a
+blind retry, and confirmed write status is distinct from verified final flag state.
+
+Validation: 81 tests in four client/marker suites, syntax, types and Dataverse/OData
+gates/self-tests passed. Luna implemented; Sol and subscription-OAuth Opus reviewed.
+Partial receipts, missing run-ID projection rejection, uncertain-write readback and
+confirmed-write attribution were corrected before execution. Opus found no blocker;
+its nonblocking uncertain-readback message was clarified. Local review receipt:
+`/private/tmp/ranking-marker-opus-review.txt`; live receipt:
+`/private/tmp/ranking-marker-apply.log` (nonportable). All three durable outcomes:
+`verified-marked`, `applied=true`, `patchResponseOk=true`, `patchError=false`,
+`runIdPresent=false`. No further write authorization is inferred from this receipt.
 
 ## Institution geography discovery — 2026-10-07
 

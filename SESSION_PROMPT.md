@@ -78,7 +78,26 @@ No Production writes, provisioning, settings or activation occurred. Exit 2 deno
 missing readiness prerequisites. The Atlas records scope and limits.
 Cutoff validation: 134 tests / 13 suites, types and relevant data/documentation gates
 and sequential self-tests pass. Luna built; Sol and bounded OAuth-only Opus reviewed
-without substantive findings. Production remains unchanged and disabled.
+without substantive findings. The ranking app remains disabled; the later exact-record marker correction is below.
+
+### Owner-approved legacy test flags — 2026-10-07
+
+[VERIFIED via exact-row PATCH and GET readback] Requests 1003220, 1003221 and
+1003222 now have `wmkf_istestrequest=true`; each successful conditional PATCH sent
+only that field. Their `wmkf_testcreationrunid` values remain null. The owner
+explicitly authorized these Production writes. No factory provenance was invented;
+the existing classifier calls marker-only legacy rows anomalies and excludes them
+from ordinary flows. Ranking activation/schema/roles remain untouched.
+The new one-purpose local command is
+`scripts/maintain-proposal-ranking-d26-test-markers.mjs` (dry-run default). Its
+separate client method fixes the three request numbers, resolves IDs/ETags internally,
+retains the target interlock and generic marker guard, and reads back uncertain
+outcomes without retrying. All three returned `verified-marked`, confirmed PATCH
+success, no transport error, and unchanged empty run ID.
+Validation: 81 tests / four client/marker suites, types and data gates pass; Luna
+built, Sol and OAuth Opus reviewed, and receipt/uncertainty corrections were included.
+Fresh GET-only cohort scan: 26 ordinary-filter matches, two further D26 cutoff
+exclusions, D26 still 23 (11 SE / 12 MR), J26 one SE. Keep the D26 cutoff.
 
 ### Owner choice before further work
 
@@ -87,8 +106,8 @@ Production still needs the three dedicated ranking tables and application role;
 provisioning requires separate explicit owner approval. Facilitator selection,
 participant grants, environment readiness and activation remain separate open work.
 Source proposals remain read-only; ranking lists, submissions and meeting order do
-persist in dedicated ranking tables. The owner approved only the narrow Production
-readiness inventory, not setup or activation. No source creation/copy is authorized.
+persist in dedicated ranking tables. The owner approved the narrow Production readiness inventory and the three-record
+test-marker correction below, not ranking setup or activation. No source creation/copy is authorized.
 
 Private ranking, submission, composite publication, meeting reordering and full-requested
 budget totals still need a source-backed, multi-identity in-app walkthrough. Counts
