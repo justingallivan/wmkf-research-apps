@@ -2813,7 +2813,7 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
   const hashScrollDoneRef = useRef(false);
   const m = useMaterials(requestId, transcriptInputRef);
   const t = useTranscription(requestId, { onMaterialsChanged: m.load });
-  const jobsSignature = t.jobs.map((job) => `${job.id}:${job.status}`).join('|');
+  const jobsSignature = t.jobs.map((job) => `${job.id}:${job.status}:${job.cleanupPending === true ? 'c' : ''}`).join('|');
   const z = useZoomImport(requestId, { onImported: t.loadCollection, jobsSignature });
   useEffect(() => {
     if (hashScrollDoneRef.current || typeof window === 'undefined' || window.location.hash !== '#recording-and-transcript-card') return;

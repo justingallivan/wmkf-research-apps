@@ -595,3 +595,22 @@ describe('a failed import retires its stranded uploading job', () => {
     expect(uploadMeetingTranscription).not.toHaveBeenCalled();
   });
 });
+
+describe('a cancelled queued job (deletion requested) no longer holds the recording', () => {
+  const cancelledRow = () => ({ id: 'old', request_id: REQUEST, zoom_meeting_uuid: UUID, state: 'started', transcription_job_id: JOB,
+    job_status: 'queued', job_cleanup_requested: true, lease_expired: false });
+  test('the listing reports the import as failed (re-importable), not started', async () => {
+    rows.set('old', cancelledRow());
+    const meeting = (await listZoomRecordingsForVisit({ requestId: REQUEST })).meetings[0];
+    expect(meeting.import).toEqual({ state: 'failed', jobId: JOB, failureCode: 'zoom_import_job_ended' });
+  });
+  test('importing again releases the old claim and creates a fresh job and claim', async () => {
+    rows.set('old', cancelledRow());
+    const result = await importZoomRecording(args());
+    expect(uploadMeetingTranscription).toHaveBeenCalledTimes(1);
+    expect(rows.get('old')).toMatchObject({ state: 'failed', failure_code: 'zoom_import_job_ended' });
+    expect(result.import.id).not.toBe('old');
+    expect(result.import.state).toBe('started');
+    expect(rows.size).toBe(2);
+  });
+});
