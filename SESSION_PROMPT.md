@@ -360,6 +360,54 @@ not the sparse request wmkf_organizationname field. Live metadata and all23accou
 names were verified. Release/browser confirmation is recorded in the Atlas below.
 ---
 
+## Session 584 Summary (Claude, main) — 2026-10-07/08 PT
+
+### What Was Completed
+1. **Zoom speaker-identity fix released:** PR #459 (merge `f48fba1ab`); owner accepted it on 1003038.
+2. **Staff Deliberations copy:** PR #460 (merge `ea1e09a0d`): the briefing next step names the upcoming
+   deliberation session date; the two writeup warnings drop "the Dataverse fill".
+3. **Stage 5 leadership daily digest live:** PR #461 (merge `ddeb1b401`); migration 073 applied and copy
+   seeded by the owner. Research only. Codex review: round 1 two high findings fixed (`c16c30092`), round 2
+   approve. DEVELOPMENT_LOG entry added.
+4. **J27 auto-prepare:** owner set Production `STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES=["D26","J27"]`
+   and redeployed; status list unchanged (register J27-084). Connor's Grant Cycle table note recorded in
+   the cycle rollover plan §2a (to-do, not top priority).
+5. **Repo hygiene:** 113 merged branches deleted from origin; performance-planning docs landed
+   (`fd3366f5e`); test-date queue item closed with no clock dependence (`ef11d8e11`); the drain-table gate
+   false positive fixed (`9f6001cb1`); the main handoff dropped by the PR #457 merge restored (`c7e6417f8`).
+6. **Deliberations vocabulary options sheet** filed (`docs/plans/DELIBERATIONS_VOCABULARY_OPTIONS_2026-10-08.md`).
+
+### Verified Open
+1. **First leadership digest:** after the first Research writeup is sent to leadership, the next night's
+   `final_writeup_leadership_digests` rows should have `accepted_at`. Evidence: plan Stage 5 rollout.
+2. **First handoff email:** after the next Research "Ready for group review", its
+   `final_writeup_handoff_emails` row should be `sent` from the lead PD. Evidence: plan Stage 4.
+3. **Dependabot PR #447** (dependency bumps from 2026-10-06): CI check, then owner "merge". Evidence: work queue.
+4. **Stream transcription audio** instead of buffering (200 MiB cap is memory-bound); decide alongside the
+   Zoom import work. Evidence: work queue "Stream transcription audio".
+5. **Stale local worktrees** (~20 on this Mac, including 8 on merged branches). `../WMKF_Apps-codex`
+   (`codex/transcription-pilot`) holds `e899518a5`, whose docs landed on main in `fd3366f5e`. Leave
+   `../WMKF_Apps-codex-proposal-ranking` and `../WMKF_Apps-codex-transcript-ux` alone while Codex uses them.
+   Check each for unpushed work before removing. Evidence: `git worktree list`.
+
+### Owner Decision Needed
+1. Cycle rollover design (plan §9): a to-do, not top priority; anchor on the planned `wmkf_grantcycle` table.
+2. Deliberations vocabulary: resurface November 1, 2026 (reminder below).
+
+### Do Not Reopen Without New Decision
+1. Leadership digest: Research only, system mailbox sender, copy in settings (owner, 2026-10-07).
+2. SoCal does not use the app suite yet; keep it out of the handoff email and digest (owner, 2026-10-07).
+
+### Process notes
+- A local Production Dataverse write (e.g. `scripts/seed-email-defaults.mjs --execute`) needs
+  `DATAVERSE_PROD_WRITE_ACK="<purpose> <today UTC>"`.
+- Vercel Production env changes and `vercel redeploy` are blocked for Claude by the permission
+  classifier; the owner runs them with `!`.
+- When merging a feature branch that carries its own `SESSION_PROMPT.md`, keep main's handoff
+  (the PR #457 merge replaced it).
+
+---
+
 ## Owner reminder (set 2026-10-07, Session 584)
 
 **November 1, 2026:** remind the owner to pick up the deliberations vocabulary options sheet,
