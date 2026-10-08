@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Import from Zoom ships; transcription queue incident fixed (Session 586)
+
+**Milestone:** Staff can import a site visit's audio and Zoom transcript directly from WMKF's Zoom account into Meeting Tracker transcription. The recording card is now a three-step flow.
+**Sessions:** 586. PR #464 (merge `441140e6e`), #465 (`e3b841005`), #466 (`cd8b5a5c7`). Claude planned and reviewed; Sonnet built; Codex ran adversarial passes (#464: high, medium, then approve; #466: high, then approve).
+**Ship state:**
+- Internal Zoom S2S OAuth app (read-only recording scopes); approved host list in `ZOOM_RECORDING_HOSTS`; migration 074 `zoom_recording_imports` applied to Production. Live import on 1003010 ran end to end, with 5 speakers named from the Zoom transcript.
+- Incident (about 11:55–13:12 PT): a 24,213-character utterance exceeded the 20,000 cap and retried in `saving` indefinitely, blocking the global transcription slot. The cap is now 200,000. Recovery needed cancelling the pinned Vercel Workflow runs and running the recovery cron.
+- Speaker matching now moves a strongly matched turn when the label's own speaker has no caption there.
+- Not yet built: MP4 copy to SharePoint (3b), paired summaries (2), turn splitting, and fail-fast transcription save errors.
+**Why it matters:** this removes the manual Zoom download and upload. The incident showed that one bad transcript can block every transcription, and that a worker fix doesn't reach in-flight runs.
+**Pointers:** `docs/plans/ZOOM_RECORDING_IMPORT_PLAN_2026-10-08.md`; `docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md`; `lib/services/meeting-tracker-recordings/`; `lib/services/transcription-pilot/{limits,worker,zoom-vtt}.js`.
+
 ## October 2026 — Leadership daily digest completes the group-review handoff (Session 584)
 
 **Milestone:** Each night at 07:00 UTC, every Leadership-persona staff member gets one email from the system mailbox listing the Research writeups newly sent to leadership review. All five group-review handoff stages are now live.

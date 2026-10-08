@@ -1,31 +1,113 @@
-# Session 586 Prompt: resume office transcript work and Proposal Ranking rehearsal
+# Session 587 Prompt: transcription hardening follow-ups after the Zoom import release
 
-## Session 586 — Meeting recording workflow merged (PR #464), 2026-10-08 (Claude)
+## Session 586 Summary (Claude, main), 2026-10-08 PT
 
-**Current transcript-workflow handoff; the Session 584 planning handoff below is historical.**
-[PR #464](https://github.com/justingallivan/wmkf-research-apps/pull/464) merged `codex/meeting-transcript-ux` to main. It carries Stages 0, 1 and 3a of `docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md`.
+### What Was Completed
 
-- **Stage 0, Zoom access.** The admin created the internal S2S OAuth app. It grants `cloud_recording:read:list_user_recordings:admin` and `cloud_recording:read:list_recording_files:admin`, plus an unrequested `:master` variant. The approved host is `wmk-library@wmkeck.org`, and every recording sits in one Personal Meeting Room with a generic title. `scripts/probe-zoom-recordings.mjs` is a read-only probe. The pilot meeting's downloaded files are in the Session 586 scratchpad only.
-- **Stage 1, step-by-step card.** The card reads 1 Get the recording, 2 Check speaker names and where the presentation ends, 3 Results. It adds Open links for both transcript halves.
-- **Stage 3a, Import from Zoom** (`docs/plans/ZOOM_RECORDING_IMPORT_PLAN_2026-10-08.md`). It imports one meeting's audio and Zoom `audio_transcript` VTT into the existing transcription pipeline. It adds the table `zoom_recording_imports`, the routes `GET …/zoom-recordings` and `POST …/zoom-imports`, and the store function `retireMeetingUploadingJob`. The plan was built by a Sonnet agent and reviewed by Claude. It then went through three Codex adversarial passes: a high and a medium finding, both fixed, then approval. Before merge, 1,026 related tests and all CI checks passed.
-- **Production state** [VERIFIED via read-only `schema_migrations` read]:
-  - Migration 074 is applied, run by the owner with `applied_by` `claude-s586-zoom-import-2026-10-08`. **The next free migration number is 075.**
-  - The owner set `ZOOM_S2S_ACCOUNT_ID`, `ZOOM_S2S_CLIENT_ID` and `ZOOM_S2S_CLIENT_SECRET` in Vercel Production only and redeployed.
-  - `ZOOM_RECORDING_HOSTS` is **unset**, so the import is hidden.
+1. **Zoom access (Stage 0)**
+   - The admin created the internal S2S OAuth app. The token grants `list_user_recordings:admin` and `list_recording_files:admin`, plus an unrequested `list_user_recordings:master`.
+   - The approved host is `wmk-library@wmkeck.org`. Every recording sits in one Personal Meeting Room, so the picker shows date and time.
+   - `scripts/probe-zoom-recordings.mjs` is a read-only probe.
 
-**Next, with the owner:**
-1. Set `ZOOM_RECORDING_HOSTS=wmk-library@wmkeck.org` in Production and redeploy.
-2. Import one non-sensitive past site visit. This spends one transcription. Verify the Zoom audio passes the start-time audio inspection, that the import finishes within the 300 s route limit, that speaker names come from the Zoom transcript, and that steps 2 and 3 work.
-3. If anything is wrong, unset `ZOOM_RECORDING_HOSTS` to hide the import.
+2. **Step-by-step card (Stage 1)**
+   - The card now reads Get the recording, then Check speaker names and where the presentation ends, then Results.
 
-**Not started:**
-- Stage 3b: copying the MP4 into SharePoint, which needs a background job.
-- Stage 2: paired summaries, which needs a Dataverse artifact type, a migration and a new prompt.
-- Stage 4: video split.
-- Stage 5: retention and deletion.
+3. **Import from Zoom (Stage 3a)**
+   - Spec: `docs/plans/ZOOM_RECORDING_IMPORT_PLAN_2026-10-08.md`. Claude planned it, a Sonnet agent built it, and Claude reviewed it.
+   - Codex ran three adversarial passes: a high and a medium finding, both fixed, then approval.
+   - It added table `zoom_recording_imports`, routes `GET …/zoom-recordings` and `POST …/zoom-imports`, and the store function `retireMeetingUploadingJob`.
+   - Merged as PR #464 (`441140e6e`).
+   - The owner applied migration 074 to Production. `applied_by` is `claude-s586-zoom-import-2026-10-08`. **Next free migration: 075.**
+   - The owner set `ZOOM_S2S_ACCOUNT_ID`, `ZOOM_S2S_CLIENT_ID`, `ZOOM_S2S_CLIENT_SECRET` and `ZOOM_RECORDING_HOSTS=wmk-library@wmkeck.org` in Vercel Production only.
+   - **Live test on 1003010 passed** [VERIFIED via read-only Postgres]:
+     - The import finished in about 6 s.
+     - The audio passed inspection: 40.5 MB, 64.4 min.
+     - The transcription reached `ready`.
+     - Zoom-transcript matching named 5 speakers at 0.97–0.98 confidence.
 
-Owner follow-up option: hide re-summarize controls behind "Summarize again" once a current summary is published.
+4. **Production incident: transcription queue blocked, about 11:55 to 13:12 PT**
+   - **Cause** [VERIFIED by a structural provider fetch]: the UNLV 1003000 transcript had one 24,213-character utterance. The worker rejected any utterance over 20,000 characters with an uncoded error and retried every 30 s with no limit. The job stayed in `saving` and held the single global transcription slot.
+   - **Fix:** PR #465 (`e3b841005`) adds a shared `MAX_TRANSCRIPT_UTTERANCE_CHARS = 200_000` in `lib/services/transcription-pilot/limits.js`, used by `worker.js` and `meeting-tracker-transcription/bundle.js`.
+   - **Gotcha** [VERIFIED via Vercel log `deploymentId`]: Vercel Workflow runs stay pinned to the deployment they started on, so the fix did not reach in-flight runs.
+   - **Recovery:**
+     - The owner cancelled the pinned runs in Vercel.
+     - The owner deleted the duplicate queued UNLV job (`93c32385`) through the staff DELETE route from the browser console.
+     - The owner ran the `drain-transcriptions?recovery=1` cron.
+     - UNLV, U of Washington 1002916 and the Zoom import then all reached `ready` within 3 minutes.
 
+5. **Speaker matching (PR #466, `cd8b5a5c7`)**
+   - **Problem:** AssemblyAI produced 5 voice labels for 7 people, and a question Jean Kim asked at 59:57 sat under a label named "Samuel Mann".
+   - **New rule in `reconcileZoomSpeakerTurns`:** a single matched turn may move only when all of these hold:
+     - The match is strong: coverage of at least 0.85 and at least 4 shared content words.
+     - The matched name has at least 2 substantial captions in the meeting.
+     - No caption of the label's own name overlaps the turn.
+   - Codex's first pass found a follow-up-pass bypass, which is fixed; the second pass approved.
+   - A real-meeting replay changes exactly 2 turns, both correct.
+   - The owner rejected presence or "last spoke" heuristics, because staff speak early and late.
+   - This applies to new transcriptions only; 1003010's labels need a manual fix in step 2.
+
+### Commits
+- PR #464 merge `441140e6e` (Stages 0, 1, 3a; branch commits `c800924d8`…`46738a83f`)
+- PR #465 merge `e3b841005` (`1099287ae` utterance cap)
+- PR #466 merge `cd8b5a5c7` (`9a5cd80e2`, `b6648a0b8` speaker matching)
+
+## Next Items
+
+### Verified Open
+
+1. **Fail validation errors in the transcription save step instead of retrying forever, and log the real error.**
+   - Evidence: `lib/services/transcription-pilot/worker.js`. `pollAndSave` catches the error and schedules a retry 30 s later. `safeProviderError` maps uncoded errors to `provider_request_failed`, and nothing is logged.
+   - Any uncoded validation error, such as `provider_invalid_utterance` or `output_integrity_mismatch`, holds the global slot until the job expires.
+2. **Add a staff control on the card to cancel or delete a queued or stuck run.**
+   - Evidence: the card's only DELETE is "Discard this draft" (`RecordingAndTranscriptCard.js`). The route `transcriptions/[jobId].js` DELETE accepts `{expectedVersion}`.
+3. **Runbook note: workflow pinning and the recovery recipe.**
+   - Workflow runs are pinned to their starting deployment, so a worker fix needs these steps: cancel the run in Vercel, then run `/api/cron/drain-transcriptions?recovery=1`. Recovery resets the dispatch (`store.js` `recoverTerminalWorkflowDispatch`) and restarts the run on the current deployment.
+   - Add this to the transcription docs.
+4. **Friendly name for imported jobs.**
+   - The import names the audio file "Zoom " plus the raw ISO start time (`lib/services/meeting-tracker-recordings/import-service.js`, `importZoomRecording`). The card shows "Zoom 2026-10-07T20:48:28.000Z".
+5. **Split merged speaker turns (plan first).**
+   - At 60:08 on 1003010, AssemblyAI merged Jean Kim's question and Justin's reply into one 90 s turn.
+   - PR #459 is a labels-only overlay and cannot split turns. Word timings exist. This needs its own plan and owner approval.
+
+### Owner Decision Needed
+
+1. **Next workflow stage.**
+   - Stage 3b: copy the MP4 into SharePoint with background chunked Zoom→Graph streaming.
+   - Stage 2: paired summaries. This needs a Dataverse artifact type, a migration and a new prompt.
+   - Stage 4: video split. Stage 5: retention.
+   - See `docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md`.
+2. **Proposal Ranking acceptance and promotion (PR #463, draft).**
+   - Codex continued on `codex/proposal-ranking` this session; the head is `9dbc3daba` (dry-run opening and confirmed erasure).
+   - Read that branch's `SESSION_PROMPT.md` before acting. The live-state preflight in the Session 585 section below still applies.
+
+### Verify Before Acting
+
+1. **Delete the Zoom pilot downloads.** The Oct 5 meeting files (5 files, about 300 MB, real applicant content) are in the Session 586 scratchpad under `zoom-pilot/`. The owner said to keep them for now. Delete them when no longer needed.
+2. **The `list_user_recordings:master` scope** was not requested. Ask the Zoom admin to remove it if unneeded.
+
+### Do Not Reopen Without New Decision
+
+1. No presence or "last spoke" speaker heuristic (owner, 2026-10-08).
+2. Zoom credentials stay out of Preview environments (owner, 2026-10-08).
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `lib/services/meeting-tracker-recordings/{zoom-client,import-service,import-store}.js` | Zoom import |
+| `lib/db/migrations/074_zoom_recording_imports.sql` | Import table (applied to Production) |
+| `shared/components/meeting-tracker/RecordingAndTranscriptCard.js` | Step-by-step card and Import from Zoom panel |
+| `lib/services/transcription-pilot/limits.js` | `MAX_TRANSCRIPT_UTTERANCE_CHARS` |
+| `lib/services/transcription-pilot/zoom-vtt.js` | Speaker reconciliation (`absentLabelMatch`) |
+| `docs/plans/ZOOM_RECORDING_IMPORT_PLAN_2026-10-08.md` | Stage 3a plan, review record |
+
+## Testing
+
+```bash
+./node_modules/.bin/jest --runInBand tests/unit/zoom-*.test.js tests/unit/recording-and-transcript-card*.test.js tests/unit/transcription-zoom-speaker-turns.test.js tests/unit/transcription-pilot-worker.test.js
+```
+
+---
 
 ## Session 585 close — Proposal Ranking office handoff (2026-10-08)
 
@@ -90,7 +172,7 @@ remains recorded. Root instructions need no change for this local-only script.
 
 ---
 
-## Owner plan for 2026-10-08 (set by the owner, Session 584)
+## Historical: Owner plan for 2026-10-08 (set by the owner, Session 584; both items addressed in Session 586)
 
 Work on two things, on the other computer:
 1. **Meeting Tracker transcript workflow:** done in Session 586; see the PR #464 section at the top. (Originally: resume `codex/meeting-transcript-ux` (pushed at

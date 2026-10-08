@@ -19,7 +19,7 @@
 - External systems / literals: feedback-verify-external-platform-claims.md; feedback-no-fabricated-placeholder-values.md
 - Delegated work / builds / review cadence: ../docs/AGENT_COLLABORATION_PLAN.md; ../docs/agent-wiki/topics/dev-environment.md (Durable Memory); project-agent-worktree-base-is-main.md
 - Codex reviews (Claude may launch adversarial reviews itself via Bash; model flag): feedback-codex-delegation-review-vs-rescue-routing.md; feedback-codex-model-gpt56-sol.md
-- Environment / deploy / Vercel / require(esm) / local containers / sandbox rehearsal / Factory ledger: ../docs/agent-wiki/topics/dev-environment.md (Durable Memory); feedback-verify-deploy-is-the-merge-build.md; feedback-postgres-url-handling-hazards.md
+- Environment / deploy / Vercel / require(esm) / local containers / sandbox rehearsal / Factory ledger: ../docs/agent-wiki/topics/dev-environment.md (Durable Memory); feedback-verify-deploy-is-the-merge-build.md; feedback-postgres-url-handling-hazards.md; project-vercel-workflow-runs-pinned-to-deployment.md
 - Production data access: feedback-never-self-authorize-prod-dataverse-reads.md
 - Production smoke residue / cleanup scope: project-test-residue-cleanup-is-for-data-mining.md
 
