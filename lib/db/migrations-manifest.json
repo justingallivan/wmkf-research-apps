@@ -71,6 +71,7 @@
     "069_staff_discussion_transcript_type.sql",
     "070_meeting_transcript_summary_drafts.sql",
     "071_summary_draft_slides_identity.sql",
-    "072_final_writeup_handoff_emails.sql"
+    "072_final_writeup_handoff_emails.sql",
+    "073_final_writeup_leadership_digests.sql"
   ]
 }
