@@ -174,8 +174,10 @@ Final Writeup group-review handoff: **Stages 1–4 are live in Production.** Pla
 
 ### Verify Before Acting
 
-1. **1003010 first scheduled preparation** (expected ~15:45 PDT 2026-10-07): not checked this
-   session. Owner-run:
+1. ~~**1003010 first scheduled preparation**~~ **Closed S584.** The owner ran the receipts
+   report: all 14 D26 rows `prepared`, no errors; every scheduled row was last updated by one
+   01:30 UTC (18:30 PDT) sweep. The owner saw 1003010's draft before 17:00 PDT (owner report).
+   (Original note: expected ~15:45 PDT 2026-10-07; not checked in S581.) Owner-run:
    `DATAVERSE_ALLOW_PROD_READS=yes node --import ./scripts/lib/use-extensionless.mjs scripts/report-staff-deliberations-preparation-receipts.mjs --cycle=D26`
 2. **S580 deferred small items** (not touched in S581, re-check source first): the list's next
    step naming the deliberation session date (`cycle-list-service.js`); the two "generated before
