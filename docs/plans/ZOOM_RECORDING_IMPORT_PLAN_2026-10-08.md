@@ -2,7 +2,7 @@
 title: Zoom recording import (Stage 3a)
 kind: plan
 domain: transcription
-status: approved
+status: built-in-branch
 summary: "Server-side Import from Zoom for the site-visit card: list approved hosts' cloud recordings, import one meeting's audio and Zoom transcript into the existing transcription pipeline, recorded by one new Postgres table and two new routes."
 owner: product-engineering
 related:
@@ -12,6 +12,19 @@ related:
 ---
 
 # Zoom recording import (Stage 3a)
+
+## Build status
+
+**[BUILT on branch `codex/meeting-transcript-ux`, 2026-10-08; not merged, migration 074 not applied, no Vercel variable set.]** The client (`lib/services/meeting-tracker-recordings/zoom-client.js`), import service and store, migration 074, both routes and the step 1 import panel exist with unit tests that mock `fetch` and the service modules. No live Zoom, Blob, Dataverse or database call has been made by the build. Review (Claude, then Codex), the owner's go-ahead to apply the migration and set the variables, and one owner-approved manual local import remain.
+
+Implementation notes that refine this plan:
+
+- The cleanup pathnames are read from the raw job row (`getMeetingTranscriptionJob` in `lib/services/transcription-pilot/store.js`); the job DTO from `projectMeetingTranscriptionJob` exposes only `zoomTranscriptAttached`.
+- The import re-lists with the same default 30-day window the picker uses; the POST body has no `days`.
+- A Zoom transcript over the 4,000,000-byte cap is treated as absent (audio imports alone); audio over the 200 MiB cap is `zoom_audio_too_large` (422) before any claim.
+- `GET zoom-recordings` rejects a non-integer or out-of-range `days` (400) rather than clamping it.
+- If the final `started` update itself fails after the job was queued, the row is left `importing` (not marked failed) so the lease-expiry lookup resolves it to `started`; the response then reports state `importing`.
+- If `startMeetingTranscription` queued the job but then threw, the row is marked `failed` as specified, so a retry creates a second job; staff should check the transcription list before retrying a failed import.
 
 ## Scope and authority
 
