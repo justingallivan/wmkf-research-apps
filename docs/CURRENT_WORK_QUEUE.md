@@ -93,11 +93,12 @@ sequence.
   when SoCal (or another program) adopts group review, add its Grant Program
   GUID to `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS` or it sends no email:
   `docs/plans/FINAL_WRITEUP_GROUP_REVIEW_HANDOFF_PLAN_2026-10-06.md`.
-- **Deferred to next session (2026-10-06):** (a) the list's next step for a
-  ready briefing should name the deliberation session date (UI only; the
-  session is already in the list payload, `cycle-list-service.js:618`);
-  (b) reword the two "generated before the Dataverse fill" warnings
-  (`lib/services/pre-site-visit/artifact-model.js:290-291`).
+- **Deferred items from 2026-10-06, built S584 on branch
+  `claude/deliberations-next-step-copy` (not merged):** (a) the Staff Deliberations
+  list's next step for a ready briefing names the deliberation session date while the
+  session is upcoming, matching the request tab's rule (`StaffDeliberationsPanel.js`);
+  (b) the two writeup "check in Word" warnings no longer say "the Dataverse fill"
+  (`lib/services/pre-site-visit/artifact-model.js`). Owner approved both wordings.
 
 - **Cycle rollover with minimal configuration (2026-10-06).** [OPEN —
   investigation designed, not started] Owner principle: very few parameters may

@@ -154,7 +154,16 @@ function nextStep(request, task, document) {
     ? 'Prepare the writeup for post-visit editing.'
     : 'Prepare your working writeup.';
   if (request.brief?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING) return 'The briefing is being prepared. Check back shortly.';
-  if (document?.key === 'brief') return 'Check the briefing in Word, then share it for the presentation.';
+  if (document?.key === 'brief') {
+    // Same rule as the request tab: name the session only while it is upcoming.
+    const sessionStartMs = Date.parse(request.session?.scheduledStartIso || '');
+    const sessionWhen = sessionStartMs > Date.now()
+      ? dateTime(request.session.scheduledStartIso, request.session.ianaTimeZone)
+      : null;
+    return sessionWhen
+      ? `Check the briefing in Word, then share it before the deliberation session on ${sessionWhen}.`
+      : 'Check the briefing in Word, then share it for the presentation.';
+  }
   return 'Generate the pre-site briefing.';
 }
 
