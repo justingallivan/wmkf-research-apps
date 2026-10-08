@@ -207,6 +207,30 @@ describe('Proposal Ranking page', () => {
     expect(screen.getByText(/Position 1 of 4 · #1001/)).toBeInTheDocument();
   });
 
+  test('published dry-run erasure requires explicit confirmation and clears displayed ranking content', async () => {
+    const current = roundResponse({ facilitator: true, published: true });
+    current.round.dryRun = true;
+    current.viewer.capabilities.resetDryRun = true;
+    current.confirmations.resetDryRun = { fingerprint: 'erase-current', message: 'Permanently erase trial rankings.' };
+    const erased = JSON.parse(JSON.stringify(current));
+    erased.round = { ...erased.round, erased: true, state: 'canceled', snapshot: { proposals: [], roster: [], seedOrders: { se: [], mr: [] } } };
+    erased.programs = { se: { proposalIds: [], meeting: null }, mr: { proposalIds: [], meeting: null } };
+    erased.viewer.capabilities = {};
+    erased.confirmations.resetDryRun = null;
+    mockLoad.mockResolvedValue(current);
+    mockSend.mockResolvedValue(erased);
+    render(<ProposalRankingApp />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Facilitate', exact: true }));
+    fireEvent.click(screen.getByText('Round administration'));
+    const erase = screen.getByRole('button', { name: 'Permanently erase dry run' });
+    expect(erase).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: /all rankings in this dry run will be permanently erased/ }));
+    fireEvent.click(erase);
+    await screen.findByText(/Dry-run rankings permanently erased/);
+    expect(screen.queryByText('First proposal')).not.toBeInTheDocument();
+    expect(mockSend.mock.calls[0][0]).toMatchObject({ action: 'resetDryRun', roundId: 'round-1', confirmationFingerprint: 'erase-current', policyRevision: 4 });
+  });
+
   test('serializes saves and keeps the latest queued drag order visible', async () => {
     const firstSave = deferred();
     mockLoad.mockResolvedValue(roundResponse());
@@ -285,6 +309,31 @@ describe('Proposal Ranking page', () => {
 
     await waitFor(() => expect(screen.queryByText('Your private ranking')).not.toBeInTheDocument());
     expect(screen.queryByText('Current PD')).not.toBeInTheDocument();
+  });
+
+  test('a late save readback cannot restore an erased dry run after refresh', async () => {
+    const initial = roundResponse();
+    initial.round.dryRun = true;
+    const erased = JSON.parse(JSON.stringify(initial));
+    erased.round = { ...erased.round, erased: true, state: 'canceled', snapshot: { proposals: [], roster: [], seedOrders: { se: [], mr: [] } } };
+    erased.programs = { se: { proposalIds: [], meeting: null }, mr: { proposalIds: [], meeting: null } };
+    erased.viewer.capabilities = {};
+    erased.viewer.isRosterParticipant = false;
+    const lateReadback = deferred();
+    mockLoad.mockResolvedValueOnce(initial);
+    mockSend.mockRejectedValueOnce(Object.assign(new Error('Lost save response'), { status: 500 }))
+      .mockImplementationOnce(() => lateReadback.promise)
+      .mockResolvedValueOnce(erased);
+    render(<ProposalRankingApp />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Move proposal 1001 down' }));
+    await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh current state' }));
+    await screen.findByText(/Dry-run rankings permanently erased/);
+    await act(async () => { lateReadback.resolve(initial); await lateReadback.promise; });
+    expect(screen.queryByText('First proposal')).not.toBeInTheDocument();
+    expect(screen.queryByText('Your private ranking')).not.toBeInTheDocument();
+    expect(screen.getByText(/Dry-run rankings permanently erased/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
   });
 
   test('shows East and West on shared cards and omits geography for unknown or older snapshot values', async () => {
@@ -446,7 +495,7 @@ describe('Proposal Ranking page', () => {
     mockSend.mockResolvedValue(roundResponse({ facilitator: true }));
     render(<ProposalRankingApp />);
     const open = await screen.findByRole('button', { name: 'Open round' });
-    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /Open as a dry run/ })).not.toBeChecked();
     expect(screen.queryByText(/outstanding external reviews/)).not.toBeInTheDocument();
     if (canOpen) {
       expect(open).toBeEnabled();
@@ -470,7 +519,7 @@ describe('Proposal Ranking page', () => {
     render(<ProposalRankingApp />);
     const open = await screen.findByRole('button', { name: 'Open round' });
     expect(open).toBeEnabled();
-    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /Open as a dry run/ })).not.toBeChecked();
     expect(screen.getByText('Opening saves the current proposals and review scores for this round.')).toBeInTheDocument();
     fireEvent.click(open);
     fireEvent.click(await screen.findByRole('button', { name: 'Resolve opening attempt' }));

@@ -8,7 +8,7 @@ import { buildCumulativeTotals, errorMessage, formatMoney, formatScore, moveProp
 const EMPTY_CAPABILITIES = {
   preview: false, open: false, saveOwnList: false, submitOwnList: false,
   generate: false, editMeetingOrder: false, publish: false,
-  transferFacilitator: false, excuseParticipant: false, cancelRound: false,
+  transferFacilitator: false, excuseParticipant: false, cancelRound: false, resetDryRun: false,
 };
 const EMPTY_ORDER = [];
 
@@ -348,6 +348,8 @@ export default function ProposalRankingApp() {
   const [transferSelection, setTransferSelection] = useState('');
   const [transferConfirmed, setTransferConfirmed] = useState(false);
   const [cancelConfirmed, setCancelConfirmed] = useState(false);
+  const [dryRun, setDryRun] = useState(false);
+  const [resetConfirmed, setResetConfirmed] = useState(false);
   const [operationNotice, setOperationNotice] = useState(null);
   const [pendingOpen, setPendingOpen] = useState(null);
   const scopeRef = useRef(0);
@@ -360,6 +362,26 @@ export default function ProposalRankingApp() {
 
   const applyResponse = useCallback((next, scope) => {
     if (!mountedRef.current || scope !== scopeRef.current || !next) return false;
+    if (next.round?.erased) {
+      // Erasure is terminal: a delayed response from this scope must never
+      // restore its private contents, even after a new round has been opened.
+      scopeRef.current += 1;
+      loadRef.current += 1;
+      lastOperationRef.current = null;
+      setRequestBusy(false);
+      setActionBusy(false);
+      setSubmitting(null);
+      setPendingConfirmation(null);
+      setSettledScopeKey(scopeKeyRef.current);
+      setDryRun(false);
+      queuesRef.current.clear();
+      localOrdersRef.current = {};
+      saveStatesRef.current = {};
+      remoteOrdersRef.current = {};
+      setLocalOrders({});
+      setSaveStates({});
+      setRemoteOrders({});
+    }
     responseRef.current = next;
     setResponse(next);
     setResponseScopeKey(scopeKeyRef.current);
@@ -693,6 +715,7 @@ export default function ProposalRankingApp() {
                 const reconciled = await sendProposalRankingAction({ action: 'read', roundId: latest.roundId, operationId });
                 if (!mountedRef.current || job.scope !== scopeRef.current) continue;
                 applyMutationResponse(reconciled, job.scope);
+                if (job.scope !== scopeRef.current) continue;
                 const serverOrder = findListOrder(reconciled, list.listKey);
                 const desired = localOrdersRef.current[list.listKey] || job.order;
                 if (serverOrder && sameOrder(serverOrder, desired)) {
@@ -750,7 +773,7 @@ export default function ProposalRankingApp() {
   const openRound = () => {
     const preview = responseRef.current?.preview;
     if (!preview?.canOpen || pendingOpen || actionBusy) return;
-    void runAction({ action: 'open', cycleCode, previewFingerprint: preview.previewFingerprint, operationId: createOperationId() });
+    void runAction({ action: 'open', dryRun, cycleCode, previewFingerprint: preview.previewFingerprint, operationId: createOperationId() });
   };
 
   const generateProgram = (programKey) => {
@@ -769,6 +792,14 @@ export default function ProposalRankingApp() {
     if (!current?.roundId || !token || !meeting) return;
     setPendingConfirmation(null);
     void runAction({ action: 'publish', roundId: current.roundId, programKey, etag: meeting.etag, policyRevision: current.round.policyRevision, confirmationFingerprint: token.fingerprint, operationId: createOperationId() });
+  };
+
+  const confirmDryRunReset = () => {
+    const current = responseRef.current;
+    const token = current?.confirmations?.resetDryRun;
+    if (!current?.roundId || !token || resetConfirmed !== token.fingerprint || hasUnresolvedSave || actionBusy) return;
+    setResetConfirmed(false);
+    void runAction({ action: 'resetDryRun', roundId: current.roundId, policyRevision: current.round.policyRevision, confirmationFingerprint: token.fingerprint, operationId: createOperationId() });
   };
 
   const confirmCancel = () => {
@@ -806,7 +837,7 @@ export default function ProposalRankingApp() {
     <PageHeader title="Proposal Ranking" subtitle="Prepare private PD rankings and facilitate the funding-cycle discussion." icon="▤">
       <div className="mx-auto mt-5 flex max-w-lg flex-wrap items-end justify-center gap-3 text-left">
         <label className="min-w-48 flex-1 text-sm font-medium text-gray-700" htmlFor="proposal-ranking-cycle">Funding cycle
-        <select id="proposal-ranking-cycle" value={cycleCode} onChange={(event) => changeCycle(event.target.value)} disabled={loading || actionBusy || hasUnresolvedSave} className="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50">
+        <select id="proposal-ranking-cycle" value={cycleCode} onChange={(event) => { setDryRun(false); changeCycle(event.target.value); }} disabled={loading || actionBusy || hasUnresolvedSave} className="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50">
             {options.map((option) => <option value={option.code} key={option.code}>{option.label}</option>)}
           </select>
         </label>
@@ -841,8 +872,12 @@ export default function ProposalRankingApp() {
           {preview?.warnings?.length > 0 && <ul className="mt-4 list-disc space-y-1 rounded-lg bg-amber-50 p-4 pl-8 text-sm text-amber-950">{preview.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
           {preview?.unexpectedStatuses?.length > 0 && <StatusBanner kind="warning" className="mt-3">Unexpected proposal statuses need review: {preview.unexpectedStatuses.join(', ')}.</StatusBanner>}
           {preview?.roster?.some((person) => !person.hasAppAccess) && <StatusBanner kind="error" className="mt-3">Every captured PD needs Proposal Ranking app access before this round can open.</StatusBanner>}
+          {capabilities.open && <label className="mt-4 flex items-start gap-2 text-sm text-gray-700">
+            <input type="checkbox" checked={dryRun} onChange={(event) => setDryRun(event.target.checked)} disabled={actionBusy || Boolean(pendingOpen)} className="mt-0.5 rounded border-gray-300" />
+            Open as a dry run. The facilitator can permanently erase its rankings, even after publication.
+          </label>}
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            {capabilities.open && <Button type="button" disabled={actionBusy || Boolean(pendingOpen) || !preview?.canOpen} loading={actionBusy} onClick={openRound}>Open round</Button>}
+            {capabilities.open && <Button type="button" disabled={actionBusy || Boolean(pendingOpen) || !preview?.canOpen} loading={actionBusy} onClick={openRound}>{dryRun ? 'Open dry run' : 'Open round'}</Button>}
           </div>
         </Card>
         <div className="grid gap-4 lg:grid-cols-2">
@@ -861,7 +896,9 @@ export default function ProposalRankingApp() {
       </>}
 
       {!loading && activeResponse?.mode === 'round' && round && <>
-        {round.state === 'canceled' && <StatusBanner kind="warning">This round was canceled and is read-only. <Button type="button" variant="outline" size="sm" onClick={() => loadCurrent({ keepDrafts: false, cyclePreview: true })}>View current cycle preview</Button></StatusBanner>}
+        {round.dryRun && !round.erased && <StatusBanner kind="warning">Dry run — practice rankings only. The facilitator can permanently erase this run after testing.</StatusBanner>}
+        {round.state === 'canceled' && <StatusBanner kind="warning">{round.erased ? 'Dry-run rankings permanently erased. You can open a fresh round.' : 'This round was canceled and is read-only.'} <Button type="button" variant="outline" size="sm" onClick={() => loadCurrent({ keepDrafts: false, cyclePreview: true })}>View current cycle preview</Button></StatusBanner>}
+        {!round.erased && <>
         {round.state === 'active' && round.snapshot.roster.some((person) => person.excluded) && <StatusBanner kind="warning">Every participant is required. This older round contains an excusal and cannot generate or publish another composite.</StatusBanner>}
         <Card hover={false} padding="p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -927,7 +964,7 @@ export default function ProposalRankingApp() {
             </Card>
           </aside>}
         </div>
-        {(view === 'facilitate' || !isFacilitator) && (capabilities.transferFacilitator || capabilities.cancelRound) && <Card hover={false}>
+        {(view === 'facilitate' || !isFacilitator) && (capabilities.transferFacilitator || capabilities.cancelRound || capabilities.resetDryRun) && <Card hover={false}>
           <details><summary className="cursor-pointer font-semibold text-gray-900">Round administration</summary>
           {capabilities.transferFacilitator && <div className="mt-3 space-y-3">
             <label className="block text-sm font-medium text-gray-700">Transfer facilitation to
@@ -941,6 +978,15 @@ export default function ProposalRankingApp() {
               I understand the new facilitator gains facilitator visibility and my later access follows my captured roster status.
             </label>
             <Button type="button" size="sm" disabled={actionBusy || hasUnresolvedSave || !transferSelection || !transferConfirmed} onClick={transferFacilitator}>Transfer facilitation</Button>
+          </div>}
+          {capabilities.resetDryRun && activeResponse.confirmations?.resetDryRun && <div className="mt-5 border-t border-gray-200 pt-4">
+            <h3 className="font-medium text-gray-900">Erase this dry run</h3>
+            <p className="mt-2 text-sm text-amber-900">{activeResponse.confirmations.resetDryRun.message}</p>
+            <label className="mt-3 flex items-start gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={resetConfirmed === activeResponse.confirmations.resetDryRun.fingerprint} onChange={(event) => setResetConfirmed(event.target.checked ? activeResponse.confirmations.resetDryRun.fingerprint : false)} disabled={actionBusy || hasUnresolvedSave} className="mt-0.5 rounded border-gray-300" />
+              I understand all rankings in this dry run will be permanently erased and cannot be restored in this app.
+            </label>
+            <Button type="button" variant="danger" size="sm" disabled={actionBusy || hasUnresolvedSave || resetConfirmed !== activeResponse.confirmations.resetDryRun.fingerprint} onClick={confirmDryRunReset} className="mt-3">Permanently erase dry run</Button>
           </div>}
           {capabilities.cancelRound && <div className="mt-5 border-t border-gray-200 pt-4">
             <h3 className="font-medium text-gray-900">Cancel this round</h3>
@@ -960,6 +1006,7 @@ export default function ProposalRankingApp() {
           <StatusBanner kind="warning">An order has unconfirmed changes. Refresh the round, compare the current list, then retry the displayed order before submitting or continuing.</StatusBanner>
           <Button type="button" variant="outline" size="sm" disabled={loading || actionBusy} onClick={() => loadCurrent({ keepDrafts: true })}>Refresh current state</Button>
         </div>}
+        </>}
       </>}
     </div>
   </div>;
