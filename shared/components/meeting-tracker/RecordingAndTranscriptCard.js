@@ -887,13 +887,19 @@ function isRetiredUploading(job) {
   return job.status === 'uploading' && (job.cleanupPending === true
     || (job.expires_at != null && new Date(job.expires_at).getTime() <= Date.now()));
 }
-// Mirrors the server guard on DELETE: only a queued run (not already being cleaned up) can be cancelled here. A run
-// that has been sent for transcription, or whose submission is uncertain, is deliberately left to its own flows.
-const canCancelRun = (job) => job?.status === 'queued' && job.cleanupPending !== true;
+// Mirrors the server guard on DELETE (requestMeetingJobCleanup): a queued run, or one already with the transcription
+// service (processing/saving), that is not already being cleaned up. `submitting` is refused by the server, and an
+// uncertain submission keeps its own reconcile/abandon flow.
+const IN_FLIGHT_STATUSES = new Set(['processing', 'saving']);
+const canCancelRun = (job) => (job?.status === 'queued' || IN_FLIGHT_STATUSES.has(job?.status)) && job.cleanupPending !== true;
 // A cancelled queued run stays 'queued' until its audio is cleaned up, which can take days for an uploaded file. It no
 // longer blocks a new transcription.
 const isCancelledRun = (job) => job?.status === 'queued' && job.cleanupPending === true;
+// A cancelled in-flight run keeps holding the server slot until the worker deletes the provider copy and the run turns
+// 'failed' (usually the next wake), so it keeps blocking and shows as Cancelling.
+const isCancellingRun = (job) => IN_FLIGHT_STATUSES.has(job?.status) && job.cleanupPending === true;
 const CANCEL_CONFIRM = 'Cancel this transcription? The audio file you chose for it is deleted, so you will need to choose it again to start over. A published transcript is not affected.';
+const CANCEL_IN_FLIGHT_CONFIRM = 'Cancel this transcription? It is already with the transcription service, which may still finish it, and it may still be billed. The audio file you chose for it is deleted, so you will need to choose it again to start over. A published transcript is not affected.';
 const UNRESOLVED_PUBLICATION = new Set(['publishing', 'retryable', 'unknown', 'published_reconcile']);
 const PUBLISHED_FOR_JOB = new Set(['published', 'published_reconcile', 'unknown']);
 const ALIGNMENT_REASONS = {
@@ -1396,7 +1402,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
 
   const discardRun = async (job) => {
     const cancelling = canCancelRun(job);
-    if (!job || busy || !globalThis.confirm?.(cancelling ? CANCEL_CONFIRM : 'Discard this draft?')) return;
+    if (!job || busy || !globalThis.confirm?.(cancelling ? (job.status === 'queued' ? CANCEL_CONFIRM : CANCEL_IN_FLIGHT_CONFIRM) : 'Discard this draft?')) return;
     const generation = generationRef.current;
     setBusy(cancelling ? 'cancel' : 'discard');
     setError(null);
@@ -1415,7 +1421,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
           if (!isCurrent(generation)) return;
         }
         setConflict(stale);
-        setError(stale && cancelling ? 'This transcription changed. The latest status is shown; try again if it is still waiting.'
+        setError(stale && cancelling ? 'This transcription changed. The latest status is shown; try again if it is still running.'
           : errorMessage(discardError, cancelling ? 'The transcription could not be cancelled.' : 'The draft could not be discarded.'));
       }
     } finally {
@@ -2230,7 +2236,7 @@ function EarlierRuns({ t }) {
               <p className="break-words text-sm font-medium text-gray-900">{displayName(job)}</p>
               <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-600">
                 {job.ready_at && <Chip>Ready {fmtDateTime(job.ready_at)}</Chip>}
-                <Chip tone={job.status === 'ready' ? 'green' : ACTIVE_STATUSES.has(job.status) && !isCancelledRun(job) ? 'blue' : job.status === 'submission_uncertain' ? 'amber' : 'gray'}>{isCancelledRun(job) ? 'Cancelled' : RUN_STATE_LABELS[job.status] || 'Unknown'}</Chip>
+                <Chip tone={job.status === 'ready' ? 'green' : ACTIVE_STATUSES.has(job.status) && !isCancelledRun(job) && !isCancellingRun(job) ? 'blue' : job.status === 'submission_uncertain' ? 'amber' : 'gray'}>{isCancelledRun(job) ? 'Cancelled' : isCancellingRun(job) ? 'Cancelling…' : RUN_STATE_LABELS[job.status] || 'Unknown'}</Chip>
               </p>
             </div>
             {job.status === 'ready' && <div className="flex items-center gap-3">
@@ -2604,7 +2610,7 @@ function TranscriptWorkflow({ m, t, z, transcriptInputRef }) {
         </div>
         {progressJob && !editing && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-800" aria-live="polite" data-testid="transcript-progress">
-            <p>{PROGRESS_VERBS[progressJob.status]} {displayName(progressJob)}{progressJob.created_at ? ` · started ${fmtTime(progressJob.created_at)}` : ''}</p>
+            <p>{isCancellingRun(progressJob) ? 'Cancelling this transcription…' : `${PROGRESS_VERBS[progressJob.status]} ${displayName(progressJob)}${progressJob.created_at ? ` · started ${fmtTime(progressJob.created_at)}` : ''}`}</p>
             <span className="flex items-center gap-3">
               {canCancelRun(progressJob) && <button type="button" onClick={() => void t.discardRun(progressJob)} disabled={Boolean(t.busy)} className={BTN_LINK}>{t.busy === 'cancel' ? 'Cancelling…' : 'Cancel this transcription'}</button>}
               <button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={BTN}>{t.loading ? 'Refreshing…' : 'Refresh'}</button>
