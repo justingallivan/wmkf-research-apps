@@ -3,6 +3,25 @@ export const PROGRAMS = [
   { key: 'mr', label: 'Medical Research', shortLabel: 'MR' },
 ];
 
+export const REVIEWER_SCORE_COLORS = Object.freeze([
+  '#b91c1c', '#dc2626', '#ea580c', '#f97316', '#f59e0b',
+  '#eab308', '#a3b80a', '#84cc16', '#22c55e', '#15803d',
+]);
+export const UNSCORED_REVIEWER_SCORE_COLOR = '#9ca3af';
+
+export function reviewerScoreIndicator(score) {
+  const mean = score?.mean;
+  if (!Number.isFinite(mean) || mean < 1 || mean > 5
+    || !Number.isFinite(score?.ratedCount) || score.ratedCount < 1) {
+    return { color: UNSCORED_REVIEWER_SCORE_COLOR, label: 'Average reviewer score: unscored' };
+  }
+  const index = Math.round(((mean - 1) / 4) * (REVIEWER_SCORE_COLORS.length - 1));
+  return {
+    color: REVIEWER_SCORE_COLORS[index],
+    label: `Average reviewer score: ${(Math.round(mean * 10) / 10).toFixed(1)} out of 5 (approximate color)`,
+  };
+}
+
 export function moveProposal(order, from, to) {
   if (!Array.isArray(order) || from === to || from < 0 || to < 0 || from >= order.length || to >= order.length) {
     return order;

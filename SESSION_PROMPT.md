@@ -47,6 +47,19 @@ accessibility note was corrected by giving the E/W symbol an explicitly named
 image role; the page regression now checks that accessible role/name. No further
 review loop was needed. No milestone entry is required.
 
+### Follow-up: ten-color reviewer-rating circle
+
+The owner chose ten approximate rating colors despite varying reviewer counts.
+The shared card now adds a 24px solid lower-right circle: red low, yellow middle,
+green high, gray unscored. It maps the frozen raw mean from 1–5 to the nearest of
+ten steps; numeric score display and all ordering/calculations remain unchanged.
+Matching colors do not imply exact ties. E/W remains at the upper right. No source,
+configuration or live data changes are part of this UI-only addition. Validation:
+126 ranking/Explorer tests, lint, types and relevant gates pass; desktop/mobile
+component renders confirm all colors, gray fallback and no overflow. Luna built;
+Sol and OAuth-only Opus approved. The hover label uses the same rounding as the
+visible score after correcting Opus's nonblocking note. No milestone entry required.
+
 ### Owner choice before further work
 
 1. Prepare the facilitator/grants/readiness prerequisites for the approved sandbox,

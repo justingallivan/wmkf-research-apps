@@ -61,6 +61,21 @@ describe('Proposal Ranking calculations', () => {
     ])).toMatchObject({ ready: false, reason: 'unknown-synthetic-reviewer-marker' });
   });
 
+  test('keeps reviewer means and seed ordering consistent from two through five reviews', () => {
+    const ratingSets = [[3, 5], [3, 4, 5], [3, 3, 5, 5], [3, 4, 4, 5, 4]];
+    const proposals = ratingSets.map((ratings, index) => ({
+      requestId: `review-${index + 1}`,
+      requestNumber: `R-${ratingSets.length - index}`,
+      score: summarizeProposalReviews(ratings.map((rating) => ({
+        received: true, synthetic: false,
+        answer: { overallAssessment: rating, questionOptions: savedScale },
+      }))),
+    }));
+    expect(proposals.map(({ score }) => score.ratedCount)).toEqual([2, 3, 4, 5]);
+    expect(proposals.map(({ score }) => score.mean)).toEqual([4, 4, 4, 4]);
+    expect(buildSeedOrder(proposals)).toEqual(proposals.slice().reverse().map(({ requestId }) => requestId));
+  });
+
   test('sorts unrounded means and then numeric-aware request numbers deterministically', () => {
     const proposals = [
       { requestId: ids[0], requestNumber: 'R-10', score: { mean: 4.25 } },

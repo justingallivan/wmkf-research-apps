@@ -69,6 +69,13 @@ right for the applicant institution's East/West classification. Use the verified
 `account.wmkf_eastwest` field through `akoya_applicantid`, not state or name inference.
 Freeze it with the other card details; missing, unknown or older absent values show
 no letter. This is a deliberation cue, not an automatic score or funding adjustment.
+Owner addition (2026-10-07): a 24px solid circle at the lower right summarizes the
+frozen average reviewer rating with ten discrete red→orange→yellow→green colors.
+Map the raw mean from 1 through 5 to the nearest of ten equally spaced steps;
+missing/invalid/unscored means use gray. The hover text and accessible name give
+the numeric score. Matching colors indicate approximate strength, not an exact
+tie. Numeric score display, seed ordering and composite calculations are unchanged.
+
 The right side shows the sum of that proposal's full requested amount and all
 higher-ranked proposals in that program list. Reordering updates totals immediately.
 Published meeting rows additionally show named submitted PD positions and a

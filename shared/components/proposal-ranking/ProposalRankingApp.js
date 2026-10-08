@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Card, PageHeader } from '../Layout';
 import { conventionalCycles, cycleCodeToLabel, resolveWorkingCycle } from '../../../lib/utils/cycle-code';
 import { createOperationId, loadProposalRanking, sendProposalRankingAction } from './client';
-import { buildCumulativeTotals, errorMessage, formatMoney, formatScore, moveProposal, PROGRAMS } from './model';
+import { buildCumulativeTotals, errorMessage, formatMoney, formatScore, moveProposal, PROGRAMS, reviewerScoreIndicator } from './model';
 
 const EMPTY_CAPABILITIES = {
   preview: false, open: false, saveOwnList: false, submitOwnList: false,
@@ -40,6 +40,7 @@ function ProposalCardRow({ proposal, position, count, total, score, rank, editab
     ? formatMoney(total.cumulativeMinorUnits, proposal.currency, { incomplete: !total.complete })
     : 'Total incomplete';
   const rankNames = rank?.participants || [];
+  const scoreIndicator = reviewerScoreIndicator(proposal.score);
   return (
     <li
       className={`rounded-xl border border-gray-200 bg-white shadow-sm ${dragging ? 'opacity-50' : ''}`}
@@ -105,10 +106,19 @@ function ProposalCardRow({ proposal, position, count, total, score, rank, editab
               {!total?.complete && <p className="mt-1 text-xs text-amber-800">A requested amount is missing or incompatible.</p>}
             </div>
           </div>
-          {editable && <div className="mt-3 flex gap-2">
-            <button type="button" aria-label={`Move proposal ${proposal.requestNumber} up`} disabled={position === 0} onClick={() => onMove(position, position - 1)} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">Move up</button>
-            <button type="button" aria-label={`Move proposal ${proposal.requestNumber} down`} disabled={position >= count - 1} onClick={() => onMove(position, position + 1)} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">Move down</button>
-          </div>}
+          <div className="mt-3 flex items-center justify-between gap-3">
+            {editable ? <div className="flex gap-2">
+              <button type="button" aria-label={`Move proposal ${proposal.requestNumber} up`} disabled={position === 0} onClick={() => onMove(position, position - 1)} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">Move up</button>
+              <button type="button" aria-label={`Move proposal ${proposal.requestNumber} down`} disabled={position >= count - 1} onClick={() => onMove(position, position + 1)} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">Move down</button>
+            </div> : <span />}
+            <span
+              role="img"
+              aria-label={scoreIndicator.label}
+              title={scoreIndicator.label}
+              className="h-6 w-6 shrink-0 rounded-full border border-gray-600"
+              style={{ backgroundColor: scoreIndicator.color }}
+            />
+          </div>
         </div>
       </div>
     </li>

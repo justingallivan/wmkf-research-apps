@@ -192,3 +192,25 @@ No second review loop was run. Local verbatim receipt:
 `/private/tmp/ranking-geography-opus-review-authorized.txt` (not portable); this
 paragraph retains the verdict, scope and disposition. OAuth authentication was
 verified as `claude.ai`; API-key environment variables were removed.
+
+
+## Approximate reviewer-rating color — 2026-10-07
+
+The shared card displays a 24px lower-right circle using ten solid colors from red
+through yellow to green, from the frozen `score.mean`. `reviewerScoreIndicator` in
+`shared/components/proposal-ranking/model.js` selects
+`Math.round(((mean - 1) / 4) * 9)` for finite means in [1,5] with at least one rated
+review. Other inputs show gray. The numeric score remains visible and the circle
+has a named image role and hover text. Equal colors do not assert exact ties.
+This presentation mapping works independently of reviewer count; it does not
+change source reads, snapshots, displayed scores, seed ordering or composites.
+
+
+Validation: 126 tests in 12 ranking/Explorer suites pass; lint, types, Atlas and
+currency gates/self-tests pass. Isolated actual-component Chrome renders at 1100px
+and 390px verified all ten colors plus gray, 24px circle dimensions, editable and
+read-only placement, and no overflow. Luna built; Sol and one bounded subscription
+OAuth-only Opus source review approved. Opus's nonblocking tooltip-rounding note
+was corrected to use the same rounding as the visible score, with a regression
+for 4.35 → 4.4. No additional review loop or live data access was needed. Local
+review receipt: `/private/tmp/ranking-rating-opus-review.txt` (not portable).

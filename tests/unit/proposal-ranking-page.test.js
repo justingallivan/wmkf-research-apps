@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import ProposalRankingApp from '../../shared/components/proposal-ranking/ProposalRankingApp';
-import { buildCumulativeTotals, formatMoney, formatScore, moveProposal } from '../../shared/components/proposal-ranking/model';
+import { buildCumulativeTotals, formatMoney, formatScore, moveProposal, reviewerScoreIndicator } from '../../shared/components/proposal-ranking/model';
 import { conventionalCycles, resolveWorkingCycle } from '../../lib/utils/cycle-code';
 
 const mockLoad = jest.fn();
@@ -231,6 +231,22 @@ describe('Proposal Ranking page', () => {
     expect(screen.getAllByRole('img', { name: /institution$/ })).toHaveLength(2);
   });
 
+  test('renders the reviewer score circle without changing its numeric card score', async () => {
+    const response = roundResponse();
+    mockLoad.mockResolvedValue(response);
+    render(<ProposalRankingApp />);
+
+    const scored = await screen.findByRole('img', {
+      name: 'Average reviewer score: 4.2 out of 5 (approximate color)',
+    });
+    expect(scored).toHaveStyle({ backgroundColor: reviewerScoreIndicator(REQUESTS[0].score).color });
+    expect(scored).toHaveAttribute('title', 'Average reviewer score: 4.2 out of 5 (approximate color)');
+    expect(screen.getByText('4.2 · 3/3 rated')).toBeInTheDocument();
+
+    const unscored = await screen.findAllByRole('img', { name: 'Average reviewer score: unscored' });
+    expect(unscored[0]).toHaveStyle({ backgroundColor: '#9ca3af' });
+  });
+
   test('a facilitator who is a PD can save and submit only their own list', async () => {
     const response = roundResponse({ facilitator: true });
     response.viewer.systemUserId = 'pd-self';
@@ -344,6 +360,21 @@ describe('Proposal Ranking page', () => {
 });
 
 describe('proposal ranking list calculations', () => {
+  test('colors frozen raw reviewer means in ten steps and shows gray for unscored values', () => {
+    const steps = Array.from({ length: 10 }, (_, index) => reviewerScoreIndicator({
+      mean: 1 + (index * 4 / 9), ratedCount: 1, displayMean: 1,
+    }).color);
+    expect(new Set(steps).size).toBe(10);
+    expect(reviewerScoreIndicator({ mean: 4.35, displayMean: 4.4, ratedCount: 20 }).label)
+      .toBe('Average reviewer score: 4.4 out of 5 (approximate color)');
+    expect(reviewerScoreIndicator({ mean: 1, ratedCount: 1 }).color).toBe(steps[0]);
+    expect(reviewerScoreIndicator({ mean: 5, ratedCount: 1 }).color).toBe(steps[9]);
+    expect(reviewerScoreIndicator({ mean: 2.99, displayMean: 3, ratedCount: 2 }).color).toBe(steps[4]);
+    expect(reviewerScoreIndicator({ mean: 3, displayMean: 3, ratedCount: 0 }).label).toBe('Average reviewer score: unscored');
+    expect(reviewerScoreIndicator({ mean: null, ratedCount: 0 }).label).toBe('Average reviewer score: unscored');
+    expect(reviewerScoreIndicator({ mean: 5.1, ratedCount: 2 }).label).toBe('Average reviewer score: unscored');
+  });
+
   test('moves a proposal without mutating the source order', () => {
     const original = ['a', 'b', 'c'];
     expect(moveProposal(original, 0, 2)).toEqual(['b', 'c', 'a']);
