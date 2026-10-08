@@ -3,7 +3,7 @@ title: Deliberations Vocabulary — Options Sheet for the Group Decision
 domain: product
 kind: plan
 status: proposed
-summary: "One-page options sheet for the owner's after-D26 group decision on Staff Deliberations wording: the eight concepts, the variants in use with current counts, a suggested name for each, and the code names that stay unless the group chooses to migrate them. Pick up mid-November 2026."
+summary: "One-page options sheet for the owner's after-D26 group decision on Staff Deliberations wording: the eight concepts, the variants in use with current counts, a suggested name for each, and the code names that stay unless the group chooses to migrate them. Resurface on November 1, 2026."
 canonical: false
 owner: product-engineering
 related:
@@ -12,7 +12,7 @@ related:
 
 # Deliberations vocabulary: options sheet
 
-**Prepared 2026-10-08 (Session 584) for the owner. Pick up mid-November 2026** (owner request), ahead
+**Prepared 2026-10-08 (Session 584) for the owner. Resurface on November 1, 2026** (owner request), ahead
 of the group discussion after the D26 cycle. Nothing here is decided. The decision, and the record
 of it, belong in `docs/NOMENCLATURE_GLOSSARY.md` § "Deliberations workflow vocabulary", which holds
 the full inventory and the owner direction: settle the names as a group, then rename across the

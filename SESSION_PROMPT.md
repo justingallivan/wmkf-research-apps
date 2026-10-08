@@ -311,7 +311,7 @@ names were verified. Release/browser confirmation is recorded in the Atlas below
 
 ## Owner reminder (set 2026-10-07, Session 584)
 
-**Mid-November 2026:** remind the owner to pick up the deliberations vocabulary options sheet,
+**November 1, 2026:** remind the owner to pick up the deliberations vocabulary options sheet,
 `docs/plans/DELIBERATIONS_VOCABULARY_OPTIONS_2026-10-08.md`, before the after-D26 group decision.
 
 ---
