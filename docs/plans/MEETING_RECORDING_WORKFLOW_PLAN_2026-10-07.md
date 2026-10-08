@@ -63,6 +63,16 @@ Use per-host listing with an approved configured host list to avoid user-directo
 
 Proposed new module locations, not existing code: `lib/services/meeting-tracker-recordings/zoom-client.js` and `import-service.js`. First test uses one authorized recording and verifies imported bytes, sizes, media duration and file types before any transcription/provider call. No deletion in this pilot. Account access, credentials, provider data handling and test environment require authorization before execution.
 
+**Pilot result, 2026-10-08 [VERIFIED via `scripts/probe-zoom-recordings.mjs`, run locally with `.env.local`].** The admin created and activated the internal S2S app. The token grants `list_user_recordings:admin` and `list_recording_files:admin` (the second was added after the first run returned Zoom code 4711), plus an unrequested `list_user_recordings:master`. Approved pilot host: `wmk-library@wmkeck.org`. Findings for Stage 3:
+
+- All 13 recordings in the 30-day window share one Personal Meeting Room number and the generic title "WM Keck Foundation's Personal Meeting Room". The picker must show date/time, and the import must key on the occurrence UUID; titles cannot identify a visit.
+- Files per meeting: MP4 `shared_screen_with_speaker_view` (suffixed `(CC)` when captions exist), M4A `audio_only` and `timeline` JSON. Zoom's `audio_transcript` VTT, with `Name - Affiliation:` speaker labels, is present from 2026-09-30 onward but absent from the four Sep 28–29 meetings. `closed_caption` VTT and `chat_file` TXT appear on some meetings only; the sampled CC track began 24 minutes into the meeting. The timeline JSON carries timestamped active-speaker names, a possible speaker-reconciliation input not yet evaluated.
+- One meeting (Oct 5, 62 min, five files, 289 MB) downloaded with `Authorization: Bearer` on `download_url`, following a redirect. Every file's byte count matched Zoom `file_size`. MP4/M4A `mvhd` durations matched Zoom's `recording_start`/`recording_end` (3749 s); the transcript's last cue ended at 3746 s.
+- Without the bearer header, `download_url` still returns HTTP 200 with an HTML sign-in page. Import must reject HTML and verify size, not trust the status code.
+- `GET /meetings/{uuid}/recordings` works with double-encoded UUIDs that contain `/`, and reports the host as Zoom `host_id`, not email. The host allowlist must resolve approved emails to IDs.
+
+Downloaded bytes stayed in the session's temporary folder; nothing was written to SharePoint, Dataverse, Blob or Zoom, and no transcription or AI provider was called. Credentials exist only in local `.env.local`; Vercel provisioning needs separate approval.
+
 ### 1. UX commit using existing capabilities
 
 Edit `shared/components/meeting-tracker/RecordingAndTranscriptCard.js` and `tests/unit/recording-and-transcript-card.test.js`. Organize input, review and outputs without changing shared primitives or speaker services. Keep audio plus optional VTT together and distinguish captions for speaker matching from uploading a finished transcript. Surface both current transcript halves and the existing presentation summary by name. Do not display functioning controls for unbuilt features. Update the matching UX plan and later the new feature controls in their own commits.

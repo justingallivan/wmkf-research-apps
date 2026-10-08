@@ -146,6 +146,25 @@ manual platform invocations succeeded, but scheduled-time delivery has not
 been observed. The incomplete-maintenance warning email was accepted for
 delivery; receipt in the inbox is unverified.
 
+### Optional — Meeting Tracker Zoom recording import (local pilot only)
+
+Internal Server-to-Server OAuth app in WMKF's Zoom account for importing
+cloud recordings (`docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md`
+Stage 0). As of 2026-10-08 only the read-only local probe
+`scripts/probe-zoom-recordings.mjs` uses these, from `.env.local`; they are not
+set in any Vercel environment. Granted scopes:
+`cloud_recording:read:list_user_recordings:admin` and
+`cloud_recording:read:list_recording_files:admin` (the token also reports
+`cloud_recording:read:list_user_recordings:master`). Admin scopes reach every
+host in the account, so the application must enforce its own approved-host
+list; the pilot host is `wmk-library@wmkeck.org`.
+
+| Variable | Purpose | Where to get it |
+|----------|---------|-----------------|
+| `ZOOM_S2S_ACCOUNT_ID` | Zoom account ID for the `account_credentials` token grant | Zoom App Marketplace → Manage → the internal S2S app → App Credentials |
+| `ZOOM_S2S_CLIENT_ID` | S2S app client ID | Same page |
+| `ZOOM_S2S_CLIENT_SECRET` | S2S app client secret (secret) | Same page; regenerating it there invalidates the old value |
+
 ### Optional — Dynamics Explorer
 
 | Variable | Purpose | Source |
