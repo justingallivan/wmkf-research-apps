@@ -42,9 +42,20 @@ return 409. `speaker_alignment` is projected through an allowlist (status,
 attempts, code, per-speaker name, confidence and `basis` of `model` or `support`,
 suggestions, per-speaker `reasons` codes for IDs not applied, and `reassignedCount`;
 added 2026-10-04) and never exposes a pathname. `speaker_alignment.reassigned`
-(`{ utteranceIndex: speakerId }`) records Zoom-evidence reassignment of short
-misdiarized utterances; `getMeetingTranscriptionJobContent` applies it at the
-content read for every consumer and the transcript Blob is never rewritten. Local PostgreSQL 16 integration suites cover the fences (37 cases).
+(`{ utteranceIndex: speakerId }`) records Zoom-evidence speaker reassignment;
+`getMeetingTranscriptionJobContent` applies it at the content read for every
+consumer and the transcript Blob is never rewritten. **[BRANCH-BUILT 2026-10-07,
+`codex/meeting-transcript-fixes`; not deployed.]** Full-recording wording and timing
+checks now separate reused audio speaker IDs. `speaker_alignment.additionalSpeakerIds`
+is the server-only allowlist of generated `zoom_N` identities; names remain in
+`speaker_names` and `speaker_alignment.speakers`. Mixed IDs lose their global
+name; unresolved turns remain unnamed. The split is atomic with its names under
+the existing job lease/version fence, needs no migration, and retains the existing
+purge contract. The combined map is capped at 2,000 entries and the new result at
+32 KiB serialized JSON, reserving room for JSONB storage overhead under the existing
+64 KiB CHECK. Oversized splits fall back to unnamed mixed IDs, or a minimal abstention
+if even that result exceeds the bound. Preview, manual name editing, TXT/VTT and
+publication all consume the corrected content. Local PostgreSQL 16 integration suites cover the pre-existing fences (37 cases).
 Production enablement completed 2026-10-04: migration 065 applied, runtime merged
 as `c99f8d966`, and the `meeting-transcript.speaker-alignment` prompt row seeded
 (v1, `sonnet` tier); the first rehearsal ran on Request 1003222 the same day.
