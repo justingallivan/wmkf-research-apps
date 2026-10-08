@@ -1249,13 +1249,43 @@ describe('cancelling a queued transcription', () => {
     expect(screen.getByRole('button', CANCEL)).toBeInTheDocument();
   });
 
-  test.each(['submitting', 'processing', 'saving', 'submission_uncertain', 'ready', 'failed', 'expired', 'uploading'])('the control is absent for a %s run', async (status) => {
+  test.each(['submitting', 'submission_uncertain', 'ready', 'failed', 'expired', 'uploading'])('the control is absent for a %s run', async (status) => {
     route({ collection: collection({ jobs: [job({ status })] }), detail: detailFor({}) });
     const { container } = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     await screen.findByTestId('recording-and-transcript-card');
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
     expect(screen.queryByRole('button', CANCEL)).toBeNull();
     expect(container.textContent).not.toContain('Cancel this transcription');
+  });
+
+  test.each(['processing', 'saving'])('the control shows for a %s run and the confirmation says the service may still finish and bill', async (status) => {
+    globalThis.confirm = jest.fn(() => true);
+    route({ collection: collection({ jobs: [job({ status, version: 5 })] }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    fireEvent.click(await screen.findByRole('button', CANCEL));
+    expect(globalThis.confirm.mock.calls[0][0]).toMatch(/already with the transcription service, which may still finish it, and it may still be billed/);
+    expect(globalThis.confirm.mock.calls[0][0]).toMatch(/audio file you chose for it is deleted/);
+    await waitFor(() => expect(deleteCalls()).toHaveLength(1));
+    expect(JSON.parse(deleteCalls()[0][1].body)).toEqual({ expectedVersion: 5 });
+  });
+
+  test('the queued confirmation is unchanged', async () => {
+    globalThis.confirm = jest.fn(() => false);
+    route({ collection: collection({ jobs: [job({ status: 'queued' })] }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    fireEvent.click(await screen.findByRole('button', CANCEL));
+    expect(globalThis.confirm.mock.calls[0][0]).not.toMatch(/billed/);
+  });
+
+  test.each(['processing', 'saving'])('a %s run being cancelled shows Cancelling, has no cancel button, and still blocks a new run', async (status) => {
+    route({ collection: collection({ jobs: [job({ status, cleanupPending: true })] }), detail: detailFor({}) });
+    const { container } = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    const progress = await screen.findByTestId('transcript-progress');
+    expect(progress.textContent).toContain('Cancelling this transcription');
+    expect(progress.textContent).not.toMatch(/Transcribing|Saving transcript/);
+    expect(screen.queryByRole('button', CANCEL)).toBeNull();
+    expect(container.textContent).not.toContain('Cancel this transcription');
+    expect(screen.queryByTestId('generate-form')).toBeNull();
   });
 
   test('a cancelled run does not block a replacement, shows as cancelled, and has no cancel button', async () => {

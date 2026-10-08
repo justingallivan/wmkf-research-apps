@@ -518,7 +518,7 @@ source, not a proven live schedule. Deletion targets only exact persisted paths 
 provider transcript IDs. A requested DELETE immediately blocks further content
 access but does not cancel remote work, claim successful erasure, or release an
 unknown active slot. Transient cleanup failures retain exact tombstones for
-retry. Keep `TRANSCRIPTION_PILOT_ENABLED` and
+retry. Staff "Cancel this transcription" (the same DELETE) is offered for `queued`, `processing` and `saving` runs (owner decision 2026-10-08): AssemblyAI may still finish and bill the work, and the run holds its slot until cleanup turns it `failed`; `submitting` and `submission_uncertain` are not offered. Keep `TRANSCRIPTION_PILOT_ENABLED` and
 `TRANSCRIPTION_SUBMISSIONS_ENABLED` disabled when pausing user work; do not
 disable the cleanup/recovery drain if deployed jobs still require cleanup.
 
