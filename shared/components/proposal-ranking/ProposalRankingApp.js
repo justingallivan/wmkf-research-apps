@@ -3,7 +3,7 @@ import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
 import { Button, Card, PageHeader } from '../Layout';
 import { conventionalCycles, cycleCodeToLabel, resolveWorkingCycle } from '../../../lib/utils/cycle-code';
 import { createOperationId, loadProposalRanking, sendProposalRankingAction } from './client';
-import { buildCumulativeTotals, errorMessage, formatMoney, formatScore, moveProposal, PROGRAMS, reviewerScoreIndicator } from './model';
+import { buildCumulativeTotals, errorMessage, formatMoney, moveProposal, PROGRAMS, reviewerScoreIndicator } from './model';
 
 const EMPTY_CAPABILITIES = {
   preview: false, open: false, saveOwnList: false, submitOwnList: false,
@@ -91,7 +91,7 @@ function ProposalCardRow({ proposal, position, count, total, score, rank, editab
                       className="inline-flex min-w-7 items-center justify-center rounded-md bg-gray-100 px-2 py-0.5 font-semibold text-gray-800"
                     >{grade}</span>))
                   : <span className="text-gray-500">Not scored</span>}
-                {proposal.score?.ratedCount > 0 && <span className="ml-1 text-gray-600">{formatScore(proposal.score)}</span>}
+                {proposal.score?.ratedCount > 0 && Number.isFinite(proposal.score?.displayMean) && <span title="Average reviewer grade" aria-label={`Average reviewer grade: ${proposal.score.displayMean.toFixed(1)}`} className="ml-1 inline-flex min-w-7 items-center justify-center rounded-md bg-gray-100 px-2 py-0.5 font-semibold text-gray-800">{proposal.score.displayMean.toFixed(1)}</span>}
               </div>
               {rankNames.length > 0 && (
                 <ul aria-label="PD ranks" className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-700">

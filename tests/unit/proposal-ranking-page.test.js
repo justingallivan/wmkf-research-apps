@@ -644,7 +644,10 @@ test('shows each external review as an inline letter grade without a distributio
   expect(within(own).getAllByText('Reviews')).toHaveLength(4);
   expect(within(own).getAllByLabelText('Excellent')).toHaveLength(2);
   expect(within(own).getByLabelText('Good')).toHaveTextContent('G');
-  const average = within(own).getByText('4.2 · 3/3 rated');
+  const average = within(own).getByLabelText('Average reviewer grade: 4.2');
+  expect(average).toHaveTextContent(/^4\.2$/);
+  expect(average).toHaveClass('font-semibold', 'bg-gray-100');
+  expect(within(own).queryByText(/3\/3 rated/)).not.toBeInTheDocument();
   expect(average.parentElement).toHaveTextContent('Reviews');
   expect(within(own).getByLabelText('Good').compareDocumentPosition(average) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(within(own).queryByText('Review score:')).not.toBeInTheDocument();
