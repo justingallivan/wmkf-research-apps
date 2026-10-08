@@ -1,5 +1,32 @@
 # Session 586 Prompt: resume office transcript work and Proposal Ranking rehearsal
 
+## Session 586 — Meeting recording workflow merged (PR #464), 2026-10-08 (Claude)
+
+**Current transcript-workflow handoff; the Session 584 planning handoff below is historical.**
+[PR #464](https://github.com/justingallivan/wmkf-research-apps/pull/464) merged `codex/meeting-transcript-ux` to main. It carries Stages 0, 1 and 3a of `docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md`.
+
+- **Stage 0, Zoom access.** The admin created the internal S2S OAuth app. It grants `cloud_recording:read:list_user_recordings:admin` and `cloud_recording:read:list_recording_files:admin`, plus an unrequested `:master` variant. The approved host is `wmk-library@wmkeck.org`, and every recording sits in one Personal Meeting Room with a generic title. `scripts/probe-zoom-recordings.mjs` is a read-only probe. The pilot meeting's downloaded files are in the Session 586 scratchpad only.
+- **Stage 1, step-by-step card.** The card reads 1 Get the recording, 2 Check speaker names and where the presentation ends, 3 Results. It adds Open links for both transcript halves.
+- **Stage 3a, Import from Zoom** (`docs/plans/ZOOM_RECORDING_IMPORT_PLAN_2026-10-08.md`). It imports one meeting's audio and Zoom `audio_transcript` VTT into the existing transcription pipeline. It adds the table `zoom_recording_imports`, the routes `GET …/zoom-recordings` and `POST …/zoom-imports`, and the store function `retireMeetingUploadingJob`. The plan was built by a Sonnet agent and reviewed by Claude. It then went through three Codex adversarial passes: a high and a medium finding, both fixed, then approval. Before merge, 1,026 related tests and all CI checks passed.
+- **Production state** [VERIFIED via read-only `schema_migrations` read]:
+  - Migration 074 is applied, run by the owner with `applied_by` `claude-s586-zoom-import-2026-10-08`. **The next free migration number is 075.**
+  - The owner set `ZOOM_S2S_ACCOUNT_ID`, `ZOOM_S2S_CLIENT_ID` and `ZOOM_S2S_CLIENT_SECRET` in Vercel Production only and redeployed.
+  - `ZOOM_RECORDING_HOSTS` is **unset**, so the import is hidden.
+
+**Next, with the owner:**
+1. Set `ZOOM_RECORDING_HOSTS=wmk-library@wmkeck.org` in Production and redeploy.
+2. Import one non-sensitive past site visit. This spends one transcription. Verify the Zoom audio passes the start-time audio inspection, that the import finishes within the 300 s route limit, that speaker names come from the Zoom transcript, and that steps 2 and 3 work.
+3. If anything is wrong, unset `ZOOM_RECORDING_HOSTS` to hide the import.
+
+**Not started:**
+- Stage 3b: copying the MP4 into SharePoint, which needs a background job.
+- Stage 2: paired summaries, which needs a Dataverse artifact type, a migration and a new prompt.
+- Stage 4: video split.
+- Stage 5: retention and deletion.
+
+Owner follow-up option: hide re-summarize controls behind "Summarize again" once a current summary is published.
+
+
 ## Session 585 close — Proposal Ranking office handoff (2026-10-08)
 
 **Current ranking handoff; older ranking checkpoints below are historical.**
@@ -66,8 +93,8 @@ remains recorded. Root instructions need no change for this local-only script.
 ## Owner plan for 2026-10-08 (set by the owner, Session 584)
 
 Work on two things, on the other computer:
-1. **Meeting Tracker transcript workflow:** resume `codex/meeting-transcript-ux` (pushed at
-   `3fa20089f`; planning only, nothing merged). Handoff directly below. The owner meets WMKF's
+1. **Meeting Tracker transcript workflow:** done in Session 586; see the PR #464 section at the top. (Originally: resume `codex/meeting-transcript-ux` (pushed at
+   `3fa20089f`; planning only, nothing merged).) Handoff directly below. The owner meets WMKF's
    Zoom administrator the morning of 2026-10-08.
 2. **Proposal Ranking:** resume the isolated rehearsal using the current office handoff
    at the top of this file and `codex/proposal-ranking` / draft PR #463. Preserve both
@@ -81,7 +108,9 @@ git worktree add ../WMKF_Apps-codex-transcript-ux -b codex/meeting-transcript-ux
 Then add the per-machine pieces: `.agents/skills` symlink to `../.claude/skills`, a `.env.local`
 symlink to the main checkout's, and `npm install` (revert any `package-lock.json` churn).
 
-## Session 584 transcript UX planning handoff — October 7, 2026 (Codex)
+## Historical: Session 584 transcript UX planning handoff — October 7, 2026 (Codex)
+
+*Superseded by the Session 586 PR #464 section at the top. The Zoom admin meeting happened, and Stages 0, 1 and 3a are merged.*
 
 **[VERIFIED via remote Git refs]** Planning branch `codex/meeting-transcript-ux` is pushed at `3fa20089f389acfb59b000628df9831c8a1439d3`. The branch contains the implementation plan, two-slide Zoom admin brief and detailed handoff. This main handoff does not merge the branch or enable any new runtime behavior.
 

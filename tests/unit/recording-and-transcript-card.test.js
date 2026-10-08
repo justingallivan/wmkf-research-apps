@@ -72,7 +72,7 @@ test('the visit fragment scrolls to the card once after it mounts', async () => 
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
   await screen.findByTestId('recording-and-transcript-card');
   await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
-  fireEvent.click(screen.getByRole('button', { name: 'Upload a transcript' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Upload a finished transcript instead' }));
   expect(scrollIntoView).toHaveBeenCalledTimes(1);
 });
 
@@ -234,7 +234,7 @@ test('an uploaded transcript with no source bundle shows no editor and says name
   expect(screen.queryByLabelText(/Name for Speaker/)).not.toBeInTheDocument();
 });
 
-test('when transcription is not enabled, Generate is disabled with the reason and uploading a transcript still works', async () => {
+test('when transcription is not enabled, step 1 states the reason and offers the transcript upload directly', async () => {
   const state = { collection: collection({ featureState: 'disabled', jobs: [], currentArtifact: null }), detail: detailFor({}) };
   const uploaded = transcriptRow({ filename: 'zoom.vtt' });
   route(state, {
@@ -243,10 +243,9 @@ test('when transcription is not enabled, Generate is disabled with the reason an
   });
   put.mockResolvedValue({});
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-  const generate = await screen.findByRole('button', { name: 'Generate from audio' });
-  await waitFor(() => expect(generate).toBeDisabled());
-  expect(screen.getByText('Not enabled for this request')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Upload a transcript' }));
+  expect(await screen.findByText('Not enabled for this request')).toBeInTheDocument();
+  expect(screen.queryByLabelText(/Audio file/)).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Start transcription' })).not.toBeInTheDocument();
   const file = new File(['WEBVTT\n\n'], 'zoom.vtt', { type: 'text/vtt' });
   fireEvent.change(screen.getByLabelText(/Transcript file/), { target: { files: [file] } });
   fireEvent.click(screen.getByRole('button', { name: 'Upload transcript' }));
@@ -329,11 +328,14 @@ test('a generated transcript with no collection is not labelled uploaded', async
   expect(screen.queryByText(/cannot be edited here/)).not.toBeInTheDocument();
 });
 
-test('the summary section remains visible with no transcript and explains the first prerequisite', async () => {
+test('with no transcript, the results step explains what comes first instead of listing empty products', async () => {
   route({ materials: [], collection: collection({ jobs: [], currentArtifact: null }), detail: detailFor({}) });
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-  expect(await screen.findByTestId('presentation-summary-block')).toBeInTheDocument();
-  expect(screen.getByText('Add a transcript first. Upload a transcript file or generate one from audio.')).toBeInTheDocument();
+  const results = await screen.findByTestId('step-results');
+  expect(within(results).getByText(/appear here after step 2/)).toBeInTheDocument();
+  expect(screen.queryByTestId('presentation-summary-block')).not.toBeInTheDocument();
+  expect(within(screen.getByTestId('step-review')).getByText('Waiting for a transcript from step 1.')).toBeInTheDocument();
+  expect(within(results).getByTestId('presentation-link-controls')).toBeInTheDocument();
 });
 
 test('a manual transcript keeps the summary task visible but explains that timed generated turns are required', async () => {
@@ -353,8 +355,7 @@ test('finalize 422 transcript_text_invalid shows the server message and no Retry
   });
   put.mockResolvedValue({});
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Upload a transcript' }));
-  fireEvent.change(screen.getByLabelText(/Transcript file/), { target: { files: [new File(['x'], 'chat.txt', { type: 'text/plain' })] } });
+  fireEvent.change(await screen.findByLabelText(/Transcript file/), { target: { files: [new File(['x'], 'chat.txt', { type: 'text/plain' })] } });
   fireEvent.click(screen.getByRole('button', { name: 'Upload transcript' }));
   expect(await screen.findByText(message)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /retry|finish transcript/i })).not.toBeInTheDocument();
@@ -421,7 +422,7 @@ test('a 409 closing an attempt keeps the Refresh affordance after the reload', a
   const state = { collection: collection({ jobs: [], publications: [{ operationId: OP_ID, state: 'unknown', version: 1, createdAt: '2020-01-01T00:00:00.000Z', quarantineUntil: '2020-01-02T00:00:00.000Z', inputJobId: 'x', resultingDocumentId: 'y' }] }), detail: detailFor({}) };
   route(state, { [`/publications/${OP_ID}/close`]: { respond: () => response({ code: 'conflict', message: 'stale' }, 409) } });
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-  fireEvent.click(await screen.findByRole('checkbox'));
+  fireEvent.click(within(await screen.findByTestId('needs-attention')).getByRole('checkbox'));
   fireEvent.click(screen.getByRole('button', { name: 'Close this attempt' }));
   expect(await screen.findByText(/Another session changed this/)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
@@ -1164,5 +1165,74 @@ describe('presentation summary', () => {
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     expect(await screen.findByText(/remains available to staff; it is withheld from the Board link/)).toBeInTheDocument();
     expect(screen.getByTestId('presentation-summary-block').textContent).not.toContain(DRAFT_ID);
+  });
+});
+
+describe('step-by-step layout', () => {
+  const stepState = (id) => screen.getByTestId(id).getAttribute('data-step-state');
+
+  test('a visit with no transcript opens step 1 with the audio form and leaves later steps waiting', async () => {
+    route({ materials: [], collection: collection({ jobs: [], currentArtifact: null }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByLabelText(/Audio file/)).toBeInTheDocument();
+    expect(stepState('step-recording')).toBe('current');
+    expect(stepState('step-review')).toBe('waiting');
+    expect(stepState('step-results')).toBe('waiting');
+    expect(within(screen.getByTestId('step-review')).getByText('Waiting for a transcript from step 1.')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Transcript file/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Replace audio or transcript' })).not.toBeInTheDocument();
+  });
+
+  test('a finished visit collapses steps 1 and 2 and opens each result by name', async () => {
+    const presentation = { artifactId: 'pres-1', artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT, backing: 'file', filename: 'presentation.txt', webUrl: 'https://example.sharepoint.com/presentation.txt' };
+    const discussion = { artifactId: 'disc-1', artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT, backing: 'file', filename: 'discussion.txt', webUrl: 'https://example.sharepoint.com/discussion.txt' };
+    const recording = { artifactId: 'rec-1', artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING, backing: 'external', createdAt: '2026-10-04T21:00:00.000Z', externalUrl: 'https://zoom.us/rec/share/abc' };
+    route({ materials: [transcriptRow(), presentation, discussion, recording], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByText('Presentation transcript ready for the Board link.')).toBeInTheDocument();
+    expect(stepState('step-recording')).toBe('done');
+    expect(stepState('step-review')).toBe('done');
+    expect(stepState('step-results')).toBe('current');
+    expect(screen.queryByLabelText(/Audio file/)).not.toBeInTheDocument();
+    const results = screen.getByTestId('step-results');
+    const opens = within(results).getAllByRole('link', { name: 'Open' }).map((link) => link.getAttribute('href'));
+    expect(opens).toEqual([presentation.webUrl, discussion.webUrl]);
+    expect(within(results).getByText('Staff discussion transcript saved for staff.')).toBeInTheDocument();
+    expect(within(results).getByRole('link', { name: 'Open recording' })).toHaveAttribute('href', recording.externalUrl);
+    expect(within(results).getByRole('link', { name: 'Download TXT' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Replace audio or transcript' }));
+    expect(screen.getByLabelText(/Audio file/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Replace recording' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByLabelText(/Audio file/)).not.toBeInTheDocument();
+  });
+
+  test('a chosen audio file keeps step 1 open even though a transcript exists', async () => {
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Replace audio or transcript' }));
+    fireEvent.change(screen.getByLabelText(/Audio file/), { target: { files: [new File(['a'], 'visit.m4a', { type: 'audio/mp4' })] } });
+    expect(await screen.findByText(/visit\.m4a/)).toBeInTheDocument();
+    expect(stepState('step-recording')).toBe('current');
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Audio file/)).toBeInTheDocument();
+  });
+
+  test('an uploaded transcript explains in step 2 why it cannot be checked or split', async () => {
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: { id: ARTIFACT_ID, bundleEditable: false } }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    const review = await screen.findByTestId('step-review');
+    expect(await within(review).findByText(/cannot be checked or split here/)).toBeInTheDocument();
+    expect(within(review).queryByRole('button', { name: 'Edit speaker names' })).not.toBeInTheDocument();
+    expect(stepState('step-review')).toBe('waiting');
+  });
+
+  test('a stale presentation transcript sends the user back to step 2 to regenerate', async () => {
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact({ presentationTranscript: { state: 'stale', artifactId: ARTIFACT_ID } }) }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByText('Presentation transcript is out of date. Generate it again in step 2.')).toBeInTheDocument();
+    expect(stepState('step-review')).toBe('current');
+    expect(within(screen.getByTestId('step-review')).getByRole('button', { name: 'Generate presentation and discussion transcripts' })).toBeInTheDocument();
+    expect(within(screen.getByTestId('step-results')).queryByRole('link', { name: 'Open' })).not.toBeInTheDocument();
   });
 });

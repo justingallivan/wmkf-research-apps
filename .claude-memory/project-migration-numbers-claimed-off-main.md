@@ -1,8 +1,8 @@
 ---
 name: project-migration-numbers-claimed-off-main
-description: "Before picking a Postgres migration number, check shared Production `schema_migrations` and numbers claimed on unmerged branches. 055 and 070 were applied to Production before merging; as of 2026-10-05 main ends at 071 (067, 070 and 071 all applied before or at merge) and the next free number is 072."
+description: "Before picking a Postgres migration number, check shared Production `schema_migrations` and numbers claimed on unmerged branches. 055, 070, 071 and 074 were applied to Production before merging; as of 2026-10-08 Production and main end at 074 (PR #464) and the next free number is 075."
 status: active
-last_verified: 2026-10-05 via lib/db/migrations on main (68 files, ends at 069) and a scan of every remote branch for 065-079
+last_verified: 2026-10-08 via read-only Production schema_migrations read (070-074 present) and a scan of every remote branch for 074-079
 metadata:
   type: project
 ---
@@ -68,6 +68,10 @@ origin/main`, 2026-09-30]. The episode shows why "the next number after
   067 has since merged to `main` in PR #432 (2026-10-05); commit `81fcfae6c` records it as
   applied to Production. 070 merged in PR #440. 071 (`071_summary_draft_slides_identity.sql`) merged in
   PR #441 and was applied before merge (owner run 2026-10-05: 1 applied, 70 skipped,
-  71 total). `main` now ends at 071; the next free number is 072.
+  71 total). 072 and 073 merged to `main` afterwards (Final Writeup handoff emails and digests).
+- [VERIFIED 2026-10-08, read-only `schema_migrations` read] Production held 070–073. 074
+  (`074_zoom_recording_imports.sql`, Zoom recording import) was applied by the owner's `!` run from
+  `codex/meeting-transcript-ux` before merge: 1 applied, 73 skipped, `applied_by`
+  `claude-s586-zoom-import-2026-10-08`. It merged to `main` in PR #464. The next free number is 075.
 - Auto-mode permissions block Claude from running `apply-migrations.js` against
   the shared database even with owner authorization; the owner runs it with `!`.
