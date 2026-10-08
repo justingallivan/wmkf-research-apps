@@ -701,3 +701,18 @@ test('uses the linked project title, a prominent rank and a program badge withou
   expect(own).not.toHaveTextContent('Position');
   expect(within(own).queryByRole('link', { name: /Open proposal/ })).not.toBeInTheDocument();
 });
+
+
+test('shows the fractional average after PD ranks in a matching colored badge', async () => {
+  const response = roundResponse({ published: true });
+  response.programs.se.meeting.composite.scores['request-1'].averageRank = 2.5;
+  mockLoad.mockResolvedValue(response);
+  render(<ProposalRankingApp />);
+  const ranks = await screen.findByRole('list', { name: 'PD ranks' });
+  const average = within(ranks).getByLabelText('Average PD rank: 2.50');
+  expect(average).toHaveTextContent('2.50');
+  expect(average).toHaveStyle({ backgroundColor: '#eab30833' });
+  expect(within(ranks).getAllByRole('listitem').at(-1)).toHaveTextContent('Average2.50');
+  expect(screen.queryByText('Composite:')).not.toBeInTheDocument();
+  expect(pdRankColor(2.5, 4)).toBe('#eab308');
+});

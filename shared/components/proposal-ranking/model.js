@@ -25,7 +25,7 @@ export function reviewerScoreIndicator(score) {
 
 /** Rank colors use the same palette as review scores, with first place best. */
 export function pdRankColor(rank, programCount) {
-  if (!Number.isInteger(rank) || !Number.isInteger(programCount) || programCount < 1 || rank < 1 || rank > programCount) return UNSCORED_REVIEWER_SCORE_COLOR;
+  if (!Number.isFinite(rank) || !Number.isInteger(programCount) || programCount < 1 || rank < 1 || rank > programCount) return UNSCORED_REVIEWER_SCORE_COLOR;
   const fraction = programCount === 1 ? 1 : (programCount - rank) / (programCount - 1);
   return REVIEWER_SCORE_COLORS[Math.round(fraction * (REVIEWER_SCORE_COLORS.length - 1))];
 }

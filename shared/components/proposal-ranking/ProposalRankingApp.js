@@ -80,7 +80,6 @@ function ProposalCardRow({ proposal, position, programCount, total, score, rank,
               {proposal.leadName && <p className="mt-1 text-sm text-gray-600">Lead PD: {proposal.leadName}</p>}
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                 <span><span className="font-medium text-gray-700">Requested:</span> {amount}</span>
-                {score && <span><span className="font-medium text-gray-700">Composite:</span> {score.averageRank.toFixed(2)}{score.tied ? ' · tied' : ''}</span>}
                 {rank?.disagreement && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">Disagreement</span>}
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-1.5 text-sm">
@@ -102,6 +101,11 @@ function ProposalCardRow({ proposal, position, programCount, total, score, rank,
                     {entry.name.trim().split(/\s+/)[0] || 'PD'}
                     <span aria-label={`${entry.name}: rank ${entry.rank} of ${programCount}`} style={{ backgroundColor: `${pdRankColor(entry.rank, programCount)}33` }} className="inline-flex min-w-7 items-center justify-center rounded-md px-2 py-0.5 font-semibold text-gray-900">{entry.rank}</span>
                   </li>)}
+                  {score && <li className="flex items-center gap-1.5 font-semibold">
+                    Average
+                    <span aria-label={`Average PD rank: ${score.averageRank.toFixed(2)}`} title={`Average PD rank within ${proposal.programKey.toUpperCase()}${score.tied ? ' · tied' : ''}`} style={{ backgroundColor: `${pdRankColor(score.averageRank, programCount)}33` }} className="inline-flex min-w-7 items-center justify-center rounded-md px-2 py-0.5 font-semibold text-gray-900">{score.averageRank.toFixed(2)}</span>
+                    {score.tied && <span className="text-xs font-normal text-gray-500">tied</span>}
+                  </li>}
                 </ul>
               )}
 
