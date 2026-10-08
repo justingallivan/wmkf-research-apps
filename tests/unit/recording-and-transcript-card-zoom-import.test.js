@@ -253,3 +253,56 @@ test('a meeting whose transcription did not finish shows plain copy and can be c
   expect(within(panel).getByText('62 min · Audio + Zoom transcript · Last transcription did not finish')).toBeInTheDocument();
   expect(within(panel).getByRole('radio', { name: /Oct 5/ })).toBeEnabled();
 });
+
+const uploadingJob = (over = {}) => ({ id: JOB_ID, status: 'uploading', version: 2, created_at: '2026-10-04T20:00:00.000Z',
+  expires_at: new Date(Date.now() + 3_600_000).toISOString(), original_filename: 'Zoom 2026-10-05.m4a', label: 'Uploading',
+  needsAttention: false, contentAccessAllowed: false, cleanupPending: false, speaker_names: {}, ...over });
+
+describe('a stranded uploading job does not block step 1', () => {
+  test.each([
+    ['a retired job (cleanupPending)', { cleanupPending: true }],
+    ['a job past its upload window', { expires_at: new Date(Date.now() - 1000).toISOString() }],
+    ['a live uploading job this browser did not start', {}],
+  ])('%s leaves the audio form and the Zoom import available with no Uploading progress', async (_label, over) => {
+    route({ collection: collection({ jobs: [uploadingJob(over)] }) }, { '/zoom-recordings': { respond: () => response(zoomList()) } });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByTestId('generate-form')).toBeInTheDocument();
+    expect(screen.queryByTestId('transcript-progress')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Uploading /)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Import from Zoom' }));
+    const panel = await screen.findByTestId('zoom-import');
+    fireEvent.click(within(panel).getByRole('radio', { name: /Oct 5/ }));
+    fireEvent.click(within(panel).getByRole('checkbox'));
+    expect(within(panel).getByRole('button', { name: 'Import and transcribe' })).toBeEnabled();
+  });
+
+  test('a queued job still blocks and shows progress', async () => {
+    route({ collection: collection({ jobs: [uploadingJob({ status: 'queued' })] }) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByTestId('transcript-progress')).toBeInTheDocument();
+    expect(screen.queryByTestId('generate-form')).not.toBeInTheDocument();
+  });
+});
+
+test('while this browser is uploading, a live uploading job shows progress but a retired one does not', async () => {
+  const hold = new Promise(() => {});
+  const original = globalThis.crypto?.randomUUID;
+  Object.defineProperty(globalThis.crypto, 'randomUUID', { configurable: true, value: () => '99999999-9999-4999-8999-999999999999' });
+  const run = async (jobOver) => {
+    route({ collection: collection({ jobs: [uploadingJob(jobOver)] }) }, { '/transcriptions': { method: 'POST', respond: () => hold } });
+    const view = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    const form = await screen.findByTestId('generate-form');
+    const file = new File(['abc'], 'a.m4a', { type: 'audio/mp4' });
+    fireEvent.change(within(form).getByLabelText(/Audio file/), { target: { files: [file] } });
+    fireEvent.click(within(form).getByRole('checkbox'));
+    fireEvent.click(within(form).getByRole('button', { name: 'Start transcription' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Continue without it' }));
+    await waitFor(() => expect(global.fetch.mock.calls.some(([, o]) => o?.method === 'POST')).toBe(true));
+    const shown = screen.queryByTestId('transcript-progress') !== null;
+    view.unmount();
+    return shown;
+  };
+  expect(await run({})).toBe(true);
+  expect(await run({ cleanupPending: true })).toBe(false);
+  Object.defineProperty(globalThis.crypto, 'randomUUID', { configurable: true, value: original });
+});

@@ -882,6 +882,11 @@ const API_PATH = '/api/meeting-tracker/visits';
 const MAX_VTT_BYTES = 4_000_000;
 const ALIGNMENT_ACTIVE = new Set(['pending', 'running']);
 const ACTIVE_STATUSES = new Set(['uploading', 'queued', 'submitting', 'processing', 'saving']);
+const BLOCKING_STATUSES = new Set(['queued', 'submitting', 'processing', 'saving']);
+function isRetiredUploading(job) {
+  return job.status === 'uploading' && (job.cleanupPending === true
+    || (job.expires_at != null && new Date(job.expires_at).getTime() <= Date.now()));
+}
 const UNRESOLVED_PUBLICATION = new Set(['publishing', 'retryable', 'unknown', 'published_reconcile']);
 const PUBLISHED_FOR_JOB = new Set(['published', 'published_reconcile', 'unknown']);
 const ALIGNMENT_REASONS = {
@@ -2497,7 +2502,12 @@ function TranscriptWorkflow({ m, t, z, transcriptInputRef }) {
   const openUrl = material ? safeMaterialUrl(material) : null;
   const featureEnabled = t.collection?.featureState === 'enabled';
   const generateReason = !t.collection ? 'Not available right now' : !featureEnabled ? 'Not enabled for this request' : null;
-  const active = t.jobs.find((job) => ACTIVE_STATUSES.has(job.status)) || null;
+  // Only queued or running work blocks step 1. A stranded 'uploading' job (failed import or abandoned upload) never
+  // does; it only shows progress while this browser is uploading and the job is not retired or past its window.
+  const active = t.jobs.find((job) => BLOCKING_STATUSES.has(job.status)) || null;
+  const uploadingHere = ['upload', 'upload-captions', 'starting'].includes(t.busy)
+    ? t.jobs.find((job) => job.status === 'uploading' && !isRetiredUploading(job)) || null : null;
+  const progressJob = active || uploadingHere;
   const editing = Boolean(t.correction);
   const presentationEnd = artifact?.presentationEnd && Number.isSafeInteger(artifact.presentationEnd.endMs) ? artifact.presentationEnd : null;
   const boundaryState = artifact?.presentationTranscript?.state;
@@ -2558,9 +2568,9 @@ function TranscriptWorkflow({ m, t, z, transcriptInputRef }) {
               : 'No recording yet'}
           </p>
         </div>
-        {active && !editing && (
+        {progressJob && !editing && (
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-800" aria-live="polite" data-testid="transcript-progress">
-            <p>{PROGRESS_VERBS[active.status]} {displayName(active)}{active.created_at ? ` · started ${fmtTime(active.created_at)}` : ''}</p>
+            <p>{PROGRESS_VERBS[progressJob.status]} {displayName(progressJob)}{progressJob.created_at ? ` · started ${fmtTime(progressJob.created_at)}` : ''}</p>
             <button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={BTN}>{t.loading ? 'Refreshing…' : 'Refresh'}</button>
           </div>
         )}
