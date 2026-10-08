@@ -24,7 +24,7 @@ Implementation notes that refine this plan:
 - A Zoom transcript over the 4,000,000-byte cap is treated as absent (audio imports alone); audio over the 200 MiB cap is `zoom_audio_too_large` (422) before any claim.
 - `GET zoom-recordings` rejects a non-integer or out-of-range `days` (400) rather than clamping it.
 - If the final `started` update itself fails after the job was queued, the row is left `importing` (not marked failed) so the lease-expiry lookup resolves it to `started`; the response then reports state `importing`.
-- If `startMeetingTranscription` queued the job but then threw, the row is marked `failed` as specified, so a retry creates a second job; staff should check the transcription list before retrying a failed import.
+- If anything throws after the job left `uploading` (for example `startMeetingTranscription` queued it and then threw), the row is marked `started` with that job instead of `failed`; if the job cannot be read, the row is left `importing` and the original error is rethrown, so no retry creates a second paid job.
 
 ## Scope and authority
 
@@ -123,7 +123,7 @@ CREATE INDEX IF NOT EXISTS idx_zoom_recording_imports_request_recent
 
 - `started` does not require `transcription_job_id`, because the FK nulls it when a job is purged.
 - The row stores identifiers only: no content, URLs, tokens, topics or names.
-- Re-importing a meeting after its transcription is finished is allowed only after the earlier row is `failed`. A `started` row blocks duplicates for the same request; staff use the existing transcription controls instead.
+- Re-importing a meeting after its transcription is finished is allowed only after the earlier row is `failed`. A `started` row blocks duplicates for the same request while its job is live; when the job is `failed`, `expired` or missing, the row is marked `failed` (`zoom_import_job_ended`) and the meeting can be imported again. A `ready` or `submission_uncertain` job still blocks, to avoid duplicate spend.
 - Retention of these rows follows later Stage 5 work and is recorded as open.
 - The store module is `lib/services/meeting-tracker-recordings/import-store.js` and uses parameterized SQL only.
 

@@ -16,7 +16,7 @@ jest.mock('../../lib/services/meeting-tracker-recordings/import-store.js', () =>
   ...jest.requireActual('../../lib/services/meeting-tracker-recordings/import-store.js'),
   claimZoomImport: jest.fn(), getActiveZoomImport: jest.fn(), findJobForImport: jest.fn(),
   takeOverExpiredAsStarted: jest.fn(), takeOverExpiredAsFailed: jest.fn(),
-  markZoomImportStarted: jest.fn(), markZoomImportFailed: jest.fn(), listZoomImportsForRequest: jest.fn(),
+  releaseStartedImportWithEndedJob: jest.fn(), markZoomImportStarted: jest.fn(), markZoomImportFailed: jest.fn(), listZoomImportsForRequest: jest.fn(),
 }));
 
 import { requireMeetingTranscriptionEnabled } from '../../lib/services/meeting-tracker-transcription/policy.js';
@@ -90,6 +90,12 @@ function installFakeStore() {
     Object.assign(r, { state: 'failed', failure_code: failureCode, lease_token: null, lease_expires_at: null, lease_expired: false });
     return { ...r };
   });
+  store.releaseStartedImportWithEndedJob.mockImplementation(async ({ id, jobId }) => {
+    const r = rows.get(id);
+    if (!r || r.state !== 'started' || (r.transcription_job_id ?? null) !== (jobId ?? null)) return null;
+    Object.assign(r, { state: 'failed', failure_code: 'zoom_import_job_ended' });
+    return { ...r };
+  });
   store.listZoomImportsForRequest.mockImplementation(async () => [...rows.values()].reverse().map(r => ({ ...r })));
 }
 
@@ -139,7 +145,7 @@ describe('config', () => {
 
 describe('listing', () => {
   test('returns occurrences with file sizes and import state, and never URLs, file ids, topics or passcodes', async () => {
-    rows.set('r1', { id: 'r1', request_id: REQUEST, zoom_meeting_uuid: UUID, state: 'started', transcription_job_id: JOB, failure_code: null, lease_expired: false });
+    rows.set('r1', { id: 'r1', request_id: REQUEST, zoom_meeting_uuid: UUID, state: 'started', transcription_job_id: JOB, job_status: 'queued', failure_code: null, lease_expired: false });
     const result = await listZoomRecordingsForVisit({ requestId: REQUEST });
     expect(requireMeetingTranscriptionEnabled).toHaveBeenCalledWith(REQUEST);
     expect(result).toEqual({ available: true, windowDays: 30, meetings: [{ meetingUuid: UUID, startTime: START, durationMinutes: 62,
@@ -307,7 +313,7 @@ describe('import: bytes and Blob writes', () => {
 
 describe('import: claim lifecycle', () => {
   test('a started row for the same meeting is returned without any upload', async () => {
-    rows.set('existing', { id: 'existing', request_id: REQUEST, zoom_meeting_uuid: UUID, state: 'started', transcription_job_id: JOB, lease_expired: false });
+    rows.set('existing', { id: 'existing', request_id: REQUEST, zoom_meeting_uuid: UUID, state: 'started', transcription_job_id: JOB, job_status: 'queued', lease_expired: false });
     getMeetingTranscriptionJob.mockResolvedValue({ id: JOB, status: 'queued', version: 3 });
     const result = await importZoomRecording(args());
     expect(result).toEqual({ import: { id: 'existing', state: 'started', failureCode: null }, job: { id: JOB, status: 'queued', version: 3 } });
@@ -432,5 +438,92 @@ describe('import: failure paths', () => {
     expect(keys).toHaveLength(2);
     expect(keys[0]).toBe(first);
     expect(keys[1]).not.toBe(first);
+  });
+});
+
+describe('started rows and ended jobs (re-import release)', () => {
+  const startedRow = (over) => rows.set('old', { id: 'old', request_id: REQUEST, actor_profile_id: 9, zoom_meeting_uuid: UUID, state: 'started',
+    transcription_job_id: JOB, job_status: 'queued', lease_expired: false, ...over });
+  test.each(['failed', 'expired'])('a started row whose job is %s is released and a new row and a new job are created', async (status) => {
+    startedRow({ job_status: status });
+    const result = await importZoomRecording(args());
+    expect(rows.get('old')).toMatchObject({ state: 'failed', failure_code: 'zoom_import_job_ended' });
+    expect(result.import.id).not.toBe('old');
+    expect(result.import.state).toBe('started');
+    expect(uploadMeetingTranscription).toHaveBeenCalledTimes(1);
+  });
+  test('a started row whose job id is NULL is re-importable', async () => {
+    startedRow({ transcription_job_id: null, job_status: null });
+    await importZoomRecording(args());
+    expect(rows.get('old').failure_code).toBe('zoom_import_job_ended');
+    expect(uploadMeetingTranscription).toHaveBeenCalledTimes(1);
+  });
+  test.each(['ready', 'submission_uncertain', 'processing', 'queued'])('a started row whose job is %s still blocks and is returned without any upload', async (status) => {
+    startedRow({ job_status: status });
+    getMeetingTranscriptionJob.mockResolvedValue({ id: JOB, status, version: 3 });
+    const result = await importZoomRecording(args());
+    expect(result.import).toEqual({ id: 'old', state: 'started', failureCode: null });
+    expect(uploadMeetingTranscription).not.toHaveBeenCalled();
+    expect(store.releaseStartedImportWithEndedJob).not.toHaveBeenCalled();
+  });
+  test('losing the release race re-reads the active row', async () => {
+    startedRow({ job_status: 'failed' });
+    store.releaseStartedImportWithEndedJob.mockImplementationOnce(async () => {
+      Object.assign(rows.get('old'), { state: 'failed', failure_code: 'zoom_import_job_ended' });
+      rows.set('theirs', { id: 'theirs', request_id: REQUEST, zoom_meeting_uuid: UUID, state: 'importing', lease_expired: false });
+      return null;
+    });
+    expect((await rejection(importZoomRecording(args()))).code).toBe('zoom_import_in_progress');
+    expect(uploadMeetingTranscription).not.toHaveBeenCalled();
+  });
+  test('an expired lease whose job already failed is failed (not started) with zoom_import_job_ended', async () => {
+    rows.set('stale', { id: 'stale', request_id: REQUEST, actor_profile_id: 3, zoom_meeting_uuid: UUID, state: 'importing', lease_expired: true, lease_token: 'old' });
+    store.findJobForImport.mockResolvedValue({ id: JOB, status: 'failed' });
+    await importZoomRecording(args());
+    expect(rows.get('stale')).toMatchObject({ state: 'failed', failure_code: 'zoom_import_job_ended' });
+    expect(store.takeOverExpiredAsStarted).not.toHaveBeenCalled();
+  });
+  test('the listing presents a started row with an ended or missing job as failed so the card offers it again', async () => {
+    rows.set('r1', { id: 'r1', request_id: REQUEST, zoom_meeting_uuid: UUID, state: 'started', transcription_job_id: JOB, job_status: 'expired', lease_expired: false });
+    expect((await listZoomRecordingsForVisit({ requestId: REQUEST })).meetings[0].import).toEqual({ state: 'failed', jobId: JOB, failureCode: 'zoom_import_job_ended' });
+    rows.get('r1').job_status = null;
+    expect((await listZoomRecordingsForVisit({ requestId: REQUEST })).meetings[0].import.state).toBe('failed');
+    rows.get('r1').job_status = 'ready';
+    expect((await listZoomRecordingsForVisit({ requestId: REQUEST })).meetings[0].import.state).toBe('started');
+  });
+});
+
+describe('a throw after the job left uploading', () => {
+  test('start throws after the job moved to queued: row started, success, and a retry creates no second job', async () => {
+    startMeetingTranscription.mockRejectedValue(new Error('post-dispatch read failed'));
+    getMeetingTranscriptionJob.mockImplementation(async () => ({ ...rawJob, status: 'queued', version: 3 }));
+    const result = await importZoomRecording(args());
+    expect(result.import).toEqual({ id: onlyRow().id, state: 'started', failureCode: null });
+    expect(result.job.id).toBe(JOB);
+    expect(onlyRow()).toMatchObject({ state: 'started', transcription_job_id: JOB });
+    expect(store.markZoomImportFailed).not.toHaveBeenCalled();
+    const first = onlyRow(); first.job_status = 'queued';
+    await importZoomRecording(args());
+    expect(uploadMeetingTranscription).toHaveBeenCalledTimes(1);
+  });
+  test('start throws while the job is still uploading: row failed as before', async () => {
+    startMeetingTranscription.mockRejectedValue(Object.assign(new Error('content_unavailable'), { code: 'content_unavailable', status: 410 }));
+    getMeetingTranscriptionJob.mockResolvedValue({ ...rawJob, status: 'uploading' });
+    expect((await rejection(importZoomRecording(args()))).status).toBe(410);
+    expect(onlyRow()).toMatchObject({ state: 'failed', failure_code: 'content_unavailable' });
+  });
+  test('start throws and the job turned failed: row failed as before', async () => {
+    startMeetingTranscription.mockRejectedValue(Object.assign(new Error('x'), { code: 'start_failed', status: 409 }));
+    getMeetingTranscriptionJob.mockResolvedValue({ ...rawJob, status: 'failed' });
+    await rejection(importZoomRecording(args()));
+    expect(onlyRow().state).toBe('failed');
+  });
+  test('the job read failing in the catch leaves the row importing and rethrows the original error', async () => {
+    startMeetingTranscription.mockRejectedValue(Object.assign(new Error('boom'), { code: 'start_boom', status: 502 }));
+    getMeetingTranscriptionJob.mockResolvedValueOnce(rawJob).mockRejectedValueOnce(new Error('db down'));
+    const error = await rejection(importZoomRecording(args()));
+    expect(error.code).toBe('start_boom');
+    expect(onlyRow().state).toBe('importing');
+    expect(store.markZoomImportFailed).not.toHaveBeenCalled();
   });
 });

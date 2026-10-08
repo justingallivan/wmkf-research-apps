@@ -245,3 +245,11 @@ test('an import response after the card unmounts writes nothing and reloads noth
   expect(reads()).toBe(before);
   expect(consoleError).not.toHaveBeenCalled();
 });
+
+test('a meeting whose transcription did not finish shows plain copy and can be chosen again', async () => {
+  const meetings = zoomList().meetings.map((m, i) => (i === 0 ? { ...m, import: { state: 'failed', jobId: JOB_ID, failureCode: 'zoom_import_job_ended' } } : m));
+  route({}, { '/zoom-recordings': { respond: () => response(zoomList({ meetings })) } });
+  const panel = await openPanel();
+  expect(within(panel).getByText('62 min · Audio + Zoom transcript · Last transcription did not finish')).toBeInTheDocument();
+  expect(within(panel).getByRole('radio', { name: /Oct 5/ })).toBeEnabled();
+});

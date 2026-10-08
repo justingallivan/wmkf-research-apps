@@ -2424,7 +2424,7 @@ function ZoomImportSection({ z, activeJob, transcriptionBusy }) {
               Number.isFinite(meeting.durationMinutes) ? `${meeting.durationMinutes} min` : null,
               !hasAudio ? 'No audio yet' : meeting.transcript ? 'Audio + Zoom transcript' : 'Audio only',
               state === 'started' ? 'Imported, transcription started' : state === 'importing' ? 'Importing…'
-                : state === 'failed' ? 'Last import did not finish' : null,
+                : state === 'failed' ? (meeting.import?.failureCode === 'zoom_import_job_ended' ? 'Last transcription did not finish' : 'Last import did not finish') : null,
             ].filter(Boolean).join(' · ');
             const id = `zoom-meeting-${meeting.meetingUuid}`;
             return (

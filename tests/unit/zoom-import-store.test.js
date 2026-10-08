@@ -3,7 +3,7 @@ jest.mock('@vercel/postgres', () => ({ sql: (strings, ...values) => mockSql(stri
 
 import {
   claimZoomImport, markZoomImportStarted, markZoomImportFailed, takeOverExpiredAsStarted,
-  takeOverExpiredAsFailed, sanitizeFailureCode, IMPORT_LEASE_SECONDS, FALLBACK_FAILURE_CODE, findJobForImport,
+  takeOverExpiredAsFailed, releaseStartedImportWithEndedJob, getActiveZoomImport, listZoomImportsForRequest, sanitizeFailureCode, IMPORT_LEASE_SECONDS, FALLBACK_FAILURE_CODE, findJobForImport,
 } from '../../lib/services/meeting-tracker-recordings/import-store.js';
 
 const id = '11111111-1111-4111-8111-111111111111';
@@ -68,4 +68,19 @@ test('the job lookup uses the owner and the import id as idempotency key', async
   const [text, values] = mockSql.mock.calls[0];
   expect(text).toContain('owner_profile_id = ? AND idempotency_key = ?');
   expect(values).toEqual([4, id]);
+});
+
+test('release is conditional on the row still being started with the same job id (NULL-safe)', async () => {
+  await releaseStartedImportWithEndedJob({ id, jobId: null });
+  const [text, values] = mockSql.mock.calls[0];
+  expect(text).toContain("WHERE id = ? AND state = 'started' AND (transcription_job_id IS NOT DISTINCT FROM ?)");
+  expect(text).toContain("'zoom_import_job_ended'");
+  expect(values).toEqual([id, null]);
+});
+
+test('the active and list reads join the job status', async () => {
+  await getActiveZoomImport({ requestId: 'r', meetingUuid: 'u' });
+  await listZoomImportsForRequest({ requestId: 'r' });
+  for (const [text] of mockSql.mock.calls) expect(text).toMatch(/LEFT JOIN transcription_jobs j ON j\.id = r\.transcription_job_id/);
+  for (const [text] of mockSql.mock.calls) expect(text).toContain('j.status AS job_status');
 });

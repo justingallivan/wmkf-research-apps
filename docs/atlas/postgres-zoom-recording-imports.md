@@ -34,7 +34,7 @@ related:
 | `failure_code` | Sanitized code matching `^[a-z0-9_]{1,80}$`; present exactly when `state = 'failed'` (CHECK) |
 | `includes_zoom_transcript` | Whether the Zoom `audio_transcript` VTT was imported with the audio |
 
-A partial unique index allows one `importing` or `started` row per request and meeting; a `failed` row frees the slot, and a retry claims a new row and creates a new job. The final update matches `id`, `lease_token` and `state = 'importing'`; an expired lease is taken over by a conditional update so two concurrent requests cannot both take over.
+A partial unique index allows one `importing` or `started` row per request and meeting; a `failed` row frees the slot, and a retry claims a new row and creates a new job. A `started` row blocks duplicates only while its job is live (any status except `failed` and `expired`, so `ready` and `submission_uncertain` still block); if the job is `failed`, `expired` or missing, the service conditionally marks the row `failed` with `zoom_import_job_ended` and the meeting can be imported again. The final update matches `id`, `lease_token` and `state = 'importing'`; an expired lease is taken over by a conditional update so two concurrent requests cannot both take over.
 
 ## Writers and readers
 

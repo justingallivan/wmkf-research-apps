@@ -4,7 +4,9 @@
 -- tokens, topics or names. 'importing' rows hold a lease (longer than the 300 s route
 -- maxDuration); the final update matches id and lease_token, so a killed request can
 -- never overwrite a takeover. At most one importing/started row exists per request and
--- meeting; a failed row frees the slot for a retry (which gets a new row and a new job).
+-- meeting; a failed row frees the slot for a retry (which gets a new row and a new job). A started
+-- row blocks duplicates only while its job is live: when the job is failed, expired or gone the
+-- service marks the row failed (zoom_import_job_ended) so the meeting can be imported again.
 CREATE TABLE IF NOT EXISTS zoom_recording_imports (
   id UUID PRIMARY KEY,
   request_id UUID NOT NULL,
