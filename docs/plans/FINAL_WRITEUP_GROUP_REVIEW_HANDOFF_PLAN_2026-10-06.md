@@ -1,6 +1,6 @@
 ---
 title: Final Writeup group-review handoff — PD drafting, PD sign-off, leadership digest
-status: approved 2026-10-06 — Stages 1–4 live; Stage 5 branch-built (claude/leadership-digest); SoCal parked
+status: approved 2026-10-06 — Stages 1–5 live; SoCal parked
 created: 2026-10-06
 owner: Justin Gallivan
 related:
@@ -303,8 +303,10 @@ Original Stage 4 requirements:
 
 ### Stage 5 — Leadership daily digest
 
-**Branch-built 2026-10-07 (Session 584), `claude/leadership-digest`; not merged, migration 073 not
-applied, copy not seeded.** As built:
+**Live 2026-10-07 PT (Session 584): PR #461, merge `ddeb1b401`; migration 073 applied and copy seeded
+by the owner; first digest not yet observed. Codex adversarial review: round 1 two high findings
+(same-day retry hit the membership CHECK before ON CONFLICT; run-wide faults raised no alert), fixed in
+`c16c30092`; round 2 approve, no material findings.** As built:
 - Selection: requests in listed programs with a current Final in lifecycle FINAL whose leadership
   checkpoint is complete and started within the last 7 days (`LOOKBACK_DAYS`), minus writeups an
   accepted digest already listed to that recipient. No backlog decision was needed: the owner
@@ -315,7 +317,11 @@ applied, copy not seeded.** As built:
   run. Cron `/api/cron/final-writeup-leadership-digest`, `0 7 * * *`.
 - The "Send to leadership" confirmation says leadership is told in the next daily summary when the
   request's program is listed (`handoffEmailEnabled`, now also returned in the review phases).
-- Rollout: apply migration 073, seed the copy, merge, confirm the first digest row is accepted.
+- Rollout (done 2026-10-07): `node scripts/apply-migrations.js` (073 applied), then
+  `DATAVERSE_PROD_WRITE_ACK="<purpose> <today's UTC date>" node scripts/seed-email-defaults.mjs --execute`
+  (the Dataverse target interlock refuses a local Production write without that same-day
+  acknowledgement), then merge. Remaining: after the first writeup is sent to leadership, confirm the
+  next night's `final_writeup_leadership_digests` rows have `accepted_at`.
 
 - Daily cron at 00:00 Pacific. Each leadership-persona recipient gets one email listing writeups
   that entered leadership review since their last digest.

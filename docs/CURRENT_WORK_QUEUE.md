@@ -88,9 +88,9 @@ sequence.
   (PR #454, merge `b2bc23b95`, 2026-10-07). Stage 4 (PD handoff email,
   Research only via `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`) is live
   (PR #456, merge `8bc5b466b`, 2026-10-07; migration 072 applied, copy seeded,
-  Production list = Research only); verify the first real send. Stage 5 (leadership daily digest) is branch-built
-  on `claude/leadership-digest` (S584; not merged, migration 073 not applied, copy not
-  seeded); scope is Research only, via the same program list (owner, S584);
+  Production list = Research only); verify the first real send. Stage 5 (leadership daily digest) is live
+  (PR #461, merge `ddeb1b401`, S584; migration 073 applied, copy seeded; first digest not
+  yet observed); scope is Research only, via the same program list (owner, S584);
   SoCal is parked by the owner (2026-10-07). Program-list reminder:
   when SoCal (or another program) adopts group review, add its Grant Program
   GUID to `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS` or it sends no email:

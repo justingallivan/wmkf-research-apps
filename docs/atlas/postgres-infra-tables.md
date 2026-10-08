@@ -414,9 +414,9 @@ recently attempted rows first so repeated failures rotate to the back. Read/writ
 Postgres is unavailable, an enabled program's handoff cannot start; the lead PD
 retries. No cleanup is scheduled; rows remain audit history.
 
-### `final_writeup_leadership_digests` — BRANCH-BUILT; MIGRATION 073 NOT APPLIED
+### `final_writeup_leadership_digests` — PRODUCTION-LIVE; MIGRATION 073 APPLIED
 
-**[BRANCH-BUILT 2026-10-07, `claude/leadership-digest`; not merged, migration 073 not applied, copy not seeded.]**
+**[PRODUCTION-LIVE: PR #461, merge `ddeb1b401`, 2026-10-07 PT; migration 073 applied; copy seeded; first digest not yet observed.]**
 **Source of truth:** Postgres send ledger for the leadership daily digest
 (Final Writeup group-review handoff Stage 5). Dataverse owns the requests and
 documents; Dynamics owns the email activity and transport. Migration
