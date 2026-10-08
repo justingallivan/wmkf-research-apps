@@ -731,3 +731,16 @@ test('places the prominent institution heading above the smaller linked proposal
   expect(institution.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(title).toHaveAttribute('href', '/workbench/request-1');
 });
+
+
+test('groups budget and ranking details in the institution column', async () => {
+  mockLoad.mockResolvedValue(roundResponse({ published: true }));
+  render(<ProposalRankingApp />);
+  const institution = await screen.findByRole('heading', { name: 'North Institute' });
+  const column = institution.parentElement;
+  expect(within(column).getByText('Requested')).toBeInTheDocument();
+  expect(within(column).getByText('Cumulative Budget')).toBeInTheDocument();
+  expect(within(column).getByText('Reviews')).toBeInTheDocument();
+  expect(within(column).getByRole('list', { name: 'PD ranks' })).toBeInTheDocument();
+  expect(within(column).queryByLabelText('Rank 1: First proposal')).not.toBeInTheDocument();
+});
