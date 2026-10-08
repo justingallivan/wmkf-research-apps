@@ -33,7 +33,7 @@ function StatusBanner({ kind = 'info', children, className = '' }) {
   return <div role={kind === 'error' ? 'alert' : 'status'} className={`rounded-lg border px-4 py-3 text-sm ${classes[kind]} ${className}`}>{children}</div>;
 }
 
-function ProposalCardRow({ proposal, position, count, total, score, rank, editable, onMove, dragging, dragProvided }) {
+function ProposalCardRow({ proposal, position, count, total, score, rank, editable, dragging, dragProvided }) {
   const amount = proposal.amountMinorUnits == null
     ? 'Requested amount unavailable'
     : formatMoney(proposal.amountMinorUnits, proposal.currency);
@@ -106,10 +106,7 @@ function ProposalCardRow({ proposal, position, count, total, score, rank, editab
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between gap-3">
-            {editable ? <div className="flex gap-2">
-              <button type="button" aria-label={`Move proposal ${proposal.requestNumber} up`} disabled={position === 0} onClick={() => onMove(position, position - 1)} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">Move up</button>
-              <button type="button" aria-label={`Move proposal ${proposal.requestNumber} down`} disabled={position >= count - 1} onClick={() => onMove(position, position + 1)} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">Move down</button>
-            </div> : <span />}
+            <span />
             {(proposal.institutionGeography === 'East' || proposal.institutionGeography === 'West') && <p
               role="img"
               aria-label={`${proposal.institutionGeography} institution`}
@@ -170,7 +167,6 @@ function ProposalOrder({ list, proposals, order, editable, saveState, composite,
                   editable={editable}
                   dragging={dragSnapshot.isDragging}
                   dragProvided={dragProvided}
-                  onMove={onMove}
                 />}
               </Draggable>;
             })}
