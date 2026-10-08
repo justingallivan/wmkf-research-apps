@@ -63,7 +63,9 @@ test.each([
   route({}, { '/zoom-recordings': { respond } });
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Import from Zoom' }));
-  await waitFor(() => expect(screen.queryByRole('button', { name: 'Import from Zoom' })).not.toBeInTheDocument());
+  expect(await screen.findByText('Loading Zoom recordings…')).toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByText('Loading Zoom recordings…')).not.toBeInTheDocument());
+  expect(screen.queryByRole('button', { name: 'Import from Zoom' })).not.toBeInTheDocument();
   expect(screen.queryByTestId('zoom-import')).not.toBeInTheDocument();
   expect(screen.getByTestId('generate-form')).toBeInTheDocument();
   expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();
