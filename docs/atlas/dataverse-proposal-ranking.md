@@ -3,9 +3,10 @@
 Date: 2026-10-07. Status: source implemented; sandbox schema and application-role
 provisioning and bounded persistence rehearsal verified. Runtime activation and
 multi-identity browser rehearsal remain pending. Direct-table denial is verified
-for the tested sandbox staff identity.
+for the tested sandbox staff identity and all four Production participants.
 Production schema and dedicated application-role setup are now verified; the app
-remains disabled. Production receipt:
+remains disabled. Production facilitator/grants and direct-table/search privacy are
+verified in `docs/audits/PROPOSAL_RANKING_PRODUCTION_ACCESS_PRIVACY_2026-10-07.md`. Production setup receipt:
 `docs/audits/PROPOSAL_RANKING_PRODUCTION_SETUP_2026-10-07.md`. Sandbox evidence:
 `docs/audits/PROPOSAL_RANKING_SANDBOX_SETUP_2026-10-07.md` and
 `docs/audits/PROPOSAL_RANKING_PERSISTENCE_REHEARSAL_2026-10-07.md` and
@@ -112,10 +113,10 @@ Live setup claims are supported by the historical setup receipt and GET-only
 source scan returned zero proposals. The bounded persistence receipt above proves
 initialization, conditional save, stale-write rollback, duplicate-key rollback and
 current sandbox search exclusion using only new-table synthetic snapshot data.
-It does not prove authenticated meeting behavior. Staff grants/default identity,
+It does not prove authenticated meeting behavior. Sandbox staff grants/default identity,
 isolation/runtime flags and browser rehearsal remain open. The selected-staff
 direct-table denial proof is limited to the sandbox identity and retained records
-in the linked privacy receipt; production permissions require their own verification.
+in the linked sandbox receipt; the four-participant Production proof is recorded below.
 Advanced Find visibility is not proof of relevance-search exclusion.
 
 
@@ -139,7 +140,7 @@ owner-approved Production inventory is recorded below.
 
 The browser lifecycle remains unperformed: private rankings, locked submission,
 composite publication, meeting reordering and full-requested budget totals. Participant
-grants and verified Beth Pruitt facilitator selection remain open per the prior
+grants and verified Beth Pruitt facilitator selection in the sandbox remain open per the prior
 setup receipt; this readiness probe does not inventory participant grants. Owner
 choice is required between preparing these prerequisites, resolving the zero-proposal
 acceptance-data gap, or deferring live acceptance. Source creation/copy and activation
@@ -195,11 +196,11 @@ Opus noted the intentional strict failure for malformed D26 numbers, including
 nonpending rows in the app's cycle scan; no change was required. Local review receipt:
 `/private/tmp/ranking-cutoff-opus-review.txt` (nonportable); this paragraph retains
 its verdict and scope. No Production write was part of cutoff implementation; the subsequent exact-row
-marker correction below was separately authorized. Ranking setup/activation remain pending.
+marker correction below was separately authorized. Ranking setup was pending at that checkpoint; later setup is recorded below.
 
 Production's D26 source pool resolves the sandbox-only zero-proposal concern, but
-Production schema and role provisioning are now complete. Participant grants,
-facilitator settings and activation still require separate owner approval. Source proposals stay read-only; ranking workflow actions
+Production schema, role, participant grants and facilitator configuration are now
+complete. Activation still requires separate owner approval. Source proposals stay read-only; ranking workflow actions
 write dedicated ranking tables. The source-backed in-app lifecycle remains unverified.
 
 ## Production schema and role setup — 2026-10-07
@@ -217,8 +218,9 @@ sanitized successful inventory:
 `docs/audits/PROPOSAL_RANKING_PRODUCTION_SETUP_2026-10-07.md`.
 This supersedes the earlier absent-schema/role inventory. No source records, ranking
 business rows, participant grants, facilitator setting or activation flags changed
-in this setup. Production staff direct-table denial, search/audit privacy checks and
-multi-identity in-app acceptance remain unverified. The app remains disabled;
+in this setup. Subsequent Production direct-table denial and search exclusion passed
+for four participants; populated audit/navigation and multi-identity in-app acceptance
+remain unverified. The app remains disabled;
 promotion/activation are still the owner's separate decisions.
 
 ## Legacy test-marker correction — 2026-10-07
@@ -317,3 +319,17 @@ OAuth-only Opus source review approved. Opus's nonblocking tooltip-rounding note
 was corrected to use the same rounding as the visible score, with a regression
 for 4.35 → 4.4. No additional review loop or live data access was needed. Local
 review receipt: `/private/tmp/ranking-rating-opus-review.txt` (not portable).
+
+## Production access and privacy — 2026-10-07
+
+[VERIFIED via live apply and independent GET readback] Beth Pruitt is the configured
+default facilitator. Justin Gallivan, John Sader, Jean Kim and Beth have app grants;
+other grants are unchanged. D26 remains 23 requests (11 SE / 12 MR). All four
+effective staff identities lack ranking Read privileges; 12 collection requests
+returned 403, with three app-200/empty controls. Search excludes all three tables.
+Receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTION_ACCESS_PRIVACY_2026-10-07.md`.
+
+The app is disabled and tables empty. Git comparison shows origin/main lacks the
+branch generic-reader privacy guards: deploy these before opening a live round.
+Promotion/activation and full browser acceptance remain owner decisions. Effective
+impersonation is not staff OAuth browser proof or populated audit/navigation proof.

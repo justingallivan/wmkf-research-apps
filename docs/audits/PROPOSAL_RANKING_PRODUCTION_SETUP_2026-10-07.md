@@ -5,6 +5,9 @@ Owner explicitly approved step 1: provision the three ranking tables and assign
 its dedicated role to the application identity. No activation, participant grants,
 facilitator settings, source writes or ranking business rows were part of this setup.
 
+This is the historical schema/role checkpoint. Later configuration and privacy
+results: `docs/audits/PROPOSAL_RANKING_PRODUCTION_ACCESS_PRIVACY_2026-10-07.md`.
+
 ## Execution and verification
 
 [VERIFIED via live commands and GET readback] Existing solution

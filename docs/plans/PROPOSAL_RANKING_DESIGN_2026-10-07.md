@@ -381,7 +381,10 @@ sandbox search exclusion is verified. See
 `docs/audits/PROPOSAL_RANKING_PERSISTENCE_REHEARSAL_2026-10-07.md`.
 Direct-table denial for the tested sandbox staff identity is now verified in
 `docs/audits/PROPOSAL_RANKING_STAFF_PRIVACY_2026-10-07.md`.
-Authenticated browser lifecycle and production privacy remain unverified.
+Production facilitator/grants and four-participant direct-table/search privacy are
+verified in `docs/audits/PROPOSAL_RANKING_PRODUCTION_ACCESS_PRIVACY_2026-10-07.md`.
+Authenticated browser lifecycle, populated audit/navigation proof and deployment of
+branch generic-reader guards remain pending; the app stays disabled.
 
 Revision-2 Opus outcome: **READY WITH NAMED CHANGES**, returned by
 `claude-opus-5-5` on 2026-10-07. Receipt:

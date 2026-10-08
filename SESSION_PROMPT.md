@@ -99,18 +99,28 @@ built, Sol and OAuth Opus reviewed, and receipt/uncertainty corrections were inc
 Fresh GET-only cohort scan: 26 ordinary-filter matches, two further D26 cutoff
 exclusions, D26 still 23 (11 SE / 12 MR), J26 one SE. Keep the D26 cutoff.
 
-### Production setup completed; configuration next
+### Production setup completed; access and privacy verified
 
 [VERIFIED via live apply and GET metadata/security readback] Owner-approved step 1
 is complete: three ranking tables, all expected attributes and Active keys; dedicated
 application role with nine ranking Create/Read/Write privileges plus nine documented
 Dataverse defaults. Exactly one assignment to the verified application system user,
-no team assignments. No app activation, participant grants or facilitator settings.
+no team assignments. That schema step did not change app activation, grants or settings.
 Receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTION_SETUP_2026-10-07.md`.
 The strengthened GET-only probe exits 0. Luna built verification; Sol and OAuth Opus
-reviewed and substantive verification gaps were corrected. Next: facilitator and
-participant access, Production privacy/search verification, then separate activation
-and promotion approval. Production schema/role setup must not be repeated as new work.
+reviewed and substantive verification gaps were corrected. Production schema/role
+setup must not be repeated as new work.
+
+[VERIFIED via live configuration and independent readback] Beth is now the default
+facilitator; Justin, John, Jean and Beth have additive Proposal Ranking grants.
+Other grants are unchanged. All four effective staff identities lack ranking Read
+privileges and all 12 collection reads returned 403. App controls returned 200/empty;
+all three tables are excluded from the provisioned search index. Receipt:
+`docs/audits/PROPOSAL_RANKING_PRODUCTION_ACCESS_PRIVACY_2026-10-07.md`.
+The app stays disabled with no ranking business rows. Next: owner-directed promotion
+and deployment of branch privacy guards (absent on origin/main), then approved
+activation and multi-identity browser acceptance. Do not create live ranking rows
+before the generic-reader guards are deployed.
 
 Private ranking, submission, composite publication, meeting reordering and full-requested
 budget totals still need a source-backed, multi-identity in-app walkthrough. Counts
@@ -163,7 +173,7 @@ The app remains disabled; production is unchanged.
 - `a1f4e0f4e`: authorized lifecycle, recovery, Admin and reviewed corrections.
 - Final receipt/message-tag and handoff documentation follow these commits.
 
-## Next items — verified open
+## Historical Session 582 next items — superseded by Production follow-ups above
 
 Source evidence and exact steps: `docs/atlas/dataverse-proposal-ranking.md`.
 Sandbox schema/role provisioning is complete and readback passed: three tables,
