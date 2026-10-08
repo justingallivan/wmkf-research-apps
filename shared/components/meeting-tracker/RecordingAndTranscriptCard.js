@@ -2307,9 +2307,47 @@ function SummaryBlock({ t, materials = [] }) {
   );
 }
 
-function TranscriptBlock({ m, t, transcriptInputRef }) {
-  const [openForm, setOpenForm] = useState(null);
-  const material = (m.data?.materials || []).find((item) => Number(item.artifactType) === REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT) || null;
+function Step({ number, title, state, action, testId, children }) {
+  const done = state === 'done';
+  const current = state === 'current';
+  const marker = done ? 'bg-green-700 text-white' : current ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-600';
+  return (
+    <section className={`mt-4 rounded-lg border p-4 ${current ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-50'}`} data-testid={testId} data-step-state={state} aria-labelledby={`${testId}-title`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 id={`${testId}-title`} className={`flex items-center gap-2 text-base font-semibold ${state === 'waiting' ? 'text-gray-600' : 'text-gray-950'}`}>
+          <span aria-hidden="true" className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs ${marker}`}>{done ? '✓' : number}</span>
+          {title}
+          {done && <span className="sr-only"> (done)</span>}
+        </h3>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function DerivativeLine({ state, label, boundText, material }) {
+  const url = state === 'bound' && material ? safeMaterialUrl(material) : null;
+  const text = state === 'bound' ? boundText
+    : state === 'stale' ? `${label} is out of date. Generate it again in step 2.`
+      : state === 'missing' ? `${label} not generated yet.`
+        : `${label} not available yet.`;
+  return (
+    <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+      <p className="text-sm text-gray-900">{text}</p>
+      {url && <a className={BTN} href={url} target="_blank" rel="noopener noreferrer">Open</a>}
+    </div>
+  );
+}
+
+function TranscriptWorkflow({ m, t, transcriptInputRef }) {
+  const [step1Open, setStep1Open] = useState(false);
+  const [uploadInstead, setUploadInstead] = useState(false);
+  const materials = m.data?.materials || [];
+  const byType = (type) => materials.find((item) => Number(item.artifactType) === type) || null;
+  const material = byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT);
+  const recording = byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING);
+  const recordingUrl = recording ? safeMaterialUrl(recording) : null;
   const line = describeCurrentTranscript({ material, collection: t.collection });
   const artifact = t.collection?.currentArtifact;
   const generated = line.kind === 'generated';
@@ -2318,81 +2356,148 @@ function TranscriptBlock({ m, t, transcriptInputRef }) {
   const generateReason = !t.collection ? 'Not available right now' : !featureEnabled ? 'Not enabled for this request' : null;
   const active = t.jobs.find((job) => ACTIVE_STATUSES.has(job.status)) || null;
   const editing = Boolean(t.correction);
-  const showBoundary = generated && Boolean(artifact?.bundleEditable) && !editing;
   const presentationEnd = artifact?.presentationEnd && Number.isSafeInteger(artifact.presentationEnd.endMs) ? artifact.presentationEnd : null;
   const boundaryState = artifact?.presentationTranscript?.state;
   const discussionState = artifact?.staffDiscussionTranscript?.state;
   const needsGenerate = ['missing', 'stale'].includes(boundaryState) || ['missing', 'stale'].includes(discussionState);
   const reviewOpen = editing || Boolean(t.showReview && t.focusJob && !ACTIVE_STATUSES.has(t.focusJob.status));
-  const toggle = (form) => setOpenForm((value) => (value === form ? null : form));
+  const readyForReview = !editing && reviewOpen && t.focusJob?.status === 'ready';
+  const editable = generated && Boolean(artifact?.bundleEditable);
+
+  // Step 1 stays open while anything in it is in progress, so a chosen file or a running upload never disappears.
+  const step1Working = Boolean(active || m.transfer || (m.data?.uploads || []).length || m.file || m.busyUploadId || m.recoveryBusyId
+    || m.zoomBusy || m.transcriptFile || m.transcriptStagedId || m.transcriptBusy || t.audioFile || t.vttFile
+    || t.uploadProgress !== null || t.confirmNoVtt || ['upload', 'upload-captions', 'starting'].includes(t.busy));
+  const step1Done = Boolean(material || readyForReview) && !step1Working;
+  const step1Expanded = !step1Done || step1Open;
+  const step2State = reviewOpen || (editable && (!presentationEnd || needsGenerate || t.savedDraft)) ? 'current'
+    : editable && presentationEnd ? 'done' : 'waiting';
+  const step3State = boundaryState === 'bound' ? 'current' : 'waiting';
+  const presentationMaterial = byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT);
+  const discussionMaterial = byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT);
+  // With no transcript yet there is nothing to report per product, unless something was already made.
+  const showProducts = Boolean(material || presentationMaterial || discussionMaterial
+    || byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY) || t.summaryDraft || t.summaryConflict || artifact?.transcriptSummary?.artifactId);
+
   return (
-    <section className="mt-6 border-t border-gray-200 pt-5" aria-labelledby="recording-transcript-transcript-title">
-      <h3 id="recording-transcript-transcript-title" className="text-base font-semibold text-gray-950">Transcript</h3>
-      <p className="mt-2 text-sm leading-6 text-gray-900" data-testid="current-transcript-line">{line.text}</p>
-      {generated && !editing && t.savedDraft && <p className="mt-1 text-xs text-gray-600">Unpublished name edits saved {fmtDateTime(t.savedDraft.createdAt)}</p>}
-      {line.kind === 'uploaded' && <p className="mt-1 text-xs text-gray-600">Uploaded file · speaker names cannot be edited here.</p>}
-      {material && <div className="mt-2 flex flex-wrap items-center gap-2">
-        {generated && artifact && <>
-          <a className={BTN} href={`${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=txt`}>Download TXT</a>
-          <a className={BTN} href={`${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=vtt`}>Download VTT</a>
-          {!editing && <button type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy)} className={BTN}>{t.busy === 'create-draft' ? 'Opening…' : t.savedDraft ? 'Continue editing names' : 'Edit speaker names'}</button>}
-        </>}
-        {!generated && openUrl && <a className={BTN} href={openUrl} target="_blank" rel="noopener noreferrer">Open</a>}
-      </div>}
-      {showBoundary && (
-        <div className="mt-3" data-testid="presentation-end-line">
-          {!presentationEnd ? <>
-            <p className="text-sm leading-6 text-gray-900">Presentation end not confirmed. The Board link shows no transcript until a program coordinator confirms where the presentation ends.</p>
-            {!t.savedDraft && <button type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.busy === 'create-draft' ? 'Opening…' : 'Set presentation end'}</button>}
-          </> : <>
-            <p className="text-sm leading-6 text-gray-900">Presentation ends at {formatTranscriptTurnTime(presentationEnd.endMs)}{presentationEnd.confirmedAt ? ` · confirmed ${fmtDateTime(presentationEnd.confirmedAt)}` : ''}</p>
-            <button type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy)} className="mt-2 text-sm font-semibold text-blue-800 underline">{t.savedDraft ? 'Continue editing presentation end' : 'Edit presentation end'}</button>
-            {boundaryState === 'bound' && <p className="mt-1 text-sm text-gray-900">Presentation transcript ready for the Board link.</p>}
-            {discussionState === 'bound' && <p className="mt-1 text-sm text-gray-900">Staff discussion transcript saved for staff.</p>}
-            {needsGenerate && <div className="mt-2">
-              {['missing', 'stale'].includes(boundaryState)
-                ? <Notice tone="warning">The Board link shows no transcript until the presentation transcript is generated.</Notice>
-                : <Notice tone="info">The staff discussion transcript for this presentation end has not been generated.</Notice>}
-              <button type="button" onClick={t.generatePresentationTranscript} disabled={Boolean(t.busy)} className={`mt-2 ${BTN_PRIMARY}`}>{t.busy === 'presentation-transcript' ? 'Generating…' : 'Generate presentation and discussion transcripts'}</button>
-            </div>}
-          </>}
-        </div>
-      )}
-      <SummaryBlock t={t} materials={m.data?.materials || []} />
-      <div className="mt-4 flex flex-wrap items-start gap-3">
-        <button type="button" onClick={() => toggle('upload')} aria-expanded={openForm === 'upload'} className={BTN}>Upload a transcript</button>
-        <div>
-          <button type="button" onClick={() => toggle('generate')} aria-expanded={openForm === 'generate'} disabled={Boolean(generateReason)} className={BTN}>Generate from audio</button>
-          {generateReason && <p className="mt-1 text-xs text-gray-600">{generateReason}</p>}
-        </div>
-      </div>
-      {openForm === 'upload' && <UploadForm m={m} inputRef={transcriptInputRef} />}
-      {openForm === 'generate' && !generateReason && <GenerateForm t={t} />}
-      {t.error && <div className="mt-4"><Notice>{t.error}</Notice></div>}
-      {t.notice && <div className="mt-4"><Notice tone={/could not|did not|still needs/.test(t.notice) ? 'warning' : 'success'}>{t.notice}</Notice></div>}
-      {active && !editing && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-800" aria-live="polite" data-testid="transcript-progress">
-          <p>{PROGRESS_VERBS[active.status]} {displayName(active)}{active.created_at ? ` · started ${fmtTime(active.created_at)}` : ''}</p>
-          <button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={BTN}>{t.loading ? 'Refreshing…' : 'Refresh'}</button>
-        </div>
-      )}
+    <div>
+      {m.error && <div className="mt-3"><Notice>{m.error}</Notice></div>}
+      {m.notice && <div className="mt-3"><Notice tone="info">{m.notice}</Notice></div>}
+      {t.error && <div className="mt-3"><Notice>{t.error}</Notice></div>}
+      {t.notice && <div className="mt-3"><Notice tone={/could not|did not|still needs/.test(t.notice) ? 'warning' : 'success'}>{t.notice}</Notice></div>}
       {!reviewOpen && t.conflict && (
-        <div className="mt-4" role="alert">
+        <div className="mt-3" role="alert">
           <Notice tone="warning">Another session changed this. Refresh to load the latest version.</Notice>
           <button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.loading ? 'Refreshing…' : 'Refresh'}</button>
         </div>
       )}
-      {reviewOpen && <ReviewBlock t={t} />}
       <AttentionBlock t={t} />
+
+      <Step number={1} title="Get the recording" state={step1Done ? 'done' : 'current'} testId="step-recording"
+        action={step1Done && <button type="button" onClick={() => setStep1Open((value) => !value)} aria-expanded={step1Open} className={BTN_LINK}>{step1Open ? 'Close' : 'Replace audio or transcript'}</button>}>
+        <div className="mt-2 text-sm leading-6 text-gray-900">
+          <div>
+            <p data-testid="current-transcript-line">{line.text}</p>
+            {generated && !editing && t.savedDraft && <p className="mt-1 text-xs text-gray-600">Unpublished name edits saved {fmtDateTime(t.savedDraft.createdAt)}</p>}
+          </div>
+          {!material && readyForReview && <p className="text-gray-700">A new transcript is ready to check in step 2.</p>}
+          {line.kind === 'uploaded' && <p className="mt-1 text-xs text-gray-600">Uploaded file · speaker names cannot be edited here.</p>}
+          <p className="mt-1 text-gray-700" data-testid="current-recording-line">
+            {recording
+              ? `${recording.backing === 'external' ? 'Zoom recording link' : 'MP4 recording'}${recording.createdAt ? ` · added ${fmtDateTime(recording.createdAt)}` : ''}`
+              : 'No recording yet'}
+          </p>
+        </div>
+        {active && !editing && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-800" aria-live="polite" data-testid="transcript-progress">
+            <p>{PROGRESS_VERBS[active.status]} {displayName(active)}{active.created_at ? ` · started ${fmtTime(active.created_at)}` : ''}</p>
+            <button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={BTN}>{t.loading ? 'Refreshing…' : 'Refresh'}</button>
+          </div>
+        )}
+        {step1Expanded && <>
+          {generateReason
+            ? <>
+              <p className="mt-4 text-sm text-gray-700">Transcribing from audio: <span>{generateReason}</span></p>
+              <UploadForm m={m} inputRef={transcriptInputRef} />
+            </>
+            : <>
+              {!active && <GenerateForm t={t} />}
+              <button type="button" onClick={() => setUploadInstead((value) => !value)} aria-expanded={uploadInstead} className={`mt-3 ${BTN_LINK}`}>Upload a finished transcript instead</button>
+              {uploadInstead && <UploadForm m={m} inputRef={transcriptInputRef} />}
+            </>}
+          <div className="mt-5 border-t border-gray-200 pt-4">
+            <RecordingBlock m={m} />
+          </div>
+        </>}
+      </Step>
+
+      <Step number={2} title="Check speaker names and where the presentation ends" state={step2State} testId="step-review">
+        {reviewOpen && <ReviewBlock t={t} />}
+        {editable && !editing ? <>
+            {reviewOpen && <p className="mt-4 border-t border-gray-200 pt-4 text-sm font-semibold text-gray-950">Current published transcript</p>}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy)} className={BTN}>{t.busy === 'create-draft' ? 'Opening…' : t.savedDraft ? 'Continue editing names' : 'Edit speaker names'}</button>
+            </div>
+            <div className="mt-3" data-testid="presentation-end-line">
+              {!presentationEnd ? <>
+                <p className="text-sm leading-6 text-gray-900">Presentation end not confirmed. The Board link shows no transcript until a program coordinator confirms where the presentation ends.</p>
+                {!t.savedDraft && <button type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.busy === 'create-draft' ? 'Opening…' : 'Set presentation end'}</button>}
+              </> : <>
+                <p className="text-sm leading-6 text-gray-900">Presentation ends at {formatTranscriptTurnTime(presentationEnd.endMs)}{presentationEnd.confirmedAt ? ` · confirmed ${fmtDateTime(presentationEnd.confirmedAt)}` : ''}</p>
+                <button type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy)} className="mt-2 text-sm font-semibold text-blue-800 underline">{t.savedDraft ? 'Continue editing presentation end' : 'Edit presentation end'}</button>
+                {needsGenerate && <div className="mt-3">
+                  {['missing', 'stale'].includes(boundaryState)
+                    ? <Notice tone="warning">The Board link shows no transcript until the presentation transcript is generated.</Notice>
+                    : <Notice tone="info">The staff discussion transcript for this presentation end has not been generated.</Notice>}
+                  <button type="button" onClick={t.generatePresentationTranscript} disabled={Boolean(t.busy)} className={`mt-2 ${BTN_PRIMARY}`}>{t.busy === 'presentation-transcript' ? 'Generating…' : 'Generate presentation and discussion transcripts'}</button>
+                </div>}
+              </>}
+            </div>
+          </>
+            : !reviewOpen && <p className="mt-2 text-sm text-gray-700">
+              {!material ? 'Waiting for a transcript from step 1.'
+                : line.kind === 'uploaded' ? 'An uploaded transcript file cannot be checked or split here. To name speakers and separate the presentation from the staff discussion, transcribe the meeting audio in step 1.'
+                  : 'Waiting for transcript status.'}
+            </p>}
+      </Step>
+
+      <Step number={3} title="Results" state={step3State} testId="step-results">
+        {step3State === 'waiting' && <p className="mt-2 text-sm text-gray-700">The presentation and staff discussion transcripts and the summary appear here after step 2.</p>}
+        {showProducts && <>
+        <div className="mt-4">
+          <h4 className="text-sm font-semibold text-gray-950">Presentation</h4>
+          <p className="text-xs text-gray-600">Eligible for the Board page.</p>
+          <DerivativeLine state={boundaryState} label="Presentation transcript" boundText="Presentation transcript ready for the Board link." material={presentationMaterial} />
+          <SummaryBlock t={t} materials={materials} />
+        </div>
+        <div className="mt-5 border-t border-gray-200 pt-4">
+          <h4 className="text-sm font-semibold text-gray-950">Staff discussion</h4>
+          <p className="text-xs text-gray-600">Staff only. Never included on the Board page.</p>
+          <DerivativeLine state={discussionState} label="Staff discussion transcript" boundText="Staff discussion transcript saved for staff." material={discussionMaterial} />
+        </div>
+        </>}
+        {(material || recordingUrl) && <div className="mt-5 border-t border-gray-200 pt-4">
+          <h4 className="text-sm font-semibold text-gray-950">Full meeting</h4>
+          <p className="text-xs text-gray-600">Staff only.</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {recordingUrl && <a className={BTN} href={recordingUrl} target="_blank" rel="noopener noreferrer">Open recording</a>}
+            {generated && artifact && <>
+              <a className={BTN} href={`${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=txt`}>Download TXT</a>
+              <a className={BTN} href={`${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=vtt`}>Download VTT</a>
+            </>}
+            {!generated && openUrl && <a className={BTN} href={openUrl} target="_blank" rel="noopener noreferrer">Open transcript</a>}
+          </div>
+        </div>}
+        <PresentationLinkBlock m={m} />
+      </Step>
       <EarlierRuns t={t} />
-    </section>
+    </div>
   );
 }
 
 function RecordingBlock({ m }) {
   const [replaceOpen, setReplaceOpen] = useState(false);
   const recording = (m.data?.materials || []).find((item) => Number(item.artifactType) === REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING) || null;
-  const openUrl = recording ? safeMaterialUrl(recording) : null;
   const intents = m.data?.uploads || [];
   const confirmed = m.transfer?.confirmedBytes || 0;
   const inFlight = Math.max(0, (m.transfer?.inFlightBytes || confirmed) - confirmed);
@@ -2400,21 +2505,9 @@ function RecordingBlock({ m }) {
   const showInputs = !recording || replaceOpen || lockedByWork || Boolean(m.file) || intents.length > 0;
   return (
     <section aria-labelledby="recording-transcript-recording-title">
-      <h3 id="recording-transcript-recording-title" className="text-base font-semibold text-gray-950">Recording</h3>
-      <p className="mt-1 text-xs text-gray-600">Zoom link or MP4. Saving a new one replaces the current one.</p>
-      {m.error && <div className="mt-3"><Notice>{m.error}</Notice></div>}
-      {m.notice && <div className="mt-3"><Notice tone="info">{m.notice}</Notice></div>}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-gray-900" data-testid="current-recording-line">
-          {recording
-            ? `${recording.backing === 'external' ? 'Zoom recording link' : 'MP4 recording'}${recording.createdAt ? ` · added ${fmtDateTime(recording.createdAt)}` : ''}`
-            : 'No recording yet'}
-        </p>
-        <div className="flex items-center gap-2">
-          {openUrl && <a href={openUrl} target="_blank" rel="noopener noreferrer" className={BTN}>Open</a>}
-          {recording && !showInputs && <button type="button" onClick={() => setReplaceOpen(true)} className={BTN}>Replace recording</button>}
-        </div>
-      </div>
+      <h4 id="recording-transcript-recording-title" className="text-sm font-semibold text-gray-950">Video recording</h4>
+      <p className="mt-1 text-xs text-gray-600">Zoom link or MP4, kept for staff. Saving a new one replaces the current one.</p>
+      {recording && !showInputs && <button type="button" onClick={() => setReplaceOpen(true)} className={`mt-3 ${BTN}`}>Replace recording</button>}
       {showInputs && <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="recording-transcript-zoom-link" className="block text-xs font-medium text-gray-700">Zoom link (paste the share message if it has a passcode)</label>
@@ -2481,8 +2574,8 @@ function RecordingBlock({ m }) {
 function PresentationLinkBlock({ m }) {
   const { link, linkBusy, linkError, linkCopied, manualCopy, confirmReissue } = m;
   return (
-    <section className="mt-6 border-t border-gray-200 pt-5" data-testid="presentation-link-controls">
-      <h3 className="text-base font-semibold text-gray-950">Board presentation link</h3>
+    <section className="mt-5 border-t border-gray-200 pt-4" data-testid="presentation-link-controls">
+      <h4 className="text-sm font-semibold text-gray-950">Board presentation link</h4>
       <p className="mt-1 text-xs text-gray-600">This materials-only link does not send email or change recipients.</p>
       <p className="mt-1 text-xs text-gray-600">The Board page can include applicant materials and current presentation transcript and summary. It excludes the full recording and staff discussion.</p>
       {!link && <Button type="button" size="sm" className="mt-3" loading={linkBusy} disabled={linkBusy} onClick={() => m.mutateLink('ensure')}>Generate link</Button>}
@@ -2537,10 +2630,8 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
       {m.loading && !m.data && <p className="mt-4 text-sm text-gray-500">Loading…</p>}
       {m.error && !m.data && <div className="mt-4"><Notice>{m.error}</Notice></div>}
       {m.data && (
-        <div className="mt-4">
-          <RecordingBlock m={m} />
-          <TranscriptBlock m={m} t={t} transcriptInputRef={transcriptInputRef} />
-          <PresentationLinkBlock m={m} />
+        <div className="mt-2">
+          <TranscriptWorkflow m={m} t={t} transcriptInputRef={transcriptInputRef} />
         </div>
       )}
     </section>
