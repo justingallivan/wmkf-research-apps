@@ -26,6 +26,17 @@ Review closure and retained evidence are recorded in the Atlas continuation sect
 Production was neither read nor changed; the app remains disabled. No production
 milestone entry is required. Only `codex/proposal-ranking` is authorized for pushing.
 
+### Follow-up: institution East-West metadata found
+
+[VERIFIED via live sandbox metadata] Added and ran
+`scripts/probe-proposal-ranking-geography.mjs`: request `akoya_applicantid` links to
+`account`; `account.wmkf_eastwest` is the **East-West** Picklist, with
+**East = 100000000**, **West = 100000001**. Only metadata GETs were performed.
+No business records or Production metadata were read. The owner wants this displayed
+on cards; this request delivered discovery only, not card/snapshot implementation.
+Exact evidence and remaining boundary are in the Atlas geography section. Syntax,
+Dataverse-access and OData gates/self-tests passed. No milestone entry is required.
+
 ### Owner choice before further work
 
 1. Prepare the facilitator/grants/readiness prerequisites for the approved sandbox,

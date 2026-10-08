@@ -146,3 +146,22 @@ no runtime check was added. No second review loop was run. The full local review
 receipt is `/private/tmp/ranking-opus-merge-review.txt` (not portable); the verdict,
 scope and disposition here are the durable receipt. The fresh probe and tests were
 run by the orchestrator, separately from the review.
+
+
+## Institution geography discovery — 2026-10-07
+
+[VERIFIED via sandbox metadata GETs from
+`scripts/probe-proposal-ranking-geography.mjs`] The applicant institution relationship
+is `akoya_request.akoya_applicantid` → `account`, relationship schema
+`akoya_account_akoya_request_applicantid`, navigation property `akoya_applicantid`.
+The institution's custom Picklist is `account.wmkf_eastwest` (schema
+`wmkf_EastWest`, display label **East-West**). Metadata defines **East = 100000000**
+and **West = 100000001**. `wmkf_eastwestname` is a Virtual attribute, not the stored
+choice field. These values were read from the registered sandbox metadata, not
+inferred from state/address or institution name.
+
+The probe reads metadata only, refuses non-sandbox targets and requires the target
+interlock on. It reads no business rows and performs no writes. Institution value
+population and Production metadata were not inspected. The owner wants geography
+noted on proposal cards; card/snapshot integration has not been implemented by this
+probe-only change. Missing-value behavior must remain explicit when that work begins.
