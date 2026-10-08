@@ -358,6 +358,8 @@ describe('Proposal Ranking page', () => {
 
     expect(await screen.findByRole('img', { name: 'East institution' })).toHaveTextContent('E');
     expect(screen.getByRole('img', { name: 'West institution' })).toHaveTextContent('W');
+    expect(screen.getByRole('img', { name: 'East institution' })).toHaveClass('text-xs', 'font-medium');
+    expect(screen.getByLabelText('Rank 1: First proposal')).toHaveClass('text-3xl');
     expect(screen.getAllByRole('img', { name: /institution$/ })).toHaveLength(2);
   });
 

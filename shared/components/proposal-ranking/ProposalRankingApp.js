@@ -55,34 +55,48 @@ function ProposalCardRow({ proposal, position, programCount, total, score, rank,
           title="Drag to reorder"
           className="flex w-8 shrink-0 cursor-grab items-center justify-center border-r border-gray-200 bg-gray-50 text-gray-400 active:cursor-grabbing"
         >
-          <span aria-hidden="true">⠿</span>
+          <svg aria-hidden="true" width="16" height="24" viewBox="0 0 16 24" fill="currentColor"><circle cx="5" cy="6" r="1.5" /><circle cx="11" cy="6" r="1.5" /><circle cx="5" cy="12" r="1.5" /><circle cx="11" cy="12" r="1.5" /><circle cx="5" cy="18" r="1.5" /><circle cx="11" cy="18" r="1.5" /></svg>
         </div>}
-        <div className="min-w-0 flex-1 p-4">
-          <div className="mb-2 flex justify-end">
+        <div className="min-w-0 flex-1 space-y-3 p-4">
+          <div className="grid grid-cols-[1fr_auto] items-start gap-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+            <span aria-label={`Rank ${position + 1}: ${proposal.title || 'Untitled proposal'}`} className="min-w-8 shrink-0 text-3xl font-bold leading-none tabular-nums text-gray-900">{position + 1}</span>
+            <div className="order-3 col-span-2 min-w-0 sm:order-2 sm:col-span-1">
+              <h3 className="break-words text-base font-semibold leading-snug text-gray-900">{proposal.organization || 'Organization unavailable'}</h3>
+              <p className="mt-1 break-words text-sm">
+                <a href={`/workbench/${encodeURIComponent(proposal.requestId)}`} className="text-blue-800 underline underline-offset-2 hover:text-blue-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">{proposal.title || 'Untitled proposal'}</a>
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-600">
+                <span>{proposal.programKey.toUpperCase()}</span>
+                {(proposal.institutionGeography === 'East' || proposal.institutionGeography === 'West') && <span
+                  role="img"
+                  aria-label={`${proposal.institutionGeography} institution`}
+                  title={`${proposal.institutionGeography} institution`}
+                  className="border-l border-gray-300 pl-2 text-xs font-medium text-gray-600"
+                >{proposal.institutionGeography[0]}</span>}
+                {proposal.leadName && <span>Lead PD: {proposal.leadName}</span>}
+                {rank?.disagreement && <span className="rounded-md bg-amber-100 px-2 py-0.5 text-amber-900">Disagreement</span>}
+              </div>
+            </div>
             <span
               role="img"
               aria-label={scoreIndicator.label}
               title={scoreIndicator.label}
-              className="h-6 w-6 shrink-0 rounded-full border border-gray-600"
+              className="order-2 h-6 w-6 shrink-0 rounded-full border border-gray-600 sm:order-3"
               style={{ backgroundColor: scoreIndicator.color }}
             />
           </div>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="mb-2 flex items-center gap-3">
-                <span aria-label={`Rank ${position + 1}: ${proposal.title || 'Untitled proposal'}`} className="text-3xl font-bold tabular-nums text-gray-900">{position + 1}</span>
-                <span className="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">{proposal.programKey.toUpperCase()}</span>
-              </div>
-              <h3 className="mt-1 break-words text-base font-semibold text-gray-900">{proposal.organization || 'Organization unavailable'}</h3>
-              <p className="mt-1 break-words text-sm">
-                <a href={`/workbench/${encodeURIComponent(proposal.requestId)}`} className="text-blue-800 underline underline-offset-2 hover:text-blue-950">{proposal.title || 'Untitled proposal'}</a>
-              </p>
-              {proposal.leadName && <p className="mt-1 text-sm text-gray-600">Lead PD: {proposal.leadName}</p>}
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                <span><span className="font-medium text-gray-700">Requested:</span> {amount}</span>
-                {rank?.disagreement && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">Disagreement</span>}
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-sm">
+          <div className="flex flex-wrap items-start gap-x-6 gap-y-2 border-t border-gray-100 pt-3 text-sm">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-gray-600">Requested</p>
+              <p className="mt-1 font-semibold tabular-nums text-gray-900">{amount}</p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-gray-600">Cumulative Budget</p>
+              <p className="mt-1 font-semibold tabular-nums text-gray-900">{accumulated}</p>
+              {!total?.complete && <p className="mt-1 text-xs text-amber-800">A requested amount is missing or incompatible.</p>}
+            </div>
+          </div>
+              <div className="flex flex-wrap items-center gap-1.5 text-sm">
                 <span className="mr-1 font-medium text-gray-700">Reviews</span>
                 {proposal.score?.ratedCount > 0 && proposal.score?.distribution
                   ? [['Excellent', 'E'], ['Very Good', 'VG'], ['Good', 'G'], ['Fair', 'F'], ['Poor', 'P']].flatMap(([rating, grade]) =>
@@ -96,7 +110,7 @@ function ProposalCardRow({ proposal, position, programCount, total, score, rank,
                 {proposal.score?.ratedCount > 0 && Number.isFinite(proposal.score?.displayMean) && <span title="Average reviewer grade" aria-label={`Average reviewer grade: ${proposal.score.displayMean.toFixed(1)}`} className="ml-1 inline-flex min-w-7 items-center justify-center rounded-md bg-gray-100 px-2 py-0.5 font-semibold text-gray-800">{proposal.score.displayMean.toFixed(1)}</span>}
               </div>
               {rankNames.length > 0 && (
-                <ul aria-label="PD ranks" className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-700">
+                <ul aria-label="PD ranks" className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-700">
                   {rankNames.map((entry) => <li key={entry.systemUserId} className="flex items-center gap-1.5 font-semibold" title={`${entry.name}: rank ${entry.rank} of ${programCount}`}>
                     {entry.name.trim().split(/\s+/)[0] || 'PD'}
                     <span aria-label={`${entry.name}: rank ${entry.rank} of ${programCount}`} style={{ backgroundColor: `${pdRankColor(entry.rank, programCount)}33` }} className="inline-flex min-w-7 items-center justify-center rounded-md px-2 py-0.5 font-semibold text-gray-900">{entry.rank}</span>
@@ -108,23 +122,6 @@ function ProposalCardRow({ proposal, position, programCount, total, score, rank,
                   </li>}
                 </ul>
               )}
-
-            </div>
-            <div className="w-full rounded-lg bg-gray-50 p-3 text-sm sm:w-52">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Cumulative Budget</p>
-              <p className="mt-1 font-semibold tabular-nums text-gray-900">{accumulated}</p>
-              {!total?.complete && <p className="mt-1 text-xs text-amber-800">A requested amount is missing or incompatible.</p>}
-            </div>
-          </div>
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <span />
-            {(proposal.institutionGeography === 'East' || proposal.institutionGeography === 'West') && <p
-              role="img"
-              aria-label={`${proposal.institutionGeography} institution`}
-              title={`${proposal.institutionGeography} institution`}
-              className="text-2xl font-bold leading-none text-gray-900"
-            >{proposal.institutionGeography[0]}</p>}
-          </div>
         </div>
       </div>
     </li>
