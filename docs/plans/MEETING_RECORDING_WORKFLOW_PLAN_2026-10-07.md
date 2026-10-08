@@ -8,7 +8,7 @@ owner: product-engineering
 related:
   - docs/plans/SITE_VISIT_SUMMARIES_AND_BOARD_SHARING_PLAN_2026-10-04.md
   - docs/plans/TRANSCRIPT_SUMMARY_UX_AUDIT_2026-10-07.md
-  - docs/atlas/postgres-meeting-transcript-publications.md
+  - docs/atlas/postgres-meeting-transcript-publications.md <!-- drain-table:ignore reason=transcript-publications-atlas-path -->
   - docs/atlas/postgres-meeting-transcript-summary-drafts.md
   - docs/API_ROUTE_SECURITY_MATRIX.md
 ---
