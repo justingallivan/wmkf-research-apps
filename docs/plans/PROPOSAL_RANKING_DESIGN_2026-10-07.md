@@ -47,8 +47,13 @@ grant approvals, award amounts, or change proposal lifecycle status.
   mutable meeting order.
 - Every captured PD must submit in each nonempty program. No participant excusal
   is available (owner decision, 2026-10-08; feature branch, not yet promoted).
-- The facilitator may cancel a round only while neither program is published.
+- The facilitator may cancel an ordinary round only while neither program is published.
   Retain the canceled round read-only and open a replacement with fresh snapshots.
+- Owner decision (2026-10-08): optionally open an explicitly labeled dry run.
+  Its current facilitator can permanently erase its ranking lists after publication.
+  The round retains only a content-free reset receipt; a new round starts from fresh
+  source inputs. Ordinary rounds cannot be relabeled or erased. This capability and
+  the ranking-list Delete role permission are branch-only, not applied in Production.
 - The current facilitator or a superuser may transfer facilitation to another
   active PD on the captured roster at any point in an active round. Preserve all
   orders and publication state; the former facilitator returns to participant
@@ -173,7 +178,7 @@ preview for confirmation; do not freeze data other than what was reviewed. The
 source read is a captured dataset, not a claim of a cross-entity Dataverse snapshot
 transaction. Once captured, it supplies every PD's initial list. Later withdrawal
 or data correction does not mutate it; the unpublished cancel/reopen control is
-available. Published pools stay fixed in v1.
+available. Published ordinary pools stay fixed; an explicitly marked dry run can be erased.
 
 ## Architecture and permissions [source implemented; sandbox storage provisioned]
 
@@ -247,7 +252,8 @@ trusted DAL context checks and the target/write interlock. The ranking adapter n
 transport; authenticated actors are recorded in mandatory payload fields. Pin
 this in tests. The transport without a caller ID neither impersonates nor enters
 the 403 impersonation-fallback branch; retain all existing context/interlock checks. No global auth/restriction
-bypass, privilege broadening, or silent fallback is authorized by this design.
+bypass or silent fallback is authorized. The owner separately approved preparing
+Delete privilege on ranking lists only for dry-run erasure; live application is pending.
 
 ### Atomic lifecycle and repeat handling
 
@@ -288,7 +294,10 @@ bypass, privilege broadening, or silent fallback is authorized by this design.
   Cancellation conditionally clears the active coordinator pointer and marks the
   round canceled in one changeset, only if no program is published. Canceled rounds
   reject mutations; use a new operation UUID for a replacement. Do not support
-  deletion/reopening of submitted lists.
+  deletion/reopening of ordinary submitted lists. Explicit dry-run erasure deletes
+  all lists together with a scrubbed receipt and cycle release, using round/list/cycle
+  ETags in one changeset. Its confirmation also binds the round ETag, and exact
+  retries resolve the retained content-free receipt. Source data is never written.
 - For a network timeout, read back by operation/round/list identity. Transport
   exceptions are not proof of rollback: the write may already have committed.
   Return a confirmed result or a clearly uncertain/conflict response, never a
@@ -306,7 +315,7 @@ bypass, privilege broadening, or silent fallback is authorized by this design.
 write/read -> permission-filtered response -> card stack and cumulative totals`.
 Use app key `proposal-ranking`. Named operations are preview/open, read
 round, save own list, submit own list, generate/edit/publish program meeting list,
-transfer facilitator, cancel unpublished round. All request
+transfer facilitator, cancel unpublished ordinary round, erase explicit dry run. All request
 actors are session-derived. Program/round selectors are validated; errors use
 400 invalid, 403 denied, 409 stale/incomplete, and 503 dependency unavailable.
 

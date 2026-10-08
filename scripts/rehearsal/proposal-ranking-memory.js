@@ -201,3 +201,19 @@ export async function cancelRoundChangeset(round, roundPatch, coordinator, coord
 // This module is webpack-aliased only by the standalone rehearsal build. Keep
 // environment mutation out of this dependency adapter; the harness provides
 // explicit readiness flags to the local process before importing the service.
+
+export async function eraseDryRunChangeset(round, roundLists, roundPatch, coordinator, coordinatorPatch) {
+  if (JSON.parse(round.wmkf_snapshotjson).dryRun !== true || coordinator.wmkf_activeroundid !== round.wmkf_proposalrankingroundid) throw new Error('Erasure requires the active dry run.');
+  if (roundLists.some((list) => list.wmkf_roundid !== round.wmkf_proposalrankingroundid)) throw new Error('Every erased list must belong to this dry run.');
+  const storedRound = currentMapRow(rounds, round.wmkf_proposalrankingroundid, 'round');
+  const storedCoordinator = currentMapRow(coordinators, coordinator.wmkf_proposalrankingcycleid, 'cycle coordinator');
+  checkEtag(storedRound, round['@odata.etag']);
+  checkEtag(storedCoordinator, coordinator['@odata.etag']);
+  for (const list of roundLists) checkEtag(currentMapRow(lists, list.wmkf_proposalrankinglistid, 'list'), list['@odata.etag']);
+  Object.assign(storedRound, clone(roundPatch));
+  Object.assign(storedCoordinator, clone(coordinatorPatch));
+  for (const list of roundLists) lists.delete(list.wmkf_proposalrankinglistid);
+  stamp(storedRound, 'round', storedRound.wmkf_proposalrankingroundid);
+  stamp(storedCoordinator, 'cycle', storedCoordinator.wmkf_proposalrankingcycleid);
+  return { ok: true };
+}

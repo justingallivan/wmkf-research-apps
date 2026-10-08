@@ -1,7 +1,7 @@
 # Proposal Ranking API contract
 
 Status: implementation contract for the first Proposal Ranking release. It is
-updated for the 2026-10-08 owner decision removing excusal, after revision 3 of `PROPOSAL_RANKING_DESIGN_2026-10-07.md`. Runtime
+updated for the 2026-10-08 owner decisions removing excusal and adding explicit dry-run erasure, after revision 3 of `PROPOSAL_RANKING_DESIGN_2026-10-07.md`. Runtime
 activation is now enabled in Production; multi-identity acceptance remains pending. Sandbox and Production schema/application-role setup are verified;
 bounded persistence checks and direct-table denial for the tested sandbox staff
 identity passed. Production facilitator/grants and four-participant direct-table/search
@@ -52,12 +52,15 @@ type Response = {
       transferFacilitator: boolean;
       excuseParticipant: false; // retained wire field; excusal is unavailable
       cancelRound: boolean;
+      resetDryRun: boolean;
     };
   };
   round: null | {
     etag: string;
     policyRevision: number;
     state: 'active' | 'canceled';
+    dryRun: boolean;
+    erased: boolean;
     facilitator: { systemUserId: string; name: string };
     snapshot: {
       proposals: ProposalCard[];
@@ -80,6 +83,7 @@ type Response = {
     publish: Record<ProgramKey, null | { fingerprint: string; message: string; outstandingNames: string[] }>;
     excuse: null; // retained wire field
     cancel: null | { fingerprint: string; message: string };
+    resetDryRun: null | { fingerprint: string; message: string };
   };
   programs: Record<ProgramKey, {
     proposalIds: string[];
@@ -146,7 +150,7 @@ transfer. Canceled rounds are read-only.
 ```ts
 type Action =
   | { action: 'preview'; cycleCode: string }
-  | { action: 'open'; cycleCode: string; previewFingerprint: string; operationId: string }
+  | { action: 'open'; dryRun?: boolean; cycleCode: string; previewFingerprint: string; operationId: string }
   | { action: 'read'; roundId: string; operationId?: string }
   | { action: 'save'; roundId: string; programKey: ProgramKey; order: string[]; etag: string; policyRevision: number; operationId: string }
   | { action: 'submit'; roundId: string; programKey: ProgramKey; order: string[]; etag: string; policyRevision: number; operationId: string }
@@ -154,6 +158,7 @@ type Action =
   | { action: 'edit'; roundId: string; programKey: ProgramKey; order: string[]; etag: string; policyRevision: number; operationId: string }
   | { action: 'publish'; roundId: string; programKey: ProgramKey; etag: string; policyRevision: number; confirmationFingerprint: string; operationId: string }
   | { action: 'transfer'; roundId: string; successorSystemUserId: string; policyRevision: number; operationId: string }
+  | { action: 'resetDryRun'; roundId: string; policyRevision: number; confirmationFingerprint: string; operationId: string }
   | { action: 'cancel'; roundId: string; policyRevision: number; confirmationFingerprint: string; operationId: string };
 ```
 
@@ -179,6 +184,34 @@ retained; a round containing a legacy excusal cannot generate or publish another
 composite (`409 legacy_excusal`). No stored history is rewritten. Opening uses a
 single Open round button without an acknowledgment checkbox; readiness and the
 fresh-preview fingerprint still gate the operation.
+
+## Explicit dry runs (feature branch; not yet promoted)
+
+`open.dryRun` defaults to false and accepts only a boolean. It is captured in the
+immutable round snapshot; existing ordinary rounds cannot be relabeled. A retry
+of the creation operation must retain the same mode. All participants see the dry-run
+label; their actual authenticated identities submit their own lists.
+
+`resetDryRun` is available only to the current facilitator of an active round
+whose persisted snapshot has `dryRun: true`, before or after either publication.
+The confirmation fingerprint includes the round ETag, so any intervening save,
+submission, meeting edit or administration change requires fresh confirmation.
+Ordinary rounds reject reset. Dry runs use erasure instead of retained cancellation.
+
+One ETag-conditional changeset deletes every list belonging to the dry run, scrubs
+its snapshot and administration history, marks the round canceled and clears its
+cycle's active pointer. It retains only a content-free round receipt (round/cycle,
+creation/reset operation IDs, facilitator/reset actor and timing) for safe retry
+and delayed-opening detection. An exact retry returns `dry-run-erased`; it cannot
+clear a subsequently opened round. Removed roster participants lose access to the
+old receipt. Source proposals, source external-review scores and other rounds are
+not changed. Opening a replacement is a separate explicit action with fresh inputs.
+
+This erases active application ranking records. Dataverse audit history, backups
+and copies already viewed/exported are outside this operation; their retention
+has not been inspected in this session. Do not promise platform-wide erasure.
+The tracked app-role spec adds Delete only on ranking lists; applying that permission
+in Production and validating it remain separately owner-approved release steps.
 
 ## Errors and outcome handling
 

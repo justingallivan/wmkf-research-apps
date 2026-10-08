@@ -9,6 +9,6 @@
   "privileges": [
     { "table": "wmkf_ProposalRankingCycle", "_note": "Application-only cycle concurrency row.", "depth": "Global", "ops": ["Create", "Read", "Write"] },
     { "table": "wmkf_ProposalRankingRound", "_note": "Application-only round snapshot and lifecycle.", "depth": "Global", "ops": ["Create", "Read", "Write"] },
-    { "table": "wmkf_ProposalRankingList", "_note": "Application-only private submissions and meeting orders.", "depth": "Global", "ops": ["Create", "Read", "Write"] }
+    { "table": "wmkf_ProposalRankingList", "_note": "Application-only private submissions and meeting orders; Delete supports explicit dry-run erasure.", "depth": "Global", "ops": ["Create", "Read", "Write", "Delete"] }
   ]
 }

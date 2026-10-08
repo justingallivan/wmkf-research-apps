@@ -94,6 +94,32 @@ tab retains its fictional identity on reload, and simulation/reset controls are
 under Rehearsal tools. Reset clears shared rehearsal memory; other tabs must reload.
 These UI changes remain on the unmerged feature branch, not promoted runtime.
 
+## Colleague dry-run erasure — 2026-10-08 (branch only)
+
+[VERIFIED via source and memory-adapter tests] An optional `dryRun: true` opening
+creates a clearly labeled trial. Only its current facilitator can invoke
+`resetDryRun`, including after publication. A real round cannot be relabeled or
+erased. Reset confirmation is invalidated by any intervening round write.
+
+The adapter atomically deletes all trial list records, scrubs the frozen snapshot
+and administration log, marks the round canceled and clears the cycle pointer.
+Only a content-free round/reset receipt remains for idempotent retries and delayed
+opening requests. It contains no rankings or composites. A separately opened new
+round uses fresh source inputs with zero submissions and no meeting edits. The
+source proposal and external-review records are untouched. Platform audit/backups
+and already viewed/exported copies are outside this application-record erasure.
+Their retention is UNKNOWN without the separately authorized live preflight.
+
+[PLANNED, not applied] The owner approved preparing Global Delete privilege on
+`wmkf_ProposalRankingList` for the application role only. The role JSON now includes
+it; coordinator and round privileges remain Create/Read/Write. The Production
+readiness probe derives its expected privilege set from that JSON. No live role
+application, reads, deployment, merge or trial erasure occurred in this session.
+Before a colleague Production trial: owner approves promotion and role application,
+verify role/readiness and current round/default facilitator, resolve any existing
+ordinary trial using its existing unpublished cancellation contract, then explicitly
+open a new dry run. Do not publish an old ordinary trial expecting this reset to work.
+
 ## Source and persistence
 
 [VERIFIED via source] `/proposal-ranking` calls `/api/proposal-ranking`, which
@@ -109,7 +135,8 @@ changesets under trusted DAL context and the existing target interlock.
 | `wmkf_proposalrankinglist` | `wmkf_proposalrankinglists` | One complete order per PD/program or meeting/program. Unique round/list key, ETag, immutable submitted inputs/composite beside mutable meeting order, terminal operation receipts. |
 
 Schema source: `lib/dataverse/schema/wave32-proposal-ranking/`. Application-only
-Create/Read/Write role: `lib/dataverse/schema/roles/proposal-ranking-app.json`.
+role: `lib/dataverse/schema/roles/proposal-ranking-app.json` (Create/Read/Write on
+all three tables; branch-only Delete addition on ranking lists as described above).
 There are no application lookup relationships on these tables; UUID text does not
 remove Dataverse's implicit audit relationships. Generic query privacy must also
 cover those relationships. Ordinary staff must receive no privileges on these
@@ -117,7 +144,8 @@ three tables. Tenant administrators remain privileged.
 
 Snapshots are bounded to 512 KiB, orders/composite JSON to 64 KiB, and administration
 logs to 128 KiB. Exceeding a bound rejects the write. Canceled rounds and submitted
-inputs are retained; this feature exposes no deletion or submission reopening.
+inputs in ordinary rounds are retained; only explicitly marked dry runs support
+atomic list erasure. Submission reopening remains unavailable.
 No Postgres migration, Blob store, AI call, funding decision writeback, or realtime
 synchronization service is introduced.
 

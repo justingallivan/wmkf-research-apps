@@ -343,7 +343,7 @@ async function main() {
   );
   const rolePrivilegesMatch = Boolean(rolePrivilegeResponse.ok
     && expectedPrivileges.missing.length === 0
-    && expectedPrivileges.expected.length === 9
+    && expectedPrivileges.expected.length === roleSpec.privileges.reduce((count, table) => count + table.ops.length, 0)
     && privilegeComparison.exactSetMatches);
   const who = await getJson(client, 'WhoAmI');
   const systemUserId = who.ok && GUID.test(String(who.body?.UserId || ''))

@@ -1,4 +1,4 @@
-jest.mock('../../lib/dataverse/adapters/proposal-ranking.js', () => jest.requireActual('../../scripts/rehearsal/proposal-ranking-memory.js'));
+jest.mock('../../lib/dataverse/adapters/proposal-ranking.js', () => ({ ...jest.requireActual('../../scripts/rehearsal/proposal-ranking-memory.js') }));
 jest.mock('../../lib/dataverse/adapters/proposal-ranking-source.js', () => jest.requireActual('../../scripts/rehearsal/proposal-ranking-memory.js'));
 jest.mock('../../lib/services/dataverse-identity-map.js', () => jest.requireActual('../../scripts/rehearsal/proposal-ranking-memory.js'));
 jest.mock('../../lib/services/app-access-service.js', () => jest.requireActual('../../scripts/rehearsal/proposal-ranking-memory.js'));
@@ -6,6 +6,12 @@ jest.mock('../../lib/services/proposal-ranking/config.js', () => jest.requireAct
 
 import {
   getRehearsalProfiles,
+  listRoundRows,
+  readRound,
+  readProposalRankingSource,
+  findCycleCoordinator,
+  patchRound,
+  eraseDryRunChangeset,
   REHEARSAL_CYCLE_CODE,
   REHEARSAL_DEPENDENCY_PATHS,
 } from '../../scripts/rehearsal/proposal-ranking-memory.js';
@@ -22,7 +28,7 @@ import {
 let operationNumber = 1;
 const operationId = () => `76000000-0000-4000-8000-${String(operationNumber++).padStart(12, '0')}`;
 
-async function openRehearsal() {
+async function openRehearsal(dryRun = false) {
   const facilitator = getRehearsalProfiles()[0];
   const generation = getGeneration();
   const preview = await handleProposalRankingRehearsalGet({ profileId: facilitator.profileId, cycleCode: REHEARSAL_CYCLE_CODE });
@@ -33,6 +39,7 @@ async function openRehearsal() {
     action: 'open',
     body: {
       cycleCode: REHEARSAL_CYCLE_CODE,
+      dryRun,
       previewFingerprint: preview.preview.previewFingerprint,
       operationId: operationId(),
     },
@@ -185,4 +192,84 @@ test('reset fences delayed actions from the previous rehearsal generation', asyn
     operationId: operationId(),
   }, facilitator.profileId, currentGeneration);
   expect(opened.roundId).toBe(getLastCreatedRoundId());
+});
+
+test('erases a published dry run, fences old requests, and opens a clean round without changing sources', async () => {
+  const source = await readProposalRankingSource(REHEARSAL_CYCLE_CODE);
+  const { facilitator, roundId, generation } = await openRehearsal(true);
+  const opening = await readRound(roundId);
+  await submitOwnPrograms(facilitator, roundId);
+  await simulateOtherSubmissions({ roundId }, generation);
+  let current = await handleProposalRankingRehearsalGet({ profileId: facilitator.profileId, roundId });
+  const action = async (name, extra = {}) => handleProposalRankingRehearsalAction({ profileId: facilitator.profileId, action: name, body: { roundId, policyRevision: current.round.policyRevision, operationId: operationId(), ...extra } });
+  for (const programKey of ['se', 'mr']) {
+    current = await action('generate', { programKey, etag: current.programs[programKey].meeting.etag, confirmationFingerprint: current.confirmations.generate[programKey].fingerprint });
+    current = await action('publish', { programKey, etag: current.programs[programKey].meeting.etag, confirmationFingerprint: current.confirmations.publish[programKey].fingerprint });
+  }
+  current = await action('edit', { programKey: 'se', order: [...current.programs.se.meeting.order].reverse(), etag: current.programs.se.meeting.etag });
+  expect((await listRoundRows(roundId)).some((row) => row.wmkf_compositejson)).toBe(true);
+  const body = { roundId, policyRevision: current.round.policyRevision, operationId: operationId(), confirmationFingerprint: current.confirmations.resetDryRun.fingerprint };
+  await expect(handleProposalRankingRehearsalAction({ profileId: getRehearsalProfiles()[1].profileId, action: 'resetDryRun', body })).rejects.toMatchObject({ status: 403 });
+  await expect(handleProposalRankingRehearsalAction({ profileId: facilitator.profileId, action: 'resetDryRun', body: { ...body, confirmationFingerprint: 'stale' } })).rejects.toMatchObject({ code: 'confirmation_stale' });
+  const erased = await handleProposalRankingRehearsalAction({ profileId: facilitator.profileId, action: 'resetDryRun', body });
+  expect(erased.round).toMatchObject({ erased: true, dryRun: true, state: 'canceled' });
+  expect(await listRoundRows(roundId)).toEqual([]);
+  expect(JSON.parse((await readRound(roundId)).wmkf_snapshotjson)).toMatchObject({ proposals: [], roster: [], seedOrders: { se: [], mr: [] } });
+  expect((await findCycleCoordinator(REHEARSAL_CYCLE_CODE)).wmkf_activeroundid).toBeNull();
+  expect(await readProposalRankingSource(REHEARSAL_CYCLE_CODE)).toEqual(source);
+  const retry = await handleProposalRankingRehearsalAction({ profileId: facilitator.profileId, action: 'resetDryRun', body });
+  expect(retry.operation).toMatchObject({ status: 'confirmed', result: 'dry-run-erased' });
+  await expect(action('edit', { programKey: 'se', order: current.programs.se.meeting.order, etag: current.programs.se.meeting.etag })).rejects.toMatchObject({ code: 'program_empty' });
+  const delayedOpen = await handleProposalRankingRehearsalAction({ profileId: facilitator.profileId, action: 'open', body: { cycleCode: REHEARSAL_CYCLE_CODE, dryRun: true, operationId: opening.wmkf_creationoperationid, previewFingerprint: 'old' } });
+  expect(delayedOpen.round.erased).toBe(true);
+  const fresh = await openRehearsal();
+  expect(fresh.roundId).not.toBe(roundId);
+  const freshView = await handleProposalRankingRehearsalGet({ profileId: facilitator.profileId, roundId: fresh.roundId });
+  expect(freshView.round.dryRun).toBe(false);
+  for (const key of ['se', 'mr']) {
+    expect(freshView.programs[key].ownList.status).toBe('draft');
+    expect(freshView.programs[key].ownList.order).toEqual(freshView.round.snapshot.seedOrders[key]);
+    expect(freshView.programs[key].meetingStatus).toBe('collecting');
+    expect(freshView.programs[key].meeting.composite).toBeUndefined();
+    expect(freshView.programs[key].progress.submitted).toBe(0);
+  }
+  await handleProposalRankingRehearsalAction({ profileId: facilitator.profileId, action: 'resetDryRun', body });
+  expect((await findCycleCoordinator(REHEARSAL_CYCLE_CODE)).wmkf_activeroundid).toBe(fresh.roundId);
+  expect(await listRoundRows(fresh.roundId)).toHaveLength(8);
+});
+
+test('ordinary rounds cannot be erased or relabeled, and concurrent writes leave dry-run data intact', async () => {
+  const { facilitator, roundId } = await openRehearsal();
+  const normal = await handleProposalRankingRehearsalGet({ profileId: facilitator.profileId, roundId });
+  expect(normal.confirmations.resetDryRun).toBeNull();
+  await expect(handleProposalRankingRehearsalAction({ profileId: facilitator.profileId, action: 'resetDryRun', body: { roundId, policyRevision: 1, operationId: operationId(), confirmationFingerprint: 'x' } })).rejects.toMatchObject({ code: 'not_dry_run' });
+  await expect(handleProposalRankingRehearsalAction({ profileId: facilitator.profileId, action: 'resetDryRun', body: { roundId, dryRun: true } })).rejects.toMatchObject({ code: 'invalid_request' });
+  expect(await listRoundRows(roundId)).toHaveLength(8);
+  resetProposalRankingServiceRehearsal();
+  const trial = await openRehearsal(true);
+  const round = await readRound(trial.roundId);
+  const lists = await listRoundRows(trial.roundId);
+  const coordinator = await findCycleCoordinator(REHEARSAL_CYCLE_CODE);
+  await patchRound(round, { wmkf_policyrevision: 2 });
+  await expect(eraseDryRunChangeset(round, lists, {}, coordinator, { wmkf_activeroundid: null })).rejects.toMatchObject({ status: 412 });
+  expect(await listRoundRows(trial.roundId)).toEqual(lists);
+  expect((await findCycleCoordinator(REHEARSAL_CYCLE_CODE)).wmkf_activeroundid).toBe(trial.roundId);
+});
+
+test('a save after reset confirmation requires fresh confirmation, and loss of the commit response is retry-safe', async () => {
+  const { facilitator, roundId } = await openRehearsal(true);
+  const before = await handleProposalRankingRehearsalGet({ profileId: facilitator.profileId, roundId });
+  const body = { roundId, policyRevision: before.round.policyRevision, operationId: operationId(), confirmationFingerprint: before.confirmations.resetDryRun.fingerprint };
+  const own = before.programs.se.ownList;
+  const saved = await handleProposalRankingRehearsalAction({ profileId: facilitator.profileId, action: 'save', body: { roundId, programKey: 'se', order: [...own.order].reverse(), etag: own.etag, policyRevision: before.round.policyRevision, operationId: operationId() } });
+  await expect(handleProposalRankingRehearsalAction({ profileId: facilitator.profileId, action: 'resetDryRun', body })).rejects.toMatchObject({ code: 'confirmation_stale' });
+  expect(await listRoundRows(roundId)).toHaveLength(8);
+  const adapter = require('../../lib/dataverse/adapters/proposal-ranking.js');
+  const realErase = adapter.eraseDryRunChangeset;
+  const spy = jest.spyOn(adapter, 'eraseDryRunChangeset').mockImplementationOnce(async (...args) => { await realErase(...args); throw new Error('Lost response'); });
+  try {
+    const result = await handleProposalRankingRehearsalAction({ profileId: facilitator.profileId, action: 'resetDryRun', body: { ...body, confirmationFingerprint: saved.confirmations.resetDryRun.fingerprint } });
+    expect(result.operation).toMatchObject({ status: 'confirmed', result: 'dry-run-erased' });
+    expect(await listRoundRows(roundId)).toEqual([]);
+  } finally { spy.mockRestore(); }
 });

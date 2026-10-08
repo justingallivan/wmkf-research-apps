@@ -5,6 +5,11 @@ const schemaDirectory = path.join(process.cwd(), 'lib/dataverse/schema/wave32-pr
 const rolePath = path.join(process.cwd(), 'lib/dataverse/schema/roles/proposal-ranking-app.json');
 
 describe('Proposal Ranking Dataverse schema', () => {
+  test('only ranking lists receive the Delete permission needed for dry-run erasure', () => {
+    const role = JSON.parse(fs.readFileSync(rolePath, 'utf8'));
+    expect(role.privileges.filter((item) => item.ops.includes('Delete')).map((item) => item.table)).toEqual(['wmkf_ProposalRankingList']);
+  });
+
   test('application role privileges name the exact schema names of all private tables', () => {
     const schemas = fs.readdirSync(schemaDirectory)
       .filter((file) => file.endsWith('.json'))
