@@ -18,6 +18,18 @@ Initial activation and rollback receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTIO
 Earlier dated sections below retain historical setup checkpoints; disabled-state
 statements in those checkpoints are superseded by this release.
 
+## Office portability — 2026-10-08
+
+Implementation is pushed on `codex/proposal-ranking` in draft PR #463 (unmerged).
+The owner requested a documentation-only handoff on main. On the office Mac,
+resume that branch, install repository dependencies if needed, run
+`node scripts/rehearse-proposal-ranking.js`, and open `http://127.0.0.1:3133/`.
+No environment file or credentials are required. Local server processes and memory
+do not transfer through Git; restarting starts empty. The fixture supports D26.
+GitHub checks at `cd8928bbc` passed Jest, Postgres integration, Claude review and
+security checks; recheck future candidate-head CI before promotion.
+No new Production milestone shipped in this rehearsal/stop work.
+
 ## Isolated local UI and service rehearsal — 2026-10-07
 
 [VERIFIED via source, final 42 focused tests, API-route and route-lifecycle-auth
