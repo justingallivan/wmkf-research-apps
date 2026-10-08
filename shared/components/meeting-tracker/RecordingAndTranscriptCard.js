@@ -1804,6 +1804,85 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   };
 }
 
+// Import from Zoom (Stage 3a, docs/plans/ZOOM_RECORDING_IMPORT_PLAN_2026-10-08.md). The list is fetched only when staff
+// open the panel, never on mount. Anything other than `available === true` means unavailable, so existing mocks and
+// environments without Zoom keep today's step 1. Every async write is dropped when the card changed or unmounted.
+function useZoomImport(requestId, { onImported }) {
+  const basePath = `${API_PATH}/${encodeURIComponent(requestId || '')}`;
+  const [status, setStatus] = useState('idle'); // idle | loading | available | unavailable | failed
+  const [windowDays, setWindowDays] = useState(30);
+  const [meetings, setMeetings] = useState([]);
+  const [selectedUuid, setSelectedUuid] = useState(null);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [showOther, setShowOther] = useState(false);
+  const generationRef = useRef(0);
+  const mountedRef = useRef(false);
+  const listSequenceRef = useRef(0);
+  const onImportedRef = useRef(onImported);
+  useEffect(() => { onImportedRef.current = onImported; }, [onImported]);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; generationRef.current += 1; listSequenceRef.current += 1; };
+  }, []);
+  // The card is keyed by requestId, so a different request remounts this hook with a clean panel.
+  const isCurrent = useCallback((generation) => mountedRef.current && generationRef.current === generation, []);
+
+  const loadList = useCallback(async ({ quiet = false } = {}) => {
+    if (!requestId) return;
+    const generation = generationRef.current;
+    const sequence = ++listSequenceRef.current;
+    const isLatest = () => isCurrent(generation) && listSequenceRef.current === sequence;
+    if (!quiet) setStatus('loading');
+    try {
+      const body = await requestJson(`${basePath}/zoom-recordings`, { method: 'GET', fallbackMessage: 'Zoom recordings could not be loaded.' });
+      if (!isLatest()) return;
+      if (body?.available === true && Array.isArray(body.meetings)) {
+        setMeetings(body.meetings);
+        setWindowDays(Number.isInteger(body.windowDays) ? body.windowDays : 30);
+        setStatus('available');
+      } else if (!quiet) setStatus('unavailable');
+    } catch (loadError) {
+      if (isLatest() && loadError?.name !== 'AbortError' && !quiet) setStatus('failed');
+    }
+  }, [basePath, isCurrent, requestId]);
+
+  const openPanel = useCallback(() => { void loadList(); }, [loadList]);
+
+  const importSelected = async () => {
+    const meeting = meetings.find((item) => item.meetingUuid === selectedUuid);
+    if (!meeting || !acknowledged || busy || !requestId) return;
+    const generation = generationRef.current;
+    setBusy(true);
+    setError(null);
+    try {
+      const body = await requestJson(`${basePath}/zoom-imports`, {
+        method: 'POST', body: { meetingUuid: meeting.meetingUuid, nonSensitiveAcknowledged: true },
+        fallbackMessage: 'The Zoom import could not be completed.',
+      });
+      if (!isCurrent(generation)) return;
+      const result = body?.import;
+      setMeetings((current) => current.map((item) => (item.meetingUuid === meeting.meetingUuid && result
+        ? { ...item, import: { state: result.state, jobId: body?.job?.id || null, failureCode: result.failureCode || null } } : item)));
+      setSelectedUuid(null);
+      setAcknowledged(false);
+      await onImportedRef.current?.();
+    } catch (importError) {
+      if (!isCurrent(generation)) return;
+      setError(importError?.message || 'The Zoom import could not be completed.');
+      void loadList({ quiet: true });
+    } finally {
+      if (isCurrent(generation)) setBusy(false);
+    }
+  };
+
+  return {
+    status, windowDays, meetings, selectedUuid, setSelectedUuid, acknowledged, setAcknowledged, busy, error,
+    showOther, toggleOther: () => setShowOther((value) => !value), openPanel, importSelected,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Presentation
 // ---------------------------------------------------------------------------
@@ -2307,6 +2386,70 @@ function SummaryBlock({ t, materials = [] }) {
   );
 }
 
+function fmtPacific(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Unknown time';
+  return `${date.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} PT`;
+}
+
+function ZoomImportSection({ z, activeJob, transcriptionBusy }) {
+  if (z.status === 'unavailable') return null;
+  if (z.status === 'idle') {
+    return <button type="button" onClick={z.openPanel} className={`mt-4 ${BTN_LINK}`}>Import from Zoom</button>;
+  }
+  if (z.status === 'loading') return <p className="mt-4 text-sm text-gray-700" aria-live="polite">Loading Zoom recordings…</p>;
+  if (z.status === 'failed') {
+    return (
+      <div className="mt-4 text-sm text-gray-700">
+        <p>Zoom recordings could not be loaded.</p>
+        <button type="button" onClick={z.openPanel} className={`mt-1 ${BTN_LINK}`}>Try again</button>
+      </div>
+    );
+  }
+  const selected = z.meetings.find((item) => item.meetingUuid === z.selectedUuid) || null;
+  const blocked = Boolean(activeJob) || transcriptionBusy;
+  return (
+    <div className="mt-4" data-testid="zoom-import">
+      <h4 className="text-sm font-semibold text-gray-950">Import from Zoom</h4>
+      <p className="mt-1 text-xs text-gray-600">Recordings from the last {z.windowDays} days. Times are Pacific.</p>
+      {z.meetings.length === 0
+        ? <p className="mt-2 text-sm text-gray-700">No Zoom recordings were found.</p>
+        : <fieldset className="mt-2 space-y-1" disabled={z.busy}>
+          <legend className="sr-only">Zoom meeting</legend>
+          {z.meetings.map((meeting) => {
+            const state = meeting.import?.state || null;
+            const chosen = state === 'started' || state === 'importing';
+            const hasAudio = Boolean(meeting.audio);
+            const detail = [
+              Number.isFinite(meeting.durationMinutes) ? `${meeting.durationMinutes} min` : null,
+              !hasAudio ? 'No audio yet' : meeting.transcript ? 'Audio + Zoom transcript' : 'Audio only',
+              state === 'started' ? 'Imported, transcription started' : state === 'importing' ? 'Importing…'
+                : state === 'failed' ? 'Last import did not finish' : null,
+            ].filter(Boolean).join(' · ');
+            const id = `zoom-meeting-${meeting.meetingUuid}`;
+            return (
+              <label key={meeting.meetingUuid} htmlFor={id} className={`flex items-start gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm ${hasAudio && !chosen ? 'cursor-pointer bg-white' : 'bg-gray-50 text-gray-600'}`}>
+                <input id={id} type="radio" name="zoom-meeting" checked={z.selectedUuid === meeting.meetingUuid} disabled={!hasAudio || chosen || z.busy}
+                  onChange={() => z.setSelectedUuid(meeting.meetingUuid)} className="mt-1 h-4 w-4 border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-600" />
+                <span><span className="font-medium text-gray-900">{fmtPacific(meeting.startTime)}</span><span className="block text-xs text-gray-700">{detail}</span></span>
+              </label>
+            );
+          })}
+        </fieldset>}
+      {selected && <>
+        <label className="mt-3 flex items-start gap-2 text-xs leading-5 text-gray-800">
+          <input type="checkbox" checked={z.acknowledged} disabled={z.busy} onChange={(event) => z.setAcknowledged(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-600" />
+          <span>This recording is non-sensitive and may be sent to our transcription provider.{selected.transcript ? ' Excerpts of both transcripts are also sent to Anthropic to match speaker names.' : ''} Transcription uses paid credits.</span>
+        </label>
+        <button type="button" onClick={z.importSelected} disabled={!z.acknowledged || z.busy || blocked} className={`mt-3 ${BTN_PRIMARY}`}>{z.busy ? 'Importing from Zoom…' : 'Import and transcribe'}</button>
+        {blocked && !z.busy && <p className="mt-2 text-xs text-gray-600">Another transcription is already running. Wait for it to finish.</p>}
+      </>}
+      {z.busy && <p className="mt-2 text-xs text-gray-700" aria-live="polite">Copying the recording from Zoom. This can take a few minutes. Keep this page open.</p>}
+      {z.error && <div className="mt-3"><Notice>{z.error}</Notice></div>}
+    </div>
+  );
+}
+
 function Step({ number, title, state, action, testId, children }) {
   const done = state === 'done';
   const current = state === 'current';
@@ -2340,7 +2483,7 @@ function DerivativeLine({ state, label, boundText, material }) {
   );
 }
 
-function TranscriptWorkflow({ m, t, transcriptInputRef }) {
+function TranscriptWorkflow({ m, t, z, transcriptInputRef }) {
   const [step1Open, setStep1Open] = useState(false);
   const [uploadInstead, setUploadInstead] = useState(false);
   const materials = m.data?.materials || [];
@@ -2367,7 +2510,7 @@ function TranscriptWorkflow({ m, t, transcriptInputRef }) {
   // Step 1 stays open while anything in it is in progress, so a chosen file or a running upload never disappears.
   const step1Working = Boolean(active || m.transfer || (m.data?.uploads || []).length || m.file || m.busyUploadId || m.recoveryBusyId
     || m.zoomBusy || m.transcriptFile || m.transcriptStagedId || m.transcriptBusy || t.audioFile || t.vttFile
-    || t.uploadProgress !== null || t.confirmNoVtt || ['upload', 'upload-captions', 'starting'].includes(t.busy));
+    || z.busy || t.uploadProgress !== null || t.confirmNoVtt || ['upload', 'upload-captions', 'starting'].includes(t.busy));
   const step1Done = Boolean(material || readyForReview) && !step1Working;
   const step1Expanded = !step1Done || step1Open;
   const step2State = reviewOpen || (editable && (!presentationEnd || needsGenerate || t.savedDraft)) ? 'current'
@@ -2378,6 +2521,13 @@ function TranscriptWorkflow({ m, t, transcriptInputRef }) {
   // With no transcript yet there is nothing to report per product, unless something was already made.
   const showProducts = Boolean(material || presentationMaterial || discussionMaterial
     || byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY) || t.summaryDraft || t.summaryConflict || artifact?.transcriptSummary?.artifactId);
+
+  const manualAdd = <>
+    {!active && <GenerateForm t={t} />}
+    <button type="button" onClick={() => setUploadInstead((value) => !value)} aria-expanded={uploadInstead} className={`mt-3 ${BTN_LINK}`}>Upload a finished transcript instead</button>
+    {uploadInstead && <UploadForm m={m} inputRef={transcriptInputRef} />}
+  </>;
+  const recordingBlock = <div className="mt-5 border-t border-gray-200 pt-4"><RecordingBlock m={m} /></div>;
 
   return (
     <div>
@@ -2421,13 +2571,15 @@ function TranscriptWorkflow({ m, t, transcriptInputRef }) {
               <UploadForm m={m} inputRef={transcriptInputRef} />
             </>
             : <>
-              {!active && <GenerateForm t={t} />}
-              <button type="button" onClick={() => setUploadInstead((value) => !value)} aria-expanded={uploadInstead} className={`mt-3 ${BTN_LINK}`}>Upload a finished transcript instead</button>
-              {uploadInstead && <UploadForm m={m} inputRef={transcriptInputRef} />}
+              <ZoomImportSection z={z} activeJob={active} transcriptionBusy={Boolean(t.busy)} />
+              {z.status === 'available'
+                ? <div className="mt-4 border-t border-gray-200 pt-3">
+                  <button type="button" onClick={z.toggleOther} aria-expanded={z.showOther} className={BTN_LINK}>Other ways to add a recording</button>
+                  {z.showOther && <>{manualAdd}{recordingBlock}</>}
+                </div>
+                : <>{manualAdd}{recordingBlock}</>}
             </>}
-          <div className="mt-5 border-t border-gray-200 pt-4">
-            <RecordingBlock m={m} />
-          </div>
+          {generateReason && recordingBlock}
         </>}
       </Step>
 
@@ -2614,6 +2766,7 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
   const hashScrollDoneRef = useRef(false);
   const m = useMaterials(requestId, transcriptInputRef);
   const t = useTranscription(requestId, { onMaterialsChanged: m.load });
+  const z = useZoomImport(requestId, { onImported: t.loadCollection });
   useEffect(() => {
     if (hashScrollDoneRef.current || typeof window === 'undefined' || window.location.hash !== '#recording-and-transcript-card') return;
     const card = document.getElementById('recording-and-transcript-card');
@@ -2631,7 +2784,7 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
       {m.error && !m.data && <div className="mt-4"><Notice>{m.error}</Notice></div>}
       {m.data && (
         <div className="mt-2">
-          <TranscriptWorkflow m={m} t={t} transcriptInputRef={transcriptInputRef} />
+          <TranscriptWorkflow m={m} t={t} z={z} transcriptInputRef={transcriptInputRef} />
         </div>
       )}
     </section>
