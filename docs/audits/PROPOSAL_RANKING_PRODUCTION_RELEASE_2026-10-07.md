@@ -51,7 +51,9 @@ runtime logs confirm the authenticated GET returned HTTP 200; an anonymous GET
 returned HTTP 307 to the sign-in page. The scoped smoke log contains no error-level
 entry. This is a brief smoke observation, not sustained monitoring.
 
-Beth's browser session is required to preview/open as the configured facilitator.
+At this release checkpoint, Beth's browser session was required to preview/open.
+The later owner-approved temporary Justin facilitator setting and mandatory
+pre-colleague trial reset are recorded in `docs/atlas/dataverse-proposal-ranking.md`.
 The other PD sessions are needed to verify private drafts, submission, independent
 SE/MR composite publication, shared reordering and full-requested budget totals.
 No session was impersonated in the browser, no votes were submitted for other staff,

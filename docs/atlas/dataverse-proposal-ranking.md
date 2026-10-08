@@ -1,11 +1,13 @@
 # Proposal Ranking storage and activation
 
 Date: 2026-10-07. Status: **Production deployed and enabled**, with schema, dedicated
-role, Beth's default facilitator setting and four participant grants verified.
+role and four participant grants verified. Justin is the temporary default facilitator
+for the owner-approved trial; Beth must be restored before colleague handoff.
 [VERIFIED via Vercel and Chrome] PR #457 merge `10c079c8` is deployed as
 `dpl_F5ewaS8DRDhABRVyhrG5XHuSRvwf`; Justin's D26 page shows “Round not open”.
-No live ranking round was created. Beth's session and the full multi-identity
-submission/publication/reordering/budget walkthrough remain pending.
+No live ranking round was created during release. The owner subsequently approved
+Justin as default facilitator for testing; the full multi-identity lifecycle remains
+unverified. Trial reset requirements are recorded below.
 Current release and rollback receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTION_RELEASE_2026-10-07.md`.
 Earlier dated sections below retain historical setup checkpoints; disabled-state
 statements in those checkpoints are superseded by this release.
@@ -346,3 +348,28 @@ session for Beth or other PDs was available, so full lifecycle acceptance and
 populated indirect-reader verification remain open. No source or ranking rows
 were written during release. See the current release receipt above for exact
 artifacts, CI, review, authorization and the disabled-with-privacy rollback.
+
+## Temporary facilitator and mandatory clean-start handoff — 2026-10-07
+
+[VERIFIED via existing Admin-service conditional write and readback] Owner approved
+Justin Gallivan (`29b0de0d-4ff7-ee11-a1fd-000d3a3621c7`, profile 2) replacing Beth
+as default facilitator for testing. Enabled identity, active profile and ranking
+grant were revalidated by the service. Setting revision changed from
+`W/"103053119"` to `W/"103053545"`. No other setting, grant, round or source data
+was changed. This is Justin acting as himself, not impersonating Beth.
+
+[OWNER REQUIREMENT] Trial PD rankings must not carry over to colleague use. Preserve
+source reviewer scores. Keep any trial round unpublished, then cancel it, restore
+Beth's default GUID `b6f1cd38-0973-f011-bec3-6045bd0510d4`, and open a fresh round
+with current source inputs. Canceled history is retained. Confirm no submissions,
+composites or meeting edits in the fresh round. The existing service blocks cancellation
+after either program is published; do not cross that boundary for this trial without
+a separately agreed reset-safe path. This reset is still pending, not completed.
+Production activation and all four grants remain on; colleague access is not isolated.
+
+[VERIFIED via signed-in Chrome after the facilitator change] Justin now sees the
+D26 facilitator preview: 23 proposals, four PDs, 51 outstanding reviews, zero
+unscored. The Open round acknowledgement remains unchecked; no round was opened.
+A newly observed display issue remains: many cards show “Organization unavailable”
+and one shows “N/A”, despite populated geography. Investigate the source organization
+name mapping before freezing cards; no source-name correction was inferred or made.

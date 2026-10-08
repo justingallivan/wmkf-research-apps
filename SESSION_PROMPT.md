@@ -1,6 +1,27 @@
 # Session 584 Prompt: Proposal Ranking live; facilitator walkthrough next
 
-## Latest: Production deployed and enabled — 2026-10-07
+## Current owner-only trial — restore a clean start before colleague use
+
+[VERIFIED via conditional Admin-service PUT and readback, 2026-10-07] Owner approved
+Justin Gallivan as temporary default facilitator (`29b0de0d-4ff7-ee11-a1fd-000d3a3621c7`,
+profile 2). Beth's previous default was `b6f1cd38-0973-f011-bec3-6045bd0510d4`.
+Only this setting changed; no round was opened or rankings submitted by this action.
+
+Owner explicitly requires a blank slate before colleagues start. This means trial
+PD orders/submissions/composites must not carry into the real round; source external
+reviewer scores remain intact. Keep the trial UNPUBLISHED: existing cancellation
+refuses a round after either program is published. Before handoff, cancel any
+unpublished trial round (retained read-only as history), restore Beth as default,
+and open a fresh round from current source data. Verify the new round has only
+initial seed orders and no submitted lists/composites/meeting edits. No reset has
+been performed yet. Do not test publication in the live trial without first agreeing
+a separate reset-safe rehearsal path. The app is already live with four grants;
+this is not an isolated environment inaccessible to colleagues.
+
+Next: Justin can inspect the facilitator preview without opening a round. Other
+people's rankings must not be manufactured using their identities.
+
+## Historical release checkpoint: Production deployed and enabled — 2026-10-07
 
 [VERIFIED via GitHub, Vercel and signed-in Chrome] Owner approved release. PR #457
 merged at `10c079c8652b4184404b4cb8ee8479f370a56c79`; privacy guards deployed while
@@ -279,3 +300,10 @@ Prior transcript/summary UX and Final Writeup handoff context is preserved at
 `git show fc56ca483:SESSION_PROMPT.md`. Those items were not reverified or advanced
 by this ranking build; read current owner/source evidence before resuming them.
 Do not carry forward destructive cleanup instructions without fresh verification.
+
+[VERIFIED via signed-in Chrome after the facilitator change] Justin now sees the
+D26 facilitator preview: 23 proposals, four PDs, 51 outstanding reviews, zero
+unscored. The Open round acknowledgement remains unchecked; no round was opened.
+A newly observed display issue remains: many cards show “Organization unavailable”
+and one shows “N/A”, despite populated geography. Investigate the source organization
+name mapping before freezing cards; no source-name correction was inferred or made.
