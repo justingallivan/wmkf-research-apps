@@ -1,7 +1,7 @@
 # Proposal Ranking API contract
 
 Status: implementation contract for the first Proposal Ranking release. It is
-derived from revision 3 of `PROPOSAL_RANKING_DESIGN_2026-10-07.md`. Runtime
+updated for the 2026-10-08 owner decision removing excusal, after revision 3 of `PROPOSAL_RANKING_DESIGN_2026-10-07.md`. Runtime
 activation is now enabled in Production; multi-identity acceptance remains pending. Sandbox and Production schema/application-role setup are verified;
 bounded persistence checks and direct-table denial for the tested sandbox staff
 identity passed. Production facilitator/grants and four-participant direct-table/search
@@ -50,7 +50,7 @@ type Response = {
       editMeetingOrder: boolean;
       publish: boolean;
       transferFacilitator: boolean;
-      excuseParticipant: boolean;
+      excuseParticipant: false; // retained wire field; excusal is unavailable
       cancelRound: boolean;
     };
   };
@@ -78,7 +78,7 @@ type Response = {
   confirmations: {
     generate: Record<ProgramKey, null | { fingerprint: string; message: string; outstandingNames: string[] }>;
     publish: Record<ProgramKey, null | { fingerprint: string; message: string; outstandingNames: string[] }>;
-    excuse: null | { fingerprint: string; message: string };
+    excuse: null; // retained wire field
     cancel: null | { fingerprint: string; message: string };
   };
   programs: Record<ProgramKey, {
@@ -154,7 +154,6 @@ type Action =
   | { action: 'edit'; roundId: string; programKey: ProgramKey; order: string[]; etag: string; policyRevision: number; operationId: string }
   | { action: 'publish'; roundId: string; programKey: ProgramKey; etag: string; policyRevision: number; confirmationFingerprint: string; operationId: string }
   | { action: 'transfer'; roundId: string; successorSystemUserId: string; policyRevision: number; operationId: string }
-  | { action: 'excuse'; roundId: string; participantSystemUserId: string; reason: string; policyRevision: number; confirmationFingerprint: string; operationId: string }
   | { action: 'cancel'; roundId: string; policyRevision: number; confirmationFingerprint: string; operationId: string };
 ```
 
@@ -163,7 +162,7 @@ change returns `409` with the replacement preview and requires the facilitator t
 review it. The server returns confirmation fingerprints in `confirmations` only
 while each transition is available. `generate` and first `publish` tokens are per
 program and bind the policy revision, both programs' submission state, and the
-named outstanding PDs. `excuse` and `cancel` bind the same current round state.
+named outstanding PDs. `cancel` binds the same current round state.
 This makes the final confirmation stale when submissions or policy change.
 
 All order writes require an exact permutation of that program's frozen proposal
@@ -173,6 +172,13 @@ the facilitator only; the captured roster gains edit permission only after that
 program is `published`. `generate` applies to a meeting list in `collecting`, and
 `publish` applies to a generated list in `composite-draft`. The response's meeting
 `etag` is required for each transition or edit.
+
+All captured participants must submit for each nonempty program. `excuse` requests
+are rejected with `400 invalid_request`. Older snapshots and published results are
+retained; a round containing a legacy excusal cannot generate or publish another
+composite (`409 legacy_excusal`). No stored history is rewritten. Opening uses a
+single Open round button without an acknowledgment checkbox; readiness and the
+fresh-preview fingerprint still gate the operation.
 
 ## Errors and outcome handling
 

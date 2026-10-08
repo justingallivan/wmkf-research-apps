@@ -338,10 +338,7 @@ export default function ProposalRankingApp() {
   const saveStatesRef = useRef({});
   const [submitting, setSubmitting] = useState(null);
   const [pendingConfirmation, setPendingConfirmation] = useState(null);
-  const [excuseSelection, setExcuseSelection] = useState('');
-  const [excuseReason, setExcuseReason] = useState('');
   const [transferSelection, setTransferSelection] = useState('');
-  const [excuseConfirmed, setExcuseConfirmed] = useState(false);
   const [transferConfirmed, setTransferConfirmed] = useState(false);
   const [cancelConfirmed, setCancelConfirmed] = useState(false);
   const [operationNotice, setOperationNotice] = useState(null);
@@ -539,7 +536,6 @@ export default function ProposalRankingApp() {
       if (operationId) lastOperationRef.current = null;
       if (operationId) setOperationNotice(`Saved (${next.operation?.result || action.action}).`);
       setPendingConfirmation(null);
-      setExcuseConfirmed(false);
       setTransferConfirmed(false);
       setCancelConfirmed(false);
       return next;
@@ -603,9 +599,6 @@ export default function ProposalRankingApp() {
     saveStatesRef.current = {};
     setRequestBusy(false);
     setPendingConfirmation(null);
-    setExcuseSelection('');
-    setExcuseReason('');
-    setExcuseConfirmed(false);
     setTransferSelection('');
     setTransferConfirmed(false);
     setCancelConfirmed(false);
@@ -771,13 +764,6 @@ export default function ProposalRankingApp() {
     void runAction({ action: 'publish', roundId: current.roundId, programKey, etag: meeting.etag, policyRevision: current.round.policyRevision, confirmationFingerprint: token.fingerprint, operationId: createOperationId() });
   };
 
-  const confirmExcuse = () => {
-    const current = responseRef.current;
-    const token = current?.confirmations?.excuse;
-    if (!current?.roundId || !token || !excuseSelection || !excuseReason.trim() || !excuseConfirmed || hasUnresolvedSave) return;
-    void runAction({ action: 'excuse', roundId: current.roundId, participantSystemUserId: excuseSelection, reason: excuseReason.trim(), policyRevision: current.round.policyRevision, confirmationFingerprint: token.fingerprint, operationId: createOperationId() });
-  };
-
   const confirmCancel = () => {
     const current = responseRef.current;
     const token = current?.confirmations?.cancel;
@@ -859,6 +845,7 @@ export default function ProposalRankingApp() {
 
       {!loading && activeResponse?.mode === 'round' && round && <>
         {round.state === 'canceled' && <StatusBanner kind="warning">This round was canceled and is read-only. <Button type="button" variant="outline" size="sm" onClick={() => loadCurrent({ keepDrafts: false, cyclePreview: true })}>View current cycle preview</Button></StatusBanner>}
+        {round.state === 'active' && round.snapshot.roster.some((person) => person.excluded) && <StatusBanner kind="warning">Every participant is required. This older round contains an excusal and cannot generate or publish another composite.</StatusBanner>}
         <Card hover={false} padding="p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -920,27 +907,6 @@ export default function ProposalRankingApp() {
             </Card>
           </aside>
         </div>
-        {activeResponse.viewer.capabilities.excuseParticipant && <Card hover={false}>
-          <h2 className="font-semibold text-gray-900">Excuse a PD</h2>
-          <p className="mt-1 text-sm text-gray-600">This exceptional action applies to both programs and is unavailable after either composite is generated. Their saved lists remain retained but are excluded from calculation.</p>
-          {activeResponse.confirmations?.excuse ? <div className="mt-3 space-y-3">
-            <label className="block text-sm font-medium text-gray-700">PD to excuse
-              <select value={excuseSelection} onChange={(event) => { setExcuseSelection(event.target.value); setExcuseConfirmed(false); }} disabled={actionBusy || hasUnresolvedSave} className="mt-1 h-10 w-full max-w-md rounded-lg border border-gray-300 bg-white px-3">
-                <option value="">Choose a PD</option>
-                {round.snapshot.roster.filter((person) => !person.excluded).map((person) => <option key={person.systemUserId} value={person.systemUserId}>{person.name}</option>)}
-              </select>
-            </label>
-            <label className="block text-sm font-medium text-gray-700">Recorded reason
-              <textarea value={excuseReason} onChange={(event) => setExcuseReason(event.target.value)} rows={3} maxLength={1000} disabled={actionBusy || hasUnresolvedSave} placeholder="Explain why this PD is being excused from voting." className="mt-1 w-full max-w-2xl rounded-lg border border-gray-300 px-3 py-2" />
-            </label>
-            <label className="flex items-start gap-2 text-sm text-gray-700">
-              <input type="checkbox" checked={excuseConfirmed} onChange={(event) => setExcuseConfirmed(event.target.checked)} disabled={actionBusy || hasUnresolvedSave || !excuseSelection || !excuseReason.trim()} className="mt-0.5 rounded border-gray-300" />
-              I confirm this recorded excusal applies to both programs and cannot be reversed in this round.
-            </label>
-            <p className="text-sm text-amber-900">{activeResponse.confirmations.excuse.message}</p>
-            <Button type="button" variant="danger" size="sm" disabled={actionBusy || hasUnresolvedSave || !excuseConfirmed || !excuseSelection || !excuseReason.trim()} onClick={confirmExcuse}>Excuse PD</Button>
-          </div> : <p className="mt-2 text-sm text-gray-600">Excusal is not available after the first composite is generated.</p>}
-        </Card>}
         {(capabilities.transferFacilitator || capabilities.cancelRound) && <Card hover={false}>
           <h2 className="font-semibold text-gray-900">Round administration</h2>
           {capabilities.transferFacilitator && <div className="mt-3 space-y-3">

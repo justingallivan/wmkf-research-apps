@@ -45,10 +45,8 @@ grant approvals, award amounts, or change proposal lifecycle status.
   No real-time synchronization infrastructure in v1.
 - Keep individual submissions and the calculated composite separate from the
   mutable meeting order.
-- The facilitator may exceptionally excuse a PD, with confirmation and a recorded
-  reason, before either program composite has been generated. Exclusion applies
-  to both programs. Retain any submitted list but exclude it from calculation.
-  Every PD submitting is the normal process; excusal is not routine roster editing.
+- Every captured PD must submit in each nonempty program. No participant excusal
+  is available (owner decision, 2026-10-08; feature branch, not yet promoted).
 - The facilitator may cancel a round only while neither program is published.
   Retain the canceled round read-only and open a replacement with fresh snapshots.
 - The current facilitator or a superuser may transfer facilitation to another
@@ -58,7 +56,7 @@ grant approvals, award amounts, or change proposal lifecycle status.
 - Freeze all card details, amounts, review-score summaries, and initial order when
   the round opens. No background refresh of those values during a round.
 - No ranking notes, projected-budget input, automatic funding cutoff, or funding
-  decision writeback in v1. An administrative excusal reason is not a ranking note.
+  decision writeback in v1.
 
 ## Card contents and totals
 
@@ -136,7 +134,8 @@ These are source observations, not new production probes or deployment claims.
 
 ## Explicit pool and opening contract
 
-Open only through a deliberate facilitator action after preview. The configured
+Open through a single Open round button after preview, without an acknowledgment
+checkbox. Show actual missing-review warnings; omit zero-warning counts. The configured
 CSO identity can preview/open before a roster exists. The preview shows proposal
 membership, assigned PDs, unscored proposals and outstanding review counts.
 A superuser can configure the default facilitator using an active Dynamics user
@@ -166,7 +165,7 @@ app access. Missing/ambiguous/inactive PDs block opening, never remove proposals
 The union of lead PDs across SE/MR is the captured voter roster. Empty program:
 no individual lists or generation required; show No proposals. Both empty: refuse
 opening. One voter is allowed, with no disagreement highlight. At least one
-non-excused voter is required in every nonempty program.
+voter is required in every nonempty program; all captured voters must submit.
 
 Opening performs a fresh full read and compares a preview fingerprint covering
 pool, staff identities, review basis, and card fields. If changed, return the new
@@ -222,9 +221,8 @@ App API permissions are mandatory on every read and write. App access alone does
 not grant access to rounds or lists. Before publication a participant gets only
 their own program lists and submission progress; the facilitator gets all. After
 program publication, that program's source ranks and shared order are available
-to the roster. Publishing SE does not expose MR. Excluded PDs remain on the roster
-for meeting participation, with their excluded status visible; their drafts are
-not included in source-rank projections. A superuser alone gets administration
+to the roster. Publishing SE does not expose MR. Legacy excusal flags remain
+visible only as retained history; new generation/publication is blocked for those rounds. A superuser alone gets administration
 metadata for facilitator transfer, not other PDs' private list contents.
 
 The new tables must not be included in ordinary staff Dataverse table privileges.
@@ -255,7 +253,7 @@ bypass, privilege broadening, or silent fallback is authorized by this design.
 
 - Every mutation re-reads the round, validates current actor permissions/state and
   client policy revision, and includes a conditional round PATCH and conditional
-  list PATCH in one changeset. This fences facilitator/excusal/cancellation races
+  list PATCH in one changeset. This fences facilitator/cancellation races
   as well as stale orders. Increment policy revision only for policy changes;
   ordinary list saves still conditionally touch the round version.
 - For another participant's unrelated save, a bounded server retry is permitted
@@ -270,31 +268,27 @@ bypass, privilege broadening, or silent fallback is authorized by this design.
   GUIDs. First coordinator creation uses POST plus a unique cycle key; a confirmed duplicate-key
   failure reloads the winner, while other errors retain their actual classification. Open requests carry a stable operation UUID so an uncertain
   retry resolves the original round and cannot create another after cancellation.
-- Generate only when all non-excused lists for that program are submitted. Store
+- Generate only when all captured participants’ lists for that program are submitted. Store
   source IDs, exact sums/counts/ranges and baseline order in the meeting row while
   moving collecting to draft. Inputs are immutable. Repeat generation returns the
-  existing result without resetting meeting edits. Excusal is forbidden after
-  either meeting list leaves collecting, keeping the voter set stable.
+  existing result without resetting meeting edits. The voter set stays fixed.
 - Publish conditionally updates the meeting row version that the facilitator
   reviewed. This atomically exposes its current order and corresponding source
   ranks. Repeat publication does not reset its timestamp or order.
-- Before first generation, name outstanding PD submissions in either program and
-  confirm that excusal will no longer be available. Before first publication,
-  name the other program's outstanding submissions and confirm that cancellation
-  will no longer be available. These confirmations bind to current round policy
-  and submission state. If a PD becomes unavailable afterward, the unfinished
-  program can remain blocked; this is a disclosed v1 limitation, not automatic
-  authority to alter published inputs or waive a vote.
-- Excusal is irreversible within a round; excused PD lists become read-only.
-  An excused PD remains eligible to facilitate because facilitator eligibility is
-  roster-based, not vote-based. Their vote remains excluded. After transfer a
-  former non-roster facilitator has no participant access. The current facilitator
-  and captured roster may edit a published program list.
-- Transfer facilitator/cancel/exceptional excusal use the round version and record
-  actor/time/reason as applicable. Cancellation conditionally clears the active
-  coordinator pointer and marks the round canceled in one changeset, only if no
-  program is published. Canceled rounds reject all mutations; use a new operation
-  UUID for a replacement. Do not support deletion/reopening of submitted lists.
+- Before generation, show outstanding PD submissions in either program. Before
+  first publication, name the other program's outstanding submissions and confirm
+  that cancellation will no longer be available. Confirmations bind to current
+  policy and submission state. An unavailable PD leaves that program blocked;
+  there is no authority to waive a vote.
+- Older snapshots containing an excusal retain their historical display and saved
+  results but cannot generate or publish another composite. No history is rewritten.
+  After transfer a former non-roster facilitator has no participant access. The
+  current facilitator and captured roster may edit a published program list.
+- Transfer facilitator/cancel use the round version and record actor/time.
+  Cancellation conditionally clears the active coordinator pointer and marks the
+  round canceled in one changeset, only if no program is published. Canceled rounds
+  reject mutations; use a new operation UUID for a replacement. Do not support
+  deletion/reopening of submitted lists.
 - For a network timeout, read back by operation/round/list identity. Transport
   exceptions are not proof of rollback: the write may already have committed.
   Return a confirmed result or a clearly uncertain/conflict response, never a
@@ -312,7 +306,7 @@ bypass, privilege broadening, or silent fallback is authorized by this design.
 write/read -> permission-filtered response -> card stack and cumulative totals`.
 Use app key `proposal-ranking`. Named operations are preview/open, read
 round, save own list, submit own list, generate/edit/publish program meeting list,
-transfer facilitator, excuse participant, cancel unpublished round. All request
+transfer facilitator, cancel unpublished round. All request
 actors are session-derived. Program/round selectors are validated; errors use
 400 invalid, 403 denied, 409 stale/incomplete, and 503 dependency unavailable.
 
@@ -351,7 +345,7 @@ tests verify existing building blocks. Feature-specific tests are now under
 `tests/unit/proposal-ranking-*.test.js`; final integrated results and review are
 recorded separately from this historical planning baseline.
 
-## Review reconciliation
+## Historical revision 2–3 review reconciliation
 
 Original review: `docs/audits/PROPOSAL_RANKING_OPUS_DESIGN_REVIEW_2026-10-07.md`
 (historical assessment of revision 1, not a statement of current design status).

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 jest.mock('../../lib/dataverse/adapters/proposal-ranking.js', () => ({
   readRound: jest.fn(),
   listRoundRows: jest.fn(),
@@ -168,11 +169,11 @@ describe('Proposal Ranking service access and voting', () => {
 
   test('confirmation ignores unrelated autosaves but changes when a ballot is submitted', async () => {
     const initial = await handleProposalRankingGet({ roundId: round.wmkf_proposalrankingroundid, profileId: 'profile-facilitator' });
-    const originalFingerprint = initial.confirmations.excuse.fingerprint;
+    const originalFingerprint = initial.confirmations.cancel.fingerprint;
     rows[1].wmkf_lastoperationid = 'abababab-1111-4111-8111-abababababab';
     rows[1].wmkf_lastoperationkind = 'save';
     const afterAutosave = await handleProposalRankingGet({ roundId: round.wmkf_proposalrankingroundid, profileId: 'profile-facilitator' });
-    expect(afterAutosave.confirmations.excuse.fingerprint).toBe(originalFingerprint);
+    expect(afterAutosave.confirmations.cancel.fingerprint).toBe(originalFingerprint);
 
     await handleProposalRankingAction({
       action: 'submit', profileId: 'profile-facilitator',
@@ -183,7 +184,7 @@ describe('Proposal Ranking service access and voting', () => {
       },
     });
     const afterSubmit = await handleProposalRankingGet({ roundId: round.wmkf_proposalrankingroundid, profileId: 'profile-facilitator' });
-    expect(afterSubmit.confirmations.excuse.fingerprint).not.toBe(originalFingerprint);
+    expect(afterSubmit.confirmations.cancel.fingerprint).not.toBe(originalFingerprint);
   });
 
   test('maps a Dataverse ETag failure to a safe conflict with the current private-filtered view', async () => {
@@ -314,35 +315,70 @@ describe('Proposal Ranking service access and voting', () => {
     expect(participantEdit.programs.se.meeting.status).toBe('published');
   });
 
-  test('excusal is confirmed, updates the captured roster, and removes only that ballot', async () => {
+  test('rejects excusal even for the facilitator without changing any stored state', async () => {
     const before = await handleProposalRankingGet({ roundId: round.wmkf_proposalrankingroundid, profileId: 'profile-facilitator' });
-    const response = await handleProposalRankingAction({
+    expect(before.viewer.capabilities.excuseParticipant).toBe(false);
+    expect(before.confirmations.excuse).toBeNull();
+    await expect(handleProposalRankingAction({
       action: 'excuse', profileId: 'profile-facilitator',
       body: {
         action: 'excuse', roundId: round.wmkf_proposalrankingroundid, participantSystemUserId: participantId,
         reason: 'Unable to participate', policyRevision: before.round.policyRevision,
-        confirmationFingerprint: before.confirmations.excuse.fingerprint,
-        operationId: 'abababab-abab-4bab-8bab-abababababab',
+        confirmationFingerprint: 'old-client-token', operationId: 'abababab-abab-4bab-8bab-abababababab',
       },
-    });
-    expect(response.round.snapshot.roster.find((person) => person.systemUserId === participantId).excluded).toBe(true);
-    expect(response.programs.se.facilitatorLists.find((list) => list.owner.systemUserId === participantId).status).toBe('draft');
-    expect(response.programs.se.progress.required).toBe(1);
-    expect(round.wmkf_administrationlogjson).toContain('Unable to participate');
+    })).rejects.toMatchObject({ status: 400, code: 'invalid_request' });
+    expect(patchRound).not.toHaveBeenCalled();
+    expect(patchRoundAndList).not.toHaveBeenCalled();
+    expect(before.programs.se.progress.required).toBe(2);
+  });
+
+  test('withholds generation until every roster member submits, independently per program', async () => {
     rows[0].wmkf_status = 100000001;
-    const afterSubmit = await handleProposalRankingGet({ roundId: round.wmkf_proposalrankingroundid, profileId: 'profile-facilitator' });
-    const generated = await handleProposalRankingAction({
+    const before = await handleProposalRankingGet({ roundId: round.wmkf_proposalrankingroundid, profileId: 'profile-facilitator' });
+    expect(before.programs.se.progress).toEqual({ required: 2, submitted: 1, outstandingNames: ['Participant'] });
+    expect(before.confirmations.generate.se).toBeNull();
+    expect(before.viewer.capabilities.generate).toBe(false);
+    // Even a correctly constructed confirmation cannot waive a missing ballot.
+    const fingerprint = createHash('sha256').update(JSON.stringify({
+      roundId: round.wmkf_proposalrankingroundid, policyRevision: 1, action: 'generate', programKey: 'se',
+      lists: rows.map((row) => [row.wmkf_listkey, row.wmkf_status, row.wmkf_submittedoperationid || null])
+        .sort((a, b) => a[0].localeCompare(b[0])),
+      facilitator: facilitatorId, state: round.wmkf_state,
+    })).digest('hex');
+    await expect(handleProposalRankingAction({
       action: 'generate', profileId: 'profile-facilitator',
       body: {
         action: 'generate', roundId: round.wmkf_proposalrankingroundid, programKey: 'se',
-        etag: rows[2]['@odata.etag'], policyRevision: afterSubmit.round.policyRevision,
-        confirmationFingerprint: afterSubmit.confirmations.generate.se.fingerprint,
+        etag: rows[2]['@odata.etag'], policyRevision: 1, confirmationFingerprint: fingerprint,
         operationId: 'bcbcbcbc-bcbc-4bcb-8bcb-bcbcbcbcbcbc',
       },
-    });
-    expect(generated.programs.se.meeting.composite.ranks[0].participants).toEqual([
-      { systemUserId: facilitatorId, name: 'Facilitator', rank: 1 },
-    ]);
+    })).rejects.toMatchObject({ status: 409, code: 'incomplete_submissions' });
+    expect(patchRoundAndList).not.toHaveBeenCalled();
+    rows[1].wmkf_status = 100000001;
+    const after = await handleProposalRankingGet({ roundId: round.wmkf_proposalrankingroundid, profileId: 'profile-facilitator' });
+    expect(after.confirmations.generate.se).not.toBeNull();
+    expect(after.confirmations.generate.mr).toBeNull();
+    expect(after.programs.se.progress).toMatchObject({ required: 2, submitted: 2 });
+  });
+
+  test.each(['generate', 'publish'])('legacy excusal cannot bypass full participation through %s', async (action) => {
+    const snapshot = JSON.parse(round.wmkf_snapshotjson);
+    snapshot.excusedSystemUserIds = [participantId];
+    round.wmkf_snapshotjson = JSON.stringify(snapshot);
+    rows[0].wmkf_status = 100000001;
+    if (action === 'publish') {
+      rows[2].wmkf_status = 100000003;
+      rows[2].wmkf_compositejson = JSON.stringify({ sourceSubmissionIds: [rows[0].wmkf_proposalrankinglistid] });
+    }
+    const before = await handleProposalRankingGet({ roundId: round.wmkf_proposalrankingroundid, profileId: 'profile-facilitator' });
+    expect(before.confirmations[action].se).toBeNull();
+    await expect(handleProposalRankingAction({
+      action, profileId: 'profile-facilitator',
+      body: { action, roundId: round.wmkf_proposalrankingroundid, programKey: 'se',
+        etag: rows[2]['@odata.etag'], policyRevision: 1, confirmationFingerprint: 'old-token',
+        operationId: 'bcbcbcbc-bcbc-4bcb-8bcb-bcbcbcbcbcbc' },
+    })).rejects.toMatchObject({ status: 409, code: 'legacy_excusal' });
+    expect(patchRoundAndList).not.toHaveBeenCalled();
   });
 
   test('cancel commits a durable terminal state and an exact retry reads it back', async () => {

@@ -69,6 +69,15 @@ requirement: before colleague use, cancel any unpublished trial, restore Beth as
 default facilitator, open a fresh round and verify only initial seed orders with
 no submissions, composites or meeting edits. Preserve source reviewer scores.
 
+## Office walkthrough simplification — 2026-10-08
+
+Opening now uses one Open round button and concise snapshot copy, without an
+acknowledgment checkbox or zero-review warning counts. Actual review warnings,
+readiness checks, preview fingerprint validation and uncertain-opening recovery
+remain. The owner required all participants to submit, so the UI no longer offers
+excusal and the service rejects the action. Source and focused mocked tests are
+the evidence; no live reads, writes or deployment are part of this change.
+
 ## Source and persistence
 
 [VERIFIED via source] `/proposal-ranking` calls `/api/proposal-ranking`, which
@@ -118,8 +127,10 @@ GUID in shared `wmkf_appsystemsetting` under
 [VERIFIED via source] The app receives filtered private/no-store responses. Before
 publication, each PD sees their own orders, the facilitator sees all, and a
 nonparticipant superuser receives only transfer metadata. Publishing one program
-reveals only that program's shared order and named submitted ranks. Excused PDs
-remain meeting participants but do not vote. A non-roster facilitator's successful
+reveals only that program's shared order and named submitted ranks. Every captured
+PD must submit; excusal is unavailable in the feature-branch UI and service. Older
+excusal snapshots retain their readable history but cannot generate or publish
+another composite. This 2026-10-08 change is not yet promoted. A non-roster facilitator's successful
 handoff returns a receipt without private data; subsequent access is denied.
 
 The UI serializes saves, retains the latest queued order, shows unconfirmed edits,

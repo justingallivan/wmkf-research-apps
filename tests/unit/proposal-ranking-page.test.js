@@ -317,6 +317,14 @@ describe('Proposal Ranking page', () => {
     await waitFor(() => expect(mockLoad).toHaveBeenLastCalledWith({ cycleCode: CYCLE, roundId: undefined }));
   });
 
+  test('does not offer excusal even if an older server advertises the capability', async () => {
+    mockLoad.mockResolvedValue(roundResponse({ facilitator: true }));
+    render(<ProposalRankingApp />);
+    await screen.findByText('Round administration');
+    expect(screen.queryByRole('button', { name: 'Excuse PD' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Excuse a PD')).not.toBeInTheDocument();
+  });
+
   test.each([true, false])('opening without an acknowledgment preserves canOpen=%s', async (canOpen) => {
     mockLoad.mockResolvedValue({ mode: 'preview', cycleCode: CYCLE, viewer: { capabilities: { open: true } },
       preview: { proposals: [REQUESTS[0]], seedOrders: { se: [INITIAL_ORDER[0]], mr: [] }, roster: [],
