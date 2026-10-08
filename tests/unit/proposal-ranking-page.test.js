@@ -224,11 +224,11 @@ describe('Proposal Ranking page', () => {
     response.round.snapshot.proposals[2].institutionGeography = 'North';
     delete response.round.snapshot.proposals[3].institutionGeography;
     mockLoad.mockResolvedValue(response);
-    const { container } = render(<ProposalRankingApp />);
+    render(<ProposalRankingApp />);
 
-    expect(await screen.findByLabelText('East institution')).toHaveTextContent('E');
-    expect(screen.getByLabelText('West institution')).toHaveTextContent('W');
-    expect(container.querySelectorAll('[aria-label$=" institution"]')).toHaveLength(2);
+    expect(await screen.findByRole('img', { name: 'East institution' })).toHaveTextContent('E');
+    expect(screen.getByRole('img', { name: 'West institution' })).toHaveTextContent('W');
+    expect(screen.getAllByRole('img', { name: /institution$/ })).toHaveLength(2);
   });
 
   test('a facilitator who is a PD can save and submit only their own list', async () => {

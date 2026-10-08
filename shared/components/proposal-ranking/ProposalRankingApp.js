@@ -61,6 +61,7 @@ function ProposalCardRow({ proposal, position, count, total, score, rank, editab
         <div className="min-w-0 flex-1 p-4">
           <div className="mb-2 flex justify-end">
             {(proposal.institutionGeography === 'East' || proposal.institutionGeography === 'West') && <p
+              role="img"
               aria-label={`${proposal.institutionGeography} institution`}
               title={`${proposal.institutionGeography} institution`}
               className="text-2xl font-bold leading-none text-gray-900"

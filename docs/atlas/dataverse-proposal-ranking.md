@@ -182,6 +182,13 @@ self-tests run sequentially. The actual card component was rendered in isolated
 Chrome with synthetic fixtures at 1100px and 390px: markers are 24px, at the upper
 right, with no horizontal overflow. This is a component layout check, not live
 sandbox acceptance. Luna implemented; Sol and the orchestrator reviewed without
-substantive blockers. Automatic approval review rejected another Opus invocation
-because the session had already used its one authorized bounded review; no new
-Opus review ran for the geography change and no retry was attempted.
+substantive blockers. After the owner explicitly authorized further OAuth-only
+Opus reviews, `claude-opus-5-5` reviewed `d2cc82fdf` and returned **APPROVE**.
+It traced the raw numeric DTO, strict option mapping, complete reads, snapshot,
+fingerprint and shared renderer. This was source-only review; it did not rerun
+tests or perform live calls. The nonblocking accessible-name note was corrected
+with an explicitly named image role for the E/W symbol and a role/name regression.
+No second review loop was run. Local verbatim receipt:
+`/private/tmp/ranking-geography-opus-review-authorized.txt` (not portable); this
+paragraph retains the verdict, scope and disposition. OAuth authentication was
+verified as `claude.ai`; API-key environment variables were removed.

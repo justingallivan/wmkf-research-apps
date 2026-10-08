@@ -40,9 +40,12 @@ The implementation uses the same eligibility and ranking rules. Exact evidence a
 remaining live-acceptance boundary are in the Atlas geography section. Geography
 regression: 123 tests / 12 suites, lint, types and relevant gates/self-tests pass;
 synthetic desktop/mobile component render confirms 24px E/W at upper right without
-overflow. Luna built and Sol reviewed. An additional Opus request was rejected by
-automatic review because the session's one authorized review had already run; no
-new Opus review is claimed. No milestone entry is required.
+overflow. Luna built and Sol reviewed. The owner subsequently authorized Opus
+reviews as needed, through subscription OAuth only (no API-key authentication).
+A bounded Opus source review of `d2cc82fdf` returned APPROVE. Its nonblocking
+accessibility note was corrected by giving the E/W symbol an explicitly named
+image role; the page regression now checks that accessible role/name. No further
+review loop was needed. No milestone entry is required.
 
 ### Owner choice before further work
 
