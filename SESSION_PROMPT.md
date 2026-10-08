@@ -213,8 +213,8 @@ Final Writeup group-review handoff: **Stages 1–4 are live in Production.** Pla
    01:30 UTC (18:30 PDT) sweep. The owner saw 1003010's draft before 17:00 PDT (owner report).
    (Original note: expected ~15:45 PDT 2026-10-07; not checked in S581.) Owner-run:
    `DATAVERSE_ALLOW_PROD_READS=yes node --import ./scripts/lib/use-extensionless.mjs scripts/report-staff-deliberations-preparation-receipts.mjs --cycle=D26`
-2. **S580 deferred small items: built S584** on `claude/deliberations-next-step-copy`
-   (owner-approved wording; not merged). The list's briefing next step names the upcoming
+2. **S580 deferred small items: live S584** via PR #460 (merge `ea1e09a0d`;
+   owner-approved wording). The list's briefing next step names the upcoming
    deliberation session date; the two writeup warnings drop "the Dataverse fill".
 3. **J27:** add `J27` to `STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES` before J27 research
    presentations unless the cycle-rollover work replaces it.

@@ -93,8 +93,8 @@ sequence.
   when SoCal (or another program) adopts group review, add its Grant Program
   GUID to `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS` or it sends no email:
   `docs/plans/FINAL_WRITEUP_GROUP_REVIEW_HANDOFF_PLAN_2026-10-06.md`.
-- **Deferred items from 2026-10-06, built S584 on branch
-  `claude/deliberations-next-step-copy` (not merged):** (a) the Staff Deliberations
+- **Deferred items from 2026-10-06, live S584 via PR #460 (merge
+  `ea1e09a0d`):** (a) the Staff Deliberations
   list's next step for a ready briefing names the deliberation session date while the
   session is upcoming, matching the request tab's rule (`StaffDeliberationsPanel.js`);
   (b) the two writeup "check in Word" warnings no longer say "the Dataverse fill"
