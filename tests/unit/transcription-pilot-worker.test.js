@@ -382,6 +382,72 @@ describe('transcription worker submission safety', () => {
     expect(submitAssemblyAITranscription).not.toHaveBeenCalled();
   });
 
+  describe('save validation failures', () => {
+    const setup = (providerResult) => {
+      store.claimNextTranscriptionJob.mockReset().mockResolvedValue(null);
+      const job = { ...queued, status: 'saving', provider_transcript_id: 'known-id', output_pathname: 'transcription-pilot/output.json' };
+      store.claimNextDueTranscriptionJob.mockReset().mockResolvedValueOnce({ job, leaseToken: job.lease_token }).mockResolvedValue(null);
+      store.getLeasedTranscriptionJob.mockResolvedValue(job);
+      if (providerResult instanceof Error) getAssemblyAITranscript.mockRejectedValue(providerResult);
+      else getAssemblyAITranscript.mockResolvedValue(providerResult);
+      store.mutateLeasedTranscriptionJob.mockResolvedValue({ ...job, version: job.version + 1 });
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+      return job;
+    };
+    const utt = (over = {}) => ({ start: 0, end: 5, text: 'hi', speaker: 'A', ...over });
+    const rescheduled = () => expect.objectContaining({ fields: expect.objectContaining({ next_attempt_at: expect.any(Date) }) });
+    const failedWith = (code) => expect.objectContaining({
+      fields: expect.objectContaining({ status: 'failed', sanitized_error_code: code, cleanup_requested_at: expect.any(Date) }),
+    });
+    it.each([
+      ['provider_invalid_utterances', { status: 'completed', text: 'x', utterances: 'bad' }],
+      ['provider_invalid_utterance', { status: 'completed', text: 'x', utterances: [utt({ end: -1 })] }],
+      ['provider_invalid_speaker_label', { status: 'completed', text: 'x', utterances: [utt({ speaker: 'bad label!' })] }],
+      ['provider_output_too_large', { status: 'completed', text: 'x'.repeat(12 * 1024 * 1024 + 1) }],
+      ['provider_output_too_large', { status: 'completed', text: 'x', utterances: Array.from({ length: 200_001 }, () => utt()) }],
+    ])('fails the job terminally with %s and does not reschedule', async (code, result) => {
+      const job = setup(result);
+      await drainTranscriptionPilot({ maxJobs: 1 });
+      expect(store.mutateLeasedTranscriptionJob).toHaveBeenCalledWith(failedWith(code));
+      expect(store.mutateLeasedTranscriptionJob).not.toHaveBeenCalledWith(rescheduled());
+      expect(console.error).toHaveBeenCalledWith('[transcription-pilot] job failed:', code, job.id);
+      expect(store.publishReadyTranscriptionJob).not.toHaveBeenCalled();
+    });
+
+    it('fails terminally with output_integrity_mismatch when the stored output differs', async () => {
+      setup({ status: 'completed', text: 'hello' });
+      runtime.readPrivateContentIfPresent.mockResolvedValue({ buffer: Buffer.from('something else'), blob: { pathname: 'transcription-pilot/output.json' } });
+      await drainTranscriptionPilot({ maxJobs: 1 });
+      expect(store.mutateLeasedTranscriptionJob).toHaveBeenCalledWith(failedWith('output_integrity_mismatch'));
+      expect(store.mutateLeasedTranscriptionJob).not.toHaveBeenCalledWith(rescheduled());
+    });
+
+    it.each([
+      ['a generic network error', new Error('fetch failed'), 'provider_request_failed'],
+      ['a provider 5xx', Object.assign(new Error('x'), { code: 'provider_http_503' }), 'provider_http_503'],
+    ])('still schedules a retry for %s', async (_label, error, code) => {
+      const job = setup(error);
+      await drainTranscriptionPilot({ maxJobs: 1 });
+      expect(store.mutateLeasedTranscriptionJob).toHaveBeenCalledWith(expect.objectContaining({
+        fields: expect.objectContaining({ next_attempt_at: expect.any(Date), sanitized_error_code: code }),
+      }));
+      expect(store.mutateLeasedTranscriptionJob).not.toHaveBeenCalledWith(expect.objectContaining({ fields: expect.objectContaining({ status: 'failed' }) }));
+      expect(console.warn).toHaveBeenCalledWith('[transcription-pilot] retry scheduled:', code, job.id);
+    });
+
+    it('still schedules a retry for output_write_verification_failed', async () => {
+      setup({ status: 'completed', text: 'hello' });
+      runtime.readPrivateContentIfPresent.mockResolvedValue(null);
+      runtime.writePrivateContent.mockResolvedValue({ pathname: 'transcription-pilot/other.json' });
+      await drainTranscriptionPilot({ maxJobs: 1 });
+      expect(store.mutateLeasedTranscriptionJob).toHaveBeenCalledWith(expect.objectContaining({
+        fields: expect.objectContaining({ next_attempt_at: expect.any(Date), sanitized_error_code: 'provider_request_failed' }),
+      }));
+      expect(store.mutateLeasedTranscriptionJob).not.toHaveBeenCalledWith(expect.objectContaining({ fields: expect.objectContaining({ status: 'failed' }) }));
+    });
+  });
+
   it('retains uncertainty and conflict evidence when DELETE follows a bound-ID conflict', async () => {
     store.claimNextTranscriptionJob.mockReset().mockResolvedValue(null);
     store.claimNextDueTranscriptionJob.mockReset().mockResolvedValue(null);
