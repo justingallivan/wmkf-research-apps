@@ -89,7 +89,8 @@ sequence.
   Research only via `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`) is live
   (PR #456, merge `8bc5b466b`, 2026-10-07; migration 072 applied, copy seeded,
   Production list = Research only); verify the first real send. Stage 5 (leadership daily digest) is planned,
-  not built; SoCal is parked by the owner (2026-10-07). Program-list reminder:
+  not built; scope is Research only, via the same program list (owner, S584);
+  SoCal is parked by the owner (2026-10-07). Program-list reminder:
   when SoCal (or another program) adopts group review, add its Grant Program
   GUID to `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS` or it sends no email:
   `docs/plans/FINAL_WRITEUP_GROUP_REVIEW_HANDOFF_PLAN_2026-10-06.md`.

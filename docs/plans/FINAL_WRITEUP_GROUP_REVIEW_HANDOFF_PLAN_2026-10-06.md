@@ -304,6 +304,9 @@ Original Stage 4 requirements:
 ### Stage 5 — Leadership daily digest
 - Daily cron at 00:00 Pacific. Each leadership-persona recipient gets one email listing writeups
   that entered leadership review since their last digest.
+- **Research only (owner, 2026-10-07, S584):** include only writeups whose request's Grant
+  Program is in `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`, the same fail-closed list that gates
+  Stage 4. Owner, 2026-10-07 (S584): "SoCal is not using this app suite yet and may never do so. We can limit to research to keep the programs separate, as the CSO does not review SoCal work."
 - Sender: the system mailbox (`NOTIFICATION_EMAIL_FROM`), not a PD (owner, 2026-10-07): it is
   scheduled and lists requests led by different PDs.
 - No email when the list is empty.

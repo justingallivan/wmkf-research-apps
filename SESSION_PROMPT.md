@@ -201,8 +201,9 @@ Final Writeup group-review handoff: **Stages 1–4 are live in Production.** Pla
    read its `final_writeup_handoff_emails` row: `state = sent`, `to_recipients` all
    `@wmkeck.org`, and the Dynamics activity's sender is the lead PD.
 2. **Stage 5, leadership daily digest** (plan §4 Stage 5): cron `0 7 * * *`, system sender,
-   modelled on `scheduled-email-service.js:754`. **Owner decision first:** SoCal writeups that reach
-   leadership review would appear (see the SoCal memory). Run `/contract-reconcile` before building.
+   modelled on `scheduled-email-service.js:754`. **Scope decided S584: Research only**, filtered by the same
+   program list as Stage 4 (`FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`); SoCal does not use the
+   app suite and the CSO does not review SoCal work. Run `/contract-reconcile` before building.
 3. **Other Mac:** its `.env.local` Postgres lines likely still hold the pre-rotation password. Fix:
    `vercel env pull` to a temporary file and copy only the `POSTGRES_*`/`DATABASE_URL*` lines.
 
