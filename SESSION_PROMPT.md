@@ -529,8 +529,7 @@ Final Writeup group-review handoff: **Stages 1–4 are live in Production.** Pla
    Remaining: after the first writeup is sent to leadership, confirm the next night's
    `final_writeup_leadership_digests` rows have `accepted_at`. Seeding needed
    `DATAVERSE_PROD_WRITE_ACK="<purpose> <today UTC>"` (plan Stage 5 rollout).
-3. **Other Mac:** its `.env.local` Postgres lines likely still hold the pre-rotation password. Fix:
-   `vercel env pull` to a temporary file and copy only the `POSTGRES_*`/`DATABASE_URL*` lines.
+3. ~~**Other Mac:** refresh `.env.local` Postgres lines after the 2026-10-01 rotation.~~ **Done** (owner, 2026-10-07).
 
 ### Verify Before Acting
 
