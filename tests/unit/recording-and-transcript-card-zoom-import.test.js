@@ -328,6 +328,22 @@ describe('the Zoom list follows the server while the panel is open', () => {
     expect(within(panel).getByText(/Last transcription did not finish/)).toBeInTheDocument();
   });
 
+  test('a queued job turning cancelled (cleanup pending) refreshes the Zoom list so the meeting becomes selectable', async () => {
+    const state = { collection: collection({ jobs: [queuedJob('queued')] }) };
+    let zoomState = 'started';
+    route(state, { '/zoom-recordings': { respond: () => response(zoomState === 'started' ? startedMeeting() : failedMeeting()) } });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Import from Zoom' }));
+    const panel = await screen.findByTestId('zoom-import');
+    expect(within(panel).getByRole('radio', { name: /Oct 5/ })).toBeDisabled();
+    const before = zoomListCalls();
+    zoomState = 'failed';
+    state.collection = collection({ jobs: [{ ...queuedJob('queued'), cleanupPending: true }] });
+    fireEvent.click(await screen.findByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect(zoomListCalls()).toBeGreaterThan(before));
+    await waitFor(() => expect(within(panel).getByRole('radio', { name: /Oct 5/ })).toBeEnabled());
+  });
+
   test('Refresh list turns an importing meeting whose lease expired into a retryable one', async () => {
     let zoomState = 'importing';
     const importing = () => zoomList({ meetings: zoomList().meetings.map((m, i) => (i === 0 ? { ...m, import: { state: 'importing', jobId: null, failureCode: null } } : m)) });
