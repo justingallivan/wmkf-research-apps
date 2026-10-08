@@ -4,7 +4,7 @@ Status: **PRODUCTION-LIVE (merged to main as `c99f8d966` on 2026-10-04, S572; mi
 
 ## Reused speaker IDs — generation fix (2026-10-07)
 
-**[BRANCH-BUILT `codex/meeting-transcript-fixes`; not deployed.]** The owner reported
+**[DEPLOYED 2026-10-07 via PR #459 (`f48fba1ab`); hosted acceptance on 1003038 pending.]** The owner reported
 Request 1003038: Zoom captions identify a late participant whose audio-derived
 turns inherit earlier participants' names. Signed-in inspection and an offline
 comparison of the downloaded VTTs verified that this is not just one incorrectly

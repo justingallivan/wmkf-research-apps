@@ -117,7 +117,7 @@ fence. A publication that exists for the job, a hand edit, or a held lease makes
 alignment yield (`superseded` / 409), never overwrite. Service:
 `lib/services/meeting-tracker-transcription/alignment-service.js`.
 
-**[BRANCH-BUILT 2026-10-07, `codex/meeting-transcript-fixes`; not deployed.]**
+**[DEPLOYED 2026-10-07 via PR #459 (`f48fba1ab`).]**
 The alignment stage also checks full-recording Zoom evidence to split reused
 audio speaker IDs. The existing alignment JSON holds the turn reassignment map
 and server-only `additionalSpeakerIds`; `getMeetingTranscriptionJobContent`

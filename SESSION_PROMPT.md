@@ -1,11 +1,15 @@
-# Session 584 Prompt: release and verify transcript speaker fix; preserve Proposal Ranking handoff; group-review handoff email live (S581)
+# Session 584 Prompt: transcript speaker fix released (PR #459), hosted acceptance pending; preserve Proposal Ranking handoff; group-review handoff email live (S581)
 
 ## Session 583 transcript handoff — 2026-10-07 PT (Codex)
 
-**[VERIFIED via Git] Built and pushed, NOT merged or deployed:**
-`codex/meeting-transcript-fixes`, tip `5ee323aaa`.
-Owner requested that this handoff land on main. This is a documentation-only handoff;
-it does not authorize or perform production promotion of the runtime changes.
+**Update, Session 584 (Claude):** the owner said "merge", and the fix went out as
+[PR #459](https://github.com/justingallivan/wmkf-research-apps/pull/459), merge
+`f48fba1ab`. All CI passed after main was merged in. [VERIFIED via GitHub deployments +
+`vercel inspect`] The Production deployment `wmkfresearchapps-bmhqc863s` was built from
+`f48fba1ab` and serves the production domains. Steps 1–2 below are done. **Step 3, hosted
+acceptance on 1003038, is still open and is the owner's** (it needs Production reads).
+
+Original S583 status: built and pushed on `codex/meeting-transcript-fixes`, tip `5ee323aaa`.
 The existing Proposal Ranking handoff is preserved below.
 
 ### Completed on the feature branch
@@ -27,9 +31,9 @@ The existing Proposal Ranking handoff is preserved below.
 
 ### Verified open and next-session sequence
 
-1. Fetch and resume `codex/meeting-transcript-fixes`; do not rebuild from main. Read the branch's
+1. ~~Done S584.~~ Fetch and resume `codex/meeting-transcript-fixes`; do not rebuild from main. Read the branch's
    generation-fix section in `docs/plans/ZOOM_VTT_SPEAKER_MAPPING_PLAN_2026-10-04.md` and its tests.
-2. Review current-head integration/CI and arrange a deliberate release. **Owner decision needed:**
+2. ~~Done S584 (PR #459).~~ Review current-head integration/CI and arrange a deliberate release. **Owner decision needed:**
    runtime merge/promotion; stopping and pushing this handoff did not authorize that release.
 3. After confirming the deployed revision includes the fix, regenerate and inspect request
    **1003038**, especially **01:02:04** and **01:02:12**, against Zoom's Allison captions.

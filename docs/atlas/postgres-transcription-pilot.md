@@ -44,8 +44,8 @@ suggestions, per-speaker `reasons` codes for IDs not applied, and `reassignedCou
 added 2026-10-04) and never exposes a pathname. `speaker_alignment.reassigned`
 (`{ utteranceIndex: speakerId }`) records Zoom-evidence speaker reassignment;
 `getMeetingTranscriptionJobContent` applies it at the content read for every
-consumer and the transcript Blob is never rewritten. **[BRANCH-BUILT 2026-10-07,
-`codex/meeting-transcript-fixes`; not deployed.]** Full-recording wording and timing
+consumer and the transcript Blob is never rewritten. **[DEPLOYED 2026-10-07 via
+PR #459 (`f48fba1ab`).]** Full-recording wording and timing
 checks now separate reused audio speaker IDs. `speaker_alignment.additionalSpeakerIds`
 is the server-only allowlist of generated `zoom_N` identities; names remain in
 `speaker_names` and `speaker_alignment.speakers`. Mixed IDs lose their global
