@@ -137,6 +137,43 @@ describe('Proposal Ranking page', () => {
     expect(screen.getByRole('button', { name: 'Generate SE draft' })).toBeInTheDocument();
   });
 
+  test('keeps confirmations and the generated draft above individual lists', async () => {
+    const collecting = roundResponse({ facilitator: true });
+    collecting.programs.se.progress = { required: 2, submitted: 2, outstandingNames: [] };
+    const draft = roundResponse({ facilitator: true, published: true });
+    draft.programs.se.meeting.status = 'composite-draft';
+    draft.programs.se.meetingStatus = 'composite-draft';
+    draft.viewer.capabilities.publish = true;
+    draft.confirmations.publish.se = { fingerprint: 'publish-se', message: 'Publish the reviewed SE order.', outstandingNames: [] };
+    mockLoad.mockResolvedValue(collecting);
+    mockSend.mockResolvedValueOnce(draft).mockResolvedValueOnce(roundResponse({ facilitator: true, published: true }));
+    render(<ProposalRankingApp />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate SE draft' }));
+    const individual = screen.getByText('Individual PD rankings');
+    const confirmGenerate = screen.getByRole('button', { name: 'Confirm generate the Science & Engineering draft' });
+    expect(confirmGenerate.compareDocumentPosition(individual) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(individual.closest('details')).toHaveAttribute('open');
+    fireEvent.click(confirmGenerate);
+    const draftHeading = await screen.findByRole('heading', { name: 'Facilitator composite draft' });
+    const collapsed = screen.getByText('Individual PD rankings').closest('details');
+    expect(collapsed).not.toHaveAttribute('open');
+    expect(draftHeading.compareDocumentPosition(collapsed) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Publish SE' }));
+    const confirmPublish = screen.getByRole('button', { name: 'Confirm publish the Science & Engineering order' });
+    expect(confirmPublish.compareDocumentPosition(draftHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(confirmPublish);
+    expect(await screen.findByRole('heading', { name: 'Shared meeting order' })).toBeInTheDocument();
+    expect(mockSend.mock.calls.map(([action]) => action.action)).toEqual(['generate', 'publish']);
+  });
+
+  test('tells a participant when all lists are submitted and the facilitator is next', async () => {
+    const response = roundResponse();
+    response.programs.se.progress = { required: 2, submitted: 2, outstandingNames: [] };
+    mockLoad.mockResolvedValue(response);
+    render(<ProposalRankingApp />);
+    expect(await screen.findByText('All rankings submitted. Waiting for the facilitator to prepare the meeting list.')).toBeInTheDocument();
+  });
+
   test('serializes saves and keeps the latest queued drag order visible', async () => {
     const firstSave = deferred();
     mockLoad.mockResolvedValue(roundResponse());

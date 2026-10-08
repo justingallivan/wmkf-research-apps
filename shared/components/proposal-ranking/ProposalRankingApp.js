@@ -257,41 +257,11 @@ function ProgramPanel({ response, program, isFacilitator, localOrders, remoteOrd
         {response.round.state === 'active' && response.viewer.capabilities.publish && meetingStatus === 'composite-draft' && <Button type="button" size="sm" disabled={actionBusy || hasUnresolvedSave || !currentConfirmations.publish?.[program.key]} onClick={() => setPendingConfirmation({ action: 'publish', programKey: program.key })}>Publish {program.shortLabel}</Button>}
       </div>
     </div>
+      {activeConfirmation?.action === 'generate' && <ConfirmationBox confirmation={currentConfirmations.generate?.[program.key]} label={`generate the ${program.label} draft`} busy={actionBusy} onConfirm={() => onGenerate(program.key)} onCancel={() => setPendingConfirmation(null)} />}
+      {activeConfirmation?.action === 'publish' && <ConfirmationBox confirmation={currentConfirmations.publish?.[program.key]} label={`publish the ${program.label} order`} busy={actionBusy} onConfirm={() => onPublish(program.key)} onCancel={() => setPendingConfirmation(null)} />}
     {programData.proposalIds?.length === 0 ? <p className="mt-4 rounded-lg bg-gray-50 p-4 text-sm text-gray-600">No proposals in this program. No individual lists or composite are required.</p> : <>
       {programData.progress && <div className="mt-3 flex flex-wrap gap-2 text-xs">
-        <span className={`rounded-full px-2.5 py-1 font-semibold ${published ? 'bg-green-100 text-green-900' : 'bg-gray-100 text-gray-700'}`}>{published ? 'Published meeting order' : meetingStatus === 'composite-draft' ? 'Facilitator draft' : 'Collecting submissions'}</span>
-      </div>}
-      {isFacilitator && <div className="mt-5">
-        <h3 className="mb-3 text-base font-semibold text-gray-900">Individual PD rankings</h3>
-        <SubmissionLists
-          response={response}
-          program={program}
-          proposals={proposals}
-          isFacilitator
-          onSubmit={onSubmit}
-          submitting={submitting}
-          saveStates={saveStates}
-          localOrders={localOrders}
-          remoteOrders={remoteOrders}
-          onMove={onMove}
-          onRetry={onRetry}
-        />
-      </div>}
-      {!isFacilitator && response.viewer.isRosterParticipant && !published && <div className="mt-5">
-        <h3 className="mb-3 text-base font-semibold text-gray-900">Your private ranking</h3>
-        <SubmissionLists
-          response={response}
-          program={program}
-          proposals={proposals}
-          isFacilitator={false}
-          onSubmit={onSubmit}
-          submitting={submitting}
-          saveStates={saveStates}
-          localOrders={localOrders}
-          remoteOrders={remoteOrders}
-          onMove={onMove}
-          onRetry={onRetry}
-        />
+        <span className={`rounded-full px-2.5 py-1 font-semibold ${published ? 'bg-green-100 text-green-900' : 'bg-gray-100 text-gray-700'}`}>{published ? 'Published meeting order' : meetingStatus === 'composite-draft' ? 'Review the draft, then publish' : totalSubmissions.required > 0 && totalSubmissions.submitted === totalSubmissions.required ? (isFacilitator ? 'All rankings submitted. Generate the draft to continue.' : 'All rankings submitted. Waiting for the facilitator to prepare the meeting list.') : 'Collecting submissions'}</span>
       </div>}
       {meeting && generated && (isFacilitator || (published && response.viewer.isRosterParticipant)) && <div className="mt-6 border-t border-gray-200 pt-5">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
@@ -313,8 +283,40 @@ function ProgramPanel({ response, program, isFacilitator, localOrders, remoteOrd
           onRetry={() => onRetry(meeting)}
         />
       </div>}
-      {activeConfirmation?.action === 'generate' && <ConfirmationBox confirmation={currentConfirmations.generate?.[program.key]} label={`generate the ${program.label} draft`} busy={actionBusy} onConfirm={() => onGenerate(program.key)} onCancel={() => setPendingConfirmation(null)} />}
-      {activeConfirmation?.action === 'publish' && <ConfirmationBox confirmation={currentConfirmations.publish?.[program.key]} label={`publish the ${program.label} order`} busy={actionBusy} onConfirm={() => onPublish(program.key)} onCancel={() => setPendingConfirmation(null)} />}
+      {isFacilitator && <details key={generated ? 'generated' : 'collecting'} open={!generated} className="mt-5">
+        <summary className="mb-3 cursor-pointer text-base font-semibold text-gray-900">Individual PD rankings</summary>
+        <SubmissionLists
+          response={response}
+          program={program}
+          proposals={proposals}
+          isFacilitator
+          onSubmit={onSubmit}
+          submitting={submitting}
+          saveStates={saveStates}
+          localOrders={localOrders}
+          remoteOrders={remoteOrders}
+          onMove={onMove}
+          onRetry={onRetry}
+        />
+      </details>}
+      {!isFacilitator && response.viewer.isRosterParticipant && !published && <div className="mt-5">
+        <h3 className="mb-3 text-base font-semibold text-gray-900">Your private ranking</h3>
+        <SubmissionLists
+          response={response}
+          program={program}
+          proposals={proposals}
+          isFacilitator={false}
+          onSubmit={onSubmit}
+          submitting={submitting}
+          saveStates={saveStates}
+          localOrders={localOrders}
+          remoteOrders={remoteOrders}
+          onMove={onMove}
+          onRetry={onRetry}
+        />
+      </div>}
+
+
     </>}
   </section>;
 }
