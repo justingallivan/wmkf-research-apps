@@ -1812,7 +1812,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
 // Import from Zoom (Stage 3a, docs/plans/ZOOM_RECORDING_IMPORT_PLAN_2026-10-08.md). The list is fetched only when staff
 // open the panel, never on mount. Anything other than `available === true` means unavailable, so existing mocks and
 // environments without Zoom keep today's step 1. Every async write is dropped when the card changed or unmounted.
-function useZoomImport(requestId, { onImported }) {
+function useZoomImport(requestId, { onImported, jobsSignature }) {
   const basePath = `${API_PATH}/${encodeURIComponent(requestId || '')}`;
   const [status, setStatus] = useState('idle'); // idle | loading | available | unavailable | failed
   const [windowDays, setWindowDays] = useState(30);
@@ -1822,6 +1822,8 @@ function useZoomImport(requestId, { onImported }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [showOther, setShowOther] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const lastSignatureRef = useRef(jobsSignature);
   const generationRef = useRef(0);
   const mountedRef = useRef(false);
   const listSequenceRef = useRef(0);
@@ -1839,7 +1841,7 @@ function useZoomImport(requestId, { onImported }) {
     const generation = generationRef.current;
     const sequence = ++listSequenceRef.current;
     const isLatest = () => isCurrent(generation) && listSequenceRef.current === sequence;
-    if (!quiet) setStatus('loading');
+    if (!quiet) setStatus('loading'); else setRefreshing(true);
     try {
       const body = await requestJson(`${basePath}/zoom-recordings`, { method: 'GET', fallbackMessage: 'Zoom recordings could not be loaded.' });
       if (!isLatest()) return;
@@ -1850,10 +1852,23 @@ function useZoomImport(requestId, { onImported }) {
       } else if (!quiet) setStatus('unavailable');
     } catch (loadError) {
       if (isLatest() && loadError?.name !== 'AbortError' && !quiet) setStatus('failed');
+    } finally {
+      if (isLatest()) setRefreshing(false);
     }
   }, [basePath, isCurrent, requestId]);
 
   const openPanel = useCallback(() => { void loadList(); }, [loadList]);
+  const refresh = useCallback(() => { void loadList({ quiet: true }); }, [loadList]);
+
+  // Once the panel has been opened, a real change in the transcription jobs (id and status) quietly reloads the list so
+  // meeting states follow the server. Nothing is fetched while the panel has never been opened, and an unchanged
+  // signature never refetches.
+  useEffect(() => {
+    if (status !== 'available') { lastSignatureRef.current = jobsSignature; return; }
+    if (lastSignatureRef.current === jobsSignature) return;
+    lastSignatureRef.current = jobsSignature;
+    void loadList({ quiet: true });
+  }, [status, jobsSignature, loadList]);
 
   const importSelected = async () => {
     const meeting = meetings.find((item) => item.meetingUuid === selectedUuid);
@@ -1884,7 +1899,7 @@ function useZoomImport(requestId, { onImported }) {
 
   return {
     status, windowDays, meetings, selectedUuid, setSelectedUuid, acknowledged, setAcknowledged, busy, error,
-    showOther, toggleOther: () => setShowOther((value) => !value), openPanel, importSelected,
+    showOther, toggleOther: () => setShowOther((value) => !value), openPanel, importSelected, refresh, refreshing,
   };
 }
 
@@ -2416,7 +2431,10 @@ function ZoomImportSection({ z, activeJob, transcriptionBusy }) {
   return (
     <div className="mt-4" data-testid="zoom-import">
       <h4 className="text-sm font-semibold text-gray-950">Import from Zoom</h4>
-      <p className="mt-1 text-xs text-gray-600">Recordings from the last {z.windowDays} days. Times are Pacific.</p>
+      <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-gray-600">Recordings from the last {z.windowDays} days. Times are Pacific.</p>
+        <button type="button" onClick={z.refresh} disabled={z.busy || z.refreshing} className={BTN_LINK}>{z.refreshing ? 'Refreshing…' : 'Refresh list'}</button>
+      </div>
       {z.meetings.length === 0
         ? <p className="mt-2 text-sm text-gray-700">No Zoom recordings were found.</p>
         : <fieldset className="mt-2 space-y-1" disabled={z.busy}>
@@ -2776,7 +2794,8 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
   const hashScrollDoneRef = useRef(false);
   const m = useMaterials(requestId, transcriptInputRef);
   const t = useTranscription(requestId, { onMaterialsChanged: m.load });
-  const z = useZoomImport(requestId, { onImported: t.loadCollection });
+  const jobsSignature = t.jobs.map((job) => `${job.id}:${job.status}`).join('|');
+  const z = useZoomImport(requestId, { onImported: t.loadCollection, jobsSignature });
   useEffect(() => {
     if (hashScrollDoneRef.current || typeof window === 'undefined' || window.location.hash !== '#recording-and-transcript-card') return;
     const card = document.getElementById('recording-and-transcript-card');

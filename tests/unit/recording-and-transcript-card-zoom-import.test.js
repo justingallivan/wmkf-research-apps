@@ -306,3 +306,67 @@ test('while this browser is uploading, a live uploading job shows progress but a
   expect(await run({ cleanupPending: true })).toBe(false);
   Object.defineProperty(globalThis.crypto, 'randomUUID', { configurable: true, value: original });
 });
+
+describe('the Zoom list follows the server while the panel is open', () => {
+  const failedMeeting = () => zoomList({ meetings: zoomList().meetings.map((m, i) => (i === 0 ? { ...m, import: { state: 'failed', jobId: JOB_ID, failureCode: 'zoom_import_job_ended' } } : m)) });
+  const startedMeeting = () => zoomList({ meetings: zoomList().meetings.map((m, i) => (i === 0 ? { ...m, import: { state: 'started', jobId: JOB_ID, failureCode: null } } : m)) });
+  const zoomListCalls = () => global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/zoom-recordings')).length;
+  const queuedJob = (status) => ({ id: JOB_ID, status, version: 1, created_at: '2026-10-04T20:00:00.000Z', original_filename: 'x.m4a', label: status, needsAttention: false, contentAccessAllowed: false, cleanupPending: false, speaker_names: {} });
+
+  test('a started meeting becomes selectable after the transcription collection shows its job failed', async () => {
+    const state = { collection: collection({ jobs: [queuedJob('queued')] }) };
+    let zoomState = 'started';
+    route(state, { '/zoom-recordings': { respond: () => response(zoomState === 'started' ? startedMeeting() : failedMeeting()) } });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Import from Zoom' }));
+    const panel = await screen.findByTestId('zoom-import');
+    expect(within(panel).getByRole('radio', { name: /Oct 5/ })).toBeDisabled();
+    zoomState = 'failed';
+    state.collection = collection({ jobs: [queuedJob('failed')] });
+    fireEvent.click(await screen.findByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect(within(panel).getByRole('radio', { name: /Oct 5/ })).toBeEnabled());
+    expect(within(panel).getByText(/Last transcription did not finish/)).toBeInTheDocument();
+  });
+
+  test('Refresh list turns an importing meeting whose lease expired into a retryable one', async () => {
+    let zoomState = 'importing';
+    const importing = () => zoomList({ meetings: zoomList().meetings.map((m, i) => (i === 0 ? { ...m, import: { state: 'importing', jobId: null, failureCode: null } } : m)) });
+    const expired = () => zoomList({ meetings: zoomList().meetings.map((m, i) => (i === 0 ? { ...m, import: { state: 'failed', jobId: null, failureCode: 'zoom_import_lease_expired' } } : m)) });
+    route({}, { '/zoom-recordings': { respond: () => response(zoomState === 'importing' ? importing() : expired()) } });
+    const panel = await openPanel();
+    expect(within(panel).getByRole('radio', { name: /Oct 5/ })).toBeDisabled();
+    zoomState = 'expired';
+    fireEvent.click(within(panel).getByRole('button', { name: 'Refresh list' }));
+    await waitFor(() => expect(within(panel).getByRole('radio', { name: /Oct 5/ })).toBeEnabled());
+    expect(within(panel).getByRole('button', { name: 'Refresh list' })).toBeEnabled();
+  });
+
+  test('a collection change while the panel was never opened makes no Zoom list request', async () => {
+    const state = { collection: collection({ jobs: [queuedJob('queued')] }) };
+    route(state);
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    const reads = () => global.fetch.mock.calls.filter(([u]) => String(u).endsWith('/transcriptions')).length;
+    fireEvent.click(await screen.findByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect(reads()).toBe(2));
+    state.collection = collection({ jobs: [queuedJob('failed')] });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect(reads()).toBe(3));
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    expect(zoomListCalls()).toBe(0);
+  });
+
+  test('re-reading the same jobs does not refetch the Zoom list', async () => {
+    const state = { collection: collection({ jobs: [queuedJob('queued')] }) };
+    route(state, { '/zoom-recordings': { respond: () => response(zoomList()) } });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Import from Zoom' }));
+    await screen.findByTestId('zoom-import');
+    const before = zoomListCalls();
+    state.collection = collection({ jobs: [queuedJob('queued')] });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    await waitFor(() => expect(global.fetch.mock.calls.filter(([u]) => String(u).endsWith('/transcriptions')).length).toBeGreaterThan(1));
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    expect(zoomListCalls()).toBe(before);
+  });
+});
