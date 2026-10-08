@@ -102,6 +102,11 @@ sequence.
   (b) the two writeup "check in Word" warnings no longer say "the Dataverse fill"
   (`lib/services/pre-site-visit/artifact-model.js`). Owner approved both wordings.
 
+- **Deliberations vocabulary: owner to pick up November 1, 2026 (owner request, 2026-10-07).**
+  The options sheet is ready: `docs/plans/DELIBERATIONS_VOCABULARY_OPTIONS_2026-10-08.md`
+  (eight concepts, current counts, a suggested name for each). The group decides after D26;
+  then one suite-wide rename on a branch. Nothing to do before then.
+
 - **Cycle rollover with minimal configuration (2026-10-06).** [OPEN —
   investigation designed, not started] Owner principle: very few parameters may
   need human care each cycle; prefer settings that derive from the record or the
@@ -131,20 +136,16 @@ sequence.
   200 MiB cap first with a real two-to-three-hour recording in production.
 
 ## Audit follow-ups — verified open, not silently prioritized
-- **Hard-coded late-2026 `expiresAt` dates in unit-test fixtures (2026-09-27, S546).**
-  `reviewer-roster-endpoint.test.js` failed on `main` when its fixed
-  `2026-09-28T00:00Z` expiry passed; fixed in `5ced59d3b` (far-future date).
-  Seven more files hard-code `expiresAt` dates in late 2026 and may fail the
-  same way when those dates pass: `pre-site-distribution-panel` (10-08, 12-17),
-  `reviewer-institution-evidence-attestation` (09-28, 10-14; uses fake timers),
-  `external-briefing-page` (10-08), `workbench-briefing-link-route` (10-08),
-  `reviewer-institution-auto-resolution-policy` (09-28, 09-29; passed on
-  09-28 UTC, so it may not compare against the clock),
-  `pre-site-distribution-service` (10-08, 11-14, 12-18) and
-  `meeting-tracker-session-service` (12-18), all under `tests/unit/`. Not
-  checked whether each value is compared with the current time. Next: per file,
-  confirm clock dependence; replace clock-compared values with a far-future
-  date or a fake clock. Earliest risk date: 2026-10-08.
+- **Hard-coded late-2026 `expiresAt` dates in unit-test fixtures (2026-09-27, S546).** **[CLOSED
+  2026-10-08 UTC, S584: no clock dependence.]** All seven files pass at 05:48 UTC on 2026-10-08
+  (236 tests), after four of the dates had passed. Each remaining value is display-only or under a fake
+  clock: `external-briefing-page` and `pre-site-distribution-service` (10-08T20:00, 11-14) only format
+  the date (`pages/external/briefing/[token].js:298-299`, `distributionBodyHtml`);
+  `pre-site-distribution-panel` (12-17) goes through `briefingExpiryLabel`, a formatter
+  (`PreSiteDistributionPanel.js:71-76`); `meeting-tracker-session-service` (12-18) is an equality
+  fixture; `reviewer-institution-evidence-attestation` (10-14) sets `jest.useFakeTimers().setSystemTime`
+  (line 52); `workbench-briefing-link-route` and `reviewer-institution-auto-resolution-policy` already
+  pass with their dates in the past. The original failure was fixed in `5ced59d3b`.
 - **Preview CSRF origin check rejects alias-hosted POSTs (2026-09-19, integration
   smoke).** `lib/utils/auth.js validateOrigin` derives the Preview allowed origin from
   `VERCEL_URL` (the immutable deployment host), so any state-changing request made

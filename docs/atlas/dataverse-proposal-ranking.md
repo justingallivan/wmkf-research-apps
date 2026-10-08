@@ -1,14 +1,18 @@
 # Proposal Ranking storage and activation
 
-Date: 2026-10-07. Status: **Production deployed and enabled**, with schema, dedicated
-role and four participant grants verified. Justin is the temporary default facilitator
-for the owner-approved trial; Beth must be restored before colleague handoff.
-[VERIFIED via Vercel and Chrome] Current Production source is PR #462 merge
+Date: 2026-10-07. At last verification, Production was **deployed and enabled**,
+with schema, dedicated role and four participant grants verified. Justin was the
+temporary default facilitator for the owner-approved trial; Beth must be restored
+before colleague handoff.
+[VERIFIED via Vercel and Chrome] The most recently verified Production deployment
+was PR #462 merge
 `f7a75fc5358649ab30765504ea6e6b35cdf00bb4`, deployment
-`dpl_FNFvVWUzPaiNgdQ7Uh1DgK526hHx`, READY with live aliases. Justin's refreshed
-D26 facilitator preview displays all 23 institution names. The upper-right rating
-dot / lower-right E/W marker placement is built on the feature branch but is not
-deployed. The full multi-identity lifecycle remains unverified. The initial PR
+`dpl_FNFvVWUzPaiNgdQ7Uh1DgK526hHx`, which was READY with live aliases. At that
+verification, Justin's refreshed D26 facilitator preview displayed all 23
+institution names. The upper-right rating dot / lower-right E/W marker placement
+is built on the feature branch. No Production app deployment was performed during
+this turn, and the current deployment and marker appearance have not been
+rechecked. The full multi-identity lifecycle remains unverified. The initial PR
 #457 deployment is a historical checkpoint; trial reset requirements are below.
 Initial activation and rollback receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTION_RELEASE_2026-10-07.md`.
 Earlier dated sections below retain historical setup checkpoints; disabled-state
@@ -460,6 +464,6 @@ The mandatory unpublished-trial reset before colleague use remains in force.
 [VERIFIED via current feature-branch source] `ProposalRankingApp.js` now places
 the 24px colored reviewer-rating dot at the card's upper right and the accessible
 East/West initial at the lower right. Both keep their existing size and named
-image role/label/title. This is a source-only UI change: it has not been deployed
-to Production, and Production cards continue to show the previously deployed
-placement. It changes no score, ordering, eligibility, snapshot or persisted data.
+image role/label/title. No Production app deployment was performed during this
+turn, and the current deployment and marker appearance have not been rechecked.
+It changes no score, ordering, eligibility, snapshot or persisted data.

@@ -1,4 +1,55 @@
-# Session 584 Prompt: Proposal Ranking live; isolated rehearsal next
+# Session 585 Prompt: transcript workflow and Proposal Ranking (owner plan for 2026-10-08)
+
+## Owner plan for 2026-10-08 (set by the owner, Session 584)
+
+Work on two things, on the other computer:
+1. **Meeting Tracker transcript workflow:** resume `codex/meeting-transcript-ux` (pushed at
+   `3fa20089f`; planning only, nothing merged). Handoff directly below. The owner meets WMKF's
+   Zoom administrator the morning of 2026-10-08.
+2. **Proposal Ranking:** the updated current status and handoff follows the transcript section.
+   Keep both handoffs; do not replace this file wholesale (the PR #457 merge did that once,
+   restored in `c7e6417f8`). The local rehearsal did not perform Production actions; restore
+   Beth and verify a blank slate before colleague use.
+
+Setting up the transcript worktree on a new machine:
+```
+git fetch origin
+git worktree add ../WMKF_Apps-codex-transcript-ux -b codex/meeting-transcript-ux --track origin/codex/meeting-transcript-ux
+```
+Then add the per-machine pieces: `.agents/skills` symlink to `../.claude/skills`, a `.env.local`
+symlink to the main checkout's, and `npm install` (revert any `package-lock.json` churn).
+
+## Session 584 transcript UX planning handoff — October 7, 2026 (Codex)
+
+**[VERIFIED via remote Git refs]** Planning branch `codex/meeting-transcript-ux` is pushed at `3fa20089f389acfb59b000628df9831c8a1439d3`. The branch contains the implementation plan, two-slide Zoom admin brief and detailed handoff. This main handoff does not merge the branch or enable any new runtime behavior.
+
+### Resume on the work computer
+
+Fetch origin, then resume `origin/codex/meeting-transcript-ux` in a dedicated checkout, preserving unrelated local work. Do not rebuild from main or use `codex/meeting-transcript-fixes`. On the planning branch, read:
+
+- [Implementation plan](https://github.com/justingallivan/wmkf-research-apps/blob/codex/meeting-transcript-ux/docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md)
+- [Two-slide Zoom admin brief](https://github.com/justingallivan/wmkf-research-apps/blob/codex/meeting-transcript-ux/docs/plans/briefs/WMKF-Zoom-Admin-Brief.pptx) — download and open in PowerPoint; exact permission names and official references are in speaker notes.
+- The branch's `SESSION_PROMPT.md` for the detailed handoff.
+
+### Decisions and next steps
+
+**Owner-approved direction:** import the full WMKF Zoom recording and available audio/captions; reconcile speakers across the full transcript; review names and confirm the split; create presentation/discussion videos and transcripts; generate both summaries with one click; review and publish. Archive presentation-only products for Board sharing. Automatically delete discussion products and full originals at the Board meeting deadline, including Zoom originals if supported.
+
+**Next:** the owner meets WMKF's Zoom administrator on October 8, 2026 in the morning (Pacific). Seek an internal Server-to-Server OAuth app with recording read access, approved hosts, a secure app-credential handoff and one test recording. Account setup and the import pilot have not been performed. The shared-account 2FA stays enabled; the integration uses its own server-side credentials after administrator authorization.
+
+**Owner decisions still needed:** implementation stage/file scope, schema/auth/Production steps, exact deletion cutoff, reschedules/holds, archive-incomplete handling and permanent erasure versus Zoom/SharePoint recoverable deletion. No deletion or provider execution is authorized by this handoff. Recheck live callers and owned file identities before implementing retention.
+
+**Critical source finding:** current Board transcript/summary binding depends on the full TRANSCRIPT manifest. Source deletion must wait for a reviewed content-free archive proof and tests that the presentation remains available afterward. Preserve the PR #459 speaker fix; the owner accepted it on 1003038.
+
+### Verification and boundaries
+
+Planning-only commit `3fa20089f`: documentation gates and self-tests passed sequentially; both slides passed package/layout checks and visual inspection. A fresh source review added no-discussion handling and content-free AI audit requirements. The checkout-specific memory symlink was repaired; agent invariants passed. The claim-evidence advisory report could not read local state; no observation was invented.
+
+No runtime code, credentials, database/schema, Production data or account settings changed. No new production milestone shipped, so no DEVELOPMENT_LOG entry is required. UX and feature implementation must be separate commits. Push only the feature branch for future work; owner decides merge. The main handoff is the only main change authorized by tonight's stop request.
+
+---
+
+## Proposal Ranking handoff (Codex): isolated rehearsal verified; Production blank slate remains required
 
 ## Current owner-only trial — restore a clean start before colleague use
 
@@ -355,6 +406,61 @@ not the sparse request wmkf_organizationname field. Live metadata and all23accou
 names were verified. Release/browser confirmation is recorded in the Atlas below.
 ---
 
+## Session 584 Summary (Claude, main) — 2026-10-07/08 PT
+
+### What Was Completed
+1. **Zoom speaker-identity fix released:** PR #459 (merge `f48fba1ab`); owner accepted it on 1003038.
+2. **Staff Deliberations copy:** PR #460 (merge `ea1e09a0d`): the briefing next step names the upcoming
+   deliberation session date; the two writeup warnings drop "the Dataverse fill".
+3. **Stage 5 leadership daily digest live:** PR #461 (merge `ddeb1b401`); migration 073 applied and copy
+   seeded by the owner. Research only. Codex review: round 1 two high findings fixed (`c16c30092`), round 2
+   approve. DEVELOPMENT_LOG entry added.
+4. **J27 auto-prepare:** owner set Production `STAFF_DELIBERATIONS_AUTO_PREPARE_CYCLE_CODES=["D26","J27"]`
+   and redeployed; status list unchanged (register J27-084). Connor's Grant Cycle table note recorded in
+   the cycle rollover plan §2a (to-do, not top priority).
+5. **Repo hygiene:** 113 merged branches deleted from origin; performance-planning docs landed
+   (`fd3366f5e`); test-date queue item closed with no clock dependence (`ef11d8e11`); the drain-table gate
+   false positive fixed (`9f6001cb1`); the main handoff dropped by the PR #457 merge restored (`c7e6417f8`).
+6. **Deliberations vocabulary options sheet** filed (`docs/plans/DELIBERATIONS_VOCABULARY_OPTIONS_2026-10-08.md`).
+
+### Verified Open
+1. **First leadership digest:** after the first Research writeup is sent to leadership, the next night's
+   `final_writeup_leadership_digests` rows should have `accepted_at`. Evidence: plan Stage 5 rollout.
+2. **First handoff email:** after the next Research "Ready for group review", its
+   `final_writeup_handoff_emails` row should be `sent` from the lead PD. Evidence: plan Stage 4.
+3. **Dependabot PR #447** (dependency bumps from 2026-10-06): CI check, then owner "merge". Evidence: work queue.
+4. **Stream transcription audio** instead of buffering (200 MiB cap is memory-bound); decide alongside the
+   Zoom import work. Evidence: work queue "Stream transcription audio".
+5. **Stale local worktrees** (~20 on this Mac, including 8 on merged branches). `../WMKF_Apps-codex`
+   (`codex/transcription-pilot`) holds `e899518a5`, whose docs landed on main in `fd3366f5e`. Leave
+   `../WMKF_Apps-codex-proposal-ranking` and `../WMKF_Apps-codex-transcript-ux` alone while Codex uses them.
+   Check each for unpushed work before removing. Evidence: `git worktree list`.
+
+### Owner Decision Needed
+1. Cycle rollover design (plan §9): a to-do, not top priority; anchor on the planned `wmkf_grantcycle` table.
+2. Deliberations vocabulary: resurface November 1, 2026 (reminder below).
+
+### Do Not Reopen Without New Decision
+1. Leadership digest: Research only, system mailbox sender, copy in settings (owner, 2026-10-07).
+2. SoCal does not use the app suite yet; keep it out of the handoff email and digest (owner, 2026-10-07).
+
+### Process notes
+- A local Production Dataverse write (e.g. `scripts/seed-email-defaults.mjs --execute`) needs
+  `DATAVERSE_PROD_WRITE_ACK="<purpose> <today UTC>"`.
+- Vercel Production env changes and `vercel redeploy` are blocked for Claude by the permission
+  classifier; the owner runs them with `!`.
+- When merging a feature branch that carries its own `SESSION_PROMPT.md`, keep main's handoff
+  (the PR #457 merge replaced it).
+
+---
+
+## Owner reminder (set 2026-10-07, Session 584)
+
+**November 1, 2026:** remind the owner to pick up the deliberations vocabulary options sheet,
+`docs/plans/DELIBERATIONS_VOCABULARY_OPTIONS_2026-10-08.md`, before the after-D26 group decision.
+
+---
+
 # Restored main handoff (Session 584, Claude)
 
 The PR #457 merge (`10c079c86`) replaced this file with the ranking branch's copy, dropping
@@ -363,39 +469,13 @@ for Proposal Ranking, and its older ranking sections below are superseded by it.
 
 ## Session 585 Prompt: resume Meeting Tracker recording workflow planning after Zoom admin meeting
 
-## Session 584 transcript UX planning handoff — October 7, 2026 (Codex)
-
-**[VERIFIED via remote Git refs]** Planning branch `codex/meeting-transcript-ux` is pushed at `3fa20089f389acfb59b000628df9831c8a1439d3`. The branch contains the implementation plan, two-slide Zoom admin brief and detailed handoff. This main handoff does not merge the branch or enable any new runtime behavior.
-
-### Resume on the work computer
-
-Fetch origin, then resume `origin/codex/meeting-transcript-ux` in a dedicated checkout, preserving unrelated local work. Do not rebuild from main or use `codex/meeting-transcript-fixes`. On the planning branch, read:
-
-- [Implementation plan](https://github.com/justingallivan/wmkf-research-apps/blob/codex/meeting-transcript-ux/docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md)
-- [Two-slide Zoom admin brief](https://github.com/justingallivan/wmkf-research-apps/blob/codex/meeting-transcript-ux/docs/plans/briefs/WMKF-Zoom-Admin-Brief.pptx) — download and open in PowerPoint; exact permission names and official references are in speaker notes.
-- The branch's `SESSION_PROMPT.md` for the detailed handoff.
-
-### Decisions and next steps
-
-**Owner-approved direction:** import the full WMKF Zoom recording and available audio/captions; reconcile speakers across the full transcript; review names and confirm the split; create presentation/discussion videos and transcripts; generate both summaries with one click; review and publish. Archive presentation-only products for Board sharing. Automatically delete discussion products and full originals at the Board meeting deadline, including Zoom originals if supported.
-
-**Next:** the owner meets WMKF's Zoom administrator on October 8, 2026 in the morning (Pacific). Seek an internal Server-to-Server OAuth app with recording read access, approved hosts, a secure app-credential handoff and one test recording. Account setup and the import pilot have not been performed. The shared-account 2FA stays enabled; the integration uses its own server-side credentials after administrator authorization.
-
-**Owner decisions still needed:** implementation stage/file scope, schema/auth/Production steps, exact deletion cutoff, reschedules/holds, archive-incomplete handling and permanent erasure versus Zoom/SharePoint recoverable deletion. No deletion or provider execution is authorized by this handoff. Recheck live callers and owned file identities before implementing retention.
-
-**Critical source finding:** current Board transcript/summary binding depends on the full TRANSCRIPT manifest. Source deletion must wait for a reviewed content-free archive proof and tests that the presentation remains available afterward. Preserve the PR #459 speaker fix; the owner accepted it on 1003038.
-
-### Verification and boundaries
-
-Planning-only commit `3fa20089f`: documentation gates and self-tests passed sequentially; both slides passed package/layout checks and visual inspection. A fresh source review added no-discussion handling and content-free AI audit requirements. The checkout-specific memory symlink was repaired; agent invariants passed. The claim-evidence advisory report could not read local state; no observation was invented.
-
-No runtime code, credentials, database/schema, Production data or account settings changed. No new production milestone shipped, so no DEVELOPMENT_LOG entry is required. UX and feature implementation must be separate commits. Push only the feature branch for future work; owner decides merge. The main handoff is the only main change authorized by tonight's stop request.
+(The Codex transcript UX planning handoff that stood here was moved to the top of this file on 2026-10-08.)
 
 ## Prior handoffs preserved below
 
 The prior S584 notes retain unrelated Proposal Ranking and Final Writeup work. Earlier transcript acceptance TODOs below are historical; the owner acceptance recorded above supersedes them. Historical cleanup suggestions are not authorization to delete anything.
 
-# Session 584 Prompt: transcript speaker fix released (PR #459), owner-accepted; UX follow-up with Codex; preserve Proposal Ranking handoff; group-review handoff email live (S581)
+## Session 584 Prompt: transcript speaker fix released (PR #459), owner-accepted; UX follow-up with Codex; preserve Proposal Ranking handoff; group-review handoff email live (S581)
 
 ## Session 583 transcript handoff — 2026-10-07 PT (Codex)
 
@@ -568,8 +648,7 @@ Final Writeup group-review handoff: **Stages 1–4 are live in Production.** Pla
    Remaining: after the first writeup is sent to leadership, confirm the next night's
    `final_writeup_leadership_digests` rows have `accepted_at`. Seeding needed
    `DATAVERSE_PROD_WRITE_ACK="<purpose> <today UTC>"` (plan Stage 5 rollout).
-3. **Other Mac:** its `.env.local` Postgres lines likely still hold the pre-rotation password. Fix:
-   `vercel env pull` to a temporary file and copy only the `POSTGRES_*`/`DATABASE_URL*` lines.
+3. ~~**Other Mac:** refresh `.env.local` Postgres lines after the 2026-10-01 rotation.~~ **Done** (owner, 2026-10-07).
 
 ### Verify Before Acting
 

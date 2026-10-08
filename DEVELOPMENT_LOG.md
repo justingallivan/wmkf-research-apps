@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Leadership daily digest completes the group-review handoff (Session 584)
+
+**Milestone:** Each night at 07:00 UTC, every Leadership-persona staff member gets one email from the system mailbox listing the Research writeups newly sent to leadership review. All five group-review handoff stages are now live.
+**Sessions:** 584. PR #461 (merge `ddeb1b401`, 2026-10-07 PT); Codex adversarial review round 1 found two high defects (same-day retry hit the membership CHECK before ON CONFLICT; run-wide faults raised no alert), fixed in `c16c30092`; round 2 approve.
+**Ship state:**
+- Ledger `final_writeup_leadership_digests` (migration 073, applied by the owner): one row per recipient and day, membership frozen at insert, lease-token fence, correlation recovery; only accepted digests count as told.
+- Research only via `FINAL_WRITEUP_HANDOFF_EMAIL_PROGRAM_IDS`; TEST requests excluded in the query; copy in `email.final_writeup_leadership_digest.*` (seeded with a same-day `DATAVERSE_PROD_WRITE_ACK`).
+- Same session: the Zoom speaker-identity fix shipped (PR #459, owner-accepted on 1003038), and `J27` was added to Staff Deliberations auto-prepare in Production.
+- First real digest not yet observed: nothing had been sent to leadership at release.
+**Why it matters:** leadership hears about new writeups without anyone remembering to tell them, and the handoff from PD drafting to leadership is now fully automatic for Research.
+**Pointers:** `docs/plans/FINAL_WRITEUP_GROUP_REVIEW_HANDOFF_PLAN_2026-10-06.md` (Stage 5); `docs/atlas/postgres-infra-tables.md`; `lib/services/final-writeup/leadership-digest-service.js`; PR #459, #460, #461.
+
 ## October 2026 — Proposal Ranking activated for Production; D26 preview ready
 
 **Milestone:** Proposal Ranking is enabled in Production after a complete read-only preview verified the 23 ordinary D26 proposals.
