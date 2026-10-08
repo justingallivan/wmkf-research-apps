@@ -304,6 +304,6 @@ Do not carry forward destructive cleanup instructions without fresh verification
 [VERIFIED via signed-in Chrome after the facilitator change] Justin now sees the
 D26 facilitator preview: 23 proposals, four PDs, 51 outstanding reviews, zero
 unscored. The Open round acknowledgement remains unchecked; no round was opened.
-A newly observed display issue remains: many cards show “Organization unavailable”
-and one shows “N/A”, despite populated geography. Investigate the source organization
-name mapping before freezing cards; no source-name correction was inferred or made.
+The institution-name display defect is corrected in source: use linked account.name,
+not the sparse request wmkf_organizationname field. Live metadata and all23account
+names were verified. Release/browser confirmation is recorded in the Atlas below.

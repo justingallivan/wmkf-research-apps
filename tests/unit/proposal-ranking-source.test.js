@@ -88,13 +88,13 @@ test('maps only the verified applicant-account East and West options; unknown or
   const westId = '55555555-5555-4555-8555-555555555555';
   const unknownId = '66666666-6666-4666-8666-666666666666';
   const rows = [
-    { akoya_requestid: REQUEST_ID, _akoya_applicantid_value: eastId, wmkf_eastwest: undefined },
-    { akoya_requestid: '77777777-7777-4777-8777-777777777777', _akoya_applicantid_value: westId },
-    { akoya_requestid: '88888888-8888-4888-8888-888888888888', _akoya_applicantid_value: unknownId },
+    { akoya_requestid: REQUEST_ID, _akoya_applicantid_value: eastId, wmkf_organizationname: 'Stale cached name' },
+    { akoya_requestid: '77777777-7777-4777-8777-777777777777', _akoya_applicantid_value: westId, wmkf_organizationname: 'N/A' },
+    { akoya_requestid: '88888888-8888-4888-8888-888888888888', _akoya_applicantid_value: unknownId, wmkf_organizationname: 'Cached unknown org' },
     { akoya_requestid: '99999999-9999-4999-8999-999999999999' },
   ].map((row) => ({
     akoya_requestnum: '1001', akoya_title: 'Proposal', akoya_request: null,
-    wmkf_organizationname: 'Institute', wmkf_meetingdate: '2026-06-15T00:00:00Z',
+    wmkf_organizationname: 'Cached fallback should not be used', wmkf_meetingdate: '2026-06-15T00:00:00Z',
     akoya_requeststatus: 'Phase II Pending', wmkf_istestrequest: null,
     wmkf_testcreationrunid: null, _akoya_programid_value: RESEARCH_PROGRAM_IDS[0],
     _wmkf_programdirector_value: null, _transactioncurrencyid_value: null, ...row,
@@ -103,9 +103,9 @@ test('maps only the verified applicant-account East and West options; unknown or
     if (entitySet === 'akoya_requests') return { records: rows };
     if (entitySet === 'wmkf_appreviewersuggestions') return { records: [] };
     if (entitySet === 'accounts') return { records: [
-      { accountid: eastId, wmkf_eastwest: 100000000 },
-      { accountid: westId, wmkf_eastwest: 100000001 },
-      { accountid: unknownId, wmkf_eastwest: 100000099 },
+      { accountid: eastId, name: 'Current East Institution', wmkf_eastwest: 100000000 },
+      { accountid: westId, name: null, wmkf_eastwest: 100000001 },
+      { accountid: unknownId, name: 'Applicant Institution', wmkf_eastwest: 100000099 },
     ] };
     throw new Error(`Unexpected source entity set: ${entitySet}`);
   });
@@ -116,13 +116,18 @@ test('maps only the verified applicant-account East and West options; unknown or
   });
 
   expect(source.proposals.map((proposal) => proposal.institutionGeography)).toEqual(['East', 'West', null, null]);
+  expect(source.proposals.map((proposal) => proposal.organization)).toEqual([
+    'Current East Institution', '', 'Applicant Institution', '',
+  ]);
   expect(DynamicsService.queryAllRecords).toHaveBeenCalledWith('akoya_requests', expect.objectContaining({
     select: expect.stringContaining('_akoya_applicantid_value'),
   }));
   expect(DynamicsService.queryAllRecords).toHaveBeenCalledWith('accounts', expect.objectContaining({
-    select: 'accountid,wmkf_eastwest',
+    select: 'accountid,name,wmkf_eastwest',
     filter: expect.stringContaining('accountid eq'),
   }));
+  expect(DynamicsService.queryAllRecords.mock.calls.find(([entitySet]) => entitySet === 'akoya_requests')[1].select)
+    .not.toContain('wmkf_organizationname');
 });
 
 test('staff readiness treats only explicit isdisabled false as active', async () => {

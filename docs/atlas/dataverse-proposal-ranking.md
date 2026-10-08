@@ -370,6 +370,31 @@ Production activation and all four grants remain on; colleague access is not iso
 [VERIFIED via signed-in Chrome after the facilitator change] Justin now sees the
 D26 facilitator preview: 23 proposals, four PDs, 51 outstanding reviews, zero
 unscored. The Open round acknowledgement remains unchecked; no round was opened.
-A newly observed display issue remains: many cards show “Organization unavailable”
-and one shows “N/A”, despite populated geography. Investigate the source organization
-name mapping before freezing cards; no source-name correction was inferred or made.
+The institution-name defect observed here is addressed by the correction below.
+
+## Institution-name source correction — 2026-10-07
+
+[VERIFIED via Production metadata and GET-only D26 account probe] The request
+`akoya_applicantid` lookup targets `account`; entity metadata declares
+`PrimaryNameAttribute=name`, `PrimaryIdAttribute=accountid`, `EntitySetName=accounts`.
+All 23 eligible applicant accounts have names. The request-side
+`wmkf_organizationname` cache was null for 14 and “N/A” for one. Examples: request
+1002852 resolves to Johns Hopkins University; 1003034 to University of Texas
+Southwestern Medical Center; 1003074 to Regents of the University of California
+at Santa Barbara. No source data was changed.
+
+The adapter now selects `accountid,name,wmkf_eastwest` in the existing paginated
+applicant query and maps organization from that account's name. It removes the
+request cache from its projection and does not fall back to stale request text.
+Missing accounts/names retain the honest unavailable display. Name and geography
+share the applicant record; scores, eligibility and budget calculations are unchanged.
+Preview fingerprints already include names; new rounds freeze the corrected value.
+Existing frozen snapshots are not rewritten. Keep the owner trial unpublished and
+reset it before colleague use as required above.
+
+Validation: 28 tests across source, preview, preview service and page suites pass;
+lint, types, Dataverse/OData and Atlas/currency gates with sequential self-tests pass.
+The full live read-only preview reports 23 names, zero missing/placeholder names,
+`canOpen=true`, four PDs, 11 SE / 12 MR and unchanged 9 East / 14 West. Luna built;
+Sol and one bounded subscription-OAuth Opus review found no substantive blocker.
+No source writes, new round, score edits or snapshot backfill occurred.
