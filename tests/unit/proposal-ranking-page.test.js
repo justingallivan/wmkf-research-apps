@@ -190,6 +190,7 @@ describe('Proposal Ranking page', () => {
     render(<ProposalRankingApp />);
     const handle = await screen.findByRole('button', { name: 'Drag proposal 1001 to reorder' });
     expect(screen.queryByRole('button', { name: /Move proposal/ })).not.toBeInTheDocument();
+    expect(screen.getAllByText('Cumulative Budget')).toHaveLength(INITIAL_ORDER.length);
     handle.focus();
     fireEvent.keyDown(handle, { key: ' ', keyCode: 32 });
     expect(await screen.findByText('Drop at position 1 of 4')).toBeInTheDocument();

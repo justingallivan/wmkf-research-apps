@@ -100,7 +100,7 @@ function ProposalCardRow({ proposal, position, count, total, score, rank, editab
               >Open proposal #{proposal.requestNumber}</a>
             </div>
             <div className="w-full rounded-lg bg-gray-50 p-3 text-sm sm:w-52">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Requested through this rank</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Cumulative Budget</p>
               <p className="mt-1 font-semibold tabular-nums text-gray-900">{accumulated}</p>
               {!total?.complete && <p className="mt-1 text-xs text-amber-800">A requested amount is missing or incompatible.</p>}
             </div>
