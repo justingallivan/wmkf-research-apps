@@ -48,7 +48,7 @@ function Rehearsal() {
       <h1 className="text-xl font-semibold">Isolated Proposal Ranking rehearsal</h1>
       <p className="mt-2 text-sm">All proposals and participants here are fictional. The real ranking screen and service run against temporary memory. Nothing here changes December 2026 or colleagues’ submissions.</p>
       <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm">
-        <li>Review the sample pool, acknowledge it, and open a round.</li>
+        <li>Review the sample pool and open a round.</li>
         <li>Rank and submit your SE and MR lists. Use <strong>Simulate other PD submissions</strong> for the other two participants.</li>
         <li>Generate and publish each composite, then reorder the meeting list.</li>
         <li><strong>Reset rehearsal</strong> clears everything here, even after publication.</li>

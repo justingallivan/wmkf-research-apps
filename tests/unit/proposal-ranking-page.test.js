@@ -317,6 +317,28 @@ describe('Proposal Ranking page', () => {
     await waitFor(() => expect(mockLoad).toHaveBeenLastCalledWith({ cycleCode: CYCLE, roundId: undefined }));
   });
 
+  test.each([true, false])('opening without an acknowledgment preserves canOpen=%s', async (canOpen) => {
+    mockLoad.mockResolvedValue({ mode: 'preview', cycleCode: CYCLE, viewer: { capabilities: { open: true } },
+      preview: { proposals: [REQUESTS[0]], seedOrders: { se: [INITIAL_ORDER[0]], mr: [] }, roster: [],
+        outstandingReviewCount: 0, canOpen, warnings: [], previewFingerprint: 'current-preview' } });
+    mockSend.mockResolvedValue(roundResponse({ facilitator: true }));
+    render(<ProposalRankingApp />);
+    const open = await screen.findByRole('button', { name: 'Open round' });
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByText(/outstanding external reviews/)).not.toBeInTheDocument();
+    if (canOpen) {
+      expect(open).toBeEnabled();
+      fireEvent.click(open);
+      await waitFor(() => expect(mockSend).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'open', previewFingerprint: 'current-preview', cycleCode: CYCLE,
+      })));
+    } else {
+      expect(open).toBeDisabled();
+      fireEvent.click(open);
+      expect(mockSend).not.toHaveBeenCalled();
+    }
+  });
+
   test('an uncertain opening retries the exact original operation and preview', async () => {
     mockLoad.mockResolvedValue({ mode: 'preview', cycleCode: CYCLE, viewer: { capabilities: { open: true } },
       preview: { proposals: REQUESTS, seedOrders: { se: INITIAL_ORDER, mr: [] }, roster: [],
@@ -324,8 +346,11 @@ describe('Proposal Ranking page', () => {
     mockSend.mockRejectedValueOnce(Object.assign(new Error('Opening uncertain'), { status: 409, code: 'uncertain_outcome' }))
       .mockResolvedValueOnce(roundResponse({ facilitator: true }));
     render(<ProposalRankingApp />);
-    fireEvent.click(await screen.findByRole('checkbox', { name: /I reviewed the proposal pool/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Open round' }));
+    const open = await screen.findByRole('button', { name: 'Open round' });
+    expect(open).toBeEnabled();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.getByText('Opening saves the current proposals and review scores for this round.')).toBeInTheDocument();
+    fireEvent.click(open);
     fireEvent.click(await screen.findByRole('button', { name: 'Resolve opening attempt' }));
     await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(2));
     expect(mockSend.mock.calls[1][0]).toEqual(mockSend.mock.calls[0][0]);

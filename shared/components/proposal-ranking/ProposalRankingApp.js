@@ -344,7 +344,6 @@ export default function ProposalRankingApp() {
   const [excuseConfirmed, setExcuseConfirmed] = useState(false);
   const [transferConfirmed, setTransferConfirmed] = useState(false);
   const [cancelConfirmed, setCancelConfirmed] = useState(false);
-  const [openingConfirmed, setOpeningConfirmed] = useState(false);
   const [operationNotice, setOperationNotice] = useState(null);
   const [pendingOpen, setPendingOpen] = useState(null);
   const scopeRef = useRef(0);
@@ -604,7 +603,6 @@ export default function ProposalRankingApp() {
     saveStatesRef.current = {};
     setRequestBusy(false);
     setPendingConfirmation(null);
-    setOpeningConfirmed(false);
     setExcuseSelection('');
     setExcuseReason('');
     setExcuseConfirmed(false);
@@ -751,7 +749,7 @@ export default function ProposalRankingApp() {
 
   const openRound = () => {
     const preview = responseRef.current?.preview;
-    if (!preview || !openingConfirmed || pendingOpen || actionBusy) return;
+    if (!preview?.canOpen || pendingOpen || actionBusy) return;
     void runAction({ action: 'open', cycleCode, previewFingerprint: preview.previewFingerprint, operationId: createOperationId() });
   };
 
@@ -799,6 +797,7 @@ export default function ProposalRankingApp() {
   const currentProposalData = activeResponse?.mode === 'preview' ? activeResponse.preview : activeResponse?.mode === 'round' ? activeResponse.round?.snapshot : null;
   const currentProposalById = new Map((currentProposalData?.proposals || []).map((proposal) => [proposal.requestId, proposal]));
   const preview = activeResponse?.preview;
+  const unscoredCount = (preview?.proposals || []).filter((proposal) => !proposal.score?.ratedCount).length;
 
   return <div className="mx-auto max-w-7xl px-4 pb-10">
     <PageHeader title="Proposal Ranking" subtitle="Prepare private PD rankings and facilitate the funding-cycle discussion." icon="▤">
@@ -829,22 +828,18 @@ export default function ProposalRankingApp() {
         <Card hover={false}>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Review the {activeResponse.cycleCode} proposal pool</h2>
-              <p className="mt-1 text-sm text-gray-600">Opening freezes this proposal set, roster, card details, scores, amounts and starting order.</p>
+              <h2 className="text-lg font-semibold text-gray-900">{activeResponse.cycleCode} proposal pool</h2>
+              <p className="mt-1 text-sm text-gray-600">Opening saves the current proposals and review scores for this round.</p>
             </div>
             <p className="text-sm font-medium text-gray-700">{preview?.proposals?.length || 0} proposals · {preview?.roster?.length || 0} PDs</p>
           </div>
-          <p className="mt-3 text-sm text-gray-700">{preview?.outstandingReviewCount || 0} outstanding external reviews · {(preview?.proposals || []).filter((proposal) => !proposal.score?.ratedCount).length} unscored proposals</p>
+          {(preview?.outstandingReviewCount > 0 || unscoredCount > 0) && <p className="mt-3 text-sm text-amber-900">{preview?.outstandingReviewCount || 0} outstanding external reviews · {unscoredCount} unscored proposals</p>}
           <p className="mt-2 text-sm text-gray-700">Participating PDs: {(preview?.roster || []).map((person) => person.name || 'Unnamed PD').join(', ') || 'None assigned'}</p>
           {preview?.warnings?.length > 0 && <ul className="mt-4 list-disc space-y-1 rounded-lg bg-amber-50 p-4 pl-8 text-sm text-amber-950">{preview.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
           {preview?.unexpectedStatuses?.length > 0 && <StatusBanner kind="warning" className="mt-3">Unexpected proposal statuses need review: {preview.unexpectedStatuses.join(', ')}.</StatusBanner>}
           {preview?.roster?.some((person) => !person.hasAppAccess) && <StatusBanner kind="error" className="mt-3">Every captured PD needs Proposal Ranking app access before this round can open.</StatusBanner>}
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <label className="flex items-start gap-2 text-sm text-gray-700">
-              <input type="checkbox" checked={openingConfirmed} onChange={(event) => setOpeningConfirmed(event.target.checked)} disabled={actionBusy} className="mt-0.5 rounded border-gray-300" />
-              I reviewed the proposal pool, roster, warnings and starting order.
-            </label>
-            {capabilities.open && <Button type="button" disabled={actionBusy || Boolean(pendingOpen) || !openingConfirmed || !preview?.canOpen} loading={actionBusy} onClick={openRound}>Open round</Button>}
+            {capabilities.open && <Button type="button" disabled={actionBusy || Boolean(pendingOpen) || !preview?.canOpen} loading={actionBusy} onClick={openRound}>Open round</Button>}
           </div>
         </Card>
         <div className="grid gap-4 lg:grid-cols-2">
