@@ -6,10 +6,10 @@ Work on two things, on the other computer:
 1. **Meeting Tracker transcript workflow:** resume `codex/meeting-transcript-ux` (pushed at
    `3fa20089f`; planning only, nothing merged). Handoff directly below. The owner meets WMKF's
    Zoom administrator the morning of 2026-10-08.
-2. **Proposal Ranking:** live in Production since PR #457 (merge `10c079c86`). A Codex session is
-   still working on it and will hand off later; its handoff is the next section after the
-   transcript one. When that session writes its handoff, keep both sections: do not replace
-   this file wholesale (the PR #457 merge did that once, restored in `c7e6417f8`).
+2. **Proposal Ranking:** the updated current status and handoff follows the transcript section.
+   Keep both handoffs; do not replace this file wholesale (the PR #457 merge did that once,
+   restored in `c7e6417f8`). The local rehearsal did not perform Production actions; restore
+   Beth and verify a blank slate before colleague use.
 
 Setting up the transcript worktree on a new machine:
 ```
@@ -49,7 +49,7 @@ No runtime code, credentials, database/schema, Production data or account settin
 
 ---
 
-## Proposal Ranking handoff (Codex): Proposal Ranking live; facilitator walkthrough next
+## Proposal Ranking handoff (Codex): isolated rehearsal verified; Production blank slate remains required
 
 ## Current owner-only trial — restore a clean start before colleague use
 
@@ -69,10 +69,54 @@ been performed yet. Do not test publication in the live trial without first agre
 a separate reset-safe rehearsal path. The app is already live with four grants;
 this is not an isolated environment inaccessible to colleagues.
 
-Next: Justin can inspect the facilitator preview without opening a round. Other
-people's rankings must not be manufactured using their identities.
+The last recorded signed-in facilitator preview and configuration are in the
+release and Atlas sections below. The local rehearsal contacted no Production
+service; its synthetic participants are not staff identities or votes.
 
-## Historical release checkpoint: Production deployed and enabled — 2026-10-07
+## Isolated local UI and service rehearsal — browser verification complete
+
+[VERIFIED via source, final 42 focused tests, API-route and route-lifecycle-auth
+gates with sequential self-tests, types and Chrome] The standalone command
+`node scripts/rehearse-proposal-ranking.js` runs at `http://127.0.0.1:3133` on
+loopback only and bundles the real Proposal Ranking UI and service with build-time
+in-memory adapters. Its fixture has six
+fictional proposals (three SE and three MR) and three fictional PDs, including
+the facilitator. It supports synthetic submissions by the other two PDs, role
+views, and an in-memory reset that still works after publication; a generation
+fence rejects delayed actions from before reset. It loads no environment file or
+live Dataverse/API service and creates no real staff votes.
+
+Chrome verified opening a synthetic round; simulating both other PDs' submissions;
+moving R002 above R001 and submitting the facilitator's SE order (3/3); generating
+and publishing the SE composite; then moving R003 above R002 in the meeting order
+and saving it. The composite showed ranks 1.33, 1.67 and 3.00, and the full
+requested total was $457,500. In PD A's view, the published named ranks and saved
+meeting order R001, R003, R002 were visible. MR stayed private; fictional Casey's
+own MR list remained locked, with program progress at 2/3 submissions. Reset after
+publication returned to a clean preview with the acknowledgement unchecked and
+Open disabled. Desktop and
+390px DOM checks placed the 24px rating dot above the 24px E/W marker, both right
+aligned and without horizontal overflow.
+
+The final 42 focused tests in three suites passed; API-route and
+route-lifecycle-auth gates with their self-tests and types passed sequentially.
+Sol identified a reset-generation race and a broken synthetic workbench link.
+Corrections fence delayed actions and make the linked page explain its fictional
+content. A bounded OAuth Opus source review found no blockers and noted
+only limitations; it ran before the reset correction. Atlas and documentation
+currency gates, plus fact-consistency checks and their self-tests, passed
+sequentially. The UI marker swap is built on the feature branch. No Production
+app deployment was performed during this turn; the current deployment and marker
+appearance have not been rechecked. Promotion remains pending owner approval.
+
+The local reset affects only rehearsal memory. Before colleagues use Production,
+the mandatory blank-slate work remains: cancel any unpublished trial round,
+restore Beth as default facilitator, open a fresh round from current source data,
+and verify it has only its initial seed orders with no submissions, composites
+or meeting edits. Preserve source reviewer scores. Publication in the live trial
+is not part of this rehearsal.
+
+## Historical release checkpoint: initial Production deployment — 2026-10-07
 
 [VERIFIED via GitHub, Vercel and signed-in Chrome] Owner approved release. PR #457
 merged at `10c079c8652b4184404b4cb8ee8479f370a56c79`; privacy guards deployed while
@@ -84,8 +128,9 @@ created. Full preview: 23 requests, 11 SE / 12 MR, four grants, all USD amounts 
 current scores. Full candidate CI passed (21,357 tests plus 129 PG tests); Sol and
 OAuth Opus found no release blocker.
 
-Current receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTION_RELEASE_2026-10-07.md`.
-Next: Beth's facilitator session and separate PD sessions for the full private-list,
+Initial release receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTION_RELEASE_2026-10-07.md`.
+At that release checkpoint, next was Beth's facilitator session and separate PD
+sessions for the full private-list,
 submission, publication, meeting-reordering and budget walkthrough. Do not silently
 change facilitator or submit other people's rankings to manufacture acceptance.
 For rollback keep the deployed privacy guards: disable ranking or return to the
@@ -143,10 +188,11 @@ review loop was needed. No milestone entry is required.
 ### Follow-up: ten-color reviewer-rating circle
 
 The owner chose ten approximate rating colors despite varying reviewer counts.
-The shared card now adds a 24px solid lower-right circle: red low, yellow middle,
-green high, gray unscored. It maps the frozen raw mean from 1–5 to the nearest of
-ten steps; numeric score display and all ordering/calculations remain unchanged.
-Matching colors do not imply exact ties. E/W remains at the upper right. No source,
+At this checkpoint, the shared card added a 24px solid lower-right circle: red low,
+yellow middle, green high, gray unscored. It maps the frozen raw mean from 1–5 to
+the nearest of ten steps; numeric score display and all ordering/calculations remain
+unchanged. Matching colors do not imply exact ties. E/W was at the upper right.
+The later source placement is documented in the Atlas. No source,
 configuration or live data changes are part of this UI-only addition. Validation:
 126 ranking/Explorer tests, lint, types and relevant gates pass; desktop/mobile
 component renders confirm all colors, gray fallback and no overflow. Luna built;
@@ -663,3 +709,13 @@ npx jest tests/unit/final-writeup tests/unit/workbench-final-writeup-route.test.
 ```
 
 (Session 580 and earlier main handoffs: `git show 444a2d8f0:SESSION_PROMPT.md`.)
+
+[VERIFIED deployed and browser-checked] PR #462 merged as
+`f7a75fc5358649ab30765504ea6e6b35cdf00bb4`; Production deployment
+`dpl_FNFvVWUzPaiNgdQ7Uh1DgK526hHx` is READY with live aliases. Justin's refreshed
+D26 facilitator preview displays names on all 23 cards, no unavailable/N/A labels,
+including Johns Hopkins, UT Southwestern and UC Santa Barbara. Open acknowledgement
+remains unchecked; no round was opened. Full CI passed on `e9d40cfc5`; the final
+merge `cc6ef1823` changed only SESSION_PROMPT.md to retain the concurrently restored
+main handoff, passed documentation gates, and had identical runtime/test source.
+The mandatory unpublished-trial reset before colleague use remains in force.
