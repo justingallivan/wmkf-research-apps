@@ -123,7 +123,7 @@ CREATE INDEX IF NOT EXISTS idx_zoom_recording_imports_request_recent
 
 - `started` does not require `transcription_job_id`, because the FK nulls it when a job is purged.
 - The row stores identifiers only: no content, URLs, tokens, topics or names.
-- Re-importing a meeting is allowed once the earlier row is `failed`. A `started` row blocks duplicates for the same request while its job is live; when the job is `failed`, `expired`, missing, or has had deletion requested (a cancelled queued run stays `queued` until its audio is cleaned up), the row is marked `failed` (`zoom_import_job_ended`) and the meeting can be imported again. A `ready` or `submission_uncertain` job still blocks, to avoid duplicate spend.
+- Re-importing a meeting is allowed once the earlier row is `failed`. A `started` row blocks duplicates for the same request while its job is live; when the job is `failed`, `expired`, missing, or is a queued job with cleanup requested (a cancelled run stays `queued` until its audio is cleaned up; cleanup on `processing`, `saving` or `submission_uncertain` does not release the claim), the row is marked `failed` (`zoom_import_job_ended`) and the meeting can be imported again. A `ready` or `submission_uncertain` job still blocks, to avoid duplicate spend.
 - Retention of these rows follows later Stage 5 work and is recorded as open.
 - The store module is `lib/services/meeting-tracker-recordings/import-store.js` and uses parameterized SQL only.
 

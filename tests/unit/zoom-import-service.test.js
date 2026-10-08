@@ -614,3 +614,38 @@ describe('a cancelled queued job (deletion requested) no longer holds the record
     expect(rows.size).toBe(2);
   });
 });
+
+describe.each(['processing', 'saving', 'submission_uncertain'])('cleanup requested on a %s job keeps the import claim', (status) => {
+  const row = (over = {}) => ({ id: 'old', request_id: REQUEST, actor_profile_id: 3, zoom_meeting_uuid: UUID, state: 'started',
+    transcription_job_id: JOB, job_status: status, job_cleanup_requested: true, lease_expired: false, ...over });
+  test('the listing still reports the import as started', async () => {
+    rows.set('old', row());
+    const meeting = (await listZoomRecordingsForVisit({ requestId: REQUEST })).meetings[0];
+    expect(meeting.import).toEqual({ state: 'started', jobId: JOB, failureCode: null });
+  });
+  test('importing again returns the existing claim: no release, no new row or job', async () => {
+    rows.set('old', row());
+    getMeetingTranscriptionJob.mockResolvedValue({ id: JOB, status, version: 3 });
+    const result = await importZoomRecording(args());
+    expect(result.import).toEqual({ id: 'old', state: 'started', failureCode: null });
+    expect(rows.get('old').state).toBe('started');
+    expect(rows.size).toBe(1);
+    expect(uploadMeetingTranscription).not.toHaveBeenCalled();
+  });
+  test('an expired lease whose job has cleanup requested is taken over as started', async () => {
+    rows.set('stale', { id: 'stale', request_id: REQUEST, actor_profile_id: 3, zoom_meeting_uuid: UUID, state: 'importing', lease_expired: true, lease_token: 'old' });
+    store.findJobForImport.mockResolvedValue({ id: JOB, status, cleanup_requested_at: new Date() });
+    getMeetingTranscriptionJob.mockResolvedValue({ id: JOB, status, version: 3 });
+    const result = await importZoomRecording(args());
+    expect(result.import).toEqual({ id: 'stale', state: 'started', failureCode: null });
+    expect(rows.size).toBe(1);
+    expect(uploadMeetingTranscription).not.toHaveBeenCalled();
+  });
+  test('error recovery keeps the claim started when the job has cleanup requested', async () => {
+    startMeetingTranscription.mockRejectedValue(Object.assign(new Error('boom'), { code: 'content_unavailable', status: 410 }));
+    getMeetingTranscriptionJob.mockResolvedValue({ id: JOB, status, version: 3, cleanup_requested_at: new Date() });
+    const result = await importZoomRecording(args());
+    expect(result.import.state).toBe('started');
+    expect(onlyRow()).toMatchObject({ state: 'started', transcription_job_id: JOB });
+  });
+});
