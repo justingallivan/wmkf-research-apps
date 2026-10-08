@@ -94,13 +94,9 @@ function ProposalCardRow({ proposal, position, count, total, score, rank, editab
                   : <span className="text-gray-500">Not scored</span>}
               </div>
               {rankNames.length > 0 && (
-                <details className="mt-2 text-sm text-gray-700">
-                  <summary className="cursor-pointer font-medium">Named PD ranks ({rankNames.length})</summary>
-                  <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                    {rankNames.map((entry) => <li key={entry.systemUserId}>{entry.name}: {entry.rank}</li>)}
-                  </ul>
-                  <p className="mt-1 text-xs text-gray-500">Range: {rank.minRank}–{rank.maxRank}</p>
-                </details>
+                <ul aria-label="PD ranks" className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-700">
+                  {rankNames.map((entry) => <li key={entry.systemUserId}>{entry.name}: <span className="font-semibold">{entry.rank}</span></li>)}
+                </ul>
               )}
               <a
                 href={`/workbench/${encodeURIComponent(proposal.requestId)}`}

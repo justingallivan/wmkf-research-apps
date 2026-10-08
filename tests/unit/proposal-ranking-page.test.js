@@ -647,3 +647,14 @@ test('shows each external review as an inline letter grade without a distributio
   expect(within(own).queryByText('Review rating distribution')).not.toBeInTheDocument();
   expect(within(own).getAllByText('Not scored').length).toBeGreaterThanOrEqual(3);
 });
+
+
+test('shows published PD names and ranks inline without a disclosure', async () => {
+  mockLoad.mockResolvedValue(roundResponse({ published: true }));
+  render(<ProposalRankingApp />);
+  const ranks = await screen.findByRole('list', { name: 'PD ranks' });
+  expect(within(ranks).getByText('Current PD:')).toHaveTextContent('Current PD: 1');
+  expect(within(ranks).getByText('Other PD:')).toHaveTextContent('Other PD: 2');
+  expect(ranks.closest('details')).toBeNull();
+  expect(screen.queryByText(/Named PD ranks/)).not.toBeInTheDocument();
+});
