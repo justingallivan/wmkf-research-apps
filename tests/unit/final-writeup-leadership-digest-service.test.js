@@ -72,6 +72,8 @@ function fakeStore() {
       .filter((row) => row.recipient_systemuser_id === recipient && row.digest_day >= sinceDay && row.accepted_at)
       .flatMap((row) => row.membership.map((item) => item.finalDocumentId)),
     claim: async ({ recipientSystemUserId, digestDay, recipientAddress, membership }) => {
+      // Postgres checks the proposed insert row (membership CHECK) before ON CONFLICT.
+      if (!Array.isArray(membership) || !membership.length) throw new Error('membership_shape');
       const key = keyOf(recipientSystemUserId, digestDay);
       const existing = rows.get(key);
       if (!existing) {
@@ -337,9 +339,25 @@ test('no Leadership persona while writeups are waiting raises an alert', async (
   }));
 });
 
-test('a capped request scan fails the run instead of freezing a partial list', async () => {
+test('a capped request scan fails the run instead of freezing a partial list, and alerts', async () => {
   const { dependencies } = harness({ overrides: { queryAllRequests: jest.fn(async () => ({ records: [request(1)], capped: true })) } });
   await expect(runLeadershipDigests(dependencies)).rejects.toMatchObject({ code: 'leadership_digest_request_scan_capped' });
+  expect(dependencies.notify).toHaveBeenCalledWith(expect.objectContaining({
+    metadata: expect.objectContaining({ reason: 'leadership_digest_request_scan_capped', recipientSystemUserId: null, digestDay: DAY }),
+  }));
+});
+
+test.each([
+  ['a staffing read failure', { personaState: jest.fn(async () => { throw new Error('dataverse down'); }) }, 'leadership_digest_run_failed'],
+  ['a missing sender', { sender: () => '' }, 'leadership_digest_not_configured'],
+])('%s fails the run and raises a run-wide alert', async (_label, overrides, reason) => {
+  const { dependencies } = harness({ overrides });
+  await expect(runLeadershipDigests(dependencies)).rejects.toThrow();
+  expect(dependencies.notify).toHaveBeenCalledWith(expect.objectContaining({
+    type: 'final_writeup_leadership_digest_undelivered',
+    metadata: expect.objectContaining({ reason, recipientSystemUserId: null }),
+  }));
+  expect(dependencies.createEmailActivity).not.toHaveBeenCalled();
 });
 
 test('the digest day is the UTC day before the run, so daily runs get consecutive keys across DST changes', () => {

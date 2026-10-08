@@ -446,7 +446,9 @@ created before its id was stored. `accepted_at` is terminal. No row is created w
 nothing is new. Failures keep the row unaccepted with `last_error_code` and raise an
 `error` ops alert (`final_writeup_leadership_digest_undelivered`), as do a blank
 subject or message (`email.final_writeup_leadership_digest.subject` / `.body`), an
-unusable recipient address, and writeups waiting with no Leadership persona. Known
+unusable recipient address, writeups waiting with no Leadership persona, and a run-wide
+fault (writeup scan, staffing read or missing sender/base URL), which also fails the cron. A
+same-day retry reclaims the row with its own stored membership. Known
 direction: a digest whose transport was accepted but whose acceptance was never
 recorded lists its writeups again the next day (duplicate, never a drop). Read/write
 paths: `lib/services/final-writeup/leadership-digest-store.js` and

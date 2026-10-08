@@ -111,12 +111,19 @@ describeIf('final_writeup_leadership_digests ledger (live Postgres, migration 07
     expect(await store.listToldFinalDocumentIds(OTHER, '2026-10-01')).toEqual([]);
   });
 
-  test('a failure releases the lease so the same day can be retried', async () => {
+  test('a failure releases the lease; the retry reclaims with the row\'s own frozen membership', async () => {
     const first = await store.claimLeadershipDigest(claimInput());
     expect(await store.recordLeadershipDigestFailure(RECIPIENT, DAY, first.row.lease_token, 'leadership_digest_send_failed')).toBe(1);
     const row = await store.getLeadershipDigest(RECIPIENT, DAY);
     expect(row).toMatchObject({ lease_token: null, last_error_code: 'leadership_digest_send_failed', accepted_at: null });
-    expect((await store.claimLeadershipDigest(claimInput())).claimed).toBe(true);
+    // The service's retry input: the stored row's membership and address (Codex review, 2026-10-07).
+    const retry = await store.claimLeadershipDigest(claimInput({
+      membership: row.membership, recipientAddress: row.recipient_address,
+    }));
+    expect(retry).toMatchObject({ claimed: true, row: { attempt_count: 2, membership: [item(FINAL_A)] } });
+    // A null membership is refused before ON CONFLICT can reclaim the row.
+    await mockPg.client.query("UPDATE final_writeup_leadership_digests SET lease_token = NULL, locked_until = NULL");
+    await expect(store.claimLeadershipDigest(claimInput({ membership: null }))).rejects.toThrow(/membership_shape/);
   });
 
   test('CHECK shapes refuse an empty membership and an accepted row without an activity', async () => {
