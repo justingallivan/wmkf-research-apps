@@ -1,3 +1,88 @@
+# Session 588 Prompt: resume Proposal Ranking acceptance and preserved transcript follow-ups
+
+## Session 587 close — Proposal Ranking rehearsal and card refinement (2026-10-08 PT)
+
+**Current ranking handoff. Earlier ranking sections below are historical checkpoints;
+their card appearance and ordinary-trial reset limitations must not override this section.**
+The other workstream handoffs below remain preserved.
+
+[VERIFIED via Git and GitHub] Implementation remains on **codex/proposal-ranking**,
+runtime tip **72efac88d**, in open draft [PR #463](https://github.com/justingallivan/wmkf-research-apps/pull/463).
+The owner requested this handoff on main, not a runtime merge or promotion.
+
+### Completed and decisions
+
+- Simplified opening and required full participation: `0f9e3b4e4`, `0c04b4ad2`.
+  Staff are not excused. The local fixture still has three fictional PDs; the owner
+  reports four real staff. Do not confuse the fixture roster with live staffing.
+- Kept draft actions/results together (`104590016`), separated My rankings,
+  Facilitate and Meeting list (`c51e60de7`), and adopted hello-pangea drag/drop
+  (`a2bebba6b`). Owner accepted dragging and called the walkthrough tested for now.
+- Explicit dry-run opening and permanent trial-ranking erasure, including after
+  publication: backend `e20f014ba`, UI `9dbc3daba`. A content-free receipt remains;
+  no trial rankings are retained. Ordinary rounds cannot be relabeled/erased this way.
+- Combined SE + MR meeting order: backend `6e1e5d187`, UI `5148af779`.
+  Both nonempty programs must be published. Compare the next items' average PD
+  ranks on the same scale, preserving each program's current internal meeting order;
+  ties choose SE. Later combined edits are independent of program lists.
+  Read the branch Atlas for the exact contract.
+- Card refinements culminate in `72efac88d`: prominent rank on left; institution
+  above a smaller linked proposal title; no proposal number or move buttons;
+  Reviews shows individual letter grades followed by the numeric average.
+  First-name PD rank badges and Average use light rank-based colors. Staff ranks
+  lower left are bottom-aligned with Requested/Cumulative Budget lower right,
+  without a horizontal divider. SE/MR and E/W are outlined circles upper right.
+  The redundant external-review score disk is removed.
+- Notable UI commits: `95d19e97a` review grades, `93886a68f` PD badges,
+  `edf5f6ad5` Average badge, `14ca47aed` institution prominence,
+  `085f7095a` left alignment, `112c1044a` disk removal,
+  `6afe9522d` shared bottom row, `72efac88d` corner badges.
+  Intermediate layout experiments are superseded by this final description.
+
+### Verification and resume
+
+[VERIFIED via local Jest, ESLint and in-app browser] Final UI regression: **39 tests
+pass**, scoped lint and diff checks pass. Browser shows the latest cards; the preceding
+bottom-row check measured equal staff/budget bottom edges. Earlier backend work ran
+focused suites and relevant scoped gates/self-tests sequentially. These are local
+rehearsal checks, not Production acceptance.
+[VERIFIED via GitHub at stop] All reported CodeQL and Vercel checks passed for
+`72efac88d`; recheck checks on any newer documentation head before release.
+Claim-evidence report was unavailable because local state could not be read;
+no advisory observation was invented.
+
+Resume the existing worktree:
+`/Users/gallivan/.codex/worktrees/proposal-ranking/WMKF_Apps-codex`.
+Do not switch its branch or rebuild from main. Read its
+`docs/atlas/dataverse-proposal-ranking.md`, the shared card in
+`shared/components/proposal-ranking/ProposalRankingApp.js`, and
+`tests/unit/proposal-ranking-page.test.js`.
+Current rehearsal is **http://127.0.0.1:3135/**, memory-only. On another machine or
+after restart, run `node scripts/rehearse-proposal-ranking.js` and use its printed
+loopback URL (default 3133). No credentials or .env.local needed. Select D26.
+Temporary memory and browser state do not travel through Git.
+
+### Open items and boundaries
+
+- **Owner decision needed:** review/merge/promotion of PR #463 and scheduling the
+  colleague Production dry run. The owner wants a colleague dry run and permanent
+  erasure of trial rankings; this is intent, not evidence that it ran.
+- **Verify before acting, explicit owner authorization required:** live-state
+  preflight, old unpublished-trial cancellation, restoring Beth as default facilitator,
+  clean-round verification and role readiness for dry-run erasure. Inspect current
+  state first; do not assume historical facilitator/round state is still current.
+  Preserve external-review scores and source proposals. Do not publish an old
+  ordinary trial expecting the new dry-run erasure path to apply.
+- No Production/live Dataverse reads or writes were performed for this local UI
+  work or stop. No runtime promotion is authorized by this handoff.
+- Preserve privacy, test exclusions and full participation. No fake staff votes,
+  source-proposal copies, API-key agent auth, Ultrareview or other metered products.
+  Keep UX and feature changes in separate commits.
+- Further cosmetic refinement is parked until the owner requests it. No new
+  Production milestone shipped; **no DEVELOPMENT_LOG entry required**.
+
+---
+
 # Session 587 Prompt: transcription hardening follow-ups after the Zoom import release
 
 ## Session 586 Summary (Claude, main), 2026-10-08 PT
@@ -77,7 +162,7 @@
    - Stage 4: video split. Stage 5: retention.
    - See `docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md`.
 2. **Proposal Ranking acceptance and promotion (PR #463, draft).**
-   - Codex continued on `codex/proposal-ranking` this session; the head is `9dbc3daba` (dry-run opening and confirmed erasure).
+   - Codex continued on `codex/proposal-ranking` this session; the latest runtime head is `72efac88d`; see Session 587 above.
    - Read that branch's `SESSION_PROMPT.md` before acting. The live-state preflight in the Session 585 section below still applies.
 
 ### Verify Before Acting
@@ -111,7 +196,7 @@
 
 ## Session 585 close — Proposal Ranking office handoff (2026-10-08)
 
-**Current ranking handoff; older ranking checkpoints below are historical.**
+**Historical Session 585 ranking checkpoint; superseded by Session 587 above.**
 Owner asked to resume at the office. Implementation and detailed Atlas remain on
 **`codex/proposal-ranking`**, not main. Do not rebuild from main. Draft
 [PR #463](https://github.com/justingallivan/wmkf-research-apps/pull/463) remains
