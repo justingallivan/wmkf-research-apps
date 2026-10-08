@@ -77,7 +77,6 @@ function ProposalCardRow({ proposal, position, count, total, score, rank, editab
               {proposal.leadName && <p className="mt-1 text-sm text-gray-600">Lead PD: {proposal.leadName}</p>}
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                 <span><span className="font-medium text-gray-700">Requested:</span> {amount}</span>
-                <span><span className="font-medium text-gray-700">Review score:</span> {formatScore(proposal.score)}</span>
                 {score && <span><span className="font-medium text-gray-700">Composite:</span> {score.averageRank.toFixed(2)}{score.tied ? ' · tied' : ''}</span>}
                 {rank?.disagreement && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">Disagreement</span>}
               </div>
@@ -92,6 +91,7 @@ function ProposalCardRow({ proposal, position, count, total, score, rank, editab
                       className="inline-flex min-w-7 items-center justify-center rounded-md bg-gray-100 px-2 py-0.5 font-semibold text-gray-800"
                     >{grade}</span>))
                   : <span className="text-gray-500">Not scored</span>}
+                {proposal.score?.ratedCount > 0 && <span className="ml-1 text-gray-600">{formatScore(proposal.score)}</span>}
               </div>
               {rankNames.length > 0 && (
                 <ul aria-label="PD ranks" className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-700">

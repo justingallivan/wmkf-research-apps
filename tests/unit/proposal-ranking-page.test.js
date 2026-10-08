@@ -644,6 +644,10 @@ test('shows each external review as an inline letter grade without a distributio
   expect(within(own).getAllByText('Reviews')).toHaveLength(4);
   expect(within(own).getAllByLabelText('Excellent')).toHaveLength(2);
   expect(within(own).getByLabelText('Good')).toHaveTextContent('G');
+  const average = within(own).getByText('4.2 · 3/3 rated');
+  expect(average.parentElement).toHaveTextContent('Reviews');
+  expect(within(own).getByLabelText('Good').compareDocumentPosition(average) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(within(own).queryByText('Review score:')).not.toBeInTheDocument();
   expect(within(own).queryByText('Review rating distribution')).not.toBeInTheDocument();
   expect(within(own).getAllByText('Not scored').length).toBeGreaterThanOrEqual(3);
 });
