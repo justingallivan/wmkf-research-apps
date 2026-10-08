@@ -1,4 +1,45 @@
-# Session 584 Prompt: Proposal Ranking owner choice pending
+# Session 584 Prompt: Proposal Ranking live; facilitator walkthrough next
+
+## Current owner-only trial — restore a clean start before colleague use
+
+[VERIFIED via conditional Admin-service PUT and readback, 2026-10-07] Owner approved
+Justin Gallivan as temporary default facilitator (`29b0de0d-4ff7-ee11-a1fd-000d3a3621c7`,
+profile 2). Beth's previous default was `b6f1cd38-0973-f011-bec3-6045bd0510d4`.
+Only this setting changed; no round was opened or rankings submitted by this action.
+
+Owner explicitly requires a blank slate before colleagues start. This means trial
+PD orders/submissions/composites must not carry into the real round; source external
+reviewer scores remain intact. Keep the trial UNPUBLISHED: existing cancellation
+refuses a round after either program is published. Before handoff, cancel any
+unpublished trial round (retained read-only as history), restore Beth as default,
+and open a fresh round from current source data. Verify the new round has only
+initial seed orders and no submitted lists/composites/meeting edits. No reset has
+been performed yet. Do not test publication in the live trial without first agreeing
+a separate reset-safe rehearsal path. The app is already live with four grants;
+this is not an isolated environment inaccessible to colleagues.
+
+Next: Justin can inspect the facilitator preview without opening a round. Other
+people's rankings must not be manufactured using their identities.
+
+## Historical release checkpoint: Production deployed and enabled — 2026-10-07
+
+[VERIFIED via GitHub, Vercel and signed-in Chrome] Owner approved release. PR #457
+merged at `10c079c8652b4184404b4cb8ee8479f370a56c79`; privacy guards deployed while
+disabled, then both ranking flags enabled and the same source rebuilt. Active
+Production deployment: `dpl_F5ewaS8DRDhABRVyhrG5XHuSRvwf`. Justin's D26 view shows
+“Round not open”; Beth must sign in to open it. No ranking rows or staff votes were
+created. Full preview: 23 requests, 11 SE / 12 MR, four grants, all USD amounts present,
+9 East / 14 West, all scored; 51 outstanding review assignments. Opening freezes
+current scores. Full candidate CI passed (21,357 tests plus 129 PG tests); Sol and
+OAuth Opus found no release blocker.
+
+Current receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTION_RELEASE_2026-10-07.md`.
+Next: Beth's facilitator session and separate PD sessions for the full private-list,
+submission, publication, meeting-reordering and budget walkthrough. Do not silently
+change facilitator or submit other people's rankings to manufacture acceptance.
+For rollback keep the deployed privacy guards: disable ranking or return to the
+verified disabled deployment `dpl_8CVM7KUdKhPh2bTHDKdaqVcAA14J`.
+Earlier sections below are historical checkpoints superseded by this release.
 
 ## Session 583 Summary — ranking branch continuation, 2026-10-07
 
@@ -260,6 +301,12 @@ Prior transcript/summary UX and Final Writeup handoff context is preserved at
 by this ranking build; read current owner/source evidence before resuming them.
 Do not carry forward destructive cleanup instructions without fresh verification.
 
+[VERIFIED via signed-in Chrome after the facilitator change] Justin now sees the
+D26 facilitator preview: 23 proposals, four PDs, 51 outstanding reviews, zero
+unscored. The Open round acknowledgement remains unchecked; no round was opened.
+The institution-name display defect is corrected in source: use linked account.name,
+not the sparse request wmkf_organizationname field. Live metadata and all23account
+names were verified. Release/browser confirmation is recorded in the Atlas below.
 ---
 
 # Restored main handoff (Session 584, Claude)

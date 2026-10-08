@@ -1,16 +1,16 @@
 # Proposal Ranking storage and activation
 
-Date: 2026-10-07. Status: source implemented; sandbox schema and application-role
-provisioning and bounded persistence rehearsal verified. Runtime activation and
-multi-identity browser rehearsal remain pending. Direct-table denial is verified
-for the tested sandbox staff identity and all four Production participants.
-Production schema and dedicated application-role setup are now verified; the app
-remains disabled. Production facilitator/grants and direct-table/search privacy are
-verified in `docs/audits/PROPOSAL_RANKING_PRODUCTION_ACCESS_PRIVACY_2026-10-07.md`. Production setup receipt:
-`docs/audits/PROPOSAL_RANKING_PRODUCTION_SETUP_2026-10-07.md`. Sandbox evidence:
-`docs/audits/PROPOSAL_RANKING_SANDBOX_SETUP_2026-10-07.md` and
-`docs/audits/PROPOSAL_RANKING_PERSISTENCE_REHEARSAL_2026-10-07.md` and
-`docs/audits/PROPOSAL_RANKING_STAFF_PRIVACY_2026-10-07.md`.
+Date: 2026-10-07. Status: **Production deployed and enabled**, with schema, dedicated
+role and four participant grants verified. Justin is the temporary default facilitator
+for the owner-approved trial; Beth must be restored before colleague handoff.
+[VERIFIED via Vercel and Chrome] PR #457 merge `10c079c8` is deployed as
+`dpl_F5ewaS8DRDhABRVyhrG5XHuSRvwf`; Justin's D26 page shows “Round not open”.
+No live ranking round was created during release. The owner subsequently approved
+Justin as default facilitator for testing; the full multi-identity lifecycle remains
+unverified. Trial reset requirements are recorded below.
+Current release and rollback receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTION_RELEASE_2026-10-07.md`.
+Earlier dated sections below retain historical setup checkpoints; disabled-state
+statements in those checkpoints are superseded by this release.
 
 ## Source and persistence
 
@@ -333,3 +333,68 @@ The app is disabled and tables empty. Git comparison shows origin/main lacks the
 branch generic-reader privacy guards: deploy these before opening a live round.
 Promotion/activation and full browser acceptance remain owner decisions. Effective
 impersonation is not staff OAuth browser proof or populated audit/navigation proof.
+
+## Production activation — 2026-10-07
+
+[VERIFIED via full preview builder, single-variable config readback and Chrome]
+Both ranking flags are on; both isolation flags and Dataverse controls remain on.
+The deployed source includes unconditional generic-reader privacy guards before
+activation. D26 full preview passes: 23 requests (11 SE / 12 MR), four grants,
+USD with no missing amounts, 9 East / 14 West, no unscored proposals, and 51
+outstanding review assignments. Opening freezes the then-current inputs.
+
+Justin's signed-in view is correctly waiting for Beth to open D26. No browser
+session for Beth or other PDs was available, so full lifecycle acceptance and
+populated indirect-reader verification remain open. No source or ranking rows
+were written during release. See the current release receipt above for exact
+artifacts, CI, review, authorization and the disabled-with-privacy rollback.
+
+## Temporary facilitator and mandatory clean-start handoff — 2026-10-07
+
+[VERIFIED via existing Admin-service conditional write and readback] Owner approved
+Justin Gallivan (`29b0de0d-4ff7-ee11-a1fd-000d3a3621c7`, profile 2) replacing Beth
+as default facilitator for testing. Enabled identity, active profile and ranking
+grant were revalidated by the service. Setting revision changed from
+`W/"103053119"` to `W/"103053545"`. No other setting, grant, round or source data
+was changed. This is Justin acting as himself, not impersonating Beth.
+
+[OWNER REQUIREMENT] Trial PD rankings must not carry over to colleague use. Preserve
+source reviewer scores. Keep any trial round unpublished, then cancel it, restore
+Beth's default GUID `b6f1cd38-0973-f011-bec3-6045bd0510d4`, and open a fresh round
+with current source inputs. Canceled history is retained. Confirm no submissions,
+composites or meeting edits in the fresh round. The existing service blocks cancellation
+after either program is published; do not cross that boundary for this trial without
+a separately agreed reset-safe path. This reset is still pending, not completed.
+Production activation and all four grants remain on; colleague access is not isolated.
+
+[VERIFIED via signed-in Chrome after the facilitator change] Justin now sees the
+D26 facilitator preview: 23 proposals, four PDs, 51 outstanding reviews, zero
+unscored. The Open round acknowledgement remains unchecked; no round was opened.
+The institution-name defect observed here is addressed by the correction below.
+
+## Institution-name source correction — 2026-10-07
+
+[VERIFIED via Production metadata and GET-only D26 account probe] The request
+`akoya_applicantid` lookup targets `account`; entity metadata declares
+`PrimaryNameAttribute=name`, `PrimaryIdAttribute=accountid`, `EntitySetName=accounts`.
+All 23 eligible applicant accounts have names. The request-side
+`wmkf_organizationname` cache was null for 14 and “N/A” for one. Examples: request
+1002852 resolves to Johns Hopkins University; 1003034 to University of Texas
+Southwestern Medical Center; 1003074 to Regents of the University of California
+at Santa Barbara. No source data was changed.
+
+The adapter now selects `accountid,name,wmkf_eastwest` in the existing paginated
+applicant query and maps organization from that account's name. It removes the
+request cache from its projection and does not fall back to stale request text.
+Missing accounts/names retain the honest unavailable display. Name and geography
+share the applicant record; scores, eligibility and budget calculations are unchanged.
+Preview fingerprints already include names; new rounds freeze the corrected value.
+Existing frozen snapshots are not rewritten. Keep the owner trial unpublished and
+reset it before colleague use as required above.
+
+Validation: 28 tests across source, preview, preview service and page suites pass;
+lint, types, Dataverse/OData and Atlas/currency gates with sequential self-tests pass.
+The full live read-only preview reports 23 names, zero missing/placeholder names,
+`canOpen=true`, four PDs, 11 SE / 12 MR and unchanged 9 East / 14 West. Luna built;
+Sol and one bounded subscription-OAuth Opus review found no substantive blocker.
+No source writes, new round, score edits or snapshot backfill occurred.
