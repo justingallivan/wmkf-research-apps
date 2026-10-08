@@ -424,16 +424,16 @@ describe('transcription worker submission safety', () => {
     });
 
     it.each([
-      ['a generic network error', new Error('fetch failed'), 'provider_request_failed'],
-      ['a provider 5xx', Object.assign(new Error('x'), { code: 'provider_http_503' }), 'provider_http_503'],
-    ])('still schedules a retry for %s', async (_label, error, code) => {
+      ['a generic network error', new Error('connect ECONNREFUSED 10.0.0.1:443'), 'provider_request_failed', 'Error'],
+      ['a provider 5xx', Object.assign(new Error('x'), { code: 'provider_http_503' }), 'provider_http_503', 'provider_http_503'],
+    ])('still schedules a retry for %s', async (_label, error, code, logged) => {
       const job = setup(error);
       await drainTranscriptionPilot({ maxJobs: 1 });
       expect(store.mutateLeasedTranscriptionJob).toHaveBeenCalledWith(expect.objectContaining({
         fields: expect.objectContaining({ next_attempt_at: expect.any(Date), sanitized_error_code: code }),
       }));
       expect(store.mutateLeasedTranscriptionJob).not.toHaveBeenCalledWith(expect.objectContaining({ fields: expect.objectContaining({ status: 'failed' }) }));
-      expect(console.warn).toHaveBeenCalledWith('[transcription-pilot] retry scheduled:', code, job.id);
+      expect(console.warn).toHaveBeenCalledWith('[transcription-pilot] retry scheduled:', logged, job.id);
     });
 
     it('still schedules a retry for output_write_verification_failed', async () => {
@@ -444,6 +444,7 @@ describe('transcription worker submission safety', () => {
       expect(store.mutateLeasedTranscriptionJob).toHaveBeenCalledWith(expect.objectContaining({
         fields: expect.objectContaining({ next_attempt_at: expect.any(Date), sanitized_error_code: 'provider_request_failed' }),
       }));
+      expect(console.warn).toHaveBeenCalledWith('[transcription-pilot] retry scheduled:', 'output_write_verification_failed', expect.any(String));
       expect(store.mutateLeasedTranscriptionJob).not.toHaveBeenCalledWith(expect.objectContaining({ fields: expect.objectContaining({ status: 'failed' }) }));
     });
   });
