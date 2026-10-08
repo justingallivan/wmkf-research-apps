@@ -99,15 +99,18 @@ built, Sol and OAuth Opus reviewed, and receipt/uncertainty corrections were inc
 Fresh GET-only cohort scan: 26 ordinary-filter matches, two further D26 cutoff
 exclusions, D26 still 23 (11 SE / 12 MR), J26 one SE. Keep the D26 cutoff.
 
-### Owner choice before further work
+### Production setup completed; configuration next
 
-The sandbox's zero-proposal gap does not apply to Production's D26 source pool.
-Production still needs the three dedicated ranking tables and application role;
-provisioning requires separate explicit owner approval. Facilitator selection,
-participant grants, environment readiness and activation remain separate open work.
-Source proposals remain read-only; ranking lists, submissions and meeting order do
-persist in dedicated ranking tables. The owner approved the narrow Production readiness inventory and the three-record
-test-marker correction below, not ranking setup or activation. No source creation/copy is authorized.
+[VERIFIED via live apply and GET metadata/security readback] Owner-approved step 1
+is complete: three ranking tables, all expected attributes and Active keys; dedicated
+application role with nine ranking Create/Read/Write privileges plus nine documented
+Dataverse defaults. Exactly one assignment to the verified application system user,
+no team assignments. No app activation, participant grants or facilitator settings.
+Receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTION_SETUP_2026-10-07.md`.
+The strengthened GET-only probe exits 0. Luna built verification; Sol and OAuth Opus
+reviewed and substantive verification gaps were corrected. Next: facilitator and
+participant access, Production privacy/search verification, then separate activation
+and promotion approval. Production schema/role setup must not be repeated as new work.
 
 Private ranking, submission, composite publication, meeting reordering and full-requested
 budget totals still need a source-backed, multi-identity in-app walkthrough. Counts

@@ -1,6 +1,6 @@
 # Proposal Ranking — design for review
 
-Date: 2026-10-07. Revision: 3 (Opus revision-2 findings incorporated). Status: **Source implemented; sandbox schema/role and persistence rehearsal verified; browser rehearsal and production activation pending.**
+Date: 2026-10-07. Revision: 3 (Opus revision-2 findings incorporated). Status: **Source implemented; sandbox/Production schema and role setup verified; sandbox persistence rehearsal verified; browser rehearsal and production activation pending.**
 Owner: Justin. Design consolidation: Codex. Requested reviewer: Claude Opus.
 Authority: owner decisions in the Proposal Ranking planning conversation.
 
@@ -177,6 +177,8 @@ or data correction does not mutate it; the unpublished cancel/reopen control is
 available. Published pools stay fixed in v1.
 
 ## Architecture and permissions [source implemented; sandbox storage provisioned]
+
+Production setup receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTION_SETUP_2026-10-07.md`.
 
 Use existing app registration and authenticated route/service/adapter boundaries.
 Dataverse is the implemented persistence target. The three table definitions and

@@ -4,7 +4,9 @@ Date: 2026-10-07. Status: source implemented; sandbox schema and application-rol
 provisioning and bounded persistence rehearsal verified. Runtime activation and
 multi-identity browser rehearsal remain pending. Direct-table denial is verified
 for the tested sandbox staff identity.
-Production has not been provisioned or enabled. Evidence:
+Production schema and dedicated application-role setup are now verified; the app
+remains disabled. Production receipt:
+`docs/audits/PROPOSAL_RANKING_PRODUCTION_SETUP_2026-10-07.md`. Sandbox evidence:
 `docs/audits/PROPOSAL_RANKING_SANDBOX_SETUP_2026-10-07.md` and
 `docs/audits/PROPOSAL_RANKING_PERSISTENCE_REHEARSAL_2026-10-07.md` and
 `docs/audits/PROPOSAL_RANKING_STAFF_PRIVACY_2026-10-07.md`.
@@ -179,12 +181,10 @@ It selected only request number, meeting date and program; no proposal titles,
 institutions or business rows were printed. These counts do not establish review
 completeness, full snapshot eligibility, participant grants or facilitator readiness.
 
-Metadata lookups for `wmkf_proposalrankingcycle`, `wmkf_proposalrankinground` and
-`wmkf_proposalrankinglist` each returned HTTP 404, code `0x80060888`: the ranking
-tables are absent. Exact role-name and current-application assignment queries both
-returned HTTP 200 with no match for `WMKF Proposal Ranking Application User`.
-The probe exits 2 / `inventoryComplete: false` for these missing prerequisites;
-this is not a failed source scan. Activation flags were not inventoried.
+The initial inventory found all three ranking tables and the dedicated role absent.
+That pre-provisioning result is superseded by the owner-approved setup below; the
+current probe exits 0 with full schema/key and role-privilege/assignment verification.
+Activation flags were not inventoried or changed.
 
 Validation of the trial cutoff: 134 tests across 13 ranking/Explorer suites passed,
 including the threshold boundary, malformed D26 input and exclusion before downstream
@@ -198,9 +198,28 @@ its verdict and scope. No Production write was part of cutoff implementation; th
 marker correction below was separately authorized. Ranking setup/activation remain pending.
 
 Production's D26 source pool resolves the sandbox-only zero-proposal concern, but
-Production schema, role provisioning, grants/settings and activation still require
-explicit owner approval. Source proposals stay read-only; ranking workflow actions
+Production schema and role provisioning are now complete. Participant grants,
+facilitator settings and activation still require separate owner approval. Source proposals stay read-only; ranking workflow actions
 write dedicated ranking tables. The source-backed in-app lifecycle remains unverified.
+
+## Production schema and role setup — 2026-10-07
+
+[VERIFIED via existing apply scripts and final GET-only probe] Owner-approved Wave
+32 and role setup completed in Production. All three table identities, every declared
+attribute/type/bound/option and all three Active keys passed. The verified enabled
+Research Review App Suite application user is the sole direct assignee of
+`WMKF Proposal Ranking Application User`; no teams hold the role. The role has the
+nine specified Global ranking privileges plus nine documented Dataverse defaults,
+reported separately. Exact privilege readback rejects unknown extras.
+
+Durable command scope, identity/role IDs, reviews, default-privilege reference and
+sanitized successful inventory:
+`docs/audits/PROPOSAL_RANKING_PRODUCTION_SETUP_2026-10-07.md`.
+This supersedes the earlier absent-schema/role inventory. No source records, ranking
+business rows, participant grants, facilitator setting or activation flags changed
+in this setup. Production staff direct-table denial, search/audit privacy checks and
+multi-identity in-app acceptance remain unverified. The app remains disabled;
+promotion/activation are still the owner's separate decisions.
 
 ## Legacy test-marker correction — 2026-10-07
 
