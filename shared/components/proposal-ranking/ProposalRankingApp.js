@@ -61,12 +61,13 @@ function ProposalCardRow({ proposal, position, count, total, score, rank, editab
         </div>}
         <div className="min-w-0 flex-1 p-4">
           <div className="mb-2 flex justify-end">
-            {(proposal.institutionGeography === 'East' || proposal.institutionGeography === 'West') && <p
+            <span
               role="img"
-              aria-label={`${proposal.institutionGeography} institution`}
-              title={`${proposal.institutionGeography} institution`}
-              className="text-2xl font-bold leading-none text-gray-900"
-            >{proposal.institutionGeography[0]}</p>}
+              aria-label={scoreIndicator.label}
+              title={scoreIndicator.label}
+              className="h-6 w-6 shrink-0 rounded-full border border-gray-600"
+              style={{ backgroundColor: scoreIndicator.color }}
+            />
           </div>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -111,13 +112,12 @@ function ProposalCardRow({ proposal, position, count, total, score, rank, editab
               <button type="button" aria-label={`Move proposal ${proposal.requestNumber} up`} disabled={position === 0} onClick={() => onMove(position, position - 1)} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">Move up</button>
               <button type="button" aria-label={`Move proposal ${proposal.requestNumber} down`} disabled={position >= count - 1} onClick={() => onMove(position, position + 1)} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">Move down</button>
             </div> : <span />}
-            <span
+            {(proposal.institutionGeography === 'East' || proposal.institutionGeography === 'West') && <p
               role="img"
-              aria-label={scoreIndicator.label}
-              title={scoreIndicator.label}
-              className="h-6 w-6 shrink-0 rounded-full border border-gray-600"
-              style={{ backgroundColor: scoreIndicator.color }}
-            />
+              aria-label={`${proposal.institutionGeography} institution`}
+              title={`${proposal.institutionGeography} institution`}
+              className="text-2xl font-bold leading-none text-gray-900"
+            >{proposal.institutionGeography[0]}</p>}
           </div>
         </div>
       </div>

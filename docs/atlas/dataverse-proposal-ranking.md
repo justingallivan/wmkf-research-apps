@@ -3,14 +3,55 @@
 Date: 2026-10-07. Status: **Production deployed and enabled**, with schema, dedicated
 role and four participant grants verified. Justin is the temporary default facilitator
 for the owner-approved trial; Beth must be restored before colleague handoff.
-[VERIFIED via Vercel and Chrome] PR #457 merge `10c079c8` is deployed as
-`dpl_F5ewaS8DRDhABRVyhrG5XHuSRvwf`; Justin's D26 page shows “Round not open”.
-No live ranking round was created during release. The owner subsequently approved
-Justin as default facilitator for testing; the full multi-identity lifecycle remains
-unverified. Trial reset requirements are recorded below.
-Current release and rollback receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTION_RELEASE_2026-10-07.md`.
+[VERIFIED via Vercel and Chrome] Current Production source is PR #462 merge
+`f7a75fc5358649ab30765504ea6e6b35cdf00bb4`, deployment
+`dpl_FNFvVWUzPaiNgdQ7Uh1DgK526hHx`, READY with live aliases. Justin's refreshed
+D26 facilitator preview displays all 23 institution names. The upper-right rating
+dot / lower-right E/W marker placement is built on the feature branch but is not
+deployed. The full multi-identity lifecycle remains unverified. The initial PR
+#457 deployment is a historical checkpoint; trial reset requirements are below.
+Initial activation and rollback receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTION_RELEASE_2026-10-07.md`.
 Earlier dated sections below retain historical setup checkpoints; disabled-state
 statements in those checkpoints are superseded by this release.
+
+## Isolated local UI and service rehearsal — 2026-10-07
+
+[VERIFIED via source, final 42 focused tests, API-route and route-lifecycle-auth
+gates with sequential self-tests, types and Chrome] The standalone command
+`node scripts/rehearse-proposal-ranking.js` runs at `http://127.0.0.1:3133` on
+loopback only. Its webpack build replaces persistence, source, identity and access
+dependencies with temporary in-memory adapters while
+using the real Proposal Ranking UI and service. The fixture has six fictional
+proposals (three SE and three MR) and three fictional PDs, including the
+facilitator. The page supports simulating the other two submissions and switching
+role views. Reset clears rehearsal memory after any lifecycle state; a generation
+fence rejects actions delayed from before reset. It loads no environment file or
+live Dataverse/API service and creates no real staff votes.
+
+Chrome verified opening a synthetic round; simulating both other PDs' submissions;
+moving R002 above R001 and submitting the facilitator's SE list (3/3); generating
+and publishing the SE composite; and moving R003 above R002 in the meeting list
+and saving. The composite showed ranks 1.33, 1.67 and 3.00 and a full requested
+total of $457,500. PD A's view showed the published named ranks and saved meeting
+order R001, R003, R002. MR remained private, with fictional Casey's own list
+locked and program progress at 2/3 submissions. Reset after publication returned
+to a clean preview with the acknowledgement unchecked and Open disabled. Desktop
+and 390px DOM checks showed
+the 24px colored dot above the 24px E/W marker, aligned right with no horizontal
+overflow.
+
+Sol identified a reset-generation race and a broken synthetic workbench link.
+Corrections make reset fence delayed actions and the linked page explain its fictional
+content. A bounded OAuth Opus source review found no blockers and noted only
+limitations; it preceded the reset correction. The final 42 focused tests in three
+suites passed. API-route and route-lifecycle-auth gates with their self-tests, and
+types, passed sequentially. Atlas and documentation-currency gates, plus
+fact-consistency checks and their self-tests, passed sequentially. No Production
+data, settings, deployment or real staff rankings changed during the rehearsal.
+Promotion remains pending owner approval. This does not complete the separate Production blank-slate
+requirement: before colleague use, cancel any unpublished trial, restore Beth as
+default facilitator, open a fresh round and verify only initial seed orders with
+no submissions, composites or meeting edits. Preserve source reviewer scores.
 
 ## Source and persistence
 
@@ -70,7 +111,7 @@ reconciles uncertain outcomes, and invalidates stale responses on scope/access
 changes. Cumulative requested amounts use frozen integer minor units and update
 with the visible order. No automatic budget cutoff is applied.
 
-## Activation checklist — sandbox setup partially complete
+## Historical sandbox activation checklist — before Production setup
 
 1. [VERIFIED via sandbox apply and readiness probe] Wave `32-proposal-ranking`
    is applied on `orgd9e66399.crm.dynamics.com`; all three entity identities, expected
@@ -272,9 +313,10 @@ population and Production metadata were not inspected.
 [VERIFIED via source and mocked regression tests] The source adapter now batches
 reads of eligible requests' applicant accounts and maps only the two verified
 choice values to `institutionGeography: 'East' | 'West' | null`. The preview carries
-that field into its fingerprint and frozen snapshot. The shared proposal card shows
-a prominent E/W in the upper-right corner, with an accessible East/West institution
-label. Unknown/missing values and older snapshots show no letter. Existing snapshots
+that field into its fingerprint and frozen snapshot. The initial shared-card
+implementation showed a prominent E/W in the upper-right corner with an accessible
+East/West institution label. The marker-placement follow-up below moves it to the
+lower-right. Unknown/missing values and older snapshots show no letter. Existing snapshots
 are not rewritten or live-refreshed; ranking calculations and eligibility are unchanged.
 Failed/capped account queries reject the preview through the existing complete-read
 contract. No schema, environment, grant or live data changes were made.
@@ -285,8 +327,9 @@ raw account choices, unknown values, frozen preview/fingerprint and legacy-card
 omission. Changed-file lint, types, Dataverse/OData and Atlas/doc gates pass with
 self-tests run sequentially. The actual card component was rendered in isolated
 Chrome with synthetic fixtures at 1100px and 390px: markers are 24px, at the upper
-right, with no horizontal overflow. This is a component layout check, not live
-sandbox acceptance. Luna implemented; Sol and the orchestrator reviewed without
+right in the original layout, with no horizontal overflow. This is a component
+layout check, not live sandbox acceptance; the later marker placement is verified
+in the isolated rehearsal section above. Luna implemented; Sol and the orchestrator reviewed without
 substantive blockers. After the owner explicitly authorized further OAuth-only
 Opus reviews, `claude-opus-5-5` reviewed `d2cc82fdf` and returned **APPROVE**.
 It traced the raw numeric DTO, strict option mapping, complete reads, snapshot,
@@ -301,8 +344,10 @@ verified as `claude.ai`; API-key environment variables were removed.
 
 ## Approximate reviewer-rating color — 2026-10-07
 
-The shared card displays a 24px lower-right circle using ten solid colors from red
-through yellow to green, from the frozen `score.mean`. `reviewerScoreIndicator` in
+The initial shared-card implementation displayed a 24px lower-right circle using
+ten solid colors from red through yellow to green, from the frozen `score.mean`.
+The marker-placement follow-up below moves it to the upper-right.
+`reviewerScoreIndicator` in
 `shared/components/proposal-ranking/model.js` selects
 `Math.round(((mean - 1) / 4) * 9)` for finite means in [1,5] with at least one rated
 review. Other inputs show gray. The numeric score remains visible and the circle
@@ -314,13 +359,14 @@ change source reads, snapshots, displayed scores, seed ordering or composites.
 Validation: 126 tests in 12 ranking/Explorer suites pass; lint, types, Atlas and
 currency gates/self-tests pass. Isolated actual-component Chrome renders at 1100px
 and 390px verified all ten colors plus gray, 24px circle dimensions, editable and
-read-only placement, and no overflow. Luna built; Sol and one bounded subscription
+read-only placement in the original layout, and no overflow. The later marker
+placement is verified in the isolated rehearsal section above. Luna built; Sol and one bounded subscription
 OAuth-only Opus source review approved. Opus's nonblocking tooltip-rounding note
 was corrected to use the same rounding as the visible score, with a regression
 for 4.35 → 4.4. No additional review loop or live data access was needed. Local
 review receipt: `/private/tmp/ranking-rating-opus-review.txt` (not portable).
 
-## Production access and privacy — 2026-10-07
+## Historical Production access and privacy checkpoint — 2026-10-07
 
 [VERIFIED via live apply and independent GET readback] Beth Pruitt is the configured
 default facilitator. Justin Gallivan, John Sader, Jean Kim and Beth have app grants;
@@ -334,7 +380,7 @@ branch generic-reader privacy guards: deploy these before opening a live round.
 Promotion/activation and full browser acceptance remain owner decisions. Effective
 impersonation is not staff OAuth browser proof or populated audit/navigation proof.
 
-## Production activation — 2026-10-07
+## Historical Production activation checkpoint — 2026-10-07
 
 [VERIFIED via full preview builder, single-variable config readback and Chrome]
 Both ranking flags are on; both isolation flags and Dataverse controls remain on.
@@ -408,3 +454,12 @@ remains unchecked; no round was opened. Full CI passed on `e9d40cfc5`; the final
 merge `cc6ef1823` changed only SESSION_PROMPT.md to retain the concurrently restored
 main handoff, passed documentation gates, and had identical runtime/test source.
 The mandatory unpublished-trial reset before colleague use remains in force.
+
+## Card marker placement — 2026-10-07
+
+[VERIFIED via current feature-branch source] `ProposalRankingApp.js` now places
+the 24px colored reviewer-rating dot at the card's upper right and the accessible
+East/West initial at the lower right. Both keep their existing size and named
+image role/label/title. This is a source-only UI change: it has not been deployed
+to Production, and Production cards continue to show the previously deployed
+placement. It changes no score, ordering, eligibility, snapshot or persisted data.
