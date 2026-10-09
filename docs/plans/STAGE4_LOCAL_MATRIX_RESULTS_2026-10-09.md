@@ -1,0 +1,95 @@
+---
+title: Stage 4 integrated local matrix results
+domain: transcription
+kind: report
+status: active
+summary: "Integrated mapping-to-cut and bounded container/long-drift checks pass. Independent Apple decoding has intermittent short audio tails; Stage A remains NOT PASSED. Local synthetic media only."
+owner: product-engineering
+related:
+  - docs/plans/STAGE4_SYNTHETIC_RESULTS_2026-10-09.md
+  - docs/plans/STAGE4_MAPPING_CAPACITY_RESULTS_2026-10-09.md
+  - docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md
+---
+
+# Integrated local matrix — Stage A NOT PASSED
+
+**[VERIFIED via local generated-media receipts, 2026-10-09] Four complete mapping-to-cut cases pass the FFmpeg-based checks. Stage A remains NOT PASSED.** Independent Apple decoding intermittently returned a shorter final audio tail from the same output bytes. No private marker appeared in the positive outputs, but that completeness discrepancy is unresolved. No cloud, real-media, SharePoint/Zoom or Board operation was performed. No runtime application code changed.
+
+## Results matrix
+
+| Area | Evidence actually exercised | Result and limit |
+|---|---|---|
+| Full mapping → cut → export checks | Positive/negative offsets, gap and drift; 48/44.1 kHz separate M4As; isolated PCM; exported AAC payload and frame-clock checks | Four bounded cases pass with FFmpeg; independent-native completeness does not consistently pass |
+| Long drift | 85-minute generated MP4/M4A, 80 ppm drift, offset, distributed anchors and near-boundary audit | Recovered within one 16 kHz sample; ignored drift rejected |
+| Unsupported/ambiguous mappings | Heavy noise, swapped channels, two gaps, an anchor straddling a gap | Rejected; no guessed mapping |
+| Extra streams and hidden bytes | Extra audio, subtitle, timecode data, private metadata, top-level and nested private payload controls | Bounded stripping/rejection tests pass; not every codec/container payload is parsed |
+| Independent decode | Apple AVFoundation, four outputs × three trials, plus leaky and truncated controls | **Non-pass: 5 of 12 positive reads returned short audio**; all controls rejected |
+| Changed input/output | Source/audio hash, revision, boundary, mapping mutation; actual altered output bytes | In-memory eligibility simulation rejects all; no production transaction/await fencing tested |
+| Quality/resources | Two 120-second 1080p variants, three encodes each, full decode, SSIM, visual inspection | Readable sampled frames; local bounded timings/resources, not a cloud or full-meeting guarantee |
+
+## Complete mapping-to-cut test
+
+[VERIFIED via `scripts/benchmarks/stage4-integrated-check.py`] The generated 120-second source contains source-frame numbers, red private frames after 92.350 seconds, independent band-limited pilot noise and private 3.5/4.1 kHz tones. The source is first checked to prove both private markers are actually present. A synthetic staff-reviewed point is placed at 92.250 seconds, 100 ms before the private markers. That prescribed safe-side point is fixture ground truth, not a measured production speech margin.
+
+The mapper receives independently encoded waveforms without the generating transform. Twelve anchors select/validate its model; three additional anchors just before the reviewed point audit it. Decoded input audio timestamps are checked at their actual sample rate before sample indices are used as clocks. Mapping comparisons use low-pass-filtered 16 kHz audio. The measured mapping drives the earlier endpoint, rounded down to a 48 kHz sample. Only the pre-endpoint decoded PCM reaches the AAC encoder, and only whole safe video-frame intervals are selected. An independent encode of the isolated PCM must match the exported AAC packet payload and raw elementary decode. All normal/ignored-edit-list content and source-frame clock checks must pass.
+
+| Case | Separate-audio transform | Sample rate | Encoded endpoint |
+|---|---|---:|---:|
+| Offset | MP4 = M4A + 0.731 s | 48 kHz | 92.249854167 s |
+| Pause/gap | Two source seconds removed; offsets 0.731 / 2.731 s | 48 kHz | 92.249854167 s |
+| Drift | MP4 = 1.0008 × M4A + 0.731 s | 44.1 kHz | 92.249812500 s |
+| Negative offset | MP4 = M4A − 0.517 s, with generated leading silence | 44.1 kHz | 92.249854167 s |
+
+[VERIFIED] Each mapped review point is within one 16 kHz sample of its generated truth. All four FFmpeg-based export checks pass. A deliberately wrong 100 ms mapping is rejected before encoding. A deliberately bypassed mapping gate producing a late cut is rejected by actual private video/audio markers and safe-payload mismatch. The empirical alignment margin remains **not a certified bound between anchors**, and these signals are not speech.
+
+## Long drift and multiple gaps
+
+[VERIFIED via `scripts/benchmarks/stage4-long-mapping-check.py`] A separate 85-minute generated source uses 16 kHz stereo, AAC 64 kbit/s and a tiny 1 fps video solely to establish the MP4 clock. Both decoded audio clocks are checked. Thirteen anchors span seconds 35–5,075; a final audit uses 4,799, 4,800 and 4,801. At M4A second 4,800, the true MP4 time is **4,800.815 s**; the recovered time differs by about **4.17 microseconds**. The maximum boundary-audit residual is about **21.67 microseconds**. Audit residuals are included in the empirical margin. Ignoring the 80 ppm drift causes up to **369.563 ms** error on validation anchors and is rejected.
+
+A short two-gap M4A is also encoded. An anchor directly straddling a gap is rejected as weak/ambiguous. With anchors moved away from both gaps, the one-gap mapper still rejects the incompatible two-gap relationship. This is fail-closed behavior, not support for solving arbitrary multi-gap recordings. No presentation export was made from the long fixture; the four short integrated cases exercise the export path.
+
+## Container and changed-state controls
+
+[VERIFIED via integrated and `scripts/benchmarks/stage4-container-check.py` receipts] The contaminated source really includes two audio tracks, a subtitle track, a timecode data track and private metadata. Explicit stream mapping and metadata removal produce the expected one-video/one-audio output, which passes the bounded checks. Separate exported-file controls add raw trailing bytes, an unknown top-level box, unreferenced `mdat` bytes, a nonempty `free` box, private nested metadata and private bytes in a nested `moov/free` box. All are rejected. The nested-free control still passes the earlier top-level/packet-extent check and reports the same duration, demonstrating why the added nested inspection matters.
+
+**[ASSUMED limits]** The nested scan allows the observed recipe's box types and rejects unsupported structures. It does not fully interpret sample-entry extensions, every allowed box field, codec side data or arbitrary concealed payload. Passing these controls is not a universal MP4 sanitization proof.
+
+[VERIFIED bounded simulation] Twenty changed-binding controls cover source hash, audio hash, transcript revision, boundary and mapping across the four cases. A file actually changed after acceptance also fails its output-hash binding; failed acceptance cannot become eligible. These are local equality/eligibility simulations. They do not exercise application awaits, concurrent database transactions, staff approval, publication or Board readers, which are outside these benchmark scripts. There is no implemented Stage 4 runtime enforcement claim.
+
+## Independent Apple decode: unresolved completeness difference
+
+[VERIFIED via `scripts/benchmarks/stage4-native-check.py` and `scripts/benchmarks/stage4-native-decode.swift`] AVFoundation decodes every video/audio sample, checks source-frame numbers and both-channel private markers, and requires the same positive frame/sample counts as the integrated receipt. A five-second truncated file is rejected even though it contains no private markers and ends early. The leaky control is rejected for actual private markers. Each control runs three times.
+
+All twelve positive reads returned the expected **2,766 video frames**, with no private video or audio marker. However, **five reads returned 215 or 217 fewer audio samples** than FFmpeg/the expected isolated input: about **4.479–4.521 ms early**, not extra discussion. Other reads of the same hash returned the complete expected audio. Therefore the strict native check remains non-pass. The root cause is unknown: this may involve the probe, native decoding or end-padding handling. This evidence does not establish an Apple player defect or a privacy leak. It must be explained before relaxing any check or claiming consistent independent playback.
+
+Native decoded video buffers supplied no individual duration. For these CFR fixtures, the probe instead requires all adjacent native timestamps to agree with native minimum frame duration, and the last interval to agree with native track end. It does not substitute zero for missing duration. This method is not yet a VFR playback proof. It is an independent decoder exercise, not a browser/VLC listening session.
+
+## 1080p quality and resource probes
+
+[VERIFIED via `scripts/benchmarks/stage4-quality-check.py`] Both generated variants are 1920×1080/30 fps, 120 seconds, H.264/AAC. One has static text and a small moving tile; the other adds scrolling rows and a much larger moving tile. Source generation is excluded from encoding timing. Output uses libx264 `veryfast`, CRF 23, two threads and AAC 128 kbit/s. Each variant is encoded three times sequentially, then fully decoded. Other local benchmark activity overlapped parts of these runs; CPU allocation was not isolated.
+
+| Measurement | Static text/small tile | Scrolling/large tile |
+|---|---:|---:|
+| Encode duration, three runs | 19.643 / 19.468 / 20.335 s | 29.372 / 38.044 / 34.799 s |
+| Output size | 6,294,471 bytes | 18,139,940 bytes |
+| Full-image SSIM vs decoded source | 0.998445 | 0.995453 |
+| Maximum encoder process RSS | 303,890,432 bytes | 302,776,320 bytes |
+
+[VERIFIED via viewing extracted frames at 60 seconds] Titles, budget figures, small alphabet/digit text and scrolling rows were readable in both outputs. Partial rows at the scrolling viewport edges are present by design. This is a two-frame visual inspection, not full-video human quality or listening approval. SSIM is supporting evidence, not a legibility guarantee. Peak process RSS across all recorded quality commands was 408,174,592 bytes; peak sampled logical scratch was 63,957,403 bytes. These are local process/sampled-file measurements, not isolated-container peaks. The two-minute tests cannot replace full-length performance testing or narrow the cloud runtime envelope.
+
+## What blocks a local pass
+
+1. Explain and resolve the intermittent native audio completeness discrepancy; repeat independent checks, including VFR/delayed-audio cases, without a blanket timing tolerance.
+2. Bound mapping uncertainty beyond sparse synthetic anchors; exercise speech-like/noisy mixes and additional codec/pause patterns. Unsupported cases must remain blocked.
+3. Complete the intended container/codec payload coverage; the current parser is deliberately narrower than arbitrary MP4 contents.
+4. Application stale-input/approval/publication fencing is still only a simulated contract. Production integration needs its own tests. Representative full-length motion/quality behavior and actual volume-exhaustion handling also remain unproven.
+
+Cloud lifecycle, uploads, region/spending enforcement and verified Sandbox cleanup remain separate later-stage obligations. No real recording may be requested/read on these non-pass results. Full Recording retention remains staff-only until Stage 5, then presentation only.
+
+## Evidence and contract reconciliation
+
+[VERIFIED] `docs/plans/STAGE4_LOCAL_MATRIX_EVIDENCE_2026-10-09.json` stores content-free receipts, command arguments, build information, hashes, observed counts and resource results. Independent/native/container receipts are bound to byte-identical final integration outputs by hash. Generated media, native binaries and decoded intermediates remain in unique local temporary folders; no complete scratch cleanup is claimed. NumPy/Pillow came from the existing bundled Python; no new package was installed. Native probe compilation uses the installed Apple toolchain; it emits API-deprecation warnings but succeeds.
+
+[VERIFIED scope] Contract-reconcile surface: benchmark scripts → generated files → content-free receipts → these research reports. Auth/routes/schema/production stores: N/A. Partial successes remain per-case; the aggregate Stage A status never becomes pass. Changed-state behavior is explicitly simulated. Fresh read-only review required complete native counts, valid video intervals, explicit long-input clocks and audit-inclusive margins; those changes are incorporated. The full startup gate set passed sequentially. Final scoped documentation/safety gates are required before commit.
+
+[VERIFIED reconciliation scope] Sweep Mode A covers the Stage 4 research reports and their live restatements, using executed receipts as authority. Earlier initial results remain historical; current summaries and remaining-work lists point here. Main's separate workflow implementation/release history is excluded because this is an isolated benchmark branch. No claim of whole-repository or Production reconciliation is made.
