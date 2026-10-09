@@ -227,6 +227,7 @@ function makeWorld({ size = 25, copyState = 'queued' } = {}) {
       w.counts.get += 1; w.rangeArgs.push({ url, args });
       w.remainingAtGet.push(args.deadlineMs - w.t);
       w.t += w.ms.get;
+      if (w.hooks.afterGet) w.hooks.afterGet(w.counts.get);
       const denied = w.denyNext.shift();
       if (denied) return { bytes: null, status: denied };
       const bytes = Buffer.alloc(args.end - args.start + 1, 7);
@@ -673,6 +674,20 @@ describe('leases and dispatch', () => {
     expect(w.counts.put).toBe(1);
     expect(w.copy.lease_token).toBe('someone-else');
     expect(w.copy.bytes_confirmed).toBe(0);
+  });
+
+  test('a takeover or cancel that lands while the chunk is being read stops before the PUT', async () => {
+    for (const interfere of [
+      w => { w.copy.lease_token = 'someone-else'; w.copy.lease_expires_at = w.t + 600_000; },
+      w => { w.copy.cancel_requested_at = new Date(w.t).toISOString(); },
+    ]) {
+      const w = makeWorld({ size: 100 });
+      w.seedSession(0);
+      w.hooks.afterGet = count => { if (count === 1) interfere(w); };
+      const result = await w.tick({ deadlineMs: w.t + 400_000 });
+      expect(w.counts.put).toBe(0);
+      expect(['lease_lost', 'cancelled']).toContain(result.outcome);
+    }
   });
 
   test('another live intent lease defers; an expired intent is left for S6; neither pumps', async () => {
