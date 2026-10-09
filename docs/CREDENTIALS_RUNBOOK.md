@@ -146,16 +146,19 @@ manual platform invocations succeeded, but scheduled-time delivery has not
 been observed. The incomplete-maintenance warning email was accepted for
 delivery; receipt in the inbox is unverified.
 
-### Optional — Meeting Tracker Zoom recording import (approved, pending provisioning)
+### Optional — Meeting Tracker Zoom recording import (provisioned in Production)
 
 Internal Server-to-Server OAuth app in WMKF's Zoom account for importing
 cloud recordings (`docs/plans/ZOOM_RECORDING_IMPORT_PLAN_2026-10-08.md`,
 Stage 3a). The owner approved these variables on 2026-10-08 for **Production
 and local only, not Preview**: every deployment holding the credentials could
-read the shared host's recordings. As of 2026-10-08 they exist only in local
-`.env.local` (used by `scripts/probe-zoom-recordings.mjs` and the branch build);
-they are not set in any Vercel environment, and the import code is not merged.
-Setting them in Vercel needs a separate owner go-ahead after merge approval.
+read the shared host's recordings. All four are set in Vercel **Production
+only**, stored as secrets, since 2026-10-08 [VERIFIED via `vercel env ls
+production`, Session 590, 2026-10-09]; they are not in Preview. They are also in
+local `.env.local` for `scripts/probe-zoom-recordings.mjs`. The Stage 3a import
+shipped in PR #464, and the Stage 3b video copy reuses these variables.
+`ZOOM_RECORDING_HOSTS` is not secret by content (see the table) but is stored as
+a Vercel secret, so its current value cannot be read back in the dashboard.
 The import is available only when all four variables below are present and
 Meeting Tracker transcription is enabled for the request; any missing value hides
 it. Granted scopes:
