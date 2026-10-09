@@ -17,6 +17,7 @@ function proposalCoreFixture() {
 function documentFieldsFixture() {
   return {
     institutionName: 'Applicant University',
+    requestNumber: '1002379',
     cityState: 'Atlanta, GA',
     internalProgram: 'Medical Research',
     projectTitle: 'A test project',
@@ -122,11 +123,11 @@ test('produces byte-identical DOCX output for identical inputs', async () => {
   expect(second.equals(first)).toBe(true);
 });
 
-test('selects render-contract v7 over the zero-inset v6 template bytes', () => {
+test('selects render-contract v8 over the v7 template bytes', () => {
   expect(PRE_SITE_VISIT_TEMPLATE).toEqual({
     id: 'phase-ii-pre-site-visit',
-    version: 7,
-    relativePath: 'shared/templates/pre-site-visit/phase-ii-pre-site-visit-v6.docx',
+    version: 8,
+    relativePath: 'shared/templates/pre-site-visit/phase-ii-pre-site-visit-v7.docx',
   });
   expect(PRE_SITE_VISIT_CONTRACT.templateId).toBe(PRE_SITE_VISIT_TEMPLATE.id);
   expect(PRE_SITE_VISIT_CONTRACT.templateVersion).toBe(String(PRE_SITE_VISIT_TEMPLATE.version));
@@ -511,4 +512,62 @@ describe('RefereeSection (Slice 4, conditional placeholder)', () => {
     expect(diagnostics).toEqual([]);
   });
 
+});
+
+test('v7 removes the title paragraph and keeps every placeholder in a single run', async () => {
+  const source = await fs.readFile('shared/templates/pre-site-visit/phase-ii-pre-site-visit-v6.docx');
+  const old = await JSZip.loadAsync(source);
+  const zip = await JSZip.loadAsync(await fs.readFile(defaultPreSiteVisitTemplatePath()));
+  const oldBody = await old.file('word/document.xml').async('string');
+  const body = await zip.file('word/document.xml').async('string');
+  expect(wordParagraphs(body)).toHaveLength(wordParagraphs(oldBody).length - 1);
+  expect(body).not.toContain('Phase II Review');
+  expect(body).not.toContain('DV:InternalProgram');
+  const names = Object.keys(zip.files).filter((name) => name === 'word/document.xml'
+    || /^word\/(?:header|footer)\d+\.xml$/.test(name));
+  for (const name of names) {
+    const xml = await zip.file(name).async('string');
+    const tokens = (part) => Array.from(part.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g))
+      .map((m) => m[1]).join('').match(/\[\[(?:AI|DV|STAFF):[^\]]+\]\]/g) || [];
+    const perRun = Array.from(xml.matchAll(/<w:r(?:\s[^>]*)?>[\s\S]*?<\/w:r>/g))
+      .flatMap((m) => tokens(m[0]));
+    expect(perRun).toEqual(tokens(xml));
+  }
+  const header = await zip.file('word/header2.xml').async('string');
+  const cells = wordTableCells(header);
+  expect(cells[0]).toContain('<w:instrText>PAGE</w:instrText>');
+  expect(cells[0]).toContain('<w:fldChar w:fldCharType="begin"/>');
+  expect(cells[0]).toContain('<w:fldChar w:fldCharType="end"/>');
+  expect(cells[1]).toContain('[[DV:InstitutionName]]');
+  expect(header.match(/<w:instrText>PAGE<\/w:instrText>/g)).toHaveLength(1);
+  expect(header).not.toContain('Phase II Review');
+});
+
+test.each([
+  ['Medical Research', 'MR'],
+  ['Science and Engineering Research', 'SE'],
+  ['Science and Engineering', 'SE'],
+  ['Science & Engineering', 'SE'],
+  ['Bridge Funding', 'Bridge Funding'],
+])('renders %s and the request number in each right-aligned footer', async (program, abbreviation) => {
+  const { docx } = await renderPreSiteVisitDocx({
+    documentFields: { ...documentFieldsFixture(), internalProgram: program },
+    proposalCore: proposalCoreFixture(),
+    personnelNames: personnelNamesFixture(),
+  });
+  const zip = await JSZip.loadAsync(docx);
+  for (const name of ['word/footer1.xml', 'word/footer2.xml', 'word/footer3.xml']) {
+    const footer = await zip.file(name).async('string');
+    expect(footer).toContain('<w:jc w:val="right"/>');
+    expect(footer).toContain(`${abbreviation}: Request #1002379`);
+    expect(footer).not.toContain('[[DV:');
+  }
+});
+
+test('refuses to generate a footer with a missing request number', async () => {
+  await expect(renderPreSiteVisitDocx({
+    documentFields: { ...documentFieldsFixture(), requestNumber: null },
+    proposalCore: proposalCoreFixture(),
+    personnelNames: personnelNamesFixture(),
+  })).rejects.toThrow(/Request number is required/);
 });

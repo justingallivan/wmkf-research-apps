@@ -575,6 +575,9 @@ test('persists eight sections and snapshots, renders the Dataverse read-back, th
   expect(harness.row.wmkf_presiteproposalcorejson).toContain('"schemaVersion":4');
   expect(harness.row.wmkf_presiteinputsnapshotjson).not.toContain('Narrative text');
   expect(harness.row.wmkf_presiteinputsnapshotjson).toContain('ProposalNarrative_1002379.pdf');
+  expect(harness.dependencies.renderDocx).toHaveBeenCalledWith(expect.objectContaining({
+    documentFields: expect.objectContaining({ requestNumber: '1002379' }),
+  }));
   expect(harness.row.wmkf_renderinputfingerprint).toMatch(/^[a-f0-9]{64}$/);
   expect(harness.request._wmkf_currentpresitevisit_value).toBe(ARTIFACT_ID);
   expect(harness.dependencies.commitChangeset).toHaveBeenCalledTimes(1);
@@ -839,7 +842,7 @@ test('read-only status projects current Ready plus milestone and newer pending r
   const provenance = {
     inputFingerprint: 'input-fingerprint', renderInputFingerprint: 'render-fingerprint',
     promptName: PRE_SITE_VISIT_CONTRACT.promptName, promptVersion: 4, promptId: PROMPT_ID,
-    runId: RUN_ID, templateId: 'phase-ii-pre-site-visit', templateVersion: '7',
+    runId: RUN_ID, templateId: 'phase-ii-pre-site-visit', templateVersion: '8',
     contentHash: 'gdc1:governed-hash',
   };
   const milestone = {
@@ -999,7 +1002,7 @@ test.each([2, 3, 4])('matching persisted core and input snapshot schema v%s reta
       provenance: {
         inputFingerprint: 'input-fingerprint', renderInputFingerprint: 'render-fingerprint',
         promptName: PRE_SITE_VISIT_CONTRACT.promptName, promptVersion: 4, promptId: PROMPT_ID,
-        runId: RUN_ID, templateId: 'phase-ii-pre-site-visit', templateVersion: '7',
+        runId: RUN_ID, templateId: 'phase-ii-pre-site-visit', templateVersion: '8',
         contentHash: 'gdc1:governed-hash',
       },
       milestone: null,

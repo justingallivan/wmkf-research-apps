@@ -80,6 +80,7 @@ const REQUEST_ID = '33333333-3333-3333-3333-333333333333';
 const ARTIFACT_ID = '44444444-4444-4444-4444-444444444444';
 const FROZEN_GOVERNED_DOCX_HASH = 'gdc1:rMTMI6qqn1FeSsmp9dYCFGzS86rqwybAzhayMi5V-6g';
 const FROZEN_TEMPLATE_HASHES = {
+  'shared/templates/pre-site-visit/phase-ii-pre-site-visit-v7.docx': 'gdc1:D0yvtTvCalO4PZwYRWiYWtioOSBKryDb8_C89EGG-wY',
   'shared/templates/pre-research-presentation-brief/brief-v1.docx': 'gdc1:-UK_7JbFy0j8zjd7-nhLEANDNmTVEUKPFF7TnryFfoM',
   'shared/templates/pre-site-visit/phase-ii-pre-site-visit-v6.docx': 'gdc1:0GZBpFBbnKGY1Kya_cSm9-69AYqf5mrVtw0ehsBQrhk',
 };
@@ -464,6 +465,7 @@ it('the shipped Word templates open word/document.xml and pass the governed pack
   const fs = await import('node:fs');
   const path = await import('node:path');
   for (const relativePath of [
+    'shared/templates/pre-site-visit/phase-ii-pre-site-visit-v7.docx',
     'shared/templates/pre-research-presentation-brief/brief-v1.docx',
     'shared/templates/pre-site-visit/phase-ii-pre-site-visit-v6.docx',
   ]) {
