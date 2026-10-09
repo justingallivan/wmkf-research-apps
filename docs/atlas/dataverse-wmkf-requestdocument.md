@@ -386,7 +386,7 @@ Production Request Document row was created by this release smoke.
   See `docs/plans/STAFF_APPLICANT_MATERIALS_REPLACEMENT_PLAN_2026-10-05.md`.
 - Recording producers (post-presentation `RECORDING`, producer
   `meeting-tracker-post-presentation`). **[Second path built on branch
-  `claude/zoom-copy`, merged 2026-10-09 (`780fab218`, Production deployment 6965242102); `ZOOM_VIDEO_COPY_ACCESS` unset (off); migration 076 applied 2026-10-09; not live.]**
+  `claude/zoom-copy`, merged 2026-10-09 (`780fab218`, Production deployment 6965242102); `ZOOM_VIDEO_COPY_ACCESS=test:<1003222>` since 2026-10-09 (one Mode D copy succeeded); migration 076 applied 2026-10-09; live for that test request only.]**
   Besides the Zoom link and the staff-browser MP4 upload, Stage 3b adds a
   server copy of the Zoom meeting MP4: staff-only, started from the Meeting
   Tracker card, moved by the every-minute `drain-zoom-video-copies` worker into

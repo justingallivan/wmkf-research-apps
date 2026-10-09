@@ -3,7 +3,7 @@ title: "Atlas: Zoom video copies (Postgres)"
 domain: postgres
 kind: state-page
 status: source-built
-summary: "zoom_video_copies holds one row per Stage 3b attempt to copy a Zoom meeting MP4 into the request's SharePoint folder (migration 076, which also adds presentation_material_uploads.origin). Migration 076 applied and step 0 merged 2026-10-09; the copy runtime merged 2026-10-09 with ZOOM_VIDEO_COPY_ACCESS unset (off), and no copy has run."
+summary: "zoom_video_copies holds one row per Stage 3b attempt to copy a Zoom meeting MP4 into the request's SharePoint folder (migration 076, which also adds presentation_material_uploads.origin). Migration 076 applied and step 0 merged 2026-10-09; the copy runtime merged 2026-10-09; ZOOM_VIDEO_COPY_ACCESS=test:<1003222> and one Mode D copy succeeded."
 canonical: true
 cataloged: 2026-10-08
 owner: product-engineering
@@ -26,7 +26,7 @@ related:
 
 ## Status
 
-**[Step 0 merged (`c79f79807`) and migration 076 applied to Production 2026-10-09 (S590); the copy runtime merged 2026-10-09 (`780fab218`, Production deployment 6965242102); `ZOOM_VIDEO_COPY_ACCESS` unset (off). The table exists in Production and is empty; no copy has run. Session 590 ran one local idle tick against Production (`outcome: idle`).]** This page describes the Stage 3b contract as built in source (`docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md`, slices S1-S8). Step 0 (migration 076, browser isolation by `origin`) is on `claude/zoom-copy-step0`; the copy store, service, route, tick worker, cron and card are on `claude/zoom-copy`. Until 076 is applied to a database, none of the paths below can run there. Claude review is done; Codex review is pending.
+**[Step 0 merged (`c79f79807`) and migration 076 applied to Production 2026-10-09 (S590); the copy runtime merged 2026-10-09 (`780fab218`, Production deployment 6965242102); `ZOOM_VIDEO_COPY_ACCESS=test:<1003222>` since 2026-10-09 (one Mode D copy succeeded). The table exists in Production; the Mode D copy on 1003222 (2026-10-09) is its one row, state `copied`. Session 590 ran one local idle tick against Production (`outcome: idle`).]** This page describes the Stage 3b contract as built in source (`docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md`, slices S1-S8). Step 0 (migration 076, browser isolation by `origin`) is on `claude/zoom-copy-step0`; the copy store, service, route, tick worker, cron and card are on `claude/zoom-copy`. Until 076 is applied to a database, none of the paths below can run there. Claude review is done; Codex review is pending.
 
 ## Ownership and contract
 
@@ -40,6 +40,7 @@ related:
 | `bytes_confirmed` | Advisory progress for the card; Graph's `nextExpectedRanges` is the resume pointer. A session restart resets it to 0. |
 | `session_create_attempts` (cap 3), `session_restarts` (cap 3), `uncertain_checks` (cap 3, shared), `registration_attempts` (cap 5) | Bounded counters; a cap and the move to `failed` happen in one UPDATE, so no statement increments past the CHECK |
 | `sharepoint_drive_id`, `sharepoint_item_id`, `request_document_id` | Receipt identities. Drive and item are set when the exact item resolves (`registering`) or at repair; the Request Document id and `completed_at` are set only at `copied` (CHECK `zoom_video_copies_copied_shape`). `sharepoint_quickxor_hash` is reserved: v1 neither writes nor compares it. |
+| `sharepoint_quickxor_hash` | Planned fingerprint for Stages 4/5 (owner decision 6: record Graph's `quickXorHash`, do not compare). **[VERIFIED gap, Session 590: no runtime code writes it (`git grep -i quickxor` over `lib`, `pages`, `shared` finds only the migration and the store's SELECT); the Mode D row has it NULL.]** Owner to decide whether to add the write. |
 | `failure_code`, `cancel_requested_at` | Sanitized failure code, present exactly when `state = 'failed'` (CHECK); staff cancel flag |
 
 Partial unique indexes: one `queued`/`copying`/`registering` copy per request (`idx_zoom_video_copies_active_request`) and one `copied` row per request and Zoom file (`idx_zoom_video_copies_copied_file`). The intent row carries the path and generation-key uniqueness.
