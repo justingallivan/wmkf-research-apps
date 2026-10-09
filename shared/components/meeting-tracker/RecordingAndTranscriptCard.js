@@ -2839,7 +2839,7 @@ function VideoCopyStatus({ z }) {
   );
 }
 
-function ZoomImportSection({ z, activeJob, transcriptionBusy }) {
+function ZoomImportSection({ z, activeJob, transcriptionBusy, hasTranscript }) {
   if (z.status === 'unavailable') return null;
   if (z.status === 'idle') {
     return <button type="button" onClick={z.openPanel} className={`mt-4 ${BTN_LINK}`}>Import from Zoom</button>;
@@ -2875,13 +2875,14 @@ function ZoomImportSection({ z, activeJob, transcriptionBusy }) {
             const detail = [
               Number.isFinite(meeting.durationMinutes) ? `${meeting.durationMinutes} min` : null,
               !audioOffered ? null : !hasAudio ? 'No audio yet' : meeting.transcript ? 'Audio + Zoom transcript' : 'Audio only',
-              state === 'started' ? 'Imported, transcription started' : state === 'importing' ? 'Importing…'
+              state === 'started' ? (meeting.import?.transcriptReady ? 'Imported, transcript ready' : 'Imported, transcribing…') : state === 'importing' ? 'Importing…'
                 : state === 'failed' ? (meeting.import?.failureCode === 'zoom_import_job_ended' ? 'Last transcription did not finish' : 'Last import did not finish') : null,
             ].filter(Boolean).join(' · ');
             const videoLine = !z.copyAvailable || meeting.video === undefined ? null : videoPickerLine(meeting.video, copy);
             const id = `zoom-meeting-${meeting.meetingUuid}`;
-            // Import covers the video for a meeting staff can still import; everything else gets its own button.
-            const ownButton = z.videoStartable(meeting) && !(hasAudio && !chosen);
+            // Import covers the video for a meeting staff can still import, unless the request already has a
+            // transcript: then Copy video is offered on its own so staff need not re-import and re-transcribe.
+            const ownButton = z.videoStartable(meeting) && (hasTranscript || !(hasAudio && !chosen));
             return (
               <div key={meeting.meetingUuid}>
                 <label htmlFor={id} className={`flex items-start gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm ${hasAudio && !chosen ? 'cursor-pointer bg-white' : 'bg-gray-50 text-gray-600'}`}>
@@ -3047,7 +3048,7 @@ function TranscriptWorkflow({ m, t, z, transcriptInputRef }) {
               <UploadForm m={m} inputRef={transcriptInputRef} />
             </>
             : <>
-              <ZoomImportSection z={z} activeJob={active} transcriptionBusy={Boolean(t.busy)} />
+              <ZoomImportSection z={z} activeJob={active} transcriptionBusy={Boolean(t.busy)} hasTranscript={Boolean(material)} />
               {z.status === 'available'
                 ? <div className="mt-4 border-t border-gray-200 pt-3">
                   <button type="button" onClick={z.toggleOther} aria-expanded={z.showOther} className={BTN_LINK}>Other ways to add a recording</button>

@@ -449,7 +449,7 @@ Naming as built: the card's Step 1 is "Get the recording"; the Recording slot is
 
 **Step 1 "Get the recording" picker.**
 - Each meeting gets a video line: "Video: none yet", "Video: not copied", "Video: waiting to copy", "Video: copying 120 of 240 MB", "Video: saving", "Video: copied", "Video: copy failed", "Video: cancelled", or a manual-upload line for a too-large or segmented meeting.
-- Import ("Import, transcribe and copy video") starts audio and video as two independent requests (ruling 10). A meeting imported before 3b offers **Copy video** on its own.
+- Import ("Import, transcribe and copy video") starts audio and video as two independent requests (ruling 10). A meeting imported before 3b offers **Copy video** on its own, and so does every copyable meeting once the request has a published transcript (ruling 30).
 - When access is off (`available: false`), no copy actions show.
 - Polls `GET zoom-video-copies` every 10 s only while a copy is non-terminal, under the existing request-generation guard.
 
@@ -647,6 +647,7 @@ A read-only build map (Sonnet reconnaissance, Session 589) found the gaps below.
     - The card shows the replace confirmation first, when the decision-8 condition holds, then sends the existing audio import and the video start as two independent POSTs. Each shows its own result; neither failure undoes the other.
     - The video start does not require `MEETING_TRACKER_TRANSCRIPTION_ACCESS`; it requires `POST_PRESENTATION_MATERIALS_ACCESS`, Zoom config and `ZOOM_VIDEO_COPY_ACCESS`.
     - When transcription is unavailable or the meeting has no audio, the card still offers **Copy video** on its own.
+    - Amended by ruling 30 (Session 590): once the request has a published transcript, every copyable meeting also offers **Copy video** on its own.
 11. **Ticks (gap 22).** Session creation and the first pump may share a tick when the budget allows (dispatch re-applies after each writer).
 12. **Host hash (gap 23).** `sha256(trim(lowercase(email)))`, matching `readZoomImportConfig`.
 13. **Noted, not changed (gaps 25, 26).** The token-arm candidate overwrite and the browser `finalizing`/NULL-lease claim gap are pre-existing browser behavior, out of 3b scope.
@@ -708,6 +709,10 @@ A read-only build map (Sonnet reconnaissance, Session 589) found the gaps below.
     - Real-Postgres probes commit a registering-to-failed transition on a second connection at both interleaving points; the old order admitted a second copy.
 28. **Graph upload-session calls are bounded end to end (round 2).** `fetchWithBodyTimeout` covers fetch and body read under one abort signal for session creation, status and chunk PUT. Other Graph callers are unchanged.
 29. **Receipt conflicts retire (round 1).** `recordZoomVideoCopyReceiptConflict` records the code on an unleased copy whose intent is finalized, from both reconcile paths.
+
+**Rulings after Production acceptance (Session 590, owner-approved).**
+30. **Copy video when a transcript exists.** In Mode D on 1003222 the transcript came from an uploaded audio file, so no meeting was imported through Zoom and the only way to copy a video was Import, which re-imports the audio and starts a paid transcription. Once the request has a published transcript (`TRANSCRIPT` material), every copyable meeting now offers **Copy video** on its own, alongside Import. Branch `claude/zoom-picker-fixes`.
+31. **Picker import label follows the job.** The listing's import summary adds `transcriptReady` (the joined `transcription_jobs.status` is `ready`; no new read). The picker shows "Imported, transcribing…" until then and "Imported, transcript ready" after, replacing the fixed "Imported, transcription started". Same branch.
 
 ## Contract review (`/contract-reconcile` Mode A, planning pass)
 
