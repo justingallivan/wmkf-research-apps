@@ -172,14 +172,26 @@ describe('startZoomVideoCopy: Try again inspects the prior registration before N
     expect(store.startZoomVideoCopy).not.toHaveBeenCalled();
   });
 
-  test('proven absence proceeds to N1 with the snapshot read after the inspection', async () => {
-    const after = [{ id: COPY, updated_key: 'k2', intent_state: 'failed', intent_lease_live: false }];
-    store.listFailedZoomVideoCopiesForFile.mockResolvedValueOnce([FAILED_UPLOADED]).mockResolvedValueOnce(after);
+  test('proven absence proceeds to N1 with exactly the snapshot that was inspected (read once, before inspection)', async () => {
+    const snapshot = [FAILED_UPLOADED];
+    store.listFailedZoomVideoCopiesForFile.mockResolvedValueOnce(snapshot);
     const w = inspectionDeps({ records: [] });
     const result = await startZoomVideoCopy(args(), withWorker(w));
     expect(result.status).toBe(202);
     expect(w.releaseInspection).toHaveBeenCalled();
-    expect(store.startZoomVideoCopy.mock.calls[0][0].failedSnapshot).toBe(after);
+    expect(store.listFailedZoomVideoCopiesForFile).toHaveBeenCalledTimes(1);
+    expect(store.startZoomVideoCopy.mock.calls[0][0].failedSnapshot).toBe(snapshot);
+  });
+
+  test('a copy that fails after inspection is not admitted: N1 sees an unseen row and the start is pending (Codex round 3)', async () => {
+    // Inspection sees no failed rows; a concurrent worker then fails a registering copy. The snapshot handed to N1 is
+    // the inspected (empty) one, so N1's locked recheck finds an unseen failed row and refuses.
+    store.listFailedZoomVideoCopiesForFile.mockResolvedValueOnce([]).mockResolvedValue([FAILED_UPLOADED]);
+    store.startZoomVideoCopy.mockImplementation(async ({ failedSnapshot }) => (
+      failedSnapshot.length === 0 ? { status: 'reconciliation_pending', copy: null } : { status: 'started', copy: { id: COPY } }));
+    const w = inspectionDeps({ records: [] });
+    await expect(startZoomVideoCopy(args(), withWorker(w))).rejects.toMatchObject({ code: 'zoom_video_reconciliation_pending' });
+    expect(store.startZoomVideoCopy.mock.calls[0][0].failedSnapshot).toEqual([]);
   });
 
   test('a failed copy whose intent is already finalized is repaired through N5 and replayed without an inspection', async () => {
