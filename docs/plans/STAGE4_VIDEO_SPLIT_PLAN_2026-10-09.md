@@ -17,7 +17,9 @@ related:
 
 **[DRAFT OUTLINE, Session 590, 2026-10-09.]** Nothing here is built or approved. This outline turns Stage 4 of `MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md` (`:104-112`) into a design. The processing venue (where the cut runs) is researched separately by Codex on `codex/stage4-video-processing-research` (deliverable `docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md`). This document defines what any venue must receive and return.
 
-## Owner decisions (open)
+## Owner decisions
+
+**Decided (owner, Session 590, 2026-10-09):** 1 = presentation **and** discussion videos; 2 = cut exactly at `endMs`; 3 = Zoom copy plus Zoom transcript only; 5 = on request. Decisions 4, 6 and 7 remain open. Original recommendations follow for the record.
 
 1. **Outputs.** Accepted UX items 5 and 7 (`MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md:30-33`) call for a presentation video **and** a staff-discussion video, plus "Not recorded" when nothing follows the boundary. Stage 5 later deletes the discussion video. Recommendation: build the presentation video first; add the discussion video only if staff need a separate discussion file beyond the full Recording, which they already have until the Stage 5 deadline.
 2. **Cut point and tolerance.** `presentationEnd.endMs` is the end of the last presentation utterance on the transcript timeline (`bundle.js:37-53`). The next utterance starts later. Options: cut exactly at `endMs`; cut at `endMs` minus a safety margin (loses a moment of presentation, never leaks); or cut in the silent gap before the next utterance. Recommendation: cut at `endMs`, and reject the output unless verification shows no audio or video after `endMs` plus 0 ms (see "Processor contract").
@@ -66,9 +68,15 @@ Any failure shows a named reason and no split.
 - Add the presentation-video type to the explicit allowlists in `presentation-page-service.js` and `briefing-page-service.js`, behind `bindPresentationVideo`. This is a deliberate reviewed edit.
 - A discussion-video type, if built, never appears in either allowlist; injected discussion rows must be excluded at listing and open (tests).
 
+## Outputs and cut [PLANNED, decisions 1-2]
+
+- **Presentation video:** source time 0 to `endMs` (mapped onto the MP4 timeline). Board-eligible once bound and verified.
+- **Staff-discussion video:** `endMs` to the end of the source, staff-only, deleted at the Stage 5 deadline. When the verified source shows nothing after `endMs`, the card shows **Not recorded** and no discussion video is made (UX plan `:35`).
+- The two outputs partition the source at the same cut, mirroring `presentationContent` / `staffDiscussionContent`. One failing does not discard the other; each shows its own state.
+
 ## Card [PLANNED]
 
-The card's "Results" step gains a Video line under **Presentation** (and **Staff discussion** if built): status (not started, working, ready, stale, failed with reason), **Create presentation video** (decision 5), and Open for staff.
+The card's "Results" step gains a Video line under **Presentation** and under **Staff discussion**: status (not started, working, ready, stale, not recorded, failed with reason) and Open for staff. One **Create videos** action (decision 5) starts both after the boundary is confirmed and the source is eligible (decision 3).
 
 ## Stage 5 hooks [PLANNED]
 
