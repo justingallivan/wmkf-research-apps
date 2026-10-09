@@ -27,11 +27,11 @@ The October 4 plan remains an implementation-history reference. Its manual Zoom 
 2. The app copies the actual video, audio and available Zoom captions into controlled WMKF storage. A saved viewing link alone does not complete import. Import status identifies missing, pending or failed files and permits a targeted retry.
 3. The existing pipeline transcribes the full audio and reconciles speaker identities using the full transcript and Zoom captions. Review names across the whole meeting before cutting any derivative. No new speaker-matching algorithm is in scope.
 4. In one review area, Duncan checks names and confirms the presentation-end timestamp. Marking a candidate time early is harmless, but only the confirmed source revision and boundary may drive outputs.
-5. The app creates presentation and staff-discussion videos and transcripts. Both use the same reviewed boundary, with verified video/audio time alignment.
+5. The app creates presentation and staff-discussion transcripts at the reviewed boundary, and a presentation video only, with verified video/audio time alignment. **Revised (owner, 2026-10-09):** no staff-discussion video is made; staff use the full Recording until the Stage 5 deadline.
 6. One **Generate summaries** action, with an acknowledgment covering both inputs, creates the two independent summary drafts. Each remains reviewable and editable before publication. A failed half does not erase a successful half or require paying to regenerate it.
-7. The completed page groups six products into **Presentation** and **Staff discussion**, each with Video, Transcript and Summary. Show open/download actions, current/stale/working/failure status and the relevant next action. Presentation materials are eligible for Board sharing after verification. Discussion products are staff-only and show the deletion deadline. Full sources remain separately accessible to authorized staff only until their deadline.
+7. The completed page groups five products into **Presentation** (Video, Transcript, Summary) and **Staff discussion** (Transcript, Summary; no video, revised 2026-10-09). Show open/download actions, current/stale/working/failure status and the relevant next action. Presentation materials are eligible for Board sharing after verification. Discussion products are staff-only and show the deletion deadline. Full sources remain separately accessible to authorized staff only until their deadline.
 
-When verified source timing and utterances show no discussion after the confirmed boundary, display **Not recorded** for the discussion products. Skip the discussion provider call and zero-length video generation while allowing the presentation to complete. The current derivative writer emits a one-line no-discussion transcript; do not infer absence by matching that text or summarize that placeholder. This is a proposed edge-case behavior to confirm with the implementation scope.
+When verified source timing and utterances show no discussion after the confirmed boundary, display **Not recorded** for the discussion products. Skip the discussion provider call while allowing the presentation to complete. The current derivative writer emits a one-line no-discussion transcript; do not infer absence by matching that text or summarize that placeholder. This is a proposed edge-case behavior to confirm with the implementation scope.
 
 The page should reveal work in the order it is needed, collapse replacement actions after success, and place feedback beside the operation. Do not put finished-summary status above unrelated upload controls or stack obsolete success banners. Drafts and published files must remain distinguishable.
 
@@ -103,7 +103,7 @@ An import requires a durable, schema-approved operation record with exact source
 
 ### 4. Video splitting and presentation archive
 
-**Superseded in part (owner, Session 590, 2026-10-09):** Stage 4 makes a presentation video only, with no staff-discussion video; staff approve its ending before Board release. Design: `docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md`. UX items 5 and 7 above still apply to transcripts and summaries.
+**Superseded in part (owner, Session 590, 2026-10-09):** Stage 4 makes a presentation video only, with no staff-discussion video; staff approve its ending before Board release. Design: `docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md`. UX items 5 and 7 above are revised to match; Stage 5 below no longer lists a discussion video.
 
 Proposed new module `lib/services/meeting-tracker-recordings/split-service.js`; publication integrates with the existing material model, registry writer and both outside readers. Persist a frozen source-video identity, transcript revision, reviewed boundary, timing transform and immutable output identity before processing. Distinguish video source changes from names-only transcript changes to avoid unnecessary re-encoding without weakening provenance.
 
@@ -115,7 +115,7 @@ Archive presentation-only MP4, transcript and reviewed summary in governed Share
 
 ### 5. Retention with automatic deletion
 
-**Owner decision:** automatically delete discussion video, transcript, summary and full-length originals at the Board meeting deadline. Presentation-only materials remain archived. Zoom-original deletion is desired when supported. The account belongs to WMKF; account-specific permissions and Trash settings are unverified.
+**Owner decision:** automatically delete the discussion transcript, discussion summary and full-length originals (including the full Recording copied by Stage 3b) at the Board meeting deadline. Stage 4 makes no discussion video (revised 2026-10-09). Presentation-only materials remain archived. Zoom-original deletion is desired when supported. The account belongs to WMKF; account-specific permissions and Trash settings are unverified.
 
 Coverage inventory must include all content-bearing copies: original video/audio/VTT, full transcript TXT/VTT/source JSON, discussion derivatives and summary drafts, prior/superseded revisions, partial/orphaned uploads, temporary Blob/worker files, Zoom variants, and provider retention. SharePoint recycle bins/version history, Zoom Trash and backup/retention holds affect permanent erasure; removing an app link is not deletion. Record precisely what the system can verify versus what provider policy controls. Unrelated meeting files and unrelated account recordings are outside the automatic deletion scope.
 
