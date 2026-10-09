@@ -374,7 +374,13 @@ Preview cannot exercise this stage. It has no Zoom credentials, and Vercel runs 
 
 ## Pre-implementation read-only probes (owner to authorize)
 
-1. **Zoom Range support [UNVERIFIED].** In `scripts/probe-zoom-recordings.mjs`, follow `download_url` with the bearer token, then send `Range: bytes=0-1023` to the final `ssrweb.zoom.us` hop. Expect 206 with `Content-Range`. Record status and headers only.
+1. **Zoom Range support: [VERIFIED via `node scripts/probe-zoom-recordings.mjs --range`, Session 588, 2026-10-08, owner-authorized].** Two meetings for `wmk-library@wmkeck.org` were probed: `shared_screen_with_speaker_view`, 248.5 MB, and `shared_screen_with_speaker_view(CC)`, 247.8 MB. On each:
+   - `download_url` with the bearer and `Range: bytes=0-1023` answered 302 from `us02web.zoom.us`.
+   - The redirect target on `ssrweb.zoom.us` answered **206**, with `accept-ranges: bytes`, `content-range: bytes 0-1023/<total>`, `content-length: 1024` and `application/octet-stream`.
+   - The resolved `ssrweb` URL, re-requested **without the bearer** at a 1 MiB offset, also answered 206 with the matching `content-range`.
+   - Bodies were cancelled unread; only status and headers were recorded.
+
+   Consequence for review item 1: drop the no-Range fallback. Treat a 200 response to a ranged request as terminal `zoom_range_unsupported`. Resuming from the resolved URL without the bearer works while that URL is live; how long it stays live is still probe 2. Original probe text: In `scripts/probe-zoom-recordings.mjs`, follow `download_url` with the bearer token, then send `Range: bytes=0-1023` to the final `ssrweb.zoom.us` hop. Expect 206 with `Content-Range`. Record status and headers only.
 2. **Zoom URL lifetime [UNVERIFIED].** Repeat probe 1 at +15 and +60 minutes on the same resolved URL.
 3. **MP4 variants and sizes [UNVERIFIED].** List `recording_type`, `file_extension` and `file_size` for every MP4 in the 30-day window.
 4. **Graph session expiry and hashes [UNVERIFIED for this tenant].** Read `expirationDateTime` from one `createUploadSession` on a TEST path, then DELETE that session. Separately, GET `file.hashes` on an existing `RECORDING` item.
@@ -416,7 +422,9 @@ Preview cannot exercise this stage. It has no Zoom credentials, and Vercel runs 
 
 ## Review — Session 588 (2026-10-08)
 
-Reviewers: a Claude source review (`/contract-reconcile` Mode A) and a Codex adversarial review (`gpt-6-astra`). No live probe ran. **Owner answers (Session 588):** decision 4 adds `ZOOM_VIDEO_COPY_ACCESS`, and new decision 8 asks staff to confirm before replacing a staff-uploaded MP4. Both are recorded under "Owner decisions". The protocol rework below is still outstanding; probe 1 (Range) should run first, because its result decides item 1.
+Reviewers: a Claude source review (`/contract-reconcile` Mode A) and a Codex adversarial review (`gpt-6-astra`). No live probe ran. **Probe 1 result (Session 588):** Zoom honors Range (206) on the final `ssrweb.zoom.us` hop, including at an offset without the bearer. See "Pre-implementation read-only probes". Item 1 below therefore becomes "a 200 response to a ranged request is terminal", not a fallback.
+
+**Owner answers (Session 588):** decision 4 adds `ZOOM_VIDEO_COPY_ACCESS`, and new decision 8 asks staff to confirm before replacing a staff-uploaded MP4. Both are recorded under "Owner decisions". The protocol rework below is still outstanding; probe 1 (Range) should run first, because its result decides item 1.
 
 **Verdict: NEEDS REWORK.** Both reviewers independently found that the transfer, lease and finalize protocol does not fit the existing upload-intent state machine. Together with the Range livelock, the core protocol needs redefining, not patching.
 

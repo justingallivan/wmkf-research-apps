@@ -6,6 +6,13 @@
  *
  *   node scripts/probe-zoom-recordings.mjs --host <email> [--days 30]
  *   node scripts/probe-zoom-recordings.mjs --host <email> [--days 30] --download <meetingUUID> --out <empty dir>
+ *   node scripts/probe-zoom-recordings.mjs --host <email> [--days 30] --range <meetingUUID>
+ *
+ * --range (Stage 3b probe 1, docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md):
+ * for each completed MP4 of the meeting, follow download_url hop by hop with
+ * `Range` requests (bearer on the first hop only, as zoom-client.js does) and print
+ * each hop's status, host and range headers. Response bodies are cancelled
+ * unread; nothing is saved.
  *
  * Reads ZOOM_S2S_ACCOUNT_ID / ZOOM_S2S_CLIENT_ID / ZOOM_S2S_CLIENT_SECRET from
  * .env.local. Never prints the token or download URLs. Never deletes, writes to
@@ -31,6 +38,7 @@ const HOST = arg('host');
 const DAYS = Number(arg('days') || 30);
 const DOWNLOAD = arg('download');
 const OUT = arg('out');
+const RANGE = arg('range');
 if (!HOST) { console.error('--host <email> is required'); process.exit(2); }
 if (DOWNLOAD && !OUT) { console.error('--download requires --out <empty dir>'); process.exit(2); }
 for (const k of ['ZOOM_S2S_ACCOUNT_ID', 'ZOOM_S2S_CLIENT_ID', 'ZOOM_S2S_CLIENT_SECRET']) {
@@ -79,6 +87,38 @@ console.log(`${byUuid.size} recorded meeting(s) for ${HOST} in the last ${DAYS} 
 
 const mb = (n) => `${(n / 1048576).toFixed(1)} MB`;
 const secs = (f) => (f.recording_start && f.recording_end ? (Date.parse(f.recording_end) - Date.parse(f.recording_start)) / 1000 : null);
+
+if (RANGE) {
+  const meeting = byUuid.get(RANGE);
+  if (!meeting) { console.error(`uuid ${RANGE} is not in ${HOST}'s listing for the last ${DAYS} days`); process.exit(1); }
+  const probe = async (url, range, bearer) => {
+    const hops = [];
+    for (let hop = 0; hop < 6; hop += 1) {
+      const headers = { Range: range };
+      if (bearer && hop === 0) headers.Authorization = `Bearer ${tok.access_token}`;
+      const res = await fetch(url, { headers, redirect: 'manual' });
+      const h = (k) => res.headers.get(k);
+      hops.push(`    hop${hop} ${new URL(url).host} -> HTTP ${res.status}  accept-ranges=${h('accept-ranges')}  content-range=${h('content-range')}  content-length=${h('content-length')}  content-type=${h('content-type')}`);
+      await res.body?.cancel();
+      const loc = h('location');
+      if (res.status >= 300 && res.status < 400 && loc) { url = new URL(loc, url).href; continue; }
+      return { hops, final: url, status: res.status };
+    }
+    return { hops, final: null, status: null };
+  };
+  for (const f of (meeting.recording_files || []).filter((x) => String(x.file_extension).toUpperCase() === 'MP4')) {
+    console.log(`${f.recording_type}  ${mb(f.file_size || 0)}  status=${f.status}`);
+    if (f.status !== 'completed') continue;
+    const first = await probe(f.download_url, 'bytes=0-1023', true);
+    console.log(`  Range bytes=0-1023 from download_url:\n${first.hops.join('\n')}`);
+    if (first.final && f.file_size > 2 * 1048576) {
+      const mid = `bytes=${1048576}-${1048576 + 1023}`;
+      const again = await probe(first.final, mid, false);
+      console.log(`  Range ${mid} on the resolved final URL, no bearer:\n${again.hops.join('\n')}`);
+    }
+  }
+  process.exit(0);
+}
 
 if (!DOWNLOAD) {
   for (const m of [...byUuid.values()].sort((a, b) => b.start_time.localeCompare(a.start_time))) {
