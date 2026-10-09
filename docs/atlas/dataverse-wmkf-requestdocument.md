@@ -793,9 +793,9 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   showing a stale summary with a note. The eTag pin above applies.
 - **Staff Discussion Summary writer** (`100000010`;
   `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md` D1, D3, D7, D8;
-  **[BUILT ON BRANCH `claude/paired-summaries`, NOT MERGED; picklist value
-  INSERTED 2026-10-09; prompt SEEDED 2026-10-09; drafts CHECK widened by
-  migration 075, applied 2026-10-09.]**): the same service publishes a reviewed draft
+  **[PRODUCTION-LIVE 2026-10-09: merge `5b8225ed8`, Production deployment 6952181551 success; picklist value,
+  prompt v1 and migration 075 provisioned 2026-10-09 by the owner. Acceptance on
+  1003222 not yet run.]**): the same service publishes a reviewed draft
   of the discussion kind (`SUMMARY_KINDS.discussion`) from the bound Staff
   Discussion Transcript, never slides, as a BOM-prefixed TXT under
   `Site Visit - Staff Discussion Summary/`, prompt

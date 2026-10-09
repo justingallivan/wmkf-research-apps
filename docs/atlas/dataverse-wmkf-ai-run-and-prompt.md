@@ -97,8 +97,8 @@ Migration plans touching either entity must preserve these foreign keys.
   'content-free'` option (added on the same branch) so no run row carries
   transcript text or names on any path. The row must be seeded before alignment
   is enabled so its variable caps match the code.
-- **Meeting transcript staff discussion summary (built on branch
-  `claude/paired-summaries`, NOT MERGED; SEEDED IN PRODUCTION 2026-10-09 by the
+- **Meeting transcript staff discussion summary (Production-live 2026-10-09,
+  merge `5b8225ed8`, Production deployment 6952181551 success; SEEDED IN PRODUCTION 2026-10-09 by the
   owner-run bootstrap as v1, current row `87768430-90c3-f111-aaad-6045bd063e21`,
   exactly one current row verified):**
   `shared/config/prompts/meeting-staff-discussion-summary.js` defines

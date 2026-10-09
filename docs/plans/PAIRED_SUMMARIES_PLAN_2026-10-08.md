@@ -2,8 +2,8 @@
 title: Paired presentation and staff discussion summaries (Stage 2)
 domain: transcription
 kind: plan
-status: built-in-branch
-summary: "One staff action drafts both a presentation summary and a staff-only discussion summary by calling the existing summary-draft routes once per allowlisted kind. Each kind has its own consent record, retry, draft and publish; the server refuses to replace a ready draft unless the request names it. Built on branch claude/paired-summaries (backend and card, Codex-approved; not merged). Release still needs migration 075 (widens one drafts CHECK), artifact type 100000010 inserted in Dataverse, and the new content-free discussion prompt seeded, all owner-run."
+status: active
+summary: "One staff action drafts both a presentation summary and a staff-only discussion summary by calling the existing summary-draft routes once per allowlisted kind. Each kind has its own consent record, retry, draft and publish; the server refuses to replace a ready draft unless the request names it. Production-live 2026-10-09 (merge 5b8225ed8, deployment 6952181551) after the owner-run picklist insert (100000010), migration 075 and discussion prompt seed. Acceptance on test request 1003222 (release step 7) not yet run."
 owner: product-engineering
 related:
   - docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md
@@ -18,7 +18,7 @@ related:
 
 ## Status and authority
 
-**Built on branch `claude/paired-summaries`, not merged (Session 589).** Release step 0 is live on `main` (merge `82c6cb26d`, deployment 6951088672). Release step 1 is done:
+**Production-live 2026-10-09 (merge `5b8225ed8`, Production deployment 6952181551 success); acceptance (step 7) not yet run.** Built on branch `claude/paired-summaries` (Sessions 588–589); `main` was merged into it first (`62646a928`; 21,659 tests and 22 gates passed). Release step 0 is live on `main` (merge `82c6cb26d`, deployment 6951088672). Release step 1 is done:
 - Backend commits `2c411c6d6`…`cb398fb47` (Session 588). The Codex backend review raised one medium finding: the card's Replace draft sent no `replaceDraft`.
 - Card commits `1c41e4c77` (that fix), `a7838e3b6` (per-kind hook refactor), `19af9ad41` (paired action and discussion block) and `424394781` (copy). The Codex adversarial review of the card slice (`gpt-6-astra`, base `cb398fb47`) approved with no material findings. Its sandbox could not run tests; the Session 589 lead ran them (921 pass).
 - Build deviations, all accepted by the owner in Session 589, are under "Owner decisions" (decisions 9–12). Responses also gain an additive `kind` field (D2).
@@ -28,7 +28,7 @@ Read-only checks V1–V3 passed (Session 588). The owner reviewed the discussion
 - **Step 4:** migration 075 applied (1 applied, 74 skipped).
 - **Step 5:** `meeting-transcript.staff-discussion-summary` seeded as v1, current row `87768430-90c3-f111-aaad-6045bd063e21`; exactly one current row verified.
 
-Until the merge, the Wave 16 preflight reports 100000010 as an "Unexpected option", as step 3 expects. Steps 6 (merge decision) and 7 (acceptance) have not run.
+Until the merge, the Wave 16 preflight reports 100000010 as an "Unexpected option", as step 3 expects. Step 6: the owner merged and pushed (`5b8225ed8`); Production deployment 6952181551 of that SHA succeeded. Step 7 (acceptance) has not run.
 
 **Originally reviewed and revised in Session 588.** The owner answered the review decisions on 2026-10-08; see "Owner decisions". This plan covers Stage 2 of `docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md` §2, which the owner approved on October 7. It does not authorize a migration, Dataverse picklist insert, prompt seed, Production read, provider call, merge or deployment. Each of those is listed below as an owner step.
 
@@ -308,7 +308,7 @@ Decisions 1 and 4–7 had no owner objection in Session 588 and stand as recomme
 
 ## Evidence limits
 
-This plan was written from source only, plus local `git ls-tree`. No Production, Dataverse, SharePoint, LLM or Zoom call was made while writing it. The build (Sessions 588–589) is on `claude/paired-summaries`; read-only checks V1–V3 are the only Production reads.
+This plan was written from source only, plus local `git ls-tree`. No Production, Dataverse, SharePoint, LLM or Zoom call was made while writing it. The build (Sessions 588–589) merged as `5b8225ed8`; read-only checks V1–V3 and the owner-run provisioning scripts are the only Production operations.
 
 ## Review — Session 588 (2026-10-08)
 

@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Paired presentation and staff discussion summaries ship (Sessions 588–589)
+
+**Milestone:** One Meeting Tracker action drafts both the presentation summary and a staff-only staff discussion summary. Each kind is reviewed, edited and published separately.
+**Sessions:** 588–589. Release step 0 merge `82c6cb26d`; Stage 2 merge `5b8225ed8` (Production deployment 6952181551). Claude built and reviewed; Codex adversarial passes (backend: one medium finding, fixed; card: approve).
+**Ship state:**
+- New artifact type 100000010 Staff Discussion Summary, migration 075 and prompt `meeting-transcript.staff-discussion-summary` v1, all provisioned by the owner 2026-10-09. The Board and briefing links never serve it.
+- The server refuses to replace a ready draft unless the request names it (fixes an old-tab overwrite of edited presentation drafts). An empty staff discussion shows "Not recorded" with no provider call.
+- Acceptance on test request 1003222 not yet run.
+**Why it matters:** staff get a summary of their own deliberation without risking it reaching the Board page, and edited drafts can no longer be silently discarded.
+**Pointers:** `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md`; `lib/services/post-presentation-materials/transcript-summary-service.js`; `summary-draft-store.js`; `shared/components/meeting-tracker/RecordingAndTranscriptCard.js`.
+
 ## October 2026 — Transcription queue hardened; staff can cancel stuck runs (Session 587)
 
 **Milestone:** A transcript that fails validation no longer blocks the transcription queue, and staff can cancel a queued or stuck transcription from the Meeting Tracker card.
