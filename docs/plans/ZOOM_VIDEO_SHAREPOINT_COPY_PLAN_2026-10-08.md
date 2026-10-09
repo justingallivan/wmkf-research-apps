@@ -2,7 +2,7 @@
 title: Zoom video copy to SharePoint (Stage 3b)
 kind: plan
 domain: transcription
-status: built-in-branch
+status: shipped
 summary: "Copy one Zoom meeting MP4 into governed SharePoint as the request's staff-only Recording, using a server-side ranged-GET chunk pump into an origin-marked MP4 upload intent, Graph upload session and the existing finalize path; one new Postgres table plus an origin column (migration 076, shipped first with browser isolation), a ZOOM_VIDEO_COPY_ACCESS kill switch, one visit route and one every-minute cron worker."
 owner: product-engineering
 related:
