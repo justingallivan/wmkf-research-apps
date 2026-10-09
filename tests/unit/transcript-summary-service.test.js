@@ -82,7 +82,7 @@ beforeEach(() => {
   tokens = 0;
   uploads = new Map();
   drafts = {
-    beginSummaryDraft: jest.fn(async (args) => ({ ...draftRow({ state: 'generating', summary_text: null, version: 1 }), id: args.id })),
+    reserveSummaryDraftRun: jest.fn(async (args) => ({ draft: { ...draftRow({ state: 'generating', summary_text: null, version: 1 }), id: args.id } })),
     completeSummaryDraft: jest.fn(async (args) => draftRow({ id: args.id, summary_text: args.text })),
     failSummaryDraft: jest.fn(async () => ({})),
     getActiveSummaryDraft: jest.fn(async () => draftRow()),
@@ -179,17 +179,17 @@ describe('create', () => {
     ['an older version', 'presentation-summary-2020-01-01'],
   ])('an acknowledgment that is %s is refused before any draft row or provider call', async (_label, version) => {
     await expect(create({ acknowledgmentVersion: version })).rejects.toMatchObject({ httpStatus: 400, code: 'summary_acknowledgment_required' });
-    expect(drafts.beginSummaryDraft).not.toHaveBeenCalled();
+    expect(drafts.reserveSummaryDraftRun).not.toHaveBeenCalled();
     expect(deps.executePrompt).not.toHaveBeenCalled();
   });
 
   test('records the acknowledgment before the provider call, sends the bound transcript text, and returns a ready draft', async () => {
     const outcome = await create();
-    expect(drafts.beginSummaryDraft).toHaveBeenCalledWith(expect.objectContaining({
+    expect(drafts.reserveSummaryDraftRun).toHaveBeenCalledWith(expect.objectContaining({
       requestId: REQUEST_ID, artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, sourceRevisionId: REVISION_ID,
       presentationEndMs: 2000, sourceArtifactId: PRESENTATION_ID,
       acknowledgmentVersion: PRESENTATION_SUMMARY_ACKNOWLEDGMENT.version, profileId: 12 }));
-    expect(drafts.beginSummaryDraft.mock.invocationCallOrder[0]).toBeLessThan(deps.executePrompt.mock.invocationCallOrder[0]);
+    expect(drafts.reserveSummaryDraftRun.mock.invocationCallOrder[0]).toBeLessThan(deps.executePrompt.mock.invocationCallOrder[0]);
     expect(deps.loadModelOverrides.mock.invocationCallOrder[0]).toBeLessThan(deps.executePrompt.mock.invocationCallOrder[0]);
     const [call] = deps.executePrompt.mock.calls[0];
     expect(call).toMatchObject({ promptName: PROMPT_NAME, requestId: REQUEST_ID, requireNoPersistence: true,
@@ -208,12 +208,12 @@ describe('create', () => {
     const outcome = await create();
     expect(deps.executePrompt.mock.calls[0][0].overrideVariables.presentation_slides).toBe('Slide 1: Quantum dots');
     expect(outcome.slidesIncluded).toBe(true);
-    expect(drafts.beginSummaryDraft).toHaveBeenCalledWith(expect.objectContaining({ slidesArtifactId: SLIDES_ID, slidesContentHash: sha('slides') }));
+    expect(drafts.reserveSummaryDraftRun).toHaveBeenCalledWith(expect.objectContaining({ slidesArtifactId: SLIDES_ID, slidesContentHash: sha('slides') }));
   });
 
   test('a run with no slide PDF on file records that none was picked', async () => {
     await create();
-    expect(drafts.beginSummaryDraft).toHaveBeenCalledWith(expect.objectContaining({ slidesArtifactId: null, slidesContentHash: null }));
+    expect(drafts.reserveSummaryDraftRun).toHaveBeenCalledWith(expect.objectContaining({ slidesArtifactId: null, slidesContentHash: null }));
   });
 
   test('a slide PDF that cannot be read is skipped, not fatal', async () => {
@@ -230,7 +230,7 @@ describe('create', () => {
   ])('a Presentation Transcript that is %s blocks summarizing before any provider call', async (_label, rows) => {
     state.rows = rows();
     await expect(create()).rejects.toMatchObject({ httpStatus: 409, code: 'presentation_transcript_not_ready' });
-    expect(drafts.beginSummaryDraft).not.toHaveBeenCalled();
+    expect(drafts.reserveSummaryDraftRun).not.toHaveBeenCalled();
     expect(deps.executePrompt).not.toHaveBeenCalled();
   });
 
@@ -246,8 +246,15 @@ describe('create', () => {
     await expect(create({ expectedCurrentFingerprint: 'f'.repeat(64) })).rejects.toMatchObject({ code: 'meeting_transcript_current_changed' });
   });
 
+  test('a ready draft blocks a new run with a typed conflict naming it, without a provider call', async () => {
+    drafts.reserveSummaryDraftRun.mockResolvedValueOnce({ conflict: { code: 'summary_draft_exists', draftId: DRAFT_ID, version: 4 } });
+    await expect(create()).rejects.toMatchObject({ httpStatus: 409, code: 'summary_draft_exists',
+      body: expect.objectContaining({ draftId: DRAFT_ID, version: 4 }) });
+    expect(deps.executePrompt).not.toHaveBeenCalled();
+  });
+
   test('another run in progress is refused without a provider call', async () => {
-    drafts.beginSummaryDraft.mockResolvedValueOnce(null);
+    drafts.reserveSummaryDraftRun.mockResolvedValueOnce({ conflict: { code: 'summary_generation_in_progress' } });
     await expect(create()).rejects.toMatchObject({ httpStatus: 409, code: 'summary_generation_in_progress' });
     expect(deps.executePrompt).not.toHaveBeenCalled();
   });
