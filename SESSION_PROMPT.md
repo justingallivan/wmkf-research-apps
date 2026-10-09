@@ -52,7 +52,7 @@
      - receipt conflicts that never retired
      - three duplicate-copy races in Try again / N1
    - **Verification:** full jest 22,090 passed; 30 `check:*` gates plus self-tests green; loopback Postgres proof 18/18.
-3. **Side session:** institution-name capitalization script (below, unchanged).
+3. **Side session:** institution-name capitalization fixes applied to production (below).
 
 ### Next Items
 
@@ -121,26 +121,16 @@ npm run check:types && npm run check:api-routes && npm run check:request-documen
 
 ---
 
-## Side session close — institution-name capitalization (Claude, main, 2026-10-08 PT)
+## Side session close — institution-name capitalization: APPLIED (Claude, main, 2026-10-08/09 PT)
 
-A side session running alongside Session 588. It made no runtime changes.
+The owner's colleagues approved fixing all 40 accounts (2026-10-09). Done; nothing open.
 
-- **Search (read-only; the owner ran it with `DATAVERSE_ALLOW_PROD_READS=yes`).** Phase II writeups render `DV:InstitutionName` from the applicant account's `akoya_aka`, falling back to `name` (`lib/services/pre-site-visit/proposal-core-service.js:269-271`).
-  - Of the 660 accounts that applied to the Research Program (`shared/config/researchPrograms.js` IDs), 40 have a title-cased "Of/For/And/In/The…" mid-name.
-  - Only 6 would print it: Bigelow Laboratory, FfAME, Magee-Womens, Morgridge, UA Huntsville and UW-Milwaukee.
-  - The other 34 have a bad `name` but a correct `akoya_aka`.
-  - The HSS account's `akoya_aka` contains a literal `&amp;`.
-- **Added `scripts/fix-institution-name-capitalization.js` (unrun).** It changes capitalization only, on `name` and `akoya_aka` of those 6 accounts.
-  - Dry-run by default; `--commit` writes.
-  - Each field is patched only if its live value still equals the expected old value.
-  - Writes go through `DynamicsService`, so the interlock applies: prod needs `DATAVERSE_ALLOW_PROD_READS=yes` plus `DATAVERSE_PROD_WRITE_ACK="<purpose> <UTC date>"`.
-
-**Owner decision needed:** the owner is consulting the database maintainers before running it. Open questions:
-  - Should `name` hold the legal name? An upstream sync might overwrite it. If so, patch `akoya_aka` only.
-  - Use official forms, such as the en dash in "Wisconsin–Milwaukee"?
-  - What to do about the `&amp;` value.
-
-**Verify before acting:** re-run the dry run first; values may have changed since 2026-10-08.
+- **Script (`scripts/fix-institution-name-capitalization.js`, commits `0e317e5a4`, `f9088c2ea`).** It now discovers targets live instead of hardcoding 6.
+  - Scans every Research Program request (9,406 rows, keyset-paged past the 5000-row cap) → 660 applicant accounts.
+  - Lower-cases title-cased "Of/For/And/In/The/At/On" after the first word in `name` and `akoya_aka`.
+  - Owner-reviewed exceptions: Rutgers keeps "The"; Temple keeps its legal "-Of The" (only "Of Higher" lowered); Notre Dame becomes "du Lac".
+- **Applied to production 2026-10-09:** 45 fields on 39 accounts; 0 skipped, 0 failed. A re-scan finds 0 remaining; re-runs are no-ops.
+- **Left as is (not discussed with maintainers):** literal `&amp;` in the HSS account and UVA `name`s; "Childrens" without apostrophe; hyphens/dashes such as "Wisconsin - Milwaukee". `name` was patched along with `akoya_aka`; whether an upstream sync rewrites `name` is unknown — if the old casing reappears, that is the cause.
 
 ## Session 588 close — Stage 2 build, 3b plan finished, Pre-Site template v8 (Claude, main, 2026-10-08/09 PT)
 
