@@ -288,6 +288,18 @@ describe('create', () => {
   });
 });
 
+// Captured from the pre-Stage-2 service (Session 588) before any SUMMARY_KINDS refactor. Do not update
+// these literals to make a refactor pass: a change here changes what the Board sees or breaks retry identity.
+const GOLDEN_PRESENTATION_PUBLISH = Object.freeze({
+  folder: 'akoya_request/1002912_x/Site Visit - Transcript Summary',
+  filename: '1002912-Presentation-Summary-20261005-143210-v2.txt',
+  name: '1002912 research presentation summary',
+  type: 100000007,
+  generationKey: 'a9778db43cc302b9f01a7184f07c934a823003cc47cf6bf08b50656d29c6bd33',
+  fingerprint: 'bfd6f8782c8d3186b8c31fc6b16d0e9e53bfdf4b641dd4bee3560b8fea63f25e',
+  leaseType: 100000007,
+});
+
 describe('publish', () => {
   test('writes the BOM-prefixed TXT, registers a bound row, supersedes the older summary, and clears the draft', async () => {
     state.rows = [...state.rows, row(SUMMARY_OLD_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, {
@@ -318,6 +330,17 @@ describe('publish', () => {
     const winners = projectPostPresentationMaterials(state.rows, REQUEST_ID).winners;
     expect(bindTranscriptSummary(winners, REQUEST_ID)).toMatchObject({ reason: 'bound', summary: { wmkf_requestdocumentid: SUMMARY_NEW_ID } });
     expect(deps.releaseSlotLease).toHaveBeenCalled();
+  });
+
+  test('golden: presentation publish identities are byte-identical to the pre-Stage-2 build (paired summaries plan D1)', async () => {
+    await publish();
+    const [, folder, filename] = deps.uploadFile.mock.calls[0];
+    const payload = deps.createDocument.mock.calls[0][0];
+    expect({
+      folder, filename, name: payload.wmkf_name, type: payload.wmkf_artifacttype,
+      generationKey: payload.wmkf_generationkey, fingerprint: payload.wmkf_inputfingerprint,
+      leaseType: deps.acquireSlotLease.mock.calls[0][0].artifactType,
+    }).toEqual(GOLDEN_PRESENTATION_PUBLISH);
   });
 
   test('the claim is scoped to presentation-summary drafts (paired summaries plan, release step 0)', async () => {
