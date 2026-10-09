@@ -641,6 +641,17 @@ A read-only build map (Sonnet reconnaissance, Session 589) found the gaps below.
 14. **Gates the plan missed.** `tests/unit/test-request-scheduled-job-census.test.js` gets a `RECORDED_CRONS` row of class `allowed`, with counts updated. `requireappaccess-endpoint-count` changes along with `api-route-file-count`. The Graph public-contract and boundary tests change for `putUploadSessionChunk`. The request-document writer stays the single `dependencies.createDocument(` in `material-service.js`, with no new writer row.
 15. **Real-Postgres proof.** Use loopback-only `ZOOM_VIDEO_COPY_PG_TEST_URL`, skipped when unset, following `tests/integration/meeting-tracker-transcription.pg.test.js`. A local Docker Postgres may be used. It is never a shared or remote database.
 
+**Rulings after S3 (stores, commit `65945e49d`).**
+16. **Failed-copy inspection ends (S3 gap 5).** `claimFailedZoomVideoCopiesDue` returns only failed copies whose linked intent is unsettled (`state NOT IN ('finalized','abandoned')`). A finalized intent goes to N5a repair; an abandoned one is settled. A 30-day backstop on the copy's `updated_at` covers anything else. S6 owns this change.
+17. **Accepted store shapes.**
+    - Try again passes `listFailedZoomVideoCopiesForFile` output verbatim as N1's `failedSnapshot`; a missing snapshot fails closed to `reconciliation_pending`.
+    - N5 is the request advisory lock followed by its UPDATE in one transaction.
+    - The failed-due selector is one CTE (`FOR UPDATE SKIP LOCKED` plus update).
+    - Snapshot reads expose no lease tokens; a holder knows its own.
+    - A session restart resets `bytes_confirmed` to 0.
+    - The S4 service supplies the display filename (ruling 9).
+18. **File split for S4/S5.** The start/GET/cancel service is `lib/services/meeting-tracker-recordings/video-copy-service.js` (S4). The tick worker is `video-copy-worker.js` in the same folder (S5, extended by S6).
+
 ## Contract review (`/contract-reconcile` Mode A, planning pass)
 
 **Historical record.** Retained as requested; current protocol is in the revised sections above.
