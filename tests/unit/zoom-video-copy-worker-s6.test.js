@@ -290,11 +290,27 @@ describe('receipt repair (N5)', () => {
     expect(w.events.map(e => e.eventType)).toContain('zoom_video_receipt_conflict');
     expect(w.intent).toMatchObject({ state: 'finalized', request_document_id: 'doc-existing' });
     expect(w.copy.state).toBe('failed');
-    // the reconcile path alerts too and leaves the failed row alone
+    // the conflict is recorded, so the reconcile path never lists, retries or re-alerts on this row
     w.events.length = 0;
+    expect((await reconcileFinalizedCopies(w.deps)).repaired).toBe(0);
+    expect(w.events).toEqual([]);
+    expect(w.copy).toMatchObject({ state: 'failed', failure_code: 'zoom_video_receipt_conflict' });
+  });
+
+  test('a copy that failed for another reason and then meets a receipt conflict records it once and leaves N5a', async () => {
+    const w = registering();
+    Object.assign(w.copy, { state: 'failed', failure_code: 'zoom_video_registration_failed', lease_token: null, lease_expires_at: null });
+    Object.assign(w.intent, { state: 'finalized', request_document_id: 'doc-existing' });
+    w.copiedElsewhere = true;
     await reconcileFinalizedCopies(w.deps);
-    expect(w.events.map(e => e.eventType)).toEqual(['zoom_video_receipt_conflict']);
-    expect(w.copy.state).toBe('failed');
+    expect(w.copy).toMatchObject({ state: 'failed', failure_code: 'zoom_video_receipt_conflict' });
+    expect(w.intent).toMatchObject({ state: 'finalized', request_document_id: 'doc-existing' });
+    expect(w.counts.receiptConflicts).toBe(1);
+    // repeated ticks: the row is gone from N5a, so no retry and no repeated alert
+    w.events.length = 0;
+    for (let i = 0; i < 3; i += 1) await reconcileFinalizedCopies(w.deps);
+    expect(w.events).toEqual([]);
+    expect(w.counts.receiptConflicts).toBe(1);
   });
 });
 
@@ -493,7 +509,8 @@ describe('failed-copy receipt inspection', () => {
     await w.tick();
     expect(w.intent.state).toBe('finalized');
     expect(w.events.map(e => e.eventType)).toContain('zoom_video_receipt_conflict');
-    expect(w.copy.state).toBe('failed');
+    expect(w.copy).toMatchObject({ state: 'failed', failure_code: 'zoom_video_receipt_conflict' });
+    expect(await w.deps.listFinalizedCopies()).toEqual([]);
   });
 });
 

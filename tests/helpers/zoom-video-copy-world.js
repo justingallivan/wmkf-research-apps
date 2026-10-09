@@ -397,7 +397,15 @@ export function makeWorld({ size = 25, copyState = 'queued' } = {}) {
       });
       return copyReturn();
     },
-    listFinalizedCopies: async () => (w.intent.state === 'finalized' && ['queued', 'copying', 'registering', 'failed'].includes(w.copy.state) && free(w.copy) ? [{ id: ID }] : []),
+    listFinalizedCopies: async () => (w.intent.state === 'finalized' && ['queued', 'copying', 'registering', 'failed'].includes(w.copy.state) && free(w.copy)
+      && !(w.copy.state === 'failed' && w.copy.failure_code === 'zoom_video_receipt_conflict') ? [{ id: ID }] : []),
+    recordReceiptConflict: async () => {
+      const c = w.copy;
+      if (w.intent.state !== 'finalized' || !['queued', 'copying', 'registering', 'failed'].includes(c.state) || !free(c)) return null;
+      w.counts.receiptConflicts = (w.counts.receiptConflicts || 0) + 1;
+      Object.assign(c, { state: 'failed', failure_code: 'zoom_video_receipt_conflict', lease_token: null, lease_expires_at: null });
+      return { id: ID, state: c.state, failure_code: c.failure_code };
+    },
     claimFailedDue: async ({ deferSeconds = 600 } = {}) => {
       const c = w.copy;
       if (c.state !== 'failed' || (c.next_attempt_at && c.next_attempt_at > w.t) || ['finalized', 'abandoned'].includes(w.intent.state)) return [];

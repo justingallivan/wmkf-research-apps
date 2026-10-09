@@ -187,6 +187,22 @@ describe('Graph failures', () => {
     expect(w.intent.lease_token).toBeNull();
   });
 
+  test('a PUT whose response body timed out (no-response error) releases both leases with no state change', async () => {
+    const w = makeWorld({ size: 25 });
+    w.seedSession(0);
+    const world = w;
+    let puts = 0;
+    const result = await world.tick(undefined, {
+      putUploadSessionChunk: async () => { puts += 1; throw Object.assign(new Error('Graph response body timed out'), { serviceName: 'graph', noResponse: true }); },
+    });
+    expect(puts).toBe(1);
+    expect(result.outcome).toBe('transient');
+    expect(world.counts.del).toBe(0);
+    expect(world.copy.state).toBe('copying');
+    expect(world.copy.lease_token).toBeNull();
+    expect(world.intent.lease_token).toBeNull();
+  });
+
   test('a mismatched next range after a PUT is uncertain, not progress', async () => {
     const w = makeWorld({ size: 100 });
     w.seedSession(0);

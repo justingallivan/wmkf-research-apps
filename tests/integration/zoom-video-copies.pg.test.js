@@ -195,6 +195,11 @@ describeIf('Zoom video copy store (isolated local Postgres proof)', () => {
     await finalizeIntent(a.copyId, 'a');
     await expect(store.markZoomVideoCopyCopied({ id: a.copyId })).rejects.toMatchObject({ code: 'zoom_video_receipt_conflict' });
     expect((await copyRow(a.copyId)).state).toBe('failed');
+    // The conflict is recorded on the unleased copy (intent stays finalized), and the row leaves N5a for good.
+    expect((await store.listZoomVideoCopiesWithFinalizedIntent({ limit: 50 })).map(r => r.id)).toContain(a.copyId);
+    expect(await store.recordZoomVideoCopyReceiptConflict({ id: a.copyId }))
+      .toMatchObject({ state: 'failed', failure_code: 'zoom_video_receipt_conflict' });
+    expect((await store.listZoomVideoCopiesWithFinalizedIntent({ limit: 50 })).map(r => r.id)).not.toContain(a.copyId);
   });
 
   it('a Try again start refuses when a failed row changed since inspection or its intent is already finalized', async () => {

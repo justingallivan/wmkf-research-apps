@@ -53,3 +53,18 @@ test('refuses bad arguments and unsafe URLs before any request', async () => {
   await expect(GraphService.putUploadSessionChunk('http://up.example/s', { start: 0, bytes, total: 20 })).rejects.toThrow('unsafe upload URL');
   expect(global.fetch).not.toHaveBeenCalled();
 });
+
+test.each([
+  ['a committed response', 201, 'json'],
+  ['an error response', 500, 'text'],
+])('%s whose body stalls after the headers is rejected within the budget and the stream is cancelled', async (_label, status, reader) => {
+  const cancel = jest.fn(async () => {});
+  const stalled = { ...response(status), body: { cancel } };
+  stalled[reader] = jest.fn(() => new Promise(() => {}));
+  global.fetch = jest.fn(async () => stalled);
+  const started = Date.now();
+  await expect(GraphService.putUploadSessionChunk(URL_, { start: 0, bytes: Buffer.from('hello'), total: 20, timeoutMs: 30 }))
+    .rejects.toMatchObject({ serviceName: 'graph', noResponse: true });
+  expect(Date.now() - started).toBeLessThan(1000);
+  expect(cancel).toHaveBeenCalled();
+});
