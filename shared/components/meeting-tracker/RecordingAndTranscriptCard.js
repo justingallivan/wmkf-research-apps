@@ -1909,7 +1909,34 @@ function useTranscription(requestId, { onMaterialsChanged }) {
 // Import from Zoom (Stage 3a, docs/plans/ZOOM_RECORDING_IMPORT_PLAN_2026-10-08.md). The list is fetched only when staff
 // open the panel, never on mount. Anything other than `available === true` means unavailable, so existing mocks and
 // environments without Zoom keep today's step 1. Every async write is dropped when the card changed or unmounted.
-function useZoomImport(requestId, { onImported, jobsSignature }) {
+const COPY_ACTIVE_STATES = new Set(['queued', 'copying', 'registering']);
+const COPY_POLL_MS = 10_000;
+const megabytes = (value) => `${Math.round((Number(value) || 0) / 1_000_000).toLocaleString()} MB`;
+const copyPercent = (copy) => (copy.declaredSize > 0 ? Math.max(0, Math.min(100, Math.floor((copy.bytesConfirmed / copy.declaredSize) * 100))) : 0);
+
+// Plain-language start errors by code. Server messages never carry ids, but the copy here is owned by the card.
+const VIDEO_START_MESSAGES = {
+  zoom_video_copy_active: 'Another video is already being copied for this request. Wait for it to finish or cancel it.',
+  zoom_video_copy_in_progress: 'Another video is already being copied for this request. Wait for it to finish or cancel it.',
+  zoom_video_reconciliation_pending: 'An earlier copy is still being checked. Try again in a few minutes.',
+  zoom_video_winner_unversioned: 'The current recording cannot be replaced from here. Upload the video manually.',
+  zoom_video_missing: 'That meeting has no video recording yet.',
+  zoom_video_segmented: 'That meeting was recorded in several video parts. Upload the video manually.',
+  zoom_video_too_large: 'That video is too large to copy. Upload it manually.',
+  zoom_video_copy_not_available: 'Video copy is not available.',
+};
+
+// Why a copy stopped, by failure-code family. Unknown codes get the generic line.
+function videoFailureMessage(code) {
+  const value = String(code || '');
+  if (value === 'zoom_video_recording_replaced') return 'A newer recording was saved while the video was copying, so the copy was not used.';
+  if (value === 'zoom_recording_changed' || value === 'zoom_video_host_not_approved') return 'The recording in Zoom changed or is no longer available, so the copy stopped.';
+  if (/^zoom_(download_denied|download_invalid|range_unsupported|not_found|auth_failed|unavailable|rate_limited)$/.test(value)) return 'Zoom would not provide the video. Try again in a few minutes.';
+  if (/^zoom_video_(session|upload|cancel|registration|receipt|path)/.test(value)) return 'The video could not be saved to SharePoint. Try again.';
+  return 'The video copy did not finish. Try again.';
+}
+
+function useZoomImport(requestId, { onImported, jobsSignature, onVideoCopied }) {
   const basePath = `${API_PATH}/${encodeURIComponent(requestId || '')}`;
   const [status, setStatus] = useState('idle'); // idle | loading | available | unavailable | failed
   const [windowDays, setWindowDays] = useState(30);
@@ -1926,9 +1953,19 @@ function useZoomImport(requestId, { onImported, jobsSignature }) {
   const listSequenceRef = useRef(0);
   const onImportedRef = useRef(onImported);
   useEffect(() => { onImportedRef.current = onImported; }, [onImported]);
+  // Stage 3b video copy. Anything other than `available === true` means off. `copies` is newest first.
+  const [copyAvailable, setCopyAvailable] = useState(false);
+  const [copies, setCopies] = useState([]);
+  const [videoBusy, setVideoBusy] = useState(false);
+  const [videoMessage, setVideoMessage] = useState(null); // { origin, tone, text }
+  const [confirm, setConfirm] = useState(null); // { meetingUuid, winner, origin, withAudio }
+  const copiesRef = useRef([]);
+  const copySequenceRef = useRef(0);
+  const onVideoCopiedRef = useRef(onVideoCopied);
+  useEffect(() => { onVideoCopiedRef.current = onVideoCopied; }, [onVideoCopied]);
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; generationRef.current += 1; listSequenceRef.current += 1; };
+    return () => { mountedRef.current = false; generationRef.current += 1; listSequenceRef.current += 1; copySequenceRef.current += 1; };
   }, []);
   // The card is keyed by requestId, so a different request remounts this hook with a clean panel.
   const isCurrent = useCallback((generation) => mountedRef.current && generationRef.current === generation, []);
@@ -1954,6 +1991,119 @@ function useZoomImport(requestId, { onImported, jobsSignature }) {
     }
   }, [basePath, isCurrent, requestId]);
 
+  // Read-only Postgres snapshot (no Zoom call). Dropped when the card changed or a newer read started.
+  const loadCopies = useCallback(async () => {
+    if (!requestId) return;
+    const generation = generationRef.current;
+    const sequence = ++copySequenceRef.current;
+    try {
+      const body = await requestJson(`${basePath}/zoom-video-copies`, { method: 'GET', fallbackMessage: 'Video copies could not be loaded.' });
+      if (!isCurrent(generation) || copySequenceRef.current !== sequence) return;
+      const next = body?.available === true && Array.isArray(body.copies)
+        ? body.copies.filter((copy) => copy && typeof copy.id === 'string' && typeof copy.state === 'string').map((copy) => ({
+          id: copy.id, meetingUuid: typeof copy.meetingUuid === 'string' ? copy.meetingUuid : '', state: copy.state,
+          bytesConfirmed: Number(copy.bytesConfirmed) || 0, declaredSize: Number(copy.declaredSize) || 0,
+          failureCode: typeof copy.failureCode === 'string' ? copy.failureCode : null, cancelRequested: copy.cancelRequested === true,
+          createdAt: copy.createdAt || null,
+        })) : [];
+      const finished = copiesRef.current.some((old) => COPY_ACTIVE_STATES.has(old.state) && next.some((copy) => copy.id === old.id && copy.state === 'copied'));
+      copiesRef.current = next;
+      setCopyAvailable(body?.available === true && Array.isArray(body.copies));
+      setCopies(next);
+      if (finished) { void onVideoCopiedRef.current?.(); }
+    } catch {
+      // Keep what is shown; the next poll or action retries.
+    }
+  }, [basePath, isCurrent, requestId]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadCopies(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadCopies]);
+  const hasActiveCopy = copies.some((copy) => COPY_ACTIVE_STATES.has(copy.state));
+  // Poll only while a copy is running; the interval is cleared on a terminal state and on unmount.
+  useEffect(() => {
+    if (!hasActiveCopy) return undefined;
+    const timer = setInterval(() => { void loadCopies(); }, COPY_POLL_MS);
+    return () => clearInterval(timer);
+  }, [hasActiveCopy, loadCopies]);
+  const currentCopy = [...copies].sort((a, b) => Number(COPY_ACTIVE_STATES.has(b.state)) - Number(COPY_ACTIVE_STATES.has(a.state))
+    || String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0] || null;
+  const copyForMeeting = (meeting) => {
+    const known = copies.find((copy) => copy.meetingUuid === meeting.meetingUuid);
+    if (known) return known;
+    const listed = meeting.video?.copy;
+    return listed && typeof listed.state === 'string'
+      ? { id: listed.id, meetingUuid: meeting.meetingUuid, state: listed.state, bytesConfirmed: 0, declaredSize: Number(meeting.video.bytes) || 0, failureCode: listed.failureCode || null, cancelRequested: false }
+      : null;
+  };
+  const videoStartable = (meeting) => {
+    if (!copyAvailable || hasActiveCopy || !meeting?.video || meeting.video.tooLarge || meeting.video.segmented) return false;
+    const copy = copyForMeeting(meeting);
+    return !copy || copy.state === 'failed' || copy.state === 'cancelled';
+  };
+
+  // One POST for the video start. Returns { outcome: started | confirm | stale | error | dropped }.
+  const startVideo = async (meetingUuid, replaces, generation, origin) => {
+    try {
+      const body = await requestJson(`${basePath}/zoom-video-copies`, {
+        method: 'POST', body: { action: 'start', meetingUuid, replaces }, fallbackMessage: 'The video copy could not be started.',
+      });
+      if (!isCurrent(generation)) return { outcome: 'dropped' };
+      if (body?.copy && typeof body.copy.id === 'string') {
+        const placeholder = { id: body.copy.id, meetingUuid, state: String(body.copy.state || 'queued'), bytesConfirmed: 0, declaredSize: 0, failureCode: null, cancelRequested: false, createdAt: new Date().toISOString() };
+        copiesRef.current = [placeholder, ...copiesRef.current.filter((copy) => copy.id !== placeholder.id)];
+        setCopies(copiesRef.current);
+      }
+      setVideoMessage({ origin, tone: 'info', text: body?.replayed ? 'This video was already copied.' : 'Video copy started. This can take several minutes. You can leave this page.' });
+      void loadCopies();
+      return { outcome: 'started' };
+    } catch (startError) {
+      if (!isCurrent(generation) || startError?.name === 'AbortError') return { outcome: 'dropped' };
+      const code = startError?.payload?.code;
+      const winner = startError?.payload?.winner;
+      if (code === 'zoom_video_replace_confirmation_required' && winner && typeof winner.artifactId === 'string' && Number.isSafeInteger(winner.slotVersion)) {
+        return { outcome: 'confirm', winner };
+      }
+      if (code === 'zoom_video_replace_stale') return { outcome: 'stale' };
+      setVideoMessage({ origin, tone: 'error', text: VIDEO_START_MESSAGES[code] || startError?.message || 'The video copy could not be started.' });
+      void loadCopies();
+      return { outcome: 'error' };
+    }
+  };
+
+  // Copy video on its own (earlier imports, transcription off, no audio) and Try again.
+  const copyVideo = async (meetingUuid, origin) => {
+    if (busy || videoBusy || !requestId) return;
+    const generation = generationRef.current;
+    setVideoBusy(true);
+    setVideoMessage(null);
+    setConfirm(null);
+    try {
+      const result = await startVideo(meetingUuid, null, generation, origin);
+      if (result.outcome === 'confirm' && isCurrent(generation)) setConfirm({ meetingUuid, winner: result.winner, origin, withAudio: false });
+    } finally {
+      if (isCurrent(generation)) setVideoBusy(false);
+    }
+  };
+
+  const cancelCopy = async (copyId) => {
+    if (videoBusy || !requestId) return;
+    const generation = generationRef.current;
+    setVideoBusy(true);
+    setVideoMessage(null);
+    try {
+      await requestJson(`${basePath}/zoom-video-copies`, { method: 'POST', body: { action: 'cancel', copyId }, fallbackMessage: 'The video copy could not be cancelled.' });
+    } catch (cancelError) {
+      if (isCurrent(generation) && cancelError?.name !== 'AbortError') {
+        setVideoMessage({ origin: 'block', tone: 'error', text: cancelError?.payload?.code === 'zoom_video_copy_saving'
+          ? 'The video is being saved and can no longer be cancelled.' : (cancelError?.message || 'The video copy could not be cancelled.') });
+      }
+    } finally {
+      if (isCurrent(generation)) { setVideoBusy(false); void loadCopies(); }
+    }
+  };
+
   const openPanel = useCallback(() => { void loadList(); }, [loadList]);
   const refresh = useCallback(() => { void loadList({ quiet: true }); }, [loadList]);
 
@@ -1967,12 +2117,8 @@ function useZoomImport(requestId, { onImported, jobsSignature }) {
     void loadList({ quiet: true });
   }, [status, jobsSignature, loadList]);
 
-  const importSelected = async () => {
-    const meeting = meetings.find((item) => item.meetingUuid === selectedUuid);
-    if (!meeting || !acknowledged || busy || !requestId) return;
-    const generation = generationRef.current;
-    setBusy(true);
-    setError(null);
+  // The existing audio import POST, unchanged in behavior. Its result and error are its own.
+  const sendAudio = async (meeting, generation) => {
     try {
       const body = await requestJson(`${basePath}/zoom-imports`, {
         method: 'POST', body: { meetingUuid: meeting.meetingUuid, nonSensitiveAcknowledged: true },
@@ -1989,14 +2135,69 @@ function useZoomImport(requestId, { onImported, jobsSignature }) {
       if (!isCurrent(generation)) return;
       setError(importError?.message || 'The Zoom import could not be completed.');
       void loadList({ quiet: true });
+    }
+  };
+
+  // Import starts the audio import and the video copy as two independent POSTs. When the video start needs the replace
+  // confirmation, nothing else is sent until staff confirm.
+  const importSelected = async () => {
+    const meeting = meetings.find((item) => item.meetingUuid === selectedUuid);
+    if (!meeting || !acknowledged || busy || videoBusy || !requestId) return;
+    const generation = generationRef.current;
+    setBusy(true);
+    setError(null);
+    setVideoMessage(null);
+    setConfirm(null);
+    try {
+      if (videoStartable(meeting)) {
+        const result = await startVideo(meeting.meetingUuid, null, generation, 'picker');
+        if (result.outcome === 'confirm') {
+          if (isCurrent(generation)) setConfirm({ meetingUuid: meeting.meetingUuid, winner: result.winner, origin: 'picker', withAudio: true });
+          return;
+        }
+        if (result.outcome === 'dropped') return;
+      }
+      await sendAudio(meeting, generation);
     } finally {
       if (isCurrent(generation)) setBusy(false);
+    }
+  };
+
+  const declineReplace = () => setConfirm(null);
+  const confirmReplace = async () => {
+    const pending = confirm;
+    if (!pending || busy || videoBusy || !requestId) return;
+    const generation = generationRef.current;
+    setConfirm(null);
+    setVideoMessage(null);
+    setError(null);
+    if (pending.withAudio) setBusy(true); else setVideoBusy(true);
+    try {
+      let result = await startVideo(pending.meetingUuid, { artifactId: pending.winner.artifactId, slotVersion: pending.winner.slotVersion }, generation, pending.origin);
+      if (result.outcome === 'stale') {
+        // The current recording changed: reload and ask again with the new file.
+        void loadList({ quiet: true });
+        result = await startVideo(pending.meetingUuid, null, generation, pending.origin);
+      }
+      if (result.outcome === 'confirm') {
+        if (isCurrent(generation)) setConfirm({ ...pending, winner: result.winner });
+        return;
+      }
+      if (result.outcome === 'dropped') return;
+      if (pending.withAudio) {
+        const meeting = meetings.find((item) => item.meetingUuid === pending.meetingUuid);
+        if (meeting) await sendAudio(meeting, generation);
+      }
+    } finally {
+      if (isCurrent(generation)) { setBusy(false); setVideoBusy(false); }
     }
   };
 
   return {
     status, windowDays, meetings, selectedUuid, setSelectedUuid, acknowledged, setAcknowledged, busy, error,
     showOther, toggleOther: () => setShowOther((value) => !value), openPanel, importSelected, refresh, refreshing,
+    copyAvailable, hasActiveCopy, currentCopy, copyForMeeting, videoStartable, videoBusy, videoMessage, confirm,
+    copyVideo, cancelCopy, confirmReplace, declineReplace,
   };
 }
 
@@ -2561,6 +2762,65 @@ function fmtPacific(value) {
   return `${date.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} PT`;
 }
 
+function videoPickerLine(video, copy) {
+  if (!video) return 'Video: none yet';
+  if (video.tooLarge) return 'Video: too large to copy. Upload it manually.';
+  if (video.segmented) return 'Video: recorded in several parts. Upload it manually.';
+  if (!copy) return 'Video: not copied';
+  if (copy.state === 'queued') return 'Video: waiting to copy';
+  if (copy.state === 'copying') return copy.declaredSize > 0 ? `Video: copying ${megabytes(copy.bytesConfirmed)} of ${megabytes(copy.declaredSize)}` : 'Video: copying';
+  if (copy.state === 'registering') return 'Video: saving';
+  if (copy.state === 'copied') return 'Video: copied';
+  if (copy.state === 'failed') return 'Video: copy failed';
+  if (copy.state === 'cancelled') return 'Video: cancelled';
+  return 'Video: not copied';
+}
+
+// Decision 8: the copy replaces a recording file already saved for this request, so staff confirm first. The file's
+// name and size come from the server; its internal identity is only sent back as `replaces`.
+function ReplaceConfirm({ z }) {
+  const winner = z.confirm?.winner;
+  return (
+    <div className="mt-3 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="alertdialog" aria-label="Replace the current recording">
+      <p>This will replace the recording file already saved for this request. Continue?</p>
+      {winner?.filename && <p className="mt-1 text-xs">Current file: {winner.filename}{Number(winner.size) > 0 ? ` (${formatBytes(winner.size)})` : ''}</p>}
+      <div className="mt-2 flex gap-2">
+        <button type="button" onClick={() => void z.confirmReplace()} disabled={z.busy || z.videoBusy} className={BTN_PRIMARY}>Replace and continue</button>
+        <button type="button" onClick={z.declineReplace} disabled={z.busy || z.videoBusy} className={BTN}>Keep current file</button>
+      </div>
+    </div>
+  );
+}
+
+// Copy progress for the Recording slot. Staff-only; no internal ids are shown.
+function VideoCopyStatus({ z }) {
+  const copy = z.currentCopy;
+  const message = z.videoMessage?.origin === 'block' ? z.videoMessage : null;
+  if (!z.copyAvailable || (!copy && !message && !z.confirm)) return null;
+  const active = copy && COPY_ACTIVE_STATES.has(copy.state);
+  return (
+    <div className="mt-4" data-testid="video-copy-status" aria-live="polite">
+      {copy?.state === 'queued' && <p className="text-sm text-gray-800">Waiting to copy the video from Zoom.</p>}
+      {copy?.state === 'copying' && <>
+        <p className="text-sm text-gray-800">Copying the video from Zoom into SharePoint.</p>
+        <progress className="mt-2 w-full" max="100" value={copyPercent(copy)} aria-label="Video copy progress" />
+        <p className="mt-1 text-xs text-gray-700">{copyPercent(copy)}%{copy.declaredSize > 0 ? ` · ${megabytes(copy.bytesConfirmed)} of ${megabytes(copy.declaredSize)}` : ''}</p>
+      </>}
+      {copy?.state === 'registering' && <p className="text-sm text-gray-800">Saving…</p>}
+      {copy?.state === 'copied' && <p className="text-sm text-gray-800">The video was copied from Zoom.</p>}
+      {copy?.state === 'cancelled' && <p className="text-sm text-gray-800">Video copy cancelled.</p>}
+      {copy?.state === 'failed' && <Notice tone="warning">Video copy needs attention. {videoFailureMessage(copy.failureCode)}</Notice>}
+      {(copy?.state === 'queued' || copy?.state === 'copying') && (copy.cancelRequested
+        ? <p className="mt-1 text-xs text-gray-700">Cancelling…</p>
+        : <button type="button" onClick={() => void z.cancelCopy(copy.id)} disabled={z.videoBusy} className={`mt-2 ${BTN_LINK}`}>Cancel copy</button>)}
+      {copy?.state === 'failed' && copy.meetingUuid && !active
+        && <button type="button" onClick={() => void z.copyVideo(copy.meetingUuid, 'block')} disabled={z.busy || z.videoBusy || z.hasActiveCopy} className={`mt-2 ${BTN}`}>Try again</button>}
+      {z.confirm?.origin === 'block' && <ReplaceConfirm z={z} />}
+      {message && <div className="mt-2"><Notice tone={message.tone === 'error' ? 'error' : 'info'}>{message.text}</Notice></div>}
+    </div>
+  );
+}
+
 function ZoomImportSection({ z, activeJob, transcriptionBusy }) {
   if (z.status === 'unavailable') return null;
   if (z.status === 'idle') {
@@ -2591,29 +2851,45 @@ function ZoomImportSection({ z, activeJob, transcriptionBusy }) {
           {z.meetings.map((meeting) => {
             const state = meeting.import?.state || null;
             const chosen = state === 'started' || state === 'importing';
+            const audioOffered = meeting.audio !== undefined;
             const hasAudio = Boolean(meeting.audio);
+            const copy = z.copyAvailable && meeting.video !== undefined ? z.copyForMeeting(meeting) : null;
             const detail = [
               Number.isFinite(meeting.durationMinutes) ? `${meeting.durationMinutes} min` : null,
-              !hasAudio ? 'No audio yet' : meeting.transcript ? 'Audio + Zoom transcript' : 'Audio only',
+              !audioOffered ? null : !hasAudio ? 'No audio yet' : meeting.transcript ? 'Audio + Zoom transcript' : 'Audio only',
               state === 'started' ? 'Imported, transcription started' : state === 'importing' ? 'Importing…'
                 : state === 'failed' ? (meeting.import?.failureCode === 'zoom_import_job_ended' ? 'Last transcription did not finish' : 'Last import did not finish') : null,
             ].filter(Boolean).join(' · ');
+            const videoLine = !z.copyAvailable || meeting.video === undefined ? null : videoPickerLine(meeting.video, copy);
             const id = `zoom-meeting-${meeting.meetingUuid}`;
+            // Import covers the video for a meeting staff can still import; everything else gets its own button.
+            const ownButton = z.videoStartable(meeting) && !(hasAudio && !chosen);
             return (
-              <label key={meeting.meetingUuid} htmlFor={id} className={`flex items-start gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm ${hasAudio && !chosen ? 'cursor-pointer bg-white' : 'bg-gray-50 text-gray-600'}`}>
-                <input id={id} type="radio" name="zoom-meeting" checked={z.selectedUuid === meeting.meetingUuid} disabled={!hasAudio || chosen || z.busy}
-                  onChange={() => z.setSelectedUuid(meeting.meetingUuid)} className="mt-1 h-4 w-4 border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-600" />
-                <span><span className="font-medium text-gray-900">{fmtPacific(meeting.startTime)}</span><span className="block text-xs text-gray-700">{detail}</span></span>
-              </label>
+              <div key={meeting.meetingUuid}>
+                <label htmlFor={id} className={`flex items-start gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm ${hasAudio && !chosen ? 'cursor-pointer bg-white' : 'bg-gray-50 text-gray-600'}`}>
+                  <input id={id} type="radio" name="zoom-meeting" checked={z.selectedUuid === meeting.meetingUuid} disabled={!hasAudio || chosen || z.busy}
+                    onChange={() => z.setSelectedUuid(meeting.meetingUuid)} className="mt-1 h-4 w-4 border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-600" />
+                  <span><span className="font-medium text-gray-900">{fmtPacific(meeting.startTime)}</span><span className="block text-xs text-gray-700">{detail}</span>
+                    {videoLine && <span className="block text-xs text-gray-700">{videoLine}</span>}</span>
+                </label>
+                {ownButton && <div className="mt-1 px-3">
+                  <button type="button" onClick={() => void z.copyVideo(meeting.meetingUuid, 'picker')} disabled={z.busy || z.videoBusy} className={BTN_LINK}>
+                    {copy?.state === 'failed' ? 'Try again' : 'Copy video'}
+                  </button>
+                </div>}
+              </div>
             );
           })}
         </fieldset>}
+      {z.confirm?.origin === 'picker' && <ReplaceConfirm z={z} />}
+      {z.videoMessage?.origin === 'picker' && <div className="mt-3"><Notice tone={z.videoMessage.tone === 'error' ? 'error' : 'info'}>{z.videoMessage.text}</Notice></div>}
       {selected && <>
         <label className="mt-3 flex items-start gap-2 text-xs leading-5 text-gray-800">
           <input type="checkbox" checked={z.acknowledged} disabled={z.busy} onChange={(event) => z.setAcknowledged(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-600" />
           <span>This recording is non-sensitive and may be sent to our transcription provider.{selected.transcript ? ' Excerpts of both transcripts are also sent to Anthropic to match speaker names.' : ''} Transcription uses paid credits.</span>
         </label>
-        <button type="button" onClick={z.importSelected} disabled={!z.acknowledged || z.busy || blocked} className={`mt-3 ${BTN_PRIMARY}`}>{z.busy ? 'Importing from Zoom…' : 'Import and transcribe'}</button>
+        <button type="button" onClick={z.importSelected} disabled={!z.acknowledged || z.busy || z.videoBusy || Boolean(z.confirm) || blocked} className={`mt-3 ${BTN_PRIMARY}`}>{z.busy ? 'Importing from Zoom…' : z.videoStartable(selected) ? 'Import, transcribe and copy video' : 'Import and transcribe'}</button>
+        {z.videoStartable(selected) && !z.busy && <p className="mt-2 text-xs text-gray-600">The video will also be copied from Zoom into SharePoint. This can take several minutes.</p>}
         {blocked && !z.busy && <p className="mt-2 text-xs text-gray-600">Another transcription is already running. Wait for it to finish.</p>}
       </>}
       {z.busy && <p className="mt-2 text-xs text-gray-700" aria-live="polite">Copying the recording from Zoom. This can take a few minutes. Keep this page open.</p>}
@@ -2687,7 +2963,7 @@ function TranscriptWorkflow({ m, t, z, transcriptInputRef }) {
   // Step 1 stays open while anything in it is in progress, so a chosen file or a running upload never disappears.
   const step1Working = Boolean(active || m.transfer || (m.data?.uploads || []).length || m.file || m.busyUploadId || m.recoveryBusyId
     || m.zoomBusy || m.transcriptFile || m.transcriptStagedId || m.transcriptBusy || t.audioFile || t.vttFile
-    || z.busy || t.uploadProgress !== null || t.confirmNoVtt || ['upload', 'upload-captions', 'starting'].includes(t.busy));
+    || z.busy || z.videoBusy || z.hasActiveCopy || t.uploadProgress !== null || t.confirmNoVtt || ['upload', 'upload-captions', 'starting'].includes(t.busy));
   const step1Done = Boolean(material || readyForReview) && !step1Working;
   const step1Expanded = !step1Done || step1Open;
   const step2State = reviewOpen || (editable && (!presentationEnd || needsGenerate || t.savedDraft)) ? 'current'
@@ -2706,7 +2982,7 @@ function TranscriptWorkflow({ m, t, z, transcriptInputRef }) {
     <button type="button" onClick={() => setUploadInstead((value) => !value)} aria-expanded={uploadInstead} className={`mt-3 ${BTN_LINK}`}>Upload a finished transcript instead</button>
     {uploadInstead && <UploadForm m={m} inputRef={transcriptInputRef} />}
   </>;
-  const recordingBlock = <div className="mt-5 border-t border-gray-200 pt-4"><RecordingBlock m={m} /></div>;
+  const recordingBlock = <div className="mt-5 border-t border-gray-200 pt-4"><RecordingBlock m={m} z={z} /></div>;
 
   return (
     <div>
@@ -2757,7 +3033,7 @@ function TranscriptWorkflow({ m, t, z, transcriptInputRef }) {
               {z.status === 'available'
                 ? <div className="mt-4 border-t border-gray-200 pt-3">
                   <button type="button" onClick={z.toggleOther} aria-expanded={z.showOther} className={BTN_LINK}>Other ways to add a recording</button>
-                  {z.showOther && <>{manualAdd}{recordingBlock}</>}
+                  {(z.showOther || z.hasActiveCopy) && <>{manualAdd}{recordingBlock}</>}
                 </div>
                 : <>{manualAdd}{recordingBlock}</>}
             </>}
@@ -2831,7 +3107,7 @@ function TranscriptWorkflow({ m, t, z, transcriptInputRef }) {
   );
 }
 
-function RecordingBlock({ m }) {
+function RecordingBlock({ m, z }) {
   const [replaceOpen, setReplaceOpen] = useState(false);
   const recording = (m.data?.materials || []).find((item) => Number(item.artifactType) === REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING) || null;
   const intents = m.data?.uploads || [];
@@ -2843,6 +3119,7 @@ function RecordingBlock({ m }) {
     <section aria-labelledby="recording-transcript-recording-title">
       <h4 id="recording-transcript-recording-title" className="text-sm font-semibold text-gray-950">Video recording</h4>
       <p className="mt-1 text-xs text-gray-600">Zoom link or MP4, kept for staff. Saving a new one replaces the current one.</p>
+      <VideoCopyStatus z={z} />
       {recording && !showInputs && <button type="button" onClick={() => setReplaceOpen(true)} className={`mt-3 ${BTN}`}>Replace recording</button>}
       {showInputs && <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div>
@@ -2951,7 +3228,7 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
   const m = useMaterials(requestId, transcriptInputRef);
   const t = useTranscription(requestId, { onMaterialsChanged: m.load });
   const jobsSignature = t.jobs.map((job) => `${job.id}:${job.status}:${job.cleanupPending === true ? 'c' : ''}`).join('|');
-  const z = useZoomImport(requestId, { onImported: t.loadCollection, jobsSignature });
+  const z = useZoomImport(requestId, { onImported: t.loadCollection, jobsSignature, onVideoCopied: m.load });
   useEffect(() => {
     if (hashScrollDoneRef.current || typeof window === 'undefined' || window.location.hash !== '#recording-and-transcript-card') return;
     const card = document.getElementById('recording-and-transcript-card');

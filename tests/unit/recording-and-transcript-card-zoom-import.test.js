@@ -35,7 +35,9 @@ function route(state = {}, handlers = {}) {
     return response({});
   });
 }
-const zoomCalls = () => global.fetch.mock.calls.filter(([url]) => String(url).includes('/zoom-'));
+// Calls that reach Zoom or write. The video-copy snapshot GET is a read-only Postgres read made once on mount (3b), tracked separately.
+const zoomCalls = () => global.fetch.mock.calls.filter(([url]) => String(url).includes('/zoom-') && !String(url).endsWith('/zoom-video-copies'));
+const copyCalls = () => global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/zoom-video-copies'));
 const importButton = () => screen.getByRole('button', { name: 'Import from Zoom' });
 async function openPanel() {
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
@@ -52,6 +54,7 @@ test('mounting the card makes no Zoom call; Stage 1 step 1 is unchanged and the 
   expect(await screen.findByTestId('generate-form')).toBeInTheDocument();
   expect(importButton()).toBeInTheDocument();
   expect(zoomCalls()).toEqual([]);
+  expect(copyCalls().every(([, options]) => (options?.method || 'GET') === 'GET')).toBe(true);
 });
 
 test.each([
