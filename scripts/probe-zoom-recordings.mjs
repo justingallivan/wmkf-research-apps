@@ -7,12 +7,22 @@
  *   node scripts/probe-zoom-recordings.mjs --host <email> [--days 30]
  *   node scripts/probe-zoom-recordings.mjs --host <email> [--days 30] --download <meetingUUID> --out <empty dir>
  *   node scripts/probe-zoom-recordings.mjs --host <email> [--days 30] --range <meetingUUID>
+ *   node scripts/probe-zoom-recordings.mjs --host <email> [--days 30] --lifetime <meetingUUID> [--minutes 0,15,60]
+ *   node scripts/probe-zoom-recordings.mjs --host <email> [--days 30] --moov <meetingUUID>
  *
  * --range (Stage 3b probe 1, docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md):
  * for each completed MP4 of the meeting, follow download_url hop by hop with
  * `Range` requests (bearer on the first hop only, as zoom-client.js does) and print
  * each hop's status, host and range headers. Response bodies are cancelled
  * unread; nothing is saved.
+ *
+ * --lifetime (probe 2): resolve the first MP4's download_url once, then re-request
+ * the resolved URL without the bearer at each listed minute mark (1 KiB range),
+ * printing only status and content-range. The URL is held in memory only.
+ *
+ * --moov (probe 5): read the first and last MiB of each MP4 with Range requests
+ * (in memory, never saved), list the top-level boxes found there, and report where
+ * `moov` sits and the `mvhd` duration versus Zoom's recording start/end.
  *
  * Reads ZOOM_S2S_ACCOUNT_ID / ZOOM_S2S_CLIENT_ID / ZOOM_S2S_CLIENT_SECRET from
  * .env.local. Never prints the token or download URLs. Never deletes, writes to
@@ -39,6 +49,8 @@ const DAYS = Number(arg('days') || 30);
 const DOWNLOAD = arg('download');
 const OUT = arg('out');
 const RANGE = arg('range');
+const LIFETIME = arg('lifetime');
+const MOOV = arg('moov');
 if (!HOST) { console.error('--host <email> is required'); process.exit(2); }
 if (DOWNLOAD && !OUT) { console.error('--download requires --out <empty dir>'); process.exit(2); }
 for (const k of ['ZOOM_S2S_ACCOUNT_ID', 'ZOOM_S2S_CLIENT_ID', 'ZOOM_S2S_CLIENT_SECRET']) {
@@ -87,6 +99,102 @@ console.log(`${byUuid.size} recorded meeting(s) for ${HOST} in the last ${DAYS} 
 
 const mb = (n) => `${(n / 1048576).toFixed(1)} MB`;
 const secs = (f) => (f.recording_start && f.recording_end ? (Date.parse(f.recording_end) - Date.parse(f.recording_start)) / 1000 : null);
+
+const resolveUrl = async (downloadUrl) => {
+  let url = downloadUrl;
+  for (let hop = 0; hop < 6; hop += 1) {
+    const headers = { Range: 'bytes=0-0' };
+    if (hop === 0) headers.Authorization = `Bearer ${tok.access_token}`;
+    const res = await fetch(url, { headers, redirect: 'manual' });
+    await res.body?.cancel();
+    const loc = res.headers.get('location');
+    if (res.status >= 300 && res.status < 400 && loc) { url = new URL(loc, url).href; continue; }
+    return res.status === 206 ? url : null;
+  }
+  return null;
+};
+const rangedBytes = async (url, start, end) => {
+  const res = await fetch(url, { headers: { Range: `bytes=${start}-${end}` } });
+  if (res.status !== 206) { await res.body?.cancel(); return { status: res.status }; }
+  return { status: 206, total: Number(String(res.headers.get('content-range')).split('/')[1]), buf: Buffer.from(await res.arrayBuffer()) };
+};
+
+if (LIFETIME) {
+  const meeting = byUuid.get(LIFETIME);
+  if (!meeting) { console.error(`uuid ${LIFETIME} is not in ${HOST}'s listing`); process.exit(1); }
+  const f = (meeting.recording_files || []).find((x) => String(x.file_extension).toUpperCase() === 'MP4' && x.status === 'completed');
+  if (!f) { console.error('no completed MP4'); process.exit(1); }
+  const marks = String(arg('minutes') || '0,15,60').split(',').map(Number);
+  const url = await resolveUrl(f.download_url);
+  if (!url) { console.error('could not resolve download_url to a 206'); process.exit(1); }
+  const t0 = Date.now();
+  console.log(`${f.recording_type}  resolved at ${new Date(t0).toISOString()}`);
+  for (const m of marks) {
+    const wait = t0 + m * 60000 - Date.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    const res = await fetch(url, { headers: { Range: 'bytes=0-1023' } });
+    await res.body?.cancel();
+    console.log(`  +${m} min (${new Date().toISOString()}): HTTP ${res.status}  content-range=${res.headers.get('content-range')}`);
+  }
+  process.exit(0);
+}
+
+if (MOOV) {
+  const meeting = byUuid.get(MOOV);
+  if (!meeting) { console.error(`uuid ${MOOV} is not in ${HOST}'s listing`); process.exit(1); }
+  const MIB = 1048576;
+  const boxes = (buf, base) => {
+    const out = [];
+    for (let pos = 0; pos + 8 <= buf.length;) {
+      let len = buf.readUInt32BE(pos); const type = buf.toString('latin1', pos + 4, pos + 8); let hdr = 8;
+      if (len === 1 && pos + 16 <= buf.length) { len = Number(buf.readBigUInt64BE(pos + 8)); hdr = 16; }
+      if (!/^[a-z0-9 ]{4}$/i.test(type) || len < hdr) break;
+      out.push({ type, offset: base + pos, len, hdr, pos });
+      pos += len;
+    }
+    return out;
+  };
+  const mvhdSeconds = (buf, moovPos, moovHdr, moovLen) => {
+    const end = Math.min(buf.length, moovPos + moovLen);
+    for (let pos = moovPos + moovHdr; pos + 8 <= end;) {
+      const len = buf.readUInt32BE(pos); const type = buf.toString('latin1', pos + 4, pos + 8);
+      if (type === 'mvhd') {
+        const v1 = buf[pos + 8] === 1; const b = pos + 8;
+        const scale = buf.readUInt32BE(v1 ? b + 20 : b + 12);
+        const dur = v1 ? Number(buf.readBigUInt64BE(b + 24)) : buf.readUInt32BE(b + 16);
+        return scale ? dur / scale : null;
+      }
+      if (len < 8) break; pos += len;
+    }
+    return null;
+  };
+  for (const f of (meeting.recording_files || []).filter((x) => String(x.file_extension).toUpperCase() === 'MP4' && x.status === 'completed')) {
+    const url = await resolveUrl(f.download_url);
+    if (!url) { console.log(`${f.recording_type}: could not resolve`); continue; }
+    const head = await rangedBytes(url, 0, MIB - 1);
+    if (head.status !== 206) { console.log(`${f.recording_type}: head HTTP ${head.status}`); continue; }
+    const headBoxes = boxes(head.buf, 0);
+    console.log(`${f.recording_type}  total=${head.total}  zoom duration=${secs(f) ?? '?'}s`);
+    console.log(`  first MiB top-level boxes: ${headBoxes.map((b) => `${b.type}@${b.offset}(${b.len})`).join(' ')}`);
+    const moovHead = headBoxes.find((b) => b.type === 'moov');
+    if (moovHead) {
+      const fits = moovHead.pos + moovHead.len <= head.buf.length;
+      console.log(`  moov starts in first MiB: offset ${moovHead.offset}, length ${moovHead.len}, fully inside=${fits}, mvhd=${mvhdSeconds(head.buf, moovHead.pos, moovHead.hdr, moovHead.len)?.toFixed(1) ?? 'not in first MiB'}s`);
+      continue;
+    }
+    const mdat = headBoxes.find((b) => b.type === 'mdat');
+    const afterMdat = mdat ? mdat.offset + mdat.len : null;
+    console.log(`  moov not in first MiB; box after mdat starts at ${afterMdat ?? '?'} (${afterMdat ? head.total - afterMdat : '?'} bytes from end)`);
+    if (afterMdat && head.total - afterMdat <= 8 * MIB) {
+      const tail = await rangedBytes(url, afterMdat, head.total - 1);
+      const tailBoxes = tail.buf ? boxes(tail.buf, afterMdat) : [];
+      console.log(`  tail boxes: ${tailBoxes.map((b) => `${b.type}@${b.offset}(${b.len})`).join(' ')}`);
+      const moovTail = tailBoxes.find((b) => b.type === 'moov');
+      if (moovTail) console.log(`  mvhd=${mvhdSeconds(tail.buf, moovTail.pos, moovTail.hdr, moovTail.len)?.toFixed(1)}s`);
+    }
+  }
+  process.exit(0);
+}
 
 if (RANGE) {
   const meeting = byUuid.get(RANGE);
