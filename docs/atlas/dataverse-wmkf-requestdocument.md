@@ -700,8 +700,8 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   owner-run, dry-run-default sibling script
   `scripts/extend-requestdocument-artifacttype-presentation-transcript.mjs`.
   Values `100000010` (Staff Discussion Summary, paired summaries Stage 2; see
-  below) and `100000011` (Board Presentation Recording) are not inserted in
-  Production (read-only check V1, Session 588).
+  below; inserted in Production 2026-10-09 by its owner-run script) and
+  `100000011` (Board Presentation Recording, not inserted).
   Postgres migration `068_presentation_transcript_boundary.sql` admits all three
   in the shared slot-lease and upload `artifact_type` CHECKs (the fresh-install
   bootstrap runs manifest migrations for real, so there is no inline mirror).
@@ -793,8 +793,9 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   showing a stale summary with a note. The eTag pin above applies.
 - **Staff Discussion Summary writer** (`100000010`;
   `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md` D1, D3, D7, D8;
-  **[BUILT ON BRANCH `claude/paired-summaries`, NOT MERGED; picklist value NOT
-  INSERTED; prompt NOT SEEDED.]**): the same service publishes a reviewed draft
+  **[BUILT ON BRANCH `claude/paired-summaries`, NOT MERGED; picklist value
+  INSERTED 2026-10-09; prompt SEEDED 2026-10-09; drafts CHECK widened by
+  migration 075, applied 2026-10-09.]**): the same service publishes a reviewed draft
   of the discussion kind (`SUMMARY_KINDS.discussion`) from the bound Staff
   Discussion Transcript, never slides, as a BOM-prefixed TXT under
   `Site Visit - Staff Discussion Summary/`, prompt

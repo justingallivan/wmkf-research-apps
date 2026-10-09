@@ -98,8 +98,9 @@ Migration plans touching either entity must preserve these foreign keys.
   transcript text or names on any path. The row must be seeded before alignment
   is enabled so its variable caps match the code.
 - **Meeting transcript staff discussion summary (built on branch
-  `claude/paired-summaries`, NOT MERGED; NOT SEEDED in any environment; read-only
-  check V3, Session 588, found no Production row):**
+  `claude/paired-summaries`, NOT MERGED; SEEDED IN PRODUCTION 2026-10-09 by the
+  owner-run bootstrap as v1, current row `87768430-90c3-f111-aaad-6045bd063e21`,
+  exactly one current row verified):**
   `shared/config/prompts/meeting-staff-discussion-summary.js` defines
   `meeting-transcript.staff-discussion-summary`, the staff-only sibling of
   `meeting-transcript.presentation-summary`
@@ -114,8 +115,8 @@ Migration plans touching either entity must preserve these foreign keys.
   output tokens). The caller
   `lib/services/post-presentation-materials/transcript-summary-service.js` passes
   `requireNoPersistence: true` and `auditRetention: 'content-free'`, so the run
-  row carries no transcript or summary text. The owner reviews the prompt wording
-  before seeding.
+  row carries no transcript or summary text. The owner accepted the wording before
+  seeding (Session 589).
 - **Pre-Site Visit proposal core (Production-live durable app slice and prompt,
   2026-08-17):**
   `shared/config/prompts/pre-site-visit-proposal-core.js` defines the reviewed

@@ -3,7 +3,7 @@ title: "Atlas: Site Visit summary drafts (Postgres)"
 domain: postgres
 kind: state-page
 status: live
-summary: "Migration 070 defines meeting_transcript_summary_drafts: one row per Summarize run holding the summarization acknowledgment and, only while ready or publishing, the generated presentation summary a program coordinator reviews before publishing. Production-live since 2026-10-05 (migration 070 applied; PR #440 deployed). Migration 075 (built on branch claude/paired-summaries, not applied) admits Staff Discussion Summary (100000010) drafts and moves run reservation into one transaction."
+summary: "Migration 070 defines meeting_transcript_summary_drafts: one row per Summarize run holding the summarization acknowledgment and, only while ready or publishing, the generated presentation summary a program coordinator reviews before publishing. Production-live since 2026-10-05 (migration 070 applied; PR #440 deployed). Migration 075 (applied to the shared Preview/Production database 2026-10-09; its code is on branch claude/paired-summaries, not merged) admits Staff Discussion Summary (100000010) drafts and moves run reservation into one transaction."
 canonical: true
 cataloged: 2026-10-05
 owner: product-engineering
@@ -35,11 +35,11 @@ columns below (`docs/plans/STAFF_APPLICANT_MATERIALS_REPLACEMENT_PLAN_2026-10-05
 applied, 70 skipped). The code that writes and reads the columns shipped in
 PR #441 merge `b4fa78819`, deployment `dpl_6kkxdv6oq8JLa4Xyx1T8SS5Szi1W`.
 
-**[BUILT ON BRANCH `claude/paired-summaries`, NOT MERGED; MIGRATION 075 NOT APPLIED.]**
+**[MIGRATION 075 APPLIED 2026-10-09 (owner-run: 1 applied, 74 skipped); CODE BUILT ON BRANCH `claude/paired-summaries`, NOT MERGED.]**
 Stage 2 of `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md` (D2, D4, D7). Migration
-075 widens the `artifact_type` CHECK to `(100000007, 100000010)`; Production still
-has the 070 CHECK `artifact_type = 100000007` (read-only check V2, Session 588).
-The reservation, not-recorded marker and widened run read below exist only on that
+075 widens the `artifact_type` CHECK to `(100000007, 100000010)`. Running `main` code
+writes only 100000007 rows, so the wider CHECK changes nothing until the merge. The
+reservation, not-recorded marker and widened run read below exist only on that
 branch until it merges. The release order is the plan's "Release sequence".
 
 ## Ownership and contract
