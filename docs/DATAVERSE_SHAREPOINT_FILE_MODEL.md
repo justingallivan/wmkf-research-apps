@@ -637,6 +637,19 @@ durable key.
 Pre-Site distribution snapshots and the Final Writeup are linked lifecycle
 documents, not Site Visit material categories.
 
+**Recording producers.** The `Post Site Visit Materials` Recording has three
+producers: a pasted Zoom link, a staff browser MP4 upload, and, **built on
+branch `claude/zoom-copy` (not merged; migration 076 NOT applied; nothing
+live)**, a server-side copy of the Zoom meeting MP4 (Stage 3b,
+`docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md`). The server copy is
+staff-only, writes through a Graph upload session into the same folder, and is
+registered by the same shared finalize as the browser MP4, so the Request
+Document has the same shape (producer `meeting-tracker-post-presentation`,
+registered under the staff member who started it). It replaces a staff-uploaded
+MP4 only after explicit confirmation. The Recording is never served outside
+staff. See `docs/atlas/dataverse-wmkf-requestdocument.md` and
+`docs/atlas/postgres-zoom-video-copies.md`.
+
 The recording and transcript are authoritative evidence. A transcript summary
 is derived and replaceable. Prefer an acceptable summary emitted by the
 approved transcription platform; do not silently make a redundant suite LLM
