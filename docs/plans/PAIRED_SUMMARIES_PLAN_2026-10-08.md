@@ -22,7 +22,7 @@ related:
 
 Migration number **075** is reserved for this stage and 076 for Stage 3b. A local scan of all 201 remote-tracking refs (`git ls-tree … lib/db/migrations/`, 2026-10-08) found no `075_`–`079_` file. It ran without a fresh fetch, so it is re-run before committing (see "Pre-implementation verification").
 
-Stages 0, 1 and 3a are merged to `main` (PRs #464, #467–#470). The workflow plan's Stage 3a "not merged" note is stale and out of scope here.
+Stages 0, 1 and 3a are merged to `main` (PRs #464, #467–#470). The workflow plan's stale Stage 3a "not merged" notes were reconciled in Session 588.
 
 ## Current flow (source baseline at `ee773977b`)
 
@@ -230,7 +230,7 @@ ALTER TABLE meeting_transcript_summary_drafts
 
 ## Source contradictions found
 
-- The migration 070 header and the drafts Atlas page (`:39-40`) say "Stage 3 extends with 100000010". That is the October 4 plan's stage numbering; this work is Stage 2 of the October 7 plan.
+- The migration 070 header and the drafts Atlas page (`:39-40`) say "Stage 3 extends with 100000010". That is the October 4 plan's stage numbering; this work is Stage 2 of the October 7 plan. Reconciled in Session 588.
 - The October 4 plan says the Postgres constraints already admit 100000010 and that "Stages 2–4 need no constraint migration" (`SITE_VISIT_SUMMARIES_AND_BOARD_SHARING_PLAN_2026-10-04.md:333,385`). That holds for the slot-lease and upload CHECKs, but not for the drafts CHECK, which admits only 100000007. The workflow plan already says a new constraint migration is needed.
 - The workflow plan's accepted UX places one Generate summaries action with the review, but today's Summarize form sits in step 3 under Presentation. This plan places the paired action at the top of step 3.
 

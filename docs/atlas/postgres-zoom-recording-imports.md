@@ -2,8 +2,8 @@
 title: "Atlas: Zoom recording imports (Postgres)"
 domain: postgres
 kind: state-page
-status: planned
-summary: "Migration 074 defines zoom_recording_imports: one row per attempt to import a Zoom meeting's audio and Zoom transcript into the Meeting Tracker transcription pipeline, with a lease so a killed request cannot overwrite a takeover. Written on a branch only; not applied to any database."
+status: live
+summary: "Migration 074 defines zoom_recording_imports: one row per attempt to import a Zoom meeting's audio and Zoom transcript into the Meeting Tracker transcription pipeline, with a lease so a killed request cannot overwrite a takeover. Merged in PR #464 and applied to Production in Session 586."
 canonical: true
 cataloged: 2026-10-08
 owner: product-engineering
@@ -20,7 +20,7 @@ related:
 
 ## Status
 
-**[PLANNED, branch only 2026-10-08.]** Migration 074 is written on `codex/meeting-transcript-ux`. It is not applied to any database and nothing is merged. Applying it, setting the Zoom environment variables and merging each need a separate owner go-ahead (`docs/plans/ZOOM_RECORDING_IMPORT_PLAN_2026-10-08.md`).
+**[LIVE, Session 586, 2026-10-08.]** Migration 074 is applied to shared Production Postgres (`applied_by` `claude-s586-zoom-import-2026-10-08`), and the code merged to `main` in PR #464 (`441140e6e`). Plan and build record: `docs/plans/ZOOM_RECORDING_IMPORT_PLAN_2026-10-08.md`.
 
 ## Ownership and contract
 

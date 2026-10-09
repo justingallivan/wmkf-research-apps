@@ -36,8 +36,8 @@ PR #441 merge `b4fa78819`, deployment `dpl_6kkxdv6oq8JLa4Xyx1T8SS5Szi1W`.
 ## Ownership and contract
 
 `meeting_transcript_summary_drafts` holds one row per "Summarize" run for a
-request and summary type (`artifact_type` 100000007 Transcript Summary; Stage 3
-adds 100000010). `request_id`, `source_revision_id`, `source_artifact_id`, and
+request and summary type (`artifact_type` 100000007 Transcript Summary; the proposed
+Stage 2 plan, `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md`, adds 100000010). `request_id`, `source_revision_id`, `source_artifact_id`, and
 `published_artifact_id` are Dataverse identities, not Postgres foreign keys;
 `acknowledged_by_profile_id` and `updated_by_profile_id` reference
 `user_profiles.id`.

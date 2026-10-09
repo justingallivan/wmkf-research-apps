@@ -2,7 +2,7 @@
 title: Zoom recording import (Stage 3a)
 kind: plan
 domain: transcription
-status: built-in-branch
+status: shipped
 summary: "Server-side Import from Zoom for the site-visit card: list approved hosts' cloud recordings, import one meeting's audio and Zoom transcript into the existing transcription pipeline, recorded by one new Postgres table and two new routes."
 owner: product-engineering
 related:
@@ -15,7 +15,7 @@ related:
 
 ## Build status
 
-**[BUILT on branch `codex/meeting-transcript-ux`, 2026-10-08; not merged, migration 074 not applied, no Vercel variable set.]** The client (`lib/services/meeting-tracker-recordings/zoom-client.js`), import service and store, migration 074, both routes and the step 1 import panel exist with unit tests that mock `fetch` and the service modules. No live Zoom, Blob, Dataverse or database call has been made by the build. Review (Claude, then Codex), the owner's go-ahead to apply the migration and set the variables, and one owner-approved manual local import remain.
+**[SHIPPED: merged to `main` in PR #464 (`441140e6e`, Session 586); migration 074 applied to Production; the Zoom variables are set and a live import on 1003010 ran end to end, per `DEVELOPMENT_LOG.md` Session 586.]** The rest of this paragraph is the pre-merge build record. The client (`lib/services/meeting-tracker-recordings/zoom-client.js`), import service and store, migration 074, both routes and the step 1 import panel exist with unit tests that mock `fetch` and the service modules. No live Zoom, Blob, Dataverse or database call has been made by the build. Review (Claude, then Codex), the owner's go-ahead to apply the migration and set the variables, and one owner-approved manual local import remain.
 
 Implementation notes that refine this plan:
 
@@ -189,7 +189,7 @@ Verdict: **ready to implement with the named changes already folded in above**, 
 - **Codex adversarial review 3**: approve, no material findings. Codex reviewed source only; its sandbox could not run Jest.
 - [VERIFIED via local commands at `b46117553`] 1,026 tests passed in 57 related suites (Zoom import, card, all `transcription-pilot-*` and `meeting-tracker-*`, `site-visit-editor-t5-matrix`). The gates and self-tests passed sequentially: migrations-manifest, atlas, api-routes, route-service-boundary, fact-consistency, canonical-pointers, secret-scan, doc-currency, doc-symbol-refs, build-claim-freshness, trust-boundary-guid, dataverse-access-layer, dynamics-context-boundary, model-override-warming, prompt-injection-tagging, scaffolding-tokens, docs-catalog, agent-invariants and types.
 - Not yet done:
-  - [VERIFIED via read-only `schema_migrations` read, 2026-10-08] The owner applied migration 074 to shared Production Postgres with `applied_by` `claude-s586-zoom-import-2026-10-08`; it applied only 074, and the empty `zoom_recording_imports` table exists. The branch is not merged.
+  - [VERIFIED via read-only `schema_migrations` read, 2026-10-08] The owner applied migration 074 to shared Production Postgres with `applied_by` `claude-s586-zoom-import-2026-10-08`; it applied only 074, and the empty `zoom_recording_imports` table exists. The branch was not merged at that point; it merged later the same session in PR #464.
   - No Vercel variables are set.
   - There has been no live import against Zoom; one manual local import needs owner approval because it spends transcription credits.
   - Nothing is merged.
