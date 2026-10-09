@@ -416,4 +416,86 @@ describeIf('Zoom video copy store (isolated local Postgres proof)', () => {
     expect(await store.claimFailedZoomVideoCopiesDue({ limit: 20, accessRequestId: requestId })).toEqual([]);
     expect((await copyRow(b.copyId)).next_attempt_at).not.toBeNull();
   });
+  it('ruling 16: the failed-due selector returns only unsettled intents inside the 30-day backstop, and never touches updated_at', async () => {
+    const requestId = uuid();
+    const seeded = {};
+    for (const [label, intentState] of [['initiated', 'initiated'], ['failedIntent', 'failed'], ['uploaded', 'uploaded'], ['finalizing', 'finalizing'], ['finalized', 'finalized'], ['abandoned', 'abandoned']]) {
+      // one failed copy per request (the active index does not cover failed rows, so one request can hold several)
+      const input = startInput({ requestId, zoomFileId: `file-${label}` });
+      await store.startZoomVideoCopy(input);
+      await failCopy(input.copyId, requestId);
+      await pool.query(
+        `UPDATE presentation_material_uploads SET state=$2,
+           candidate_site_id = CASE WHEN $2 IN ('uploaded','finalizing','finalized') THEN 's' END,
+           candidate_drive_id = CASE WHEN $2 IN ('uploaded','finalizing','finalized') THEN 'd' END,
+           candidate_item_id = CASE WHEN $2 IN ('uploaded','finalizing','finalized') THEN 'i-' || $1 END,
+           candidate_version_id = CASE WHEN $2 IN ('uploaded','finalizing','finalized') THEN 'v' END,
+           candidate_etag = CASE WHEN $2 IN ('uploaded','finalizing','finalized') THEN 'e' END,
+           candidate_size = CASE WHEN $2 IN ('uploaded','finalizing','finalized') THEN 5000 END,
+           request_document_id = CASE WHEN $2 = 'finalized' THEN $3::uuid END,
+           finalized_at = CASE WHEN $2 = 'finalized' THEN NOW() END
+         WHERE id=$1`,
+        [input.copyId, intentState, uuid()],
+      );
+      seeded[label] = input.copyId;
+    }
+    const old = startInput({ requestId, zoomFileId: 'file-old' });
+    await store.startZoomVideoCopy(old);
+    await failCopy(old.copyId, requestId);
+    await pool.query("UPDATE zoom_video_copies SET updated_at = NOW() - INTERVAL '31 days' WHERE id=$1", [old.copyId]);
+    const before = await pool.query('SELECT id, updated_at FROM zoom_video_copies WHERE request_id=$1', [requestId]);
+
+    const due = await store.claimFailedZoomVideoCopiesDue({ limit: 20, deferSeconds: 600, accessRequestId: requestId });
+    expect(due.map(row => row.id).sort()).toEqual([seeded.initiated, seeded.failedIntent, seeded.uploaded, seeded.finalizing].sort());
+    // the advance is next_attempt_at only: updated_at (the backstop clock) is untouched, and the rows are not due again
+    const after = await pool.query('SELECT id, updated_at, next_attempt_at FROM zoom_video_copies WHERE request_id=$1', [requestId]);
+    for (const row of after.rows) expect(String(row.updated_at)).toBe(String(before.rows.find(r => r.id === row.id).updated_at));
+    expect(await store.claimFailedZoomVideoCopiesDue({ limit: 20, accessRequestId: requestId })).toEqual([]);
+    for (const id of [seeded.finalized, seeded.abandoned, old.copyId]) {
+      expect(after.rows.find(r => r.id === id).next_attempt_at).toBeNull();
+    }
+  });
+
+  it('ruling 21: the deferral writer releases the lease and delays the next claim without counting, and only for a live active lease', async () => {
+    const requestId = uuid();
+    const a = startInput({ requestId });
+    await store.startZoomVideoCopy(a);
+    const { leaseToken } = await claimFor(requestId);
+    expect(await store.deferZoomVideoCopyAttempt({ id: a.copyId, leaseToken: uuid(), retryAfterSeconds: 900 })).toBeNull();
+    const deferred = await store.deferZoomVideoCopyAttempt({ id: a.copyId, leaseToken, retryAfterSeconds: 900 });
+    expect(deferred).toMatchObject({ state: 'queued', lease_token: null, lease_expires_at: null, session_create_attempts: 0, uncertain_checks: 0, registration_attempts: 0 });
+    const gap = (await pool.query('SELECT EXTRACT(EPOCH FROM (next_attempt_at - NOW()))::int AS s FROM zoom_video_copies WHERE id=$1', [a.copyId])).rows[0].s;
+    expect(gap).toBeGreaterThan(890);
+    expect(gap).toBeLessThanOrEqual(900);
+    expect(await store.claimZoomVideoCopyWork({ accessRequestId: requestId })).toBeNull(); // N2 honors next_attempt_at
+    await pool.query("UPDATE zoom_video_copies SET next_attempt_at = NOW() - INTERVAL '1 second' WHERE id=$1", [a.copyId]);
+    const again = await claimFor(requestId);
+    // a stale token (the lease was taken again) and an expired lease cannot defer
+    expect(await store.deferZoomVideoCopyAttempt({ id: a.copyId, leaseToken, retryAfterSeconds: 900 })).toBeNull();
+    await expireCopyLease(a.copyId);
+    expect(await store.deferZoomVideoCopyAttempt({ id: a.copyId, leaseToken: again.leaseToken, retryAfterSeconds: 900 })).toBeNull();
+    // a terminal row is never deferred (terminal rows are unleased by CHECK)
+    const fresh = await claimFor(requestId);
+    await store.failZoomVideoCopy({ id: a.copyId, leaseToken: fresh.leaseToken, failureCode: 'zoom_recording_changed' });
+    expect(await store.deferZoomVideoCopyAttempt({ id: a.copyId, leaseToken: fresh.leaseToken, retryAfterSeconds: 900 })).toBeNull();
+    await expect(store.deferZoomVideoCopyAttempt({ id: a.copyId, leaseToken: fresh.leaseToken })).rejects.toThrow(TypeError);
+  });
+
+  it('rejected candidate past expiry: the failed copy frees the request, the intent stays failed and unbound, and a new start succeeds', async () => {
+    const requestId = uuid();
+    const a = startInput({ requestId });
+    await store.startZoomVideoCopy(a);
+    const { leaseToken } = await claimFor(requestId);
+    await pool.query(
+      `UPDATE presentation_material_uploads SET state='failed', last_error='post_presentation_mp4_signature_invalid',
+         candidate_site_id='s', candidate_drive_id='d', candidate_item_id='i', candidate_version_id='v', candidate_etag='e', candidate_size=5000,
+         intent_expires_at = NOW() - INTERVAL '2 days' WHERE id=$1`, [a.copyId],
+    );
+    await store.markZoomVideoCopyRegistering({ id: a.copyId, leaseToken, driveId: 'd', itemId: 'i' }).catch(() => null);
+    const failed = await store.failZoomVideoCopy({ id: a.copyId, leaseToken, failureCode: 'post_presentation_mp4_signature_invalid' });
+    expect(failed).toMatchObject({ state: 'failed', sharepoint_item_id: 'i' });
+    expect(await intentRow(a.copyId)).toMatchObject({ state: 'failed', request_document_id: null, candidate_item_id: 'i' });
+    const snapshot = await store.listFailedZoomVideoCopiesForFile({ requestId, zoomFileId: 'file-1' });
+    expect((await store.startZoomVideoCopy({ ...startInput({ requestId }), failedSnapshot: snapshot })).status).toBe('started');
+  });
 });

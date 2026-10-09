@@ -219,7 +219,8 @@ export function makeWorld({ size = 25, copyState = 'queued' } = {}) {
     recordUploadCandidate: async ({ requestId, actorId, candidate, leaseToken }) => {
       const u = w.intent;
       if (requestId !== u.request_id || actorId !== u.actor_id || !live(u, leaseToken) || ['finalized', 'abandoned'].includes(u.state)) return null;
-      Object.assign(u, { state: 'uploaded', candidate_item_id: candidate.itemId, candidate_drive_id: candidate.driveId, candidate_site_id: candidate.siteId, candidate_size: candidate.size });
+      // The real token arm keeps `finalizing`, and keeps a rejected `failed` candidate failed.
+      Object.assign(u, { state: u.state === 'finalizing' ? 'finalizing' : (u.state === 'failed' && u.candidate_item_id) ? 'failed' : 'uploaded', candidate_version_id: candidate.versionId, candidate_etag: candidate.eTag, candidate_item_id: candidate.itemId, candidate_drive_id: candidate.driveId, candidate_site_id: candidate.siteId, candidate_size: candidate.size });
       return { ...u };
     },
 
@@ -299,7 +300,7 @@ export function makeWorld({ size = 25, copyState = 'queued' } = {}) {
   w.dvDown = false;
   w.matEvents = [];
   w.copiedElsewhere = false; // another copied row already owns the request/file (N5 uniqueness conflict)
-  w.slot = { token: null, fence: 0, expiresAt: 0 };
+  w.slot = { token: null, fence: 4, expiresAt: 0 }; // earlier documents carry lower fences
   w.nextDoc = 1;
   w.mime = 'video/mp4';
   w.failedDueLog = [];
