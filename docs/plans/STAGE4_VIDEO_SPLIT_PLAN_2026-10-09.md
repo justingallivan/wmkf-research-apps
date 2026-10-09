@@ -21,6 +21,11 @@ related:
 
 **Decided (owner, Session 590, 2026-10-09):** 1 = presentation **and** discussion videos; 2 = cut exactly at `endMs`; 3 = Zoom copy plus Zoom transcript only; 5 = on request. Decisions 4, 6 and 7 remain open. Original recommendations follow for the record.
 
+**Decided (owner, Session 590, 2026-10-09), after Codex's first research pass:**
+- **8. Staff review before Board release.** A staff member listens to the presentation video's ending and approves it before the video becomes Board-eligible. Until then outside readers withhold it.
+- **9. Staff access needs no verification.** The full Recording stays available to staff at all times, as today; the review in decision 8 gates only Board release. [ASSUMED reading: the split videos are also visible to staff as soon as they pass the automated checks; confirm.]
+- **6 (venue), status.** Azure availability is pending an IT ticket (Dragonfly) with no quick answer expected. The first benchmark therefore targets Vercel Sandbox, per the research doc's fallback.
+
 1. **Outputs.** Accepted UX items 5 and 7 (`MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md:30-33`) call for a presentation video **and** a staff-discussion video, plus "Not recorded" when nothing follows the boundary. Stage 5 later deletes the discussion video. Recommendation: build the presentation video first; add the discussion video only if staff need a separate discussion file beyond the full Recording, which they already have until the Stage 5 deadline.
 2. **Cut point and tolerance.** `presentationEnd.endMs` is the end of the last presentation utterance on the transcript timeline (`bundle.js:37-53`). The next utterance starts later. Options: cut exactly at `endMs`; cut at `endMs` minus a safety margin (loses a moment of presentation, never leaks); or cut in the silent gap before the next utterance. Recommendation: cut at `endMs`, and reject the output unless verification shows no audio or video after `endMs` plus 0 ms (see "Processor contract").
 3. **Eligible sources.** The cut needs proof that the transcript and the video come from the same recording (see "Same-source proof"). Recommendation: v1 splits only a Zoom-copied Recording whose transcript came from a Zoom import of the same meeting. A staff-uploaded MP4, or a transcript from uploaded audio, shows a named reason ("The transcript was not made from this video") and no split.
@@ -74,9 +79,17 @@ Any failure shows a named reason and no split.
 - **Staff-discussion video:** `endMs` to the end of the source, staff-only, deleted at the Stage 5 deadline. When the verified source shows nothing after `endMs`, the card shows **Not recorded** and no discussion video is made (UX plan `:35`).
 - The two outputs partition the source at the same cut, mirroring `presentationContent` / `staffDiscussionContent`. One failing does not discard the other; each shows its own state.
 
+## Technique and verification [PLANNED, from Codex research]
+
+See `docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md` (branch `codex/stage4-video-processing-research`).
+- Full re-encode of each kept span from decoded frames and samples; naive stream copy is a negative control only.
+- The cut on the MP4 is `endMs` mapped from the transcript (M4A) timeline using at least three audio anchors, minus the measured mapping uncertainty. Unbounded uncertainty, drift or a pause blocks the split.
+- Two acceptance checks: no source content from after the cut is used, and no output stream plays past it. Duration alone proves neither; AAC padding, edit lists and extra tracks are checked explicitly.
+- The lineage record gains a mapping version and a verification receipt.
+
 ## Card [PLANNED]
 
-The card's "Results" step gains a Video line under **Presentation** and under **Staff discussion**: status (not started, working, ready, stale, not recorded, failed with reason) and Open for staff. One **Create videos** action (decision 5) starts both after the boundary is confirmed and the source is eligible (decision 3).
+The card's "Results" step gains a Video line under **Presentation** and under **Staff discussion**: status (not started, working, ready for review, approved for the Board, stale, not recorded, failed with reason) and Open for staff. The presentation video adds **Check the ending and approve** (decision 8). One **Create videos** action (decision 5) starts both after the boundary is confirmed and the source is eligible (decision 3).
 
 ## Stage 5 hooks [PLANNED]
 
