@@ -19,6 +19,8 @@ related:
 
 **[PROPOSED 2026-10-08; nothing built.] Reworked in Session 588 after review and the Codex fix pass; implementation and crash tests remain pending.** The transfer, state machine, schema, routes, card, concurrency, tests and release sections were rewritten against the upload-intent store's actual predicates; see "Folded in" under the Session 588 review. This plan does not authorize a migration, a Vercel setting, a live Zoom, Graph or Dataverse call, a merge or a deployment.
 
+**Step 0 build status.** [SOURCE-BUILT on branch `claude/zoom-copy-step0`, not merged; migration 076 NOT applied; nothing live.] Migration 076 (both the `origin` column and the inert table), the `origin = 'browser'` predicates, the non-destructive registered-item binding and their tests exist on that branch. The rest of the build is not started.
+
 **Migration number.** 076 is reserved for this stage; Stage 2 holds 075.
 - [VERIFIED via `git ls-tree` of the migrations directory on each local `refs/remotes/origin/*` ref, 2026-10-08.] No ref carries migrations `075_` to `079_`. `origin/main` ends at `074_zoom_recording_imports.sql`.
 - Re-checked after `git fetch` in the Session 588 rework: all 81 `origin/*` refs, still none (Schema section).
@@ -367,7 +369,7 @@ CREATE INDEX IF NOT EXISTS idx_zoom_video_copies_request_recent
 - No URLs, tokens, topics or emails are stored.
 - One Zoom file copied for two requests makes two SharePoint items. Stage 5 must check the other rows before deleting a Zoom original.
 
-**Fresh-install parity.** Add 076 to `lib/db/migrations-manifest.json`, and the same DDL to `scripts/setup-database.js` next to the `presentation_material_uploads` block [VERIFIED it lives at `scripts/setup-database.js:1607-1702`], in the step-0 PR.
+**Fresh-install parity.** Add 076 to `lib/db/migrations-manifest.json` in the step-0 PR; no `scripts/setup-database.js` edit. **Corrected Session 589:** the inline block at `setup-database.js:1607` belongs to `v56Statements`, which `getBootstrapGroups()` (`:2126-2142`) does not list. A fresh install runs the base groups, then replays every manifest file (`scripts/lib/fresh-database-bootstrap.js:62-67`, `bootstrapFreshDatabase`) [VERIFIED]. Migrations 074 and 075 shipped the same way.
 
 ## Routes and security
 
