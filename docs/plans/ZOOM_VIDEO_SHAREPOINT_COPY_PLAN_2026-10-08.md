@@ -3,7 +3,7 @@ title: Zoom video copy to SharePoint (Stage 3b)
 kind: plan
 domain: transcription
 status: proposed
-summary: "Copy one Zoom meeting MP4 into governed SharePoint as the request's staff-only Recording, using a server-side chunk pump into the existing MP4 upload intent, Graph upload session and finalize path; one new Postgres table (migration 076), one marker column, one visit route and one every-minute cron worker."
+summary: "Copy one Zoom meeting MP4 into governed SharePoint as the request's staff-only Recording, using a server-side ranged-GET chunk pump into an origin-marked MP4 upload intent, Graph upload session and the existing finalize path; one new Postgres table plus an origin column (migration 076, shipped first with browser isolation), a ZOOM_VIDEO_COPY_ACCESS kill switch, one visit route and one every-minute cron worker."
 owner: product-engineering
 related:
   - docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md
@@ -17,10 +17,11 @@ related:
 
 ## Status and authority
 
-**[PROPOSED 2026-10-08; nothing built.]** This plan does not authorize a migration, a Vercel setting, a live Zoom, Graph or Dataverse call, a merge or a deployment.
+**[PROPOSED 2026-10-08; nothing built.] Reworked in Session 588 after review; not re-reviewed yet.** The transfer, state machine, schema, routes, card, concurrency, tests and release sections were rewritten against the upload-intent store's actual predicates; see "Folded in" under the Session 588 review. This plan does not authorize a migration, a Vercel setting, a live Zoom, Graph or Dataverse call, a merge or a deployment.
 
 **Migration number.** 076 is reserved for this stage; Stage 2 holds 075.
 - [VERIFIED via `git ls-tree` of the migrations directory on each local `refs/remotes/origin/*` ref, 2026-10-08.] No ref carries migrations `075_` to `079_`. `origin/main` ends at `074_zoom_recording_imports.sql`.
+- Re-checked after `git fetch` in the Session 588 rework: all 81 `origin/*` refs, still none (Schema section).
 - Remote-tracking refs can be stale. Re-fetch and re-check Production `schema_migrations` immediately before writing the migration.
 
 **Stage 3a (audio and Zoom transcript import) is merged as PR #464.** Its migration, 074, is applied to Production [VERIFIED via `ZOOM_RECORDING_IMPORT_PLAN_2026-10-08.md:192`; the merge is owner-reported].
@@ -72,7 +73,14 @@ That create seam is already registered as `REQUIRED` in `check:request-document-
   - rejects `text/html` and requires an exact byte count;
   - sends no `Range` header.
 - 3a's `pickFiles` ignores MP4s [VERIFIED via `import-service.js:63-76`].
-- Graph `uploadFileLarge` requires a whole Buffer [VERIFIED via `graph/upload-session.js:132-193`].
+- Graph `uploadFileLarge` requires a whole Buffer [VERIFIED via `graph/upload-session.js:132-193`], and DELETEs the session after any failed chunk PUT (`:186-189`).
+- Zoom honors Range on the final `ssrweb.zoom.us` hop, including at an offset without the bearer [VERIFIED via probe 1, Session 588; see probes].
+
+**Session loss today (browser path).** `404` and `410` are not the same [VERIFIED via `material-service.js:875-906`, `:1062-1160`]:
+- Status and retry both re-check the exact path at 0, 2 and 8 s after a 404 or 410 from the session.
+- `retryMp4Upload` starts a fresh zero-based session **only** when the status was **410** and every path check, including one before the status read, found nothing (`:1080`). It marks the intent `failed`/`session_expired`, creates the session, and records it with `recordPresentationMaterialUploadRecoverySession`, which returns the intent to `initiated` and clears its lease (`upload-intent-store.js:366-388`).
+- A **404**, a partial item or any uncertain check marks the intent `failed`/`retry_status_unknown` and reports "reconciliation pending" (`:1080-1084`); it never restarts.
+- A complete item at any check is recorded as the candidate for finalize.
 
 **Pilot sizes.**
 - The one measured meeting (Oct 5, 62 min) totalled 289 MB across five files [VERIFIED via `MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md:69-70`].
@@ -115,262 +123,389 @@ That create seam is already registered as `REQUIRED` in `check:request-document-
 **Limits.**
 - Vercel Pro with Fluid Compute caps `maxDuration` at 800 s [VERIFIED as recorded in `docs/REVIEWER_TIMEOUT_BUDGET_PLAN.md:43`; https://vercel.com/docs/functions/limitations, from memory].
 - Production functions run at 2048 MB [VERIFIED as recorded in `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md:859`, `:904`].
-- The cron route uses `maxDuration` 300 with a 240 s work budget per tick.
-- It needs its own `vercel.json` `functions` entry, because the `pages/api/cron/*.js` glob sets 120 s [VERIFIED via `vercel.json:21-23`].
+- The `pages/api/cron/*.js` glob sets 120 s [VERIFIED via `vercel.json:21-23`]. The new cron needs its own `maxDuration: 300` entry, like `drain-materials-uploads` [VERIFIED via `vercel.json:33-35`].
 
-**Chunk size: 10 MiB.**
-- 10 MiB is a multiple of Graph's 320 KiB unit and under its 60 MiB per-request maximum [VERIFIED in code via `upload-session.js:152`; https://learn.microsoft.com/en-us/graph/api/driveitem-createuploadsession, from memory].
-- At most one chunk is held in memory at a time.
-- No bytes pass through the browser or Blob.
+**Chunks.**
+- 10 MiB, a multiple of Graph's 320 KiB unit and under its 60 MiB per-request maximum [VERIFIED in code via `upload-session.js:152`; Graph limit from memory].
+- At most one chunk is in memory. No bytes pass through the browser or Blob.
+- A new Graph helper, `putUploadSessionChunk(uploadUrl, { start, bytes, total })`, sends one PUT with `Content-Range` and returns Graph's next range or the committed item. It must **not** DELETE the session on a failed PUT, unlike `uploadFileLarge` [VERIFIED via `upload-session.js:186-189`]. A failed PUT is a retry, not session loss.
 
-**Each tick:**
-1. Claim the copy row lease. This fences overlapping invocations [ASSUMED possible, from memory of https://vercel.com/docs/cron-jobs].
-2. Claim the intent lease, so `upload-intent-cleanup` cannot act mid-copy.
-3. Recheck the request→visit binding, Zoom availability, post-presentation access and `cancel_requested_at`.
-4. Re-call `getMeetingRecordings`. The stored `zoom_file_id` must still be `completed`, with the same `file_size` and host. Otherwise stop with `zoom_recording_changed`.
-5. Read Graph's next offset `o`.
-6. Loop until 240 s or completion:
-   - GET the resolved Zoom URL with `Range: bytes=o-(o+10MiB-1)`.
-   - Check the 206 response's `Content-Range` and length.
-   - PUT the chunk to Graph with `Content-Range`. Require Graph's ack to advance to `o+len`.
-   - Renew both leases and call `refreshPresentationMaterialUploadSession`.
+**Range (probe 1 settled it).**
+- New `fetchRecordingRange(url, { start, end, total, bearer })` in `zoom-client.js`. Same host rules as `downloadRecordingFile`: https, port 443, no URL credentials, `zoom.us` or `*.zoom.us`, at most 5 manual redirects, bearer on the first hop only [VERIFIED via `zoom-client.js:154-159`, `:193-212`].
+- The final response must be **206** with `Content-Range: bytes start-end/total`, `Content-Length = end-start+1`, and not `text/html`.
+- **No fallback.** A 200 or any other 2xx to a ranged GET is terminal `zoom_range_unsupported`.
+- **Resolved URL.** Each tick calls `getMeetingRecordings` once, follows `download_url` with the bearer to the final `ssrweb.zoom.us` URL, and keeps that URL **in memory for this tick only**. Later chunks in the tick GET it without the bearer (probe 1 showed this works at an offset). Nothing about the URL is persisted; the next tick re-resolves. Re-resolving costs one Zoom API call and one redirect per tick, which is cheaper than storing a bearer-free capability URL.
+- **Expiry.** A 401, 403, 404 or 410 from the resolved URL re-resolves once (fresh `getMeetingRecordings` plus redirect) and retries that chunk. If the retried chunk fails the same way, the copy is terminal `zoom_download_denied`. The re-resolve allowance resets after each successful chunk. 429, 5xx and timeouts end the tick without a state change.
+- **URL lifetime is [ASSUMED] to exceed one tick (≈5 min), pending probe 2.** If probe 2 shows a shorter life, nothing changes in the protocol; each expiry costs one re-resolve. If it shows the URL dies within one chunk (under 60 s), per-chunk re-resolution becomes the norm and the design should be re-reviewed for Zoom rate limits.
+- Download URLs, the resolved URL, query strings and the Zoom token are never persisted, logged, returned or put in an error. Errors carry only `ZoomClientError` codes [VERIFIED pattern via `zoom-client.js:5-8`, `:30-37`].
 
-Download URLs are never persisted. They are re-resolved every tick, and once more after a 401, 403 or HTML response.
-
-**If Zoom ignores Range [UNVERIFIED].**
-- If Zoom answers a ranged GET with 200, stream from 0 and discard the bytes before Graph's offset.
-- This stays correct, and its cost is bounded by the file size.
-- Record `zoom_range_unsupported` once per copy.
-
-**Upload session expiry.** A 404 or 410 from the session triggers the existing exact-path check:
-- If the item is absent, start one lease-fenced fresh session under the same intent and generation key, restarting at 0, as `retryMp4Upload` does.
-- After 3 such restarts, the copy is `failed` with `zoom_video_session_expired`.
-- If a full-size item is present, go straight to finalize.
+**Tick budget.** One copy row per tick. `T0` is handler entry; the work deadline is `T0 + 270 s`, 30 s under `maxDuration` 300.
+- Per chunk: Zoom GET timeout 45 s, Graph PUT timeout 45 s.
+- Start a chunk only when at least 110 s remain (two timeouts plus 20 s for lease renewals).
+- Start finalize only when at least 150 s remain; otherwise leave the row `registering` for the next tick.
+- These numbers are [ASSUMED] sizing. They are a liveness aid only. If a tick is killed anyway, its leases expire and the next tick resumes (state table: takeover), and finalize is idempotent by generation key.
 
 **Integrity.**
-- Each chunk must match the requested range and length, and Graph's ack.
-- The final item size must equal Zoom's `file_size`.
-- Finalize's MP4 signature and mime checks must pass.
-- Zoom publishes no source checksum [ASSUMED, from memory of https://developers.zoom.us/docs/api/meetings/]. A hash we computed ourselves would only prove the app-to-Graph leg, which TLS and the range acks already cover.
-- v1 records Graph's `file.hashes.quickXorHash`, if Graph returns it, as a fingerprint so Stage 4/5 can detect replaced bytes (https://learn.microsoft.com/en-us/graph/api/resources/hashes, from memory).
-- The repo has no quickXorHash code [VERIFIED via grep of `lib`, `shared` and `scripts`].
+- Each chunk matches the requested range and length, and Graph's next range equals `start+len`.
+- The committed item's size equals Zoom's `file_size`; finalize re-resolves the exact item and checks it is stable [VERIFIED via `material-service.js:647-692`].
+- Finalize's `ftyp` signature and `video/mp4` mime checks must pass [VERIFIED via `material-service.js:1245-1254`].
+- Zoom publishes no source checksum [ASSUMED, from memory of the Zoom API docs]. v1 records Graph's `file.hashes.quickXorHash` when present, as a fingerprint for Stage 4/5, without comparing it. Whether this tenant returns it is probe 4. If it does not, the column stays null and nothing else changes.
+- Duration check against Zoom's start and end times is deferred until probe 5 says whether `mvhd` is in the first MiB.
+
+**Variant and segments.**
+- Allowlist in code, not in the CHECK: `recording_type` `shared_screen_with_speaker_view`, else `shared_screen_with_speaker_view(CC)`; `file_extension` `MP4`; `status` `completed`; integer `file_size` from 1 to 2,000,000,000.
+- Segments: if the meeting has more than one completed file of the chosen type, start refuses with 422 `zoom_video_segmented` and the Zoom link stays. Zoom producing several same-type files for one occurrence is [ASSUMED] possible (pause and resume); probe 3 should count them. v1 never concatenates.
+
+## State machine and leases
+
+**Two rows, linked at birth.** `zoom_video_copies` (new, migration 076) and one `presentation_material_uploads` intent with `origin = 'zoom_copy'` and the **same id**. Start inserts both in one transaction.
+
+| Copy `state` | Meaning | Intent `state` while here |
+|---|---|---|
+| `queued` | Rows exist; no Graph session recorded yet | `initiated`, `upload_url_ciphertext IS NULL` |
+| `copying` | Session recorded; bytes moving, or session loss being reconciled | `initiated` (or `failed` without candidate after a loss) |
+| `registering` | Full item resolved; drive/item recorded on the copy row; finalize pending or retrying | `uploaded` with candidate, or `finalizing` |
+| `copied` | Request Document registered | `finalized` |
+| `failed` | Terminal, with `failure_code` | any non-`finalized` state; left for cleanup and Stage 5 |
+| `cancelled` | Terminal; staff cancelled before finalize | `abandoned`, or `uploaded` when bytes were complete (drive/item recorded) |
+
+**Leases.**
+- **Copy lease**: `zoom_video_copies.lease_token`, 600 s, longer than `maxDuration` 300, so a live tick is never taken over. Same choice as 3a's import lease [VERIFIED via `import-store.js:13-14`].
+- **Intent pump lease**: the intent's own `lease_token`, 300 s [VERIFIED via `upload-intent-store.js:5`], taken with the recovery-shaped predicate and renewed after every chunk.
+- **Intent finalize lease**: the same column with `state = 'finalizing'`, renewed by `renewPresentationMaterialUploadLease` [VERIFIED via `upload-intent-store.js:208-221`].
+- **Slot lease**: `presentation_material_slot_leases`, token = intent id, 300 s, taken inside finalize [VERIFIED via `material-service.js:1257-1262`; `slot-lease-store.js:17-45`].
+
+**Reuse rule.** Existing functions keyed only by `id + lease_token` (renew, release, record-with-token, mark, complete) are not browser entry points: a caller needs a token from a claim. The tick reuses them unchanged. Every function keyed by `request_id + actor_id` is a browser entry point; the tick never calls those, and gets NEW origin-aware twins instead.
+
+**Copy fence.** "Fence" in the table means, in this order: (1) `renewZoomVideoCopyLease` (N3) returns the row, so the copy lease is live and the state is as expected; (2) its returned `cancel_requested_at` is null where cancel applies; (3) `zoomVideoCopyAccess()` still allows this request; (4) the intent lease renew named in the cell succeeds. Any failure stops the tick before the write.
+
+### NEW store functions
+
+Copy-row store, new file `lib/services/meeting-tracker-recordings/video-copy-store.js`:
+
+| Id | Function | Exact predicate / statement |
+|---|---|---|
+| N1 | `startZoomVideoCopy` (one transaction, `review-panel-store.js:73-84` pattern) | `SELECT pg_advisory_xact_lock(hashtextextended('zoom_video_copy:' \|\| $request_id \|\| ':100000005', 0))`; then `SELECT id FROM zoom_video_copies WHERE request_id=$1 AND state IN ('queued','copying','registering')` (any row → 409 `zoom_video_copy_active`); then `SELECT * FROM zoom_video_copies WHERE request_id=$1 AND zoom_file_id=$2 AND state='copied'` (row → replay, 200); then `INSERT INTO presentation_material_uploads (id=$copyId, origin='zoom_copy', state='initiated', …)`; then `INSERT INTO zoom_video_copies (id=$copyId, upload_id=$copyId, state='queued', …)`; `COMMIT`. |
+| N2 | `claimZoomVideoCopyWork({ accessRequestId })` | `WITH next AS (SELECT id FROM zoom_video_copies WHERE state IN ('queued','copying','registering') AND (lease_token IS NULL OR lease_expires_at <= NOW()) AND (next_attempt_at IS NULL OR next_attempt_at <= NOW()) AND ($accessRequestId::uuid IS NULL OR request_id = $accessRequestId) ORDER BY updated_at LIMIT 1 FOR UPDATE SKIP LOCKED) UPDATE zoom_video_copies c SET lease_token=$t, lease_expires_at=NOW()+600s, updated_at=NOW() FROM next WHERE c.id=next.id RETURNING c.*` |
+| N3 | `renewZoomVideoCopyLease({ id, leaseToken, states })` | `UPDATE … SET lease_expires_at=NOW()+600s, updated_at=NOW() WHERE id=$id AND lease_token=$t AND lease_expires_at > NOW() AND state = ANY($states) RETURNING state, cancel_requested_at` |
+| N4 | `transitionZoomVideoCopy({ id, leaseToken, from, to, patch })` | `UPDATE … SET state=$to, <patch columns>, updated_at=NOW() WHERE id=$id AND lease_token=$t AND lease_expires_at > NOW() AND state = ANY($from)`. Used for: `queued→copying`; `copying→registering` (sets `sharepoint_drive_id`, `sharepoint_item_id`, `bytes_confirmed=declared_size`); `copying→copying` (counters, `bytes_confirmed`, `next_attempt_at`); `registering→registering` (`registration_attempts+1`, `next_attempt_at`, clears lease); `→failed` (sets `failure_code`, clears lease); `queued\|copying\|registering→cancelled` (clears lease). |
+| N5 | `markZoomVideoCopyCopied({ id, leaseToken = null })` | `UPDATE zoom_video_copies c SET state='copied', request_document_id=u.request_document_id, sharepoint_drive_id=u.candidate_drive_id, sharepoint_item_id=u.candidate_item_id, completed_at=NOW(), failure_code=NULL, lease_token=NULL, lease_expires_at=NULL, updated_at=NOW() FROM presentation_material_uploads u WHERE c.id=$id AND u.id=c.upload_id AND u.state='finalized' AND c.state IN ('queued','copying','registering') AND (($t IS NOT NULL AND c.lease_token=$t AND c.lease_expires_at > NOW()) OR ($t IS NULL AND (c.lease_token IS NULL OR c.lease_expires_at <= NOW())))` |
+| N5a | `listZoomVideoCopiesWithFinalizedIntent({ limit })` | `SELECT c.id FROM zoom_video_copies c JOIN presentation_material_uploads u ON u.id=c.upload_id WHERE c.state IN ('queued','copying','registering') AND u.state='finalized' AND (c.lease_token IS NULL OR c.lease_expires_at <= NOW()) LIMIT $limit` |
+| N6 | `requestZoomVideoCopyCancel({ id, requestId })` | `UPDATE … SET cancel_requested_at=COALESCE(cancel_requested_at, NOW()), updated_at=NOW() WHERE id=$id AND request_id=$requestId AND state IN ('queued','copying') RETURNING *` (no row → read it; `registering` → 409 `zoom_video_copy_saving`; terminal → return as is) |
+| N7 | `releaseZoomVideoCopyLease({ id, leaseToken })` | `UPDATE … SET lease_token=NULL, lease_expires_at=NULL, updated_at=NOW() WHERE id=$id AND lease_token=$t RETURNING *` (state unchanged) |
+
+Intent store, additions to `upload-intent-store.js`:
+
+| Id | Function | Exact predicate |
+|---|---|---|
+| I1 | `claimZoomCopyIntentPump({ uploadId })` | `UPDATE presentation_material_uploads SET lease_token=$t, lease_expires_at=NOW()+300s, updated_at=NOW() WHERE id=$id AND origin='zoom_copy' AND state IN ('initiated','failed') AND candidate_item_id IS NULL AND request_document_id IS NULL AND intent_expires_at > NOW() AND (lease_token IS NULL OR lease_expires_at <= NOW()) RETURNING *`. This is `claimPresentationMaterialUploadRecovery` (`:265-282`) with `origin` and `intent_expires_at` in place of `request_id`/`actor_id`, so the existing recovery renew/mark/release functions (`:284-364`) fit it exactly. |
+| I2 | `recordZoomCopyIntentSession({ uploadId, leaseToken, uploadUrlCiphertext, expiresAt, intentExpiresAt })` | `UPDATE … SET upload_url_ciphertext=$c, upload_session_expires_at=$e, intent_expires_at=$ie, last_error=NULL, updated_at=NOW() WHERE id=$id AND origin='zoom_copy' AND state='initiated' AND upload_url_ciphertext IS NULL AND candidate_item_id IS NULL AND lease_token=$t AND lease_expires_at > NOW() RETURNING *` (keeps the lease; `recordPresentationMaterialUploadSession` `:55-71` has no lease or origin predicate, so it is not used) |
+| I3 | `claimZoomCopyIntentForFinalize({ uploadId })` | `UPDATE … SET state='finalizing', lease_token=$t, lease_expires_at=NOW()+300s, updated_at=NOW() WHERE id=$id AND origin='zoom_copy' AND intent_expires_at > NOW() AND ((state='uploaded' AND candidate_item_id IS NOT NULL AND (lease_token IS NULL OR lease_expires_at <= NOW())) OR (state='finalizing' AND lease_expires_at <= NOW())) RETURNING *`. This is `claimPresentationMaterialUpload` (`:189-196`) with `origin` in place of `request_id`/`actor_id`, narrowed to a recorded candidate. |
+
+### State table
+
+All line numbers are `upload-intent-store.js` unless prefixed. `ms` = `material-service.js`.
+
+| Phase | Store functions, in order | Copy `state` predicate | Intent `state` predicate | Leases held | Transition | Fence before each post-await write |
+|---|---|---|---|---|---|---|
+| **Start** (POST) | N1 | none in `queued\|copying\|registering` for the request; `copied` for (request, file) → replay | none (inserted) | advisory xact lock on request + Recording slot; no row lease | → copy `queued`; intent `initiated`, `origin='zoom_copy'`, ciphertext NULL, `intent_expires_at` = now + 3 d (the `ms:753` provisional formula) | All remote reads (Zoom listing and detail, Request, Site Visit, bucket, Recording winner) happen before `BEGIN`. Access and decision-8 checks run immediately before `BEGIN`. Inside the transaction only Postgres statements run. |
+| **Reconcile-finalized** (first step of every tick, before any claim) | N5a, then N5 with `leaseToken=null` per row | `queued\|copying\|registering`, copy lease free or expired | `finalized` (by `completePresentationMaterialUpload` `:243-262` or cleanup's `bindPresentationMaterialUploadForCleanup` `:467-487`) | none; N5's predicate refuses a row whose copy lease is live | copy → `copied` with `request_document_id`, drive and item from the intent | Single statement; nothing awaited between its read and write. Runs even when access is `off` (see kill switch). |
+| **Session create** (tick, missing receipt) | N2; I1; `resolveStableMp4Path` (`ms:647`); `createBrowserUploadSession` (`conflictBehavior:'fail'`); I2; N4 `queued→copying` | `queued` | `initiated`, ciphertext NULL | copy + intent pump | copy `queued→copying`; intent keeps `initiated`, gains ciphertext | Copy fence (N3 states `[queued]`) + `renewPresentationMaterialUploadRecovery` (`:284-298`) before the create; I2's own token predicate for the write; copy fence before N4. Path `complete` → "Bytes complete" row (record the candidate under the pump lease); `partial` or mismatch → `failed` `zoom_video_path_conflict`. A create or I2 failure leaves the row `queued`, adds `session_create_attempts`; at 3 → `failed` `zoom_video_session_create_failed`. If I2 returns no row, cancel the just-created session (`ms:1168-1187` pattern). An earlier creation whose receipt was lost is harmless: an uncommitted session creates no item, the path check catches a committed one, and the orphan expires on Graph's clock [ASSUMED, probe 4]. |
+| **Pump tick** | N2; I1; path check; `getBrowserUploadSessionStatus`; `refreshPresentationMaterialUploadSession` with `leaseToken` (`:73-91`); per chunk: Zoom ranged GET, `putUploadSessionChunk`; N4 `copying→copying` (`bytes_confirmed`) | `copying` | `initiated` with ciphertext | copy + intent pump | none until the last chunk | Before every PUT and every Postgres write: copy fence (N3 `[copying]`) + `renewPresentationMaterialUploadRecovery`. The refresh write is fenced by its own `lease_token = $t` arm (`:87`). |
+| **Bytes complete** (end of pump) | `resolveStableMp4Path`; `recordPresentationMaterialUploadCandidate` with `leaseToken` (`:129-155`); N4 `copying→registering`; `releasePresentationMaterialUploadRecovery` (`:300-312`) | `copying` | `initiated` → `uploaded` | copy + intent pump, then copy only | intent → `uploaded` with candidate; copy → `registering` with drive/item ids | Copy fence + recovery renew before the candidate write, **ignoring the cancel flag**: the write records a fact (a committed item), like reconcile-finalized, and cancel is handled after it. After the candidate write the recovery renew can no longer match (`:293` requires `candidate_item_id IS NULL`), so the copy fence alone guards N4. If the tick dies between the two writes, the next tick finds intent `uploaded` with copy `copying` and replays N4 from the intent's candidate columns. A cancel flag seen here goes to "cancel after bytes complete". |
+| **Session restart after loss** | inside the pump lease: one path check before the status read; on status 404/410, path checks at 0/2/8 s, each after `renewPresentationMaterialUploadRecovery` (the `ms:984-996` loop) | `copying` | `initiated` or `failed` without candidate | copy + intent pump | **Only** when the status was **410** and every path check was absent: `markPresentationMaterialUploadRecoveryTerminal` (`:314-327`, → `failed`/`session_expired`); N4 `session_restarts+1` (at 3 → `failed` `zoom_video_session_expired`); `createBrowserUploadSession`; `recordPresentationMaterialUploadRecoverySession` (`:366-388`, `failed→initiated`, **clears the intent lease**). The tick then re-claims I1 if budget allows, else ends. **404, a partial item, or any uncertain check**: `markPresentationMaterialUploadRecoveryUncertain` (`:329-344`, `failed`/`retry_status_unknown`); N4 `uncertain_checks+1`, `next_attempt_at` +10 min; at 3 → `failed` `zoom_video_session_uncertain`. A complete item at any check → "Bytes complete". | Copy fence before each mark, create and record. This is exactly `retryMp4Upload` (`ms:1062-1088`, `:1123-1160`). |
+| **Finalize hand-off** | N2 (`registering`, due); budget ≥ 150 s; I3; extracted `finalizeClaimedMp4Upload` (`ms:1224-1489`) with the copy hooks; on success N5 with the tick's token | `registering` | `uploaded` with candidate, or `finalizing` with expired lease | copy + intent finalize + slot (inside finalize) | intent → `finalized` (`completePresentationMaterialUpload`, `ms:1443`); copy → `copied` | Finalize renews at `ms:1231`, `:1242` and the `renewIntentOrLose` closure (`:1265`), and renews nothing directly before `acquireMaterialSlot` (`:1257`). The extraction replaces all of these with one `renewOrStop` closure (browser default: `renewPresentationMaterialUploadLease` only) and adds a call before `:1257`. The copy path extends it with the copy fence (N3 `[registering]`). The cancel flag is honored up to I3; after I3 claims, the fence ignores it, and POST cancel on a `registering` row is refused. The decision-8 hook runs after `before` loads (`:1273`) and before predecessors and create. The slot renew (`renewOrLose`, `ms:307-318`) stays as is. The window between "bytes complete" and I3 holds no intent lease. Browser paths cannot see the row (step 0), and cleanup cannot claim it because `intent_expires_at` is session expiry + 3 d (`ms:806`; cleanup `:396-399`). |
+| **Registration retry** | on a finalize error: `releasePresentationMaterialUpload` (`:223-241`, terminal flag = `TERMINAL_MP4_VALIDATION_CODES`, `ms:93-96`); then N4 | `registering` | `finalizing` → `uploaded` (or `failed` with candidate when terminal, `:227`) | copy + intent finalize, then copy only | Retryable: `registration_attempts+1`, `next_attempt_at` = now + 1, 5, 15, 60 min, lease cleared; at 5 → `failed` `zoom_video_registration_failed`. Terminal (see "Retry policy"): → `failed` with the code. | Copy fence before N4. Intent release is token-fenced (`:236-237`). |
+| **Cancel, before bytes complete** | POST: N6. Tick: N2; I1; then the `cancelMp4Upload` sequence (`ms:1013-1042`): path check; `cancelBrowserUploadSession` if ciphertext present; path checks 0/2/8 s; `cancelPresentationMaterialUploadRecovery` (`:346-364`, → `abandoned`); N4 → `cancelled` | `queued\|copying`, `cancel_requested_at` set | `initiated` or `failed`, candidate NULL | copy + intent pump | intent → `abandoned`; copy → `cancelled` | Copy fence (N3 `[queued, copying]`; the cancel arm is expected) + recovery renew before the DELETE and each write. A 404 from DELETE is not proof (`upload-session.js:104-122`). Path not absent, or outcome not `cancelled\|expired` → `markPresentationMaterialUploadRecoveryUncertain`; the copy stays `copying` with the flag, `uncertain_checks+1`; at 3 → `failed` `zoom_video_cancel_uncertain`. A complete item → next row. |
+| **Cancel, after bytes complete** | flag seen by the copy fence before N4 `copying→registering` or before I3 | `copying` (flag set) or `registering` (flag set while `copying`, seen before I3) | `uploaded` with candidate | copy | copy → `cancelled` with `sharepoint_drive_id`/`sharepoint_item_id` set; intent left `uploaded`, unregistered | N4's token predicate. POST cancel on a `registering` row is refused (409 `zoom_video_copy_saving`), so once I3 claims, cancel cannot apply. The SharePoint item is deleted only by the existing cleanup when `POST_PRESENTATION_MATERIALS_CLEANUP=on` (`upload-intent-cleanup.js:53`; not configured, `CREDENTIALS_RUNBOOK.md:288`), else by Stage 5. |
+| **Takeover after lease expiry** | N2 (expired copy lease); I1 or I3 (expired intent lease, or `finalizing` expired); `acquirePresentationSlotLease` (same token = intent id keeps the fence, `slot-lease-store.js:28-31`) | any of `queued\|copying\|registering` | whatever the dead tick left | new copy lease, then the phase's intent lease | new tokens; state unchanged | Every later write by the dead tick fails its `lease_token = $old` predicate (N3, N4, I2, `:214`, `:236`, `:255`, `:290`). A slot lease left by a dead finalize blocks for ≤ 300 s and surfaces as `post_presentation_slot_busy` (`ms:299-304`), which is a retryable registration retry. |
+| **Kill switch off** | tick entry: `zoomVideoCopyAccess()`. `off` → reconcile-finalized only, no N2. `test:<GUID>` → N2 with `accessRequestId`. Mid-tick denial → `releasePresentationMaterialUploadRecovery` or `releasePresentationMaterialUpload` (non-terminal), then N7 | any non-terminal | unchanged | released | none (pause, not fail) | The access check in the copy fence. A Vercel env change takes effect on the next deployment [ASSUMED, from memory], so a running tick keeps its value. The per-write check catches a request no longer allowed by a newer deployment's `test:<GUID>`. Within one tick the cancel flag and the leases do the work. The Graph session keeps its own expiry; after re-enable the restart row applies. |
+| **Rollback** (revert to the step-0 build) | step-0 browser functions (all with `origin='browser'`); `claimPresentationMaterialUploadsForCleanup` (`:390-413`, origin-agnostic) | frozen at any state; no tick exists | any; browser predicates match none | none, until cleanup leases an expired intent | none by the app. After `intent_expires_at` + 6 h, cleanup refreshes a live session, binds a registered item, or alerts and retains (`upload-intent-cleanup.js:172-238`); it deletes or abandons only when destructive cleanup is on. | Drain first: set `ZOOM_VIDEO_COPY_ACCESS=off`, redeploy, wait 10 min (one copy lease), then revert. Re-deploying 3b later resumes the rows or ends them by the dispatch rule below; reconcile-finalized fixes any that cleanup bound meanwhile. |
+
+**Dispatch after N2.** The tick reads the linked intent before choosing a row of the table:
+- `finalized` → N5 with the tick's token.
+- `abandoned` (cleanup abandoned it during a pause or rollback window, `upload-intent-cleanup.js:186-191`, `:232-237`) → N4 `→failed` `zoom_video_intent_abandoned`.
+- `failed` **with** a candidate (rejected by finalize or retained by cleanup) → N4 `→failed` with the intent's `last_error` mapped to a code, keeping drive/item.
+- Intent lease held by another live token (cleanup's, or a stale tick's) → N7 and end the tick.
+- `intent_expires_at` passed and no claim matches → N4 `→failed` `zoom_video_intent_expired`; cleanup owns the intent from here.
+- Otherwise route by copy and intent state as in the table.
+
+**Intent rows never stranded by start.** N1 inserts both rows or neither, so review item 4's "intent-less `queued`" row cannot exist. A `queued` row whose session creation keeps failing ends at its attempt cap.
+
+### Retry policy
+
+| Condition | Treatment |
+|---|---|
+| `request_document_actor_unavailable` (`request-document-actor-service.js:54-62`, thrown under `REQUIRED` at `:110-112`) | Terminal. Intent released non-terminal to `uploaded`; bytes stay unregistered and the copy row keeps drive/item. **Try again** starts a new copy. |
+| `post_presentation_mp4_signature_invalid`, `post_presentation_mp4_malware` | Terminal (already `TERMINAL_MP4_VALIDATION_CODES`). |
+| `zoom_video_recording_replaced` (decision 8), `post_presentation_site_visit_changed`, `post_presentation_replay_mismatch`, `post_presentation_generation_ambiguous`, `post_presentation_candidate_mismatch` | Terminal. |
+| `post_presentation_slot_busy`, `post_presentation_slot_lease_lost`, `post_presentation_upload_lease_lost`, `post_presentation_mp4_mime_unconfirmed`, `post_presentation_create_unconfirmed`, `post_presentation_upload_completion_failed`, Dataverse 5xx or timeout | Retryable, with backoff 1, 5, 15, 60 min; cap 5 attempts. |
+| Zoom 429, 5xx or timeout; Graph PUT 5xx or timeout | End the tick, no state change; the next tick resumes from Graph's offset. |
+| Zoom file gone, `file_size` or `host_id` changed, host no longer in `ZOOM_RECORDING_HOSTS` | Terminal `zoom_recording_changed` or `zoom_video_host_not_approved`; the session is cancelled through the cancel sequence. |
+| Visit unbound, `POST_PRESENTATION_MATERIALS_ACCESS` denies the request, Zoom config removed | Pause (like the kill switch), not fail. Staff can cancel. |
 
 ## Schema — migration `076_zoom_video_copies.sql`
+
+**Ref scan [VERIFIED via `git fetch -q origin` then `git ls-tree` of `lib/db/migrations` on all 81 `refs/remotes/origin/*` refs, Session 588 rework, 2026-10-08].** No ref carries `075_` to `079_`; `origin/main` ends at `074_zoom_recording_imports.sql`. 075 stays reserved for Stage 2. Re-fetch and re-check Production `schema_migrations` immediately before writing the file.
+
+**One migration, applied before step 0 merges**, because step-0 code reads `origin`. It holds the `origin` column and the inert new table. Any table change after 076 is applied takes the next free number; an applied migration is never edited. **Owner choice:** split into 076 (column, step 0) and 077 (table, with the build). That reserves a number the owner has not reserved.
 
 ```sql
 ALTER TABLE presentation_material_uploads
   ADD COLUMN IF NOT EXISTS origin TEXT NOT NULL DEFAULT 'browser'
-  CHECK (origin IN ('browser', 'zoom_copy'));
+  CONSTRAINT presentation_material_uploads_origin_check CHECK (origin IN ('browser', 'zoom_copy'));
 
 CREATE TABLE IF NOT EXISTS zoom_video_copies (
   id UUID PRIMARY KEY,
+  upload_id UUID NOT NULL UNIQUE REFERENCES presentation_material_uploads(id),
   request_id UUID NOT NULL,
   site_visit_activity_id UUID NOT NULL,
   actor_profile_id INTEGER NOT NULL REFERENCES user_profiles(id),
   zoom_meeting_uuid TEXT NOT NULL CHECK (char_length(zoom_meeting_uuid) BETWEEN 1 AND 200),
   zoom_host_id TEXT NOT NULL CHECK (char_length(zoom_host_id) BETWEEN 1 AND 100),
+  zoom_host_email_sha256 CHAR(64) NOT NULL CHECK (zoom_host_email_sha256 ~ '^[0-9a-f]{64}$'),
   zoom_meeting_start TIMESTAMPTZ NOT NULL,
   zoom_file_id TEXT NOT NULL CHECK (char_length(zoom_file_id) BETWEEN 1 AND 200),
-  zoom_recording_type TEXT NOT NULL CHECK (zoom_recording_type IN (
-    'shared_screen_with_speaker_view', 'shared_screen_with_speaker_view(CC)')),
+  zoom_recording_type TEXT NOT NULL CHECK (zoom_recording_type ~ '^[a-z_]{1,60}(\(CC\))?$'),
   declared_size BIGINT NOT NULL CHECK (declared_size > 0 AND declared_size <= 2000000000),
-  upload_id UUID UNIQUE REFERENCES presentation_material_uploads(id),
+  confirmed_winner_document_id UUID,
+  confirmed_winner_slot_version INTEGER,
   state TEXT NOT NULL CHECK (state IN ('queued','copying','registering','copied','failed','cancelled')),
   lease_token UUID,
   lease_expires_at TIMESTAMPTZ,
+  next_attempt_at TIMESTAMPTZ,
   bytes_confirmed BIGINT NOT NULL DEFAULT 0 CHECK (bytes_confirmed BETWEEN 0 AND declared_size),
+  session_create_attempts SMALLINT NOT NULL DEFAULT 0 CHECK (session_create_attempts BETWEEN 0 AND 3),
   session_restarts SMALLINT NOT NULL DEFAULT 0 CHECK (session_restarts BETWEEN 0 AND 3),
+  uncertain_checks SMALLINT NOT NULL DEFAULT 0 CHECK (uncertain_checks BETWEEN 0 AND 3),
+  registration_attempts SMALLINT NOT NULL DEFAULT 0 CHECK (registration_attempts BETWEEN 0 AND 5),
   cancel_requested_at TIMESTAMPTZ,
   request_document_id UUID,
   sharepoint_drive_id TEXT,
   sharepoint_item_id TEXT,
-  sharepoint_quickxor_hash TEXT,
+  sharepoint_quickxor_hash TEXT CHECK (sharepoint_quickxor_hash IS NULL OR char_length(sharepoint_quickxor_hash) <= 100),
   failure_code TEXT CHECK (failure_code IS NULL OR failure_code ~ '^[a-z0-9_]{1,80}$'),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   completed_at TIMESTAMPTZ,
+  CONSTRAINT zoom_video_copies_intent_id CHECK (upload_id = id),
   CONSTRAINT zoom_video_copies_lease_shape CHECK ((lease_token IS NULL) = (lease_expires_at IS NULL)),
+  CONSTRAINT zoom_video_copies_winner_shape CHECK ((confirmed_winner_document_id IS NULL) = (confirmed_winner_slot_version IS NULL)),
+  CONSTRAINT zoom_video_copies_item_shape CHECK ((sharepoint_drive_id IS NULL) = (sharepoint_item_id IS NULL)),
   CONSTRAINT zoom_video_copies_failed_shape CHECK ((state = 'failed') = (failure_code IS NOT NULL)),
+  CONSTRAINT zoom_video_copies_terminal_unleased CHECK (state NOT IN ('copied','failed','cancelled') OR lease_token IS NULL),
+  CONSTRAINT zoom_video_copies_registering_shape CHECK (state <> 'registering' OR sharepoint_item_id IS NOT NULL),
   CONSTRAINT zoom_video_copies_copied_shape CHECK (state <> 'copied' OR (request_document_id IS NOT NULL
-    AND sharepoint_drive_id IS NOT NULL AND sharepoint_item_id IS NOT NULL AND completed_at IS NOT NULL
-    AND upload_id IS NOT NULL AND lease_token IS NULL))
+    AND sharepoint_item_id IS NOT NULL AND completed_at IS NOT NULL))
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_zoom_video_copies_active
-  ON zoom_video_copies (request_id, zoom_file_id) WHERE state IN ('queued','copying','registering','copied');
+CREATE UNIQUE INDEX IF NOT EXISTS idx_zoom_video_copies_active_request
+  ON zoom_video_copies (request_id) WHERE state IN ('queued','copying','registering');
+CREATE UNIQUE INDEX IF NOT EXISTS idx_zoom_video_copies_copied_file
+  ON zoom_video_copies (request_id, zoom_file_id) WHERE state = 'copied';
 CREATE INDEX IF NOT EXISTS idx_zoom_video_copies_work
-  ON zoom_video_copies (state, lease_expires_at) WHERE state IN ('queued','copying','registering');
+  ON zoom_video_copies (state, next_attempt_at, lease_expires_at) WHERE state IN ('queued','copying','registering');
 CREATE INDEX IF NOT EXISTS idx_zoom_video_copies_request_recent
   ON zoom_video_copies (request_id, created_at DESC);
 ```
 
-**State machine.**
-- `queued` → `copying` → `registering` → `copied`.
-- Any non-terminal state can move to `failed`.
-- `queued` and `copying` can move to `cancelled` once cancellation is confirmed.
-- `upload_id` is null only between the claim and the intent creation in the same POST. If that POST fails, the row is marked `failed`.
+**Why these shapes.**
+- **One active copy per request**, not per file. The Recording slot is per request; two different files racing one slot is the case to prevent. N1's advisory lock serializes starts; the index backs it.
+- `copied` stays unique per (request, file), so repeating Import on a copied file replays and never creates a second item. Stage 5 adds a deleted state.
+- `upload_id = id` makes "intent id derived from copy id" a constraint. The physical filename is `mintMp4Upload`'s formula with this id, `<RequestNum>-Recording-<id>.mp4` [VERIFIED via `ms:750`], and the path is unique per intent [VERIFIED via `055_post_presentation_materials.sql:130-131`].
+- The variant CHECK is a shape check; the allowlist lives in code (Transfer).
+- `zoom_host_email_sha256` lets each tick check that the approved host is still in `ZOOM_RECORDING_HOSTS` without storing the email.
 
-**Idempotency.**
-- The partial unique index means a repeated selection returns the existing row.
-- A `copied` row blocks a second copy of the same Zoom file for the same request, until Stage 5 adds a deleted state.
-- The intent's `client_resume_fingerprint` is derived on the server as `sha256("zoom-copy:" + uuid + ":" + fileId + ":" + size)`. This is lowercase hex, which its CHECK requires [VERIFIED via `055_post_presentation_materials.sql`].
-- The generation key uses `mintMp4Upload`'s formula. A registration retry after a lost response therefore recovers the same Request Document.
-
-**Browser exclusion.**
-- `listPresentationMaterialUploads` filters only on actor and non-terminal state [VERIFIED via `upload-intent-store.js:20-33`].
-- Without a marker, `projectUploadIntents` would offer staff the browser Resume, Cancel and Retry actions on a session the server owns [VERIFIED via `material-service.js:398-427`].
-- After 076, every browser-facing read and claim requires `origin = 'browser'`. That covers `getPresentationMaterialUpload`, `listPresentationMaterialUploads`, `claimPresentationMaterialUpload` and the recovery claim.
-- The cleanup claim covers both origins.
+**Intent row written by N1.**
+- `client_resume_fingerprint` = `sha256("zoom-copy:" + meetingUuid + ":" + fileId + ":" + size)`, lowercase hex as the CHECK requires [VERIFIED via `055_post_presentation_materials.sql:78-81`].
+- `generation_key` = `mintMp4Upload`'s formula with operation id = copy id [VERIFIED via `ms:752`], so a registration replay recovers the same Request Document (`ms:1284-1297`).
+- `original_display_filename` = generated `Zoom video <Mon D, YYYY h.mm AM> PT.mp4`, the 3a naming pattern [VERIFIED via `import-service.js:31-36`]. Never the Zoom topic.
+- `actor_id` = the session's Dataverse system-user GUID; `origin = 'zoom_copy'` written explicitly.
 
 **Stage 5 identities.**
-- On `copied`, the row holds the exact Request Document id, drive id and item id, independent of what later happens to the intent. It also holds the Zoom meeting UUID and file id, for deleting the Zoom original.
-- It stores no URLs, tokens, topics or names.
-- One Zoom file copied for two requests produces two owned SharePoint items. Stage 5 must check the other rows before deleting a Zoom original.
+- On `copied`: Request Document id, drive id and item id on the copy row, plus Zoom meeting UUID and file id for deleting the Zoom original.
+- Drive and item are recorded at `registering`, as soon as the exact item resolves, so unregistered bytes (failed or cancelled after bytes complete) are findable: `zoom_video_copies WHERE sharepoint_item_id IS NOT NULL AND request_document_id IS NULL`. For a failed row whose intent cleanup later bound, join through `upload_id` to `presentation_material_uploads.request_document_id`.
+- No URLs, tokens, topics or emails are stored.
+- One Zoom file copied for two requests makes two SharePoint items. Stage 5 must check the other rows before deleting a Zoom original.
 
-**Fresh-install parity.**
-- Add 076 to the `files` list in `lib/db/migrations-manifest.json`.
-- Add the same DDL to `scripts/setup-database.js`, as was done for 055 [VERIFIED: `presentation_material_uploads` appears in `scripts/setup-database.js`].
+**Fresh-install parity.** Add 076 to `lib/db/migrations-manifest.json`, and the same DDL to `scripts/setup-database.js` next to the `presentation_material_uploads` block [VERIFIED it lives at `scripts/setup-database.js:1607-1702`], in the step-0 PR.
 
 ## Routes and security
 
+**Kill switch `ZOOM_VIDEO_COPY_ACCESS=off|test:<GUID>|on`** (owner decision 4).
+- New `zoomVideoCopyAccess(env)` and `isZoomVideoCopyRequestAllowed(requestId, env)` in `lib/utils/zoom-video-copy-access.js`, copying `postPresentationMaterialsAccess` exactly: unset, empty or `off` → off; malformed → off and invalid; `test:` plus a GUID compared lowercase with a trusted server-derived request id [VERIFIED pattern via `lib/utils/post-presentation-materials-readiness.js:20-40`].
+- Read at: GET (to report `available`), start, tick entry (`off` → reconcile-finalized only; `test` → N2 scoped to that request), and in the copy fence before every post-await write. Cancel does not read it: cancel only sets a flag that stops work.
+- It is additive: start and the tick also require `isPostPresentationMaterialsRequestAllowed` (`assertFeature`, `ms:230-241`) and `readZoomImportConfig().available` [VERIFIED via `import-service.js:50-56`].
+- **Reconcile-finalized runs under `off`.** It is a Postgres-only receipt of a Dataverse create that already committed, so it changes no external system. Forbidding it would leave the card at "Saving" for a Recording that is already current.
+- **Runbook row** (build PR): non-sensitive; `off`, `test:<request GUID>` or `on`; unset or malformed is off; stops new copies and pauses in-flight ones within one deployment; the rollback drain control; set per environment; Production only while Zoom credentials are Production-only.
+- **Parity gates.** `check:transcription-pilot-deployment` needs no change. Its dedicated config allows exactly one function entry and exactly the two transcription crons, so the new cron and function entry can never enter it [VERIFIED via `scripts/check-transcription-pilot-deployment.js:86-99`]. Its standard-config check counts only transcription crons (`:122`). The meeting-transcription test Preview policy pins `POST_PRESENTATION_MATERIALS_ACCESS` (`test-deployment-policy.js:107`) but not Zoom variables; with `ZOOM_VIDEO_COPY_ACCESS` unset the copy is off there. No sibling gate needed.
+
 **New route `pages/api/meeting-tracker/visits/[requestId]/zoom-video-copies.js`.**
-- It does not extend 3a's `POST zoom-imports`. That route has an exact `{meetingUuid, nonSensitiveAcknowledged}` allowlist, is synchronous for up to 300 s, and is fenced on transcription spend [VERIFIED via `API_ROUTE_SECURITY_MATRIX.md:277`]. The copy spends nothing at any provider and must return as soon as the claim and session exist.
-- The card calls both routes behind one Import action. This follows the workflow plan's "two independent existing-route calls behind one UI action" [VERIFIED via workflow plan `:86`].
-- The preamble matches `transcriptions.js:8-37` (per the 3a plan; not re-read here).
-- **`GET`** reads Postgres only, with no Zoom call. It returns `{ copies: [{ id, meetingUuid, state, bytesConfirmed, declaredSize, failureCode }] }`.
-- **`POST`** accepts an exact discriminated body of at most 8 KB: `{action:'start', meetingUuid}` or `{action:'cancel', copyId}`. The actor comes from the session.
+- It does not extend 3a's `POST zoom-imports`, which has an exact `{meetingUuid, nonSensitiveAcknowledged}` body, runs synchronously for up to 300 s and is fenced on transcription spend [VERIFIED via `zoom-imports.js:11-12`; `API_ROUTE_SECURITY_MATRIX.md:277`]. The copy spends nothing at a provider and returns as soon as N1 commits.
+- Preamble copies `zoom-imports.js:24-33`: `isGuid(requestId)`, `requireAppAccess(req, res, 'meeting-tracker')`, an active profile, an exact body, `Cache-Control: private, no-store`, `withDalContext`. The actor comes from the session (`actorRefFromSession`). `maxDuration` 60.
+- **`GET`** reads Postgres only, with no Zoom call: `{ available, copies: [{ id, meetingUuid, state, bytesConfirmed, declaredSize, failureCode, cancelRequested }] }`.
+- **`POST`** exact discriminated body, 8 KB cap:
+  - `{ action: 'start', meetingUuid, replaces }`, where `replaces` is `null` or `{ artifactId, slotVersion }`;
+  - `{ action: 'cancel', copyId }`, with `copyId` GUID-checked at the edge.
 
-**Start** (`maxDuration` 60):
-1. Recheck Zoom availability, the transcription interlock and post-presentation access.
-2. Verify the meeting through the approved hosts' listing and the `host_id` match (3a's rule).
-3. Pick the variant. Reject files over 2,000,000,000 bytes with `zoom_video_too_large` (422).
-4. Claim the row.
-5. Create the `zoom_copy` intent and Graph session through a helper extracted from `mintMp4Upload`. The path, generation key and session code stay unchanged.
-6. Return `queued`.
+**Start.**
+1. Access: `isZoomVideoCopyRequestAllowed`, `assertFeature`, Zoom config available; `loadBoundContext` for the Request and the single active Site Visit [VERIFIED via `ms:243-265`].
+2. Verify the meeting through the approved hosts' listing and the `host_id` match (3a's rule, `import-service.js:209-219`).
+3. Pick the variant (Transfer). Over 2,000,000,000 bytes → 422 `zoom_video_too_large`; segmented → 422 `zoom_video_segmented`.
+4. **Decision 8 check.** Read the request's documents and take the current `RECORDING` winner from `projectPostPresentationMaterials(...).winners` [VERIFIED via `material-model.js:151-184`]; its kind comes from `materialBacking` (`:101-130`).
+   - Winner is SharePoint-backed (`file`), whether a staff upload or an earlier copy: `replaces` must equal `{ artifactId: winner id, slotVersion: winner wmkf_slotversion }`. `null` → 409 `zoom_video_replace_confirmation_required`, with the winner's filename and size so the card can ask. A mismatch → 409 `zoom_video_replace_stale`.
+   - No winner, or winner is a Zoom link (`external`): `replaces` must be `null`, else 409 `zoom_video_replace_stale`.
+   - The card already has both values: `materialDescriptor` returns `artifactId`, `backing` and `slotVersion` [VERIFIED via `material-model.js:186-205`]. It sends them; it never displays them.
+5. Resolve the bucket and folder (`activeBucket`, `ensureFolderPath`, as `ms:747-751`).
+6. N1, storing `replaces` as `confirmed_winner_document_id` and `confirmed_winner_slot_version`.
+7. Return `{ copy: { id, state: 'queued' } }`. Graph session creation belongs to the tick.
 
-**Cancel.**
-- Sets `cancel_requested_at`.
-- The next tick cancels the Graph session with `cancelBrowserUploadSession` semantics, where a 404 is not proof of cancellation.
-- It abandons the intent only when the exact path is absent.
+**Decision 8 at finalize.** The hook runs inside the slot fence, after `before` loads (`ms:1273`). Take the winner from `before`. If it is SharePoint-backed and its id differs from `confirmed_winner_document_id` (including when that is null), throw terminal `zoom_video_recording_replaced`. A Zoom-link winner, or the confirmed one, proceeds and is superseded by the existing predecessor logic (`ms:1274-1281`). The slot version is compared for start staleness only; inside the fence the winner id is enough, because any newer SharePoint row has a different id.
+
+**Cancel.** N6. `queued` or `copying` → flag set, 202. `registering` → 409 `zoom_video_copy_saving`. Terminal → 200 with the row.
 
 **Actor for the cron-executed registration.**
-- `finalizeClaimedMp4Upload` requires a Dataverse system-user GUID and writes with actor policy `REQUIRED` [VERIFIED via `material-service.js:351-357`, `:615-619`].
-- The tick passes the intent's stored `actor_id` as that GUID. That is the session system user who chose Import (`presentation_material_uploads.actor_id UUID NOT NULL`, 055).
-- This is the first `REQUIRED` write on this seam that scheduled code executes with a stored actor. The cron-driven Pre-Site generator uses `SCHEDULED_AUTOMATION` instead [VERIFIED via `scripts/check-request-document-writers.js:27-31`].
-- `REQUIRED` with the stored actor is recommended because a named staff member chose this exact file. Owner decision 7 confirms it.
+- `finalizeClaimedMp4Upload` writes with actor policy `REQUIRED` and a Dataverse system-user GUID [VERIFIED via `ms:351-357`, `:615-619`]. The tick passes the intent's stored `actor_id`, the session system user who chose Import.
+- First `REQUIRED` write on this seam executed by scheduled code with a stored actor; the Pre-Site generator uses `SCHEDULED_AUTOMATION` [VERIFIED via `scripts/check-request-document-writers.js:27-31`]. Owner decision 7 confirms `REQUIRED`. A disabled or stale actor is terminal (Retry policy).
 
-**New cron `pages/api/cron/drain-zoom-video-copies.js`.**
-- Uses `verifyCronSecret` and `withDalContext('cron-drain-zoom-video-copies', …)`.
-- Needs a `* * * * *` cron row and a `maxDuration: 300` functions entry.
+**New cron `pages/api/cron/drain-zoom-video-copies.js`.** `verifyCronSecret`, `MaintenanceService.startRun`, `withDalContext('cron-drain-zoom-video-copies', …)`, at most one copy row per invocation [VERIFIED pattern via `pages/api/cron/drain-materials-uploads.js:1-20`]. `* * * * *` cron row and a `maxDuration: 300` functions entry. Tick order: reconcile-finalized; access check; N2; dispatch by copy and intent state per the state table; host recheck (`getMeetingRecordings` → same `host_id`, same file id, `completed`, same size; stored host-email hash still in `ZOOM_RECORDING_HOSTS`) before any Zoom download or Graph write.
+
+**Extraction rules.**
+- Split the session-creation and finalize code out of `mintMp4Upload` and `finalizeMp4Upload` so the browser path keeps its exact behavior; characterize it first.
+- The server origin never returns, persists in plaintext or logs `uploadUrl`. It is sealed with `sealPresentationUploadUrl` like the browser path (`ms:804`). Errors carry codes only.
+- `insertPresentationMaterialUpload` writes `origin` explicitly ('browser' from `mintMp4Upload`, 'zoom_copy' only from N1).
 
 **Guards and gates.**
-- Add two matrix rows.
-- Raise `api-route-file-count` in `docs/CANONICAL_COUNTS.md` by 2.
+- Two matrix rows (route and cron). Raise `api-route-file-count` in `docs/CANONICAL_COUNTS.md` by 2.
 - Run `check:api-routes` and `check:route-service-boundary`.
-- Run `check:route-lifecycle-auth` if the visit namespace is listed in `ROUTE_NAMESPACE_LIFECYCLE`; check at build time.
+- `check:route-lifecycle-auth` does not apply: `/api/meeting-tracker` is not in `ROUTE_NAMESPACE_LIFECYCLE` [VERIFIED via `shared/config/appRegistry.js:361-410`].
+- `check:trust-boundary-guid` flags request ids that reach Dataverse sinks [VERIFIED via `scripts/check-trust-boundary-guid.js:1-40`]. `copyId` reaches only Postgres, so the gate will not see it. The route validates it with `isGuid` anyway, and a route test proves a non-GUID `copyId` is a 400 before any query. Run the gate for `requestId`.
 
 **Credentials and interlock.**
-- No new credentials. Graph uses its existing app credentials.
-- Zoom uses `ZOOM_S2S_*` and `ZOOM_RECORDING_HOSTS`, which are set in Production only, by owner decision.
-- Finalize's Dataverse create passes through the target/write interlock. SharePoint/Graph writes do not [VERIFIED via grep: no `graph` or `sharepoint` in `lib/dataverse/core/interlock.js`, no `interlock` in `lib/services/graph*`].
-- So a local run writes to whatever SharePoint site `.env.local` targets.
+- One new non-sensitive variable (above). Graph uses its existing app credentials; Zoom uses `ZOOM_S2S_*` and `ZOOM_RECORDING_HOSTS`, Production-only by owner decision.
+- Finalize's Dataverse create passes through the target/write interlock. SharePoint/Graph writes do not [VERIFIED via grep: no `graph` or `sharepoint` in `lib/dataverse/core/interlock.js`, no `interlock` in `lib/services/graph*`]. A local run writes to whatever SharePoint site `.env.local` targets.
+
+**Outside readers (denominator of four).**
+
+| Reader | `RECORDING` handling | Recipients | Effect of 3b |
+|---|---|---|---|
+| Board presentation page | Excluded by allowlist [VERIFIED via `presentation-page-service.js:29-37`, `:168`] | Board link holders | None |
+| Deliberation briefing | Excluded for listing and direct open [VERIFIED via `briefing-page-service.js:92-106`, `:294`, `:782`] | Briefing link holders | None |
+| Pre-Site distribution email | `RECORDING` is in `MATERIAL_TYPES` [VERIFIED via `pre-site-visit/distribution/model.js:23-30`]; a row is selectable only with an https `wmkf_sharepointweburl` [VERIFIED via `distribution/context.js:124-135`] | Any valid To/Cc addresses staff enter [VERIFIED via `distribution/composition.js:12-33`] | **Changes.** A valid Zoom-link row carries no SharePoint field, so it is not selectable today [VERIFIED via `material-model.js:27-33`, `:108-112`]. A copied MP4 becomes selectable, the same as a browser-uploaded MP4 today. Opening it still needs SharePoint permission [ASSUMED]. **Owner question:** keep, or drop `RECORDING` from distribution `MATERIAL_TYPES` (a separate change). |
+| Site Visit logistics | `RECORDING` is in `MATERIAL_TYPES`, projected with `webUrl` [VERIFIED via `site-visit/logistics-service.js:59-68`, `:396-420`] | Staff only: `meeting-tracker/visits/[requestId]/index.js:58` and `workbench/site-visit/logistics.js:66` | Shows the SharePoint MP4 instead of nothing; staff-only |
 
 ## Card (Recording slot)
 
 **Step 1 picker.**
-- Each meeting gets a video line: "Video: not copied", "Copying 120 of 240 MB", "Saving", "Copied" or "Copy failed".
-- Import starts both audio and video. A meeting imported before 3b offers **Copy video** on its own.
-- The card polls `GET zoom-video-copies` every 10 s only while a copy is non-terminal, under the existing request-generation guard.
+- Each meeting gets a video line: "Video: not copied", "Waiting to copy", "Copying 120 of 240 MB", "Saving", "Copied", "Copy failed" or "Cancelled".
+- Import starts audio and video. A meeting imported before 3b offers **Copy video** on its own.
+- When access is off (`available: false`), no copy actions show.
+- Polls `GET zoom-video-copies` every 10 s only while a copy is non-terminal, under the existing request-generation guard.
+
+**Replace confirmation (decision 8).** When the current Recording is a SharePoint MP4, Import, **Copy video** and **Try again** first ask: "This will replace the recording file already saved for this request. Continue?" The card sends the winner's `artifactId` and `slotVersion` as `replaces`. On 409 `zoom_video_replace_stale` it reloads and asks again. When the current Recording is a Zoom link or empty, the card sends `replaces: null` and does not ask.
 
 **Step 3, Full meeting → Recording.**
-- While copying, the card keeps the Zoom link and adds "Copying the video from Zoom into SharePoint".
-- On failure it shows "The video was not copied. The Zoom link still works." with **Try again**, which claims a new row.
-- Once the copy succeeds, the existing projection shows the SharePoint MP4 as the current Recording, and the Zoom-link row is superseded.
-- The card stays staff-only and desktop-first, and shows no internal ids.
+- While copying, the Zoom link stays and the card adds "Copying the video from Zoom into SharePoint." with **Cancel copy** (only in `queued`/`copying`).
+- On failure: "The video was not copied. The Zoom link still works." with **Try again**, which starts a new copy.
+- On `zoom_video_recording_replaced`: "A newer recording was saved while the video was copying, so the copy was not used."
+- Once copied, the existing projection shows the SharePoint MP4 as the current Recording and the Zoom-link row is superseded.
+- Staff-only, desktop-first, no internal ids shown.
 
 ## Partial success and concurrency
 
 | Case | Behavior |
 |---|---|
-| Audio imported, video failed | The transcript proceeds and the Zoom link stays current. A video retry claims a new row and never touches the transcription job. |
+| Audio imported, video failed | The transcript proceeds; the Zoom link stays current. **Try again** starts a new copy and never touches the transcription job. |
 | Video copied, audio failed | The Recording slot shows the MP4. Step 1 still offers the audio import. |
-| Bytes complete, registration fails | The row stays `registering`. Each tick re-runs the idempotent finalize, which recovers by generation key. After the intent's review window the row becomes `failed` (`zoom_video_registration_failed`), and the candidate is left to the existing cleanup reconciler. |
-| Transcription cancelled (#469/#470), or audio re-imported | No effect on the copy, because the two rows are independent. |
-| Staff upload an MP4 manually during a copy | The higher slot fence at finalize wins. Existing code supersedes the loser or records it for reconciliation. |
-| Visit unbound, access `off`, or Zoom config removed mid-copy | The tick stops before any write. The row becomes `failed` (`zoom_video_binding_changed` or `zoom_video_unavailable`), and the session is cancelled. |
-| Zoom file deleted or changed | The row becomes `failed` (`zoom_recording_changed`), and the partial session is cancelled. |
+| Bytes complete, registration fails | Copy stays `registering`; retries with backoff up to 5 attempts, each recovering by generation key. Terminal codes stop at once. Bytes stay unregistered with drive/item on the copy row. |
+| Finalize committed, tick died before `copied` | The next tick's reconcile-finalized writes `copied`. |
+| Transcription cancelled (#469/#470), or audio re-imported | No effect; the rows are independent. |
+| Staff upload an MP4 while a copy runs | The upload wins the slot when it finalizes first. The copy's finalize then aborts `zoom_video_recording_replaced` (decision 8). If the copy finalizes first, the later staff upload supersedes it (existing behavior). |
+| Staff save a new Zoom link while a copy runs | The copy proceeds and supersedes the link at finalize. |
+| Second Import for another meeting on the same request | 409 `zoom_video_copy_active` until the first copy ends. |
+| Visit unbound, post-presentation access denied, Zoom config removed, copy access off | Pause: no claim, no writes. Staff can cancel; the flag is processed when work resumes. |
+| Zoom file deleted or changed, host removed from the allowlist | `failed` (`zoom_recording_changed` or `zoom_video_host_not_approved`), and the session is cancelled. |
+| Two ticks overlap (every-minute cron, 300 s function) | `FOR UPDATE SKIP LOCKED` in N2 plus the 600 s copy lease give each row one worker. |
 
 ## Durable surfaces to update in the build
 
-- **Atlas:**
-  - a new `docs/atlas/postgres-zoom-video-copies.md` page and its index row;
-  - the `origin` column, in the `presentation_material_uploads` entry of `docs/atlas/postgres-infra-tables.md`;
-  - the second `RECORDING` producer path, in `docs/atlas/dataverse-wmkf-requestdocument.md`.
+- **Atlas:** new `docs/atlas/postgres-zoom-video-copies.md` and its index row; the `origin` column in `docs/atlas/postgres-infra-tables.md` (step 0); the second `RECORDING` producer path in `docs/atlas/dataverse-wmkf-requestdocument.md`.
 - **API matrix:** two rows.
-- **`docs/CANONICAL_COUNTS.md`:** the route count.
+- **`docs/CANONICAL_COUNTS.md`:** route count +2.
+- **`docs/CREDENTIALS_RUNBOOK.md`:** the `ZOOM_VIDEO_COPY_ACCESS` row, next to `POST_PRESENTATION_MATERIALS_ACCESS` (`:287`).
 - **`docs/CI_GATES_REFERENCE.md`:** only if a gate changes.
-- **`docs/SERVICE_AND_UTILITY_CATALOG.md`:** the copy service and the streaming Graph chunk helper.
-- **Plans:** the workflow plan's Stage 3 note, and this plan's status.
-- **Credentials runbook:** no change, unless the owner chooses a kill switch (decision 4).
+- **`docs/SERVICE_AND_UTILITY_CATALOG.md`:** the copy service, the copy store, `fetchRecordingRange`, `putUploadSessionChunk`, the access helper.
+- **`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`:** the server-origin `RECORDING` producer.
+- **Plans:** the workflow plan's Stage 3 note and this plan's status.
 
 ## Tests (discriminating, with mutation checks)
 
-**Pump (fake Zoom and Graph servers).**
-- It resumes from Graph's offset, not from `bytes_confirmed`. Mutation check: resuming from the database column fails the case where Graph is ahead.
-- A 200 response (no Range support) discards exactly the prefix before Graph's offset.
-- Short or misaligned chunks are rejected.
-- An HTML 200 and a redirect to a non-Zoom host are rejected.
-- A URL that expires mid-tick is refetched once.
-- A changed size or file id fails the copy.
-- A 410 restarts the copy at 0, at most 3 times.
-- The 240 s budget stops cleanly.
-- Peak buffered bytes stay at or below one chunk.
+**Step 0: browser isolation and version skew.**
+- Characterize the browser MP4 path first: mint, status, retry (410 restart, 404 uncertain), cancel, finalize, finalized replay, projection.
+- Seed nonterminal `zoom_copy` intents in each shape: `initiated` without ciphertext, `initiated` with ciphertext, `failed` without candidate, `uploaded` with candidate, `finalizing` with an expired lease. Run every browser path against each with the same actor and request: list and `projectUploadIntents`, `getMp4UploadStatus`, `retryMp4Upload`, `cancelMp4Upload`, `finalizeMp4Upload`, and a `mintMp4Upload` replay of the same id. Expect not-listed or 404, and **no row change**. Mutation: drop `origin='browser'` from any one query; its case must fail.
+- Cleanup still claims expired intents of both origins.
 
-**Store.**
-- A start race returns one row.
-- A `copied` row blocks re-copying. Mutation check: dropping `copied` from the index predicate fails the test.
-- A stale lease can be taken over.
-- Cancel fences a running tick.
-- Browser list, claim and resume exclude `origin='zoom_copy'`. Mutation check: removing the filter fails the card-projection test.
+**Store (N1–N7, I1–I3) against real Postgres.**
+- Concurrent starts for two different files on one request → one row, one 409. Mutation: remove the advisory lock and the active-request index; the race test must fail.
+- N1 leaves both rows or neither (kill between the inserts by throwing).
+- A `copied` row replays. Mutation: drop the copied-file index.
+- N5 refuses a row with a live copy lease and accepts it once expired.
+- I1 rejects `uploaded`, a candidate, a live lease and `origin='browser'`. I3 rejects `initiated`. I2 rejects a wrong token.
+- A stale tick's write after takeover fails on every token predicate.
+- Dispatch: an `abandoned`, rejected or expired intent ends the copy `failed`; an intent leased by cleanup makes the tick release and exit. Mutation: route an `abandoned` intent to I1; the copy must not stay `copying`.
+
+**Pump (fake Zoom and Graph servers).**
+- Resumes from Graph's offset, not `bytes_confirmed`. Mutation: resume from the column; the "Graph ahead" case fails.
+- A 200 to a ranged GET is terminal `zoom_range_unsupported`, with zero bytes PUT.
+- Wrong `Content-Range`, short body, `text/html` and a non-Zoom redirect are rejected.
+- A 403 from the resolved URL re-resolves once and continues; a second 403 on the same chunk is terminal.
+- No request after hop 0 carries the bearer; no log line, error or row contains a URL. Mutation: send the bearer on later hops.
+- A failed Graph PUT does not DELETE the session.
+- **410 with all checks absent** restarts at 0, at most 3 times. **404** marks uncertain and never restarts. Mutation: treat 404 like 410; the 404 case must fail.
+- Restart re-claims I1 after `recordPresentationMaterialUploadRecoverySession` clears the lease.
+- A cancel flag set during the last chunk still lets the candidate write land, then cancels with drive/item recorded.
+- Budget: with a fake clock, no chunk starts under 110 s left and finalize does not start under 150 s. Peak buffered bytes ≤ one chunk.
+- Changed size, file id or host fails the copy.
+- Kill switch: `off` → only reconcile-finalized runs; `test:<other GUID>` → N2 claims nothing for this request.
 
 **Registration.**
-- Replaying finalize recovers the same Request Document.
-- The Zoom-link predecessor is superseded.
+- Replaying finalize recovers the same Request Document; the Zoom-link predecessor is superseded.
+- Crash after `completePresentationMaterialUpload` → next tick writes `copied`.
+- Decision 8: a SharePoint winner newer than the confirmed one aborts `zoom_video_recording_replaced` with no create. Mutation: skip the hook; the test must see a superseded staff MP4.
+- Actor unavailable, signature, malware → terminal on the first attempt. Slot busy → retry with backoff, capped at 5.
+- The `renewOrStop` closure runs before `acquireMaterialSlot`. Mutation: remove that call; a cancel or lease loss injected there must still be caught.
 
-**Outside readers.** Inject a copied-recording row, with the real producer and drive/item ids, into both reader suites. Cover both listing and direct open.
+**Cancel.** Before bytes → intent `abandoned`, copy `cancelled`. Flag seen after bytes → copy `cancelled` with drive/item, intent `uploaded`. A 404 from DELETE alone never yields `cancelled`. POST cancel on `registering` → 409.
 
-**Routes.**
-- The body must match exactly.
-- The actor comes from the session.
-- GET makes no Zoom call.
+**Routes.** Exact bodies; `replaces` required with a SharePoint winner and stale-checked; actor from session; non-GUID `copyId` → 400 before any query; GET makes no Zoom call.
 
-**Card.**
-- Progress shows while copying.
-- Failure shows the plain-language copy and **Try again**.
-- Polling stops at a terminal state.
+**Outside readers.** Inject a copied-recording row with the real producer and drive/item ids into the Board and briefing suites, for listing and direct open. Add a distribution case that pins whichever answer the owner gives.
 
-**Gates**, each with its self-test, run sequentially:
-- migrations-manifest, atlas, api-routes, route-service-boundary, route-lifecycle-auth;
-- request-document-writers (expect no new writer row);
-- fact-consistency, secret-scan, doc-currency;
-- types and scoped ESLint.
+**Card.** Progress while copying; replace confirmation shown only for a SharePoint winner; failure copy and **Try again**; polling stops at a terminal state.
+
+**Gates**, each with its self-test, run sequentially: migrations-manifest, atlas, api-routes, route-service-boundary, trust-boundary-guid, request-document-writers (expect no new writer row), transcription-pilot-deployment, fact-consistency, secret-scan, doc-currency, types and scoped ESLint.
 
 ## Release (Tier 2)
 
-This is Tier 2: it adds background work, uploads and a migration [VERIFIED via `CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md:119-131`].
+Tier 2: background work, uploads and a migration [VERIFIED via `CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md:119-131`]. Preview cannot exercise it: Zoom credentials are Production-only, and Vercel runs crons only on Production [ASSUMED, from memory of the Vercel cron docs].
 
-Preview cannot exercise this stage. It has no Zoom credentials, and Vercel runs crons only on Production [ASSUMED, from memory of https://vercel.com/docs/cron-jobs].
-
-1. Build on a feature branch. Add characterization tests of the browser MP4 path before the marker column lands.
-2. Run the Mode A suites locally.
-3. With owner approval, invoke the cron route once locally with `CRON_SECRET`, against a marked TEST request. Before that run, the owner confirms which Dataverse host and SharePoint site `.env.local` targets.
-4. The owner applies 076 to Production Postgres.
-5. Merge, with the last-known-good deployment and rollback recorded.
-6. Run Mode D acceptance on one real recording the owner chooses. List the expected writes and cleanup beforehand, then confirm:
-   - the SharePoint size equals the Zoom `file_size`;
-   - the file plays;
+0. **Browser isolation first, as its own PR** (mirrors Stage 2's step 0, `PAIRED_SUMMARIES_PLAN_2026-10-08.md:245`).
+   - The owner applies 076 (`node scripts/apply-migrations.js`). The column defaults to `browser` and the table is inert, so current code is unaffected.
+   - The PR adds `AND origin = 'browser'` to `getPresentationMaterialUpload` (`:9-18`), `listPresentationMaterialUploads` (`:20-34`), `claimPresentationMaterialUpload` (`:181-206`) and `claimPresentationMaterialUploadRecovery` (`:265-282`). The unleased writers a browser path reaches after a get also gain it: `recordPresentationMaterialUploadSession` (`:55-71`), `markPresentationMaterialUploadFailed` (`:93-101`), `markPresentationMaterialUploadSessionClosed` (`:103-118`), and the token-less arms of `refreshPresentationMaterialUploadSession` (`:73-91`) and `recordPresentationMaterialUploadCandidate` (`:156-177`), as `AND (${leaseToken}::uuid IS NOT NULL OR origin = 'browser')`. Token-keyed and cleanup functions stay origin-agnostic.
+   - `insertPresentationMaterialUpload` writes `origin` explicitly. `setup-database.js` and the manifest get 076.
+   - Ships with the characterization and version-skew tests above. **This release is the oldest permitted rollback target.**
+1. Build on a branch off `main`. Mode A suites locally. Claude review and an ordinary Codex adversarial review; no metered products.
+2. Probes 2–5 as the owner authorizes; update the [ASSUMED] items they settle.
+3. With owner approval, invoke the cron route once locally with `CRON_SECRET` and `ZOOM_VIDEO_COPY_ACCESS=test:<marked TEST request>`. Beforehand, the owner confirms which Dataverse host and SharePoint site `.env.local` targets.
+4. Merge with `ZOOM_VIDEO_COPY_ACCESS` unset (off) in Production. Verify the Production deployment is the merge build.
+5. Set `test:<GUID>` for the owner-chosen request and redeploy. Mode D on one real recording. List expected writes and cleanup first, then confirm:
+   - the SharePoint size equals the Zoom `file_size`, and the file plays;
    - the Request Document is visible to staff and absent from the Board page and the briefing;
    - the Zoom link is superseded;
-   - repeating Import creates nothing new.
+   - repeating Import creates nothing new;
+   - a second run against a request with a staff MP4 asks for confirmation.
+6. Owner sets `on`.
+
+**Rollback.** Set `off`, redeploy, wait 10 minutes, then revert the 3b merge, never past step 0. Rows stay; the state table's rollback row says what touches them.
 
 ## Pre-implementation read-only probes (owner to authorize)
 
@@ -421,6 +556,8 @@ Preview cannot exercise this stage. It has no Zoom credentials, and Vercel runs 
   - the 3a plan's own Build status line.
 
 ## Review — Session 588 (2026-10-08)
+
+**Folded in (Session 588 rework):** item 1 (Range livelock) → Transfer, "Range": no fallback, a non-206 is terminal `zoom_range_unsupported`. Item 2 (lease choreography) → "State machine and leases": NEW origin-aware I1–I3 and N1–N7 with exact predicates, the reuse rule, and the copy fence. Item 3 (finalized replay) → state table "Reconcile-finalized", run first in every tick. Item 4 (killed start) → N1 inserts both rows in one transaction with `upload_id = id`; session creation is tick-owned ("Session create" row). Item 5 (404 vs 410) → "What exists today, Session loss" and the "Session restart" row, which keep `retryMp4Upload`'s semantics. Item 6 and decision 8 → Routes "Start" step 4, "Decision 8 at finalize", and the Card's replace confirmation. Item 7 (rollback exposure) → Release step 0 and the "Rollback" row. Item 8 (registration loop) → "Retry policy". Item 9 → Schema "Stage 5 identities" and the cancel rows (drive/item and cancel after bytes); Transfer "Variant and segments" and the shape CHECK; Routes "Extraction rules"; Transfer "Tick budget"; the cron's per-tick host recheck; Routes "Guards and gates" on `copyId`; Routes "Outside readers" (denominator of four, with an owner question on Pre-Site distribution). Decision 4 → Routes "Kill switch". The review text below is kept as the record.
 
 Reviewers: a Claude source review (`/contract-reconcile` Mode A) and a Codex adversarial review (`gpt-6-astra`). No live probe ran. **Probe 1 result (Session 588):** Zoom honors Range (206) on the final `ssrweb.zoom.us` hop, including at an offset without the bearer. See "Pre-implementation read-only probes". Item 1 below therefore becomes "a 200 response to a ranged request is terminal", not a fallback.
 
