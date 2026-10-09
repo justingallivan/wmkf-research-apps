@@ -285,6 +285,38 @@ describe('summary-draft routes', () => {
     }
   });
 
+  test('POST accepts kind and replaceDraft, and GET passes its kind query (paired summaries plan D2)', async () => {
+    const body = { ...createBody, kind: 'discussion', replaceDraft: { draftId, expectedVersion: 3 } };
+    const post = response();
+    await summaryDraft({ method: 'POST', query: { requestId }, body }, post);
+    expect(post.statusCode).toBe(200);
+    expect(createSummaryDraft).toHaveBeenCalledWith(expect.objectContaining({ body }));
+    const nullReplace = response();
+    await summaryDraft({ method: 'POST', query: { requestId }, body: { ...createBody, replaceDraft: null } }, nullReplace);
+    expect(nullReplace.statusCode).toBe(200);
+    const get = response();
+    await summaryDraft({ method: 'GET', query: { requestId, kind: 'discussion' } }, get);
+    expect(getSummaryDraft).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'discussion' }));
+    expect(get.statusCode).toBe(200);
+  });
+
+  test.each([
+    ['POST with kind board', 'POST', { requestId }, { ...createBody, kind: 'board' }],
+    ['POST with a non-string kind', 'POST', { requestId }, { ...createBody, kind: 1 }],
+    ['POST replaceDraft with an extra key', 'POST', { requestId }, { ...createBody, replaceDraft: { draftId, expectedVersion: 1, x: 1 } }],
+    ['POST replaceDraft with a non-GUID id', 'POST', { requestId }, { ...createBody, replaceDraft: { draftId: 'x', expectedVersion: 1 } }],
+    ['POST replaceDraft with version 0', 'POST', { requestId }, { ...createBody, replaceDraft: { draftId, expectedVersion: 0 } }],
+    ['POST with a kind query', 'POST', { requestId, kind: 'discussion' }, createBody],
+    ['GET with kind board', 'GET', { requestId, kind: 'board' }, undefined],
+    ['GET with a repeated kind', 'GET', { requestId, kind: ['presentation', 'discussion'] }, undefined],
+  ])('rejects %s', async (_label, method, query, body) => {
+    const res = response();
+    await summaryDraft({ method, query, body }, res);
+    expect(res.statusCode).toBe(400);
+    expect(createSummaryDraft).not.toHaveBeenCalled();
+    expect(getSummaryDraft).not.toHaveBeenCalled();
+  });
+
   test('publish rejects a malformed body and non-POST methods', async () => {
     const bad = response();
     await summaryPublish({ method: 'POST', query: { requestId }, body: { draftId, expectedVersion: '2' } }, bad);
