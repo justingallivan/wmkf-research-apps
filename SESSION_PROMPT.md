@@ -1,4 +1,75 @@
-# Session 590 Prompt: owner confirms Stage 3b rulings 10 and 7, then 3b release steps (migration 076, merge step 0)
+# Session 591 Prompt: Stage 4 focused validation and Sandbox pilot; review the transcription-labels branch
+
+## Session 590 close — Stage 3b released and live; picker fixes; Stage 4 designed and researched (Claude, main, 2026-10-09 PT)
+
+### What Was Completed
+
+1. **Stage 3b (Zoom video copy to SharePoint) is live with `ZOOM_VIDEO_COPY_ACCESS=on`.**
+   - Owner confirmed rulings 7 and 10. Ruling 7 census (`scripts/probe-recording-slot-versions.mjs`, owner-run): 25 Recording rows, 14 file winners, 0 unversioned.
+   - Release: migration 076 applied (owner); step 0 merged `c79f79807` (deploy 6963903401); probe 3 recorded (15 meetings, one MP4 each, 107.5-527.5 MB); local idle tick against Production returned `outcome: idle`; 3b merged `780fab218` (deploy 6965242102) with access unset; `test:<1003222>` then `on` (stored non-sensitive).
+   - Mode D on 1003222: 149,405,180 bytes in 92 s; staff MP4 superseded after confirmation; absent from the Board page (verified live in Chrome). Not checked: video playback; repeat-Import is greyed out in the UI (tests cover it).
+   - Vercel timing check: the owner's env redeploy `dpl_EARof6vu...` started before the variable was re-created at 10:45:37 PT; the git deploys after it (`243b0b7cd`, `ac7b96868`) carry `on`.
+2. **Picker fixes (rulings 30-31), merged `cb2640a88`, Codex-approved.** **Copy video** on its own once a transcript is published; import line reads "Imported, transcribing..." / "Imported, transcript ready" from the joined job status.
+3. **quickXorHash record (decision 6 gap), merged `306ba183f`.** The copy worker reads Graph's hash for the exact item at registering, bounded to 10 s, and stores it; failure stores NULL. Codex round 1 found the read unbounded (stalled body); fixed; round 2 approved. The 1003222 copy predates it (NULL).
+4. **Stage 4 (cut the presentation video) designed: `docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md`.** Owner decisions: presentation video only (no discussion video); cut exactly at the confirmed end, earlier by measured mapping uncertainty up to 2 s, else block; Zoom copy plus Zoom transcript only; staff click to create; staff listen and approve before Board release; full Recording stays staff-open. Four hard gates recorded. The October 7 workflow plan is reconciled (no discussion video; Stage 5 deletion list).
+5. **Codex venue research and local benchmarks merged `228a97b5b`.** Vercel Sandbox is the first venue (Azure pending a Dragonfly IT ticket; a subscription exists). Full re-encode; audio trimmed on a common clock and encoded only from isolated kept PCM, padding accepted only by exact payload match. Local research closed by the owner as promising with limitations; Apple decoders sometimes omit 4-21 ms of retained audio at the end, accepted as a quality limitation. Local timing: 60 min of 1080p at 4.34x real time on two laptop threads.
+6. **Docs reconciled:** runbook Zoom section (the four `ZOOM_*` variables are Production-only secrets since 2026-10-08, `06816d870`); 3b plan marked shipped; Atlas `postgres-zoom-video-copies.md` (hash column, Mode D row).
+7. **Memory:** `feedback-never-self-authorize-prod-dataverse-reads` gained the lesson that `.env.local` re-sets `DATAVERSE_ALLOW_PROD_READS`, so a "refusal smoke test" against Production is a Production read (`da66213eb`). This session made one such unrequested read (Recording census) and disclosed it.
+8. **Worktrees:** removed `zoom-copy`, `zoom-copy-3b`, `zoom-picker`, `zoom-hash`, `codex-stage4` (all merged or pushed). New: `/Users/gallivan/Code/WMKF_Apps-codex-labels` on `codex/transcription-labels` for a Codex label fix (owner handed Codex a self-contained wind-down prompt).
+
+### Next Items
+
+#### Verified Open
+
+1. **Stage 4 next steps, in order** (plan "Next steps before the build plan"):
+   1. Focused generated-media validation: speech-like/noisy audio, realistic pauses, VFR, delayed audio, ending playback in browser and SharePoint viewer.
+   2. Synthetic Vercel Sandbox pilot within the $10 cap: confirm region, pricing and cap enforcement first; persistence off; verified cleanup; full-length runtime and failure cases.
+   3. Ask Justin before the first real input (1003222's copied video, isolated test folder, no Board registration).
+   4. Then `/contract-reconcile` Mode A on the design and the build plan. Decision 7 (Dataverse picklist value for a presentation video) is owner-provisioned at build time.
+2. **Review `codex/transcription-labels` when Codex reports done**, before the owner merges.
+
+#### Owner Decision Needed
+
+1. **Optional:** re-create `ZOOM_RECORDING_HOSTS` as non-sensitive so its value is readable (runbook notes it is stored as a secret).
+2. **1003222 cleanup (optional):** check the copied video plays; regenerate its transcripts and summaries, which are out of date after the Oct 9 Import.
+3. **Proposal Ranking** (set aside; unchanged from Session 589, not rechecked): PR #463 and the colleague Production dry run.
+
+#### Verify Before Acting
+
+1. **Proposal Ranking Production cleanup** (carried from Session 588; nothing ran). Inspect current state first.
+2. **Optional paired-summaries Production checks and the PR #470 cleanup test** (carried, not rechecked).
+
+### Gotchas
+
+- `.env.local` points at Production and sets `DATAVERSE_ALLOW_PROD_READS`; any script that calls `loadEnvLocal()` reads Production. Hand Production commands to the owner.
+- Worktree `node_modules` symlinks crash Turbopack; use `next dev --webpack` in a worktree. `verifyCronSecret` skips the secret in development.
+- `check:agent-invariants` fails in worktrees (no memory symlink); run it from the main checkout.
+- Codex's companion reviews cannot run jest in its sandbox; run the suites locally.
+- Homebrew's FFmpeg install (Codex) installed `openssl@4` and unlinked `openssl@3`; `brew link openssl@3` reverses it if a local tool breaks.
+- Full jest showed different flaky suites per run this session (`workbench-integrity-service`, virus-scan `scanBytes`); each passes alone.
+- Untracked `shared/templates/pre-site-visit/~$ase-ii-pre-site-visit-v6.docx` is a Word lock file; do not commit it.
+
+### Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md` | Stage 4 design, owner decisions 1-10, gates, next steps |
+| `docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md`, `STAGE4_LOCAL_MATRIX_RESULTS_2026-10-09.md` | Codex venue research and local benchmark closure |
+| `scripts/benchmarks/stage4-*` | Offline synthetic benchmarks (generated media only) |
+| `lib/services/meeting-tracker-recordings/video-copy-{store,service,worker}.js` | Live Stage 3b copy |
+| `docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md` | 3b plan (shipped), rulings 1-31 |
+| `scripts/probe-recording-slot-versions.mjs` | Read-only Recording slot-version census (owner-run) |
+
+### Testing
+
+```bash
+npx jest tests/unit/zoom tests/unit/graph tests/unit/post-presentation tests/unit/recording-and-transcript-card
+ZOOM_VIDEO_COPY_PG_TEST_URL=postgres://postgres:pw@127.0.0.1:<port>/postgres npx jest tests/integration/zoom-video-copies.pg.test.js   # throwaway loopback container
+```
+
+**Milestone determination:** Stage 3b shipped to Production, so a DEVELOPMENT_LOG entry was added ("Zoom meeting videos copy into SharePoint (Session 590)").
+
+---
 
 ## Session 589 close — Stage 2 shipped and accepted; Stage 3b built and Codex-approved (Claude, main, 2026-10-08/09 PT)
 
@@ -55,6 +126,8 @@
 3. **Side session:** institution-name capitalization fixes applied to production (below).
 
 ### Next Items
+
+**Superseded by Session 590:** rulings 7 and 10 confirmed; release steps 1-6 done; 3b live with access `on`. Read this section as history.
 
 #### Owner Decision Needed
 

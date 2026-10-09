@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Zoom meeting videos copy into SharePoint (Session 590)
+
+**Milestone:** Staff can copy a site visit's Zoom meeting MP4 into the request's SharePoint folder as its staff-only Recording, from the same picker that imports the audio. `ZOOM_VIDEO_COPY_ACCESS=on` in Production.
+**Sessions:** 589 (build, Codex-approved round 5) and 590 (release). Migration 076 applied; merges `c79f79807` (step 0: origin column, browser isolation), `780fab218` (Stage 3b), `cb2640a88` (picker fixes), `306ba183f` (quickXorHash record).
+**Ship state:**
+- An every-minute cron copies one meeting at a time in resumable ranged chunks through a Graph upload session, then registers it under the slot fence. Replacing a staff MP4 needs explicit confirmation.
+- Mode D on test request 1003222: 149,405,180 bytes in 92 s, staff MP4 superseded, absent from the Board page.
+- Picker: **Copy video** on its own once a transcript exists; import lines follow the transcription job's status.
+**Why it matters:** the full meeting video now lives in governed WMKF storage, the input Stage 4 will cut into a Board-eligible presentation video.
+**Pointers:** `docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md`; `docs/atlas/postgres-zoom-video-copies.md`; `lib/services/meeting-tracker-recordings/video-copy-{store,service,worker}.js`; next stage `docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md`.
+
 ## October 2026 — Paired presentation and staff discussion summaries ship (Sessions 588–589)
 
 **Milestone:** One Meeting Tracker action drafts both the presentation summary and a staff-only staff discussion summary. Each kind is reviewed, edited and published separately.
