@@ -83,7 +83,7 @@ Edit `shared/components/meeting-tracker/RecordingAndTranscriptCard.js` and `test
 
 ### 2. Paired summaries feature
 
-**Production-live 2026-10-09 (merge `5b8225ed8`, Production deployment 6952181551 success); acceptance on 1003222 not yet run.** Planned and built in `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md` (migration 075, artifact type 100000010, prompt `meeting-transcript.staff-discussion-summary`; owner decisions 1–12). The paragraphs below are the original direction.
+**Production-live 2026-10-09 (merge `5b8225ed8`, Production deployment 6952181551 success); acceptance on 1003222 verified 2026-10-09 except the in-run reload and a draft edit, which were not observed (see that plan's release step 7).** Planned and built in `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md` (migration 075, artifact type 100000010, prompt `meeting-transcript.staff-discussion-summary`; owner decisions 1–12). The paragraphs below are the original direction.
 
 Extend existing routes `pages/api/meeting-tracker/visits/[requestId]/transcriptions/summary-draft.js` and `summary-draft/publish.js` with explicit allowlisted summary kind handling, preserving existing callers. Prefer two independent existing-route calls behind one UI action over a new batch route or a doubled synchronous server timeout. Each request records consent and source identity separately. The UI uses independent results and retries only the failed kind. An interrupted browser reload recovers durable drafts from GET.
 

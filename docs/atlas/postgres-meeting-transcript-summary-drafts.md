@@ -35,7 +35,7 @@ columns below (`docs/plans/STAFF_APPLICANT_MATERIALS_REPLACEMENT_PLAN_2026-10-05
 applied, 70 skipped). The code that writes and reads the columns shipped in
 PR #441 merge `b4fa78819`, deployment `dpl_6kkxdv6oq8JLa4Xyx1T8SS5Szi1W`.
 
-**[PRODUCTION-LIVE 2026-10-09: migration 075 applied (owner-run: 1 applied, 74 skipped); merge `5b8225ed8`, Production deployment 6952181551 success. Acceptance on test request 1003222 not yet run.]**
+**[PRODUCTION-LIVE 2026-10-09: migration 075 applied (owner-run: 1 applied, 74 skipped); merge `5b8225ed8`, Production deployment 6952181551 success. Accepted on test request 1003222 2026-10-09 (paired summaries plan, release step 7).]**
 Stage 2 of `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md` (D2, D4, D7). Migration
 075 widens the `artifact_type` CHECK to `(100000007, 100000010)`. The reservation,
 not-recorded marker and widened run read below shipped with that merge. The release order is the plan's "Release sequence".

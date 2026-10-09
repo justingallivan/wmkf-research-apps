@@ -795,7 +795,7 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md` D1, D3, D7, D8;
   **[PRODUCTION-LIVE 2026-10-09: merge `5b8225ed8`, Production deployment 6952181551 success; picklist value,
   prompt v1 and migration 075 provisioned 2026-10-09 by the owner. Acceptance on
-  1003222 not yet run.]**): the same service publishes a reviewed draft
+  1003222 2026-10-09: both outside routes 404 the discussion row.]**): the same service publishes a reviewed draft
   of the discussion kind (`SUMMARY_KINDS.discussion`) from the bound Staff
   Discussion Transcript, never slides, as a BOM-prefixed TXT under
   `Site Visit - Staff Discussion Summary/`, prompt

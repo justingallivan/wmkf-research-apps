@@ -17,7 +17,7 @@ The chronological archive after the `Legacy chronological session log` divider c
 **Ship state:**
 - New artifact type 100000010 Staff Discussion Summary, migration 075 and prompt `meeting-transcript.staff-discussion-summary` v1, all provisioned by the owner 2026-10-09. The Board and briefing links never serve it.
 - The server refuses to replace a ready draft unless the request names it (fixes an old-tab overwrite of edited presentation drafts). An empty staff discussion shows "Not recorded" with no provider call.
-- Acceptance on test request 1003222 not yet run.
+- Accepted on test request 1003222 2026-10-09. Staff Deliberations and the card show both summaries. The Board and briefing pages list only the presentation summary, and both refuse the discussion row by direct id (404). The reload during a run and a draft edit were not observed.
 **Why it matters:** staff get a summary of their own deliberation without risking it reaching the Board page, and edited drafts can no longer be silently discarded.
 **Pointers:** `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md`; `lib/services/post-presentation-materials/transcript-summary-service.js`; `summary-draft-store.js`; `shared/components/meeting-tracker/RecordingAndTranscriptCard.js`.
 

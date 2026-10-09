@@ -3,7 +3,7 @@ title: Paired presentation and staff discussion summaries (Stage 2)
 domain: transcription
 kind: plan
 status: active
-summary: "One staff action drafts both a presentation summary and a staff-only discussion summary by calling the existing summary-draft routes once per allowlisted kind. Each kind has its own consent record, retry, draft and publish; the server refuses to replace a ready draft unless the request names it. Production-live 2026-10-09 (merge 5b8225ed8, deployment 6952181551) after the owner-run picklist insert (100000010), migration 075 and discussion prompt seed. Acceptance on test request 1003222 (release step 7) not yet run."
+summary: "One staff action drafts both a presentation summary and a staff-only discussion summary by calling the existing summary-draft routes once per allowlisted kind. Each kind has its own consent record, retry, draft and publish; the server refuses to replace a ready draft unless the request names it. Production-live 2026-10-09 (merge 5b8225ed8, deployment 6952181551) after the owner-run picklist insert (100000010), migration 075 and discussion prompt seed. Acceptance on 1003222 verified 2026-10-09 except the in-run reload and a draft edit."
 owner: product-engineering
 related:
   - docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md
@@ -18,7 +18,7 @@ related:
 
 ## Status and authority
 
-**Production-live 2026-10-09 (merge `5b8225ed8`, Production deployment 6952181551 success); acceptance (step 7) not yet run.** Built on branch `claude/paired-summaries` (Sessions 588–589); `main` was merged into it first (`62646a928`; 21,659 tests and 22 gates passed). Release step 0 is live on `main` (merge `82c6cb26d`, deployment 6951088672). Release step 1 is done:
+**Production-live 2026-10-09 (merge `5b8225ed8`, Production deployment 6952181551 success); acceptance on 1003222 verified 2026-10-09 except the in-run reload and a draft edit, which were not observed (see step 7 below).** Built on branch `claude/paired-summaries` (Sessions 588–589); `main` was merged into it first (`62646a928`; 21,659 tests and 22 gates passed). Release step 0 is live on `main` (merge `82c6cb26d`, deployment 6951088672). Release step 1 is done:
 - Backend commits `2c411c6d6`…`cb398fb47` (Session 588). The Codex backend review raised one medium finding: the card's Replace draft sent no `replaceDraft`.
 - Card commits `1c41e4c77` (that fix), `a7838e3b6` (per-kind hook refactor), `19af9ad41` (paired action and discussion block) and `424394781` (copy). The Codex adversarial review of the card slice (`gpt-6-astra`, base `cb398fb47`) approved with no material findings. Its sandbox could not run tests; the Session 589 lead ran them (921 pass).
 - Build deviations, all accepted by the owner in Session 589, are under "Owner decisions" (decisions 9–12). Responses also gain an additive `kind` field (D2).
@@ -28,7 +28,15 @@ Read-only checks V1–V3 passed (Session 588). The owner reviewed the discussion
 - **Step 4:** migration 075 applied (1 applied, 74 skipped).
 - **Step 5:** `meeting-transcript.staff-discussion-summary` seeded as v1, current row `87768430-90c3-f111-aaad-6045bd063e21`; exactly one current row verified.
 
-Until the merge, the Wave 16 preflight reports 100000010 as an "Unexpected option", as step 3 expects. Step 6: the owner merged and pushed (`5b8225ed8`); Production deployment 6952181551 of that SHA succeeded. Step 7 (acceptance) has not run.
+Until the merge, the Wave 16 preflight reports 100000010 as an "Unexpected option", as step 3 expects. Step 6: the owner merged and pushed (`5b8225ed8`); Production deployment 6952181551 of that SHA succeeded. 
+
+**Step 7, acceptance on 1003222 (2026-10-09, Session 589).** The owner ran the paired action; it published the discussion summary (row `064a57e0-91c3-f111-aaad-6045bd04539e`, 03:31 UTC). The presentation kind was skipped because 1003222 already had a current published summary (`80ce7231-17c1-f111-aaaf-002248086b29`, 2026-10-05), as decision 2 intends. Claude checked the rest in Chrome and by status-only requests:
+- The card shows both summaries published. The discussion one reads "Staff only." with no Board wording, and with nothing left to summarize the paired button is hidden.
+- Staff Deliberations shows both summaries inline with Read more and Open links. The discussion one is labelled "Staff only. Never included on the Board page."
+- The Board presentation page and the briefing page list only the presentation transcript and the presentation summary.
+- `open?member=material:<discussion id>` returns 404 on both the briefing and the Board routes; the presentation summary returns 302 to SharePoint on both.
+
+**Not observed:** the reload during a run ("Summarizing… started …") and editing a draft before publishing. Card tests cover both; they have not been seen in Production.
 
 **Originally reviewed and revised in Session 588.** The owner answered the review decisions on 2026-10-08; see "Owner decisions". This plan covers Stage 2 of `docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md` §2, which the owner approved on October 7. It does not authorize a migration, Dataverse picklist insert, prompt seed, Production read, provider call, merge or deployment. Each of those is listed below as an owner step.
 
