@@ -51,6 +51,8 @@ describeIf('Zoom video copy store (isolated local Postgres proof)', () => {
   let admin; let pool; let schema; let store; let profileId;
   // Widens the race window: after N1's active-request check, hold for a moment before the inserts.
   let raceDelayMs = 0;
+  // Runs once, on a separate connection, right after the first N1 query matching `match` (an interleaving probe).
+  let afterQuery = null;
   const actorSystemId = uuid();
 
   const startInput = (over = {}) => ({
@@ -111,6 +113,7 @@ describeIf('Zoom video copy store (isolated local Postgres proof)', () => {
             async query(text, params = []) {
               const result = await client.query(text, params);
               if (raceDelayMs && /^SELECT id FROM zoom_video_copies WHERE request_id/.test(text)) await new Promise(resolve => setTimeout(resolve, raceDelayMs));
+              if (afterQuery && afterQuery.match.test(text)) { const hook = afterQuery; afterQuery = null; await hook.fn(); }
               return result;
             },
           });
@@ -139,6 +142,33 @@ describeIf('Zoom video copy store (isolated local Postgres proof)', () => {
     expect(intent).toMatchObject({ origin: 'zoom_copy', state: 'initiated', upload_url_ciphertext: null, actor_id: actorSystemId });
     expect(intent.physical_filename).toBe(`1001234-Recording-${input.copyId}.mp4`);
     expect(JSON.stringify(copy)).not.toMatch(/example\.org/i);
+  });
+
+  it.each([
+    ['after the copied-file replay query', /^SELECT \* FROM zoom_video_copies WHERE request_id = \$1 AND zoom_file_id = \$2 AND state = 'copied'/],
+    ['after the active-request query', /^SELECT id FROM zoom_video_copies WHERE request_id = \$1 AND state IN/],
+  ])('N1 refuses when a registering copy of the file fails %s (Codex round 4)', async (_label, match) => {
+    const requestId = uuid();
+    const a = await start({ requestId, zoomFileId: 'file-1' });
+    expect(a.result.status).toBe('started');
+    const { leaseToken } = await claimFor(requestId);
+    await store.markZoomVideoCopyCopying({ id: a.input.copyId, leaseToken });
+    await store.markZoomVideoCopyRegistering({ id: a.input.copyId, leaseToken, driveId: 'd', itemId: 'i' });
+    await pool.query('UPDATE zoom_video_copies SET registration_attempts = 4 WHERE id=$1', [a.input.copyId]);
+    // Try again saw no failed rows. Right after N1's copied-file replay query, the worker's final registration
+    // attempt fails the copy on another connection (deferZoomVideoCopyRegistration does not take N1's lock).
+    afterQuery = {
+      match,
+      fn: async () => {
+        const failed = await store.deferZoomVideoCopyRegistration({ id: a.input.copyId, leaseToken });
+        expect(failed).toMatchObject({ state: 'failed', failure_code: 'zoom_video_registration_failed' });
+      },
+    };
+    const b = startInput({ requestId, zoomFileId: 'file-1' });
+    let result;
+    try { result = await store.startZoomVideoCopy({ ...b, failedSnapshot: [] }); } finally { afterQuery = null; }
+    expect(['active', 'reconciliation_pending']).toContain(result.status);
+    expect(await copyRow(b.copyId)).toBeUndefined();
   });
 
   it('concurrent starts for one request create exactly one active copy', async () => {

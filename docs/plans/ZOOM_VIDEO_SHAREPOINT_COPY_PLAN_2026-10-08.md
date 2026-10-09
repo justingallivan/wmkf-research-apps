@@ -701,6 +701,14 @@ A read-only build map (Sonnet reconnaissance, Session 589) found the gaps below.
     - Reconcile and inspection errors are logged and never block the tick.
     - The card gives `request_document_actor_unavailable` an administrator message instead of "Try again".
 
+**Rulings from the Codex adversarial review (Session 589).**
+27. **Try-again admission is race-free.**
+    - Start reads the failed-row snapshot once, before inspection; inspection covers exactly that snapshot; N1 receives the same array (round 3).
+    - Inside N1, under the request advisory lock, the order is: replay lookup, active check, then the failed-row recheck (round 4). Writers that fail a copy do not take N1's lock, so the failed-row recheck must follow the active check. A copy still active at the check is refused there; one that failed before it is unseen in the snapshot and returns `reconciliation_pending`.
+    - Real-Postgres probes commit a registering-to-failed transition on a second connection at both interleaving points; the old order admitted a second copy.
+28. **Graph upload-session calls are bounded end to end (round 2).** `fetchWithBodyTimeout` covers fetch and body read under one abort signal for session creation, status and chunk PUT. Other Graph callers are unchanged.
+29. **Receipt conflicts retire (round 1).** `recordZoomVideoCopyReceiptConflict` records the code on an unleased copy whose intent is finalized, from both reconcile paths.
+
 ## Contract review (`/contract-reconcile` Mode A, planning pass)
 
 **Historical record.** Retained as requested; current protocol is in the revised sections above.

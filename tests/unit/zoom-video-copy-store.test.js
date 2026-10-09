@@ -31,16 +31,17 @@ test('host email hash normalizes like readZoomImportConfig and the fingerprint f
   expect(zoomCopyResumeFingerprint({ meetingUuid: 'm', fileId: 'f', size: 5 })).toMatch(/^[0-9a-f]{64}$/);
 });
 
-test('N1 runs lock, failed recheck, replay lookup, active check, intent insert, copy insert in one transaction, in that order', async () => {
+test('N1 runs lock, replay lookup, active check, failed recheck, intent insert, copy insert in one transaction, in that order', async () => {
   const { store, calls } = harness((text) => (/^SELECT (id|\*) FROM zoom_video_copies/.test(text) || /^SELECT c\.id/.test(text) ? [] : [{ id: ID }]));
   const result = await store.startZoomVideoCopy(START);
   expect(result.status).toBe('started');
   const texts = calls.map(c => c.text);
   expect(texts[0]).toContain('pg_advisory_xact_lock(hashtext($1), 0)');
   expect(calls[0].params).toEqual([`zoom_video_copy:${REQ}:100000005`]);
-  expect(texts[1]).toContain("c.state = 'failed'");
-  expect(texts[2]).toContain("request_id = $1 AND zoom_file_id = $2 AND state = 'copied'");
-  expect(texts[3]).toContain("state IN ('queued', 'copying', 'registering')");
+  expect(texts[1]).toContain("request_id = $1 AND zoom_file_id = $2 AND state = 'copied'");
+  expect(texts[2]).toContain("state IN ('queued', 'copying', 'registering')");
+  // The failed recheck must follow the active check (Codex round 4: a copy failing between them is otherwise missed).
+  expect(texts[3]).toContain("c.state = 'failed'");
   expect(texts[4]).toContain('INSERT INTO presentation_material_uploads');
   expect(texts[4]).toContain("'initiated'");
   expect(texts[4]).toContain("'zoom_copy'");
