@@ -123,11 +123,11 @@ test('produces byte-identical DOCX output for identical inputs', async () => {
   expect(second.equals(first)).toBe(true);
 });
 
-test('selects render-contract v8 over the v7 template bytes', () => {
+test('selects render-contract v9 over the v8 template bytes', () => {
   expect(PRE_SITE_VISIT_TEMPLATE).toEqual({
     id: 'phase-ii-pre-site-visit',
-    version: 8,
-    relativePath: 'shared/templates/pre-site-visit/phase-ii-pre-site-visit-v7.docx',
+    version: 9,
+    relativePath: 'shared/templates/pre-site-visit/phase-ii-pre-site-visit-v8.docx',
   });
   expect(PRE_SITE_VISIT_CONTRACT.templateId).toBe(PRE_SITE_VISIT_TEMPLATE.id);
   expect(PRE_SITE_VISIT_CONTRACT.templateVersion).toBe(String(PRE_SITE_VISIT_TEMPLATE.version));
@@ -570,4 +570,12 @@ test('refuses to generate a footer with a missing request number', async () => {
     proposalCore: proposalCoreFixture(),
     personnelNames: personnelNamesFixture(),
   })).rejects.toThrow(/Request number is required/);
+});
+
+
+test('retains the owner-added 12pt space after city/state', async () => {
+  const zip = await JSZip.loadAsync(await fs.readFile(defaultPreSiteVisitTemplatePath()));
+  const body = await zip.file('word/document.xml').async('string');
+  const paragraph = wordParagraphs(body).find((p) => p.includes('[[DV:CityState]]'));
+  expect(paragraph).toContain('<w:spacing w:after="240"/>');
 });

@@ -842,7 +842,7 @@ test('read-only status projects current Ready plus milestone and newer pending r
   const provenance = {
     inputFingerprint: 'input-fingerprint', renderInputFingerprint: 'render-fingerprint',
     promptName: PRE_SITE_VISIT_CONTRACT.promptName, promptVersion: 4, promptId: PROMPT_ID,
-    runId: RUN_ID, templateId: 'phase-ii-pre-site-visit', templateVersion: '8',
+    runId: RUN_ID, templateId: 'phase-ii-pre-site-visit', templateVersion: '9',
     contentHash: 'gdc1:governed-hash',
   };
   const milestone = {
@@ -1002,7 +1002,7 @@ test.each([2, 3, 4])('matching persisted core and input snapshot schema v%s reta
       provenance: {
         inputFingerprint: 'input-fingerprint', renderInputFingerprint: 'render-fingerprint',
         promptName: PRE_SITE_VISIT_CONTRACT.promptName, promptVersion: 4, promptId: PROMPT_ID,
-        runId: RUN_ID, templateId: 'phase-ii-pre-site-visit', templateVersion: '8',
+        runId: RUN_ID, templateId: 'phase-ii-pre-site-visit', templateVersion: '9',
         contentHash: 'gdc1:governed-hash',
       },
       milestone: null,

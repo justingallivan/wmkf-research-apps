@@ -95,8 +95,8 @@ export const PRE_SITE_VISIT_CONTRACT = Object.freeze({
   artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
   promptName: 'pre-site-visit.proposal-core.generate',
   templateId: 'phase-ii-pre-site-visit',
-  // Render-contract v8 uses v7 OOXML with program/request footers and a compact header.
-  templateVersion: '8',
+  // Render-contract v9 uses v8 OOXML with 12pt after the city/state line.
+  templateVersion: '9',
   relativeFolder: 'Artifacts/Pre-Site Visit',
   producer: 'request-workbench',
   contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
