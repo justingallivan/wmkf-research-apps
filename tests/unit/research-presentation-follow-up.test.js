@@ -93,3 +93,35 @@ test('a short summary without the Q&A heading is shown whole, never clamped with
   expect(paragraph.className).not.toMatch(/line-clamp/);
   expect(screen.queryByRole('button', { name: 'Read more' })).not.toBeInTheDocument();
 });
+
+describe('inline staff discussion summary (paired summaries plan D8, owner decision 5)', () => {
+  const discussionRow = { artifactType: 100000010, filename: 'discussion.txt', backing: 'file', webUrl: 'https://tenant.sharepoint.com/discussion.txt' };
+  const TEXT = 'Main points raised\nThe budget looks high.\n\nQuestions and concerns\nWho owns the follow-up?\n\nFollow-ups and decisions\nNone noted.';
+
+  test('shows its link, a staff-only note, the first section and Read more', () => {
+    render(<ResearchPresentationFollowUp status="loaded" materials={[discussionRow]}
+      discussionSummary={{ text: TEXT, stale: false, publishedAt: '2026-10-06T15:00:00Z' }} />);
+    expect(screen.getByRole('link', { name: /Open staff discussion summary/ })).toHaveAttribute('href', discussionRow.webUrl);
+    expect(screen.getByText('Staff only. Never included on the Board page.')).toBeInTheDocument();
+    const block = screen.getByTestId('discussion-summary-text');
+    expect(block).toHaveTextContent('The budget looks high.');
+    expect(block).not.toHaveTextContent('Who owns the follow-up?');
+    fireEvent.click(screen.getByRole('button', { name: 'Read more' }));
+    expect(block).toHaveTextContent('Who owns the follow-up?');
+    expect(screen.queryByTestId('presentation-summary-text')).not.toBeInTheDocument();
+  });
+
+  test('a stale discussion summary does not mention the Board link', () => {
+    render(<ResearchPresentationFollowUp status="loaded" materials={[discussionRow]}
+      discussionSummary={{ text: TEXT, stale: true, publishedAt: '2026-10-06T15:00:00Z' }} />);
+    const block = screen.getByTestId('discussion-summary-text');
+    expect(block).toHaveTextContent('from an earlier transcript version');
+    expect(block).not.toHaveTextContent('Board link');
+  });
+
+  test('no inline discussion block without its summary row', () => {
+    render(<ResearchPresentationFollowUp status="loaded" materials={[]}
+      discussionSummary={{ text: TEXT, stale: false, publishedAt: null }} />);
+    expect(screen.queryByTestId('discussion-summary-text')).not.toBeInTheDocument();
+  });
+});

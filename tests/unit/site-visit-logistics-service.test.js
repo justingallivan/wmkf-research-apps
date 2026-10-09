@@ -10,7 +10,7 @@ import {
 } from '../../shared/config/requestDocument';
 import { SITE_VISIT_FORMAT } from '../../shared/config/siteVisit';
 import {
-  presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey, transcriptSummaryBindingFingerprint,
+  presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey, staffDiscussionSummaryBindingFingerprint, transcriptSummaryBindingFingerprint,
 } from '../../lib/services/post-presentation-materials/presentation-transcript-binding';
 import { createHash } from 'node:crypto';
 import { PARTY_NAVIGATION_PROPERTY } from '../../lib/dataverse/adapters/site-visit';
@@ -319,6 +319,20 @@ describe('staff feed binds the transcript derivatives to the current boundary', 
       expect(replaced.result.presentationSummary).toMatchObject({ text: null, stale: false });
       const failed = await summaryFeed([transcript(1_800_000), summary(1_800_000)], { download: async () => { throw new Error('graph'); } });
       expect(failed.result.presentationSummary).toMatchObject({ text: null });
+    });
+
+    test('a published staff discussion summary is returned separately, never as the presentation summary (paired summaries plan D8)', async () => {
+      const DISCUSSION_SUMMARY_ID = '66666666-6666-4666-8666-66666666666b';
+      const discussionSummary = { ...derivative(DISCUSSION_SUMMARY_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY, () => 'unique-d', 1_800_000),
+        wmkf_inputfingerprint: staffDiscussionSummaryBindingFingerprint({ requestId: REQUEST_ID, sourceRevisionId: REVISION, presentationEndMs: 1_800_000 }),
+        wmkf_contenthash: createHash('sha256').update(BYTES).digest('hex'), createdon: '2026-10-06T15:00:00Z' };
+      const { result, summarySlidesChanged } = await summaryFeed([transcript(1_800_000), discussionSummary]);
+      expect(result.discussionSummary).toEqual({ text: TEXT, stale: false, publishedAt: '2026-10-06T15:00:00Z', slidesChanged: false });
+      expect(result.presentationSummary).toBeNull();
+      expect(summarySlidesChanged).not.toHaveBeenCalled();
+      const both = await summaryFeed([transcript(1_800_000), summary(1_800_000), discussionSummary]);
+      expect(both.result.presentationSummary).toMatchObject({ text: TEXT, publishedAt: '2026-10-05T15:00:00Z' });
+      expect(both.result.discussionSummary).toMatchObject({ text: TEXT, publishedAt: '2026-10-06T15:00:00Z' });
     });
 
     test('nothing is read unless the caller asks, and null without a summary row', async () => {
