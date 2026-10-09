@@ -722,6 +722,42 @@ describe('listing: Stage 3b video fields', () => {
     expect(b.video).toMatchObject({ tooLarge: false, segmented: true });
     expect(c.video).toBeNull();
   });
+  describe('ruling 19: the four flag combinations', () => {
+    const disabled = () => { throw Object.assign(new Error('meeting_transcription_disabled'), { code: 'meeting_transcription_disabled', httpStatus: 503 }); };
+    const run = async (transcription, copy) => {
+      if (copy) process.env.ZOOM_VIDEO_COPY_ACCESS = 'on'; else delete process.env.ZOOM_VIDEO_COPY_ACCESS;
+      if (!transcription) requireMeetingTranscriptionEnabled.mockImplementation(disabled);
+      videoStore.listZoomVideoCopySnapshotsForRequest.mockResolvedValue([]);
+      return listZoomRecordingsForVisit({ requestId: REQUEST });
+    };
+    test('transcription on, copy on: audio and video fields', async () => {
+      const result = await run(true, true);
+      expect(result.videoCopyAvailable).toBe(true);
+      expect(result.meetings[0]).toMatchObject({ audio: { bytes: 5 }, import: null });
+      expect(result.meetings[0]).toHaveProperty('video');
+    });
+    test('transcription on, copy off: 3a shape exactly', async () => {
+      const result = await run(true, false);
+      expect(Object.keys(result)).toEqual(['available', 'windowDays', 'meetings']);
+      expect(Object.keys(result.meetings[0])).toEqual(['meetingUuid', 'startTime', 'durationMinutes', 'hostEmail', 'audio', 'transcript', 'import']);
+    });
+    test('transcription off, copy on: video fields only; imports are never read', async () => {
+      const result = await run(false, true);
+      expect(result.videoCopyAvailable).toBe(true);
+      expect(Object.keys(result.meetings[0])).toEqual(['meetingUuid', 'startTime', 'durationMinutes', 'hostEmail', 'video']);
+      expect(store.listZoomImportsForRequest).not.toHaveBeenCalled();
+    });
+    test('transcription off, copy off: still rejected with the transcription error', async () => {
+      const error = await rejection(run(false, false));
+      expect(error.code).toBe('meeting_transcription_disabled');
+      expect(listHostRecordings).not.toHaveBeenCalled();
+    });
+    test('transcription off, copy on: an unrelated policy error still propagates', async () => {
+      process.env.ZOOM_VIDEO_COPY_ACCESS = 'on';
+      requireMeetingTranscriptionEnabled.mockImplementation(() => { throw new Error('boom'); });
+      await rejection(listZoomRecordingsForVisit({ requestId: REQUEST }));
+    });
+  });
   test('flag test:<other request> is off for this request', async () => {
     process.env.ZOOM_VIDEO_COPY_ACCESS = 'test:99999999-9999-4999-8999-999999999999';
     expect(await listZoomRecordingsForVisit({ requestId: REQUEST })).not.toHaveProperty('videoCopyAvailable');
