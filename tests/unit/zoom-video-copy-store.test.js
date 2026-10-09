@@ -156,6 +156,16 @@ test('counter writers raise the counter and fail at the cap inside one UPDATE', 
   for (const call of [create, restart, uncertain, registration]) expect(call.text).toContain("state = CASE WHEN");
 });
 
+test('markZoomVideoCopyRegistering stores a valid quickXorHash and NULL for anything else', async () => {
+  const { store, calls } = harness();
+  await store.markZoomVideoCopyRegistering({ id: ID, leaseToken: TOKEN, driveId: 'd', itemId: 'i', quickXorHash: 'abc=' });
+  await store.markZoomVideoCopyRegistering({ id: ID, leaseToken: TOKEN, driveId: 'd', itemId: 'i' });
+  await store.markZoomVideoCopyRegistering({ id: ID, leaseToken: TOKEN, driveId: 'd', itemId: 'i', quickXorHash: 'x'.repeat(101) });
+  await store.markZoomVideoCopyRegistering({ id: ID, leaseToken: TOKEN, driveId: 'd', itemId: 'i', quickXorHash: 7 });
+  expect(calls[0].text).toContain('sharepoint_quickxor_hash = $5');
+  expect(calls.map(call => call.params[4])).toEqual(['abc=', null, null, null]);
+});
+
 test('writer argument guards: uncertain cap code allowlist, item pair, bytes, retry delay, sanitized failure code', async () => {
   const { store, calls } = harness();
   await expect(store.recordZoomVideoCopyUncertainCheck({ id: ID, leaseToken: TOKEN, capFailureCode: 'anything' })).rejects.toThrow(TypeError);

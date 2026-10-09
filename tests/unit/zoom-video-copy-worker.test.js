@@ -31,6 +31,45 @@ describe('happy path', () => {
     expect(line.expirationDateTime).toMatch(/^\d{4}-/);
   });
 
+  test('registering records Graph quickXorHash for the exact item (decision 6)', async () => {
+    const w = makeWorld({ size: 25 });
+    w.graph.quickXorHash = 'QUICKXORHASHQUICKXORHASH123=';
+    expect((await w.tick()).outcome).toBe('registering');
+    expect(w.copy.sharepoint_quickxor_hash).toBe('QUICKXORHASHQUICKXORHASH123=');
+  });
+
+  test('a failed hash read records no hash, logs a code and still registers', async () => {
+    const w = makeWorld({ size: 25 });
+    // The candidate check reads the item first (resolveStableMp4Path); only the later hash read fails.
+    const stable = w.deps.getFileMetadataById;
+    const failing = jest.fn()
+      .mockImplementationOnce(stable)
+      .mockImplementation(async () => { const error = new Error('graph down'); error.code = 'graph_unavailable'; throw error; });
+    expect((await w.tick({}, { getFileMetadataById: failing })).outcome).toBe('registering');
+    expect(failing).toHaveBeenLastCalledWith('drive1', 'item1', { siteId: 'site1', timeoutMs: 10_000 });
+    expect(w.copy).toMatchObject({ state: 'registering', sharepoint_item_id: 'item1', sharepoint_quickxor_hash: null });
+    expect(w.logs).toContainEqual(expect.objectContaining({ event: 'zoom_video_copy_hash_unavailable', code: 'graph_unavailable' }));
+  });
+
+  test('a hash read that never settles (stalled body) times out to NULL and still registers', async () => {
+    const w = makeWorld({ size: 25 });
+    const stable = w.deps.getFileMetadataById;
+    const stalled = jest.fn().mockImplementationOnce(stable).mockImplementation(() => new Promise(() => {}));
+    const result = await w.tick({}, { getFileMetadataById: stalled, hashReadMs: 25 });
+    expect(result.outcome).toBe('registering');
+    expect(w.copy).toMatchObject({ state: 'registering', sharepoint_quickxor_hash: null });
+    expect(w.logs).toContainEqual(expect.objectContaining({ event: 'zoom_video_copy_hash_unavailable', code: 'zoom_video_hash_timeout' }));
+  });
+
+  test('without budget for the hash read the worker skips it and registers', async () => {
+    const w = makeWorld({ size: 25 });
+    const reads = jest.fn(w.deps.getFileMetadataById);
+    // A limit larger than the whole tick leaves no room for the optional read; the candidate check still runs.
+    expect((await w.tick({}, { getFileMetadataById: reads, hashReadMs: 10_000_000 })).outcome).toBe('registering');
+    expect(reads).toHaveBeenCalledTimes(1);
+    expect(w.copy.sharepoint_quickxor_hash).toBeNull();
+  });
+
   test('I2 is recorded before the copy moves queued to copying, and the session is never created twice', async () => {
     const w = makeWorld({ size: 25 });
     w.seedSession(0, { copy: 'queued' });

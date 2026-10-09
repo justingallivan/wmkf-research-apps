@@ -281,6 +281,7 @@ it('reads current file metadata by encoded stable drive and item identity', asyn
     lastModifiedDateTime: '2026-07-31T01:33:55Z',
     file: {
       mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      hashes: { quickXorHash: 'AAAAAAAAAAAAAAAAAAAAAAAAAAA=' },
     },
     publication: { versionId: '2.0' },
     parentReference: { driveId: 'drive/id' },
@@ -302,6 +303,7 @@ it('reads current file metadata by encoded stable drive and item identity', asyn
     versionId: '2.0',
     lastModified: '2026-07-31T01:33:55Z',
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    quickXorHash: 'AAAAAAAAAAAAAAAAAAAAAAAAAAA=',
     parentReference: { driveId: 'drive/id' },
   });
   expect(global.fetch.mock.calls[0][0]).toContain('/drives/drive%2Fid/items/item%2Fid');

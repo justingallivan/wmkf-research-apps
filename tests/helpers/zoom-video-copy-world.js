@@ -140,9 +140,9 @@ export function makeWorld({ size = 25, copyState = 'queued' } = {}) {
       if (!cap('uncertain_checks', capFailureCode)) w.copy.next_attempt_at = w.t + retryAfterSeconds * 1000;
       return copyReturn();
     },
-    markRegistering: async ({ leaseToken, driveId, itemId }) => {
+    markRegistering: async ({ leaseToken, driveId, itemId, quickXorHash = null }) => {
       if (!live(w.copy, leaseToken) || !['queued', 'copying'].includes(w.copy.state)) return null;
-      Object.assign(w.copy, { state: 'registering', sharepoint_drive_id: driveId, sharepoint_item_id: itemId, bytes_confirmed: w.copy.declared_size });
+      Object.assign(w.copy, { state: 'registering', sharepoint_drive_id: driveId, sharepoint_item_id: itemId, sharepoint_quickxor_hash: quickXorHash, bytes_confirmed: w.copy.declared_size });
       return copyReturn();
     },
     failCopy: async ({ leaseToken, failureCode }) => {
@@ -277,7 +277,7 @@ export function makeWorld({ size = 25, copyState = 'queued' } = {}) {
       if (w.graph.partialItem) return w.graph.partialItem;
       return item() && !w.graph.hideItem ? { ...item() } : null;
     },
-    getFileMetadataById: async () => (item() ? { ...item() } : null),
+    getFileMetadataById: async () => (item() ? { ...item(), quickXorHash: w.graph.quickXorHash ?? null } : null),
   };
   // Seed an existing Graph session (and its sealed receipt on the intent) at a given received offset.
   w.seedSession = (received, { copy = 'copying' } = {}) => {
