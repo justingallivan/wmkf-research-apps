@@ -1,0 +1,112 @@
+{
+  "scope": "Local generated media; focused validation part 1 (mapper on speech-like audio and silence)",
+  "ffmpeg": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+  "cases": [
+    {
+      "case": "speech_like",
+      "silence_seconds": null,
+      "anchor_times": [
+        5,
+        15,
+        25,
+        35,
+        45,
+        55,
+        65,
+        75,
+        85,
+        95,
+        105,
+        115
+      ],
+      "outcome": "blocked",
+      "reason": "insufficient or silent anchor",
+      "anchors_found": 0,
+      "blocked_at_seconds": 5
+    },
+    {
+      "case": "speech_like_quiet_channel",
+      "silence_seconds": null,
+      "anchor_times": [
+        5,
+        15,
+        25,
+        35,
+        45,
+        55,
+        65,
+        75,
+        85,
+        95,
+        105,
+        115
+      ],
+      "outcome": "blocked",
+      "reason": "channels disagree",
+      "anchors_found": 0,
+      "blocked_at_seconds": 5
+    },
+    {
+      "case": "speech_like_20s_silence_over_two_anchors",
+      "silence_seconds": [
+        33.0,
+        53.0
+      ],
+      "anchor_times": [
+        5,
+        15,
+        25,
+        35,
+        45,
+        55,
+        65,
+        75,
+        85,
+        95,
+        105,
+        115
+      ],
+      "outcome": "blocked",
+      "reason": "insufficient or silent anchor",
+      "anchors_found": 0,
+      "blocked_at_seconds": 5
+    },
+    {
+      "case": "speech_like_noise_snr_10db",
+      "silence_seconds": null,
+      "anchor_times": [
+        5,
+        15,
+        25,
+        35,
+        45,
+        55,
+        65,
+        75,
+        85,
+        95,
+        105,
+        115
+      ],
+      "outcome": "mapped",
+      "model_kind": "constant",
+      "max_residual": 7.105427357601002e-15,
+      "mapped_error_seconds": 0.0,
+      "audit": "ok",
+      "correlations": [
+        0.854583394302626,
+        0.8530956483593498,
+        0.9112745422314559,
+        0.8991425165972371,
+        0.8893961136308169,
+        0.8862805071285262,
+        0.9074222872516611,
+        0.9064147384327449,
+        0.8381985565124916,
+        0.9101180512366546,
+        0.911128730833171,
+        0.8388282071581423
+      ]
+    }
+  ]
+}

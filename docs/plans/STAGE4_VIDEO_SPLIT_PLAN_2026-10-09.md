@@ -102,6 +102,12 @@ Hard gates (privacy and correct-file publication); none can be waived by staff a
 
 Quality (documented, not blocking): the Apple tail limitation above; staff listening to the ending (decision 8) is the check.
 
+## Focused validation results [Session 590, local generated media]
+
+Part 1 (`scripts/benchmarks/stage4-focused-check.py`, evidence `docs/plans/STAGE4_FOCUSED_EVIDENCE_2026-10-09.json`): the Codex mapper (`stage4-mapping-check.py`, fixed anchors every 10 s, 0.25 s windows, both channels within 2 samples, any silent or weak anchor blocks the whole mapping) **blocks speech-like audio**. Speech-like (3-5 Hz syllables, 0.2-2 s pauses): blocked at the first anchor (silent window). Quiet second channel: blocked (channels disagree). 20 s silence over two anchors: blocked. The same audio with 10 dB noise mapped exactly, only because noise filled the pauses. Fail-closed, so nothing leaks, but as written the mapper would block almost every real recording.
+
+**Design change [PLANNED, owner to confirm]: adaptive anchor selection.** Search a few seconds around each target time for the most energetic, distinctive window; use 1-2 s windows; correlate a mono mix or the louder channel; skip anchors in long silences and block only when too few good anchors remain or none lie near the cut. Held-out validation, the residual ceiling and the 2 s uncertainty rule are unchanged. Also [ASSUMED]: Zoom's M4A and the MP4's own audio come from one recording, so the measured offset may be zero; a real pair settles it. VFR video and browser ending playback are not yet run.
+
 ## Next steps before the build plan [PLANNED]
 
 1. **Focused validation on generated media:** speech-like and noisy audio, realistic pauses, variable frame rate and delayed audio; several anchors including near the cut; check the ending on the intended playback paths (browser and the SharePoint viewer). Not an open-ended codec study.
