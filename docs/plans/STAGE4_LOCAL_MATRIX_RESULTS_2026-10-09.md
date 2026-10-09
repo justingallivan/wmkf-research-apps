@@ -3,7 +3,7 @@ title: Stage 4 integrated local matrix results
 domain: transcription
 kind: report
 status: active
-summary: "Integrated mapping-to-cut and bounded container/long-drift checks pass. Independent native reads intermittently omit retained audio, not padding; the completeness check is unchanged and Stage A remains NOT PASSED. Local synthetic media only."
+summary: "Integrated mapping-to-cut and bounded container/long-drift checks pass. Cutting earlier at a complete AAC packet did not resolve intermittent native omissions; the completeness check is unchanged and Stage A remains NOT PASSED. Local synthetic media only."
 owner: product-engineering
 related:
   - docs/plans/STAGE4_SYNTHETIC_RESULTS_2026-10-09.md
@@ -13,7 +13,7 @@ related:
 
 # Integrated local matrix — Stage A NOT PASSED
 
-**[VERIFIED via local generated-media receipts, 2026-10-09] Four complete mapping-to-cut cases pass the FFmpeg-based checks. Stage A remains NOT PASSED.** Independent Apple decoding intermittently returned a shorter final audio tail from the same output bytes. No private marker appeared in the positive outputs. Follow-up proves the missing samples are retained presentation audio, not disposable padding; the cause of the intermittent omission remains unresolved. No cloud, real-media, SharePoint/Zoom or Board operation was performed. No runtime application code changed.
+**[VERIFIED via local generated-media receipts, 2026-10-09] Four complete mapping-to-cut cases pass the FFmpeg-based checks. Stage A remains NOT PASSED.** Independent Apple decoding intermittently returned a shorter final audio tail from the same output bytes. No private marker appeared in the positive outputs. Follow-up proves the missing samples are retained presentation audio, not disposable padding; the cause of the intermittent omission remains unresolved. An earlier complete-packet cut also intermittently loses retained audio in the original Apple probe; a second Apple audio API returns the full sample count but records an EOF error on the subsequent read. No cloud, real-media, SharePoint/Zoom or Board operation was performed. No runtime application code changed.
 
 ## Results matrix
 
@@ -23,7 +23,7 @@ related:
 | Long drift | 85-minute generated MP4/M4A, 80 ppm drift, offset, distributed anchors and near-boundary audit | Recovered within one 16 kHz sample; ignored drift rejected |
 | Unsupported/ambiguous mappings | Heavy noise, swapped channels, two gaps, an anchor straddling a gap | Rejected; no guessed mapping |
 | Extra streams and hidden bytes | Extra audio, subtitle, timecode data, private metadata, top-level and nested private payload controls | Bounded stripping/rejection tests pass; not every codec/container payload is parsed |
-| Independent decode | Apple AVFoundation, four outputs × three trials, plus leaky and truncated controls | **Non-pass: 5 of 12 positive reads returned short audio**; all controls rejected |
+| Independent decode | Initial AVFoundation tests plus original/packet-aligned copies through two Apple APIs | **Non-pass:** initial 5/12 reads short; packet-aligned follow-up still short in 2/16 reader trials. See separate API/error accounting below |
 | Changed input/output | Source/audio hash, revision, boundary, mapping mutation; actual altered output bytes | In-memory eligibility simulation rejects all; no production transaction/await fencing tested |
 | Quality/resources | Two 120-second 1080p variants, three encodes each, full decode, SSIM, visual inspection | Readable sampled frames; local bounded timings/resources, not a cloud or full-meeting guarantee |
 
@@ -81,9 +81,32 @@ All twelve positive reads returned the expected **2,766 video frames**, with no 
 
 [VERIFIED scope] Small size or low energy alone cannot authorize a padding exemption. Classification controls distinguish removal of only the proven post-input padding from removal of even one retained sample, and reject a changed earlier prefix. The classifier is a forensic aid, not a new playback acceptance rule. **No acceptance check was relaxed.** This is a tiny loss of retained synthetic presentation audio, not detected private content. The investigation does not determine whether a listener would notice it, whether an actual player behaves identically, or why the native probe intermittently omits it.
 
-[VERIFIED background via Apple documentation] AAC uses overlapping transforms and separate priming/remainder samples; a final packet can therefore be needed to recover retained source audio. Padding and retained samples must be distinguished by their position and provenance, not packet byte size. See [Apple's AAC encoding background](https://developer.apple.com/documentation/quicktime-file-format/background_aac_encoding). This explains the investigation method; the local receipts establish this fixture's result. The next diagnostic is the native probe's handling of the final partial AAC packet, without granting a blanket short-tail allowance.
+[VERIFIED background via Apple documentation] AAC uses overlapping transforms and separate priming/remainder samples; a final packet can therefore be needed to recover retained source audio. Padding and retained samples must be distinguished by their position and provenance, not packet byte size. See [Apple's AAC encoding background](https://developer.apple.com/documentation/quicktime-file-format/background_aac_encoding). This explains the investigation method; the local receipts establish this fixture's result. The complete-packet experiment below tests that hypothesis without granting a blanket short-tail allowance.
 
 Native decoded video buffers supplied no individual duration. For these CFR fixtures, the probe instead requires all adjacent native timestamps to agree with native minimum frame duration, and the last interval to agree with native track end. It does not substitute zero for missing duration. This method is not yet a VFR playback proof. It is an independent decoder exercise, not a browser/VLC listening session.
+
+## Earlier complete-packet cut: not a reliable fix
+
+**[VERIFIED via `scripts/benchmarks/stage4-packet-boundary-check.py` and `docs/plans/STAGE4_PACKET_BOUNDARY_EVIDENCE_2026-10-09.json`] Re-encoding at an earlier complete AAC packet did not eliminate the intermittent short read. Stage A remains NOT PASSED.** This is a bounded diagnostic, not a production recipe change.
+
+The experiment reuses only source/output/isolated-PCM bytes matching the committed integration hashes. It truncates the encoder input to **4,427,776 samples/channel**, ending at **92.245333333 s**: 217 samples (4.521 ms) earlier for offset/gap/negative-offset, or 215 samples (4.479 ms) earlier for drift. It re-encodes from that isolated prefix; it does not drop a compressed packet from an existing file. Offset and drift produce the **same aligned output hash**, so these are repeated reads of one aligned file, not two distinct format cases. The video remains 2,766 frames ending at 92.200 s.
+
+[VERIFIED] Final assertions check the exported audio time base is **1/48,000**, its last packet begins at sample **4,426,752**, lasts **1,024 samples**, and ends exactly at the chosen endpoint. Elementary decode has 1,024 priming samples and **zero trailing padding**. The isolated input is byte-for-byte the earlier prefix of the original safe input. Packet equality with the independently encoded reference, raw/normal/ignored-edit-list provenance, private-marker checks, video source clocks and audio timestamp continuity all pass. Both-channel waveform anchors at 1.5, 45 and 91.5 seconds pass. Thus packet alignment was actually established, not inferred solely from an input-length multiple.
+
+Two completed batches each read both original files and both aligned copies four times through each API. The first batch's observations are preserved; the final batch adds explicit packet assertions, uses the aligned output's own expected frame count and records a combined strict status.
+
+| Apple path | Original files: complete reads | Aligned file: complete reads | Terminal behavior |
+|---|---:|---:|---|
+| Existing AVAssetReader probe | 13/16 | **14/16** | Reports completion even on short reads |
+| New AVAudioFile audio-only diagnostic | 16/16 | 16/16 | All 32 reads deliver the expected samples, then the next read raises EOF (-39), with zero frames in the error buffer |
+
+[VERIFIED] Three original reader trials omit 215 retained samples. **Two aligned reader trials omit an entire final 1,024-sample packet (21.333 ms)**. Every observed PCM output is bit-identical over its shared prefix to the corresponding complete AVAudioFile read. No positive private marker appears. All reader video intervals/clocks and tested audio clocks/anchors pass; exact audio completeness still rejects the short reads. No numerical shortfall allowance was added.
+
+[VERIFIED scope] The AVAudioFile diagnostic uses a separate read loop and records declared length, final position, actual byte/sample count, final chunk sizes and terminal error. Its initial exploratory run surfaced EOF as an uncaught error; the diagnostic was revised to retain that error in the receipt. It does not count a buffer returned alongside an error, and all observed error buffers contain zero frames. **It is not a replacement acceptance checker:** the final strict status does not waive any terminal error. These results narrow the discrepancy to the tested read paths but do not identify its root cause or prove actual browser/player behavior. Inspection of the existing reader found that it already checks successful completion, every buffer's byte count and sample clock; none of those checks was removed.
+
+[VERIFIED controls, repeated in each completed batch] Four milliseconds of private tone placed inside the aligned endpoint is rejected by the marker and isolated-payload checks. A 10 ms shift of the right channel is rejected at early/middle/late waveform anchors. A 50 ms audio timestamp shift is rejected by the cumulative clock check. These new controls exercise the FFmpeg/provenance/sync verifier; the original Apple leaky/truncated controls remain separate historical evidence. No claim is made that the new AVAudioFile diagnostic itself has a complete acceptance/control matrix.
+
+**[PLANNED next diagnostic]** Test the original reader's end-of-stream handling with Apple's newer async output-provider API or a minimal independently implemented reader, on the same hash-bound files. Keep exact completeness and privacy requirements; do not make progressively earlier cuts to conceal reader omissions. Extend independent testing to VFR/delayed-audio only after the reader path is understood. No cloud or real media follows from this result.
 
 ## 1080p quality and resource probes
 
@@ -100,7 +123,7 @@ Native decoded video buffers supplied no individual duration. For these CFR fixt
 
 ## What blocks a local pass
 
-1. Resolve the intermittent omission of retained audio in the native probe; a disposable-padding exemption is now ruled out. Repeat independent checks, including VFR/delayed-audio cases, without a blanket timing tolerance.
+1. Resolve the intermittent native-reader omission: both a padding exemption and complete-packet alignment are inadequate fixes. Compare end-of-stream handling with another reader implementation, then repeat independent VFR/delayed-audio checks without a blanket timing tolerance.
 2. Bound mapping uncertainty beyond sparse synthetic anchors; exercise speech-like/noisy mixes and additional codec/pause patterns. Unsupported cases must remain blocked.
 3. Complete the intended container/codec payload coverage; the current parser is deliberately narrower than arbitrary MP4 contents.
 4. Application stale-input/approval/publication fencing is still only a simulated contract. Production integration needs its own tests. Representative full-length motion/quality behavior and actual volume-exhaustion handling also remain unproven.
@@ -114,3 +137,5 @@ Cloud lifecycle, uploads, region/spending enforcement and verified Sandbox clean
 [VERIFIED scope] Contract-reconcile surface: benchmark scripts → generated files → content-free receipts → these research reports. Auth/routes/schema/production stores: N/A. Partial successes remain per-case; the aggregate Stage A status never becomes pass. Changed-state behavior is explicitly simulated. Fresh read-only review required complete native counts, valid video intervals, explicit long-input clocks and audit-inclusive margins; those changes are incorporated. The full startup gate set passed sequentially. Final scoped documentation/safety gates are required before commit. The tail investigation leaves all existing privacy and completeness gates unchanged; its new forensic assertions check sample provenance rather than accepting a duration tolerance.
 
 [VERIFIED reconciliation scope] Sweep Mode A covers the Stage 4 research reports and their live restatements, using executed receipts as authority. Earlier initial results remain historical; current summaries and remaining-work lists point here. Main's separate workflow implementation/release history is excluded because this is an isolated benchmark branch. No claim of whole-repository or Production reconciliation is made.
+
+[VERIFIED packet follow-up reconciliation] Sweep Mode A: generated test scripts → hash-bound local files → content-free packet evidence → four Stage 4 research reports. Current summaries and next steps describe the failed packet-alignment remedy; prior numerical results remain historical observations. Search collisions in unrelated operational documents are excluded. No new runtime/persistence status, auth route, schema or production consumer is introduced (N/A). Fresh read-only review required explicit exported-packet proof, aligned frame counts and separate completeness/error accounting; the final rerun includes these. Remaining unknowns are native-reader root cause and the broader matrix, not a waived privacy check. Scoped documentation gates do not certify nested plan facts or media behavior.
