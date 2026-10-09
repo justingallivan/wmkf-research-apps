@@ -58,6 +58,7 @@ const MINOR_WORDS = new Set(['Of', 'For', 'And', 'In', 'The', 'At', 'On']);
 const NAME_OVERRIDES = new Map([
   ['Rutgers, The State University of New Jersey', 'Rutgers, The State University of New Jersey'],
   ['Temple University-Of The Commonwealth System Of Higher Education', 'Temple University-Of The Commonwealth System of Higher Education'],
+  ['Temple University-Of The Commonwealth System of Higher Education', 'Temple University-Of The Commonwealth System of Higher Education'],
   ['University Of Notre Dame Du Lac', 'University of Notre Dame du Lac'],
 ]);
 
