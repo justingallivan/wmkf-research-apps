@@ -134,7 +134,7 @@ test('importing posts only the meeting and the acknowledgement, reloads the coll
   expect(call[0]).toBe(`/api/meeting-tracker/visits/${REQUEST_ID}/zoom-imports`);
   expect(Object.keys(JSON.parse(call[1].body)).sort()).toEqual(['meetingUuid', 'nonSensitiveAcknowledged']);
   await waitFor(() => expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/transcriptions')).length).toBeGreaterThan(before));
-  expect(await within(panel).findByText('62 min · Audio + Zoom transcript · Imported, transcription started')).toBeInTheDocument();
+  expect(await within(panel).findByText('62 min · Audio + Zoom transcript · Imported, transcribing…')).toBeInTheDocument();
   expect(within(panel).getByRole('radio', { name: /Oct 5/ })).toBeDisabled();
   expect(within(panel).queryByRole('button', { name: 'Import and transcribe' })).not.toBeInTheDocument();
 });
@@ -223,7 +223,7 @@ test('an import response for an earlier request never reloads or marks the curre
   await act(async () => { release(); await gate; });
   expect(oldCollectionReads()).toBe(before);
   expect(screen.queryByTestId('zoom-import')).not.toBeInTheDocument();
-  expect(screen.queryByText(/Imported, transcription started/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Imported, /)).not.toBeInTheDocument();
 });
 
 test('an import response after the card unmounts writes nothing and reloads nothing', async () => {
@@ -388,4 +388,16 @@ describe('the Zoom list follows the server while the panel is open', () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
     expect(zoomListCalls()).toBe(before);
   });
+});
+
+test('an imported meeting reads transcribing until its job is ready, then transcript ready', async () => {
+  const started = { state: 'started', jobId: JOB_ID, failureCode: null };
+  const meetings = zoomList().meetings;
+  meetings[0] = { ...meetings[0], import: { ...started, transcriptReady: false } };
+  meetings[1] = { ...meetings[1], import: { ...started, transcriptReady: true } };
+  route({}, { '/zoom-recordings': { respond: () => response(zoomList({ meetings })) } });
+  const panel = await openPanel();
+  expect(within(panel).getByText('62 min · Audio + Zoom transcript · Imported, transcribing…')).toBeInTheDocument();
+  expect(within(panel).getByText('45 min · Audio only · Imported, transcript ready')).toBeInTheDocument();
+  expect(within(panel).queryByText(/transcription started/)).not.toBeInTheDocument();
 });

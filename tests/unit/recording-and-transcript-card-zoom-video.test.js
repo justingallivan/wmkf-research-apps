@@ -1,6 +1,7 @@
 /** @jest-environment jsdom */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import RecordingAndTranscriptCard from '../../shared/components/meeting-tracker/RecordingAndTranscriptCard';
+import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../shared/config/requestDocument';
 
 jest.mock('@vercel/blob/client', () => ({ put: jest.fn() }));
 
@@ -46,7 +47,7 @@ function route(handlers = {}) {
       return handlers.audioPost ? handlers.audioPost(body) : response({ import: { id: 'i1', state: 'started', failureCode: null }, job: { id: '22222222-2222-4222-8222-222222222222' } });
     }
     if (path.endsWith('/presentation-link')) return response({ link: null });
-    if (path.endsWith('/presentation-materials')) return response({ materials: [], uploads: [] });
+    if (path.endsWith('/presentation-materials')) return response({ materials: state.materials || [], uploads: [] });
     if (path.endsWith('/transcriptions')) return response(collection());
     return response({});
   });
@@ -116,7 +117,7 @@ describe('Import starts audio and video as two independent POSTs', () => {
     expect(posts('video')).toEqual([{ path: 'video', body: { action: 'start', meetingUuid: UUID_A, replaces: null } }]);
     expect(posts('audio')[0].body).toEqual({ meetingUuid: UUID_A, nonSensitiveAcknowledged: true });
     expect(await within(panel).findByText(/Video copy started/)).toBeInTheDocument();
-    expect(within(panel).getAllByText(/Imported, transcription started/)).toHaveLength(2);
+    expect(within(panel).getAllByText(/Imported, transcribing…/)).toHaveLength(2);
   });
   test('a failing video start leaves the audio import and its result', async () => {
     route({ videoPost: () => response({ error: 'Too big.', code: 'zoom_video_too_large' }, 422) });
@@ -124,7 +125,7 @@ describe('Import starts audio and video as two independent POSTs', () => {
     await importMeetingA(panel);
     await waitFor(() => expect(posts('audio')).toHaveLength(1));
     expect(await within(panel).findByText('That video is too large to copy. Upload it manually.')).toBeInTheDocument();
-    expect(within(panel).getAllByText(/Imported, transcription started/)).toHaveLength(2);
+    expect(within(panel).getAllByText(/Imported, transcribing…/)).toHaveLength(2);
   });
   test('a failing audio import leaves the video copy started', async () => {
     route({ audioPost: () => response({ error: 'The audio could not be imported.', code: 'x' }, 500) });
@@ -208,6 +209,21 @@ describe('standalone Copy video', () => {
     fireEvent.click(within(panel).getAllByRole('button', { name: 'Copy video' })[1]);
     await waitFor(() => expect(posts('video')).toHaveLength(1));
     expect(posts('video')[0].body).toEqual({ action: 'start', meetingUuid: UUID_C, replaces: null });
+    expect(posts('audio')).toHaveLength(0);
+  });
+  test('with a published transcript every copyable meeting offers Copy video, which sends no audio import', async () => {
+    const transcript = { artifactId: '33333333-3333-4333-8333-333333333333', artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT, artifactTypeLabel: 'Transcript',
+      backing: 'file', filename: 'transcript.txt', createdAt: '2026-10-04T22:24:00.000Z', slotVersion: 3, webUrl: 'https://example.sharepoint.com/t.txt' };
+    route({ state: { materials: [transcript] } });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Replace audio or transcript' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Import from Zoom' }));
+    const panel = await screen.findByTestId('zoom-import');
+    expect(within(panel).getAllByRole('button', { name: 'Copy video' })).toHaveLength(3);
+    expect(within(panel).getByRole('radio', { name: /Oct 5/ })).toBeEnabled();
+    fireEvent.click(within(panel).getAllByRole('button', { name: 'Copy video' })[0]);
+    await waitFor(() => expect(posts('video')).toHaveLength(1));
+    expect(posts('video')[0].body).toEqual({ action: 'start', meetingUuid: UUID_A, replaces: null });
     expect(posts('audio')).toHaveLength(0);
   });
   test('with transcription off the listing has no audio fields: Copy video on every meeting, no radio is selectable', async () => {

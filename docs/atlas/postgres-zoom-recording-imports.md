@@ -39,5 +39,5 @@ A partial unique index allows one `importing` or `started` row per request and m
 ## Writers and readers
 
 - Writer: `lib/services/meeting-tracker-recordings/import-store.js`, called only from `import-service.js`, reached from `POST /api/meeting-tracker/visits/[requestId]/zoom-imports`.
-- Readers: the same service, to show per-meeting import state in the picker (`GET .../zoom-recordings`) and to find the job for an expired lease.
+- Readers: the same service, to show per-meeting import state in the picker (`GET .../zoom-recordings`; the joined `transcription_jobs.status` also sets `transcriptReady`, so the picker reads "Imported, transcript ready" once the job is `ready`) and to find the job for an expired lease.
 - Retention of these rows follows later Stage 5 work and is open.

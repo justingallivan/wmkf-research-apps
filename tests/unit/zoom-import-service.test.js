@@ -165,7 +165,7 @@ describe('listing', () => {
     const result = await listZoomRecordingsForVisit({ requestId: REQUEST });
     expect(requireMeetingTranscriptionEnabled).toHaveBeenCalledWith(REQUEST);
     expect(result).toEqual({ available: true, windowDays: 30, meetings: [{ meetingUuid: UUID, startTime: START, durationMinutes: 62,
-      hostEmail: 'wmk-library@wmkeck.org', audio: { bytes: 5 }, transcript: { bytes: 3 }, import: { state: 'started', jobId: JOB, failureCode: null } }] });
+      hostEmail: 'wmk-library@wmkeck.org', audio: { bytes: 5 }, transcript: { bytes: 3 }, import: { state: 'started', jobId: JOB, transcriptReady: false, failureCode: null } }] });
     const text = JSON.stringify(result);
     for (const leak of ['SECRET', 'download', 'audio-id', 'vtt-id', 'passcode', 'HOST']) expect(text).not.toContain(leak);
   });
@@ -175,7 +175,13 @@ describe('listing', () => {
   });
   test('an expired importing row is shown as failed so the meeting can be retried', async () => {
     rows.set('r1', { id: 'r1', request_id: REQUEST, zoom_meeting_uuid: UUID, state: 'importing', lease_expired: true });
-    expect((await listZoomRecordingsForVisit({ requestId: REQUEST })).meetings[0].import).toEqual({ state: 'failed', jobId: null, failureCode: 'zoom_import_lease_expired' });
+    expect((await listZoomRecordingsForVisit({ requestId: REQUEST })).meetings[0].import).toEqual({ state: 'failed', jobId: null, transcriptReady: false, failureCode: 'zoom_import_lease_expired' });
+  });
+  test('a started import whose transcription job is ready reads transcriptReady; any other job status does not', async () => {
+    rows.set('r1', { id: 'r1', request_id: REQUEST, zoom_meeting_uuid: UUID, state: 'started', transcription_job_id: JOB, job_status: 'ready', failure_code: null, lease_expired: false });
+    expect((await listZoomRecordingsForVisit({ requestId: REQUEST })).meetings[0].import).toEqual({ state: 'started', jobId: JOB, transcriptReady: true, failureCode: null });
+    rows.set('r1', { ...rows.get('r1'), job_status: 'processing' });
+    expect((await listZoomRecordingsForVisit({ requestId: REQUEST })).meetings[0].import.transcriptReady).toBe(false);
   });
   test.each(['0', '91', '1.5', 'abc', -3, 500])('days=%s is rejected with 400 (not clamped)', async (days) => {
     const error = await rejection(listZoomRecordingsForVisit({ requestId: REQUEST, days }));
@@ -501,7 +507,7 @@ describe('started rows and ended jobs (re-import release)', () => {
   });
   test('the listing presents a started row with an ended or missing job as failed so the card offers it again', async () => {
     rows.set('r1', { id: 'r1', request_id: REQUEST, zoom_meeting_uuid: UUID, state: 'started', transcription_job_id: JOB, job_status: 'expired', lease_expired: false });
-    expect((await listZoomRecordingsForVisit({ requestId: REQUEST })).meetings[0].import).toEqual({ state: 'failed', jobId: JOB, failureCode: 'zoom_import_job_ended' });
+    expect((await listZoomRecordingsForVisit({ requestId: REQUEST })).meetings[0].import).toEqual({ state: 'failed', jobId: JOB, transcriptReady: false, failureCode: 'zoom_import_job_ended' });
     rows.get('r1').job_status = null;
     expect((await listZoomRecordingsForVisit({ requestId: REQUEST })).meetings[0].import.state).toBe('failed');
     rows.get('r1').job_status = 'ready';
@@ -617,7 +623,7 @@ describe('a cancelled queued job (deletion requested) no longer holds the record
   test('the listing reports the import as failed (re-importable), not started', async () => {
     rows.set('old', cancelledRow());
     const meeting = (await listZoomRecordingsForVisit({ requestId: REQUEST })).meetings[0];
-    expect(meeting.import).toEqual({ state: 'failed', jobId: JOB, failureCode: 'zoom_import_job_ended' });
+    expect(meeting.import).toEqual({ state: 'failed', jobId: JOB, transcriptReady: false, failureCode: 'zoom_import_job_ended' });
   });
   test('importing again releases the old claim and creates a fresh job and claim', async () => {
     rows.set('old', cancelledRow());
@@ -636,7 +642,7 @@ describe.each(['processing', 'saving', 'submission_uncertain'])('cleanup request
   test('the listing still reports the import as started', async () => {
     rows.set('old', row());
     const meeting = (await listZoomRecordingsForVisit({ requestId: REQUEST })).meetings[0];
-    expect(meeting.import).toEqual({ state: 'started', jobId: JOB, failureCode: null });
+    expect(meeting.import).toEqual({ state: 'started', jobId: JOB, transcriptReady: false, failureCode: null });
   });
   test('importing again returns the existing claim: no release, no new row or job', async () => {
     rows.set('old', row());
