@@ -1,4 +1,125 @@
-# Session 589 Prompt: build the Stage 2 card (paired summaries), then docs; Proposal Ranking acceptance pending
+# Session 590 Prompt: owner confirms Stage 3b rulings 10 and 7, then 3b release steps (migration 076, merge step 0)
+
+## Session 589 close — Stage 2 shipped and accepted; Stage 3b built and Codex-approved (Claude, main, 2026-10-08/09 PT)
+
+### What Was Completed
+
+1. **Paired summaries (Stage 2) is Production-live and accepted.**
+   - Card slice on `claude/paired-summaries`:
+     - `1c41e4c77`: Codex's replaceDraft fix
+     - `a7838e3b6`: per-kind hook refactor
+     - `19af9ad41`: paired action and discussion block
+     - `424394781`: copy
+   - Docs slice `4d1917085`. Codex approved the card slice.
+   - **Owner decisions 9–12** (the build deviations) were accepted as recommended:
+     - 9: the paired click skips any kind that has a draft
+     - 10: both kinds send the paired acknowledgment version
+     - 11: the "Replace draft with a new summary" label is kept
+     - 12: one `SummaryBlock` component serves both kinds
+     - The owner also accepted the prompt and consent text as built.
+   - **Owner ran the release steps** (2026-10-09 UTC):
+     - picklist 100000010 inserted
+     - migration 075 applied (1 applied, 74 skipped)
+     - prompt `meeting-transcript.staff-discussion-summary` v1 seeded (`87768430-90c3-f111-aaad-6045bd063e21`)
+     - merge `5b8225ed8`; Production deployment 6952181551 success
+   - **Acceptance on 1003222** (`ce3f45770`):
+     - Verified by Claude in Chrome and by status-only probes:
+       - the card and Staff Deliberations show both summaries
+       - the Board page and the briefing page show only the presentation summary
+       - both outside `open` routes return 404 for the discussion row (`064a57e0-…`) and 302 for the presentation summary
+     - Not observed: the reload during a run and a draft edit.
+   - DEVELOPMENT_LOG milestone added (`c44879d3e`, updated in `ce3f45770`).
+   - The `claude/paired-summaries` worktree and local branch were removed. The remote branch is kept.
+2. **Stage 3b (Zoom video copy to SharePoint) is built, Codex-approved, and not merged.**
+   - The owner accepted decisions 1–3 and 5–7 as recommended, and set the stopping point: branches only; no migration, Vercel setting, live call or merge (`c4ba53bc5` on main).
+   - **Step 0**, `claude/zoom-copy-step0` (worktree `/Users/gallivan/Code/WMKF_Apps-zoom-copy`, tip `e874c30ce`):
+     - migration 076 (`origin` column plus the inert `zoom_video_copies` table)
+     - `origin='browser'` isolation predicates
+     - non-destructive registered-item binding
+     - Codex approved in one round.
+   - **Full build**, `claude/zoom-copy` (worktree `/Users/gallivan/Code/WMKF_Apps-zoom-copy-3b`, tip `61f4773af`, stacked on step 0). Sonnet built eight slices; Claude reviewed each:
+     - S1: transport and access flag
+     - S2: material-service seams and the decision-8 hook
+     - S3: stores, with a real-Postgres proof
+     - S4: service and route
+     - S5: transfer worker
+     - S6: registration, recovery and cron, with a crash-injection suite
+     - S7: card
+     - S8: docs
+   - **Build rulings 1–29** are recorded in the plan under "Build rulings (Session 589, orchestrator)".
+   - **Codex adversarial review:** rounds 1–4 raised six medium findings, all fixed with regression tests (rulings 24–29). Round 5 approved with no material findings.
+     - a stalled Graph response body
+     - receipt conflicts that never retired
+     - three duplicate-copy races in Try again / N1
+   - **Verification:** full jest 22,090 passed; 30 `check:*` gates plus self-tests green; loopback Postgres proof 18/18.
+3. **Side session:** institution-name capitalization script (below, unchanged).
+
+### Next Items
+
+#### Owner Decision Needed
+
+1. **Confirm Stage 3b ruling 10 (Import starts both).**
+   - Evidence: plan "Build rulings" 10, 19 and 23; card code in `RecordingAndTranscriptCard.js` (`useZoomImport`, `declineReplace`).
+   - As built:
+     - Import first shows the replace confirmation, when the current Recording is a staff MP4.
+     - It then sends the audio import and the video copy as two independent POSTs.
+     - **Copy video** works on its own when transcription is off or there is no audio (the listing works video-only).
+     - **Keep current file** copies no video and still imports the audio.
+   - Confirm, or say what to change, before the 3b merge.
+2. **Confirm Stage 3b ruling 7 (unversioned winner).**
+   - Evidence: plan ruling 7; `video-copy-service.js` `checkReplacement`.
+   - If the current Recording winner is a SharePoint MP4 without a positive slot version, start refuses with 409 `zoom_video_winner_unversioned` and copies nothing (staff can upload manually).
+   - Conservative and expected to be rare. Confirm or change.
+3. **Stage 3b release, owner-run, in order** (plan "Release"):
+   1. Apply migration 076 (`node scripts/apply-migrations.js` from the step-0 worktree).
+   2. Merge `claude/zoom-copy-step0` and verify the deployment is the merge build.
+   3. Optional probe 3 (`node scripts/probe-zoom-recordings.mjs`; its default listing shows MP4 variants).
+   4. Run the cron route once locally with `ZOOM_VIDEO_COPY_ACCESS=test:<TEST GUID>`, after confirming the Dataverse host and SharePoint site `.env.local` targets.
+   5. Merge `claude/zoom-copy` with the flag unset.
+   6. Set `test:<GUID>` for a Mode D run on one real recording, then `on`.
+   - `ZOOM_VIDEO_COPY_ACCESS` is a new non-sensitive variable (runbook row on the branch).
+   - The cron runs every minute once merged; with the flag off it only reconciles.
+4. **Proposal Ranking** (set aside by the owner): PR #463 review/merge/promotion and the colleague Production dry run. See the ranking sections below.
+5. **Institution-name capitalization:** the owner is consulting the database maintainers (side-session section below).
+
+#### Verified Open
+
+1. **Optional paired-summaries checks not observed in Production:** the reload during a run ("Summarizing… started …") and a draft edit before publish. Card tests cover both. Running them costs a provider call and a new published document on 1003222.
+2. **Optional test from PR #470** (carried from Session 588, not rechecked this session): provider DELETE rejected, cleanup retries, slot freed.
+
+#### Verify Before Acting
+
+1. **Proposal Ranking Production cleanup** (cancel the old unpublished trial, restore Beth as default facilitator). Unchanged from Session 588: classifier-blocked, nothing ran. Inspect current state first.
+2. **Session 588's "Next Items" below are superseded.** Stage 2 has shipped; read that section as history.
+
+### Gotchas
+
+- The Claude Code auto-mode classifier blocks Claude's merge-to-main pushes ("Production Deploy") and Production reads ("Production Reads"). The owner ran those from the terminal with `!`.
+- `npm run check:agent-invariants` fails inside the zoom-copy worktrees because `.claude-memory` is not a symlink there. This is a worktree artifact; run that gate from the main checkout.
+- The 3b real-Postgres proof needs a loopback Docker Postgres: `ZOOM_VIDEO_COPY_PG_TEST_URL=postgres://postgres:pw@127.0.0.1:<port>/postgres`, against a throwaway container. It is skipped when unset.
+- Untracked `shared/templates/pre-site-visit/~$ase-ii-pre-site-visit-v6.docx` is a Word lock file. Do not commit it; delete it once Word is closed.
+
+### Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md` (branch) | 3b plan, build rulings 1–29, release steps |
+| `lib/services/meeting-tracker-recordings/video-copy-{store,service,worker}.js` (branch) | Copy store (N1–N7), start/GET/cancel, tick worker |
+| `pages/api/meeting-tracker/visits/[requestId]/zoom-video-copies.js`, `pages/api/cron/drain-zoom-video-copies.js` (branch) | Route and cron |
+| `tests/integration/zoom-video-copies.pg.test.js` (branch) | Loopback real-Postgres proof (18 cases) |
+| `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md` | Stage 2 plan; live and accepted |
+
+### Testing
+
+```bash
+cd /Users/gallivan/Code/WMKF_Apps-zoom-copy-3b
+npx jest tests/unit/zoom tests/unit/post-presentation tests/unit/graph tests/unit/recording-and-transcript-card
+npm run check:types && npm run check:api-routes && npm run check:request-document-writers
+```
+
+**Milestone determination:** a DEVELOPMENT_LOG entry was required for Stage 2 shipping, and it was added this session. Stage 3b is not shipped, so it needs no entry.
+
+---
 
 ## Side session close — institution-name capitalization (Claude, main, 2026-10-08 PT)
 
