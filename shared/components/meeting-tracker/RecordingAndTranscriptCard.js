@@ -2163,7 +2163,23 @@ function useZoomImport(requestId, { onImported, jobsSignature, onVideoCopied }) 
     }
   };
 
-  const declineReplace = () => setConfirm(null);
+  // Declining keeps the current file: the video is not copied, but an Import still imports the audio.
+  const declineReplace = async () => {
+    const pending = confirm;
+    setConfirm(null);
+    if (!pending?.withAudio || busy || videoBusy || !requestId) return;
+    const meeting = meetings.find((item) => item.meetingUuid === pending.meetingUuid);
+    if (!meeting) return;
+    const generation = generationRef.current;
+    setBusy(true);
+    setError(null);
+    setVideoMessage({ origin: pending.origin, tone: 'info', text: 'The current recording file was kept. The video was not copied.' });
+    try {
+      await sendAudio(meeting, generation);
+    } finally {
+      if (isCurrent(generation)) setBusy(false);
+    }
+  };
   const confirmReplace = async () => {
     const pending = confirm;
     if (!pending || busy || videoBusy || !requestId) return;
@@ -2786,7 +2802,7 @@ function ReplaceConfirm({ z }) {
       {winner?.filename && <p className="mt-1 text-xs">Current file: {winner.filename}{Number(winner.size) > 0 ? ` (${formatBytes(winner.size)})` : ''}</p>}
       <div className="mt-2 flex gap-2">
         <button type="button" onClick={() => void z.confirmReplace()} disabled={z.busy || z.videoBusy} className={BTN_PRIMARY}>Replace and continue</button>
-        <button type="button" onClick={z.declineReplace} disabled={z.busy || z.videoBusy} className={BTN}>Keep current file</button>
+        <button type="button" onClick={() => void z.declineReplace()} disabled={z.busy || z.videoBusy} className={BTN}>Keep current file</button>
       </div>
     </div>
   );

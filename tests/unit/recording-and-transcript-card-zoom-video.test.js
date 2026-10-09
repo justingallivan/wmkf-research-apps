@@ -163,14 +163,15 @@ describe('replace confirmation', () => {
       { action: 'start', meetingUuid: UUID_A, replaces: { artifactId: WINNER_ID, slotVersion: 3 } },
     ]);
   });
-  test('keeping the current file sends nothing further', async () => {
+  test('keeping the current file copies no video but still imports the audio', async () => {
     route({ videoPost: needsConfirm() });
     const panel = await openPanel();
     await importMeetingA(panel);
     fireEvent.click(await within(panel).findByRole('button', { name: 'Keep current file' }));
     expect(within(panel).queryByText(/This will replace/)).not.toBeInTheDocument();
+    await waitFor(() => expect(posts('audio')).toHaveLength(1));
     expect(posts('video')).toHaveLength(1);
-    expect(posts('audio')).toHaveLength(0);
+    expect(await within(panel).findByText('The current recording file was kept. The video was not copied.')).toBeInTheDocument();
   });
   test('a stale confirmation reloads and asks again with the new file', async () => {
     let calls = 0;
