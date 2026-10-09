@@ -31,6 +31,26 @@ describe('happy path', () => {
     expect(line.expirationDateTime).toMatch(/^\d{4}-/);
   });
 
+  test('registering records Graph quickXorHash for the exact item (decision 6)', async () => {
+    const w = makeWorld({ size: 25 });
+    w.graph.quickXorHash = 'QUICKXORHASHQUICKXORHASH123=';
+    expect((await w.tick()).outcome).toBe('registering');
+    expect(w.copy.sharepoint_quickxor_hash).toBe('QUICKXORHASHQUICKXORHASH123=');
+  });
+
+  test('a failed hash read records no hash, logs a code and still registers', async () => {
+    const w = makeWorld({ size: 25 });
+    // The candidate check reads the item first (resolveStableMp4Path); only the later hash read fails.
+    const stable = w.deps.getFileMetadataById;
+    const failing = jest.fn()
+      .mockImplementationOnce(stable)
+      .mockImplementation(async () => { const error = new Error('graph down'); error.code = 'graph_unavailable'; throw error; });
+    expect((await w.tick({}, { getFileMetadataById: failing })).outcome).toBe('registering');
+    expect(failing).toHaveBeenLastCalledWith('drive1', 'item1', { siteId: 'site1' });
+    expect(w.copy).toMatchObject({ state: 'registering', sharepoint_item_id: 'item1', sharepoint_quickxor_hash: null });
+    expect(w.logs).toContainEqual(expect.objectContaining({ event: 'zoom_video_copy_hash_unavailable', code: 'graph_unavailable' }));
+  });
+
   test('I2 is recorded before the copy moves queued to copying, and the session is never created twice', async () => {
     const w = makeWorld({ size: 25 });
     w.seedSession(0, { copy: 'queued' });
