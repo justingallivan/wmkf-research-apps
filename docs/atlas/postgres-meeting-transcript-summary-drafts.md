@@ -57,7 +57,10 @@ States: `generating` → `ready` | `failed`; `ready` → `publishing` |
 `published` | `ready` | `superseded` | `expired`.
 
 A publish claims the row with its own token at the expected version before any
-SharePoint or Dataverse write. Edit, discard, and a new run act only on `ready`
+SharePoint or Dataverse write. The claim also matches the summary kind
+(`artifact_type`), and the presentation publisher refuses any other kind with
+`summary_draft_kind_unsupported`, so a draft of another kind can never be
+registered as a Transcript Summary (paired summaries plan, release step 0). Edit, discard, and a new run act only on `ready`
 rows, and a claim held by a running publish cannot be claimed, released, or
 yielded by another request (Codex reviews 2026-10-05). Just before the first
 registry write the publish sets `publish_registration_attempted`; after that
