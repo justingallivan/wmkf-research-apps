@@ -369,7 +369,7 @@ CREATE INDEX IF NOT EXISTS idx_zoom_video_copies_request_recent
 - No URLs, tokens, topics or emails are stored.
 - One Zoom file copied for two requests makes two SharePoint items. Stage 5 must check the other rows before deleting a Zoom original.
 
-**Fresh-install parity.** Add 076 to `lib/db/migrations-manifest.json`, and the same DDL to `scripts/setup-database.js` next to the `presentation_material_uploads` block [VERIFIED it lives at `scripts/setup-database.js:1607-1702`], in the step-0 PR.
+**Fresh-install parity.** Add 076 to `lib/db/migrations-manifest.json` in the step-0 PR; no `scripts/setup-database.js` edit. **Corrected Session 589:** the inline block at `setup-database.js:1607` belongs to `v56Statements`, which `getBootstrapGroups()` (`:2126-2142`) does not list. A fresh install runs the base groups, then replays every manifest file (`scripts/lib/fresh-database-bootstrap.js:62-67`, `bootstrapFreshDatabase`) [VERIFIED]. Migrations 074 and 075 shipped the same way.
 
 ## Routes and security
 
