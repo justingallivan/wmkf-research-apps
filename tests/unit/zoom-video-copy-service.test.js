@@ -27,7 +27,7 @@ jest.mock('../../lib/services/post-presentation-materials/material-service.js', 
     activeBucket: jest.fn(buckets => buckets[0] || null),
     loadBoundContext: jest.fn(),
     materialError: error,
-    _internal: { assertFeature: jest.fn() },
+    _internal: { assertFeature: jest.fn(), TERMINAL_MP4_VALIDATION_CODES: [], resolveStableMp4Path: jest.fn(), validateRecoveredMp4Row: jest.fn() },
   };
 });
 
@@ -62,6 +62,28 @@ const zoomLinkWinner = () => ({ wmkf_requestdocumentid: WINNER, _wmkf_request_va
   wmkf_operationstatus: 100000001, wmkf_lifecyclestate: 100000000, wmkf_externalurl: 'https://us02web.zoom.us/rec/share/abc', wmkf_slotversion: 2 });
 const args = (over = {}) => ({ requestId: REQUEST, actorProfileId: 9, actingUserSystemId: ACTOR, meetingUuid: UUID, replaces: null, ...over });
 async function rejection(promise) { try { await promise; } catch (error) { return error; } throw new Error('expected rejection'); }
+
+
+// Worker-side inspection seams for Try again. The default seams would reach Postgres and Dataverse.
+function inspectionDeps({ records = [], over = {} } = {}) {
+  return {
+    now: () => Date.now(),
+    log: jest.fn(),
+    recordEvent: jest.fn(async () => {}),
+    claimInspection: jest.fn(async ({ uploadId }) => ({
+      row: { id: uploadId, request_id: REQUEST, generation_key: 'gen-key', state: 'uploaded', candidate_item_id: 'item1', client_resume_fingerprint: 'fp' },
+      leaseToken: 'INSPECT',
+    })),
+    renewInspection: jest.fn(async () => ({})),
+    releaseInspection: jest.fn(async () => ({})),
+    bindReceipt: jest.fn(async () => ({ bound: true })),
+    markCopied: jest.fn(async ({ id }) => ({ id })),
+    recordReceiptConflict: jest.fn(async () => ({})),
+    materialDependencies: { findDocumentByGenerationKey: jest.fn(async () => ({ records })) },
+    ...over,
+  };
+}
+const FAILED_UPLOADED = { id: COPY, updated_key: 'k', intent_state: 'uploaded', intent_lease_live: false };
 
 let saved;
 beforeEach(() => {
@@ -102,7 +124,7 @@ describe('startZoomVideoCopy: success', () => {
   test('passes the Try-again snapshot verbatim to N1', async () => {
     const snapshot = [{ id: 'old', updated_key: 'k', intent_state: 'failed', intent_lease_live: false }];
     store.listFailedZoomVideoCopiesForFile.mockResolvedValue(snapshot);
-    await startZoomVideoCopy(args());
+    await startZoomVideoCopy(args(), { ...deps, zoomCopyWorkerDependencies: inspectionDeps({ records: [] }) });
     expect(store.listFailedZoomVideoCopiesForFile).toHaveBeenCalledWith({ requestId: REQUEST, zoomFileId: 'mp4-id' });
     expect(store.startZoomVideoCopy.mock.calls[0][0].failedSnapshot).toBe(snapshot);
   });
@@ -114,6 +136,77 @@ describe('startZoomVideoCopy: success', () => {
   test('does not require the transcription flag (no transcription module is consulted)', async () => {
     await startZoomVideoCopy(args());
     expect(jest.requireMock('../../lib/services/meeting-tracker-transcription/policy.js').requireMeetingTranscriptionEnabled).not.toHaveBeenCalled();
+  });
+});
+
+describe('startZoomVideoCopy: Try again inspects the prior registration before N1', () => {
+  const withWorker = (workerDeps) => ({ ...deps, zoomCopyWorkerDependencies: workerDeps });
+  const registered = { wmkf_requestdocumentid: WINNER };
+  beforeEach(() => {
+    _internal.resolveStableMp4Path.mockResolvedValue({ state: 'complete', candidate: { itemId: 'item1' } });
+    _internal.validateRecoveredMp4Row.mockReturnValue(true);
+    store.listFailedZoomVideoCopiesForFile.mockResolvedValue([FAILED_UPLOADED]);
+  });
+
+  test('a failed copy whose registration already exists is bound and replayed; N1 never runs', async () => {
+    const w = inspectionDeps({ records: [registered] });
+    const result = await startZoomVideoCopy(args(), withWorker(w));
+    expect(result).toEqual({ status: 200, body: { copy: { id: COPY, state: 'copied' }, replayed: true } });
+    expect(w.materialDependencies.findDocumentByGenerationKey).toHaveBeenCalledWith('gen-key');
+    expect(w.bindReceipt).toHaveBeenCalledWith(expect.objectContaining({ copyId: COPY, verified: expect.objectContaining({ requestDocumentId: WINNER }) }));
+    expect(w.markCopied).toHaveBeenCalledWith({ id: COPY, leaseToken: null });
+    expect(w.releaseInspection).toHaveBeenCalled();
+    expect(store.startZoomVideoCopy).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['the registration read fails', { materialDependencies: { findDocumentByGenerationKey: jest.fn(async () => { throw new Error('dataverse down'); }) } }],
+    ['the intent lease is busy', { claimInspection: jest.fn(async () => null) }],
+    ['the registration is ambiguous', { materialDependencies: { findDocumentByGenerationKey: jest.fn(async () => ({ records: [registered, registered] })) } }],
+    ['the bind is refused', { bindReceipt: jest.fn(async () => ({ bound: false, reason: 'stale' })) }],
+    ['the receipt repair throws', { markCopied: jest.fn(async () => { throw new Error('pg down'); }) }],
+  ])('%s: 409 reconciliation pending and N1 never runs', async (_label, over) => {
+    const records = over.bindReceipt || over.markCopied ? [registered] : [];
+    const error = await rejection(startZoomVideoCopy(args(), withWorker(inspectionDeps({ records, over }))));
+    expect(error).toMatchObject({ httpStatus: 409, code: 'zoom_video_reconciliation_pending' });
+    expect(store.startZoomVideoCopy).not.toHaveBeenCalled();
+  });
+
+  test('proven absence proceeds to N1 with the snapshot read after the inspection', async () => {
+    const after = [{ id: COPY, updated_key: 'k2', intent_state: 'failed', intent_lease_live: false }];
+    store.listFailedZoomVideoCopiesForFile.mockResolvedValueOnce([FAILED_UPLOADED]).mockResolvedValueOnce(after);
+    const w = inspectionDeps({ records: [] });
+    const result = await startZoomVideoCopy(args(), withWorker(w));
+    expect(result.status).toBe(202);
+    expect(w.releaseInspection).toHaveBeenCalled();
+    expect(store.startZoomVideoCopy.mock.calls[0][0].failedSnapshot).toBe(after);
+  });
+
+  test('a failed copy whose intent is already finalized is repaired through N5 and replayed without an inspection', async () => {
+    store.listFailedZoomVideoCopiesForFile.mockResolvedValue([{ ...FAILED_UPLOADED, intent_state: 'finalized' }]);
+    const w = inspectionDeps();
+    const result = await startZoomVideoCopy(args(), withWorker(w));
+    expect(result).toEqual({ status: 200, body: { copy: { id: COPY, state: 'copied' }, replayed: true } });
+    expect(w.markCopied).toHaveBeenCalledWith({ id: COPY, leaseToken: null });
+    expect(w.claimInspection).not.toHaveBeenCalled();
+    expect(store.startZoomVideoCopy).not.toHaveBeenCalled();
+  });
+
+  test('a receipt uniqueness conflict on repair is recorded and blocks N1', async () => {
+    const conflict = Object.assign(new Error('conflict'), { code: 'zoom_video_receipt_conflict' });
+    store.listFailedZoomVideoCopiesForFile.mockResolvedValue([{ ...FAILED_UPLOADED, intent_state: 'finalized' }]);
+    const w = inspectionDeps({ over: { markCopied: jest.fn(async () => { throw conflict; }) } });
+    const error = await rejection(startZoomVideoCopy(args(), withWorker(w)));
+    expect(error).toMatchObject({ httpStatus: 409, code: 'zoom_video_reconciliation_pending' });
+    expect(w.recordReceiptConflict).toHaveBeenCalledWith({ id: COPY });
+    expect(store.startZoomVideoCopy).not.toHaveBeenCalled();
+  });
+
+  test('an abandoned intent is settled and not inspected', async () => {
+    store.listFailedZoomVideoCopiesForFile.mockResolvedValue([{ ...FAILED_UPLOADED, intent_state: 'abandoned' }]);
+    const w = inspectionDeps();
+    expect((await startZoomVideoCopy(args(), withWorker(w))).status).toBe(202);
+    expect(w.claimInspection).not.toHaveBeenCalled();
   });
 });
 
