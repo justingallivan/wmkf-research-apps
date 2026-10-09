@@ -32,6 +32,9 @@
     },
     "pages/api/cron/drain-materials-uploads.js": {
       "maxDuration": 300
+    },
+    "pages/api/cron/drain-zoom-video-copies.js": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -121,6 +124,10 @@
     },
     {
       "path": "/api/cron/drain-materials-uploads",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/drain-zoom-video-copies",
       "schedule": "* * * * *"
     },
     {

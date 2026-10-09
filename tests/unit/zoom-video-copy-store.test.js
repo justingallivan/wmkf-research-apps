@@ -217,8 +217,11 @@ test('the failed-due selector locks failed rows, takes no copy lease, and advanc
   const { store, calls } = harness();
   await store.claimFailedZoomVideoCopiesDue({ limit: 2, deferSeconds: 900 });
   const { text, params } = calls[0];
-  expect(text).toContain("WHERE state = 'failed' AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())");
-  expect(text).toContain('FOR UPDATE SKIP LOCKED');
+  expect(text).toContain("WHERE c.state = 'failed' AND (c.next_attempt_at IS NULL OR c.next_attempt_at <= NOW())");
+  // ruling 16: only unsettled linked intents, and the 30-day backstop on the copy's updated_at
+  expect(text).toContain("u.state NOT IN ('finalized', 'abandoned')");
+  expect(text).toContain("c.updated_at > NOW() - INTERVAL '30 days'");
+  expect(text).toContain('FOR UPDATE OF c SKIP LOCKED');
   expect(text).toContain("SET next_attempt_at = NOW() + $2::int * INTERVAL '1 second' FROM due WHERE c.id = due.id AND c.state = 'failed'");
   expect(text).not.toContain('lease_token');
   expect(params).toEqual([2, 900, null]);
