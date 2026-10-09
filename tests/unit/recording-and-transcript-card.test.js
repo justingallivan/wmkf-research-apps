@@ -724,6 +724,32 @@ describe('presentation summary', () => {
     expect(screen.getByLabelText(/may be sent to Anthropic/)).not.toBeChecked();
   });
 
+  test('Replace draft names the shown draft, and a newer draft elsewhere reloads instead of replacing', async () => {
+    let postBody = null;
+    let reads = 0;
+    route({ materials: [transcriptRow()], collection: withSummary(), detail: detailFor({}) }, {
+      '/summary-draft': { method: 'GET', respond: () => {
+        reads += 1;
+        return response(summaryState({ draft: reads === 1 ? readyDraft() : readyDraft({ version: 3, text: 'Edited in another tab.' }), draftMatchesTranscript: true }));
+      } },
+    });
+    global.fetch.mockImplementation(((original) => async (url, options = {}) => {
+      if (String(url).endsWith('/summary-draft') && options.method === 'POST') {
+        postBody = JSON.parse(options.body);
+        return response({ error: 'A newer draft exists.', code: 'summary_draft_exists', draftId: DRAFT_ID, version: 3 }, 409);
+      }
+      return original(url, options);
+    })(global.fetch.getMockImplementation()));
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await screen.findByLabelText(/^Draft/)).toHaveValue('What was presented\nQuantum dots.');
+    fireEvent.click(screen.getByLabelText(/may be sent to Anthropic/));
+    fireEvent.click(screen.getByRole('button', { name: 'Replace draft with a new summary' }));
+    expect(await screen.findByText(/A newer draft was saved elsewhere, so nothing was replaced/)).toBeInTheDocument();
+    expect(postBody).toEqual({ acknowledgmentVersion: ACK, expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: 'e'.repeat(64),
+      replaceDraft: { draftId: DRAFT_ID, expectedVersion: 2 } });
+    await waitFor(() => expect(screen.getByLabelText(/^Draft/)).toHaveValue('Edited in another tab.'));
+  });
+
   test('a published summary made from replaced slides says so; the same summary without the flag does not (staff replacement plan §3.5)', async () => {
     const published = { state: 'bound', artifactId: DRAFT_ID, publishedAt: CONFIRMED_AT };
     route({ materials: [transcriptRow()], collection: withSummary({ transcriptSummary: published }), detail: detailFor({}) }, {

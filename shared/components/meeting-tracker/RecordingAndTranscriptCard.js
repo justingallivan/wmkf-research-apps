@@ -1711,8 +1711,10 @@ function useTranscription(requestId, { onMaterialsChanged }) {
     try {
       const result = await requestJson(summaryPath, {
         method: 'POST',
+        // Replacing names the shown draft; the server refuses to discard any other ready draft (paired summaries plan D2).
         body: { acknowledgmentVersion: PRESENTATION_SUMMARY_ACKNOWLEDGMENT.version,
-          expectedCurrentArtifactId: currentArtifact.id, expectedCurrentFingerprint: currentArtifact.fingerprint },
+          expectedCurrentArtifactId: currentArtifact.id, expectedCurrentFingerprint: currentArtifact.fingerprint,
+          ...(summaryDraft ? { replaceDraft: { draftId: summaryDraft.id, expectedVersion: summaryDraft.version } } : {}) },
         fallbackMessage: 'The summary could not be generated.',
       });
       if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return;
@@ -1728,7 +1730,9 @@ function useTranscription(requestId, { onMaterialsChanged }) {
         : 'Draft ready, made from the presentation transcript. Slide text was not included. Review it before publishing.');
     } catch (summaryFailure) {
       if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return;
-      setSummaryError(errorMessage(summaryFailure, 'The summary could not be generated.'));
+      setSummaryError(summaryFailure?.payload?.code === 'summary_draft_exists'
+        ? 'A newer draft was saved elsewhere, so nothing was replaced. The latest draft is loaded; review it before summarizing again.'
+        : errorMessage(summaryFailure, 'The summary could not be generated.'));
       await loadSummary();
     } finally {
       if (isCurrent(generation)) setBusy(null);
