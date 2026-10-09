@@ -412,3 +412,31 @@ Preview cannot exercise this stage. It has no Zoom credentials, and Vercel runs 
   - the Atlas index row (`APPLICATION_STATE_ATLAS.md:111`);
   - API matrix rows 276–277;
   - the 3a plan's own Build status line.
+
+## Review — Session 588 (2026-10-08)
+
+Reviewers: a Claude source review (`/contract-reconcile` Mode A) and a Codex adversarial review (`gpt-6-astra`). No live probe ran. **Verdict: NEEDS REWORK.** Both reviewers independently found that the transfer, lease and finalize protocol does not fit the existing upload-intent state machine. Together with the Range livelock, the core protocol needs redefining, not patching.
+
+Claims are marked [VERIFIED via file:line] (the Session 588 lead re-read the source) or [agent-reported].
+
+**Protocol defects (rework)**
+1. **No-Range fallback livelocks.** The plan says the cost is "bounded by the file size" (:140-143). Each tick re-streams the prefix before Graph's offset, so total reads are O(N²/C), and once the prefix takes the tick budget no tick progresses [VERIFIED via plan text; arithmetic from both reviewers]. Make a 200 response to a ranged GET terminal (`zoom_range_unsupported`), or make probe 1 a build prerequisite. Today `downloadRecordingFile` buffers the whole body and sends no Range header (`zoom-client.js:155-222`) [agent-reported].
+2. **Lease choreography does not match store states.** Intent renew requires `finalizing`, recovery renew requires `initiated|failed`, session refresh requires `initiated|uploaded`, the finalize claim requires an unleased row, and release clears the lease (`upload-intent-store.js:84-160, 223-258`) [agent-reported, both reviewers]. Define origin-aware server store functions per phase: pump, restart, finalize hand-off. Require the copy lease and the cancellation flag before every post-await write, and pass a copy-fence check into finalize.
+3. **Finalize is not replayable from a finalized intent.** `finalizeClaimedMp4Upload` renews the intent lease first (`material-service.js:1231-1232`) [VERIFIED]. A crash after the intent completes but before the copy row reads `copied` leaves `registering` work the helper cannot resume. The finalized-receipt recovery lives in the outer `finalizeMp4Upload` (:1509-1517) [agent-reported]. Reconcile finalized intents into copied receipts first, copy-lease-fenced. The helper is not exported.
+4. **Killed start strands rows.** A kill after the copy claim leaves `queued` with `upload_id` NULL. The active unique index then blocks a fresh start. A kill between intent/session creation and linking orphans the session. Derive the intent id from the copy id, or insert and link in one transaction. The tick fails intent-less `queued` rows after N minutes.
+5. **Session-expiry restart collapses existing semantics.** The plan restarts on 404 or 410 (:145-147). `retryMp4Upload` restarts only on 410 with the item still absent after the 0/2/8 s checks; a 404 or an uncertain read marks the intent uncertain (`material-service.js:1018-1059`) [agent-reported]. Keep those semantics.
+
+**Behavior and release defects**
+6. **A copy can displace a staff-uploaded MP4.** Predecessors are rows with `slotversion < fenceVersion`, and the fence is taken at finalize (`material-service.js:1257, 1271-1279`) [VERIFIED]. A copy that finishes after a staff upload, or a later **Copy video** / **Try again**, supersedes the staff MP4. Capture the winner's slot version at start, refuse (or confirm) when the winner is a SharePoint MP4, and abort before finalize if a newer non-Zoom winner appeared. **New owner decision 8.**
+7. **A plain revert exposes server intents to the browser.** After rollback, `origin='zoom_copy'` rows become resumable, cancellable or finalizable browser uploads (`upload-intent-store.js:9-33`; `material-service.js:398-424`) [agent-reported, Codex]. Ship origin-aware browser isolation in a prerequisite deploy that stays in the rollback target. Document a drain procedure.
+8. **Registration retry loop.** `request_document_actor_unavailable` is not terminal (`material-service.js:93-96`) [agent-reported]. Each attempt takes the Recording slot lease and blocks staff. Make actor-unavailable and signature/malware terminal, and add backoff and an attempt cap.
+9. **Smaller items** [agent-reported]:
+   - Record drive/item identity as soon as the exact item resolves, not only at `copied`, so Stage 5 can find unregistered bytes. Define what cancel does once the bytes are complete.
+   - Relax the variant CHECK to a shape check, keep the allowlist in code, and define segment handling.
+   - Extraction rules: the server origin never returns, persists or logs `uploadUrl`; it uses a generated display filename; `origin` is written on insert, including in `setup-database.js`.
+   - Set per-chunk timeouts so 240 s plus a chunk stays under `maxDuration` 300.
+   - Recheck `ZOOM_RECORDING_HOSTS` membership per tick.
+   - Add `check:trust-boundary-guid` coverage for `copyId`.
+   - The outside-reader denominator also includes `pre-site-visit/distribution/model.js:23-30` and `site-visit/logistics-service.js`, which project RECORDING links. Enumerate their recipients.
+
+**Owner decisions after review:** 1 agree, but relax the CHECK and handle segments. 2, 3 and 6 agree; 3's cost holds only with Range support. **4: change the recommendation.** Both reviewers recommend `ZOOM_VIDEO_COPY_ACCESS=off|test:<GUID>|on`. That matches the repo's `*_ACCESS` pattern, is needed for Mode D on a real recording under an every-minute cron, and is the rollback control in item 7. 5 agree, given decision 4 and item 6. 7 agree, given item 8. **New decision 8:** the displacement policy in item 6.
