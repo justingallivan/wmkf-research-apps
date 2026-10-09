@@ -17,11 +17,19 @@
 7. **Memory:** `feedback-never-self-authorize-prod-dataverse-reads` gained the lesson that `.env.local` re-sets `DATAVERSE_ALLOW_PROD_READS`, so a "refusal smoke test" against Production is a Production read (`da66213eb`). This session made one such unrequested read (Recording census) and disclosed it.
 8. **Worktrees:** removed `zoom-copy`, `zoom-copy-3b`, `zoom-picker`, `zoom-hash`, `codex-stage4` (all merged or pushed). New: `/Users/gallivan/Code/WMKF_Apps-codex-labels` on `codex/transcription-labels` for a Codex label fix (owner handed Codex a self-contained wind-down prompt).
 
+### Addendum after `/stop` (same session, 2026-10-09 PT)
+
+- **Stage 4 is PAUSED by the owner** to deconflict with a Codex speaker-label plan (attendance, Zoom timeline, VTT, per-revision transcript source record). Wait for that plan; then map the overlap and decide ownership and order. Do not edit the Stage 4 plan or run Stage 4 tests until then.
+- Focused check part 1 (`804f5aa03`): Codex's fixed-anchor mapper blocks speech-like audio.
+- Owner-approved real pair (`f02be6a66`): 1003222's copied MP4 audio is byte-identical to Zoom's M4A (157,533 packets); video constant 25 fps. Mapping is the identity, proven by packet equality; media deleted. Added `probe-zoom-recordings.mjs --only <recording_type>`.
+- Open owner decision: transcribed-audio fingerprint at Stage 3a import (option 1, recommended) or Zoom re-download at split time (option 2). Likely folded into the shared transcript source record.
+- For the Codex plan, Claude asked it to state: ownership of the source record, fingerprint and revision semantics (names-only vs source change); any change to the manifest, `bundle.js` or `zoom_recording_imports`; any word-timestamp or utterance-boundary change (moves the cut); migration numbers; its worktree/branch. Claude's points: bind the Stage 4 video to audio source + `endMs` + source video, not `revisionId`; add a word-gap check at the cut; per-participant transcripts need their own alignment proof or a block.
+
 ### Next Items
 
 #### Verified Open
 
-1. **Stage 4 next steps, in order** (plan "Next steps before the build plan"):
+1. **Stage 4 next steps, in order (PAUSED, see addendum)** (plan "Next steps before the build plan"):
    1. Focused generated-media validation: speech-like/noisy audio, realistic pauses, VFR, delayed audio, ending playback in browser and SharePoint viewer.
    2. Synthetic Vercel Sandbox pilot within the $10 cap: confirm region, pricing and cap enforcement first; persistence off; verified cleanup; full-length runtime and failure cases.
    3. Ask Justin before the first real input (1003222's copied video, isolated test folder, no Board registration).
