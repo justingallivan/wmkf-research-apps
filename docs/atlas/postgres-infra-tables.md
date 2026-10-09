@@ -913,16 +913,22 @@ and offline-tested only on `codex/feature-request`.
   destructive-cleanup gates. If an exact Request Document was already created
   before a later validation rejection, cleanup retains and alerts instead of
   relabeling the rejected intent as finalized.
-  **[SOURCE-BUILT on branch `claude/zoom-copy-step0`, not merged; migration 076
-  NOT applied.]** Migration 076 adds `origin` (`browser` default, or `zoom_copy`
-  for the planned Stage 3b server copy; CHECK
+  **[Step 0 merged (`c79f79807`) and migration 076 applied to Production
+  2026-10-09 (S590); the `zoom_copy` writers are on `claude/zoom-copy`, not merged.]** Migration 076 adds `origin` (`browser`
+  default, or `zoom_copy` for the Stage 3b server copy; CHECK
   `presentation_material_uploads_origin_check`). Step 0 adds `origin = 'browser'`
   to the actor-keyed reads, claims and unleased writers, so a `zoom_copy` intent
   is invisible to the browser Upload, Resume, Cancel, Retry and Finalize paths;
   token-keyed and cleanup functions stay origin-agnostic. Cleanup now binds a
   verified registered item in every access mode (a Postgres write only);
   deletion and abandonment stay behind the destructive-cleanup gates, and a
-  rejected candidate is still retained. No row has `zoom_copy` origin yet; see
+  rejected candidate is still retained. On `claude/zoom-copy` the `zoom_copy`
+  writers now exist (`upload-intent-store.js`, section "Server-origin writers":
+  pump, session, finalize, receipt-inspection, source-failure abandonment and
+  receipt-bind functions, each keyed on `origin = 'zoom_copy'`), created only by
+  the copy store's start transaction as the one-to-one partner of a
+  `zoom_video_copies` row; no copy has run, so no row has
+  `zoom_copy` origin. See
   [postgres-zoom-video-copies.md](postgres-zoom-video-copies.md).
 - `presentation_material_slot_leases` is keyed by Request + Recording,
   Transcript, or Transcript Summary artifact type and stores a paired

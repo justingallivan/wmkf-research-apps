@@ -6,7 +6,7 @@ status: active
 summary: Governed request-artifact registry with Production-proved same-item Final lineage, explicit group-review attribution, and the Production-live leadership-review transition (2026-09-07).
 canonical: false
 owner: product-engineering
-last_verified: 2026-10-05
+last_verified: 2026-10-08
 related:
   - lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json
   - lib/dataverse/schema/wave16-request-document-registry/zz_akoya_request_pre_rp_brief_pointer.json
@@ -28,6 +28,7 @@ related:
   - lib/utils/post-presentation-materials-readiness.js
   - lib/utils/meeting-transcript-bundle-readiness.js
   - lib/dataverse/adapters/request-document.js
+  - lib/services/meeting-tracker-recordings/video-copy-worker.js
   - lib/services/initial-assessment/artifact-service.js
   - lib/services/initial-assessment/controls-service.js
   - lib/services/pre-site-visit/distribution-service.js
@@ -383,6 +384,24 @@ Production Request Document row was created by this release smoke.
   - ends `wmkf_name` in "(staff upload)" instead of "(applicant upload)".
 
   See `docs/plans/STAFF_APPLICANT_MATERIALS_REPLACEMENT_PLAN_2026-10-05.md`.
+- Recording producers (post-presentation `RECORDING`, producer
+  `meeting-tracker-post-presentation`). **[Second path built on branch
+  `claude/zoom-copy`, not merged; migration 076 applied 2026-10-09; not live.]**
+  Besides the Zoom link and the staff-browser MP4 upload, Stage 3b adds a
+  server copy of the Zoom meeting MP4: staff-only, started from the Meeting
+  Tracker card, moved by the every-minute `drain-zoom-video-copies` worker into
+  the request's `Post Site Visit Materials` folder through a Graph upload
+  session, then registered by the same shared `finalizeClaimedMp4Upload` that the
+  browser path uses. The registry row therefore has the same shape as a browser
+  MP4 Recording (file-backed, Ready, slot-versioned, signature- and
+  malware-validated, supersedes the captured predecessor) and no new writer row.
+  The only added rule is decision 8: when the current Recording winner is a
+  SharePoint MP4, staff must confirm replacing it; the copy stores that winner's
+  document id and slot version and aborts at finalize with
+  `zoom_video_recording_replaced` if a newer non-Zoom-link winner appeared. The
+  actor is the staff member who started the copy (`REQUIRED`). The Recording is
+  never served to outside pages. State, leases and receipt identities live in
+  [postgres-zoom-video-copies.md](postgres-zoom-video-copies.md).
 - `wmkf_requestdocument` owns the request/cycle relationship, typed artifact and
   lifecycle state, producer operation state, stable Graph site/drive/item
   identity, upload/finalization eTag/version snapshot, and
