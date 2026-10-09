@@ -3,7 +3,7 @@ title: Stage 4 integrated local matrix results
 domain: transcription
 kind: report
 status: active
-summary: "Integrated mapping-to-cut and bounded container/long-drift checks pass. Independent Apple decoding has intermittent short audio tails; Stage A remains NOT PASSED. Local synthetic media only."
+summary: "Integrated mapping-to-cut and bounded container/long-drift checks pass. Independent native reads intermittently omit retained audio, not padding; the completeness check is unchanged and Stage A remains NOT PASSED. Local synthetic media only."
 owner: product-engineering
 related:
   - docs/plans/STAGE4_SYNTHETIC_RESULTS_2026-10-09.md
@@ -13,7 +13,7 @@ related:
 
 # Integrated local matrix — Stage A NOT PASSED
 
-**[VERIFIED via local generated-media receipts, 2026-10-09] Four complete mapping-to-cut cases pass the FFmpeg-based checks. Stage A remains NOT PASSED.** Independent Apple decoding intermittently returned a shorter final audio tail from the same output bytes. No private marker appeared in the positive outputs, but that completeness discrepancy is unresolved. No cloud, real-media, SharePoint/Zoom or Board operation was performed. No runtime application code changed.
+**[VERIFIED via local generated-media receipts, 2026-10-09] Four complete mapping-to-cut cases pass the FFmpeg-based checks. Stage A remains NOT PASSED.** Independent Apple decoding intermittently returned a shorter final audio tail from the same output bytes. No private marker appeared in the positive outputs. Follow-up proves the missing samples are retained presentation audio, not disposable padding; the cause of the intermittent omission remains unresolved. No cloud, real-media, SharePoint/Zoom or Board operation was performed. No runtime application code changed.
 
 ## Results matrix
 
@@ -56,11 +56,32 @@ A short two-gap M4A is also encoded. An anchor directly straddling a gap is reje
 
 [VERIFIED bounded simulation] Twenty changed-binding controls cover source hash, audio hash, transcript revision, boundary and mapping across the four cases. A file actually changed after acceptance also fails its output-hash binding; failed acceptance cannot become eligible. These are local equality/eligibility simulations. They do not exercise application awaits, concurrent database transactions, staff approval, publication or Board readers, which are outside these benchmark scripts. There is no implemented Stage 4 runtime enforcement claim.
 
-## Independent Apple decode: unresolved completeness difference
+## Independent Apple decode: retained audio omitted, not padding
 
 [VERIFIED via `scripts/benchmarks/stage4-native-check.py` and `scripts/benchmarks/stage4-native-decode.swift`] AVFoundation decodes every video/audio sample, checks source-frame numbers and both-channel private markers, and requires the same positive frame/sample counts as the integrated receipt. A five-second truncated file is rejected even though it contains no private markers and ends early. The leaky control is rejected for actual private markers. Each control runs three times.
 
-All twelve positive reads returned the expected **2,766 video frames**, with no private video or audio marker. However, **five reads returned 215 or 217 fewer audio samples** than FFmpeg/the expected isolated input: about **4.479–4.521 ms early**, not extra discussion. Other reads of the same hash returned the complete expected audio. Therefore the strict native check remains non-pass. The root cause is unknown: this may involve the probe, native decoding or end-padding handling. This evidence does not establish an Apple player defect or a privacy leak. It must be explained before relaxing any check or claiming consistent independent playback.
+All twelve positive reads returned the expected **2,766 video frames**, with no private video or audio marker. However, **five reads returned 215 or 217 fewer audio samples** than FFmpeg/the expected isolated input: about **4.479–4.521 ms early**, not extra discussion. Other reads of the same hash returned the complete expected audio. Therefore the strict native check remains non-pass. The cause of the intermittent omission remains unknown. The follow-up below rules out treating the missing interval as disposable padding. This evidence does not establish an Apple player defect or a privacy leak; the exact-count completeness check remains unchanged.
+
+### Tail-forensics follow-up: padding exemption ruled out
+
+**[VERIFIED via `scripts/benchmarks/stage4-tail-forensics.py` and `docs/plans/STAGE4_NATIVE_TAIL_EVIDENCE_2026-10-09.json`] The missing 215–217 samples belong to the retained encoder input.** They precede the actual AAC trailing padding. The two distinct output hashes cover all four integrated cases.
+
+| Measurement | Offset output (also gap/negative-offset hash) | Drift output |
+|---|---:|---:|
+| Isolated input / normal decoded samples per channel | 4,427,993 | 4,427,991 |
+| Samples in a short native read | 4,427,776 | 4,427,776 |
+| Retained samples omitted | 217 (4.521 ms) | 215 (4.479 ms) |
+| Actual post-input padding, separately accounted | 807 samples | 809 samples |
+| Missing source interval RMS, normalized ±1 scale | 0.107401 | 0.107810 |
+| Correlation between omitted native tail and retained input tail | 0.998696 | 0.997967 |
+
+[VERIFIED] The presentation MP4 and isolated encoder input match the prior committed hashes. A fresh independent AAC encode of that isolated input reproduces the output's complete AAC packet payloads. Elementary AAC decoding contains exactly **1,024 priming + retained input + 807/809 trailing samples**; removing only priming and trailing samples reproduces the normal decode exactly. The MP4 audio time base is explicitly checked as 1/48,000 before comparing packet timestamps with sample indices. The short reads stop at the beginning of the last AAC packet's **valid** 215/217-sample interval, not at the beginning of post-input padding.
+
+[VERIFIED] Each missing source sample is nonzero in both channels, and the omitted decoded waveform strongly correlates with that retained input. A short native read is **bit-identical to the corresponding complete native read throughout the entire shared prefix**. Eight fresh native reads reproduced four complete and four short reads; all shared prefixes remained bit-identical. The retained historical native PCM artifacts were matched to the previously recorded counts and newly hashed during this investigation; they did not have prior committed PCM hashes. The MP4 and isolated-input hash bindings, plus the fresh repeated reads, are separate evidence.
+
+[VERIFIED scope] Small size or low energy alone cannot authorize a padding exemption. Classification controls distinguish removal of only the proven post-input padding from removal of even one retained sample, and reject a changed earlier prefix. The classifier is a forensic aid, not a new playback acceptance rule. **No acceptance check was relaxed.** This is a tiny loss of retained synthetic presentation audio, not detected private content. The investigation does not determine whether a listener would notice it, whether an actual player behaves identically, or why the native probe intermittently omits it.
+
+[VERIFIED background via Apple documentation] AAC uses overlapping transforms and separate priming/remainder samples; a final packet can therefore be needed to recover retained source audio. Padding and retained samples must be distinguished by their position and provenance, not packet byte size. See [Apple's AAC encoding background](https://developer.apple.com/documentation/quicktime-file-format/background_aac_encoding). This explains the investigation method; the local receipts establish this fixture's result. The next diagnostic is the native probe's handling of the final partial AAC packet, without granting a blanket short-tail allowance.
 
 Native decoded video buffers supplied no individual duration. For these CFR fixtures, the probe instead requires all adjacent native timestamps to agree with native minimum frame duration, and the last interval to agree with native track end. It does not substitute zero for missing duration. This method is not yet a VFR playback proof. It is an independent decoder exercise, not a browser/VLC listening session.
 
@@ -79,7 +100,7 @@ Native decoded video buffers supplied no individual duration. For these CFR fixt
 
 ## What blocks a local pass
 
-1. Explain and resolve the intermittent native audio completeness discrepancy; repeat independent checks, including VFR/delayed-audio cases, without a blanket timing tolerance.
+1. Resolve the intermittent omission of retained audio in the native probe; a disposable-padding exemption is now ruled out. Repeat independent checks, including VFR/delayed-audio cases, without a blanket timing tolerance.
 2. Bound mapping uncertainty beyond sparse synthetic anchors; exercise speech-like/noisy mixes and additional codec/pause patterns. Unsupported cases must remain blocked.
 3. Complete the intended container/codec payload coverage; the current parser is deliberately narrower than arbitrary MP4 contents.
 4. Application stale-input/approval/publication fencing is still only a simulated contract. Production integration needs its own tests. Representative full-length motion/quality behavior and actual volume-exhaustion handling also remain unproven.
@@ -90,6 +111,6 @@ Cloud lifecycle, uploads, region/spending enforcement and verified Sandbox clean
 
 [VERIFIED] `docs/plans/STAGE4_LOCAL_MATRIX_EVIDENCE_2026-10-09.json` stores content-free receipts, command arguments, build information, hashes, observed counts and resource results. Independent/native/container receipts are bound to byte-identical final integration outputs by hash. Generated media, native binaries and decoded intermediates remain in unique local temporary folders; no complete scratch cleanup is claimed. NumPy/Pillow came from the existing bundled Python; no new package was installed. Native probe compilation uses the installed Apple toolchain; it emits API-deprecation warnings but succeeds.
 
-[VERIFIED scope] Contract-reconcile surface: benchmark scripts → generated files → content-free receipts → these research reports. Auth/routes/schema/production stores: N/A. Partial successes remain per-case; the aggregate Stage A status never becomes pass. Changed-state behavior is explicitly simulated. Fresh read-only review required complete native counts, valid video intervals, explicit long-input clocks and audit-inclusive margins; those changes are incorporated. The full startup gate set passed sequentially. Final scoped documentation/safety gates are required before commit.
+[VERIFIED scope] Contract-reconcile surface: benchmark scripts → generated files → content-free receipts → these research reports. Auth/routes/schema/production stores: N/A. Partial successes remain per-case; the aggregate Stage A status never becomes pass. Changed-state behavior is explicitly simulated. Fresh read-only review required complete native counts, valid video intervals, explicit long-input clocks and audit-inclusive margins; those changes are incorporated. The full startup gate set passed sequentially. Final scoped documentation/safety gates are required before commit. The tail investigation leaves all existing privacy and completeness gates unchanged; its new forensic assertions check sample provenance rather than accepting a duration tolerance.
 
 [VERIFIED reconciliation scope] Sweep Mode A covers the Stage 4 research reports and their live restatements, using executed receipts as authority. Earlier initial results remain historical; current summaries and remaining-work lists point here. Main's separate workflow implementation/release history is excluded because this is an isolated benchmark branch. No claim of whole-repository or Production reconciliation is made.
