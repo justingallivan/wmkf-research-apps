@@ -2366,3 +2366,136 @@ describe('browser MP4 mint/finalize characterization', () => {
     expect(d.releaseSlotLease).toHaveBeenCalled();
   });
 });
+
+describe('finalizeClaimedMp4Upload server-copy seams', () => {
+  const { finalizeClaimedMp4Upload, mp4GenerationIdentity } = _internal;
+  const pathItem = {
+    siteId: 'site', driveId: 'drive', id: 'item', name: `1003220-Recording-${OPERATION_ID}.mp4`,
+    size: 100, eTag: 'etag', versionId: '1.0', webUrl: 'https://example.test/item',
+    lastModified: '2026-09-25T12:30:00Z',
+  };
+  const run = (d, extra = {}) => finalizeClaimedMp4Upload({
+    row: mp4Intent({ state: 'finalizing' }),
+    leaseToken: 'intent-lease',
+    actingUserSystemId: ACTOR_ID,
+    ...extra,
+  }, d);
+  const baseDeps = (overrides = {}) => deps({
+    getFileMetadataByPath: jest.fn(async () => pathItem),
+    getFileMetadataById: jest.fn(async () => ({ ...pathItem })),
+    ...overrides,
+  });
+  const changed = () => Object.assign(new Error('winner changed'), { code: 'zoom_video_winner_changed' });
+
+  test('mp4GenerationIdentity matches the browser mint formula', () => {
+    const identity = mp4GenerationIdentity({
+      requestId: REQUEST_ID.toUpperCase(), requestNum: '1003220',
+      operationId: OPERATION_ID.toUpperCase(), resumeFingerprint: 'a'.repeat(64),
+    });
+    expect(identity.physicalFilename).toBe(`1003220-Recording-${OPERATION_ID.toUpperCase()}.mp4`);
+    expect(identity.generationKey).toBe(createHash('sha256').update(
+      `meeting-tracker-post-presentation:${REQUEST_ID}:${REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING}:${OPERATION_ID}:${'a'.repeat(64)}`,
+    ).digest('hex'));
+  });
+
+  test('mint passes origin browser to the intent insert explicitly', async () => {
+    const d = deps();
+    await mintMp4Upload({
+      requestId: REQUEST_ID, operationId: OPERATION_ID, actingUserSystemId: ACTOR_ID,
+      filename: 'recording.mp4', contentType: 'video/mp4', size: 100, resumeFingerprint: 'a'.repeat(64),
+    }, d);
+    expect(d.insertUploadIntent.mock.calls[0][0].origin).toBe('browser');
+  });
+
+  test('renewOrStop is called immediately before the slot is acquired', async () => {
+    const renewOrStop = jest.fn(async () => ({ id: OPERATION_ID }));
+    const d = baseDeps();
+    await run(d, { renewOrStop });
+    expect(d.renewUploadLease).not.toHaveBeenCalled();
+    const acquireOrder = d.acquireSlotLease.mock.invocationCallOrder[0];
+    const signatureOrder = d.readMediaRange.mock.invocationCallOrder[0];
+    expect(renewOrStop.mock.invocationCallOrder.some((o) => o > signatureOrder && o < acquireOrder)).toBe(true);
+  });
+
+  test('a renewOrStop failure before the slot stops without acquiring or writing', async () => {
+    const lost = Object.assign(new Error('copy fence lost'), { code: 'copy_fence_lost' });
+    const renewOrStop = jest.fn()
+      .mockResolvedValueOnce({}).mockResolvedValueOnce({}).mockRejectedValueOnce(lost);
+    const d = baseDeps();
+    await expect(run(d, { renewOrStop })).rejects.toBe(lost);
+    expect(d.acquireSlotLease).not.toHaveBeenCalled();
+    expect(d.createDocument).not.toHaveBeenCalled();
+  });
+
+  test('beforeCreate aborts on a changed winner before create or supersede, and the slot is released', async () => {
+    const staffWinner = mp4Recording(OLD_ID, 6, { wmkf_generationkey: 'c'.repeat(64) });
+    const beforeCreate = jest.fn(async ({ winnerDocumentId }) => {
+      if (winnerDocumentId !== 'confirmed-winner') throw changed();
+    });
+    const d = baseDeps({ findDocuments: jest.fn(async () => ({ records: [staffWinner] })) });
+    await expect(run(d, { beforeCreate })).rejects.toMatchObject({ code: 'zoom_video_winner_changed' });
+    expect(beforeCreate).toHaveBeenCalledWith(expect.objectContaining({
+      winnerDocumentId: OLD_ID, winnerSlotVersion: 6, fenceVersion: 7,
+    }));
+    expect(d.createDocument).not.toHaveBeenCalled();
+    expect(d.updateDocument).not.toHaveBeenCalled();
+    expect(d.completeUploadIntent).not.toHaveBeenCalled();
+    expect(d.releaseSlotLease).toHaveBeenCalled();
+  });
+
+  test('beforeCreate that returns lets create proceed and supersede the predecessor', async () => {
+    const zoomWinner = recording(OLD_ID, 6);
+    const beforeCreate = jest.fn(async () => {});
+    const d = baseDeps({
+      findDocuments: jest.fn()
+        .mockResolvedValueOnce({ records: [zoomWinner] })
+        .mockResolvedValueOnce({ records: [zoomWinner, mp4Recording(NEW_ID, 7)] }),
+    });
+    const result = await run(d, { beforeCreate });
+    expect(beforeCreate).toHaveBeenCalledTimes(1);
+    expect(d.createDocument).toHaveBeenCalledTimes(1);
+    expect(d.updateDocument).toHaveBeenCalledWith(OLD_ID, expect.any(Object), expect.any(Object));
+    expect(result.requestDocumentId).toBe(NEW_ID);
+  });
+
+  test('beforeCreate is not consulted for a verified recovered winner replay', async () => {
+    const recovered = mp4Recording(OLD_ID, 7);
+    const beforeCreate = jest.fn(async () => { throw changed(); });
+    const d = baseDeps({
+      acquireSlotLease: jest.fn(async () => ({ fence_version: 9 })),
+      renewSlotLease: jest.fn(async () => ({ fence_version: 9 })),
+      findDocumentByGenerationKey: jest.fn(async () => ({ records: [recovered] })),
+      findDocuments: jest.fn(async () => ({ records: [recovered] })),
+    });
+    const result = await run(d, { beforeCreate });
+    expect(beforeCreate).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ replayed: true, requestDocumentId: OLD_ID });
+  });
+
+  test('beforeCreate is not consulted for a verified stale replay under a newer winner', async () => {
+    const recovered = mp4Recording(OLD_ID, 7);
+    const newer = mp4Recording(NEW_ID, 8, { wmkf_generationkey: 'c'.repeat(64), wmkf_sharepointitemid: 'newer-item' });
+    const beforeCreate = jest.fn(async () => { throw changed(); });
+    const d = baseDeps({
+      acquireSlotLease: jest.fn(async () => ({ fence_version: 9 })),
+      renewSlotLease: jest.fn(async () => ({ fence_version: 9 })),
+      findDocumentByGenerationKey: jest.fn(async () => ({ records: [recovered] })),
+      findDocuments: jest.fn(async () => ({ records: [recovered, newer] })),
+    });
+    const result = await run(d, { beforeCreate });
+    expect(beforeCreate).not.toHaveBeenCalled();
+    expect(d.createDocument).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ replayed: true, requestDocumentId: OLD_ID });
+  });
+
+  test('beforeCreate is not reached when the recovered document fails identity verification', async () => {
+    const beforeCreate = jest.fn(async () => {});
+    const d = baseDeps({
+      findDocumentByGenerationKey: jest.fn(async () => ({
+        records: [mp4Recording(OLD_ID, 7, { wmkf_inputfingerprint: 'f'.repeat(64) })],
+      })),
+    });
+    await expect(run(d, { beforeCreate })).rejects.toMatchObject({ code: 'post_presentation_replay_mismatch' });
+    expect(beforeCreate).not.toHaveBeenCalled();
+  });
+});
