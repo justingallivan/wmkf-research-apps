@@ -26,6 +26,7 @@ const METHODS = {
   createBrowserUploadSession: [3, true],
   getBrowserUploadSessionStatus: [1, true],
   cancelBrowserUploadSession: [1, true],
+  putUploadSessionChunk: [2, true],
   resolveMediaDownloadUrl: [2, true],
   readMediaRange: [2, true],
   replaceFileContent: [3, true],
@@ -57,7 +58,7 @@ beforeEach(() => {
 test('keeps the named export, canonical URL, own static surface, arity, and sync/async split', () => {
   expect(SHAREPOINT_CANONICAL_SITE_URL).toBe('https://appriver3651007194.sharepoint.com/sites/akoyaGO');
   expect(Object.keys(graphServiceModule).sort()).toEqual(['GraphService', 'SHAREPOINT_CANONICAL_SITE_URL']);
-  expect(Object.keys(METHODS)).toHaveLength(27);
+  expect(Object.keys(METHODS)).toHaveLength(28);
   expect(Object.getOwnPropertyNames(GraphService)
     .filter(name => !['length', 'name', 'prototype'].includes(name)).sort())
     .toEqual(Object.keys(METHODS).sort());

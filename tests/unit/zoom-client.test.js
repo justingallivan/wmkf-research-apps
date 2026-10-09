@@ -1,7 +1,7 @@
 /** @jest-environment node */
 import {
   ZoomClientError, getAccessToken, resetZoomTokenCache, listHostRecordings, getMeetingRecordings,
-  downloadRecordingFile, encodeMeetingUuid,
+  downloadRecordingFile, encodeMeetingUuid, resolveRecordingDownloadUrl, fetchRecordingRange,
 } from '../../lib/services/meeting-tracker-recordings/zoom-client.js';
 
 const SECRET = 'client-secret-value';
@@ -224,5 +224,153 @@ describe('downloadRecordingFile', () => {
     const error = await rejection(downloadRecordingFile(START, opts));
     expect(error.code).toBe('zoom_unavailable');
     expect(error.message).not.toContain('ECONNRESET');
+  });
+});
+
+describe('resolveRecordingDownloadUrl', () => {
+  const START = 'https://us02web.zoom.us/rec/download/abc';
+  const FINAL = 'https://ssrweb.zoom.us/file/x?token=t';
+  const calls = () => fetchMock.mock.calls;
+  const ranged = (status, extra = {}) => ({ ok: status >= 200 && status < 300, status, headers: headers(extra), json: async () => ({}), body: null });
+
+  test('follows redirects manually, bearer on hop 0 only, Range on every hop, returns the 206 URL', async () => {
+    fetchMock.mockImplementation(async (url) => (String(url) === START ? redirect('https://us02web.zoom.us/hop2') : String(url).endsWith('/hop2') ? redirect(FINAL) : ranged(206)));
+    expect(await resolveRecordingDownloadUrl(START, { bearer: TOKEN, deadlineMs: Date.now() + 60_000 })).toBe(FINAL);
+    expect(calls()).toHaveLength(3);
+    calls().forEach(([, init], i) => {
+      expect(init.redirect).toBe('manual');
+      expect(init.headers.Range).toBe('bytes=0-0');
+      if (i === 0) expect(init.headers.Authorization).toBe(`Bearer ${TOKEN}`);
+      else expect(init.headers.Authorization).toBeUndefined();
+    });
+  });
+
+  test('a 200 to the ranged request is terminal zoom_range_unsupported', async () => {
+    fetchMock.mockResolvedValue(ranged(200));
+    const error = await rejection(resolveRecordingDownloadUrl(START, { bearer: TOKEN }));
+    expect(error.code).toBe('zoom_range_unsupported');
+    expectNoLeak(error);
+  });
+
+  test.each([
+    ['non-zoom host', 'https://evil.example.com/steal'],
+    ['http scheme', 'http://ssrweb.zoom.us/x'],
+    ['non-443 port', 'https://ssrweb.zoom.us:8443/x'],
+    ['URL credentials', 'https://user:pw@ssrweb.zoom.us/x'],
+  ])('rejects a redirect to %s before fetching it', async (_label, target) => {
+    fetchMock.mockImplementation(async (url) => (String(url) === START ? redirect(target) : ranged(206)));
+    expect((await rejection(resolveRecordingDownloadUrl(START, { bearer: TOKEN }))).code).toBe('zoom_download_invalid');
+    expect(calls()).toHaveLength(1);
+  });
+
+  test('rejects a non-zoom starting URL without fetching, and a sixth redirect', async () => {
+    expect((await rejection(resolveRecordingDownloadUrl('https://evil.example.com/x', { bearer: TOKEN }))).code).toBe('zoom_download_invalid');
+    expect(calls()).toHaveLength(0);
+    let n = 0;
+    fetchMock.mockImplementation(async () => redirect(`https://a${n += 1}.zoom.us/x`));
+    expect((await rejection(resolveRecordingDownloadUrl(START, { bearer: TOKEN }))).code).toBe('zoom_download_invalid');
+    expect(calls()).toHaveLength(6);
+  });
+
+  test('a failure on a hop maps through mapFailure', async () => {
+    fetchMock.mockResolvedValue(jsonRes({}, 404));
+    expect((await rejection(resolveRecordingDownloadUrl(START, { bearer: TOKEN }))).code).toBe('zoom_not_found');
+  });
+
+  test('a deadline shorter than the 30 s budget wins; an exhausted deadline sends nothing', async () => {
+    const timeout = jest.spyOn(AbortSignal, 'timeout');
+    fetchMock.mockResolvedValue(ranged(206));
+    await resolveRecordingDownloadUrl(START, { bearer: TOKEN, deadlineMs: Date.now() + 5_000 });
+    expect(timeout.mock.calls[0][0]).toBeLessThanOrEqual(5_000);
+    timeout.mockClear();
+    await resolveRecordingDownloadUrl(START, { bearer: TOKEN });
+    expect(timeout.mock.calls[0][0]).toBeGreaterThan(5_000);
+    fetchMock.mockClear();
+    expect((await rejection(resolveRecordingDownloadUrl(START, { bearer: TOKEN, deadlineMs: Date.now() - 1 }))).code).toBe('zoom_unavailable');
+    expect(calls()).toHaveLength(0);
+    timeout.mockRestore();
+  });
+});
+
+describe('fetchRecordingRange', () => {
+  const URL_ = 'https://ssrweb.zoom.us/file/x?token=t';
+  const range = { start: 10, end: 14, total: 100 };
+  const ok = (body = ['hello'], extra = {}) => streamRes(body, { status: 206, type: 'video/mp4', extra: { 'content-range': 'bytes 10-14/100', ...extra } });
+
+  test('returns the bytes with no bearer and the exact Range header', async () => {
+    fetchMock.mockResolvedValue(ok(['he', 'llo']));
+    const out = await fetchRecordingRange(URL_, { ...range, deadlineMs: Date.now() + 60_000 });
+    expect(out.status).toBe(206);
+    expect(out.bytes.toString()).toBe('hello');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(URL_);
+    expect(init.headers).toEqual({ Range: 'bytes=10-14' });
+    expect(init.redirect).toBe('manual');
+  });
+
+  test('a 200 to a ranged request is terminal zoom_range_unsupported', async () => {
+    fetchMock.mockResolvedValue(streamRes(['hello'], { status: 200, type: 'video/mp4' }));
+    expect((await rejection(fetchRecordingRange(URL_, range))).code).toBe('zoom_range_unsupported');
+  });
+
+  test.each([
+    ['wrong Content-Range', ok(['hello'], { 'content-range': 'bytes 10-14/101' })],
+    ['missing Content-Range', streamRes(['hello'], { status: 206, type: 'video/mp4' })],
+    ['short body', ok(['hell'])],
+    ['long body', ok(['hello!'])],
+    ['text/html', streamRes(['hello'], { status: 206, type: 'text/html', extra: { 'content-range': 'bytes 10-14/100' } })],
+  ])('rejects %s', async (_label, res) => {
+    fetchMock.mockResolvedValue(res);
+    const error = await rejection(fetchRecordingRange(URL_, range));
+    expect(error.code).toBe('zoom_download_invalid');
+    expectNoLeak(error);
+  });
+
+  test('rejects a redirect (never followed) and a non-zoom URL without fetching', async () => {
+    fetchMock.mockResolvedValue(redirect('https://evil.example.com/steal'));
+    expect((await rejection(fetchRecordingRange(URL_, range))).code).toBe('zoom_download_invalid');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    fetchMock.mockClear();
+    expect((await rejection(fetchRecordingRange('https://evil.example.com/x', range))).code).toBe('zoom_download_invalid');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test.each([401, 403, 404, 410])('%i is returned as a raw status for the caller to re-resolve', async (status) => {
+    fetchMock.mockResolvedValue(jsonRes({ code: 4711 }, status));
+    expect(await fetchRecordingRange(URL_, range)).toEqual({ bytes: null, status });
+  });
+
+  test.each([[429, 'zoom_rate_limited'], [500, 'zoom_unavailable'], [400, 'zoom_download_invalid']])('HTTP %i throws %s', async (status, code) => {
+    fetchMock.mockResolvedValue(jsonRes({}, status));
+    expect((await rejection(fetchRecordingRange(URL_, range))).code).toBe(code);
+  });
+
+  test('refuses invalid ranges and a network failure becomes zoom_unavailable', async () => {
+    for (const bad of [{ start: -1, end: 4, total: 10 }, { start: 5, end: 4, total: 10 }, { start: 0, end: 10, total: 10 }, { start: 0, end: 1.5, total: 10 }, {}]) {
+      expect((await rejection(fetchRecordingRange(URL_, bad))).code).toBe('zoom_download_invalid');
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockRejectedValue(new Error(`ECONNRESET ${URL_}`));
+    expect((await rejection(fetchRecordingRange(URL_, range))).code).toBe('zoom_unavailable');
+  });
+
+  test('a deadline shorter than the 45 s budget wins; an exhausted deadline sends nothing', async () => {
+    const timeout = jest.spyOn(AbortSignal, 'timeout');
+    fetchMock.mockResolvedValue(ok());
+    await fetchRecordingRange(URL_, { ...range, deadlineMs: Date.now() + 7_000 });
+    expect(timeout.mock.calls[0][0]).toBeLessThanOrEqual(7_000);
+    timeout.mockClear();
+    fetchMock.mockResolvedValue(ok());
+    await fetchRecordingRange(URL_, range);
+    expect(timeout.mock.calls[0][0]).toBe(45_000);
+    fetchMock.mockClear();
+    expect((await rejection(fetchRecordingRange(URL_, { ...range, deadlineMs: Date.now() - 1 }))).code).toBe('zoom_unavailable');
+    expect(fetchMock).not.toHaveBeenCalled();
+    timeout.mockRestore();
+  });
+
+  test('the new codes carry HTTP statuses', () => {
+    expect(new ZoomClientError('zoom_range_unsupported').httpStatus).toBe(502);
+    expect(new ZoomClientError('zoom_download_denied').httpStatus).toBe(502);
   });
 });
