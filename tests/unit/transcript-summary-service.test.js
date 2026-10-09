@@ -313,6 +313,24 @@ describe('publish', () => {
     expect(deps.releaseSlotLease).toHaveBeenCalled();
   });
 
+  test('the claim is scoped to presentation-summary drafts (paired summaries plan, release step 0)', async () => {
+    await publish();
+    expect(drafts.claimSummaryDraftForPublish).toHaveBeenCalledWith(expect.objectContaining({
+      artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY }));
+  });
+
+  test('a claimed draft of another summary kind is refused before any write and its claim returns to ready', async () => {
+    drafts.claimSummaryDraftForPublish.mockImplementationOnce(async (args) => {
+      Object.assign(claim, { state: 'publishing', token: args.token });
+      return draftRow({ state: 'publishing', artifact_type: 100000010 });
+    });
+    await expect(publish()).rejects.toMatchObject({ httpStatus: 409, code: 'summary_draft_kind_unsupported' });
+    expect(deps.acquireSlotLease).not.toHaveBeenCalled();
+    expect(deps.uploadFile).not.toHaveBeenCalled();
+    expect(deps.createDocument).not.toHaveBeenCalled();
+    expect(claim).toMatchObject({ state: 'ready', token: null });
+  });
+
   test('the claim precedes every external write, and the published text is the claimed text', async () => {
     claim.text = 'Claimed text';
     await publish();
