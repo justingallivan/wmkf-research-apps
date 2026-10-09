@@ -66,10 +66,12 @@ function makeWorld({ size = 25, copyState = 'queued' } = {}) {
     candidate_item_id: w.intent.candidate_item_id, candidate_drive_id: w.intent.candidate_drive_id,
     candidate_site_id: w.intent.candidate_site_id,
   });
-  const cap = (field, code, state) => {
+  const cap = (field, code) => {
     if (w.copy[field] + 1 > 3) throw new Error('CHECK violated: counter above cap');
     w.copy[field] += 1;
-    return w.copy[field] >= 3 ? (endCopy('failed', { failure_code: code }), true) : (void (state), false);
+    if (w.copy[field] < 3) return false;
+    endCopy('failed', { failure_code: code });
+    return true;
   };
 
   const graphError = (status, message = 'graph failed https://graph.example/up?tempauth=SECRETSIG Bearer ZOOMTOKENSECRET') =>
@@ -385,7 +387,6 @@ describe('resume and loss', () => {
     const w = makeWorld({ size: 100 });
     w.seedSession(0);
     const url = [...w.graph.sessions.keys()][0];
-    w.hooks.afterPut = () => {};
     let first = true;
     const deps = {
       putUploadSessionChunk: async (...args) => {
@@ -483,15 +484,26 @@ describe('Graph failures', () => {
     expect(result.outcome).toBe('uncertain');
     expect(w.copy).toMatchObject({ state: 'copying', uncertain_checks: 1 });
     expect(w.intent.state).toBe('initiated');
+    // the next attempt re-sends the final chunk to a fresh session and is again absent; the third check caps
     w.copy.uncertain_checks = 2;
-    w.t += 120_000;
-    w.graph.sessions.clear();
-    w.graph.lossStatus = 404;
-    w.graph.hideItem = true;
+    w.copy.next_attempt_at = null;
+    w.seedSession(0);
     result = await w.tick();
-    expect(['uncertain', 'failed']).toContain(result.outcome);
-    expect(w.copy.uncertain_checks).toBe(3);
-    expect(w.copy.failure_code).toBe('zoom_video_session_uncertain');
+    expect(result.outcome).toBe('failed');
+    expect(w.copy).toMatchObject({ state: 'failed', failure_code: 'zoom_video_upload_uncertain', uncertain_checks: 3 });
+  });
+
+  test('a failed intent without a ciphertext runs the 0/2/8 s path checks, creates through the recovery-session writer and reacquires I1', async () => {
+    const w = makeWorld({ size: 25 });
+    w.intent.state = 'failed';
+    w.intent.last_error = 'retry_status_unknown';
+    const result = await w.tick();
+    expect(result.outcome).toBe('registering');
+    expect(w.sleeps).toEqual([2_000, 8_000]);
+    expect(w.counts.create).toBe(1);
+    expect(w.counts.claimPump).toBe(2);
+    expect(w.puts).toHaveLength(3);
+    expect(w.copy.session_create_attempts).toBe(0);
   });
 
   test('a create failure counts an attempt on a queued row and caps at three', async () => {
