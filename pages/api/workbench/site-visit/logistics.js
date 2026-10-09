@@ -75,6 +75,7 @@ export default async function handler(req, res) {
             presentationMaterials: result.presentationMaterials,
             presentationMaterialConflicts: result.presentationMaterialConflicts,
             presentationSummary: result.presentationSummary ?? null,
+            discussionSummary: result.discussionSummary ?? null,
           } : {}),
         });
       }

@@ -85,6 +85,7 @@ test('derives siteVisit, materials, and suggested recipients from the logistics 
     presentationMaterials: [],
     presentationMaterialConflicts: [],
     presentationSummary: null,
+    discussionSummary: null,
   }));
 });
 
@@ -108,6 +109,7 @@ test.each([
     presentationMaterials: [],
     presentationMaterialConflicts: [],
     presentationSummary: null,
+    discussionSummary: null,
   }));
 });
 
@@ -129,6 +131,7 @@ test('yields empty suggestions when no visit is scheduled', async () => {
     presentationMaterials: [],
     presentationMaterialConflicts: [],
     presentationSummary: null,
+    discussionSummary: null,
   }));
 });
 
@@ -198,17 +201,18 @@ test('keeps presentation materials when the independent recipient directory fail
   }));
 });
 
-test('passes the presentation summary through with a ready projection', async () => {
+test('passes the presentation and staff discussion summaries through with a ready projection', async () => {
   const presentationSummary = { text: 'What was presented', stale: false, publishedAt: '2026-10-05T15:00:00Z' };
+  const discussionSummary = { text: 'Main points raised', stale: false, publishedAt: '2026-10-06T15:00:00Z' };
   global.fetch = jest.fn(async (url) => (
     String(url).includes('/logistics')
       ? response({ siteVisit: null, materials: [], presentationMaterialsStatus: 'ready', presentationMaterials: [],
-        presentationMaterialConflicts: [], presentationSummary })
+        presentationMaterialConflicts: [], presentationSummary, discussionSummary })
       : response({ staff: [], external: [] })
   ));
   render(<Harness requestId={REQUEST_ID} />);
   await waitFor(() => expect(JSON.parse(screen.getByTestId('context').textContent)).toMatchObject({
-    presentationMaterialsStatus: 'loaded', presentationSummary,
+    presentationMaterialsStatus: 'loaded', presentationSummary, discussionSummary,
   }));
 });
 

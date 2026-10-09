@@ -10,7 +10,7 @@ import {
 } from '../../utils/graph-browser-upload';
 import { normalizeZoomPaste } from '../../../lib/services/post-presentation-materials/material-model';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../config/requestDocument';
-import { PRESENTATION_SUMMARY_ACKNOWLEDGMENT, SUMMARY_TEXT_MAX_CHARS } from '../../config/transcriptSummary';
+import { PAIRED_SUMMARY_ACKNOWLEDGMENT, SUMMARY_TEXT_MAX_CHARS } from '../../config/transcriptSummary';
 import { Button } from '../Layout';
 import { formatTranscriptTurnTime, getTranscriptSpeakers, groupTranscriptByTurn } from '../../../lib/services/transcription-pilot/transcript-format';
 import { MAX_TRANSCRIPTION_BYTES as MAX_AUDIO_BYTES, MAX_TRANSCRIPTION_MIB } from '../../../lib/services/transcription-pilot/limits';
@@ -1024,6 +1024,285 @@ function Chip({ tone = 'gray', children }) {
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${classes}`}>{children}</span>;
 }
 
+// Per-kind card wiring for the summary hook. Response bodies use `transcriptSummary` for either kind's published state.
+const SUMMARY_KIND_UI = Object.freeze({
+  presentation: Object.freeze({
+    query: '', postBody: Object.freeze({}), transcriptKey: 'presentationTranscript', publishedKey: 'transcriptSummary',
+    acknowledgmentVersion: PAIRED_SUMMARY_ACKNOWLEDGMENT.version,
+    busy: Object.freeze({ save: 'summary-save', discard: 'summary-discard', publish: 'summary-publish' }),
+    loadFailure: 'The presentation summary could not be loaded.',
+    readyNotice: (result) => (result.slidesIncluded
+      ? 'Draft ready, made from the presentation transcript and the applicant slides. Review it before publishing.'
+      : 'Draft ready, made from the presentation transcript. Slide text was not included. Review it before publishing.'),
+    publishedNotice: 'Summary published. Available to staff and eligible for the Board link.',
+  }),
+  discussion: Object.freeze({
+    query: '?kind=discussion', postBody: Object.freeze({ kind: 'discussion' }), transcriptKey: 'staffDiscussionTranscript',
+    publishedKey: 'staffDiscussionSummary', acknowledgmentVersion: PAIRED_SUMMARY_ACKNOWLEDGMENT.version,
+    busy: Object.freeze({ save: 'discussion-summary-save', discard: 'discussion-summary-discard', publish: 'discussion-summary-publish' }),
+    loadFailure: 'The staff discussion summary could not be loaded.',
+    readyNotice: () => 'Draft ready, made from the staff discussion transcript. Review it before publishing.',
+    publishedNotice: 'Summary published. Staff only; never included on the Board page.',
+  }),
+});
+const SUMMARY_KIND_ORDER = Object.freeze(['presentation', 'discussion']);
+// A generating row older than the server's abandon window (360 s) can be retried.
+const SUMMARY_RUN_ABANDON_MS = 360 * 1000;
+function summaryRunAbandoned(draft) {
+  return draft?.state === 'generating' && Date.now() - Date.parse(draft.createdAt) > SUMMARY_RUN_ABANDON_MS;
+}
+// The paired click summarizes a kind only when its half is bound and it has no draft or current published summary
+// (owner decision 2); the server separately refuses to replace a ready draft (plan D2).
+function pairedSummaryEligible(h) {
+  const draft = h.summary?.draft;
+  return h.transcriptBound && h.summaryReadState === 'ready' && h.summaryLoadedKey === h.summaryLoadKey && !h.summaryConflict
+    && (!draft || summaryRunAbandoned(draft)) && h.summary?.transcriptSummary?.state !== 'bound' && h.summary?.discussionNotRecorded !== true;
+}
+
+// One summary kind's draft, review and publish state (plan §4.3, §16; paired summaries plan D9). The caller owns
+// `busy` for generation and the acknowledgment; every write is dropped when the card changed or this kind's load key moved on.
+function useSummaryKind(kind, { requestId, basePath, currentArtifact, busy, setBusy, generationRef, isCurrent,
+  loadCollection, onMaterialsChangedRef }) {
+  const spec = SUMMARY_KIND_UI[kind];
+  const summaryPath = `${basePath}/summary-draft`;
+  const summarySequenceRef = useRef(0);
+  const [summary, setSummary] = useState(null);
+  const [summaryText, setSummaryText] = useState('');
+  const [summaryConflict, setSummaryConflict] = useState(null);
+  const summaryRef = useRef(summary);
+  const summaryTextRef = useRef(summaryText);
+  const summaryConflictRef = useRef(summaryConflict);
+  summaryRef.current = summary;
+  summaryTextRef.current = summaryText;
+  summaryConflictRef.current = summaryConflict;
+  const summaryDirtyRef = useRef(false);
+  const [summaryReadState, setSummaryReadState] = useState('idle');
+  const [summaryLoadedKey, setSummaryLoadedKey] = useState(null);
+  const summaryReadErrorRef = useRef(false);
+  const [summaryError, setSummaryError] = useState(null);
+  const [summaryNotice, setSummaryNotice] = useState(null);
+  const [summarizing, setSummarizing] = useState(false);
+  const currentArtifactRef = useRef(currentArtifact);
+  currentArtifactRef.current = currentArtifact;
+  const transcriptBound = currentArtifact?.[spec.transcriptKey]?.state === 'bound';
+  const publishedInCollection = currentArtifact?.[spec.publishedKey];
+  // Each kind's key holds only its own transcript half and published state, so one kind's publish never drops the other's result.
+  const summaryLoadKey = `${currentArtifact?.id || ''}|${currentArtifact?.fingerprint || ''}|${currentArtifact?.presentationEnd?.endMs ?? ''}|${transcriptBound}|${publishedInCollection?.state || ''}|${publishedInCollection?.artifactId || ''}`;
+  const summaryLoadKeyRef = useRef(summaryLoadKey);
+  summaryLoadKeyRef.current = summaryLoadKey;
+  const isCurrentSummaryRequest = useCallback((generation, key) => isCurrent(generation) && summaryLoadKeyRef.current === key, [isCurrent]);
+  // A 'publishing' draft is one whose publish did not finish: it is read-only and can only be published again.
+  const summaryDraft = ['ready', 'publishing'].includes(summary?.draft?.state) ? summary.draft : null;
+  const summaryDirty = summaryDraft?.state === 'ready' && summaryText !== (summaryDraft.text || '');
+  const summaryLocalTextPending = summaryDraft?.state === 'publishing' && summaryText !== (summaryDraft.text || '');
+  summaryDirtyRef.current = summaryDirty || summaryLocalTextPending || Boolean(summaryConflict);
+  const changeSummaryText = useCallback((value) => {
+    setSummaryText(value);
+  }, []);
+
+  const loadSummary = useCallback(async ({ replaceText = false } = {}) => {
+    if (!requestId) return;
+    const generation = generationRef.current;
+    const sequence = ++summarySequenceRef.current;
+    setSummaryReadState('loading');
+    try {
+      const body = await requestJson(`${summaryPath}${spec.query}`, { method: 'GET', fallbackMessage: spec.loadFailure });
+      if (!isCurrentSummaryRequest(generation, summaryLoadKey) || summarySequenceRef.current !== sequence) return;
+      const keepLocalDraft = !replaceText && summaryDirtyRef.current;
+      const previous = summaryRef.current;
+      const existingConflict = replaceText ? null : summaryConflictRef.current;
+      if (existingConflict) {
+        setSummary(body);
+      } else if (keepLocalDraft && previous?.draft) {
+        const sameDraftVersion = previous.draft.id === body?.draft?.id && previous.draft.version === body?.draft?.version;
+        if (!sameDraftVersion) {
+          setSummary(body);
+          setSummaryConflict({ draftId: previous.draft.id, version: previous.draft.version, text: summaryTextRef.current });
+        } else {
+          setSummary({
+            ...body,
+            draft: { ...body.draft, id: previous.draft.id, version: previous.draft.version, text: previous.draft.text },
+            draftMatchesTranscript: body.draftMatchesTranscript === true,
+          });
+        }
+      } else {
+        setSummary(body);
+      }
+      if (summaryReadErrorRef.current) {
+        summaryReadErrorRef.current = false;
+        setSummaryError(null);
+      }
+      setSummaryReadState('ready');
+      setSummaryLoadedKey(summaryLoadKey);
+      if (replaceText) setSummaryConflict(null);
+      if (replaceText || !keepLocalDraft) {
+        const nextText = ['ready', 'publishing'].includes(body?.draft?.state) ? body.draft.text || '' : '';
+        setSummaryText(nextText);
+      }
+    } catch (loadError) {
+      if (!isCurrentSummaryRequest(generation, summaryLoadKey) || summarySequenceRef.current !== sequence) return;
+      setSummaryReadState('unavailable');
+      setSummaryLoadedKey(summaryLoadKey);
+      if (![404, 503].includes(loadError?.status)) {
+        summaryReadErrorRef.current = true;
+        setSummaryError(errorMessage(loadError, spec.loadFailure));
+      }
+    }
+  }, [requestId, summaryPath, spec, generationRef, isCurrentSummaryRequest, summaryLoadKey]);
+
+  const wantsSummary = Boolean(currentArtifact?.id && (transcriptBound || publishedInCollection?.artifactId));
+  useEffect(() => {
+    let cancelled = false;
+    if (!wantsSummary) {
+      summarySequenceRef.current += 1;
+      if (summaryReadErrorRef.current) {
+        summaryReadErrorRef.current = false;
+        setSummaryError(null);
+      }
+      const current = currentArtifactRef.current;
+      const previous = summaryRef.current;
+      if (!summaryConflictRef.current && summaryDirtyRef.current && previous?.draft) {
+        setSummaryConflict({ draftId: previous.draft.id, version: previous.draft.version, text: summaryTextRef.current });
+      }
+      setSummary(current ? { draft: null, draftMatchesTranscript: false, lastFailure: null,
+        transcriptSummary: current[spec.publishedKey] || null } : null);
+      setSummaryReadState('not_needed');
+      setSummaryLoadedKey(summaryLoadKey);
+      return () => { cancelled = true; };
+    }
+    Promise.resolve().then(() => { if (!cancelled && wantsSummary) void loadSummary(); });
+    return () => { cancelled = true; };
+  }, [summaryLoadKey, wantsSummary, loadSummary, spec]);
+
+  // The paired handler holds `busy` and checks the acknowledgment; this kind tracks only its own run.
+  const summarize = async () => {
+    if (!currentArtifact?.id) return;
+    const generation = generationRef.current;
+    summarySequenceRef.current += 1;
+    setSummarizing(true);
+    summaryReadErrorRef.current = false;
+    setSummaryError(null);
+    setSummaryNotice(null);
+    try {
+      const result = await requestJson(summaryPath, {
+        method: 'POST',
+        // Replacing names the shown draft; the server refuses to discard any other ready draft (paired summaries plan D2).
+        body: { ...spec.postBody, acknowledgmentVersion: spec.acknowledgmentVersion,
+          expectedCurrentArtifactId: currentArtifact.id, expectedCurrentFingerprint: currentArtifact.fingerprint,
+          ...(summaryDraft ? { replaceDraft: { draftId: summaryDraft.id, expectedVersion: summaryDraft.version } } : {}) },
+        fallbackMessage: 'The summary could not be generated.',
+      });
+      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return;
+      setSummary((previous) => ({ ...(previous || {}), draft: result.draft, draftMatchesTranscript: true, lastFailure: null,
+        transcriptSummary: result.transcriptSummary || previous?.transcriptSummary }));
+      setSummaryConflict(null);
+      setSummaryLoadedKey(summaryLoadKey);
+      setSummaryReadState('ready');
+      changeSummaryText(result.draft?.text || '');
+      setSummaryNotice(spec.readyNotice(result));
+    } catch (summaryFailure) {
+      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return;
+      const code = summaryFailure?.payload?.code;
+      // Not recorded is a durable server marker (plan D4); the reload shows it, so it is not an error.
+      if (code !== 'staff_discussion_not_recorded') {
+        setSummaryError(code === 'summary_draft_exists'
+          ? 'A newer draft was saved elsewhere, so nothing was replaced. The latest draft is loaded; review it before summarizing again.'
+          : errorMessage(summaryFailure, 'The summary could not be generated.'));
+      }
+      await loadSummary();
+    } finally {
+      if (isCurrent(generation)) setSummarizing(false);
+    }
+  };
+
+  const saveSummaryDraft = async () => {
+    if (summaryConflict || summaryDraft?.state !== 'ready' || busy) return null;
+    const generation = generationRef.current;
+    summarySequenceRef.current += 1;
+    setBusy(spec.busy.save);
+    summaryReadErrorRef.current = false;
+    setSummaryError(null);
+    setSummaryNotice(null);
+    try {
+      const result = await requestJson(summaryPath, {
+        method: 'PATCH', body: { draftId: summaryDraft.id, expectedVersion: summaryDraft.version, text: summaryText },
+        fallbackMessage: 'The draft could not be saved.',
+      });
+      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return null;
+      setSummary((previous) => ({ ...(previous || {}), draft: result.draft }));
+      changeSummaryText(result.draft?.text || '');
+      setSummaryNotice('Draft saved.');
+      await loadSummary({ replaceText: true });
+      return result.draft;
+    } catch (saveFailure) {
+      if (isCurrentSummaryRequest(generation, summaryLoadKey)) setSummaryError(errorMessage(saveFailure, 'The draft could not be saved.'));
+      return null;
+    } finally {
+      if (isCurrent(generation)) setBusy(null);
+    }
+  };
+
+  const discardSummaryDraft = async () => {
+    if (summaryConflict || summaryDraft?.state !== 'ready' || busy) return;
+    const generation = generationRef.current;
+    summarySequenceRef.current += 1;
+    setBusy(spec.busy.discard);
+    summaryReadErrorRef.current = false;
+    setSummaryError(null);
+    setSummaryNotice(null);
+    try {
+      await requestJson(summaryPath, { method: 'DELETE', body: { draftId: summaryDraft.id, expectedVersion: summaryDraft.version },
+        fallbackMessage: 'The draft could not be discarded.' });
+      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return;
+      changeSummaryText('');
+      setSummary((previous) => ({ ...(previous || {}), draft: null, draftMatchesTranscript: false }));
+      setSummaryNotice('Draft discarded.');
+      await loadSummary({ replaceText: true });
+    } catch (discardFailure) {
+      if (isCurrentSummaryRequest(generation, summaryLoadKey)) setSummaryError(errorMessage(discardFailure, 'The draft could not be discarded.'));
+    } finally {
+      if (isCurrent(generation)) setBusy(null);
+    }
+  };
+
+  const publishSummaryDraft = async () => {
+    if (summaryConflict || !summaryDraft || busy) return;
+    const generation = generationRef.current;
+    let draft = summaryDraft;
+    if (summaryDirty) {
+      draft = await saveSummaryDraft();
+      if (!draft || !isCurrentSummaryRequest(generation, summaryLoadKey)) return;
+    }
+    summarySequenceRef.current += 1;
+    setBusy(spec.busy.publish);
+    summaryReadErrorRef.current = false;
+    setSummaryError(null);
+    setSummaryNotice(null);
+    try {
+      await requestJson(`${summaryPath}/publish`, { method: 'POST', body: { draftId: draft.id, expectedVersion: draft.version },
+        fallbackMessage: 'The summary could not be published.' });
+      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return;
+      changeSummaryText('');
+      setSummary((previous) => ({ ...(previous || {}), draft: null }));
+      setSummaryNotice(spec.publishedNotice);
+      await Promise.allSettled([loadCollection(), loadSummary({ replaceText: true }), onMaterialsChangedRef.current?.()]);
+    } catch (publishFailure) {
+      if (isCurrentSummaryRequest(generation, summaryLoadKey)) {
+        setSummaryError(errorMessage(publishFailure, 'The summary could not be published.'));
+        await Promise.allSettled([loadCollection(), loadSummary(), onMaterialsChangedRef.current?.()]);
+      }
+    } finally {
+      if (isCurrent(generation)) setBusy(null);
+    }
+  };
+
+  return {
+    summary, summaryDraft, summaryText, setSummaryText: changeSummaryText, summaryDirty, summaryLocalTextPending, summaryConflict,
+    summaryError, summaryNotice, summaryReadState, wantsSummary, summaryLoadKey, summaryLoadedKey, transcriptBound, summarizing,
+    summarize, saveSummaryDraft, discardSummaryDraft, publishSummaryDraft, loadSummary,
+  };
+}
+
 function useTranscription(requestId, { onMaterialsChanged }) {
   const basePath = `${API_PATH}/${encodeURIComponent(requestId || '')}/transcriptions`;
   const [collection, setCollection] = useState(null);
@@ -1590,236 +1869,34 @@ function useTranscription(requestId, { onMaterialsChanged }) {
     }
   };
 
-  // ---- Presentation summary (plan §4.3, §16): draft, review, publish. Shares the generation guard. ----
-  const summaryPath = `${basePath}/summary-draft`;
-  const summarySequenceRef = useRef(0);
-  const [summary, setSummary] = useState(null);
-  const [summaryText, setSummaryText] = useState('');
-  const [summaryConflict, setSummaryConflict] = useState(null);
-  const summaryRef = useRef(summary);
-  const summaryTextRef = useRef(summaryText);
-  const summaryConflictRef = useRef(summaryConflict);
-  summaryRef.current = summary;
-  summaryTextRef.current = summaryText;
-  summaryConflictRef.current = summaryConflict;
-  const summaryDirtyRef = useRef(false);
-  const [summaryReadState, setSummaryReadState] = useState('idle');
-  const [summaryLoadedKey, setSummaryLoadedKey] = useState(null);
-  const summaryReadErrorRef = useRef(false);
+  // ---- Summaries: one hook per kind, sharing the generation guard and `busy`. ----
   const [summaryAck, setSummaryAck] = useState(false);
-  const [summaryError, setSummaryError] = useState(null);
-  const [summaryNotice, setSummaryNotice] = useState(null);
-  const currentArtifact = collection?.currentArtifact || null;
-  const currentArtifactRef = useRef(currentArtifact);
-  currentArtifactRef.current = currentArtifact;
-  const presentationBound = currentArtifact?.presentationTranscript?.state === 'bound';
-  const summaryLoadKey = `${currentArtifact?.id || ''}|${currentArtifact?.fingerprint || ''}|${currentArtifact?.presentationEnd?.endMs ?? ''}|${presentationBound}|${currentArtifact?.transcriptSummary?.state || ''}|${currentArtifact?.transcriptSummary?.artifactId || ''}`;
-  const summaryLoadKeyRef = useRef(summaryLoadKey);
-  summaryLoadKeyRef.current = summaryLoadKey;
-  const isCurrentSummaryRequest = useCallback((generation, key) => isCurrent(generation) && summaryLoadKeyRef.current === key, [isCurrent]);
-  // A 'publishing' draft is one whose publish did not finish: it is read-only and can only be published again.
-  const summaryDraft = ['ready', 'publishing'].includes(summary?.draft?.state) ? summary.draft : null;
-  const summaryDirty = summaryDraft?.state === 'ready' && summaryText !== (summaryDraft.text || '');
-  const summaryLocalTextPending = summaryDraft?.state === 'publishing' && summaryText !== (summaryDraft.text || '');
-  summaryDirtyRef.current = summaryDirty || summaryLocalTextPending || Boolean(summaryConflict);
-  const changeSummaryText = useCallback((value) => {
-    setSummaryText(value);
-  }, []);
+  const summaryHookArgs = { requestId, basePath, currentArtifact: collection?.currentArtifact || null,
+    busy, setBusy, generationRef, isCurrent, loadCollection, onMaterialsChangedRef };
+  const presentationSummary = useSummaryKind('presentation', summaryHookArgs);
+  const discussionSummary = useSummaryKind('discussion', summaryHookArgs);
+  const summaryHooks = { presentation: presentationSummary, discussion: discussionSummary };
+  const pairedSummaryKinds = SUMMARY_KIND_ORDER.filter((kind) => pairedSummaryEligible(summaryHooks[kind]));
 
-  const loadSummary = useCallback(async ({ replaceText = false } = {}) => {
-    if (!requestId) return;
+  // One lock for the whole run (plan D9): `busy` clears only after every kind's POST settles, and each kind's
+  // result lands on its own. A single-kind Try again or Summarize again goes through here with one kind.
+  const summarizeKinds = async (kinds) => {
+    const runs = kinds.map((kind) => summaryHooks[kind]).filter(Boolean);
+    if (!collection?.currentArtifact?.id || busy || !summaryAck || !runs.length) return;
     const generation = generationRef.current;
-    const sequence = ++summarySequenceRef.current;
-    setSummaryReadState('loading');
-    try {
-      const body = await requestJson(summaryPath, { method: 'GET', fallbackMessage: 'The presentation summary could not be loaded.' });
-      if (!isCurrentSummaryRequest(generation, summaryLoadKey) || summarySequenceRef.current !== sequence) return;
-      const keepLocalDraft = !replaceText && summaryDirtyRef.current;
-      const previous = summaryRef.current;
-      const existingConflict = replaceText ? null : summaryConflictRef.current;
-      if (existingConflict) {
-        setSummary(body);
-      } else if (keepLocalDraft && previous?.draft) {
-        const sameDraftVersion = previous.draft.id === body?.draft?.id && previous.draft.version === body?.draft?.version;
-        if (!sameDraftVersion) {
-          setSummary(body);
-          setSummaryConflict({ draftId: previous.draft.id, version: previous.draft.version, text: summaryTextRef.current });
-        } else {
-          setSummary({
-            ...body,
-            draft: { ...body.draft, id: previous.draft.id, version: previous.draft.version, text: previous.draft.text },
-            draftMatchesTranscript: body.draftMatchesTranscript === true,
-          });
-        }
-      } else {
-        setSummary(body);
-      }
-      if (summaryReadErrorRef.current) {
-        summaryReadErrorRef.current = false;
-        setSummaryError(null);
-      }
-      setSummaryReadState('ready');
-      setSummaryLoadedKey(summaryLoadKey);
-      if (replaceText) setSummaryConflict(null);
-      if (replaceText || !keepLocalDraft) {
-        const nextText = ['ready', 'publishing'].includes(body?.draft?.state) ? body.draft.text || '' : '';
-        setSummaryText(nextText);
-      }
-    } catch (loadError) {
-      if (!isCurrentSummaryRequest(generation, summaryLoadKey) || summarySequenceRef.current !== sequence) return;
-      setSummaryReadState('unavailable');
-      setSummaryLoadedKey(summaryLoadKey);
-      if (![404, 503].includes(loadError?.status)) {
-        summaryReadErrorRef.current = true;
-        setSummaryError(errorMessage(loadError, 'The presentation summary could not be loaded.'));
-      }
-    }
-  }, [requestId, summaryPath, isCurrentSummaryRequest, summaryLoadKey]);
-
-  const wantsSummary = Boolean(currentArtifact?.id && (presentationBound || currentArtifact?.transcriptSummary?.artifactId));
-  useEffect(() => {
-    let cancelled = false;
-    if (!wantsSummary) {
-      summarySequenceRef.current += 1;
-      if (summaryReadErrorRef.current) {
-        summaryReadErrorRef.current = false;
-        setSummaryError(null);
-      }
-      const current = currentArtifactRef.current;
-      const previous = summaryRef.current;
-      if (!summaryConflictRef.current && summaryDirtyRef.current && previous?.draft) {
-        setSummaryConflict({ draftId: previous.draft.id, version: previous.draft.version, text: summaryTextRef.current });
-      }
-      setSummary(current ? { draft: null, draftMatchesTranscript: false, lastFailure: null,
-        transcriptSummary: current.transcriptSummary || null } : null);
-      setSummaryReadState('not_needed');
-      setSummaryLoadedKey(summaryLoadKey);
-      return () => { cancelled = true; };
-    }
-    Promise.resolve().then(() => { if (!cancelled && wantsSummary) void loadSummary(); });
-    return () => { cancelled = true; };
-  }, [summaryLoadKey, wantsSummary, loadSummary]);
-
-  const summarize = async () => {
-    if (!currentArtifact?.id || busy || !summaryAck) return;
-    const generation = generationRef.current;
-    summarySequenceRef.current += 1;
     setBusy('summarize');
-    summaryReadErrorRef.current = false;
-    setSummaryError(null);
-    setSummaryNotice(null);
     try {
-      const result = await requestJson(summaryPath, {
-        method: 'POST',
-        body: { acknowledgmentVersion: PRESENTATION_SUMMARY_ACKNOWLEDGMENT.version,
-          expectedCurrentArtifactId: currentArtifact.id, expectedCurrentFingerprint: currentArtifact.fingerprint },
-        fallbackMessage: 'The summary could not be generated.',
-      });
-      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return;
-      setSummary((previous) => ({ ...(previous || {}), draft: result.draft, draftMatchesTranscript: true, lastFailure: null,
-        transcriptSummary: result.transcriptSummary || previous?.transcriptSummary }));
-      setSummaryConflict(null);
-      setSummaryLoadedKey(summaryLoadKey);
-      setSummaryReadState('ready');
-      changeSummaryText(result.draft?.text || '');
-      setSummaryAck(false);
-      setSummaryNotice(result.slidesIncluded
-        ? 'Draft ready, made from the presentation transcript and the applicant slides. Review it before publishing.'
-        : 'Draft ready, made from the presentation transcript. Slide text was not included. Review it before publishing.');
-    } catch (summaryFailure) {
-      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return;
-      setSummaryError(errorMessage(summaryFailure, 'The summary could not be generated.'));
-      await loadSummary();
+      await Promise.allSettled(runs.map((run) => run.summarize()));
     } finally {
-      if (isCurrent(generation)) setBusy(null);
-    }
-  };
-
-  const saveSummaryDraft = async () => {
-    if (summaryConflict || summaryDraft?.state !== 'ready' || busy) return null;
-    const generation = generationRef.current;
-    summarySequenceRef.current += 1;
-    setBusy('summary-save');
-    summaryReadErrorRef.current = false;
-    setSummaryError(null);
-    setSummaryNotice(null);
-    try {
-      const result = await requestJson(summaryPath, {
-        method: 'PATCH', body: { draftId: summaryDraft.id, expectedVersion: summaryDraft.version, text: summaryText },
-        fallbackMessage: 'The draft could not be saved.',
-      });
-      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return null;
-      setSummary((previous) => ({ ...(previous || {}), draft: result.draft }));
-      changeSummaryText(result.draft?.text || '');
-      setSummaryNotice('Draft saved.');
-      await loadSummary({ replaceText: true });
-      return result.draft;
-    } catch (saveFailure) {
-      if (isCurrentSummaryRequest(generation, summaryLoadKey)) setSummaryError(errorMessage(saveFailure, 'The draft could not be saved.'));
-      return null;
-    } finally {
-      if (isCurrent(generation)) setBusy(null);
-    }
-  };
-
-  const discardSummaryDraft = async () => {
-    if (summaryConflict || summaryDraft?.state !== 'ready' || busy) return;
-    const generation = generationRef.current;
-    summarySequenceRef.current += 1;
-    setBusy('summary-discard');
-    summaryReadErrorRef.current = false;
-    setSummaryError(null);
-    setSummaryNotice(null);
-    try {
-      await requestJson(summaryPath, { method: 'DELETE', body: { draftId: summaryDraft.id, expectedVersion: summaryDraft.version },
-        fallbackMessage: 'The draft could not be discarded.' });
-      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return;
-      changeSummaryText('');
-      setSummary((previous) => ({ ...(previous || {}), draft: null, draftMatchesTranscript: false }));
-      setSummaryNotice('Draft discarded.');
-      await loadSummary({ replaceText: true });
-    } catch (discardFailure) {
-      if (isCurrentSummaryRequest(generation, summaryLoadKey)) setSummaryError(errorMessage(discardFailure, 'The draft could not be discarded.'));
-    } finally {
-      if (isCurrent(generation)) setBusy(null);
-    }
-  };
-
-  const publishSummaryDraft = async () => {
-    if (summaryConflict || !summaryDraft || busy) return;
-    const generation = generationRef.current;
-    let draft = summaryDraft;
-    if (summaryDirty) {
-      draft = await saveSummaryDraft();
-      if (!draft || !isCurrentSummaryRequest(generation, summaryLoadKey)) return;
-    }
-    summarySequenceRef.current += 1;
-    setBusy('summary-publish');
-    summaryReadErrorRef.current = false;
-    setSummaryError(null);
-    setSummaryNotice(null);
-    try {
-      await requestJson(`${summaryPath}/publish`, { method: 'POST', body: { draftId: draft.id, expectedVersion: draft.version },
-        fallbackMessage: 'The summary could not be published.' });
-      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return;
-      changeSummaryText('');
-      setSummary((previous) => ({ ...(previous || {}), draft: null }));
-      setSummaryNotice('Summary published. Available to staff and eligible for the Board link.');
-      await Promise.allSettled([loadCollection(), loadSummary({ replaceText: true }), onMaterialsChangedRef.current?.()]);
-    } catch (publishFailure) {
-      if (isCurrentSummaryRequest(generation, summaryLoadKey)) {
-        setSummaryError(errorMessage(publishFailure, 'The summary could not be published.'));
-        await Promise.allSettled([loadCollection(), loadSummary(), onMaterialsChangedRef.current?.()]);
+      if (isCurrent(generation)) {
+        setBusy(null);
+        setSummaryAck(false);
       }
-    } finally {
-      if (isCurrent(generation)) setBusy(null);
     }
   };
 
   return {
-    summary, summaryDraft, summaryText, setSummaryText: changeSummaryText, summaryDirty, summaryLocalTextPending, summaryConflict, summaryAck, setSummaryAck, summaryError, summaryNotice, summaryReadState, wantsSummary,
-    summaryLoadKey, summaryLoadedKey,
-    summarize, saveSummaryDraft, discardSummaryDraft, publishSummaryDraft, loadSummary,
+    presentationSummary, discussionSummary, summaryAck, setSummaryAck, pairedSummaryKinds, summarizeKinds,
     basePath, collection, collectionCheckedAt, savedDraft, loading, jobs, publications, newestJob, focusJob, showReview, selectedJob,
     correction, correctionDetail, content, speakerIds, names, setNames: editNames, baseline, dirtyNames, dirtyEnd, dirty, presentationEndMs, setPresentationEndMs, suggestionPicks, setSuggestionPicks,
     detail, audioFile, vttFile, setVttFile, acknowledged, setAcknowledged, uploadProgress, busy, error, notice, conflict,
@@ -2307,67 +2384,117 @@ function UploadForm({ m, inputRef }) {
   );
 }
 
-function SummaryBlock({ t, materials = [] }) {
-  const artifact = t.collection?.currentArtifact;
-  const summaryCurrent = t.summaryReadState === 'ready' && t.summaryLoadedKey === t.summaryLoadKey;
-  const summaryStatusCurrent = ['ready', 'not_needed'].includes(t.summaryReadState) && t.summaryLoadedKey === t.summaryLoadKey;
-  const published = summaryStatusCurrent
-    ? t.summary?.transcriptSummary || null
-    : artifact?.transcriptSummary || null;
-  const collectionSaysNoSummary = artifact?.transcriptSummary?.state === 'missing'
-    || (artifact?.transcriptSummary && [null, undefined].includes(artifact.transcriptSummary.artifactId));
-  const compactSummaryStatusUnknown = Boolean(artifact?.id && !artifact.transcriptSummary
-    && !summaryCurrent && t.summaryReadState !== 'loading');
-  const presentationReady = artifact?.presentationTranscript?.state === 'bound';
-  const transcriptMaterial = materials.find((item) => Number(item.artifactType) === REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT) || null;
-  const summaryMaterial = materials.find((item) => Number(item.artifactType) === REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY) || null;
-  const summaryUrl = summaryMaterial ? safeMaterialUrl(summaryMaterial) : null;
-  const draft = t.summaryDraft;
-  const summarizing = t.busy === 'summarize';
-  const ackId = 'presentation-summary-ack';
-  const publishedLine = !summaryStatusCurrent && t.summaryReadState === 'loading'
-    ? 'Checking summary status for the current transcript…'
-    : !summaryStatusCurrent && artifact?.id && (artifact.bundleEditable || artifact.transcriptSummary?.artifactId)
-        ? t.summaryReadState === 'unavailable' ? 'Summary status unavailable.' : 'Summary status for this transcript has not been checked.'
-      : published?.state === 'bound'
-    ? `Published ${fmtDateTime(published.publishedAt)}. Available to staff and eligible for the Board link.`
-    : published?.state === 'stale'
-      ? 'The published summary is from an earlier transcript version. It remains available to staff; it is withheld from the Board link. Summarize again to replace it.'
-      : published?.state === 'not_confirmed' && published?.artifactId
-        ? 'A summary artifact exists. Its eligibility for the Board link is not confirmed for the current presentation.'
-      : t.summaryReadState === 'unavailable' ? 'Summary status unavailable.'
-        : compactSummaryStatusUnknown ? 'Summary status unavailable.'
-        : collectionSaysNoSummary ? 'No summary published yet.'
-          : summaryCurrent && t.summary ? 'No summary published yet.'
-            : t.error && !artifact ? 'Summary status unavailable.'
-              : t.summaryReadState === 'not_needed' && !artifact ? 'Summary status cannot be checked until transcript status is available.'
-                : 'Summary status has not been checked.';
-  // Offered for a stuck 'publishing' draft too: the server retires it only when no publish holds it.
-  const summarizeForm = presentationReady && summaryCurrent && !t.summaryConflict && (
-    <div className="mt-3">
-      <label htmlFor={ackId} className="flex items-start gap-2 text-sm leading-6 text-gray-900">
-        <input id={ackId} type="checkbox" className="mt-1.5" checked={t.summaryAck} disabled={Boolean(t.busy)}
+const SUMMARY_BLOCK_COPY = Object.freeze({
+  presentation: Object.freeze({
+    title: 'Presentation summary', testId: 'presentation-summary-block', draftLabel: 'Draft',
+    materialType: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, none: 'No summary published yet.',
+    published: (at) => `Published ${at}. Available to staff and eligible for the Board link.`,
+    stale: 'The published summary is from an earlier transcript version. It remains available to staff; it is withheld from the Board link. Summarize again to replace it.',
+    notConfirmed: 'A summary artifact exists. Its eligibility for the Board link is not confirmed for the current presentation.',
+  }),
+  // Staff only: no Board eligibility copy (plan D9).
+  discussion: Object.freeze({
+    title: 'Staff discussion summary', testId: 'discussion-summary-block', draftLabel: 'Discussion draft',
+    materialType: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY, none: 'No discussion summary published yet.',
+    published: (at) => `Published ${at}. Staff only.`,
+    stale: 'The published discussion summary is from an earlier transcript version. It remains available to staff. Summarize again to replace it.',
+    notConfirmed: 'A discussion summary exists. It is not confirmed for the current presentation end.',
+  }),
+});
+
+// One acknowledgment and one button for both kinds (plan D6, D9); kinds that already have a draft or a current
+// published summary are left to their own rerun action.
+function PairedSummarizeForm({ t }) {
+  const kinds = t.pairedSummaryKinds;
+  const running = t.busy === 'summarize';
+  const label = kinds.length === 2 ? 'Summarize presentation and discussion'
+    : kinds[0] === 'discussion' ? 'Summarize staff discussion' : 'Summarize presentation';
+  return (
+    <div className="mt-4" data-testid="paired-summary-form">
+      <label htmlFor="paired-summary-ack" className="flex items-start gap-2 text-sm leading-6 text-gray-900">
+        <input id="paired-summary-ack" type="checkbox" className="mt-1.5" checked={t.summaryAck} disabled={Boolean(t.busy)}
           onChange={(event) => t.setSummaryAck(event.target.checked)} />
-        <span>{PRESENTATION_SUMMARY_ACKNOWLEDGMENT.text}</span>
+        <span>{PAIRED_SUMMARY_ACKNOWLEDGMENT.text}</span>
       </label>
-      <button type="button" onClick={t.summarize} disabled={Boolean(t.busy) || !t.summaryAck || Boolean(t.summaryConflict)} className={`mt-2 ${draft ? BTN : BTN_PRIMARY}`}>
-        {summarizing ? 'Summarizing…' : draft ? 'Replace draft with a new summary' : 'Summarize presentation'}
-      </button>
-      {summarizing && <p className="mt-1 text-xs text-gray-600" aria-live="polite">This can take a few minutes. Keep this page open.</p>}
+      {(kinds.length > 0 || running) && (
+        <button type="button" onClick={() => void t.summarizeKinds(kinds)} disabled={Boolean(t.busy) || !t.summaryAck || !kinds.length}
+          className={`mt-2 ${BTN_PRIMARY}`}>{running ? 'Summarizing…' : label}</button>
+      )}
+      {running && <p className="mt-1 text-xs text-gray-600" aria-live="polite">This can take a few minutes. Keep this page open.</p>}
     </div>
   );
+}
+
+function SummaryBlock({ t, s, kind = 'presentation', materials = [] }) {
+  const copy = SUMMARY_BLOCK_COPY[kind];
+  const busyKeys = SUMMARY_KIND_UI[kind].busy;
+  const artifact = t.collection?.currentArtifact;
+  const collectionPublished = artifact?.[SUMMARY_KIND_UI[kind].publishedKey];
+  const summaryCurrent = s.summaryReadState === 'ready' && s.summaryLoadedKey === s.summaryLoadKey;
+  const summaryStatusCurrent = ['ready', 'not_needed'].includes(s.summaryReadState) && s.summaryLoadedKey === s.summaryLoadKey;
+  const published = summaryStatusCurrent
+    ? s.summary?.transcriptSummary || null
+    : artifact?.transcriptSummary || null;
+  const collectionSaysNoSummary = collectionPublished?.state === 'missing'
+    || (collectionPublished && [null, undefined].includes(collectionPublished.artifactId));
+  const compactSummaryStatusUnknown = Boolean(artifact?.id && !collectionPublished
+    && !summaryCurrent && s.summaryReadState !== 'loading');
+  const presentationReady = artifact?.presentationTranscript?.state === 'bound';
+  const transcriptMaterial = materials.find((item) => Number(item.artifactType) === REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT) || null;
+  const summaryMaterial = materials.find((item) => Number(item.artifactType) === copy.materialType) || null;
+  const summaryUrl = summaryMaterial ? safeMaterialUrl(summaryMaterial) : null;
+  const draft = s.summaryDraft;
+  const kindReady = s.transcriptBound;
+  const generatingRun = s.summary?.draft?.state === 'generating' ? s.summary.draft : null;
+  const runAbandoned = summaryRunAbandoned(generatingRun);
+  const notRecorded = kind === 'discussion' && summaryCurrent && s.summary?.discussionNotRecorded === true;
+  const failed = summaryCurrent && Boolean(s.summary?.lastFailure) && !draft && !notRecorded;
+  const publishedLine = !summaryStatusCurrent && s.summaryReadState === 'loading'
+    ? 'Checking summary status for the current transcript…'
+    : !summaryStatusCurrent && artifact?.id && (artifact.bundleEditable || collectionPublished?.artifactId)
+        ? s.summaryReadState === 'unavailable' ? 'Summary status unavailable.' : 'Summary status for this transcript has not been checked.'
+      : published?.state === 'bound'
+    ? copy.published(fmtDateTime(published.publishedAt))
+    : published?.state === 'stale'
+      ? copy.stale
+      : published?.state === 'not_confirmed' && published?.artifactId
+        ? copy.notConfirmed
+      : s.summaryReadState === 'unavailable' ? 'Summary status unavailable.'
+        : compactSummaryStatusUnknown ? 'Summary status unavailable.'
+        : collectionSaysNoSummary ? copy.none
+          : summaryCurrent && s.summary ? copy.none
+            : t.error && !artifact ? 'Summary status unavailable.'
+              : s.summaryReadState === 'not_needed' && !artifact ? 'Summary status cannot be checked until transcript status is available.'
+                : 'Summary status has not been checked.';
+  // Per-kind rerun, offered for a stuck 'publishing' draft too: the server retires it only when no publish holds it.
+  // It sends one POST through the paired handler and uses the shared acknowledgment at the top of step 3.
+  const againLabel = draft ? 'Replace draft with a new summary'
+    : failed || runAbandoned ? 'Try again'
+      : ['bound', 'stale'].includes(published?.state) ? 'Summarize again' : null;
+  const againForm = kindReady && summaryCurrent && !s.summaryConflict && !notRecorded && againLabel && !(generatingRun && !runAbandoned) && (
+    <button type="button" onClick={() => void t.summarizeKinds([kind])} disabled={Boolean(t.busy) || !t.summaryAck}
+      className={`mt-3 ${BTN}`}>{againLabel}</button>
+  );
   return (
-    <div className="mt-4 border-t border-gray-100 pt-4" data-testid="presentation-summary-block">
-      <h4 className="text-sm font-semibold text-gray-950">Presentation summary</h4>
-      <p className="mt-1 text-sm leading-6 text-gray-900">{publishedLine}</p>
+    <div className="mt-4 border-t border-gray-100 pt-4" data-testid={copy.testId}>
+      <h4 className="text-sm font-semibold text-gray-950">{copy.title}</h4>
+      <p className="mt-1 text-sm leading-6 text-gray-900">{notRecorded ? 'Not recorded. No staff discussion was recorded after the presentation ended.' : publishedLine}</p>
+      {s.summarizing && <p className="mt-1 text-sm text-gray-800" aria-live="polite">Summarizing… This can take a few minutes. Keep this page open.</p>}
+      {!s.summarizing && generatingRun && summaryCurrent && (runAbandoned
+        ? <p className="mt-1 text-sm text-gray-700">The summary started {fmtDateTime(generatingRun.createdAt)} did not finish.</p>
+        : <div className="mt-1 text-sm text-gray-800" aria-live="polite"><p>Summarizing… started {fmtDateTime(generatingRun.createdAt)}.</p>
+          <button type="button" onClick={() => void s.loadSummary()} disabled={Boolean(t.busy) || s.summaryReadState === 'loading'} className={`mt-2 ${BTN}`}>Check again</button></div>)}
       {summaryUrl && <a className={`mt-2 inline-flex ${BTN}`} href={summaryUrl} target="_blank" rel="noopener noreferrer">Open published summary</a>}
-      {t.summaryReadState === 'unavailable' && t.wantsSummary && <button type="button" onClick={() => void t.loadSummary()} disabled={Boolean(t.busy)} className={`mt-2 ${BTN}`}>Check again</button>}
-      {compactSummaryStatusUnknown && <button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.loading ? 'Refreshing…' : 'Refresh transcription status'}</button>}
-      {t.summaryReadState === 'unavailable' && <p className="mt-1 text-sm text-amber-900">Current summary status is unavailable. Any published file shown above reflects the latest material list.</p>}
-      {(published?.state === 'bound' || published?.state === 'stale') && t.summary?.slidesChangedSinceSummary === true && (
+      {s.summaryReadState === 'unavailable' && s.wantsSummary && <button type="button" onClick={() => void s.loadSummary()} disabled={Boolean(t.busy)} className={`mt-2 ${BTN}`}>Check again</button>}
+      {kind === 'presentation' && compactSummaryStatusUnknown && <button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.loading ? 'Refreshing…' : 'Refresh transcription status'}</button>}
+      {s.summaryReadState === 'unavailable' && <p className="mt-1 text-sm text-amber-900">Current summary status is unavailable. Any published file shown above reflects the latest material list.</p>}
+      {kind === 'presentation' && (published?.state === 'bound' || published?.state === 'stale') && s.summary?.slidesChangedSinceSummary === true && (
         <p className="mt-1 text-sm leading-6 text-amber-900" data-testid="summary-slides-changed">The applicant slides were updated after this summary was made. Summarize again to include them.</p>
       )}
-      {!presentationReady && !t.correction && (!transcriptMaterial
+      {kind === 'discussion' && presentationReady && !kindReady && !t.correction && (
+        <p className="mt-1 text-sm text-gray-700">Generate the discussion transcript first.</p>
+      )}
+      {kind === 'presentation' && !presentationReady && !t.correction && (!transcriptMaterial
         ? <p className="mt-1 text-sm text-gray-700">Add a transcript first. Upload a transcript file or generate one from audio.</p>
         : !artifact
           ? <div className="mt-1 text-sm text-gray-700"><p>Transcript status is unavailable. Refresh transcription status to check whether this transcript can be summarized.</p><button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.loading ? 'Refreshing…' : 'Refresh transcription status'}</button></div>
@@ -2378,52 +2505,52 @@ function SummaryBlock({ t, materials = [] }) {
             : !artifact.presentationEnd
             ? <div className="mt-1 text-sm text-gray-700"><p>Confirm where the presentation ends before generating the presentation transcript and summary.</p><button type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.savedDraft ? 'Continue editing presentation end' : 'Set end to enable summary'}</button></div>
             : <p className="mt-1 text-sm text-gray-700">Generate the presentation transcript before summarizing it.</p>)}
-      {summaryCurrent && t.summary?.lastFailure && !draft && <p className="mt-1 text-sm text-gray-700">The last summary attempt did not produce a draft.</p>}
-      {t.summaryConflict && (
+      {failed && <p className="mt-1 text-sm text-gray-700">The last summary attempt did not produce a draft.</p>}
+      {s.summaryConflict && (
         <div className="mt-3" data-testid="summary-draft-conflict">
           <Notice tone="warning">This draft is no longer current. Your edits are preserved below, but they are not a current server draft. Load latest to replace these edits with the current server state.</Notice>
-          <label htmlFor="presentation-summary-recovery-text" className="mt-2 block text-sm font-medium text-gray-900">Preserved unsaved edits</label>
-          <textarea id="presentation-summary-recovery-text" rows={14} className={`${INPUT} font-mono`} value={t.summaryConflict.text} readOnly />
-          <button type="button" onClick={() => void t.loadSummary({ replaceText: true })}
-            disabled={Boolean(t.busy) || t.summaryReadState === 'loading'} className={`mt-2 ${BTN}`}>Load latest</button>
+          <label htmlFor={`${kind}-summary-recovery-text`} className="mt-2 block text-sm font-medium text-gray-900">Preserved unsaved edits</label>
+          <textarea id={`${kind}-summary-recovery-text`} rows={14} className={`${INPUT} font-mono`} value={s.summaryConflict.text} readOnly />
+          <button type="button" onClick={() => void s.loadSummary({ replaceText: true })}
+            disabled={Boolean(t.busy) || s.summaryReadState === 'loading'} className={`mt-2 ${BTN}`}>Load latest</button>
         </div>
       )}
-      {draft && !t.summaryConflict && (
+      {draft && !s.summaryConflict && (
         <div className="mt-3">
-          {!summaryCurrent ? <Notice tone="info">Checking whether this draft matches the current transcript.</Notice> : !t.summary?.draftMatchesTranscript && (
+          {!summaryCurrent ? <Notice tone="info">Checking whether this draft matches the current transcript.</Notice> : !s.summary?.draftMatchesTranscript && (
             <Notice tone="warning">This draft was made from an earlier transcript version or presentation end. Summarize again before publishing.</Notice>
           )}
-          <label htmlFor="presentation-summary-text" className="mt-2 block text-sm font-medium text-gray-900">
-            Draft{draft.edited ? ' (edited)' : ''} · expires {fmtDateTime(draft.expiresAt)}
+          <label htmlFor={`${kind}-summary-text`} className="mt-2 block text-sm font-medium text-gray-900">
+            {copy.draftLabel}{draft.edited ? ' (edited)' : ''} · expires {fmtDateTime(draft.expiresAt)}
           </label>
           {draft.state === 'publishing' && (
             <>
               <Notice tone="warning">Publishing this draft did not finish. Publish it again to complete it, or summarize again to start over. It cannot be edited or discarded.</Notice>
-              {t.summaryLocalTextPending && <Notice tone="warning">The text shown includes unsaved edits, but this draft is already publishing and cannot include them. Publishing again uses its saved version; summarize again to replace it.</Notice>}
+              {s.summaryLocalTextPending && <Notice tone="warning">The text shown includes unsaved edits, but this draft is already publishing and cannot include them. Publishing again uses its saved version; summarize again to replace it.</Notice>}
             </>
           )}
-          <textarea id="presentation-summary-text" rows={14} className={`${INPUT} font-mono`} value={t.summaryText}
+          <textarea id={`${kind}-summary-text`} rows={14} className={`${INPUT} font-mono`} value={s.summaryText}
             maxLength={SUMMARY_TEXT_MAX_CHARS} disabled={Boolean(t.busy) || draft.state !== 'ready'}
-            onChange={(event) => t.setSummaryText(event.target.value)} />
+            onChange={(event) => s.setSummaryText(event.target.value)} />
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button type="button" onClick={t.publishSummaryDraft} className={BTN_PRIMARY}
-              disabled={Boolean(t.busy) || !summaryCurrent || !t.summary?.draftMatchesTranscript || !t.summaryText.trim()}>
-              {t.busy === 'summary-publish' ? 'Publishing…' : 'Publish summary'}
+            <button type="button" onClick={s.publishSummaryDraft} className={BTN_PRIMARY}
+              disabled={Boolean(t.busy) || !summaryCurrent || !s.summary?.draftMatchesTranscript || !s.summaryText.trim()}>
+              {t.busy === busyKeys.publish ? 'Publishing…' : 'Publish summary'}
             </button>
             {draft.state === 'ready' && <>
-              <button type="button" onClick={() => void t.saveSummaryDraft()} className={BTN} disabled={Boolean(t.busy) || !t.summaryDirty || !t.summaryText.trim()}>
-                {t.busy === 'summary-save' ? 'Saving…' : 'Save draft'}
+              <button type="button" onClick={() => void s.saveSummaryDraft()} className={BTN} disabled={Boolean(t.busy) || !s.summaryDirty || !s.summaryText.trim()}>
+                {t.busy === busyKeys.save ? 'Saving…' : 'Save draft'}
               </button>
-              <button type="button" onClick={t.discardSummaryDraft} className={BTN_LINK} disabled={Boolean(t.busy)}>
-                {t.busy === 'summary-discard' ? 'Discarding…' : 'Discard draft'}
+              <button type="button" onClick={s.discardSummaryDraft} className={BTN_LINK} disabled={Boolean(t.busy)}>
+                {t.busy === busyKeys.discard ? 'Discarding…' : 'Discard draft'}
               </button>
             </>}
           </div>
         </div>
       )}
-      {summarizeForm}
-      {t.summaryError && <div className="mt-3"><Notice>{t.summaryError}</Notice></div>}
-      {t.summaryNotice && <div className="mt-3"><Notice tone="success">{t.summaryNotice}</Notice></div>}
+      {againForm}
+      {s.summaryError && <div className="mt-3"><Notice>{s.summaryError}</Notice></div>}
+      {s.summaryNotice && <div className="mt-3"><Notice tone="success">{s.summaryNotice}</Notice></div>}
     </div>
   );
 }
@@ -2570,7 +2697,9 @@ function TranscriptWorkflow({ m, t, z, transcriptInputRef }) {
   const discussionMaterial = byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT);
   // With no transcript yet there is nothing to report per product, unless something was already made.
   const showProducts = Boolean(material || presentationMaterial || discussionMaterial
-    || byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY) || t.summaryDraft || t.summaryConflict || artifact?.transcriptSummary?.artifactId);
+    || byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY) || t.presentationSummary.summaryDraft || t.presentationSummary.summaryConflict || artifact?.transcriptSummary?.artifactId
+    || byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY) || t.discussionSummary.summaryDraft || t.discussionSummary.summaryConflict
+    || artifact?.staffDiscussionSummary?.artifactId);
 
   const manualAdd = <>
     {!active && <GenerateForm t={t} />}
@@ -2667,18 +2796,20 @@ function TranscriptWorkflow({ m, t, z, transcriptInputRef }) {
       </Step>
 
       <Step number={3} title="Results" state={step3State} testId="step-results">
-        {step3State === 'waiting' && <p className="mt-2 text-sm text-gray-700">The presentation and staff discussion transcripts and the summary appear here after step 2.</p>}
+        {step3State === 'waiting' && <p className="mt-2 text-sm text-gray-700">The presentation and staff discussion transcripts and their summaries appear here after step 2.</p>}
         {showProducts && <>
+        {boundaryState === 'bound' && <PairedSummarizeForm t={t} />}
         <div className="mt-4">
           <h4 className="text-sm font-semibold text-gray-950">Presentation</h4>
           <p className="text-xs text-gray-600">Eligible for the Board page.</p>
           <DerivativeLine state={boundaryState} label="Presentation transcript" boundText="Presentation transcript ready for the Board link." material={presentationMaterial} />
-          <SummaryBlock t={t} materials={materials} />
+          <SummaryBlock t={t} s={t.presentationSummary} materials={materials} />
         </div>
         <div className="mt-5 border-t border-gray-200 pt-4">
           <h4 className="text-sm font-semibold text-gray-950">Staff discussion</h4>
           <p className="text-xs text-gray-600">Staff only. Never included on the Board page.</p>
           <DerivativeLine state={discussionState} label="Staff discussion transcript" boundText="Staff discussion transcript saved for staff." material={discussionMaterial} />
+          <SummaryBlock t={t} s={t.discussionSummary} kind="discussion" materials={materials} />
         </div>
         </>}
         {(material || recordingUrl) && <div className="mt-5 border-t border-gray-200 pt-4">

@@ -81,6 +81,13 @@ export const EXECUTOR_BUDGET_DEFAULTS = Object.freeze({
     maxTokensOverride: 16_000,
     timeoutMsOverride: 240_000,
   }),
+  // The staff discussion summary (paired summaries plan D5, owner decision 6)
+  // uses the same envelope: a staff discussion transcript of similar length.
+  'meeting-transcript.staff-discussion-summary': Object.freeze({
+    kind: 'standing',
+    maxTokensOverride: 16_000,
+    timeoutMsOverride: 240_000,
+  }),
 });
 
 // Safety bounds remain code-owned. Admin publications may tune values only
@@ -131,6 +138,10 @@ export const EXECUTOR_BUDGET_LIMITS = Object.freeze({
     maxTokensOverride: Object.freeze({ min: 4_096, max: 32_000 }),
     timeoutMsOverride: Object.freeze({ min: 60_000, max: 240_000 }),
   }),
+  'meeting-transcript.staff-discussion-summary': Object.freeze({
+    maxTokensOverride: Object.freeze({ min: 4_096, max: 32_000 }),
+    timeoutMsOverride: Object.freeze({ min: 60_000, max: 240_000 }),
+  }),
 });
 
 export const EXECUTOR_BUDGET_DESCRIPTIONS = Object.freeze({
@@ -165,6 +176,10 @@ export const EXECUTOR_BUDGET_DESCRIPTIONS = Object.freeze({
   'meeting-transcript.presentation-summary': Object.freeze({
     since: '2026-10-05 (Site Visit summaries plan §16)',
     reason: 'One three-section plain-text summary over a full presentation transcript plus slide text. Adaptive thinking is counted inside this output budget, so it is admin-tunable from the start.',
+  }),
+  'meeting-transcript.staff-discussion-summary': Object.freeze({
+    since: '2026-10-08 (paired summaries plan D5)',
+    reason: 'One three-section plain-text summary over the staff discussion transcript, with the presentation summary envelope. Adaptive thinking is counted inside this output budget.',
   }),
 });
 

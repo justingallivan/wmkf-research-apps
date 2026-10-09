@@ -24,7 +24,8 @@ import * as publisher from '../../lib/services/post-presentation-materials/mater
 import * as binding from '../../lib/services/meeting-tracker-transcription/binding.js';
 import * as store from '../../lib/services/transcription-pilot/store.js';
 import { buildMeetingTranscriptFiles, buildMeetingTranscriptManifest } from '../../lib/services/meeting-tracker-transcription/bundle.js';
-import { presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey, transcriptSummaryBindingFingerprint } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
+import { presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey, transcriptSummaryBindingFingerprint,
+  staffDiscussionSummaryBindingFingerprint } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE, REQUEST_DOCUMENT_LIFECYCLE_STATE, REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument.js';
 import { getMeetingCorrectionDraft, createMeetingCorrection, updateMeetingCorrection, publishMeetingCorrection,
   getMeetingTranscriptionOverview } from '../../lib/services/meeting-tracker-transcription/service.js';
@@ -232,6 +233,21 @@ describe('overview currentArtifact', () => {
     documents.findByRequest.mockResolvedValue({ records: [transcriptRow] });
     expect((await getMeetingTranscriptionOverview({ requestId, ownerProfileId: 12 })).currentArtifact.staffDiscussionTranscript)
       .toEqual({ state: 'missing', artifactId: null });
+  });
+
+  test('the staff discussion summary is reported separately and binds only by its own fingerprint (paired summaries plan D8)', async () => {
+    const discussionSummaryId = '99999999-9999-4999-8999-999999999992';
+    const identity = { requestId, sourceRevisionId: revisionId, presentationEndMs: 2000 };
+    const discussionSummaryRow = (fingerprint) => ({ ...presentationRow(`discussion-summary-key-${fingerprint}`),
+      wmkf_requestdocumentid: discussionSummaryId, wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY,
+      wmkf_inputfingerprint: fingerprint });
+    documents.findByRequest.mockResolvedValue({ records: [transcriptRow, discussionSummaryRow(staffDiscussionSummaryBindingFingerprint(identity))] });
+    const bound = (await getMeetingTranscriptionOverview({ requestId, ownerProfileId: 12 })).currentArtifact;
+    expect(bound.staffDiscussionSummary).toMatchObject({ state: 'bound', artifactId: discussionSummaryId });
+    expect(bound.transcriptSummary).toMatchObject({ state: 'missing', artifactId: null });
+    documents.findByRequest.mockResolvedValue({ records: [transcriptRow, discussionSummaryRow(transcriptSummaryBindingFingerprint(identity))] });
+    expect((await getMeetingTranscriptionOverview({ requestId, ownerProfileId: 12 })).currentArtifact.staffDiscussionSummary)
+      .toMatchObject({ state: 'stale', artifactId: discussionSummaryId });
   });
 
   test('the summary is bound by its input fingerprint; a stale one stays visible to staff with its id', async () => {

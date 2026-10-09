@@ -3,7 +3,7 @@ import { actorRefFromSession } from '../../../../../../../lib/utils/actor-ref.js
 import { withDalContext } from '../../../../../../../lib/dataverse/core/context.js';
 import { isGuid } from '../../../../../../../lib/utils/guid.js';
 import { ServiceHttpError } from '../../../../../../../lib/services/service-http-error.js';
-import { publishPresentationSummaryDraft } from '../../../../../../../lib/services/post-presentation-materials/transcript-summary-service.js';
+import { publishSummaryDraft } from '../../../../../../../lib/services/post-presentation-materials/transcript-summary-service.js';
 
 export const config = { api: { bodyParser: { sizeLimit: '4kb' } }, maxDuration: 120 };
 export default async function handler(req, res) {
@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'private, no-store');
   return withDalContext('meeting-tracker-transcript-summary-publish', async () => {
     try {
-      return res.status(200).json(await publishPresentationSummaryDraft({ requestId, ownerProfileId: access.profileId,
+      return res.status(200).json(await publishSummaryDraft({ requestId, ownerProfileId: access.profileId,
         actingUserSystemId: actorRefFromSession(access.session), body }));
     } catch (error) {
       const status = error instanceof ServiceHttpError ? error.httpStatus : Number(error?.httpStatus || error?.status) || 500;

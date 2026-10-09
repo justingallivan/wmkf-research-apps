@@ -468,6 +468,18 @@ const SURFACES = [
     callSiteFiles: ['lib/services/execute-prompt.js'],
     requiredMarkers: ['untrusted: true', "source: { kind: 'override' }", "target: { kind: 'none' }"],
   },
+  {
+    // Executor-driven (meeting-transcript.staff-discussion-summary, paired
+    // summaries plan D5; caller transcript-summary-service.js). The Executor
+    // wraps the untrusted discussion_transcript (meeting transcript text) and
+    // injects the A7 preamble; the prompt file carries no markers of its own.
+    id: 'meeting-staff-discussion-summary',
+    inv: 34,
+    status: 'migrated',
+    promptFiles: ['shared/config/prompts/meeting-staff-discussion-summary.js'],
+    callSiteFiles: ['lib/services/execute-prompt.js'],
+    requiredMarkers: ['untrusted: true', "source: { kind: 'override' }", "target: { kind: 'none' }"],
+  },
 ];
 
 // Prompt-builder files known NOT to be untrusted-content surfaces (so the

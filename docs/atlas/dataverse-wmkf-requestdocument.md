@@ -699,8 +699,9 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   `shared/config/requestDocument.js` and the Wave 16 record). Inserted by the
   owner-run, dry-run-default sibling script
   `scripts/extend-requestdocument-artifacttype-presentation-transcript.mjs`.
-  Values `100000010` (Staff Discussion Summary) and `100000011` (Board
-  Presentation Recording) are reserved for Stages 3 and 4 and are not inserted.
+  Values `100000010` (Staff Discussion Summary, paired summaries Stage 2; see
+  below; inserted in Production 2026-10-09 by its owner-run script) and
+  `100000011` (Board Presentation Recording, not inserted).
   Postgres migration `068_presentation_transcript_boundary.sql` admits all three
   in the shared slot-lease and upload `artifact_type` CHECKs (the fresh-install
   bootstrap runs manifest migrations for real, so there is no inline mirror).
@@ -790,6 +791,31 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   fails closed, so any republish (including a names edit) hides it outside until
   re-summarized (owner decision, plan §16 decision A). Staff surfaces keep
   showing a stale summary with a note. The eTag pin above applies.
+- **Staff Discussion Summary writer** (`100000010`;
+  `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md` D1, D3, D7, D8;
+  **[BUILT ON BRANCH `claude/paired-summaries`, NOT MERGED; picklist value
+  INSERTED 2026-10-09; prompt SEEDED 2026-10-09; drafts CHECK widened by
+  migration 075, applied 2026-10-09.]**): the same service publishes a reviewed draft
+  of the discussion kind (`SUMMARY_KINDS.discussion`) from the bound Staff
+  Discussion Transcript, never slides, as a BOM-prefixed TXT under
+  `Site Visit - Staff Discussion Summary/`, prompt
+  `meeting-transcript.staff-discussion-summary`. The binding is
+  `wmkf_inputfingerprint` over
+  `meeting-tracker-post-presentation:<request id>:100000010:<revisionId>:<endMs>`
+  (`staffDiscussionSummaryBindingFingerprint`, `bindStaffDiscussionSummary`);
+  the generation key and stale handling follow the Transcript Summary above.
+  A draft is published only as its own stored kind (`summary_draft_kind_unsupported`
+  otherwise), so a discussion draft can never become a Board-visible Transcript
+  Summary. Staff-only: it is in `POST_PRESENTATION_ARTIFACT_TYPES`
+  (`material-model.js`), but neither outside allowlist names it
+  (`presentation-page-service` `OUTSIDE_POST_PRESENTATION_TYPES`,
+  `briefing-page-service` `outsidePostPresentationRows`). Staff readers: the
+  Meeting Tracker collection DTO (`staffDiscussionSummary`), the Recording and
+  transcript card, and the Workbench logistics feed shown on Staff
+  Deliberations (inline with Read more, owner decision 5). The value is added by
+  the owner-run, dry-run-default
+  `scripts/extend-requestdocument-artifacttype-staff-discussion-summary.mjs`
+  and mirrored in `shared/config/requestDocument.js` and the Wave 16 record.
 - **Boundary proposal, stray-line guard** (Production-live 2026-10-05: PR #437
   merge `9dfec5479`, deployment 6865805766 success): a short applicant
   line (three words or fewer) that starts more than two minutes after the

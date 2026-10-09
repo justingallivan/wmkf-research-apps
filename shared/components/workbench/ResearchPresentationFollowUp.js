@@ -7,15 +7,17 @@ const SLOTS = [
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT, label: 'Transcript', action: 'Open transcript' },
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT, label: 'Presentation transcript', action: 'Open presentation transcript' },
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT, label: 'Staff discussion transcript', action: 'Open staff discussion transcript' },
+  { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY, label: 'Staff discussion summary', action: 'Open staff discussion summary' },
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, label: 'Presentation summary', action: 'Open presentation summary' },
 ];
 
-// The summary's sections are fixed by its prompt; the first one is shown until "Read more".
-const SECOND_SECTION = /\n\s*Questions and answers\s*\n/;
+// Each summary's sections are fixed by its prompt; the first one is shown until "Read more".
+const PRESENTATION_SECOND_SECTION = /\n\s*Questions and answers\s*\n/;
+const DISCUSSION_SECOND_SECTION = /\n\s*Questions and concerns\s*\n/;
 const COLLAPSED_FALLBACK_CHARS = 700;
 
-function firstSection(text) {
-  const match = SECOND_SECTION.exec(text);
+function firstSection(text, secondSection) {
+  const match = secondSection.exec(text);
   if (match) return text.slice(0, match.index).trim();
   return text.length > COLLAPSED_FALLBACK_CHARS ? `${text.slice(0, COLLAPSED_FALLBACK_CHARS).trim()}…` : text;
 }
@@ -27,16 +29,16 @@ function formatDate(value) {
     : null;
 }
 
-function SummaryText({ summary }) {
+function SummaryText({ summary, secondSection = PRESENTATION_SECOND_SECTION, testId = 'presentation-summary-text', staleNote }) {
   const [expanded, setExpanded] = useState(false);
   const published = formatDate(summary.publishedAt);
-  const collapsed = summary.text ? firstSection(summary.text) : null;
+  const collapsed = summary.text ? firstSection(summary.text, secondSection) : null;
   const canExpand = Boolean(summary.text) && collapsed !== summary.text;
   return (
-    <div className="mt-0.5" data-testid="presentation-summary-text">
+    <div className="mt-0.5" data-testid={testId}>
       <p className="text-xs text-gray-500">
         {published ? `Published ${published}` : 'Published'}
-        {summary.stale ? ' · from an earlier transcript version; the Board link no longer shows it' : ''}
+        {summary.stale ? ` · ${staleNote || 'from an earlier transcript version; the Board link no longer shows it'}` : ''}
         {summary.slidesChanged === true ? ' · the applicant slides were updated after this summary was made' : ''}
       </p>
       {summary.text && (
@@ -58,7 +60,7 @@ function SummaryText({ summary }) {
 // Rendered inside the Presentation step of the Staff deliberations tab: one
 // link per published item (file names carry internal ids, so they are not
 // shown), and the summary's opening with Read more.
-export default function ResearchPresentationFollowUp({ status, materials = [], summary = null }) {
+export default function ResearchPresentationFollowUp({ status, materials = [], summary = null, discussionSummary = null }) {
   if (status === 'disabled') return null;
   const byType = new Map(materials.map((material) => [Number(material.artifactType), material]));
   const present = SLOTS
@@ -69,6 +71,7 @@ export default function ResearchPresentationFollowUp({ status, materials = [], s
     })
     .filter(Boolean);
   const summarySlot = present.find((slot) => slot.type === REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY);
+  const discussionSlot = present.find((slot) => slot.type === REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY);
   return (
     <div className="mt-3" data-testid="research-presentation-follow-up">
       <h4 className="text-sm font-semibold text-gray-900">Recording and transcripts</h4>
@@ -100,6 +103,14 @@ export default function ResearchPresentationFollowUp({ status, materials = [], s
         <div className="mt-3 max-w-3xl">
           <h4 className="text-sm font-semibold text-gray-900">Presentation summary</h4>
           <SummaryText summary={summary} />
+        </div>
+      )}
+      {status === 'loaded' && discussionSlot && discussionSummary && (
+        <div className="mt-3 max-w-3xl">
+          <h4 className="text-sm font-semibold text-gray-900">Staff discussion summary</h4>
+          <p className="text-xs text-gray-500">Staff only. Never included on the Board page.</p>
+          <SummaryText summary={discussionSummary} secondSection={DISCUSSION_SECOND_SECTION}
+            testId="discussion-summary-text" staleNote="from an earlier transcript version" />
         </div>
       )}
     </div>
