@@ -3,7 +3,7 @@ title: Stage 4 local synthetic benchmark results
 domain: transcription
 kind: report
 status: active
-summary: "Local generated-media Stage A is not passed: offset audio and edit-list clock/padding checks remain unresolved. No cloud or real recording was accessed."
+summary: "Six local padding/provenance and synchronization follow-up cases pass; the broader Stage A matrix remains incomplete. No cloud or real recording was accessed."
 owner: product-engineering
 related:
   - docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md
@@ -11,7 +11,38 @@ related:
 
 # Stage 4 local synthetic results
 
-**[VERIFIED via local experiment, 2026-10-09] Stage A is NOT PASSED.** This was a local exploratory experiment, not production verification. Five of six short full-reencode candidates passed the normal fixture-specific checks. The delayed-audio candidate failed its decoded endpoint check. All six have unresolved results when decoded without MP4 edit lists. Deliberately leaky remux and wrong-offset controls were rejected, with both private-video and private-audio markers independently detected. No cloud job ran, no SharePoint/Zoom recording was read, and nothing was registered for the Board.
+**[VERIFIED via local follow-up, 2026-10-09] All six padding/provenance and tested synchronization cases now pass.** The original four-millisecond tail was reproduced from physically isolated, already-cut audio: it was not newly encoded discussion. It was not digital silence either. The revised recipe inserts leading silence on the common clock before trimming, preserving the delayed audio's position. Full Stage A is still incomplete because the broader source-mapping, capacity and container matrix remains unfinished. No cloud job, SharePoint/Zoom read or Board registration occurred.
+
+## Padding and synchronization follow-up — current result
+
+[VERIFIED via `scripts/benchmarks/stage4-padding-check.py` and `docs/plans/STAGE4_PADDING_EVIDENCE_2026-10-09.json`] The follow-up uses generated media only and the existing bundled Python with NumPy 2.3.5; no additional package was installed. Run the follow-up script with a NumPy-capable Python interpreter. It imports the fixture harness; the original default harness remains a reproducible historical experiment. The optional seeded pilot gives each audio channel a nonperiodic reference waveform for alignment. The follow-up asserts bounded case/control success; neither script is a production verifier.
+
+**What the four milliseconds contained.** The exact original source/output hashes were checked against the initial committed evidence. Encoding just its isolated pre-E PCM produced **identical AAC packet payloads** to the original output. Its extra 192 samples had peak 0.0144504 and RMS 0.00466483 on a normalized ±1 scale. This supports encoder ringing/padding derived from retained audio, not newly selected post-E source samples. A separate regenerated pilot fixture also reproduces the issue but has different hashes/amplitudes; its receipt is kept separate from the original-file recheck. Do not describe either tail as silence or generalize this result to arbitrary recordings.
+
+**How the candidate recipe changed.** Decode onto the common zero-based clock using `aresample=first_pts=0`, preserving a late audio start by inserting leading silence. Trim on that clock, then write the selected samples to an isolated PCM file. The AAC encode reads only that file. Video retains its source-clock timestamps. This avoids independently resetting audio/video to their own first content samples. In the delayed-audio test, the new normal decoded audio ends at 12.250 seconds, rather than 12.254.
+
+**How padding is accepted without allowing leakage.** Independently encode the isolated PCM into an audio-only reference, and require exact AAC packet-payload equality. Extract the output as elementary ADTS AAC, removing MP4 edit lists and skip/discard-padding metadata, and decode it completely. Require exact equality with the isolated reference decode; removing the recorded 1,024 priming samples and the measured tail must reproduce the normal decode exactly. Normal output endpoints must still pass. Normal/ignored-edit-list video pixels must match, and each frame timestamp must agree with its embedded source-frame number. The current synthetic guard allows 1 ms for the reference container clock; observed maximum error was below 0.4 microseconds. Every decoded audio frame must follow the cumulative sample clock from zero within one sample, so correlation cannot hide shifted timestamps.
+
+| Fixture | Normal audio endpoint | Extra samples exposed by elementary AAC decode | Bounded result |
+|---|---:|---:|---|
+| Mid-GOP | 12.250 s | 800 | Pass |
+| Before keyframe | 11.966 s | 96 | Pass |
+| At keyframe | 12.000 s | 512 | Pass |
+| After keyframe | 12.033 s | 976 | Pass |
+| Delayed audio | 12.250 s | 800 | Pass |
+| VFR + extra source audio track | 12.250 s | 800 | Pass |
+
+[VERIFIED] Both channels matched the known reference at 1.5, 6.5 and 10.5 seconds: **36/36 measured lags were zero samples**. Correlation and timestamp/provenance checks are separate requirements. Raw AAC tails were sometimes nonzero; they were accepted only because they exactly matched the independently encoded safe input. No generic “allow a few milliseconds” exception was added.
+
+**Deliberately bad controls:**
+
+- Four milliseconds of private tone substituted inside an otherwise correct-duration file: rejected for private audio and safe-payload mismatch, with no endpoint failure required.
+- Four milliseconds of private audio appended past E, with MP4 movie/track/edit durations deliberately shortened to report exactly 12.250 seconds: rejected. All AAC packets remained present; the duration fields did not authorize the payload.
+- Video shifted about 20 ms while still ending before E: ordinary endpoint checks passed, but source-frame clock verification rejected it.
+- Right audio channel shifted 10 ms: measured lag was 480 samples on that channel and zero on the other; synchronization rejected it.
+- Audio remuxed with a 50 ms timestamp offset: rejected by the cumulative audio-clock check, independently of waveform content.
+
+[ASSUMED limits] These are known-input tests using the same pinned encoder for output and isolated reference. Payload equality is strong bounded evidence about the input used, not an independent codec implementation or a generic speech-privacy classifier. AAC source pre-echo, arbitrary edit schedules, gaps, drift and separate M4A alignment still need their own tests. The fixture's 100 ms margin is prescribed ground truth, not measured production uncertainty. The owner's <=2-second earlier-trim rule is unchanged. This local follow-up does not authorize real-media access or claim the entire Stage A matrix passed.
 
 ## Authorization and environment
 
@@ -26,9 +57,9 @@ related:
 - Generated media/logs remain in uniquely named local temporary directories printed by the harness; they were not committed or uploaded. The harness only removes its exact generated raw intermediate files; it does not claim all scratch is cleaned. No Sandbox cleanup receipt exists because no Sandbox was created.
 - A zero script exit means the experiment completed, **not** that Stage A acceptance passed. The receipt/report records the non-pass explicitly.
 
-## Short-case results
+## Initial short-case results — historical, before the follow-up
 
-[VERIFIED via final short run] Each reference is 24 seconds, 320×180, nominal 30 fps, stereo 48 kHz. Lossless FFV1/PCM reference precedes H.264/AAC source encoding. Video contains a binary frame-number strip and turns red at the synthetic private boundary; each audio channel switches to a distinct private tone (3.5/4.1 kHz). This is simpler than the proposed pseudorandom watermark and human-readable timecode. Source scenecut is disabled and keyframes are probed. The VFR case drops alternate frames after six seconds and adds a second audio track to the source; output contains only the selected video/audio pair.
+[VERIFIED via initial-run final short receipt] Each reference is 24 seconds, 320×180, nominal 30 fps, stereo 48 kHz. Lossless FFV1/PCM reference precedes H.264/AAC source encoding. Video contains a binary frame-number strip and turns red at the synthetic private boundary; each audio channel switches to a distinct private tone (3.5/4.1 kHz). This is simpler than the proposed pseudorandom watermark and human-readable timecode. Source scenecut is disabled and keyframes are probed. The VFR case drops alternate frames after six seconds and adds a second audio track to the source; output contains only the selected video/audio pair.
 
 [ASSUMED fixture input] Every positive case supplies a **100 ms uncertainty** and cuts at `E = B − 0.1`. This is prescribed synthetic ground truth, **not measured waveform alignment** or a recommended fixed production margin. Owner policy tests accept 0, 0.1 and exactly 2 seconds and block 2.001 seconds. Real uncertainty must be measured; above 2 seconds or unbounded, block for staff boundary/mapping review. Staff issue resolution cannot approve a failed generated video.
 
@@ -43,13 +74,13 @@ related:
 
 [VERIFIED via packet/stream inspection] In the offset case, the source MP4's encoded audio start is 0.328667 s, and the output's is 0.307333 s, rather than blindly preserving the nominal 0.350 s reference offset. AAC priming and MP4 edit-list handling need explicit treatment. The normal output's audio stream duration plus start reaches 12.250 s, yet decoded frame sample intervals reach 12.254 s. That is a concrete example of duration metadata failing to establish decoded-sample bounds.
 
-[VERIFIED via marker/provenance checks] No positive candidate exposed a private red frame or private-tone block. That does **not** prove semantic privacy or that all padding is silence. Ignoring edit lists changes timeline origins and priming treatment: raw timestamp excess is an unresolved verifier/clock issue, **not evidence that discussion content leaked**. A valid verifier must map both decode paths to the same source clock and classify padding before accepting or rejecting on those timestamps. Do not normalize audio and video independently and thereby erase their relative offset.
+[VERIFIED via marker/provenance checks] No positive candidate exposed a private red frame or private-tone block. That does **not** prove semantic privacy or that all padding is silence. Ignoring edit lists changes timeline origins and priming treatment: raw timestamp excess was then an unresolved verifier/clock issue, **not evidence that discussion content leaked**. A valid verifier must map both decode paths to the same source clock and classify padding before accepting or rejecting on those timestamps. Do not normalize audio and video independently and thereby erase their relative offset.
 
 [VERIFIED via inspected source keyframes] Constant-rate cases have keyframes at 0, 2, 4, …, 22 seconds; the named keyframe cases refer to **E**, not B. Whole-frame interval rounding is deliberately conservative: the at/after-keyframe outputs actually retain only through source frame 358 and end at 11.966666 s; neither is claimed to retain the keyframe itself. VFR keyframe spacing differs and is retained in the receipt. These fixtures do not exercise arbitrary open-GOP dependencies.
 
-## Negative controls and checker limits
+## Initial negative controls and checker limits — historical
 
-[VERIFIED via final run] The leaky remux produced **17 private video frames** and **27 private-tone blocks on each channel**; the wrong-offset encode produced **13 private frames** and **26 blocks on each channel**. Both also exceeded E, but explicit assertions require both marker reasons, so timestamp failure alone cannot make the content-detector test pass. Naive presentation stream-copy exposed no private marker in this guarded fixture, yet retained source frames/intervals beyond E and was rejected. This supports rejecting a naive copy recipe; it is not proof that every possible stream-copy implementation leaks discussion.
+[VERIFIED via initial-run final receipt] The leaky remux produced **17 private video frames** and **27 private-tone blocks on each channel**; the wrong-offset encode produced **13 private frames** and **26 blocks on each channel**. Both also exceeded E, but explicit assertions require both marker reasons, so timestamp failure alone cannot make the content-detector test pass. Naive presentation stream-copy exposed no private marker in this guarded fixture, yet retained source frames/intervals beyond E and was rejected. This supports rejecting a naive copy recipe; it is not proof that every possible stream-copy implementation leaks discussion.
 
 [VERIFIED via review and rerun] Review found that the initial audio detector skipped its final partial block; the final short run examines it too. Source scenecut was disabled and named keyframe cases were moved to align the **cut endpoint** with the intended GOP positions. Detector thresholds remain fixture-specific: a low-level or short arbitrary speech leak could evade this tone detector. Its successful controls do not establish a generic production classifier.
 
@@ -72,16 +103,18 @@ related:
 
 ## What remains before a synthetic pass
 
-[ASSUMED engineering follow-up] Resolve the delayed-audio sample/priming issue and normalize the edit-list-ignoring path to a proved common source clock, without hiding samples through metadata. Then rerun the positive cases and controls. Also implement and test the remaining acceptance coverage:
+[VERIFIED scope] The bounded padding/sync follow-up above resolves the six-case local issue. [ASSUMED engineering follow-up] The remaining acceptance coverage is:
 
-- Waveform alignment across separate M4A origins, pauses/discontinuities and multiple distinct anchors; the current harness supplies known timing rather than estimating it.
-- Pseudorandom/tail-local audio controls, independent video-only/audio-only faults, and representative codec/offset combinations. Tiny thresholded tone checks are not sample-level exclusion proof.
+- Mapping across separate M4A origins, pauses/discontinuities and unknown offsets/drift. The follow-up measures known synthetic pilot alignment; it is not a production mapping solver.
+- Broader codec/offset combinations and arbitrary low-level speech leakage. The new tail-local/audio/video fault controls pass their intended tests, but thresholded markers are not general speech-privacy proof.
 - Unexpected caption/data streams, arbitrary trailing/unreferenced payload, all-track inspection, a second independent playback path and stale-input binding behavior.
-- Near-2 GB input/output-cap failure, peak memory/disk measurements and the proposed motion-heavier/legible-slide quality fixture. The long repeating pattern below is only a timing probe.
+- Near-2 GB input/output-cap failure, peak memory/disk measurements and the proposed motion-heavier/legible-slide quality fixture. The long repeating pattern above is only a timing probe.
 - Cloud dispatch, timeout/crash cleanup, snapshots, upload failure/reconciliation and region/cap enforcement remain separate cloud-stage obligations.
 
-[VERIFIED scope] Stage A was run far enough to expose blocking correctness gaps; it does not satisfy the complete proposed synthetic acceptance matrix. No real recording should be requested/read on the strength of these results. The full staff Recording retention policy is unchanged: retain until Stage 5, then retain only the presentation video.
+[VERIFIED scope] The local padding issue was investigated and the six-case follow-up passed; this still does not satisfy the complete proposed synthetic acceptance matrix. No real recording should be requested/read on the strength of these results. The full staff Recording retention policy is unchanged: retain until Stage 5, then retain only the presentation video.
 
 ## Review and checks
 
 [VERIFIED via fresh read-only review] The reviewer checked short-case arithmetic, control detections, endpoint interpretation and the explicit non-pass. Review corrections were incorporated and short cases rerun; exact offset stream metadata is preserved. Long-run values were read directly from the completed receipt. Documentation/reference gates, available self-tests, secret/scaffolding checks and Python syntax validation passed within their registered scopes; none proves production privacy acceptance.
+
+[VERIFIED via follow-up review] Fresh review required both-channel correlation, frame-to-source timestamp checks, explicit duration-preserving negative controls, and separate original-file evidence; these are now included. Audio continuity checks also cover every decoded frame. Full Stage A and production readiness remain unclaimed.

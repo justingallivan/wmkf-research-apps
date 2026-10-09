@@ -5,7 +5,7 @@ No network/credentials/input-media arguments. Creates a fresh /tmp directory.
 Run: python3 scripts/benchmarks/stage4-synthetic.py [--long]
 JSON receipts and all generated media stay in that directory. No automatic deletion.
 """
-import argparse, array, hashlib, json, math, os, platform, subprocess, tempfile, time, wave
+import argparse, array, hashlib, json, math, os, platform, random, subprocess, tempfile, time, wave
 from pathlib import Path
 
 ROOT = Path(tempfile.mkdtemp(prefix='wmkf-stage4-synthetic-'))
@@ -45,7 +45,7 @@ def endpoint(boundary, uncertainty):
         return None
     return max(0, boundary-uncertainty)
 
-def fixture(name, boundary, offset=0, vfr=False, extras=False):
+def fixture(name, boundary, offset=0, vfr=False, extras=False, pilot=False):
     # Uncompressed reference: frame number encoded as 12 high-contrast blocks.
     raw=ROOT/(name+'.rgb'); wav=ROOT/(name+'.wav')
     with raw.open('wb') as f:
@@ -61,11 +61,12 @@ def fixture(name, boundary, offset=0, vfr=False, extras=False):
             f.write(frame)
     # Distinct changing pre-boundary tones; 3.5/4.1kHz private markers per channel.
     samples=array.array('h')
+    pilot_rng=random.Random(1909)
     for i in range(24*SR):
         t=i/SR+offset
         for ch in range(2):
             freq=(3500+600*ch) if t>=boundary else (330+110*ch+55*int(t//2))
-            samples.append(int(7000*math.sin(2*math.pi*freq*t)))
+            samples.append(int(7000*math.sin(2*math.pi*freq*t)) + (pilot_rng.randint(-5000,5000) if pilot and t<boundary else 0))
     with wave.open(str(wav),'wb') as f:
         f.setparams((2,2,SR,0,'NONE','not compressed'));f.writeframes(samples.tobytes())
     ref=ROOT/(name+'-reference.mkv')

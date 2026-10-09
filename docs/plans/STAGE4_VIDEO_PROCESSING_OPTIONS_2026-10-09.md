@@ -180,7 +180,7 @@ In the table, **F** means “our full re-encode plus the acceptance procedure be
 | Sandbox primary benchmark | Approved full-source use; persistence disabled at creation; cleanup at every terminal outcome | Public capacity/persistence docs and local synthetic experiment; no Sandbox created | Persistence cannot be reliably disabled/cleaned, or region/processor terms rejected | [PLANNED] Authorized cloud venue/cap; report Stage A before dispatch |
 | Reject naive presentation stream-copy initially | Exact packet/content proof would be required before publication | FFmpeg documented copy semantics only | A representative, independently validated safe-prefix implementation could support reconsideration | [ASSUMED] Conservative technique choice |
 
-**[ASSUMED — verdict]** Local synthetic results expose unresolved acceptance issues. Production readiness and cloud performance remain unproven; see the Stage A results report. Documentation checks validate the report's bounded references and consistency, not encoder behavior or Production retention enforcement.
+**[ASSUMED — verdict]** The six-case local padding/provenance and synchronization follow-up passes; the broader synthetic acceptance matrix remains incomplete. Production readiness and cloud performance remain unproven; see the Stage A results report. Documentation checks validate the report's bounded references and consistency, not encoder behavior or Production retention enforcement.
 
 ## Public sources (all accessed 2026-10-09)
 
