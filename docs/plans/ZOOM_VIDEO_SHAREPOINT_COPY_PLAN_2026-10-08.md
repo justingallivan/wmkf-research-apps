@@ -661,6 +661,23 @@ A read-only build map (Sonnet reconnaissance, Session 589) found the gaps below.
     - A segmented or too-large meeting returns 422 before the replay lookup.
     - `findCopiedZoomVideoCopyForFile` serves ruling 6.
 
+**Rulings after S5 (worker transfer path) and S7 (card).**
+21. **Zoom auth or scope errors in the worker.** These are configuration faults, not per-copy faults. Release the copy lease with `next_attempt_at = now + 15 min` and record one operational alert (`zoom_video_config_error`) per deferral. Do not fail the copy and do not count it. S6 adds the deferral writer.
+22. **Accepted S5 choices.**
+    - Host removed: terminal with no Graph write; the orphan session expires on Graph's clock.
+    - Graph PUT 404 or 410 goes to the loss path.
+    - A partial item right after our own final PUT is uncertain, not a path conflict.
+    - The I2 readback uses the snapshot's `intent_has_ciphertext`; unknown means retain.
+    - An invalid tuple fails with `zoom_video_state_invalid` plus an alert.
+    - A host-removed partial item caps as `zoom_video_cancel_uncertain` (fails closed).
+    - The visit-unbound pause belongs to S6, next to the finalize binding read.
+23. **Accepted S7 choices.**
+    - One read-only copies GET on mount.
+    - The section holding the recording opens automatically during a copy.
+    - Video-only mode keeps the listing's binding guard.
+    - A cancelled copy is retried from the picker.
+    - **Keep current file** on Import keeps the file, copies no video, and still imports the audio (commit `daee437c2`).
+
 ## Contract review (`/contract-reconcile` Mode A, planning pass)
 
 **Historical record.** Retained as requested; current protocol is in the revised sections above.
