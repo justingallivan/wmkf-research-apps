@@ -3,7 +3,7 @@ title: Meeting video split at the presentation end (Stage 4)
 kind: plan
 domain: transcription
 status: draft
-summary: "Design outline for cutting the copied Zoom meeting MP4 at the staff-confirmed presentation end into a Board-eligible presentation video only (no discussion video; owner 2026-10-09), approved by staff before Board release, with same-source proof, a frozen source identity, a durable split job and a processor contract. Venue research runs separately on codex/stage4-video-processing-research. Draft: owner decisions open; nothing built."
+summary: "Design outline for cutting the copied Zoom meeting MP4 at the staff-confirmed presentation end into a Board-eligible presentation video only (no discussion video; owner 2026-10-09), approved by staff before Board release, with same-source proof, a frozen source identity, a durable split job and a processor contract. Venue research and local benchmarks by Codex are merged to main (228a97b5b). Draft: research closed; nothing built."
 owner: product-engineering
 related:
   - docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md
@@ -15,7 +15,7 @@ related:
 
 # Meeting video split at the presentation end (Stage 4)
 
-**[DRAFT OUTLINE, Session 590, 2026-10-09.]** Nothing here is built or approved. This outline turns Stage 4 of `MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md` (`:104-112`) into a design. The processing venue (where the cut runs) is researched separately by Codex on `codex/stage4-video-processing-research` (deliverable `docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md`). This document defines what any venue must receive and return.
+**[DRAFT OUTLINE, Session 590, 2026-10-09.]** Nothing here is built or approved. This outline turns Stage 4 of `MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md` (`:104-112`) into a design. The processing venue (where the cut runs) was researched by Codex (merged to `main` in `228a97b5b`; deliverable `docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md`). This document defines what any venue must receive and return.
 
 ## Owner decisions
 
@@ -82,14 +82,14 @@ Any failure shows a named reason and no split.
 
 ## Technique and verification [PLANNED, from Codex research]
 
-See `docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md` (branch `codex/stage4-video-processing-research`).
+See `docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md` and the benchmark scripts under `scripts/benchmarks/stage4-*`.
 - Full re-encode of each kept span from decoded frames and samples; naive stream copy is a negative control only.
 - The cut on the MP4 is `endMs` mapped from the transcript (M4A) timeline using at least three audio anchors, minus the measured mapping uncertainty. Unbounded uncertainty, drift or a pause blocks the split.
 - Two acceptance checks: no source content from after the cut is used, and no output stream plays past it. Duration alone proves neither; AAC padding, edit lists and extra tracks are checked explicitly.
 - The lineage record gains a mapping version and a verification receipt.
 - **Audio recipe (Codex synthetic follow-up, `STAGE4_SYNTHETIC_RESULTS_2026-10-09.md`, branch commit `97b8feb66`):** decode audio onto a common zero-based clock (inserting leading silence for a late start), trim there, write only the kept samples to an isolated PCM file, and encode AAC from that file alone, so no post-cut sample is ever encoder input. Video keeps source-clock timestamps. The AAC tail is accepted only if the output's audio packets exactly match an independent encode of the same isolated PCM; there is no millisecond tolerance.
 - **Sync checks:** each decoded video frame's timestamp agrees with its source frame, and each audio frame follows a continuous sample clock from zero; both decode paths (with and without MP4 edit lists) must agree.
-- **Local research closed (owner, Session 590, 2026-10-09): promising with documented limitations.** Evidence: `STAGE4_LOCAL_MATRIX_RESULTS_2026-10-09.md`, `STAGE4_MAPPING_CAPACITY_RESULTS_2026-10-09.md` and `STAGE4_SYNTHETIC_RESULTS_2026-10-09.md` on `codex/stage4-video-processing-research` (tip `418e85594`). Four separate-M4A mapping cases (offset, pause, drift, negative offset) mapped within one 16 kHz sample and passed the export checks; 80 ppm drift over 85 minutes was recovered within about 4 microseconds; ambiguous mappings (heavy noise, two gaps, an anchor on a gap) were rejected rather than guessed; extra streams, private metadata and hidden container bytes were stripped or rejected; 1080p text stayed readable. Local timing: 60 minutes of 1080p encoded at 4.34x real time on two laptop threads, not a cloud estimate. The historical strict matrix stays recorded as not passed.
+- **Local research closed (owner, Session 590, 2026-10-09): promising with documented limitations.** Evidence: `STAGE4_LOCAL_MATRIX_RESULTS_2026-10-09.md`, `STAGE4_MAPPING_CAPACITY_RESULTS_2026-10-09.md` and `STAGE4_SYNTHETIC_RESULTS_2026-10-09.md` (merged to `main` in `228a97b5b`, research tip `418e85594`). Four separate-M4A mapping cases (offset, pause, drift, negative offset) mapped within one 16 kHz sample and passed the export checks; 80 ppm drift over 85 minutes was recovered within about 4 microseconds; ambiguous mappings (heavy noise, two gaps, an anchor on a gap) were rejected rather than guessed; extra streams, private metadata and hidden container bytes were stripped or rejected; 1080p text stayed readable. Local timing: 60 minutes of 1080p encoded at 4.34x real time on two laptop threads, not a cloud estimate. The historical strict matrix stays recorded as not passed.
 - **Accepted limitation (owner):** Apple's decoders sometimes omit about 4-21 ms of retained presentation audio at the very end. This is lost presentation, not leaked discussion; it is a quality limitation, not a blocker. Reopen only if real playback shows an objectionable ending, material truncation, a sync failure or a privacy concern.
 
 ## Acceptance and release gates [PLANNED]
