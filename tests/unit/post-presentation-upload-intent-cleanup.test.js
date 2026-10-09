@@ -78,29 +78,86 @@ test('approved on-mode cleanup deletes only the exact zero-row candidate with it
   expect(result.deleted).toBe(1);
 });
 
-test('an exact registry binding in any lifecycle retains bytes and closes authority only in on mode', async () => {
+const REGISTERED = {
+  wmkf_requestdocumentid: '44444444-4444-4444-8444-444444444444',
+  _wmkf_request_value: ROW.request_id,
+  wmkf_artifacttype: ROW.artifact_type,
+  wmkf_producer: 'meeting-tracker-post-presentation',
+  wmkf_generationkey: ROW.generation_key,
+  wmkf_sharepointdriveid: 'drive',
+  wmkf_sharepointitemid: 'item',
+  wmkf_lifecyclestate: 100000003,
+};
+
+test.each([
+  ['access off, cleanup off', { mode: 'off', valid: true }, false],
+  ['test access, cleanup off', { mode: 'test', valid: true }, false],
+  ['invalid access, cleanup off', { mode: 'off', valid: false }, false],
+  ['on access, cleanup off', { mode: 'on', valid: true }, false],
+  ['on access, cleanup on', { mode: 'on', valid: true }, true],
+])('an exact registry binding binds without deleting or abandoning (%s)', async (_label, access, cleanup) => {
   const d = deps({
-    access: () => ({ mode: 'on', valid: true }),
-    destructiveCleanupEnabled: () => true,
-    findByGenerationKey: jest.fn(async () => ({ records: [{
-      wmkf_requestdocumentid: '44444444-4444-4444-8444-444444444444',
-      _wmkf_request_value: ROW.request_id,
-      wmkf_artifacttype: ROW.artifact_type,
-      wmkf_producer: 'meeting-tracker-post-presentation',
-      wmkf_generationkey: ROW.generation_key,
-      wmkf_sharepointdriveid: 'drive',
-      wmkf_sharepointitemid: 'item',
-      wmkf_lifecyclestate: 100000003,
-    }] })),
+    access: () => access,
+    destructiveCleanupEnabled: () => cleanup,
+    findByGenerationKey: jest.fn(async () => ({ records: [REGISTERED] })),
   });
   const result = await cleanupPresentationMaterialUploads({}, d);
+  expect(d.renew).toHaveBeenCalledWith({ uploadId: ROW.id, leaseToken: 'lease' });
   expect(d.bind).toHaveBeenCalledWith({
     uploadId: ROW.id,
     leaseToken: 'lease',
     requestDocumentId: '44444444-4444-4444-8444-444444444444',
   });
   expect(d.deleteByEtag).not.toHaveBeenCalled();
-  expect(result.bound).toBe(1);
+  expect(d.abandon).not.toHaveBeenCalled();
+  expect(result).toEqual(expect.objectContaining({ bound: 1, retained: 0, deleted: 0 }));
+});
+
+test('a lost cleanup lease before the non-destructive bind retains without binding', async () => {
+  const d = deps({
+    renew: jest.fn(async () => null),
+    findByGenerationKey: jest.fn(async () => ({ records: [REGISTERED] })),
+  });
+  const result = await cleanupPresentationMaterialUploads({}, d);
+  expect(d.bind).not.toHaveBeenCalled();
+  expect(result.retained).toBe(1);
+});
+
+test('a failed bind write is retained for reconciliation, never deleted', async () => {
+  const d = deps({
+    bind: jest.fn(async () => null),
+    findByGenerationKey: jest.fn(async () => ({ records: [REGISTERED] })),
+  });
+  const result = await cleanupPresentationMaterialUploads({}, d);
+  expect(d.release).toHaveBeenCalledWith(expect.objectContaining({ lastError: 'bound_finalize_failed' }));
+  expect(d.deleteByEtag).not.toHaveBeenCalled();
+  expect(result.retained).toBe(1);
+});
+
+test.each([
+  ['ambiguous registry', [REGISTERED, REGISTERED], 'registry_ambiguous'],
+  ['mismatched registry', [{ ...REGISTERED, wmkf_sharepointitemid: 'other' }], 'registry_mismatch'],
+])('%s is never bound or deleted even with destructive cleanup on', async (_label, records, reason) => {
+  const d = deps({
+    access: () => ({ mode: 'on', valid: true }),
+    destructiveCleanupEnabled: () => true,
+    findByGenerationKey: jest.fn(async () => ({ records })),
+  });
+  const result = await cleanupPresentationMaterialUploads({}, d);
+  expect(d.bind).not.toHaveBeenCalled();
+  expect(d.deleteByEtag).not.toHaveBeenCalled();
+  expect(d.release).toHaveBeenCalledWith(expect.objectContaining({ lastError: reason }));
+  expect(result.retained).toBe(1);
+});
+
+test('a candidate recorded after a bind-eligible row still needs the recorded write to land', async () => {
+  const d = deps({
+    recordCandidate: jest.fn(async () => null),
+    findByGenerationKey: jest.fn(async () => ({ records: [REGISTERED] })),
+  });
+  await cleanupPresentationMaterialUploads({}, d);
+  expect(d.bind).not.toHaveBeenCalled();
+  expect(d.release).toHaveBeenCalledWith(expect.objectContaining({ lastError: 'candidate_record_failed' }));
 });
 
 test('a rejected candidate already bound to a Request Document is retained and alerted, never relabeled finalized', async () => {
@@ -129,6 +186,21 @@ test('a rejected candidate already bound to a Request Document is retained and a
   expect(d.recordEvent).toHaveBeenCalledWith(expect.objectContaining({
     metadata: { uploadId: ROW.id, reason: 'rejected_candidate_registered', validationReason: 'post_presentation_mp4_malware' },
   }));
+});
+
+test('a rejected candidate stays unbound when destructive cleanup is off, with the same retention', async () => {
+  const rejected = { ...ROW, state: 'failed', candidate_item_id: 'item', last_error: 'post_presentation_mp4_malware' };
+  const d = deps({
+    claim: jest.fn(async () => ({ leaseToken: 'lease', rows: [rejected] })),
+    findByGenerationKey: jest.fn(async () => ({ records: [REGISTERED] })),
+  });
+  const result = await cleanupPresentationMaterialUploads({}, d);
+  expect(result.retained).toBe(1);
+  expect(d.bind).not.toHaveBeenCalled();
+  expect(d.deleteByEtag).not.toHaveBeenCalled();
+  expect(d.release).toHaveBeenCalledWith({
+    uploadId: ROW.id, leaseToken: 'lease', lastError: 'rejected_candidate_registered',
+  });
 });
 
 test('a live session only refreshes server-observed expiry and review-after', async () => {
