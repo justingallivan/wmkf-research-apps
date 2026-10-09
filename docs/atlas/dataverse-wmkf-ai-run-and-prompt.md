@@ -97,6 +97,25 @@ Migration plans touching either entity must preserve these foreign keys.
   'content-free'` option (added on the same branch) so no run row carries
   transcript text or names on any path. The row must be seeded before alignment
   is enabled so its variable caps match the code.
+- **Meeting transcript staff discussion summary (built on branch
+  `claude/paired-summaries`, NOT MERGED; NOT SEEDED in any environment; read-only
+  check V3, Session 588, found no Production row):**
+  `shared/config/prompts/meeting-staff-discussion-summary.js` defines
+  `meeting-transcript.staff-discussion-summary`, the staff-only sibling of
+  `meeting-transcript.presentation-summary`
+  (`docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md` D5). Its one variable,
+  `discussion_transcript`, is `untrusted` with `dataClass: 'meeting_transcript'`
+  (A7 marker registered in `scripts/check-prompt-injection-tagging.js`); output is
+  plain text, a single `summary` with `kind: none`, `rawOutputRetention: 'none'`.
+  `scripts/seed-meeting-staff-discussion-summary-prompt.js` is a create-only
+  `seedPromptRow` bootstrap (`--dry-run`, `--execute`, `--execute --force` for a
+  version-preserving recovery) with the `sonnet` alias (owner decision 6). The
+  budget is the code-owned default in `shared/config/executorBudgets.js` (16,000
+  output tokens). The caller
+  `lib/services/post-presentation-materials/transcript-summary-service.js` passes
+  `requireNoPersistence: true` and `auditRetention: 'content-free'`, so the run
+  row carries no transcript or summary text. The owner reviews the prompt wording
+  before seeding.
 - **Pre-Site Visit proposal core (Production-live durable app slice and prompt,
   2026-08-17):**
   `shared/config/prompts/pre-site-visit-proposal-core.js` defines the reviewed
