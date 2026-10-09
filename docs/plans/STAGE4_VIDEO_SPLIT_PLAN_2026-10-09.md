@@ -89,7 +89,25 @@ See `docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md` (branch `codex/st
 - The lineage record gains a mapping version and a verification receipt.
 - **Audio recipe (Codex synthetic follow-up, `STAGE4_SYNTHETIC_RESULTS_2026-10-09.md`, branch commit `97b8feb66`):** decode audio onto a common zero-based clock (inserting leading silence for a late start), trim there, write only the kept samples to an isolated PCM file, and encode AAC from that file alone, so no post-cut sample is ever encoder input. Video keeps source-clock timestamps. The AAC tail is accepted only if the output's audio packets exactly match an independent encode of the same isolated PCM; there is no millisecond tolerance.
 - **Sync checks:** each decoded video frame's timestamp agrees with its source frame, and each audio frame follows a continuous sample clock from zero; both decode paths (with and without MP4 edit lists) must agree.
-- **Open before synthetic pass [Codex, 2026-10-09]:** mapping a separate M4A onto the MP4 (unknown offset, pauses, drift), real-speech leak detection, and capacity (near 2 GB, memory/disk, realistic slide/motion). Local timing: an 85-minute 1080p input cut to 60 minutes encoded at 4.34x real time on two laptop threads; not a cloud estimate.
+- **Local research closed (owner, Session 590, 2026-10-09): promising with documented limitations.** Evidence: `STAGE4_LOCAL_MATRIX_RESULTS_2026-10-09.md`, `STAGE4_MAPPING_CAPACITY_RESULTS_2026-10-09.md` and `STAGE4_SYNTHETIC_RESULTS_2026-10-09.md` on `codex/stage4-video-processing-research` (tip `418e85594`). Four separate-M4A mapping cases (offset, pause, drift, negative offset) mapped within one 16 kHz sample and passed the export checks; 80 ppm drift over 85 minutes was recovered within about 4 microseconds; ambiguous mappings (heavy noise, two gaps, an anchor on a gap) were rejected rather than guessed; extra streams, private metadata and hidden container bytes were stripped or rejected; 1080p text stayed readable. Local timing: 60 minutes of 1080p encoded at 4.34x real time on two laptop threads, not a cloud estimate. The historical strict matrix stays recorded as not passed.
+- **Accepted limitation (owner):** Apple's decoders sometimes omit about 4-21 ms of retained presentation audio at the very end. This is lost presentation, not leaked discussion; it is a quality limitation, not a blocker. Reopen only if real playback shows an objectionable ending, material truncation, a sync failure or a privacy concern.
+
+## Acceptance and release gates [PLANNED]
+
+Hard gates (privacy and correct-file publication); none can be waived by staff approval:
+1. The mapping from the transcript (M4A) clock to the MP4 clock is measured from several distinct anchors, including near the cut. The cut moves earlier by the measured uncertainty, up to 2 s (decision 10); larger or unbounded uncertainty, or an ambiguous mapping, blocks the split for staff resolution.
+2. Only pre-cut samples and whole pre-cut video frames reach the encoder (isolated PCM recipe above); only the selected H.264 and AAC streams are written, with extra tracks and metadata removed; unsupported output structures are rejected.
+3. The automated checks (payload equality, frame and sample clocks, container scan) pass before the video is offered for staff review.
+4. Board eligibility binds the exact file staff approved: source identity and quickXorHash, transcript revision and boundary, mapping version, output hash and SharePoint version, the verification receipt and the approval. Any change to those inputs, or to the output, during or after processing makes the video ineligible, at listing and at `open`.
+
+Quality (documented, not blocking): the Apple tail limitation above; staff listening to the ending (decision 8) is the check.
+
+## Next steps before the build plan [PLANNED]
+
+1. **Focused validation on generated media:** speech-like and noisy audio, realistic pauses, variable frame rate and delayed audio; several anchors including near the cut; check the ending on the intended playback paths (browser and the SharePoint viewer). Not an open-ended codec study.
+2. **Synthetic Vercel Sandbox pilot** within the $10 incremental-compute cap: confirm the app's region, current pricing and how the cap is enforced before dispatch; persistence off, no media snapshots, independently verified cleanup. Measure a full-length presentation (runtime, scratch, readability, ending), and test interruption, insufficient disk, failed or partial upload and failed cleanup; anything incomplete stays unpublished.
+3. **Ask Justin before the first real input** (1003222's copied video, any paired audio scoped explicitly), with the pilot results and the applicable Vercel data-processing terms. Isolated staff-only test folder; no new Zoom read; no Board registration. A longer recording follows only after that passes.
+4. **Correct-file safeguards are built and tested in the application** (gate 4): retries, concurrent changes, upload reconciliation, approval, and Board listing and `open` paths. Required before Board use, not before the pilot.
 
 ## Card [PLANNED]
 
