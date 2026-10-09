@@ -50,6 +50,12 @@ function budgets(overrides = {}) {
       timeoutMsOverride: 240000,
       ...(overrides.presentationSummary || {}),
     },
+    'meeting-transcript.staff-discussion-summary': {
+      kind: 'standing',
+      maxTokensOverride: 16000,
+      timeoutMsOverride: 240000,
+      ...(overrides.discussionSummary || {}),
+    },
   };
 }
 
@@ -225,10 +231,10 @@ test('publishes and verifies the next immutable revision after model-ceiling che
   expect(result).toMatchObject({ status: 'completed', config: { version: 1, source: 'dataverse' } });
   // pre-site-visit.proposal-core.generate + review-synthesis.generate (retry)
   // + review-panel.seat + review-panel.chair + initial-assessment.generate
-  // + meeting-transcript.presentation-summary:
+  // + meeting-transcript.presentation-summary + meeting-transcript.staff-discussion-summary:
   // every 'standing'/'retry' kind reads its current prompt row for a
   // model-ceiling check; 'timeout' kinds (field-primer, cycle-dossier) do not.
-  expect(deps.fetchCurrentPrompt).toHaveBeenCalledTimes(6);
+  expect(deps.fetchCurrentPrompt).toHaveBeenCalledTimes(7);
   expect(deps.createSettingStrict).toHaveBeenCalledWith(
     'executor.budgets.v000001',
     expect.any(String),
