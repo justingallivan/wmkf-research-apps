@@ -87,6 +87,9 @@ See `docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md` (branch `codex/st
 - The cut on the MP4 is `endMs` mapped from the transcript (M4A) timeline using at least three audio anchors, minus the measured mapping uncertainty. Unbounded uncertainty, drift or a pause blocks the split.
 - Two acceptance checks: no source content from after the cut is used, and no output stream plays past it. Duration alone proves neither; AAC padding, edit lists and extra tracks are checked explicitly.
 - The lineage record gains a mapping version and a verification receipt.
+- **Audio recipe (Codex synthetic follow-up, `STAGE4_SYNTHETIC_RESULTS_2026-10-09.md`, branch commit `97b8feb66`):** decode audio onto a common zero-based clock (inserting leading silence for a late start), trim there, write only the kept samples to an isolated PCM file, and encode AAC from that file alone, so no post-cut sample is ever encoder input. Video keeps source-clock timestamps. The AAC tail is accepted only if the output's audio packets exactly match an independent encode of the same isolated PCM; there is no millisecond tolerance.
+- **Sync checks:** each decoded video frame's timestamp agrees with its source frame, and each audio frame follows a continuous sample clock from zero; both decode paths (with and without MP4 edit lists) must agree.
+- **Open before synthetic pass [Codex, 2026-10-09]:** mapping a separate M4A onto the MP4 (unknown offset, pauses, drift), real-speech leak detection, and capacity (near 2 GB, memory/disk, realistic slide/motion). Local timing: an 85-minute 1080p input cut to 60 minutes encoded at 4.34x real time on two laptop threads; not a cloud estimate.
 
 ## Card [PLANNED]
 
