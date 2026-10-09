@@ -19,6 +19,8 @@ jest.mock('../../lib/services/meeting-tracker-recordings/import-store.js', () =>
   releaseStartedImportWithEndedJob: jest.fn(), markZoomImportStarted: jest.fn(), markZoomImportFailed: jest.fn(), listZoomImportsForRequest: jest.fn(),
 }));
 
+jest.mock('../../lib/services/meeting-tracker-recordings/video-copy-store.js', () => ({ listZoomVideoCopySnapshotsForRequest: jest.fn(async () => []) }));
+
 import { requireMeetingTranscriptionEnabled } from '../../lib/services/meeting-tracker-transcription/policy.js';
 import { loadMeetingTranscriptionBinding } from '../../lib/services/meeting-tracker-transcription/binding.js';
 import { uploadMeetingTranscription, startMeetingTranscription } from '../../lib/services/meeting-tracker-transcription/service.js';
@@ -26,8 +28,9 @@ import { writePrivateContent, projectMeetingTranscriptionJob } from '../../lib/s
 import { getMeetingTranscriptionJob, retireMeetingTranscriptionUploadingJob } from '../../lib/services/transcription-pilot/store.js';
 import { ZoomClientError, listHostRecordings, getMeetingRecordings, downloadRecordingFile } from '../../lib/services/meeting-tracker-recordings/zoom-client.js';
 import * as store from '../../lib/services/meeting-tracker-recordings/import-store.js';
+import * as videoStore from '../../lib/services/meeting-tracker-recordings/video-copy-store.js';
 import { ServiceHttpError } from '../../lib/services/service-http-error.js';
-import { importZoomRecording, listZoomRecordingsForVisit, readZoomImportConfig, zoomImportFilename } from '../../lib/services/meeting-tracker-recordings/import-service.js';
+import { importZoomRecording, listZoomRecordingsForVisit, readZoomImportConfig, zoomImportFilename, zoomVideoFilename, pickVideoFile } from '../../lib/services/meeting-tracker-recordings/import-service.js';
 
 const REQUEST = '11111111-1111-4111-8111-111111111111';
 const VISIT = '22222222-2222-4222-8222-222222222222';
@@ -659,5 +662,69 @@ describe.each(['processing', 'saving', 'submission_uncertain'])('cleanup request
     const result = await importZoomRecording(args());
     expect(result.import.state).toBe('started');
     expect(onlyRow()).toMatchObject({ state: 'started', transcription_job_id: JOB });
+  });
+});
+
+
+describe('video file picker (Stage 3b variant rule)', () => {
+  const video = (id, type, over = {}) => file({ id, file_extension: 'MP4', recording_type: type, file_size: 100, ...over });
+  const PLAIN = 'shared_screen_with_speaker_view';
+  test('prefers the non-CC file and falls back to the (CC) file', () => {
+    const both = pickVideoFile(meeting([video('cc', `${PLAIN}(CC)`), video('plain', PLAIN)]));
+    expect(both.file.id).toBe('plain');
+    expect(both.segmented).toBe(false);
+    expect(pickVideoFile(meeting([video('cc', `${PLAIN}(CC)`)])).file.id).toBe('cc');
+  });
+  test('ignores other layouts, non-MP4, incomplete and unsized files; none returns null', () => {
+    expect(pickVideoFile(meeting([audioFile, vttFile, video('g', 'gallery_view'), video('a', 'active_speaker'),
+      video('x', PLAIN, { file_extension: 'M4A' }), video('i', PLAIN, { status: 'processing' }), video('z', PLAIN, { file_size: 0 })]))).toBeNull();
+  });
+  test('more than one completed MP4 of the chosen type is segmented; a CC file does not segment a plain choice', () => {
+    expect(pickVideoFile(meeting([video('a', PLAIN), video('b', PLAIN)])).segmented).toBe(true);
+    expect(pickVideoFile(meeting([video('a', PLAIN), video('c', `${PLAIN}(CC)`)])).segmented).toBe(false);
+    expect(pickVideoFile(meeting([video('c1', `${PLAIN}(CC)`), video('c2', `${PLAIN}(CC)`)])).segmented).toBe(true);
+  });
+  test('the display name is Pacific, SharePoint-safe and ends .mp4', () => {
+    expect(zoomVideoFilename(new Date('2026-10-07T20:48:28Z'))).toBe('Zoom video Oct 7, 2026 1.48 PM PT.mp4');
+    expect(zoomVideoFilename(new Date('2027-01-15T08:05:00Z'))).toBe('Zoom video Jan 15, 2027 12.05 AM PT.mp4');
+  });
+});
+
+describe('listing: Stage 3b video fields', () => {
+  const COPY_ENV = process.env.ZOOM_VIDEO_COPY_ACCESS;
+  afterEach(() => { if (COPY_ENV === undefined) delete process.env.ZOOM_VIDEO_COPY_ACCESS; else process.env.ZOOM_VIDEO_COPY_ACCESS = COPY_ENV; });
+  const copyRow = over => ({ id: 'c1', zoom_meeting_uuid: UUID, zoom_file_id: 'mp4-id', state: 'copying', failure_code: null, ...over });
+
+  test('flag off: no video fields and the copy table is never read', async () => {
+    delete process.env.ZOOM_VIDEO_COPY_ACCESS;
+    const result = await listZoomRecordingsForVisit({ requestId: REQUEST });
+    expect(result).not.toHaveProperty('videoCopyAvailable');
+    expect(result.meetings[0]).not.toHaveProperty('video');
+    expect(videoStore.listZoomVideoCopySnapshotsForRequest).not.toHaveBeenCalled();
+  });
+  test('flag on: eligible file type and size, tooLarge, segmented and the file\'s copy state; no file id or URL', async () => {
+    process.env.ZOOM_VIDEO_COPY_ACCESS = 'on';
+    videoStore.listZoomVideoCopySnapshotsForRequest.mockResolvedValue([copyRow(), copyRow({ id: 'other', zoom_file_id: 'different-file', state: 'failed' })]);
+    const result = await listZoomRecordingsForVisit({ requestId: REQUEST });
+    expect(result.videoCopyAvailable).toBe(true);
+    expect(result.meetings[0].video).toEqual({ recordingType: 'shared_screen_with_speaker_view', bytes: 99, tooLarge: false, segmented: false,
+      copy: { id: 'c1', state: 'copying', failureCode: null } });
+    expect(JSON.stringify(result)).not.toMatch(/mp4-id|download|SECRET/);
+    expect(videoStore.listZoomVideoCopySnapshotsForRequest).toHaveBeenCalledWith({ requestId: REQUEST, limit: 20 });
+  });
+  test('flag on: over 2,000,000,000 bytes is tooLarge, two same-type MP4s are segmented, no MP4 is null, no copy row is null', async () => {
+    process.env.ZOOM_VIDEO_COPY_ACCESS = 'on';
+    videoStore.listZoomVideoCopySnapshotsForRequest.mockResolvedValue([]);
+    const big = { ...mp4File, file_size: 2_000_000_001 };
+    listHostRecordings.mockResolvedValue([meeting([big]), meeting([mp4File, { ...mp4File, id: 'mp4-2' }], { uuid: 'seg' }), meeting([audioFile], { uuid: 'none' })]);
+    const [a, b, c] = (await listZoomRecordingsForVisit({ requestId: REQUEST })).meetings;
+    expect(a.video).toMatchObject({ tooLarge: true, segmented: false, copy: null });
+    expect(b.video).toMatchObject({ tooLarge: false, segmented: true });
+    expect(c.video).toBeNull();
+  });
+  test('flag test:<other request> is off for this request', async () => {
+    process.env.ZOOM_VIDEO_COPY_ACCESS = 'test:99999999-9999-4999-8999-999999999999';
+    expect(await listZoomRecordingsForVisit({ requestId: REQUEST })).not.toHaveProperty('videoCopyAvailable');
+    expect(videoStore.listZoomVideoCopySnapshotsForRequest).not.toHaveBeenCalled();
   });
 });

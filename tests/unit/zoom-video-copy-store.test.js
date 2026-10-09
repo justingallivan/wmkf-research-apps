@@ -237,3 +237,11 @@ test('snapshot reads join the intent, expose no lease token or upload URL, and a
   expect(calls[1].text).toContain('WHERE c.request_id = $1 ORDER BY c.created_at DESC LIMIT $2');
   expect(calls[1].params).toEqual([REQ, 20]);
 });
+
+test('findCopiedZoomVideoCopyForFile reads only the copied row for the request and file', async () => {
+  const { store, calls } = harness(() => [{ id: ID, zoom_meeting_uuid: 'm==', state: 'copied' }]);
+  expect(await store.findCopiedZoomVideoCopyForFile({ requestId: REQ, zoomFileId: 'f1' })).toEqual({ id: ID, zoom_meeting_uuid: 'm==', state: 'copied' });
+  expect(calls[0].text).toContain("WHERE request_id = $1 AND zoom_file_id = $2 AND state = 'copied'");
+  expect(calls[0].params).toEqual([REQ, 'f1']);
+  await expect(store.findCopiedZoomVideoCopyForFile({ requestId: 'nope', zoomFileId: 'f1' })).rejects.toThrow(TypeError);
+});
