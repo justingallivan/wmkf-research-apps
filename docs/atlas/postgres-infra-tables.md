@@ -914,7 +914,7 @@ and offline-tested only on `codex/feature-request`.
   before a later validation rejection, cleanup retains and alerts instead of
   relabeling the rejected intent as finalized.
   **[Step 0 merged (`c79f79807`) and migration 076 applied to Production
-  2026-10-09 (S590); the `zoom_copy` writers are on `claude/zoom-copy`, not merged.]** Migration 076 adds `origin` (`browser`
+  2026-10-09 (S590); the `zoom_copy` writers merged 2026-10-09 (`780fab218`, Production deployment 6965242102); `ZOOM_VIDEO_COPY_ACCESS` unset (off).]** Migration 076 adds `origin` (`browser`
   default, or `zoom_copy` for the Stage 3b server copy; CHECK
   `presentation_material_uploads_origin_check`). Step 0 adds `origin = 'browser'`
   to the actor-keyed reads, claims and unleased writers, so a `zoom_copy` intent
