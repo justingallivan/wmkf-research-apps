@@ -203,6 +203,51 @@ describe('Graph failures', () => {
     expect(world.intent.lease_token).toBeNull();
   });
 
+  describe('a Graph response body that stalls after the headers', () => {
+    const realFetch = global.fetch;
+    afterEach(() => { global.fetch = realFetch; jest.dontMock('../../lib/services/graph/constants.js'); });
+    const stalled = (status) => async (_url, init) => new Response(new ReadableStream({
+      start(c) { init.signal.addEventListener('abort', () => c.error(Object.assign(new Error('aborted'), { name: 'AbortError' })), { once: true }); },
+    }), { status });
+
+    test('a stalled session-status read releases both leases with no state change', async () => {
+      const w = makeWorld({ size: 25 });
+      w.seedSession(0);
+      const { getBrowserUploadSessionStatus } = await import('../../lib/services/graph/upload-session.js');
+      global.fetch = jest.fn(stalled(200));
+      const result = await w.tick(undefined, {
+        getBrowserUploadSessionStatus: (url) => getBrowserUploadSessionStatus(null, url, { timeoutMs: 30 }),
+      });
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(result.outcome).toBe('transient');
+      expect(w.counts.del).toBe(0);
+      expect(w.copy.state).toBe('copying');
+      expect(w.copy.lease_token).toBeNull();
+      expect(w.intent.lease_token).toBeNull();
+    });
+
+    test('a stalled create-session read releases both leases with no state change', async () => {
+      const w = makeWorld({ size: 25 });
+      jest.resetModules();
+      jest.doMock('../../lib/services/graph/constants.js', () => ({ ...jest.requireActual('../../lib/services/graph/constants.js'), API_TIMEOUT: 30 }));
+      const { createBrowserUploadSession } = await import('../../lib/services/graph/upload-session.js');
+      const { ALLOWED_LIBRARIES } = jest.requireActual('../../lib/services/graph/constants.js');
+      const svc = { getSiteId: async () => 'site', getDriveId: async () => 'drive', getAccessToken: async () => 'tok', buildHeaders: () => ({}) };
+      global.fetch = jest.fn(stalled(200));
+      const result = await w.tick(undefined, {
+        createBrowserUploadSession: (_lib, folder, name, opts) => createBrowserUploadSession(svc, [...ALLOWED_LIBRARIES][0], folder, name, opts),
+      });
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      // a create failure is the worker's own counted, retryable outcome (see the create-failure cap test)
+      expect(result.outcome).toBe('session_create_failed');
+      expect(w.copy).toMatchObject({ state: 'queued', session_create_attempts: 1 });
+      expect(w.counts.put).toBe(0);
+      expect(w.counts.del).toBe(0);
+      expect(w.copy.lease_token).toBeNull();
+      expect(w.intent.lease_token).toBeNull();
+    });
+  });
+
   test('a mismatched next range after a PUT is uncertain, not progress', async () => {
     const w = makeWorld({ size: 100 });
     w.seedSession(0);

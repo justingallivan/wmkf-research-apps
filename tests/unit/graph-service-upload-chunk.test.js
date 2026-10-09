@@ -54,17 +54,56 @@ test('refuses bad arguments and unsafe URLs before any request', async () => {
   expect(global.fetch).not.toHaveBeenCalled();
 });
 
-test.each([
-  ['a committed response', 201, 'json'],
-  ['an error response', 500, 'text'],
-])('%s whose body stalls after the headers is rejected within the budget and the stream is cancelled', async (_label, status, reader) => {
-  const cancel = jest.fn(async () => {});
-  const stalled = { ...response(status), body: { cancel } };
-  stalled[reader] = jest.fn(() => new Promise(() => {}));
-  global.fetch = jest.fn(async () => stalled);
-  const started = Date.now();
-  await expect(GraphService.putUploadSessionChunk(URL_, { start: 0, bytes: Buffer.from('hello'), total: 20, timeoutMs: 30 }))
-    .rejects.toMatchObject({ serviceName: 'graph', noResponse: true });
-  expect(Date.now() - started).toBeLessThan(1000);
-  expect(cancel).toHaveBeenCalled();
+// Real Response objects whose body sends nothing after the headers. The
+// stream is wired to the request signal the way undici does, so an abort of the
+// shared controller must end the stalled read.
+function stalledResponse(status, signal) {
+  const body = new ReadableStream({
+    start(controller) {
+      signal?.addEventListener('abort', () => controller.error(Object.assign(new Error('aborted'), { name: 'AbortError' })), { once: true });
+    },
+  });
+  return new Response(body, { status, headers: { 'Content-Type': 'application/json' } });
+}
+
+const stalledCalls = {
+  put: (timeoutMs) => GraphService.putUploadSessionChunk(URL_, { start: 0, bytes: Buffer.from('hello'), total: 20, timeoutMs }),
+  status: (timeoutMs) => GraphService.getBrowserUploadSessionStatus(URL_, { timeoutMs }),
+};
+
+describe.each([['put'], ['status']])('%s: body stalled after headers', (name) => {
+  test.each([[200], [202], [500]])('status %i is rejected within the budget as a no-response error', async (status) => {
+    global.fetch = jest.fn(async (_url, init) => stalledResponse(status, init.signal));
+    const started = Date.now();
+    await expect(stalledCalls[name](30)).rejects.toMatchObject({ serviceName: 'graph', noResponse: true });
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  test('a body that ignores the abort signal is still bounded', async () => {
+    global.fetch = jest.fn(async () => stalledResponse(200, null));
+    await expect(stalledCalls[name](30)).rejects.toMatchObject({ noResponse: true });
+  });
+});
+
+describe('createBrowserUploadSession: body stalled after headers', () => {
+  function svc() {
+    return {
+      getSiteId: jest.fn(async () => 'site'),
+      getDriveId: jest.fn(async () => 'drive'),
+      getAccessToken: jest.fn(async () => 'tok'),
+      buildHeaders: jest.fn(() => ({})),
+    };
+  }
+  test.each([[200], [500]])('status %i is rejected within the budget as a no-response error', async (status) => {
+    jest.resetModules();
+    jest.doMock('../../lib/services/graph/constants.js', () => ({ ...jest.requireActual('../../lib/services/graph/constants.js'), API_TIMEOUT: 30 }));
+    const { ALLOWED_LIBRARIES } = jest.requireActual('../../lib/services/graph/constants.js');
+    const { createBrowserUploadSession } = await import('../../lib/services/graph/upload-session.js');
+    global.fetch = jest.fn(async (_url, init) => stalledResponse(status, init.signal));
+    const started = Date.now();
+    await expect(createBrowserUploadSession(svc(), [...ALLOWED_LIBRARIES][0], 'a/b', 'f.mp4'))
+      .rejects.toMatchObject({ serviceName: 'graph', noResponse: true });
+    expect(Date.now() - started).toBeLessThan(1000);
+    jest.dontMock('../../lib/services/graph/constants.js');
+  });
 });
