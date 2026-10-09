@@ -5,11 +5,16 @@
 **Read this first if resuming mid-build.** /stop will fold this into the full handoff.
 
 - **Stage 2 (paired summaries) build** is on branch `claude/paired-summaries`, worktree `/Users/gallivan/Code/WMKF_Apps-paired-summaries` (node_modules, .env.local and .agents/skills are symlinks into the main checkout). It is based on `claude/summary-publish-presentation-only` (release step 0, `9df47ff92`, worktree `/Users/gallivan/Code/WMKF_Apps-summary-compat`), which was under Codex review; neither is merged. Both are Tier 2 runtime work: owner go-ahead before merge.
-- **Slices** (plan `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md`; each its own commit with scoped tests):
-  1. Migration 075 + manifest + test: **done** (`2c411c6d6`). Not applied anywhere.
-  2. Store: `reserveSummaryDraftRun` (transaction on a dedicated `db.connect()` client like `review-panel-store.js:73-84`, not the pooled `sql` tag; advisory lock; typed conflicts); widen `getLatestSummaryRun`; failed-row "not recorded" insert. The plan's interleaving/rollback tests need real Postgres. No Postgres harness exists for this store, so name that gap; do not fake it.
-  3. Service: write the presentation golden-hash test FIRST, then `SUMMARY_KINDS`, `bindCurrent` filter widening, and parameterize the 14 `TRANSCRIPT_SUMMARY` sites; discussion source read; D4 marker; write-side privacy tests.
-  4. Routes (`kind`, `replaceDraft`). 5. Prompt config + seed script + injection-tagging/budget registrations (the seed is **owner-run, not executed**). 6. Dataverse constant/Wave 16 record/picklist script (**owner-run, not executed**) and consumers. 7. Card (separate commit from service). 8. Docs/Atlas/matrix.
+- **Release step 0 is merged and live**: `82c6cb26d`, Production deployment 6951088672 success (publish claim scoped to presentation drafts). Its worktree is removed.
+- **Slices** (plan `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md`; each its own commit with scoped tests), on `claude/paired-summaries`:
+  1. Migration 075 + test: **done** `2c411c6d6` (not applied anywhere).
+  2. Store `reserveSummaryDraftRun` (transaction, advisory lock, typed conflicts), `recordEmptySummaryRun`, widened `getLatestSummaryRun`: **done** `d5d05f78d`. Named gap: no real-Postgres harness for concurrent reservations.
+  3. Golden presentation identities pinned `e197c0ce4`; 100000010 constant/Wave 16/projection + owner-run picklist script `d9a1d7620`; discussion binding `905497965`; prompt config, paired acknowledgment, budgets, A7 inv 34, owner-run seed script `95bb9f8fe`; `SUMMARY_KINDS` service parameterization, D4 marker, write-side privacy tests (8 mutations each fail) `914a03fc4`.
+  4. Route `kind`/`replaceDraft`: **done** `57193bdfd`.
+  5. Staff consumers (Meeting Tracker DTO, logistics feed, Staff Deliberations inline summary): **done** `cb398fb47`.
+  6. **Next: card** (`RecordingAndTranscriptCard.js`): per-kind summary hook, one paired handler holding `busy` until `Promise.allSettled`, per-kind load keys (discussion GET uses `?kind=discussion`), Summarize again sends `replaceDraft`, `summary_draft_exists` shows a reload message, Not recorded state, discussion block in the Staff discussion group. Until the card ships, a plain Summarize no longer replaces a ready presentation draft (server returns 409).
+  7. Then docs: Atlas (drafts page, requestdocument 100000010, ai prompt), API matrix rows for summary-draft, workflow plan status.
+- **Owner-run, NOT executed:** `scripts/extend-requestdocument-artifacttype-staff-discussion-summary.mjs` (picklist 100000010), `scripts/seed-meeting-staff-discussion-summary-prompt.js` (prompt row), migration 075. Owner reviews prompt wording and paired consent text first.
 - **Production checks V1–V3 passed** (Session 588, read-only): 100000010 and 100000011 absent from the picklist; schema_migrations ends at 074; drafts CHECK is `artifact_type = 100000007`; no discussion prompt row.
 - **Shipped this session:** Pre-Site template v8 (`9e435586c`, Production deployment 6950899994 success).
 - **3b plan** final state `c13b6fe88`: Codex passes resolved; probes 1, 4, 5 recorded; probe 2 (Zoom URL lifetime) was still running (206 at 0/5/15 min).
