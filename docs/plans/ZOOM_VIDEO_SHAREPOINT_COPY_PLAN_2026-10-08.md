@@ -583,6 +583,8 @@ Tier 2: background work, uploads and a migration [VERIFIED via `CAMPAIGN_RELEASE
 5. **Copy automatically.** Recommendation: Import starts both audio and video. Earlier imports get **Copy video**.
 6. **Integrity checks.** Recommendation: in v1, check size, range acks and the signature. Record the quickXorHash but do not compare it.
 7. **Registration actor policy.** Recommendation: `REQUIRED`, with the stored actor of the staff member who chose Import. The alternative is `SCHEDULED_AUTOMATION`, which would add a new writer-gate row.
+**Decided (owner, Session 589, 2026-10-09): decisions 1, 2, 3, 5, 6 and 7 are built as recommended.** The owner also confirmed the build's stopping point: step 0 and the 3b build each on a branch, Claude- and Codex-reviewed, pushed and not merged. Migration 076, Vercel settings, live Zoom/Graph/Dataverse calls and release steps 2–6 stay with the owner. Probe 3 (one read-only Zoom listing call) is owner-run when convenient; the build does not depend on it.
+
 8. **Replacing a staff-uploaded MP4 (from review item 6).** **Decided (owner, Session 588): ask staff to confirm.** When the current Recording winner is a SharePoint MP4, starting a copy (Import, **Copy video** or **Try again**) requires explicit confirmation that it will replace that file. The copy records the winner's slot version at start. Before finalize it aborts with a named code if a newer non-Zoom-link winner has appeared since. The rework must specify this.
 
 ## Contract review (`/contract-reconcile` Mode A, planning pass)
