@@ -619,10 +619,13 @@ materials, recording, transcript, and transcript summary are file-backed
 artifacts. Do not add or repurpose a Dataverse staff-observations Memo: staff
 record observations directly in Word, with native SharePoint version history.
 
-The governed request-relative paths are
-`Site Visit/Applicant Materials/Slides`,
-`Site Visit/Applicant Materials/Other`, `Site Visit/Recording`,
-`Site Visit/Transcript`, and `Site Visit/Transcript Summary`. Stage 1 of the
+The governed request-relative folders are flat, directly under the request
+folder: `Site Visit - Slides`, `Site Visit - Participant Bios`, and
+`Site Visit - Other` for applicant materials
+(`shared/config/siteVisitMaterials.js`; decision M4 in
+`docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md`), `Post Site Visit Materials` for
+the recording MP4 (`lib/services/post-presentation-materials/material-service.js`),
+`Site Visit - Transcript`, and `Site Visit - Transcript Summary`. Stage 1 of the
 summaries and Board sharing plan adds `Site Visit - Presentation Transcript`
 for the presentation-only transcript derivative (artifact type 100000012;
 Production-live 2026-10-05), and `Site Visit - Staff Discussion Transcript`
@@ -718,9 +721,8 @@ Minimum whole-flow invariants:
    another request; or supply a drive, folder, item, or record identifier.
 4. The server resolves the request, Site Visit context, and server-controlled
    SharePoint destination from the validated token. Files land inside the
-   request's governed SharePoint folder under
-   `Site Visit/Applicant Materials/Slides` or
-   `Site Visit/Applicant Materials/Other`.
+   request's governed SharePoint folder under the flat `Site Visit - Slides`,
+   `Site Visit - Participant Bios`, or `Site Visit - Other` folder.
 5. Applicant uploads are limited to **PDF** and **PPTX**. Before persistence,
    the server enforces rate, size, file-count, extension, MIME/magic-byte, and
    malware checks and normalizes the stored filename/path. Large-file support

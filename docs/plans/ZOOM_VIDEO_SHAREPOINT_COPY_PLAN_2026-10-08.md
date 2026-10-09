@@ -406,7 +406,7 @@ Preview cannot exercise this stage. It has no Zoom credentials, and Vercel runs 
 - **Helper extraction:** the session-creation part of `mintMp4Upload` becomes shared, so characterize the browser behavior first.
 - **Symbol fan-out:** the `origin` marker touches every browser intent query.
 
-**Source contradicts other docs (none edited here; the `zoom_recording_imports` items were reconciled in Session 588).**
+**Source contradicts other docs (none edited here; both items below were reconciled in Session 588).**
 - `DATAVERSE_SHAREPOINT_FILE_MODEL.md:624` names `Site Visit/Recording` as the governed path. The code writes MP4s under `Post Site Visit Materials/` (`material-service.js:749`).
 - Three places still call `zoom_recording_imports` unapplied or unmerged:
   - the Atlas index row (`APPLICATION_STATE_ATLAS.md:111`);

@@ -684,8 +684,8 @@ material types, and the applicant files they are authorized to manage. The
 recipient must not select a Dataverse record, SharePoint folder, or destination
 identifier. The server resolves those from the signed request context,
 validates the operation, places the bytes inside the request's governed
-SharePoint folder under `Site Visit/Applicant Materials/Slides` or
-`Site Visit/Applicant Materials/Other`, and registers the artifact and its
+SharePoint folder under the flat `Site Visit - Slides`,
+`Site Visit - Participant Bios`, or `Site Visit - Other` folder, and registers the artifact and its
 provenance in Dataverse.
 
 Applicant-facing uploads are limited to **PDF** and **PPTX** files in the
@@ -1153,8 +1153,8 @@ Owner-decided:
     request, and shared-link identity without claiming PI-versus-liaison
     attribution; applicants do not receive an activity log; and
 36. applicant files land inside the request's governed SharePoint folder under
-    `Site Visit/Applicant Materials/Slides` or
-    `Site Visit/Applicant Materials/Other`;
+    the flat `Site Visit - Slides`, `Site Visit - Participant Bios`, or
+    `Site Visit - Other` folder;
 37. no standalone applicant-upload-link revocation action is needed in the
     minimum product; normal access ends at 60 days and Reissue revokes the
     superseded link;

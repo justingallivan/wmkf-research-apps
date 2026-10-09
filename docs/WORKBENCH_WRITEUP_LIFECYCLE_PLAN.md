@@ -502,11 +502,14 @@ existing artifact choices; do not infer category from filenames alone.
 
 | Artifact type | Governed request-relative folder |
 |---|---|
-| Applicant Slides | `Site Visit/Applicant Materials/Slides` |
-| Other Applicant Materials | `Site Visit/Applicant Materials/Other` |
-| Recording | `Site Visit/Recording` |
-| Transcript | `Site Visit/Transcript` |
-| Transcript Summary | `Site Visit/Transcript Summary` |
+| Applicant Slides | `Site Visit - Slides` |
+| Other Applicant Materials | `Site Visit - Participant Bios` or `Site Visit - Other` |
+| Recording | `Post Site Visit Materials` |
+| Transcript | `Site Visit - Transcript` |
+| Transcript Summary | `Site Visit - Transcript Summary` |
+
+Folders are flat under the request folder, as built (reconciled Session 588;
+`docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` lists the source for each).
 
 Folder strings should become shared server-side constants when the upload
 surface is implemented. Stable Graph site/drive/item identity remains the
