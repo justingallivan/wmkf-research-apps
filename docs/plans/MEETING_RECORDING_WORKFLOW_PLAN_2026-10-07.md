@@ -103,6 +103,8 @@ An import requires a durable, schema-approved operation record with exact source
 
 ### 4. Video splitting and presentation archive
 
+**Superseded in part (owner, Session 590, 2026-10-09):** Stage 4 makes a presentation video only, with no staff-discussion video; staff approve its ending before Board release. Design: `docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md`. UX items 5 and 7 above still apply to transcripts and summaries.
+
 Proposed new module `lib/services/meeting-tracker-recordings/split-service.js`; publication integrates with the existing material model, registry writer and both outside readers. Persist a frozen source-video identity, transcript revision, reviewed boundary, timing transform and immutable output identity before processing. Distinguish video source changes from names-only transcript changes to avoid unnecessary re-encoding without weakening provenance.
 
 Run long video work asynchronously in a durable worker, outside the UI request. The processing venue is **UNKNOWN** pending input sizes/durations, security boundary and runtime/codec feasibility. A read-only marketplace discovery found Mux, but no provider is selected or installed. Prefer existing approved infrastructure if it can handle the workload. A new external processor requires owner approval of data handling and costs. Do not promise deployment on a particular runtime before a representative benchmark.

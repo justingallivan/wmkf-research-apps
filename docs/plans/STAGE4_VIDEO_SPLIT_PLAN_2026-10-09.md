@@ -3,7 +3,7 @@ title: Meeting video split at the presentation end (Stage 4)
 kind: plan
 domain: transcription
 status: draft
-summary: "Design outline for cutting the copied Zoom meeting MP4 at the staff-confirmed presentation end into a Board-eligible presentation video (and, if confirmed, a staff-only discussion video), with same-source proof, a frozen source identity, a durable split job and a processor contract. Venue research runs separately on codex/stage4-video-processing-research. Draft: owner decisions open; nothing built."
+summary: "Design outline for cutting the copied Zoom meeting MP4 at the staff-confirmed presentation end into a Board-eligible presentation video only (no discussion video; owner 2026-10-09), approved by staff before Board release, with same-source proof, a frozen source identity, a durable split job and a processor contract. Venue research runs separately on codex/stage4-video-processing-research. Draft: owner decisions open; nothing built."
 owner: product-engineering
 related:
   - docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md
@@ -19,11 +19,12 @@ related:
 
 ## Owner decisions
 
-**Decided (owner, Session 590, 2026-10-09):** 1 = presentation **and** discussion videos; 2 = cut exactly at `endMs`; 3 = Zoom copy plus Zoom transcript only; 5 = on request. Decisions 4, 6 and 7 remain open. Original recommendations follow for the record.
+**Decided (owner, Session 590, 2026-10-09):** 1 = **presentation video only** (revised; see below); 2 = cut exactly at `endMs`; 3 = Zoom copy plus Zoom transcript only; 5 = on request. Decisions 4, 6 and 7 remain open. Original recommendations follow for the record.
 
 **Decided (owner, Session 590, 2026-10-09), after Codex's first research pass:**
 - **8. Staff review before Board release.** A staff member listens to the presentation video's ending and approves it before the video becomes Board-eligible. Until then outside readers withhold it.
-- **9. Staff access needs no verification.** The full Recording stays available to staff at all times, as today; the review in decision 8 gates only Board release. [ASSUMED reading: the split videos are also visible to staff as soon as they pass the automated checks; confirm.]
+- **9. Staff access needs no verification.** The full Recording stays available to staff at all times, as today; the review in decision 8 gates only Board release. Staff do not need split versions: they were on the call.
+- **1, revised.** Presentation video only. No discussion video is made: staff keep the full Recording until the Stage 5 deadline, when it is deleted and only the presentation video is retained. A discussion file would add a second discussion copy to protect and delete.
 - **6 (venue), status.** Azure availability is pending an IT ticket (Dragonfly) with no quick answer expected. The first benchmark therefore targets Vercel Sandbox, per the research doc's fallback.
 
 1. **Outputs.** Accepted UX items 5 and 7 (`MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md:30-33`) call for a presentation video **and** a staff-discussion video, plus "Not recorded" when nothing follows the boundary. Stage 5 later deletes the discussion video. Recommendation: build the presentation video first; add the discussion video only if staff need a separate discussion file beyond the full Recording, which they already have until the Stage 5 deadline.
@@ -32,7 +33,7 @@ related:
 4. **Source fingerprint.** The copied Recording row has no content hash (`material-service.js:1336-1352` sets version ID, eTag and size only), and `zoom_video_copies.sharepoint_quickxor_hash` is never written. Recommendation: add the quickXorHash write to the Stage 3b worker first, as a small separate change, so the split can freeze a content fingerprint of its source.
 5. **Automatic or on request.** Options: split automatically once a boundary is confirmed and the video is copied, or only when staff click **Create presentation video**. Recommendation: on request in v1, because each run costs processing time or money.
 6. **Venue.** Pending Codex research. Owner approval is needed if the recommended venue sends applicant or staff-discussion bytes to an outside processor.
-7. **Dataverse vocabulary.** No artifact-type values exist for a presentation video or a discussion video (`shared/config/requestDocument.js` ends at 100000013). The owner adds the picklist value(s) in Dataverse first, as with 100000010 in Stage 2; the code never guesses a value.
+7. **Dataverse vocabulary.** No artifact-type value exists for a presentation video (`shared/config/requestDocument.js` ends at 100000013). The owner adds the picklist value in Dataverse first, as with 100000010 in Stage 2; the code never guesses a value.
 
 ## What exists [VERIFIED 2026-10-09 via source reads]
 
@@ -70,14 +71,13 @@ Any failure shows a named reason and no split.
 
 ## Outside readers [PLANNED]
 
-- Add the presentation-video type to the explicit allowlists in `presentation-page-service.js` and `briefing-page-service.js`, behind `bindPresentationVideo`. This is a deliberate reviewed edit.
-- A discussion-video type, if built, never appears in either allowlist; injected discussion rows must be excluded at listing and open (tests).
+- Add the presentation-video type to the explicit allowlists in `presentation-page-service.js` and `briefing-page-service.js`, behind `bindPresentationVideo` and the staff approval (decision 8). This is a deliberate reviewed edit.
+- Tests inject the full Recording and an unapproved or stale presentation video and prove both are excluded at listing and open.
 
-## Outputs and cut [PLANNED, decisions 1-2]
+## Output and cut [PLANNED, decisions 1-2]
 
-- **Presentation video:** source time 0 to `endMs` (mapped onto the MP4 timeline). Board-eligible once bound and verified.
-- **Staff-discussion video:** `endMs` to the end of the source, staff-only, deleted at the Stage 5 deadline. When the verified source shows nothing after `endMs`, the card shows **Not recorded** and no discussion video is made (UX plan `:35`).
-- The two outputs partition the source at the same cut, mirroring `presentationContent` / `staffDiscussionContent`. One failing does not discard the other; each shows its own state.
+- **Presentation video only:** source time 0 to the cut (`endMs` mapped onto the MP4 timeline, see "Technique and verification"). Board-eligible once bound, verified and approved by staff (decision 8).
+- No discussion video. This supersedes accepted UX items 5 and 7 of the October 7 workflow plan for video; the transcript side still produces both halves.
 
 ## Technique and verification [PLANNED, from Codex research]
 
@@ -89,7 +89,7 @@ See `docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md` (branch `codex/st
 
 ## Card [PLANNED]
 
-The card's "Results" step gains a Video line under **Presentation** and under **Staff discussion**: status (not started, working, ready for review, approved for the Board, stale, not recorded, failed with reason) and Open for staff. The presentation video adds **Check the ending and approve** (decision 8). One **Create videos** action (decision 5) starts both after the boundary is confirmed and the source is eligible (decision 3).
+The card's "Results" step gains a Video line under **Presentation** only: status (not started, working, ready for review, approved for the Board, stale, failed with reason) and Open for staff. The presentation video adds **Check the ending and approve** (decision 8). One **Create presentation video** action (decision 5) starts it after the boundary is confirmed and the source is eligible (decision 3).
 
 ## Stage 5 hooks [PLANNED]
 
