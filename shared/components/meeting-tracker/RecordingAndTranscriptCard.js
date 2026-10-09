@@ -1930,6 +1930,8 @@ const VIDEO_START_MESSAGES = {
 function videoFailureMessage(code) {
   const value = String(code || '');
   if (value === 'zoom_video_recording_replaced') return 'A newer recording was saved while the video was copying, so the copy was not used.';
+  if (value === 'zoom_video_receipt_conflict') return 'This video was already copied for this request, so this copy was not used.';
+  if (value === 'request_document_actor_unavailable') return 'The staff account that started this copy could not be used. Ask an administrator to check it.';
   if (value === 'zoom_recording_changed' || value === 'zoom_video_host_not_approved') return 'The recording in Zoom changed or is no longer available, so the copy stopped.';
   if (/^zoom_(download_denied|download_invalid|range_unsupported|not_found|auth_failed|unavailable|rate_limited)$/.test(value)) return 'Zoom would not provide the video. Try again in a few minutes.';
   if (/^zoom_video_(session|upload|cancel|registration|receipt|path)/.test(value)) return 'The video could not be saved to SharePoint. Try again.';

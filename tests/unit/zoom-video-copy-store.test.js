@@ -195,6 +195,8 @@ test('N5a lists finalized-intent rows that are not copied and have no live copy 
   await store.listZoomVideoCopiesWithFinalizedIntent({ limit: 3 });
   expect(calls[0].text).toContain("c.state IN ('queued', 'copying', 'registering', 'failed') AND u.state = 'finalized'");
   expect(calls[0].text).toContain('(c.lease_token IS NULL OR c.lease_expires_at <= NOW())');
+  // A receipt conflict is permanent and never re-listed.
+  expect(calls[0].text).toContain("AND NOT (c.state = 'failed' AND c.failure_code = 'zoom_video_receipt_conflict')");
   expect(calls[0].params).toEqual([3]);
 });
 
@@ -222,7 +224,10 @@ test('the failed-due selector locks failed rows, takes no copy lease, and advanc
   expect(text).toContain("u.state NOT IN ('finalized', 'abandoned')");
   expect(text).toContain("c.updated_at > NOW() - INTERVAL '30 days'");
   expect(text).toContain('FOR UPDATE OF c SKIP LOCKED');
-  expect(text).toContain("SET next_attempt_at = NOW() + $2::int * INTERVAL '1 second' FROM due WHERE c.id = due.id AND c.state = 'failed'");
+  // The recheck interval grows with the failure's age.
+  expect(text).toContain("SET next_attempt_at = NOW() + GREATEST($2::int * INTERVAL '1 second', CASE");
+  expect(text).toContain("WHEN c.updated_at > NOW() - INTERVAL '1 day' THEN INTERVAL '1 hour'");
+  expect(text).toContain("ELSE INTERVAL '6 hours' END) FROM due WHERE c.id = due.id AND c.state = 'failed'");
   expect(text).not.toContain('lease_token');
   expect(params).toEqual([2, 900, null]);
 });

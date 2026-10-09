@@ -678,6 +678,17 @@ A read-only build map (Sonnet reconnaissance, Session 589) found the gaps below.
     - A cancelled copy is retried from the picker.
     - **Keep current file** on Import keeps the file, copies no video, and still imports the audio (commit `daee437c2`).
 
+**Rulings after S6 (registration, recovery, cron).**
+24. **Receipt conflict is permanent.** N5a never re-lists a `failed` copy with `zoom_video_receipt_conflict`; another copied row owns the file. The card says the video was already copied.
+25. **Failed-copy recheck cost.** The due-batch interval grows with the failure's age: 10 min for the first hour, hourly to one day, then every 6 h until the 30-day backstop. That is about 150 Dataverse reads per row instead of about 4,300. Verified with the real-Postgres proof (16/16).
+26. **Accepted S6 choices.**
+    - The decision-8 code is `zoom_video_recording_replaced`, as the plan and card already use; `zoom_video_winner_changed` existed only in an S2 test stub.
+    - Finalize runs on the tick after bytes complete (about one minute later), not chained into the pump tick.
+    - Proven-absent registration after a non-staff abandonment keeps a `zoom_*` source code, otherwise `zoom_video_intent_abandoned`.
+    - Staff-cancelled abandonment with a candidate is an invalid tuple and fails closed.
+    - Reconcile and inspection errors are logged and never block the tick.
+    - The card gives `request_document_actor_unavailable` an administrator message instead of "Try again".
+
 ## Contract review (`/contract-reconcile` Mode A, planning pass)
 
 **Historical record.** Retained as requested; current protocol is in the revised sections above.
