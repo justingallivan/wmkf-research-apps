@@ -2796,7 +2796,7 @@ function TranscriptWorkflow({ m, t, z, transcriptInputRef }) {
       </Step>
 
       <Step number={3} title="Results" state={step3State} testId="step-results">
-        {step3State === 'waiting' && <p className="mt-2 text-sm text-gray-700">The presentation and staff discussion transcripts and the summary appear here after step 2.</p>}
+        {step3State === 'waiting' && <p className="mt-2 text-sm text-gray-700">The presentation and staff discussion transcripts and their summaries appear here after step 2.</p>}
         {showProducts && <>
         {boundaryState === 'bound' && <PairedSummarizeForm t={t} />}
         <div className="mt-4">
