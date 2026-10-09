@@ -55,7 +55,16 @@ Widen the service's own `bindCurrent` filter (`:133-134`) to include 100000013 a
 ### D2. Route contract: kind on POST and GET only
 
 - **POST** accepts the existing three-key body (meaning `presentation`) plus two optional keys: `kind ∈ {'presentation','discussion'}` and `replaceDraft`, which is `null` or `{draftId: <GUID>, expectedVersion: <integer>}`. Any other value or key is rejected with 400.
-- **Server-side draft protection (owner decision 8).** A `ready` draft of the kind is superseded only when `replaceDraft` names its exact id and version. Change `beginSummaryDraft`'s supersede `UPDATE` so a `ready` row matches only `id = replaceDraft.draftId AND version = replaceDraft.expectedVersion`; the `generating`/`publishing` abandonment clauses are unchanged. An unmatched `ready` row stays, the `INSERT` hits the partial unique index (which covers `ready`, `070:61-63`), and the service returns 409 `summary_draft_exists` with that draft's id and version. This happens before any provider call. The paired action always sends `replaceDraft: null`; each kind's **Summarize again** sends the draft it is showing. A tab holding an old version gets 409 and must reload. This also changes today's presentation behavior: an old tab without `replaceDraft` can no longer discard a ready draft.
+- **Server-side draft protection (owner decision 8).** Replace `beginSummaryDraft`'s two statements (supersede `UPDATE`, then `INSERT … ON CONFLICT DO NOTHING`, `summary-draft-store.js:27-52`) with one store operation, `reserveSummaryDraftRun`, that runs in a single transaction. It follows the `withReviewPanelTransaction` pattern (`lib/services/review-panel-store.js:73-84`).
+  1. Take `pg_advisory_xact_lock` keyed on request id and artifact type, then read the active row (`generating`, `ready` or `publishing`) of that type.
+  2. Classify it:
+     - **No active row,** or an abandoned `generating`/`publishing` row (the existing 360 s / 180 s rules): supersede the abandoned row and insert the new `generating` row.
+     - **`ready` row whose id and version equal `replaceDraft`:** supersede it (text cleared) and insert.
+     - **`ready` row otherwise:** return the typed conflict `summary_draft_exists` with that draft's id and version.
+     - **Live `generating` or `publishing` row:** return `summary_generation_in_progress`.
+  3. Commit. Any error rolls back, so an edited draft's text survives a failed insert.
+
+  The partial unique index (`070:61-63`) stays as the backstop. The service maps the typed result to 409s before any provider call. The paired action always sends `replaceDraft: null`, and each kind's **Summarize again** sends the draft it is showing. A tab holding an old version gets 409 and must reload. This also changes today's presentation behavior: an old tab without `replaceDraft` can no longer discard a ready draft.
 - **GET** accepts `?kind=`. If it is absent, the kind is `presentation` and the response is unchanged. Any other value, including an array, is 400. This is new code: today `validBody` returns `true` for GET (`summary-draft.js:17`). The discussion response has the same shape plus `kind`, and its `transcriptSummary` key holds that kind's published state. `slidesChangedSinceSummary` is `null` for discussion.
 - **PATCH, DELETE and publish** do not change their bodies. The server takes the kind from the stored row's `artifact_type`, never from the client. A row whose type is not in `SUMMARY_KINDS` fails closed with 409.
 - No new route. The guards, body caps and `maxDuration` stay as they are, so `check:route-lifecycle-auth` and the route count are unaffected.
@@ -74,8 +83,8 @@ The manifest carries no utterance count or last-utterance time, so absence canno
 
 **Decided (owner decision 3, Session 588): a durable marker with no schema change.** On a discussion POST only:
 1. Export and call `loadVerifiedSource` (`presentation-transcript-service.js:129-154`) and test `staffDiscussionContent(source.content, endMs).utterances.length === 0`.
-2. If it is empty, record the run with `beginSummaryDraft` (consent metadata included) and immediately mark it `failed` with `failure_code = 'staff_discussion_not_recorded'`. There is no provider call. Respond 422 `staff_discussion_not_recorded`.
-3. GET already returns the newest run as `lastFailure` (`transcript-summary-service.js:288`). When that run's `source_revision_id` and `presentation_end_ms` match the current boundary, the card shows **Not recorded** and no Summarize action for discussion. A later boundary or revision change makes the marker stale, and Summarize returns.
+2. If it is empty, insert one row directly in state `failed` with `failure_code = 'staff_discussion_not_recorded'`, consent metadata, `source_revision_id` and `presentation_end_ms`. There is no provider call. A `failed` row is not in the active unique index, so it never conflicts with or supersedes a draft. Respond 422 `staff_discussion_not_recorded`.
+3. **Read contract (fixed after Codex pass 2).** Today `getLatestSummaryRun` selects only `id, state, failure_code, created_at, updated_at` (`summary-draft-store.js:109-115`), and GET reduces `lastFailure` to `{code, at}` (`transcript-summary-service.js:288`) [VERIFIED, Session 588]. Widen the projection to include `source_revision_id` and `presentation_end_ms`. The discussion GET computes `discussionNotRecorded` server-side: true only when the newest discussion run is that marker and both fields equal the current boundary. The card shows **Not recorded**, with no discussion Summarize action, only when that field is true. A boundary or revision change makes it false, and Summarize returns. Maintenance expiry touches only active states (`summary-draft-store.js:215-220`), so the marker survives it.
 
 `failure_code` is free text, so no migration change is needed [agent-reported, Session 588 review]. The source read happens before any row exists, so concurrent discussion clicks each pay one source read but no provider charge.
 
@@ -177,7 +186,7 @@ ALTER TABLE meeting_transcript_summary_drafts
 
 - **Two kinds in flight:** separate function invocations, separate rows; the partial unique index is per `(request_id, artifact_type)` (070:61-63). One kind timing out cannot fail the other.
 - **Double click or second tab:** the second POST of a kind gets 409 `summary_generation_in_progress` from `beginSummaryDraft` before any provider call (`transcript-summary-service.js:222-229`; `summary-draft-store.js:49`). The paired lock also prevents it in the UI.
-- **Out-of-date tab after the other tab's draft is ready:** today the new run would supersede the ready draft and discard its edits (`summary-draft-store.js:27-36`). With D2's `replaceDraft` rule the server returns 409 `summary_draft_exists` and makes no provider call.
+- **Out-of-date tab after the other tab's draft is ready:** today the new run would supersede the ready draft and discard its edits (`summary-draft-store.js:27-36`). With D2's transactional reservation the server returns 409 `summary_draft_exists` and makes no provider call.
 - **One kind failing:** that row becomes `failed` with `failure_code` and keeps its consent metadata. The other kind is unaffected. A retry creates a new row and supersedes only same-kind rows.
 - **Edits and new runs:** a `ready` draft is replaced only by a POST whose `replaceDraft` names its id and current version, which only that kind's **Summarize again** sends. The paired button also skips kinds with a current draft or published summary (owner decision 2).
 - **Version conflicts:** PATCH, DELETE and the publish claim use `expectedVersion` per row, unchanged.
@@ -195,13 +204,16 @@ ALTER TABLE meeting_transcript_summary_drafts
 
 1. **Route:** the three-key POST still means presentation. `kind: 'board'`, an extra key and a non-string `kind` are each 400. GET without `kind` matches today's response exactly. Publish ignores any client kind (an extra key is 400).
 2. **Presentation unchanged:** golden generation key, fingerprint, folder and filename for a fixed presentation draft. The existing `transcript-summary-service` and card suites stay green unmodified, except where the Summarize form moves.
-3. **Discussion create:** the `executePrompt` arguments carry the discussion text only (no slides variable) plus both retention flags. Missing or stale discussion transcript gives 409 with no row. Changed bytes or eTag give 409. The `not_recorded` path gives 422 with no `beginSummaryDraft` and no `executePrompt` call. Mutation: drop the `utterances.length` check and the test must see a provider call.
+3. **Discussion create:** the `executePrompt` arguments carry the discussion text only (no slides variable) plus both retention flags. Missing or stale discussion transcript gives 409 with no row. Changed bytes or eTag give 409. The `not_recorded` path is covered by item 11. Mutation: drop the `utterances.length` check and the test must see a provider call.
 4. **Draft protection (D2):**
    - With a `ready`, edited draft, a POST with `replaceDraft: null` returns 409 `summary_draft_exists`, makes no provider call, and leaves the text and version unchanged. Run this for both kinds and for the old three-key body.
    - A POST naming the draft at an older version is also 409.
    - Two tabs: tab A's draft becomes ready and is edited, then tab B's paired POST arrives. Tab A's edits survive.
    - A POST naming the exact id and version supersedes it.
    - Mutation: restore the unconditional `state = 'ready'` clause and the stale-tab test must fail.
+   - Interleaving: two reservations for the same request and type run concurrently; exactly one inserts and the other gets a typed conflict naming the winner.
+   - Insert failure: force the insert to throw after the supersede; the transaction rolls back and the edited draft's text and version survive.
+   - A live `generating` blocker returns `summary_generation_in_progress`, not `summary_draft_exists`.
 5. **Independence:** with a presentation draft `ready` and edited, a discussion run or failure leaves its text and version unchanged. A discussion failure followed by a retry leaves one `failed` row and one `ready` row.
 6. **Stale:** for each kind, a boundary move after drafting gives `draftMatchesTranscript: false` and publish 409. After publishing, a boundary move makes `bindStaffDiscussionSummary` report stale.
 7. **Publish discipline:** the existing claim, registration and yield tests are parameterized over both kinds, not duplicated by hand.
@@ -214,7 +226,7 @@ ALTER TABLE meeting_transcript_summary_drafts
 
    An end-to-end case passes the resulting rows to `buildPresentationContext` and `buildBriefingContext` and finds no discussion member. Mutation: revert any one of the 14 sites to `TRANSCRIPT_SUMMARY` and a test must fail.
 10. **Service filter:** a discussion POST against a bound 100000013 row reaches the provider stub. Mutation: remove 100000013 from the `bindCurrent` filter and it must fail.
-11. **Not recorded:** an empty discussion half produces one `failed` row with `staff_discussion_not_recorded` and consent metadata, plus a 422, with no `executePrompt` call. GET then reports it as `lastFailure`.
+11. **Not recorded:** an empty discussion half produces one `failed` row with `staff_discussion_not_recorded`, consent metadata and the boundary fields, plus a 422, with no `executePrompt` call and no change to any active row. GET then reports `discussionNotRecorded: true`; after a reload it is still true; after a boundary or revision change it is false; after maintenance expiry runs it is still true.
 12. **Migration:** the 075 test pins the CHECK text and its manifest order after 074.
 13. **Card:**
    - One click sends exactly two POSTs, and only one when a current draft exists.
@@ -230,6 +242,7 @@ ALTER TABLE meeting_transcript_summary_drafts
 
 ## Release sequence (Tier 2: migration, Dataverse write, LLM)
 
+0. **Compatibility release first (fixes Codex pass 2's rollback leak).** Before Stage 2 merges, ship a small PR that limits `claimSummaryDraftForPublish` (`summary-draft-store.js:151-164`, which today has no `artifact_type` predicate) and the publish service to `artifact_type = 100000007`. Without it, reverting Stage 2 restores a publisher that would claim a still-open discussion draft and register its text as a Board-visible presentation summary (`transcript-summary-service.js:369-380,416`) [VERIFIED, Session 588]. This release is the oldest permitted rollback target. A version-skew test publishes a retained discussion draft against it and expects a refusal.
 1. Build on a short branch off `main` (proposed `claude/paired-summaries`). Run the tests and gates. Then a Claude review and an ordinary Codex adversarial review, with no metered products.
 2. The owner authorizes and runs the read-only checks V1–V3 below.
 3. The owner runs the picklist script: dry run, then `--execute` and re-read. This only adds a value. Until the merge, the Wave 16 preflight (`preflight-request-document-table.mjs:209-219`) reports 100000010 as an "Unexpected option". That is expected in this window. Running code ignores unknown types: the projection skips any type outside `POST_PRESENTATION_ARTIFACT_TYPES` [VERIFIED via `lib/services/post-presentation-materials/material-model.js:155-158`].
@@ -244,7 +257,7 @@ ALTER TABLE meeting_transcript_summary_drafts
    - Check that the Board presentation link and the briefing link show the presentation summary but no discussion summary.
    - Opening the discussion row id on the briefing link returns 404.
 
-**Rollback:** revert the merge. The old code projects no 100000010 rows, and the schema stays expanded.
+**Rollback:** revert the Stage 2 merge, but never past the compatibility release in step 0. The old code projects no 100000010 rows, its publisher refuses discussion drafts, and the schema stays expanded.
 
 ## Pre-implementation verification (owner-authorized, read-only)
 
@@ -295,3 +308,10 @@ Claims are marked [VERIFIED via file:line] (the Session 588 lead re-read the sou
 6. **Consistency:** pick "current draft" or "current draft or published summary" for the skip rule (D9 vs decision 2). The discussion GET returns the paired acknowledgment, not the presentation one (`:286`). Note the Wave 16 preflight "Unexpected option" window between picklist insert and merge.
 
 **Owner decisions after review:** 1, 2 (once item 6 fixes the wording), 4, 5, 6 and 7 agree with the recommendation. **Decision 3 refined:** a `failed` run with `failure_code='staff_discussion_not_recorded'` and no provider call is a durable "Not recorded" marker with no schema change (`failure_code` is free text; GET already returns `lastFailure`) [agent-reported]. This contradicts the plan's statement that a marker would need schema work. **New decision:** item 3 scope.
+
+### Codex pass 2 (Session 588, after the revision)
+
+Codex (`gpt-6-astra`) reviewed the revision and returned needs-attention with three findings. The Session 588 lead re-read the source for each [VERIFIED], and all three are folded into the body.
+1. **HIGH: rollback could publish discussion text as a Board-visible summary.** The pre-Stage-2 publish claim has no type predicate. Fixed by release step 0, a compatibility release that becomes the oldest rollback target.
+2. **MEDIUM: the "Not recorded" marker had no read contract.** The latest-run query and GET drop the boundary fields. Fixed in D4 step 3 with a server-computed `discussionNotRecorded`.
+3. **MEDIUM: replacement was not atomic, and conflicts were not typed.** Fixed in D2 with a transactional `reserveSummaryDraftRun` that returns a typed conflict, plus interleaving and rollback tests.
