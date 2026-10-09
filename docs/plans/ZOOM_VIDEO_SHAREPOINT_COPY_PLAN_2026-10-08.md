@@ -636,14 +636,14 @@ A read-only build map (Sonnet reconnaissance, Session 589) found the gaps below.
      - a failed-copy due-batch selector
    - The selector advances `next_attempt_at` with a conditional UPDATE keyed on `state = 'failed'` and the previously read `next_attempt_at`. It takes no copy lease, because `terminal_unleased` forbids one. The I4 lease sits on the intent row.
 6. **Replay before confirmation (gap 14).** The copied-file replay lookup for the same request and file runs before start step 4. Repeating Import on an already copied file replays and asks nothing.
-7. **Unversioned winner (gap 15).** If the current Recording winner is a SharePoint MP4 without a positive slot version, start refuses with 409 `zoom_video_winner_unversioned` and copies nothing. Conservative and rare; staff can still upload manually.
+7. **Unversioned winner (gap 15).** If the current Recording winner is a SharePoint MP4 without a positive slot version, start refuses with 409 `zoom_video_winner_unversioned` and copies nothing. Conservative and rare; staff can still upload manually. **Confirmed (owner, Session 590, 2026-10-09).** Production census (`scripts/probe-recording-slot-versions.mjs`, owner-run): 25 Recording rows, 14 requests with a SharePoint winner, 0 unversioned.
 8. **Unlisted failure codes (gap 16).**
    - `post_presentation_site_visit_required`, `post_presentation_site_visit_ambiguous` and `post_presentation_cycle_required` pause, like the kill switch, and do not fail.
    - A Dataverse or Graph error that is not a `ServiceHttpError`, or has HTTP status 500 or above, or is a timeout, is retryable under `registration_attempts` (cap 5, then `failed` `zoom_video_registration_failed`).
    - Any other code is terminal `failed` with the sanitized code.
 8a. **Post-final-chunk absence (gap 17).** If `resolveStableMp4Path` returns `absent` after the final PUT, retry next tick and count it under `uncertain_checks` (cap 3, then `failed` `zoom_video_upload_uncertain`). Log each tick's post-chunk `expirationDateTime` in the structured log line, with no new column; this answers probe 4's open question.
 9. **3a reuse (gap 18).** Export or generalize `listApprovedOccurrences`, `pickFiles` and the filename helper from `import-service.js` rather than copying them. The `zoom-recordings` GET gains additive per-meeting video fields: eligible file, size, `tooLarge`, `segmented`, existing copy state. Update its API matrix row and tests.
-10. **Import starts both (gap 19), conservative; owner to confirm.**
+10. **Import starts both (gap 19). Confirmed (owner, Session 590, 2026-10-09).**
     - The card shows the replace confirmation first, when the decision-8 condition holds, then sends the existing audio import and the video start as two independent POSTs. Each shows its own result; neither failure undoes the other.
     - The video start does not require `MEETING_TRACKER_TRANSCRIPTION_ACCESS`; it requires `POST_PRESENTATION_MATERIALS_ACCESS`, Zoom config and `ZOOM_VIDEO_COPY_ACCESS`.
     - When transcription is unavailable or the meeting has no audio, the card still offers **Copy video** on its own.
