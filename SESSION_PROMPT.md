@@ -1,25 +1,99 @@
-# Session 588 Prompt: resume Proposal Ranking acceptance; review Stage 2/3b meeting-recording plans
+# Session 589 Prompt: build the Stage 2 card (paired summaries), then docs; Proposal Ranking acceptance pending
 
-## Session 588 in progress — Stage 2 build started (Claude, 2026-10-08/09)
+## Session 588 close — Stage 2 build, 3b plan finished, Pre-Site template v8 (Claude, main, 2026-10-08/09 PT)
 
-**Read this first if resuming mid-build.** /stop will fold this into the full handoff.
+### What Was Completed
 
-- **Stage 2 (paired summaries) build** is on branch `claude/paired-summaries`, worktree `/Users/gallivan/Code/WMKF_Apps-paired-summaries` (node_modules, .env.local and .agents/skills are symlinks into the main checkout). It is based on `claude/summary-publish-presentation-only` (release step 0, `9df47ff92`, worktree `/Users/gallivan/Code/WMKF_Apps-summary-compat`), which was under Codex review; neither is merged. Both are Tier 2 runtime work: owner go-ahead before merge.
-- **Release step 0 is merged and live**: `82c6cb26d`, Production deployment 6951088672 success (publish claim scoped to presentation drafts). Its worktree is removed.
-- **Slices** (plan `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md`; each its own commit with scoped tests), on `claude/paired-summaries`:
-  1. Migration 075 + test: **done** `2c411c6d6` (not applied anywhere).
-  2. Store `reserveSummaryDraftRun` (transaction, advisory lock, typed conflicts), `recordEmptySummaryRun`, widened `getLatestSummaryRun`: **done** `d5d05f78d`. Named gap: no real-Postgres harness for concurrent reservations.
-  3. Golden presentation identities pinned `e197c0ce4`; 100000010 constant/Wave 16/projection + owner-run picklist script `d9a1d7620`; discussion binding `905497965`; prompt config, paired acknowledgment, budgets, A7 inv 34, owner-run seed script `95bb9f8fe`; `SUMMARY_KINDS` service parameterization, D4 marker, write-side privacy tests (8 mutations each fail) `914a03fc4`.
-  4. Route `kind`/`replaceDraft`: **done** `57193bdfd`.
-  5. Staff consumers (Meeting Tracker DTO, logistics feed, Staff Deliberations inline summary): **done** `cb398fb47`.
-  6. **Next: card** (`RecordingAndTranscriptCard.js`): per-kind summary hook, one paired handler holding `busy` until `Promise.allSettled`, per-kind load keys (discussion GET uses `?kind=discussion`), Summarize again sends `replaceDraft`, `summary_draft_exists` shows a reload message, Not recorded state, discussion block in the Staff discussion group. Until the card ships, a plain Summarize no longer replaces a ready presentation draft (server returns 409).
-  7. Then docs: Atlas (drafts page, requestdocument 100000010, ai prompt), API matrix rows for summary-draft, workflow plan status.
-- **Owner-run, NOT executed:** `scripts/extend-requestdocument-artifacttype-staff-discussion-summary.mjs` (picklist 100000010), `scripts/seed-meeting-staff-discussion-summary-prompt.js` (prompt row), migration 075. Owner reviews prompt wording and paired consent text first.
-- **Production checks V1–V3 passed** (Session 588, read-only): 100000010 and 100000011 absent from the picklist; schema_migrations ends at 074; drafts CHECK is `artifact_type = 100000007`; no discussion prompt row.
-- **Shipped this session:** Pre-Site template v8 (`9e435586c`, Production deployment 6950899994 success).
-- **3b plan** final state `c13b6fe88`: Codex passes resolved; probes 1, 4, 5 recorded; probe 2 (Zoom URL lifetime) was still running (206 at 0/5/15 min).
-- **Blocked by auto-mode classifier, owner to handle:** Proposal Ranking cleanup (cancel old trial, restore Beth).
+1. **Pre-Site Visit template v8 is live in Production** (merge `9e435586c`; deployment 6950899994 success).
+   - Codex made the owner's edits on `codex/presite-template-fixes` (`9e44ad9ae` v7, `b7ec914aa` v8): the "Phase II Review" title line is removed, the page number sits beside the institution on pages 2+, there is a right-aligned `MR: Request #…` footer, and 12 pt space follows city/state.
+   - The renderer points at v8 with render-contract 9; `PRE_SITE_VISIT_CONTRACT.templateVersion` is `'9'`.
+   - Claude reviewed it: 149 tests pass, footer placeholders are filled (the renderer handles header and footer parts), and the docx has no tracked changes or comments. Catalog line fixed (`5266f30e7`). The worktree and local branch are removed.
+2. **Paired summaries release step 0 is live** (merge `82c6cb26d`; deployment 6951088672 success). The summary publish claim matches `artifact_type`, and the publisher refuses any other kind (`summary_draft_kind_unsupported`). Codex approved it. It is the oldest permitted rollback target for Stage 2.
+3. **Stage 2 backend is built on `claude/paired-summaries`** (worktree `/Users/gallivan/Code/WMKF_Apps-paired-summaries`; its `node_modules`, `.env.local` and `.agents/skills` are symlinks into the main checkout). It is pushed and NOT merged:
+   - `2c411c6d6` migration 075
+   - `d5d05f78d` transactional `reserveSummaryDraftRun` (advisory lock, typed conflicts), `recordEmptySummaryRun`, widened `getLatestSummaryRun`
+   - `e197c0ce4` golden presentation publish identities
+   - `d9a1d7620` artifact type 100000010 (config, Wave 16, staff projection) plus the owner-run picklist script
+   - `905497965` discussion summary binding
+   - `95bb9f8fe` discussion prompt config, paired acknowledgment, budgets, A7 inv 34, owner-run seed script
+   - `914a03fc4` `SUMMARY_KINDS` service parameterization, the D4 marker and write-side privacy tests (8 mutations each fail a test)
+   - `57193bdfd` route `kind`/`replaceDraft`
+   - `cb398fb47` staff consumers (Meeting Tracker DTO, Workbench logistics feed, Staff Deliberations inline discussion summary)
 
+   **Codex backend review:** one medium finding, the known gap. The current card's "Replace draft with a new summary" sends no `replaceDraft`, so it always gets 409. The card slice must fix this before any merge. Codex found no outside-surface leak.
+4. **Stage 2 plan** reviewed, revised and re-reviewed (`17fd86ac2`, `9d3651b2a`, `5665b406d`). Owner decisions are recorded in the plan.
+5. **Stage 3b plan** reviewed, reworked by a Claude agent (`99b923010`), fixed by Codex (`eca27698b`) and given a final Codex fix (`bfd663160`). Owner decisions: `ZOOM_VIDEO_COPY_ACCESS` kill switch; confirm before a copy replaces a staff-uploaded MP4; one migration 076. The distribution-email question is closed because email material links were retired 2026-09-10. All five probes are recorded:
+   - Range supported (`30fab00c9`)
+   - link lifetime: 206 through 30 min, 403 at 60 min (`8c4765d5f`)
+   - Graph session idles out at 15 min; recordings carry quickXorHash only (`c13b6fe88`)
+   - mvhd within the first MiB (`eca27698b`)
+   - variants: a partial sample only
+
+   The 3b build has not started.
+6. **Docs reconciled:** Stage 3a recorded as merged and applied; 100000010 stage numbering fixed (`5e515c253`); Site Visit SharePoint folder names now match the code (`18dfc69c3`).
+7. **Production checks V1–V3 for Stage 2 passed**, read-only:
+   - V1: 100000010 and 100000011 are absent from the `wmkf_artifacttype` picklist.
+   - V2: `schema_migrations` ends at 074, and the drafts CHECK is `artifact_type = 100000007`.
+   - V3: no `meeting-transcript.staff-discussion-summary` prompt row exists.
+
+### Next Items
+
+#### Verified Open
+
+1. **Stage 2 card slice.** File: `shared/components/meeting-tracker/RecordingAndTranscriptCard.js`.
+   - Evidence: the Codex backend review and the plan (D9, test plan item 13). Summary hook and handlers are at `:1593-1823`; `SummaryBlock` is at `:2310`; the step 3 groups are at `:2669-2683`.
+   - First, Codex's fix: "Summarize again" / "Replace draft" sends `replaceDraft: {draftId, expectedVersion}` of the displayed draft, and a 409 `summary_draft_exists` reloads the summary.
+   - Then build:
+     - a per-kind summary hook used twice; the discussion GET is `?kind=discussion`
+     - one paired handler that holds `busy='summarize'` until `Promise.allSettled`
+     - per-kind load keys (discussion key uses `staffDiscussionTranscript` and `staffDiscussionSummary` from the collection)
+     - the paired checkbox using `PAIRED_SUMMARY_ACKNOWLEDGMENT`
+     - "Not recorded" when `discussionNotRecorded`
+     - a `DiscussionSummaryBlock` in the Staff discussion group
+   - Keep UX and feature changes in separate commits. Then a Codex review.
+2. **Stage 2 docs slice.** Atlas pages: `postgres-meeting-transcript-summary-drafts.md`, `dataverse-wmkf-requestdocument.md` (100000010 contract) and `dataverse-wmkf-ai-run-and-prompt.md`; the Atlas index row. The API matrix summary-draft rows (`kind`, `replaceDraft`, new codes). The workflow plan's Stage 2 status. Note the deviation: responses gain an additive `kind`.
+3. **Optional test from PR #470:** provider DELETE rejected, cleanup retries, slot freed. Not written.
+
+#### Owner Decision Needed
+
+1. **Before Stage 2 can ship (all owner-run, none executed):**
+   - Review the prompt wording (`shared/config/prompts/meeting-staff-discussion-summary.js` on the branch) and the paired consent text (`shared/config/transcriptSummary.js`).
+   - Then run `scripts/extend-requestdocument-artifacttype-staff-discussion-summary.mjs` (dry run, then `--execute`), apply migration 075 with `node scripts/apply-migrations.js`, run `scripts/seed-meeting-staff-discussion-summary-prompt.js --dry-run`, then `--execute`, and decide the merge.
+   - Release order is in the plan's "Release sequence".
+2. **Stage 3b build start.** The plan is final (`docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md`); release step 0 (browser isolation) ships first.
+3. **Proposal Ranking:** PR #463 review/merge/promotion and the colleague Production dry run were set aside by the owner this session.
+
+#### Verify Before Acting
+
+1. **Proposal Ranking Production cleanup:** cancel the old unpublished trial and restore Beth as default facilitator.
+   - The owner authorized it this session, but the Claude Code auto-mode classifier blocked the delegated agent ("Modify Shared Resources"). Nothing ran.
+   - Inspect current state first. The owner may do it in the admin UI or add a permission rule. See the ranking section below.
+2. **Production-read probes** from this session are classifier-blocked when Claude runs them. The owner ran probe 4 manually. Its script was scratch and is not in the repo.
+
+### Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md` | Stage 2 plan (reviewed; owner decisions; release sequence) |
+| `docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md` | Stage 3b plan (state table, dispatch table, probes 1, 2, 4, 5 recorded) |
+| `lib/services/post-presentation-materials/transcript-summary-service.js` (branch) | `SUMMARY_KINDS`, create/get/publish for both kinds |
+| `lib/services/post-presentation-materials/summary-draft-store.js` | `reserveSummaryDraftRun` (branch), kind-scoped publish claim (main) |
+| `scripts/probe-zoom-recordings.mjs` | Read-only Zoom probe: `--range`, `--lifetime`, `--moov` |
+| `shared/templates/pre-site-visit/phase-ii-pre-site-visit-v8.docx` | Live Pre-Site template (render contract 9) |
+
+### Testing
+
+```bash
+cd /Users/gallivan/Code/WMKF_Apps-paired-summaries
+npx jest tests/unit/transcript-summary-service.test.js tests/unit/summary-draft-store-reserve.test.js \
+  tests/unit/meeting-tracker-transcription-routes.test.js tests/unit/post-presentation tests/unit/meeting-tracker \
+  tests/unit/research-presentation-follow-up.test.js tests/unit/site-visit-logistics-service.test.js
+npm run check:types && npm run check:prompt-injection-tagging && npm run check:request-document-writers
+```
+
+**Milestone determination:** no DEVELOPMENT_LOG entry. Template v8 is a formatting change and release step 0 is a small publish guard; Stage 2 and 3b are not shipped.
+
+---
 
 ## Session 587 close — Proposal Ranking rehearsal and card refinement (2026-10-08 PT)
 
@@ -104,100 +178,6 @@ Temporary memory and browser state do not travel through Git.
 
 ---
 
-# Session 587 close — transcription hardening, staff cancel, Stage 2/3b plans (Claude, main, 2026-10-08 PT)
-
-This is the transcript and meeting-recording workstream. It ran in parallel with the Proposal Ranking section above.
-
-### What Was Completed
-
-1. **Red gate fixed and runbook note added** (`3289133b9`, docs only, on main).
-   - `check:drain-table-mentions` was a false positive: the word "publications" in an Atlas file path. It now has an ignore marker.
-   - The transcription runbook's "Recovery and abandonment" section now covers runs pinned to their starting deployment. Cancel the run in Vercel, then run `drain-transcriptions?recovery=1`.
-2. **PR #467 (`e2e6ef6f4`): friendly Zoom import names.** Example: `Zoom Oct 7, 2026 1.48 PM PT.m4a`. The name is display only, not a key.
-3. **PR #468 (`c5030df33`): save validation errors are terminal.** This is the fix for the S586 queue outage.
-   - These codes now fail the job, request cleanup and free the slot: `provider_invalid_utterance(s)`, `provider_invalid_speaker_label`, `provider_output_too_large` and `output_integrity_mismatch`.
-   - Transient errors still retry.
-   - A provider-ID conflict raised mid-save now becomes `submission_uncertain` instead of failed.
-   - Log lines carry only allowlisted codes. Codex approved on pass 2.
-4. **PR #469 (`99ca8d413`): cancel a queued transcription from the card.**
-   - A cancelled run is listed as "Cancelled" and no longer blocks a new run or a Zoom re-import.
-   - The Zoom claim is released on cleanup only for **queued** jobs. Processing, saving and uncertain jobs keep the claim, so there is no duplicate spend.
-   - Codex approved on pass 4.
-5. **PR #470 (`ee773977b`): cancel while processing or saving.** Owner decision: clearing stuck jobs matters more than avoiding an unwanted charge.
-   - The confirm text warns that AssemblyAI may still finish and bill.
-   - The card shows "Cancelling…" until cleanup marks the job failed.
-   - Codex approved on pass 1.
-6. **Production** [VERIFIED via GitHub deployments API]: `ee773977b` deployed with status success at 22:10 UTC. No migrations or env changes were needed.
-7. **Dropped:** `fix/transcription-delete-uncertain-guard`. It was never pushed and is deleted.
-   - The design deliberately allows DELETE on `submission_uncertain` as local content deletion that keeps the slot (`docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md:121,140`).
-   - I called this a gap at first; that was wrong.
-8. **Stage 2 and Stage 3b plans** (`97f612d36`). Opus agents wrote both; status `proposed`. **They are not reviewed by Claude or Codex; the owner deferred review.**
-   - `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md` (Stage 2, migration **075** reserved).
-   - `docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md` (Stage 3b, migration **076** reserved; 414 lines).
-
-### Commits
-- `3289133b9` docs: drain-table gate fix + Workflow pinning recovery runbook note
-- `e2e6ef6f4` / `c5030df33` / `99ca8d413` / `ee773977b` merges of PRs #467 / #468 / #469 / #470
-- `97f612d36` docs: proposed Stage 2 and 3b plans
-
-## Next Items (transcript workstream)
-
-### Verified Open
-
-1. **Review the Stage 2 and 3b plans.** Claude reviews against source first, then a Codex adversarial review, then the owner decides.
-   - Each plan ends with about 7 owner decisions, each with a recommended answer.
-   - Stage 2 needs owner-authorized read-only Production checks V1–V3: the Dataverse picklist value 100000010, `schema_migrations`, and the prompt row.
-   - Stage 3b needs live probes: Zoom Range support, download-URL lifetime, MP4 variants and sizes, and Graph upload-session expiry.
-   - Re-scan remote branches for migration-number collisions after a fresh fetch.
-2. **Stale docs still describe 3a as unmerged or unapplied.** Evidence (agent-reported, not yet re-read):
-   - `docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md` lines 20, 64 and 96
-   - `docs/APPLICATION_STATE_ATLAS.md:111`
-   - `docs/API_ROUTE_SECURITY_MATRIX.md` rows 276–277
-   - the 3a plan's build-status line
-
-   Fix these with `/sweep` (docs only).
-3. **SharePoint recording folder mismatch.** `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md:624` says `Site Visit/Recording`, but `material-service.js:749` writes MP4s to `Post Site Visit Materials/` (agent-reported). Verify and reconcile.
-4. **Old stage numbering.** The migration 070 header and `docs/atlas/postgres-meeting-transcript-summary-drafts.md:39-40` say "Stage 3 adds 100000010", which is the October 4 plan's numbering.
-5. **Optional test for cleanup retries.** Provider DELETE is rejected, cleanup retries, and the slot is freed. Codex suggested it on #470; it is not written.
-6. **Split merged speaker turns.** Carried from S586: 1003010 at 60:08. This needs its own plan and owner approval. 1003010's labels also need a manual fix in step 2.
-
-### Owner Decision Needed
-
-1. **Next build after plan review.** Stage 2 and Stage 3b can be built in parallel; they share only small card and matrix edits.
-   - Stage 4 needs a decision on the video processing venue.
-   - Stage 5 needs the retention policy answers: cutoff, Board date changes, late archive, Zoom Trash and SharePoint recycle bin, and who owns failures.
-
-### Verify Before Acting
-
-1. **Zoom pilot downloads.** These are about 300 MB of real applicant content in the S586 scratchpad `zoom-pilot/`. The owner said to keep them for now. Delete them only on the owner's word.
-2. **Zoom S2S scope `list_user_recordings:master`** is unrequested. Ask the Zoom admin to remove it if it isn't needed.
-
-### Do Not Reopen Without New Decision
-
-1. No presence or "last spoke" speaker heuristic (owner, 2026-10-08).
-2. Zoom credentials stay out of Preview (owner, 2026-10-08).
-3. DELETE on `submission_uncertain` stays allowed as a local content deletion that keeps the slot (design: transcription pilot plan :121,140; S587).
-4. A retry cap for unclassified save errors is not built: it would need a migration, and job expiry bounds the retries.
-
-## Key Files Reference (transcript workstream)
-
-| File | Purpose |
-|------|---------|
-| `lib/services/transcription-pilot/worker.js` | `TERMINAL_SAVE_CODES`, `diagnosticCode`, conflict recheck in `pollAndSave` catch |
-| `shared/components/meeting-tracker/RecordingAndTranscriptCard.js` | `canCancelRun`, `isCancelledRun`, `isCancellingRun`, cancel confirm copy |
-| `lib/services/meeting-tracker-recordings/import-service.js` | `zoomImportFilename`, `jobEnded` (cleanup releases the claim only for queued) |
-| `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md` | Stage 2 plan (proposed, unreviewed) |
-| `docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md` | Stage 3b plan (proposed, unreviewed) |
-
-## Testing (transcript workstream)
-
-```bash
-./node_modules/.bin/jest --runInBand tests/unit/zoom-*.test.js tests/unit/recording-and-transcript-card*.test.js tests/unit/meeting-tracker-transcription*.test.js tests/unit/transcription-pilot-*.test.js
-```
-
-Milestone: DEVELOPMENT_LOG entry "Transcription queue hardened; staff can cancel stuck runs (Session 587)" added.
-
----
 
 ## Session 585 close — Proposal Ranking office handoff (2026-10-08)
 
