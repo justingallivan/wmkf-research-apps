@@ -5,7 +5,7 @@
  * cloud recordings and download one chosen meeting's files.
  *
  *   node scripts/probe-zoom-recordings.mjs --host <email> [--days 30]
- *   node scripts/probe-zoom-recordings.mjs --host <email> [--days 30] --download <meetingUUID> --out <empty dir>
+ *   node scripts/probe-zoom-recordings.mjs --host <email> [--days 30] --download <meetingUUID> --out <empty dir> [--only <recording_type>]
  *   node scripts/probe-zoom-recordings.mjs --host <email> [--days 30] --range <meetingUUID>
  *   node scripts/probe-zoom-recordings.mjs --host <email> [--days 30] --lifetime <meetingUUID> [--minutes 0,15,60]
  *   node scripts/probe-zoom-recordings.mjs --host <email> [--days 30] --moov <meetingUUID>
@@ -51,6 +51,7 @@ const OUT = arg('out');
 const RANGE = arg('range');
 const LIFETIME = arg('lifetime');
 const MOOV = arg('moov');
+const ONLY = arg('only'); // --download: fetch only files of this recording_type (e.g. audio_only)
 if (!HOST) { console.error('--host <email> is required'); process.exit(2); }
 if (DOWNLOAD && !OUT) { console.error('--download requires --out <empty dir>'); process.exit(2); }
 for (const k of ['ZOOM_S2S_ACCOUNT_ID', 'ZOOM_S2S_CLIENT_ID', 'ZOOM_S2S_CLIENT_SECRET']) {
@@ -282,6 +283,7 @@ console.log(`Downloading "${meeting.topic}" (${meeting.start_time}) to ${OUT}\n`
 for (const f of meeting.recording_files || []) {
   const name = `${f.recording_type}-${f.id}.${(f.file_extension || 'bin').toLowerCase()}`;
   const dest = path.join(OUT, name);
+  if (ONLY && f.recording_type !== ONLY) { console.log(`SKIP ${name}: not --only ${ONLY}`); continue; }
   if (f.status !== 'completed') { console.log(`SKIP ${name}: status=${f.status}`); continue; }
   const res = await fetch(f.download_url, { headers: { Authorization: `Bearer ${tok.access_token}` } });
   if (!res.ok) await fail(`Download ${name}`, res);
