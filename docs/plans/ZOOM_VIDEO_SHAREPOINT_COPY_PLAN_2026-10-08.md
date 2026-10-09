@@ -385,10 +385,11 @@ Preview cannot exercise this stage. It has no Zoom credentials, and Vercel runs 
 1. **Which variants to copy.** Recommendation: one MP4 per meeting, `shared_screen_with_speaker_view`, preferring the non-CC file and falling back to `(CC)`. Gallery and other layouts are not copied.
 2. **Size cap.** Recommendation: keep the existing 2,000,000,000-byte cap, which is about 8 hours at the assumed rate.
 3. **Cost.** There is no provider spend. Costs are Vercel function time (about 1–3 ticks per meeting [ASSUMED]), plus empty every-minute polls and SharePoint storage until Stage 5. Recommendation: accept.
-4. **Kill switch.** Recommendation: no new variable. Availability follows the Zoom variables and `POST_PRESENTATION_MATERIALS_ACCESS`, and rollback is a revert. The alternative is a non-sensitive `ZOOM_VIDEO_COPY_ACCESS=off|test:<GUID>|on`, which would allowlist the Mode D request.
+4. **Kill switch.** **Decided (owner, Session 588): add `ZOOM_VIDEO_COPY_ACCESS=off|test:<GUID>|on`** (non-sensitive). It also serves as the rollback control in review item 7. The original recommendation follows for the record. Recommendation: no new variable. Availability follows the Zoom variables and `POST_PRESENTATION_MATERIALS_ACCESS`, and rollback is a revert. The alternative is a non-sensitive `ZOOM_VIDEO_COPY_ACCESS=off|test:<GUID>|on`, which would allowlist the Mode D request.
 5. **Copy automatically.** Recommendation: Import starts both audio and video. Earlier imports get **Copy video**.
 6. **Integrity checks.** Recommendation: in v1, check size, range acks and the signature. Record the quickXorHash but do not compare it.
 7. **Registration actor policy.** Recommendation: `REQUIRED`, with the stored actor of the staff member who chose Import. The alternative is `SCHEDULED_AUTOMATION`, which would add a new writer-gate row.
+8. **Replacing a staff-uploaded MP4 (from review item 6).** **Decided (owner, Session 588): ask staff to confirm.** When the current Recording winner is a SharePoint MP4, starting a copy (Import, **Copy video** or **Try again**) requires explicit confirmation that it will replace that file. The copy records the winner's slot version at start. Before finalize it aborts with a named code if a newer non-Zoom-link winner has appeared since. The rework must specify this.
 
 ## Contract review (`/contract-reconcile` Mode A, planning pass)
 
@@ -415,7 +416,9 @@ Preview cannot exercise this stage. It has no Zoom credentials, and Vercel runs 
 
 ## Review — Session 588 (2026-10-08)
 
-Reviewers: a Claude source review (`/contract-reconcile` Mode A) and a Codex adversarial review (`gpt-6-astra`). No live probe ran. **Verdict: NEEDS REWORK.** Both reviewers independently found that the transfer, lease and finalize protocol does not fit the existing upload-intent state machine. Together with the Range livelock, the core protocol needs redefining, not patching.
+Reviewers: a Claude source review (`/contract-reconcile` Mode A) and a Codex adversarial review (`gpt-6-astra`). No live probe ran. **Owner answers (Session 588):** decision 4 adds `ZOOM_VIDEO_COPY_ACCESS`, and new decision 8 asks staff to confirm before replacing a staff-uploaded MP4. Both are recorded under "Owner decisions". The protocol rework below is still outstanding; probe 1 (Range) should run first, because its result decides item 1.
+
+**Verdict: NEEDS REWORK.** Both reviewers independently found that the transfer, lease and finalize protocol does not fit the existing upload-intent state machine. Together with the Range livelock, the core protocol needs redefining, not patching.
 
 Claims are marked [VERIFIED via file:line] (the Session 588 lead re-read the source) or [agent-reported].
 
