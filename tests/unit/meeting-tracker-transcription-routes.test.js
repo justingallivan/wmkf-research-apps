@@ -14,11 +14,11 @@ jest.mock('../../lib/services/meeting-tracker-transcription/service.js', () => (
 }));
 jest.mock('../../lib/utils/actor-ref.js', () => ({ actorRefFromSession: jest.fn(() => '77777777-7777-4777-8777-777777777777') }));
 jest.mock('../../lib/services/post-presentation-materials/transcript-summary-service.js', () => ({
-  createPresentationSummaryDraft: jest.fn(async () => ({ draft: { id: 'd' } })),
-  getPresentationSummaryDraft: jest.fn(async () => ({ draft: null })),
-  updatePresentationSummaryDraft: jest.fn(async () => ({ draft: { id: 'd' } })),
-  discardPresentationSummaryDraft: jest.fn(async () => ({ draft: null })),
-  publishPresentationSummaryDraft: jest.fn(async () => ({ transcriptSummary: { state: 'bound' } })),
+  createSummaryDraft: jest.fn(async () => ({ draft: { id: 'd' } })),
+  getSummaryDraft: jest.fn(async () => ({ draft: null })),
+  updateSummaryDraft: jest.fn(async () => ({ draft: { id: 'd' } })),
+  discardSummaryDraft: jest.fn(async () => ({ draft: null })),
+  publishSummaryDraft: jest.fn(async () => ({ transcriptSummary: { state: 'bound' } })),
 }));
 jest.mock('../../lib/services/post-presentation-materials/presentation-transcript-service.js', () => ({
   generatePresentationTranscript: jest.fn(async () => ({ presentationTranscript: { artifactId: 'a', state: 'bound' } })),
@@ -34,8 +34,8 @@ import collection from '../../pages/api/meeting-tracker/visits/[requestId]/trans
 import summaryDraft from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/summary-draft.js';
 import summaryPublish from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/summary-draft/publish.js';
 import {
-  createPresentationSummaryDraft, getPresentationSummaryDraft, updatePresentationSummaryDraft, discardPresentationSummaryDraft,
-  publishPresentationSummaryDraft,
+  createSummaryDraft, getSummaryDraft, updateSummaryDraft, discardSummaryDraft,
+  publishSummaryDraft,
 } from '../../lib/services/post-presentation-materials/transcript-summary-service.js';
 import speakers from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/[jobId]/speakers.js';
 import publish from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/[jobId]/publish.js';
@@ -248,11 +248,11 @@ describe('summary-draft routes', () => {
 
   test('each method dispatches with the authenticated profile; only writes that reach Dataverse get the mapped actor', async () => {
     const cases = [
-      ['GET', undefined, getPresentationSummaryDraft, { requestId, ownerProfileId: 9, body: undefined }],
-      ['POST', createBody, createPresentationSummaryDraft, { requestId, ownerProfileId: 9, body: createBody, actingUserSystemId: actor }],
-      ['PATCH', { draftId, expectedVersion: 2, text: 'Edited' }, updatePresentationSummaryDraft,
+      ['GET', undefined, getSummaryDraft, { requestId, ownerProfileId: 9, body: undefined }],
+      ['POST', createBody, createSummaryDraft, { requestId, ownerProfileId: 9, body: createBody, actingUserSystemId: actor }],
+      ['PATCH', { draftId, expectedVersion: 2, text: 'Edited' }, updateSummaryDraft,
         { requestId, ownerProfileId: 9, body: { draftId, expectedVersion: 2, text: 'Edited' } }],
-      ['DELETE', { draftId, expectedVersion: 2 }, discardPresentationSummaryDraft,
+      ['DELETE', { draftId, expectedVersion: 2 }, discardSummaryDraft,
         { requestId, ownerProfileId: 9, body: { draftId, expectedVersion: 2 } }],
     ];
     for (const [method, body, service, expected] of cases) {
@@ -264,7 +264,7 @@ describe('summary-draft routes', () => {
     }
     const res = response();
     await summaryPublish({ method: 'POST', query: { requestId }, body: { draftId, expectedVersion: 2 } }, res);
-    expect(publishPresentationSummaryDraft).toHaveBeenCalledWith({ requestId, ownerProfileId: 9, actingUserSystemId: actor,
+    expect(publishSummaryDraft).toHaveBeenCalledWith({ requestId, ownerProfileId: 9, actingUserSystemId: actor,
       body: { draftId, expectedVersion: 2 } });
     expect(res.statusCode).toBe(200);
   });
@@ -280,7 +280,7 @@ describe('summary-draft routes', () => {
     const res = response();
     await summaryDraft({ method, query: { requestId }, body }, res);
     expect(res.statusCode).toBe(400);
-    for (const service of [createPresentationSummaryDraft, updatePresentationSummaryDraft, discardPresentationSummaryDraft]) {
+    for (const service of [createSummaryDraft, updateSummaryDraft, discardSummaryDraft]) {
       expect(service).not.toHaveBeenCalled();
     }
   });
@@ -292,11 +292,11 @@ describe('summary-draft routes', () => {
     const get = response();
     await summaryPublish({ method: 'GET', query: { requestId }, body: {} }, get);
     expect(get.statusCode).toBe(405);
-    expect(publishPresentationSummaryDraft).not.toHaveBeenCalled();
+    expect(publishSummaryDraft).not.toHaveBeenCalled();
   });
 
   test('reports service status and code', async () => {
-    createPresentationSummaryDraft.mockRejectedValueOnce(Object.assign(new Error('declined'), { code: 'summary_claude_output_refused', httpStatus: 422 }));
+    createSummaryDraft.mockRejectedValueOnce(Object.assign(new Error('declined'), { code: 'summary_claude_output_refused', httpStatus: 422 }));
     const res = response();
     await summaryDraft({ method: 'POST', query: { requestId }, body: createBody }, res);
     expect(res.statusCode).toBe(422);

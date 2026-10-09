@@ -7,16 +7,18 @@ jest.mock('../../lib/services/portal-upload-staging.js', () => ({
 
 import { createHash } from 'node:crypto';
 import {
-  createPresentationSummaryDraft, getPresentationSummaryDraft, presentationSummarySlidesChanged, publishPresentationSummaryDraft,
-  updatePresentationSummaryDraft,
+  createSummaryDraft, getSummaryDraft, presentationSummarySlidesChanged, publishSummaryDraft,
+  updateSummaryDraft,
 } from '../../lib/services/post-presentation-materials/transcript-summary-service.js';
 import {
-  bindTranscriptSummary, presentationTranscriptGenerationKey, transcriptSummaryBindingFingerprint,
+  bindTranscriptSummary, bindStaffDiscussionSummary, presentationTranscriptGenerationKey, transcriptSummaryBindingFingerprint,
+  staffDiscussionTranscriptGenerationKey, staffDiscussionSummaryBindingFingerprint,
 } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
 import { projectPostPresentationMaterials } from '../../lib/services/post-presentation-materials/material-model.js';
 import { buildMeetingTranscriptFiles, buildMeetingTranscriptManifest } from '../../lib/services/meeting-tracker-transcription/bundle.js';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE, REQUEST_DOCUMENT_LIFECYCLE_STATE, REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument.js';
-import { PRESENTATION_SUMMARY_ACKNOWLEDGMENT } from '../../shared/config/transcriptSummary.js';
+import { PRESENTATION_SUMMARY_ACKNOWLEDGMENT, PAIRED_SUMMARY_ACKNOWLEDGMENT } from '../../shared/config/transcriptSummary.js';
+import { PROMPT_NAME as DISCUSSION_PROMPT_NAME } from '../../shared/config/prompts/meeting-staff-discussion-summary.js';
 import { PROMPT_NAME } from '../../shared/config/prompts/meeting-presentation-summary.js';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -82,6 +84,8 @@ beforeEach(() => {
   tokens = 0;
   uploads = new Map();
   drafts = {
+    getSummaryDraftArtifactType: jest.fn(async () => REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY),
+    recordEmptySummaryRun: jest.fn(async (args) => ({ id: args.id, state: 'failed' })),
     reserveSummaryDraftRun: jest.fn(async (args) => ({ draft: { ...draftRow({ state: 'generating', summary_text: null, version: 1 }), id: args.id } })),
     completeSummaryDraft: jest.fn(async (args) => draftRow({ id: args.id, summary_text: args.text })),
     failSummaryDraft: jest.fn(async () => ({})),
@@ -166,10 +170,10 @@ beforeEach(() => {
 });
 afterAll(() => { process.env = oldEnv; });
 
-const create = (overrides = {}) => createPresentationSummaryDraft({ requestId: REQUEST_ID, ownerProfileId: 12, actingUserSystemId: ACTOR,
+const create = (overrides = {}) => createSummaryDraft({ requestId: REQUEST_ID, ownerProfileId: 12, actingUserSystemId: ACTOR,
   body: { expectedCurrentArtifactId: TRANSCRIPT_ID, expectedCurrentFingerprint: generated.inputSha256,
     acknowledgmentVersion: PRESENTATION_SUMMARY_ACKNOWLEDGMENT.version, ...overrides } }, deps);
-const publish = (overrides = {}) => publishPresentationSummaryDraft({ requestId: REQUEST_ID, ownerProfileId: 12, actingUserSystemId: ACTOR,
+const publish = (overrides = {}) => publishSummaryDraft({ requestId: REQUEST_ID, ownerProfileId: 12, actingUserSystemId: ACTOR,
   body: { draftId: DRAFT_ID, expectedVersion: 2, ...overrides } }, deps);
 
 describe('create', () => {
@@ -326,7 +330,7 @@ describe('publish', () => {
     expect(deps.updateDocument).toHaveBeenCalledWith(SUMMARY_OLD_ID,
       { wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED }, expect.anything());
     expect(claim.state).toBe('published');
-    expect(outcome).toEqual({ transcriptSummary: { state: 'bound', artifactId: SUMMARY_NEW_ID, publishedAt: '2026-10-05T15:00:00Z' }, draft: null });
+    expect(outcome).toEqual({ kind: 'presentation', transcriptSummary: { state: 'bound', artifactId: SUMMARY_NEW_ID, publishedAt: '2026-10-05T15:00:00Z' }, draft: null });
     const winners = projectPostPresentationMaterials(state.rows, REQUEST_ID).winners;
     expect(bindTranscriptSummary(winners, REQUEST_ID)).toMatchObject({ reason: 'bound', summary: { wmkf_requestdocumentid: SUMMARY_NEW_ID } });
     expect(deps.releaseSlotLease).toHaveBeenCalled();
@@ -481,21 +485,21 @@ describe('publish', () => {
 
 describe('read and edit', () => {
   test('reports the active draft, whether it matches the current transcript, and the acknowledgment copy', async () => {
-    const outcome = await getPresentationSummaryDraft({ requestId: REQUEST_ID, ownerProfileId: 12 }, deps);
+    const outcome = await getSummaryDraft({ requestId: REQUEST_ID, ownerProfileId: 12 }, deps);
     expect(outcome).toMatchObject({ draft: { id: DRAFT_ID, version: 2, text: SUMMARY_TEXT, presentationEndMs: 2000 },
       draftMatchesTranscript: true, lastFailure: null, acknowledgment: PRESENTATION_SUMMARY_ACKNOWLEDGMENT });
     drafts.getActiveSummaryDraft.mockResolvedValueOnce(draftRow({ presentation_end_ms: '1500' }));
-    expect((await getPresentationSummaryDraft({ requestId: REQUEST_ID, ownerProfileId: 12 }, deps)).draftMatchesTranscript).toBe(false);
+    expect((await getSummaryDraft({ requestId: REQUEST_ID, ownerProfileId: 12 }, deps)).draftMatchesTranscript).toBe(false);
   });
 
   test.each([['empty', '   '], ['too long', 'x'.repeat(100001)]])('an %s edit is refused', async (_label, text) => {
-    await expect(updatePresentationSummaryDraft({ requestId: REQUEST_ID, ownerProfileId: 12,
+    await expect(updateSummaryDraft({ requestId: REQUEST_ID, ownerProfileId: 12,
       body: { draftId: DRAFT_ID, expectedVersion: 2, text } }, deps)).rejects.toMatchObject({ httpStatus: 400, code: 'summary_text_invalid' });
   });
 
   test('an edit against a changed version is a conflict', async () => {
     drafts.updateSummaryDraftText.mockResolvedValueOnce(null);
-    await expect(updatePresentationSummaryDraft({ requestId: REQUEST_ID, ownerProfileId: 12,
+    await expect(updateSummaryDraft({ requestId: REQUEST_ID, ownerProfileId: 12,
       body: { draftId: DRAFT_ID, expectedVersion: 1, text: 'New text' } }, deps)).rejects.toMatchObject({ code: 'summary_draft_changed' });
   });
 });
@@ -527,3 +531,148 @@ describe('slides changed since the published summary (staff replacement plan §3
     expect(await changed([slidesRow(SLIDES_ID, sha('v1'))])).toBeNull();
   });
 });
+
+describe('staff discussion kind (paired summaries plan D1-D4, D8)', () => {
+  const DISCUSSION_ID = '55555555-5555-4555-8555-5555555555dd';
+  const DISCUSSION_TEXT = '[0:05] PD: The budget looks high.\n';
+  const DISCUSSION_BYTES = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(DISCUSSION_TEXT, 'utf8')]);
+  const identity = { requestId: REQUEST_ID, sourceRevisionId: REVISION_ID, presentationEndMs: 2000 };
+  const discussionRow = () => row(DISCUSSION_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT, {
+    wmkf_generationkey: staffDiscussionTranscriptGenerationKey(identity),
+    wmkf_contenthash: sha(DISCUSSION_BYTES), wmkf_sharepointetag: 'pres-etag', wmkf_sharepointsiteid: 'site' });
+  const createDiscussion = (overrides = {}) => create({ kind: 'discussion', acknowledgmentVersion: PAIRED_SUMMARY_ACKNOWLEDGMENT.version, ...overrides });
+
+  beforeEach(() => {
+    deps.randomUUID = jest.fn(() => DRAFT_ID);
+    state.rows = [...state.rows, discussionRow()];
+    const download = deps.downloadFile.getMockImplementation();
+    deps.downloadFile = jest.fn(async (drive, itemId, options) => (itemId === `item-${DISCUSSION_ID}`
+      ? { buffer: DISCUSSION_BYTES } : download(drive, itemId, options)));
+    deps.loadVerifiedSource = jest.fn(async () => ({ content: { utterances: [
+      { speaker: 'B', start: 0, end: 2000, text: 'Presentation.' },
+      { speaker: 'C', start: 2100, end: 3000, text: 'The budget looks high.' }] } }));
+  });
+
+  test('summarizes the bound discussion transcript only, with the discussion prompt and both retention flags', async () => {
+    const outcome = await createDiscussion();
+    expect(drafts.reserveSummaryDraftRun).toHaveBeenCalledWith(expect.objectContaining({
+      artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY, sourceArtifactId: DISCUSSION_ID,
+      acknowledgmentVersion: PAIRED_SUMMARY_ACKNOWLEDGMENT.version, slidesArtifactId: null, slidesContentHash: null }));
+    const [call] = deps.executePrompt.mock.calls[0];
+    expect(call).toMatchObject({ promptName: DISCUSSION_PROMPT_NAME, requireNoPersistence: true, auditRetention: 'content-free' });
+    expect(call.overrideVariables).toEqual({ discussion_transcript: DISCUSSION_TEXT });
+    expect(deps.getExecutorBudget).toHaveBeenCalledWith(DISCUSSION_PROMPT_NAME);
+    expect(outcome).toMatchObject({ kind: 'discussion', slidesIncluded: false });
+  });
+
+  test('the presentation-only acknowledgment is refused for the discussion kind before any read', async () => {
+    await expect(createDiscussion({ acknowledgmentVersion: PRESENTATION_SUMMARY_ACKNOWLEDGMENT.version }))
+      .rejects.toMatchObject({ httpStatus: 400, code: 'summary_acknowledgment_required' });
+    expect(deps.loadVerifiedSource).not.toHaveBeenCalled();
+    expect(drafts.reserveSummaryDraftRun).not.toHaveBeenCalled();
+  });
+
+  test('an unknown kind is refused', async () => {
+    await expect(create({ kind: 'board' })).rejects.toMatchObject({ httpStatus: 400, code: 'summary_kind_invalid' });
+  });
+
+  test('a missing discussion transcript is refused with no row and no provider call', async () => {
+    state.rows = state.rows.filter((item) => item.wmkf_requestdocumentid !== DISCUSSION_ID);
+    await expect(createDiscussion()).rejects.toMatchObject({ httpStatus: 409, code: 'staff_discussion_transcript_not_ready' });
+    expect(deps.loadVerifiedSource).not.toHaveBeenCalled();
+    expect(drafts.reserveSummaryDraftRun).not.toHaveBeenCalled();
+    expect(drafts.recordEmptySummaryRun).not.toHaveBeenCalled();
+  });
+
+  test('an empty discussion records the failed marker with its boundary, returns 422 and makes no provider call', async () => {
+    deps.loadVerifiedSource.mockResolvedValueOnce({ content: { utterances: [{ speaker: 'B', start: 0, end: 2000, text: 'Presentation.' }] } });
+    await expect(createDiscussion()).rejects.toMatchObject({ httpStatus: 422, code: 'staff_discussion_not_recorded' });
+    expect(drafts.recordEmptySummaryRun).toHaveBeenCalledWith(expect.objectContaining({
+      artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY, failureCode: 'staff_discussion_not_recorded',
+      sourceRevisionId: REVISION_ID, presentationEndMs: 2000, sourceArtifactId: DISCUSSION_ID,
+      acknowledgmentVersion: PAIRED_SUMMARY_ACKNOWLEDGMENT.version, profileId: 12 }));
+    expect(drafts.reserveSummaryDraftRun).not.toHaveBeenCalled();
+    expect(deps.executePrompt).not.toHaveBeenCalled();
+  });
+
+  describe('publish (write side: never registered as the presentation summary)', () => {
+    beforeEach(() => {
+      drafts.getSummaryDraftArtifactType.mockResolvedValue(REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY);
+      const claimImpl = drafts.claimSummaryDraftForPublish.getMockImplementation();
+      drafts.claimSummaryDraftForPublish = jest.fn(async (args) => {
+        const claimed = await claimImpl(args);
+        return claimed && { ...claimed, artifact_type: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY };
+      });
+      // A published, bound presentation summary is already on file.
+      state.rows = [...state.rows, row(SUMMARY_OLD_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, {
+        wmkf_inputfingerprint: bindingFingerprint(), wmkf_generationkey: 'old-key' })];
+    });
+
+    test('registers type 100000010 under its own fingerprint, folder, name, lease and key', async () => {
+      const outcome = await publish();
+      expect(drafts.claimSummaryDraftForPublish).toHaveBeenCalledWith(expect.objectContaining({
+        artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY }));
+      const [, folder, filename] = deps.uploadFile.mock.calls[0];
+      expect(folder).toBe('akoya_request/1002912_x/Site Visit - Staff Discussion Summary');
+      expect(filename).toBe('1002912-Staff-Discussion-Summary-20261005-143210-v2.txt');
+      const payload = deps.createDocument.mock.calls[0][0];
+      expect(payload.wmkf_artifacttype).toBe(REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY);
+      expect(payload.wmkf_name).toBe('1002912 site visit staff discussion summary (staff only)');
+      expect(payload.wmkf_inputfingerprint).toBe(staffDiscussionSummaryBindingFingerprint(identity));
+      expect(payload.wmkf_inputfingerprint).not.toBe(bindingFingerprint());
+      expect(payload.wmkf_generationkey).not.toBe(GOLDEN_PRESENTATION_PUBLISH.generationKey);
+      expect(deps.acquireSlotLease.mock.calls[0][0].artifactType).toBe(REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY);
+      expect(outcome).toMatchObject({ kind: 'discussion', transcriptSummary: { state: 'bound', artifactId: SUMMARY_NEW_ID } });
+    });
+
+    test('after publishing, the presentation summary binding still serves the presentation row, not the discussion one', async () => {
+      await publish();
+      const winners = projectPostPresentationMaterials(state.rows, REQUEST_ID).winners;
+      expect(bindTranscriptSummary(winners, REQUEST_ID)).toMatchObject({ reason: 'bound', summary: { wmkf_requestdocumentid: SUMMARY_OLD_ID } });
+      expect(bindStaffDiscussionSummary(winners, REQUEST_ID)).toMatchObject({ reason: 'bound', summary: { wmkf_requestdocumentid: SUMMARY_NEW_ID } });
+      expect(state.rows.find((item) => item.wmkf_requestdocumentid === SUMMARY_OLD_ID).wmkf_lifecyclestate)
+        .not.toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED);
+    });
+
+    test('a claimed row whose type differs from the stored kind is refused before any write', async () => {
+      drafts.claimSummaryDraftForPublish = jest.fn(async () => draftRow({ state: 'publishing' }));
+      await expect(publish()).rejects.toMatchObject({ httpStatus: 409, code: 'summary_draft_kind_unsupported' });
+      expect(deps.uploadFile).not.toHaveBeenCalled();
+      expect(deps.createDocument).not.toHaveBeenCalled();
+    });
+
+    test('a draft with no known stored kind is refused without a claim', async () => {
+      drafts.getSummaryDraftArtifactType.mockResolvedValue(null);
+      await expect(publish()).rejects.toMatchObject({ httpStatus: 409, code: 'summary_draft_changed' });
+      expect(drafts.claimSummaryDraftForPublish).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('read', () => {
+    const marker = (endMs) => ({ id: 'run', state: 'failed', failure_code: 'staff_discussion_not_recorded',
+      source_revision_id: REVISION_ID, presentation_end_ms: String(endMs), created_at: new Date(), updated_at: new Date() });
+    const read = () => getSummaryDraft({ requestId: REQUEST_ID, ownerProfileId: 12, kind: 'discussion' }, deps);
+
+    test('reports the paired acknowledgment, its own kind, and no slides comparison', async () => {
+      drafts.getActiveSummaryDraft.mockResolvedValueOnce(null);
+      await expect(read()).resolves.toMatchObject({ kind: 'discussion', acknowledgment: PAIRED_SUMMARY_ACKNOWLEDGMENT,
+        slidesChangedSinceSummary: null, discussionNotRecorded: false, transcriptSummary: { state: 'missing' } });
+      expect(drafts.getActiveSummaryDraft).toHaveBeenCalledWith(expect.objectContaining({
+        artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY }));
+    });
+
+    test('the not-recorded marker counts only at the current boundary', async () => {
+      drafts.getLatestSummaryRun.mockResolvedValueOnce(marker(2000));
+      await expect(read()).resolves.toMatchObject({ discussionNotRecorded: true });
+      drafts.getLatestSummaryRun.mockResolvedValueOnce(marker(1500));
+      await expect(read()).resolves.toMatchObject({ discussionNotRecorded: false });
+    });
+
+    test('the presentation read carries no not-recorded field', async () => {
+      const result = await getSummaryDraft({ requestId: REQUEST_ID, ownerProfileId: 12 }, deps);
+      expect(result.kind).toBe('presentation');
+      expect(result).not.toHaveProperty('discussionNotRecorded');
+    });
+  });
+});
+

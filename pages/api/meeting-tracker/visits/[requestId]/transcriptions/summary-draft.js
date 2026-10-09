@@ -4,7 +4,7 @@ import { withDalContext } from '../../../../../../lib/dataverse/core/context.js'
 import { isGuid } from '../../../../../../lib/utils/guid.js';
 import { ServiceHttpError } from '../../../../../../lib/services/service-http-error.js';
 import {
-  createPresentationSummaryDraft, getPresentationSummaryDraft, updatePresentationSummaryDraft, discardPresentationSummaryDraft,
+  createSummaryDraft, getSummaryDraft, updateSummaryDraft, discardSummaryDraft,
 } from '../../../../../../lib/services/post-presentation-materials/transcript-summary-service.js';
 
 // POST runs the summary prompt synchronously (plan §16 decision C), so the route allows 300 s.
@@ -50,10 +50,10 @@ export default async function handler(req, res) {
   return withDalContext('meeting-tracker-transcript-summary', async () => {
     try {
       const args = { requestId, ownerProfileId: access.profileId, body: req.body };
-      if (req.method === 'GET') return res.status(200).json(await getPresentationSummaryDraft(args));
-      if (req.method === 'PATCH') return res.status(200).json(await updatePresentationSummaryDraft(args));
-      if (req.method === 'DELETE') return res.status(200).json(await discardPresentationSummaryDraft(args));
-      return res.status(200).json(await createPresentationSummaryDraft({ ...args, actingUserSystemId: actorRefFromSession(access.session) }));
+      if (req.method === 'GET') return res.status(200).json(await getSummaryDraft(args));
+      if (req.method === 'PATCH') return res.status(200).json(await updateSummaryDraft(args));
+      if (req.method === 'DELETE') return res.status(200).json(await discardSummaryDraft(args));
+      return res.status(200).json(await createSummaryDraft({ ...args, actingUserSystemId: actorRefFromSession(access.session) }));
     } catch (error) {
       const status = error instanceof ServiceHttpError ? error.httpStatus : Number(error?.httpStatus || error?.status) || 500;
       const code = error?.code || 'transcript_summary_failed';
