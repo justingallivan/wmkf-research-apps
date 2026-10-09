@@ -1,0 +1,1949 @@
+{
+  "stage_a_status": "NOT PASSED: complete matrix outstanding",
+  "date": "2026-10-09",
+  "ffmpeg_version": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+  "harness_sha256": {
+    "scripts/benchmarks/stage4-mapping-check.py": "0039b2845deab44e8a2ec61847d391e92c06549e11d229df8789e7fbca2a8184",
+    "scripts/benchmarks/stage4-capacity-check.py": "75bacfbaf459f0a4d0a601707c6a6eeb3c1b7cd1063b5fafa52411fd47f32327"
+  },
+  "mapping": {
+    "scope": "Generated source; MP4 audio clock checked against sample origin; no production guarantee",
+    "clock": {
+      "decoded_samples": 1920000,
+      "max_contiguous_clock_error_seconds": 0.0
+    },
+    "source_sha256": "0d03b0f19a4170a5946585567474c4f585d946bb16a46efb63b310369ffb00f4",
+    "cases": [
+      {
+        "case": "offset",
+        "truth": {
+          "slope": 1.0,
+          "offset": 0.731,
+          "removed_source_interval": null
+        },
+        "final_boundary_audit": {
+          "anchors": [
+            {
+              "m4a_seconds": 109,
+              "mp4_seconds": 109.731,
+              "channels": [
+                {
+                  "correlation": 0.9999867636524223,
+                  "second_peak": 0.19063541481108118
+                },
+                {
+                  "correlation": 0.9999886815644096,
+                  "second_peak": 0.23125320847083816
+                }
+              ],
+              "role": "untouched_boundary_audit"
+            },
+            {
+              "m4a_seconds": 110,
+              "mp4_seconds": 110.731,
+              "channels": [
+                {
+                  "correlation": 0.999989760821929,
+                  "second_peak": 0.19909368147210332
+                },
+                {
+                  "correlation": 0.999987171822728,
+                  "second_peak": 0.1891628667406847
+                }
+              ],
+              "role": "untouched_boundary_audit"
+            },
+            {
+              "m4a_seconds": 111,
+              "mp4_seconds": 111.731,
+              "channels": [
+                {
+                  "correlation": 0.9999884840751847,
+                  "second_peak": 0.20248815866297631
+                },
+                {
+                  "correlation": 0.999988842991421,
+                  "second_peak": 0.1991404213381256
+                }
+              ],
+              "role": "untouched_boundary_audit"
+            }
+          ]
+        },
+        "final_boundary_errors": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "m4a_sha256": "dfeeb404b6812c21019ad0cc8781fd7c62d793bee16b92386e543afc08b0c429",
+        "m4a_clock": {
+          "decoded_samples": 1908304,
+          "max_contiguous_clock_error_seconds": 0.0
+        },
+        "observations": {
+          "anchors": [
+            {
+              "m4a_seconds": 5,
+              "mp4_seconds": 5.731,
+              "channels": [
+                {
+                  "correlation": 0.9999875568091634,
+                  "second_peak": 0.2018780256728001
+                },
+                {
+                  "correlation": 0.9999890554221219,
+                  "second_peak": 0.1882861527602525
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 15,
+              "mp4_seconds": 15.731,
+              "channels": [
+                {
+                  "correlation": 0.9999858623860854,
+                  "second_peak": 0.21783953598270345
+                },
+                {
+                  "correlation": 0.9999889464254261,
+                  "second_peak": 0.21546674033894858
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 25,
+              "mp4_seconds": 25.731,
+              "channels": [
+                {
+                  "correlation": 0.9999869725568605,
+                  "second_peak": 0.19209955625332953
+                },
+                {
+                  "correlation": 0.999988529266635,
+                  "second_peak": 0.20763719291293634
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 35,
+              "mp4_seconds": 35.731,
+              "channels": [
+                {
+                  "correlation": 0.9999884589905802,
+                  "second_peak": 0.20378129983558305
+                },
+                {
+                  "correlation": 0.9999878580748726,
+                  "second_peak": 0.2254704607244348
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 45,
+              "mp4_seconds": 45.731,
+              "channels": [
+                {
+                  "correlation": 0.9999878702196744,
+                  "second_peak": 0.2017768165852639
+                },
+                {
+                  "correlation": 0.9999903788080509,
+                  "second_peak": 0.22203740487895807
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 55,
+              "mp4_seconds": 55.731,
+              "channels": [
+                {
+                  "correlation": 0.9999888476967158,
+                  "second_peak": 0.19878719691336197
+                },
+                {
+                  "correlation": 0.9999883342094571,
+                  "second_peak": 0.20890874535136478
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 65,
+              "mp4_seconds": 65.731,
+              "channels": [
+                {
+                  "correlation": 0.9999871465730319,
+                  "second_peak": 0.20789775612435113
+                },
+                {
+                  "correlation": 0.999988693812197,
+                  "second_peak": 0.2005152846699073
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 75,
+              "mp4_seconds": 75.731,
+              "channels": [
+                {
+                  "correlation": 0.9999895798071909,
+                  "second_peak": 0.21532959328598633
+                },
+                {
+                  "correlation": 0.9999892097704421,
+                  "second_peak": 0.17950478736248593
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 85,
+              "mp4_seconds": 85.731,
+              "channels": [
+                {
+                  "correlation": 0.999988658382385,
+                  "second_peak": 0.20349555050412374
+                },
+                {
+                  "correlation": 0.9999893753193702,
+                  "second_peak": 0.1924226802389994
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 95,
+              "mp4_seconds": 95.731,
+              "channels": [
+                {
+                  "correlation": 0.9999865130735556,
+                  "second_peak": 0.207787443076269
+                },
+                {
+                  "correlation": 0.9999869826622655,
+                  "second_peak": 0.23065544937926055
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 105,
+              "mp4_seconds": 105.731,
+              "channels": [
+                {
+                  "correlation": 0.9999863736917044,
+                  "second_peak": 0.18984803567028352
+                },
+                {
+                  "correlation": 0.9999878349106314,
+                  "second_peak": 0.19140913894930844
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 115,
+              "mp4_seconds": 115.731,
+              "channels": [
+                {
+                  "correlation": 0.9999871029687541,
+                  "second_peak": 0.19301148618546468
+                },
+                {
+                  "correlation": 0.9999876681985503,
+                  "second_peak": 0.18649258476474345
+                }
+              ],
+              "role": "validation"
+            }
+          ]
+        },
+        "model": {
+          "kind": "constant",
+          "segments": [
+            {
+              "slope": 1.0,
+              "offset": 0.7309999999999972,
+              "lo": 5,
+              "hi": 115
+            }
+          ],
+          "validation": {
+            "accepted": true,
+            "max_residual_seconds": 7.105427357601002e-15,
+            "residuals_seconds": [
+              1.7763568394002505e-15,
+              7.105427357601002e-15,
+              7.105427357601002e-15,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "max_residual": 7.105427357601002e-15
+        },
+        "boundary_m4a": 110,
+        "boundary_result": {
+          "mapped": 110.731,
+          "empirical_margin": 0.00012500000000710543,
+          "candidate_end": 110.73087499999998
+        },
+        "truth_boundary_mp4": 110.731
+      },
+      {
+        "case": "pause_gap",
+        "truth": {
+          "slope": 1.0,
+          "offset": 0.731,
+          "removed_source_interval": [
+            50,
+            52
+          ]
+        },
+        "final_boundary_audit": {
+          "anchors": [
+            {
+              "m4a_seconds": 109,
+              "mp4_seconds": 111.731,
+              "channels": [
+                {
+                  "correlation": 0.9999873139241228,
+                  "second_peak": 0.20267450871681156
+                },
+                {
+                  "correlation": 0.9999881460655,
+                  "second_peak": 0.2042689666764228
+                }
+              ],
+              "role": "untouched_boundary_audit"
+            },
+            {
+              "m4a_seconds": 110,
+              "mp4_seconds": 112.731,
+              "channels": [
+                {
+                  "correlation": 0.9999886351720236,
+                  "second_peak": 0.18846785432767685
+                },
+                {
+                  "correlation": 0.9999892219164149,
+                  "second_peak": 0.2020216345203315
+                }
+              ],
+              "role": "untouched_boundary_audit"
+            },
+            {
+              "m4a_seconds": 111,
+              "mp4_seconds": 113.731,
+              "channels": [
+                {
+                  "correlation": 0.9999876296086101,
+                  "second_peak": 0.2182765879317736
+                },
+                {
+                  "correlation": 0.9999897686907725,
+                  "second_peak": 0.20644911014178613
+                }
+              ],
+              "role": "untouched_boundary_audit"
+            }
+          ]
+        },
+        "final_boundary_errors": [
+          2.842170943040401e-14,
+          2.842170943040401e-14,
+          2.842170943040401e-14
+        ],
+        "m4a_sha256": "9ae4201e89c6b652b8045e7c8101afe7680f5e982542e0f5813a3402a1dde9e8",
+        "m4a_clock": {
+          "decoded_samples": 1876304,
+          "max_contiguous_clock_error_seconds": 0.0
+        },
+        "observations": {
+          "anchors": [
+            {
+              "m4a_seconds": 5,
+              "mp4_seconds": 5.731,
+              "channels": [
+                {
+                  "correlation": 0.9999875568091634,
+                  "second_peak": 0.2018780256728001
+                },
+                {
+                  "correlation": 0.9999890554221219,
+                  "second_peak": 0.1882861527602525
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 15,
+              "mp4_seconds": 15.731,
+              "channels": [
+                {
+                  "correlation": 0.9999858623860854,
+                  "second_peak": 0.21783953598270345
+                },
+                {
+                  "correlation": 0.9999889464254261,
+                  "second_peak": 0.21546674033894858
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 25,
+              "mp4_seconds": 25.731,
+              "channels": [
+                {
+                  "correlation": 0.9999869725568605,
+                  "second_peak": 0.19209955625332953
+                },
+                {
+                  "correlation": 0.999988529266635,
+                  "second_peak": 0.20763719291293634
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 35,
+              "mp4_seconds": 35.731,
+              "channels": [
+                {
+                  "correlation": 0.9999884589905802,
+                  "second_peak": 0.20378129983558305
+                },
+                {
+                  "correlation": 0.9999878580748726,
+                  "second_peak": 0.2254704607244348
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 45,
+              "mp4_seconds": 45.731,
+              "channels": [
+                {
+                  "correlation": 0.9999878702196744,
+                  "second_peak": 0.2017768165852639
+                },
+                {
+                  "correlation": 0.9999903788080509,
+                  "second_peak": 0.22203740487895807
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 55,
+              "mp4_seconds": 57.731,
+              "channels": [
+                {
+                  "correlation": 0.9999876521979622,
+                  "second_peak": 0.2093801709510133
+                },
+                {
+                  "correlation": 0.9999855127283196,
+                  "second_peak": 0.19201937302194297
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 65,
+              "mp4_seconds": 67.731,
+              "channels": [
+                {
+                  "correlation": 0.9999877976079081,
+                  "second_peak": 0.20929292578936037
+                },
+                {
+                  "correlation": 0.9999887763451094,
+                  "second_peak": 0.20096215587106298
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 75,
+              "mp4_seconds": 77.731,
+              "channels": [
+                {
+                  "correlation": 0.9999876948188432,
+                  "second_peak": 0.21258720533422934
+                },
+                {
+                  "correlation": 0.9999887013909488,
+                  "second_peak": 0.1985559520599077
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 85,
+              "mp4_seconds": 87.731,
+              "channels": [
+                {
+                  "correlation": 0.9999865259817516,
+                  "second_peak": 0.23260469757798496
+                },
+                {
+                  "correlation": 0.9999888828539587,
+                  "second_peak": 0.20446957282066322
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 95,
+              "mp4_seconds": 97.731,
+              "channels": [
+                {
+                  "correlation": 0.9999883970796773,
+                  "second_peak": 0.20923680332054767
+                },
+                {
+                  "correlation": 0.9999887466053043,
+                  "second_peak": 0.206175811171181
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 105,
+              "mp4_seconds": 107.731,
+              "channels": [
+                {
+                  "correlation": 0.9999866324737146,
+                  "second_peak": 0.20202163611044024
+                },
+                {
+                  "correlation": 0.9999897685870877,
+                  "second_peak": 0.22485498397435358
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 115,
+              "mp4_seconds": 117.731,
+              "channels": [
+                {
+                  "correlation": 0.9999873547830356,
+                  "second_peak": 0.21393463100348922
+                },
+                {
+                  "correlation": 0.9999881506661817,
+                  "second_peak": 0.18640341592254317
+                }
+              ],
+              "role": "validation"
+            }
+          ]
+        },
+        "model": {
+          "kind": "piecewise",
+          "segments": [
+            {
+              "slope": 1.0000000000000007,
+              "offset": 0.7309999999999651,
+              "lo": 5,
+              "hi": 45
+            },
+            {
+              "slope": 1.0000000000000007,
+              "offset": 2.730999999999945,
+              "lo": 55,
+              "hi": 115
+            }
+          ],
+          "blocked_gap_interval": [
+            45,
+            55
+          ],
+          "max_residual": 3.108624468950438e-14
+        },
+        "boundary_m4a": 110,
+        "boundary_result": {
+          "mapped": 112.73100000000002,
+          "empirical_margin": 0.00012500000003108625,
+          "candidate_end": 112.730875
+        },
+        "truth_boundary_mp4": 112.731,
+        "gap_boundary_result": {
+          "blocked": "boundary in unanchored gap or outside anchor support"
+        }
+      },
+      {
+        "case": "slow_drift",
+        "truth": {
+          "slope": 1.0008,
+          "offset": 0.731,
+          "removed_source_interval": null
+        },
+        "final_boundary_audit": {
+          "anchors": [
+            {
+              "m4a_seconds": 109,
+              "mp4_seconds": 109.8181875,
+              "channels": [
+                {
+                  "correlation": 0.9747000932261343,
+                  "second_peak": 0.2071560281255986
+                },
+                {
+                  "correlation": 0.9745714228060371,
+                  "second_peak": 0.2029163278275152
+                }
+              ],
+              "role": "untouched_boundary_audit"
+            },
+            {
+              "m4a_seconds": 110,
+              "mp4_seconds": 110.819,
+              "channels": [
+                {
+                  "correlation": 0.9789911038016693,
+                  "second_peak": 0.21175257148977755
+                },
+                {
+                  "correlation": 0.972926828190057,
+                  "second_peak": 0.22013173649638623
+                }
+              ],
+              "role": "untouched_boundary_audit"
+            },
+            {
+              "m4a_seconds": 111,
+              "mp4_seconds": 111.8198125,
+              "channels": [
+                {
+                  "correlation": 0.9723664213069557,
+                  "second_peak": 0.19391052707559364
+                },
+                {
+                  "correlation": 0.9723821076780921,
+                  "second_peak": 0.1944916384374976
+                }
+              ],
+              "role": "untouched_boundary_audit"
+            }
+          ]
+        },
+        "final_boundary_errors": [
+          1.2500000096338226e-05,
+          8.526512829121202e-14,
+          1.2499999911597115e-05
+        ],
+        "m4a_sha256": "6809b66749f21aaabfee20c1e16a94df64bdbfbed3b305850d81eb16e863c178",
+        "m4a_clock": {
+          "decoded_samples": 1906778,
+          "max_contiguous_clock_error_seconds": 0.0
+        },
+        "observations": {
+          "anchors": [
+            {
+              "m4a_seconds": 5,
+              "mp4_seconds": 5.735,
+              "channels": [
+                {
+                  "correlation": 0.9764745169280444,
+                  "second_peak": 0.2011278755485655
+                },
+                {
+                  "correlation": 0.9786313785701589,
+                  "second_peak": 0.19108237200061529
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 15,
+              "mp4_seconds": 15.743,
+              "channels": [
+                {
+                  "correlation": 0.9742631747041186,
+                  "second_peak": 0.2065970142043093
+                },
+                {
+                  "correlation": 0.9781673821332165,
+                  "second_peak": 0.21272364597068763
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 25,
+              "mp4_seconds": 25.751,
+              "channels": [
+                {
+                  "correlation": 0.9677504098179266,
+                  "second_peak": 0.19021479751390513
+                },
+                {
+                  "correlation": 0.977126378243304,
+                  "second_peak": 0.1999312380716568
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 35,
+              "mp4_seconds": 35.759,
+              "channels": [
+                {
+                  "correlation": 0.9742262308405234,
+                  "second_peak": 0.21782623457707204
+                },
+                {
+                  "correlation": 0.9736023663118905,
+                  "second_peak": 0.2131109242374645
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 45,
+              "mp4_seconds": 45.767,
+              "channels": [
+                {
+                  "correlation": 0.9736751971845495,
+                  "second_peak": 0.20597323961596856
+                },
+                {
+                  "correlation": 0.9756947001476599,
+                  "second_peak": 0.21088280437489054
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 55,
+              "mp4_seconds": 55.775,
+              "channels": [
+                {
+                  "correlation": 0.9781329908398455,
+                  "second_peak": 0.21743817253576223
+                },
+                {
+                  "correlation": 0.9745648518997387,
+                  "second_peak": 0.21871550499784143
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 65,
+              "mp4_seconds": 65.783,
+              "channels": [
+                {
+                  "correlation": 0.9761098231435361,
+                  "second_peak": 0.19461823191713967
+                },
+                {
+                  "correlation": 0.9761979605240928,
+                  "second_peak": 0.20821517876262616
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 75,
+              "mp4_seconds": 75.791,
+              "channels": [
+                {
+                  "correlation": 0.9756611589024756,
+                  "second_peak": 0.21064672702700127
+                },
+                {
+                  "correlation": 0.9716796758317495,
+                  "second_peak": 0.1973349578919971
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 85,
+              "mp4_seconds": 85.799,
+              "channels": [
+                {
+                  "correlation": 0.9717934630386742,
+                  "second_peak": 0.2289219149664695
+                },
+                {
+                  "correlation": 0.9753539641517365,
+                  "second_peak": 0.2044249722680886
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 95,
+              "mp4_seconds": 95.807,
+              "channels": [
+                {
+                  "correlation": 0.9772844248822704,
+                  "second_peak": 0.18998322807787882
+                },
+                {
+                  "correlation": 0.9749587314719559,
+                  "second_peak": 0.22475121644175627
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 105,
+              "mp4_seconds": 105.815,
+              "channels": [
+                {
+                  "correlation": 0.9722681008113733,
+                  "second_peak": 0.19544505319598982
+                },
+                {
+                  "correlation": 0.9724995600611697,
+                  "second_peak": 0.21447251854798036
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 115,
+              "mp4_seconds": 115.823,
+              "channels": [
+                {
+                  "correlation": 0.9710648784606999,
+                  "second_peak": 0.20905166665127542
+                },
+                {
+                  "correlation": 0.9763322578187779,
+                  "second_peak": 0.20585134121488866
+                }
+              ],
+              "role": "validation"
+            }
+          ]
+        },
+        "model": {
+          "kind": "affine",
+          "segments": [
+            {
+              "slope": 1.0008000000000004,
+              "offset": 0.7310000000000458,
+              "lo": 5,
+              "hi": 115
+            }
+          ],
+          "validation": {
+            "accepted": true,
+            "max_residual_seconds": 9.947598300641403e-14,
+            "residuals_seconds": [
+              5.1514348342607263e-14,
+              5.684341886080802e-14,
+              6.394884621840902e-14,
+              8.526512829121202e-14,
+              8.526512829121202e-14,
+              9.947598300641403e-14
+            ]
+          },
+          "max_residual": 1.2500000096338226e-05
+        },
+        "boundary_m4a": 110,
+        "boundary_result": {
+          "mapped": 110.81900000000009,
+          "empirical_margin": 0.00013750000009633823,
+          "candidate_end": 110.8188625
+        },
+        "truth_boundary_mp4": 110.81899999999999
+      }
+    ],
+    "controls": [
+      {
+        "case": "offset",
+        "wrong_model": {
+          "slope": 1.0,
+          "offset": 0.8309999999999972
+        },
+        "validation": {
+          "accepted": false,
+          "max_residual_seconds": 0.10000000000000853,
+          "residuals_seconds": [
+            0.09999999999999787,
+            0.09999999999999432,
+            0.09999999999999432,
+            0.10000000000000853,
+            0.10000000000000853,
+            0.10000000000000853
+          ]
+        },
+        "fault": "offset off by 100ms"
+      },
+      {
+        "case": "pause_gap",
+        "wrong_model": {
+          "slope": 1.0,
+          "offset": 0.7309999999999999
+        },
+        "validation": {
+          "accepted": false,
+          "max_residual_seconds": 2.0,
+          "residuals_seconds": [
+            0.0,
+            0.0,
+            2.0,
+            2.0,
+            2.0,
+            2.0
+          ]
+        },
+        "fault": "gap ignored"
+      },
+      {
+        "case": "slow_drift",
+        "wrong_model": {
+          "slope": 1.0,
+          "offset": 0.7350000000000003
+        },
+        "validation": {
+          "accepted": false,
+          "max_residual_seconds": 0.08799999999999386,
+          "residuals_seconds": [
+            0.008000000000000895,
+            0.02400000000000091,
+            0.03999999999999915,
+            0.055999999999997385,
+            0.07200000000000273,
+            0.08799999999999386
+          ]
+        },
+        "fault": "drift ignored"
+      },
+      {
+        "fault": "100ms local warp between model anchors",
+        "observations": {
+          "anchors": [
+            {
+              "m4a_seconds": 5,
+              "mp4_seconds": 5.731,
+              "channels": [
+                {
+                  "correlation": 0.9999875568091634,
+                  "second_peak": 0.2018780256728001
+                },
+                {
+                  "correlation": 0.9999890554221219,
+                  "second_peak": 0.1882861527602525
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 15,
+              "mp4_seconds": 15.731,
+              "channels": [
+                {
+                  "correlation": 0.9999858623860854,
+                  "second_peak": 0.21783953598270345
+                },
+                {
+                  "correlation": 0.9999889464254261,
+                  "second_peak": 0.21546674033894858
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 25,
+              "mp4_seconds": 25.731,
+              "channels": [
+                {
+                  "correlation": 0.9999869725568605,
+                  "second_peak": 0.19209955625332953
+                },
+                {
+                  "correlation": 0.999988529266635,
+                  "second_peak": 0.20763719291293634
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 35,
+              "mp4_seconds": 35.731,
+              "channels": [
+                {
+                  "correlation": 0.9999884589905802,
+                  "second_peak": 0.20378129983558305
+                },
+                {
+                  "correlation": 0.9999878580748726,
+                  "second_peak": 0.2254704607244348
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 45,
+              "mp4_seconds": 45.731,
+              "channels": [
+                {
+                  "correlation": 0.9999878702196744,
+                  "second_peak": 0.2017768165852639
+                },
+                {
+                  "correlation": 0.9999903788080509,
+                  "second_peak": 0.22203740487895807
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 55,
+              "mp4_seconds": 55.731,
+              "channels": [
+                {
+                  "correlation": 0.9999888476967158,
+                  "second_peak": 0.19878719691336197
+                },
+                {
+                  "correlation": 0.9999883342094571,
+                  "second_peak": 0.20890874535136478
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 65,
+              "mp4_seconds": 65.731,
+              "channels": [
+                {
+                  "correlation": 0.9999871465730319,
+                  "second_peak": 0.20789775612435113
+                },
+                {
+                  "correlation": 0.999988693812197,
+                  "second_peak": 0.2005152846699073
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 75,
+              "mp4_seconds": 75.731,
+              "channels": [
+                {
+                  "correlation": 0.9999895798071909,
+                  "second_peak": 0.21532959328598633
+                },
+                {
+                  "correlation": 0.9999892097704421,
+                  "second_peak": 0.17950478736248593
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 85,
+              "mp4_seconds": 85.731,
+              "channels": [
+                {
+                  "correlation": 0.999988658382385,
+                  "second_peak": 0.20349555050412374
+                },
+                {
+                  "correlation": 0.9999893753193702,
+                  "second_peak": 0.1924226802389994
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 95,
+              "mp4_seconds": 95.731,
+              "channels": [
+                {
+                  "correlation": 0.9999865130735556,
+                  "second_peak": 0.207787443076269
+                },
+                {
+                  "correlation": 0.9999869826622655,
+                  "second_peak": 0.23065544937926055
+                }
+              ],
+              "role": "validation"
+            },
+            {
+              "m4a_seconds": 105,
+              "mp4_seconds": 105.731,
+              "channels": [
+                {
+                  "correlation": 0.9999863736917044,
+                  "second_peak": 0.18984803567028352
+                },
+                {
+                  "correlation": 0.9999878349106314,
+                  "second_peak": 0.19140913894930844
+                }
+              ],
+              "role": "fit"
+            },
+            {
+              "m4a_seconds": 115,
+              "mp4_seconds": 115.731,
+              "channels": [
+                {
+                  "correlation": 0.9999871029265383,
+                  "second_peak": 0.19301148622273542
+                },
+                {
+                  "correlation": 0.9999876679293286,
+                  "second_peak": 0.1864925797457106
+                }
+              ],
+              "role": "validation"
+            }
+          ]
+        },
+        "model": {
+          "kind": "constant",
+          "segments": [
+            {
+              "slope": 1.0,
+              "offset": 0.7309999999999972,
+              "lo": 5,
+              "hi": 115
+            }
+          ],
+          "validation": {
+            "accepted": true,
+            "max_residual_seconds": 7.105427357601002e-15,
+            "residuals_seconds": [
+              1.7763568394002505e-15,
+              7.105427357601002e-15,
+              7.105427357601002e-15,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "max_residual": 7.105427357601002e-15
+        },
+        "final_boundary_audit": {
+          "anchors": [
+            {
+              "m4a_seconds": 109,
+              "mp4_seconds": 109.831,
+              "channels": [
+                {
+                  "correlation": 0.9999867554813805,
+                  "second_peak": 0.2033045582125538
+                },
+                {
+                  "correlation": 0.9999866968748031,
+                  "second_peak": 0.17762316644676224
+                }
+              ],
+              "role": "untouched_boundary_audit"
+            },
+            {
+              "m4a_seconds": 110,
+              "mp4_seconds": 110.831,
+              "channels": [
+                {
+                  "correlation": 0.9999874219799497,
+                  "second_peak": 0.196319206374141
+                },
+                {
+                  "correlation": 0.9999874529860038,
+                  "second_peak": 0.20262792491763879
+                }
+              ],
+              "role": "untouched_boundary_audit"
+            },
+            {
+              "m4a_seconds": 111,
+              "mp4_seconds": 111.831,
+              "channels": [
+                {
+                  "correlation": 0.9999873658384142,
+                  "second_peak": 0.21254784707935032
+                },
+                {
+                  "correlation": 0.999987191578655,
+                  "second_peak": 0.1872699749852723
+                }
+              ],
+              "role": "untouched_boundary_audit"
+            }
+          ]
+        },
+        "audit_errors": [
+          0.10000000000000853,
+          0.10000000000000853,
+          0.10000000000000853
+        ],
+        "rejected": true
+      },
+      {
+        "fault": "silent unmatched input",
+        "result": {
+          "blocked": "insufficient or silent anchor",
+          "anchors": []
+        }
+      },
+      {
+        "fault": "repetitive ambiguous waveform (matcher-level)",
+        "result": {
+          "blocked": "weak or ambiguous anchor",
+          "anchors": []
+        }
+      }
+    ],
+    "sample_rate": 16000,
+    "anchor_search_seconds": 4,
+    "residual_ceiling_seconds": 0.005,
+    "bounded_mapping_tests_passed": true,
+    "stage_a_status": "NOT PASSED: complete matrix outstanding",
+    "commands": [
+      {
+        "label": "source-mp4",
+        "argv": [
+          "ffmpeg",
+          "-hide_banner",
+          "-nostdin",
+          "-y",
+          "-loglevel",
+          "error",
+          "-f",
+          "f32le",
+          "-ar",
+          "16000",
+          "-ac",
+          "2",
+          "-i",
+          "$SCRATCH/source.f32",
+          "-f",
+          "lavfi",
+          "-i",
+          "testsrc2=s=320x180:r=10:d=120",
+          "-map",
+          "1:v",
+          "-map",
+          "0:a",
+          "-t",
+          "120",
+          "-c:v",
+          "libx264",
+          "-threads",
+          "2",
+          "-preset",
+          "ultrafast",
+          "-crf",
+          "23",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "96k",
+          "$SCRATCH/source.mp4"
+        ],
+        "seconds": 0.4804797499673441,
+        "exit": 0
+      },
+      {
+        "label": "offset-m4a",
+        "argv": [
+          "ffmpeg",
+          "-hide_banner",
+          "-nostdin",
+          "-y",
+          "-loglevel",
+          "error",
+          "-f",
+          "f32le",
+          "-ar",
+          "16000",
+          "-ac",
+          "2",
+          "-i",
+          "$SCRATCH/offset.f32",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "96k",
+          "$SCRATCH/offset.m4a"
+        ],
+        "seconds": 0.46768254204653203,
+        "exit": 0
+      },
+      {
+        "label": "pause_gap-m4a",
+        "argv": [
+          "ffmpeg",
+          "-hide_banner",
+          "-nostdin",
+          "-y",
+          "-loglevel",
+          "error",
+          "-f",
+          "f32le",
+          "-ar",
+          "16000",
+          "-ac",
+          "2",
+          "-i",
+          "$SCRATCH/pause_gap.f32",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "96k",
+          "$SCRATCH/pause_gap.m4a"
+        ],
+        "seconds": 0.44836487498832867,
+        "exit": 0
+      },
+      {
+        "label": "slow_drift-m4a",
+        "argv": [
+          "ffmpeg",
+          "-hide_banner",
+          "-nostdin",
+          "-y",
+          "-loglevel",
+          "error",
+          "-f",
+          "f32le",
+          "-ar",
+          "16000",
+          "-ac",
+          "2",
+          "-i",
+          "$SCRATCH/slow_drift.f32",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "96k",
+          "$SCRATCH/slow_drift.m4a"
+        ],
+        "seconds": 0.455143874976784,
+        "exit": 0
+      },
+      {
+        "label": "hidden_local_warp-m4a",
+        "argv": [
+          "ffmpeg",
+          "-hide_banner",
+          "-nostdin",
+          "-y",
+          "-loglevel",
+          "error",
+          "-f",
+          "f32le",
+          "-ar",
+          "16000",
+          "-ac",
+          "2",
+          "-i",
+          "$SCRATCH/hidden_local_warp.f32",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "96k",
+          "$SCRATCH/hidden_local_warp.m4a"
+        ],
+        "seconds": 0.45905258296988904,
+        "exit": 0
+      }
+    ]
+  },
+  "capacity": {
+    "scope": "Local synthetic capacity only; no published artifacts",
+    "free_bytes_before": 76525707264,
+    "input_and_experimental_output_cap": 2000000000,
+    "source": {
+      "bytes": 1949649480,
+      "sha256": "74cb6edfbf1f8f3046e15917048bf1b79d156f0adf330d4816a2e27f29677046",
+      "probe": {
+        "streams": [
+          {
+            "index": 0,
+            "codec_name": "h264",
+            "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+            "profile": "Constrained Baseline",
+            "codec_type": "video",
+            "codec_tag_string": "avc1",
+            "codec_tag": "0x31637661",
+            "mime_codec_string": "avc1.42c01e",
+            "width": 320,
+            "height": 180,
+            "coded_width": 320,
+            "coded_height": 180,
+            "has_b_frames": 0,
+            "sample_aspect_ratio": "1:1",
+            "display_aspect_ratio": "16:9",
+            "pix_fmt": "yuv420p",
+            "level": 30,
+            "chroma_location": "left",
+            "field_order": "progressive",
+            "is_avc": "true",
+            "nal_length_size": "4",
+            "id": "0x1",
+            "r_frame_rate": "25/1",
+            "avg_frame_rate": "326287360/13056083",
+            "time_base": "1/12800",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 65280415,
+            "duration": "5100.032422",
+            "bit_rate": "2989435",
+            "bits_per_raw_sample": "8",
+            "nb_frames": "127456",
+            "extradata_size": 50,
+            "disposition": {
+              "default": 1,
+              "dub": 0,
+              "original": 0,
+              "comment": 0,
+              "lyrics": 0,
+              "karaoke": 0,
+              "forced": 0,
+              "hearing_impaired": 0,
+              "visual_impaired": 0,
+              "clean_effects": 0,
+              "attached_pic": 0,
+              "timed_thumbnails": 0,
+              "non_diegetic": 0,
+              "captions": 0,
+              "descriptions": 0,
+              "metadata": 0,
+              "dependent": 0,
+              "still_image": 0,
+              "multilayer": 0
+            },
+            "tags": {
+              "language": "und",
+              "handler_name": "VideoHandler",
+              "encoder": "Lavc63.1.102 libx264"
+            }
+          },
+          {
+            "index": 1,
+            "codec_name": "aac",
+            "codec_long_name": "AAC (Advanced Audio Coding)",
+            "profile": "LC",
+            "codec_type": "audio",
+            "codec_tag_string": "mp4a",
+            "codec_tag": "0x6134706d",
+            "mime_codec_string": "mp4a.40.2",
+            "sample_fmt": "fltp",
+            "sample_rate": "48000",
+            "channels": 1,
+            "channel_layout": "mono",
+            "bits_per_sample": 0,
+            "initial_padding": 1024,
+            "id": "0x2",
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/48000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 244800534,
+            "duration": "5100.011125",
+            "bit_rate": "64311",
+            "nb_frames": "239022",
+            "extradata_size": 5,
+            "disposition": {
+              "default": 1,
+              "dub": 0,
+              "original": 0,
+              "comment": 0,
+              "lyrics": 0,
+              "karaoke": 0,
+              "forced": 0,
+              "hearing_impaired": 0,
+              "visual_impaired": 0,
+              "clean_effects": 0,
+              "attached_pic": 0,
+              "timed_thumbnails": 0,
+              "non_diegetic": 0,
+              "captions": 0,
+              "descriptions": 0,
+              "metadata": 0,
+              "dependent": 0,
+              "still_image": 0,
+              "multilayer": 0
+            },
+            "tags": {
+              "language": "und",
+              "handler_name": "SoundHandler"
+            }
+          }
+        ],
+        "format": {
+          "filename": "$SCRATCH/near-cap-85min.mp4",
+          "nb_streams": 2,
+          "nb_programs": 0,
+          "nb_stream_groups": 0,
+          "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+          "format_long_name": "QuickTime / MOV",
+          "start_time": "0.000000",
+          "duration": "5100.032422",
+          "size": "1949649480",
+          "bit_rate": "3058254",
+          "probe_score": 100,
+          "tags": {
+            "major_brand": "isom",
+            "minor_version": "512",
+            "compatible_brands": "isomiso2avc1mp41",
+            "encoder": "Lavf63.1.102"
+          }
+        }
+      },
+      "allocated_bytes": 1962938368
+    },
+    "full_output": {
+      "bytes": 2190280943,
+      "sha256": "7bb54118e2ae0df30a17bb2bdf44a6d981aa0d6524cc03a34de1f76b72a2d97a",
+      "probe": {
+        "streams": [
+          {
+            "index": 0,
+            "codec_name": "h264",
+            "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+            "profile": "Constrained Baseline",
+            "codec_type": "video",
+            "codec_tag_string": "avc1",
+            "codec_tag": "0x31637661",
+            "mime_codec_string": "avc1.42c01e",
+            "width": 320,
+            "height": 180,
+            "coded_width": 320,
+            "coded_height": 180,
+            "has_b_frames": 0,
+            "sample_aspect_ratio": "1:1",
+            "display_aspect_ratio": "16:9",
+            "pix_fmt": "yuv420p",
+            "level": 30,
+            "chroma_location": "left",
+            "field_order": "progressive",
+            "is_avc": "true",
+            "nal_length_size": "4",
+            "id": "0x1",
+            "r_frame_rate": "25/1",
+            "avg_frame_rate": "89969/3600",
+            "time_base": "1/12800",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 46080000,
+            "duration": "3600.000000",
+            "bit_rate": "4798482",
+            "bits_per_raw_sample": "8",
+            "nb_frames": "89969",
+            "extradata_size": 49,
+            "disposition": {
+              "default": 1,
+              "dub": 0,
+              "original": 0,
+              "comment": 0,
+              "lyrics": 0,
+              "karaoke": 0,
+              "forced": 0,
+              "hearing_impaired": 0,
+              "visual_impaired": 0,
+              "clean_effects": 0,
+              "attached_pic": 0,
+              "timed_thumbnails": 0,
+              "non_diegetic": 0,
+              "captions": 0,
+              "descriptions": 0,
+              "metadata": 0,
+              "dependent": 0,
+              "still_image": 0,
+              "multilayer": 0
+            },
+            "tags": {
+              "language": "und",
+              "handler_name": "VideoHandler",
+              "encoder": "Lavc63.1.102 libx264"
+            }
+          },
+          {
+            "index": 1,
+            "codec_name": "aac",
+            "codec_long_name": "AAC (Advanced Audio Coding)",
+            "profile": "LC",
+            "codec_type": "audio",
+            "codec_tag_string": "mp4a",
+            "codec_tag": "0x6134706d",
+            "mime_codec_string": "mp4a.40.2",
+            "sample_fmt": "fltp",
+            "sample_rate": "48000",
+            "channels": 1,
+            "channel_layout": "mono",
+            "bits_per_sample": 0,
+            "initial_padding": 1024,
+            "id": "0x2",
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/48000",
+            "start_pts": 0,
+            "start_time": "0.000000",
+            "duration_ts": 172800000,
+            "duration": "3600.000000",
+            "bit_rate": "64298",
+            "nb_frames": "168722",
+            "extradata_size": 5,
+            "disposition": {
+              "default": 1,
+              "dub": 0,
+              "original": 0,
+              "comment": 0,
+              "lyrics": 0,
+              "karaoke": 0,
+              "forced": 0,
+              "hearing_impaired": 0,
+              "visual_impaired": 0,
+              "clean_effects": 0,
+              "attached_pic": 0,
+              "timed_thumbnails": 0,
+              "non_diegetic": 0,
+              "captions": 0,
+              "descriptions": 0,
+              "metadata": 0,
+              "dependent": 0,
+              "still_image": 0,
+              "multilayer": 0
+            },
+            "tags": {
+              "language": "und",
+              "handler_name": "SoundHandler"
+            }
+          }
+        ],
+        "format": {
+          "filename": "$SCRATCH/oversized-presentation.mp4",
+          "nb_streams": 2,
+          "nb_programs": 0,
+          "nb_stream_groups": 0,
+          "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+          "format_long_name": "QuickTime / MOV",
+          "start_time": "0.000000",
+          "duration": "3600.000000",
+          "size": "2190280943",
+          "bit_rate": "4867290",
+          "probe_score": 100,
+          "tags": {
+            "major_brand": "isom",
+            "minor_version": "512",
+            "compatible_brands": "isomiso2avc1mp41",
+            "encoder": "Lavf63.1.102"
+          }
+        }
+      },
+      "decision": {
+        "accepted": false,
+        "reason": "output_cap_exceeded",
+        "bytes": 2190280943
+      },
+      "exact_file_cleanup_verified": true
+    },
+    "oversized_input_decision": "reject_input_cap",
+    "fs_limit": {
+      "exit": 0,
+      "decision": {
+        "accepted": false,
+        "reason": "truncated_duration",
+        "bytes": 64302101,
+        "duration": 105.952
+      },
+      "exact_file_cleanup_verified": true
+    },
+    "os_limit": {
+      "exit": -25,
+      "bytes": 33554432,
+      "decision": {
+        "accepted": false,
+        "reason": "encoder_failed"
+      },
+      "exact_file_cleanup_verified": true
+    },
+    "preflight_controls": {
+      "exact_cap": "admit",
+      "cap_plus_one": "reject_input_cap",
+      "mock_insufficient_scratch": "reject_insufficient_scratch"
+    },
+    "bounded_capacity_tests_passed": true,
+    "stage_a_status": "NOT PASSED: complete matrix outstanding",
+    "runs": [
+      {
+        "label": "seed",
+        "exit": 0,
+        "seconds": 0.4404672909877263,
+        "peak_sampled_owned_bytes": 22947349,
+        "maximum_resident_set_bytes": 22724608,
+        "file_limit": null,
+        "argv": [
+          "/usr/bin/time",
+          "-l",
+          "ffmpeg",
+          "-hide_banner",
+          "-nostdin",
+          "-y",
+          "-loglevel",
+          "error",
+          "-f",
+          "lavfi",
+          "-i",
+          "testsrc2=s=320x180:r=25:d=60",
+          "-f",
+          "lavfi",
+          "-i",
+          "sine=frequency=440:sample_rate=48000:duration=60",
+          "-c:v",
+          "libx264",
+          "-threads",
+          "2",
+          "-preset",
+          "ultrafast",
+          "-b:v",
+          "3000k",
+          "-minrate",
+          "3000k",
+          "-maxrate",
+          "3000k",
+          "-bufsize",
+          "6000k",
+          "-x264-params",
+          "nal-hrd=cbr:force-cfr=1",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "64k",
+          "-movflags",
+          "+faststart",
+          "$SCRATCH/seed.mp4"
+        ]
+      },
+      {
+        "label": "near-cap-source",
+        "exit": 0,
+        "seconds": 2.9654535410227254,
+        "peak_sampled_owned_bytes": 1972597606,
+        "maximum_resident_set_bytes": 49856512,
+        "file_limit": null,
+        "argv": [
+          "/usr/bin/time",
+          "-l",
+          "ffmpeg",
+          "-hide_banner",
+          "-nostdin",
+          "-y",
+          "-loglevel",
+          "error",
+          "-stream_loop",
+          "84",
+          "-i",
+          "$SCRATCH/seed.mp4",
+          "-t",
+          "5100",
+          "-c",
+          "copy",
+          "-movflags",
+          "+faststart",
+          "$SCRATCH/near-cap-85min.mp4"
+        ]
+      },
+      {
+        "label": "full-output",
+        "exit": 0,
+        "seconds": 19.728424291999545,
+        "peak_sampled_owned_bytes": 4162879326,
+        "maximum_resident_set_bytes": 51789824,
+        "file_limit": null,
+        "argv": [
+          "/usr/bin/time",
+          "-l",
+          "ffmpeg",
+          "-hide_banner",
+          "-nostdin",
+          "-y",
+          "-loglevel",
+          "error",
+          "-i",
+          "$SCRATCH/near-cap-85min.mp4",
+          "-t",
+          "3600",
+          "-map",
+          "0:v:0",
+          "-map",
+          "0:a:0",
+          "-c:v",
+          "libx264",
+          "-threads",
+          "2",
+          "-preset",
+          "ultrafast",
+          "-b:v",
+          "4800k",
+          "-minrate",
+          "4800k",
+          "-maxrate",
+          "4800k",
+          "-bufsize",
+          "9600k",
+          "-x264-params",
+          "nal-hrd=cbr:force-cfr=1",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "64k",
+          "-movflags",
+          "+faststart",
+          "$SCRATCH/oversized-presentation.mp4"
+        ]
+      },
+      {
+        "label": "full-output-decode",
+        "exit": 0,
+        "seconds": 5.220079166989308,
+        "peak_sampled_owned_bytes": 4162880103,
+        "maximum_resident_set_bytes": 46055424,
+        "file_limit": null,
+        "argv": [
+          "/usr/bin/time",
+          "-l",
+          "ffmpeg",
+          "-hide_banner",
+          "-nostdin",
+          "-y",
+          "-loglevel",
+          "error",
+          "-i",
+          "$SCRATCH/oversized-presentation.mp4",
+          "-map",
+          "0:v:0",
+          "-map",
+          "0:a:0",
+          "-f",
+          "null",
+          "-"
+        ]
+      },
+      {
+        "label": "ffmpeg-fs-limit",
+        "exit": 0,
+        "seconds": 0.6434761669952422,
+        "peak_sampled_owned_bytes": 2036902038,
+        "maximum_resident_set_bytes": 49938432,
+        "file_limit": null,
+        "argv": [
+          "/usr/bin/time",
+          "-l",
+          "ffmpeg",
+          "-hide_banner",
+          "-nostdin",
+          "-y",
+          "-loglevel",
+          "error",
+          "-i",
+          "$SCRATCH/near-cap-85min.mp4",
+          "-t",
+          "3600",
+          "-map",
+          "0:v:0",
+          "-map",
+          "0:a:0",
+          "-c:v",
+          "libx264",
+          "-threads",
+          "2",
+          "-preset",
+          "ultrafast",
+          "-b:v",
+          "4800k",
+          "-minrate",
+          "4800k",
+          "-maxrate",
+          "4800k",
+          "-bufsize",
+          "9600k",
+          "-x264-params",
+          "nal-hrd=cbr:force-cfr=1",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "64k",
+          "-movflags",
+          "+faststart",
+          "-fs",
+          "64000000",
+          "$SCRATCH/fs-limited.mp4"
+        ]
+      },
+      {
+        "label": "os-file-limit",
+        "exit": -25,
+        "seconds": 0.3745894170133397,
+        "peak_sampled_owned_bytes": 2006155182,
+        "maximum_resident_set_bytes": 48627712,
+        "file_limit": 33554432,
+        "argv": [
+          "/usr/bin/time",
+          "-l",
+          "ffmpeg",
+          "-hide_banner",
+          "-nostdin",
+          "-y",
+          "-loglevel",
+          "error",
+          "-i",
+          "$SCRATCH/near-cap-85min.mp4",
+          "-t",
+          "3600",
+          "-map",
+          "0:v:0",
+          "-map",
+          "0:a:0",
+          "-c:v",
+          "libx264",
+          "-threads",
+          "2",
+          "-preset",
+          "ultrafast",
+          "-b:v",
+          "4800k",
+          "-minrate",
+          "4800k",
+          "-maxrate",
+          "4800k",
+          "-bufsize",
+          "9600k",
+          "-x264-params",
+          "nal-hrd=cbr:force-cfr=1",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "64k",
+          "-movflags",
+          "+faststart",
+          "$SCRATCH/os-limit.mp4"
+        ]
+      }
+    ],
+    "scratch_bytes_remaining": 1972600750,
+    "limits": [
+      "320x180 CBR filler stresses bytes, not representative 1080p encoding quality or memory",
+      "Disk peak sampled every50ms, not exact instantaneous peak; macOS time reports RSS bytes",
+      "OS per-file quota is real; insufficient-volume-space branch mocked; actual ENOSPC not induced",
+      "Output 2GB cap is experimental, not an owner-approved production output cap",
+      "No cloud quota, transfer, retries, Board publication or production cleanup exercised"
+    ]
+  }
+}

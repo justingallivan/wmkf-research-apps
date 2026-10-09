@@ -3,7 +3,7 @@ title: Stage 4 local synthetic benchmark results
 domain: transcription
 kind: report
 status: active
-summary: "Six local padding/provenance and synchronization follow-up cases pass; the broader Stage A matrix remains incomplete. No cloud or real recording was accessed."
+summary: "Local padding/sync, separate-M4A mapping and capacity cases pass their bounded checks; the broader Stage A matrix remains NOT PASSED / incomplete. No cloud or real recording was accessed."
 owner: product-engineering
 related:
   - docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md
@@ -11,7 +11,7 @@ related:
 
 # Stage 4 local synthetic results
 
-**[VERIFIED via local follow-up, 2026-10-09] All six padding/provenance and tested synchronization cases now pass.** The original four-millisecond tail was reproduced from physically isolated, already-cut audio: it was not newly encoded discussion. It was not digital silence either. The revised recipe inserts leading silence on the common clock before trimming, preserving the delayed audio's position. Full Stage A is still incomplete because the broader source-mapping, capacity and container matrix remains unfinished. No cloud job, SharePoint/Zoom read or Board registration occurred.
+**[VERIFIED via local follow-up, 2026-10-09] All six padding/provenance and tested synchronization cases now pass.** The original four-millisecond tail was reproduced from physically isolated, already-cut audio: it was not newly encoded discussion. It was not digital silence either. The revised recipe inserts leading silence on the common clock before trimming, preserving the delayed audio's position. The subsequent separate-M4A mapping and capacity follow-up also passes its bounded cases; see `docs/plans/STAGE4_MAPPING_CAPACITY_RESULTS_2026-10-09.md`. Full Stage A remains NOT PASSED because the integrated mapping, broader codec/container and quality matrix remains unfinished. No cloud job, SharePoint/Zoom read or Board registration occurred.
 
 ## Padding and synchronization follow-up — current result
 
@@ -42,7 +42,7 @@ related:
 - Right audio channel shifted 10 ms: measured lag was 480 samples on that channel and zero on the other; synchronization rejected it.
 - Audio remuxed with a 50 ms timestamp offset: rejected by the cumulative audio-clock check, independently of waveform content.
 
-[ASSUMED limits] These are known-input tests using the same pinned encoder for output and isolated reference. Payload equality is strong bounded evidence about the input used, not an independent codec implementation or a generic speech-privacy classifier. AAC source pre-echo, arbitrary edit schedules, gaps, drift and separate M4A alignment still need their own tests. The fixture's 100 ms margin is prescribed ground truth, not measured production uncertainty. The owner's <=2-second earlier-trim rule is unchanged. This local follow-up does not authorize real-media access or claim the entire Stage A matrix passed.
+[ASSUMED limits] These are known-input tests using the same pinned encoder for output and isolated reference. Payload equality is strong bounded evidence about the input used, not an independent codec implementation or a generic speech-privacy classifier. AAC source pre-echo and arbitrary edit schedules remain untested. Separate M4A offset/gap/drift now have bounded tests in the linked mapping/capacity report; production generalization remains unproven. The fixture's 100 ms margin is prescribed ground truth, not measured production uncertainty. The owner's <=2-second earlier-trim rule is unchanged. This local follow-up does not authorize real-media access or claim the entire Stage A matrix passed.
 
 ## Authorization and environment
 
@@ -105,10 +105,10 @@ related:
 
 [VERIFIED scope] The bounded padding/sync follow-up above resolves the six-case local issue. [ASSUMED engineering follow-up] The remaining acceptance coverage is:
 
-- Mapping across separate M4A origins, pauses/discontinuities and unknown offsets/drift. The follow-up measures known synthetic pilot alignment; it is not a production mapping solver.
+- Integrated mapped-boundary encoding and broader separate-M4A origins, pauses/discontinuities and offsets/drift. The linked mapping/capacity follow-up recovers an unknown 731 ms offset, one two-second gap and 800 ppm drift, and rejects wrong mappings; its empirical margin is not a production uncertainty bound.
 - Broader codec/offset combinations and arbitrary low-level speech leakage. The new tail-local/audio/video fault controls pass their intended tests, but thresholded markers are not general speech-privacy proof.
 - Unexpected caption/data streams, arbitrary trailing/unreferenced payload, all-track inspection, a second independent playback path and stale-input binding behavior.
-- Near-2 GB input/output-cap failure, peak memory/disk measurements and the proposed motion-heavier/legible-slide quality fixture. The long repeating pattern above is only a timing probe.
+- Representative resource/quality measurements and the motion-heavier/legible-slide fixture. The linked capacity follow-up covers a physical 1.95 GB input, larger 2.19 GB output, truncation and OS file-limit rejection, process RSS and sampled logical scratch size. Its low-resolution filler fixture does not establish 1080p/cloud capacity or actual volume-exhaustion handling.
 - Cloud dispatch, timeout/crash cleanup, snapshots, upload failure/reconciliation and region/cap enforcement remain separate cloud-stage obligations.
 
 [VERIFIED scope] The local padding issue was investigated and the six-case follow-up passed; this still does not satisfy the complete proposed synthetic acceptance matrix. No real recording should be requested/read on the strength of these results. The full staff Recording retention policy is unchanged: retain until Stage 5, then retain only the presentation video.
