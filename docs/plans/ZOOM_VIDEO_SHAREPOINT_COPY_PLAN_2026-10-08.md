@@ -589,6 +589,58 @@ Tier 2: background work, uploads and a migration [VERIFIED via `CAMPAIGN_RELEASE
 
 8. **Replacing a staff-uploaded MP4 (from review item 6).** **Decided (owner, Session 588): ask staff to confirm.** When the current Recording winner is a SharePoint MP4, starting a copy (Import, **Copy video** or **Try again**) requires explicit confirmation that it will replace that file. The copy records the winner's slot version at start. Before finalize it aborts with a named code if a newer non-Zoom-link winner has appeared since. The rework must specify this.
 
+## Build rulings (Session 589, orchestrator)
+
+A read-only build map (Sonnet reconnaissance, Session 589) found the gaps below. Claude ruled on each so that no builder guesses. Each ruling is binding on the build unless the owner overrides it. Gap numbers refer to that map. Plan store line citations elsewhere in this document are about 8 lines stale after step 0; locate by symbol.
+
+**Build order (slices).**
+- S1 transport primitives and `ZOOM_VIDEO_COPY_ACCESS`
+- S2 MP4 mint/finalize extraction, characterization tests first
+- S3 copy and intent stores
+- S4 start/GET/cancel service and route
+- S5 tick pump
+- S6 registration, receipt recovery and the cron
+- S7 card
+- S8 gates and durable docs
+
+**Rulings.**
+1. **Stale text (gaps 1–5, 20, 21, 24, 27).** Correct it in the docs slice: fresh installs need no `setup-database.js` edit; step-0 binding is done and retention codes changed; store line numbers; the Atlas page already exists; card naming is Step 1 "Get the recording" / `RecordingBlock`. Duration stays out of v1 (decision 6). Use the repo's `hashtext()` idiom.
+2. **Zoom transport (gaps 6–8).**
+   - Split resolution from transfer. A resolver follows `download_url` with the bearer on hop 0 only, sending `Range: bytes=0-0` on each hop and manual redirects, and returns the final `ssrweb.zoom.us` URL. A ranged GET without the bearer then fetches bytes. The first chunk may fuse with resolution.
+   - Add `zoom_range_unsupported` and `zoom_download_denied` to the client's status map.
+   - The ranged GET returns the raw HTTP status for the resolved hop and does not use `mapFailure`. 401, 403, 404 or 410 there means re-resolve once; then the outcome is terminal.
+   - Add a deadline-aware `timedFetch` variant (a per-call timeout derived from the tick deadline).
+3. **Path conflict (gap 9).** Catch `post_presentation_candidate_mismatch` thrown by `resolveStableMp4Path`, and treat `partial`, as `failed` `zoom_video_path_conflict`.
+4. **Counter caps (gap 10).** A counter reaching its cap and the transition to `failed` happen in one UPDATE: increment when below the cap, otherwise set `failed` with the named code. No statement may increment past the CHECK.
+5. **Store shape (gaps 11–13).**
+   - N4 becomes per-transition named store functions, one per state-table write. There is no generic column patch.
+   - N1 runs in one `db.connect()` transaction (the `withReviewPanelTransaction` pattern). It inserts both rows with its own INSERT statements, with `origin = 'zoom_copy'` written explicitly; `insertPresentationMaterialUpload` cannot join the transaction.
+   - Try again's failed-row inspection runs before the transaction and is rechecked under the advisory lock.
+   - A unique-index violation inside N1 (active request, path or generation key) rolls back and maps to 409 `zoom_video_copy_in_progress`. The exception is the copied-file index, which replays.
+   - Build these named functions:
+     - I4 renew and release, which need no expired-intent predicate, so the existing cleanup renew cannot serve
+     - an origin-aware source-failure abandonment writer
+     - a joined copy-plus-intent snapshot read for dispatch and GET
+     - a failed-copy due-batch selector
+   - The selector advances `next_attempt_at` with a conditional UPDATE keyed on `state = 'failed'` and the previously read `next_attempt_at`. It takes no copy lease, because `terminal_unleased` forbids one. The I4 lease sits on the intent row.
+6. **Replay before confirmation (gap 14).** The copied-file replay lookup for the same request and file runs before start step 4. Repeating Import on an already copied file replays and asks nothing.
+7. **Unversioned winner (gap 15).** If the current Recording winner is a SharePoint MP4 without a positive slot version, start refuses with 409 `zoom_video_winner_unversioned` and copies nothing. Conservative and rare; staff can still upload manually.
+8. **Unlisted failure codes (gap 16).**
+   - `post_presentation_site_visit_required`, `post_presentation_site_visit_ambiguous` and `post_presentation_cycle_required` pause, like the kill switch, and do not fail.
+   - A Dataverse or Graph error that is not a `ServiceHttpError`, or has HTTP status 500 or above, or is a timeout, is retryable under `registration_attempts` (cap 5, then `failed` `zoom_video_registration_failed`).
+   - Any other code is terminal `failed` with the sanitized code.
+7a. **Post-final-chunk absence (gap 17).** If `resolveStableMp4Path` returns `absent` after the final PUT, retry next tick and count it under `uncertain_checks` (cap 3, then `failed` `zoom_video_upload_uncertain`). Log each tick's post-chunk `expirationDateTime` in the structured log line, with no new column; this answers probe 4's open question.
+9. **3a reuse (gap 18).** Export or generalize `listApprovedOccurrences`, `pickFiles` and the filename helper from `import-service.js` rather than copying them. The `zoom-recordings` GET gains additive per-meeting video fields: eligible file, size, `tooLarge`, `segmented`, existing copy state. Update its API matrix row and tests.
+10. **Import starts both (gap 19), conservative; owner to confirm.**
+    - The card shows the replace confirmation first, when the decision-8 condition holds, then sends the existing audio import and the video start as two independent POSTs. Each shows its own result; neither failure undoes the other.
+    - The video start does not require `MEETING_TRACKER_TRANSCRIPTION_ACCESS`; it requires `POST_PRESENTATION_MATERIALS_ACCESS`, Zoom config and `ZOOM_VIDEO_COPY_ACCESS`.
+    - When transcription is unavailable or the meeting has no audio, the card still offers **Copy video** on its own.
+11. **Ticks (gap 22).** Session creation and the first pump may share a tick when the budget allows (dispatch re-applies after each writer).
+12. **Host hash (gap 23).** `sha256(trim(lowercase(email)))`, matching `readZoomImportConfig`.
+13. **Noted, not changed (gaps 25, 26).** The token-arm candidate overwrite and the browser `finalizing`/NULL-lease claim gap are pre-existing browser behavior, out of 3b scope.
+14. **Gates the plan missed.** `tests/unit/test-request-scheduled-job-census.test.js` gets a `RECORDED_CRONS` row of class `allowed`, with counts updated. `requireappaccess-endpoint-count` changes along with `api-route-file-count`. The Graph public-contract and boundary tests change for `putUploadSessionChunk`. The request-document writer stays the single `dependencies.createDocument(` in `material-service.js`, with no new writer row.
+15. **Real-Postgres proof.** Use loopback-only `ZOOM_VIDEO_COPY_PG_TEST_URL`, skipped when unset, following `tests/integration/meeting-tracker-transcription.pg.test.js`. A local Docker Postgres may be used. It is never a shared or remote database.
+
 ## Contract review (`/contract-reconcile` Mode A, planning pass)
 
 **Historical record.** Retained as requested; current protocol is in the revised sections above.
