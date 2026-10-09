@@ -3,7 +3,7 @@ title: Stage 4 separate-audio mapping and capacity results
 domain: transcription
 kind: report
 status: active
-summary: "Local generated-media offset, pause/gap, drift and capacity cases pass their bounded checks; full Stage A remains NOT PASSED. No cloud or real media accessed."
+summary: "Local generated-media offset, pause/gap, drift and capacity cases pass their bounded checks; local investigation is closed as promising with documented limitations. Historical strict matrix remains non-pass. No cloud or real media accessed."
 owner: product-engineering
 related:
   - docs/plans/STAGE4_SYNTHETIC_RESULTS_2026-10-09.md
@@ -12,7 +12,7 @@ related:
 
 # Separate M4A mapping and capacity follow-up
 
-**[VERIFIED via local generated-media receipts, 2026-10-09] The requested bounded mapping and capacity cases passed. Full Stage A remains NOT PASSED / incomplete.** No cloud run, real recording, SharePoint/Zoom access or Board registration occurred. This report extends the earlier padding/synchronization results; it does not certify a production mapper or output verifier.
+**[VERIFIED via local generated-media receipts, 2026-10-09] The requested bounded mapping and capacity cases passed. The historical strict Stage A matrix remains non-pass; Justin has closed the local investigation as promising with documented limitations.** No cloud run, real recording, SharePoint/Zoom access or Board registration occurred. This report extends the earlier padding/synchronization results; it does not certify a production mapper or output verifier.
 
 ## Mapping a separate M4A onto the MP4 clock
 
@@ -82,4 +82,4 @@ These unusually short timings reflect low resolution and filler bytes, not reali
 
 [VERIFIED via fresh read-only review] Review checked model validation/audit separation, monotonicity, the hidden-warp control, capacity rejection semantics and resource-claim limits. Findings were incorporated before the final mapping rerun. The report deliberately keeps empirical mapping margins and capacity checks separate from production acceptance.
 
-**[ASSUMED engineering follow-up; Stage A NOT PASSED]** See `docs/plans/STAGE4_LOCAL_MATRIX_RESULTS_2026-10-09.md` for completed bounded integration, container, native-decode, changed-binding simulation and 1080p quality tests. Native audio completeness is intermittently non-pass even after an earlier complete-packet cut; the linked report separates the two Apple APIs and their terminal behavior. Generalized uncertainty/container coverage, production stale-state fencing and representative full-length behavior remain unproven. Cloud lifecycle and upload/cleanup/region/cap enforcement remain later-stage obligations. No cloud or real media is authorized by these partial results. Staff retain the full Recording until Stage 5, then only the presentation video.
+**[VERIFIED owner closure; PLANNED follow-up]** Local investigation is closed as promising with documented limitations. See `docs/plans/STAGE4_LOCAL_MATRIX_RESULTS_2026-10-09.md` for the practical sequence and release requirements. The historical native exact-count results remain non-pass; the small omission is an accepted quality limitation, not a standalone project blocker. Focus next on representative mapping/compatibility, a bounded synthetic cloud pilot, and implementation tests that prevent publishing a stale or unapproved file. Exhaustive MP4 proof is not required; controlled-recipe privacy checks remain required. Real-media access still requires fresh permission. Staff retain the full Recording until Stage 5, then only the presentation video.

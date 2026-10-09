@@ -3,7 +3,7 @@ title: Stage 4 integrated local matrix results
 domain: transcription
 kind: report
 status: active
-summary: "Integrated mapping-to-cut and bounded container/long-drift checks pass. Cutting earlier at a complete AAC packet did not resolve intermittent native omissions; the completeness check is unchanged and Stage A remains NOT PASSED. Local synthetic media only."
+summary: "Local investigation closed as promising with documented limitations by owner decision. Historical strict matrix remains non-pass; tiny Apple tail omissions are a quality limitation, not a standalone project blocker. Practical mapping, compatibility, cloud and publication checks remain before production."
 owner: product-engineering
 related:
   - docs/plans/STAGE4_SYNTHETIC_RESULTS_2026-10-09.md
@@ -11,9 +11,13 @@ related:
   - docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md
 ---
 
-# Integrated local matrix — Stage A NOT PASSED
+# Integrated local matrix — investigation closed, promising with limitations
 
-**[VERIFIED via local generated-media receipts, 2026-10-09] Four complete mapping-to-cut cases pass the FFmpeg-based checks. Stage A remains NOT PASSED.** Independent Apple decoding intermittently returned a shorter final audio tail from the same output bytes. No private marker appeared in the positive outputs. Follow-up proves the missing samples are retained presentation audio, not disposable padding; the cause of the intermittent omission remains unresolved. An earlier complete-packet cut also intermittently loses retained audio in the original Apple probe; a second Apple audio API returns the full sample count but records an EOF error on the subsequent read. No cloud, real-media, SharePoint/Zoom or Board operation was performed. No runtime application code changed.
+**[VERIFIED via Justin's closure decision, 2026-10-09] The local investigation is closed as promising with documented limitations.** The evidence supports proceeding to focused validation and implementation planning, not production certification. The original strict Stage A matrix and immutable receipts remain **NOT PASSED**; this decision changes which open items block progress, not the recorded test outcomes.
+
+[VERIFIED via local receipts] Four mapping-to-cut cases pass the bounded FFmpeg checks. No private marker appeared in positive outputs; deliberate privacy and synchronization faults were rejected. The Apple probe intermittently omits approximately 4–21 ms of retained presentation audio. Another Apple audio API returns complete counts but records EOF on a subsequent read. Actual player behavior and the root cause remain unknown. **[Owner-accepted limitation]** Treat this as a minor unresolved playback-quality issue, not a standalone project blocker. Stop investigating it unless representative playback exposes an objectionable ending or a materially different failure. Staff listening addresses ending quality; it does not override a failed privacy check.
+
+No cloud, real-media, SharePoint/Zoom or Board operation was performed. No runtime application code or acceptance script changed for this closure. No generic tolerance for private content, unexplained timing errors or materially truncated files is authorized.
 
 ## Results matrix
 
@@ -87,7 +91,7 @@ Native decoded video buffers supplied no individual duration. For these CFR fixt
 
 ## Earlier complete-packet cut: not a reliable fix
 
-**[VERIFIED via `scripts/benchmarks/stage4-packet-boundary-check.py` and `docs/plans/STAGE4_PACKET_BOUNDARY_EVIDENCE_2026-10-09.json`] Re-encoding at an earlier complete AAC packet did not eliminate the intermittent short read. Stage A remains NOT PASSED.** This is a bounded diagnostic, not a production recipe change.
+**[VERIFIED via `scripts/benchmarks/stage4-packet-boundary-check.py` and `docs/plans/STAGE4_PACKET_BOUNDARY_EVIDENCE_2026-10-09.json`] Re-encoding at an earlier complete AAC packet did not eliminate the intermittent short read. The historical strict matrix remains NOT PASSED.** This is a bounded diagnostic, not a production recipe change.
 
 The experiment reuses only source/output/isolated-PCM bytes matching the committed integration hashes. It truncates the encoder input to **4,427,776 samples/channel**, ending at **92.245333333 s**: 217 samples (4.521 ms) earlier for offset/gap/negative-offset, or 215 samples (4.479 ms) earlier for drift. It re-encodes from that isolated prefix; it does not drop a compressed packet from an existing file. Offset and drift produce the **same aligned output hash**, so these are repeated reads of one aligned file, not two distinct format cases. The video remains 2,766 frames ending at 92.200 s.
 
@@ -106,7 +110,7 @@ Two completed batches each read both original files and both aligned copies four
 
 [VERIFIED controls, repeated in each completed batch] Four milliseconds of private tone placed inside the aligned endpoint is rejected by the marker and isolated-payload checks. A 10 ms shift of the right channel is rejected at early/middle/late waveform anchors. A 50 ms audio timestamp shift is rejected by the cumulative clock check. These new controls exercise the FFmpeg/provenance/sync verifier; the original Apple leaky/truncated controls remain separate historical evidence. No claim is made that the new AVAudioFile diagnostic itself has a complete acceptance/control matrix.
 
-**[PLANNED next diagnostic]** Test the original reader's end-of-stream handling with Apple's newer async output-provider API or a minimal independently implemented reader, on the same hash-bound files. Keep exact completeness and privacy requirements; do not make progressively earlier cuts to conceal reader omissions. Extend independent testing to VFR/delayed-audio only after the reader path is understood. No cloud or real media follows from this result.
+**[Owner decision — diagnostic deferred]** Do not pursue another Apple reader implementation or progressively earlier cuts solely to resolve this small omission. Preserve the evidence. Reopen only if representative playback shows an objectionable ending, material truncation, synchronization failure or a privacy concern. Packet alignment is not adopted as a proven fix.
 
 ## 1080p quality and resource probes
 
@@ -121,14 +125,19 @@ Two completed batches each read both original files and both aligned copies four
 
 [VERIFIED via viewing extracted frames at 60 seconds] Titles, budget figures, small alphabet/digit text and scrolling rows were readable in both outputs. Partial rows at the scrolling viewport edges are present by design. This is a two-frame visual inspection, not full-video human quality or listening approval. SSIM is supporting evidence, not a legibility guarantee. Peak process RSS across all recorded quality commands was 408,174,592 bytes; peak sampled logical scratch was 63,957,403 bytes. These are local process/sampled-file measurements, not isolated-container peaks. The two-minute tests cannot replace full-length performance testing or narrow the cloud runtime envelope.
 
-## What blocks a local pass
+## Practical next steps and release requirements
 
-1. Resolve the intermittent native-reader omission: both a padding exemption and complete-packet alignment are inadequate fixes. Compare end-of-stream handling with another reader implementation, then repeat independent VFR/delayed-audio checks without a blanket timing tolerance.
-2. Bound mapping uncertainty beyond sparse synthetic anchors; exercise speech-like/noisy mixes and additional codec/pause patterns. Unsupported cases must remain blocked.
-3. Complete the intended container/codec payload coverage; the current parser is deliberately narrower than arbitrary MP4 contents.
-4. Application stale-input/approval/publication fencing is still only a simulated contract. Production integration needs its own tests. Representative full-length motion/quality behavior and actual volume-exhaustion handling also remain unproven.
+[VERIFIED owner direction; PLANNED execution] Close local research now. Do not require every theoretical matrix case to pass before the project can advance. Prioritize the following bounded work:
 
-Cloud lifecycle, uploads, region/spending enforcement and verified Sandbox cleanup remain separate later-stage obligations. No real recording may be requested/read on these non-pass results. Full Recording retention remains staff-only until Stage 5, then presentation only.
+1. **Update the separate Stage 4 workflow plan.** Carry this closure decision into its acceptance/release criteria: privacy and correct-file publication remain hard gates; the observed Apple tail omission is a documented quality limitation. Keep historical exact-count diagnostics available without turning their known small discrepancy into a universal processing blocker. This report does not implement a new production tolerance or change that separate plan.
+2. **Validate representative mapping and compatibility.** Exercise noisy/speech-like audio, realistic pauses, variable frame rate and delayed audio using generated material first. Check several distinct anchors, including near the cut, and verify a conservative endpoint. Reject ambiguous mappings rather than guess. Keep the owner rule: trim earlier by measured uncertainty up to 2 seconds; larger or unbounded uncertainty requires staff boundary/mapping resolution. Check actual intended playback and ending quality; do not make this contingent on solving the Apple probe's internals. This is the remaining material media/privacy validation, not an exhaustive codec research program.
+3. **Run a bounded synthetic Sandbox pilot when resumed.** Confirm the app's actual US region, current pricing and enforcement of the authorized $10 incremental-compute cap before dispatch. Use persistence off, no media snapshots, and independently verified cleanup. Measure a representative full-length presentation, readability, ending quality, runtime and scratch use. Test interruption, insufficient disk, failed/partial uploads and cleanup failure; failed or incomplete results must remain unpublished. Cloud limits and cleanup are later-stage checks, not reasons to reopen this local investigation.
+4. **Build and test correct-file publication safeguards during application implementation.** Bind source identity/hash, transcript/boundary revision, mapping, output hash/version, automated acceptance and staff approval. Invalidate an output if those inputs change during processing. Test retries, concurrent changes, upload reconciliation, approval and Board listing/direct-open paths. Existing equality simulations do not prove these production behaviors. These safeguards are required before Board use, not before encoder research can close.
+5. **Obtain fresh permission before the first real input.** After the focused synthetic safety checks and cloud preflight, present their results and ask Justin before reading request 1003222's already-copied video; explicitly scope any paired audio. Note applicable Vercel data-processing terms beforehand. Use an isolated staff-only test folder, no new Zoom read and no Board registration. A longer recording follows only after that case passes. This documentation closure is not permission to access real media or start a cloud run in this turn.
+
+[Owner-accepted scope] Validate the controlled re-encode recipe: selected H.264/AAC streams only, removal of extra tracks/metadata, isolated pre-endpoint input, complete decode, and the tested hidden-content/provenance checks. Unsupported output structures remain rejected. A universal proof over every possible MP4 field or codec payload is **not** a prerequisite to moving forward. Representative full-length quality and resource failure handling belong in the pilot; they are operational requirements, not evidence of a current privacy leak.
+
+[Unchanged privacy/release contract] Automated privacy/mapping acceptance must pass before an output is offered for staff ending review. Staff approval cannot override failed privacy checks, and Board eligibility must refer to the exact approved file. Keep the full Recording staff-only until the Stage 5 deadline, then retain only the presentation video. The historical universal Stage A pass is no longer the sole progression criterion; the focused checks and explicit access/release gates above replace that open-ended research requirement.
 
 ## Evidence and contract reconciliation
 
@@ -138,4 +147,6 @@ Cloud lifecycle, uploads, region/spending enforcement and verified Sandbox clean
 
 [VERIFIED reconciliation scope] Sweep Mode A covers the Stage 4 research reports and their live restatements, using executed receipts as authority. Earlier initial results remain historical; current summaries and remaining-work lists point here. Main's separate workflow implementation/release history is excluded because this is an isolated benchmark branch. No claim of whole-repository or Production reconciliation is made.
 
-[VERIFIED packet follow-up reconciliation] Sweep Mode A: generated test scripts → hash-bound local files → content-free packet evidence → four Stage 4 research reports. Current summaries and next steps describe the failed packet-alignment remedy; prior numerical results remain historical observations. Search collisions in unrelated operational documents are excluded. No new runtime/persistence status, auth route, schema or production consumer is introduced (N/A). Fresh read-only review required explicit exported-packet proof, aligned frame counts and separate completeness/error accounting; the final rerun includes these. Remaining unknowns are native-reader root cause and the broader matrix, not a waived privacy check. Scoped documentation gates do not certify nested plan facts or media behavior.
+[VERIFIED packet follow-up reconciliation] Sweep Mode A: generated test scripts → hash-bound local files → content-free packet evidence → four Stage 4 research reports. The packet experiment records the failed packet-alignment remedy; prior numerical results remain historical observations. Search collisions in unrelated operational documents are excluded. No new runtime/persistence status, auth route, schema or production consumer is introduced (N/A). Fresh read-only review required explicit exported-packet proof, aligned frame counts and separate completeness/error accounting; the final rerun includes these. Remaining unknowns are native-reader root cause and the broader matrix, not a waived privacy check. Scoped documentation gates do not certify nested plan facts or media behavior.
+
+[VERIFIED closure reconciliation] Sweep Mode A: Justin's explicit closure decision → this report and three linked research summaries → Claude's separate workflow-plan handoff. Historical receipts and benchmark scripts are unchanged; original non-pass observations remain evidence, not a current instruction to continue open-ended local research. Current next steps distinguish material privacy/publication gates from accepted quality limitations and deferred exhaustive checks. No runtime, schema, approval binding or deployment is implemented by this documentation change. The separate workflow plan still needs updating; production readiness remains unproven.

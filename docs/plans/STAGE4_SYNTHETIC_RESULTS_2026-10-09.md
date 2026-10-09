@@ -3,7 +3,7 @@ title: Stage 4 local synthetic benchmark results
 domain: transcription
 kind: report
 status: active
-summary: "Local padding/sync, mapping, integration and capacity cases pass bounded FFmpeg checks; independent native audio completeness remains intermittent even after complete-packet alignment. Stage A remains NOT PASSED. No cloud or real recording was accessed."
+summary: "Local investigation closed as promising with documented limitations. Historical strict Stage A results remain non-pass; focused mapping, compatibility and production safeguards are the next steps. No cloud or real recording was accessed."
 owner: product-engineering
 related:
   - docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md
@@ -11,7 +11,7 @@ related:
 
 # Stage 4 local synthetic results
 
-**[VERIFIED via local follow-up, 2026-10-09] All six padding/provenance and tested synchronization cases now pass.** The original four-millisecond tail was reproduced from physically isolated, already-cut audio: it was not newly encoded discussion. It was not digital silence either. The revised recipe inserts leading silence on the common clock before trimming, preserving the delayed audio's position. The subsequent separate-M4A mapping and capacity follow-up also passes its bounded cases; see `docs/plans/STAGE4_MAPPING_CAPACITY_RESULTS_2026-10-09.md`. The integrated mapping-to-cut, extended container and 1080p quality follow-up is recorded in `docs/plans/STAGE4_LOCAL_MATRIX_RESULTS_2026-10-09.md`. Stage A remains NOT PASSED: independent native decoding intermittently returns a short audio tail even after an earlier complete-packet cut, and broader coverage remains incomplete. No cloud job, SharePoint/Zoom read or Board registration occurred.
+**[VERIFIED via local follow-up, 2026-10-09] All six padding/provenance and tested synchronization cases now pass.** The original four-millisecond tail was reproduced from physically isolated, already-cut audio: it was not newly encoded discussion. It was not digital silence either. The revised recipe inserts leading silence on the common clock before trimming, preserving the delayed audio's position. The subsequent separate-M4A mapping and capacity follow-up also passes its bounded cases; see `docs/plans/STAGE4_MAPPING_CAPACITY_RESULTS_2026-10-09.md`. The integrated mapping-to-cut, extended container and 1080p quality follow-up is recorded in `docs/plans/STAGE4_LOCAL_MATRIX_RESULTS_2026-10-09.md`. Justin has closed the local investigation as promising with documented limitations. The historical strict Stage A matrix remains non-pass; the small Apple tail omission is accepted as an unresolved quality limitation, not a standalone project blocker. Practical next steps and unchanged privacy gates are in the linked local-matrix report. No cloud job, SharePoint/Zoom read or Board registration occurred.
 
 ## Padding and synchronization follow-up — current result
 
@@ -46,7 +46,7 @@ related:
 
 ## Authorization and environment
 
-[VERIFIED via latest owner instruction] FFmpeg installation through Homebrew and generated-media Stage A were authorized. Future Sandbox use has a $10 incremental compute cap, persistence off, verified cleanup and the app functions' US region; first report Stage A. Real-media progression requires synthetic checks to pass and a fresh question to Justin before reading request 1003222's already-copied video. Outputs belong in an isolated staff-only test folder; a longer real recording follows only after that passes. Document applicable Vercel data-processing terms before real media. None of those later steps was exercised here.
+[VERIFIED via latest owner instruction] FFmpeg installation through Homebrew and generated-media Stage A were authorized. Future Sandbox use has a $10 incremental compute cap, persistence off, verified cleanup and the app functions' US region; first report Stage A. Under the closure decision, real-media progression requires the focused synthetic safety checks in the local-matrix report to pass and a fresh question to Justin before reading request 1003222's already-copied video. Outputs belong in an isolated staff-only test folder; a longer real recording follows only after that passes. Document applicable Vercel data-processing terms before real media. None of those later steps was exercised here.
 
 [VERIFIED via installation/version/hardware commands] Homebrew installed FFmpeg/ffprobe **9.0.2**, including libx264 and AAC encoding, on **Apple M3, 16 GiB RAM**. Homebrew installed dependencies and upgraded ca-certificates/xz; its dependency installation also unlinked openssl@3 while installing openssl@4. No application dependency or runtime configuration changed. Encoding used two libx264 threads, **not** a two-vCPU resource allocation. This cannot establish Sandbox timing or memory sufficiency.
 
@@ -101,17 +101,11 @@ related:
 
 [ASSUMED conclusion] Keep the cloud 0.5–3× sensitivity envelope unvalidated rather than replacing it with this local 4.34× point. A representative motion/slide fixture, repeated runs and target Sandbox hardware are still needed to narrow it.
 
-## What remains before a synthetic pass
+## Local closure and practical follow-up
 
-[VERIFIED scope] The bounded padding/sync follow-up above resolves the six-case local issue. [ASSUMED engineering follow-up] The remaining acceptance coverage is:
+[VERIFIED via owner decision] Local investigation is **closed as promising with documented limitations**, not certified production-ready. The original strict matrix/receipts remain non-pass. Stop investigating the small Apple tail omission unless representative playback reveals a material problem; no private-content tolerance is introduced.
 
-- Resolve the intermittent native audio completeness discrepancy in the linked local-matrix report; complete-packet alignment did not fix it. Compare reader end-of-stream handling, then extend independent checks to VFR/delayed-audio cases. Four integrated mapping-to-cut cases already pass the bounded FFmpeg checks.
-- Broader codec/offset combinations, speech-like/noisy mixtures and defensible mapping uncertainty. Long drift and unsupported two-gap/noise/channel-swap controls now have bounded evidence; markers still are not general speech-privacy proof.
-- Arbitrary codec/sample-entry payload and all-container coverage. The follow-up strips extra tracks/metadata and rejects top-level/nested injected payloads, but does not parse every permitted field. Changed-binding checks remain simulations, not production await/publication fencing.
-- Representative full-length motion/quality and actual volume-exhaustion behavior. Near-cap/quota controls and new two-minute 1080p slide/motion resource/visual probes are bounded evidence, not cloud sizing or full-video quality approval.
-- Cloud dispatch, timeout/crash cleanup, snapshots, upload failure/reconciliation and region/cap enforcement remain separate cloud-stage obligations.
-
-[VERIFIED scope] The local padding issue was investigated and the six-case follow-up passed; this still does not satisfy the complete proposed synthetic acceptance matrix. No real recording should be requested/read on the strength of these results. The full staff Recording retention policy is unchanged: retain until Stage 5, then retain only the presentation video.
+[PLANNED] Follow the practical sequence in `docs/plans/STAGE4_LOCAL_MATRIX_RESULTS_2026-10-09.md`: update the separate workflow plan, perform focused representative mapping/compatibility checks, run a bounded synthetic cloud pilot with region/cap/cleanup verification, and implement/test exact-file publication safeguards. Validate the controlled export recipe rather than every possible MP4 structure. Obtain fresh permission before any real recording and retain automated privacy acceptance before staff approval. These are phased validation/release obligations, not an open-ended requirement to finish every hypothetical local case.
 
 ## Review and checks
 
