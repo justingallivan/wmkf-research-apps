@@ -711,8 +711,8 @@ A read-only build map (Sonnet reconnaissance, Session 589) found the gaps below.
 29. **Receipt conflicts retire (round 1).** `recordZoomVideoCopyReceiptConflict` records the code on an unleased copy whose intent is finalized, from both reconcile paths.
 
 **Rulings after Production acceptance (Session 590, owner-approved).**
-30. **Copy video when a transcript exists.** In Mode D on 1003222 the transcript came from an uploaded audio file, so no meeting was imported through Zoom and the only way to copy a video was Import, which re-imports the audio and starts a paid transcription. Once the request has a published transcript (`TRANSCRIPT` material), every copyable meeting now offers **Copy video** on its own, alongside Import. Branch `claude/zoom-picker-fixes`.
-31. **Picker import label follows the job.** The listing's import summary adds `transcriptReady` (the joined `transcription_jobs.status` is `ready`; no new read). The picker shows "Imported, transcribing…" until then and "Imported, transcript ready" after, replacing the fixed "Imported, transcription started". Same branch.
+30. **Copy video when a transcript exists.** In Mode D on 1003222 the transcript came from an uploaded audio file, so no meeting was imported through Zoom and the only way to copy a video was Import, which re-imports the audio and starts a paid transcription. Once the request has a published transcript (`TRANSCRIPT` material), every copyable meeting now offers **Copy video** on its own, alongside Import. Merged 2026-10-09 (`cb2640a88`), Codex-approved.
+31. **Picker import label follows the job.** The listing's import summary adds `transcriptReady` (the joined `transcription_jobs.status` is `ready`; no new read). The picker shows "Imported, transcribing…" until then and "Imported, transcript ready" after, replacing the fixed "Imported, transcription started". Merged with ruling 30 (`cb2640a88`).
 
 ## Contract review (`/contract-reconcile` Mode A, planning pass)
 
