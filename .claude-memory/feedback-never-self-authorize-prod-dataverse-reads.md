@@ -44,6 +44,11 @@ do before telling the user you can't.
   If you would need permission, ask and stop.
 - The interlock logging `mode=on target=production` is not consent; it is the
   guard telling you where you are.
+- Never run a prod-targeted script "to see it get refused". `.env.local`
+  points at production and itself sets `DATAVERSE_ALLOW_PROD_READS`, and
+  `loadEnvLocal()` restores it after `env -u`, so the read succeeds. `[VERIFIED
+  via S590, 2026-10-09: probe-recording-slot-versions.mjs ran against prod]`
+  Check a new probe with `node --check` only, then hand it over.
 
 Related: [[feedback-verify-external-platform-claims]],
 [[feedback-cite-ground-truth]].
