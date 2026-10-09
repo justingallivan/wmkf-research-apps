@@ -652,6 +652,15 @@ A read-only build map (Sonnet reconnaissance, Session 589) found the gaps below.
     - The S4 service supplies the display filename (ruling 9).
 18. **File split for S4/S5.** The start/GET/cancel service is `lib/services/meeting-tracker-recordings/video-copy-service.js` (S4). The tick worker is `video-copy-worker.js` in the same folder (S5, extended by S6).
 
+**Rulings after S4 (service and route, commit `34a993d25`).**
+19. **Video-only listing.** `listZoomRecordingsForVisit` serves the picker when either the transcription flag or video copy (`isZoomVideoCopyRequestAllowed`) allows the request. Audio-import fields and actions are present only when transcription is enabled, and video fields only when copy is allowed. With both off it behaves as in 3a. This makes ruling 10's standalone **Copy video** reachable. S7 owns this change, with tests for the four flag combinations.
+20. **Accepted S4 choices.**
+    - The picker exposes no Zoom file id; the server re-derives it.
+    - Cancel is POST `{action:'cancel'}` only.
+    - Start returns 202, replay 200. Codes not named in the plan: `zoom_video_copy_not_available`, `zoom_video_missing`, `zoom_video_reconciliation_pending`, `zoom_video_copy_not_found`.
+    - A segmented or too-large meeting returns 422 before the replay lookup.
+    - `findCopiedZoomVideoCopyForFile` serves ruling 6.
+
 ## Contract review (`/contract-reconcile` Mode A, planning pass)
 
 **Historical record.** Retained as requested; current protocol is in the revised sections above.
