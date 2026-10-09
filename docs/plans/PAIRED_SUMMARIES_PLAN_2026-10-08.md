@@ -23,7 +23,7 @@ related:
 - Card commits `1c41e4c77` (that fix), `a7838e3b6` (per-kind hook refactor), `19af9ad41` (paired action and discussion block) and `424394781` (copy). The Codex adversarial review of the card slice (`gpt-6-astra`, base `cb398fb47`) approved with no material findings. Its sandbox could not run tests; the Session 589 lead ran them (921 pass).
 - Build deviations, all accepted by the owner in Session 589, are under "Owner decisions" (decisions 9–12). Responses also gain an additive `kind` field (D2).
 
-Read-only checks V1–V3 passed (Session 588). Steps 3–7 have not run.
+Read-only checks V1–V3 passed (Session 588). The owner reviewed the discussion prompt wording (`shared/config/prompts/meeting-staff-discussion-summary.js`) and the paired consent text (`shared/config/transcriptSummary.js`) and accepted both as built for now (Session 589). Steps 3–7 have not run.
 
 **Originally reviewed and revised in Session 588.** The owner answered the review decisions on 2026-10-08; see "Owner decisions". This plan covers Stage 2 of `docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md` §2, which the owner approved on October 7. It does not authorize a migration, Dataverse picklist insert, prompt seed, Production read, provider call, merge or deployment. Each of those is listed below as an owner step.
 
