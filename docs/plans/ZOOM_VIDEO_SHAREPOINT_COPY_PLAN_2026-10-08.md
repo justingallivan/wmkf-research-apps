@@ -234,10 +234,10 @@ All line numbers are `upload-intent-store.js` unless prefixed. `ms` = `material-
 | X | abandoned | 0 | 0 | free | Return cancelled receipt. |
 | F | initiated/failed/uploaded/finalizing/abandoned | 0 or 1 | 0 or 1 | free/own/other | No pump or finalize. Release an owned residual phase lease before I4; an owned I4 lease continues inspection. Staff_cancelled is retained without binding. Schedule exact-registration inspection; if bound, first row repairs receipt. Other live lease means defer. |
 | Q/C/R | initiated/failed/uploaded/finalizing/abandoned | 0 or 1 | 0 or 1 | other | N7; defer to lease holder, then redispatch. |
-| Q/C/R | initiated/failed/uploaded/finalizing/abandoned | 0 or 1 | 0 or 1 | free/own; expired intent, excluding staff_cancelled | Exact-registration reconciliation before expiry failure. Bound → N5; rejected candidate or uncertain/mismatch/ambiguous → retain and back off; proven absent → copy-only N4 failed/zoom_video_intent_expired, preserving candidate. |
+| Q/C/R | failed | 0 or 1 | 1 | free/own; expired or unexpired (precedes the expiry row) | Rejected candidate (terminal finalize release, `upload-intent-store.js:223-239`): preserve identities and mapped error; copy-only N4 failed, which releases the request's active-copy lock. Exact registration, if present, is retained for review, never converted to a valid upload. Release owned lease. |
+| Q/C/R | initiated/failed/uploaded/finalizing/abandoned | 0 or 1 | 0 or 1 | free/own; expired intent, excluding staff_cancelled and failed-with-candidate (handled by the row above) | Exact-registration reconciliation before expiry failure. Bound → N5; rejected candidate or uncertain/mismatch/ambiguous → retain and back off; proven absent → copy-only N4 failed/zoom_video_intent_expired, preserving candidate. |
 | Q/C | abandoned | 0 | 0 | free; last_error=staff_cancelled | Copy-only N4 cancelled; replay crash after abandonment, even after expiry. |
 | Q/C/R | abandoned | 0 | 0 or 1 | free; other last_error | Exact-registration check first; absent → N4 failed/zoom_video_intent_abandoned; uncertain → retain. |
-| Q/C/R | failed | 0 or 1 | 1 | free/own; unexpired | Rejected candidate: preserve identities and mapped error; copy-only N4 failed. Exact registration, if present, is retained for review, never converted to a valid upload. Release owned lease. |
 | Q/C | initiated/failed | 0 or 1 | 0 | free/own; unexpired, cancel requested | Acquire I1 if free; server cancellation below. Complete path → record candidate then copy-only N4 cancelled with identity. |
 | Q/C/R | uploaded | 0 or 1 | 1 | free/own; unexpired, cancel requested before I3 | Copy-only N4 cancelled with identity; release any owned residual pump lease. |
 | Q | initiated | 0 | 0 | free/own; unexpired | I1 if free; Session create. Complete path → Bytes complete directly from Q. |
@@ -484,6 +484,8 @@ CREATE INDEX IF NOT EXISTS idx_zoom_video_copies_request_recent
 - Seed nonterminal `zoom_copy` intents in each shape: `initiated` without ciphertext, `initiated` with ciphertext, `failed` without candidate, `uploaded` with candidate, `finalizing` with an expired lease. Run every browser path against each with the same actor and request: list and `projectUploadIntents`, `getMp4UploadStatus`, `retryMp4Upload`, `cancelMp4Upload`, `finalizeMp4Upload`, and a `mintMp4Upload` replay of the same id. Expect not-listed or 404, and **no row change**. Mutation: drop `origin='browser'` from any one query; its case must fail.
 - Cleanup still claims expired intents of both origins.
 
+**Rejected candidate past expiry.** Crash between the terminal `releasePresentationMaterialUpload` and N4, advance past `intent_expires_at`, run a tick: the copy becomes `failed` with identities preserved, the intent is not bound, and a new N1 start for the request succeeds. Mutation: restore the `unexpired` condition and the test must fail.
+
 **Store (N1–N7, I1–I5) against real Postgres.**
 - Concurrent starts for two different files on one request → one row, one 409. Mutation: remove the advisory lock and the active-request index; the race test must fail.
 - N1 leaves both rows or neither (kill between the inserts by throwing).
@@ -607,6 +609,8 @@ Tier 2: background work, uploads and a migration [VERIFIED via `CAMPAIGN_RELEASE
 ## Review — Session 588 (2026-10-08)
 
 ### Codex fix pass (Session 588)
+
+**Final Codex pass (Session 588):** one HIGH finding. A rejected candidate (intent `failed` with a candidate after a terminal finalize release) whose intent expired before N4 fell into the expiry row, which retained and backed off, leaving the copy `registering` forever and blocking new copies. Fixed: the rejected-candidate row now applies regardless of expiry and sits directly after the live-lease defer row; the expiry row excludes that tuple. Test added below.
 
 Plan-only revision against commit `99b923010` review; local source read, no network, runtime tests or implementation. Change surface and sole edited entry point: this plan. Persistence and consumers described here are proposed Postgres intents/copies, cron, card and cleanup; actual persistence changes in this pass: none. Bounded contract/sweep pass covers the six findings and this file's restatements only. `check:doc-currency` and its self-test passed (13/13); runtime crash tests remain build requirements. Current proposed protocol above supersedes the historical reviews below.
 - Finding 1 → Routes, **Decision 8 at finalize**: validate generation-key recovery first; exact exemption and stale replay.
