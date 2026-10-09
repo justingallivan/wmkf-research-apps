@@ -3,7 +3,7 @@ title: "Atlas: Zoom video copies (Postgres)"
 domain: postgres
 kind: state-page
 status: source-built
-summary: "zoom_video_copies holds one row per Stage 3b attempt to copy a Zoom meeting MP4 into the request's SharePoint folder (migration 076, which also adds presentation_material_uploads.origin). Migration 076 applied and step 0 merged 2026-10-09; the copy runtime merged 2026-10-09; ZOOM_VIDEO_COPY_ACCESS=test:<1003222> and one Mode D copy succeeded."
+summary: "zoom_video_copies holds one row per Stage 3b attempt to copy a Zoom meeting MP4 into the request's SharePoint folder (migration 076, which also adds presentation_material_uploads.origin). Migration 076 applied and step 0 merged 2026-10-09; the copy runtime merged 2026-10-09; one Mode D copy succeeded on 1003222 and ZOOM_VIDEO_COPY_ACCESS is on (2026-10-09)."
 canonical: true
 cataloged: 2026-10-08
 owner: product-engineering
@@ -26,7 +26,7 @@ related:
 
 ## Status
 
-**[Step 0 merged (`c79f79807`) and migration 076 applied to Production 2026-10-09 (S590); the copy runtime merged 2026-10-09 (`780fab218`, Production deployment 6965242102); `ZOOM_VIDEO_COPY_ACCESS=test:<1003222>` since 2026-10-09 (one Mode D copy succeeded). The table exists in Production; the Mode D copy on 1003222 (2026-10-09) is its one row, state `copied`. Session 590 ran one local idle tick against Production (`outcome: idle`).]** This page describes the Stage 3b contract as built in source (`docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md`, slices S1-S8). Step 0 (migration 076, browser isolation by `origin`) is on `claude/zoom-copy-step0`; the copy store, service, route, tick worker, cron and card are on `claude/zoom-copy`. Until 076 is applied to a database, none of the paths below can run there. Claude review is done; Codex review is pending.
+**[Step 0 merged (`c79f79807`) and migration 076 applied to Production 2026-10-09 (S590); the copy runtime merged 2026-10-09 (`780fab218`, Production deployment 6965242102); `ZOOM_VIDEO_COPY_ACCESS=on` since 2026-10-09 (owner, after one Mode D copy on 1003222). The table exists in Production; the Mode D copy on 1003222 (2026-10-09) is its one row, state `copied`. Session 590 ran one local idle tick against Production (`outcome: idle`).]** This page describes the Stage 3b contract as built in source (`docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md`, slices S1-S8). Step 0 (migration 076, browser isolation by `origin`) is on `claude/zoom-copy-step0`; the copy store, service, route, tick worker, cron and card are on `claude/zoom-copy`. Until 076 is applied to a database, none of the paths below can run there. Claude review is done; Codex review is pending.
 
 ## Ownership and contract
 

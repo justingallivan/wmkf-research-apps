@@ -639,8 +639,8 @@ documents, not Site Visit material categories.
 
 **Recording producers.** The `Post Site Visit Materials` Recording has three
 producers: a pasted Zoom link, a staff browser MP4 upload, and, **merged
-2026-10-09 (`780fab218`); `ZOOM_VIDEO_COPY_ACCESS=test:<1003222>`, so live
-for that test request only**, a server-side copy of the Zoom meeting MP4 (Stage 3b,
+2026-10-09 (`780fab218`); `ZOOM_VIDEO_COPY_ACCESS=on` since the same
+day**, a server-side copy of the Zoom meeting MP4 (Stage 3b,
 `docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md`). The server copy is
 staff-only, writes through a Graph upload session into the same folder, and is
 registered by the same shared finalize as the browser MP4, so the Request
