@@ -40,13 +40,13 @@
 1. **Stage 4 build plan (Claude), then `/contract-reconcile` Mode A.** Evidence: Stage 4 plan decisions 11-17; the provenance seam is merged; the card is now free for Stage 4 (attendance merged).
    - Scope: migration 079 (split-job table plus `zoom_video_copies.recording_start/end`), recording times written at copy, split service/worker/Sandbox processor, `bindPresentationVideo` (new file), Board/briefing allowlists, card Video line.
    - Decision 7 (presentation-video picklist value) is owner-provisioned at build time.
+   - Ending playback is checked on the first real cut (browser and SharePoint viewer, before Board/briefing exposure), not on a synthetic clip (Session 592).
 2. **First live use of attendance attribution.** Not yet exercised on a real meeting. Needs a transcript with verified Zoom provenance (a new import); legacy transcripts show only the voices list. Suggested: re-import 1003222 from Zoom (one paid transcription, owner-run), which also gives Stage 4 its first real input (re-copy its video too, decision 16).
 3. **Review `codex/group-review-non-lead-ui` when Codex reports.** Not started at close.
 
 #### Owner Decision Needed
 
-1. **Stage 4 ending playback check:** a 2-minute synthetic clip was saved only in the session scratchpad (gone). Regenerate with `scripts/benchmarks/stage4-sandbox-pilot.py cut 150 120.437 short` locally if needed.
-2. Carried, not rechecked: Proposal Ranking PR #463 and the colleague dry run. (`ZOOM_RECORDING_HOSTS` was re-created as non-sensitive in Production on 2026-10-10, Session 592.)
+1. Carried, not rechecked: Proposal Ranking PR #463 and the colleague dry run. (`ZOOM_RECORDING_HOSTS` was re-created as non-sensitive in Production on 2026-10-10, Session 592.)
 
 #### Verify Before Acting
 
