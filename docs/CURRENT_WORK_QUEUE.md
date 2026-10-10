@@ -135,6 +135,16 @@ sequence.
   cap can track the four-hour duration cap instead of memory. Verify the
   200 MiB cap first with a real two-to-three-hour recording in production.
 
+- **Zoom import list: "Copy video" is ambiguous (2026-10-10).** [OPEN — owner
+  note, not scheduled] On the Recording and transcript card's "Import from
+  Zoom" list, each "Copy video" link sits outside and below its recording's
+  box, so it reads as belonging to the next row as easily as the previous one.
+  The list also mixes two selections: the radio button (which recording to
+  import) and the per-row video copy. Staff cannot tell which recording a click
+  will copy. Fix: put the action inside its recording's row (for example next
+  to "Video: not copied") and name the recording in it. Screenshot:
+  owner, Session 592.
+
 ## Audit follow-ups — verified open, not silently prioritized
 - **Hard-coded late-2026 `expiresAt` dates in unit-test fixtures (2026-09-27, S546).** **[CLOSED
   2026-10-08 UTC, S584: no clock dependence.]** All seven files pass at 05:48 UTC on 2026-10-08
