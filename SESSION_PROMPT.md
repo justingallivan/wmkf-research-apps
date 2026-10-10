@@ -46,7 +46,7 @@
 #### Owner Decision Needed
 
 1. **Stage 4 ending playback check:** a 2-minute synthetic clip was saved only in the session scratchpad (gone). Regenerate with `scripts/benchmarks/stage4-sandbox-pilot.py cut 150 120.437 short` locally if needed.
-2. Carried, not rechecked: `ZOOM_RECORDING_HOSTS` non-sensitive re-create; Proposal Ranking PR #463 and the colleague dry run.
+2. Carried, not rechecked: Proposal Ranking PR #463 and the colleague dry run. (`ZOOM_RECORDING_HOSTS` was re-created as non-sensitive in Production on 2026-10-10, Session 592.)
 
 #### Verify Before Acting
 
