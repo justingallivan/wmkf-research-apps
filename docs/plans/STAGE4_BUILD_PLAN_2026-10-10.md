@@ -71,9 +71,10 @@ Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEAS
 - **Wiring:** the times are passed at N1 in `video-copy-service.js`, and the comparison is in `listAndValidate`.
 - **Tests:** store, service and worker tests, including a mutation check of the worker guard. The 13 related suites pass (453 tests).
 - **Atlas** page updated.
+- **Guard complement:** a row with no times skips the check, which covers pre-079 rows; the 079 CHECK makes a row with only one time impossible. `ctx.row` is always the claimed row (`video-copy-worker.js:230-231`), so `listAndValidate` never sees an undefined row.
 
 - Migration 079: `zoom_video_copies.recording_start` and `recording_end` (`TIMESTAMPTZ NULL`, both null or both set). Manifest entry and Atlas updates.
-- Write the times at copy start: `video-copy-service.js:127-133` already holds the Zoom file from `pickVideoFile`, whose `recording_start` / `recording_end` are available there; pass them into `store.startZoomVideoCopy` (insert at `video-copy-store.js:183-191`). The worker's `listAndValidate` (`video-copy-worker.js:464-481`) gains the same comparison, only for rows that have times, so a changed Zoom file fails the copy. A copy already in flight when slice 1 deploys has null times and must not fail on the new check.
+- Write the times at copy start: `video-copy-service.js:127-133` already holds the Zoom file from `pickVideoFile`, whose `recording_start` / `recording_end` are available there; pass them into `store.startZoomVideoCopy` (insert at `video-copy-store.js:205`, after slice 1). The worker's `listAndValidate` (`video-copy-worker.js:464-481`) gains the same comparison, only for rows that have times, so a changed Zoom file fails the copy. A copy already in flight when slice 1 deploys has null times and must not fail on the new check.
 - Rows copied before this slice keep null times and are ineligible for a cut (decision 16). Landable alone.
 
 ### Slice 2 — Split store, start route and same-source check
