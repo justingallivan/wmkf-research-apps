@@ -37,7 +37,7 @@
 
 #### Verified Open
 
-1. **Stage 4 build plan (Claude), then `/contract-reconcile` Mode A.** **Session 592: drafted and reviewed** — `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md` (slices 0-5; Mode A ready with named changes, applied; owner decisions B1-B6 open). Evidence: Stage 4 plan decisions 11-17; the provenance seam is merged; the card is now free for Stage 4 (attendance merged).
+1. **Stage 4 build plan (Claude), then `/contract-reconcile` Mode A.** **Session 592: drafted and reviewed** — `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md` (slices 0-5; Mode A ready with named changes, applied; owner decisions B1-B6 recorded; slice 0 SDK probe passed; next is slice 1, migration 079 plus copy-time recording times, on a branch). Evidence: Stage 4 plan decisions 11-17; the provenance seam is merged; the card is now free for Stage 4 (attendance merged).
    - Scope: migration 079 (split-job table plus `zoom_video_copies.recording_start/end`), recording times written at copy, split service/worker/Sandbox processor, `bindPresentationVideo` (new file), Board/briefing allowlists, card Video line.
    - Decision 7 (presentation-video picklist value) is owner-provisioned at build time.
    - Ending playback is checked on the first real cut (browser and SharePoint viewer, before Board/briefing exposure), not on a synthetic clip (Session 592).

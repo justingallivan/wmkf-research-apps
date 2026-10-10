@@ -3,7 +3,7 @@ title: Stage 4 build plan — presentation video cut
 kind: plan
 domain: transcription
 status: draft
-summary: "Build plan for Stage 4 (presentation-only video cut from the copied Zoom MP4 at the confirmed presentation end), written Session 592 from source reads. Ordered slices with owner gates: Sandbox SDK probe, migration 079 plus copy-time recording times, split store and start route, Sandbox worker with reaper, approval and Board/briefing playback, card. Contract-reconcile Mode A: ready with named changes (applied; approval = registration, as for summaries). Draft: nothing built; owner decisions B1-B6 open."
+summary: "Build plan for Stage 4 (presentation-only video cut from the copied Zoom MP4 at the confirmed presentation end), written Session 592 from source reads. Ordered slices with owner gates: Sandbox SDK probe, migration 079 plus copy-time recording times, split store and start route, Sandbox worker with reaper, approval and Board/briefing playback, card. Contract-reconcile Mode A: ready with named changes (applied; approval = registration, as for summaries). Owner decisions B1-B6 recorded; slice 0 (SDK probe) passed. Nothing built in the app."
 owner: product-engineering
 related:
   - docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md
@@ -42,6 +42,14 @@ Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEAS
 - On a branch, add `@vercel/sandbox`; from a Preview deployment (or locally against the linked project), create a 10-second non-persistent sandbox in `iad1`, stop it, delete it, and confirm `list` and `snapshots list` are empty.
 - Record: which credential the SDK used, the maximum `timeout` the Pro tier allows, whether a detached command can be rediscovered from a later invocation by sandbox name and command id, and how the network allowlist is set per sandbox.
 - Output: a short results note. If detached commands cannot be rediscovered across invocations, stop and revise slice 3 before building.
+
+**Slice 0 result (Session 592, 2026-10-10): passed.** Run locally from the scratchpad, outside the repo, with `@vercel/sandbox@3.4.0` (published 2026-09-23) and a freshly pulled Development OIDC token. The local `.env.local` token had expired on 2026-08-20.
+- **Credential [VERIFIED via SDK source `dist/utils/get-credentials.js`]:** the SDK calls `getVercelOidcToken` from `@vercel/oidc` and reads team and project from the token. Inside a Vercel function it uses the runtime OIDC token, so no stored secret or personal token is needed. That this works in a *deployed* function is `[ASSUMED]` until the first Preview run of slice 3.
+- **Create [VERIFIED via probe]:** `persistent: false`, `iad1`, `failoverRegions: []`, 2 vCPU, `networkPolicy: 'deny-all'`, and a requested `timeout` of 5 hours (18,000,000 ms) were all accepted and read back. The tier's ceiling above 5 hours was not probed; 5 hours is enough for v1.
+- **Rediscovery [VERIFIED via probe]:** a detached `runCommand` returned a `cmdId`; a fresh `Sandbox.get({ name })` plus `getCommand(cmdId).wait()` returned exit 0 and the output. A later cron tick can therefore poll a job started by an earlier tick.
+- **Charge tracking [VERIFIED via probe]:** `activeCpuUsageMs` is reported after stop (2,414 ms for this probe). The SDK documents it as available only once the VM is stopped.
+- **Cleanup [VERIFIED via probe and CLI]:** stop, then `listSnapshots` (0), then `delete`; `Sandbox.get` then returned 404, and `vercel sandbox list --all` and `vercel sandbox snapshots list` were both empty.
+- Cost: under $0.01.
 
 ### Slice 1 — Migration 079 and copy-time recording times
 
@@ -171,4 +179,4 @@ Verdict: **READY WITH NAMED CHANGES**. The changes below are applied above.
 5. **Staff review access.** Added a staff open route for the unregistered output.
 6. **quickXorHash** needs an in-sandbox implementation.
 
-Still open: B1 (measured in slice 0), B3, B4, B5, B6. A fresh-agent adversarial review (`/codex:adversarial-review`) is recommended before slice 2 code, per the skill's step 6.
+Owner decisions B1-B6 were recorded later the same session (see the top). A fresh-agent adversarial review (`/codex:adversarial-review`) is recommended before slice 2 code, per the skill's step 6.
