@@ -1,8 +1,8 @@
 ---
 name: project-migration-numbers-claimed-off-main
-description: "Before picking a Postgres migration number, check shared Production `schema_migrations` and numbers claimed on unmerged branches. 055, 070, 071 and 074 were applied to Production before merging; as of 2026-10-08 Production and main end at 074 (PR #464) and the next free number is 075."
+description: "Before picking a Postgres migration number, check shared Production `schema_migrations` and numbers claimed on unmerged branches. 055, 070, 071 and 074 were applied to Production before merging; as of 2026-10-09 Production and main end at 076, 077 is reserved for Codex's transcript-provenance slice, and the next free number is 078."
 status: active
-last_verified: 2026-10-08 via read-only Production schema_migrations read (070-074 present) and a scan of every remote branch for 074-079
+last_verified: 2026-10-09 via owner-run read-only Production schema_migrations read (highest 076) and a scan of every local and remote branch for 077-089 (none)
 metadata:
   type: project
 ---
@@ -73,5 +73,12 @@ origin/main`, 2026-09-30]. The episode shows why "the next number after
   (`074_zoom_recording_imports.sql`, Zoom recording import) was applied by the owner's `!` run from
   `codex/meeting-transcript-ux` before merge: 1 applied, 73 skipped, `applied_by`
   `claude-s586-zoom-import-2026-10-08`. It merged to `main` in PR #464. The next free number is 075.
+- [VERIFIED 2026-10-09, Session 591, owner-run read-only `schema_migrations` read] Production's
+  highest rows are 076 (`076_zoom_video_copies.sql`, applied 2026-10-09 15:00Z) and 075; `main` also
+  ends at 076, and no local or remote branch carries 077-089. **077 is reserved** for Codex's
+  transcript-provenance slice (`codex/transcription-labels`; `zoom_recording_imports` provenance
+  columns and `meeting_transcript_publications.frozen_source_provenance`). Stage 4's split-job
+  migration and Codex's later policy migration take 078 onward, claimed at build time.
+  The tracker column is `name`, not `filename`.
 - Auto-mode permissions block Claude from running `apply-migrations.js` against
   the shared database even with owner authorization; the owner runs it with `!`.
