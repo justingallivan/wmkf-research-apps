@@ -3088,7 +3088,8 @@ function PresentationVideoLine({ requestId }) {
   if (!available) return null;
   const state = newest?.state || null;
   const openHref = newest ? `${path}/${encodeURIComponent(newest.id)}/open` : null;
-  const canCreate = !processing && state !== 'review';
+  // A video waiting for its check can be replaced (the server supersedes it), e.g. after fixing the presentation end.
+  const canCreate = !processing;
   let status = 'Not started';
   if (state === 'queued' || state === 'cutting' || state === 'uploading') status = 'Working…';
   else if (state === 'review') status = 'Ready to check';
@@ -3104,7 +3105,7 @@ function PresentationVideoLine({ requestId }) {
       <div className="mt-1 flex flex-wrap items-center gap-2">
         {(state === 'review' || state === 'approved') && <a className={BTN} href={openHref} target="_blank" rel="noreferrer">Open video</a>}
         {state === 'review' && <button type="button" onClick={() => setConfirming('approve')} disabled={busy} className={BTN_PRIMARY}>Check the ending and approve</button>}
-        {canCreate && <button type="button" onClick={() => (state === 'approved' ? setConfirming('recreate') : void create())} disabled={busy} className={BTN}>{busy ? 'Working…' : 'Create presentation video'}</button>}
+        {canCreate && <button type="button" onClick={() => (state === 'approved' || state === 'review' ? setConfirming('recreate') : void create())} disabled={busy} className={BTN}>{busy ? 'Working…' : (state === 'review' ? 'Create it again' : 'Create presentation video')}</button>}
       </div>
       {confirming === 'approve' && (
         <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="alertdialog" aria-label="Approve the presentation video">
@@ -3117,7 +3118,7 @@ function PresentationVideoLine({ requestId }) {
       )}
       {confirming === 'recreate' && (
         <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="alertdialog" aria-label="Create the presentation video again">
-          <p>This replaces the approved video once the new one is approved.</p>
+          <p>{state === 'review' ? 'This discards the video waiting for your check and makes a new one.' : 'This replaces the approved video once the new one is approved.'}</p>
           <div className="mt-2 flex gap-2">
             <button type="button" onClick={() => void create()} disabled={busy} className={BTN_PRIMARY}>Create again</button>
             <button type="button" onClick={() => setConfirming(null)} disabled={busy} className={BTN}>Keep current video</button>

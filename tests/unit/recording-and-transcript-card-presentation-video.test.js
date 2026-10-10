@@ -86,6 +86,9 @@ describe('Video line', () => {
     expect(open).toHaveAttribute('rel', 'noreferrer');
     expect(within(el).getByRole('button', { name: 'Check the ending and approve' })).toBeInTheDocument();
     expect(within(el).queryByRole('button', { name: 'Create presentation video' })).not.toBeInTheDocument();
+    // Staff can replace a video that is waiting for its check (e.g. after fixing the presentation end), behind a confirm.
+    fireEvent.click(within(el).getByRole('button', { name: 'Create it again' }));
+    expect(within(el).getByRole('alertdialog')).toHaveTextContent('This discards the video waiting for your check and makes a new one.');
   });
 
   test('registering shows Approving', async () => {
