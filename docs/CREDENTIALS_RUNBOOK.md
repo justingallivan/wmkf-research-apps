@@ -157,11 +157,10 @@ only**, since 2026-10-08; they are not in Preview. The three `ZOOM_S2S_*`
 variables are stored as secrets; `ZOOM_RECORDING_HOSTS` was re-created as a
 non-sensitive (Config) variable on 2026-10-10 so its value is readable in the
 dashboard [VERIFIED via `vercel env ls production`, Session 592, 2026-10-10].
-The three `ZOOM_S2S_*` variables are also in local `.env.local` for
-`scripts/probe-zoom-recordings.mjs`, which reads only those three;
-`ZOOM_RECORDING_HOSTS` is not set locally [VERIFIED via a names-only grep of
-`.env.local`, 2026-10-10], so the import and video copy stay hidden on a local
-dev server. The Stage 3a import
+All four, plus `ZOOM_VIDEO_COPY_ACCESS=on`, are also in local `.env.local`
+(host list and copy flag added 2026-10-10, Session 592), so a local dev server's
+Zoom import and video copy act on Production data like the deployed app.
+`scripts/probe-zoom-recordings.mjs` reads only the three `ZOOM_S2S_*` variables. The Stage 3a import
 shipped in PR #464, and the Stage 3b video copy reuses these variables.
 The import is available only when all four variables below are present and
 Meeting Tracker transcription is enabled for the request; any missing value hides
