@@ -9,6 +9,7 @@
  *   node scripts/probe-zoom-recordings.mjs --host <email> [--days 30] --range <meetingUUID>
  *   node scripts/probe-zoom-recordings.mjs --host <email> [--days 30] --lifetime <meetingUUID> [--minutes 0,15,60]
  *   node scripts/probe-zoom-recordings.mjs --host <email> [--days 30] --moov <meetingUUID>
+ *   node scripts/probe-zoom-recordings.mjs --host <email> [--days 30] --attendance <meetingUUID>
  *
  * --range (Stage 3b probe 1, docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md):
  * for each completed MP4 of the meeting, follow download_url hop by hop with
@@ -23,6 +24,11 @@
  * --moov (probe 5): read the first and last MiB of each MP4 with Range requests
  * (in memory, never saved), list the top-level boxes found there, and report where
  * `moov` sits and the `mvhd` duration versus Zoom's recording start/end.
+ *
+ * --attendance (attendance slice): read the participants report and the past-meeting
+ * participants list for one listed occurrence and print SHAPES ONLY: root keys, pagination,
+ * per-field value classes and distinct counts, identifier grouping counts, status counts and
+ * whether duration is seconds or minutes. No names, emails, ids or times are printed.
  *
  * Reads ZOOM_S2S_ACCOUNT_ID / ZOOM_S2S_CLIENT_ID / ZOOM_S2S_CLIENT_SECRET from
  * .env.local. Never prints the token or download URLs. Never deletes, writes to
@@ -51,6 +57,7 @@ const OUT = arg('out');
 const RANGE = arg('range');
 const LIFETIME = arg('lifetime');
 const MOOV = arg('moov');
+const ATTENDANCE = arg('attendance');
 const ONLY = arg('only'); // --download: fetch only files of this recording_type (e.g. audio_only)
 if (!HOST) { console.error('--host <email> is required'); process.exit(2); }
 if (DOWNLOAD && !OUT) { console.error('--download requires --out <empty dir>'); process.exit(2); }
@@ -119,6 +126,74 @@ const rangedBytes = async (url, start, end) => {
   if (res.status !== 206) { await res.body?.cancel(); return { status: res.status }; }
   return { status: 206, total: Number(String(res.headers.get('content-range')).split('/')[1]), buf: Buffer.from(await res.arrayBuffer()) };
 };
+
+if (ATTENDANCE) {
+  const meeting = byUuid.get(ATTENDANCE);
+  if (!meeting) { console.error(`uuid ${ATTENDANCE} is not in ${HOST}'s listing for the last ${DAYS} days`); process.exit(1); }
+  const enc = /^\/|\/\//.test(ATTENDANCE) ? encodeURIComponent(encodeURIComponent(ATTENDANCE)) : encodeURIComponent(ATTENDANCE);
+  const shape = (v) => {
+    if (v === null || v === undefined) return 'null';
+    if (typeof v !== 'string') return typeof v;
+    if (v === '') return 'empty';
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)) return 'uuid';
+    if (/^[^@\s]+@[^@\s]+$/.test(v)) return 'email';
+    if (/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z$/.test(v)) return `iso${v.includes('.') ? '-fractional' : '-seconds'}`;
+    if (/^\+?[\d\s()-]{7,}$/.test(v)) return 'phone-like';
+    if (/^\d+$/.test(v)) return `digits(${v.length})`;
+    if (/^[A-Za-z0-9+/_=-]{16,}$/.test(v)) return `token(${v.length})`;
+    return 'text';
+  };
+  const describe = async (label, base, extra = {}) => {
+    console.log(`--- ${label} ---`);
+    const first = await fetch(`${base}?${new URLSearchParams({ page_size: '2', ...extra })}`, { headers: H });
+    if (!first.ok) { const b = await first.text(); let d = b.slice(0, 200); try { const j = JSON.parse(b); d = `code=${j.code} message=${j.message}`; } catch {} console.log(`HTTP ${first.status} ${d}\n`); return; }
+    const fj = await first.json();
+    console.log(`root keys: ${Object.keys(fj).sort().join(', ')}`);
+    console.log(`page_size=2 probe: page_count=${fj.page_count ?? '-'} total_records=${fj.total_records ?? '-'} next_page_token=${fj.next_page_token ? 'present' : 'absent'}`);
+    const rows = []; let next = ''; let pages = 0;
+    do {
+      const q = new URLSearchParams({ page_size: '300', ...extra }); if (next) q.set('next_page_token', next);
+      const res = await fetch(`${base}?${q}`, { headers: H });
+      if (!res.ok) await fail(`${label} page ${pages + 1}`, res);
+      const j = await res.json(); pages += 1; rows.push(...(j.participants || [])); next = j.next_page_token || '';
+    } while (next && pages < 20);
+    console.log(`page_size=300: ${pages} page(s), ${rows.length} row(s)${next ? ', STOPPED at 20 pages' : ''}`);
+    const keys = [...new Set(rows.flatMap((r) => Object.keys(r)))].sort();
+    for (const k of keys) {
+      const hist = {}; const distinct = new Set();
+      for (const r of rows) { const s = shape(r[k]); hist[s] = (hist[s] || 0) + 1; if (r[k] !== '' && r[k] != null) distinct.add(JSON.stringify(r[k])); }
+      console.log(`  ${k}: ${Object.entries(hist).map(([s, n]) => `${s}×${n}`).join(' ')}  distinct=${distinct.size}`);
+    }
+    const names = new Set(rows.map((r) => r.name));
+    console.log(`distinct names=${names.size}; rows with phone-like name=${rows.filter((r) => shape(r.name) === 'phone-like').length}; rows whose user_email is the host=${rows.filter((r) => r.user_email && r.user_email.toLowerCase() === HOST.toLowerCase()).length}`);
+    for (const k of ['id', 'user_id', 'participant_user_id', 'participant_uuid', 'registrant_id', 'user_email', 'customer_key']) {
+      if (!keys.includes(k)) continue;
+      const byId = new Map();
+      for (const r of rows) if (r[k]) byId.set(r[k], [...(byId.get(r[k]) || []), r]);
+      const multi = [...byId.values()].filter((g) => g.length > 1).length;
+      const multiName = [...byId.values()].filter((g) => new Set(g.map((r) => r.name)).size > 1).length;
+      const nameMultiId = [...names].filter((n) => new Set(rows.filter((r) => r.name === n && r[k]).map((r) => r[k])).size > 1).length;
+      console.log(`  grouping by ${k}: ${byId.size} value(s), ${multi} with >1 row, ${multiName} spanning >1 name, ${nameMultiId} name(s) spanning >1 value, ${rows.filter((r) => !r[k]).length} row(s) without it`);
+    }
+    const st = {}; for (const r of rows) st[r.status ?? '(none)'] = (st[r.status ?? '(none)'] || 0) + 1;
+    console.log(`status: ${Object.entries(st).map(([s, n]) => `${s}×${n}`).join(' ')}`);
+    let secMatch = 0; let minMatch = 0; let timed = 0;
+    for (const r of rows) {
+      const diff = (Date.parse(r.leave_time) - Date.parse(r.join_time)) / 1000;
+      if (!Number.isFinite(diff) || typeof r.duration !== 'number') continue;
+      timed += 1; if (Math.abs(r.duration - diff) <= 1) secMatch += 1; if (Math.abs(r.duration - diff / 60) <= 1) minMatch += 1;
+    }
+    console.log(`duration vs leave-join: ${timed} timed row(s); matches seconds=${secMatch}, minutes=${minMatch}`);
+    const firstJoin = rows.map((r) => Date.parse(r.join_time)).filter(Number.isFinite).sort((a, b) => a - b)[0];
+    const audio = (meeting.recording_files || []).filter((f) => f.recording_type === 'audio_only');
+    if (firstJoin && audio[0]) console.log(`audio_only files=${audio.length}; first join is ${((Date.parse(audio[0].recording_start) - firstJoin) / 1000).toFixed(0)} s before the first audio recording_start`);
+    console.log('');
+  };
+  console.log(`Meeting ended ${meeting.start_time ? `(started ${meeting.start_time}, ${meeting.duration} min)` : ''}; report requested ${new Date().toISOString()}\n`);
+  await describe('report participants', `https://api.zoom.us/v2/report/meetings/${enc}/participants`, { include_fields: 'registrant_id' });
+  await describe('past_meetings participants', `https://api.zoom.us/v2/past_meetings/${enc}/participants`);
+  process.exit(0);
+}
 
 if (LIFETIME) {
   const meeting = byUuid.get(LIFETIME);
