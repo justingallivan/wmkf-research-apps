@@ -3,7 +3,7 @@ title: Zoom attendance and discussion speaker attribution
 kind: plan
 domain: transcription
 status: draft
-summary: "After Duncan confirms the presentation end, the same correction shows everyone who attended (silent people included), checked by default; unchecking someone makes their discussion turns read 'Unidentified speaker'. Owner decisions D1-D4 and probe-verified Zoom report facts are recorded; four design questions await Justin. Codex builds; Claude orchestrates. Nothing built."
+summary: "After Duncan confirms the presentation end, the same correction shows everyone who attended (silent people included), checked by default; unchecking someone makes their discussion turns read 'Unidentified speaker'. Owner decisions D1-D4 and Q1-Q4, and probe-verified Zoom report facts, are recorded. Codex builds; Claude orchestrates. Nothing built."
 owner: product-engineering
 related:
   - docs/plans/ZOOM_TRANSCRIPT_PROVENANCE_PLAN_2026-10-09.md
@@ -51,13 +51,13 @@ Source: an owner-run, read-only, shape-only run of `node scripts/probe-zoom-reco
 - **Recording offset.** The first join was **884 s before** the `audio_only` file's `recording_start`. Attendance time must be measured from the provenance `audioFile.recordingStart`, never from the meeting start.
 - **Not observed:** phone or dial-in participants (no phone-like names in this meeting), how long after the meeting ends the report becomes available, and the meaning of `groupId` (5 of 19 rows carried one).
 
-## Design [PROPOSED; items marked Q need Justin]
+## Design [Q1-Q4 decided by Justin, Session 591; the rest PROPOSED]
 
 ### People list
 
 - Fetch the report server-side, by the frozen `sourceProvenance.zoom.meetingUuid` only. Never fetch by a browser-supplied UUID or by the request's newest import. Legacy, upload and invalid provenance gets no attendance (see fallback).
 - Group rows by **exact display name**. A person is listed only if they have at least one `in_meeting` row. Their presence interval is from the first admitted join to the last admitted leave.
-- **Q3:** people who were only ever in the waiting room are not listed. One line shows how many there were.
+- **Q3 (decided):** people who were only ever in the waiting room are not listed. One line shows how many there were.
 - The host row is listed like anyone else. Nobody is excluded by role.
 - Name collisions (two people with one display name) merge into one row. Renaming mid-meeting splits a person into two rows. Both are accepted limitations; Duncan sees what Zoom recorded.
 
@@ -66,7 +66,7 @@ Source: an owner-run, read-only, shape-only run of `node scripts/probe-zoom-reco
 - Published speaker names come from Zoom VTT reconciliation, so they are Zoom display names wherever Zoom named the speaker. They are *display-transformed*, though: `zoomDisplayNames` reorders "Surname, Given" to "Given Surname", and keeps the original when two distinct Zoom names would collide [VERIFIED `lib/services/transcription-pilot/zoom-vtt.js:395-430`]. Staff may also have renamed a speaker in an earlier correction.
 - **Rule [PROPOSED]:** compute the attendees' display forms with the same `zoomDisplayNames` over the attendance name set. An attendee is linked to every discussion speaker ID whose current name equals either that display form or the raw Zoom name, exactly. The link is computed when the checklist is shown and frozen in the confirmation. A speaker renamed by staff to something else falls into "Other voices".
 - Discussion speaker IDs that match no attendee are listed in a short second group, "Other voices in the discussion", also checked by default. That covers diarization labels such as "Speaker C" and shared microphones.
-- **Q1, shared microphone:** if one speaker ID carries a departed person and a remaining person, there is no way to split it. Unchecking either person's row has no effect on that ID, and the ID can only be unchecked in its own row, which excludes everyone on it. Proposed: show the ID once, under the person whose name it carries.
+- **Q1, shared microphone (decided as proposed):** if one speaker ID carries a departed person and a remaining person, there is no way to split it. Unchecking either person's row has no effect on that ID, and the ID can only be unchecked in its own row, which excludes everyone on it. Proposed: show the ID once, under the person whose name it carries.
 - Silent attendees need no speaker ID: unchecking them changes nothing in the output. Their row still records Duncan's confirmation.
 
 ### Effect on the output
@@ -88,14 +88,14 @@ Source: an owner-run, read-only, shape-only run of `node scripts/probe-zoom-reco
 
 ### Fallback
 
-- **Q2:** when attendance is unavailable (legacy or upload source, report error, incomplete pages), the same step shows only the "voices in the discussion" list with an explanatory line, so Duncan can still exclude speaker IDs in the same click flow. Missing attendance is never treated as "nobody attended".
+- **Q2 (decided):** when attendance is unavailable (legacy or upload source, report error, incomplete pages), the same step shows only the "voices in the discussion" list with an explanatory line, so Duncan can still exclude speaker IDs in the same click flow. Missing attendance is never treated as "nobody attended".
 
 ### Persistence and versioning (migration 078)
 
 - **Draft:** the attendance decision is saved with the existing version-checked correction draft, alongside `presentationEnd`. Changing the boundary, renaming speakers or changing the source invalidates the confirmation server-side, and publishing requires a current confirmation.
 - **Publication:** the frozen decision goes into the new source envelope, so a correction's `inputSha256` and revision change, and derivative staleness works as today. It also goes into a receipt column for recovery comparison.
   - Envelope fields: `version`, the per-row `displayName`, `kept`, `speakerIds`, `excludedSpeakerIds`, `attendance.status` (`complete`, `partial` or `unavailable`) and `fetchedAt`.
-  - **Q4:** store no raw rows, emails, `user_id` values or intervals beyond the one last-leave time shown. The decision is deleted with the full transcript at Stage 5.
+  - **Q4 (decided):** store no raw rows, emails, `user_id` values or intervals beyond the one last-leave time shown. The decision is deleted with the full transcript at Stage 5.
 - **Versioning:** a new formatter and schema version (7). Versions 1–6 reject the new field and stay byte-identical. The transcription pilot shares the formatter constant, so its output must be proven unchanged.
 - **Provenance and video lineage:** the content-free provenance and the Stage 4 video lineage never carry attendance.
 
