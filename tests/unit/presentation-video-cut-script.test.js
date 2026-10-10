@@ -128,7 +128,7 @@ d('presentation-video-cut-script', () => {
     srcPlain = path.join(root, 'src-10010.mp4');
     await makeSource(srcPlain, { priv: 10.01 });
   });
-  afterAll(() => { fs.rmSync(root, { recursive: true, force: true }); });
+  afterAll(() => { fs.rmSync(bframeSrc, { force: true }); fs.rmSync(root, { recursive: true, force: true }); });
 
   const expectRejected = (r, code) => {
     expect(r.status).toBe(3);
@@ -181,15 +181,39 @@ d('presentation-video-cut-script', () => {
 
   // Edit list: x264 B-frames make the mp4 muxer write an elst that hides the decoder delay, so the
   // ignore_editlist decode starts later than the normal decode (stream start_time still reads 0).
-  let editListSrc;
   const firstVideoPts = (file, extra) => JSON.parse(spawnSync('ffprobe', ['-v', 'error', ...extra, '-select_streams', 'v:0',
     '-show_entries', 'frame=pts', '-read_intervals', '%+#2', '-of', 'json', file]).stdout.toString()).frames[0].pts;
-  test('5. edit list that shifts the timeline is rejected as unsupported_timeline', async () => {
-    editListSrc = path.join(root, 'editlist.mp4');
-    await ff('-f', 'lavfi', '-i', 'color=c=0xf6f8fc:s=320x180:r=25:d=15', '-f', 'lavfi', '-i', `sine=f=440:r=${SR}:d=15`,
-      '-c:v', 'libx264', '-preset', 'veryfast', '-bf', '3', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-movflags', '+faststart', editListSrc);
-    expect(firstVideoPts(editListSrc, [])).not.toBe(firstVideoPts(editListSrc, ['-ignore_editlist', '1']));
-    expectRejected(await cut(editListSrc, 12437), 'unsupported_timeline');
+  const bframeSrc = path.join(os.tmpdir(), `cutscript-bf-${process.pid}.mp4`);
+  test('5. B-frame codec-delay edit list is tolerated: accepted, tail clean, delay recorded', async () => {
+    await makeSource(bframeSrc, { priv: 12.437, vcodec: ['-preset', 'veryfast', '-bf', '3', '-movflags', '+faststart'] });
+    expect(firstVideoPts(bframeSrc, [])).not.toBe(firstVideoPts(bframeSrc, ['-ignore_editlist', '1']));
+    const r = await cut(bframeSrc, 12437);
+    expect(r.status).toBe(0);
+    expect(r.receipt).toMatchObject({ ok: true, framesKept: 310 });
+    expect(r.receipt.videoEditDelayMs).toBeGreaterThan(0);
+    assertCleanTail(r.outPath);
+  });
+
+  test('5b. an edit list that shifts the presentation (start 1 s into the media) is rejected', async () => {
+    const buf = fs.readFileSync(bframeSrc);
+    const at = buf.indexOf('elst');
+    expect(at).toBeGreaterThan(0);
+    expect(buf[at + 4]).toBe(0); // version 0
+    const mediaTimeOffset = at + 4 + 4 + 4 + 4; // type, version/flags, entry count, segment duration
+    const shifted = Buffer.from(buf);
+    shifted.writeInt32BE(shifted.readInt32BE(mediaTimeOffset) + 12800, mediaTimeOffset);
+    const out = path.join(root, 'shifted-elst.mp4');
+    fs.writeFileSync(out, shifted);
+    expectRejected(await cut(out, 12437), 'unsupported_timeline');
+  });
+
+  test('5c. standard AAC priming edit list is accepted and the priming is recorded', async () => {
+    const r = await cut(src25, 12437);
+    expect(r.status).toBe(0);
+    expect(typeof r.receipt.audioPrimingMs).toBe('number');
+    expect(r.receipt.audioPrimingMs).toBeLessThanOrEqual(44);
+    // eslint-disable-next-line no-console
+    console.log(`audioPrimingMs ${r.receipt.audioPrimingMs}`);
   });
 
   test('6. variable frame rate is rejected as unsupported_timeline', async () => {
@@ -284,6 +308,22 @@ d('presentation-video-cut-script', () => {
     // eslint-disable-next-line no-console
     console.log(`mutant outcome on video-offset fixture: status ${mut.status}, ok ${mut.receipt.ok}, code ${mut.receipt.code}`);
     expect(mut.receipt.code).not.toBe('unsupported_timeline');
+  });
+
+  test('11b. mutation: with the output correspondence check removed and the encode mistimed (-r 30) the cut is accepted, the real script rejects it', async () => {
+    const needle = "raise Fail('frame_timestamp_mismatch', step)";
+    const enc = "'-fps_mode', 'passthrough',";
+    expect(CUT_SCRIPT_PY).toContain(needle);
+    expect(CUT_SCRIPT_PY).toContain(enc);
+    const bad = CUT_SCRIPT_PY.replace(enc, "'-fps_mode', 'cfr', '-r', '30',");
+    const mutantNoCheck = path.join(root, 'cut-mutant2.py');
+    fs.writeFileSync(mutantNoCheck, bad.replace(needle, 'pass'));
+    const onlyBadEncode = path.join(root, 'cut-mutant3.py');
+    fs.writeFileSync(onlyBadEncode, bad);
+    const rejected = await cut(src25, 12437, {}, onlyBadEncode);
+    expect(rejected.receipt.code).toBe('frame_timestamp_mismatch');
+    const accepted = await cut(src25, 12437, {}, mutantNoCheck);
+    expect(accepted.receipt.ok).toBe(true);
   });
 
   describe('upload (local server)', () => {
