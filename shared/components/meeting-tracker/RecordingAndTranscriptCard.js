@@ -3027,6 +3027,7 @@ const PV_FAILURE_TEXT = Object.freeze({
   presentation_video_transcript_changed: PV_STALE_TEXT,
   presentation_video_approval_stale: PV_STALE_TEXT,
 });
+const PV_IN_PROGRESS_TEXT = 'Approval is still in progress. Try again in a few minutes.';
 const PV_GENERIC_FAILURE = 'Something went wrong. Try again.';
 const PV_REASON_TEXT = (code) => PV_FAILURE_TEXT[code] || PV_GENERIC_FAILURE;
 
@@ -3037,6 +3038,8 @@ function PresentationVideoLine({ requestId }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);
   const [confirming, setConfirming] = useState(null); // 'approve' | 'recreate'
+  const [loaded, setLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const mountedRef = useRef(true);
   const sequenceRef = useRef(0);
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
@@ -3052,8 +3055,11 @@ function PresentationVideoLine({ requestId }) {
           .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))) : [];
       setAvailable(body?.available === true && Array.isArray(body.splits));
       setSplits(rows);
+      setLoaded(true);
+      setLoadFailed(false);
     } catch {
-      // Keep what is shown; the next poll or action retries.
+      // Keep what is shown; the interval below keeps retrying.
+      if (mountedRef.current && sequenceRef.current === sequence) setLoadFailed(true);
     }
   }, [path, requestId]);
   useEffect(() => {
@@ -3063,20 +3069,33 @@ function PresentationVideoLine({ requestId }) {
   const newest = splits[0] || null;
   const processing = splits.some((s) => PV_PROCESSING.has(s.state));
   useEffect(() => {
-    if (!processing) return undefined;
+    if (!processing && !loadFailed) return undefined;
     const timer = setInterval(() => { void load(); }, PV_POLL_MS);
     return () => clearInterval(timer);
-  }, [processing, load]);
+  }, [processing, loadFailed, load]);
 
   const post = async (body, fallbackMessage) => {
     setBusy(true); setMessage(null); setConfirming(null);
     try {
-      await requestJson(path, { method: 'POST', body, fallbackMessage });
-      if (mountedRef.current) await load();
+      const result = await requestJson(path, { method: 'POST', body, fallbackMessage });
+      if (!mountedRef.current) return;
+      // Show the server's answer now, so a failed refresh cannot hide it (and staff do not start a second cut).
+      const row = result?.split;
+      if (row && typeof row.id === 'string' && typeof row.state === 'string') {
+        setSplits((old) => {
+          const known = old.find((item) => item.id === row.id);
+          const next = { createdAt: new Date().toISOString(), failureCode: null, ...known, id: row.id, state: row.state };
+          return [next, ...old.filter((item) => item.id !== row.id)];
+        });
+        setLoaded(true); setAvailable(true);
+      }
+      await load();
     } catch (error) {
       if (!mountedRef.current) return;
-      const stale = error?.payload?.code === 'presentation_video_approval_stale';
-      setMessage({ tone: stale ? 'warning' : 'error', text: stale ? PV_STALE_TEXT : (error?.message || fallbackMessage) });
+      const code = error?.payload?.code;
+      const stale = code === 'presentation_video_approval_stale';
+      const inProgress = code === 'presentation_video_approval_in_progress';
+      setMessage({ tone: stale || inProgress ? 'warning' : 'error', text: stale ? PV_STALE_TEXT : inProgress ? PV_IN_PROGRESS_TEXT : (error?.message || fallbackMessage) });
       await load();
     } finally {
       if (mountedRef.current) setBusy(false);
@@ -3085,6 +3104,14 @@ function PresentationVideoLine({ requestId }) {
   const create = () => post({ action: 'start' }, 'The presentation video could not be started. Try again.');
   const approve = () => post({ action: 'approve', splitId: newest.id }, 'The video could not be approved. Try again.');
 
+  if (!loaded && loadFailed) {
+    return (
+      <div className="mt-3" data-testid="presentation-video-line">
+        <p className="text-sm leading-6 text-gray-900"><span className="font-medium">Video:</span> Couldn’t load the video status.</p>
+        <button type="button" onClick={() => void load()} className={`mt-1 ${BTN}`}>Retry</button>
+      </div>
+    );
+  }
   if (!available) return null;
   const state = newest?.state || null;
   const openHref = newest ? `${path}/${encodeURIComponent(newest.id)}/open` : null;
@@ -3100,11 +3127,13 @@ function PresentationVideoLine({ requestId }) {
   return (
     <div className="mt-3" data-testid="presentation-video-line" aria-live="polite">
       <p className="text-sm leading-6 text-gray-900"><span className="font-medium">Video:</span> {status}</p>
+      {loadFailed && <p className="text-xs text-gray-700">Couldn’t refresh the video status. Retrying…</p>}
       {state === 'superseded' && <p className="text-xs text-gray-700">{PV_STALE_TEXT}</p>}
       {state === 'failed' && <p className="text-xs text-gray-700">{PV_REASON_TEXT(newest.failureCode)}</p>}
       <div className="mt-1 flex flex-wrap items-center gap-2">
         {(state === 'review' || state === 'approved') && <a className={BTN} href={openHref} target="_blank" rel="noreferrer">Open video</a>}
         {state === 'review' && <button type="button" onClick={() => setConfirming('approve')} disabled={busy} className={BTN_PRIMARY}>Check the ending and approve</button>}
+        {state === 'registering' && <button type="button" onClick={() => void approve()} disabled={busy} className={BTN_PRIMARY}>{busy ? 'Working…' : 'Finish approving'}</button>}
         {canCreate && <button type="button" onClick={() => (state === 'approved' || state === 'review' ? setConfirming('recreate') : void create())} disabled={busy} className={BTN}>{busy ? 'Working…' : (state === 'review' ? 'Create it again' : 'Create presentation video')}</button>}
       </div>
       {confirming === 'approve' && (
