@@ -178,6 +178,18 @@ host in the account, so the application enforces its own approved-host list
 | `ZOOM_S2S_CLIENT_SECRET` | S2S app client secret (secret) | Same page; regenerating it there invalidates the old value |
 | `ZOOM_RECORDING_HOSTS` | Comma-separated approved host emails (security allowlist, not a secret); initially `wmk-library@wmkeck.org`. Change only by a deliberate deploy-time edit. | Owner decision; not a Dataverse setting |
 
+### Optional — Stage 4 presentation video (built on branch `claude/stage4-build`, not yet merged)
+
+The presentation-video cut (`docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md`) runs FFmpeg in Vercel Sandbox, which authenticates with the deployment's own OIDC token, so there is no Sandbox secret to set. It reuses `UPLOADS_BLOB_RW_TOKEN` (private Blob, for the pinned FFmpeg tarball) and `EXTERNAL_LINK_SECRET` (to seal the Graph upload-session URL). Every variable below is non-sensitive configuration.
+
+| Variable | Purpose | Default / where to get it |
+|----------|---------|---------------------------|
+| `PRESENTATION_VIDEO_SPLIT_ACCESS` | Rollout flag: `off`, `on` or `test:<request GUID>`. Unset means off. | Owner decision at rollout |
+| `PRESENTATION_VIDEO_FFMPEG_BLOB_PATHNAME` | Pathname of the verified FFmpeg 9.0.2 tarball in the private uploads Blob store. The SHA-256 is pinned in code. | Set after the owner-approved one-time upload |
+| `PRESENTATION_VIDEO_SANDBOX_TIMEOUT_MS` | Sandbox timeout, which is also the per-job cost ceiling. | 10800000 (3 h); lower it after the first real cut |
+| `PRESENTATION_VIDEO_SANDBOX_VCPUS` | vCPUs per Sandbox. | 2 |
+| `PRESENTATION_VIDEO_LEASE_SECONDS` | Worker lease length. | 600 |
+
 ### Optional — Dynamics Explorer
 
 | Variable | Purpose | Source |
