@@ -1,6 +1,71 @@
-# Session 591 Prompt: Stage 4 focused validation and Sandbox pilot; review the transcription-labels branch
+# Session 592 Prompt: Stage 4 build plan; first live test of attendance attribution
 
-## Session 590 close — Stage 3b released and live; picker fixes; Stage 4 designed and researched (Claude, main, 2026-10-09 PT)
+## Session 591 close — provenance and attendance shipped (Codex built, Claude orchestrated); Stage 4 Sandbox pilot passed (Claude, main, 2026-10-09/10 PT)
+
+### What Was Completed
+
+1. **Stage 4 coordinated with Codex's speaker-label work; owner decisions 11-17 recorded** in `docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md` (`090b3e528`, `f7a767f2a`):
+   - 11: the video binds to the transcript revision (later edits rare);
+   - 12: the same-source check is metadata plus a staff listen (hard gate 1 relaxed; no packet proof, no Zoom re-fetch);
+   - 13: 1003222 is a test request; re-import it when a real cut is needed;
+   - 14: Codex owns provenance and attendance, Claude owns Stage 4, shared files one editor at a time;
+   - 15: guiding principle is fewest sessions and clicks with minimum regeneration (presentation end plus attendance in ONE correction);
+   - 16: record the MP4's recording start/end on `zoom_video_copies`;
+   - 17: migration 079 is Stage 4.
+2. **Synthetic Vercel Sandbox pilot passed, about $0.22 of the $10 cap** (`09930245a`, `fbde74ad4`):
+   - 60-minute 1080p generated fixture cut in iad1 at 2 vCPU in about 11.5 min (48-minute presentation);
+   - interruption, full disk and sandbox timeout all fail closed;
+   - every sandbox removed, no snapshots.
+   - Results `docs/plans/STAGE4_SANDBOX_PILOT_RESULTS_2026-10-09.md`; script `scripts/benchmarks/stage4-sandbox-pilot.py`.
+   - Not exercised: upload, VFR, Zoom `bin_data` stream, browser/SharePoint ending playback.
+3. **Transcript provenance shipped (Codex):** merge `f3cc08540`, migration 077 applied by the owner. Exact Zoom file binding at import, frozen content-free source identity per publication, bundle v6, and the server seam `resolveCurrentMeetingTranscriptSource`.
+4. **Attendance attribution shipped (Codex built; Claude reviewed, ran 125 related suites / 2,273 tests, merged):** merge `06ef45ee8` (`7ddc5a4e7`, `3af9267de`), migration 078 applied by the owner before merge; Production deployment of `06ef45ee8` succeeded.
+   - Plan `docs/plans/ZOOM_ATTENDANCE_ATTRIBUTION_PLAN_2026-10-09.md`; owner decisions D1-D4 and Q1-Q4.
+   - The manual "Shared microphone" link Codex added was removed on owner decision. Claude committed that removal because Codex's sandbox could not write git metadata.
+5. **Zoom report facts probed (owner-run, shape-only):** `scripts/probe-zoom-recordings.mjs --attendance` (`1c752504d`).
+   - The Meeting Tracker app already has the report and past-participants scopes.
+   - Guests have no stable ID; `user_id` is per row, so grouping is by display name only.
+   - Repeated names were waiting-room rows; `duration` is seconds.
+   - The first join was 884 s before the audio `recording_start`.
+6. **Migrations:** Production and `main` end at 078; **079 reserved for Stage 4**; next free 080 (`.claude-memory/project-migration-numbers-claimed-off-main.md`, `cf5b1257e`).
+7. **Worktrees:**
+   - `/Users/gallivan/Code/WMKF_Apps-codex-labels` is on `codex/zoom-attendance` (merged; no uncommitted changes; no `.env.local`, deliberately).
+   - New `/Users/gallivan/Code/WMKF_Apps-codex-group-review` on `codex/group-review-non-lead-ui` (no upstream) for minor group-review UI changes for non-lead PDs. The owner holds the Codex prompt; no commits yet.
+8. **Wiki:** Sandbox hazards in `docs/agent-wiki/topics/dev-environment.md`: `vercel sandbox run` leaves the sandbox running; no per-sandbox spend cap.
+
+### Next Items
+
+#### Verified Open
+
+1. **Stage 4 build plan (Claude), then `/contract-reconcile` Mode A.** Evidence: Stage 4 plan decisions 11-17; the provenance seam is merged; the card is now free for Stage 4 (attendance merged).
+   - Scope: migration 079 (split-job table plus `zoom_video_copies.recording_start/end`), recording times written at copy, split service/worker/Sandbox processor, `bindPresentationVideo` (new file), Board/briefing allowlists, card Video line.
+   - Decision 7 (presentation-video picklist value) is owner-provisioned at build time.
+2. **First live use of attendance attribution.** Not yet exercised on a real meeting. Needs a transcript with verified Zoom provenance (a new import); legacy transcripts show only the voices list. Suggested: re-import 1003222 from Zoom (one paid transcription, owner-run), which also gives Stage 4 its first real input (re-copy its video too, decision 16).
+3. **Review `codex/group-review-non-lead-ui` when Codex reports.** Not started at close.
+
+#### Owner Decision Needed
+
+1. **Stage 4 ending playback check:** a 2-minute synthetic clip was saved only in the session scratchpad (gone). Regenerate with `scripts/benchmarks/stage4-sandbox-pilot.py cut 150 120.437 short` locally if needed.
+2. Carried, not rechecked: `ZOOM_RECORDING_HOSTS` non-sensitive re-create; Proposal Ranking PR #463 and the colleague dry run.
+
+#### Verify Before Acting
+
+1. Carried from Sessions 588-590, not rechecked: Proposal Ranking Production cleanup; optional paired-summaries checks; PR #470 cleanup test.
+
+### Gotchas
+
+- Codex's sandbox cannot write shared git metadata (`index.lock`) in a worktree. Expect to commit and push for it after reviewing its diff.
+- The `codex:codex-rescue` Agent prompt must start with the CODEX RESCUE HANDOFF preface (a hook blocks it otherwise).
+- Apply a migration from a worktree without `.env.local` with `node --env-file=../WMKF_Apps/.env.local scripts/apply-migrations.js` (owner `!` run).
+- `schema_migrations` columns are `name`, `applied_at`, `applied_by` (not `filename`).
+- Jest here rejects `--testPathPattern`; pass the regex as a positional argument.
+- Earlier gotchas still apply: `.env.local` points at Production; worktree Turbopack needs `--webpack`; `check:agent-invariants` fails in worktrees; the Word lock file `shared/templates/pre-site-visit/~$ase-ii-pre-site-visit-v6.docx` must not be committed.
+
+**Milestone determination:** provenance and attendance attribution shipped to Production, so a DEVELOPMENT_LOG entry was added ("Zoom transcript provenance and attendance-based discussion attribution (Session 591)").
+
+---
+
+## Session 590 close (superseded in part by Session 591) — Stage 3b released and live; picker fixes; Stage 4 designed and researched (Claude, main, 2026-10-09 PT)
 
 ### What Was Completed
 

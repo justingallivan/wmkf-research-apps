@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Zoom transcript provenance and attendance-based discussion attribution (Session 591)
+
+**Milestone:** When Duncan confirms a transcript's presentation end, the same step now lists everyone admitted to the Zoom meeting (silent people included), all checked; unchecking someone makes their discussion turns read "Unidentified speaker". Underneath, every Zoom-imported transcript now carries a frozen, content-free record of the exact recording files it came from.
+**Sessions:** 591 (Claude orchestrating, Codex building). Provenance merge `f3cc08540` (migration 077); attendance merge `06ef45ee8` (migration 078, `7ddc5a4e7` + `3af9267de`); both migrations applied by the owner before merge; Production deployment of `06ef45ee8` succeeded.
+**Ship state:**
+- Import binds the exact Zoom file (ID, type, size, start/end; a same-size replacement is rejected) and freezes file hashes before transcription; corrections and recovery carry the same source identity; transcript bundle v6 then v7.
+- Attendance comes from the Zoom participants report by the frozen meeting UUID only; people grouped by display name; waiting-room-only hidden behind a count; unavailable or partial attendance falls back to the voices list. Presentation turns, names, timestamps and the presentation end never change.
+- Legacy transcripts stay "source unknown"; not yet exercised on a live meeting.
+**Why it matters:** the discussion transcript no longer credits people who had left, and Stage 4 can prove which recording a transcript came from.
+**Pointers:** `docs/plans/ZOOM_TRANSCRIPT_PROVENANCE_PLAN_2026-10-09.md`; `docs/plans/ZOOM_ATTENDANCE_ATTRIBUTION_PLAN_2026-10-09.md`; `lib/services/meeting-tracker-transcription/{source-provenance,attendance-service,discussion-attribution}.js`.
+
 ## October 2026 — Zoom meeting videos copy into SharePoint (Session 590)
 
 **Milestone:** Staff can copy a site visit's Zoom meeting MP4 into the request's SharePoint folder as its staff-only Recording, from the same picker that imports the audio. `ZOOM_VIDEO_COPY_ACCESS=on` in Production.
