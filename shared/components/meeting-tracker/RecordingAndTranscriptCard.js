@@ -1,3 +1,5 @@
+import { sharedMicrophoneDecision } from '../../../lib/services/meeting-tracker-transcription/discussion-attribution';
+import { resolveDiscussionAttribution } from '../../../lib/services/meeting-tracker-transcription/presentation-boundary';
 /** Site Visit "Recording and transcript" card: recording, transcript upload/generation, speaker names, board link. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiRequestError, requestEnvelope, requestJson } from '../../utils/api-request';
@@ -1313,6 +1315,8 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   const [correctionDetail, setCorrectionDetail] = useState(null);
   const [names, setNames] = useState({});
   const [endEdit, setEndEdit] = useState(null);
+  const [attendanceEdit, setAttendanceEdit] = useState(null);
+  const attendanceAttemptRef = useRef(null);
   const [suggestionPicks, setSuggestionPicks] = useState({});
   const [audioFile, setAudioFile] = useState(null);
   const [vttFile, setVttFile] = useState(null);
@@ -1367,7 +1371,32 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   const baselineEndMs = correction && Number.isSafeInteger(correction.presentationEndMs) ? correction.presentationEndMs : null;
   const presentationEndMs = correction && endEdit?.key === editorKey ? endEdit.value : baselineEndMs;
   const dirtyEnd = presentationEndMs !== baselineEndMs;
-  const dirty = dirtyNames || dirtyEnd;
+  const attendanceReview = correction?.attendanceReview || null;
+  const originalLinkedIds = attendanceReview?.decision.rows.filter(row => row.kind === 'attendee').flatMap(row => row.speakerIds) || [];
+  const savedSharedIds = correction?.discussionAttribution?.rows.filter(row => row.kind === 'voice')
+    .flatMap(row => row.speakerIds).filter(id => originalLinkedIds.includes(id)) || [];
+  const sharedSpeakerIds = attendanceReview && attendanceEdit?.id === attendanceReview.id ? attendanceEdit.sharedSpeakerIds : savedSharedIds;
+  const attendanceDecision = attendanceReview ? sharedMicrophoneDecision(attendanceReview.decision, sharedSpeakerIds) : null;
+  const attendanceKept = attendanceReview ? (attendanceEdit?.id === attendanceReview.id ? attendanceEdit.kept
+    : (correction.discussionAttribution || attendanceDecision).rows.map(row => row.kept)) : [];
+  const dirtyAttendance = Boolean(attendanceReview && attendanceEdit?.id === attendanceReview.id
+    && (JSON.stringify(sharedSpeakerIds) !== JSON.stringify(savedSharedIds)
+      || JSON.stringify(attendanceKept) !== JSON.stringify((correction.discussionAttribution || attendanceDecision).rows.map(row => row.kept))));
+  const dirty = dirtyNames || dirtyEnd || dirtyAttendance;
+  const setAttendanceKept = (index, kept) => setAttendanceEdit({ id: attendanceReview.id, sharedSpeakerIds,
+    kept: attendanceKept.map((value, position) => position === index ? kept : value) });
+  const markSharedMicrophone = (id) => {
+    const selected = [...sharedSpeakerIds, id].sort();
+    setAttendanceEdit({ id: attendanceReview.id, sharedSpeakerIds: selected,
+      kept: sharedMicrophoneDecision(attendanceReview.decision, selected).rows.map((row, index) => {
+        if (index < attendanceReview.decision.rows.length) return attendanceKept[index];
+        const previous = attendanceDecision.rows.findIndex(prior => prior.kind === 'voice'
+          && JSON.stringify(prior.speakerIds) === JSON.stringify(row.speakerIds));
+        return previous < 0 ? true : attendanceKept[previous];
+      }) });
+  };
+  const previewDecision = !dirtyNames && !dirtyEnd && attendanceDecision ? { excludedSpeakerIds: attendanceDecision.rows
+    .filter((row, index) => !attendanceKept[index]).flatMap(row => row.speakerIds) } : null;
   const setPresentationEndMs = (value) => setEndEdit({ key: editorKey, value: Number.isSafeInteger(value) ? value : null });
 
   // Seed the editor from the server whenever the edited target changes, and adopt newly arrived
@@ -1442,6 +1471,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   }, [basePath, isCurrent, requestId]);
 
   const loadCorrection = useCallback(async (operationId) => {
+    attendanceAttemptRef.current = null;
     const generation = generationRef.current;
     const sequence = ++detailSeqRef.current;
     const current = () => isCurrent(generation) && detailSeqRef.current === sequence;
@@ -1458,6 +1488,25 @@ function useTranscription(requestId, { onMaterialsChanged }) {
       if (current()) setBusy(null);
     }
   }, [basePath, isCurrent]);
+
+  useEffect(() => {
+    if (!correction || attendanceReview || dirtyNames || dirtyEnd || busy || !Number.isSafeInteger(baselineEndMs)) return;
+    const key = `${requestId}:${correction.operationId}:${correction.version}`;
+    if (attendanceAttemptRef.current === key) return;
+    attendanceAttemptRef.current = key;
+    const generation = generationRef.current;
+    const sequence = detailSeqRef.current;
+    const target = editorKey;
+    const current = () => isCurrent(generation) && sequence === detailSeqRef.current && editorKeyRef.current === target;
+    setBusy('attendance');
+    requestJson(`${basePath}/corrections/${encodeURIComponent(correction.operationId)}/attendance`, {
+      method: 'POST', body: { expectedVersion: correction.version }, fallbackMessage: 'Attendance could not be loaded.',
+    }).then(result => {
+      if (current()) setCorrectionDetail(detail => detail ? { ...detail, correction: result.correction } : detail);
+    }).catch(error => {
+      if (current()) setError(errorMessage(error, 'Attendance could not be loaded. Refresh to try again.'));
+    }).finally(() => { if (current()) setBusy(null); });
+  }, [correction, attendanceReview, dirtyNames, dirtyEnd, busy, baselineEndMs, requestId, editorKey, basePath, isCurrent]);
 
   // Load the run under review once it is readable; one attempt per run and status so a failure cannot loop.
   useEffect(() => {
@@ -1528,7 +1577,8 @@ function useTranscription(requestId, { onMaterialsChanged }) {
       setNotice(null);
       try {
         const result = await requestJson(`${basePath}/corrections/${encodeURIComponent(correction.operationId)}`, {
-          method: 'PATCH', body: { expectedVersion: correction.version, speakerNames: names, ...(dirtyEnd ? { presentationEndMs } : {}) },
+          method: 'PATCH', body: { expectedVersion: correction.version, speakerNames: names, ...(dirtyEnd ? { presentationEndMs } : {}),
+            ...(!dirtyNames && !dirtyEnd && attendanceReview ? { attendanceConfirmation: { reviewId: attendanceReview.id, kept: attendanceKept, ...(sharedSpeakerIds.length ? { sharedSpeakerIds } : {}) } } : {}) },
           fallbackMessage: 'Your changes could not be saved.',
         });
         if (!isCurrent(generation)) return;
@@ -1539,12 +1589,12 @@ function useTranscription(requestId, { onMaterialsChanged }) {
         setNotice('Changes saved.');
         setConflict(false);
       } catch (saveError) {
-        if (isCurrent(generation)) {
+        if (isCurrent(generation) && editorKeyRef.current === targetKey) {
           setConflict(saveError?.status === 409);
           setError(errorMessage(saveError, 'Your changes could not be saved.'));
         }
       } finally {
-        if (isCurrent(generation)) setBusy(null);
+        if (isCurrent(generation) && editorKeyRef.current === targetKey) setBusy(null);
       }
       return;
     }
@@ -1581,18 +1631,29 @@ function useTranscription(requestId, { onMaterialsChanged }) {
 
   const publishCorrection = async () => {
     const artifact = correctionDetail?.currentArtifact;
-    if (!correction || !artifact || dirty || !speakerIds.length || correction.state !== 'draft' || busy) return;
+    if (!correction || !artifact || dirtyNames || dirtyEnd || !attendanceReview || !speakerIds.length || correction.state !== 'draft' || busy) return;
     if (artifact.id !== correction.expectedCurrentArtifactId || artifact.fingerprint !== correction.expectedCurrentFingerprint) {
       setError('The published transcript changed after you started editing. Cancel, then choose Edit speaker names again.');
       return;
     }
     const generation = generationRef.current;
+    const targetKey = editorKey;
     setBusy('publish');
     setError(null);
     setNotice(null);
     try {
-      const result = await requestJson(`${basePath}/corrections/${encodeURIComponent(correction.operationId)}/publish`, { method: 'POST', body: { expectedVersion: correction.version }, fallbackMessage: 'The edited transcript could not be published.' });
-      if (!isCurrent(generation)) return;
+      let version = correction.version;
+      if (!correction.discussionAttribution || dirtyAttendance) {
+        const saved = await requestJson(`${basePath}/corrections/${encodeURIComponent(correction.operationId)}`, {
+          method: 'PATCH', body: { expectedVersion: version, speakerNames: names,
+            attendanceConfirmation: { reviewId: attendanceReview.id, kept: attendanceKept, ...(sharedSpeakerIds.length ? { sharedSpeakerIds } : {}) } }, fallbackMessage: 'Attendance could not be confirmed.',
+        });
+        if (!isCurrent(generation) || editorKeyRef.current !== `c:${correction.operationId}`) return;
+        version = saved.correction.version;
+        setCorrectionDetail(detail => detail ? { ...detail, correction: saved.correction } : detail);
+      }
+      const result = await requestJson(`${basePath}/corrections/${encodeURIComponent(correction.operationId)}/publish`, { method: 'POST', body: { expectedVersion: version }, fallbackMessage: 'The edited transcript could not be published.' });
+      if (!isCurrent(generation) || editorKeyRef.current !== targetKey) return;
       if (result.currentArtifact) setCollection((state) => (state ? { ...state, currentArtifact: result.currentArtifact } : state));
       announcePublication(result.publication || { state: 'unknown' }, false);
       if (result.publication?.state === 'published') setNotice('Transcript updated. Generate the presentation and staff discussion transcripts, then summarize again to restore Board derivatives.');
@@ -1600,15 +1661,15 @@ function useTranscription(requestId, { onMaterialsChanged }) {
       await loadCollection();
       await onMaterialsChangedRef.current?.();
     } catch (publishError) {
-      if (isCurrent(generation)) {
+      if (isCurrent(generation) && editorKeyRef.current === targetKey) {
         await loadCollection();
-        if (isCurrent(generation)) {
+        if (isCurrent(generation) && editorKeyRef.current === targetKey) {
           setConflict(publishError?.status === 409);
           setError(errorMessage(publishError, 'The edited transcript could not be published.'));
         }
       }
     } finally {
-      if (isCurrent(generation)) setBusy(null);
+      if (isCurrent(generation) && editorKeyRef.current === targetKey) setBusy(null);
     }
   };
 
@@ -1898,6 +1959,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   return {
     presentationSummary, discussionSummary, summaryAck, setSummaryAck, pairedSummaryKinds, summarizeKinds,
     basePath, collection, collectionCheckedAt, savedDraft, loading, jobs, publications, newestJob, focusJob, showReview, selectedJob,
+    attendanceReview, attendanceDecision, attendanceKept, setAttendanceKept, markSharedMicrophone, previewDecision,
     correction, correctionDetail, content, speakerIds, names, setNames: editNames, baseline, dirtyNames, dirtyEnd, dirty, presentationEndMs, setPresentationEndMs, suggestionPicks, setSuggestionPicks,
     detail, audioFile, vttFile, setVttFile, acknowledged, setAcknowledged, uploadProgress, busy, error, notice, conflict,
     closeAcknowledgedId, setCloseAcknowledgedId, confirmNoVtt, setNoVttConfirmation,
@@ -2389,6 +2451,23 @@ function PresentationEndEditor({ t, readOnly }) {
         </div>
       )}
       {selected === null && <p className="mt-2 text-xs text-gray-600">Not confirmed. The Board link shows no transcript.</p>}
+      {selected !== null && (t.dirtyNames || t.dirtyEnd) && <p className="mt-3 text-xs text-gray-600">Save changes to review attendance.</p>}
+      {t.attendanceReview && !t.dirtyNames && !t.dirtyEnd && <fieldset className="mt-4 space-y-2" disabled={disabled}>
+        <legend className="text-sm font-semibold">Discussion attendance</legend>
+        <p className="text-xs text-gray-600">Uncheck anyone whose discussion turns should say “Unidentified speaker”. Publish to confirm. For a shared microphone, use its own checkbox; unchecking a person leaves that voice unchanged.</p>
+        {t.attendanceReview.decision.attendance.status !== 'complete' && <p className="text-xs text-gray-600">Attendance is unavailable or incomplete. Review the voices in the discussion.</p>}
+        {['attendee', 'voice'].map(kind => <div key={kind}>
+          {kind === 'voice' && t.attendanceDecision.rows.some(row => row.kind === kind) && <p className="mt-3 text-xs font-semibold">Other voices in the discussion</p>}
+          {t.attendanceDecision.rows.map((row, index) => row.kind === kind && <label key={index} className="flex items-start gap-2 text-sm">
+            <input type="checkbox" checked={t.attendanceKept[index]} onChange={event => t.setAttendanceKept(index, event.target.checked)} />
+            <span>{row.displayName}{row.lastLeaveAt && <span className="ml-2 text-xs text-gray-600">Left {new Date(row.lastLeaveAt).toLocaleString('en-US', { timeZone: t.attendanceReview.timeZone || 'UTC', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}</span>}
+              {row.kind === 'attendee' && row.speakerIds.map(id => <button key={id} type="button" className="ml-2 text-xs underline" onClick={event => { event.preventDefault(); t.markSharedMicrophone(id); }}>Shared microphone</button>)}
+              {t.attendanceReview.leftBeforeEnd[index] && <span className="block text-xs text-gray-600">Left before the presentation ended</span>}</span>
+          </label>)}
+        </div>)}
+        {t.attendanceReview.waitingRoomOnlyCount > 0 && <p className="text-xs text-gray-600">{t.attendanceReview.waitingRoomOnlyCount} stayed in the waiting room.</p>}
+      </fieldset>}
+
     </div>
   );
 }
@@ -2426,7 +2505,8 @@ function ReviewBlock({ t }) {
   const staleCorrection = Boolean(correction) && (t.correctionDetail?.currentArtifact?.id !== correction.expectedCurrentArtifactId
     || t.correctionDetail?.currentArtifact?.fingerprint !== correction.expectedCurrentFingerprint);
   const publishBlockedReason = matchingActive ? 'Matching still running'
-    : dirty ? (correction ? 'Save changes first' : 'Save names first')
+    : (t.dirtyNames || t.dirtyEnd) ? (correction ? 'Save changes first' : 'Save names first')
+      : correction && !t.attendanceReview ? 'Review attendance first'
       : !hasTurns ? 'Publishing needs timed speaker turns.'
         : staleCorrection ? 'The published transcript changed. Cancel and start again.'
           : correction ? (correction.state !== 'draft' ? 'This edit was already published.' : null)
@@ -2435,7 +2515,7 @@ function ReviewBlock({ t }) {
                 : status !== 'ready' ? 'Only a ready run can be published.' : null;
   const canReview = correction ? Boolean(t.content) : status === 'ready' && job?.contentAccessAllowed === true && Boolean(t.content);
   const title = correction ? 'Edit speaker names and presentation end' : displayName(job);
-  const showRefresh = matchingActive || conflict || (status === 'ready' && !t.content && Boolean(t.error));
+  const showRefresh = matchingActive || conflict || (correction && Boolean(t.error)) || (status === 'ready' && !t.content && Boolean(t.error));
   const base = t.basePath;
 
   return (
@@ -2464,7 +2544,7 @@ function ReviewBlock({ t }) {
         {alignmentShown && ALIGNMENT_REASONS[alignmentStatus] && <p className="mt-3 text-sm leading-5 text-gray-700">{ALIGNMENT_REASONS[alignmentStatus]}</p>}
         <SpeakerEditor t={{ ...t, collection }} alignment={alignment} readOnly={matchingActive || (correction && correction.state !== 'draft')} />
         {correction && <PresentationEndEditor t={t} readOnly={correction.state !== 'draft'} />}
-        <TranscriptPreview content={t.content} names={t.names} />
+        <TranscriptPreview content={resolveDiscussionAttribution(t.content, t.presentationEndMs, t.previewDecision)} names={t.names} />
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className="mr-auto text-xs text-gray-600" aria-live="polite">{correction ? (dirty ? 'Unsaved changes' : 'Saved') : (dirty ? 'Unsaved name changes' : 'Names saved')}</span>
           <button type="button" onClick={t.saveNames} disabled={!dirty || Boolean(busy) || matchingActive} className={BTN}>{busy === 'speakers' ? (correction ? 'Saving…' : 'Saving names…') : (correction ? 'Save changes' : 'Save names')}</button>

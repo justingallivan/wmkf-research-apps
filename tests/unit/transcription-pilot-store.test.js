@@ -844,3 +844,16 @@ test('publication freezes normalized provenance and checks it against the locked
   await expect(createTranscriptionPilotStore(db).freezeMeetingPublicationFromJob(args)).rejects.toMatchObject({ code: 'transcription_source_changed' });
   expect(tx.query).toHaveBeenCalledTimes(2);
 });
+
+
+it('invalidates confirmed attendance in SQL on rename or boundary change and preserves the version fence', async () => {
+  const db = fakeDatabase();
+  const store = createTranscriptionPilotStore(db);
+  const args = { operationId: '00000000-0000-4000-8000-000000000001', requestId: NON_RFC_REQUEST_ID,
+    siteVisitActivityId: NON_RFC_SITE_VISIT_ID, actorProfileId: 12, expectedVersion: 8, speakerNames: { A: 'Changed' } };
+  await store.updateMeetingCorrectionDraft(args);
+  expect(db.query.mock.calls[0][0]).toContain('discussion_attribution = CASE WHEN speaker_names IS DISTINCT FROM $4::jsonb THEN NULL ELSE discussion_attribution END');
+  await store.updateMeetingCorrectionDraft({ ...args, presentationEnd: null });
+  expect(db.query.mock.calls[1][0]).toContain('OR presentation_end_ms IS DISTINCT FROM $6::integer THEN NULL ELSE discussion_attribution END');
+  expect(db.query.mock.calls[1][0]).toContain('AND version = $5 RETURNING *');
+});

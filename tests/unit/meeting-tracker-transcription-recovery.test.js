@@ -1,4 +1,7 @@
 /** @jest-environment node */
+import crypto from 'node:crypto';
+jest.mock('../../lib/services/meeting-tracker-recordings/zoom-client', () => ({ getMeetingAttendance: jest.fn(async () => ({ status: 'unavailable', participants: [] })) }));
+/** @jest-environment node */
 jest.mock('../../lib/services/meeting-tracker-recordings/import-store', () => ({ getZoomImportForJob: jest.fn(async () => null) }));
 jest.mock('../../lib/dataverse/adapters/request-document.js', () => ({ findByRequest: jest.fn(), findByGenerationKey: jest.fn() }));
 jest.mock('../../lib/services/graph-service.js', () => ({ GraphService: { downloadFile: jest.fn(), getFileMetadataById: jest.fn() } }));
@@ -15,7 +18,7 @@ jest.mock('../../lib/services/transcription-pilot/runtime.js', () => ({ getMeeti
 jest.mock('../../lib/services/transcription-pilot/provider.js', () => ({}));
 jest.mock('../../lib/services/transcription-pilot/workflow-dispatch.js', () => ({}));
 jest.mock('../../lib/services/transcription-pilot/store.js', () => Object.fromEntries([
-  'getMeetingTranscriptPublication', 'claimMeetingTranscriptPublicationForRecovery',
+  'updateMeetingTranscriptCorrectionDraft', 'getMeetingTranscriptPublication', 'claimMeetingTranscriptPublicationForRecovery',
   'renewMeetingPublicationReceiptLease', 'transitionMeetingTranscriptPublication',
   'expireMeetingTranscriptCorrectionDrafts', 'listUnresolvedMeetingTranscriptPublications',
   'markMeetingTranscriptPublicationChecked', 'closeMeetingPublicationAfterQuarantine',
@@ -33,7 +36,7 @@ import * as binding from '../../lib/services/meeting-tracker-transcription/bindi
 import * as store from '../../lib/services/transcription-pilot/store.js';
 import { buildMeetingTranscriptFiles, buildMeetingTranscriptManifest } from '../../lib/services/meeting-tracker-transcription/bundle.js';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE, REQUEST_DOCUMENT_LIFECYCLE_STATE, REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument.js';
-import { createMeetingCorrection, resolveCurrentMeetingTranscriptSource, publishMeetingTranscription, publishMeetingCorrection, closeMeetingTranscriptPublication, reconcileMeetingTranscriptPublication, reconcileMeetingTranscriptPublicationsBatch } from '../../lib/services/meeting-tracker-transcription/service.js';
+import { prepareMeetingAttendance, updateMeetingCorrection, createMeetingCorrection, resolveCurrentMeetingTranscriptSource, publishMeetingTranscription, publishMeetingCorrection, closeMeetingTranscriptPublication, reconcileMeetingTranscriptPublication, reconcileMeetingTranscriptPublicationsBatch } from '../../lib/services/meeting-tracker-transcription/service.js';
 
 const requestId = '11111111-1111-4111-8111-111111111111';
 const visitId = '22222222-2222-4222-8222-222222222222';
@@ -91,6 +94,21 @@ function fixture(sourceRevisionId = null, presentationEnd = null, sourceProvenan
   return receipt;
 }
 
+const stable = value => Array.isArray(value) ? `[${value.map(stable).join(',')}]`
+  : value && typeof value === 'object' ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stable(value[key])}`).join(',')}}` : JSON.stringify(value);
+function confirmedDraft(receipt) {
+  receipt.presentation_end_ms = receipt.presentation_end_ms ?? 1000;
+  receipt.presentation_end_confirmed_by = 12;
+  receipt.presentation_end_confirmed_at = '2026-10-09T18:00:00.000Z';
+  receipt.discussion_attribution = { version: 1, rows: [], excludedSpeakerIds: [], attendance: { status: 'unavailable', fetchedAt: '2026-10-09T18:00:00.000Z' } };
+  receipt.attendance_review = { id: 'review', decision: receipt.discussion_attribution,
+    context: crypto.createHash('sha256').update(stable({ operationId: receipt.operation_id,
+      sourceRevisionId: receipt.source_revision_id, fingerprint: receipt.expected_current_fingerprint,
+      sourceProvenance: receipt.frozen_source_provenance, endMs: receipt.presentation_end_ms,
+      speakerNames: receipt.speaker_names })).digest('hex') };
+  return receipt;
+}
+
 describe.each(['job', 'correction'])('%s publication catch boundary', kind => {
   test.each(['closed', 'unproven', 'proof-error', 'other-slot', 'release-error'])('%s retains the original error and fences release', async outcome => {
     const receipt = fixture();
@@ -116,10 +134,10 @@ describe.each(['job', 'correction'])('%s publication catch boundary', kind => {
         wmkf_contenttype: files.txt.contentType, wmkf_contenthash: files.txt.sha256, wmkf_filesize: files.txt.size,
         wmkf_slotversion: 7, createdon: '2026-09-25T12:00:00Z',
       }] });
-      store.getMeetingTranscriptPublication.mockResolvedValue({ ...receipt, operation_id: originalActor,
+      store.getMeetingTranscriptPublication.mockResolvedValue(confirmedDraft({ ...receipt, operation_id: originalActor,
         state: 'draft', expires_at: new Date(Date.now() + 60_000), source_artifact_id: predecessor,
         source_revision_id: operationId, expected_current_artifact_id: predecessor,
-        expected_current_fingerprint: receipt.frozen_input_sha256, speaker_names: {} });
+        expected_current_fingerprint: receipt.frozen_input_sha256, speaker_names: {} }));
       GraphService.getFileMetadataById.mockResolvedValue({ eTag: files.source.eTag, versionId: files.source.versionId });
       binding.getMeetingTranscriptionCandidates.mockResolvedValue({ candidates: [] });
     }
@@ -179,7 +197,7 @@ test('recovery rebuilds a current-version bundle from the receipt-frozen present
   const result = await reconcileMeetingTranscriptPublication({ requestId, operationId,
     actorProfileId: 12, actingUserSystemId: currentActor });
   expect(result).toMatchObject({ resumed: true, requiresAttention: false });
-  expect(receipt.formatter_version).toBe('6');
+  expect(receipt.formatter_version).toBe('7');
   expect(publisher.publishMeetingTranscriptBundle).toHaveBeenCalledWith(expect.objectContaining({
     frozenInputSha256: receipt.frozen_input_sha256,
     identity: expect.objectContaining({ presentationEnd: boundary }),
@@ -286,7 +304,7 @@ test('close is denied before quarantine, refuses ambiguous generation lookup, an
     artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT });
 });
 
-test('a verified committed receipt superseded by a newer winner becomes terminal without replacing it', async () => {
+test.each([false, true])('registered receipt checks source decision before supersession (mismatch=%s)', async mismatch => {
   const receipt = fixture();
   const generated = buildMeetingTranscriptFiles({ identity: { requestId, siteVisitActivityId: visitId,
     revisionId: operationId, operationId, sourceRevisionId: null },
@@ -298,6 +316,11 @@ test('a verified committed receipt superseded by a newer winner becomes terminal
     sha256: file.sha256, size: file.bytes.length, filename: file.filename, contentType: file.contentType,
   }]));
   receipt.verified_files = files;
+  if (mismatch) {
+    identity.presentationEnd = { endMs: 1000, confirmedBy: 12, confirmedAt: '2026-10-09T18:00:00Z' };
+    identity.discussionAttribution = { version: 1, rows: [], excludedSpeakerIds: [], attendance: { status: 'complete', fetchedAt: '2026-10-09T18:00:00Z' } };
+    receipt.frozen_discussion_attribution = identity.discussionAttribution;
+  }
   const manifest = buildMeetingTranscriptManifest({ identity, files });
   const committed = { wmkf_requestdocumentid: predecessor, _wmkf_request_value: requestId,
     wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT,
@@ -320,6 +343,11 @@ test('a verified committed receipt superseded by a newer winner becomes terminal
   store.transitionMeetingTranscriptPublication.mockResolvedValueOnce({ ...receipt, state: 'published', error_code: 'publication_superseded' });
   const result = await reconcileMeetingTranscriptPublication({ requestId, operationId, actorProfileId: 12,
     actingUserSystemId: currentActor });
+  if (mismatch) {
+    expect(result).toMatchObject({ requiresAttention: true, reason: 'source_identity_mismatch' });
+    expect(store.transitionMeetingTranscriptPublication).not.toHaveBeenCalled();
+    return;
+  }
   expect(result).toMatchObject({ publication: { state: 'published', errorCode: 'publication_superseded' },
     currentArtifact: { id: newerWinner.wmkf_requestdocumentid }, superseded: true, requiresAttention: false });
   expect(store.transitionMeetingTranscriptPublication).toHaveBeenCalledWith(expect.objectContaining({
@@ -490,8 +518,9 @@ test('Zoom provenance survives real service publish, names correction and recove
   const draft = await createMeetingCorrection({ requestId, ownerProfileId: 12, artifactId: first.currentArtifact.id });
   const correction = receipts.get(draft.correction.operationId);
   correction.speaker_names = { A: 'Corrected name' };
+  confirmedDraft(correction);
   store.freezeMeetingTranscriptCorrectionDraft.mockImplementation(async args => {
-    Object.assign(correction, { state: 'publishing', formatter_version: args.formatterVersion, frozen_input_sha256: args.frozenInputSha256 });
+    Object.assign(correction, { frozen_discussion_attribution: correction.discussion_attribution, state: 'publishing', formatter_version: args.formatterVersion, frozen_input_sha256: args.frozenInputSha256 });
     return { leaseToken: args.operationId, publication: correction };
   });
   await publishMeetingCorrection({ requestId, ownerProfileId: 12, actingUserSystemId: currentActor,
@@ -516,4 +545,60 @@ test('Stage 4 resolver requires an authenticated actor and a matching published 
   await expect(resolveCurrentMeetingTranscriptSource({ requestId })).rejects.toThrow();
   store.getMeetingTranscriptPublication.mockResolvedValue({ state: 'published', frozen_source_provenance: uploadProvenance });
   await expect(resolveCurrentMeetingTranscriptSource({ requestId, actorProfileId: 12 })).resolves.toMatchObject({ status: 'invalid', reason: 'publication_receipt_mismatch' });
+});
+
+
+function editableAttendanceFixture() {
+  const row = bindCurrentFixture(null);
+  const receipt = confirmedDraft({ operation_id: originalActor, request_id: requestId, site_visit_activity_id: visitId,
+    state: 'draft', version: 4, expires_at: new Date(Date.now() + 60000), source_artifact_id: predecessor,
+    source_revision_id: operationId, expected_current_artifact_id: predecessor,
+    expected_current_fingerprint: row.wmkf_inputfingerprint, speaker_names: { A: 'Synthetic Chair' }, frozen_source_provenance: null });
+  receipt.attendance_review = null; receipt.discussion_attribution = null;
+  store.getMeetingTranscriptPublication.mockResolvedValue(receipt);
+  const manifest = JSON.parse(row.wmkf_transcriptbundlejson);
+  GraphService.getFileMetadataById.mockResolvedValue(manifest.files.source);
+  binding.getMeetingTranscriptionCandidates.mockResolvedValue({ candidates: [] });
+  store.updateMeetingTranscriptCorrectionDraft.mockImplementation(async args => {
+    if (args.expectedVersion !== receipt.version) return null;
+    if (args.attendanceReview !== undefined) { receipt.attendance_review = args.attendanceReview; receipt.discussion_attribution = null; }
+    if (args.discussionAttribution !== undefined) receipt.discussion_attribution = args.discussionAttribution;
+    receipt.version += 1;
+    return { ...receipt };
+  });
+  return receipt;
+}
+
+test('attendance uses a version-fenced snapshot; stale version and replayed review IDs cannot confirm', async () => {
+  const receipt = editableAttendanceFixture();
+  const args = { requestId, operationId: originalActor, ownerProfileId: 12 };
+  await expect(prepareMeetingAttendance({ ...args, expectedVersion: 3 })).rejects.toMatchObject({ code: 'meeting_transcript_correction_changed' });
+  const prepared = await prepareMeetingAttendance({ ...args, expectedVersion: 4 });
+  expect(prepared.correction.attendanceReview.decision.attendance.status).toBe('unavailable');
+  const confirmation = { reviewId: receipt.attendance_review.id, kept: [] };
+  await expect(updateMeetingCorrection({ ...args, body: { expectedVersion: 4, speakerNames: receipt.speaker_names, attendanceConfirmation: confirmation } })).rejects.toMatchObject({ code: 'meeting_transcript_correction_changed' });
+  await expect(updateMeetingCorrection({ ...args, body: { expectedVersion: 5, speakerNames: receipt.speaker_names, attendanceConfirmation: { ...confirmation, reviewId: 'old' } } })).rejects.toMatchObject({ code: 'meeting_attendance_confirmation_stale' });
+  await updateMeetingCorrection({ ...args, body: { expectedVersion: 5, speakerNames: receipt.speaker_names, attendanceConfirmation: confirmation } });
+  expect(receipt.discussion_attribution).toEqual(receipt.attendance_review.decision);
+  await expect(updateMeetingCorrection({ ...args, body: { expectedVersion: 5, speakerNames: receipt.speaker_names, attendanceConfirmation: confirmation } })).rejects.toMatchObject({ code: 'meeting_transcript_correction_changed' });
+});
+
+test('a rename or boundary change cannot carry a prior confirmation; publish requires current context', async () => {
+  const receipt = editableAttendanceFixture();
+  const args = { requestId, operationId: originalActor, ownerProfileId: 12 };
+  await prepareMeetingAttendance({ ...args, expectedVersion: 4 });
+  const attendanceConfirmation = { reviewId: receipt.attendance_review.id, kept: [] };
+  await expect(updateMeetingCorrection({ ...args, body: { expectedVersion: 5, speakerNames: { A: 'New name' }, attendanceConfirmation } })).rejects.toMatchObject({ code: 'meeting_attendance_confirmation_stale' });
+  await expect(updateMeetingCorrection({ ...args, body: { expectedVersion: 5, speakerNames: receipt.speaker_names, presentationEndMs: null, attendanceConfirmation } })).rejects.toMatchObject({ code: 'meeting_attendance_confirmation_stale' });
+  receipt.discussion_attribution = receipt.attendance_review.decision;
+  receipt.speaker_names = { A: 'New name' };
+  await expect(publishMeetingCorrection({ ...args, actingUserSystemId: currentActor, body: { expectedVersion: 5 } })).rejects.toMatchObject({ code: 'meeting_attendance_confirmation_required' });
+  expect(publisher.prepareMeetingTranscriptBundlePublication).not.toHaveBeenCalled();
+});
+
+test('recovery rejects a receipt policy mismatch before publication', async () => {
+  const receipt = fixture(predecessor, boundary);
+  receipt.frozen_discussion_attribution = { version: 1, rows: [], excludedSpeakerIds: [], attendance: { status: 'complete', fetchedAt: '2026-10-09T18:00:00.000Z' } };
+  await expect(reconcileMeetingTranscriptPublication({ requestId, operationId, actorProfileId: 12, actingUserSystemId: currentActor })).rejects.toThrow('invalid_transcript_bundle');
+  expect(publisher.publishMeetingTranscriptBundle).not.toHaveBeenCalled();
 });

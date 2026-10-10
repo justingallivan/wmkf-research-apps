@@ -1,4 +1,5 @@
 /** @jest-environment node */
+import crypto from 'node:crypto';
 jest.mock('../../lib/dataverse/adapters/request-document.js', () => ({ findByRequest: jest.fn(), findByGenerationKey: jest.fn() }));
 jest.mock('../../lib/services/graph-service.js', () => ({ GraphService: { downloadFile: jest.fn(), getFileMetadataById: jest.fn() } }));
 jest.mock('../../lib/services/post-presentation-materials/material-service.js', () => ({
@@ -169,15 +170,20 @@ describe('correction draft presentation end', () => {
   });
 
   test('publish freezes the receipt boundary into the bundle identity, as an ISO instant', async () => {
+    const decision = { version: 1, rows: [], excludedSpeakerIds: [], attendance: { status: 'unavailable', fetchedAt: '2026-10-05T12:00:00.000Z' } };
+    const stable = value => value && typeof value === 'object' ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stable(value[key])}`).join(',')}}` : JSON.stringify(value);
+    const context = crypto.createHash('sha256').update(stable({ operationId: draftId, sourceRevisionId: revisionId,
+      fingerprint: generated.inputSha256, sourceProvenance: null, endMs: 3000, speakerNames })).digest('hex');
     store.getMeetingTranscriptPublication.mockResolvedValue(draft({ presentation_end_ms: 3000,
-      presentation_end_confirmed_by: 12, presentation_end_confirmed_at: new Date('2026-10-05T12:00:00.000Z') }));
+      presentation_end_confirmed_by: 12, presentation_end_confirmed_at: new Date('2026-10-05T12:00:00.000Z'),
+      discussion_attribution: decision, attendance_review: { id: 'review', decision, context } }));
     publisher.prepareMeetingTranscriptBundlePublication.mockResolvedValue({ candidatePaths: { txt: 'a', vtt: 'b', source: 'c' } });
     store.freezeMeetingTranscriptCorrectionDraft.mockResolvedValue(null);
     await expect(publishMeetingCorrection({ requestId, ownerProfileId: 12, actingUserSystemId: actor,
       operationId: draftId, body: { expectedVersion: 2 } })).rejects.toMatchObject({ code: 'meeting_transcript_correction_changed' });
     const frozenInput = store.freezeMeetingTranscriptCorrectionDraft.mock.calls[0][0].frozenInputSha256;
     const expected = buildMeetingTranscriptFiles({ content, speakerNames, identity: { requestId, siteVisitActivityId: visitId,
-      revisionId: draftId, operationId: draftId, sourceRevisionId: revisionId,
+      revisionId: draftId, operationId: draftId, sourceRevisionId: revisionId, discussionAttribution: decision,
       presentationEnd: { endMs: 3000, confirmedBy: 12, confirmedAt: '2026-10-05T12:00:00.000Z' } } });
     expect(frozenInput).toBe(expected.inputSha256);
   });

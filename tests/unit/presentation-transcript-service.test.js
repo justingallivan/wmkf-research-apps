@@ -347,3 +347,24 @@ test('guards: the bundle schema flag must be on', async () => {
   process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = 'off';
   await expect(call()).rejects.toMatchObject({ code: 'meeting_transcript_bundle_schema_not_ready', httpStatus: 503 });
 });
+
+test('v7 discussion derivative supplies unidentified labels while presentation keeps original names', async () => {
+  const identity = { requestId: REQUEST_ID, siteVisitActivityId: VISIT_ID, revisionId: REVISION_ID,
+    operationId: REVISION_ID, sourceRevisionId: null, presentationEnd: boundary,
+    discussionAttribution: { version: 1, rows: [{ displayName: 'Foundation Staff', kept: false,
+      speakerIds: ['A'], lastLeaveAt: null, kind: 'voice' }], excludedSpeakerIds: ['A'],
+    attendance: { status: 'unavailable', fetchedAt: '2026-10-09T12:00:00.000Z' } } };
+  generated = buildMeetingTranscriptFiles({ content, speakerNames, identity });
+  const files = Object.fromEntries(Object.entries(generated.files).map(([role, file]) => [role, {
+    siteId: 'site', driveId: 'drive', itemId: role, versionId: '1', eTag: `tag-${role}`,
+    filename: file.filename, contentType: file.contentType, sha256: file.sha256, size: file.bytes.length }]));
+  Object.assign(transcriptRow, { wmkf_transcriptbundlejson: JSON.stringify(buildMeetingTranscriptManifest({ identity, files })),
+    wmkf_inputfingerprint: generated.inputSha256, wmkf_contenthash: files.txt.sha256, wmkf_filesize: files.txt.size });
+  await call();
+  expect(uploads.get('pres-item').bytes.toString('utf8')).toContain('Foundation Staff');
+  const discussion = uploads.get('disc-item').bytes.toString('utf8');
+  expect(discussion).toContain('Unidentified speaker');
+  expect(discussion).toContain('Staff only discussion.');
+  expect(discussion).not.toContain('Foundation Staff');
+  expect(speakerNames.A).toBe('Foundation Staff');
+});

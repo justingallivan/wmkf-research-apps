@@ -69,7 +69,7 @@ it('names/boundary revisions retain source identity and frozen evidence after jo
 it('v6 preserves v5 rendered text/VTT and pilot rendering; legacy source bytes rebuild identically', () => {
   const legacy = build({ formatterVersion: '5' });
   const current = build({ sourceProvenance: provenance });
-  expect(TRANSCRIPT_FORMATTER_VERSION).toBe('6');
+  expect(TRANSCRIPT_FORMATTER_VERSION).toBe('7');
   expect(current.files.txt.bytes).toEqual(legacy.files.txt.bytes);
   expect(current.files.vtt.bytes).toEqual(legacy.files.vtt.bytes);
   expect(formatTranscriptText(content, { A: 'Presenter' }, { layout: 'turn' })).toBe(legacy.files.txt.bytes.toString('utf8').slice(1));

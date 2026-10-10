@@ -3,7 +3,7 @@ title: "Atlas: Meeting Tracker transcript publications (Postgres)"
 domain: postgres
 kind: state-page
 status: production-live-controlled-acceptance-passed
-summary: "Migrations 063–064 and Wave 31 schema are verified in Production. Controlled non-sensitive end-to-end acceptance passed and staff access is enabled. Synthetic content was removed; publication audit and late-upload watch remain. Scheduled-time delivery is unobserved; confidential use is not approved."
+summary: "Migrations 063–064 and Wave 31 schema are verified in Production. Controlled non-sensitive end-to-end acceptance passed and staff access is enabled. Synthetic content was removed; publication audit and late-upload watch remain. Scheduled-time delivery is unobserved; confidential use is not approved. Branch migration 078 adds the minimized attendance decision and remains unapplied."
 canonical: true
 cataloged: 2026-10-01
 owner: product-engineering
@@ -81,8 +81,35 @@ Versions 1–5 remain supported with unknown provenance; history is not fabricat
 `resolveCurrentMeetingTranscriptSource` verifies the current bundle and rechecks
 current artifact/fingerprint for server consumers. It does not establish video
 eligibility or synchronization. No word or utterance times change. Migration `077_zoom_transcript_provenance.sql` is reserved for this extension;
-database application and deployment remain pending; attendance/policy are outside this slice. See the
+database application and deployment were pending at that provenance checkpoint; attendance is the separate 078 extension below. See the
 [provenance plan](../plans/ZOOM_TRANSCRIPT_PROVENANCE_PLAN_2026-10-09.md).
+
+## Attendance extension — branch-built, migration not applied
+
+[VERIFIED via branch source, 2026-10-09] Migration
+`078_zoom_attendance_attribution.sql` adds three nullable bounded JSONB columns:
+`attendance_review` (server-created checklist plus source/name/boundary context),
+`discussion_attribution` (confirmed draft decision), and
+`frozen_discussion_attribution` (publication/recovery decision). No backfill.
+Fresh installation executes the manifest migration through the existing bootstrap;
+there is no duplicate inline table definition. Justin applies 078 before merge.
+
+`prepareMeetingAttendance` reads the frozen source occurrence only. The guarded
+attendance POST and correction PATCH use the existing draft version CAS; edits to
+names or the boundary clear review and confirmation. Publishing v7 requires current
+confirmation and copies it into the frozen column and source/manifest envelope.
+Recovery compares receipt, manifest and source decisions. Legacy v1–v6 reject
+policy fields and replay their original bytes. Preview, TXT/VTT, the discussion
+derivative and its summary input use the same discussion-only resolver.
+
+Rows retain display name, kept flag, linked speaker IDs, kind and at most the last
+leave time; the decision retains report completeness and fetch time. Raw report
+rows, emails, participant/session IDs and join intervals never persist. The
+checklist and draft decision clear on publication, close or seven-day draft expiry.
+The frozen decision remains with the full transcript until the separately owned
+Stage 5 deletion flow; this slice does not implement final-product deletion.
+Content-free provenance and video lineage carry no attendance. See the
+[attendance plan](../plans/ZOOM_ATTENDANCE_ATTRIBUTION_PLAN_2026-10-09.md).
 
 ## Ownership and relationships
 

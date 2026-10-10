@@ -1,3 +1,4 @@
+import attendance from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/corrections/[operationId]/attendance.js';
 jest.mock('../../lib/utils/auth.js', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/dataverse/core/context.js', () => ({ withDalContext: (_name, fn) => fn() }));
 jest.mock('../../lib/services/transcription-pilot/runtime.js', () => ({
@@ -9,6 +10,7 @@ jest.mock('../../lib/services/meeting-tracker-transcription/service.js', () => (
   renameMeetingTranscriptionSpeakers: jest.fn(async () => ({ job: { id: 'j' } })),
   publishMeetingTranscription: jest.fn(async () => ({ publication: { state: 'published' } })),
   closeMeetingTranscriptPublication: jest.fn(async () => ({ closed: true, retainedFiles: true })),
+  prepareMeetingAttendance: jest.fn(async () => ({ correction: {} })),
   getMeetingCorrectionDraft: jest.fn(async () => ({ correction: {} })),
   updateMeetingCorrection: jest.fn(async () => ({ correction: { presentationEndMs: null } })),
 }));
@@ -26,7 +28,7 @@ jest.mock('../../lib/services/post-presentation-materials/presentation-transcrip
 
 import { requireAppAccess } from '../../lib/utils/auth.js';
 import { getMeetingTranscriptionOverview, uploadMeetingTranscription, renameMeetingTranscriptionSpeakers,
-  publishMeetingTranscription, closeMeetingTranscriptPublication, updateMeetingCorrection } from '../../lib/services/meeting-tracker-transcription/service.js';
+  publishMeetingTranscription, closeMeetingTranscriptPublication, updateMeetingCorrection, prepareMeetingAttendance } from '../../lib/services/meeting-tracker-transcription/service.js';
 import { generatePresentationTranscript } from '../../lib/services/post-presentation-materials/presentation-transcript-service.js';
 import correction from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/corrections/[operationId].js';
 import presentationTranscript from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/presentation-transcript.js';
@@ -336,3 +338,19 @@ describe('summary-draft routes', () => {
   });
 });
 
+
+
+test('attendance requires app access and rejects browser occurrence/identity injection', async () => {
+  const request = { method: 'POST', query: { requestId, operationId: jobId }, body: { expectedVersion: 3 } };
+  const res = response();
+  await attendance(request, res);
+  expect(requireAppAccess).toHaveBeenCalledWith(request, res, 'meeting-tracker');
+  expect(prepareMeetingAttendance).toHaveBeenCalledWith({ requestId, operationId: jobId, ownerProfileId: 9, expectedVersion: 3 });
+  const bad = response();
+  await attendance({ ...request, body: { expectedVersion: 3, meetingUuid: 'browser-choice' } }, bad);
+  expect(bad.statusCode).toBe(400);
+  requireAppAccess.mockResolvedValue(null);
+  const denied = response();
+  await attendance(request, denied);
+  expect(prepareMeetingAttendance).toHaveBeenCalledTimes(1);
+});

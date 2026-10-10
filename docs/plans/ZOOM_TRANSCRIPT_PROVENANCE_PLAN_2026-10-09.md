@@ -20,7 +20,10 @@ Owner authorized provenance implementation first on `codex/transcription-labels`
 `/Users/gallivan/Code/WMKF_Apps-codex-labels`. This document describes branch source,
 not a deployed feature or applied database change. The owner confirmed the migration sequence ends at 076 and reserved
 `077_zoom_transcript_provenance.sql` for this slice; execution remains pending. Attendance, timeline attribution, Duncan's
-checklist and discussion exclusions are deferred to a separate schema/release slice;
+checklist and discussion exclusions are implemented separately on `codex/zoom-attendance`
+under migration 078, which is not applied; see
+[the attendance plan](ZOOM_ATTENDANCE_ATTRIBUTION_PLAN_2026-10-09.md). This provenance
+release checkpoint excludes that policy;
 never amend a landed provenance migration to add that policy.
 
 ## Rollout prerequisite and rollback
@@ -84,7 +87,7 @@ Zoom endpoint or a substitute for route authorization.
 | Exact download capture | `import-service.js` → `selected_recording_files` via `captureZoomImportFiles` → `provenanceFromJob` | VERIFIED via branch source; offline regressions passed; database provisioning pending |
 | Revision-stable identity | publication service → `frozen_source_provenance`, source and manifest v6 → correction/recovery | VERIFIED via branch source; offline regressions passed; deployment pending |
 | Authorized current-source read | current binding and verified bundle → `resolveCurrentMeetingTranscriptSource` | VERIFIED via branch source; server seam only, no video eligibility inference |
-| Attendance/policy and video acceptance | N/A in this slice | PLANNED separately |
+| Attendance/policy and video acceptance | N/A in this provenance slice | Attendance branch source is documented in the separate 078 plan; video acceptance remains separately owned |
 
 ## Verification and handoff record
 
@@ -107,6 +110,6 @@ Zoom endpoint or a substitute for route authorization.
 
 Scoped documentation sweep: RECONCILED for branch-source provenance facts. Production
 application of 077 and deployed behavior are unverified; no Production probe or write
-was performed. Attendance, policy, timeline inference and Stage 4 video processing
-remain separate future slices. Commit/push and the owner-controlled migration/merge
+was performed. Attendance/policy are now a separate unmerged 078 slice. Timeline inference and Stage 4 video processing
+remain outside this provenance scope. Commit/push and the owner-controlled migration/merge
 complete the handoff; migration must precede the main merge as described above.

@@ -117,6 +117,15 @@ function correctionDetail(artifact, overrides = {}) {
   };
 }
 
+function attendanceDraft(overrides = {}) {
+  const decision = { version: 1, rows: [
+    { displayName: 'Silent attendee', kept: true, speakerIds: [], lastLeaveAt: '2026-10-09T18:00:00Z', kind: 'attendee' },
+    { displayName: 'Speaker B', kept: true, speakerIds: ['B'], lastLeaveAt: null, kind: 'voice' },
+  ], excludedSpeakerIds: [], attendance: { status: 'complete', fetchedAt: '2026-10-09T18:00:00Z' } };
+  return draftCorrection({ presentationEndMs: 62900, discussionAttribution: decision,
+    attendanceReview: { id: 'review', decision, waitingRoomOnlyCount: 1, leftBeforeEnd: [false, false], timeZone: 'America/Los_Angeles' }, ...overrides });
+}
+
 const shortDate = (iso) => new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 const detailFor = (jobOverrides) => () => ({ job: job(jobOverrides), content, candidates: [] });
 
@@ -410,7 +419,7 @@ test('publishing an edited-names draft closes the editor for any result and list
   const published = { operationId: 'op-orig', state: 'published', version: 1, createdAt: '2026-10-04T21:00:00.000Z', inputJobId: JOB_ID, resultingDocumentId: ARTIFACT_ID };
   const artifact = { id: ARTIFACT_ID, fingerprint: 'd'.repeat(64), bundleEditable: true };
   const state = { materials: [transcriptRow()], collection: collection({ currentArtifact: artifact, publications: [published] }), detail: detailFor({}) };
-  const correction = { operationId: OP_ID, state: 'draft', version: 1, speakerNames: {}, expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: artifact.fingerprint };
+  const correction = attendanceDraft({ operationId: OP_ID, expectedCurrentFingerprint: artifact.fingerprint });
   route(state, {
     '/corrections': { method: 'POST', respond: (path) => (path.endsWith('/publish')
       ? (() => { state.collection = collection({ currentArtifact: artifact, publications: [published, { operationId: 'op-edit', state: 'published_reconcile', version: 2, createdAt: '2026-10-04T23:00:00.000Z', sourceArtifactId: ARTIFACT_ID, resultingDocumentId: 'doc-2' }] }); return response({ publication: { state: 'published_reconcile' }, currentArtifact: artifact }); })()
@@ -608,8 +617,8 @@ describe('presentation end', () => {
         state.collection = collection({ jobs: [], currentArtifact: staleArtifact });
         return response({ publication: { state: 'published' }, currentArtifact: staleArtifact });
       } },
-      '/corrections': { method: 'POST', respond: () => response(correctionDetail(artifact, { correction: draftCorrection({ speakerNames: { A: '' } }) })) },
-      [`/corrections/${CORRECTION_ID}`]: { method: 'PATCH', respond: (path, options) => response({ correction: draftCorrection({ version: 2, speakerNames: JSON.parse(options.body).speakerNames }) }) },
+      '/corrections': { method: 'POST', respond: () => response(correctionDetail(artifact, { correction: attendanceDraft({ speakerNames: {} }) })) },
+      [`/corrections/${CORRECTION_ID}`]: { method: 'PATCH', respond: (path, options) => response({ correction: attendanceDraft({ version: 2, speakerNames: JSON.parse(options.body).speakerNames }) }) },
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Edit speaker names' }));
@@ -1599,4 +1608,85 @@ describe('cancelling a queued transcription', () => {
     await waitFor(() => expect(reads).toBeGreaterThanOrEqual(2));
     expect(screen.queryByText(/Transcription cancelled/)).toBeNull();
   });
+});
+
+
+test('attendance shares the boundary step, previews exclusion, and confirms once before publishing', async () => {
+  const artifact = boundaryArtifact();
+  let draft = attendanceDraft({ discussionAttribution: null });
+  let confirmations = 0, publications = 0;
+  route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) }, {
+    [`/corrections/${CORRECTION_ID}/publish`]: { method: 'POST', respond: () => { publications += 1; return response({ publication: { state: 'published' }, currentArtifact: artifact }); } },
+    '/corrections': { method: 'POST', respond: () => response(correctionDetail(artifact, { correction: draft })) },
+    [`/corrections/${CORRECTION_ID}`]: { method: 'PATCH', respond: (_path, options) => {
+      const body = JSON.parse(options.body); confirmations += 1;
+      expect(body.attendanceConfirmation).toEqual({ reviewId: 'review', kept: [false, false] });
+      draft = { ...draft, version: 2, discussionAttribution: { ...draft.attendanceReview.decision, excludedSpeakerIds: ['B'], rows: draft.attendanceReview.decision.rows.map(row => ({ ...row, kept: false })) } };
+      return response({ correction: draft });
+    } },
+  });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit speaker names' }));
+  const editor = await screen.findByTestId('presentation-end-editor');
+  const silent = within(editor).getByRole('checkbox', { name: /Silent attendee/ });
+  const voice = within(editor).getByRole('checkbox', { name: 'Speaker B' });
+  expect(silent).toBeChecked(); expect(voice).toBeChecked();
+  expect(within(editor).getByText('1 stayed in the waiting room.')).toBeInTheDocument();
+  fireEvent.click(silent); fireEvent.click(voice);
+  expect(within(screen.getByTestId('transcript-preview')).getByText('Unidentified speaker:')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Publish transcript' }));
+  await waitFor(() => expect(publications).toBe(1));
+  expect(confirmations).toBe(1);
+});
+
+test('failed attendance can retry after explicit Refresh at the same draft version', async () => {
+  const artifact = boundaryArtifact();
+  const draft = attendanceDraft({ attendanceReview: null, discussionAttribution: null });
+  let attempts = 0;
+  route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) }, {
+    '/attendance': { method: 'POST', respond: () => { attempts += 1; return attempts === 1 ? response({ error: 'Temporary attendance error' }, 503) : response({ correction: attendanceDraft({ version: 2 }) }); } },
+    '/corrections': { respond: () => response(correctionDetail(artifact, { correction: draft })) },
+  });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit speaker names' }));
+  expect(await screen.findByText('Temporary attendance error')).toBeInTheDocument();
+  expect(attempts).toBe(1);
+  fireEvent.click(within(screen.getByTestId('transcript-review')).getByRole('button', { name: 'Refresh' }));
+  expect(await screen.findByText('Discussion attendance')).toBeInTheDocument();
+  expect(attempts).toBe(2);
+});
+
+test.each(['success', 'failure'])('late attendance %s cannot update a different request', async outcome => {
+  const artifact = boundaryArtifact();
+  const draft = attendanceDraft({ attendanceReview: null, discussionAttribution: null });
+  let finish;
+  route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) }, {
+    '/attendance': { method: 'POST', respond: () => new Promise(resolve => { finish = resolve; }) },
+    '/corrections': { respond: () => response(correctionDetail(artifact, { correction: draft })) },
+  });
+  const view = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit speaker names' }));
+  await waitFor(() => expect(finish).toBeDefined());
+  view.rerender(<RecordingAndTranscriptCard requestId="99999999-9999-4999-8999-999999999999" />);
+  await act(async () => finish(outcome === 'success' ? response({ correction: attendanceDraft() }) : response({ error: 'Late attendance failure' }, 503)));
+  expect(screen.queryByText('Discussion attendance')).not.toBeInTheDocument();
+  expect(screen.queryByText('Late attendance failure')).not.toBeInTheDocument();
+});
+
+test('marking a shared microphone preserves earlier checkbox choices', async () => {
+  const artifact = boundaryArtifact();
+  const draft = attendanceDraft();
+  draft.attendanceReview.decision.rows[0] = { displayName: 'Named attendee', kept: true, speakerIds: ['A'], lastLeaveAt: null, kind: 'attendee' };
+  route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) }, {
+    '/corrections': { respond: () => response(correctionDetail(artifact, { correction: draft })) },
+  });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit speaker names' }));
+  const editor = await screen.findByTestId('presentation-end-editor');
+  fireEvent.click(within(editor).getByRole('checkbox', { name: 'Speaker B' }));
+  fireEvent.click(within(editor).getByRole('checkbox', { name: /Named attendee/ }));
+  fireEvent.click(within(editor).getByRole('button', { name: 'Shared microphone' }));
+  expect(within(editor).getByRole('checkbox', { name: 'Speaker B' })).not.toBeChecked();
+  expect(within(editor).getByRole('checkbox', { name: 'Named attendee' })).not.toBeChecked();
+  expect(within(editor).getByRole('checkbox', { name: 'Named attendee (shared microphone)' })).toBeChecked();
 });
