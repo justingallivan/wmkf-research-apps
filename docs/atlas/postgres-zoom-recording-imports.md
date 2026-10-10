@@ -54,3 +54,14 @@ A partial unique index allows one `importing` or `started` row per request and m
 - Writer: `lib/services/meeting-tracker-recordings/import-store.js`, called only from `import-service.js`, reached from `POST /api/meeting-tracker/visits/[requestId]/zoom-imports`.
 - Readers: the branch provenance publication path also uses `getZoomImportForJob`; the same import service continues to show per-meeting import state in the picker (`GET .../zoom-recordings`; the joined `transcription_jobs.status` also sets `transcriptReady`, so the picker reads "Imported, transcript ready" once the job is `ready`) and to find the job for an expired lease.
 - Retention of these rows follows later Stage 5 work and is open.
+
+
+## Attendance consumer — branch source
+
+[VERIFIED via source, 2026-10-09] The attendance slice reads the occurrence from
+verified publication `sourceProvenance.zoom.meetingUuid`, not the newest import.
+`attendance-service.js` calls the bounded report client and projects only decision
+rows. It does not add attendance to `selected_recording_files` or this table.
+Receipt persistence is documented in the
+[publication Atlas](postgres-meeting-transcript-publications.md). <!-- drain-table:ignore reason=transcription-atlas-filename-not-retired-table -->
+Migration 078 is reserved and unapplied in this worktree; the import schema is unchanged.

@@ -1,8 +1,8 @@
 ---
 name: project-migration-numbers-claimed-off-main
-description: "Before picking a Postgres migration number, check shared Production `schema_migrations` and numbers claimed on unmerged branches. 055, 070, 071 and 074 were applied to Production before merging; as of 2026-10-09 Production and main end at 077 (Zoom transcript provenance); 078 is reserved for Codex's attendance/policy slice and 079 for Stage 4; the next free number is 080."
+description: "Before picking a Postgres migration number, check shared Production `schema_migrations` and numbers claimed on unmerged branches. 055, 070, 071 and 074 were applied to Production before merging; as of 2026-10-09 Production and main end at 077 (Zoom transcript provenance); 078 is built on codex/zoom-attendance for the attendance/policy slice (not applied) and 079 for Stage 4; the next free number is 080."
 status: active
-last_verified: 2026-10-09 via owner statement that 077 is applied and verified in Production, and a scan of every local and remote branch for 078-089 (none)
+last_verified: 2026-10-09 via owner statement that 077 is applied and verified in Production, and branch source for 078 (not applied); the earlier all-branch scan is historical
 metadata:
   type: project
 ---
@@ -82,7 +82,9 @@ origin/main`, 2026-09-30]. The episode shows why "the next number after
   The tracker column is `name`, not `filename`.
 - [VERIFIED 2026-10-09, Session 591] 077 (`077_zoom_transcript_provenance.sql`) merged to `main` in
   `f3cc08540` and is applied to Production (owner statement: applied and verified; not re-read by Claude).
-  No branch carries 078-089. **078 is reserved** for Codex's attendance/discussion-policy slice;
+  At that allocation checkpoint no branch carried 078-089. **078 is now built** on
+  `codex/zoom-attendance` as `078_zoom_attendance_attribution.sql`, not applied; Justin
+  applies it before merge. Contract: `docs/plans/ZOOM_ATTENDANCE_ATTRIBUTION_PLAN_2026-10-09.md`.
   **079 is reserved** for Stage 4 (split-job table plus `zoom_video_copies` recording times). Owner
   approved both (coordination file `/tmp/zoom-stage4-attendance-coordination.md`, outside the repo).
 - Auto-mode permissions block Claude from running `apply-migrations.js` against

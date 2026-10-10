@@ -2,8 +2,8 @@
 title: Zoom attendance and discussion speaker attribution
 kind: plan
 domain: transcription
-status: draft
-summary: "After Duncan confirms the presentation end, the same correction shows everyone who attended (silent people included), checked by default; unchecking someone makes their discussion turns read 'Unidentified speaker'. Owner decisions D1-D4 and Q1-Q4, and probe-verified Zoom report facts, are recorded. Codex builds; Claude orchestrates. Nothing built."
+status: branch-built-not-deployed
+summary: "Branch-built attendance and discussion attribution in one boundary correction; migration 078 remains unapplied and requires owner application before merge. Offline acceptance and recovery verification are recorded below."
 owner: product-engineering
 related:
   - docs/plans/ZOOM_TRANSCRIPT_PROVENANCE_PLAN_2026-10-09.md
@@ -14,7 +14,7 @@ related:
 
 # Zoom attendance and discussion speaker attribution
 
-**[DRAFT, Session 591, 2026-10-09.]** Nothing here is built. Claude orchestrates; Codex implements in `/Users/gallivan/Code/WMKF_Apps-codex-labels` on a branch cut from current `main`. This plan supersedes the field-level proposals in `/tmp/zoom-attribution-plan.md` and `/tmp/zoom-attribution-shared-contract.md` (historical, outside the repo). Codex's wind-down handoff is `/tmp/zoom-attendance-codex-handoff.md`.
+**[BRANCH-BUILT, 2026-10-09; NOT DEPLOYED.]** Implementation is on `codex/zoom-attendance`; migration 078 is not applied. Claude orchestrates; Codex implements in `/Users/gallivan/Code/WMKF_Apps-codex-labels` on a branch cut from current `main`. This plan supersedes the field-level proposals in `/tmp/zoom-attribution-plan.md` and `/tmp/zoom-attribution-shared-contract.md` (historical, outside the repo). Codex's wind-down handoff is `/tmp/zoom-attendance-codex-handoff.md`.
 
 ## Outcome
 
@@ -51,7 +51,7 @@ Source: an owner-run, read-only, shape-only run of `node scripts/probe-zoom-reco
 - **Recording offset.** The first join was **884 s before** the `audio_only` file's `recording_start`. Attendance time must be measured from the provenance `audioFile.recordingStart`, never from the meeting start.
 - **Not observed:** phone or dial-in participants (no phone-like names in this meeting), how long after the meeting ends the report becomes available, and the meaning of `groupId` (5 of 19 rows carried one).
 
-## Design [Q1-Q4 decided by Justin, Session 591; the rest PROPOSED]
+## Design [Q1-Q4 decided by Justin, Session 591]
 
 ### People list
 
@@ -64,9 +64,9 @@ Source: an owner-run, read-only, shape-only run of `node scripts/probe-zoom-reco
 ### Linking people to transcript speakers
 
 - Published speaker names come from Zoom VTT reconciliation, so they are Zoom display names wherever Zoom named the speaker. They are *display-transformed*, though: `zoomDisplayNames` reorders "Surname, Given" to "Given Surname", and keeps the original when two distinct Zoom names would collide [VERIFIED `lib/services/transcription-pilot/zoom-vtt.js:395-430`]. Staff may also have renamed a speaker in an earlier correction.
-- **Rule [PROPOSED]:** compute the attendees' display forms with the same `zoomDisplayNames` over the attendance name set. An attendee is linked to every discussion speaker ID whose current name equals either that display form or the raw Zoom name, exactly. The link is computed when the checklist is shown and frozen in the confirmation. A speaker renamed by staff to something else falls into "Other voices".
+- **Rule:** compute the attendees' display forms with the same `zoomDisplayNames` over the attendance name set. An attendee is linked to every discussion speaker ID whose current name equals either that display form or the raw Zoom name, exactly. The link is computed when the checklist is shown and frozen in the confirmation. A speaker renamed by staff to something else falls into "Other voices".
 - Discussion speaker IDs that match no attendee are listed in a short second group, "Other voices in the discussion", also checked by default. That covers diarization labels such as "Speaker C" and shared microphones.
-- **Q1, shared microphone (decided as proposed):** if one speaker ID carries a departed person and a remaining person, there is no way to split it. Unchecking either person's row has no effect on that ID, and the ID can only be unchecked in its own row, which excludes everyone on it. Proposed: show the ID once, under the person whose name it carries.
+- **Q1, shared microphone (owner reaffirmed after review):** no manual shared-microphone split. A speaker ID automatically linked to more than one attendee is controlled only by its own "Other voices" row; unchecking either attendee has no effect on that ID. Unchecking the voice excludes everyone on it. Attendance cannot infer who used a microphone.
 - Silent attendees need no speaker ID: unchecking them changes nothing in the output. Their row still records Duncan's confirmation.
 
 ### Effect on the output
@@ -126,3 +126,34 @@ Claude reviews each Codex task, runs the gates and hands Justin the merge. Migra
 - Recovery rejecting a policy mismatch.
 - v6 transcripts unchanged byte for byte, and the pilot's output unchanged.
 - Each core regression fails with its fix reverted.
+
+
+## Branch implementation and review
+
+[VERIFIED via source and offline Jest, 2026-10-09] The boundary editor loads the
+checklist after saving names/end. Publish confirms the checked rows and publishes
+once. Checkboxes can also be saved as a version-checked draft. A server-created
+review ID and source/name/boundary context prevent replay; any later name/end edit
+invalidates the review in SQL. Missing/partial reports show checked discussion
+voices. There is no manual shared-microphone control. The automatic multi-attendee
+link rule keeps that ID in its own "Other voices" row. Confirmation accepts exactly
+`{ reviewId, kept }`; an extra `sharedSpeakerIds` key is rejected. Names and timing
+are never rewritten.
+
+Migration 078 adds nullable checklist, draft decision and frozen decision JSONB
+columns on the existing publication receipt. The manifest-driven fresh bootstrap
+runs that same SQL. No migration, live Zoom call, Production operation, environment
+change or paid tool was used. Stage 4 surfaces were not edited. Stage 5 deletion
+remains separately owned; frozen attendance must be deleted with the full transcript.
+
+The report is bounded to 20 pages of 300 rows and a 90-second total deadline; repeated tokens, count mismatch,
+malformed rows and over-size decision rosters use partial/manual fallback. Last
+leave hints require the single-audio/duration/margin checks above. Display uses the
+Site Visit IANA zone when present and explicit UTC otherwise; it never silently
+uses the browser's zone as the meeting zone.
+
+Pre-change fixtures were generated from base commit `4e970b70f` for all v1–v6
+bundle bytes and pilot TXT/VTT. Tests compare those exact fixtures, not two runs of
+the new implementation. Fresh read-only review identified a recovery comparison
+gap and blocked attendance retry; both were corrected. The full verification
+receipt is recorded in [the implementation report](ZOOM_ATTENDANCE_IMPLEMENTATION_REPORT_2026-10-09.md).

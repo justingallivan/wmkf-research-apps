@@ -1,6 +1,6 @@
 /** @jest-environment node */
 import {
-  ZoomClientError, getAccessToken, resetZoomTokenCache, listHostRecordings, getMeetingRecordings,
+  ZoomClientError, getMeetingAttendance, getAccessToken, resetZoomTokenCache, listHostRecordings, getMeetingRecordings,
   downloadRecordingFile, encodeMeetingUuid, resolveRecordingDownloadUrl, fetchRecordingRange,
 } from '../../lib/services/meeting-tracker-recordings/zoom-client.js';
 
@@ -103,10 +103,10 @@ describe('listHostRecordings', () => {
 });
 
 describe('getMeetingRecordings', () => {
-  test('double-encodes uuids that start with / or contain //, single-encodes others', async () => {
+  test('double-encodes UUIDs containing a slash, single-encodes others', async () => {
     expect(encodeMeetingUuid('/abc==')).toBe('%252Fabc%253D%253D');
     expect(encodeMeetingUuid('ab//c')).toBe('ab%252F%252Fc');
-    expect(encodeMeetingUuid('abc/def==')).toBe('abc%2Fdef%3D%3D');
+    expect(encodeMeetingUuid('abc/def==')).toBe('abc%252Fdef%253D%253D');
     fetchMock.mockImplementation(async (url) => (String(url).startsWith('https://zoom.us/oauth') ? tokenRes() : jsonRes({ host_id: 'h' })));
     await getMeetingRecordings('/abc==');
     expect(fetchMock.mock.calls.at(-1)[0]).toBe('https://api.zoom.us/v2/meetings/%252Fabc%253D%253D/recordings');
@@ -372,5 +372,28 @@ describe('fetchRecordingRange', () => {
   test('the new codes carry HTTP statuses', () => {
     expect(new ZoomClientError('zoom_range_unsupported').httpStatus).toBe(502);
     expect(new ZoomClientError('zoom_download_denied').httpStatus).toBe(502);
+  });
+});
+
+
+describe('attendance report pagination', () => {
+  const participant = { name: 'Synthetic Person', status: 'in_meeting', join_time: '2026-10-09T16:00:00Z', leave_time: '2026-10-09T16:01:00Z', duration: 60, user_email: 'discard@example.test', user_id: 'discard' };
+  test('uses report endpoint, encoded frozen occurrence, page size 300, and strips identity fields', async () => {
+    fetchMock.mockResolvedValueOnce(tokenRes()).mockResolvedValueOnce(jsonRes({ participants: [participant], total_records: 2, next_page_token: 'next' }))
+      .mockResolvedValueOnce(jsonRes({ participants: [participant], total_records: 2, next_page_token: '' }));
+    const result = await getMeetingAttendance('/occurrence//==');
+    expect(result.status).toBe('complete');
+    expect(result.participants).toHaveLength(2);
+    expect(result.participants[0]).not.toHaveProperty('user_email');
+    expect(result.participants[0]).not.toHaveProperty('user_id');
+    expect(fetchMock.mock.calls[1][0]).toContain('/v2/report/meetings/%252Foccurrence%252F%252F%253D%253D/participants?page_size=300');
+    expect(fetchMock.mock.calls[2][0]).toContain('next_page_token=next');
+  });
+  test('marks truncated pages and count mismatch partial and bounds repeated tokens', async () => {
+    fetchMock.mockResolvedValueOnce(tokenRes()).mockResolvedValue(jsonRes({ participants: [participant], total_records: 10, next_page_token: 'repeat' }));
+    expect((await getMeetingAttendance('occurrence')).status).toBe('partial');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    fetchMock.mockResolvedValue(jsonRes({ participants: [participant], total_records: 2, next_page_token: '' }));
+    expect((await getMeetingAttendance('occurrence')).status).toBe('partial');
   });
 });
