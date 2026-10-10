@@ -1,7 +1,7 @@
 /** @jest-environment node */
 import baseline from '../fixtures/zoom-attendance-legacy-baseline.json';
 import { buildAttendanceReview } from '../../lib/services/meeting-tracker-transcription/attendance-service';
-import { normalizeDiscussionAttribution, sharedMicrophoneDecision, confirmDiscussionAttribution } from '../../lib/services/meeting-tracker-transcription/discussion-attribution';
+import { normalizeDiscussionAttribution, confirmDiscussionAttribution } from '../../lib/services/meeting-tracker-transcription/discussion-attribution';
 import { resolveDiscussionAttribution, proposePresentationEnd, buildStaffDiscussionTranscriptText } from '../../lib/services/meeting-tracker-transcription/presentation-boundary';
 import { buildMeetingTranscriptFiles, parseVerifiedMeetingTranscriptSource } from '../../lib/services/meeting-tracker-transcription/bundle';
 import { formatTranscriptText, formatTranscriptVtt, groupTranscriptByTurn } from '../../lib/services/transcription-pilot/transcript-format';
@@ -123,15 +123,11 @@ it('pilot text/VTT remain byte-identical to the pre-v7 baseline', () => {
   expect(formatTranscriptVtt(content, names)).toBe(baseline.pilot.vtt);
 });
 
-it('shared microphone is controlled only by its own voice row, independent of either attendee', async () => {
+it.each([[[]], [['A']]])('rejects confirmation carrying sharedSpeakerIds %j', async sharedSpeakerIds => {
   const review = { id: 'shared', ...await buildAttendanceReview(args, report([row('Alex Example'), row('Silent')])) };
-  const split = sharedMicrophoneDecision(review.decision, ['A']);
-  expect(split.rows.map(row => row.speakerIds)).toEqual([[], [], ['B'], ['A']]);
-  const peopleOnly = confirmDiscussionAttribution(review, { reviewId: 'shared', sharedSpeakerIds: ['A'], kept: [false, false, true, true] });
-  expect(peopleOnly.excludedSpeakerIds).toEqual([]);
-  const mic = confirmDiscussionAttribution(review, { reviewId: 'shared', sharedSpeakerIds: ['A'], kept: [true, true, true, false] });
-  expect(mic.excludedSpeakerIds).toEqual(['A']);
-  expect(() => sharedMicrophoneDecision(review.decision, ['unknown'])).toThrow();
+  const confirmation = { reviewId: review.id, kept: review.decision.rows.map(() => true) };
+  expect(() => confirmDiscussionAttribution(review, confirmation)).not.toThrow();
+  expect(() => confirmDiscussionAttribution(review, { ...confirmation, sharedSpeakerIds })).toThrow('invalid_discussion_attribution');
 });
 
 it('never claims waiting-only attendance from incomplete pages', async () => {

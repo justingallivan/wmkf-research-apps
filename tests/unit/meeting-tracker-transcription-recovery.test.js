@@ -578,6 +578,7 @@ test('attendance uses a version-fenced snapshot; stale version and replayed revi
   const confirmation = { reviewId: receipt.attendance_review.id, kept: [] };
   await expect(updateMeetingCorrection({ ...args, body: { expectedVersion: 4, speakerNames: receipt.speaker_names, attendanceConfirmation: confirmation } })).rejects.toMatchObject({ code: 'meeting_transcript_correction_changed' });
   await expect(updateMeetingCorrection({ ...args, body: { expectedVersion: 5, speakerNames: receipt.speaker_names, attendanceConfirmation: { ...confirmation, reviewId: 'old' } } })).rejects.toMatchObject({ code: 'meeting_attendance_confirmation_stale' });
+  await expect(updateMeetingCorrection({ ...args, body: { expectedVersion: 5, speakerNames: receipt.speaker_names, attendanceConfirmation: { ...confirmation, sharedSpeakerIds: [] } } })).rejects.toMatchObject({ code: 'meeting_attendance_confirmation_stale' });
   await updateMeetingCorrection({ ...args, body: { expectedVersion: 5, speakerNames: receipt.speaker_names, attendanceConfirmation: confirmation } });
   expect(receipt.discussion_attribution).toEqual(receipt.attendance_review.decision);
   await expect(updateMeetingCorrection({ ...args, body: { expectedVersion: 5, speakerNames: receipt.speaker_names, attendanceConfirmation: confirmation } })).rejects.toMatchObject({ code: 'meeting_transcript_correction_changed' });

@@ -1,4 +1,3 @@
-import { sharedMicrophoneDecision } from '../../../lib/services/meeting-tracker-transcription/discussion-attribution';
 import { resolveDiscussionAttribution } from '../../../lib/services/meeting-tracker-transcription/presentation-boundary';
 /** Site Visit "Recording and transcript" card: recording, transcript upload/generation, speaker names, board link. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -1372,29 +1371,14 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   const presentationEndMs = correction && endEdit?.key === editorKey ? endEdit.value : baselineEndMs;
   const dirtyEnd = presentationEndMs !== baselineEndMs;
   const attendanceReview = correction?.attendanceReview || null;
-  const originalLinkedIds = attendanceReview?.decision.rows.filter(row => row.kind === 'attendee').flatMap(row => row.speakerIds) || [];
-  const savedSharedIds = correction?.discussionAttribution?.rows.filter(row => row.kind === 'voice')
-    .flatMap(row => row.speakerIds).filter(id => originalLinkedIds.includes(id)) || [];
-  const sharedSpeakerIds = attendanceReview && attendanceEdit?.id === attendanceReview.id ? attendanceEdit.sharedSpeakerIds : savedSharedIds;
-  const attendanceDecision = attendanceReview ? sharedMicrophoneDecision(attendanceReview.decision, sharedSpeakerIds) : null;
+  const attendanceDecision = attendanceReview?.decision || null;
   const attendanceKept = attendanceReview ? (attendanceEdit?.id === attendanceReview.id ? attendanceEdit.kept
     : (correction.discussionAttribution || attendanceDecision).rows.map(row => row.kept)) : [];
   const dirtyAttendance = Boolean(attendanceReview && attendanceEdit?.id === attendanceReview.id
-    && (JSON.stringify(sharedSpeakerIds) !== JSON.stringify(savedSharedIds)
-      || JSON.stringify(attendanceKept) !== JSON.stringify((correction.discussionAttribution || attendanceDecision).rows.map(row => row.kept))));
+    && JSON.stringify(attendanceKept) !== JSON.stringify((correction.discussionAttribution || attendanceDecision).rows.map(row => row.kept)));
   const dirty = dirtyNames || dirtyEnd || dirtyAttendance;
-  const setAttendanceKept = (index, kept) => setAttendanceEdit({ id: attendanceReview.id, sharedSpeakerIds,
+  const setAttendanceKept = (index, kept) => setAttendanceEdit({ id: attendanceReview.id,
     kept: attendanceKept.map((value, position) => position === index ? kept : value) });
-  const markSharedMicrophone = (id) => {
-    const selected = [...sharedSpeakerIds, id].sort();
-    setAttendanceEdit({ id: attendanceReview.id, sharedSpeakerIds: selected,
-      kept: sharedMicrophoneDecision(attendanceReview.decision, selected).rows.map((row, index) => {
-        if (index < attendanceReview.decision.rows.length) return attendanceKept[index];
-        const previous = attendanceDecision.rows.findIndex(prior => prior.kind === 'voice'
-          && JSON.stringify(prior.speakerIds) === JSON.stringify(row.speakerIds));
-        return previous < 0 ? true : attendanceKept[previous];
-      }) });
-  };
   const previewDecision = !dirtyNames && !dirtyEnd && attendanceDecision ? { excludedSpeakerIds: attendanceDecision.rows
     .filter((row, index) => !attendanceKept[index]).flatMap(row => row.speakerIds) } : null;
   const setPresentationEndMs = (value) => setEndEdit({ key: editorKey, value: Number.isSafeInteger(value) ? value : null });
@@ -1578,7 +1562,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
       try {
         const result = await requestJson(`${basePath}/corrections/${encodeURIComponent(correction.operationId)}`, {
           method: 'PATCH', body: { expectedVersion: correction.version, speakerNames: names, ...(dirtyEnd ? { presentationEndMs } : {}),
-            ...(!dirtyNames && !dirtyEnd && attendanceReview ? { attendanceConfirmation: { reviewId: attendanceReview.id, kept: attendanceKept, ...(sharedSpeakerIds.length ? { sharedSpeakerIds } : {}) } } : {}) },
+            ...(!dirtyNames && !dirtyEnd && attendanceReview ? { attendanceConfirmation: { reviewId: attendanceReview.id, kept: attendanceKept } } : {}) },
           fallbackMessage: 'Your changes could not be saved.',
         });
         if (!isCurrent(generation)) return;
@@ -1646,7 +1630,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
       if (!correction.discussionAttribution || dirtyAttendance) {
         const saved = await requestJson(`${basePath}/corrections/${encodeURIComponent(correction.operationId)}`, {
           method: 'PATCH', body: { expectedVersion: version, speakerNames: names,
-            attendanceConfirmation: { reviewId: attendanceReview.id, kept: attendanceKept, ...(sharedSpeakerIds.length ? { sharedSpeakerIds } : {}) } }, fallbackMessage: 'Attendance could not be confirmed.',
+            attendanceConfirmation: { reviewId: attendanceReview.id, kept: attendanceKept } }, fallbackMessage: 'Attendance could not be confirmed.',
         });
         if (!isCurrent(generation) || editorKeyRef.current !== `c:${correction.operationId}`) return;
         version = saved.correction.version;
@@ -1959,7 +1943,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   return {
     presentationSummary, discussionSummary, summaryAck, setSummaryAck, pairedSummaryKinds, summarizeKinds,
     basePath, collection, collectionCheckedAt, savedDraft, loading, jobs, publications, newestJob, focusJob, showReview, selectedJob,
-    attendanceReview, attendanceDecision, attendanceKept, setAttendanceKept, markSharedMicrophone, previewDecision,
+    attendanceReview, attendanceDecision, attendanceKept, setAttendanceKept, previewDecision,
     correction, correctionDetail, content, speakerIds, names, setNames: editNames, baseline, dirtyNames, dirtyEnd, dirty, presentationEndMs, setPresentationEndMs, suggestionPicks, setSuggestionPicks,
     detail, audioFile, vttFile, setVttFile, acknowledged, setAcknowledged, uploadProgress, busy, error, notice, conflict,
     closeAcknowledgedId, setCloseAcknowledgedId, confirmNoVtt, setNoVttConfirmation,
@@ -2454,14 +2438,13 @@ function PresentationEndEditor({ t, readOnly }) {
       {selected !== null && (t.dirtyNames || t.dirtyEnd) && <p className="mt-3 text-xs text-gray-600">Save changes to review attendance.</p>}
       {t.attendanceReview && !t.dirtyNames && !t.dirtyEnd && <fieldset className="mt-4 space-y-2" disabled={disabled}>
         <legend className="text-sm font-semibold">Discussion attendance</legend>
-        <p className="text-xs text-gray-600">Uncheck anyone whose discussion turns should say “Unidentified speaker”. Publish to confirm. For a shared microphone, use its own checkbox; unchecking a person leaves that voice unchanged.</p>
+        <p className="text-xs text-gray-600">Uncheck anyone whose discussion turns should say “Unidentified speaker”. Publish to confirm.</p>
         {t.attendanceReview.decision.attendance.status !== 'complete' && <p className="text-xs text-gray-600">Attendance is unavailable or incomplete. Review the voices in the discussion.</p>}
         {['attendee', 'voice'].map(kind => <div key={kind}>
           {kind === 'voice' && t.attendanceDecision.rows.some(row => row.kind === kind) && <p className="mt-3 text-xs font-semibold">Other voices in the discussion</p>}
           {t.attendanceDecision.rows.map((row, index) => row.kind === kind && <label key={index} className="flex items-start gap-2 text-sm">
             <input type="checkbox" checked={t.attendanceKept[index]} onChange={event => t.setAttendanceKept(index, event.target.checked)} />
             <span>{row.displayName}{row.lastLeaveAt && <span className="ml-2 text-xs text-gray-600">Left {new Date(row.lastLeaveAt).toLocaleString('en-US', { timeZone: t.attendanceReview.timeZone || 'UTC', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}</span>}
-              {row.kind === 'attendee' && row.speakerIds.map(id => <button key={id} type="button" className="ml-2 text-xs underline" onClick={event => { event.preventDefault(); t.markSharedMicrophone(id); }}>Shared microphone</button>)}
               {t.attendanceReview.leftBeforeEnd[index] && <span className="block text-xs text-gray-600">Left before the presentation ended</span>}</span>
           </label>)}
         </div>)}

@@ -1672,21 +1672,3 @@ test.each(['success', 'failure'])('late attendance %s cannot update a different 
   expect(screen.queryByText('Discussion attendance')).not.toBeInTheDocument();
   expect(screen.queryByText('Late attendance failure')).not.toBeInTheDocument();
 });
-
-test('marking a shared microphone preserves earlier checkbox choices', async () => {
-  const artifact = boundaryArtifact();
-  const draft = attendanceDraft();
-  draft.attendanceReview.decision.rows[0] = { displayName: 'Named attendee', kept: true, speakerIds: ['A'], lastLeaveAt: null, kind: 'attendee' };
-  route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) }, {
-    '/corrections': { respond: () => response(correctionDetail(artifact, { correction: draft })) },
-  });
-  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit speaker names' }));
-  const editor = await screen.findByTestId('presentation-end-editor');
-  fireEvent.click(within(editor).getByRole('checkbox', { name: 'Speaker B' }));
-  fireEvent.click(within(editor).getByRole('checkbox', { name: /Named attendee/ }));
-  fireEvent.click(within(editor).getByRole('button', { name: 'Shared microphone' }));
-  expect(within(editor).getByRole('checkbox', { name: 'Speaker B' })).not.toBeChecked();
-  expect(within(editor).getByRole('checkbox', { name: 'Named attendee' })).not.toBeChecked();
-  expect(within(editor).getByRole('checkbox', { name: 'Named attendee (shared microphone)' })).toBeChecked();
-});

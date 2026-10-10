@@ -66,7 +66,7 @@ Source: an owner-run, read-only, shape-only run of `node scripts/probe-zoom-reco
 - Published speaker names come from Zoom VTT reconciliation, so they are Zoom display names wherever Zoom named the speaker. They are *display-transformed*, though: `zoomDisplayNames` reorders "Surname, Given" to "Given Surname", and keeps the original when two distinct Zoom names would collide [VERIFIED `lib/services/transcription-pilot/zoom-vtt.js:395-430`]. Staff may also have renamed a speaker in an earlier correction.
 - **Rule:** compute the attendees' display forms with the same `zoomDisplayNames` over the attendance name set. An attendee is linked to every discussion speaker ID whose current name equals either that display form or the raw Zoom name, exactly. The link is computed when the checklist is shown and frozen in the confirmation. A speaker renamed by staff to something else falls into "Other voices".
 - Discussion speaker IDs that match no attendee are listed in a short second group, "Other voices in the discussion", also checked by default. That covers diarization labels such as "Speaker C" and shared microphones.
-- **Q1, shared microphone (decided as proposed):** if one speaker ID carries a departed person and a remaining person, there is no way to split it. Unchecking either person's row has no effect on that ID, and the ID can only be unchecked in its own row, which excludes everyone on it. Proposed: show the ID once, under the person whose name it carries.
+- **Q1, shared microphone (owner reaffirmed after review):** no manual shared-microphone split. A speaker ID automatically linked to more than one attendee is controlled only by its own "Other voices" row; unchecking either attendee has no effect on that ID. Unchecking the voice excludes everyone on it. Attendance cannot infer who used a microphone.
 - Silent attendees need no speaker ID: unchecking them changes nothing in the output. Their row still records Duncan's confirmation.
 
 ### Effect on the output
@@ -135,10 +135,10 @@ checklist after saving names/end. Publish confirms the checked rows and publishe
 once. Checkboxes can also be saved as a version-checked draft. A server-created
 review ID and source/name/boundary context prevent replay; any later name/end edit
 invalidates the review in SQL. Missing/partial reports show checked discussion
-voices. Staff can mark a matched voice as a shared microphone: its own checkbox
-then controls that ID, while either attendee's checkbox has no effect on it.
-This explicit staff control is necessary because report presence cannot detect
-microphone sharing. Names and timing are never rewritten.
+voices. There is no manual shared-microphone control. The automatic multi-attendee
+link rule keeps that ID in its own "Other voices" row. Confirmation accepts exactly
+`{ reviewId, kept }`; an extra `sharedSpeakerIds` key is rejected. Names and timing
+are never rewritten.
 
 Migration 078 adds nullable checklist, draft decision and frozen decision JSONB
 columns on the existing publication receipt. The manifest-driven fresh bootstrap
