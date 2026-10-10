@@ -147,4 +147,5 @@ Stage 5 deletes the full Recording, the full transcript and discussion content a
 ## Process notes
 
 - Before the build plan: run `/contract-reconcile` Mode A on this design.
+- **Build plan drafted (Session 592):** `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md` (slices 0-5, owner decisions B1-B6).
 - This file and Codex's research doc are separate files under `docs/plans/`. `docs/DOCS_CATALOG.md` covers top-level `docs/*.md` only (`check:docs-catalog`, 2026-10-09), so the two branches do not collide there.
