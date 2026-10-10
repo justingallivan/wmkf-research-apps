@@ -42,7 +42,7 @@
    - Decision 7 (presentation-video picklist value) is owner-provisioned at build time.
    - Ending playback is checked on the first real cut (browser and SharePoint viewer, before Board/briefing exposure), not on a synthetic clip (Session 592).
 2. **First live use of attendance attribution.** Not yet exercised on a real meeting. Needs a transcript with verified Zoom provenance (a new import); legacy transcripts show only the voices list. Suggested: re-import 1003222 from Zoom (one paid transcription, owner-run), which also gives Stage 4 its first real input (re-copy its video too, decision 16).
-3. **Review `codex/group-review-non-lead-ui` when Codex reports.** Not started at close.
+3. ~~Review `codex/group-review-non-lead-ui`~~ **Closed (Session 592): no change needed.** Codex found "Send to leadership" already limited to the lead PD or a superuser; Claude confirmed in source (`resolveAuthorization` in `lib/services/final-writeup/transition-model.js`, UI `canAdvance` gate, server re-check in `transition-service.js`). The owner saw it as an admin, and admins keep access. The worktree and branch hold no commits.
 
 #### Owner Decision Needed
 
