@@ -211,7 +211,8 @@ test('recovery claim: unleased processing rows only, access-withdrawn or aged, f
   const text = calls[0].text;
   expect(text).toContain("state IN ('queued', 'cutting', 'uploading')");
   expect(text).toContain('lease_token IS NULL OR lease_expires_at <= NOW()');
-  expect(text).toContain('updated_at < NOW() - ($4 || \' seconds\')::INTERVAL');
+  expect(text).toContain('COALESCE(sandbox_created_at, created_at) < NOW() - ($4 || \' seconds\')::INTERVAL');
+  expect(text).not.toContain('updated_at < NOW()');
   expect(text).toContain('FOR UPDATE SKIP LOCKED');
   expect(calls[0].params.slice(0, 4)).toEqual([2, 'test', REQ, 11700]);
   await expect(store.claimPresentationVideoSplitRecovery({ accessMode: 'bogus', maxAgeSeconds: 1, leaseSeconds: 1 })).rejects.toThrow(TypeError);

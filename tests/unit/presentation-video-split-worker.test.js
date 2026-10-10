@@ -68,7 +68,7 @@ function world(over = {}) {
       const r = row();
       if (!PROCESSING.includes(r.state) || r.lease_token) return [];
       const withdrawn = accessMode === 'off' || (accessMode === 'test' && r.request_id !== testRequestId);
-      const expired = w.nowMs - (r.updated_ms ?? w.nowMs) > maxAgeSeconds * 1000;
+      const expired = w.nowMs - (r.sandbox_created_ms ?? r.created_ms ?? w.nowMs) > maxAgeSeconds * 1000;  // never updated_at (Codex slice 3 round 2)
       if (!withdrawn && !expired) return [];
       r.lease_token = 'rec-tok';
       return [{ row: { ...r }, leaseToken: 'rec-tok', reason: withdrawn ? 'access_withdrawn' : 'processor_expired' }];
@@ -497,19 +497,35 @@ describe('recovery pass', () => {
 
   test('a healthy polled row (access on, recent) is untouched', async () => {
     const w = cuttingWorld();
-    w.row.updated_ms = w.nowMs - 60_000;
+    w.row.sandbox_created_ms = w.nowMs - 60_000;
     expect((await w.tick()).outcome).toBe('polling');
     expect(w.row.state).toBe('cutting');
   });
 
-  test('a row untouched for longer than the Sandbox timeout plus 15 minutes fails processor_expired even with access on', async () => {
+  test('a row whose Sandbox was created longer ago than the timeout plus 15 minutes fails processor_expired even with access on', async () => {
     const w = cuttingWorld();
-    w.row.updated_ms = w.nowMs - (10_800_000 + 16 * 60_000);
+    w.row.sandbox_created_ms = w.nowMs - (10_800_000 + 16 * 60_000);
+    w.row.updated_ms = w.nowMs;                     // recent lease activity must not postpone expiry
     await w.tick();
     expect(w.row).toMatchObject({ state: 'failed', failure_code: 'presentation_video_processor_expired' });
     const fresh = cuttingWorld();
-    fresh.row.updated_ms = fresh.nowMs - (10_800_000 + 14 * 60_000);
+    fresh.row.sandbox_created_ms = fresh.nowMs - (10_800_000 + 14 * 60_000);
     expect((await fresh.tick()).outcome).toBe('polling');
+  });
+
+  test('persistent revalidation errors cannot postpone expiry: repeated failing ticks end in processor_expired and cleanup', async () => {
+    const w = cuttingWorld();
+    w.row.sandbox_created_ms = w.nowMs;
+    w.deps.getFileMetadataById = async () => { throw Object.assign(new Error('forbidden'), { status: 403 }); };
+    for (let minute = 0; minute < 200; minute += 1) {
+      w.nowMs += 60_000;
+      w.row.updated_ms = w.nowMs;                   // every claim/release refreshes updated_at
+      await w.tick();
+      if (w.row.state === 'failed') break;
+    }
+    expect(w.row).toMatchObject({ state: 'failed', failure_code: 'presentation_video_processor_expired' });
+    await w.tick();
+    expect(w.row.sandbox_cleaned_at).toBeTruthy();
   });
 });
 
