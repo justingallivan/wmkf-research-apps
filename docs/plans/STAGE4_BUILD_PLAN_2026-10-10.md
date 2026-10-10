@@ -274,3 +274,10 @@ Verdict *needs-attention*, 4 findings. All accepted and applied above:
 Verdict *needs-attention*, 2 findings, both accepted and applied. Codex confirmed that the round 1 cleanup fix closes its finding, and that the Stage 5 deferral is safe while deletion stays blocked behind the retirement transition.
 1. **High, accepted:** a stale yielded approval could block replacement cuts. Added stale-approval reconciliation: look up by generation key, supersede any orphan row, settle the split as `superseded`. Start runs it for an abandoned, stale `registering` row.
 2. **Medium, accepted:** the omitted-frame predicate rejected valid non-frame-aligned cuts. Kept frames must end at or before T; the first omitted frame must end after T and may straddle it. Added the T = 10.01 s fixture.
+
+## Codex adversarial review, round 3 (Session 592)
+
+**Verdict: approve.** "The plan at 831e1f080 is ready to implement. Both Round 2 findings are closed at the plan level; no new concrete high/medium defects found." Implementation proceeds slice by slice on branch `claude/stage4-build`, with a Codex review of each slice.
+- **Orchestration:** Opus orchestrates and reviews; Sonnet does the builds. A slice gets at most three Codex rounds before Opus adjudicates (owner, 2026-10-10).
+- **Merge:** once at the end, after Codex is satisfied with the whole branch. Migration 080 and the Dataverse value 100000011 are applied by the owner first.
+- **Slice 2 scope note:** start refuses every `registering` row. Stale-approval reconciliation lands in slice 4 with the approve route. Before then no `registering` row can exist.
