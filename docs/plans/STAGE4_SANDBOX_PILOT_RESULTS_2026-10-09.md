@@ -49,7 +49,7 @@ A local negative control, cutting 1 s after the discussion starts, was rejected 
 
 - **Speed:** the 48-minute presentation was cut in about 11.5 minutes, about 4.2× real time on 2 vCPU. The independent audio encode used for acceptance added 66 s. Making the fixture (745 s) is test-only. **Limitation:** a synthetic slide with one moving box compresses far more easily than real camera tiles or screen shares, so real recordings will encode more slowly. Only a real input measures that.
 - **Readability:** the frame 0.2 s before the cut shows the 44 px and 20 px slide text clearly.
-- **Interruption:** the encoder was killed with SIGKILL after 20 s. The partial file existed but did not play, and nothing was declared.
+- **Interruption:** the encoder was killed with SIGKILL after 20 s. The partial file existed but did not play. No output was declared, but that is by construction (this path never renames to the final name), not observed: the receipt was truncated and removed before it was read.
 - **Disk full:** the scratch disk was filled to leave 40 MB. The result was a rejection with the reason `insufficient_scratch during audio_decode_trim`, and nothing was declared.
   - The first attempt left 300 MB, which turned out to be enough for a 10-minute cut. That was a mistake in the test, not a pass of the cut.
   - The second attempt crashed while writing its receipt to the full disk. The script now reports the outcome even when the receipt can't be written, and the third attempt passed.

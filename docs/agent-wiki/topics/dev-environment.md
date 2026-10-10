@@ -64,6 +64,10 @@ Claude config sync, and environment-specific operating notes.
 
 ## Operating Notes
 
+- **Vercel Sandbox (Stage 4 pilot, S591).** `vercel sandbox run` leaves the sandbox running after its
+  command; always `stop` then `remove`, and confirm `list --all` and `snapshots list` are empty. There is
+  no per-sandbox spend cap: the ceiling is `--vcpus` × `--timeout` (iad1 ≈ $0.34/h at 2 vCPU). See
+  `docs/plans/STAGE4_SANDBOX_PILOT_RESULTS_2026-10-09.md`.
 - **Jest resolves extensionless imports; plain `node` does not (S544).** App modules import
   siblings without `.js` (Next/webpack and Jest resolve them), so a raw-`node` script that
   reaches one dies with `ERR_MODULE_NOT_FOUND` while every unit test stays green. For an ad-hoc

@@ -3,7 +3,7 @@ title: Stage 4 integrated local matrix results
 domain: transcription
 kind: report
 status: active
-summary: "Local investigation closed as promising with documented limitations by owner decision. Historical strict matrix remains non-pass; tiny Apple tail omissions are a quality limitation, not a standalone project blocker. Practical mapping, compatibility, cloud and publication checks remain before production."
+summary: "Local investigation closed as promising with documented limitations by owner decision. Historical strict matrix remains non-pass; tiny Apple tail omissions are a quality limitation, not a standalone project blocker. Practical mapping, compatibility, cloud and publication checks remain before production; the synthetic cloud pilot passed in Session 591 (STAGE4_SANDBOX_PILOT_RESULTS_2026-10-09.md)."
 owner: product-engineering
 related:
   - docs/plans/STAGE4_SYNTHETIC_RESULTS_2026-10-09.md
