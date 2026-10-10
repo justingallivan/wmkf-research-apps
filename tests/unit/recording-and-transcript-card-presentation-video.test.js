@@ -98,7 +98,7 @@ describe('Video line', () => {
   });
 
   test('approved: Open plus re-create behind a confirm that posts start', async () => {
-    route({ state: { splits: { available: true, splits: [split({ state: 'approved' }), split({ id: OLD_ID, state: 'superseded', createdAt: '2026-10-01T10:00:00Z' })] } } });
+    route({ state: { splits: { available: true, splits: [split({ state: 'approved', boardReady: true }), split({ id: OLD_ID, state: 'superseded', createdAt: '2026-10-01T10:00:00Z' })] } } });
     await renderLine();
     const el = await line();
     expect(el).toHaveTextContent('Approved for the Board');
@@ -171,7 +171,7 @@ describe('actions', () => {
     fireEvent.click(within(el).getByRole('button', { name: 'Check the ending and approve' }));
     expect(within(el).getByText('Approve this video for the Board? Board members will be able to watch it.')).toBeInTheDocument();
     expect(state.posts).toHaveLength(0);
-    state.splits = { available: true, splits: [split({ state: 'approved' })] };
+    state.splits = { available: true, splits: [split({ state: 'approved', boardReady: true })] };
     fireEvent.click(within(el).getByRole('button', { name: 'Approve video' }));
     await waitFor(() => expect(state.posts).toEqual([{ action: 'approve', splitId: SPLIT_ID }]));
     await waitFor(() => expect(el).toHaveTextContent('Approved for the Board'));
@@ -241,7 +241,7 @@ describe('registering recovery and failed refreshes', () => {
     route({ state: { splits: { available: true, splits: [split({ state: 'registering' })] } } });
     await renderLine();
     const el = await line();
-    state.splits = { available: true, splits: [split({ state: 'approved' })] };
+    state.splits = { available: true, splits: [split({ state: 'approved', boardReady: true })] };
     fireEvent.click(within(el).getByRole('button', { name: 'Finish approving' }));
     await waitFor(() => expect(state.posts).toEqual([{ action: 'approve', splitId: SPLIT_ID }]));
     await waitFor(() => expect(el).toHaveTextContent('Approved for the Board'));
@@ -290,5 +290,48 @@ describe('registering recovery and failed refreshes', () => {
     fireEvent.click(within(el).getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(el).toHaveTextContent('Not started'));
     expect(container.textContent).not.toMatch(/presentation_video_|network down/);
+  });
+});
+
+describe('Board readiness of an approved video', () => {
+  test('boardReady false shows Out of date with Create and no Open', async () => {
+    route({ state: { splits: { available: true, splits: [split({ state: 'approved', boardReady: false })] } } });
+    await renderLine();
+    const el = await line();
+    expect(el).toHaveTextContent('Out of date');
+    expect(el).toHaveTextContent('The transcript or video changed. Create it again.');
+    expect(el).not.toHaveTextContent('Approved for the Board');
+    expect(within(el).queryByRole('link', { name: 'Open video' })).not.toBeInTheDocument();
+    fireEvent.click(within(el).getByRole('button', { name: 'Create presentation video' }));
+    await waitFor(() => expect(state.posts).toEqual([{ action: 'start' }]));
+  });
+
+  test('boardReady true shows Approved for the Board', async () => {
+    route({ state: { splits: { available: true, splits: [split({ state: 'approved', boardReady: true })] } } });
+    await renderLine();
+    expect(await line()).toHaveTextContent('Approved for the Board');
+  });
+
+  test('boardReady unknown shows Approved with a small note', async () => {
+    route({ state: { splits: { available: true, splits: [split({ state: 'approved', boardReady: null })] } } });
+    await renderLine();
+    const el = await line();
+    expect(el).toHaveTextContent('Approved');
+    expect(el).not.toHaveTextContent('Approved for the Board');
+    expect(el).toHaveTextContent('Couldn’t check the Board status.');
+  });
+
+  test('approve, then a later load after a boundary change shows Out of date', async () => {
+    route({ state: { splits: { available: true, splits: [split()] } } });
+    await renderLine();
+    const el = await line();
+    state.splits = { available: true, splits: [split({ state: 'approved', boardReady: true })] };
+    fireEvent.click(within(el).getByRole('button', { name: 'Check the ending and approve' }));
+    fireEvent.click(within(el).getByRole('button', { name: 'Approve video' }));
+    await waitFor(() => expect(el).toHaveTextContent('Approved for the Board'));
+    state.splits = { available: true, splits: [split({ state: 'approved', boardReady: false })] };
+    // Mounting again (as a reload does) reads the Board status afresh.
+    const again = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    await waitFor(() => expect(within(again.container).getByTestId('presentation-video-line')).toHaveTextContent('Out of date'));
   });
 });

@@ -1,5 +1,6 @@
 /** @jest-environment node */
 jest.mock('../../lib/services/meeting-tracker-transcription/service.js', () => ({ resolveCurrentMeetingTranscriptSource: jest.fn() }));
+jest.mock('../../lib/services/post-presentation-materials/presentation-video-binding.js', () => ({ ...jest.requireActual('../../lib/services/post-presentation-materials/presentation-video-binding.js'), bindPresentationVideo: jest.fn() }));
 jest.mock('../../lib/services/meeting-tracker-recordings/presentation-video-split-store.js', () => ({
   startPresentationVideoSplit: jest.fn(), findCopiedZoomVideoCopyForDocument: jest.fn(), listPresentationVideoSplitSnapshotsForRequest: jest.fn(),
   findAbandonedRegisteringPresentationVideoSplit: jest.fn(), claimPresentationVideoApproval: jest.fn(),
@@ -7,11 +8,12 @@ jest.mock('../../lib/services/meeting-tracker-recordings/presentation-video-spli
   yieldPresentationVideoApproval: jest.fn(), settleStalePresentationVideoApproval: jest.fn(),
 }));
 jest.mock('../../lib/services/post-presentation-materials/material-service.js', () => ({
-  POST_PRESENTATION_MATERIALS_DEPENDENCIES: { findDocuments: jest.fn(), findDocumentByGenerationKey: jest.fn(), updateDocument: jest.fn() },
+  POST_PRESENTATION_MATERIALS_DEPENDENCIES: { findDocuments: jest.fn(), findDocumentsWithMeetingTranscriptBundle: jest.fn(), findDocumentByGenerationKey: jest.fn(), updateDocument: jest.fn() },
   loadBoundContext: jest.fn(),
   _internal: { assertFeature: jest.fn() },
 }));
 
+import { bindPresentationVideo } from '../../lib/services/post-presentation-materials/presentation-video-binding.js';
 import { resolveCurrentMeetingTranscriptSource } from '../../lib/services/meeting-tracker-transcription/service.js';
 import * as store from '../../lib/services/meeting-tracker-recordings/presentation-video-split-store.js';
 import { POST_PRESENTATION_MATERIALS_DEPENDENCIES as deps, loadBoundContext, _internal } from '../../lib/services/post-presentation-materials/material-service.js';
@@ -237,6 +239,53 @@ describe('getPresentationVideoSplits', () => {
     expect(store.listPresentationVideoSplitSnapshotsForRequest).toHaveBeenCalledWith({ requestId: REQUEST, limit: 10 });
     expect(result).toEqual({ available: true, splits: [{ id: SPLIT, state: 'review', failureCode: null, createdAt: 'c', updatedAt: 'u', completedAt: null, approvedAt: null }] });
     expect(presentationVideoSplitDto({ id: 'x', state: 'failed', failure_code: 'f' }).failureCode).toBe('f');
+  });
+  test('no approved row: no Dataverse read and no board fields', async () => {
+    store.listPresentationVideoSplitSnapshotsForRequest.mockResolvedValue([{ id: SPLIT, state: 'review' }]);
+    const result = await getPresentationVideoSplits({ requestId: REQUEST });
+    expect(deps.findDocuments).not.toHaveBeenCalled();
+    expect(deps.findDocumentsWithMeetingTranscriptBundle).not.toHaveBeenCalled();
+    expect(result.boardVideo).toBeUndefined();
+    expect(result.splits[0].boardReady).toBeUndefined();
+  });
+  test('flag off: no Dataverse read either', async () => {
+    process.env.PRESENTATION_VIDEO_SPLIT_ACCESS = 'off';
+    await getPresentationVideoSplits({ requestId: REQUEST });
+    expect(deps.findDocuments).not.toHaveBeenCalled();
+  });
+  describe('approved row', () => {
+    const DOC = '99999999-9999-4999-8999-999999999999';
+    const approved = [{ id: SPLIT, state: 'approved', request_document_id: DOC }];
+    const bound = (result) => bindPresentationVideo.mockReturnValue(result);
+    beforeEach(() => {
+      store.listPresentationVideoSplitSnapshotsForRequest.mockResolvedValue(approved);
+      deps.findDocuments.mockResolvedValue({ records: [] });
+      deps.findDocumentsWithMeetingTranscriptBundle.mockResolvedValue({ records: [] });
+    });
+    test('bound to this row: boardReady true', async () => {
+      bound({ reason: 'bound', video: { wmkf_requestdocumentid: DOC.toUpperCase() } });
+      const result = await getPresentationVideoSplits({ requestId: REQUEST });
+      expect(result.boardVideo).toEqual({ status: 'bound' });
+      expect(result.splits[0].boardReady).toBe(true);
+    });
+    test('stale: boardReady false', async () => {
+      bound({ reason: 'stale', video: null });
+      const result = await getPresentationVideoSplits({ requestId: REQUEST });
+      expect(result.boardVideo).toEqual({ status: 'stale' });
+      expect(result.splits[0].boardReady).toBe(false);
+    });
+    test('bound to a different row: boardReady false', async () => {
+      bound({ reason: 'bound', video: { wmkf_requestdocumentid: '88888888-8888-4888-8888-888888888888' } });
+      expect((await getPresentationVideoSplits({ requestId: REQUEST })).splits[0].boardReady).toBe(false);
+    });
+    test('Dataverse read throws: boardReady null, no failure, no ids logged', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      deps.findDocuments.mockRejectedValue(new Error(`boom ${DOC}`));
+      const result = await getPresentationVideoSplits({ requestId: REQUEST });
+      expect(result.splits[0].boardReady).toBeNull();
+      expect(result.boardVideo).toEqual({ status: 'unknown' });
+      expect(JSON.stringify(warn.mock.calls)).not.toContain(DOC);
+    });
   });
   test('rejects an invalid request id', async () => {
     expect(await rejection(getPresentationVideoSplits({ requestId: 'nope' }))).toMatchObject({ httpStatus: 400 });

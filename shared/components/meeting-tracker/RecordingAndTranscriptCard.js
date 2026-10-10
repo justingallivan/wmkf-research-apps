@@ -3031,7 +3031,7 @@ const PV_IN_PROGRESS_TEXT = 'Approval is still in progress. Try again in a few m
 const PV_GENERIC_FAILURE = 'Something went wrong. Try again.';
 const PV_REASON_TEXT = (code) => PV_FAILURE_TEXT[code] || PV_GENERIC_FAILURE;
 
-function PresentationVideoLine({ requestId }) {
+function PresentationVideoLine({ requestId, revisionKey = '' }) {
   const path = `${API_PATH}/${encodeURIComponent(requestId || '')}/presentation-video-splits`;
   const [available, setAvailable] = useState(false);
   const [splits, setSplits] = useState([]);
@@ -3065,7 +3065,8 @@ function PresentationVideoLine({ requestId }) {
   useEffect(() => {
     const timer = window.setTimeout(() => { void load(); }, 0);
     return () => window.clearTimeout(timer);
-  }, [load]);
+    // A changed transcript or boundary can make an approved video stale, so look again without a reload.
+  }, [load, revisionKey]);
   const newest = splits[0] || null;
   const processing = splits.some((s) => PV_PROCESSING.has(s.state));
   useEffect(() => {
@@ -3117,24 +3118,28 @@ function PresentationVideoLine({ requestId }) {
   const openHref = newest ? `${path}/${encodeURIComponent(newest.id)}/open` : null;
   // A video waiting for its check can be replaced (the server supersedes it), e.g. after fixing the presentation end.
   const canCreate = !processing;
+  // An approved video the Board no longer serves (transcript, end or recording changed since) is out of date.
+  const boardStale = state === 'approved' && newest.boardReady === false;
   let status = 'Not started';
   if (state === 'queued' || state === 'cutting' || state === 'uploading') status = 'Working…';
   else if (state === 'review') status = 'Ready to check';
   else if (state === 'registering') status = 'Approving…';
-  else if (state === 'approved') status = 'Approved for the Board';
+  else if (state === 'approved') status = boardStale ? 'Out of date' : newest.boardReady === true ? 'Approved for the Board' : 'Approved';
   else if (state === 'superseded') status = 'Out of date';
   else if (state === 'failed') status = 'Failed';
   return (
     <div className="mt-3" data-testid="presentation-video-line" aria-live="polite">
       <p className="text-sm leading-6 text-gray-900"><span className="font-medium">Video:</span> {status}</p>
       {loadFailed && <p className="text-xs text-gray-700">Couldn’t refresh the video status. Retrying…</p>}
+      {boardStale && <p className="text-xs text-gray-700">{PV_STALE_TEXT}</p>}
+      {state === 'approved' && newest.boardReady == null && <p className="text-xs text-gray-700">Couldn’t check the Board status.</p>}
       {state === 'superseded' && <p className="text-xs text-gray-700">{PV_STALE_TEXT}</p>}
       {state === 'failed' && <p className="text-xs text-gray-700">{PV_REASON_TEXT(newest.failureCode)}</p>}
       <div className="mt-1 flex flex-wrap items-center gap-2">
-        {(state === 'review' || state === 'approved') && <a className={BTN} href={openHref} target="_blank" rel="noreferrer">Open video</a>}
+        {(state === 'review' || (state === 'approved' && !boardStale)) && <a className={BTN} href={openHref} target="_blank" rel="noreferrer">Open video</a>}
         {state === 'review' && <button type="button" onClick={() => setConfirming('approve')} disabled={busy} className={BTN_PRIMARY}>Check the ending and approve</button>}
         {state === 'registering' && <button type="button" onClick={() => void approve()} disabled={busy} className={BTN_PRIMARY}>{busy ? 'Working…' : 'Finish approving'}</button>}
-        {canCreate && <button type="button" onClick={() => (state === 'approved' || state === 'review' ? setConfirming('recreate') : void create())} disabled={busy} className={BTN}>{busy ? 'Working…' : (state === 'review' ? 'Create it again' : 'Create presentation video')}</button>}
+        {canCreate && <button type="button" onClick={() => ((state === 'approved' && !boardStale) || state === 'review' ? setConfirming('recreate') : void create())} disabled={busy} className={BTN}>{busy ? 'Working…' : (state === 'review' ? 'Create it again' : 'Create presentation video')}</button>}
       </div>
       {confirming === 'approve' && (
         <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="alertdialog" aria-label="Approve the presentation video">
@@ -3308,7 +3313,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef }) {
           <p className="text-xs text-gray-600">Eligible for the Board page.</p>
           <DerivativeLine state={boundaryState} label="Presentation transcript" boundText="Presentation transcript ready for the Board link." material={presentationMaterial} />
           <SummaryBlock t={t} s={t.presentationSummary} materials={materials} />
-          <PresentationVideoLine requestId={requestId} />
+          <PresentationVideoLine requestId={requestId} revisionKey={`${artifact?.id || ''}:${artifact?.fingerprint || ''}:${artifact?.presentationEnd?.endMs ?? ''}`} />
         </div>
         <div className="mt-5 border-t border-gray-200 pt-4">
           <h4 className="text-sm font-semibold text-gray-950">Staff discussion</h4>
