@@ -112,3 +112,94 @@ test('snapshot list clamps the limit and never selects secrets, lineage or recei
   }
   expect(calls[0].text).toContain('ORDER BY created_at DESC LIMIT $2');
 });
+
+// --- slice 3: worker transitions and the cleanup ledger -------------------------------------------------------
+const TOKEN = '99999999-9999-4999-8999-999999999999';
+const FENCE = 'lease_token = $2 AND lease_expires_at > NOW()';
+const one = (store, name, args) => { const h = harness(); return h.store[name](args).then(() => h.calls[0]); };
+
+test('claim takes one due processing row (lease-expired included), skips locked rows, and normalizes BIGINT strings', async () => {
+  const { store, calls } = harness(() => [{ id: ID, state: 'queued', presentation_end_ms: '1234', source_size: '99', output_size: null }]);
+  const claim = await store.claimPresentationVideoSplitWork({ accessRequestId: REQ, leaseSeconds: 600 });
+  expect(claim.row).toMatchObject({ presentation_end_ms: 1234, source_size: 99, output_size: null });
+  expect(typeof claim.leaseToken).toBe('string');
+  expect(calls[0].text).toContain("state IN ('queued', 'cutting', 'uploading')");
+  expect(calls[0].text).toContain('lease_token IS NULL OR lease_expires_at <= NOW()');
+  expect(calls[0].text).toContain('next_attempt_at IS NULL OR next_attempt_at <= NOW()');
+  expect(calls[0].text).toContain('FOR UPDATE SKIP LOCKED');
+  expect(calls[0].params.slice(1)).toEqual([REQ, 600]);
+  expect(await harness(() => []).store.claimPresentationVideoSplitWork({ leaseSeconds: 600 })).toBeNull();
+});
+
+test('every worker transition is lease-fenced with its own from-state', async () => {
+  const cases = [
+    ['renewPresentationVideoSplitLease', { id: ID, leaseToken: TOKEN, states: ['cutting'], leaseSeconds: 600 }, 'state = ANY($4::text[])'],
+    ['deferPresentationVideoSplitAttempt', { id: ID, leaseToken: TOKEN, retrySeconds: 900 }, "state IN ('queued', 'cutting', 'uploading')"],
+    ['recordPresentationVideoSandboxName', { id: ID, leaseToken: TOKEN, sandboxName: 's4-x' }, "state = 'queued' AND sandbox_name IS NULL"],
+    ['recordPresentationVideoSandboxCreated', { id: ID, leaseToken: TOKEN }, "state = 'queued'"],
+    ['recordPresentationVideoCutStarted', { id: ID, leaseToken: TOKEN, commandId: 'c1' }, "state = 'queued'"],
+    ['recordPresentationVideoCutReceiptAndUploadStarted', { id: ID, leaseToken: TOKEN, verificationReceipt: { ok: true }, uploadUrlCiphertext: 'sealed', commandId: 'c2' }, "state = 'cutting'"],
+    ['markPresentationVideoSplitReview', { id: ID, leaseToken: TOKEN, outputDriveId: 'd', outputItemId: 'i', outputEtag: 'e', outputSize: 5 }, "state = 'uploading'"],
+    ['failPresentationVideoSplit', { id: ID, leaseToken: TOKEN, failureCode: 'processor_lost' }, "state IN ('queued', 'cutting', 'uploading')"],
+    ['supersedePresentationVideoSplit', { id: ID, leaseToken: TOKEN, failureCode: 'presentation_video_source_changed' }, "state IN ('queued', 'cutting', 'uploading')"],
+  ];
+  for (const [name, args, predicate] of cases) {
+    const call = await one(null, name, args);
+    expect(call.text).toContain(FENCE);
+    expect(call.text).toContain(predicate);
+    expect(call.params.slice(0, 2)).toEqual([ID, TOKEN]);
+  }
+});
+
+test('review, failed and superseded clear the lease and the sealed upload URL; release only needs the token', async () => {
+  for (const [name, args, state] of [
+    ['markPresentationVideoSplitReview', { id: ID, leaseToken: TOKEN, outputDriveId: 'd', outputItemId: 'i', outputEtag: 'e', outputSize: 5 }, 'review'],
+    ['failPresentationVideoSplit', { id: ID, leaseToken: TOKEN, failureCode: 'x_y' }, 'failed'],
+    ['supersedePresentationVideoSplit', { id: ID, leaseToken: TOKEN }, 'superseded'],
+  ]) {
+    const call = await one(null, name, args);
+    expect(call.text).toContain(`state = '${state}'`);
+    expect(call.text).toContain('upload_url_ciphertext = NULL');
+    expect(call.text).toContain('lease_token = NULL, lease_expires_at = NULL');
+  }
+  const release = await one(null, 'releasePresentationVideoSplitLease', { id: ID, leaseToken: TOKEN });
+  expect(release.text).toContain('WHERE id = $1 AND lease_token = $2');
+});
+
+test('invalid codes, sizes and seconds are rejected before any SQL', async () => {
+  const { store, calls } = harness();
+  await expect(store.failPresentationVideoSplit({ id: ID, leaseToken: TOKEN, failureCode: 'Has Spaces' })).rejects.toThrow(TypeError);
+  await expect(store.markPresentationVideoSplitReview({ id: ID, leaseToken: TOKEN, outputDriveId: 'd', outputItemId: 'i', outputEtag: 'e', outputSize: 0 })).rejects.toThrow(TypeError);
+  await expect(store.claimPresentationVideoSplitWork({ leaseSeconds: 0 })).rejects.toThrow(TypeError);
+  expect(calls).toHaveLength(0);
+});
+
+test('cleanup claim never selects a processing row, orders by next_cleanup_at, and bumps attempts and backoff in the same statement', async () => {
+  const { store, calls } = harness(() => [{ id: ID, sandbox_name: 's4-x', cleanup_attempts: 1 }]);
+  expect(await store.claimPresentationVideoSplitCleanup({ limit: 2 })).toHaveLength(1);
+  const text = calls[0].text;
+  expect(text).toContain('sandbox_name IS NOT NULL AND sandbox_cleaned_at IS NULL');
+  expect(text).toContain("state NOT IN ('queued', 'cutting', 'uploading')");
+  expect(text).not.toContain('lease_token IS NULL');
+  expect(text).toContain('ORDER BY next_cleanup_at NULLS FIRST');
+  expect(text).toContain('FOR UPDATE SKIP LOCKED');
+  expect(text).toContain('cleanup_attempts = s.cleanup_attempts + 1');
+  expect(text).toContain("INTERVAL '1 minute'");
+  expect(text).toContain("INTERVAL '10 minutes'");
+  expect(text).toContain("INTERVAL '1 hour'");
+  expect(calls[0].params).toEqual([2]);
+});
+
+test('usage, cleaned receipt, orphan lookup and source-copy read', async () => {
+  const usage = await one(null, 'recordPresentationVideoSandboxUsage', { id: ID, activeCpuMs: 10, provisionedMs: 20, vcpus: 2 });
+  expect(usage.params).toEqual([ID, 10, 20, 2]);
+  const cleaned = await one(null, 'markPresentationVideoSandboxCleaned', { id: ID, cleanupReceipt: { snapshots: 0 } });
+  expect(cleaned.text).toContain('sandbox_cleaned_at IS NULL AND state NOT IN');
+  expect(cleaned.params).toEqual([ID, '{"snapshots":0}']);
+  const { store, calls } = harness(() => [{ sandbox_name: 's4-a' }]);
+  expect(await store.listUncleanedPresentationVideoSandboxNames({ names: ['s4-a', 's4-b'] })).toEqual(['s4-a']);
+  expect(calls[0].text).toContain('sandbox_cleaned_at IS NULL');
+  expect(await store.listUncleanedPresentationVideoSandboxNames({ names: [] })).toEqual([]);
+  const copy = await one(null, 'getPresentationVideoSourceCopy', { copyId: COPY });
+  expect(copy.text).toContain('FROM zoom_video_copies WHERE id = $1');
+});

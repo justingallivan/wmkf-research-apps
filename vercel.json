@@ -35,6 +35,9 @@
     },
     "pages/api/cron/drain-zoom-video-copies.js": {
       "maxDuration": 300
+    },
+    "pages/api/cron/drain-presentation-video-splits.js": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -128,6 +131,10 @@
     },
     {
       "path": "/api/cron/drain-zoom-video-copies",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/drain-presentation-video-splits",
       "schedule": "* * * * *"
     },
     {
