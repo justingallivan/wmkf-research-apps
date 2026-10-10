@@ -78,6 +78,7 @@
     "076_zoom_video_copies.sql",
     "077_zoom_transcript_provenance.sql",
     "078_zoom_attendance_attribution.sql",
-    "079_zoom_video_copy_recording_times.sql"
+    "079_zoom_video_copy_recording_times.sql",
+    "080_presentation_video_splits.sql"
   ]
 }

@@ -3,7 +3,7 @@ title: Stage 4 build plan — presentation video cut
 kind: plan
 domain: transcription
 status: draft
-summary: "Build plan for Stage 4 (presentation-only video cut from the copied Zoom MP4 at the confirmed presentation end), written Session 592 from source reads. Ordered slices with owner gates: Sandbox SDK probe, migration 079 plus copy-time recording times, split store and start route, Sandbox worker with reaper, approval and Board/briefing playback, card. Contract-reconcile Mode A: ready with named changes (applied; approval = registration, as for summaries). Codex adversarial round 1: 4 findings accepted (3 in full, 1 in part) and applied. Owner decisions B1-B6 recorded; slice 0 (SDK probe) passed. Nothing built in the app."
+summary: "Build plan for Stage 4 (presentation-only video cut from the copied Zoom MP4 at the confirmed presentation end). Slice 0 probe passed; slice 1 (migration 079, recording times) merged and live; slices 2-5 (migration 080, start route, Sandbox worker and cut recipe, approval and Board/briefing playback, card) built on branch claude/stage4-build and each approved by Codex adversarial review (Session 592). Not merged: owner applies 080, adds Dataverse value 100000011, uploads the FFmpeg tarball, then merge with the flag off."
 owner: product-engineering
 related:
   - docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md
@@ -158,7 +158,7 @@ Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEAS
 - **Staff review open:** a staff route (`requireAppAccess('meeting-tracker')`) resolves a fresh download URL for the split row's output item. It checks the recorded item id and eTag, like `resolvePresentationMember`. This is the card's Open link before approval.
 - **Approve route** (staff, actor from session):
   - **Claim (revised, Codex round 1 finding 2: accepted).** This mirrors `publishSummaryDraft` exactly.
-    - One UPDATE moves `review` → `registering` with a new `approval_claim_token`, `approval_claimed_at = NOW()` and `approval_actor_profile_id` (the session's actor).
+    - One UPDATE moves `review` → `registering` with a new `approval_claim_token`, `approval_claimed_at = NOW()` and `approval_actor_profile_id` (the session's actor). It runs inside the same per-request advisory lock as start (`presentation_video_split:<request>`). Start locks the awaiting row with `FOR UPDATE` and supersedes it by id, so start and approve cannot interleave (Codex slice 2 review).
     - The same UPDATE also takes a `registering` row whose claim is abandoned: `approval_claim_token IS NULL`, or `approval_claimed_at <= NOW() - 180 s`.
     - Immediately before any registry read-for-write or create, it sets `approval_registration_attempted = TRUE` and refreshes `approval_claimed_at`, guarded by its token.
     - **On error:** release back to `review` only when `NOT approval_registration_attempted`. Otherwise yield: null the token, stay `registering`.
@@ -188,6 +188,14 @@ Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEAS
   - `POST_PRESENTATION_ARTIFACT_TYPES` (`material-model.js:15-27`) and `MATERIAL_TYPES` (`logistics-service.js:59`) gain the type.
   - Tests inject the full Recording, an unapproved video and a stale video, and prove all three are excluded at listing and at open.
 
+**Built (Session 593, branch `claude/stage4-slice4`, not merged):**
+- Vocabulary: `PRESENTATION_VIDEO: 100000011` ('Presentation Video') in `shared/config/requestDocument.js` and the Wave 16 record; owner-run `scripts/extend-requestdocument-artifacttype-presentation-video.mjs` (dry-run default, not run).
+- `presentation-video-binding.js`: `presentationVideoFingerprint`, `presentationVideoGenerationKey(splitId, requestId)`, `bindPresentationVideo(winners, requestId)` (`bound` / `missing` / `stale`; no current TRANSCRIPT is `stale`).
+- Store: nine approval functions appended to `presentation-video-split-store.js` (claim under the advisory lock, attempted, release, yield, approved, settle-stale, supersede-older, `getPresentationVideoSplitForApproval`, `findAbandonedRegisteringPresentationVideoSplit`).
+- `presentation-video-approval-service.js`: approve (mirrors `publishSummaryDraft`), stale-approval reconciliation shared with start (`startPresentationVideoSplit` now reconciles an abandoned, stale `registering` row and retries once; an abandoned but current row is 409 `presentation_video_approval_pending`), and the staff open resolver. POST `{action:'approve', splitId}` on the existing route; GET `.../presentation-video-splits/[splitId]/open` (302). The create seam is a `REQUIRED` row in `WRITERS`.
+- Outside readers: the type joins `POST_PRESENTATION_ARTIFACT_TYPES`, logistics `MATERIAL_TYPES` and both outside allowlists, gated by `bindPresentationVideo` at listing and open; `video/mp4` and `watch` only for this type.
+- Deviations: `presentationVideoGenerationKey` takes `(splitId, requestId)` because its preimage includes the request id. A stale output item (eTag or quickXorHash changed, or item gone) is handled as stale-approval reconciliation, like a changed transcript. The approve route's `maxDuration` is 120 (was 60) for the Graph and Dataverse work.
+
 ### Slice 5 — Card
 
 In `RecordingAndTranscriptCard.js`, step 3's **Presentation** subsection (`:3160-3165`) gains a Video line:
@@ -196,6 +204,10 @@ In `RecordingAndTranscriptCard.js`, step 3's **Presentation** subsection (`:3160
 - **Check the ending and approve:** staff open the video from the card.
 
 UI gates mirror the server guards (memory rule `feedback-ui-gates-must-mirror-server-guards`).
+
+**Built (branch `claude/stage4-slice5`, not merged):** `PresentationVideoLine` in `RecordingAndTranscriptCard.js`, under the Presentation subsection. Hidden unless GET returns `available: true`. Shows the newest split's state, polls every 15 s while processing, create (confirm when replacing an approved video), approve (confirm dialog), Open link. Failure codes map to plain copy (unknown codes get a generic line). Tests: `tests/unit/recording-and-transcript-card-presentation-video.test.js`.
+- Board readiness (final review fix): an approved split can go stale after approval (boundary, transcript or Recording change). GET now returns `boardVideo.status` and `boardReady` on approved rows from the same binding the Board uses; the card shows "Out of date" with Create when `boardReady` is false and reloads when the transcript revision or boundary changes.
+- Deviations: Create is not offered in `review` (the server treats it as active). The create button's gate is client-side state only; the server's slice 2 checks are shown as their own refusal messages after the click, not pre-checked, because GET carries no eligibility field.
 
 ## Sandbox recipe (port of `scripts/benchmarks/stage4-sandbox-pilot.py`)
 
@@ -281,3 +293,33 @@ Verdict *needs-attention*, 2 findings, both accepted and applied. Codex confirme
 - **Orchestration:** Opus orchestrates and reviews; Sonnet does the builds. A slice gets at most three Codex rounds before Opus adjudicates (owner, 2026-10-10).
 - **Merge:** once at the end, after Codex is satisfied with the whole branch. Migration 080 and the Dataverse value 100000011 are applied by the owner first.
 - **Slice 2 scope note:** start refuses every `registering` row. Stale-approval reconciliation lands in slice 4 with the approve route. Before then no `registering` row can exist.
+
+## Build status (Session 592, end of build)
+
+All slices are built on `claude/stage4-build`, and each passed Codex adversarial review:
+- slice 2: round 2;
+- slice 3: round 3;
+- slice 4: round 1;
+- slice 5: round 2.
+
+Notable findings fixed along the way:
+- audio-gap privacy leak;
+- snapshot delete contract;
+- stranded jobs when access is withdrawn;
+- processor expiry postponed by failing ticks;
+- awaiting-row lock;
+- card recovery paths.
+
+The orchestrator ruled that the source recipe tolerates edit lists that only reflect codec delay, because real Zoom MP4s carry them.
+
+The full suite passes: 1,333 suites, 22,437 tests. One flaky card test was seen under load and passes on rerun.
+
+**Open follow-ups:**
+- Frame probing decodes frames; measure the cost on the first real cut and switch to packet timestamps if it is slow.
+- A real Graph-reported quickXorHash vector is still to be added to the recipe tests.
+
+**Gates before merge (owner), all done 2026-10-10:**
+1. Migration 080 applied (1 applied, 79 skipped).
+2. 100000011 "Presentation Video" added to `wmkf_artifacttype` (`--execute`, after a dry run).
+3. Pinned FFmpeg tarball uploaded to private Blob (SHA-256 matched); `PRESENTATION_VIDEO_FFMPEG_BLOB_PATHNAME` set in Production.
+4. Merged to `main` with `PRESENTATION_VIDEO_SPLIT_ACCESS` unset (off). The first real cut uses `test:<1003222 GUID>` after the re-import and re-copy (B6).

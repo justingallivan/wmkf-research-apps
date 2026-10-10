@@ -3013,7 +3013,158 @@ function DerivativeLine({ state, label, boundText, material }) {
   );
 }
 
-function TranscriptWorkflow({ m, t, z, transcriptInputRef }) {
+// Stage 4 slice 5: the Video line under Presentation. Hidden when the feature is off for this request. Staff only; ids
+// and raw codes are never rendered (the id only appears in the Open link target).
+const PV_POLL_MS = 15_000;
+const PV_PROCESSING = new Set(['queued', 'cutting', 'uploading', 'registering']);
+const PV_STALE_TEXT = 'The transcript or video changed. Create it again.';
+const PV_FAILURE_TEXT = Object.freeze({
+  unsupported_timeline: 'This recording’s timing can’t be cut safely (it has gaps or shifted tracks).',
+  insufficient_scratch: 'The recording was too large to cut. Ask for help if this keeps happening.',
+  source_download_failed: 'The recording could not be downloaded to cut it. Try again.',
+  upload_failed: 'The cut video could not be saved. Try again.',
+  presentation_video_source_changed: PV_STALE_TEXT,
+  presentation_video_transcript_changed: PV_STALE_TEXT,
+  presentation_video_approval_stale: PV_STALE_TEXT,
+});
+const PV_IN_PROGRESS_TEXT = 'Approval is still in progress. Try again in a few minutes.';
+const PV_GENERIC_FAILURE = 'Something went wrong. Try again.';
+const PV_REASON_TEXT = (code) => PV_FAILURE_TEXT[code] || PV_GENERIC_FAILURE;
+
+function PresentationVideoLine({ requestId, revisionKey = '' }) {
+  const path = `${API_PATH}/${encodeURIComponent(requestId || '')}/presentation-video-splits`;
+  const [available, setAvailable] = useState(false);
+  const [splits, setSplits] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState(null);
+  const [confirming, setConfirming] = useState(null); // 'approve' | 'recreate'
+  const [loaded, setLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const mountedRef = useRef(true);
+  const sequenceRef = useRef(0);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
+
+  const load = useCallback(async () => {
+    if (!requestId) return;
+    const sequence = ++sequenceRef.current;
+    try {
+      const body = await requestJson(path, { method: 'GET', fallbackMessage: 'The presentation video could not be loaded.' });
+      if (!mountedRef.current || sequenceRef.current !== sequence) return;
+      const rows = body?.available === true && Array.isArray(body.splits)
+        ? body.splits.filter((s) => s && typeof s.id === 'string' && typeof s.state === 'string')
+          .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))) : [];
+      setAvailable(body?.available === true && Array.isArray(body.splits));
+      setSplits(rows);
+      setLoaded(true);
+      setLoadFailed(false);
+    } catch {
+      // Keep what is shown; the interval below keeps retrying.
+      if (mountedRef.current && sequenceRef.current === sequence) setLoadFailed(true);
+    }
+  }, [path, requestId]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
+    // A changed transcript or boundary can make an approved video stale, so look again without a reload.
+  }, [load, revisionKey]);
+  const newest = splits[0] || null;
+  const processing = splits.some((s) => PV_PROCESSING.has(s.state));
+  useEffect(() => {
+    if (!processing && !loadFailed) return undefined;
+    const timer = setInterval(() => { void load(); }, PV_POLL_MS);
+    return () => clearInterval(timer);
+  }, [processing, loadFailed, load]);
+
+  const post = async (body, fallbackMessage) => {
+    setBusy(true); setMessage(null); setConfirming(null);
+    try {
+      const result = await requestJson(path, { method: 'POST', body, fallbackMessage });
+      if (!mountedRef.current) return;
+      // Show the server's answer now, so a failed refresh cannot hide it (and staff do not start a second cut).
+      const row = result?.split;
+      if (row && typeof row.id === 'string' && typeof row.state === 'string') {
+        setSplits((old) => {
+          const known = old.find((item) => item.id === row.id);
+          const next = { createdAt: new Date().toISOString(), failureCode: null, ...known, id: row.id, state: row.state };
+          return [next, ...old.filter((item) => item.id !== row.id)];
+        });
+        setLoaded(true); setAvailable(true);
+      }
+      await load();
+    } catch (error) {
+      if (!mountedRef.current) return;
+      const code = error?.payload?.code;
+      const stale = code === 'presentation_video_approval_stale';
+      const inProgress = code === 'presentation_video_approval_in_progress';
+      setMessage({ tone: stale || inProgress ? 'warning' : 'error', text: stale ? PV_STALE_TEXT : inProgress ? PV_IN_PROGRESS_TEXT : (error?.message || fallbackMessage) });
+      await load();
+    } finally {
+      if (mountedRef.current) setBusy(false);
+    }
+  };
+  const create = () => post({ action: 'start' }, 'The presentation video could not be started. Try again.');
+  const approve = () => post({ action: 'approve', splitId: newest.id }, 'The video could not be approved. Try again.');
+
+  if (!loaded && loadFailed) {
+    return (
+      <div className="mt-3" data-testid="presentation-video-line">
+        <p className="text-sm leading-6 text-gray-900"><span className="font-medium">Video:</span> Couldn’t load the video status.</p>
+        <button type="button" onClick={() => void load()} className={`mt-1 ${BTN}`}>Retry</button>
+      </div>
+    );
+  }
+  if (!available) return null;
+  const state = newest?.state || null;
+  const openHref = newest ? `${path}/${encodeURIComponent(newest.id)}/open` : null;
+  // A video waiting for its check can be replaced (the server supersedes it), e.g. after fixing the presentation end.
+  const canCreate = !processing;
+  // An approved video the Board no longer serves (transcript, end or recording changed since) is out of date.
+  const boardStale = state === 'approved' && newest.boardReady === false;
+  let status = 'Not started';
+  if (state === 'queued' || state === 'cutting' || state === 'uploading') status = 'Working…';
+  else if (state === 'review') status = 'Ready to check';
+  else if (state === 'registering') status = 'Approving…';
+  else if (state === 'approved') status = boardStale ? 'Out of date' : newest.boardReady === true ? 'Approved for the Board' : 'Approved';
+  else if (state === 'superseded') status = 'Out of date';
+  else if (state === 'failed') status = 'Failed';
+  return (
+    <div className="mt-3" data-testid="presentation-video-line" aria-live="polite">
+      <p className="text-sm leading-6 text-gray-900"><span className="font-medium">Video:</span> {status}</p>
+      {loadFailed && <p className="text-xs text-gray-700">Couldn’t refresh the video status. Retrying…</p>}
+      {boardStale && <p className="text-xs text-gray-700">{PV_STALE_TEXT}</p>}
+      {state === 'approved' && newest.boardReady == null && <p className="text-xs text-gray-700">Couldn’t check the Board status.</p>}
+      {state === 'superseded' && <p className="text-xs text-gray-700">{PV_STALE_TEXT}</p>}
+      {state === 'failed' && <p className="text-xs text-gray-700">{PV_REASON_TEXT(newest.failureCode)}</p>}
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        {(state === 'review' || (state === 'approved' && !boardStale)) && <a className={BTN} href={openHref} target="_blank" rel="noreferrer">Open video</a>}
+        {state === 'review' && <button type="button" onClick={() => setConfirming('approve')} disabled={busy} className={BTN_PRIMARY}>Check the ending and approve</button>}
+        {state === 'registering' && <button type="button" onClick={() => void approve()} disabled={busy} className={BTN_PRIMARY}>{busy ? 'Working…' : 'Finish approving'}</button>}
+        {canCreate && <button type="button" onClick={() => ((state === 'approved' && !boardStale) || state === 'review' ? setConfirming('recreate') : void create())} disabled={busy} className={BTN}>{busy ? 'Working…' : (state === 'review' ? 'Create it again' : 'Create presentation video')}</button>}
+      </div>
+      {confirming === 'approve' && (
+        <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="alertdialog" aria-label="Approve the presentation video">
+          <p>Approve this video for the Board? Board members will be able to watch it.</p>
+          <div className="mt-2 flex gap-2">
+            <button type="button" onClick={() => void approve()} disabled={busy} className={BTN_PRIMARY}>Approve video</button>
+            <button type="button" onClick={() => setConfirming(null)} disabled={busy} className={BTN}>Not yet</button>
+          </div>
+        </div>
+      )}
+      {confirming === 'recreate' && (
+        <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="alertdialog" aria-label="Create the presentation video again">
+          <p>{state === 'review' ? 'This discards the video waiting for your check and makes a new one.' : 'This replaces the approved video once the new one is approved.'}</p>
+          <div className="mt-2 flex gap-2">
+            <button type="button" onClick={() => void create()} disabled={busy} className={BTN_PRIMARY}>Create again</button>
+            <button type="button" onClick={() => setConfirming(null)} disabled={busy} className={BTN}>Keep current video</button>
+          </div>
+        </div>
+      )}
+      {message && <div className="mt-2"><Notice tone={message.tone}>{message.text}</Notice></div>}
+    </div>
+  );
+}
+
+function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef }) {
   const [step1Open, setStep1Open] = useState(false);
   const [uploadInstead, setUploadInstead] = useState(false);
   const materials = m.data?.materials || [];
@@ -3162,6 +3313,7 @@ function TranscriptWorkflow({ m, t, z, transcriptInputRef }) {
           <p className="text-xs text-gray-600">Eligible for the Board page.</p>
           <DerivativeLine state={boundaryState} label="Presentation transcript" boundText="Presentation transcript ready for the Board link." material={presentationMaterial} />
           <SummaryBlock t={t} s={t.presentationSummary} materials={materials} />
+          <PresentationVideoLine requestId={requestId} revisionKey={`${artifact?.id || ''}:${artifact?.fingerprint || ''}:${artifact?.presentationEnd?.endMs ?? ''}`} />
         </div>
         <div className="mt-5 border-t border-gray-200 pt-4">
           <h4 className="text-sm font-semibold text-gray-950">Staff discussion</h4>
@@ -3328,7 +3480,7 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
       {m.error && !m.data && <div className="mt-4"><Notice>{m.error}</Notice></div>}
       {m.data && (
         <div className="mt-2">
-          <TranscriptWorkflow m={m} t={t} z={z} transcriptInputRef={transcriptInputRef} />
+          <TranscriptWorkflow m={m} t={t} z={z} requestId={requestId} transcriptInputRef={transcriptInputRef} />
         </div>
       )}
     </section>

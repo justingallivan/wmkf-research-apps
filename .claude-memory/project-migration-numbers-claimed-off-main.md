@@ -1,6 +1,6 @@
 ---
 name: project-migration-numbers-claimed-off-main
-description: "Before picking a Postgres migration number, check shared Production `schema_migrations` and numbers claimed on unmerged branches. 055, 070, 071, 074 and 078 were applied to Production before merging; as of 2026-10-10 Production and main end at 078 (Zoom attendance attribution); 079 (zoom_video_copies recording times) is applied to Production (2026-10-10, owner run) from branch claude/stage4-slice1, not yet merged; 080 (presentation_video_splits) is written on branch claude/stage4-build, Codex-approved, awaiting owner apply before merge; the next free number is 081."
+description: "Before picking a Postgres migration number, check shared Production `schema_migrations` and numbers claimed on unmerged branches. 055, 070, 071, 074 and 078 were applied to Production before merging; as of 2026-10-10 Production and main end at 080: 079 (zoom_video_copies recording times) and 080 (presentation_video_splits) were both owner-applied before merge and are merged; the next free number is 081."
 status: active
 last_verified: 2026-10-10 via owner-run apply-migrations output (078 applied; 1 applied, 77 skipped) and merge 06ef45ee8 to main
 metadata:
@@ -98,12 +98,11 @@ origin/main`, 2026-09-30]. The episode shows why "the next number after
   **080** is reserved for the split-job table (slice 2 of `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md`).
   The next free number is 081.
 - [VERIFIED 2026-10-10, Session 592, via `git log` on `claude/stage4-build`] **080** is
-  `080_presentation_video_splits.sql` (Stage 4 slices 2-5), on branch `claude/stage4-build`. It is approved by Codex
-  adversarial review and not yet applied. The owner applies it from `/Users/gallivan/Code/WMKF_Apps-stage4`
-  before the merge.
+  `080_presentation_video_splits.sql` (Stage 4 slices 2-5), on branch `claude/stage4-build`. It was approved by Codex
+  adversarial review, owner-applied from `/Users/gallivan/Code/WMKF_Apps-stage4` on 2026-10-10 (1 applied,
+  79 skipped, 80 total), then merged to `main` the same day.
 - [VERIFIED 2026-10-10, owner `!` run output] `079_zoom_video_copy_recording_times.sql` was applied to Production
   from the `WMKF_Apps-stage4` worktree before merge (1 applied, 78 skipped, 79 total), using
-  `node --env-file=../WMKF_Apps/.env.local scripts/apply-migrations.js`. Production expects
-  `migration_drift_ahead` until `claude/stage4-slice1` merges.
+  `node --env-file=../WMKF_Apps/.env.local scripts/apply-migrations.js`. Merged to `main` in `894826cd5`.
 - Auto-mode permissions block Claude from running `apply-migrations.js` against
   the shared database even with owner authorization; the owner runs it with `!`.

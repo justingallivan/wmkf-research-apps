@@ -11,6 +11,7 @@ related:
   - docs/APPLICATION_STATE_ATLAS.md
   - docs/atlas/postgres-infra-tables.md
   - docs/atlas/postgres-zoom-recording-imports.md
+  - docs/atlas/postgres-presentation-video-splits.md
   - docs/atlas/dataverse-wmkf-requestdocument.md
   - docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md
   - lib/db/migrations/076_zoom_video_copies.sql

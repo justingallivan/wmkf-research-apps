@@ -310,3 +310,74 @@ test.each([
   expect(deps.resolveMediaDownloadUrl).not.toHaveBeenCalled();
 });
 
+
+// ---- Stage 4: Presentation Video (100000011) ------------------------------------------------------------------
+describe('presentation video', () => {
+  const vf = require('../helpers/presentation-video-fixtures.js');
+  const videoMedia = (over = {}) => jest.fn(async (driveId, itemId) => ({
+    driveId, itemId, filename: 'presentation-video.mp4', mimeType: 'video/mp4', malware: null, eTag: 'video-etag-1',
+    downloadUrl: 'https://tenant.sharepoint.com/download?short=1', ...over,
+  }));
+  const bound = () => [vf.transcriptRow(), vf.recordingRow(), vf.videoRow()];
+  const member = (id = vf.VIDEO_ID) => ({ requestId: REQUEST_ID, member: `material:${id}` });
+
+  test('only a bound video lists, with canWatch true; the full Recording and an unapproved cut (no row) never list', async () => {
+    const listed = await buildPresentationContext({ requestId: REQUEST_ID }, dependencies(bound()));
+    expect(listed.materials).toHaveLength(1);
+    expect(listed.materials[0]).toMatchObject({ member: `material:${vf.VIDEO_ID}`, label: 'Presentation Video', canWatch: true, canDownload: true });
+    const json = JSON.stringify(listed);
+    for (const leak of ['full-recording', vf.RECORDING_ID, 'rec-item', 'sharepoint.com', 'video-etag-1']) expect(json).not.toContain(leak);
+    // Full Recording (and transcript) only: an unapproved split has no Dataverse row, so nothing lists.
+    const none = await buildPresentationContext({ requestId: REQUEST_ID }, dependencies([vf.transcriptRow(), vf.recordingRow()]));
+    expect(none.materials).toEqual([]);
+  });
+
+  test('the full Recording is never openable, with or without an approved video beside it', async () => {
+    for (const rows of [[vf.recordingRow()], bound()]) {
+      const deps = dependencies(rows, { resolveMediaDownloadUrl: videoMedia() });
+      for (const mode of ['open', 'watch', 'download']) {
+        await expectNotFound(resolvePresentationMember({ ...member(vf.RECORDING_ID), mode }, deps));
+      }
+    }
+  });
+
+  test.each([
+    ['transcript republished', () => [vf.transcriptRow(vf.manifest({ revisionId: vf.OTHER_REVISION, operationId: vf.OTHER_REVISION, sourceRevisionId: vf.REVISION })), vf.recordingRow(), vf.videoRow()]],
+    ['boundary moved', () => [vf.transcriptRow(vf.manifest({ presentationEnd: { endMs: 1000, confirmedBy: 5, confirmedAt: '2026-10-05T19:00:00.000Z' } })), vf.recordingRow(), vf.videoRow()]],
+    ['recording replaced', () => [vf.transcriptRow(), vf.recordingRow({ wmkf_sharepointetag: 'rec-etag-2' }), vf.videoRow()]],
+    ['no transcript row (Stage 5 fail-closed)', () => [vf.recordingRow(), vf.videoRow()]],
+    ['no recording row', () => [vf.transcriptRow(), vf.videoRow()]],
+    ['superseded video', () => [vf.transcriptRow(), vf.recordingRow(), vf.videoRow({ wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED })]],
+  ])('a stale video (%s) is omitted at listing and 404s at open, watch and download', async (_l, makeRows) => {
+    const deps = dependencies(makeRows(), { resolveMediaDownloadUrl: videoMedia() });
+    expect((await buildPresentationContext({ requestId: REQUEST_ID }, deps)).materials).toEqual([]);
+    for (const mode of ['open', 'watch', 'download']) await expectNotFound(resolvePresentationMember({ ...member(), mode }, deps));
+    expect(deps.resolveMediaDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  test('a bound video opens, watches and downloads by redirect with MP4 only, and the pinned eTag is enforced', async () => {
+    for (const mode of ['open', 'watch', 'download']) {
+      const deps = dependencies(bound(), { resolveMediaDownloadUrl: videoMedia() });
+      expect(await resolvePresentationMember({ ...member(), mode }, deps))
+        .toMatchObject({ kind: 'file', mimeType: 'video/mp4', redirectUrl: 'https://tenant.sharepoint.com/download?short=1' });
+    }
+    const replaced = dependencies(bound(), { resolveMediaDownloadUrl: videoMedia({ eTag: 'video-etag-2' }) });
+    await expectNotFound(resolvePresentationMember({ ...member(), mode: 'watch' }, replaced));
+    for (const over of [{ mimeType: 'text/plain' }, { mimeType: 'video/webm' }, { filename: 'presentation-video.txt' }, { malware: { x: 1 } }]) {
+      await expectNotFound(resolvePresentationMember({ ...member(), mode: 'open' }, dependencies(bound(), { resolveMediaDownloadUrl: videoMedia(over) })));
+    }
+  });
+
+  test('MP4 is accepted for the video only, and watch stays refused for transcripts and summaries', async () => {
+    const deps = dependencies([fullTranscript(), derivative()], { resolveMediaDownloadUrl: textMedia('presentation.mp4', 'video/mp4') });
+    await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: `material:${PRESENTATION_ID}`, mode: 'open' }, deps));
+    const text = dependencies([fullTranscript(), derivative()], { resolveMediaDownloadUrl: textMedia() });
+    await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: `material:${PRESENTATION_ID}`, mode: 'watch' }, text));
+  });
+
+  test('a video from another producer is not served', async () => {
+    const deps = dependencies([vf.transcriptRow(), vf.recordingRow(), vf.videoRow({ wmkf_producer: 'someone-else' })], { resolveMediaDownloadUrl: videoMedia() });
+    expect((await buildPresentationContext({ requestId: REQUEST_ID }, deps)).materials).toEqual([]);
+    await expectNotFound(resolvePresentationMember({ ...member(), mode: 'open' }, deps));
+  });
+});

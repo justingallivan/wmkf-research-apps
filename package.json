@@ -123,6 +123,7 @@
     "@vercel/blob": "^2.8.0",
     "@vercel/functions": "^3.7.6",
     "@vercel/postgres": "^0.10.0",
+    "@vercel/sandbox": "3.4.0",
     "balanced-match": "^1.0.2",
     "brace-expansion": "file:vendor/brace-expansion-compat",
     "brace-expansion-upstream": "npm:brace-expansion@5.0.12",
