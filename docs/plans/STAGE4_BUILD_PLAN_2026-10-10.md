@@ -205,6 +205,9 @@ In `RecordingAndTranscriptCard.js`, step 3's **Presentation** subsection (`:3160
 
 UI gates mirror the server guards (memory rule `feedback-ui-gates-must-mirror-server-guards`).
 
+**Built (branch `claude/stage4-slice5`, not merged):** `PresentationVideoLine` in `RecordingAndTranscriptCard.js`, under the Presentation subsection. Hidden unless GET returns `available: true`. Shows the newest split's state, polls every 15 s while processing, create (confirm when replacing an approved video), approve (confirm dialog), Open link. Failure codes map to plain copy (unknown codes get a generic line). Tests: `tests/unit/recording-and-transcript-card-presentation-video.test.js`.
+- Deviations: Create is not offered in `review` (the server treats it as active). The create button's gate is client-side state only; the server's slice 2 checks are shown as their own refusal messages after the click, not pre-checked, because GET carries no eligibility field.
+
 ## Sandbox recipe (port of `scripts/benchmarks/stage4-sandbox-pilot.py`)
 
 1. Fetch the pinned FFmpeg 9.0.2 build (B4) and verify its SHA-256 (`14020417…0902`) before use. The font is not needed.
