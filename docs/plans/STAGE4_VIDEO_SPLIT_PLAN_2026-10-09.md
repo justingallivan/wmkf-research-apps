@@ -17,7 +17,7 @@ related:
 
 **[DRAFT OUTLINE, Session 590, 2026-10-09.]** Nothing here is built or approved. This outline turns Stage 4 of `MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md` (`:104-112`) into a design. The processing venue (where the cut runs) was researched by Codex (merged to `main` in `228a97b5b`; deliverable `docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md`). This document defines what any venue must receive and return.
 
-**[Session 591, 2026-10-09] Coordination with the Codex speaker-label plan is agreed (owner approved).** Response and contract: `/tmp/zoom-attribution-stage4-response.md` against Codex's `/tmp/zoom-attribution-shared-contract.md` (both outside the repo; the decisions are recorded below). Stage 4 is unpaused for the Sandbox pilot only; its build waits for Codex's provenance slice.
+**[Session 591, 2026-10-09] Coordination with the Codex speaker-label plan is agreed (owner approved).** Response and contract: `/tmp/zoom-attribution-stage4-response.md` against Codex's `/tmp/zoom-attribution-shared-contract.md` (both outside the repo; the decisions are recorded below). Stage 4 is unpaused for the Sandbox pilot only (done, see `STAGE4_SANDBOX_PILOT_RESULTS_2026-10-09.md`); its build waits for Codex's provenance slice.
 
 ## Owner decisions
 
@@ -124,7 +124,7 @@ Part 1 (`scripts/benchmarks/stage4-focused-check.py`, evidence `docs/plans/STAGE
 ## Next steps before the build plan [PLANNED]
 
 1. **Focused validation on generated media:** variable frame rate, and the ending on the intended playback paths (browser and the SharePoint viewer). The anchor-mapping cases (speech-like audio, pauses, delayed audio) are dropped with decision 12. Not an open-ended codec study.
-2. **Synthetic Vercel Sandbox pilot** within the $10 incremental-compute cap: confirm the app's region, current pricing and how the cap is enforced before dispatch; persistence off, no media snapshots, independently verified cleanup. Measure a full-length presentation (runtime, scratch, readability, ending), and test interruption, insufficient disk, failed or partial upload and failed cleanup; anything incomplete stays unpublished.
+2. **Done (Session 591): synthetic Vercel Sandbox pilot passed, about $0.22 of the cap; results `STAGE4_SANDBOX_PILOT_RESULTS_2026-10-09.md`. Ending playback in browser and SharePoint viewer still pending (step 1).** Original scope: synthetic Vercel Sandbox pilot within the $10 incremental-compute cap: confirm the app's region, current pricing and how the cap is enforced before dispatch; persistence off, no media snapshots, independently verified cleanup. Measure a full-length presentation (runtime, scratch, readability, ending), and test interruption, insufficient disk, failed or partial upload and failed cleanup; anything incomplete stays unpublished.
 3. **Ask Justin before the first real input** (1003222's copied video, any paired audio scoped explicitly), with the pilot results and the applicable Vercel data-processing terms. Isolated staff-only test folder; no new Zoom read; no Board registration. A longer recording follows only after that passes.
 4. **Correct-file safeguards are built and tested in the application** (gate 4): retries, concurrent changes, upload reconciliation, approval, and Board listing and `open` paths. Required before Board use, not before the pilot.
 
