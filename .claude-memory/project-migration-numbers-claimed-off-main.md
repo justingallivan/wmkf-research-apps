@@ -1,6 +1,6 @@
 ---
 name: project-migration-numbers-claimed-off-main
-description: "Before picking a Postgres migration number, check shared Production `schema_migrations` and numbers claimed on unmerged branches. 055, 070, 071, 074 and 078 were applied to Production before merging; as of 2026-10-10 Production and main end at 078 (Zoom attendance attribution), 079 is reserved for Stage 4, and the next free number is 080."
+description: "Before picking a Postgres migration number, check shared Production `schema_migrations` and numbers claimed on unmerged branches. 055, 070, 071, 074 and 078 were applied to Production before merging; as of 2026-10-10 Production and main end at 078 (Zoom attendance attribution); 079 (zoom_video_copies recording times) is written on branch claude/stage4-slice1 for the owner to apply before merge; 080 is reserved for the Stage 4 split-job table; the next free number is 081."
 status: active
 last_verified: 2026-10-10 via owner-run apply-migrations output (078 applied; 1 applied, 77 skipped) and merge 06ef45ee8 to main
 metadata:
@@ -92,5 +92,10 @@ origin/main`, 2026-09-30]. The episode shows why "the next number after
   `codex-attendance-2026-10-09`). That worktree has no `.env.local`, so the run used
   `node --env-file=../WMKF_Apps/.env.local scripts/apply-migrations.js`. Merged to `main` in `06ef45ee8`.
   079 remains reserved for Stage 4.
+- [VERIFIED 2026-10-10, Session 592, via `git log` on `claude/stage4-slice1`] Stage 4 split its allocation.
+  **079** is `079_zoom_video_copy_recording_times.sql` (commit `27819c8c6`, worktree
+  `/Users/gallivan/Code/WMKF_Apps-stage4`): two nullable columns, so the owner can apply it early.
+  **080** is reserved for the split-job table (slice 2 of `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md`).
+  The next free number is 081.
 - Auto-mode permissions block Claude from running `apply-migrations.js` against
   the shared database even with owner authorization; the owner runs it with `!`.

@@ -27,7 +27,7 @@
    - Guests have no stable ID; `user_id` is per row, so grouping is by display name only.
    - Repeated names were waiting-room rows; `duration` is seconds.
    - The first join was 884 s before the audio `recording_start`.
-6. **Migrations:** Production and `main` end at 078; **079 reserved for Stage 4**; next free 080 (`.claude-memory/project-migration-numbers-claimed-off-main.md`, `cf5b1257e`).
+6. **Migrations:** Production and `main` end at 078; **079 reserved for Stage 4**; next free 080 (`.claude-memory/project-migration-numbers-claimed-off-main.md`, `cf5b1257e`). **Session 592:** 079 = `zoom_video_copies` recording times, on branch `claude/stage4-slice1`, for the owner to apply before merge; 080 is reserved for the split table; next free 081.
 7. **Worktrees:**
    - `/Users/gallivan/Code/WMKF_Apps-codex-labels` is on `codex/zoom-attendance` (merged; no uncommitted changes; no `.env.local`, deliberately).
    - New `/Users/gallivan/Code/WMKF_Apps-codex-group-review` on `codex/group-review-non-lead-ui` (no upstream) for minor group-review UI changes for non-lead PDs. The owner holds the Codex prompt; no commits yet.
