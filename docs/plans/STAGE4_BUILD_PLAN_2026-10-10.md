@@ -3,7 +3,7 @@ title: Stage 4 build plan — presentation video cut
 kind: plan
 domain: transcription
 status: draft
-summary: "Build plan for Stage 4 (presentation-only video cut from the copied Zoom MP4 at the confirmed presentation end), written Session 592 from source reads. Ordered slices with owner gates: Sandbox SDK probe, migration 079 plus copy-time recording times, split store and start route, Sandbox worker with reaper, approval and Board/briefing playback, card. Contract-reconcile Mode A: ready with named changes (applied; approval = registration, as for summaries). Owner decisions B1-B6 recorded; slice 0 (SDK probe) passed. Nothing built in the app."
+summary: "Build plan for Stage 4 (presentation-only video cut from the copied Zoom MP4 at the confirmed presentation end), written Session 592 from source reads. Ordered slices with owner gates: Sandbox SDK probe, migration 079 plus copy-time recording times, split store and start route, Sandbox worker with reaper, approval and Board/briefing playback, card. Contract-reconcile Mode A: ready with named changes (applied; approval = registration, as for summaries). Codex adversarial round 1: 4 findings accepted (3 in full, 1 in part) and applied. Owner decisions B1-B6 recorded; slice 0 (SDK probe) passed. Nothing built in the app."
 owner: product-engineering
 related:
   - docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md
@@ -84,11 +84,15 @@ Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEAS
   - frozen input: `transcript_revision_id`, `presentation_end_ms`, the content-free provenance projection (JSONB, no names or attendance), source document id, SharePoint drive/item/version/eTag, size, quickXorHash, `mapping_version`;
   - state: `queued`, `cutting`, `uploading`, `review`, `registering`, `approved`, `failed`, `cancelled`, `superseded`. The worker owns `queued` through `review`. The staff approve route owns `review` → `registering` → `approved`;
   - lease and fence (`lease_token`, `lease_expires_at`, `next_attempt_at`), attempt caps, `cancel_requested_at`;
-  - sandbox ledger: `sandbox_name`, `sandbox_command_id`, `sandbox_created_at`, `sandbox_cleaned_at`, cleanup receipt (JSONB, content-free);
+  - sandbox ledger: `sandbox_name` (written before create), `sandbox_command_id`, `sandbox_created_at`, `sandbox_cleaned_at`, `cleanup_attempts`, `next_cleanup_at`, usage (`sandbox_active_cpu_ms`, `sandbox_provisioned_ms`, `sandbox_vcpus`) and the cleanup receipt (JSONB, content-free). Cleanup is tracked independently of `state` (Codex round 1, finding 1);
   - output: SharePoint drive/item/version/eTag, size, quickXorHash, `request_document_id`, verification receipt (JSONB);
-  - approval: `approved_by_profile_id`, `approved_at`;
+  - approval claim, mirroring the summary publish claim (`summary-draft-store.js` `claimSummaryDraftForPublish` / `markSummaryDraftRegistering` / release / yield): `approval_claim_token`, `approval_claimed_at`, `approval_actor_profile_id`, `approval_registration_attempted`; then `approved_by_profile_id`, `approved_at` (Codex round 1, finding 2);
+  - retained lineage (Codex round 1, finding 4): `lineage` JSONB, content-free. It holds the provenance projection, `transcript_revision_id`, `presentation_end_ms`, the boundary's `confirmedBy` / `confirmedAt`, the source Recording identity, the output identity, the verification receipt and the approval. It is the fingerprint preimage, so the binding can be recomputed without the full Recording or transcript;
   - `failure_code`, timestamps;
-  - CHECKs mirroring the copy table's shape checks, and a partial unique index allowing one active split per request.
+  - CHECKs mirroring the copy table's shape checks.
+  - A partial unique index allows one **processing** split per request (`queued`, `cutting`, `uploading`).
+  - A second partial unique index allows one **awaiting-approval** split per request (`review`, `registering`).
+  - Starting a new cut supersedes a `review` row. It is refused (409 `presentation_video_approval_in_progress`) while a `registering` row exists, unless that claim is abandoned: either more than 180 s old, or yielded with a null token. In that case staff finish the approval first, via the approve route's reclaim.
 - **Output upload ledger.** The split row holds its own upload session. It does not reuse `presentation_material_uploads`. Reusing it needs a third `origin` value and an audit of the 18 `origin = '…'` predicates in `upload-intent-store.js` [DERIVED-FROM: `grep -c "origin = '"` on that file, Session 592; independent of other counts]. The split never takes browser bytes, so a separate ledger is smaller.
 - **Start (staff route, `requireAppAccess('meeting-tracker')`, actor from session).** The route calls `resolveCurrentMeetingTranscriptSource({ requestId, actorProfileId })` (`meeting-tracker-transcription/service.js:941-967`; only tests call it today). It requires all of:
   - `status === 'verified_zoom'`;
@@ -103,7 +107,7 @@ Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEAS
 ### Slice 3 — Worker, Sandbox supervisor and reaper
 
 - **New cron** `pages/api/cron/drain-presentation-video-splits.js`, every minute, `maxDuration` 300, `verifyCronSecret`, a `MaintenanceService` run and `withDalContext`, like `drain-zoom-video-copies.js`. It is separate from the copy cron, so each has its own time budget and failure surface. Census edits are included: the hard-coded counts and `RECORDED_CRONS` in `tests/unit/test-request-scheduled-job-census.test.js`, `vercel.json`, and the API matrix row.
-- **Tick order:** reap expired leases, then claim one due row (`FOR UPDATE SKIP LOCKED`), then dispatch by state. The worker never re-runs the resolver, which needs a staff actor. It revalidates against the frozen identity before each phase:
+- **Tick order:** cleanup sweep (below), then expire leases, then claim one due row (`FOR UPDATE SKIP LOCKED`), then dispatch by state. The worker never re-runs the resolver, which needs a staff actor. It revalidates against the frozen identity before each phase:
   - the copy row is unchanged;
   - the SharePoint item's version, eTag and quickXorHash are unchanged;
   - the request's current transcript revision and `endMs` are unchanged, read from the Dataverse TRANSCRIPT row via `confirmedPresentationEnd`.
@@ -120,9 +124,18 @@ Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEAS
   2. A second detached command uploads chunks in multiples of 320 KiB to that session URL.
   3. The worker confirms that the completed item's size and Graph quickXorHash equal the receipt (same item-id check as `readQuickXorHash`, `video-copy-worker.js:538-559`). There is no re-download.
 - **Then `review`.** The worker does not register anything. The output is in SharePoint, recorded only on the split row, and it is not visible to outside readers because no Dataverse row exists for it.
-- **Cleanup and reaper:**
-  - After every terminal step, and on any failure: stop the sandbox; list snapshots across all pages and delete any found (each one logged as a retention incident); delete the sandbox; confirm it is absent with an independent list; write the cleanup receipt.
-  - A row whose lease expired in `cutting` or `uploading` gets the same cleanup, then fails with `processor_lost`. A partly uploaded session is cancelled.
+- **Cleanup and reaper (revised, Codex round 1 finding 1: accepted).** Cleanup is its own claimable unit, independent of `state`:
+  - **What is eligible.** Any row with `sandbox_name` set and `sandbox_cleaned_at` null, in **any** state, including `queued` (process died after create), `review`, and terminal states. It qualifies when it is not under a live processing lease, or when it is terminal.
+  - **Selection.** Selected `FOR UPDATE SKIP LOCKED`, at most 2 per tick, ordered by `next_cleanup_at`. Backoff is 1 min, 10 min, then 1 h, with no cap on attempts. After 10 attempts, every failed attempt raises an operational alert.
+  - **Steps for each row.** Each step is idempotent, so any one of them may fail and the next tick retries:
+    1. `Sandbox.get({ name })`. A 404 means "never created or already deleted", so skip to step 5.
+    2. Stop the sandbox (blocking).
+    3. Read and persist the usage (`activeCpuUsageMs`, provisioned duration, vCPUs) **before** delete.
+    4. List snapshots across all pages and delete every one; each one found raises an alert. Then delete the sandbox.
+    5. Confirm absence with an independent `Sandbox.get` (404), then set `sandbox_cleaned_at` and the receipt.
+  - **Orphan sweep.** Every sandbox is created with tags `{ app: 'wmkf-stage4', split: <row id> }`. Once an hour the sweep runs `Sandbox.list` filtered by the `app` tag and cleans any sandbox whose split row is missing or already cleaned. This covers the window between the create call and the row write, which an interrupted response can leave.
+  - **Processing loss.** A row whose processing lease expired in `cutting` or `uploading` fails with `processor_lost`, and a partly uploaded session is cancelled. Its sandbox is then left to the cleanup sweep above, not cleaned inline.
+  - **Timeout.** The sandbox timeout bounds runtime, and therefore cost, if cleanup itself is down. Deletion and snapshot removal are established only by the receipt.
 - **Ceilings in config, not code:** sandbox timeout, vCPUs and attempt caps (memory rule `feedback-mutable-parameters-not-in-code`). The first real cut measures runtime. The timeout starts at 3 hours on 2 vCPU, at most about $1 per job at the pilot's list prices, and is lowered from that measurement.
 
 ### Slice 4 — Binding, approval and Board/briefing playback
@@ -131,17 +144,32 @@ Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEAS
   - the type is 100000011;
   - `wmkf_inputfingerprint` matches the current revision, `endMs` and source Recording identity, all computable from the Dataverse rows the readers already load.
 
-  Unapproved output has no Dataverse row, so it is `missing` (B2). The fingerprint and lineage are content-free and do not need the full Recording to exist (Stage 5).
+  Unapproved output has no Dataverse row, so it is `missing` (B2).
+
+  **Stage 5 (revised, Codex round 1 finding 4: accepted in part).**
+  - **v1 behaviour, pinned by tests:** the binding needs the current TRANSCRIPT row (via `confirmedPresentationEnd`, which needs its manifest). With no current transcript, an approved video is `stale` and is withheld at listing and at open. That fails closed.
+  - **What v1 stores:** the content-free fingerprint preimage, in the split row's `lineage` and recomputable from it. It also records `wmkf_inputfingerprint` on the Dataverse row.
+  - **What Stage 5 must add before it deletes anything:** an authorized-retirement transition, and a binding rule that accepts a retired source, distinguished from a replaced or unexplained one. Stage 5 must not delete a TRANSCRIPT or RECORDING row with an approved presentation video until that exists.
+  - Stage 4 does not build the retirement transition. The rule above is recorded in the Stage 5 hooks of the design plan.
 - **Staff review open:** a staff route (`requireAppAccess('meeting-tracker')`) resolves a fresh download URL for the split row's output item. It checks the recorded item id and eTag, like `resolvePresentationMember`. This is the card's Open link before approval.
 - **Approve route** (staff, actor from session):
-  - It claims the split row first (`review` → `registering`, leased), so a second click or a concurrent re-cut cannot double-register. The summary publish's claim-first pattern is the precedent (`transcript-summary-service.js` `publishSummaryDraft`).
+  - **Claim (revised, Codex round 1 finding 2: accepted).** This mirrors `publishSummaryDraft` exactly.
+    - One UPDATE moves `review` → `registering` with a new `approval_claim_token`, `approval_claimed_at = NOW()` and `approval_actor_profile_id` (the session's actor).
+    - The same UPDATE also takes a `registering` row whose claim is abandoned: `approval_claim_token IS NULL`, or `approval_claimed_at <= NOW() - 180 s`.
+    - Immediately before any registry read-for-write or create, it sets `approval_registration_attempted = TRUE` and refreshes `approval_claimed_at`, guarded by its token.
+    - **On error:** release back to `review` only when `NOT approval_registration_attempted`. Otherwise yield: null the token, stay `registering`.
+    - **On success:** set `approved` with `approved_by_profile_id` / `approved_at`, guarded by the token.
+    - A claim lost before `approved` is recorded as a reconciliation event (`draft_claim_lost` precedent).
+    - **The lost-response case** (Dataverse created the row, but the response or the final UPDATE was lost) is a test: the next approve call reclaims, finds the exact row by generation key and settles `approved` with no second create.
   - It rechecks the frozen identity, the current transcript revision and boundary, and that the output item's eTag and quickXorHash still match the receipt.
   - It registers through the post-presentation create path with the slot fence:
     - type 100000011, `DRAFT`, `wmkf_producer` as for the other post-presentation rows;
     - `wmkf_generationkey` unique per split row, mirroring the MP4 finalize's per-upload key (`material-service.js:1336-1338`);
     - the binding fingerprint on `wmkf_inputfingerprint`;
     - the pinned SharePoint version and eTag.
-  - Before any create on retry, it looks up an existing row by that generation key.
+  - **Before any create, including the first attempt,** it looks up rows by that generation key.
+    - More than one row: `presentation_video_generation_ambiguous` (500).
+    - One row: it must match the request, type, producer and fingerprint, or `presentation_video_registry_conflict` (409). A match is reused, and its slot version is restored if needed, as in summary publish.
   - The new create seam is a `REQUIRED` actor-policy row in `scripts/check-request-document-writers.js` `WRITERS`.
   - It then sets `approved` with the approver. A later approved re-cut supersedes the earlier video through the slot's latest-only winner rule.
 - **Outside readers:**
@@ -163,17 +191,20 @@ UI gates mirror the server guards (memory rule `feedback-ui-gates-must-mirror-se
 
 1. Fetch the pinned FFmpeg 9.0.2 build (B4) and verify its SHA-256 (`14020417…0902`) before use. The font is not needed.
 2. Download the source from the pre-authenticated URL to scratch; require its size to equal the frozen size.
-3. Run `ffprobe` on the source for frame rate, sample rate and stream layout.
-   - Reject variable frame rate.
-   - Reject more than one video or audio stream. Zoom's `bin_data` stream is the exception and is dropped.
+3. Run `ffprobe` on the source for frame rate, sample rate, stream layout and **timeline** (revised, Codex round 1 finding 3: accepted). Each of these is rejected with `unsupported_timeline`:
+   - variable frame rate;
+   - more than one video or audio stream. Zoom's `bin_data` stream is the exception and is dropped;
+   - a format, video or audio `start_time` other than 0;
+   - any edit list that changes the presentation timeline. Detected by decoding the first `frames + 1` video frame timestamps and the first audio timestamp twice, with and without `-ignore_editlist 1`; the two lists must be identical and start at 0.
 4. Compute `frames = floor(T × fps)` and `samples = floor(T × rate)`, where T = `endMs` / 1000.
 5. Decode the audio onto a zero-based clock, trim it to `samples`, and write isolated PCM. Reject unless the size is exactly `samples × channels × 2`.
 6. Encode AAC from that PCM twice: once as the output, once as an independent check copy.
-7. Re-encode the first `frames` video frames with libx264 (veryfast, CRF 20, yuv420p).
+7. Re-encode exactly the source frames whose **source** end time (pts + frame duration) is at or before T, with libx264 (veryfast, CRF 20, yuv420p), keeping source timestamps. Use passthrough frame timing, not `-r`. With step 3's checks this is the first `frames` frames. The step proves it, not assumes it: source frame `frames - 1` must end at or before T, and frame `frames` must start at or after T.
 8. Mux one H.264 stream and one AAC stream into a partial file, with metadata and chapters removed and `+faststart`.
 9. Accept only if all of these hold:
    - exactly two streams, and only MP4 brand tags;
    - the frame count matches, and the last frame ends at or before T;
+   - output frame *i*'s timestamp equals source frame *i*'s timestamp for every kept frame (source/output correspondence), on both decode paths (with and without edit lists);
    - the audio duration is at most `samples`;
    - the audio packets equal the independent encode.
 10. Rename the partial file only after acceptance, then compute its quickXorHash. Out-of-space errors map to `insufficient_scratch`.
@@ -182,6 +213,20 @@ UI gates mirror the server guards (memory rule `feedback-ui-gates-must-mirror-se
 ## Acceptance before Board use
 
 - Unit tests for each store transition and fence, the start route's refusals, the worker's revalidation, the reaper, and the outside-reader exclusions.
+- **Crash-window tests (Codex round 1):**
+  - process death after sandbox create but before the row write, caught by the orphan sweep;
+  - process death after the row write but before create (404, so cleaned with no work);
+  - a failure at each cleanup step;
+  - a committed Dataverse create whose response is lost (the approve reclaim finds it by generation key);
+  - an abandoned `registering` claim blocking, then being reclaimed;
+  - a stale transcript (no current TRANSCRIPT row), which withholds the approved video.
+- **Recipe fixtures, run locally with Homebrew FFmpeg against the sandbox script:**
+  - nonzero video `start_time`;
+  - nonzero audio `start_time`;
+  - an edit list that shifts the timeline;
+  - a shifted source that passes duration-only checks but contains post-cut content.
+
+  Each must be rejected or caught by the source/output correspondence check.
 - First real cut (B6): the owner watches its ending in a browser and in the SharePoint viewer before approving. This replaces the synthetic ending check (Session 592).
 - The first real cut records runtime and cost, which then set the timeout ceiling.
 
@@ -200,3 +245,11 @@ Verdict: **READY WITH NAMED CHANGES**. The changes below are applied above.
 6. **quickXorHash** needs an in-sandbox implementation.
 
 Owner decisions B1-B6 were recorded later the same session (see the top). A fresh-agent adversarial review (`/codex:adversarial-review`) is recommended before slice 2 code, per the skill's step 6.
+
+## Codex adversarial review, round 1 (Session 592) — adjudication
+
+Verdict *needs-attention*, 4 findings. All accepted and applied above:
+1. **High, accepted:** cleanup outside the reaper's scope. Cleanup is now claimable independently of state, with an orphan tag sweep and usage persisted before delete.
+2. **High, accepted:** stranded approval after a registry write. The summary-publish claim, attempted-flag, release/yield and reclaim pattern is mirrored, with lookup by generation key before every create.
+3. **High, accepted:** the recipe dropped the source-clock checks. The recipe now has timeline probes, source-clock frame selection, and source/output correspondence on both decode paths. Verified: the pilot's `accept()` compares output timestamps only to `T`, never to source frames (`scripts/benchmarks/stage4-sandbox-pilot.py`).
+4. **Medium, accepted in part:** Stage 5 binding authority. v1 stores the content-free lineage and pins fail-closed behaviour. The retirement transition is deferred to Stage 5 as a precondition of any deletion, not built here.

@@ -138,7 +138,7 @@ The card's "Results" step gains a Video line under **Presentation** only: status
 
 ## Stage 5 hooks [PLANNED]
 
-Stage 5 deletes the full Recording, the full transcript and discussion content at the Board deadline. The presentation video's binding must stay valid after that, so the lineage record (input identity including a copy of the provenance projection, boundary `endMs` with `confirmedBy`/`confirmedAt`, output identity, verification report, approval) must be content-free and must not require the full-source bytes to exist. This needs the `presentation-transcript-binding.js` / `bundle.js` change named in the workflow plan (`:112`); Stage 4 must not foreclose it.
+Stage 5 deletes the full Recording, the full transcript and discussion content at the Board deadline. The presentation video's binding must stay valid after that, so the lineage record (input identity including a copy of the provenance projection, boundary `endMs` with `confirmedBy`/`confirmedAt`, output identity, verification report, approval) must be content-free and must not require the full-source bytes to exist. This needs the `presentation-transcript-binding.js` / `bundle.js` change named in the workflow plan (`:112`); Stage 4 must not foreclose it. **Precondition (Session 592, Codex round 1):** Stage 5 must add an authorized-retirement transition and a binding rule that accepts a retired source before it deletes any TRANSCRIPT or RECORDING row that has an approved presentation video. Until then the video binding fails closed (`STAGE4_BUILD_PLAN_2026-10-10.md`, slice 4).
 
 ## Gates this work will hit
 
