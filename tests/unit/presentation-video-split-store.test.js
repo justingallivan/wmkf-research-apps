@@ -217,3 +217,72 @@ test('recovery claim: unleased processing rows only, access-withdrawn or aged, f
   expect(calls[0].params.slice(0, 4)).toEqual([2, 'test', REQ, 11700]);
   await expect(store.claimPresentationVideoSplitRecovery({ accessMode: 'bogus', maxAgeSeconds: 1, leaseSeconds: 1 })).rejects.toThrow(TypeError);
 });
+
+describe('slice 4 approval writers', () => {
+  const TOKEN = '88888888-8888-4888-8888-888888888888';
+  test('claim: advisory lock first, then one UPDATE taking review or an abandoned registering row, with the actor', async () => {
+    const { store, calls } = harness(text => (text.startsWith('UPDATE') ? [{ id: ID, state: 'registering', presentation_end_ms: '5', source_size: '9', output_size: '4' }] : []));
+    const row = await store.claimPresentationVideoApproval({ id: ID, requestId: REQ, actorProfileId: 7, token: TOKEN });
+    expect(row).toMatchObject({ id: ID, presentation_end_ms: 5, output_size: 4 });
+    expect(calls[0].text).toContain('pg_advisory_xact_lock(hashtext($1), 0)');
+    expect(calls[0].params).toEqual([`presentation_video_split:${REQ.toLowerCase()}`]);
+    expect(calls).toHaveLength(2);
+    const sql = calls[1].text;
+    expect(sql).toContain("SET state = 'registering', approval_claim_token = $3, approval_claimed_at = NOW(), approval_actor_profile_id = $4");
+    expect(sql).toContain("state = 'review' OR (state = 'registering' AND (approval_claim_token IS NULL OR approval_claimed_at <= NOW() - INTERVAL '180 seconds'))");
+    expect(calls[1].params).toEqual([ID, REQ, TOKEN, 7]);
+  });
+  test('claim returns null when nothing is claimable', async () => {
+    const { store } = harness(() => []);
+    expect(await store.claimPresentationVideoApproval({ id: ID, requestId: REQ, actorProfileId: 7, token: TOKEN })).toBeNull();
+  });
+  test('claim rejects malformed input before any query', async () => {
+    const { store, calls } = harness();
+    await expect(store.claimPresentationVideoApproval({ id: 'x', requestId: REQ, actorProfileId: 7, token: TOKEN })).rejects.toThrow(TypeError);
+    await expect(store.claimPresentationVideoApproval({ id: ID, requestId: REQ, actorProfileId: 0, token: TOKEN })).rejects.toThrow(TypeError);
+    expect(calls).toHaveLength(0);
+  });
+  test('markAttempted, release, yield, approve and settle are each guarded by the claim token and from-state', async () => {
+    const { store, calls } = harness();
+    await store.markPresentationVideoApprovalAttempted({ token: TOKEN });
+    await store.releasePresentationVideoApproval({ token: TOKEN });
+    await store.yieldPresentationVideoApproval({ token: TOKEN });
+    await store.markPresentationVideoApproved({ token: TOKEN, requestDocumentId: DOC, approvedBy: 7 });
+    await store.settleStalePresentationVideoApproval({ token: TOKEN, supersededDocumentId: DOC });
+    const [attempted, release, yielded, approved, settled] = calls.map(c => c.text);
+    expect(attempted).toContain('approval_registration_attempted = TRUE, approval_claimed_at = NOW()');
+    expect(attempted).toContain("approval_claim_token = $1 AND state = 'registering'");
+    expect(release).toContain("SET state = 'review'");
+    expect(release).toContain("approval_claim_token = $1 AND state = 'registering' AND NOT approval_registration_attempted");
+    expect(yielded).toContain('SET approval_claim_token = NULL');
+    expect(yielded).not.toContain("state = 'review'");
+    expect(approved).toContain("SET state = 'approved', request_document_id = $2, approved_by_profile_id = $3, approved_at = NOW(), approval_claim_token = NULL");
+    expect(approved).toContain("approval_claim_token = $1 AND state = 'registering'");
+    expect(settled).toContain("state = 'superseded', failure_code = 'presentation_video_approval_stale', superseded_document_id = $2");
+    expect(settled).toContain("approval_claim_token = $1 AND state = 'registering'");
+    expect(calls.map(c => c.params[0])).toEqual(Array(5).fill(TOKEN));
+    expect(calls[3].params).toEqual([TOKEN, DOC, 7]);
+    expect(calls[4].params).toEqual([TOKEN, DOC]);
+  });
+  test('settle with no orphan passes a null document id', async () => {
+    const { store, calls } = harness();
+    await store.settleStalePresentationVideoApproval({ token: TOKEN });
+    expect(calls[0].params).toEqual([TOKEN, null]);
+  });
+  test('supersedeApproved touches only older approved rows of the request, never the kept one', async () => {
+    const { store, calls } = harness(() => [{ id: DOC }]);
+    expect(await store.supersedeApprovedPresentationVideos({ requestId: REQ, exceptId: ID })).toEqual([{ id: DOC }]);
+    expect(calls[0].text).toContain("request_id = $1 AND state = 'approved' AND id <> $2");
+    expect(calls[0].params).toEqual([REQ, ID]);
+  });
+  test('findAbandonedRegistering selects only a registering row with a null or old claim', async () => {
+    const { store, calls } = harness(() => [{ id: ID, presentation_end_ms: '10' }]);
+    expect(await store.findAbandonedRegisteringPresentationVideoSplit({ requestId: REQ })).toMatchObject({ id: ID, presentation_end_ms: 10 });
+    expect(calls[0].text).toContain("state = 'registering' AND (approval_claim_token IS NULL OR approval_claimed_at <= NOW() - INTERVAL '180 seconds')");
+  });
+  test('getForApproval returns the full row scoped to the request', async () => {
+    const { store, calls } = harness(() => [{ id: ID, lineage: { a: 1 }, output_size: '3' }]);
+    expect(await store.getPresentationVideoSplitForApproval({ id: ID, requestId: REQ })).toMatchObject({ lineage: { a: 1 }, output_size: 3 });
+    expect(calls[0].text).toContain('WHERE id = $1 AND request_id = $2');
+  });
+});

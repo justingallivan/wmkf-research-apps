@@ -720,7 +720,7 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   `scripts/extend-requestdocument-artifacttype-presentation-transcript.mjs`.
   Values `100000010` (Staff Discussion Summary, paired summaries Stage 2; see
   below; inserted in Production 2026-10-09 by its owner-run script) and
-  `100000011` (Board Presentation Recording, not inserted).
+  `100000011` (Presentation Video, Stage 4; see the Presentation Video writer below; **not inserted** in any environment).
   Postgres migration `068_presentation_transcript_boundary.sql` admits all three
   in the shared slot-lease and upload `artifact_type` CHECKs (the fresh-install
   bootstrap runs manifest migrations for real, so there is no inline mirror).
@@ -835,6 +835,7 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   the owner-run, dry-run-default
   `scripts/extend-requestdocument-artifacttype-staff-discussion-summary.mjs`
   and mirrored in `shared/config/requestDocument.js` and the Wave 16 record.
+- **Presentation Video writer** (`100000011`, Stage 4 slice 4, **[BUILT on branch `claude/stage4-slice4`; not merged; picklist value not inserted: the owner runs the dry-run-default `scripts/extend-requestdocument-artifacttype-presentation-video.mjs`; migration 080 not applied]**; plan `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md`): one row per approved cut of the copied Zoom MP4 at the confirmed presentation end. The only writer is `approvePresentationVideoSplit` (`lib/services/meeting-tracker-recordings/presentation-video-approval-service.js`, `REQUIRED` actor policy, registered in `scripts/check-request-document-writers.js`), run by a staff approval, never by the cron. The row is `DRAFT` / `READY` with `wmkf_producer` `meeting-tracker-post-presentation`, the unique-per-split `wmkf_generationkey` (`presentationVideoGenerationKey`: SHA-256 over `<producer>:<request id>:100000011:split:<split id>`), the binding on `wmkf_inputfingerprint` (`presentationVideoFingerprint`: SHA-256 over the versioned string of producer, request, type, transcript revision, `endMs`, source Recording document id and SharePoint eTag), the SharePoint identity of the cut (`Post Site Visit Materials/`, `video/mp4`) and the slot fence for the type. An unapproved cut has no row. Readers: both outside pages (`presentation-page-service`, `briefing-page-service`) list and open it only when `bindPresentationVideo` returns `bound` (current transcript revision, boundary and RECORDING winner id and eTag all match; no current TRANSCRIPT means `stale`, the Stage 5 fail-closed rule), serve `video/mp4` for this type only, allow `watch` for this type only, and keep the pinned-eTag check at open; the buffering briefing document route still refuses producer rows. Staff readers: `POST_PRESENTATION_ARTIFACT_TYPES` (`material-model.js`) and the Workbench logistics feed (`MATERIAL_TYPES`). It is never a RECORDING: no reader maps it to type 100000005, and the pre-site distribution `MATERIAL_TYPES` excludes it. Stage 5 must add an authorized-retirement transition before deleting a TRANSCRIPT or RECORDING row an approved video depends on.
 - **Boundary proposal, stray-line guard** (Production-live 2026-10-05: PR #437
   merge `9dfec5479`, deployment 6865805766 success): a short applicant
   line (three words or fewer) that starts more than two minutes after the

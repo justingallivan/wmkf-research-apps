@@ -1643,3 +1643,64 @@ test.each([
   expect(deps.resolveMediaDownloadUrl).not.toHaveBeenCalled();
 });
 
+
+// ---- Stage 4: Presentation Video (100000011) ------------------------------------------------------------------
+describe('briefing presentation video', () => {
+  const vf = require('../helpers/presentation-video-fixtures.js');
+  const videoMedia = (over = {}) => jest.fn(async (driveId, itemId) => ({
+    driveId, itemId, filename: 'presentation-video.mp4', mimeType: 'video/mp4', malware: null, eTag: 'video-etag-1',
+    downloadUrl: 'https://tenant.sharepoint.com/download?short=1', ...over,
+  }));
+  const bound = () => [vf.transcriptRow(), vf.recordingRow(), vf.videoRow()];
+  const open = (d, mode, id = vf.VIDEO_ID) => resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(id), mode }, d);
+
+  test('REQUEST_ID matches the shared fixtures', () => { expect(REQUEST_ID).toBe(vf.REQUEST_ID); });
+
+  test('only a bound video lists (media, canWatch); the full Recording and an unapproved cut never list', async () => {
+    const context = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, enabledDeps(bound()));
+    expect(context.materials).toHaveLength(1);
+    expect(context.materials[0]).toMatchObject({ member: briefingMember(vf.VIDEO_ID), label: 'Presentation Video', media: true, canWatch: true, backing: 'file' });
+    const json = JSON.stringify(context.materials);
+    for (const leak of ['full-recording', vf.RECORDING_ID, 'rec-item', 'video-item', 'video-etag-1', 'drive']) expect(json).not.toContain(leak);
+    expect((await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, enabledDeps([vf.transcriptRow(), vf.recordingRow()]))).materials).toEqual([]);
+  });
+
+  test('the full Recording never opens, with or without an approved video', async () => {
+    for (const rows of [[vf.recordingRow()], bound()]) {
+      const d = enabledDeps(rows, { resolveMediaDownloadUrl: videoMedia() });
+      for (const mode of ['open', 'watch', 'download']) await expectBriefingNotFound(open(d, mode, vf.RECORDING_ID));
+      await expectBriefingNotFound(resolveBriefingMember({ requestId: REQUEST_ID, member: briefingMember(vf.RECORDING_ID) }, d));
+    }
+  });
+
+  test.each([
+    ['transcript republished', () => [vf.transcriptRow(vf.manifest({ revisionId: vf.OTHER_REVISION, operationId: vf.OTHER_REVISION, sourceRevisionId: vf.REVISION })), vf.recordingRow(), vf.videoRow()]],
+    ['boundary moved', () => [vf.transcriptRow(vf.manifest({ presentationEnd: { endMs: 1000, confirmedBy: 5, confirmedAt: '2026-10-05T19:00:00.000Z' } })), vf.recordingRow(), vf.videoRow()]],
+    ['recording replaced', () => [vf.transcriptRow(), vf.recordingRow({ wmkf_requestdocumentid: vf.OTHER_RECORDING_ID }), vf.videoRow()]],
+    ['no transcript row (Stage 5 fail-closed)', () => [vf.recordingRow(), vf.videoRow()]],
+  ])('a stale video (%s) is omitted at listing and 404s at open, watch and download', async (_l, makeRows) => {
+    const d = enabledDeps(makeRows(), { resolveMediaDownloadUrl: videoMedia() });
+    expect((await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d)).materials).toEqual([]);
+    for (const mode of ['open', 'watch', 'download']) await expectBriefingNotFound(open(d, mode));
+    expect(d.resolveMediaDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  test('a bound video opens, watches and downloads by redirect (MP4, pinned eTag); the buffering document route still refuses it', async () => {
+    for (const mode of ['open', 'watch', 'download']) {
+      expect(await open(enabledDeps(bound(), { resolveMediaDownloadUrl: videoMedia() }), mode))
+        .toMatchObject({ kind: 'file', mimeType: 'video/mp4', redirectUrl: 'https://tenant.sharepoint.com/download?short=1' });
+    }
+    await expectBriefingNotFound(open(enabledDeps(bound(), { resolveMediaDownloadUrl: videoMedia({ eTag: 'video-etag-2' }) }), 'watch'));
+    for (const over of [{ mimeType: 'text/plain' }, { filename: 'presentation-video.txt' }, { malware: { x: 1 } }]) {
+      await expectBriefingNotFound(open(enabledDeps(bound(), { resolveMediaDownloadUrl: videoMedia(over) }), 'open'));
+    }
+    const d = enabledDeps(bound(), { resolveMediaDownloadUrl: videoMedia() });
+    await expectBriefingNotFound(resolveBriefingMember({ requestId: REQUEST_ID, member: briefingMember(vf.VIDEO_ID) }, d));
+    expect(d.downloadFile).not.toHaveBeenCalled();
+  });
+
+  test('MP4 stays refused for transcripts, and watch stays refused for transcripts', async () => {
+    const d = enabledDeps([fullTranscript(), derivative()], { resolveMediaDownloadUrl: textMedia('presentation.mp4', 'video/mp4') });
+    await expectBriefingNotFound(resolveBriefingMediaMember({ requestId: REQUEST_ID, member: briefingMember(PRESENTATION_ID), mode: 'open' }, d));
+  });
+});

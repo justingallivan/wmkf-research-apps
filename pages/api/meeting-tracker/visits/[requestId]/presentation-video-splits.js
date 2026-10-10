@@ -6,10 +6,11 @@ import { ServiceHttpError } from '../../../../../lib/services/service-http-error
 import {
   getPresentationVideoSplits, startPresentationVideoSplit,
 } from '../../../../../lib/services/meeting-tracker-recordings/presentation-video-split-service.js';
+import { approvePresentationVideoSplit } from '../../../../../lib/services/meeting-tracker-recordings/presentation-video-approval-service.js';
 
-// Lists and starts the Stage 4 presentation-video split. Start only queues the cut (the slice 3 cron does the work),
-// so this route is short.
-export const config = { api: { bodyParser: { sizeLimit: '8kb' } }, maxDuration: 60 };
+// Lists, starts and approves the Stage 4 presentation-video split. Start only queues the cut (the slice 3 cron does the
+// work). Approve registers the reviewed cut under the slot fence (Graph + Dataverse), so it gets the summary publish budget.
+export const config = { api: { bodyParser: { sizeLimit: '8kb' } }, maxDuration: 120 };
 function errorResponse(res, error) {
   const status = error instanceof ServiceHttpError ? error.httpStatus : Number(error?.httpStatus ?? error?.status) || 500;
   const code = error?.code || 'presentation_video_split_failed';
@@ -19,10 +20,14 @@ function errorResponse(res, error) {
 function exactKeys(body, keys) {
   return Object.keys(body).length === keys.length && keys.every(key => Object.hasOwn(body, key));
 }
-// Returns the parsed command, or null when the body is not exactly a start.
+// Returns the parsed command, or null when the body is not exactly a start or an approve.
 function parseBody(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
-  return body.action === 'start' && exactKeys(body, ['action']) ? { action: 'start' } : null;
+  if (body.action === 'start' && exactKeys(body, ['action'])) return { action: 'start' };
+  if (body.action === 'approve' && exactKeys(body, ['action', 'splitId']) && typeof body.splitId === 'string' && body.splitId === body.splitId.trim() && isGuid(body.splitId)) {
+    return { action: 'approve', splitId: body.splitId };
+  }
+  return null;
 }
 
 export default async function handler(req, res) {
@@ -43,7 +48,10 @@ export default async function handler(req, res) {
   return withDalContext('meeting-tracker-presentation-video-splits', async () => {
     try {
       if (!command) return res.status(200).json(await getPresentationVideoSplits({ requestId }));
-      const result = await startPresentationVideoSplit({ requestId, actorProfileId: access.profileId, actingUserSystemId: actorRefFromSession(access.session) });
+      const actor = { requestId, actorProfileId: access.profileId, actingUserSystemId: actorRefFromSession(access.session) };
+      const result = command.action === 'approve'
+        ? await approvePresentationVideoSplit({ ...actor, splitId: command.splitId })
+        : await startPresentationVideoSplit(actor);
       return res.status(result.status).json(result.body);
     } catch (error) { return errorResponse(res, error); }
   });

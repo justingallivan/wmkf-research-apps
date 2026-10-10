@@ -2,9 +2,12 @@
 jest.mock('../../lib/services/meeting-tracker-transcription/service.js', () => ({ resolveCurrentMeetingTranscriptSource: jest.fn() }));
 jest.mock('../../lib/services/meeting-tracker-recordings/presentation-video-split-store.js', () => ({
   startPresentationVideoSplit: jest.fn(), findCopiedZoomVideoCopyForDocument: jest.fn(), listPresentationVideoSplitSnapshotsForRequest: jest.fn(),
+  findAbandonedRegisteringPresentationVideoSplit: jest.fn(), claimPresentationVideoApproval: jest.fn(),
+  markPresentationVideoApprovalAttempted: jest.fn(), releasePresentationVideoApproval: jest.fn(),
+  yieldPresentationVideoApproval: jest.fn(), settleStalePresentationVideoApproval: jest.fn(),
 }));
 jest.mock('../../lib/services/post-presentation-materials/material-service.js', () => ({
-  POST_PRESENTATION_MATERIALS_DEPENDENCIES: { findDocuments: jest.fn() },
+  POST_PRESENTATION_MATERIALS_DEPENDENCIES: { findDocuments: jest.fn(), findDocumentByGenerationKey: jest.fn(), updateDocument: jest.fn() },
   loadBoundContext: jest.fn(),
   _internal: { assertFeature: jest.fn() },
 }));
@@ -154,6 +157,68 @@ describe('startPresentationVideoSplit: refusals', () => {
   test('an unknown store outcome is a 500', async () => {
     store.startPresentationVideoSplit.mockResolvedValue({ status: 'weird' });
     expect(await rejection(startPresentationVideoSplit(args()))).toMatchObject({ httpStatus: 500 });
+  });
+});
+
+describe('startPresentationVideoSplit: awaiting registering row', () => {
+  const ABANDONED = '99999999-9999-4999-8999-999999999999';
+  const ORPHAN = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const frozen = (over = {}) => ({ id: ABANDONED, transcript_revision_id: REV, presentation_end_ms: 1_800_000, source_document_id: WINNER, source_etag: 'etag-1', state: 'registering', ...over });
+  beforeEach(() => {
+    store.startPresentationVideoSplit.mockResolvedValueOnce({ status: 'approval_in_progress', split: null });
+    store.claimPresentationVideoApproval.mockResolvedValue({ id: ABANDONED });
+    store.markPresentationVideoApprovalAttempted.mockResolvedValue({ id: ABANDONED });
+    store.settleStalePresentationVideoApproval.mockResolvedValue({ id: ABANDONED });
+    deps.findDocumentByGenerationKey.mockResolvedValue({ records: [] });
+  });
+
+  test('a live (not abandoned) claim stays 409 approval_in_progress; nothing is claimed', async () => {
+    store.findAbandonedRegisteringPresentationVideoSplit.mockResolvedValue(null);
+    expect(await rejection(startPresentationVideoSplit(args()))).toMatchObject({ httpStatus: 409, code: 'presentation_video_approval_in_progress' });
+    expect(store.claimPresentationVideoApproval).not.toHaveBeenCalled();
+  });
+  test('an abandoned row whose frozen identity is still current stays a refusal: finish approving it', async () => {
+    store.findAbandonedRegisteringPresentationVideoSplit.mockResolvedValue(frozen());
+    expect(await rejection(startPresentationVideoSplit(args()))).toMatchObject({ httpStatus: 409, code: 'presentation_video_approval_pending' });
+    expect(store.claimPresentationVideoApproval).not.toHaveBeenCalled();
+    expect(store.startPresentationVideoSplit).toHaveBeenCalledTimes(1);
+  });
+  test.each([
+    ['transcript revision', { transcript_revision_id: '88888888-8888-4888-8888-888888888888' }],
+    ['boundary', { presentation_end_ms: 1_700_000 }],
+    ['source recording', { source_document_id: '88888888-8888-4888-8888-888888888888' }],
+    ['source eTag', { source_etag: 'older' }],
+  ])('an abandoned row stale by %s is reconciled (orphan superseded, row settled) and start is retried once', async (_l, over) => {
+    store.findAbandonedRegisteringPresentationVideoSplit.mockResolvedValue(frozen(over));
+    deps.findDocumentByGenerationKey.mockResolvedValue({ records: [{ wmkf_requestdocumentid: ORPHAN, _wmkf_request_value: REQUEST, wmkf_artifacttype: 100000011, wmkf_producer: 'meeting-tracker-post-presentation', wmkf_lifecyclestate: 100000000 }] });
+    const result = await startPresentationVideoSplit(args());
+    expect(result.status).toBe(202);
+    expect(store.claimPresentationVideoApproval).toHaveBeenCalledWith(expect.objectContaining({ id: ABANDONED, requestId: REQUEST, actorProfileId: 9 }));
+    expect(store.markPresentationVideoApprovalAttempted).toHaveBeenCalled();
+    expect(deps.updateDocument).toHaveBeenCalledWith(ORPHAN, { wmkf_lifecyclestate: 100000003 }, expect.objectContaining({ actingUserSystemId: ACTOR }));
+    expect(store.settleStalePresentationVideoApproval).toHaveBeenCalledWith(expect.objectContaining({ supersededDocumentId: ORPHAN }));
+    expect(store.startPresentationVideoSplit).toHaveBeenCalledTimes(2);
+  });
+  test('stale with no Dataverse row (create never happened): settles with no document and retries start', async () => {
+    store.findAbandonedRegisteringPresentationVideoSplit.mockResolvedValue(frozen({ source_etag: 'older' }));
+    expect((await startPresentationVideoSplit(args())).status).toBe(202);
+    expect(deps.updateDocument).not.toHaveBeenCalled();
+    expect(store.settleStalePresentationVideoApproval).toHaveBeenCalledWith(expect.objectContaining({ supersededDocumentId: null }));
+  });
+  test('an ambiguous generation key yields the claim, never retries start, and surfaces 500', async () => {
+    store.findAbandonedRegisteringPresentationVideoSplit.mockResolvedValue(frozen({ source_etag: 'older' }));
+    deps.findDocumentByGenerationKey.mockResolvedValue({ records: [{}, {}] });
+    store.releasePresentationVideoApproval.mockResolvedValue(null);
+    store.yieldPresentationVideoApproval.mockResolvedValue({ id: ABANDONED });
+    expect(await rejection(startPresentationVideoSplit(args()))).toMatchObject({ httpStatus: 500, code: 'presentation_video_generation_ambiguous' });
+    expect(store.yieldPresentationVideoApproval).toHaveBeenCalled();
+    expect(store.settleStalePresentationVideoApproval).not.toHaveBeenCalled();
+    expect(store.startPresentationVideoSplit).toHaveBeenCalledTimes(1);
+  });
+  test('losing the claim race stays 409 approval_in_progress', async () => {
+    store.findAbandonedRegisteringPresentationVideoSplit.mockResolvedValue(frozen({ source_etag: 'older' }));
+    store.claimPresentationVideoApproval.mockResolvedValue(null);
+    expect(await rejection(startPresentationVideoSplit(args()))).toMatchObject({ httpStatus: 409, code: 'presentation_video_approval_in_progress' });
   });
 });
 

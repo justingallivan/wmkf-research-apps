@@ -3,7 +3,7 @@ title: "Atlas: Presentation video splits (Postgres)"
 domain: postgres
 kind: state-page
 status: source-built
-summary: "presentation_video_splits holds one row per Stage 4 cut of the copied Zoom MP4 at the confirmed presentation end (migration 080). Slices 2 (store, start route, same-source check) and 3 (worker, Sandbox supervisor, cleanup ledger, cron) are built on branch claude/stage4-build; migration 080 is not applied and nothing is merged. Slices 4-5 (binding, approval, playback, card) are PLANNED."
+summary: "presentation_video_splits holds one row per Stage 4 cut of the copied Zoom MP4 at the confirmed presentation end (migration 080). Slices 2 (store, start route, same-source check) and 3 (worker, Sandbox supervisor, cleanup ledger, cron) are built on branch claude/stage4-build; migration 080 is not applied and nothing is merged. Slice 4 (binding, approval claim and register, staff open, Board/briefing playback) is built on branch claude/stage4-slice4; slice 5 (card) is PLANNED."
 canonical: true
 cataloged: 2026-10-10
 owner: product-engineering
@@ -39,7 +39,7 @@ related:
 | `state`, `lease_token`, `lease_expires_at`, `next_attempt_at`, `cut_attempts`, `cancel_requested_at` | `queued`, `cutting`, `uploading`, `review`, `registering`, `approved`, `failed`, `cancelled`, `superseded`. Terminal and awaiting states hold no lease (CHECK `presentation_video_splits_terminal_unleased`). |
 | sandbox ledger | `sandbox_name`, `sandbox_command_id`, `sandbox_created_at`, `sandbox_cleaned_at`, `cleanup_attempts`, `next_cleanup_at`, usage columns, `cleanup_receipt`. Cleanup is tracked independently of `state`. Written by the slice 3 worker and cleanup sweep (see below). |
 | output | `upload_url_ciphertext`, `upload_session_expires_at`, `output_*`, `verification_receipt`, `request_document_id`, `superseded_document_id`. `upload_*`, `output_*` and `verification_receipt` are written by the slice 3 worker; the document columns are PLANNED (slices 4-5). |
-| approval | `approval_claim_token`, `approval_claimed_at`, `approval_actor_profile_id`, `approval_registration_attempted`, `approved_by_profile_id`, `approved_at`. [PLANNED writers, slice 4] |
+| approval | `approval_claim_token`, `approval_claimed_at`, `approval_actor_profile_id`, `approval_registration_attempted`, `approved_by_profile_id`, `approved_at`. Writers built on branch `claude/stage4-slice4` (slice 4): `claimPresentationVideoApproval`, `markPresentationVideoApprovalAttempted`, `releasePresentationVideoApproval`, `yieldPresentationVideoApproval`, `markPresentationVideoApproved`, `settleStalePresentationVideoApproval`, `supersedeApprovedPresentationVideos`; readers `getPresentationVideoSplitForApproval`, `findAbandonedRegisteringPresentationVideoSplit`. |
 | `failure_code` | Sanitized code. Required when `state = 'failed'`; allowed only on `failed` or `superseded` (`presentation_video_approval_stale`). |
 
 Partial unique indexes: one processing row (`queued`, `cutting`, `uploading`) per request (`idx_presentation_video_splits_processing`) and one awaiting-approval row (`review`, `registering`) per request (`idx_presentation_video_splits_awaiting`).
@@ -48,7 +48,7 @@ Partial unique indexes: one processing row (`queued`, `cutting`, `uploading`) pe
 
 | From | To | Function (`presentation-video-split-store.js`) | Trigger |
 |---|---|---|---|
-| none | `queued` | `startPresentationVideoSplit` | Staff start; one transaction under the advisory lock `presentation_video_split:<request id>`. Refuses (`active`) a processing row, refuses (`approval_in_progress`) any `registering` row (slice 2 has no stale-approval reconciliation), supersedes a `review` row, inserts the row. A unique violation maps to `active`. |
+| none | `queued` | `startPresentationVideoSplit` | Staff start; one transaction under the advisory lock `presentation_video_split:<request id>`. Refuses (`active`) a processing row, refuses (`approval_in_progress`) any `registering` row (the service then reconciles an abandoned, stale one and retries once; see below), supersedes a `review` row, inserts the row. A unique violation maps to `active`. |
 | `review` | `superseded` | `startPresentationVideoSplit` | A newer start |
 | `queued` | `cutting` | `recordPresentationVideoCutStarted` | Worker: Sandbox created, FFmpeg installed, detached cut command started. `recordPresentationVideoSandboxName` writes the name first (queued, name still null) and `recordPresentationVideoSandboxCreated` stamps `sandbox_created_at`. |
 | `cutting` | `uploading` | `recordPresentationVideoCutReceiptAndUploadStarted` | Worker: cut receipt validated; Graph upload session created, stored sealed with `uploadDriveId` in `verification_receipt`; detached upload command started |
@@ -56,20 +56,28 @@ Partial unique indexes: one processing row (`queued`, `cutting`, `uploading`) pe
 | `queued`, `cutting`, `uploading` | `failed` | `failPresentationVideoSplit` | Worker: coded failure (`processor_lost`, `presentation_video_receipt_invalid`, `presentation_video_output_mismatch`, `presentation_video_cut_crashed`, a script receipt code, ...). A crash is terminal in v1; `cut_attempts` stays 0. |
 | `queued`, `cutting`, `uploading` | `superseded` | `supersedePresentationVideoSplit` | Worker revalidation: copy row, source eTag/quickXorHash, or transcript revision/end changed (`presentation_video_source_changed`, `presentation_video_transcript_changed`) |
 | any processing row | same | `claimPresentationVideoSplitWork`, `renewPresentationVideoSplitLease`, `releasePresentationVideoSplitLease`, `deferPresentationVideoSplitAttempt` | Lease claim (also of an expired lease), fence renewals, release after a still-running poll, uncounted configuration deferral. Every transition above is fenced by `lease_token = $x AND lease_expires_at > NOW()` and its own from-state. |
-| `review` onward | PLANNED | slices 4-5 | Staff approve route |
+| `review` | `registering` | `claimPresentationVideoApproval` | Staff approve (slice 4): one UPDATE under the per-request advisory lock; sets `approval_claim_token`, `approval_claimed_at`, `approval_actor_profile_id`. Also reclaims a `registering` row whose token is null or whose claim is older than 180 s. |
+| `registering` | same | `markPresentationVideoApprovalAttempted` | Under the claim, before any registry lookup-for-write or create: `approval_registration_attempted = TRUE`, claim time refreshed. |
+| `registering` | `review` | `releasePresentationVideoApproval` | Error before any registry write (guarded by `NOT approval_registration_attempted`) |
+| `registering` | same | `yieldPresentationVideoApproval` | Error after the attempted flag: token nulled, state kept, so the next approve or start reclaims it at once |
+| `registering` | `approved` | `markPresentationVideoApproved` | Guarded by the token: `request_document_id`, `approved_by_profile_id`, `approved_at` (the session actor) |
+| `registering` | `superseded` | `settleStalePresentationVideoApproval` | Stale-approval reconciliation: `failure_code = presentation_video_approval_stale`, `superseded_document_id` = the orphan Request Document found by generation key, if any. Frees both partial unique indexes. |
+| `approved` | `superseded` | `supersedeApprovedPresentationVideos` | A later approval for the same request |
 
 ## Writers and readers
 
 | Surface | File | Access |
 |---|---|---|
 | Store | `lib/services/meeting-tracker-recordings/presentation-video-split-store.js` | Writes the start transaction; reads snapshots (`listPresentationVideoSplitSnapshotsForRequest`, no tokens, ciphertext, lineage or receipts) and `zoom_video_copies` (`findCopiedZoomVideoCopyForDocument`) |
-| Service | `lib/services/meeting-tracker-recordings/presentation-video-split-service.js` | Start (same-source checks, lineage) and GET; staff DTO built field by field |
+| Service | `lib/services/meeting-tracker-recordings/presentation-video-split-service.js` | Start (same-source checks, lineage; reconciles an abandoned stale `registering` row and retries once) and GET; staff DTO built field by field |
+| Approval service | `lib/services/meeting-tracker-recordings/presentation-video-approval-service.js` | Slice 4. `approvePresentationVideoSplit` (claim, revalidate, slot fence, generation-key lookup, the one `PRESENTATION_VIDEO` create seam with a `REQUIRED` actor, `settleWinner`, mark approved), `reconcileStaleApproval`, `resolvePresentationVideoSplitOpen`. Reads the Dataverse TRANSCRIPT and RECORDING winners and Graph; writes the Request Document registry |
+| Binding | `lib/services/post-presentation-materials/presentation-video-binding.js` | `bindPresentationVideo`, `presentationVideoFingerprint`, `presentationVideoGenerationKey`; pure |
 | Flag | `lib/utils/presentation-video-split-access.js` | `PRESENTATION_VIDEO_SPLIT_ACCESS` (`off`, `on`, `test:<request GUID>`; unset or invalid is off) |
-| Route | `pages/api/meeting-tracker/visits/[requestId]/presentation-video-splits.js` | GET, POST start (matrix row) |
+| Route | `pages/api/meeting-tracker/visits/[requestId]/presentation-video-splits.js` | GET, POST start, POST approve (matrix row) |
 | Worker | `lib/services/meeting-tracker-recordings/presentation-video-split-worker.js` | `runPresentationVideoSplitTick`: claim, revalidate, dispatch by state, cleanup and orphan sweeps. Reads the Dataverse TRANSCRIPT row and Graph; writes the split row only |
 | Sandbox adapter | `lib/services/meeting-tracker-recordings/presentation-video-sandbox.js` | The only `@vercel/sandbox` user (OIDC auth); create, get, run, poll, stop, snapshots, delete, tagged list |
 | Cron | `pages/api/cron/drain-presentation-video-splits.js` | Every minute, `maxDuration` 300, 270 s work deadline (matrix row) |
-| Approve route | PLANNED | slices 4-5 |
+| Open route | `pages/api/meeting-tracker/visits/[requestId]/presentation-video-splits/[splitId]/open.js` | GET; 302 to a fresh Graph download URL for the unregistered output after an id and eTag match (matrix row). Built on branch `claude/stage4-slice4` |
 
 ## Sandbox cleanup ledger and orphan sweep (slice 3)
 
@@ -83,4 +91,4 @@ Recovery pass (`claimPresentationVideoSplitRecovery`, runs first every tick, ind
 
 ## Not covered
 
-Slice 3 writes no Dataverse row and registers nothing; the output stays in SharePoint, recorded only on the split row. `cut_attempts` is unused (a crashed cut is terminal in v1).
+The worker (slice 3) writes no Dataverse row and registers nothing; the output stays in SharePoint, recorded only on the split row until the staff approve route (slice 4) registers it. `cut_attempts` is unused (a crashed cut is terminal in v1).

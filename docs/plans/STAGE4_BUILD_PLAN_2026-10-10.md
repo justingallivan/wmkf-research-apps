@@ -188,6 +188,14 @@ Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEAS
   - `POST_PRESENTATION_ARTIFACT_TYPES` (`material-model.js:15-27`) and `MATERIAL_TYPES` (`logistics-service.js:59`) gain the type.
   - Tests inject the full Recording, an unapproved video and a stale video, and prove all three are excluded at listing and at open.
 
+**Built (Session 593, branch `claude/stage4-slice4`, not merged):**
+- Vocabulary: `PRESENTATION_VIDEO: 100000011` ('Presentation Video') in `shared/config/requestDocument.js` and the Wave 16 record; owner-run `scripts/extend-requestdocument-artifacttype-presentation-video.mjs` (dry-run default, not run).
+- `presentation-video-binding.js`: `presentationVideoFingerprint`, `presentationVideoGenerationKey(splitId, requestId)`, `bindPresentationVideo(winners, requestId)` (`bound` / `missing` / `stale`; no current TRANSCRIPT is `stale`).
+- Store: nine approval functions appended to `presentation-video-split-store.js` (claim under the advisory lock, attempted, release, yield, approved, settle-stale, supersede-older, `getPresentationVideoSplitForApproval`, `findAbandonedRegisteringPresentationVideoSplit`).
+- `presentation-video-approval-service.js`: approve (mirrors `publishSummaryDraft`), stale-approval reconciliation shared with start (`startPresentationVideoSplit` now reconciles an abandoned, stale `registering` row and retries once; an abandoned but current row is 409 `presentation_video_approval_pending`), and the staff open resolver. POST `{action:'approve', splitId}` on the existing route; GET `.../presentation-video-splits/[splitId]/open` (302). The create seam is a `REQUIRED` row in `WRITERS`.
+- Outside readers: the type joins `POST_PRESENTATION_ARTIFACT_TYPES`, logistics `MATERIAL_TYPES` and both outside allowlists, gated by `bindPresentationVideo` at listing and open; `video/mp4` and `watch` only for this type.
+- Deviations: `presentationVideoGenerationKey` takes `(splitId, requestId)` because its preimage includes the request id. A stale output item (eTag or quickXorHash changed, or item gone) is handled as stale-approval reconciliation, like a changed transcript. The approve route's `maxDuration` is 120 (was 60) for the Graph and Dataverse work.
+
 ### Slice 5 — Card
 
 In `RecordingAndTranscriptCard.js`, step 3's **Presentation** subsection (`:3160-3165`) gains a Video line:

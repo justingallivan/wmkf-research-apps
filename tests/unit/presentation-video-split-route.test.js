@@ -6,12 +6,16 @@ jest.mock('../../lib/services/meeting-tracker-recordings/presentation-video-spli
   getPresentationVideoSplits: jest.fn(async () => ({ available: true, splits: [] })),
   startPresentationVideoSplit: jest.fn(async () => ({ status: 202, body: { split: { id: 's', state: 'queued' } } })),
 }));
+jest.mock('../../lib/services/meeting-tracker-recordings/presentation-video-approval-service.js', () => ({
+  approvePresentationVideoSplit: jest.fn(async () => ({ status: 200, body: { split: { id: 's', state: 'approved' } } })),
+}));
 
 import { requireAppAccess } from '../../lib/utils/auth.js';
 import { withDalContext } from '../../lib/dataverse/core/context.js';
 import { actorRefFromSession } from '../../lib/utils/actor-ref.js';
 import { ServiceHttpError } from '../../lib/services/service-http-error.js';
 import { getPresentationVideoSplits, startPresentationVideoSplit } from '../../lib/services/meeting-tracker-recordings/presentation-video-split-service.js';
+import { approvePresentationVideoSplit } from '../../lib/services/meeting-tracker-recordings/presentation-video-approval-service.js';
 import route, { config } from '../../pages/api/meeting-tracker/visits/[requestId]/presentation-video-splits.js';
 
 const requestId = '11111111-1111-4111-8111-111111111111';
@@ -20,7 +24,7 @@ function response() {
   return { status: jest.fn(function status(v) { this.statusCode = v; return this; }), json: jest.fn(function json(v) { this.body = v; return this; }), setHeader: jest.fn() };
 }
 const post = (body, res = response(), query = { requestId }) => route({ method: 'POST', query, body }, res).then(() => res);
-const noService = () => [getPresentationVideoSplits, startPresentationVideoSplit].forEach(fn => expect(fn).not.toHaveBeenCalled());
+const noService = () => [getPresentationVideoSplits, startPresentationVideoSplit, approvePresentationVideoSplit].forEach(fn => expect(fn).not.toHaveBeenCalled());
 beforeEach(() => { jest.clearAllMocks(); requireAppAccess.mockResolvedValue({ profileId: 9, session: { user: {} } }); });
 
 describe('GET', () => {
@@ -65,6 +69,28 @@ describe('POST start', () => {
   });
 });
 
+describe('POST approve', () => {
+  const SPLIT = '66666666-6666-4666-8666-666666666666';
+  test('passes the session actor, profile and the split id only', async () => {
+    const res = await post({ action: 'approve', splitId: SPLIT });
+    expect(approvePresentationVideoSplit).toHaveBeenCalledWith({ requestId, actorProfileId: 9, actingUserSystemId: ACTOR, splitId: SPLIT });
+    expect(startPresentationVideoSplit).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ split: { id: 's', state: 'approved' } });
+  });
+  test.each([
+    ['no split id', { action: 'approve' }],
+    ['a non-GUID split id', { action: 'approve', splitId: 'nope' }],
+    ['a padded split id', { action: 'approve', splitId: ` ${SPLIT}` }],
+    ['an array split id', { action: 'approve', splitId: [SPLIT] }],
+    ['an extra key', { action: 'approve', splitId: SPLIT, actorProfileId: 1 }],
+    ['a split id on start', { action: 'start', splitId: SPLIT }],
+  ])('rejects %s with 400 before any service call', async (_l, payload) => {
+    expect((await post(payload)).statusCode).toBe(400);
+    noService();
+  });
+});
+
 describe('shared guards', () => {
   test('rejects other methods (405) and bad request ids (400) before any service call', async () => {
     for (const method of ['PUT', 'PATCH', 'DELETE']) { const res = response(); await route({ method, query: { requestId }, body: { action: 'start' } }, res); expect(res.statusCode).toBe(405); }
@@ -90,8 +116,8 @@ describe('shared guards', () => {
     const b = await post({ action: 'start' });
     expect(b.statusCode).toBe(500); expect(JSON.stringify(b.body)).not.toMatch(/token|zoom\.us/);
   });
-  test('uses an 8 kb body limit and maxDuration 60', () => {
+  test('uses an 8 kb body limit and maxDuration 120', () => {
     expect(config.api.bodyParser.sizeLimit).toBe('8kb');
-    expect(config.maxDuration).toBe(60);
+    expect(config.maxDuration).toBe(120);
   });
 });
