@@ -64,6 +64,15 @@ function world(over = {}) {
     failPresentationVideoSplit: rec('fail', terminal('failed', a => ({ failure_code: a.failureCode }))),
     supersedePresentationVideoSplit: rec('supersede', terminal('superseded', a => ({ failure_code: a.failureCode }))),
     getPresentationVideoSourceCopy: rec('sourceCopy', async () => w.copy),
+    claimPresentationVideoSplitRecovery: rec('recovery', async ({ accessMode, testRequestId, maxAgeSeconds }) => {
+      const r = row();
+      if (!PROCESSING.includes(r.state) || r.lease_token) return [];
+      const withdrawn = accessMode === 'off' || (accessMode === 'test' && r.request_id !== testRequestId);
+      const expired = w.nowMs - (r.updated_ms ?? w.nowMs) > maxAgeSeconds * 1000;
+      if (!withdrawn && !expired) return [];
+      r.lease_token = 'rec-tok';
+      return [{ row: { ...r }, leaseToken: 'rec-tok', reason: withdrawn ? 'access_withdrawn' : 'processor_expired' }];
+    }),
     claimPresentationVideoSplitCleanup: rec('claimCleanup', async () => {
       const r = row();
       if (!r.sandbox_name || r.sandbox_cleaned_at || PROCESSING.includes(r.state)) return [];
@@ -351,15 +360,16 @@ describe('access', () => {
     for (const access of [{ valid: true, mode: 'off', requestId: null }, { valid: false, mode: 'off', requestId: null }]) {
       const w = world({ access });
       expect((await w.tick()).outcome).toBe('access_off');
-      expect(w.storeCalls.map(([n]) => n)).toEqual(['claimCleanup']);
+      expect(w.storeCalls.map(([n]) => n)).not.toContain('claim');
     }
   });
 
   test('test mode restricts the claim to that request', async () => {
     const w = world({ access: { valid: true, mode: 'test', requestId: '99999999-9999-4999-8999-999999999999' } });
+    w.row.state = 'review';
     expect((await w.tick()).outcome).toBe('idle');
     expect(w.storeCalls.find(([n]) => n === 'claim')[1]).toMatchObject({ accessRequestId: '99999999-9999-4999-8999-999999999999', leaseSeconds: 600 });
-    expect(w.row.state).toBe('queued');
+    expect(w.row.state).toBe('review');
   });
 });
 
@@ -433,6 +443,7 @@ describe('orphan sweep', () => {
   test('deletes only an own-environment tagged Sandbox with no uncleaned row, and runs once', async () => {
     const w = world({
       access: { valid: true, mode: 'off', requestId: null },
+      row: { id: ID, request_id: REQ, state: 'review', sandbox_name: null, sandbox_cleaned_at: null, lease_token: null },
       tagged: [{ name: 's4-known', tags: { env: 'test' } }, { name: 's4-orphan', tags: { env: 'test' } }, { name: 's4-other-env', tags: { env: 'production' } }],
       uncleaned: ['s4-known'],
       boxes: { 's4-known': { status: 'running' }, 's4-orphan': { status: 'running' }, 's4-other-env': { status: 'running' } },
@@ -447,6 +458,58 @@ describe('orphan sweep', () => {
     w.nowMs = Date.UTC(2026, 9, 10, 14, 0, 0);
     await w.tick();
     expect(w.boxes['s4-orphan']).toBeUndefined();
+  });
+});
+
+describe('recovery pass', () => {
+  const cuttingWorld = over => {
+    const w = world(over);
+    Object.assign(w.row, { state: 'cutting', sandbox_name: NAME, sandbox_command_id: 'cmd-1', upload_url_ciphertext: null });
+    w.boxes[NAME] = { status: 'running' };
+    w.commands['cmd-1'] = { exitCode: null };
+    return w;
+  };
+
+  test('access turned off fails a stranded cutting row, and the same sweep cleans its Sandbox', async () => {
+    const w = cuttingWorld({ access: { valid: true, mode: 'off', requestId: null } });
+    expect((await w.tick()).outcome).toBe('access_off');
+    expect(w.row).toMatchObject({ state: 'failed', failure_code: 'presentation_video_access_withdrawn', lease_token: null });
+    expect(w.boxes[NAME]).toBeUndefined();
+    expect(w.row.sandbox_cleaned_at).toBe('now');
+  });
+
+  test('an invalid flag value counts as off; a test flag narrowed to another request withdraws access', async () => {
+    const bad = cuttingWorld({ access: { valid: false, mode: 'off', requestId: null } });
+    await bad.tick();
+    expect(bad.row.failure_code).toBe('presentation_video_access_withdrawn');
+    const other = cuttingWorld({ access: { valid: true, mode: 'test', requestId: '99999999-9999-4999-8999-999999999999' } });
+    await other.tick();
+    expect(other.row).toMatchObject({ state: 'failed', failure_code: 'presentation_video_access_withdrawn' });
+  });
+
+  test('an uploading row is failed and its sealed upload session cancelled', async () => {
+    const w = cuttingWorld({ access: { valid: true, mode: 'off', requestId: null } });
+    Object.assign(w.row, { state: 'uploading', upload_url_ciphertext: 'SEALED' });
+    await w.tick();
+    expect(w.cancelled).toEqual(['https://up.example.com/s?tok=SECRET2']);
+    expect(w.row.upload_url_ciphertext).toBeNull();
+  });
+
+  test('a healthy polled row (access on, recent) is untouched', async () => {
+    const w = cuttingWorld();
+    w.row.updated_ms = w.nowMs - 60_000;
+    expect((await w.tick()).outcome).toBe('polling');
+    expect(w.row.state).toBe('cutting');
+  });
+
+  test('a row untouched for longer than the Sandbox timeout plus 15 minutes fails processor_expired even with access on', async () => {
+    const w = cuttingWorld();
+    w.row.updated_ms = w.nowMs - (10_800_000 + 16 * 60_000);
+    await w.tick();
+    expect(w.row).toMatchObject({ state: 'failed', failure_code: 'presentation_video_processor_expired' });
+    const fresh = cuttingWorld();
+    fresh.row.updated_ms = fresh.nowMs - (10_800_000 + 14 * 60_000);
+    expect((await fresh.tick()).outcome).toBe('polling');
   });
 });
 

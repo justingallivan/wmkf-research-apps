@@ -203,3 +203,16 @@ test('usage, cleaned receipt, orphan lookup and source-copy read', async () => {
   const copy = await one(null, 'getPresentationVideoSourceCopy', { copyId: COPY });
   expect(copy.text).toContain('FROM zoom_video_copies WHERE id = $1');
 });
+
+test('recovery claim: unleased processing rows only, access-withdrawn or aged, fresh lease, locked', async () => {
+  const { store, calls } = harness(() => [{ id: ID, state: 'cutting', presentation_end_ms: '5', source_size: '9', recovery_reason: 'access_withdrawn' }]);
+  const out = await store.claimPresentationVideoSplitRecovery({ accessMode: 'test', testRequestId: REQ, maxAgeSeconds: 11700, leaseSeconds: 600 });
+  expect(out[0]).toMatchObject({ reason: 'access_withdrawn', row: { presentation_end_ms: 5 } });
+  const text = calls[0].text;
+  expect(text).toContain("state IN ('queued', 'cutting', 'uploading')");
+  expect(text).toContain('lease_token IS NULL OR lease_expires_at <= NOW()');
+  expect(text).toContain('updated_at < NOW() - ($4 || \' seconds\')::INTERVAL');
+  expect(text).toContain('FOR UPDATE SKIP LOCKED');
+  expect(calls[0].params.slice(0, 4)).toEqual([2, 'test', REQ, 11700]);
+  await expect(store.claimPresentationVideoSplitRecovery({ accessMode: 'bogus', maxAgeSeconds: 1, leaseSeconds: 1 })).rejects.toThrow(TypeError);
+});

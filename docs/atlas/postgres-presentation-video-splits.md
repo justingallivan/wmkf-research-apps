@@ -79,6 +79,8 @@ Per row, each step idempotent: `Sandbox.get` (404 means gone), stop, `recordPres
 
 Orphan sweep: Sandboxes are created with tags `app=wmkf-stage4`, `split=<row id>`, `env=<VERCEL_ENV>`. On the first tick of an instance, and at minute 0 at least 55 minutes after the previous run, the tick lists the `app` tag, keeps only this environment's Sandboxes, asks `listUncleanedPresentationVideoSandboxNames` which still have an uncleaned row, and deletes the rest (at most 3 per tick, alert `presentation_video_orphan_sandbox_cleaned`). The name is written to the row before the create call, so a Sandbox with a live row is never an orphan.
 
+Recovery pass (`claimPresentationVideoSplitRecovery`, runs first every tick, independent of access): unleased or lease-expired processing rows whose request the access flag no longer allows (off, invalid, or `test:` for another request) or that have not been updated for the Sandbox timeout plus 15 minutes are claimed with a fresh lease, their sealed upload session is cancelled, and they move to `failed` with `presentation_video_access_withdrawn` or `presentation_video_processor_expired`; cleanup then removes their Sandbox. Healthy polled rows are recent and stay excluded. Snapshot cleanup resolves each listed metadata item with `Snapshot.get({ snapshotId })` before `delete()`, and the Sandbox delete passes `deleteOrphanSnapshots: true`.
+
 ## Not covered
 
 Slice 3 writes no Dataverse row and registers nothing; the output stays in SharePoint, recorded only on the split row. `cut_attempts` is unused (a crashed cut is terminal in v1).
