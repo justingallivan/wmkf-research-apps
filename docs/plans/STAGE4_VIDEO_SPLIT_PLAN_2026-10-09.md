@@ -17,7 +17,7 @@ related:
 
 **[DRAFT OUTLINE, Session 590, 2026-10-09.]** Nothing here is built or approved. This outline turns Stage 4 of `MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md` (`:104-112`) into a design. The processing venue (where the cut runs) was researched by Codex (merged to `main` in `228a97b5b`; deliverable `docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md`). This document defines what any venue must receive and return.
 
-**[Session 591, 2026-10-09] Coordination with the Codex speaker-label plan is agreed (owner approved).** Response and contract: `/tmp/zoom-attribution-stage4-response.md` against Codex's `/tmp/zoom-attribution-shared-contract.md` (both outside the repo; the decisions are recorded below). Stage 4 is unpaused for the Sandbox pilot only (done, see `STAGE4_SANDBOX_PILOT_RESULTS_2026-10-09.md`); its build waits for Codex's provenance slice.
+**[Session 591, 2026-10-09] Coordination with the Codex speaker-label plan is agreed (owner approved).** Response and contract: `/tmp/zoom-attribution-stage4-response.md` against Codex's `/tmp/zoom-attribution-shared-contract.md` (both outside the repo; the decisions are recorded below). Stage 4 is unpaused for the Sandbox pilot only (done, see `STAGE4_SANDBOX_PILOT_RESULTS_2026-10-09.md`); Codex's provenance slice has since merged (`f3cc08540`, migration 077), so the Stage 4 build plan can proceed (decisions 15-17).
 
 ## Owner decisions
 
@@ -33,6 +33,10 @@ related:
 - **12. Same-source check is metadata plus staff listen; hard gate 1 relaxed.** No audio-packet comparison, no import-time packet digest, no Zoom re-download at split time. See "Same-source proof". Zoom keeps cloud recordings about 180 days (owner), but Stage 4 does not depend on it.
 - **13. 1003222 is a test request** (its Board link is never shared outside the foundation), so it may be used end to end, including Board approval. Its current transcript has no provenance; when testing reaches a real cut, the owner re-imports it after Codex's provenance slice is live (one paid transcription).
 - **14. Ownership and order.** Codex first ships transcript provenance (Zoom file identity captured at import, `audioSha256`, frozen per publication and carried through corrections) with the import file-ID binding fix, then the discussion-exclusion policy and attendance checklist. Claude owns Stage 4 (mapping, processing, verification, split jobs, approval, Board eligibility) and runs the Sandbox pilot meanwhile. Shared files have one editor at a time: `bundle.js`, `import-service.js` and `zoom_recording_imports` are Codex's until the provenance slice merges; `presentation-transcript-binding.js` and `RecordingAndTranscriptCard.js` until the policy slice merges. Codex's migration precedes the split-job migration; numbers are claimed at build time.
+**Decided (owner, Session 591), coordinating with Codex's attendance slice (`/tmp/zoom-stage4-attendance-coordination.md`):**
+- **15. Fewest sessions and clicks; minimum regeneration** is the guiding principle. Duncan confirms the presentation end and the attendance list in one correction, published once, so derived outputs (transcripts, summaries, video) are generated once. Decision 11 stands: later edits are rare.
+- **16. Record the MP4's recording times.** Stage 4 adds `recording_start`/`recording_end` to `zoom_video_copies`, written at copy time; the same-source check requires them to equal the audio file's. Copy rows from before the change (1003222's included) block until re-copied.
+- **17. Migrations:** 078 is Codex's attendance/policy slice; **079 is Stage 4** (split-job table plus the decision 16 columns). Codex's provenance slice merged as 077 (`f3cc08540`).
 - **6 (venue), status.** Azure availability is pending an IT ticket (Dragonfly) with no quick answer expected. The first benchmark therefore targets Vercel Sandbox, per the research doc's fallback.
 
 1. **Outputs.** Accepted UX items 5 and 7 (`MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md:30-33`) call for a presentation video **and** a staff-discussion video, plus "Not recorded" when nothing follows the boundary. Stage 5 later deletes the discussion video. Recommendation: build the presentation video first; add the discussion video only if staff need a separate discussion file beyond the full Recording, which they already have until the Stage 5 deadline.
@@ -52,10 +56,10 @@ related:
 
 ## Same-source proof [PLANNED; revised Session 591, decision 12]
 
-Before any cut, the split service reads the current transcript's provenance through Codex's server-only resolver (outcomes `verified_zoom`, `upload`, `legacy_unknown`, `invalid`; proposed in Codex's contract, not built) and requires:
+Before any cut, the split service reads the current transcript's provenance through Codex's server-only resolver (outcomes `verified_zoom`, `upload`, `legacy_unknown`, `invalid`; merged in `f3cc08540`) and requires:
 1. `verified_zoom` with a verified `audio_only` file. Uploaded audio, unknown or invalid provenance blocks with a named reason. (Corrections carry the frozen provenance, so no walk of the `source_revision_id` chain is needed; corrections publish with `input_job_id` null [VERIFIED `063_meeting_tracker_transcription.sql:27,30,74`, `service.js:446,504`].)
 2. The current RECORDING winner is the registered result of a `copied` `zoom_video_copies` row for the same request and meeting occurrence (`zoom_meeting_uuid`).
-3. Exactly one audio file and one copied MP4, with matching recording start and end times. Segmented meetings block.
+3. Exactly one audio file (`zoom.audioOnlyFileCount === 1`) and one copied MP4 that is not segmented, with the MP4's recorded start and end (decision 16) equal to the audio file's. Segmented meetings block. The provenance seam is `resolveCurrentMeetingTranscriptSource` (`meeting-tracker-transcription/service.js`, merged `f3cc08540`).
 
 The cut is `endMs` taken directly on the MP4 timeline (identity mapping, measured on 1003222's real pair below). The staff listen to the ending (decision 8) is the safeguard against a misplaced cut. Any failure shows a named reason and no split.
 
@@ -67,7 +71,7 @@ The cut is `endMs` taken directly on the MP4 timeline (identity mapping, measure
 
 ## Durable job [PLANNED]
 
-- A new table (migration 077 or later; number claimed off `main` at build time) modeled on `zoom_video_copies`: one active split per request, lease and fence, attempt caps, cancel, terminal states without leases, and the frozen input identity.
+- A new table (migration 079, reserved; decision 17) modeled on `zoom_video_copies`: one active split per request, lease and fence, attempt caps, cancel, terminal states without leases, and the frozen input identity.
 - Output upload: reuse the origin-marked MP4 upload intent (`presentation_material_uploads`), which needs a new `origin` value. Its CHECK admits only `browser` and `zoom_copy` (migration 076), and the origin-isolation predicates must be extended. Alternative: a separate output ledger. Decide in the build plan.
 - Registration goes through the single `createDocument` in `material-service.js` (the `request-document-writers` gate), with the slot fence.
 
