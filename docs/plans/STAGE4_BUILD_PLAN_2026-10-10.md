@@ -26,6 +26,18 @@ related:
 
 **Charge tracking (owner request, B1).** Each split row records its sandbox usage: provisioned seconds, vCPUs, active CPU seconds when the SDK or API reports them (slice 0 checks this; otherwise wall time × vCPUs as an upper bound), and the cost computed at list prices. The per-hour prices live in config, not code. A staff-visible monthly total (per request and overall) lets the owner plan spend. Failed and reaped jobs are counted too.
 
+**Billing context (Session 592, 2026-10-10).**
+- **[VERIFIED via vercel.com/docs/sandbox/pricing, updated 2026-09-10]:**
+  - Pro Sandbox usage draws on the $20 monthly credit and is then billed at list price; Pro is never paused for exhausting it.
+  - Creations cost $0.60 per million. Outbound data is included in Pro's flat-rate CDN.
+  - Memory is billed in 1-minute minimums.
+  - The maximum session is 24 hours, so the 3-hour timeout is well within it.
+- **The only outage path is Spend Management "Pause production deployments"** (vercel.com/docs/spend-management, updated 2026-09-18). Over budget, it pauses every project on the team.
+- **The owner's team setting, from a dashboard screenshot:**
+  - Budget $200, with pausing **off**, so alerts only.
+  - Current, previous-cycle and 3-month spend are all $0.
+- At under 50 cuts per cycle (owner estimate), Stage 4 is roughly $8-$40 per cycle. No credit or plan change is needed.
+
 - **B1. Sandbox SDK and credential path.** The app has no `@vercel/sandbox` dependency, and nothing in the app authenticates to Vercel from a deployed function; the only Vercel API caller (`pages/api/cron/log-analysis.js:40-60`) uses a personal token. How the SDK authenticates from a deployed function (OIDC or a token) is `[ASSUMED]` until slice 0 measures it. Approve adding the dependency and the credential that slice 0 finds.
 - **B2. Approval = registration (revised by contract-reconcile, Session 592).** Recommendation: follow the summary draft → publish model. The cut output sits in SharePoint, recorded only on the Postgres split row, while staff check it. **Check the ending and approve** registers the Dataverse document. A Board-visible video therefore always means "registered and bound", exactly as for summaries (`transcript-summary-service.js:555-560` creates the row only at publish). Every post-presentation row is registered as `DRAFT` today, and the outside pages exclude only `SUPERSEDED` (`material-service.js:1335`, `presentation-page-service.js:84`). A `REVIEW` → `BOARD_READY` gate would therefore be a new lifecycle meaning that no reader honours today. Rejected alternative: register at `REVIEW` and gate outside readers on `BOARD_READY`.
 - **B3. Board playback.** The outside presentation open route already redirects to a fresh Microsoft URL after rechecking membership (`pages/api/external/presentation/[token]/open.js:1,35-37`) and already accepts `mode=watch` at the route (`:26`); the service currently rejects `watch` for post-presentation types. Recommendation: the presentation video uses the same redirect, with `watch` allowed for this type only; the browser plays the MP4 from the SharePoint download URL. Confirm Board members may be sent to that short-lived URL for video, as they already are for transcripts.
