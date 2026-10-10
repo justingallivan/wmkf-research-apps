@@ -77,6 +77,7 @@
     "075_summary_drafts_discussion_kind.sql",
     "076_zoom_video_copies.sql",
     "077_zoom_transcript_provenance.sql",
-    "078_zoom_attendance_attribution.sql"
+    "078_zoom_attendance_attribution.sql",
+    "079_zoom_video_copy_recording_times.sql"
   ]
 }

@@ -3,7 +3,7 @@ title: "Atlas: Zoom video copies (Postgres)"
 domain: postgres
 kind: state-page
 status: source-built
-summary: "zoom_video_copies holds one row per Stage 3b attempt to copy a Zoom meeting MP4 into the request's SharePoint folder (migration 076, which also adds presentation_material_uploads.origin). Migration 076 applied and step 0 merged 2026-10-09; the copy runtime merged 2026-10-09; one Mode D copy succeeded on 1003222 and ZOOM_VIDEO_COPY_ACCESS is on (2026-10-09)."
+summary: "zoom_video_copies holds one row per Stage 3b attempt to copy a Zoom meeting MP4 into the request's SharePoint folder (migration 076, which also adds presentation_material_uploads.origin). Migration 076 applied and step 0 merged 2026-10-09; the copy runtime merged 2026-10-09; one Mode D copy succeeded on 1003222 and ZOOM_VIDEO_COPY_ACCESS is on (2026-10-09). Migration 079 (Stage 4 decision 16) adds recording_start/recording_end, written at copy start on branch claude/stage4-slice1 (not yet merged)."
 canonical: true
 cataloged: 2026-10-08
 owner: product-engineering
@@ -14,6 +14,8 @@ related:
   - docs/atlas/dataverse-wmkf-requestdocument.md
   - docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md
   - lib/db/migrations/076_zoom_video_copies.sql
+  - lib/db/migrations/079_zoom_video_copy_recording_times.sql
+  - docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md
   - lib/services/meeting-tracker-recordings/video-copy-store.js
   - lib/services/meeting-tracker-recordings/video-copy-service.js
   - lib/services/meeting-tracker-recordings/video-copy-worker.js
@@ -41,6 +43,7 @@ related:
 | `session_create_attempts` (cap 3), `session_restarts` (cap 3), `uncertain_checks` (cap 3, shared), `registration_attempts` (cap 5) | Bounded counters; a cap and the move to `failed` happen in one UPDATE, so no statement increments past the CHECK |
 | `sharepoint_drive_id`, `sharepoint_item_id`, `request_document_id` | Receipt identities. Drive and item are set when the exact item resolves (`registering`) or at repair; the Request Document id and `completed_at` are set only at `copied` (CHECK `zoom_video_copies_copied_shape`). `sharepoint_quickxor_hash`: see the next row. |
 | `sharepoint_quickxor_hash` | Graph's `file.hashes.quickXorHash` for the exact completed item, written on the `queued|copying -> registering` transition (`markZoomVideoCopyRegistering`). The worker reads it best effort (`readQuickXorHash` in `video-copy-worker.js`): a short budget, a failed read, a different item or a read longer than 10 s (a race bounds token, headers and body) leaves it NULL and never blocks registration. Recorded as a fingerprint for Stages 4/5 and never compared (owner decision 6). Merged 2026-10-09 (`306ba183f`, Production deployment 6970443980); the earlier Mode D row on 1003222 predates it and is NULL. |
+| `recording_start`, `recording_end` | **[Migration 079 and slice 1 of `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md`, on branch `claude/stage4-slice1`; not yet applied or merged.]** The picked Zoom MP4's `recording_files[].recording_start` / `recording_end`. `startZoomVideoCopy` writes them at N1 through `zoomRecordingTimes` (`video-copy-store.js`). Missing, unparseable or reversed times are written as NULL, and the copy still proceeds. CHECK `zoom_video_copies_recording_times_shape`: both or neither, end >= start. The worker's `listAndValidate` fails the copy with `zoom_recording_changed` when a row with times no longer matches Zoom (`sameZoomRecordingTimes`, compared as instants). Rows without times, including every copy made before 079, skip that comparison. The Stage 4 same-source check requires these times to equal the audio file's (decision 16); NULL rows are ineligible for a cut until re-copied. Not exposed by the GET snapshot (`COPY_COLUMNS`). |
 | `failure_code`, `cancel_requested_at` | Sanitized failure code, present exactly when `state = 'failed'` (CHECK); staff cancel flag |
 
 Partial unique indexes: one `queued`/`copying`/`registering` copy per request (`idx_zoom_video_copies_active_request`) and one `copied` row per request and Zoom file (`idx_zoom_video_copies_copied_file`). The intent row carries the path and generation-key uniqueness.
@@ -96,4 +99,4 @@ The Request Document is created only through the existing shared `finalizeClaime
 
 ## Not covered
 
-Duration capture is out of v1. Gallery or non-selected recording variants are never copied. Segmented and over-2,000,000,000-byte meetings are refused with a message to upload manually. Stage 4 splitting and Stage 5 retention are separate plans.
+Duration capture is out of v1 (recording start and end times are captured from migration 079). Gallery or non-selected recording variants are never copied. Segmented and over-2,000,000,000-byte meetings are refused with a message to upload manually. Stage 4 splitting and Stage 5 retention are separate plans.

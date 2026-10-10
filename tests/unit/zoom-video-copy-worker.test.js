@@ -427,6 +427,31 @@ describe('Zoom failures', () => {
     expect(w.copy.lease_token).toBeNull();
   });
 
+  test('Stage 4 decision 16: recorded times must still match Zoom; pre-079 rows (no times) are unaffected', async () => {
+    const START_ISO = '2026-10-08T17:46:00Z';
+    const END_ISO = '2026-10-08T18:42:00Z';
+    const timed = (endIso) => {
+      const w = makeWorld({ size: 25 });
+      Object.assign(w.copy, { recording_start: new Date(START_ISO), recording_end: new Date(END_ISO) });
+      const detail = w.detail;
+      w.deps.getMeetingRecordings = async () => {
+        const d = detail();
+        Object.assign(d.recording_files[0], { recording_start: START_ISO, recording_end: endIso });
+        return d;
+      };
+      return w;
+    };
+    const same = timed(END_ISO);
+    const ok = await same.tick();
+    expect(ok.code).not.toBe('zoom_recording_changed');
+    expect(same.counts.put).toBeGreaterThan(0);
+    const changed = timed('2026-10-08T18:43:00Z');
+    const result = await changed.tick();
+    expect(result).toMatchObject({ outcome: 'failed', code: 'zoom_recording_changed' });
+    expect(changed.counts.put).toBe(0);
+    expect(changed.copy.state).toBe('failed');
+  });
+
   test('a changed file size, id or host fails the copy before any byte moves', async () => {
     for (const mutate of [d => { d.recording_files[0].file_size = 99; }, d => { d.recording_files[0].id = 'other'; }, d => { d.host_id = 'host2'; }]) {
       const w = makeWorld({ size: 25 });

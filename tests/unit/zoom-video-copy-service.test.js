@@ -16,6 +16,7 @@ jest.mock('../../lib/services/meeting-tracker-recordings/zoom-client.js', () => 
 jest.mock('../../lib/services/meeting-tracker-recordings/video-copy-store.js', () => ({
   startZoomVideoCopy: jest.fn(), listFailedZoomVideoCopiesForFile: jest.fn(), findCopiedZoomVideoCopyForFile: jest.fn(),
   listZoomVideoCopySnapshotsForRequest: jest.fn(), requestZoomVideoCopyCancel: jest.fn(),
+  zoomRecordingTimes: (file) => jest.requireActual('../../lib/services/meeting-tracker-recordings/video-copy-store.js').zoomRecordingTimes(file),
 }));
 jest.mock('../../lib/services/post-presentation-materials/material-service.js', () => {
   const { ServiceHttpError } = jest.requireActual('../../lib/services/service-http-error.js');
@@ -116,10 +117,17 @@ describe('startZoomVideoCopy: success', () => {
       zoomMeetingUuid: UUID, zoomHostId: HOST_ID, zoomHostEmail: HOST_EMAIL, zoomMeetingStart: '2026-10-05T17:00:00.000Z',
       zoomFileId: 'mp4-id', zoomRecordingType: PLAIN, declaredSize: 1000, originalDisplayFilename: 'Zoom video Oct 5, 2026 10.00 AM PT.mp4',
       libraryName: 'akoya_request', folderPath: 'akoya_request/R-1/Post Site Visit Materials',
-      confirmedWinnerDocumentId: null, confirmedWinnerSlotVersion: null, failedSnapshot: [],
+      confirmedWinnerDocumentId: null, confirmedWinnerSlotVersion: null, recordingStart: null, recordingEnd: null, failedSnapshot: [],
     });
     expect(deps.ensureFolderPath).toHaveBeenCalledWith('akoya_request', 'akoya_request/R-1/Post Site Visit Materials');
     expect(JSON.stringify(result)).not.toMatch(/LEASE|SECRET|mp4-id/);
+  });
+  test('Stage 4 decision 16: writes the picked file\'s recording_start/recording_end to N1', async () => {
+    getMeetingRecordings.mockResolvedValue(meeting([video({ recording_end: '2026-10-05T18:02:00Z' })]));
+    await startZoomVideoCopy(args());
+    expect(store.startZoomVideoCopy).toHaveBeenCalledWith(expect.objectContaining({
+      recordingStart: '2026-10-05T17:00:00.000Z', recordingEnd: '2026-10-05T18:02:00.000Z',
+    }));
   });
   test('passes the Try-again snapshot verbatim to N1', async () => {
     const snapshot = [{ id: 'old', updated_key: 'k', intent_state: 'failed', intent_lease_live: false }];
