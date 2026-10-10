@@ -103,7 +103,7 @@ An import requires a durable, schema-approved operation record with exact source
 
 ### 4. Video splitting and presentation archive
 
-**Superseded in part (owner, Session 590, 2026-10-09):** Stage 4 makes a presentation video only, with no staff-discussion video; staff approve its ending before Board release. Design: `docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md`. UX items 5 and 7 above are revised to match; Stage 5 below no longer lists a discussion video.
+**Superseded in part (owner, Session 590, 2026-10-09):** Stage 4 makes a presentation video only, with no staff-discussion video; staff approve its ending before Board release. Design: `docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md`. UX items 5 and 7 above are revised to match; Stage 5 below no longer lists a discussion video. **Also superseded (owner, Session 591):** the video binds to the transcript revision like other derivatives (no names-only exemption), and same-source proof is a metadata check (same Zoom occurrence, one audio file and one MP4 with matching start/end) plus the staff listen, not a measured mapping (Stage 4 plan decisions 11-12).
 
 Proposed new module `lib/services/meeting-tracker-recordings/split-service.js`; publication integrates with the existing material model, registry writer and both outside readers. Persist a frozen source-video identity, transcript revision, reviewed boundary, timing transform and immutable output identity before processing. Distinguish video source changes from names-only transcript changes to avoid unnecessary re-encoding without weakening provenance.
 

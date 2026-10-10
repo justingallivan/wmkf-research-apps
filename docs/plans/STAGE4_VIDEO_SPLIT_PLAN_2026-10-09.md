@@ -3,7 +3,7 @@ title: Meeting video split at the presentation end (Stage 4)
 kind: plan
 domain: transcription
 status: draft
-summary: "Design outline for cutting the copied Zoom meeting MP4 at the staff-confirmed presentation end into a Board-eligible presentation video only (no discussion video; owner 2026-10-09), approved by staff before Board release, with same-source proof, a frozen source identity, a durable split job and a processor contract. Venue research and local benchmarks by Codex are merged to main (228a97b5b). Draft: research closed; nothing built."
+summary: "Design outline for cutting the copied Zoom meeting MP4 at the staff-confirmed presentation end into a Board-eligible presentation video only (no discussion video; owner 2026-10-09), approved by staff before Board release, with same-source proof, a frozen source identity, a durable split job and a processor contract. Venue research and local benchmarks by Codex are merged to main (228a97b5b). Session 591: coordinated with the Codex transcript-provenance contract; same-source check is metadata plus staff listen (hard gate 1 relaxed). Draft: nothing built."
 owner: product-engineering
 related:
   - docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md
@@ -17,6 +17,8 @@ related:
 
 **[DRAFT OUTLINE, Session 590, 2026-10-09.]** Nothing here is built or approved. This outline turns Stage 4 of `MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md` (`:104-112`) into a design. The processing venue (where the cut runs) was researched by Codex (merged to `main` in `228a97b5b`; deliverable `docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md`). This document defines what any venue must receive and return.
 
+**[Session 591, 2026-10-09] Coordination with the Codex speaker-label plan is agreed (owner approved).** Response and contract: `/tmp/zoom-attribution-stage4-response.md` against Codex's `/tmp/zoom-attribution-shared-contract.md` (both outside the repo; the decisions are recorded below). Stage 4 is unpaused for the Sandbox pilot only; its build waits for Codex's provenance slice.
+
 ## Owner decisions
 
 **Decided (owner, Session 590, 2026-10-09):** 1 = **presentation video only** (revised; see below); 2 = cut exactly at `endMs`; 3 = Zoom copy plus Zoom transcript only; 5 = on request. Decision 4 was later decided (add the hash write); 6 and 7 remain open. Original recommendations follow for the record.
@@ -26,6 +28,11 @@ related:
 - **9. Staff access needs no verification.** The full Recording stays available to staff at all times, as today; the review in decision 8 gates only Board release. Staff do not need split versions: they were on the call.
 - **1, revised.** Presentation video only. No discussion video is made: staff keep the full Recording until the Stage 5 deadline, when it is deleted and only the presentation video is retained. A discussion file would add a second discussion copy to protect and delete.
 - **10. Benchmark (owner, Session 590).** Codex may install FFmpeg locally for synthetic media. Cloud benchmark on Vercel Sandbox with a $10 incremental compute cap, persistence off and verified cleanup, in the app's US region. When the transcript-to-video mapping is uncertain, trim the presentation's end by the measured uncertainty up to 2 s; above 2 s, block for staff review. First real input after synthetic checks pass: 1003222's copied video, with outputs in an isolated staff-only test folder. Defaults not yet confirmed by the owner [ASSUMED]: source resolution, H.264 + AAC at standard quality, same-day turnaround.
+**Decided (owner, Session 591, 2026-10-09), coordinating with Codex's transcript-provenance contract:**
+- **11. Binding stays on the transcript revision.** The presentation video goes out of date whenever the transcript revision changes, like the derivative transcripts and summaries. Edits after publication are expected to be rare; a re-cut and re-listen is acceptable.
+- **12. Same-source check is metadata plus staff listen; hard gate 1 relaxed.** No audio-packet comparison, no import-time packet digest, no Zoom re-download at split time. See "Same-source proof". Zoom keeps cloud recordings about 180 days (owner), but Stage 4 does not depend on it.
+- **13. 1003222 is a test request** (its Board link is never shared outside the foundation), so it may be used end to end, including Board approval. Its current transcript has no provenance; when testing reaches a real cut, the owner re-imports it after Codex's provenance slice is live (one paid transcription).
+- **14. Ownership and order.** Codex first ships transcript provenance (Zoom file identity captured at import, `audioSha256`, frozen per publication and carried through corrections) with the import file-ID binding fix, then the discussion-exclusion policy and attendance checklist. Claude owns Stage 4 (mapping, processing, verification, split jobs, approval, Board eligibility) and runs the Sandbox pilot meanwhile. Shared files have one editor at a time: `bundle.js`, `import-service.js` and `zoom_recording_imports` are Codex's until the provenance slice merges; `presentation-transcript-binding.js` and `RecordingAndTranscriptCard.js` until the policy slice merges. Codex's migration precedes the split-job migration; numbers are claimed at build time.
 - **6 (venue), status.** Azure availability is pending an IT ticket (Dragonfly) with no quick answer expected. The first benchmark therefore targets Vercel Sandbox, per the research doc's fallback.
 
 1. **Outputs.** Accepted UX items 5 and 7 (`MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md:30-33`) call for a presentation video **and** a staff-discussion video, plus "Not recorded" when nothing follows the boundary. Stage 5 later deletes the discussion video. Recommendation: build the presentation video first; add the discussion video only if staff need a separate discussion file beyond the full Recording, which they already have until the Stage 5 deadline.
@@ -43,18 +50,18 @@ related:
 - **Source video.** Stage 3b registers the copied MP4 as the request's `RECORDING` (100000005) winner, staff-only. The Board page and briefing never select `RECORDING` (`presentation-page-service.js:30`, `briefing-page-service.js:98`; verified live on 1003222's Board page).
 - **Transcript-to-meeting link (Postgres only).** A fresh publication's `revisionId` equals its `operationId` (`meeting-tracker-transcription/service.js:306-308`). `meeting_transcript_publications.operation_id` → `input_job_id` (`063_meeting_tracker_transcription.sql`) → `zoom_recording_imports.transcription_job_id` → `zoom_meeting_uuid`, which `zoom_video_copies.zoom_meeting_uuid` also carries. The transcript manifest itself records no meeting or audio-file identity (`bundle.js:18-19`).
 
-## Same-source proof [PLANNED]
+## Same-source proof [PLANNED; revised Session 591, decision 12]
 
-Before any cut, the split service proves:
-1. The current TRANSCRIPT winner's revision chain (following `source_revision_id` for speaker-name revisions) [ASSUMED: name edits create a revision with `source_revision_id`; verify] resolves to a publication whose input job came from a Zoom import of meeting *M*.
-2. The current RECORDING winner is the registered result of a `copied` `zoom_video_copies` row for the same request and meeting *M*.
-3. Offset: the MP4's audio and video start times, and the M4A's, align within a stated tolerance. Same meeting is not proof of equal timelines (`MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md:110`). How to measure this is a research question for Codex.
+Before any cut, the split service reads the current transcript's provenance through Codex's server-only resolver (outcomes `verified_zoom`, `upload`, `legacy_unknown`, `invalid`; proposed in Codex's contract, not built) and requires:
+1. `verified_zoom` with a verified `audio_only` file. Uploaded audio, unknown or invalid provenance blocks with a named reason. (Corrections carry the frozen provenance, so no walk of the `source_revision_id` chain is needed; corrections publish with `input_job_id` null [VERIFIED `063_meeting_tracker_transcription.sql:27,30,74`, `service.js:446,504`].)
+2. The current RECORDING winner is the registered result of a `copied` `zoom_video_copies` row for the same request and meeting occurrence (`zoom_meeting_uuid`).
+3. Exactly one audio file and one copied MP4, with matching recording start and end times. Segmented meetings block.
 
-Any failure shows a named reason and no split.
+The cut is `endMs` taken directly on the MP4 timeline (identity mapping, measured on 1003222's real pair below). The staff listen to the ending (decision 8) is the safeguard against a misplaced cut. Any failure shows a named reason and no split.
 
 ## Frozen identity and binding [PLANNED]
 
-- **Input identity:** request, transcript `revisionId`, `presentationEnd.endMs`, source Recording document id, its SharePoint drive/item/version, its size, and (after decision 4) its quickXorHash.
+- **Input identity:** request, the content-free provenance projection (Codex's `sourceProvenance`), transcript `revisionId`, `presentationEnd.endMs`, source Recording document id, its SharePoint drive/item/version, its size, and (after decision 4) its quickXorHash.
 - **Generation key:** extend `derivativeGenerationKey` with the source-video identity, one key per output type.
 - **Binding:** a `bindPresentationVideo` mirroring `bindPresentationTranscript`'s reasons (`bound`, `missing`, `stale`). A changed boundary, transcript revision or source video makes the output stale, and outside readers withhold it at once, on both listing and `open` routes.
 
@@ -84,7 +91,7 @@ Any failure shows a named reason and no split.
 
 See `docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md` and the benchmark scripts under `scripts/benchmarks/stage4-*`.
 - Full re-encode of each kept span from decoded frames and samples; naive stream copy is a negative control only.
-- The cut on the MP4 is `endMs` mapped from the transcript (M4A) timeline using at least three audio anchors, minus the measured mapping uncertainty. Unbounded uncertainty, drift or a pause blocks the split.
+- The cut on the MP4 is `endMs` taken directly (decision 12). The anchor mapper researched by Codex is not used in v1.
 - Two acceptance checks: no source content from after the cut is used, and no output stream plays past it. Duration alone proves neither; AAC padding, edit lists and extra tracks are checked explicitly.
 - The lineage record gains a mapping version and a verification receipt.
 - **Audio recipe (Codex synthetic follow-up, `STAGE4_SYNTHETIC_RESULTS_2026-10-09.md`, branch commit `97b8feb66`):** decode audio onto a common zero-based clock (inserting leading silence for a late start), trim there, write only the kept samples to an isolated PCM file, and encode AAC from that file alone, so no post-cut sample is ever encoder input. Video keeps source-clock timestamps. The AAC tail is accepted only if the output's audio packets exactly match an independent encode of the same isolated PCM; there is no millisecond tolerance.
@@ -94,8 +101,8 @@ See `docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md` and the benchmark
 
 ## Acceptance and release gates [PLANNED]
 
-Hard gates (privacy and correct-file publication); none can be waived by staff approval:
-1. The mapping from the transcript (M4A) clock to the MP4 clock is measured from several distinct anchors, including near the cut. The cut moves earlier by the measured uncertainty, up to 2 s (decision 10); larger or unbounded uncertainty, or an ambiguous mapping, blocks the split for staff resolution.
+Hard gates (privacy and correct-file publication); gates 2-4 cannot be waived by staff approval:
+1. **Relaxed (owner, Session 591, decision 12).** The same-source metadata check passes ("Same-source proof"); the cut is `endMs` on the MP4 timeline. Mapping is not measured, and the staff listen (decision 8) is the safeguard against a misplaced cut. Previously: the mapping was measured from several anchors, the cut moved earlier by the uncertainty up to 2 s, and staff approval could not waive this gate.
 2. Only pre-cut samples and whole pre-cut video frames reach the encoder (isolated PCM recipe above); only the selected H.264 and AAC streams are written, with extra tracks and metadata removed; unsupported output structures are rejected.
 3. The automated checks (payload equality, frame and sample clocks, container scan) pass before the video is offered for staff review.
 4. Board eligibility binds the exact file staff approved: source identity and quickXorHash, transcript revision and boundary, mapping version, output hash and SharePoint version, the verification receipt and the approval. Any change to those inputs, or to the output, during or after processing makes the video ineligible, at listing and at `open`.
@@ -110,11 +117,13 @@ Part 1 (`scripts/benchmarks/stage4-focused-check.py`, evidence `docs/plans/STAGE
 
 **Real pair, owner-approved (Session 590; evidence `docs/plans/STAGE4_REAL_AV_PAIR_EVIDENCE_2026-10-09.json`, media deleted after measurement).** For 1003222's Oct 8 10:46 meeting, the Stage 3b MP4's audio track is **byte-identical** to Zoom's `audio_only` M4A: all 157,533 AAC packets match (frame MD5, 0 differences), the decoded PCM MD5 matches, both start at 0 with equal edit lists and duration 3,360.704 s. Video is constant 25 fps (all 84,017 intervals 40 ms); the MP4 also carries one `bin_data` data stream (3 frames), which the recipe strips. [VERIFIED for one meeting; other meetings ASSUMED until checked per recording.]
 
-**Consequence [PLANNED, owner to confirm]:** for the eligible path (decision 3), the transcript-to-video mapping is the identity, proven exactly by audio packet equality, not estimated by correlation. The cut is then `endMs` directly (rounded down to a whole frame and AAC sample, as before), with no mapping uncertainty. The adaptive correlation mapper becomes a fallback that v1 does not need; a mismatch blocks the split. The proof needs the transcribed audio's identity at split time, but `transcription_jobs.audio_sha256` is cleared when job content is purged (`lib/services/transcription-pilot/store.js:1992`, `:2025`). Options: (1) at Stage 3a import, store a content-free digest of the M4A's audio packets on `zoom_recording_imports` (durable; small migration), and at split time compute the same digest from the MP4's audio and require equality; or (2) at split time re-download the M4A from Zoom by its recorded file id and compare packets, relying on Zoom file immutability and availability. Recommendation: (1).
+**Resolved (owner, Session 591, decision 12):** v1 uses the identity mapping with the metadata check above and no packet proof; options (1) and (2) below are not built. Original analysis follows.
+
+**Consequence [superseded]:** for the eligible path (decision 3), the transcript-to-video mapping is the identity, proven exactly by audio packet equality, not estimated by correlation. The cut is then `endMs` directly (rounded down to a whole frame and AAC sample, as before), with no mapping uncertainty. The adaptive correlation mapper becomes a fallback that v1 does not need; a mismatch blocks the split. The proof needs the transcribed audio's identity at split time, but `transcription_jobs.audio_sha256` is cleared when job content is purged (`lib/services/transcription-pilot/store.js:1992`, `:2025`). Options: (1) at Stage 3a import, store a content-free digest of the M4A's audio packets on `zoom_recording_imports` (durable; small migration), and at split time compute the same digest from the MP4's audio and require equality; or (2) at split time re-download the M4A from Zoom by its recorded file id and compare packets, relying on Zoom file immutability and availability. Recommendation: (1).
 
 ## Next steps before the build plan [PLANNED]
 
-1. **Focused validation on generated media:** speech-like and noisy audio, realistic pauses, variable frame rate and delayed audio; several anchors including near the cut; check the ending on the intended playback paths (browser and the SharePoint viewer). Not an open-ended codec study.
+1. **Focused validation on generated media:** variable frame rate, and the ending on the intended playback paths (browser and the SharePoint viewer). The anchor-mapping cases (speech-like audio, pauses, delayed audio) are dropped with decision 12. Not an open-ended codec study.
 2. **Synthetic Vercel Sandbox pilot** within the $10 incremental-compute cap: confirm the app's region, current pricing and how the cap is enforced before dispatch; persistence off, no media snapshots, independently verified cleanup. Measure a full-length presentation (runtime, scratch, readability, ending), and test interruption, insufficient disk, failed or partial upload and failed cleanup; anything incomplete stays unpublished.
 3. **Ask Justin before the first real input** (1003222's copied video, any paired audio scoped explicitly), with the pilot results and the applicable Vercel data-processing terms. Isolated staff-only test folder; no new Zoom read; no Board registration. A longer recording follows only after that passes.
 4. **Correct-file safeguards are built and tested in the application** (gate 4): retries, concurrent changes, upload reconciliation, approval, and Board listing and `open` paths. Required before Board use, not before the pilot.
@@ -125,7 +134,7 @@ The card's "Results" step gains a Video line under **Presentation** only: status
 
 ## Stage 5 hooks [PLANNED]
 
-Stage 5 deletes the full Recording, the full transcript and discussion content at the Board deadline. The presentation video's binding must stay valid after that, so the lineage record (input identity, boundary, output identity, verification report) must be content-free and must not require the full-source bytes to exist. This needs the `presentation-transcript-binding.js` / `bundle.js` change named in the workflow plan (`:112`); Stage 4 must not foreclose it.
+Stage 5 deletes the full Recording, the full transcript and discussion content at the Board deadline. The presentation video's binding must stay valid after that, so the lineage record (input identity including a copy of the provenance projection, boundary `endMs` with `confirmedBy`/`confirmedAt`, output identity, verification report, approval) must be content-free and must not require the full-source bytes to exist. This needs the `presentation-transcript-binding.js` / `bundle.js` change named in the workflow plan (`:112`); Stage 4 must not foreclose it.
 
 ## Gates this work will hit
 
