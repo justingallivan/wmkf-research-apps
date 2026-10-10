@@ -2,7 +2,7 @@ const mockSql = jest.fn();
 jest.mock('@vercel/postgres', () => ({ sql: (strings, ...values) => mockSql(strings.join('?'), values) }));
 
 import {
-  claimZoomImport, markZoomImportStarted, markZoomImportFailed, takeOverExpiredAsStarted,
+  captureZoomImportFiles, getZoomImportForJob, claimZoomImport, markZoomImportStarted, markZoomImportFailed, takeOverExpiredAsStarted,
   takeOverExpiredAsFailed, releaseStartedImportWithEndedJob, getActiveZoomImport, listZoomImportsForRequest, sanitizeFailureCode, IMPORT_LEASE_SECONDS, FALLBACK_FAILURE_CODE, findJobForImport,
 } from '../../lib/services/meeting-tracker-recordings/import-store.js';
 
@@ -83,4 +83,24 @@ test('the active and list reads join the job status', async () => {
   await listZoomImportsForRequest({ requestId: 'r' });
   for (const [text] of mockSql.mock.calls) expect(text).toMatch(/LEFT JOIN transcription_jobs j ON j\.id = r\.transcription_job_id/);
   for (const [text] of mockSql.mock.calls) expect(text).toContain('j.status AS job_status');
+});
+
+
+test('file capture is write-once under the unexpired import lease and binds the job', async () => {
+  const capture = { version: 1, audioOnlyFileCount: 1, transcriptFile: null,
+    audioFile: { fileId: 'audio', recordingType: 'audio_only', bytes: 1,
+      recordingStart: '2026-10-09T00:00:00Z', recordingEnd: '2026-10-09T01:00:00Z', sha256: 'a'.repeat(64) } };
+  await captureZoomImportFiles({ id, leaseToken: lease, jobId: id, capture });
+  expect(mockSql.mock.calls[0][0]).toContain('lease_expires_at > NOW() AND selected_recording_files IS NULL');
+  expect(mockSql.mock.calls[0][0]).toContain('transcription_job_id IS NULL OR transcription_job_id = ?');
+  mockSql.mockResolvedValue({ rows: [] });
+  expect(await captureZoomImportFiles({ id, leaseToken: lease, jobId: id, capture })).toBeNull();
+});
+
+test('origin lookup scopes both request and visit and rejects competing imports', async () => {
+  await getZoomImportForJob({ jobId: id, requestId: id, siteVisitActivityId: lease });
+  expect(mockSql.mock.calls[0][0]).toContain('r.request_id = ? AND r.site_visit_activity_id = ?');
+  expect(mockSql.mock.calls[0][0]).toContain('r.id = j.idempotency_key AND r.actor_profile_id = j.owner_profile_id');
+  mockSql.mockResolvedValue({ rows: [{ id }, { id: lease }] });
+  await expect(getZoomImportForJob({ jobId: id, requestId: id, siteVisitActivityId: lease })).rejects.toThrow('ambiguous_zoom_source');
 });

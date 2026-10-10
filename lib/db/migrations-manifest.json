@@ -75,6 +75,7 @@
     "073_final_writeup_leadership_digests.sql",
     "074_zoom_recording_imports.sql",
     "075_summary_drafts_discussion_kind.sql",
-    "076_zoom_video_copies.sql"
+    "076_zoom_video_copies.sql",
+    "077_zoom_transcript_provenance.sql"
   ]
 }

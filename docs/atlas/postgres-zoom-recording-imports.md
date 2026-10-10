@@ -22,9 +22,22 @@ related:
 
 **[LIVE, Session 586, 2026-10-08.]** Migration 074 is applied to shared Production Postgres (`applied_by` `claude-s586-zoom-import-2026-10-08`), and the code merged to `main` in PR #464 (`441140e6e`). Plan and build record: `docs/plans/ZOOM_RECORDING_IMPORT_PLAN_2026-10-08.md`.
 
+## Branch provenance extension — not deployed
+
+[VERIFIED via branch source, 2026-10-09] `codex/transcription-labels` adds nullable
+`selected_recording_files` capture before dispatch under the unexpired import lease.
+It records selected audio/optional VTT file IDs, types, sizes, start/end times and
+actual-byte SHA-256, plus the count of all `audio_only` response entries. URL refresh
+must preserve the selected file identity, extension, size and time range. No URLs or
+content enter this JSON. `getZoomImportForJob` scopes publication lookup by job,
+request and visit; ambiguous matches fail. Legacy rows without capture stay unknown.
+Migration `077_zoom_transcript_provenance.sql` is reserved for this extension;
+application remains pending and no Production change is claimed. See the
+[provenance plan](../plans/ZOOM_TRANSCRIPT_PROVENANCE_PLAN_2026-10-09.md).
+
 ## Ownership and contract
 
-`zoom_recording_imports` holds one row per import attempt for a request's Site Visit meeting. It stores identifiers and lifecycle state only: no recording content, download URLs, tokens, topics or names. `request_id` and `site_visit_activity_id` are Dataverse identities, not foreign keys; `actor_profile_id` references `user_profiles.id`; `transcription_job_id` references `transcription_jobs.id` (`ON DELETE SET NULL`; jobs are expired, never deleted).
+`zoom_recording_imports` holds one row per import attempt for a request's Site Visit meeting. It stores identifiers, lifecycle state and (in the undeployed provenance slice above) bounded recording-file evidence: no recording content, download URLs, tokens, topics or names. `request_id` and `site_visit_activity_id` are Dataverse identities, not foreign keys; `actor_profile_id` references `user_profiles.id`; `transcription_job_id` references `transcription_jobs.id` (`ON DELETE SET NULL`; jobs are expired, never deleted).
 
 | Column group | Meaning |
 |---|---|
@@ -39,5 +52,5 @@ A partial unique index allows one `importing` or `started` row per request and m
 ## Writers and readers
 
 - Writer: `lib/services/meeting-tracker-recordings/import-store.js`, called only from `import-service.js`, reached from `POST /api/meeting-tracker/visits/[requestId]/zoom-imports`.
-- Readers: the same service, to show per-meeting import state in the picker (`GET .../zoom-recordings`; the joined `transcription_jobs.status` also sets `transcriptReady`, so the picker reads "Imported, transcript ready" once the job is `ready`) and to find the job for an expired lease.
+- Readers: the branch provenance publication path also uses `getZoomImportForJob`; the same import service continues to show per-meeting import state in the picker (`GET .../zoom-recordings`; the joined `transcription_jobs.status` also sets `transcriptReady`, so the picker reads "Imported, transcript ready" once the job is `ready`) and to find the job for an expired lease.
 - Retention of these rows follows later Stage 5 work and is open.

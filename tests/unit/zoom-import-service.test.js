@@ -14,7 +14,7 @@ jest.mock('../../lib/services/meeting-tracker-recordings/zoom-client.js', () => 
 }));
 jest.mock('../../lib/services/meeting-tracker-recordings/import-store.js', () => ({
   ...jest.requireActual('../../lib/services/meeting-tracker-recordings/import-store.js'),
-  claimZoomImport: jest.fn(), getActiveZoomImport: jest.fn(), findJobForImport: jest.fn(),
+  captureZoomImportFiles: jest.fn(), claimZoomImport: jest.fn(), getActiveZoomImport: jest.fn(), findJobForImport: jest.fn(),
   takeOverExpiredAsStarted: jest.fn(), takeOverExpiredAsFailed: jest.fn(),
   releaseStartedImportWithEndedJob: jest.fn(), markZoomImportStarted: jest.fn(), markZoomImportFailed: jest.fn(), listZoomImportsForRequest: jest.fn(),
 }));
@@ -45,7 +45,7 @@ const VTT_URL = 'https://us02web.zoom.us/rec/download/VTT-SECRET';
 const CC_URL = 'https://us02web.zoom.us/rec/download/CC-SECRET';
 
 const file = (over) => ({ id: 'file-id', status: 'completed', file_extension: 'M4A', recording_type: 'audio_only', file_size: 5,
-  recording_start: '2026-10-05T17:00:00Z', download_url: AUDIO_URL, ...over });
+  recording_start: '2026-10-05T17:00:00Z', recording_end: '2026-10-05T18:00:00Z', download_url: AUDIO_URL, ...over });
 const audioFile = file({ id: 'audio-id' });
 const vttFile = file({ id: 'vtt-id', file_extension: 'VTT', recording_type: 'audio_transcript', file_size: 3, download_url: VTT_URL });
 const ccFile = file({ id: 'cc-id', file_extension: 'VTT', recording_type: 'closed_caption', file_size: 9, download_url: CC_URL });
@@ -56,6 +56,7 @@ let rows;
 let clock;
 function installFakeStore() {
   rows = new Map();
+  store.captureZoomImportFiles.mockImplementation(async ({ id, capture, jobId }) => { const r = rows.get(id); if (!r) return null; r.selected_recording_files = capture; r.transcription_job_id = jobId; return { ...r }; });
   store.claimZoomImport.mockImplementation(async (p) => {
     for (const r of rows.values()) if (r.request_id === p.requestId && r.zoom_meeting_uuid === p.meetingUuid && ['importing', 'started'].includes(r.state)) return null;
     const row = { id: p.id || `44444444-4444-4444-8444-${String(rows.size + 1).padStart(12, '0')}`, request_id: p.requestId, site_visit_activity_id: p.siteVisitActivityId,
@@ -322,6 +323,34 @@ describe('import: bytes and Blob writes', () => {
     expect(getMeetingRecordings).toHaveBeenCalledTimes(2);
     expect(downloadRecordingFile.mock.calls[0][0]).toBe('https://us02web.zoom.us/rec/download/FRESH');
     now.mockRestore();
+  });
+  test.each([
+    { id: 'replacement-with-same-size' },
+    { recording_start: '2026-10-05T17:01:00Z' },
+    { recording_end: '2026-10-05T18:01:00Z' },
+    { recording_type: 'other' },
+  ])('refresh refuses changed file identity even at the same byte size: %j', async change => {
+    const now = jest.spyOn(Date, 'now').mockImplementation(() => clock);
+    uploadMeetingTranscription.mockImplementation(async () => { clock += 6 * 60_000; return { job: { id: JOB, status: 'uploading', version: 2 }, upload: {} }; });
+    getMeetingRecordings.mockResolvedValueOnce(meeting([audioFile])).mockResolvedValue(meeting([{ ...audioFile, ...change }]));
+    expect((await rejection(importZoomRecording(args()))).code).toBe('zoom_recording_changed');
+    expect(downloadRecordingFile).not.toHaveBeenCalled();
+    expect(startMeetingTranscription).not.toHaveBeenCalled();
+    now.mockRestore();
+  });
+  test('captures the downloaded file hashes and audio-file count before start, without signed URLs', async () => {
+    getMeetingRecordings.mockResolvedValue(meeting([audioFile, vttFile, { ...audioFile, id: 'older-audio', recording_start: '2026-10-05T16:00:00Z' }]));
+    await importZoomRecording(args());
+    const saved = store.captureZoomImportFiles.mock.calls[0][0].capture;
+    expect(saved).toMatchObject({ audioOnlyFileCount: 2, audioFile: { fileId: 'audio-id', bytes: 5 }, transcriptFile: { fileId: 'vtt-id', bytes: 3 } });
+    expect(saved.audioFile.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.stringify(saved)).not.toContain('https:');
+    expect(store.captureZoomImportFiles.mock.invocationCallOrder[0]).toBeLessThan(startMeetingTranscription.mock.invocationCallOrder[0]);
+  });
+  test('a failed provenance capture never dispatches transcription', async () => {
+    store.captureZoomImportFiles.mockResolvedValueOnce(null);
+    expect((await rejection(importZoomRecording(args()))).code).toBe('zoom_import_lease_lost');
+    expect(startMeetingTranscription).not.toHaveBeenCalled();
   });
   test('a recording that changed size after the job was declared is rejected', async () => {
     const now = jest.spyOn(Date, 'now').mockImplementation(() => clock);

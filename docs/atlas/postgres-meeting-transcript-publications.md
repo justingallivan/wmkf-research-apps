@@ -68,6 +68,22 @@ hourly schedules remains unobserved despite successful platform-triggered
 checks. The incomplete-maintenance warning was accepted for delivery but not
 confirmed in the recipient inbox.
 
+## Branch provenance extension — not deployed
+
+[VERIFIED via branch source, 2026-10-09] `codex/transcription-labels` adds nullable
+`frozen_source_provenance` to publication receipts and `sourceProvenance` to bundle
+source/manifest v6. The publication service captures trusted request/visit/job-bound
+Zoom evidence or upload identity before freezing; the store checks the job's hash,
+bytes, duration and source ID under its existing transaction. Corrections preserve
+that identity while creating a new revision. Recovery compares source, manifest and
+receipt provenance and rebuilds using the receipt's frozen formatter version.
+Versions 1–5 remain supported with unknown provenance; history is not fabricated.
+`resolveCurrentMeetingTranscriptSource` verifies the current bundle and rechecks
+current artifact/fingerprint for server consumers. It does not establish video
+eligibility or synchronization. No word or utterance times change. Migration `077_zoom_transcript_provenance.sql` is reserved for this extension;
+database application and deployment remain pending; attendance/policy are outside this slice. See the
+[provenance plan](../plans/ZOOM_TRANSCRIPT_PROVENANCE_PLAN_2026-10-09.md).
+
 ## Ownership and relationships
 
 `meeting_transcript_publications` is designed as an operational receipt and
@@ -231,14 +247,14 @@ For ordinary reconciliation, a verified receipt whose Request Document has
 been superseded is marked terminal `published` (with the superseded error
 code), and the newer current artifact remains unchanged.
 
-## Deployed follow-up behavior and bounded verification
+## Historical formatter releases and bounded verification
 
 Formatter/schema v3 (branch-built 2026-10-04, owner decision after the Oregon
 State rehearsal) renders readable TXT as one paragraph per speaker turn, each
 prefixed with the turn's start time, with no minute sections; consecutive
 utterances by the same speaker ID merge, so a multi-minute monologue reads as
 one paragraph. The source shape is identical to v2 (optional word timings kept).
-New publications use v3; `TRANSCRIPT_FORMATTER_VERSIONS` in
+At that release, new publications used v3; `TRANSCRIPT_FORMATTER_VERSIONS` in
 `lib/services/transcription-pilot/transcript-format.js` is the single accepted-
 version list for the bundle builder, the manifest validator and the store, and
 recovery still rebuilds v1 and v2 byte-for-byte through the recorded version.
@@ -247,7 +263,7 @@ with optional, validated word timings. When word spans align with the exact
 utterance text, readable TXT may split an utterance at timed minute boundaries
 without dropping its punctuation or changing speaker attribution; absent or
 misaligned timings retain whole-utterance v1 behavior. VTT continues to use the
-original utterance cues. New publications use v2; recovery accepts explicit v1
+original utterance cues. At that release, new publications used v2; recovery accepts explicit v1
 and v2 source/manifests and rebuilds using the receipt's frozen formatter
 version so legacy v1 hashes remain reproducible. Optional word data is omitted
 if needed to stay within the existing 4 MB bounds. Formatter v2 was exercised

@@ -1,4 +1,5 @@
 /** @jest-environment node */
+jest.mock('../../lib/services/meeting-tracker-recordings/import-store', () => ({ getZoomImportForJob: jest.fn(async () => null) }));
 jest.mock('../../lib/dataverse/adapters/request-document.js', () => ({ findByRequest: jest.fn(), findByGenerationKey: jest.fn() }));
 jest.mock('../../lib/services/graph-service.js', () => ({ GraphService: { downloadFile: jest.fn(), getFileMetadataById: jest.fn() } }));
 jest.mock('../../lib/services/post-presentation-materials/material-service.js', () => ({
@@ -19,9 +20,10 @@ jest.mock('../../lib/services/transcription-pilot/store.js', () => Object.fromEn
   'expireMeetingTranscriptCorrectionDrafts', 'listUnresolvedMeetingTranscriptPublications',
   'markMeetingTranscriptPublicationChecked', 'closeMeetingPublicationAfterQuarantine',
   'getMeetingTranscriptionJob', 'freezeMeetingPublicationFromJob', 'freezeMeetingTranscriptCorrectionDraft',
-  'closeMeetingPublicationWithoutWrites',
+  'closeMeetingPublicationWithoutWrites', 'closeMeetingPublicationJobLease', 'createMeetingTranscriptCorrectionDraft',
 ].map(name => [name, jest.fn()])));
 
+import { getZoomImportForJob } from '../../lib/services/meeting-tracker-recordings/import-store';
 import * as documents from '../../lib/dataverse/adapters/request-document.js';
 import { GraphService } from '../../lib/services/graph-service.js';
 import * as publisher from '../../lib/services/post-presentation-materials/material-service.js';
@@ -31,7 +33,7 @@ import * as binding from '../../lib/services/meeting-tracker-transcription/bindi
 import * as store from '../../lib/services/transcription-pilot/store.js';
 import { buildMeetingTranscriptFiles, buildMeetingTranscriptManifest } from '../../lib/services/meeting-tracker-transcription/bundle.js';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE, REQUEST_DOCUMENT_LIFECYCLE_STATE, REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument.js';
-import { publishMeetingTranscription, publishMeetingCorrection, closeMeetingTranscriptPublication, reconcileMeetingTranscriptPublication, reconcileMeetingTranscriptPublicationsBatch } from '../../lib/services/meeting-tracker-transcription/service.js';
+import { createMeetingCorrection, resolveCurrentMeetingTranscriptSource, publishMeetingTranscription, publishMeetingCorrection, closeMeetingTranscriptPublication, reconcileMeetingTranscriptPublication, reconcileMeetingTranscriptPublicationsBatch } from '../../lib/services/meeting-tracker-transcription/service.js';
 
 const requestId = '11111111-1111-4111-8111-111111111111';
 const visitId = '22222222-2222-4222-8222-222222222222';
@@ -56,8 +58,8 @@ afterAll(() => {
   }
 });
 
-function fixture(sourceRevisionId = null, presentationEnd = null) {
-  const identity = { requestId, siteVisitActivityId: visitId, revisionId: operationId, operationId, sourceRevisionId, presentationEnd };
+function fixture(sourceRevisionId = null, presentationEnd = null, sourceProvenance = null) {
+  const identity = { requestId, siteVisitActivityId: visitId, revisionId: operationId, operationId, sourceRevisionId, presentationEnd, sourceProvenance };
   const generated = buildMeetingTranscriptFiles({ identity,
     content: { text: 'Synthetic words.', utterances: [{ speaker: 'A', start: 0, end: 1000, text: 'Synthetic words.' }] },
     speakerNames: { A: 'Synthetic Chair' } });
@@ -69,7 +71,7 @@ function fixture(sourceRevisionId = null, presentationEnd = null) {
   const receipt = { operation_id: operationId, request_id: requestId, site_visit_activity_id: visitId,
     state: 'unknown', version: 4, source_revision_id: sourceRevisionId,
     lease_expires_at: new Date(Date.now() - 60_000), quarantine_until: new Date(Date.now() - 1),
-    frozen_input_sha256: generated.inputSha256, formatter_version: generated.formatterVersion,
+    frozen_source_provenance: sourceProvenance, frozen_input_sha256: generated.inputSha256, formatter_version: generated.formatterVersion,
     published_by_profile_id: 8, published_by_system_id: originalActor, slot_fence_version: 7,
     verified_files: verifiedFiles, candidate_paths: candidatePaths,
     expected_current_artifact_id: null, expected_current_fingerprint: null,
@@ -177,7 +179,7 @@ test('recovery rebuilds a current-version bundle from the receipt-frozen present
   const result = await reconcileMeetingTranscriptPublication({ requestId, operationId,
     actorProfileId: 12, actingUserSystemId: currentActor });
   expect(result).toMatchObject({ resumed: true, requiresAttention: false });
-  expect(receipt.formatter_version).toBe('5');
+  expect(receipt.formatter_version).toBe('6');
   expect(publisher.publishMeetingTranscriptBundle).toHaveBeenCalledWith(expect.objectContaining({
     frozenInputSha256: receipt.frozen_input_sha256,
     identity: expect.objectContaining({ presentationEnd: boundary }),
@@ -356,4 +358,162 @@ test('daily checks rotate twenty persistent-attention receipts so the twenty-fir
   await expect(reconcileMeetingTranscriptPublicationsBatch({ limit: 20 })).resolves.toMatchObject({ checked: 20, attention: 20 });
   expect(store.getMeetingTranscriptPublication).toHaveBeenCalledWith(expect.objectContaining({ operationId: receipts[20].operation_id }));
   expect(publisher.publishMeetingTranscriptBundle).not.toHaveBeenCalled();
+});
+
+
+const uploadProvenance = { version: 1, sourceId: predecessor, kind: 'upload', audioSha256: 'a'.repeat(64),
+  audioBytes: 100, audioDurationMs: 1000, zoom: null };
+
+test('recovery retains provenance without needing the expired original job', async () => {
+  fixture(predecessor, boundary, uploadProvenance);
+  await reconcileMeetingTranscriptPublication({ requestId, operationId, actorProfileId: 12, actingUserSystemId: currentActor });
+  expect(publisher.publishMeetingTranscriptBundle).toHaveBeenCalledWith(expect.objectContaining({
+    identity: expect.objectContaining({ sourceProvenance: uploadProvenance }),
+  }));
+  expect(store.getMeetingTranscriptionJob).not.toHaveBeenCalled();
+});
+
+test('recovery rejects a source/receipt provenance mismatch before registration', async () => {
+  const receipt = fixture(predecessor, boundary, uploadProvenance);
+  receipt.frozen_source_provenance = { ...uploadProvenance, audioSha256: 'b'.repeat(64) };
+  await expect(reconcileMeetingTranscriptPublication({ requestId, operationId,
+    actorProfileId: 12, actingUserSystemId: currentActor })).rejects.toThrow('invalid_transcript_bundle');
+  expect(publisher.publishMeetingTranscriptBundle).not.toHaveBeenCalled();
+});
+
+
+function bindCurrentFixture(sourceProvenance) {
+  const receipt = fixture(null, boundary, sourceProvenance);
+  receipt.state = 'published';
+  receipt.resulting_document_id = predecessor;
+  const files = receipt.verified_files;
+  const manifest = buildMeetingTranscriptManifest({ identity: { requestId, siteVisitActivityId: visitId,
+    revisionId: operationId, operationId, presentationEnd: boundary, sourceProvenance }, files });
+  const row = { wmkf_requestdocumentid: predecessor, _wmkf_request_value: requestId,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT,
+    wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+    wmkf_producer: 'meeting-tracker-post-presentation', wmkf_inputfingerprint: receipt.frozen_input_sha256,
+    wmkf_transcriptbundlejson: JSON.stringify(manifest), wmkf_sharepointsiteid: 'site',
+    wmkf_sharepointdriveid: 'drive', wmkf_sharepointitemid: 'txt', wmkf_sharepointversionid: '1',
+    wmkf_sharepointetag: 'tag-txt', wmkf_filename: files.txt.filename,
+    wmkf_contenttype: files.txt.contentType, wmkf_contenthash: files.txt.sha256, wmkf_filesize: files.txt.size,
+    wmkf_slotversion: 7, createdon: '2026-09-25T12:00:00Z' };
+  documents.findByRequest.mockResolvedValue({ records: [row] });
+  return row;
+}
+
+test('Stage 4 resolver returns verified current source and boundary, never a newest-import guess', async () => {
+  bindCurrentFixture(uploadProvenance);
+  await expect(resolveCurrentMeetingTranscriptSource({ requestId, actorProfileId: 12 })).resolves.toMatchObject({
+    status: 'upload', provenance: uploadProvenance, revisionId: operationId, presentationEnd: boundary,
+  });
+});
+
+test('Stage 4 resolver rejects a current revision change during source read', async () => {
+  const row = bindCurrentFixture(uploadProvenance);
+  documents.findByRequest.mockResolvedValueOnce({ records: [row] }).mockResolvedValueOnce({ records: [row] })
+    .mockResolvedValue({ records: [{ ...row, wmkf_inputfingerprint: 'f'.repeat(64) }] });
+  await expect(resolveCurrentMeetingTranscriptSource({ requestId, actorProfileId: 12 })).rejects.toMatchObject({ code: 'meeting_transcript_current_changed' });
+});
+
+test('Stage 4 resolver distinguishes a malformed manifest from missing legacy provenance', async () => {
+  const row = bindCurrentFixture(null);
+  await expect(resolveCurrentMeetingTranscriptSource({ requestId, actorProfileId: 12 })).resolves.toMatchObject({ status: 'legacy_unknown' });
+  documents.findByRequest.mockResolvedValue({ records: [{ ...row, wmkf_transcriptbundlejson: '{invalid' }] });
+  await expect(resolveCurrentMeetingTranscriptSource({ requestId, actorProfileId: 12 })).resolves.toMatchObject({ status: 'invalid' });
+});
+
+
+test('Zoom provenance survives real service publish, names correction and recovery with string BIGINT rows', async () => {
+  const baseRow = bindCurrentFixture(null);
+  let current = null;
+  const receipts = new Map();
+  const blobs = new Map();
+  const descriptors = new Map();
+  let lastPublication;
+  const zoomJob = { id: predecessor, status: 'ready', version: 4, expires_at: new Date(Date.now() + 60000),
+    speaker_names: { A: 'Original name' }, verified_bytes: '5', audio_duration_ms: '1000', audio_sha256: 'a'.repeat(64) };
+  getZoomImportForJob.mockResolvedValue({ id: originalActor, zoom_meeting_uuid: 'exact-occurrence==', zoom_host_id: 'host',
+    selected_recording_files: { version: 1, audioOnlyFileCount: 1, transcriptFile: null,
+      audioFile: { fileId: 'exact-audio', recordingType: 'audio_only', bytes: 5, sha256: 'a'.repeat(64),
+        recordingStart: '2026-10-09T00:00:00Z', recordingEnd: '2026-10-09T00:00:01Z' } } });
+  store.getMeetingTranscriptionJob.mockResolvedValueOnce(zoomJob).mockResolvedValue(null);
+  getMeetingTranscriptionJobContent.mockResolvedValue({ content: { text: 'Synthetic.', utterances: [{ speaker: 'A', start: 0, end: 1000, text: 'Synthetic.' }] } });
+  documents.findByRequest.mockImplementation(async () => ({ records: current ? [current] : [] }));
+  GraphService.downloadFile.mockImplementation(async (_drive, item) => ({ buffer: blobs.get(item) }));
+  GraphService.getFileMetadataById.mockImplementation(async (_drive, item) => descriptors.get(item));
+  binding.getMeetingTranscriptionCandidates.mockResolvedValue({ candidates: [] });
+  store.getMeetingTranscriptPublication.mockImplementation(async ({ operationId: op }) => receipts.get(op));
+  store.freezeMeetingPublicationFromJob.mockImplementation(async args => {
+    receipts.set(args.operationId, { operation_id: args.operationId, state: 'publishing', version: 1,
+      frozen_source_provenance: args.sourceProvenance, frozen_input_sha256: args.frozenInputSha256,
+      formatter_version: args.formatterVersion });
+    return { jobLeaseToken: args.operationId, jobVersion: 5 };
+  });
+  store.closeMeetingPublicationJobLease.mockResolvedValue({ version: 6 });
+  store.transitionMeetingTranscriptPublication.mockImplementation(async args => {
+    const receipt = receipts.get(args.operationId);
+    Object.assign(receipt, { state: args.state, resulting_document_id: args.resultingDocumentId, verified_files: args.verifiedFiles });
+    return receipt;
+  });
+  publisher.publishMeetingTranscriptBundle.mockImplementation(async args => {
+    lastPublication = args;
+    if (args.resumeVerifiedFiles) return { artifactId: args.operationId, fingerprint: args.frozenInputSha256, manifest: { files: args.resumeVerifiedFiles } };
+    const files = Object.fromEntries(Object.entries(args.files).map(([role, file]) => {
+      const itemId = `${args.operationId}-${role}`;
+      const d = { siteId: 'site', driveId: 'drive', itemId, versionId: '1', eTag: itemId,
+        filename: file.filename, contentType: file.contentType, size: file.bytes.length, sha256: file.sha256 };
+      blobs.set(itemId, file.bytes); descriptors.set(itemId, { ...d, name: d.filename }); return [role, d];
+    }));
+    const manifest = buildMeetingTranscriptManifest({ identity: args.identity, files });
+    current = { ...baseRow, wmkf_requestdocumentid: args.operationId, wmkf_inputfingerprint: args.frozenInputSha256,
+      wmkf_transcriptbundlejson: JSON.stringify(manifest), wmkf_sharepointitemid: files.txt.itemId,
+      wmkf_sharepointetag: files.txt.eTag, wmkf_filename: files.txt.filename, wmkf_filesize: files.txt.size,
+      wmkf_contenthash: files.txt.sha256 };
+    const receipt = receipts.get(args.operationId);
+    Object.assign(receipt, { verified_files: files, slot_fence_version: 7,
+      candidate_paths: Object.fromEntries(Object.entries(files).map(([role, d]) => [role, `request/${d.filename}`])) });
+    return { artifactId: current.wmkf_requestdocumentid, fingerprint: args.frozenInputSha256, manifest };
+  });
+  const first = await publishMeetingTranscription({ requestId, ownerProfileId: 12, actingUserSystemId: currentActor,
+    jobId: predecessor, body: { expectedVersion: 4 } });
+  const firstProvenance = receipts.get(first.publication.operationId).frozen_source_provenance;
+  expect(firstProvenance).toMatchObject({ kind: 'zoom', audioBytes: 5, audioDurationMs: 1000, zoom: { meetingUuid: 'exact-occurrence==' } });
+  store.createMeetingTranscriptCorrectionDraft.mockImplementation(async args => {
+    const receipt = { operation_id: args.operationId, state: 'draft', version: 1, expires_at: args.expiresAt,
+      source_artifact_id: args.sourceArtifactId, source_revision_id: args.sourceRevisionId,
+      expected_current_artifact_id: args.expectedCurrentArtifactId, expected_current_fingerprint: args.expectedCurrentFingerprint,
+      speaker_names: args.speakerNames, frozen_source_provenance: args.sourceProvenance };
+    receipts.set(args.operationId, receipt); return receipt;
+  });
+  const draft = await createMeetingCorrection({ requestId, ownerProfileId: 12, artifactId: first.currentArtifact.id });
+  const correction = receipts.get(draft.correction.operationId);
+  correction.speaker_names = { A: 'Corrected name' };
+  store.freezeMeetingTranscriptCorrectionDraft.mockImplementation(async args => {
+    Object.assign(correction, { state: 'publishing', formatter_version: args.formatterVersion, frozen_input_sha256: args.frozenInputSha256 });
+    return { leaseToken: args.operationId, publication: correction };
+  });
+  await publishMeetingCorrection({ requestId, ownerProfileId: 12, actingUserSystemId: currentActor,
+    operationId: correction.operation_id, body: { expectedVersion: 1 } });
+  expect(lastPublication.identity.sourceProvenance).toEqual(firstProvenance);
+  expect(lastPublication.identity.revisionId).not.toBe(first.publication.operationId);
+  expect(lastPublication.files.txt.bytes.toString()).toContain('Corrected name');
+  // Simulate registry loss after all files were recorded; recovery must use this revision's frozen evidence.
+  correction.state = 'unknown'; correction.lease_expires_at = null;
+  store.claimMeetingTranscriptPublicationForRecovery.mockResolvedValue({ publication: correction, leaseToken: correction.operation_id });
+  const result = await reconcileMeetingTranscriptPublication({ requestId, operationId: correction.operation_id,
+    actorProfileId: 12, actingUserSystemId: currentActor });
+  expect(result).toMatchObject({ resumed: true, requiresAttention: false });
+  expect(lastPublication.identity.sourceProvenance).toEqual(firstProvenance);
+  expect(blobs.get(correction.verified_files.txt.itemId).toString()).toContain('Corrected name');
+  expect(getZoomImportForJob).toHaveBeenCalledTimes(1);
+});
+
+
+test('Stage 4 resolver requires an authenticated actor and a matching published receipt', async () => {
+  bindCurrentFixture(uploadProvenance);
+  await expect(resolveCurrentMeetingTranscriptSource({ requestId })).rejects.toThrow();
+  store.getMeetingTranscriptPublication.mockResolvedValue({ state: 'published', frozen_source_provenance: uploadProvenance });
+  await expect(resolveCurrentMeetingTranscriptSource({ requestId, actorProfileId: 12 })).resolves.toMatchObject({ status: 'invalid', reason: 'publication_receipt_mismatch' });
 });
