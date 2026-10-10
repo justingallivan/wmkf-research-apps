@@ -158,7 +158,7 @@ Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEAS
 - **Staff review open:** a staff route (`requireAppAccess('meeting-tracker')`) resolves a fresh download URL for the split row's output item. It checks the recorded item id and eTag, like `resolvePresentationMember`. This is the card's Open link before approval.
 - **Approve route** (staff, actor from session):
   - **Claim (revised, Codex round 1 finding 2: accepted).** This mirrors `publishSummaryDraft` exactly.
-    - One UPDATE moves `review` → `registering` with a new `approval_claim_token`, `approval_claimed_at = NOW()` and `approval_actor_profile_id` (the session's actor).
+    - One UPDATE moves `review` → `registering` with a new `approval_claim_token`, `approval_claimed_at = NOW()` and `approval_actor_profile_id` (the session's actor). It runs inside the same per-request advisory lock as start (`presentation_video_split:<request>`). Start locks the awaiting row with `FOR UPDATE` and supersedes it by id, so start and approve cannot interleave (Codex slice 2 review).
     - The same UPDATE also takes a `registering` row whose claim is abandoned: `approval_claim_token IS NULL`, or `approval_claimed_at <= NOW() - 180 s`.
     - Immediately before any registry read-for-write or create, it sets `approval_registration_attempted = TRUE` and refreshes `approval_claimed_at`, guarded by its token.
     - **On error:** release back to `review` only when `NOT approval_registration_attempted`. Otherwise yield: null the token, stay `registering`.

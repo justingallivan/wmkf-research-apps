@@ -29,7 +29,7 @@ const START = {
 };
 const none = text => (/^(SELECT id|UPDATE)/.test(text) ? [] : [{ id: ID, state: 'queued' }]);
 
-test('start runs lock, processing check, registering check, supersede, insert in one transaction, in that order', async () => {
+test('start runs lock, processing check, locked awaiting check, insert in one transaction, in that order (no awaiting row: no UPDATE)', async () => {
   const { store, calls } = harness(none);
   const result = await store.startPresentationVideoSplit(START);
   expect(result).toEqual({ status: 'started', split: { id: ID, state: 'queued' }, supersededIds: [] });
@@ -37,19 +37,27 @@ test('start runs lock, processing check, registering check, supersede, insert in
   expect(texts[0]).toContain('pg_advisory_xact_lock(hashtext($1), 0)');
   expect(calls[0].params).toEqual([`presentation_video_split:${REQ.toLowerCase()}`]);
   expect(texts[1]).toContain("state IN ('queued', 'cutting', 'uploading')");
-  expect(texts[2]).toContain("state = 'registering'");
-  expect(texts[3]).toContain("UPDATE presentation_video_splits SET state = 'superseded'");
-  expect(texts[3]).toContain("state = 'review'");
-  expect(texts[3]).toContain('completed_at = NOW()');
-  expect(texts[4]).toContain('INSERT INTO presentation_video_splits');
-  expect(texts[4]).toContain("'queued'");
-  expect(calls[4].params).toEqual([ID, REQ, SITE, 7, COPY, REV, 1234, DOC, 'd', 'i', '3', 'e', 99, 'q', '{"version":1}']);
-  expect(texts).toHaveLength(5);
+  expect(texts[2]).toContain("state IN ('review', 'registering') FOR UPDATE");
+  expect(texts[3]).toContain('INSERT INTO presentation_video_splits');
+  expect(texts[3]).toContain("'queued'");
+  expect(calls[3].params).toEqual([ID, REQ, SITE, 7, COPY, REV, 1234, DOC, 'd', 'i', '3', 'e', 99, 'q', '{"version":1}']);
+  expect(texts).toHaveLength(4);
 });
 
-test('start returns the superseded review row ids', async () => {
-  const { store } = harness(text => (text.startsWith('SELECT id') ? [] : text.startsWith('UPDATE') ? [{ id: DOC }] : [{ id: ID, state: 'queued' }]));
+test('start supersedes exactly the locked review row by id, then inserts', async () => {
+  const { store, calls } = harness(text => (text.includes('FOR UPDATE') ? [{ id: DOC, state: 'review' }]
+    : text.startsWith('SELECT id') ? [] : text.startsWith('UPDATE') ? [{ id: DOC }] : [{ id: ID, state: 'queued' }]));
   expect(await store.startPresentationVideoSplit(START)).toMatchObject({ status: 'started', supersededIds: [DOC] });
+  const update = calls.find(c => c.text.startsWith('UPDATE'));
+  expect(update.text).toContain("WHERE id = $1 AND state = 'review'");
+  expect(update.params).toEqual([DOC]);
+});
+
+test('a locked review row that no longer updates refuses instead of inserting beside it', async () => {
+  const { store, calls } = harness(text => (text.includes('FOR UPDATE') ? [{ id: DOC, state: 'review' }]
+    : text.startsWith('SELECT id') || text.startsWith('UPDATE') ? [] : [{ id: ID, state: 'queued' }]));
+  expect(await store.startPresentationVideoSplit(START)).toEqual({ status: 'approval_in_progress', split: null });
+  expect(calls.some(c => c.text.startsWith('INSERT'))).toBe(false);
 });
 
 test('start refuses a processing split without writing', async () => {
@@ -59,7 +67,7 @@ test('start refuses a processing split without writing', async () => {
 });
 
 test('start refuses any registering split without writing', async () => {
-  const { store, calls } = harness(text => (text.includes("state = 'registering'") ? [{ id: ID }] : []));
+  const { store, calls } = harness(text => (text.includes('FOR UPDATE') ? [{ id: ID, state: 'registering' }] : []));
   expect(await store.startPresentationVideoSplit(START)).toEqual({ status: 'approval_in_progress', split: null });
   expect(calls.some(c => /^(INSERT|UPDATE)/.test(c.text))).toBe(false);
 });
