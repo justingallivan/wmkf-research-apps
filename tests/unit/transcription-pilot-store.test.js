@@ -168,9 +168,9 @@ describe('transcription pilot persistence contract', () => {
       const [query, params] = db.query.mock.calls[0];
       expect(query).toMatch(/presentation_end_ms, presentation_end_confirmed_by, presentation_end_confirmed_at/);
       expect(query).toMatch(/\$11::integer,\$12::integer,\$13::timestamptz/);
-      expect(params.slice(-3)).toEqual([90_000, 12, '2026-10-05T12:00:00.000Z']);
+      expect(params.slice(10, 13)).toEqual([90_000, 12, '2026-10-05T12:00:00.000Z']);
       await store.createMeetingCorrectionDraft(draft);
-      expect(db.query.mock.calls[1][1].slice(-3)).toEqual([null, null, null]);
+      expect(db.query.mock.calls[1][1].slice(10, 13)).toEqual([null, null, null]);
     });
 
     it('leaves the boundary untouched when presentationEnd is undefined', async () => {
@@ -236,7 +236,7 @@ describe('transcription pilot persistence contract', () => {
     expect(db.query.mock.calls[1][1]).toEqual([
       operationId, NON_RFC_REQUEST_ID, NON_RFC_SITE_VISIT_ID, 12, NON_RFC_DOCUMENT_ID,
       '00000000-0000-4000-8000-000000000002', NON_RFC_DOCUMENT_ID, 'a'.repeat(64), '{}', expect.any(Date),
-      null, null, null,
+      null, null, null, null,
     ]);
 
     await store.transitionMeetingPublication({ operationId, requestId: NON_RFC_REQUEST_ID,
@@ -822,4 +822,25 @@ describe('speaker alignment validation and projection allowlist', () => {
     expect(JSON.stringify(meeting.speaker_alignment)).not.toMatch(/pairIds|LEAK|prior|floor/);
     expect(meeting.speaker_alignment.speakers.A).toEqual({ name: 'Chair', confidence: 0.9 });
   });
+});
+
+
+test('publication freezes normalized provenance and checks it against the locked audio job', async () => {
+  const op = '11111111-1111-4111-8111-111111111111';
+  const jobId = '22222222-2222-4222-8222-222222222222';
+  const provenance = { version: 1, sourceId: jobId, kind: 'upload', audioSha256: 'a'.repeat(64), audioBytes: 5, audioDurationMs: 1000, zoom: null };
+  const args = { operationId: op, jobId, requestId: NON_RFC_REQUEST_ID, siteVisitActivityId: NON_RFC_SITE_VISIT_ID,
+    initiatorProfileId: 12, publishedByProfileId: 12, actingUserSystemId: NON_RFC_ACTOR_ID, expectedVersion: 4,
+    frozenInputSha256: 'b'.repeat(64), formatterVersion: '6', sourceProvenance: provenance,
+    candidatePaths: { txt: `folder/${op}.txt`, vtt: `folder/${op}.vtt`, source: `folder/${op}.json` } };
+  const locked = { id: jobId, audio_sha256: provenance.audioSha256, verified_bytes: '5', audio_duration_ms: '1000' };
+  const tx = { query: jest.fn().mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [locked] })
+    .mockResolvedValueOnce({ rows: [{ version: 5 }] }).mockResolvedValueOnce({ rows: [{ operation_id: op }] }) };
+  const db = { query: jest.fn(), transaction: async fn => fn(tx) };
+  await createTranscriptionPilotStore(db).freezeMeetingPublicationFromJob(args);
+  expect(tx.query.mock.calls[3][0]).toContain('frozen_source_provenance');
+  expect(JSON.parse(tx.query.mock.calls[3][1][16])).toEqual(provenance);
+  tx.query.mockReset().mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [{ ...locked, audio_sha256: 'c'.repeat(64) }] });
+  await expect(createTranscriptionPilotStore(db).freezeMeetingPublicationFromJob(args)).rejects.toMatchObject({ code: 'transcription_source_changed' });
+  expect(tx.query).toHaveBeenCalledTimes(2);
 });
