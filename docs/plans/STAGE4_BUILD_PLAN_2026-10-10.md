@@ -3,7 +3,7 @@ title: Stage 4 build plan — presentation video cut
 kind: plan
 domain: transcription
 status: draft
-summary: "Build plan for Stage 4 (presentation-only video cut from the copied Zoom MP4 at the confirmed presentation end), written Session 592 from source reads. Ordered slices with owner gates: Sandbox SDK probe, migration 079 plus copy-time recording times, split store and start route, Sandbox worker with reaper, approval and Board/briefing playback, card. Contract-reconcile Mode A: ready with named changes (applied; approval = registration, as for summaries). Codex adversarial round 1: 4 findings accepted (3 in full, 1 in part) and applied. Owner decisions B1-B6 recorded; slice 0 (SDK probe) passed. Nothing built in the app."
+summary: "Build plan for Stage 4 (presentation-only video cut from the copied Zoom MP4 at the confirmed presentation end). Slice 0 probe passed; slice 1 (migration 079, recording times) merged and live; slices 2-5 (migration 080, start route, Sandbox worker and cut recipe, approval and Board/briefing playback, card) built on branch claude/stage4-build and each approved by Codex adversarial review (Session 592). Not merged: owner applies 080, adds Dataverse value 100000011, uploads the FFmpeg tarball, then merge with the flag off."
 owner: product-engineering
 related:
   - docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md
@@ -285,3 +285,33 @@ Verdict *needs-attention*, 4 findings. All accepted and applied above:
 Verdict *needs-attention*, 2 findings, both accepted and applied. Codex confirmed that the round 1 cleanup fix closes its finding, and that the Stage 5 deferral is safe while deletion stays blocked behind the retirement transition.
 1. **High, accepted:** a stale yielded approval could block replacement cuts. Added stale-approval reconciliation: look up by generation key, supersede any orphan row, settle the split as `superseded`. Start runs it for an abandoned, stale `registering` row.
 2. **Medium, accepted:** the omitted-frame predicate rejected valid non-frame-aligned cuts. Kept frames must end at or before T; the first omitted frame must end after T and may straddle it. Added the T = 10.01 s fixture.
+
+## Build status (Session 592, end of build)
+
+All slices are built on `claude/stage4-build`, and each passed Codex adversarial review:
+- slice 2: round 2;
+- slice 3: round 3;
+- slice 4: round 1;
+- slice 5: round 2.
+
+Notable findings fixed along the way:
+- audio-gap privacy leak;
+- snapshot delete contract;
+- stranded jobs when access is withdrawn;
+- processor expiry postponed by failing ticks;
+- awaiting-row lock;
+- card recovery paths.
+
+The orchestrator ruled that the source recipe tolerates edit lists that only reflect codec delay, because real Zoom MP4s carry them.
+
+The full suite passes: 1,333 suites, 22,437 tests. One flaky card test was seen under load and passes on rerun.
+
+**Open follow-ups:**
+- Frame probing decodes frames; measure the cost on the first real cut and switch to packet timestamps if it is slow.
+- A real Graph-reported quickXorHash vector is still to be added to the recipe tests.
+
+**Gates before merge (owner):**
+1. Apply migration 080.
+2. Run `scripts/extend-requestdocument-artifacttype-presentation-video.mjs --execute`, which adds 100000011 "Presentation Video".
+3. Approve and upload the pinned FFmpeg tarball to private Blob, and set `PRESENTATION_VIDEO_FFMPEG_BLOB_PATHNAME`.
+4. Merge with `PRESENTATION_VIDEO_SPLIT_ACCESS` unset (off). The first real cut uses `test:<1003222 GUID>` after the re-import and re-copy (B6).
