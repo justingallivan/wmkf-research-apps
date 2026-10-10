@@ -235,3 +235,60 @@ describe('polling', () => {
     expect(getCount()).toBe(before);
   });
 });
+
+describe('registering recovery and failed refreshes', () => {
+  test('registering offers Finish approving, which posts approve and ends Approved', async () => {
+    route({ state: { splits: { available: true, splits: [split({ state: 'registering' })] } } });
+    await renderLine();
+    const el = await line();
+    state.splits = { available: true, splits: [split({ state: 'approved' })] };
+    fireEvent.click(within(el).getByRole('button', { name: 'Finish approving' }));
+    await waitFor(() => expect(state.posts).toEqual([{ action: 'approve', splitId: SPLIT_ID }]));
+    await waitFor(() => expect(el).toHaveTextContent('Approved for the Board'));
+  });
+
+  test('a live claim (409 in progress) shows the wait message and keeps Approving', async () => {
+    route({ state: { splits: { available: true, splits: [split({ state: 'registering' })] } },
+      post: () => response({ error: 'x', code: 'presentation_video_approval_in_progress' }, 409) });
+    const { container } = await renderLine();
+    const el = await line();
+    fireEvent.click(within(el).getByRole('button', { name: 'Finish approving' }));
+    expect(await within(el).findByText('Approval is still in progress. Try again in a few minutes.')).toBeInTheDocument();
+    expect(el).toHaveTextContent('Approving…');
+    expect(container.textContent).not.toMatch(/presentation_video_/);
+  });
+
+  test('a started cut stays Working and polling recovers after the refresh fails', async () => {
+    jest.useFakeTimers();
+    route({ post: () => response({ split: { id: SPLIT_ID, state: 'queued' } }, 202) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    const advance = (ms) => act(async () => { jest.advanceTimersByTime(ms); });
+    await advance(0);
+    await screen.findByText(/Presentation ends at/);
+    const el = await line();
+    state.splits = () => { throw new Error('network down'); };
+    fireEvent.click(within(el).getByRole('button', { name: 'Create presentation video' }));
+    await waitFor(() => expect(el).toHaveTextContent('Couldn’t refresh the video status. Retrying…'));
+    expect(el).toHaveTextContent('Video: Working…');
+    expect(within(el).queryByRole('button', { name: 'Create presentation video' })).not.toBeInTheDocument();
+    const before = getCount();
+    await advance(15_500);
+    expect(getCount()).toBe(before + 1);
+    state.splits = { available: true, splits: [split({ state: 'review' })] };
+    await advance(15_500);
+    await waitFor(() => expect(el).toHaveTextContent('Ready to check'));
+    expect(el).not.toHaveTextContent('Retrying');
+    expect(el.textContent).not.toContain(SPLIT_ID);
+  });
+
+  test('an initial load failure shows a Retry instead of hiding the line', async () => {
+    route({ state: { splits: () => { throw new Error('network down'); } } });
+    const { container } = await renderLine();
+    const el = await line();
+    expect(el).toHaveTextContent('Couldn’t load the video status.');
+    state.splits = { available: true, splits: [] };
+    fireEvent.click(within(el).getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(el).toHaveTextContent('Not started'));
+    expect(container.textContent).not.toMatch(/presentation_video_|network down/);
+  });
+});
