@@ -3,7 +3,7 @@ title: Stage 4 build plan — presentation video cut
 kind: plan
 domain: transcription
 status: draft
-summary: "Build plan for Stage 4 (presentation-only video cut from the copied Zoom MP4 at the confirmed presentation end), written Session 592 from source reads. Ordered slices with owner gates: Sandbox SDK probe, migration 079 plus copy-time recording times, split store and start route, Sandbox worker with reaper, approval and Board/briefing playback, card. Draft: nothing built; owner decisions B1-B6 open."
+summary: "Build plan for Stage 4 (presentation-only video cut from the copied Zoom MP4 at the confirmed presentation end), written Session 592 from source reads. Ordered slices with owner gates: Sandbox SDK probe, migration 079 plus copy-time recording times, split store and start route, Sandbox worker with reaper, approval and Board/briefing playback, card. Contract-reconcile Mode A: ready with named changes (applied; approval = registration, as for summaries). Draft: nothing built; owner decisions B1-B6 open."
 owner: product-engineering
 related:
   - docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md
@@ -23,7 +23,7 @@ related:
 ## Owner decisions needed
 
 - **B1. Sandbox SDK and credential path.** The app has no `@vercel/sandbox` dependency, and nothing in the app authenticates to Vercel from a deployed function; the only Vercel API caller (`pages/api/cron/log-analysis.js:40-60`) uses a personal token. How the SDK authenticates from a deployed function (OIDC or a token) is `[ASSUMED]` until slice 0 measures it. Approve adding the dependency and the credential that slice 0 finds.
-- **B2. Approval home.** Recommendation: the staff approval sets the Dataverse document's `wmkf_lifecyclestate` from `REVIEW` (100000001) to `BOARD_READY` (100000002) (`shared/config/requestDocument.js:54-60`), and the Postgres split row records who approved and when. Outside readers then need no new Postgres read, and the approval survives Stage 5 deletion. Alternative: approval only on the Postgres row, which adds a Postgres read to the Board and briefing pages.
+- **B2. Approval = registration (revised by contract-reconcile, Session 592).** Recommendation: follow the summary draft → publish model. The cut output sits in SharePoint, recorded only on the Postgres split row, while staff check it. **Check the ending and approve** registers the Dataverse document. A Board-visible video therefore always means "registered and bound", exactly as for summaries (`transcript-summary-service.js:555-560` creates the row only at publish). Every post-presentation row is registered as `DRAFT` today, and the outside pages exclude only `SUPERSEDED` (`material-service.js:1335`, `presentation-page-service.js:84`). A `REVIEW` → `BOARD_READY` gate would therefore be a new lifecycle meaning that no reader honours today. Rejected alternative: register at `REVIEW` and gate outside readers on `BOARD_READY`.
 - **B3. Board playback.** The outside presentation open route already redirects to a fresh Microsoft URL after rechecking membership (`pages/api/external/presentation/[token]/open.js:1,35-37`) and already accepts `mode=watch` at the route (`:26`); the service currently rejects `watch` for post-presentation types. Recommendation: the presentation video uses the same redirect, with `watch` allowed for this type only; the browser plays the MP4 from the SharePoint download URL. Confirm Board members may be sent to that short-lived URL for video, as they already are for transcripts.
 - **B4. FFmpeg source at run time.** The pilot fetched the pinned BtbN build from GitHub, and GitHub rate-limited a Vercel deployment's source fetch on 2026-10-10. Recommendation: store the verified tarball once in a private Blob store and fetch it from there in the sandbox, still checking its SHA-256. Alternative: GitHub at run time (no new storage, exposed to GitHub limits).
 - **B5. Picklist value.** `BOARD_PRESENTATION_RECORDING = 100000011` is reserved for Stage 4 (`SITE_VISIT_SUMMARIES_AND_BOARD_SHARING_PLAN_2026-10-04.md`; header of `scripts/extend-requestdocument-artifacttype-staff-discussion-transcript.mjs`), and migration 068 already admits 100000011 in its Postgres CHECKs (`lib/db/migrations/068*.sql:18,24`). The owner runs a one-value extend script in Dataverse before slice 4 deploys. Until then the code fails closed.
@@ -42,7 +42,7 @@ Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEAS
 ### Slice 1 — Migration 079 and copy-time recording times
 
 - Migration 079: `zoom_video_copies.recording_start` and `recording_end` (`TIMESTAMPTZ NULL`, both null or both set), plus the split table below. Manifest entry and Atlas updates.
-- Write the times at copy start: `video-copy-service.js:127-133` already holds the Zoom file from `pickVideoFile`, whose `recording_start` / `recording_end` are available there; pass them into `store.startZoomVideoCopy` (insert at `video-copy-store.js:183-191`). The worker's `listAndValidate` (`video-copy-worker.js:464-481`) gains the same comparison, so a changed Zoom file fails the copy.
+- Write the times at copy start: `video-copy-service.js:127-133` already holds the Zoom file from `pickVideoFile`, whose `recording_start` / `recording_end` are available there; pass them into `store.startZoomVideoCopy` (insert at `video-copy-store.js:183-191`). The worker's `listAndValidate` (`video-copy-worker.js:464-481`) gains the same comparison, only for rows that have times, so a changed Zoom file fails the copy. A copy already in flight when slice 1 deploys has null times and must not fail on the new check.
 - Rows copied before this slice keep null times and are ineligible for a cut (decision 16). Landable alone.
 
 ### Slice 2 — Split store, start route and same-source check
@@ -50,7 +50,7 @@ Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEAS
 - **Table `presentation_video_splits`** (in 079), modeled on `zoom_video_copies` (`076_zoom_video_copies.sql`):
   - identity: `id`, `request_id`, `site_visit_activity_id`, `actor_profile_id`, `source_copy_id` (FK `zoom_video_copies`);
   - frozen input: `transcript_revision_id`, `presentation_end_ms`, the content-free provenance projection (JSONB, no names or attendance), source document id, SharePoint drive/item/version/eTag, size, quickXorHash, `mapping_version`;
-  - state: `queued`, `cutting`, `uploading`, `registering`, `review`, `approved`, `failed`, `cancelled`, `superseded`;
+  - state: `queued`, `cutting`, `uploading`, `review`, `registering`, `approved`, `failed`, `cancelled`, `superseded`. The worker owns `queued` through `review`. The staff approve route owns `review` → `registering` → `approved`;
   - lease and fence (`lease_token`, `lease_expires_at`, `next_attempt_at`), attempt caps, `cancel_requested_at`;
   - sandbox ledger: `sandbox_name`, `sandbox_command_id`, `sandbox_created_at`, `sandbox_cleaned_at`, cleanup receipt (JSONB, content-free);
   - output: SharePoint drive/item/version/eTag, size, quickXorHash, `request_document_id`, verification receipt (JSONB);
@@ -87,12 +87,7 @@ Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEAS
   1. Only now does the worker create the Graph upload session (`createBrowserUploadSession`, `conflictBehavior: 'fail'`) in the request's `Post Site Visit Materials` folder.
   2. A second detached command uploads chunks in multiples of 320 KiB to that session URL.
   3. The worker confirms that the completed item's size and Graph quickXorHash equal the receipt (same item-id check as `readQuickXorHash`, `video-copy-worker.js:538-559`). There is no re-download.
-- **`registering`:** register through the single `createDocument` path in `material-service.js`:
-  - type 100000011, lifecycle `REVIEW`;
-  - the slot fence;
-  - generation identity on `wmkf_inputfingerprint`, as summaries do. `wmkf_generationkey` is the Dataverse alternate key, and a re-cut at the same revision and boundary must not collide with it. Contract-reconcile confirms this choice.
-
-  Then `review`.
+- **Then `review`.** The worker does not register anything. The output is in SharePoint, recorded only on the split row, and it is not visible to outside readers because no Dataverse row exists for it.
 - **Cleanup and reaper:**
   - After every terminal step, and on any failure: stop the sandbox; list snapshots across all pages and delete any found (each one logged as a retention incident); delete the sandbox; confirm it is absent with an independent list; write the cleanup receipt.
   - A row whose lease expired in `cutting` or `uploading` gets the same cleanup, then fails with `processor_lost`. A partly uploaded session is cancelled.
@@ -100,13 +95,23 @@ Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEAS
 
 ### Slice 4 — Binding, approval and Board/briefing playback
 
-- **`bindPresentationVideo`** (new, next to `presentation-transcript-binding.js`) returns `bound`, `missing`, `stale` or `not_approved`. A row is bound only when all of these hold:
+- **`bindPresentationVideo`** (new, next to `presentation-transcript-binding.js`) returns `bound`, `missing` or `stale`. A row is bound only when both hold:
   - the type is 100000011;
-  - the fingerprint matches the current revision, `endMs` and source identity;
-  - the lifecycle is `BOARD_READY` (B2).
+  - `wmkf_inputfingerprint` matches the current revision, `endMs` and source Recording identity, all computable from the Dataverse rows the readers already load.
 
-  The fingerprint and lineage are content-free and do not need the full Recording to exist (Stage 5).
-- **Approve route** (staff): moves the document from `REVIEW` to `BOARD_READY` and records the approver on the split row, fenced on the output's version and eTag. A later re-cut supersedes the earlier video.
+  Unapproved output has no Dataverse row, so it is `missing` (B2). The fingerprint and lineage are content-free and do not need the full Recording to exist (Stage 5).
+- **Staff review open:** a staff route (`requireAppAccess('meeting-tracker')`) resolves a fresh download URL for the split row's output item. It checks the recorded item id and eTag, like `resolvePresentationMember`. This is the card's Open link before approval.
+- **Approve route** (staff, actor from session):
+  - It claims the split row first (`review` → `registering`, leased), so a second click or a concurrent re-cut cannot double-register. The summary publish's claim-first pattern is the precedent (`transcript-summary-service.js` `publishSummaryDraft`).
+  - It rechecks the frozen identity, the current transcript revision and boundary, and that the output item's eTag and quickXorHash still match the receipt.
+  - It registers through the post-presentation create path with the slot fence:
+    - type 100000011, `DRAFT`, `wmkf_producer` as for the other post-presentation rows;
+    - `wmkf_generationkey` unique per split row, mirroring the MP4 finalize's per-upload key (`material-service.js:1336-1338`);
+    - the binding fingerprint on `wmkf_inputfingerprint`;
+    - the pinned SharePoint version and eTag.
+  - Before any create on retry, it looks up an existing row by that generation key.
+  - The new create seam is a `REQUIRED` actor-policy row in `scripts/check-request-document-writers.js` `WRITERS`.
+  - It then sets `approved` with the approver. A later approved re-cut supersedes the earlier video through the slot's latest-only winner rule.
 - **Outside readers:**
   - Add the type to the allowlists in `presentation-page-service.js:34-37` and `briefing-page-service.js:91-103`, plus an MP4 mime entry.
   - Allow `watch` only for this type, and keep the pinned-eTag check at open.
@@ -140,6 +145,7 @@ UI gates mirror the server guards (memory rule `feedback-ui-gates-must-mirror-se
    - the audio duration is at most `samples`;
    - the audio packets equal the independent encode.
 10. Rename the partial file only after acceptance, then compute its quickXorHash. Out-of-space errors map to `insufficient_scratch`.
+    - quickXorHash is not an FFmpeg feature. The sandbox needs a small stdlib implementation, with a unit test against a Graph-reported hash of a known file.
 
 ## Acceptance before Board use
 
@@ -150,3 +156,15 @@ UI gates mirror the server guards (memory rule `feedback-ui-gates-must-mirror-se
 ## Gates
 
 `check:migrations-manifest`, `check:atlas` (new table page; `zoom_video_copies` and `wmkf_requestdocument` pages), `check:api-routes` (start, approve and cron rows), `check:route-lifecycle-auth`, `check:trust-boundary-guid`, `check:request-document-writers`, `check:status-enum-parity` (state and label maps), `check:dataverse-access-layer`, `check:route-service-boundary`, the scheduled-job census test, and `check:types`.
+
+## Contract-reconcile Mode A (Session 592)
+
+Verdict: **READY WITH NAMED CHANGES**. The changes below are applied above.
+1. **Approval model.** The plan's `REVIEW` → `BOARD_READY` gate would have added a lifecycle meaning no outside reader checks. The only lifecycle check is `!= SUPERSEDED` (`presentation-page-service.js:84`). A grep of `lib/services/{post-presentation-materials,meeting-tracker-transcription,meeting-tracker-recordings}` finds no write of `REVIEW`, `BOARD_READY` or `FINAL`. Replaced by register-on-approval (B2), the summary publish precedent.
+2. **Generation identity.** It was "fingerprint only, to avoid alternate-key collisions". It is now a per-split `wmkf_generationkey` plus the binding fingerprint on `wmkf_inputfingerprint`, as the MP4 finalize already does (`material-service.js:1336-1338`).
+3. **Actor policy.** Registration moved from the cron to the staff approve route, so the new create seam uses `REQUIRED` with the approving staff member as actor, and needs a `WRITERS` row in `scripts/check-request-document-writers.js`.
+4. **In-flight copies.** The copy worker's new recording-time comparison applies only to rows that have times.
+5. **Staff review access.** Added a staff open route for the unregistered output.
+6. **quickXorHash** needs an in-sandbox implementation.
+
+Still open: B1 (measured in slice 0), B3, B4, B5, B6. A fresh-agent adversarial review (`/codex:adversarial-review`) is recommended before slice 2 code, per the skill's step 6.
