@@ -92,7 +92,11 @@ Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEAS
   - CHECKs mirroring the copy table's shape checks.
   - A partial unique index allows one **processing** split per request (`queued`, `cutting`, `uploading`).
   - A second partial unique index allows one **awaiting-approval** split per request (`review`, `registering`).
-  - Starting a new cut supersedes a `review` row. It is refused (409 `presentation_video_approval_in_progress`) while a `registering` row exists, unless that claim is abandoned: either more than 180 s old, or yielded with a null token. In that case staff finish the approval first, via the approve route's reclaim.
+  - Starting a new cut supersedes a `review` row.
+  - **A `registering` row:**
+    - With a live claim, start is refused (409 `presentation_video_approval_in_progress`).
+    - With an abandoned claim (null token, or older than 180 s) whose frozen identity still matches the current transcript revision, boundary and source, start is refused with "finish approving the current video first", which the approve route's reclaim can do.
+    - With an abandoned claim whose identity is **stale**, start runs **stale-approval reconciliation** (below) and then proceeds (Codex round 2, finding 1).
 - **Output upload ledger.** The split row holds its own upload session. It does not reuse `presentation_material_uploads`. Reusing it needs a third `origin` value and an audit of the 18 `origin = '…'` predicates in `upload-intent-store.js` [DERIVED-FROM: `grep -c "origin = '"` on that file, Session 592; independent of other counts]. The split never takes browser bytes, so a separate ledger is smaller.
 - **Start (staff route, `requireAppAccess('meeting-tracker')`, actor from session).** The route calls `resolveCurrentMeetingTranscriptSource({ requestId, actorProfileId })` (`meeting-tracker-transcription/service.js:941-967`; only tests call it today). It requires all of:
   - `status === 'verified_zoom'`;
@@ -160,6 +164,12 @@ Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEAS
     - **On error:** release back to `review` only when `NOT approval_registration_attempted`. Otherwise yield: null the token, stay `registering`.
     - **On success:** set `approved` with `approved_by_profile_id` / `approved_at`, guarded by the token.
     - A claim lost before `approved` is recorded as a reconciliation event (`draft_claim_lost` precedent).
+    - **Stale-approval reconciliation (Codex round 2, finding 1: accepted).** If the reclaimed row's frozen identity no longer matches the current transcript revision, boundary or source, the approve route does not register. Start runs the same step before it admits a new cut. Under the fenced claim it:
+      1. looks up rows by the split's generation key (more than one: `presentation_video_generation_ambiguous`);
+      2. if one exists, patches it to `SUPERSEDED` and records its id on the split row;
+      3. settles the split as terminal `superseded` with `failure_code` `presentation_video_approval_stale`, which frees both partial unique indexes.
+
+      The orphaned Dataverse row is withheld before step 2 anyway, because its fingerprint no longer matches (stale). Step 2 makes that explicit. If a step fails, the row stays `registering` with its token yielded, and the next start or approve call retries. A test covers a lost create response followed by a transcript change before retry.
     - **The lost-response case** (Dataverse created the row, but the response or the final UPDATE was lost) is a test: the next approve call reclaims, finds the exact row by generation key and settles `approved` with no second create.
   - It rechecks the frozen identity, the current transcript revision and boundary, and that the output item's eTag and quickXorHash still match the receipt.
   - It registers through the post-presentation create path with the slot fence:
@@ -199,7 +209,11 @@ UI gates mirror the server guards (memory rule `feedback-ui-gates-must-mirror-se
 4. Compute `frames = floor(T × fps)` and `samples = floor(T × rate)`, where T = `endMs` / 1000.
 5. Decode the audio onto a zero-based clock, trim it to `samples`, and write isolated PCM. Reject unless the size is exactly `samples × channels × 2`.
 6. Encode AAC from that PCM twice: once as the output, once as an independent check copy.
-7. Re-encode exactly the source frames whose **source** end time (pts + frame duration) is at or before T, with libx264 (veryfast, CRF 20, yuv420p), keeping source timestamps. Use passthrough frame timing, not `-r`. With step 3's checks this is the first `frames` frames. The step proves it, not assumes it: source frame `frames - 1` must end at or before T, and frame `frames` must start at or after T.
+7. Re-encode exactly the source frames whose **source** end time (pts + frame duration) is at or before T, with libx264 (veryfast, CRF 20, yuv420p), keeping source timestamps. Use passthrough frame timing, not `-r`. With step 3's checks this is the first `frames` frames. The step proves it, not assumes it:
+   - every kept frame (`0 … frames - 1`) ends at or before T;
+   - the first omitted frame (`frames`), when present, ends **after** T. It may straddle T, because boundaries are utterance-end milliseconds and are not frame-aligned (`presentation-boundary.js:64-81`; Codex round 2, finding 2).
+
+   A 25 fps fixture cut at T = 10.01 s keeps 250 frames ending at 10.00 s and is accepted.
 8. Mux one H.264 stream and one AAC stream into a partial file, with metadata and chapters removed and `+faststart`.
 9. Accept only if all of these hold:
    - exactly two streams, and only MP4 brand tags;
@@ -224,7 +238,8 @@ UI gates mirror the server guards (memory rule `feedback-ui-gates-must-mirror-se
   - nonzero video `start_time`;
   - nonzero audio `start_time`;
   - an edit list that shifts the timeline;
-  - a shifted source that passes duration-only checks but contains post-cut content.
+  - a shifted source that passes duration-only checks but contains post-cut content;
+  - a 25 fps source cut at T = 10.01 s, which keeps 250 frames and must be **accepted** (a non-frame-aligned boundary).
 
   Each must be rejected or caught by the source/output correspondence check.
 - First real cut (B6): the owner watches its ending in a browser and in the SharePoint viewer before approving. This replaces the synthetic ending check (Session 592).
@@ -253,3 +268,9 @@ Verdict *needs-attention*, 4 findings. All accepted and applied above:
 2. **High, accepted:** stranded approval after a registry write. The summary-publish claim, attempted-flag, release/yield and reclaim pattern is mirrored, with lookup by generation key before every create.
 3. **High, accepted:** the recipe dropped the source-clock checks. The recipe now has timeline probes, source-clock frame selection, and source/output correspondence on both decode paths. Verified: the pilot's `accept()` compares output timestamps only to `T`, never to source frames (`scripts/benchmarks/stage4-sandbox-pilot.py`).
 4. **Medium, accepted in part:** Stage 5 binding authority. v1 stores the content-free lineage and pins fail-closed behaviour. The retirement transition is deferred to Stage 5 as a precondition of any deletion, not built here.
+
+## Codex adversarial review, round 2 (Session 592) — adjudication
+
+Verdict *needs-attention*, 2 findings, both accepted and applied. Codex confirmed that the round 1 cleanup fix closes its finding, and that the Stage 5 deferral is safe while deletion stays blocked behind the retirement transition.
+1. **High, accepted:** a stale yielded approval could block replacement cuts. Added stale-approval reconciliation: look up by generation key, supersede any orphan row, settle the split as `superseded`. Start runs it for an abandoned, stale `registering` row.
+2. **Medium, accepted:** the omitted-frame predicate rejected valid non-frame-aligned cuts. Kept frames must end at or before T; the first omitted frame must end after T and may straddle it. Added the T = 10.01 s fixture.
