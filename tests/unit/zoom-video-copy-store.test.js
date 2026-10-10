@@ -1,7 +1,7 @@
 /** @jest-environment node */
 jest.mock('@vercel/postgres', () => ({ sql: { query: jest.fn() }, db: { connect: jest.fn() } }));
 
-import { createZoomVideoCopyStore, hashZoomHostEmail, zoomCopyResumeFingerprint } from '../../lib/services/meeting-tracker-recordings/video-copy-store.js';
+import { createZoomVideoCopyStore, hashZoomHostEmail, sameZoomRecordingTimes, zoomCopyResumeFingerprint, zoomRecordingTimes } from '../../lib/services/meeting-tracker-recordings/video-copy-store.js';
 
 const ID = '11111111-1111-4111-8111-111111111111';
 const REQ = '22222222-2222-4222-8222-222222222222';
@@ -263,4 +263,46 @@ test('findCopiedZoomVideoCopyForFile reads only the copied row for the request a
   expect(calls[0].text).toContain("WHERE request_id = $1 AND zoom_file_id = $2 AND state = 'copied'");
   expect(calls[0].params).toEqual([REQ, 'f1']);
   await expect(store.findCopiedZoomVideoCopyForFile({ requestId: 'nope', zoomFileId: 'f1' })).rejects.toThrow(TypeError);
+});
+
+describe('Stage 4 decision 16: recording times (migration 079)', () => {
+  const NONE = (text) => (/^SELECT (id|\*) FROM zoom_video_copies/.test(text) || /^SELECT c\.id/.test(text) ? [] : [{ id: ID }]);
+
+  test('N1 writes recording_start/recording_end as $14/$15, null when not given', async () => {
+    const withTimes = harness(NONE);
+    await withTimes.store.startZoomVideoCopy({ ...START, recordingStart: '2026-10-08T17:46:00.000Z', recordingEnd: '2026-10-08T18:42:00.000Z' });
+    const insert = withTimes.calls.find(c => c.text.includes('INSERT INTO zoom_video_copies'));
+    expect(insert.text).toContain('recording_start, recording_end, state');
+    expect(insert.text).toContain('$14, $15, \'queued\'');
+    expect(insert.params.slice(-2)).toEqual(['2026-10-08T17:46:00.000Z', '2026-10-08T18:42:00.000Z']);
+    const without = harness(NONE);
+    await without.store.startZoomVideoCopy(START);
+    expect(without.calls.find(c => c.text.includes('INSERT INTO zoom_video_copies')).params.slice(-2)).toEqual([null, null]);
+  });
+
+  test('N1 refuses one time without the other before any query', async () => {
+    const { store, calls } = harness(NONE);
+    await expect(store.startZoomVideoCopy({ ...START, recordingStart: '2026-10-08T17:46:00.000Z' })).rejects.toThrow(TypeError);
+    expect(calls).toHaveLength(0);
+  });
+
+  test('zoomRecordingTimes normalizes to ISO and gives nulls for missing, bad or reversed times', () => {
+    expect(zoomRecordingTimes({ recording_start: '2026-10-08T17:46:00Z', recording_end: '2026-10-08T18:42:00Z' }))
+      .toEqual({ recordingStart: '2026-10-08T17:46:00.000Z', recordingEnd: '2026-10-08T18:42:00.000Z' });
+    const none = { recordingStart: null, recordingEnd: null };
+    expect(zoomRecordingTimes({ recording_start: '2026-10-08T17:46:00Z' })).toEqual(none);
+    expect(zoomRecordingTimes({ recording_start: 'soon', recording_end: '2026-10-08T18:42:00Z' })).toEqual(none);
+    expect(zoomRecordingTimes({ recording_start: '2026-10-08T18:42:00Z', recording_end: '2026-10-08T17:46:00Z' })).toEqual(none);
+    expect(zoomRecordingTimes(null)).toEqual(none);
+  });
+
+  test('sameZoomRecordingTimes: pre-079 rows pass; recorded rows compare instants (pg Date vs Zoom string)', () => {
+    const file = { recording_start: '2026-10-08T17:46:00Z', recording_end: '2026-10-08T18:42:00Z' };
+    expect(sameZoomRecordingTimes({ recording_start: null, recording_end: null }, file)).toBe(true);
+    expect(sameZoomRecordingTimes({}, {})).toBe(true);
+    const row = { recording_start: new Date('2026-10-08T17:46:00.000Z'), recording_end: new Date('2026-10-08T18:42:00.000Z') };
+    expect(sameZoomRecordingTimes(row, file)).toBe(true);
+    expect(sameZoomRecordingTimes(row, { ...file, recording_end: '2026-10-08T18:43:00Z' })).toBe(false);
+    expect(sameZoomRecordingTimes(row, { recording_start: file.recording_start })).toBe(false);
+  });
 });

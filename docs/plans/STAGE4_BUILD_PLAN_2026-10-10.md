@@ -47,7 +47,7 @@ related:
 
 ## Slices
 
-Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`). Migration 079 is applied to Production by the owner before the merge that needs it, as with 077 and 078.
+Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`). Migrations 079 and 080 are applied to Production by the owner before the merge that needs each, as with 077 and 078.
 
 ### Slice 0 — Sandbox SDK probe (no app runtime change)
 
@@ -65,13 +65,20 @@ Each slice is a branch merge under Tier 1-3 release rules (`docs/CAMPAIGN_RELEAS
 
 ### Slice 1 — Migration 079 and copy-time recording times
 
-- Migration 079: `zoom_video_copies.recording_start` and `recording_end` (`TIMESTAMPTZ NULL`, both null or both set), plus the split table below. Manifest entry and Atlas updates.
+**[Session 592] Migration numbering revised.** 079 holds only the two `zoom_video_copies` columns, so the owner can apply it early. The split table moves to **080** with slice 2, so its schema is reviewed before it is fixed. This revises decision 17 ("079 is the split-job table plus the decision 16 columns"). **Built on branch `claude/stage4-slice1`** (worktree `/Users/gallivan/Code/WMKF_Apps-stage4`):
+- **Migration:** `079_zoom_video_copy_recording_times.sql`.
+- **Helpers:** `zoomRecordingTimes` and `sameZoomRecordingTimes` in `video-copy-store.js`.
+- **Wiring:** the times are passed at N1 in `video-copy-service.js`, and the comparison is in `listAndValidate`.
+- **Tests:** store, service and worker tests, including a mutation check of the worker guard. The 13 related suites pass (453 tests).
+- **Atlas** page updated.
+
+- Migration 079: `zoom_video_copies.recording_start` and `recording_end` (`TIMESTAMPTZ NULL`, both null or both set). Manifest entry and Atlas updates.
 - Write the times at copy start: `video-copy-service.js:127-133` already holds the Zoom file from `pickVideoFile`, whose `recording_start` / `recording_end` are available there; pass them into `store.startZoomVideoCopy` (insert at `video-copy-store.js:183-191`). The worker's `listAndValidate` (`video-copy-worker.js:464-481`) gains the same comparison, only for rows that have times, so a changed Zoom file fails the copy. A copy already in flight when slice 1 deploys has null times and must not fail on the new check.
 - Rows copied before this slice keep null times and are ineligible for a cut (decision 16). Landable alone.
 
 ### Slice 2 — Split store, start route and same-source check
 
-- **Table `presentation_video_splits`** (in 079), modeled on `zoom_video_copies` (`076_zoom_video_copies.sql`):
+- **Table `presentation_video_splits`** (migration 080), modeled on `zoom_video_copies` (`076_zoom_video_copies.sql`):
   - identity: `id`, `request_id`, `site_visit_activity_id`, `actor_profile_id`, `source_copy_id` (FK `zoom_video_copies`);
   - frozen input: `transcript_revision_id`, `presentation_end_ms`, the content-free provenance projection (JSONB, no names or attendance), source document id, SharePoint drive/item/version/eTag, size, quickXorHash, `mapping_version`;
   - state: `queued`, `cutting`, `uploading`, `review`, `registering`, `approved`, `failed`, `cancelled`, `superseded`. The worker owns `queued` through `review`. The staff approve route owns `review` → `registering` → `approved`;
