@@ -326,6 +326,48 @@ d('presentation-video-cut-script', () => {
     expect(accepted.receipt.ok).toBe(true);
   });
 
+  describe('audio continuity (gap before the boundary)', () => {
+    let gapSrc;
+    const audioGaps = (file) => JSON.parse(spawnSync('ffprobe', ['-v', 'error', '-select_streams', 'a:0', '-show_entries',
+      'frame=pts,nb_samples', '-of', 'json', file]).stdout.toString()).frames
+      .filter((f, i, all) => i > 0 && Number(all[i - 1].pts) + Number(all[i - 1].nb_samples) !== Number(f.pts));
+    beforeAll(async () => {
+      // 1.5 s of 440 Hz, a 50 ms timestamp gap, then 3 kHz marker audio; video from the marker fixture.
+      const a1 = path.join(root, 'gap-a1.m4a');
+      const a2 = path.join(root, 'gap-a2.m4a');
+      await ff('-f', 'lavfi', '-i', `sine=f=440:r=${SR}:d=1.5`, '-ac', '2', '-c:a', 'aac', a1);
+      await ff('-f', 'lavfi', '-i', `sine=f=3000:r=${SR}:d=5`, '-ac', '2', '-c:a', 'aac', a2);
+      const list = path.join(root, 'gap-list.txt');
+      fs.writeFileSync(list, `file '${a1}'\nduration 1.55\nfile '${a2}'\n`);
+      const joined = path.join(root, 'gap-joined.m4a');
+      await ff('-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', joined);
+      gapSrc = path.join(root, 'gap-source.mp4');
+      await ff('-i', src25, '-i', joined, '-map', '0:v', '-map', '1:a', '-c', 'copy', '-t', '10', gapSrc);
+    });
+    test('fixture really has a timestamp gap', () => {
+      expect(audioGaps(gapSrc).length).toBeGreaterThan(0);
+    });
+    test('12. cut after the gap is rejected as unsupported_timeline at audio_timeline', async () => {
+      const r = await cut(gapSrc, 2000);
+      expectRejected(r, 'unsupported_timeline');
+      expect(r.receipt.step).toBe('audio_timeline');
+    });
+    test('12b. mutation: with the continuity check patched out the gap fixture is accepted', async () => {
+      const needle = "        if not covered:\n            timeline_fail(step)";
+      const hit = "            if f.get('pts') is None or f.get('nb_samples') is None or int(f['pts']) != pos:\n                timeline_fail(step)";
+      expect(CUT_SCRIPT_PY).toContain(needle);
+      expect(CUT_SCRIPT_PY).toContain(hit);
+      const mutant = path.join(root, 'cut-mutant-gap.py');
+      fs.writeFileSync(mutant, CUT_SCRIPT_PY.replace(needle, '        pass').replace(hit, '            pass'));
+      const r = await cut(gapSrc, 2000, {}, mutant);
+      expect(r.receipt.ok).toBe(true);
+    });
+    test('continuous sources record audioFramesChecked', async () => {
+      const r = await cut(src25, 12437);
+      expect(r.receipt.audioFramesChecked).toBeGreaterThan(500);
+    });
+  });
+
   describe('upload (local server)', () => {
     test('chunks sequentially, resumes after a 503 via nextExpectedRanges, parses the item id, sends no Authorization', async () => {
       const work = sandbox('up');
