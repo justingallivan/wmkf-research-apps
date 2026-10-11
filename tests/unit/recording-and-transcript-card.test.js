@@ -1612,6 +1612,36 @@ describe('step-by-step layout', () => {
     expect(review).not.toHaveTextContent('Wait for the newer transcript');
   });
 
+  test('reviewing an older run does not lift the gate while a newer readable run awaits review', async () => {
+    const OLDER = '99999999-9999-4999-8999-999999999990';
+    const newer = job({ status: 'ready', created_at: '2026-10-05T20:00:00.000Z' });
+    const older = job({ id: OLDER, status: 'ready', contentAccessAllowed: false, created_at: '2026-10-03T20:00:00.000Z', original_filename: 'Older recording.m4a' });
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [newer, older], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    const review = await screen.findByTestId('step-review');
+    await waitFor(() => expect(within(review).getByRole('button', { name: 'Edit speaker names' })).toBeDisabled());
+    const earlier = screen.getByTestId('earlier-runs');
+    fireEvent.click(within(earlier).getByText(/Earlier runs/));
+    fireEvent.click(within(earlier).getByRole('button', { name: 'Review' }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    const editNames = within(screen.getByTestId('step-review')).queryByRole('button', { name: 'Edit speaker names' });
+    if (editNames) expect(editNames).toBeDisabled();
+    else expect(stepMenuItem('Edit speaker names · wait for the newer transcript')).toBeDisabled();
+  });
+
+  test('an unpublished ready run older than the latest published run does not block edits', async () => {
+    const OLDER = '99999999-9999-4999-8999-999999999991';
+    const published = job({ status: 'ready', created_at: '2026-10-05T20:00:00.000Z' });
+    const older = job({ id: OLDER, status: 'ready', created_at: '2026-10-03T20:00:00.000Z' });
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [published, older], currentArtifact: boundaryArtifact(),
+      publications: [{ operationId: 'op-1', state: 'published', version: 1, createdAt: '2026-10-05T21:00:00.000Z', inputJobId: JOB_ID, resultingDocumentId: ARTIFACT_ID }] }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    await findRow('presentation-transcript-row');
+    const review = screen.getByTestId('step-review');
+    const control = (label) => within(review).queryByRole('button', { name: label }) || stepMenuItem(label);
+    await waitFor(() => expect(control('Edit speaker names')).toBeEnabled());
+  });
+
   test('the summary row\'s Set end action is gated while a newer transcription runs', async () => {
     route({ materials: [transcriptRow()], collection: collection({ jobs: [job({ status: 'queued', contentAccessAllowed: false })],
       currentArtifact: boundaryArtifact({ presentationEnd: null, presentationTranscript: { state: 'not_confirmed', artifactId: null },

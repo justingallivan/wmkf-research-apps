@@ -586,3 +586,11 @@ regression tests. Round 2 approved with no material findings. As built, with the
   cleaned up, purged or unreadable). `beginEditNames` refuses while it holds, so every
   entry point is gated, and the summary action shows the reason. Regression tests cover
   discarded and expired runs and the summary action; reverting the gate fails all three.
+- **Codex round 2 (needs-attention, one medium):** the ready-run check followed the focused
+  run, so reviewing an older run from Earlier runs lifted the gate. It is now independent
+  of focus. Pending means a running run not being cancelled, or an unpublished, reviewable
+  ready run created after the latest published run, so an old unpublished run does not
+  block forever. Two regression tests: focus switch stays blocked (fails with the
+  focus-based check), and an older unpublished run does not block. The server's
+  `createMeetingCorrection` checks only the current artifact; Codex noted it, and it stays
+  a UI gate in this build.

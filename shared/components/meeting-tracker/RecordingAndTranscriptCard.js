@@ -1364,13 +1364,17 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   const focusJob = (focusId && jobs.find((job) => job.id === focusId)) || newestJob;
   const focusPublished = Boolean(focusJob) && publications.some((row) => row.inputJobId === focusJob.id && PUBLISHED_FOR_JOB.has(row.state));
   const showReview = Boolean(focusJob) && (focusId === focusJob.id || !focusPublished);
-  // A newer transcript is on its way: a run still transcribing (not being cancelled), or a ready run whose content can
-  // still be reviewed. While it is, editing the published transcript would open the older one, so every edit entry
-  // point is gated here (queue: "Old-transcript edit buttons look current"; Codex review, redesign commit 3). A
-  // discarded, expired or purged run never blocks.
+  // A newer transcript is on its way: a run still transcribing (not being cancelled), or an unpublished ready run,
+  // newer than the latest published run, whose content can still be reviewed. While one exists, editing the
+  // published transcript would open the older one, so every edit entry point is gated here (queue: "Old-transcript
+  // edit buttons look current"; Codex review rounds 1-2, redesign commit 3). This does not depend on which run is
+  // focused for review, and a discarded, expired, purged or unreadable run never blocks.
+  const isPublishedJob = (job) => publications.some((row) => row.inputJobId === job.id && PUBLISHED_FOR_JOB.has(row.state));
+  const latestPublishedAt = jobs.filter(isPublishedJob).map((job) => String(job.created_at || '')).sort().pop() || '';
+  const reviewableReady = (job) => job.status === 'ready' && job.contentAccessAllowed === true && !job.cleanup_requested_at
+    && !job.content_purged_at && job.cleanupPending !== true;
   const newerTranscriptPending = jobs.some((job) => BLOCKING_STATUSES.has(job.status) && !isCancelledRun(job) && job.cleanupPending !== true)
-    || Boolean(showReview && focusJob && !ACTIVE_STATUSES.has(focusJob.status) && focusJob.status === 'ready'
-      && focusJob.contentAccessAllowed === true && !focusJob.cleanup_requested_at && !focusJob.content_purged_at && focusJob.cleanupPending !== true);
+    || jobs.some((job) => reviewableReady(job) && !isPublishedJob(job) && String(job.created_at || '') > latestPublishedAt);
   const selectedJob = focusJob && detail?.job?.id === focusJob.id ? detail.job : focusJob;
   const correction = correctionDetail?.correction || null;
   const content = correction ? correctionDetail.content : detail?.job?.id === focusJob?.id ? detail?.content : null;
