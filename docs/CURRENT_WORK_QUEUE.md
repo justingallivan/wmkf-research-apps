@@ -205,6 +205,14 @@ sequence.
   names) stays greyed until a page reload. Fix: clear `busy` on the success
   path regardless of the editor key, and add a test that the generate button
   is enabled after a successful publish.
+- **Speed up the presentation video cut (2026-10-10).** [OPEN — from the
+  first real cut, 1003222: 40 min on 2 vCPUs; encode 22 min, probe and accept
+  checks about 15 min] (1) Set `PRESENTATION_VIDEO_SANDBOX_VCPUS=4` in
+  Production (no code). (2) After a measured 4-vCPU run, lower
+  `PRESENTATION_VIDEO_SANDBOX_TIMEOUT_MS` from 3 h to about 90 min. (3) Replace
+  frame decoding in the cut script's probe/accept steps with packet timestamps
+  where the recipe allows; a privacy-recipe change, so full Codex review.
+  Detail: `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md` "First real cut".
 - **Board file check uses the SharePoint eTag (2026-10-10).** [OPEN —
   follow-up to the Stage 4 content-identity fix] `pinnedBytesMatch` in
   `lib/services/post-presentation-materials/presentation-page-service.js`

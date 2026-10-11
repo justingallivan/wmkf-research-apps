@@ -316,7 +316,7 @@ The full suite passes: 1,333 suites, 22,437 tests. One flaky card test was seen 
 
 **Open follow-ups:**
 - Frame probing decodes frames; measure the cost on the first real cut and switch to packet timestamps if it is slow.
-- A real Graph-reported quickXorHash vector is still to be added to the recipe tests.
+- ~~A real Graph-reported quickXorHash vector is still to be added to the recipe tests.~~ Live parity confirmed on the first real cut (see "First real cut" below); a fixed test vector remains optional.
 
 **Gates before merge (owner), all done 2026-10-10:**
 1. Migration 080 applied (1 applied, 79 skipped).
@@ -329,3 +329,19 @@ The full suite passes: 1,333 suites, 22,437 tests. One flaky card test was seen 
 **Codex adversarial review of the content-identity fix (2026-10-10).**
 - Round 1, high, accepted and fixed: the staff open route checked the hash on a metadata read separate from the download-URL read, so a same-size replacement between the two could be served. `resolveMediaDownloadUrl` now returns `quickXorHash` from the same Graph response as the URL, and the open route checks id, size and hash on that one response (regression test; mutation-checked).
 - Round 2, high, **rejected by the orchestrator (outside the threat model), recorded for the owner:** quickXorHash is not cryptographic, so someone with write access to the request's SharePoint folder could craft different same-size bytes with the same quickXorHash. The guard exists to catch accidental change or replacement (a different recording, a re-upload, corruption), which size plus quickXorHash detects with negligible false-match probability. A deliberate collision needs SharePoint write access to the request folder, which already lets that person replace any Board material or transcript directly, so the guard is not the boundary against them. The unforgeable alternative (freeze the server-assigned cTag or a SHA-256 of the copied bytes) needs a migration; revisit only if the owner wants SharePoint writers treated as untrusted.
+
+## First real cut (1003222, 2026-10-10) — result
+
+**Outcome: approved and registered.** Split `d957e094-…`, started 01:17 UTC (6:17 PM PT), reached review 02:52 UTC, approved 02:58 UTC; the owner played the downloaded output and confirmed it ends at the presentation end. [VERIFIED via `presentation_video_splits` row, worker tick logs, the sandbox receipt]
+- **Receipt (cut script v2):** cut at 3,597,257 ms; 89,931 frames kept at 25 fps; last kept frame ends 3,597,240 ms, first omitted ends 3,597,280 ms; video edit delay 0, audio priming 0; audio packets equal; output 448,768,873 bytes.
+- **quickXorHash parity confirmed:** the script's hash of the downloaded source equalled Graph's (`source_hash_mismatch` did not fire), and the output's Graph hash equalled the receipt's. This closes the open "real Graph quickXorHash vector" item.
+- **Timings:** probe 474 s, audio 135 s, video encode 1,333 s, mux 2 s, accept 448 s; total 2,392 s (40 min) on 2 vCPUs.
+- **Usage:** active CPU 3,803 s (about $0.14 at $0.128 per CPU-hour); sandbox provisioned 5,697 s (95 min, inflated by the defect below). Memory charge not computed (sandbox memory size not recorded).
+- **Defect found and fixed live:** the non-waiting `getCommand` kept `exitCode` null after the command exited 0, so the worker polled for about 50 minutes after the cut finished. `commandState` now follows a null read with a 5 s bounded `wait()` (merge `02a5bd146`, Codex approve). The first tick on the fixed deployment moved the upload to review.
+- **Earlier the same evening:** the eTag-identity defect (above) superseded the first attempt.
+- **Output eTag after approval:** unchanged since upload (`,3`), so the Board check (`pinnedBytesMatch`) passes at approval time. The source MP4's eTag moved about 30 minutes after its copy; whether the output's moves later is still to be observed (owner checks the Board link now and the next day).
+
+**Recommendations from this run:**
+1. Set `PRESENTATION_VIDEO_SANDBOX_VCPUS=4` (environment only): the encode (22 min) and decode passes dominate.
+2. Lower `PRESENTATION_VIDEO_SANDBOX_TIMEOUT_MS` to about 90 minutes (5,400,000) once a 4-vCPU run is measured.
+3. Replace frame decoding in the probe and accept steps with packet timestamps where the recipe allows (about 15 min of the 40); a recipe change, so it gets a full Codex review.
