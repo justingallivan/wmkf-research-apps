@@ -164,6 +164,20 @@ sequence.
     "Upload manually" disclosure, or when Zoom is unavailable for the request.
   - **Order the steps** so the path reads import from Zoom, then transcript,
     then confirm the presentation end, then the presentation video.
+  - **Old-transcript edit buttons look current.** While a newer Zoom
+    transcription is pending, "Edit presentation end" still opens the older
+    published transcript (`beginEditNames` edits `collection.currentArtifact`),
+    so staff land in a different recording's transcript. De-emphasise or hide
+    the published transcript's edit actions while a newer one is pending.
+- **Speaker-name picker should offer the Zoom call's participants
+  (2026-10-10).** [OPEN — owner request] "People on this request" in the
+  speaker-name editor (`RecordingAndTranscriptCard.js`, option groups PI,
+  Co-PI, Saved staff, Saved attendee) is built from the request and its
+  invitation. That was defensible before Zoom import; for a transcript with
+  verified Zoom provenance it should default to the people on the call, from
+  the same Zoom participants report the attendance attribution already
+  fetches (`attendance-service.js`). Keep the request people as a secondary
+  group or fallback for uploads and when attendance is unavailable.
 
 ## Audit follow-ups — verified open, not silently prioritized
 - **Hard-coded late-2026 `expiresAt` dates in unit-test fixtures (2026-09-27, S546).** **[CLOSED
