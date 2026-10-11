@@ -15,7 +15,7 @@ THESIS: Every finished artifact is one row. Its name is the link, status is a ch
 
 OWN-WORLD: Inherit DESIGN.md (Clear Workbench). Neutral surfaces, ink primary only for confirmations, semantic chips, and the shared `Button` and Workbench `OverflowMenu`. No new visual identity.
 
-STORY: The header names the request (number, institution, title, program, cycle). Visit details is read first, with editing behind Edit. In the edit form, organizer and attendees are search pickers, with each person Required or Optional. In Applicant materials, each item is a row and the heading shows the one next step. Then four cards in work order (owner, 2026-10-11): Recording setup (steps 1 and 2, one line each once done, and the one Refresh), Presentation (video, transcript, summary), Staff discussion (transcript, summary, full meeting recording and transcript), and Board materials (link actions plus a readiness list).
+STORY: The header names the request (number, institution, title, program, cycle). Visit details is read first, with editing behind Edit. In the edit form, organizer and attendees are search pickers, with each person Required or Optional. In Applicant materials, each item is a row and the heading shows the one next step. Then four cards in work order (owner, 2026-10-11): Recording setup (steps 1 and 2, one line each once done, and the one Refresh), Presentation (video, summary, transcript), Staff discussion (summary, transcript), and Board materials (link actions plus a readiness list).
 
 FIRST VIEWPORT: Header, the Visit details summary, and the top of Applicant materials. Desktop first; narrow widths only avoid overflow.
 

@@ -3341,7 +3341,6 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
   const byType = (type) => materials.find((item) => Number(item.artifactType) === type) || null;
   const material = byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT);
   const recording = byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING);
-  const recordingUrl = recording ? safeMaterialUrl(recording) : null;
   const line = describeCurrentTranscript({ material, collection: t.collection });
   const artifact = t.collection?.currentArtifact;
   const generated = line.kind === 'generated';
@@ -3436,7 +3435,16 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
       <Step number={1} title="Get the recording" state={step1Done ? 'done' : 'current'} testId="step-recording"
         summary={step1Done && !step1Open && recordingSummary}
         action={step1Done && step1Open && <Button size="sm" variant="outline" type="button" onClick={() => setStep1Open(false)} aria-expanded>Close</Button>}
-        menuItems={step1Done && !step1Open ? [{ key: 'replace', label: 'Replace recording or transcript', onSelect: () => setStep1Open(true) }] : []}>
+        menuItems={step1Done && !step1Open ? [
+          // The full meeting transcript is the source of the split transcripts, so it lives with setup (owner,
+          // 2026-10-11), not with the results.
+          ...(openUrl ? [{ key: 'open-full', label: 'Open full transcript', href: openUrl }] : []),
+          ...(generated && artifact ? [
+            { key: 'txt', label: 'Download full transcript (TXT)', href: `${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=txt`, download: true },
+            { key: 'vtt', label: 'Download full transcript (VTT)', href: `${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=vtt`, download: true },
+          ] : []),
+          { key: 'replace', label: 'Replace recording or transcript', onSelect: () => setStep1Open(true) },
+        ] : []}>
         {!(step1Done && !step1Open) && <div className="mt-2 text-sm leading-6 text-gray-900">{recordingSummary}</div>}
         {generated && !editing && t.savedDraft && <p className="mt-1 text-xs text-gray-600">Unpublished name edits saved {fmtDateTime(t.savedDraft.createdAt)}</p>}
         {!material && readyForReview && <p className="mt-1 text-sm text-gray-700">A new transcript is ready to check in step 2.</p>}
@@ -3507,9 +3515,9 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
       {showProducts && (
         <ul className="mt-3 divide-y divide-gray-100 border-t border-gray-200">
           <PresentationVideoLine v={video} />
+          <SummaryBlock t={t} s={t.presentationSummary} materials={materials} request={summarizeRequest} setRequest={setSummarizeRequest} />
           <DerivativeRow state={boundaryState} label="Presentation transcript" material={presentationMaterial} testId="presentation-transcript-row"
             action={generateAnchor === 'presentation' ? generateButton : null} needsEnd={editable && !presentationEnd} />
-          <SummaryBlock t={t} s={t.presentationSummary} materials={materials} request={summarizeRequest} setRequest={setSummarizeRequest} />
         </ul>
       )}
     </section>
@@ -3517,27 +3525,11 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
     <section className={shell} data-testid="card-staff-discussion" aria-labelledby="staff-discussion-card-title">
       <h2 id="staff-discussion-card-title" className="text-lg font-semibold text-gray-950">Staff discussion</h2>
       {resultsWaiting && <p className="mt-2 text-sm text-gray-700">The staff discussion transcript and summary appear here once the presentation end is checked.</p>}
-      {(showProducts || material || recordingUrl) && (
+      {showProducts && (
         <ul className="mt-3 divide-y divide-gray-100 border-t border-gray-200">
-          {showProducts && <>
-            <DerivativeRow state={discussionState} label="Staff discussion transcript" material={discussionMaterial} testId="discussion-transcript-row"
-              action={generateAnchor === 'discussion' ? generateButton : null} needsEnd={editable && !presentationEnd} />
-            <SummaryBlock t={t} s={t.discussionSummary} kind="discussion" materials={materials} request={summarizeRequest} setRequest={setSummarizeRequest} />
-          </>}
-          {recordingUrl && (
-            <ArtifactRow name="Full meeting recording" href={recordingUrl} testId="full-recording-row"
-              status={{ tone: 'gray', label: recording.backing === 'external' ? 'Zoom link' : 'Saved' }}
-              detail={fmtDateTime(recording.createdAt)} />
-          )}
-          {material && (
-            <ArtifactRow name="Full meeting transcript" href={openUrl} testId="full-transcript-row"
-              status={generated ? { tone: 'green', label: 'Published' } : { tone: 'gray', label: 'Uploaded' }}
-              detail={fmtDateTime(material.createdAt)}
-              menuItems={generated && artifact ? [
-                { key: 'txt', label: 'Download TXT', href: `${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=txt`, download: true },
-                { key: 'vtt', label: 'Download VTT', href: `${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=vtt`, download: true },
-              ] : []} />
-          )}
+          <SummaryBlock t={t} s={t.discussionSummary} kind="discussion" materials={materials} request={summarizeRequest} setRequest={setSummarizeRequest} />
+          <DerivativeRow state={discussionState} label="Staff discussion transcript" material={discussionMaterial} testId="discussion-transcript-row"
+            action={generateAnchor === 'discussion' ? generateButton : null} needsEnd={editable && !presentationEnd} />
         </ul>
       )}
     </section>

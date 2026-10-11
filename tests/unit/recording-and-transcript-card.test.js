@@ -438,8 +438,10 @@ test('the cards run in work order: recording setup, presentation, staff discussi
   expect(within(screen.getByTestId('card-recording-setup')).getByTestId('card-refresh')).toBeInTheDocument();
   expect(within(screen.getByTestId('card-presentation')).getByTestId('presentation-transcript-row')).toBeInTheDocument();
   expect(within(screen.getByTestId('card-staff-discussion')).getByTestId('discussion-transcript-row')).toBeInTheDocument();
-  expect(within(screen.getByTestId('card-staff-discussion')).getByTestId('full-transcript-row')).toBeInTheDocument();
-  expect(within(screen.getByTestId('card-presentation')).queryByTestId('full-transcript-row')).toBeNull();
+  // Row order (owner, 2026-10-11): summary before transcript in each card.
+  const before = (a, b) => Boolean(screen.getByTestId(a).compareDocumentPosition(screen.getByTestId(b)) & Node.DOCUMENT_POSITION_FOLLOWING);
+  expect(before('presentation-summary-block', 'presentation-transcript-row')).toBe(true);
+  expect(before('discussion-summary-block', 'discussion-transcript-row')).toBe(true);
 });
 
 test('a manual transcript keeps the summary task visible but explains that timed generated turns are required', async () => {
@@ -1710,13 +1712,15 @@ describe('step-by-step layout', () => {
     expect(within(screen.getByTestId('recording-and-transcript-card')).queryAllByRole('link', { name: /^Open( published summary| video| recording| transcript)?$/ })).toHaveLength(0);
     expect(within(presentationCard).getByRole('link', { name: 'Presentation transcript' })).toHaveAttribute('href', presentation.webUrl);
     expect(within(discussionCard).getByRole('link', { name: 'Staff discussion transcript' })).toHaveAttribute('href', discussion.webUrl);
-    // There is no discussion video; staff watch the discussion in the full recording, which sits with it.
-    expect(within(discussionCard).getByRole('link', { name: 'Full meeting recording' })).toHaveAttribute('href', recording.externalUrl);
-    // The full transcript's text downloads live in its row menu (owner decision 3).
-    expect(within(discussionCard).queryByRole('link', { name: 'Download TXT' })).toBeNull();
-    openRowMenu(row('full-transcript-row'));
-    expect(screen.getByRole('menuitem', { name: 'Download TXT' })).toHaveAttribute('href', expect.stringContaining('/download?format=txt'));
-    expect(screen.getByRole('menuitem', { name: 'Download VTT' })).toHaveAttribute('href', expect.stringContaining('/download?format=vtt'));
+    // The full recording will be deleted, so staff see only the presentation video in the results (owner, 2026-10-11).
+    expect(screen.queryByRole('link', { name: 'Full meeting recording' })).toBeNull();
+    expect(screen.queryByTestId('full-recording-row')).toBeNull();
+    // The full meeting transcript is the source of the splits, so it lives in step 1's menu with its downloads.
+    expect(screen.queryByTestId('full-transcript-row')).toBeNull();
+    expect(within(discussionCard).queryByRole('link', { name: /Download/ })).toBeNull();
+    expect(stepMenuItem('Open full transcript', 'step-recording')).toHaveAttribute('href', 'https://example.sharepoint.com/transcript.txt');
+    expect(stepMenuItem('Download full transcript (TXT)', 'step-recording')).toHaveAttribute('href', expect.stringContaining('/download?format=txt'));
+    expect(stepMenuItem('Download full transcript (VTT)', 'step-recording')).toHaveAttribute('href', expect.stringContaining('/download?format=vtt'));
     fireEvent.click(stepMenuItem('Replace recording or transcript', 'step-recording'));
     expect(screen.getByLabelText(/Audio file/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Replace recording' })).toBeInTheDocument();

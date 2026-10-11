@@ -342,11 +342,11 @@ The Board section is used rarely (an interested member); every staff member uses
 So the results are organized for staff:
 
 7. **Four cards in work order:** Recording setup (steps 1 and 2; the one Refresh for all four
-   cards sits on its heading), then **Presentation** (video, transcript, summary), then
-   **Staff discussion** (transcript, summary), then **Board materials** at the bottom. Setup
+   cards sits on its heading), then **Presentation** (video, summary, transcript; order revised
+   by decision 11), then **Staff discussion** (summary, transcript), then **Board materials** at the bottom. Setup
    comes first because every result depends on it; once done its steps are one line each.
-8. **The full meeting recording and full meeting transcript sit in Staff discussion.** There
-   is no discussion video, so the full recording is how staff watch the discussion.
+8. ~~The full meeting recording and full meeting transcript sit in Staff discussion.~~
+   **Superseded by decision 12.**
 9. **Board materials:** the link actions (Generate, Copy, Open, Issue new link) plus a
    status-only readiness list: Presentation transcript, Presentation summary and (when the
    feature is on for the request) Presentation video, each "On the Board page", "Not yet" or
@@ -355,6 +355,13 @@ So the results are organized for staff:
    them; the Board card's note says the Board page shows them.
 10. The per-row "Not on the Board page until it is generated" note is removed; the readiness
     list carries that.
+11. **Row order (owner, later 2026-10-11):** Presentation video, Presentation summary,
+    Presentation transcript; then Staff discussion summary, Staff discussion transcript. Summary
+    before transcript in each card.
+12. **No full recording in the results.** The full recording will be deleted at the Stage 5
+    deadline, so staff see only the presentation video. The full meeting transcript is the source
+    of the split transcripts, so "Open full transcript" and its TXT/VTT downloads live in step 1's
+    "…" menu in Recording setup.
 
 ## 9. Build brief (Session 593, 2026-10-11)
 
@@ -796,6 +803,11 @@ Codex round 6 (needs-attention, one medium), **accepted by the owner (2026-10-11
 recording save succeeds and the materials reload right after it fails, the video status key does not
 change, so the readiness line can keep an old "On the Board page" until the next successful Refresh.
 The card shows the materials load error at the same time. Recorded in §10.
+
+**Row order and full recording (owner decisions 11-12, §8.2):** summary before transcript in both
+result cards; the full-recording row is removed; the full meeting transcript's Open and TXT/VTT
+downloads moved to step 1's menu. Tests: row order (fails if the discussion rows are swapped back),
+no full-recording link anywhere, the step-1 menu items and their links.
 
 ## 10. Remaining after the build (2026-10-11)
 
