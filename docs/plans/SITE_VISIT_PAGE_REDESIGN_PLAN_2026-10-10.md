@@ -819,11 +819,11 @@ The card shows the materials load error at the same time. Recorded in §10.
 
 ### 10.1 Owner desktop check findings (2026-10-11, held until the check is done)
 
-1. **Leftover "Refresh transcription status" button** in the Results summary block
+1. **[DONE 2026-10-11, owner approved removal]** **Leftover "Refresh transcription status" button** in the Results summary block
    (`RecordingAndTranscriptCard.js`, three sites: the status-unknown button and the two
    "Transcript status is unavailable" branches). It predates the redesign (`132eac566`)
    and duplicates the card Refresh. Fix: remove the buttons; the note reads "Transcript
-   status is unavailable. Use Refresh above to check whether this transcript can be
-   summarized."; move the two tests that click it to the card Refresh.
+   status is unavailable. Use Refresh in Recording setup to check whether this transcript can
+   be summarized."; the two tests that clicked it now use the Recording setup Refresh.
 2. **Local setup:** `.env.local` lacks `MEETING_TRACKER_SCHEMA_READY=on`, so localhost shows
    "Meeting Tracker is not yet enabled". Not a code defect.

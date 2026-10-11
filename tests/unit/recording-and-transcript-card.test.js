@@ -811,10 +811,11 @@ describe('presentation summary', () => {
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     const summaryBlock = await screen.findByTestId('presentation-summary-block');
     await waitFor(() => expect(collectionReads).toBe(1));
-    await screen.findByRole('button', { name: 'Refresh transcription status' });
-    expect(summaryBlock.textContent).toContain('Summary status unavailable.');
+    await waitFor(() => expect(summaryBlock.textContent).toContain('Summary status unavailable.'));
     expect(screen.queryByText('No summary published yet.')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh transcription status' }));
+    // No per-block refresh (owner, 2026-10-11): the Recording setup Refresh reloads the transcript status.
+    expect(screen.queryByRole('button', { name: 'Refresh transcription status' })).toBeNull();
+    fireEvent.click(screen.getByTestId('card-refresh'));
     await waitFor(() => expect(collectionReads).toBe(2));
     expect(summaryBlock.textContent).toContain('Summary status unavailable.');
     expect(screen.queryByText('No summary published yet.')).toBeNull();
@@ -1240,11 +1241,12 @@ describe('presentation summary', () => {
       } },
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    expect(await screen.findByText('Transcript status is unavailable. Refresh transcription status to check whether this transcript can be summarized.')).toBeInTheDocument();
+    expect(await screen.findByText('Transcript status is unavailable. Use Refresh in Recording setup to check whether this transcript can be summarized.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Refresh transcription status' })).toBeNull();
     const presentationBlock = screen.getByTestId('presentation-summary-block');
     expect(within(presentationBlock).getByText('Summary status unavailable.')).toBeInTheDocument();
     expect(screen.queryByText(/Uploaded transcript files cannot be split/)).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh transcription status' }));
+    fireEvent.click(screen.getByTestId('card-refresh'));
     expect(await within(presentationBlock).findByText('Summary status cannot be checked until transcript status is available.')).toBeInTheDocument();
     expect(collectionReads).toBe(2);
   });

@@ -2883,7 +2883,6 @@ function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = n
         : <div className="mt-1 text-sm text-gray-800" aria-live="polite"><p>Summarizing… started {fmtDateTime(generatingRun.createdAt)}.</p>
           <Button size="sm" variant="outline" type="button" onClick={() => void s.loadSummary()} disabled={Boolean(t.busy) || s.summaryReadState === 'loading'} className="mt-2">Check again</Button></div>)}
       {s.summaryReadState === 'unavailable' && s.wantsSummary && <Button size="sm" variant="outline" type="button" onClick={() => void s.loadSummary()} disabled={Boolean(t.busy)} className="mt-2">Check again</Button>}
-      {kind === 'presentation' && compactSummaryStatusUnknown && <Button size="sm" variant="outline" type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className="mt-2">{t.loading ? 'Refreshing…' : 'Refresh transcription status'}</Button>}
       {s.summaryReadState === 'unavailable' && <p className="mt-1 text-sm text-amber-900">Current summary status is unavailable. Any published file shown above reflects the latest material list.</p>}
       {kind === 'presentation' && (published?.state === 'bound' || published?.state === 'stale') && s.summary?.slidesChangedSinceSummary === true && (
         <p className="mt-1 text-sm leading-6 text-amber-900" data-testid="summary-slides-changed">The applicant slides were updated after this summary was made. Summarize again to include them.</p>
@@ -2894,11 +2893,11 @@ function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = n
       {kind === 'presentation' && !presentationReady && !t.correction && (!transcriptMaterial
         ? <p className="mt-1 text-sm text-gray-700">Add a transcript first. Upload a transcript file or generate one from audio.</p>
         : !artifact
-          ? <div className="mt-1 text-sm text-gray-700"><p>Transcript status is unavailable. Refresh transcription status to check whether this transcript can be summarized.</p><Button size="sm" variant="outline" type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className="mt-2">{t.loading ? 'Refreshing…' : 'Refresh transcription status'}</Button></div>
+          ? <p className="mt-1 text-sm text-gray-700">Transcript status is unavailable. Use Refresh in Recording setup to check whether this transcript can be summarized.</p>
           : artifact.bundleEditable === false
           ? <p className="mt-1 text-sm text-gray-700">A generated transcript with timed speaker turns is required. Uploaded transcript files cannot be split into presentation and discussion sections here.</p>
           : artifact.bundleEditable !== true
-            ? <div className="mt-1 text-sm text-gray-700"><p>Transcript status is unavailable. Refresh transcription status to check whether this transcript can be summarized.</p><Button size="sm" variant="outline" type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className="mt-2">{t.loading ? 'Refreshing…' : 'Refresh transcription status'}</Button></div>
+            ? <p className="mt-1 text-sm text-gray-700">Transcript status is unavailable. Use Refresh in Recording setup to check whether this transcript can be summarized.</p>
             : !artifact.presentationEnd
             ? <div className="mt-1 text-sm text-gray-700"><p>Confirm where the presentation ends before generating the presentation transcript and summary.</p><Button size="sm" variant="outline" type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy) || t.newerTranscriptPending} className="mt-2">{t.savedDraft ? 'Continue editing presentation end' : 'Set end to enable summary'}</Button>{t.newerTranscriptPending && <p className="mt-1 text-xs text-gray-600">Wait for the newer transcript before setting the end.</p>}</div>
             : <p className="mt-1 text-sm text-gray-700">Generate the presentation transcript before summarizing it.</p>)}
