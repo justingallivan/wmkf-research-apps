@@ -70,6 +70,9 @@ fallback.
   missing applicants as one-click Add suggestions and preserve recorded attendees. The Activity
   and its parties change only when staff click Save. The Tracker GET explicitly opts into these
   contact reads; the Workbench logistics GET continues to return only visit and materials data.
+  **[BRANCH-BUILT 2026-10-11 on `claude/site-visit-redesign`; not merged]** It also opts into a
+  read-only request identity for the page header (`includeRequestIdentity`; see
+  `dataverse-akoya-request.md` read paths).
 - **[SOURCE-BUILT / OFFLINE-TESTED 2026-10-02; NOT DEPLOYED.]** The Meeting
   Tracker dashboard retains its legacy default and `projection=full` / `legacy`
   aliases: those call `findActiveByRequests(requestIds)` and hydrate each

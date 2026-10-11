@@ -323,3 +323,24 @@ describe('one attendee picker (Site Visit redesign §3.1)', () => {
     expect(JSON.parse(global.fetch.mock.calls.find(([, o]) => o?.method === 'PATCH')[1].body).organizer).toEqual({ kind: 'staff', profileId: 8 });
   });
 });
+
+test('the header shows the request identity from the visit read, and only the number when it is missing (redesign §9.2)', async () => {
+  const visit = { activityId: 'a1', etag: 'W/"1"', subject: 'S', description: '', startLocal: '2026-10-01T09:00', endLocal: '2026-10-01T12:00', timeZone: 'America/Los_Angeles', format: 100000001, locationOrLink: 'Campus', organizer: { kind: 'staff', profileId: 7 }, requiredAttendees: [], optionalAttendees: [] };
+  const route = (request) => {
+    global.fetch = jest.fn(async (url) => {
+      const target = String(url);
+      if (target.includes('/recipients')) return response(recipients);
+      if (target.endsWith('/materials') || target.endsWith('/presentation-materials')) return response({ error: 'not enabled' }, 503);
+      return response({ success: true, siteVisit: visit, request });
+    });
+  };
+  route({ requestNumber: '1003222', title: 'Quantum dots for imaging', institution: 'Example University', grantProgram: 'Research Program', cycleLabel: 'December 2026' });
+  const view = render(<SiteVisitEditor />);
+  expect(await screen.findByTestId('visit-request-identity')).toHaveTextContent('Example University — Quantum dots for imaging · Research Program · December 2026');
+  expect(screen.getByRole('heading', { name: /^Site visit · #1003222/ })).toBeInTheDocument();
+  view.unmount();
+  route(null);
+  render(<SiteVisitEditor />);
+  expect(await screen.findByRole('heading', { name: /^Site visit · #1003222/ })).toBeInTheDocument();
+  expect(screen.queryByTestId('visit-request-identity')).toBeNull();
+});

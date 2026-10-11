@@ -190,6 +190,8 @@ export default function SiteVisitEditor() {
   const [notice, setNotice] = useState(null);
   const [applicantAttendees, setApplicantAttendees] = useState([]);
   const [applicantAttendeesUnavailable, setApplicantAttendeesUnavailable] = useState(false);
+  // Header identity from the visit GET (redesign §9.2); null keeps the number-only header.
+  const [requestIdentity, setRequestIdentity] = useState(null);
   // A saved visit opens read-only (DESIGN.md Read-First Rule). Keyed to the
   // request so a client-side move to another visit starts read-only again.
   const [editingFor, setEditingFor] = useState(null);
@@ -217,6 +219,7 @@ export default function SiteVisitEditor() {
       setRecipients(directory);
       setApplicantAttendees(visitBody.applicantAttendees || []);
       setApplicantAttendeesUnavailable(visitBody.applicantAttendeesUnavailable === true);
+      setRequestIdentity(visitBody.request && typeof visitBody.request === 'object' ? visitBody.request : null);
     } catch (loadError) {
       setError(`${loadError.message} Please try again. If the problem continues, contact an administrator.`);
     } finally {
@@ -330,7 +333,13 @@ export default function SiteVisitEditor() {
     <Layout title={visit ? 'Site visit' : 'Schedule site visit'}>
       <div className="pt-6 mb-6">
         {backLink}
-        <h1 className="mt-3 text-2xl font-semibold text-gray-900">{visit ? 'Site visit' : 'Schedule the site visit'}{requestNumber ? ` · #${requestNumber}` : ''}</h1>
+        <h1 className="mt-3 text-2xl font-semibold text-gray-900">{visit ? 'Site visit' : 'Schedule the site visit'}{(requestIdentity?.requestNumber || requestNumber) ? ` · #${requestIdentity?.requestNumber || requestNumber}` : ''}</h1>
+        {requestIdentity && (requestIdentity.institution || requestIdentity.title || requestIdentity.grantProgram || requestIdentity.cycleLabel) && (
+          <p className="mt-1 text-sm text-gray-600" data-testid="visit-request-identity">
+            {[[requestIdentity.institution, requestIdentity.title].filter(Boolean).join(' — '), requestIdentity.grantProgram, requestIdentity.cycleLabel]
+              .filter((part) => typeof part === 'string' && part).join(' · ')}
+          </p>
+        )}
         {(!visit || editing) && <p className="mt-2 text-sm text-gray-600">The date here feeds the Staff Deliberations rail, the cycle view, the briefing page, and the Share email's calendar entry.</p>}
       </div>
 

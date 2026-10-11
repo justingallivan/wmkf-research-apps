@@ -9,6 +9,7 @@ import {
   REQUEST_DOCUMENT_OPERATION_STATUS,
 } from '../../shared/config/requestDocument';
 import { SITE_VISIT_FORMAT } from '../../shared/config/siteVisit';
+import { meetingDateToCycleCode, cycleCodeToLabel } from '../../lib/utils/cycle-code';
 import {
   presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey, staffDiscussionSummaryBindingFingerprint, transcriptSummaryBindingFingerprint,
 } from '../../lib/services/post-presentation-materials/presentation-transcript-binding';
@@ -63,6 +64,11 @@ function dependencies(overrides = {}) {
   };
   return {
     schemaReady: jest.fn(() => true),
+    getRequestIdentity: jest.fn(async () => ({
+      akoya_requestid: REQUEST_ID, akoya_requestnum: '1003222', akoya_title: 'Quantum dots for imaging',
+      wmkf_meetingdate: '2026-12-11T00:00:00Z', _akoya_applicantid_value_formatted: 'Example University',
+      _wmkf_grantprogram_value_formatted: 'Research Program',
+    })),
     getRequest: jest.fn(async () => ({
       akoya_requestid: REQUEST_ID,
       akoya_requeststatus: 'Phase II Pending',
@@ -359,10 +365,30 @@ test('a failed applicant-contact read leaves the tracker visit usable and report
   expect(result.applicantAttendeesUnavailable).toBe(true);
 });
 
+test('the Meeting Tracker opt-in adds the request identity for the page header (Site Visit redesign §9.2)', async () => {
+  const deps = dependencies();
+  const result = await getSiteVisitLogistics({ requestId: REQUEST_ID, includeRequestIdentity: true }, deps);
+  expect(deps.getRequestIdentity).toHaveBeenCalledWith(REQUEST_ID);
+  const cycleCode = meetingDateToCycleCode('2026-12-11T00:00:00Z');
+  expect(result.request).toEqual({
+    requestNumber: '1003222', title: 'Quantum dots for imaging', institution: 'Example University',
+    grantProgram: 'Research Program', cycleLabel: cycleCode ? cycleCodeToLabel(cycleCode) : null,
+  });
+});
+
+test('a failed identity read leaves the visit usable and returns a null request', async () => {
+  const result = await getSiteVisitLogistics({ requestId: REQUEST_ID, includeRequestIdentity: true }, dependencies({
+    getRequestIdentity: jest.fn(async () => { throw new Error('Dataverse unavailable'); }),
+  }));
+  expect(result.request).toBeNull();
+  expect(result.siteVisit).toBeNull();
+});
+
 test('the default Workbench read omits applicant suggestions and their Dataverse lookup', async () => {
   const deps = dependencies();
   const result = await getSiteVisitLogistics({ requestId: REQUEST_ID }, deps);
   expect(deps.resolveApplicantContacts).not.toHaveBeenCalled();
+  expect(deps.getRequestIdentity).not.toHaveBeenCalled();
   expect(result).toEqual({
     siteVisit: null,
     materials: [],

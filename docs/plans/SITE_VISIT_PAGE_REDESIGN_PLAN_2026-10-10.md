@@ -685,3 +685,23 @@ UI change was needed; a saved attribution is unaffected.
   inside the state update), and a toggle into a full list is disabled with the reason. The
   search disables only when both lists are full. Three boundary tests; the Optional-add
   test fails when adds always go to Required.
+- Codex round 2 for commit 6: approve.
+
+**Commit 7, header identity** (owner decision 4). As built:
+
+- `getSiteVisitLogistics` takes an opt-in `includeRequestIdentity`. The new dependency
+  `getRequestIdentity` reads `akoya_request` (number, title, applicant, grant program,
+  meeting date) through `grantRequestAdapter.getById`, in parallel with the existing
+  reads. It projects `request: { requestNumber, title, institution, grantProgram,
+  cycleLabel }`, the same derivations as `resolve-request-service.js`; a failed read
+  returns `null`. Only the Meeting Tracker visit GET passes the flag, so the Workbench read
+  is unchanged (tested).
+- The header keeps "Site visit · #number" (from the URL until loaded) and adds one
+  metadata line: "Institution — Title · Program · Cycle".
+- Docs: API route security matrix row; Atlas `dataverse-akoya-request.md` read paths and
+  `dataverse-wmkf-sitevisit.md` consumers (marked branch-built, not merged).
+- **Deferred, open for the owner:** the header status chip (§3). An accurate chip needs
+  state the page does not hold: the materials collection state from its card and Board
+  readiness from the Results rows, including the video line's own fetch. Building it means
+  lifting that state or adding reads. A partial chip would contradict the cards it
+  summarizes, so this build leaves it out.
