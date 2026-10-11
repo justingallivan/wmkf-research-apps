@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Board presentation page redesigned for board members (Session 594)
+
+**Milestone:** the outside Board page became a usable reading surface: video, on-page AI-generated summary, proposal, slides and bios, each opening in the browser.
+**Sessions:** 594.
+**Ship state:**
+- Approved video bound by size + quickXorHash (SharePoint eTag bumps no longer break the Board link).
+- Summary shown on the page only when its bytes match the published SHA-256; full transcript unlisted.
+- Proposal (external-reviewer PDF) offered by owner decision, via a strict complete lookup checked after render.
+- View opens PDFs as local copies (CSP `connect-src` tenant on this page only); Office files convert to PDF, bounded 4 MB / 20 s.
+**Why it matters:** board members get what they need without filenames, downloads or broken links.
+**Pointers:** `pages/external/presentation/[token].js`; `lib/services/post-presentation-materials/presentation-page-service.js`; merges `81dbc6c66`, `f35ae70f7`, `35d5456d2`, `e05bbd962`, `700619a76`, `7b9746f7b`.
+
 ## October 2026 — Site Visit page redesigned for staff (Session 593)
 
 **Milestone:** The Meeting Tracker Site Visit page was rebuilt under DESIGN.md's Page Structure rules: each finished item is one row (name is the link, a status chip, a "…" menu), finished steps collapse to one line, and results sit in staff-first cards (Recording setup, Presentation, Staff discussion, Board materials with a status-only readiness list). The full recording is no longer shown to staff.

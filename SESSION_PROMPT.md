@@ -1,4 +1,49 @@
-# Session 594 Prompt: Site Visit redesign shipped; CI green again
+# Session 595 Prompt: Board presentation page redesigned and working end to end
+
+## Session 594 close — Board video fixed, Board page redesigned for board members, proposal and Office viewing added (Claude, main, 2026-10-11 PT)
+
+### What Was Completed
+
+1. **Board video link fixed** (merge `81dbc6c66`). The approved 1003222 video stopped opening (Watch, Download, Resume) because SharePoint bumped its eTag on a metadata-only change (owner-run probe: eTag `,3`→`,4`, size and quickXorHash unchanged). The Board route now binds the video to the approved cut's size + quickXorHash (`getApprovedPresentationVideoByDocument`). Verified live (206 `video/mp4`).
+   - Owner decisions: Codex's quickXorHash-collision finding **accepted as outside the threat model** (SharePoint writers trusted; applicant files carry no byte check); transcripts/summaries **stay on eTag** until one breaks (queue item has the versionId follow-up). Recorded in `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md` "Board link fix".
+2. **Board page redesigned with Impeccable** (merge `f35ae70f7`, then `35d5456d2`, `e05bbd962`, `700619a76`, `7b9746f7b`). `pages/external/presentation/[token].js`:
+   - Proposal title as H1; video first (one-click play); summary rendered on the page via shared `shared/components/SummaryText.js` with an **AI-generated** badge (server returns the text only when size + SHA-256 match the published row; 4 s deadline); Materials rows show **View only** (no filenames, sizes, or download links); full transcript no longer listed; one quiet line before the visit.
+   - **Proposal** (owner decision reversing 2026-09-21): the external-reviewer PDF via member `proposal`, found by a strict complete lookup (`listReviewerProposalStrict`); the page asks `mode=check` after render (lookup takes 4–8 s) on its own rate-limit buckets.
+   - **View**: Microsoft serves every file as a download, so the page fetches the PDF and opens a blob copy in a new tab; required adding the tenant to `connect-src` on this page only (`proxy.js`). Word/PowerPoint/Excel open via `mode=pdf` (Graph `content?format=pdf`, bounded 4 MB / 20 s through opt-in `downloadFileAsPdf` options). A failed View offers the original.
+   - Each slice had a Codex adversarial review; findings fixed or recorded. Verified live: summary text, proposal check, in-browser proposal fetch (2.8 MB PDF), bios conversion (15 KB PDF).
+3. **Queue:** new item "Show transcripts and summaries formatted in the browser across the suite" (owner chose Board now, suite next).
+
+### Next Items
+
+#### Verified Open
+
+1. **Owner check of the live Board page**: View on Proposal, Slides, Bios opens a new tab; iPad Safari not yet tried. Evidence: Session 594 live probes.
+2. **Suite-wide formatted transcript/summary viewing** (reuse `SummaryText`; staff discussion summary headings). Evidence: `docs/CURRENT_WORK_QUEUE.md`.
+3. **Site Visit redesign remaining work** (plan §10), carried from Session 593. Evidence: `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md` §10.
+
+#### Owner Decision Needed
+
+1. **Widen `PRESENTATION_VIDEO_SPLIT_ACCESS`** from `test:<1003222>`; the Board link blocker is fixed. Evidence: `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md`.
+2. Delete merged remote branches (`claude/site-visit-redesign` and this session's `claude/board-*`); all are ancestors of `main`.
+3. Proposal Ranking PR #463 (draft since 2026-10-08) and the colleague dry run.
+4. Optional: issue a new Board link for 1003222 (the current token was pasted into the Session 594 transcript).
+
+#### Verify Before Acting
+
+1. Stage 4 worktrees (`WMKF_Apps-stage4`, `-stage4-recipe`, `-s4`, `-s5`): remove only after confirming no uncommitted work. Sessions 588–590 carryover unchanged.
+
+### Gotchas
+
+- Auto mode blocks Production reads and merges to `main` even after owner approval in chat; hand the owner a `!` command (scripts in the scratchpad print metadata only).
+- Board page CSP: `media-src` and now `connect-src` allow only the canonical tenant; any new browser-side fetch elsewhere needs its own CSP review.
+- Local preview of the Board page: a temporary page under `pages/external/` (public path) with a fetch stub works; the dev server needs a restart to pick up a new page file. Delete it before committing.
+- The strict proposal lookup gives up on folder trees deeper than 3 levels (`failOnDepthLimit`); 1003222 passes.
+
+**Milestone determination:** the Board presentation page shipped a redesigned outside-facing capability (proposal access, on-page summary, in-browser viewing), so a DEVELOPMENT_LOG entry was added.
+
+---
+
+## Session 594 Prompt (superseded): Site Visit redesign shipped; CI green again
 
 ## Session 593 close — Site Visit page redesign built, owner-checked, merged and deployed; CI install failure fixed (Claude, main, 2026-10-11 PT)
 
