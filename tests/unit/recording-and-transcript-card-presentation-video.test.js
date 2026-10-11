@@ -361,13 +361,18 @@ describe('an open confirmation is bound to the video it was opened for (Codex wh
 
 describe('Board materials readiness list', () => {
   const readiness = () => screen.findByTestId('board-readiness-video');
+  const older = (over = {}) => split({ id: OLD_ID, state: 'approved', boardReady: true, createdAt: '2026-10-09T10:00:00Z', ...over });
   test.each([
-    ['approved and served', split({ state: 'approved', boardReady: true }), 'On the Board page'],
-    ['approved but out of date', split({ state: 'approved', boardReady: false }), 'Not yet'],
-    ['approved with an unknown Board status', split({ state: 'approved', boardReady: null }), 'Status unknown'],
-    ['waiting for its check', split({ state: 'review' }), 'Not yet'],
-  ])('a video %s reads from the same load as its row', async (_l, row, label) => {
-    route({ state: { splits: { available: true, splits: [row] } } });
+    ['approved and served', [split({ state: 'approved', boardReady: true })], 'bound', 'On the Board page'],
+    ['approved but out of date', [split({ state: 'approved', boardReady: false })], 'stale', 'Not yet'],
+    ['approved with an unknown Board status', [split({ state: 'approved', boardReady: null })], 'unknown', 'Status unknown'],
+    ['waiting for its check, with none approved', [split({ state: 'review' })], undefined, 'Not yet'],
+    // An older approved video stays on the Board while a newer one is made (Codex round 2, four-card commit).
+    ['being made again while the older one is served', [split({ state: 'queued' }), older()], 'bound', 'On the Board page'],
+    ['made again and waiting for its check while the older one is served', [split({ state: 'review' }), older()], 'bound', 'On the Board page'],
+    ['made again and failed while the older one is served', [split({ state: 'failed', failureCode: 'upload_failed' }), older()], 'bound', 'On the Board page'],
+  ])('a video %s reads from the same load as its row', async (_l, splits, board, label) => {
+    route({ state: { splits: { available: true, splits, ...(board ? { boardVideo: { status: board } } : {}) } } });
     await renderLine();
     await line();
     expect(await readiness()).toHaveTextContent(label);
@@ -387,7 +392,7 @@ describe('Board materials readiness list', () => {
   test('approving the video in the Presentation card turns its Board line on', async () => {
     let approved = false;
     route({
-      state: { splits: () => response({ available: true, splits: [split(approved ? { state: 'approved', boardReady: true } : {})] }) },
+      state: { splits: () => response({ available: true, splits: [split(approved ? { state: 'approved', boardReady: true } : {})], ...(approved ? { boardVideo: { status: 'bound' } } : {}) }) },
       post: () => { approved = true; return response({ split: { id: SPLIT_ID, state: 'approved' } }); },
     });
     await renderLine();
@@ -400,7 +405,7 @@ describe('Board materials readiness list', () => {
 
 describe('Board readiness of the video follows the transcript revision (Codex review, four-card commit)', () => {
   test('a changed presentation end whose video re-read fails shows Status unknown, not the old On', async () => {
-    route({ state: { splits: { available: true, splits: [split({ state: 'approved', boardReady: true })] } } });
+    route({ state: { splits: { available: true, splits: [split({ state: 'approved', boardReady: true })], boardVideo: { status: 'bound' } } } });
     const base = global.fetch;
     let endMs = 62900;
     let failSplits = false;

@@ -3170,6 +3170,9 @@ function usePresentationVideo(requestId, { enabled = true, revisionKey = '', ref
   // The transcript revision the last successful read was made for. The Board serves an approved video only for the
   // current revision, so a status read for an earlier one is not evidence about now (Codex review, four-card commit).
   const [loadedKey, setLoadedKey] = useState(null);
+  // What the Board serves now ('bound' | 'missing' | 'stale' | 'unknown'), from the server's aggregate check. An older
+  // approved video stays on the Board while a newer one is made, so the newest split alone cannot answer this.
+  const [boardStatus, setBoardStatus] = useState(null);
   const mountedRef = useRef(true);
   const sequenceRef = useRef(0);
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
@@ -3188,6 +3191,7 @@ function usePresentationVideo(requestId, { enabled = true, revisionKey = '', ref
       setLoaded(true);
       setLoadFailed(false);
       setLoadedKey(revisionKey);
+      setBoardStatus(typeof body?.boardVideo?.status === 'string' ? body.boardVideo.status : null);
     } catch {
       // Keep what is shown; the interval below keeps retrying.
       if (mountedRef.current && sequenceRef.current === sequence) setLoadFailed(true);
@@ -3246,6 +3250,7 @@ function usePresentationVideo(requestId, { enabled = true, revisionKey = '', ref
     load, create, approve, confirmTargetLive,
     // True only while the shown status was read successfully for the current transcript revision.
     statusCurrent: loaded && !loadFailed && loadedKey === revisionKey,
+    boardStatus,
   };
 }
 
@@ -3543,11 +3548,11 @@ function BoardReadiness({ t, boundaryState, video }) {
   const transcript = boundaryState === 'bound' ? BOARD_ON : !t.collection ? BOARD_UNKNOWN : BOARD_NOT_YET;
   // Without a loaded transcript collection the summary read reports 'not_needed', which is not evidence of absence.
   const summary = !t.collection || !summaryStatusCurrent ? BOARD_UNKNOWN : published?.state === 'bound' ? BOARD_ON : BOARD_NOT_YET;
-  const newest = video.newest;
+  // No boardVideo in the response means no approved video exists, so nothing is on the Board.
   const videoStatus = !video.loaded ? null
     : !video.statusCurrent ? BOARD_UNKNOWN
-    : newest?.state === 'approved' && newest.boardReady === true ? BOARD_ON
-      : newest?.state === 'approved' && newest.boardReady == null ? BOARD_UNKNOWN : BOARD_NOT_YET;
+    : video.boardStatus === 'bound' ? BOARD_ON
+      : video.boardStatus === 'unknown' ? BOARD_UNKNOWN : BOARD_NOT_YET;
   return (
     <ul className="mt-3 divide-y divide-gray-100 border-t border-gray-200" data-testid="board-readiness" aria-label="On the Board page">
       <ArtifactRow name="Presentation transcript" status={transcript} testId="board-readiness-transcript" />

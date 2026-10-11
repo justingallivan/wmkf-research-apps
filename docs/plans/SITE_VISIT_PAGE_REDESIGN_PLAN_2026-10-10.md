@@ -767,6 +767,12 @@ read was made for, and the readiness list says "Status unknown" unless the read 
 succeeded. (b) With the transcript collection failed to load, the summary read reports
 `not_needed`, which the list showed as "Not yet"; it is now "Status unknown". Each has a
 regression test that fails without its fix.
+Codex round 2 (needs-attention, one medium): the video readiness read only the newest split,
+but an older approved video stays on the Board while a newer one is made. It now uses the
+server's aggregate `boardVideo.status` (`bound` → On, `unknown` → Status unknown, absent or
+`missing`/`stale` → Not yet), still behind the revision and failure guards. Regression cases:
+a newer queued, in-review or failed split beside an older served one stays "On the Board
+page" (all three fail under the old newest-only rule).
 
 ## 10. Remaining after the build (2026-10-11)
 
