@@ -169,6 +169,15 @@ sequence.
     published transcript (`beginEditNames` edits `collection.currentArtifact`),
     so staff land in a different recording's transcript. De-emphasise or hide
     the published transcript's edit actions while a newer one is pending.
+  - **Start hinted leavers unchecked in "Discussion attendance".** Reverses
+    owner decision D2 of `docs/plans/ZOOM_ATTENDANCE_ATTRIBUTION_PLAN_2026-10-09.md`
+    ("everyone starts checked"), by owner request after the first live use
+    (1003222, 2026-10-10): people flagged "Left before the presentation ended"
+    were still checked. Rows whose `leftBeforeEnd` hint is true should start
+    `kept: false` (`attendance-service.js` builds every row `kept: true`);
+    everyone else and every "other voice" row stays checked. The hint already
+    requires aligned recording times, so a misaligned transcript is unaffected.
+    Update D2 in the plan in the same change.
 - **Speaker-name picker should offer the Zoom call's participants
   (2026-10-10).** [OPEN — owner request] "People on this request" in the
   speaker-name editor (`RecordingAndTranscriptCard.js`, option groups PI,
