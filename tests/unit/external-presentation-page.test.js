@@ -11,6 +11,7 @@ const SLIDES_PDF = { member: 'material:11111111-1111-4111-8111-111111111111', ki
 const SLIDES_PPTX = { member: 'material:22222222-2222-4222-8222-222222222222', kind: 'slides', label: 'Applicant Slides', filename: '1003222 Site Visit Presentation.pptx', contentType: PPTX, size: 35_000_000, backing: 'file', canWatch: false, canDownload: true };
 const BIOS = { member: 'material:33333333-3333-4333-8333-333333333333', kind: 'other', label: 'Other Applicant Materials', filename: '1003222 Site Visit Participant Bios.docx', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', size: 20_633, backing: 'file', canWatch: false, canDownload: true };
 const VIDEO = { member: 'material:44444444-4444-4444-8444-444444444444', kind: 'video', label: 'Presentation Video', filename: '1003222-Presentation-Video-d957e094.mp4', contentType: 'video/mp4', size: 448_768_873, backing: 'file', canWatch: true, canDownload: true };
+const PROPOSAL = { member: 'proposal', kind: 'proposal', label: 'Proposal', filename: null, contentType: 'application/pdf', size: null, backing: 'file', canWatch: false, canDownload: true };
 const SUMMARY = { member: 'material:55555555-5555-4555-8555-555555555555', kind: 'summary', label: 'Transcript Summary', filename: '1003222-Presentation-Summary-20261011-003346-v2.txt', contentType: 'text/plain; charset=utf-8', size: 7_981, backing: 'file', canWatch: false, canDownload: true,
   text: 'What was presented\nThe team studies X.\n\nQuestions and answers\nA staff member asked about cost.\n\nOpen points\nSend the budget breakdown.\n' };
 
@@ -22,17 +23,21 @@ beforeEach(() => {
   jest.clearAllMocks();
   HTMLMediaElement.prototype.play = jest.fn(async () => undefined);
   HTMLMediaElement.prototype.load = jest.fn();
-  requestJson.mockResolvedValue(context([SLIDES_PDF, BIOS, SLIDES_PPTX, SUMMARY, VIDEO]));
+  requestJson.mockResolvedValue(context([PROPOSAL, SLIDES_PDF, BIOS, SLIDES_PPTX, SUMMARY, VIDEO]));
 });
 
 test('after the visit: video first, then the formatted summary, then one Slides item and the bios, with no filenames or sizes', async () => {
   render(<PresentationMaterialsPage />);
   expect(await screen.findByRole('heading', { level: 1, name: 'A proposal title' })).toBeInTheDocument();
   expect(screen.getByText('Example University · Research presentation')).toBeInTheDocument();
-  const order = ['Watch the presentation', 'Summary', 'Slides and materials'].map((text) => screen.getByText(text));
+  const order = ['Watch the presentation', 'Summary', 'Materials', 'Proposal', 'Slides', 'Site Visit Participant Bios'].map((text) => screen.getByText(text));
   for (let i = 1; i < order.length; i += 1) {
     expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   }
+  expect(screen.getByRole('heading', { level: 2, name: 'Summary' })).toBeInTheDocument();
+  expect(screen.getByText('AI-generated')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'View proposal' })).toBeInTheDocument();
+  expect(screen.getAllByRole('link', { name: 'Download PDF' })[0].getAttribute('href')).toContain('member=proposal');
   expect(screen.getByRole('heading', { level: 3, name: 'Questions and answers' })).toBeInTheDocument();
   expect(screen.getByText('Send the budget breakdown.').tagName).toBe('LI');
   expect(screen.getByText('Slides')).toBeInTheDocument();

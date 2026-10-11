@@ -27,6 +27,19 @@ transcript in Staff Deliberations. Meeting Tracker can mint and copy a separate 
 Board members. That link shows presentation materials only; it does not expose the proposal,
 reviews, consultant feedback, or staff brief.
 
+> **Owner decision 2026-10-11 (Session 594), partly superseding the above:** the Board page now
+> also offers the proposal, as the exact external-reviewer PDF
+> (`Reviewer Materials/Proposal_{requestNumber}.pdf`, the one file `lib/external/reviewer-materials.js`
+> allows), listed without a filename or request number and opened through the same
+> non-buffering open route (`member=proposal`). Reviews, review bundle, consultant feedback,
+> staff brief, attendee list, join link and request number stay excluded. The page was also
+> redesigned the same day (video, AI-generated summary on the page, proposal/slides/bios; no
+> full transcript listed). Codex review (round 2, medium) noted that a downloaded proposal keeps
+> its SharePoint name `Proposal_{requestNumber}.pdf`; rejected by the orchestrator as outside this
+> page's boundary: the "no request number" rule covers the page and its context response, and
+> other downloads here already carry it (applicant file names; the published summary is named
+> `{requestNum}-Presentation-Summary-….txt`). Renaming would require proxying the bytes.
+
 Locked product decisions from 2026-09-21 plus review resolutions accepted 2026-09-22:
 
 | Decision | Contract |
@@ -257,7 +270,8 @@ Add `/external/presentation/[token]` with minimal context:
 - active applicant slides and other presentation materials already in the registry;
 - latest Recording, Transcript, and Transcript Summary only;
 - no proposal document, reviews, review bundle, consultant feedback, staff brief, attendee list,
-  meeting join link, or request number.
+  meeting join link, or request number. (2026-10-11: the external-reviewer proposal PDF is now
+  offered; see the owner decision near the top.)
 
 The presentation audience has an exact material-membership model:
 

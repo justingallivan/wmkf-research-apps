@@ -57,6 +57,9 @@ function dependencies(rows, overrides = {}) {
       size: 90_000_000, malware: null, downloadUrl: 'https://tenant.sharepoint.com/download?short=1',
     })),
     // The approved cut matching the video fixture (drive / video-item); the Board route checks the video's bytes against it.
+    // No reviewer PDF by default; proposal tests override this.
+    listReviewerProposal: jest.fn(async () => []),
+    getDriveId: jest.fn(async () => 'proposal-drive'),
     // No summary bytes by default: the summary lists with text null. Tests that read it override this.
     downloadFile: jest.fn(async () => { throw new Error('no summary bytes in this test'); }),
     getApprovedVideoCut: jest.fn(async () => ({
@@ -144,6 +147,112 @@ test('context lists applicant files plus only the bound summary (the Presentatio
   for (const leak of ['1003220', 'sharepoint.com', 'consultant', REVISION, 'presentationEnd', 'generationkey', 'schemaVersion']) {
     expect(json).not.toContain(leak);
   }
+});
+
+describe('the proposal (external-reviewer PDF; owner decision 2026-10-11)', () => {
+  const PDF_FILE = { id: 'proposal-item', name: 'Proposal_1003220.pdf', library: 'akoya_request', folder: 'x/Reviewer Materials' };
+  const proposalMedia = (over = {}) => jest.fn(async (driveId, itemId) => ({
+    driveId, itemId, filename: 'Proposal_1003220.pdf', mimeType: 'application/pdf', malware: null,
+    downloadUrl: 'https://tenant.sharepoint.com/download?proposal=1', ...over,
+  }));
+  const withProposal = (over = {}) => dependencies([], { listReviewerProposal: jest.fn(async () => [PDF_FILE]), resolveMediaDownloadUrl: proposalMedia(), ...over });
+
+  test('exactly one reviewer PDF lists first as a Proposal with no filename or request number', async () => {
+    const deps = withProposal();
+    const ctx = await buildPresentationContext({ requestId: REQUEST_ID }, deps);
+    expect(ctx.materials[0]).toEqual(expect.objectContaining({ member: 'proposal', kind: 'proposal', filename: null, canDownload: true, canWatch: false }));
+    expect(deps.listReviewerProposal).toHaveBeenCalledWith(REQUEST_ID, '1003220');
+    const json = JSON.stringify(ctx);
+    for (const leak of ['1003220', 'Proposal_', 'proposal-item', 'Reviewer Materials', 'akoya_request"']) expect(json).not.toContain(leak);
+  });
+
+  test.each([
+    ['no reviewer PDF', () => jest.fn(async () => [])],
+    ['two matching files', () => jest.fn(async () => [PDF_FILE, { ...PDF_FILE, id: 'other' }])],
+    ['the lookup fails', () => jest.fn(async () => { throw new Error('graph down'); })],
+  ])('%s lists no proposal and opens nothing', async (_label, lister) => {
+    const deps = withProposal({ listReviewerProposal: lister() });
+    expect((await buildPresentationContext({ requestId: REQUEST_ID }, deps)).materials).toEqual([]);
+    await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode: 'open' }, deps));
+  });
+
+  test('a stalled lookup does not hold back the page', async () => {
+    const deps = withProposal({ listReviewerProposal: jest.fn(() => new Promise(() => {})), proposalLookupDeadlineMs: 50 });
+    const started = Date.now();
+    expect((await buildPresentationContext({ requestId: REQUEST_ID }, deps)).materials).toEqual([]);
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
+  test('open and download redirect to a fresh Microsoft URL for the exact reviewer PDF; watch never does', async () => {
+    for (const mode of ['open', 'download']) {
+      const deps = withProposal();
+      expect(await resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode }, deps))
+        .toEqual({ kind: 'file', redirectUrl: 'https://tenant.sharepoint.com/download?proposal=1', filename: 'Proposal_1003220.pdf', mimeType: 'application/pdf' });
+      expect(deps.getDriveId).toHaveBeenCalledWith('akoya_request');
+      expect(deps.resolveMediaDownloadUrl).toHaveBeenCalledWith('proposal-drive', 'proposal-item');
+    }
+    await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode: 'watch' }, withProposal()));
+  });
+
+  test.each([
+    ['another filename', { filename: 'Research Phase I Application_2026.pdf' }],
+    ['not a PDF', { mimeType: 'text/html' }],
+    ['flagged as malware', { malware: { description: 'x' } }],
+    ['a different item', { itemId: 'other-item' }],
+    ['a non-https URL', { downloadUrl: 'http://tenant.sharepoint.com/download' }],
+  ])('a live item with %s is never served', async (_label, over) => {
+    const media = jest.fn(async (driveId, itemId) => ({ driveId, itemId, filename: 'Proposal_1003220.pdf', mimeType: 'application/pdf', malware: null,
+      downloadUrl: 'https://tenant.sharepoint.com/download?proposal=1', ...over }));
+    await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode: 'open' }, withProposal({ resolveMediaDownloadUrl: media })));
+  });
+
+  test('other non-material members are still refused', async () => {
+    for (const member of ['Proposal', 'proposal:x', 'review', 'material:not-a-guid']) {
+      await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member, mode: 'open' }, withProposal()));
+    }
+  });
+});
+
+describe('strict reviewer-PDF lookup (Codex review: partial listings must not look unique)', () => {
+  const { listReviewerProposalStrict } = require('../../lib/services/post-presentation-materials/presentation-page-service.js');
+  const MATCH = { id: 'p1', name: 'Proposal_1003220.pdf', folder: 'active/Reviewer Materials' };
+  const ARCHIVED = { id: 'p2', name: 'Proposal_1003220.pdf', folder: 'archive/Reviewer Materials' };
+  const INTERNAL = { id: 'x', name: 'Research Phase I Application_2026.pdf', folder: 'active/Reviewer Materials' };
+  const buckets = async () => [{ library: 'akoya_request', folder: 'active' }, { library: 'archive_lib', folder: 'archive' }];
+  const failing = (code) => Object.assign(new Error('list failed'), code ? { code } : {});
+
+  test('lists completely and strictly, returning every canonical match with its library', async () => {
+    const listFiles = jest.fn(async (library) => (library === 'akoya_request' ? [MATCH, INTERNAL] : [ARCHIVED]));
+    const found = await listReviewerProposalStrict(REQUEST_ID, '1003220', { getBuckets: buckets, listFiles });
+    expect(found.map((f) => [f.id, f.library])).toEqual([['p1', 'akoya_request'], ['p2', 'archive_lib']]);
+    expect(listFiles.mock.calls[0][2]).toEqual(expect.objectContaining({ failOnTruncation: true, failOnDepthLimit: true }));
+  });
+
+  test('a bucket that fails (timeout, 503, truncation) throws instead of leaving another copy looking unique', async () => {
+    for (const error of [failing(), failing('graph_file_list_truncated'), Object.assign(failing(), { status: 503 })]) {
+      const listFiles = jest.fn(async (library) => { if (library === 'akoya_request') throw error; return [ARCHIVED]; });
+      await expect(listReviewerProposalStrict(REQUEST_ID, '1003220', { getBuckets: buckets, listFiles })).rejects.toBe(error);
+    }
+  });
+
+  test('only a folder confirmed absent is treated as empty', async () => {
+    const listFiles = jest.fn(async (library) => { if (library === 'archive_lib') throw failing('graph_folder_not_found'); return [MATCH]; });
+    expect((await listReviewerProposalStrict(REQUEST_ID, '1003220', { getBuckets: buckets, listFiles })).map((f) => f.id)).toEqual(['p1']);
+  });
+
+  test('end to end: one bucket failing while the other holds a copy serves no proposal at context or open', async () => {
+    const listFiles = jest.fn(async (library) => { if (library === 'akoya_request') throw failing(); return [ARCHIVED]; });
+    const deps = dependencies([], {
+      listReviewerProposal: (id, num) => listReviewerProposalStrict(id, num, { getBuckets: buckets, listFiles }),
+      resolveMediaDownloadUrl: jest.fn(async (driveId, itemId) => ({ driveId, itemId, filename: 'Proposal_1003220.pdf', mimeType: 'application/pdf', malware: null, downloadUrl: 'https://tenant.sharepoint.com/d' })),
+    });
+    expect((await buildPresentationContext({ requestId: REQUEST_ID }, deps)).materials).toEqual([]);
+    await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode: 'open' }, deps));
+  });
+
+  test('the default dependency uses the strict lookup', () => {
+    expect(String(_internal.DEFAULT_DEPENDENCIES.listReviewerProposal)).toContain('listReviewerProposalStrict');
+  });
 });
 
 describe('summary text on the page', () => {

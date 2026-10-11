@@ -15,6 +15,7 @@ export function displayName(filename) {
   return name || 'Additional material';
 }
 
+// The proposal is the external-reviewer PDF (owner decision 2026-10-11).
 // The page fills in stages (slides and bios before the visit; video and summary after), so it is
 // assembled from what exists rather than listed in arrival order.
 export function arrangeMaterials(materials = []) {
@@ -25,5 +26,6 @@ export function arrangeMaterials(materials = []) {
   const slidesOriginal = slideFiles.find((m) => !isType(m, PDF)) || null;
   const extraSlides = slideFiles.filter((m) => m !== slidesPdf && m !== slidesOriginal);
   const others = [...extraSlides, ...materials.filter((m) => m.kind === 'other')];
-  return { video, summary, slidesPdf, slidesOriginal, others };
+  const proposal = materials.find((m) => m.kind === 'proposal') || null;
+  return { video, summary, proposal, slidesPdf, slidesOriginal, others };
 }
