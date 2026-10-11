@@ -19,6 +19,7 @@ function keyOf(ref) { return `${ref.kind}-${ref.profileId ?? ref.rosterId}`; }
 
 export default function AttendeePicker({
   label, people, selected = [], roles = null, onAdd, onRemove, onRole, disabled = false, single = false, hintFor, full = false,
+  roleFull = () => false,
 }) {
   const [query, setQuery] = useState('');
   const inputId = useId();
@@ -41,7 +42,7 @@ export default function AttendeePicker({
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Type a name"
             className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 md:w-96" />
-          {full && <p id={`${inputId}-full`} className="mt-1 text-xs text-gray-500">The attendee limit is reached.</p>}
+          {full && <p id={`${inputId}-full`} className="mt-1 text-xs text-gray-500">Both attendee lists are full.</p>}
           {results.length > 0 && (
             <ul id={listId} aria-label={`Matches for ${label}`} className="mt-1 w-full divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white md:w-96">
               {results.map((person) => {
@@ -78,7 +79,9 @@ export default function AttendeePicker({
                   {onRole && (
                     <span role="group" aria-label={`${name}: attendance`} className="inline-flex overflow-hidden rounded-lg border border-gray-300">
                       {['required', 'optional'].map((value) => (
-                        <button key={value} type="button" aria-pressed={role === value} disabled={disabled} onClick={() => onRole(ref, value)}
+                        <button key={value} type="button" aria-pressed={role === value} disabled={disabled || (role !== value && roleFull(value))}
+                          title={role !== value && roleFull(value) ? `The ${value === 'required' ? 'Required' : 'Optional'} list is full.` : undefined}
+                          onClick={() => onRole(ref, value)}
                           className={`px-3 py-1.5 text-xs font-medium ${role === value ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'} disabled:opacity-50`}>
                           {value === 'required' ? 'Required' : 'Optional'}
                         </button>

@@ -248,10 +248,23 @@ export default function SiteVisitEditor() {
     optionalAttendees: current.optionalAttendees.filter((row) => !sameRef(row, ref)),
   }));
   const attendeeRole = (ref) => (form.optionalAttendees.some((row) => sameRef(row, ref)) ? 'optional' : 'required');
-  const setAttendeeRole = (ref, role) => {
-    if (attendeeRole(ref) === role) return;
-    toggleIn(role === 'optional' ? 'optionalAttendees' : 'requiredAttendees', ref);
-  };
+  // Each list holds at most attendeesPerRole people, manual applicant rows included; the server rejects the whole save
+  // otherwise. Adding goes to Required, or to Optional when Required is full; a role change never overfills its
+  // destination (Codex review, commit 6).
+  const ROLE_LIMIT = SITE_VISIT_LIMITS.attendeesPerRole;
+  const addAttendee = (ref) => setForm((current) => {
+    if ([...current.requiredAttendees, ...current.optionalAttendees].some((row) => sameRef(row, ref))) return current;
+    if (current.requiredAttendees.length < ROLE_LIMIT) return { ...current, requiredAttendees: [...current.requiredAttendees, ref] };
+    if (current.optionalAttendees.length < ROLE_LIMIT) return { ...current, optionalAttendees: [...current.optionalAttendees, ref] };
+    return current;
+  });
+  const setAttendeeRole = (ref, role) => setForm((current) => {
+    const to = role === 'optional' ? 'optionalAttendees' : 'requiredAttendees';
+    const from = role === 'optional' ? 'requiredAttendees' : 'optionalAttendees';
+    if (current[to].some((row) => sameRef(row, ref)) || current[to].length >= ROLE_LIMIT) return current;
+    return { ...current, [to]: [...current[to], ref], [from]: current[from].filter((row) => !sameRef(row, ref)) };
+  });
+  const roleFull = (role) => (role === 'optional' ? form.optionalAttendees : form.requiredAttendees).length >= ROLE_LIMIT;
   const addManual = () => {
     const email = manual.email.trim().toLowerCase();
     if (!email) return;
@@ -359,8 +372,8 @@ export default function SiteVisitEditor() {
                 ? <p className="text-sm text-gray-500">No eligible people found.</p>
                 : <AttendeePicker label="Find a staff or Board member" people={[...recipients.staff, ...recipients.board]}
                   selected={[...form.requiredAttendees, ...form.optionalAttendees]} roles={attendeeRole}
-                  onAdd={(ref) => toggleIn('requiredAttendees', ref)} onRemove={removeAttendee} onRole={setAttendeeRole}
-                  disabled={busy} hintFor={noEmailHint} full={form.requiredAttendees.length >= SITE_VISIT_LIMITS.attendeesPerRole} />}
+                  onAdd={addAttendee} onRemove={removeAttendee} onRole={setAttendeeRole} roleFull={roleFull}
+                  disabled={busy} hintFor={noEmailHint} full={roleFull('required') && roleFull('optional')} />}
               {[...recipients.staff, ...recipients.board].some((person) => !person.email) && <p className="mt-2 text-xs text-gray-500">{NO_EMAIL_SECTION_HINT}</p>}
             </div>
           </fieldset>

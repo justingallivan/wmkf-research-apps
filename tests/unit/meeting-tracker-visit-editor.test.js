@@ -266,6 +266,53 @@ describe('one attendee picker (Site Visit redesign §3.1)', () => {
     expect(option).toHaveAttribute('title', noEmailHint({ linked: false }));
   });
 
+  describe('the 100-per-list limit, manual applicant rows included (Codex review, commit 6)', () => {
+    const manualRows = (n, prefix) => Array.from({ length: n }, (_, i) => ({ kind: 'manual', name: `${prefix} ${i}`, email: `${prefix}${i}@example.edu` }));
+    async function openWith(required, optional) {
+      const full = { ...visit, requiredAttendees: required, optionalAttendees: optional };
+      global.fetch = jest.fn(async (url, options = {}) => {
+        const target = String(url);
+        if (target.includes('/recipients')) return response(withNoEmail);
+        if (target.endsWith('/materials') || target.endsWith('/presentation-materials')) return response({ error: 'not enabled' }, 503);
+        if (options.method === 'PATCH') return response({ success: true, siteVisit: full });
+        return response({ success: true, siteVisit: full });
+      });
+      render(<SiteVisitEditor />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit visit details' }));
+    }
+    const saved = async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save site visit' }));
+      await waitFor(() => expect(global.fetch.mock.calls.some(([, o]) => o?.method === 'PATCH')).toBe(true));
+      return JSON.parse(global.fetch.mock.calls.find(([, o]) => o?.method === 'PATCH')[1].body);
+    };
+
+    test('with Required full, a new person is added to Optional', async () => {
+      await openWith(manualRows(100, 'r'), []);
+      fireEvent.change(screen.getByLabelText('Find a staff or Board member'), { target: { value: 'chris' } });
+      fireEvent.click(screen.getByRole('button', { name: /Add Chris Staff/ }));
+      const payload = await saved();
+      expect(payload.requiredAttendees).toHaveLength(100);
+      expect(payload.optionalAttendees).toEqual([{ kind: 'staff', profileId: 8 }]);
+    });
+
+    test('a role change into a full list is refused and leaves the selection as it was', async () => {
+      await openWith([{ kind: 'roster', rosterId: 3 }], manualRows(100, 'o'));
+      const toggle = within(screen.getByRole('group', { name: 'Board Member: attendance' })).getByRole('button', { name: 'Optional' });
+      expect(toggle).toBeDisabled();
+      expect(toggle).toHaveAttribute('title', 'The Optional list is full.');
+      fireEvent.click(toggle);
+      const payload = await saved();
+      expect(payload.requiredAttendees).toEqual([{ kind: 'roster', rosterId: 3 }]);
+      expect(payload.optionalAttendees).toHaveLength(100);
+    });
+
+    test('with both lists full the search is disabled', async () => {
+      await openWith(manualRows(100, 'r'), manualRows(100, 'o'));
+      expect(screen.getByLabelText('Find a staff or Board member')).toBeDisabled();
+      expect(screen.getByText('Both attendee lists are full.')).toBeInTheDocument();
+    });
+  });
+
   test('the organizer can be changed through its picker', async () => {
     await openEditor();
     fireEvent.click(screen.getByRole('button', { name: 'Change organizer' }));

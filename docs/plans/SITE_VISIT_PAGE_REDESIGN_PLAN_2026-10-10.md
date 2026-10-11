@@ -678,3 +678,10 @@ UI change was needed; a saved attribution is unaffected.
 - Applicant-side attendees (AkoyaGo suggestions plus manual entry) are unchanged.
 - **Deviation:** the read-only Visit details summary is left as built. It is already
   read-first and compact (a two-column definition list) and already shows names, not ids.
+- **Codex round 1 for commit 6 (needs-attention, one medium):** the per-list limit (100,
+  manual rows included) blocked adds once Required was full and let role changes overfill
+  a list, which makes the server reject the whole save. Adds now go to Required, or to
+  Optional when Required is full; role changes never overfill their destination (guarded
+  inside the state update), and a toggle into a full list is disabled with the reason. The
+  search disables only when both lists are full. Three boundary tests; the Optional-add
+  test fails when adds always go to Required.
