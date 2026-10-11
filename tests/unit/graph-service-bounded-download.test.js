@@ -99,6 +99,22 @@ describe('PDF conversion with opt-in bounds (Board page Word view)', () => {
     expect(cancel).toHaveBeenCalledTimes(1);
   });
 
+  test('a stalled or oversized error body never holds a bounded caller past timeoutMs', async () => {
+    const cancel = jest.fn();
+    const stalledError = { ok: false, status: 503, headers: { get: () => null }, text: jest.fn(() => new Promise(() => {})),
+      body: new ReadableStream({ start(controller) { controller.enqueue(Buffer.from('err')); }, cancel }) };
+    global.fetch = jest.fn().mockResolvedValueOnce(stalledError);
+    const started = Date.now();
+    await expect(GraphService.downloadFileAsPdf('drive', 'item', { maxBytes: 1024, timeoutMs: 50 })).rejects.toMatchObject({ status: 503 });
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(stalledError.text).not.toHaveBeenCalled();
+    const huge = { ok: false, status: 500, headers: { get: () => null }, text: jest.fn(),
+      body: new ReadableStream({ start(controller) { controller.enqueue(Buffer.alloc(10_000, 97)); controller.close(); } }) };
+    global.fetch = jest.fn().mockResolvedValueOnce(huge);
+    await expect(GraphService.downloadFileAsPdf('drive', 'item', { maxBytes: 1024, timeoutMs: 1000 })).rejects.toMatchObject({ status: 500 });
+    expect(huge.text).not.toHaveBeenCalled();
+  });
+
   test('within bounds it returns the bytes; without options it keeps the unbounded behavior', async () => {
     const closing = { ok: true, status: 200, headers: { get: () => null },
       body: new ReadableStream({ start(controller) { controller.enqueue(Buffer.from('%PDF-ok')); controller.close(); } }) };
