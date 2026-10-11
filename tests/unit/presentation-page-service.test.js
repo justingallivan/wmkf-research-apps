@@ -177,11 +177,21 @@ describe('the proposal (external-reviewer PDF; owner decision 2026-10-11)', () =
   test.each([
     ['no reviewer PDF', () => jest.fn(async () => [])],
     ['two matching files', () => jest.fn(async () => [PDF_FILE, { ...PDF_FILE, id: 'other' }])],
-    ['the lookup fails', () => jest.fn(async () => { throw new Error('graph down'); })],
-  ])('%s: check, open and download all refuse', async (_label, lister) => {
+  ])('%s: check, open and download all refuse with 404 (confirmed absence)', async (_label, lister) => {
     for (const mode of ['check', 'open', 'download']) {
       await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode }, withProposal({ listReviewerProposal: lister() })));
     }
+  });
+
+  test('a failed lookup is temporary (503), not absence, and the next lookup can succeed', async () => {
+    const lister = jest.fn()
+      .mockRejectedValueOnce(new Error('graph down'))
+      .mockResolvedValueOnce([PDF_FILE]);
+    const deps = withProposal({ listReviewerProposal: lister });
+    await expect(resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode: 'check' }, deps))
+      .rejects.toMatchObject({ httpStatus: 503 });
+    await expect(resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode: 'check' }, deps))
+      .resolves.toMatchObject({ kind: 'available' });
   });
 
   test('mode check is refused for every other member', async () => {
@@ -254,7 +264,8 @@ describe('strict reviewer-PDF lookup (Codex review: partial listings must not lo
       resolveMediaDownloadUrl: jest.fn(async (driveId, itemId) => ({ driveId, itemId, filename: 'Proposal_1003220.pdf', mimeType: 'application/pdf', malware: null, downloadUrl: 'https://tenant.sharepoint.com/d' })),
     });
     for (const mode of ['check', 'open']) {
-      await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode }, deps));
+      await expect(resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode }, deps))
+        .rejects.toMatchObject({ httpStatus: 503 });
     }
   });
 

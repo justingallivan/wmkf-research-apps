@@ -92,9 +92,32 @@ test('a throttled proposal check retries and adds the row when it later succeeds
     render(<PresentationMaterialsPage />);
     await waitFor(() => expect(checks).toBe(1));
     expect(screen.queryByText('Proposal')).not.toBeInTheDocument();
-    jest.advanceTimersByTime(15_000);
+    jest.advanceTimersByTime(20_000);
     expect(await screen.findByRole('button', { name: 'View proposal' })).toBeInTheDocument();
     expect(checks).toBe(2);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test('retries reach past a full 60 s rate window (attempts at 0, +20 s, +65 s)', async () => {
+  jest.useFakeTimers();
+  const times = [];
+  requestJson.mockImplementation(async (url) => {
+    if (!url.includes('mode=check')) return context([SLIDES_PDF]);
+    times.push(Date.now());
+    throw Object.assign(new Error('busy'), { status: 429 });
+  });
+  try {
+    render(<PresentationMaterialsPage />);
+    await waitFor(() => expect(times).toHaveLength(1));
+    await jest.advanceTimersByTimeAsync(20_000);
+    await waitFor(() => expect(times).toHaveLength(2));
+    await jest.advanceTimersByTimeAsync(45_000);
+    await waitFor(() => expect(times).toHaveLength(3));
+    expect(times[2] - times[0]).toBeGreaterThan(60_000);
+    await jest.advanceTimersByTimeAsync(120_000);
+    expect(times).toHaveLength(3);
   } finally {
     jest.useRealTimers();
   }
