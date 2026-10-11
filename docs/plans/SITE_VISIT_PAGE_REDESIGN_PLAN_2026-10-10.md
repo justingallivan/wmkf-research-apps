@@ -503,8 +503,11 @@ work is in progress. Builders tick each line off in the slice that moves it, and
 
 ### 9.6 Build log
 
-**Commit 1, Results rows** (branch `claude/site-visit-redesign`, `b48649a14` plus a
-follow-up amend commit). As built, with these deviations from §4 and §9.3:
+**Commit 1, Results rows** (branch `claude/site-visit-redesign`: `b48649a14`, `a644baa6f`,
+and the round-1 fix). Codex adversarial review: round 1 found that an open Summarize
+confirmation could act on a changed target (high), which is now fixed. The confirmation is bound to a
+signature of the transcript and each target's draft and load state, with two
+regression tests. Round 2 approved with no material findings. As built, with these deviations from §4 and §9.3:
 
 - **Unmet prerequisites keep the old card's behavior:** the action is absent and the
   reason shows as a note under the row (for example "Generate the discussion
