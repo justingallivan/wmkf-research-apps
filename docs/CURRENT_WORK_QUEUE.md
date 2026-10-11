@@ -171,7 +171,8 @@ sequence.
     published transcript (`beginEditNames` edits `collection.currentArtifact`),
     so staff land in a different recording's transcript. De-emphasise or hide
     the published transcript's edit actions while a newer one is pending.
-  - **Start hinted leavers unchecked in "Discussion attendance".** Reverses
+  - **Start hinted leavers unchecked in "Discussion attendance".** [BUILT on branch
+    `claude/site-visit-redesign`, commit 4; not merged] Reverses
     owner decision D2 of `docs/plans/ZOOM_ATTENDANCE_ATTRIBUTION_PLAN_2026-10-09.md`
     ("everyone starts checked"), by owner request after the first live use
     (1003222, 2026-10-10): people flagged "Left before the presentation ended"

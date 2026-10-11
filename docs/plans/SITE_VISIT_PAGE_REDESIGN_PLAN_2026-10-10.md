@@ -629,3 +629,11 @@ the underlined `BTN_LINK` text actions (disclosures such as Upload manually, and
 actions such as Cancel this transcription or Discard draft), because `Button` has no
 text-link variant. Converting those would mean adding a variant to the shared component,
 which is outside this build.
+- Codex review of 3b: approve (all 46 conversions checked by AST comparison).
+
+**Commit 4, hinted leavers start unchecked.** `buildAttendanceReview` computes the
+`leftBeforeEnd` hints first, sets each row's `kept` to the opposite, and derives
+`excludedSpeakerIds` from the unchecked rows before `normalizeDiscussionAttribution` (which
+requires them to match). Plan D2 in `ZOOM_ATTENDANCE_ATTRIBUTION_PLAN_2026-10-09.md` is
+revised in the same commit. The card seeds its checkboxes from the decision rows, so no
+UI change was needed; a saved attribution is unaffected.
