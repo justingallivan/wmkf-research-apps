@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Play } from 'lucide-react';
 import { requestJson } from '../../../shared/utils/api-request.js';
-import { arrangeMaterials, displayName, isType } from '../../../shared/utils/presentation-page-materials.js';
+import { arrangeMaterials, displayName, isOffice, isType } from '../../../shared/utils/presentation-page-materials.js';
 import SummaryText from '../../../shared/components/SummaryText.js';
 import {
   PRESENTATION_SUMMARY_HEADINGS,
@@ -112,7 +112,7 @@ function Video({ token, material }) {
 
 // Microsoft serves every file as a download, so a PDF is fetched here and handed to the browser's own
 // viewer as a local copy. The tab is opened first, inside the click, so it is not blocked.
-function usePdfViewer(token, material) {
+function usePdfViewer(token, material, viewMode = 'open') {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const open = async () => {
@@ -122,7 +122,7 @@ function usePdfViewer(token, material) {
     try {
       if (tab) tab.opener = null;
       // eslint-disable-next-line no-restricted-syntax -- raw fetch: binary PDF bytes via the open route's redirect to Microsoft (not JSON); allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
-      const response = await fetch(endpoint(token, material, 'open'));
+      const response = await fetch(endpoint(token, material, viewMode));
       if (!response.ok) throw new Error(`status ${response.status}`);
       const url = URL.createObjectURL(new Blob([await response.arrayBuffer()], { type: PDF }));
       if (tab && !tab.closed) tab.location.href = url;
@@ -138,47 +138,55 @@ function usePdfViewer(token, material) {
   return { open, busy, failed };
 }
 
-// One grid for every row: name, a fixed-width main action, then a download link, so actions align.
-function MaterialRow({ name, primary, secondary = null, note = null }) {
+// One grid for every row: the name, then a fixed-width action, so actions align.
+function MaterialRow({ name, action, note = null }) {
   return (
     <li className="py-5">
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 sm:grid sm:grid-cols-[minmax(0,1fr)_10rem_12rem] sm:gap-6">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 sm:grid sm:grid-cols-[minmax(0,1fr)_10rem] sm:gap-6">
         <p className="basis-full text-lg font-medium text-gray-900">{name}</p>
-        <div className="flex">{primary}</div>
-        <div className="flex">{secondary}</div>
+        <div className="flex">{action}</div>
       </div>
       {note}
     </li>
   );
 }
 
-function PdfRow({ token, name, pdf, download, downloadLabel }) {
-  const viewer = usePdfViewer(token, pdf);
+// View opens a PDF in the browser (Office files as a PDF copy Microsoft converts on the server). The
+// original (for slides, the PowerPoint when there is one) is offered only if viewing fails.
+function ViewRow({ token, name, file, viewMode = 'open', fallback = file }) {
+  const viewer = usePdfViewer(token, file, viewMode);
   return (
     <MaterialRow
       name={name}
-      primary={(
+      action={(
         <button type="button" onClick={viewer.open} disabled={viewer.busy} aria-label={`View ${name.toLowerCase()}`} className={`${BUTTON} sm:w-full`}>
           {viewer.busy ? 'Opening…' : 'View'}
         </button>
       )}
-      secondary={<a href={endpoint(token, download, 'download')} className={LINK}>{downloadLabel}</a>}
       note={viewer.failed && (
         <p role="status" className="mt-3 text-base text-gray-600">
-          This file could not be opened in the browser. Use {downloadLabel} instead.
+          This file could not be opened in the browser.{' '}
+          <a href={endpoint(token, fallback, 'download')} className={LINK}>Download it instead</a>
         </p>
       )}
     />
   );
 }
 
+// Files Microsoft cannot convert (for example an image) can only be downloaded.
 function DownloadRow({ token, name, file }) {
   return (
     <MaterialRow
       name={name}
-      primary={<a href={endpoint(token, file, 'download')} aria-label={`Download ${name.toLowerCase()}`} className={`${BUTTON} sm:w-full`}>Download</a>}
+      action={<a href={endpoint(token, file, 'download')} aria-label={`Download ${name.toLowerCase()}`} className={`${BUTTON} sm:w-full`}>Download</a>}
     />
   );
+}
+
+function FileRow({ token, name, file }) {
+  if (isType(file, PDF)) return <ViewRow token={token} name={name} file={file} />;
+  if (isOffice(file)) return <ViewRow token={token} name={name} file={file} viewMode="pdf" />;
+  return <DownloadRow token={token} name={name} file={file} />;
 }
 
 function SectionHeading({ children }) {
@@ -186,25 +194,17 @@ function SectionHeading({ children }) {
 }
 
 function Materials({ token, proposal, slidesPdf, slidesOriginal, others }) {
-  if (!proposal && !slidesPdf && !slidesOriginal && others.length === 0) return null;
+  const slides = slidesPdf || slidesOriginal;
+  if (!proposal && !slides && others.length === 0) return null;
   return (
     <section className="mt-16">
       <SectionHeading>Materials</SectionHeading>
       <ul className="mt-4 divide-y divide-gray-200 border-y border-gray-200">
-        {proposal && <PdfRow token={token} name="Proposal" pdf={proposal} download={proposal} downloadLabel="Download PDF" />}
-        {slidesPdf && (
-          <PdfRow
-            token={token}
-            name="Slides"
-            pdf={slidesPdf}
-            download={slidesOriginal || slidesPdf}
-            downloadLabel={slidesOriginal ? 'Download PowerPoint' : 'Download PDF'}
-          />
-        )}
-        {!slidesPdf && slidesOriginal && <DownloadRow token={token} name="Slides" file={slidesOriginal} />}
-        {others.map((material) => (isType(material, PDF)
-          ? <PdfRow key={material.member} token={token} name={displayName(material.filename)} pdf={material} download={material} downloadLabel="Download PDF" />
-          : <DownloadRow key={material.member} token={token} name={displayName(material.filename)} file={material} />))}
+        {proposal && <ViewRow token={token} name="Proposal" file={proposal} />}
+        {slidesPdf
+          ? <ViewRow token={token} name="Slides" file={slidesPdf} fallback={slidesOriginal || slidesPdf} />
+          : slidesOriginal && <FileRow token={token} name="Slides" file={slidesOriginal} />}
+        {others.map((material) => <FileRow key={material.member} token={token} name={displayName(material.filename)} file={material} />)}
       </ul>
     </section>
   );

@@ -4,6 +4,17 @@ const PDF = 'application/pdf';
 
 export const isType = (material, type) => String(material?.contentType || '').split(';')[0].trim().toLowerCase() === type;
 
+// Office files the server can convert to PDF for viewing (open route mode=pdf).
+const OFFICE_TYPES = new Set([
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+]);
+export const isOffice = (material) => OFFICE_TYPES.has(String(material?.contentType || '').split(';')[0].trim().toLowerCase());
+
 // "1003222 Site Visit Participant Bios.docx" -> "Site Visit Participant Bios": no request number, no extension.
 export function displayName(filename) {
   const name = String(filename || '')
