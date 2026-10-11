@@ -118,7 +118,7 @@ function world(over = {}) {
     ensureFolderPath: async (library, folder) => { w.folder = folder; },
     readConfirmedBoundary: async () => w.boundary,
     getFileMetadataById: async (drive, item) => w.metas[`${drive}/${item}`] ?? null,
-    resolveMediaDownloadUrl: async () => ({ eTag: w.mediaEtag ?? 'etag1', downloadUrl: 'https://dl.example.net/file?sig=SECRET' }),
+    resolveMediaDownloadUrl: async () => ({ eTag: w.mediaEtag ?? 'etag1', driveId: w.mediaDriveId ?? 'drv', itemId: w.mediaItemId ?? 'itm', size: w.mediaSize ?? 1000, downloadUrl: 'https://dl.example.net/file?sig=SECRET' }),
     createBrowserUploadSession: async (library, folder, filename) => { w.filename = filename; return { driveId: 'updrv', uploadUrl: 'https://up.example.com/s?tok=SECRET2', expiresAt: '2026-10-11T00:00:00Z' }; },
     cancelBrowserUploadSession: async url => { w.cancelled.push(url); return { outcome: 'cancelled' }; },
     sealUploadUrl: () => 'SEALED',
@@ -156,7 +156,7 @@ describe('happy path', () => {
     expect(w.written.map(f => f.path)).toEqual(['/vercel/sandbox/cut.py', '/vercel/sandbox/ffmpeg.tar.xz']);
     expect(w.installSpec.env).toMatchObject({ FFMPEG_SHA256: FFMPEG_TARBALL_SHA256, FFMPEG_DIR: '/vercel/sandbox/ffmpeg', INSTALL_RECEIPT: '/vercel/sandbox/install.json' });
     expect(w.policies[0]).toEqual({ allow: ['dl.example.net'] });
-    expect(w.lastDetached.env).toMatchObject({ SOURCE_SIZE: '1000', CUT_MS: '5000', FFMPEG_BIN_DIR: '/vercel/sandbox/ffmpeg/bin', WORK_DIR: WORK });
+    expect(w.lastDetached.env).toMatchObject({ SOURCE_SIZE: '1000', SOURCE_QXH: 'qx', CUT_MS: '5000', FFMPEG_BIN_DIR: '/vercel/sandbox/ffmpeg/bin', WORK_DIR: WORK });
     expect(w.row).toMatchObject({ state: 'cutting', sandbox_command_id: 'cmd-1', lease_token: null });
 
     expect((await w.tick()).outcome).toBe('polling');
@@ -301,21 +301,40 @@ describe('failures and supersedes', () => {
   });
 
   test.each([
-    ['eTag changed', w => { w.metas['drv/itm'].eTag = 'etag2'; }],
+    ['size changed', w => { w.metas['drv/itm'].size = 1001; }],
+    ['frozen quickXorHash missing', w => { w.row.source_quickxor_hash = null; }],
+    ['live quickXorHash missing', w => { delete w.metas['drv/itm'].quickXorHash; }],
     ['quickXorHash changed', w => { w.metas['drv/itm'].quickXorHash = 'other'; }],
     ['item gone', w => { delete w.metas['drv/itm']; }],
     ['copy row no longer copied', w => { w.copy = { ...w.copy, state: 'failed' }; }],
-    ['download eTag differs at resolve time', w => { w.mediaEtag = 'etag9'; }],
+    ['download size differs at resolve time', w => { w.mediaSize = 1001; }],
+    ['download item differs at resolve time', w => { w.mediaItemId = 'other'; }],
   ])('source %s supersedes', async (_label, mutate) => {
     const w = world();
     mutate(w);
     expect(await w.tick()).toMatchObject({ outcome: 'superseded', code: 'presentation_video_source_changed' });
   });
 
+  test('a metadata-only eTag bump (size and hash unchanged) is NOT a source change (live regression 2026-10-10)', async () => {
+    const w = world();
+    w.metas['drv/itm'].eTag = 'etag2';
+    w.mediaEtag = 'etag2';
+    expect(await w.tick()).toMatchObject({ outcome: 'cut_started' });
+    expect(w.lastDetached.env).toMatchObject({ SOURCE_QXH: 'qx' });
+  });
+
+  test('a source_hash_mismatch cut receipt supersedes the split instead of failing it', async () => {
+    const w = world();
+    await toCutting(w);
+    w.files[`${WORK}/receipt.json`] = json({ ok: false, code: 'source_hash_mismatch' });
+    w.setCommand('cmd-1', 3);
+    expect(await w.tick()).toMatchObject({ outcome: 'superseded', code: 'presentation_video_source_changed' });
+  });
+
   test('revalidation runs again before the upload phase', async () => {
     const w = world();
     await toCutting(w);
-    w.metas['drv/itm'].eTag = 'changed-mid-cut';
+    w.metas['drv/itm'].quickXorHash = 'changed-mid-cut';
     expect(await w.tick()).toMatchObject({ outcome: 'superseded', code: 'presentation_video_source_changed' });
   });
 

@@ -135,6 +135,7 @@ describe('startPresentationVideoSplit: refusals', () => {
     ['a Zoom-link winner', () => deps.findDocuments.mockResolvedValue({ records: [{ ...winnerRow(), wmkf_sharepointdriveid: undefined, wmkf_sharepointitemid: undefined,
       wmkf_sharepointversionid: undefined, wmkf_sharepointetag: undefined, wmkf_externalurl: 'https://us02web.zoom.us/rec/share/abc' }] }), 'presentation_video_recording_missing'],
     ['a winner without an eTag', () => deps.findDocuments.mockResolvedValue({ records: [winnerRow({ wmkf_sharepointetag: null })] }), 'presentation_video_recording_missing'],
+    ['a copy without a quickXorHash', () => store.findCopiedZoomVideoCopyForDocument.mockResolvedValue(copyRow({ sharepoint_quickxor_hash: null })), 'presentation_video_recopy_required'],
     ['no copied row', () => store.findCopiedZoomVideoCopyForDocument.mockResolvedValue(null), 'presentation_video_source_not_copied'],
     ['a different meeting', () => store.findCopiedZoomVideoCopyForDocument.mockResolvedValue(copyRow({ zoom_meeting_uuid: 'other' })), 'presentation_video_source_mismatch'],
     ['a pre-079 copy (null times)', () => store.findCopiedZoomVideoCopyForDocument.mockResolvedValue(copyRow({ recording_start: null, recording_end: null })), 'presentation_video_recopy_required'],

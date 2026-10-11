@@ -236,6 +236,41 @@ d('presentation-video-cut-script', () => {
     expect(fs.existsSync(path.join(work, 'presentation.mp4'))).toBe(false);
   });
 
+  describe('source content identity (SOURCE_QXH)', () => {
+    const run = async (extra) => {
+      const work = sandbox('work');
+      const r = await script('cut', { SOURCE_PATH: src25, SOURCE_SIZE: String(fs.statSync(src25).size), CUT_MS: '12437', WORK_DIR: work, ...extra });
+      return { r, receipt: JSON.parse(fs.readFileSync(path.join(work, 'receipt.json'), 'utf8')), work };
+    };
+    const realQxh = async () => JSON.parse((await script('qxh', { FILE: src25 })).stdout).quickXorHash;
+
+    test('the correct SOURCE_QXH passes and the computed source hash is recorded', async () => {
+      const qxh = await realQxh();
+      const { r, receipt } = await run({ SOURCE_QXH: qxh });
+      expect(r.status).toBe(0);
+      expect(receipt).toMatchObject({ ok: true, sourceQuickXorHash: qxh });
+    });
+
+    test('a wrong SOURCE_QXH is rejected as source_hash_mismatch, with the computed hash recorded and no output', async () => {
+      const { r, receipt, work } = await run({ SOURCE_QXH: 'AAAAAAAAAAAAAAAAAAAAAAAAAAA=' });
+      expect(r.status).toBe(3);
+      expect(receipt).toMatchObject({ ok: false, code: 'source_hash_mismatch', step: 'source', sourceQuickXorHash: await realQxh() });
+      expect(fs.existsSync(path.join(work, 'presentation.mp4'))).toBe(false);
+    });
+
+    test('production (SOURCE_URL) without SOURCE_QXH fails closed even when the bytes are right', async () => {
+      const server = http.createServer((req, res) => { res.end(fs.readFileSync(src25)); });
+      await new Promise((r) => server.listen(0, '127.0.0.1', r));
+      try {
+        const work = sandbox('work');
+        const r = await script('cut', { SOURCE_URL: `http://127.0.0.1:${server.address().port}/v.mp4`,
+          SOURCE_SIZE: String(fs.statSync(src25).size), CUT_MS: '12437', WORK_DIR: work });
+        expect(r.status).toBe(3);
+        expect(JSON.parse(fs.readFileSync(path.join(work, 'receipt.json'), 'utf8'))).toMatchObject({ ok: false, code: 'source_hash_mismatch' });
+      } finally { await new Promise((res) => server.close(res)); }
+    });
+  });
+
   describe('install', () => {
     const fakeTarball = () => {
       const dir = sandbox('fake');
