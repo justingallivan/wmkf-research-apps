@@ -378,6 +378,27 @@ describe('the Zoom list follows the server while the panel is open', () => {
     expect(zoomListCalls()).toBe(0);
   });
 
+  test('the card Refresh waits for the Zoom list: it stays disabled and a second click starts nothing (Codex round 5)', async () => {
+    let release = null;
+    let listReads = 0;
+    route({}, { '/zoom-recordings': { respond: () => {
+      listReads += 1;
+      return listReads === 1 ? response(zoomList()) : new Promise((resolve) => { release = () => resolve(response(zoomList())); });
+    } } });
+    await openPanel();
+    const refresh = screen.getByTestId('card-refresh');
+    await waitFor(() => expect(refresh).toBeEnabled());
+    fireEvent.click(refresh);
+    await waitFor(() => expect(release).not.toBeNull());
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    expect(refresh).toBeDisabled();
+    fireEvent.click(refresh);
+    expect(listReads).toBe(2);
+    await act(async () => { release(); });
+    await waitFor(() => expect(refresh).toBeEnabled());
+    expect(listReads).toBe(2);
+  });
+
   test('re-reading the same jobs does not refetch the Zoom list', async () => {
     const state = { collection: collection({ jobs: [queuedJob('queued')] }) };
     route(state, { '/zoom-recordings': { respond: () => response(zoomList()) } });

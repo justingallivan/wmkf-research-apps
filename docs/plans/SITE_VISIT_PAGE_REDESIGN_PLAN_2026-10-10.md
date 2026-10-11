@@ -607,3 +607,7 @@ regression tests. Round 2 approved with no material findings. As built, with the
   materials are held until the key-change read completes, and Refresh still produces
   exactly one read; the test fails without the sequence check. The owner approved this
   round (2026-10-11).
+- **Codex round 5 (needs-attention, one medium):** `z.refresh` discarded the Zoom list
+  promise, so Refresh re-enabled before the list settled. It now returns the read, and the
+  button stays disabled while the list is refreshing. Regression: a held Zoom response
+  keeps Refresh disabled and a second click starts no request (fails with both reverted).

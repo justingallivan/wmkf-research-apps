@@ -2203,7 +2203,8 @@ function useZoomImport(requestId, { onImported, jobsSignature, onVideoCopied }) 
   };
 
   const openPanel = useCallback(() => { void loadList(); }, [loadList]);
-  const refresh = useCallback(() => { void loadList({ quiet: true }); }, [loadList]);
+  // Returns the read so the card Refresh can wait for it (Codex review round 5, redesign commit 3).
+  const refresh = useCallback(() => loadList({ quiet: true }), [loadList]);
 
   // Once the panel has been opened, a real change in the transcription jobs (id and status) quietly reloads the list so
   // meeting states follow the server. Nothing is fetched while the panel has never been opened, and an unchanged
@@ -3645,7 +3646,7 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
     <section id="recording-and-transcript-card" className={shell} data-testid="recording-and-transcript-card" aria-labelledby="recording-transcript-title">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div id="recording-transcript-title">{heading}</div>
-        {m.data && <button type="button" data-testid="card-refresh" onClick={() => void refreshAll()} disabled={refreshing || t.loading || Boolean(t.busy)} className={BTN}>{refreshing ? 'Refreshing…' : 'Refresh'}</button>}
+        {m.data && <button type="button" data-testid="card-refresh" onClick={() => void refreshAll()} disabled={refreshing || z.refreshing || t.loading || Boolean(t.busy)} className={BTN}>{refreshing ? 'Refreshing…' : 'Refresh'}</button>}
       </div>
       {m.loading && !m.data && <p className="mt-4 text-sm text-gray-500">Loading…</p>}
       {m.error && !m.data && <div className="mt-4"><Notice>{m.error}</Notice></div>}
