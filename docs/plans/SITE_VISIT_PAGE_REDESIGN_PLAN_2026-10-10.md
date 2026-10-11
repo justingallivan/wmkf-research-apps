@@ -761,6 +761,12 @@ readiness list, so the "On the Board page" status for the summary matches the "P
 Tests: card order and placement; readiness for the transcript, the summary (bound or stale)
 and the video (served, out of date, unknown, in review, feature off, and turning on after
 approval, with one load). Mutation checks: each readiness rule, broken, fails its test.
+Codex round 1 (needs-attention, two medium): (a) after the presentation end changed, a failed
+video re-read kept the old "On the Board page"; the hook now records the revision each successful
+read was made for, and the readiness list says "Status unknown" unless the read is current and
+succeeded. (b) With the transcript collection failed to load, the summary read reports
+`not_needed`, which the list showed as "Not yet"; it is now "Status unknown". Each has a
+regression test that fails without its fix.
 
 ## 10. Remaining after the build (2026-10-11)
 

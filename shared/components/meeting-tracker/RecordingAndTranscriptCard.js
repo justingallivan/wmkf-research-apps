@@ -3167,6 +3167,9 @@ function usePresentationVideo(requestId, { enabled = true, revisionKey = '', ref
   const [confirming, setConfirming] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
+  // The transcript revision the last successful read was made for. The Board serves an approved video only for the
+  // current revision, so a status read for an earlier one is not evidence about now (Codex review, four-card commit).
+  const [loadedKey, setLoadedKey] = useState(null);
   const mountedRef = useRef(true);
   const sequenceRef = useRef(0);
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
@@ -3184,11 +3187,12 @@ function usePresentationVideo(requestId, { enabled = true, revisionKey = '', ref
       setSplits(rows);
       setLoaded(true);
       setLoadFailed(false);
+      setLoadedKey(revisionKey);
     } catch {
       // Keep what is shown; the interval below keeps retrying.
       if (mountedRef.current && sequenceRef.current === sequence) setLoadFailed(true);
     }
-  }, [path, requestId, enabled]);
+  }, [path, requestId, enabled, revisionKey]);
   useEffect(() => {
     const timer = window.setTimeout(() => { void load(); }, 0);
     return () => window.clearTimeout(timer);
@@ -3240,6 +3244,8 @@ function usePresentationVideo(requestId, { enabled = true, revisionKey = '', ref
   return {
     path, available, newest, processing, busy, message, confirming, setConfirming, loaded, loadFailed,
     load, create, approve, confirmTargetLive,
+    // True only while the shown status was read successfully for the current transcript revision.
+    statusCurrent: loaded && !loadFailed && loadedKey === revisionKey,
   };
 }
 
@@ -3535,9 +3541,11 @@ const BOARD_UNKNOWN = { tone: 'gray', label: 'Status unknown' };
 function BoardReadiness({ t, boundaryState, video }) {
   const { summaryStatusCurrent, published } = publishedSummaryOf(t, t.presentationSummary);
   const transcript = boundaryState === 'bound' ? BOARD_ON : !t.collection ? BOARD_UNKNOWN : BOARD_NOT_YET;
-  const summary = !summaryStatusCurrent ? BOARD_UNKNOWN : published?.state === 'bound' ? BOARD_ON : BOARD_NOT_YET;
+  // Without a loaded transcript collection the summary read reports 'not_needed', which is not evidence of absence.
+  const summary = !t.collection || !summaryStatusCurrent ? BOARD_UNKNOWN : published?.state === 'bound' ? BOARD_ON : BOARD_NOT_YET;
   const newest = video.newest;
   const videoStatus = !video.loaded ? null
+    : !video.statusCurrent ? BOARD_UNKNOWN
     : newest?.state === 'approved' && newest.boardReady === true ? BOARD_ON
       : newest?.state === 'approved' && newest.boardReady == null ? BOARD_UNKNOWN : BOARD_NOT_YET;
   return (

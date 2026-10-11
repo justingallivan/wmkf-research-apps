@@ -397,3 +397,29 @@ describe('Board materials readiness list', () => {
     await waitFor(() => expect(screen.getByTestId('board-readiness-video')).toHaveTextContent('On the Board page'));
   });
 });
+
+describe('Board readiness of the video follows the transcript revision (Codex review, four-card commit)', () => {
+  test('a changed presentation end whose video re-read fails shows Status unknown, not the old On', async () => {
+    route({ state: { splits: { available: true, splits: [split({ state: 'approved', boardReady: true })] } } });
+    const base = global.fetch;
+    let endMs = 62900;
+    let failSplits = false;
+    global.fetch = jest.fn(async (url, options = {}) => {
+      const path = String(url);
+      if (path.endsWith('/transcriptions')) {
+        const body = collection();
+        body.currentArtifact.presentationEnd.endMs = endMs;
+        return response(body);
+      }
+      if (failSplits && path.endsWith('/presentation-video-splits') && (options.method || 'GET') === 'GET') return response({ error: 'down' }, 500);
+      return base(url, options);
+    });
+    await renderLine();
+    await waitFor(() => expect(screen.getByTestId('board-readiness-video')).toHaveTextContent('On the Board page'));
+    endMs = 70000;
+    failSplits = true;
+    fireEvent.click(screen.getByTestId('card-refresh'));
+    await waitFor(() => expect(screen.getByTestId('board-readiness-video')).toHaveTextContent('Status unknown'));
+    expect(screen.getByTestId('board-readiness-video')).not.toHaveTextContent('On the Board page');
+  });
+});

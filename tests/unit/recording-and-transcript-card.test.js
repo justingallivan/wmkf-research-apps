@@ -401,6 +401,17 @@ test('with no transcript, the Presentation and Staff discussion cards explain wh
   expect(within(boardCard).getByTestId('board-readiness-transcript')).toHaveTextContent('Not yet');
 });
 
+test('when the transcript list fails to load, Board readiness says Status unknown rather than Not yet (Codex review, four-card commit)', async () => {
+  route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) }, {
+    '/transcriptions': { method: 'GET', respond: () => response({ error: 'down' }, 500) },
+  });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  const board = await screen.findByTestId('card-board-materials');
+  await waitFor(() => expect(within(board).getByTestId('board-readiness-summary')).toHaveTextContent('Status unknown'));
+  expect(within(board).getByTestId('board-readiness-transcript')).toHaveTextContent('Status unknown');
+  expect(within(board).queryByText('Not yet')).toBeNull();
+});
+
 test('the cards run in work order: recording setup, presentation, staff discussion, then Board materials', async () => {
   route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
