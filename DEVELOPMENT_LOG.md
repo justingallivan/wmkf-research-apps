@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Presentation video cut from the Zoom recording (Session 592)
+
+**Milestone:** Staff can cut the copied Zoom MP4 at the confirmed presentation end in a Vercel Sandbox, check the ending, and approve it; approval registers a Dataverse "Presentation Video" (100000011) the Board and briefing pages can play. First real cut (1003222) approved 2026-10-10.
+**Sessions:** 592 (Opus orchestrating, Sonnet building, Codex adversarial review per slice). Merge `e53cb4b9a` (migrations 079, 080, owner-applied); live fixes `c277afa8f` (content identity), `02a5bd146` (command exit code), `4d23ff779` (card busy flag).
+**Ship state:**
+- Pinned FFmpeg 9.0.2 from private Blob; source verified by size + quickXorHash inside the sandbox; frame- and sample-exact cut with privacy proofs on both decode paths; Graph upload verified by size + hash.
+- Access gated by `PRESENTATION_VIDEO_SPLIT_ACCESS` (test request only so far); 40 min and about $0.14 CPU for a 60-minute presentation on 2 vCPU.
+- Open: Board link eTag check (`pinnedBytesMatch`), speed-ups, card redesign.
+**Why it matters:** the Board sees only the presentation, never the staff discussion, without anyone editing video by hand.
+**Pointers:** `docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md`; `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md`; `lib/services/meeting-tracker-recordings/presentation-video-*.js`.
+
 ## October 2026 — Zoom transcript provenance and attendance-based discussion attribution (Session 591)
 
 **Milestone:** When Duncan confirms a transcript's presentation end, the same step now lists everyone admitted to the Zoom meeting (silent people included), all checked; unchecking someone makes their discussion turns read "Unidentified speaker". Underneath, every Zoom-imported transcript now carries a frozen, content-free record of the exact recording files it came from.

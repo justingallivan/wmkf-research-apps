@@ -1,4 +1,55 @@
-# Session 592 Prompt: Stage 4 build plan; first live test of attendance attribution
+# Session 593 Prompt: Stage 4 live (first cut approved); Board-link eTag check; Recording and transcript card redesign
+
+## Session 592 close — Stage 4 presentation video built, merged and first real cut approved; three live fixes (Claude orchestrating, Sonnet builds, Codex reviews; main, 2026-10-10 PT)
+
+### What Was Completed
+
+1. **Stage 4 built and merged.** Slices 1-5 on branches, each slice and the whole branch passed Codex adversarial review; merge `e53cb4b9a`.
+   - Owner gates done 2026-10-10: migration 079 applied (merge `894826cd5`), migration 080 applied, 100000011 "Presentation Video" added to `wmkf_artifacttype`, pinned FFmpeg uploaded to private Blob, `PRESENTATION_VIDEO_FFMPEG_BLOB_PATHNAME` set.
+   - Production flags: `PRESENTATION_VIDEO_SPLIT_ACCESS=test:e43ae6ea-698f-f111-8076-6045bd018a07` (1003222 only); `PRESENTATION_VIDEO_SANDBOX_VCPUS=4` (set and redeployed by the owner after the first cut).
+2. **First real cut on 1003222: approved and registered** (split `d957e094-…`, 2026-10-10 PT). The owner played the output; it ends at the presentation end. Receipt: cut 3,597,257 ms, 89,931 frames, audio packets equal, no edit delay, 40 min on 2 vCPU (encode 22 min), about $0.14 active CPU. Full record: `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md` "First real cut".
+3. **Three live defects found and fixed, each on a branch with Codex review:**
+   - SharePoint eTag used as content identity; metadata-only bumps superseded valid cuts. Now size + quickXorHash, in-sandbox source hash check, same-response hash on the staff open route (merge `c277afa8f`). Codex round 2 (quickXorHash collision by a SharePoint writer) **rejected by the orchestrator as outside the threat model**; recorded in the build plan for the owner.
+   - Non-waiting `getCommand` kept `exitCode` null after the command finished; `commandState` now follows with a 5 s bounded `wait()` (merge `02a5bd146`, Codex approve).
+   - Recording and transcript card stayed greyed after a successful transcript publish; owner-token busy claims for publish, save and attendance (merge `4d23ff779`, Codex approve round 3).
+4. **quickXorHash parity confirmed live:** the cut script's hash equals Graph's (source and output).
+5. **Owner UI notes logged** in `docs/CURRENT_WORK_QUEUE.md`: one "Redesign the Recording and transcript card" item (Copy video ambiguity, off-screen replace confirmation, stacked banners, three refresh controls, hide manual uploads, step order, stale-transcript edit buttons, hinted leavers start unchecked (reverses attendance D2), auto-generate split transcripts after publish, superseded-video message, stream the review video); separate items for the speaker picker using Zoom participants, the Board eTag check, and cut speed-ups.
+6. **Attendance attribution exercised live for the first time** (1003222): attendance list loaded from Zoom with leave times and "left before the presentation ended" hints; worked as designed; owner asked for hinted leavers to start unchecked (logged).
+7. **Migrations:** Production and `main` end at 080; next free 081 (`.claude-memory/project-migration-numbers-claimed-off-main.md`).
+
+### Next Items
+
+#### Verified Open
+
+1. **Board link check for the approved presentation video (1003222).** The output eTag was unchanged at approval (`,3`), so `pinnedBytesMatch` passed then; the source MP4's eTag moved about 30 minutes after its copy. Owner plays the video from the Board link now and the next day. If it stops opening, the queue item "Board file check uses the SharePoint eTag" becomes urgent (needs a decision: store a content identity at approval, or accept size + versionId).
+   Evidence: `docs/CURRENT_WORK_QUEUE.md`; `lib/services/post-presentation-materials/presentation-page-service.js` `pinnedBytesMatch`.
+2. **Recording and transcript card redesign.** Plan first, own session. Evidence: `docs/CURRENT_WORK_QUEUE.md` "Redesign the Recording and transcript card".
+3. **Measure a 4-vCPU cut, then lower `PRESENTATION_VIDEO_SANDBOX_TIMEOUT_MS`** (3 h now; target about 90 min). Packet-timestamp checks are a later recipe change with full Codex review. Evidence: queue item "Speed up the presentation video cut".
+
+#### Owner Decision Needed
+
+1. **Widen `PRESENTATION_VIDEO_SPLIT_ACCESS`** from `test:<1003222>` to on, after the Board link check passes.
+2. **SharePoint-writer threat model for Stage 4 identity:** accept the orchestrator's rejection of the quickXorHash collision finding, or require an unforgeable identity (cTag or SHA-256; needs a migration). Evidence: build plan "Codex adversarial review of the content-identity fix".
+3. Carried, not rechecked: Proposal Ranking PR #463 and the colleague dry run.
+
+#### Verify Before Acting
+
+1. Carried from Sessions 588-590, not rechecked: Proposal Ranking Production cleanup; optional paired-summaries checks; PR #470 cleanup test.
+2. Stage 4 worktrees `/Users/gallivan/Code/WMKF_Apps-stage4`, `-stage4-recipe`, `-s4`, `-s5` hold merged branches; remove only after confirming no uncommitted work.
+
+### Gotchas
+
+- Reading Production Postgres job rows and SharePoint file metadata (no content, no URLs) was done this session to diagnose live jobs; Production **Dataverse** reads still need explicit owner authorization.
+- A running Stage 4 sandbox can be inspected read-only with `@vercel/sandbox` `Sandbox.get({ name: 's4-<splitId>' })` from the main checkout's `.env.local` OIDC token; `readFileToBuffer` and short `runCommand` calls worked against a Production-created sandbox.
+- Vercel crons keep hitting the previous deployment for about a minute after a deploy reports success.
+- Background `node … | grep` pipes buffer; use `grep --line-buffered` (Monitor) for live watchers. Scratchpad scripts need `NODE_PATH=$PWD/node_modules` or `createRequire(process.cwd()+'/package.json')`.
+- Codex's review sandbox cannot run jest (read-only); all test results come from local runs.
+
+**Milestone determination:** Stage 4 shipped a new Production capability (presentation video cut, approved and registered on a real request), so a DEVELOPMENT_LOG entry was added.
+
+---
+
+## Session 592 Prompt (superseded): Stage 4 build plan; first live test of attendance attribution
 
 ## Session 591 close — provenance and attendance shipped (Codex built, Claude orchestrated); Stage 4 Sandbox pilot passed (Claude, main, 2026-10-09/10 PT)
 
