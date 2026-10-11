@@ -444,3 +444,15 @@ describe('Board readiness when the approved video is outside the recent splits (
     await waitFor(() => expect(screen.getByTestId('board-readiness-video')).toHaveTextContent('Status unknown'));
   });
 });
+
+describe('an absent Board status proves no video only when the split list is the whole history (Codex round 4)', () => {
+  const failedSplits = (n) => Array.from({ length: n }, (_v, i) => split({ id: `ffffffff-ffff-4fff-8fff-${String(i).padStart(12, '0')}`, state: 'failed', failureCode: 'upload_failed' }));
+  test.each([
+    ['ten attempts (a full list) and materials without a video record', 10, 'Status unknown'],
+    ['nine attempts (the whole history) and no video record', 9, 'Not yet'],
+  ])('%s', async (_l, n, label) => {
+    route({ state: { splits: { available: true, splits: failedSplits(n) } } });
+    await renderLine();
+    await waitFor(() => expect(screen.getByTestId('board-readiness-video')).toHaveTextContent(label));
+  });
+});

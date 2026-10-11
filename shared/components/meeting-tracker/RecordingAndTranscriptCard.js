@@ -3146,6 +3146,9 @@ function DerivativeRow({ state, label, material, testId, action = null, needsEnd
 // Stage 4 slice 5: the Video line under Presentation. Hidden when the feature is off for this request. Staff only; ids
 // and raw codes are never rendered (the id only appears in the Open link target).
 const PV_POLL_MS = 15_000;
+// The splits GET returns a request's most recent splits up to this many (presentation-video-split-service LIST_LIMIT),
+// unfiltered. Fewer than this is the whole history.
+const PV_SERVER_LIST_LIMIT = 10;
 const PV_PROCESSING = new Set(['queued', 'cutting', 'uploading', 'registering']);
 const PV_STALE_TEXT = 'The transcript or video changed. Create it again.';
 const PV_FAILURE_TEXT = Object.freeze({
@@ -3180,6 +3183,7 @@ function usePresentationVideo(requestId, { enabled = true, revisionKey = '', ref
   // What the Board serves now ('bound' | 'missing' | 'stale' | 'unknown'), from the server's aggregate check. An older
   // approved video stays on the Board while a newer one is made, so the newest split alone cannot answer this.
   const [boardStatus, setBoardStatus] = useState(null);
+  const [historyComplete, setHistoryComplete] = useState(false);
   const mountedRef = useRef(true);
   const sequenceRef = useRef(0);
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
@@ -3199,6 +3203,7 @@ function usePresentationVideo(requestId, { enabled = true, revisionKey = '', ref
       setLoadFailed(false);
       setLoadedKey(revisionKey);
       setBoardStatus(typeof body?.boardVideo?.status === 'string' ? body.boardVideo.status : null);
+      setHistoryComplete(Array.isArray(body?.splits) && body.splits.length < PV_SERVER_LIST_LIMIT);
     } catch {
       // Keep what is shown; the interval below keeps retrying.
       if (mountedRef.current && sequenceRef.current === sequence) setLoadFailed(true);
@@ -3257,7 +3262,7 @@ function usePresentationVideo(requestId, { enabled = true, revisionKey = '', ref
     load, create, approve, confirmTargetLive,
     // True only while the shown status was read successfully for the current transcript revision.
     statusCurrent: loaded && !loadFailed && loadedKey === revisionKey,
-    boardStatus,
+    boardStatus, historyComplete,
   };
 }
 
@@ -3556,13 +3561,14 @@ function BoardReadiness({ t, boundaryState, video, hasVideoMaterial }) {
   // summary read also reports 'not_needed' without one, which is not evidence of absence.
   const transcript = !t.collectionCurrent ? BOARD_UNKNOWN : boundaryState === 'bound' ? BOARD_ON : BOARD_NOT_YET;
   const summary = !t.collectionCurrent || !summaryStatusCurrent ? BOARD_UNKNOWN : published?.state === 'bound' ? BOARD_ON : BOARD_NOT_YET;
-  // The server adds boardVideo only when an approved split is among its recent ones, so an absent status proves nothing
-  // while a Presentation video record exists (an older approval can fall outside that window). With no such record
-  // the Board cannot serve a video: it binds from the same winners this list comes from.
+  // The server adds boardVideo only when an approved split is among its recent ones, so an absent status proves no
+  // approved video exists only when that list is the whole history; otherwise an older approval may still be served
+  // (Codex rounds 3-4). A Presentation video record among the staff materials also makes absence unproven.
+  const absenceProven = video.historyComplete && !hasVideoMaterial;
   const videoStatus = !video.loaded ? null
     : !video.statusCurrent ? BOARD_UNKNOWN
     : video.boardStatus === 'bound' ? BOARD_ON
-      : video.boardStatus === 'unknown' || (!video.boardStatus && hasVideoMaterial) ? BOARD_UNKNOWN : BOARD_NOT_YET;
+      : video.boardStatus === 'unknown' || (!video.boardStatus && !absenceProven) ? BOARD_UNKNOWN : BOARD_NOT_YET;
   return (
     <ul className="mt-3 divide-y divide-gray-100 border-t border-gray-200" data-testid="board-readiness" aria-label="On the Board page">
       <ArtifactRow name="Presentation transcript" status={transcript} testId="board-readiness-transcript" />

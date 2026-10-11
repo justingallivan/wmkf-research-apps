@@ -781,6 +781,12 @@ approved split is among its 10 most recent, so an older approval behind ten fail
 the status absent; absent now means "Not yet" only when no Presentation video record exists among
 the staff materials (the Board binds from the same winners), otherwise "Status unknown". Each has
 a regression test that fails without its fix.
+Codex round 4 (needs-attention, one medium): (b) still trusted possibly stale materials as proof of
+absence. An absent `boardVideo` now means "Not yet" only when the splits list is shorter than the
+server's 10-row limit (the list is unfiltered, `presentation-video-split-store.js`
+`listPresentationVideoSplitSnapshotsForRequest`, so a shorter list is the whole history) and no
+Presentation video record exists; otherwise "Status unknown". Regression: ten failed attempts with no
+video record is unknown, nine is "Not yet" (fails without the history check).
 
 ## 10. Remaining after the build (2026-10-11)
 
