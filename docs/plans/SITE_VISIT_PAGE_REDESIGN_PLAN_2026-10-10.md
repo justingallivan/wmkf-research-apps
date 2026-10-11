@@ -17,7 +17,9 @@ related:
 
 Status: **proposed; scope decided** (Session 593, 2026-10-10/11). Planning only; no
 code. The owner answered §8: the whole page is in scope, the Board link sits on the
-Results "Board page" heading, and TXT/VTT downloads live in the row menu.
+Results "Board page" heading, and TXT/VTT downloads live in the row menu. The build brief
+(§9: reusable pieces, header identity source, action inventory, commit order,
+verification) is written; the build has not started.
 
 ## 1. Problem
 
@@ -314,9 +316,186 @@ is automatic.
 3. **TXT and VTT downloads live in the row's "…" menu**, for the split transcripts
    and the full meeting transcript alike.
 
-## 9. Next step
+## 9. Build brief (Session 593, 2026-10-11)
 
-Turn this proposal into a build brief: the action inventory (§7), the
-`SiteVisitEditor` identity data source (§3, [ASSUMED]), and a commit order for
-slices A and B. Slice C items go to the queue as separate entries. Build on a branch
-(Tier 1 runtime UI per the campaign release strategy).
+Branch `claude/site-visit-redesign` off `main`, Tier 1 runtime UI (campaign release
+strategy). Keep UX and behavior changes in separate commits. Each slice gets a
+Codex adversarial review before the next one starts; the whole branch gets one at
+the end.
+
+### 9.1 Reusable pieces (found, not to be rebuilt)
+
+- **"…" menu:** `shared/components/workbench/OverflowMenu.js` already takes
+  `items: [{ key, label, onSelect?, href?, download?, disabled?, title? }]`,
+  portals, flips upward, and closes on outside click. It is used by
+  `StaffDeliberationsTab.js` and `SessionEditor.js`. Import it from its current path;
+  do not move it in this branch. A disabled item's reason goes **in the label**
+  ("Summarize again · needs presentation end"), because `title` is only a tooltip.
+- **Buttons:** `Button` in `shared/components/Layout.js` (primary, secondary,
+  outline, danger). The card's `BTN`, `BTN_PRIMARY` and `BTN_LINK` strings and the
+  materials card's hand-colored buttons converge on it.
+- **Steps:** the card's own `Step` component (`RecordingAndTranscriptCard.js:2992`)
+  stays and gains a collapsed one-line form. No suite stepper component was found
+  to reuse.
+- **Header:** `PageHeader` in `Layout.js` is the centered hero form (the Left
+  Header Rule reserves that for the suite home). Keep the editor's own left-aligned
+  header markup and extend it.
+- **New shared piece:** one `ArtifactRow` (name as link, status chip, timestamp or
+  detail, then an inline action **or** an `OverflowMenu`) under
+  `shared/components/meeting-tracker/`. Results and Applicant materials both use it.
+
+### 9.2 Header identity source
+
+[VERIFIED via `SiteVisitEditor.js:179`] The request number comes from the `?n=`
+URL parameter. [VERIFIED via `lib/services/site-visit/logistics-service.js:430-480`]
+The visit GET (`getSiteVisitLogistics`) returns the visit, materials, presentation
+descriptors and applicant suggestions, but not the request's title, institution,
+program or cycle. `/api/workbench/resolve-request` has those fields but is guarded
+by `requireAppAccess('reviewers')` (`pages/api/workbench/resolve-request.js:28`), a
+different grant from `meeting-tracker`, and also returns the Proposal tab's
+payload.
+
+**Recommendation:** add an opt-in `includeRequestIdentity` to
+`getSiteVisitLogistics`, following the existing `includeApplicantAttendees`
+pattern so the Workbench read keeps its shape and cost. Only the Meeting Tracker
+visit GET (`pages/api/meeting-tracker/visits/[requestId]/index.js`) passes it.
+It returns `request: { requestNumber, title, institution, grantProgram,
+cycleLabel }`, computed the way `resolve-request-service.js` computes them
+(`akoya_title`, `requestInstitution`, the formatted `_wmkf_grantprogram_value`,
+`meetingDateToCycleCode`/`cycleCodeToLabel`). [ASSUMED] This costs one more
+read-only request row read. Check first whether the request row is already read
+inside this call (for example by `resolveApplicantContacts`) and reuse it.
+
+The header falls back to `?n=` while the visit is loading or after an error
+(Identity-Always). This is the only server change in slices A/B. It needs
+`/contract-reconcile` (route → service → UI), an `API_ROUTE_SECURITY_MATRIX.md`
+row update, and a check of the Atlas page that covers this read.
+
+### 9.3 Action inventory (old → new)
+
+Every current control, by component. "Inline" means the row's single visible
+action; "menu" means the row's or card's `OverflowMenu`. **Unchanged** means the
+control stays where it is, inside an editor or form that is open only while that
+work is in progress. Builders tick each line off in the slice that moves it, and
+`ArtifactRow` tests assert the menu contents per state from §4.1.
+
+**Page (`SiteVisitEditor.js`)**
+
+| Control | Now | New |
+|---|---|---|
+| Back to the cycle schedule (`:299`) | header and page bottom | unchanged |
+| Edit visit details (`:144`) | Visit details card | Visit details strip, right |
+| Open meeting link (`:150`) | Visit details row | strip, labeled with its host |
+| Organizer / attendee chips (`:163`), applicant suggestion Add (`:375`), manual Add (`:397`) | edit form | one Attendees picker with Required/Optional per person; applicant section kept (§3.1) |
+| Cancel / Save site visit (`:404-405`) | edit form | unchanged |
+
+**Applicant materials (`SiteVisitMaterialsCard.js`, `StaffMaterialUpload.js`)**
+
+| Control | Now | New |
+|---|---|---|
+| Request materials (`:240`) | card header | card inline primary when there is no collection |
+| Open file (`OpenFileLink`, `:53`) | row right | the item name is the link |
+| Waive / Require again (`:279`) | row right | row menu |
+| Upload file (`StaffMaterialUpload`) | row right | inline on a missing row |
+| Upload updated file (`StaffMaterialUpload`) | row right | row menu (it opens the file picker; progress and errors stay in the row) |
+| Add other file (`:308`) | below list | card menu |
+| Copy contributor link (`:315`) | card footer | card menu |
+| Send invitation / again (`:317`) | card footer | card menu |
+| Send reminder (`:321`) | card footer | card inline primary when state is `missing` |
+| Confirm the files open (`:324`) | card footer | card inline primary when state is `received` |
+
+**Recording and transcript, step 1 (`RecordingAndTranscriptCard.js`)**
+
+| Control | Now | New |
+|---|---|---|
+| Replace audio or transcript / Close (`:3244`) | step 1 header link | collapsed step 1 menu: Replace recording or transcript |
+| Cancel this transcription (`:3262`, `:2614`) | progress line, earlier runs | unchanged (in-progress work) |
+| Refresh (`:3263`, `:3238`, `:2522`, `:2780`, `:2791`, `:2795`) | progress line, conflict banner, review, summary blocks | **one** card-level Refresh in the status region; the card reloads after its own writes (§6 B) |
+| Import from Zoom / Try again (`:2917`, `:2924`) | Zoom section | unchanged while step 1 is open |
+| Refresh list (`:2935`) | Zoom section | folded into the card Refresh |
+| Zoom recording radio, acknowledgment, Import… (`:2961`, `:2979`, `:2982`) | Zoom section | unchanged |
+| Copy video / Try again (`:2967`) | below its row | inside its recording row, naming the recording |
+| Cancel copy / Try again (`:2905`, `:2907`) | copy status | in the recording row |
+| Replace and continue / Keep current file (`:2878-2879`) | after the list | inside the clicked row, focus moved |
+| Other ways to add a recording (`:3277`) | step 1 | "Upload manually" disclosure |
+| Upload a finished transcript instead (`:3224`), Upload transcript (`:2673`) | step 1 | inside "Upload manually" |
+| Audio/VTT pickers, acknowledgment, Transcribe, Add Zoom captions, Continue without it (`:2631-2649`) | step 1 | inside "Upload manually" |
+| Replace recording, Save Zoom link, Upload MP4, Pause (`:3366-3384`) | Video recording block | inside "Upload manually"; Replace recording also in the step 1 menu |
+| Resume / Retry upload / Finish saving / Cancel / Cancel upload / Keep upload (`:3407-3417`) | unfinished uploads | unchanged (in-progress work; shown whenever present) |
+| Review / Discard this draft (`:2611-2612`) | Earlier runs | step 1 menu: Earlier transcriptions (opens the list) |
+| Check now / Close this attempt (`:2580-2581`) | attention block | unchanged (real attention; stays visible) |
+
+**Step 2**
+
+| Control | Now | New |
+|---|---|---|
+| Edit speaker names / Continue editing names (`:3291`) | step 2 | collapsed step 2 menu; disabled with its reason while a newer transcription is pending |
+| Set presentation end (`:3296`) | step 2 | step 2 inline primary while no end is confirmed |
+| Edit / Continue editing presentation end (`:3299`, `:2797`) | step 2, summary block | step 2 menu (same disabling) |
+| Generate presentation and discussion transcripts (`:3304`) | step 2 | inline **Regenerate** on the stale or missing transcript row in Results (§4.1); removed from step 2 |
+| Review editor: Use {name}, Use proposed, Use this line instead, Download draft TXT/VTT, Save, Publish transcript, Cancel, Discard this draft (`:2346-2552`) | review block | unchanged (open editor) |
+| Discussion attendance checkboxes (`:2455`) | review block | unchanged; default `kept` changes (§6 B) |
+
+**Step 3, Results**
+
+| Control | Now | New |
+|---|---|---|
+| Consent checkbox + Summarize presentation and discussion (`:2705-2711`) | top of Results | inline **Summarize** on the summary rows (paired when both are missing); consent moves into the confirmation it opens |
+| Summarize again / Replace draft with a new summary / Try again (`:2766`) | summary block | row menu when published and current; inline when stale or failed (§4.1); same confirmation |
+| Open published summary (`:2778`) | summary block | the summary name is the link |
+| Check again (`:2777`, `:2779`) | summary block | card Refresh |
+| Load latest (`:2805`), Publish summary, Save draft, Discard draft (`:2827-2835`) | draft editor | unchanged (open editor); the row's inline action **Review and publish** opens it |
+| Open (split transcripts, `:3020`) | transcript lines | the transcript name is the link |
+| Download TXT / VTT (split transcripts) | not offered | row menu (owner decision 3) |
+| Open video (`:3148`) | video line | the video name is the link (streams once C3 ships) |
+| Check the ending and approve / Approve video / Not yet (`:3149`, `:3157-3158`) | video line | inline action on the video row; confirmation unchanged |
+| Finish approving (`:3150`) | video line | inline action |
+| Create presentation video / Create it again / Create again / Keep current video (`:3151`, `:3166-3167`) | video line | inline when there is no video or it is out of date; otherwise row menu; confirmation unchanged |
+| Retry (video load, `:3121`) | video line | card Refresh |
+| Open recording (`:3338`) | Full meeting | "Full meeting recording" name is the link |
+| Download TXT / VTT (`:3340-3341`) | Full meeting | "Full meeting transcript" row menu |
+| Open transcript (uploaded, `:3343`) | Full meeting | "Full meeting transcript" name is the link |
+| Generate link (`:3437`) | Board link block | inline on the "Board page" heading when no link exists |
+| Open Board page (`:3443`), Copy link (`:3449`) | Board link block | "Board page" heading |
+| Issue new link + confirm / Keep current link (`:3450-3457`) | Board link block | "Board page" heading menu; confirmation stays inline |
+
+### 9.4 Commit order
+
+1. **`ArtifactRow` + Results (UX).** Board page and Staff only groups, Board link
+   on the heading, row menus including the TXT/VTT downloads, and consent in the
+   Summarize confirmation. This is the screenshot and the biggest gain. Card tests
+   that select "Open" or "Open published summary" by text are updated to the
+   name-link queries in the same commit.
+2. **Steps 1-2 collapse (UX).** One-line done states with menus, the "Upload
+   manually" disclosure, "Copy video" in its row, and Earlier transcriptions in
+   the menu.
+3. **Card behavior (B).** One status region and one Refresh, reload after the
+   card's own writes, the in-row replace confirmation with focus, and disabled
+   stale edit actions.
+4. **Hinted leavers start unchecked (B).** In `attendance-service.js`, plus its
+   test, plus the D2 text in `ZOOM_ATTENDANCE_ATTRIBUTION_PLAN_2026-10-09.md`.
+5. **Applicant materials rows (UX).**
+6. **Visit details strip and Attendees picker (UX).** The saved attendee shape is
+   unchanged.
+7. **Header identity.** 7a: server opt-in read (§9.2), with `/contract-reconcile`
+   and the matrix row. 7b: header and status chip.
+8. **Docs.** This plan's status, the surface brief
+   `.impeccable/surfaces/onents-meeting-tracker-sitevisiteditor-js-e5657c91.md`
+   (its "not a redesign" scope is superseded), the queue item, and the Atlas or
+   matrix rows touched in 7a.
+
+### 9.5 Verification
+
+- Existing UI suites, updated rather than deleted:
+  `recording-and-transcript-card{,-zoom-import,-zoom-video,-presentation-video}.test.js`,
+  `site-visit-materials-card{,-t5-matrix}.test.js`,
+  `meeting-tracker-visit-editor.test.js`, `site-visit-editor-t5-matrix.test.js`.
+- New tests: `ArtifactRow` menu contents per §4.1 state; disabled menu items carry
+  their reason in the label; no element with the accessible name "Open" remains
+  in Results; the consent confirmation blocks a summary run until checked.
+- Gates: `check:types`, `check:api-routes` (7a), `check:route-service-boundary`,
+  `check:dataverse-access-layer` (7a), plus the doc gates for slice 8.
+- Impeccable detector once over the changed UI files at the end
+  (`impeccable detect --json`), then the finish review.
+- Desktop check in a browser on a test request. Rendering this page reads
+  Production Dataverse, so the owner either authorizes it or drives it.
