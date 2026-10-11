@@ -244,8 +244,10 @@ describe('standalone Copy video', () => {
     expect(meetingRow).not.toBeNull();
     expect(button).toHaveAccessibleName(`Copy video from ${within(meetingRow).getByRole('radio').closest('label').querySelector('.font-medium').textContent}`);
     fireEvent.click(button);
-    // The replace confirmation opens in the clicked row, not after the list.
-    fireEvent.click(await within(meetingRow).findByRole('button', { name: 'Replace and continue' }));
+    // The replace confirmation opens in the clicked row, not after the list, and takes focus.
+    const dialog = await within(meetingRow).findByRole('alertdialog', { name: 'Replace the current recording' });
+    await waitFor(() => expect(document.activeElement).toBe(dialog));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Replace and continue' }));
     await waitFor(() => expect(posts('video')).toHaveLength(2));
     expect(posts('video')[1].body.replaces).toEqual({ artifactId: WINNER_ID, slotVersion: 3 });
     expect(posts('audio')).toHaveLength(0);

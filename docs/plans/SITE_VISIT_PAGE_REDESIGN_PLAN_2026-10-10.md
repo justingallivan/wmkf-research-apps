@@ -550,3 +550,32 @@ regression tests. Round 2 approved with no material findings. As built, with the
   discoverable. Step 2's summary shows no speaker count, since the count is not loaded
   without the transcript content. The open step 2 now uses a `BTN` for "Edit presentation
   end" where it had a blue text link (One Button Vocabulary).
+
+**Commit 2 review:** Codex approved in round 1 with no material findings.
+
+**Commit 3, card behavior.** As built:
+
+- **One card Refresh** in the card heading (`data-testid="card-refresh"`). It reloads the
+  transcription status, the materials and Board link, the Zoom list (when open) and the
+  presentation video. It replaces the conflict banner's Refresh, the progress line's
+  Refresh and the Zoom "Refresh list".
+- **Kept in place, by DESIGN.md's State Rule** (a failed load gets its Retry where it
+  failed): summary **Check again**, **Refresh transcription status** and the video's
+  **Retry**. The speaker editor's **Refresh** also stays, because it preserves unsaved
+  edits. The card Refresh does not re-read the summaries: their load keys already reload
+  them when the transcript changes, and an extra read raced the draft-edit guards that the
+  tests protect.
+- **Own-write staleness:** cancelling a run that had already moved on now reloads and
+  shows a single warning. It no longer adds a red error plus an "Another session changed
+  this" banner. That banner is kept for real 409 conflicts and now points to the card
+  Refresh.
+- **Old-transcript edits gated:** while a newer transcription is running or waiting to be
+  checked, Edit speaker names, Edit presentation end and Set presentation end are
+  disabled. In the step 2 menu each label carries "· wait for the newer transcript"; in
+  the open step a note explains why.
+- **Replace confirmation takes focus** (and scrolls into view) when it opens in its row.
+- **Deferred to commit 3b:** converging the card's `BTN`/`BTN_PRIMARY`/`BTN_LINK` strings on
+  the shared `Button` (a mechanical change across the file, kept separate so this
+  behavior commit stays reviewable).
+- Mutation checks: removing the gate, the focus call, or the conflict reset each fails its
+  new test.

@@ -212,7 +212,7 @@ test('seeds names from the job on load, then adopts names that arrive when match
     speaker_alignment: { status: 'partial', speakers: { A: { name: 'Alex Lee', confidence: 0.97 }, B: { name: 'Jordan Rivera', confidence: 0.9 } }, suggestions: {} },
     speaker_names: { A: 'Alex Lee', B: 'Jordan Rivera' }, version: 2,
   };
-  fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+  fireEvent.click(within(screen.getByTestId('step-review')).getByRole('button', { name: 'Refresh' }));
   await waitFor(() => expect(screen.getByLabelText('Name for Speaker A')).toHaveValue('Alex Lee'));
   expect(screen.getByLabelText('Name for Speaker B')).toHaveValue('Jordan Rivera');
   expect(screen.getByText('Names saved')).toBeInTheDocument();
@@ -231,7 +231,8 @@ test('a 409 on save keeps local names, shows the conflict notice, and Refresh re
   expect(await screen.findByText(/This draft changed elsewhere/)).toBeInTheDocument();
   expect(screen.getByLabelText('Name for Speaker B')).toHaveValue('My edit');
   version = 2;
-  fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+  // The speaker editor keeps its own Refresh, which preserves unsaved edits.
+  fireEvent.click(within(screen.getByTestId('step-review')).getByRole('button', { name: 'Refresh' }));
   await waitFor(() => expect(screen.queryByText(/This draft changed elsewhere/)).not.toBeInTheDocument());
   expect(screen.getByLabelText('Name for Speaker B')).toHaveValue('My edit');
   expect(screen.getByLabelText('Name for Speaker A')).toHaveValue('Alex Lee');
@@ -501,7 +502,8 @@ test('the review block offers a transcript preview that shows live speaker names
 test('a saved names draft is resumed with a GET instead of creating a second draft', async () => {
   const artifact = { id: ARTIFACT_ID, fingerprint: 'd'.repeat(64), bundleEditable: true };
   const draft = { operationId: OP_ID, state: 'draft', sourceArtifactId: ARTIFACT_ID, speakerNames: { A: 'Yara' }, createdAt: '2026-10-04T21:00:00.000Z', expiresAt: '2099-01-01T00:00:00.000Z' };
-  const state = { materials: [transcriptRow()], collection: collection({ currentArtifact: artifact, correctionDrafts: [draft] }), detail: detailFor({}) };
+  // No newer run is waiting, so the published transcript's name edits are available.
+  const state = { materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact, correctionDrafts: [draft] }), detail: detailFor({}) };
   const correction = { operationId: OP_ID, state: 'draft', version: 1, speakerNames: { A: 'Yara' }, expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: artifact.fingerprint };
   route(state, { [`/corrections/${OP_ID}`]: { method: 'GET', respond: () => response({ correction, content, currentArtifact: artifact, candidates: [] }) } });
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
@@ -515,14 +517,15 @@ test('a saved names draft is resumed with a GET instead of creating a second dra
   expect(calls.some((call) => call.startsWith('POST') && call.includes('/corrections'))).toBe(false);
 });
 
-test('an older active run still shows progress with Refresh while the newest run is ready', async () => {
+test('an older active run still shows progress while the newest run is ready, and the card Refresh rereads it', async () => {
   const older = job({ id: '99999999-9999-4999-8999-999999999999', status: 'processing', created_at: '2026-10-04T19:00:00.000Z' });
   const state = { collection: collection({ jobs: [job(), older] }), detail: detailFor({}) };
   route(state);
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
   const progress = await screen.findByTestId('transcript-progress');
   expect(progress.textContent).toContain('Transcribing');
-  const refresh = within(progress).getByRole('button', { name: 'Refresh' });
+  expect(within(progress).queryByRole('button', { name: 'Refresh' })).toBeNull();
+  const refresh = screen.getByTestId('card-refresh');
   await waitFor(() => expect(refresh).toBeEnabled());
   const before = global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/transcriptions')).length;
   fireEvent.click(refresh);
@@ -1587,6 +1590,22 @@ describe('step-by-step layout', () => {
     expect(screen.queryByLabelText(/Audio file/)).not.toBeInTheDocument();
   });
 
+  test('while a newer transcription runs, the published transcript edit actions are disabled with the reason', async () => {
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [job({ status: 'queued', contentAccessAllowed: false })], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    await screen.findByTestId('transcript-progress');
+    expect(stepMenuItem('Edit speaker names · wait for the newer transcript')).toBeDisabled();
+    expect(screen.getByRole('menuitem', { name: 'Edit presentation end · wait for the newer transcript' })).toBeDisabled();
+  });
+
+  test('with no newer transcription the same edit actions are enabled', async () => {
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    await findRow('presentation-transcript-row');
+    expect(stepMenuItem('Edit speaker names')).toBeEnabled();
+    expect(screen.getByRole('menuitem', { name: 'Edit presentation end' })).toBeEnabled();
+  });
+
   test('a chosen audio file keeps step 1 open even though a transcript exists', async () => {
     route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
@@ -1743,9 +1762,12 @@ describe('cancelling a queued transcription', () => {
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     fireEvent.click(await screen.findByRole('button', CANCEL));
-    expect(await screen.findByText(/This transcription changed\./)).toBeInTheDocument();
+    expect(await screen.findByText(/could not be cancelled because it had already moved on/)).toBeInTheDocument();
     await waitFor(() => expect(reads).toBeGreaterThanOrEqual(2));
     expect(screen.queryByText(/Transcription cancelled/)).toBeNull();
+    // The card reloaded itself, so there is one warning and no "another session" banner (owner note 2026-10-10).
+    expect(screen.queryByText(/Another session changed this/)).toBeNull();
+    expect(screen.queryAllByRole('alert')).toHaveLength(0);
   });
 });
 

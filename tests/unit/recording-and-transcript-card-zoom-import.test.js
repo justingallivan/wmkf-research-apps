@@ -348,7 +348,7 @@ describe('the Zoom list follows the server while the panel is open', () => {
     await waitFor(() => expect(within(panel).getByRole('radio', { name: /Oct 5/ })).toBeEnabled());
   });
 
-  test('Refresh list turns an importing meeting whose lease expired into a retryable one', async () => {
+  test('the card Refresh turns an importing meeting whose lease expired into a retryable one', async () => {
     let zoomState = 'importing';
     const importing = () => zoomList({ meetings: zoomList().meetings.map((m, i) => (i === 0 ? { ...m, import: { state: 'importing', jobId: null, failureCode: null } } : m)) });
     const expired = () => zoomList({ meetings: zoomList().meetings.map((m, i) => (i === 0 ? { ...m, import: { state: 'failed', jobId: null, failureCode: 'zoom_import_lease_expired' } } : m)) });
@@ -356,9 +356,11 @@ describe('the Zoom list follows the server while the panel is open', () => {
     const panel = await openPanel();
     expect(within(panel).getByRole('radio', { name: /Oct 5/ })).toBeDisabled();
     zoomState = 'expired';
-    fireEvent.click(within(panel).getByRole('button', { name: 'Refresh list' }));
+    // One Refresh for the card replaces the list's own Refresh list (redesign §6 B).
+    expect(within(panel).queryByRole('button', { name: 'Refresh list' })).toBeNull();
+    fireEvent.click(screen.getByTestId('card-refresh'));
     await waitFor(() => expect(within(panel).getByRole('radio', { name: /Oct 5/ })).toBeEnabled());
-    expect(within(panel).getByRole('button', { name: 'Refresh list' })).toBeEnabled();
+    await waitFor(() => expect(screen.getByTestId('card-refresh')).toBeEnabled());
   });
 
   test('a collection change while the panel was never opened makes no Zoom list request', async () => {
@@ -384,10 +386,11 @@ describe('the Zoom list follows the server while the panel is open', () => {
     await screen.findByTestId('zoom-import');
     const before = zoomListCalls();
     state.collection = collection({ jobs: [queuedJob('queued')] });
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    fireEvent.click(screen.getByTestId('card-refresh'));
     await waitFor(() => expect(global.fetch.mock.calls.filter(([u]) => String(u).endsWith('/transcriptions')).length).toBeGreaterThan(1));
     await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
-    expect(zoomListCalls()).toBe(before);
+    // The card Refresh reads the list once; identical jobs add no second read.
+    expect(zoomListCalls()).toBe(before + 1);
   });
 });
 
