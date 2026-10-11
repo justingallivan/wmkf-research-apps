@@ -191,6 +191,10 @@ sequence.
     when the worker cancelled it for its own reasons (first live cut, 1003222,
     2026-10-10: a SharePoint metadata-only eTag bump). Show the actual reason,
     and never suggest "again" when a retry cannot succeed.
+  - **Play the presentation video for review instead of downloading it.** The
+    staff open link (`resolvePresentationVideoSplitOpen`) redirects to Graph's
+    download URL, so the browser downloads 450 MB (first live cut, 2026-10-10).
+    Stream it instead: the SharePoint web view, or the Board link's watch mode.
 - **Card stays busy after a successful transcript publish (2026-10-10).**
   [OPEN — defect, found live on 1003222] In `RecordingAndTranscriptCard.js`
   the publish handler closes the editor on success (`setCorrectionDetail(null)`,
