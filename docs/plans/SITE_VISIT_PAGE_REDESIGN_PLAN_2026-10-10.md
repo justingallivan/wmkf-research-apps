@@ -2,7 +2,7 @@
 title: Site Visit page redesign
 domain: transcription
 kind: plan
-status: proposed
+status: built-in-branch
 summary: "Proposal to rework the Meeting Tracker Site Visit page under DESIGN.md's Page Structure rules: each finished artifact becomes one row (name is the link, audience and status chips, a … menu), steps collapse once done, the Board link sits with what the Board sees, and the queue's card notes are sorted into layout, client-behavior and server slices."
 owner: product-engineering
 related:
@@ -15,8 +15,9 @@ related:
 
 # Site Visit page redesign
 
-Status: **proposed; scope decided** (Session 593, 2026-10-10/11). Planning only; no
-code. The owner answered §8: the whole page is in scope, the Board link sits on the
+Status: **built on `claude/site-visit-redesign`** (Session 593, 2026-10-11): commits 1-7 are
+built and each was approved by Codex adversarial review; not merged. See §9.6 for the
+build log and §10 for what remains. Scope was decided before the build. The owner answered §8: the whole page is in scope, the Board link sits on the
 Results "Board page" heading, and TXT/VTT downloads live in the row menu. The build brief
 (§9: reusable pieces, header identity source, action inventory, commit order,
 verification) is written; the build has not started.
@@ -705,3 +706,27 @@ UI change was needed; a saved attribution is unaffected.
   readiness from the Results rows, including the video line's own fetch. Building it means
   lifting that state or adding reads. A partial chip would contradict the cards it
   summarizes, so this build leaves it out.
+- **Codex round 1 for commit 7 (needs-attention, one medium):** the identity survived
+  client-side navigation between visits, and loads were unguarded. The identity is now
+  stored with its request id, and stale loads drop their state, error and loading updates.
+  Two same-mount A→B tests fail with the guards removed. Round 2: approve.
+
+**Commit 8, docs.** Plan status, the remaining-work list below, the work queue item, the
+Impeccable surface brief (its "not a redesign" scope is superseded), and a pointer from the
+2026-10-04 card plan. The detector over the changed UI files found nothing.
+
+## 10. Remaining after the build (2026-10-11)
+
+- **Owner:** merge decision. The branch is pushed and not merged (owner decision 5). It is
+  Tier 1 runtime UI plus one read-only server read, so promote it deliberately.
+- **Owner:** a desktop check on a real request. The page reads Production, so the owner
+  runs it or authorizes it. The build was checked in jsdom and through static
+  renders of the card.
+- **Open design item:** the header status chip (§9.6 commit 7).
+- **Server slices C1-C3 (§6), not started:** automatic split-transcript generation after a
+  publish with a confirmed end; the real reason a presentation video was superseded; and
+  streaming the review video instead of downloading it.
+- **Not converged:** the underlined `BTN_LINK` text actions (no text-link variant in
+  `Button`).
+- **Server-side gap noted by Codex (commit 3):** `createMeetingCorrection` does not refuse
+  while a newer transcription is pending; the gate is UI-only.

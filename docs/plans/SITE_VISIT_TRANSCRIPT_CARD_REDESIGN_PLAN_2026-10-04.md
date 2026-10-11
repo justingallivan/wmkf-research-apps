@@ -16,6 +16,11 @@ related:
 
 Status: built on `feature/site-visit-transcript-card` (see §13); awaiting owner merge and Production acceptance.
 
+> **Superseded again (2026-10-11):** the whole Site Visit page, including this card, was
+> redesigned on `claude/site-visit-redesign`; see
+> [SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md](SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md).
+> The sections below are history.
+
 > **Layout superseded on `codex/meeting-transcript-ux` (2026-10-08):** the Recording / Transcript / Board link sequence in §4 is replaced there by a three-step card. See Stage 1 of [the October 7 workflow plan](MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md). Until that branch merges, this section still describes the deployed card.
 Shaped with the Impeccable skill (Operate mode, incumbent "Clear Workbench"
 design system in `DESIGN.md`); this is a brief, not component code.

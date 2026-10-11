@@ -141,7 +141,13 @@ sequence.
   stage by stage and now reads as a mess for an ordinary Zoom import. Do one
   design pass over the whole card, not piecemeal patches. **Proposal (Session
   593, scope widened to the whole Site Visit page by the owner):**
-  `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md`. Owner observations
+  `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md`. **[BUILT on branch
+  `claude/site-visit-redesign`, Session 593, 2026-10-11; pushed, not merged.]** Built:
+  Results rows, collapsed steps, Upload manually, Copy video in its row with an in-row
+  replace confirmation, one card Refresh, quiet own-write staleness, old-transcript edits
+  gated, hinted leavers unchecked. Still open: auto-generate after publish, the real
+  cancel reason, streaming the review video (plan §6 C1-C3), and the header status chip
+  (plan §10). Owner observations
   and screenshots from Session 592:
   - **"Copy video" is ambiguous.** In the "Import from Zoom" list each link sits
     outside and below its recording's box, so it reads as belonging to the next
