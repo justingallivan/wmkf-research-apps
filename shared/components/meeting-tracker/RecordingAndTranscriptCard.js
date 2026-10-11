@@ -1653,7 +1653,9 @@ function useTranscription(requestId, { onMaterialsChanged }) {
         }
       }
     } finally {
-      if (isCurrent(generation) && editorKeyRef.current === targetKey) setBusy(null);
+      // Not keyed to the editor: a successful publish closes it (setCorrectionDetail(null)), which changes editorKey
+      // before this runs, and keying the clear to it left every busy-disabled control greyed until a reload.
+      if (isCurrent(generation)) setBusy(current => (current === 'publish' ? null : current));
     }
   };
 

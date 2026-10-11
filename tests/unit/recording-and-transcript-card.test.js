@@ -612,13 +612,21 @@ describe('presentation end', () => {
       transcriptSummary: { state: 'stale', artifactId: summaryArtifactId, publishedAt: CONFIRMED_AT },
     });
     const state = { materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) };
+    let published = false;
     route(state, {
       [`/corrections/${CORRECTION_ID}/publish`]: { method: 'POST', respond: () => {
+        published = true;
         state.collection = collection({ jobs: [], currentArtifact: staleArtifact });
         return response({ publication: { state: 'published' }, currentArtifact: staleArtifact });
       } },
       '/corrections': { method: 'POST', respond: () => response(correctionDetail(artifact, { correction: attendanceDraft({ speakerNames: {} }) })) },
       [`/corrections/${CORRECTION_ID}`]: { method: 'PATCH', respond: (path, options) => response({ correction: attendanceDraft({ version: 2, speakerNames: JSON.parse(options.body).speakerNames }) }) },
+    });
+    // Like a real network: the post-publish collection reload is slow enough for the closed editor to render first.
+    const routed = global.fetch;
+    global.fetch = jest.fn(async (url, options = {}) => {
+      if (published && String(url).endsWith('/transcriptions') && (options.method || 'GET') === 'GET') await new Promise(resolve => setTimeout(resolve, 50));
+      return routed(url, options);
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Edit speaker names' }));
@@ -629,6 +637,9 @@ describe('presentation end', () => {
     expect(screen.getByText(/including a names-only change/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Publish transcript' }));
     expect(await screen.findByText(/Generate the presentation and staff discussion transcripts, then summarize again/)).toBeInTheDocument();
+    // Live 2026-10-10: the publish closed the editor and its busy flag was never cleared, so these stayed greyed.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Generate presentation and discussion transcripts' })).toBeEnabled());
+    expect(screen.getByRole('button', { name: 'Edit speaker names' })).toBeEnabled();
   });
 
   test('both halves bound shows both ready lines; a missing discussion alone shows an info notice and Generate', async () => {
