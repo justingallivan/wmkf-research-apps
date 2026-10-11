@@ -1003,6 +1003,55 @@ describe('presentation summary', () => {
     expect(screen.queryByText(/Checking summary status/)).toBeNull();
   });
 
+  describe('an open Summarize confirmation closes when its target changes (Codex review, redesign commit 1)', () => {
+    const summarizePosts = () => global.fetch.mock.calls.filter(([url, options]) => String(url).endsWith('/summary-draft') && options?.method === 'POST');
+    function setup() {
+      const state = { materials: [transcriptRow()], collection: collection({
+        jobs: [job({ status: 'queued', contentAccessAllowed: false })],
+        currentArtifact: boundaryArtifact({ transcriptSummary: { state: 'missing', artifactId: null } }),
+      }), detail: detailFor({}) };
+      const reads = { draft: readyDraft() };
+      route(state, {
+        '/summary-draft': { method: 'GET', respond: () => response(summaryState({ draft: reads.draft, draftMatchesTranscript: true })) },
+      });
+      return { state, reads };
+    }
+    async function openAcknowledged() {
+      render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+      await screen.findByLabelText(/^Draft/);
+      openRowMenu(row('presentation-summary-block'));
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Replace draft with a new summary' }));
+      fireEvent.click(screen.getByLabelText(/may be sent to Anthropic/));
+      expect(screen.getByRole('button', { name: 'Summarize presentation' })).toBeEnabled();
+    }
+
+    test('a refresh that loads a newer draft closes the confirmation and sends nothing', async () => {
+      const { state, reads } = setup();
+      await openAcknowledged();
+      reads.draft = readyDraft({ version: 3, text: 'Edited in another tab.' });
+      state.collection = collection({ jobs: [job({ status: 'queued', contentAccessAllowed: false })],
+        currentArtifact: boundaryArtifact({ fingerprint: 'f'.repeat(64), transcriptSummary: { state: 'missing', artifactId: null } }) });
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+      await waitFor(() => expect(screen.getByLabelText(/^Draft/)).toHaveValue('Edited in another tab.'));
+      expect(screen.queryByRole('button', { name: 'Summarize presentation' })).toBeNull();
+      expect(screen.queryByLabelText(/may be sent to Anthropic/)).toBeNull();
+      expect(summarizePosts()).toHaveLength(0);
+    });
+
+    test('losing the presentation end closes the confirmation and sends nothing', async () => {
+      const { state } = setup();
+      await openAcknowledged();
+      state.collection = collection({ jobs: [job({ status: 'queued', contentAccessAllowed: false })],
+        currentArtifact: boundaryArtifact({ presentationEnd: null,
+          presentationTranscript: { state: 'not_confirmed', artifactId: null },
+          transcriptSummary: { state: 'not_confirmed', artifactId: null } }) });
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+      await waitFor(() => expect(screen.queryByRole('button', { name: 'Summarize presentation' })).toBeNull());
+      expect(screen.queryByLabelText(/may be sent to Anthropic/)).toBeNull();
+      expect(summarizePosts()).toHaveLength(0);
+    });
+  });
+
   test('losing the confirmed boundary preserves dirty text in recovery when no summary read is needed', async () => {
     const state = { materials: [transcriptRow()], collection: collection({
       jobs: [job({ status: 'queued', contentAccessAllowed: false })],

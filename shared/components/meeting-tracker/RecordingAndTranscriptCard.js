@@ -2701,7 +2701,21 @@ function summarizeLabel(kinds) {
   return kinds.length === 2 ? 'Summarize presentation and discussion'
     : kinds[0] === 'discussion' ? 'Summarize staff discussion' : 'Summarize presentation';
 }
-function SummarizeConfirm({ t, kinds, onClose }) {
+// What a Summarize confirmation was opened for: the transcript, each target kind's load state, draft identity and
+// conflict. If any of it changes while the confirmation is open, the confirmation closes (Codex review, commit 1),
+// so an acknowledgment never carries over to a target the user did not see.
+function summaryTargetKey(h) {
+  const draft = h?.summary?.draft || null;
+  return [h?.summaryLoadKey, h?.summaryLoadedKey, h?.summaryReadState, draft?.id || '', draft?.version ?? '', draft?.state || '',
+    h?.summaryConflict ? 'conflict' : '', h?.summary?.transcriptSummary?.state || ''].join(':');
+}
+function summarizeSignature(t, mode, kinds) {
+  const artifact = t.collection?.currentArtifact;
+  const hooks = { presentation: t.presentationSummary, discussion: t.discussionSummary };
+  return [mode, kinds.join(','), artifact?.id || '', artifact?.fingerprint || '', artifact?.presentationEnd?.endMs ?? '',
+    ...kinds.map((kind) => summaryTargetKey(hooks[kind]))].join('|');
+}
+function SummarizeConfirm({ t, kinds, valid, onClose }) {
   return (
     <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3" data-testid="paired-summary-form">
       <label htmlFor="paired-summary-ack" className="flex items-start gap-2 text-sm leading-6 text-gray-900">
@@ -2710,7 +2724,7 @@ function SummarizeConfirm({ t, kinds, onClose }) {
         <span>{PAIRED_SUMMARY_ACKNOWLEDGMENT.text}</span>
       </label>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button type="button" onClick={() => { onClose(); void t.summarizeKinds(kinds); }} disabled={Boolean(t.busy) || !t.summaryAck || !kinds.length}
+        <button type="button" onClick={() => { onClose(); if (valid) void t.summarizeKinds(kinds); }} disabled={!valid || Boolean(t.busy) || !t.summaryAck || !kinds.length}
           className={BTN_PRIMARY}>{summarizeLabel(kinds)}</button>
         <button type="button" onClick={() => { t.setSummaryAck(false); onClose(); }} disabled={Boolean(t.busy)} className={BTN}>Cancel</button>
       </div>
@@ -2771,16 +2785,28 @@ function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = n
   const paired = t.collection?.currentArtifact?.presentationTranscript?.state === 'bound' ? t.pairedSummaryKinds : [];
   const pairedHere = paired.length > 0 && paired[0] === kind;
   const pairedSingleHere = pairedHere && paired.length === 1;
-  const open = (kinds) => { t.setSummaryAck(false); setRequest({ kinds, anchor: kind }); };
+  const open = (mode, kinds) => { t.setSummaryAck(false); setRequest({ mode, kinds, anchor: kind, signature: summarizeSignature(t, mode, kinds) }); };
   const rerunInline = !pairedHere && againAllowed && !draft && (failed || runAbandoned || published?.state === 'stale');
   const rerunInMenu = againAllowed && !pairedSingleHere && !rerunInline;
   const pairedLabel = paired.length === 2 ? 'Summarize both' : againLabel === 'Try again' ? 'Try again' : ['bound', 'stale'].includes(published?.state) ? 'Summarize again' : 'Summarize';
   const action = pairedHere
-    ? <button type="button" onClick={() => open(paired)} disabled={Boolean(t.busy)} className={BTN}>{pairedLabel}</button>
+    ? <button type="button" onClick={() => open('paired', paired)} disabled={Boolean(t.busy)} className={BTN}>{pairedLabel}</button>
     : rerunInline
-      ? <button type="button" onClick={() => open([kind])} disabled={Boolean(t.busy)} className={BTN}>{againLabel}</button>
+      ? <button type="button" onClick={() => open('single', [kind])} disabled={Boolean(t.busy)} className={BTN}>{againLabel}</button>
       : null;
-  const menuItems = rerunInMenu ? [{ key: 'again', label: againLabel, disabled: Boolean(t.busy), onSelect: () => open([kind]) }] : [];
+  // An open confirmation stays valid only while the action that opened it is still offered for the same targets.
+  const mine = request?.anchor === kind ? request : null;
+  const stillOffered = mine?.mode === 'paired'
+    ? pairedHere && paired.join(',') === mine.kinds.join(',')
+    : mine?.mode === 'single' && againAllowed && !pairedSingleHere;
+  const requestValid = Boolean(mine && stillOffered && summarizeSignature(t, mine.mode, mine.kinds) === mine.signature);
+  const closeStale = Boolean(mine) && !requestValid;
+  useEffect(() => {
+    if (!closeStale) return;
+    t.setSummaryAck(false);
+    setRequest(null);
+  }, [closeStale]); // eslint-disable-line react-hooks/exhaustive-deps
+  const menuItems = rerunInMenu ? [{ key: 'again', label: againLabel, disabled: Boolean(t.busy), onSelect: () => open('single', [kind]) }] : [];
   const status = notRecorded ? { tone: 'gray', label: 'Not recorded' }
     : s.summarizing || (generatingRun && !runAbandoned && summaryCurrent) ? { tone: 'gray', label: 'Summarizing…' }
       : !summaryStatusCurrent && s.summaryReadState === 'loading' ? { tone: 'gray', label: 'Checking…' }
@@ -2825,7 +2851,7 @@ function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = n
             ? <div className="mt-1 text-sm text-gray-700"><p>Confirm where the presentation ends before generating the presentation transcript and summary.</p><button type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.savedDraft ? 'Continue editing presentation end' : 'Set end to enable summary'}</button></div>
             : <p className="mt-1 text-sm text-gray-700">Generate the presentation transcript before summarizing it.</p>)}
       {failed && <p className="mt-1 text-sm text-gray-700">The last summary attempt did not produce a draft.</p>}
-      {request?.anchor === kind && <SummarizeConfirm t={t} kinds={request.kinds} onClose={() => setRequest(null)} />}
+      {requestValid && <SummarizeConfirm t={t} kinds={mine.kinds} valid={requestValid} onClose={() => setRequest(null)} />}
       {s.summaryConflict && (
         <div className="mt-3" data-testid="summary-draft-conflict">
           <Notice tone="warning">This draft is no longer current. Your edits are preserved below, but they are not a current server draft. Load latest to replace these edits with the current server state.</Notice>
