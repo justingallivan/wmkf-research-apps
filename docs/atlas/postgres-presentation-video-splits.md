@@ -3,7 +3,7 @@ title: "Atlas: Presentation video splits (Postgres)"
 domain: postgres
 kind: state-page
 status: source-built
-summary: "presentation_video_splits holds one row per Stage 4 cut of the copied Zoom MP4 at the confirmed presentation end (migration 080). Slices 2 (store, start route, same-source check) and 3 (worker, Sandbox supervisor, cleanup ledger, cron) are built on branch claude/stage4-build; migration 080 is not applied and nothing is merged. Slice 4 (binding, approval claim and register, staff open, Board/briefing playback) is built on branch claude/stage4-slice4; slice 5 (card) is PLANNED."
+summary: "presentation_video_splits holds one row per Stage 4 cut of the copied Zoom MP4 at the confirmed presentation end (migration 080, applied to Production 2026-10-10). All slices (store and start route, worker and Sandbox supervisor, approval and Board/briefing playback, card) merged to main 2026-10-10; PRESENTATION_VIDEO_SPLIT_ACCESS is on in Production since 2026-10-11."
 canonical: true
 cataloged: 2026-10-10
 owner: product-engineering
@@ -26,7 +26,7 @@ related:
 
 ## Status
 
-**[Slices 2 and 3 of `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md`, built on branch `claude/stage4-build`. Migration 080 is not applied to any database and nothing is merged. `PRESENTATION_VIDEO_SPLIT_ACCESS` is off by default. Slices 4-5 are PLANNED.]**
+**[Slices 2-5 of `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md` merged to `main` 2026-10-10 (merge `e53cb4b9a`). Migration 080 applied to Production 2026-10-10. `PRESENTATION_VIDEO_SPLIT_ACCESS` was `test:<1003222 GUID>` from 2026-10-10 and is `on` in Production since 2026-10-11 (owner). The first real cut was approved and registered on 1003222 on 2026-10-10.]**
 
 ## Ownership and contract
 
@@ -38,8 +38,8 @@ related:
 | `lineage` | Content-free JSONB (object, at most 16384 bytes): provenance projection, transcript revision, boundary and its `confirmedBy`/`confirmedAt`, source identity. Never names, attendance, emails or URLs. Not exposed by the GET snapshot. |
 | `state`, `lease_token`, `lease_expires_at`, `next_attempt_at`, `cut_attempts`, `cancel_requested_at` | `queued`, `cutting`, `uploading`, `review`, `registering`, `approved`, `failed`, `cancelled`, `superseded`. Terminal and awaiting states hold no lease (CHECK `presentation_video_splits_terminal_unleased`). |
 | sandbox ledger | `sandbox_name`, `sandbox_command_id`, `sandbox_created_at`, `sandbox_cleaned_at`, `cleanup_attempts`, `next_cleanup_at`, usage columns, `cleanup_receipt`. Cleanup is tracked independently of `state`. Written by the slice 3 worker and cleanup sweep (see below). |
-| output | `upload_url_ciphertext`, `upload_session_expires_at`, `output_*`, `verification_receipt`, `request_document_id`, `superseded_document_id`. `upload_*`, `output_*` and `verification_receipt` are written by the slice 3 worker; the document columns are PLANNED (slices 4-5). |
-| approval | `approval_claim_token`, `approval_claimed_at`, `approval_actor_profile_id`, `approval_registration_attempted`, `approved_by_profile_id`, `approved_at`. Writers built on branch `claude/stage4-slice4` (slice 4): `claimPresentationVideoApproval`, `markPresentationVideoApprovalAttempted`, `releasePresentationVideoApproval`, `yieldPresentationVideoApproval`, `markPresentationVideoApproved`, `settleStalePresentationVideoApproval`, `supersedeApprovedPresentationVideos`; readers `getPresentationVideoSplitForApproval`, `findAbandonedRegisteringPresentationVideoSplit`. |
+| output | `upload_url_ciphertext`, `upload_session_expires_at`, `output_*`, `verification_receipt`, `request_document_id`, `superseded_document_id`. `upload_*`, `output_*` and `verification_receipt` are written by the slice 3 worker; the document columns are written at approval (slice 4). |
+| approval | `approval_claim_token`, `approval_claimed_at`, `approval_actor_profile_id`, `approval_registration_attempted`, `approved_by_profile_id`, `approved_at`. Writers (slice 4): `claimPresentationVideoApproval`, `markPresentationVideoApprovalAttempted`, `releasePresentationVideoApproval`, `yieldPresentationVideoApproval`, `markPresentationVideoApproved`, `settleStalePresentationVideoApproval`, `supersedeApprovedPresentationVideos`; readers `getPresentationVideoSplitForApproval`, `findAbandonedRegisteringPresentationVideoSplit`. |
 | `failure_code` | Sanitized code. Required when `state = 'failed'`; allowed only on `failed` or `superseded` (`presentation_video_approval_stale`). |
 
 Partial unique indexes: one processing row (`queued`, `cutting`, `uploading`) per request (`idx_presentation_video_splits_processing`) and one awaiting-approval row (`review`, `registering`) per request (`idx_presentation_video_splits_awaiting`).
@@ -76,7 +76,7 @@ Partial unique indexes: one processing row (`queued`, `cutting`, `uploading`) pe
 | Flag | `lib/utils/presentation-video-split-access.js` | `PRESENTATION_VIDEO_SPLIT_ACCESS` (`off`, `on`, `test:<request GUID>`; unset or invalid is off) |
 | Route | `pages/api/meeting-tracker/visits/[requestId]/presentation-video-splits.js` | GET, POST start, POST approve (matrix row) |
 | Worker | `lib/services/meeting-tracker-recordings/presentation-video-split-worker.js` | `runPresentationVideoSplitTick`: claim, revalidate, dispatch by state, cleanup and orphan sweeps. Reads the Dataverse TRANSCRIPT row and Graph; writes the split row only |
-| Card (reader) | `shared/components/meeting-tracker/RecordingAndTranscriptCard.js` (`PresentationVideoLine`) | Slice 5, built on branch `claude/stage4-slice5`. Staff only. GETs the route (hidden unless `available: true`), polls every 15 s while any split is `queued`/`cutting`/`uploading`/`registering`, POSTs start and approve, links the staff open route in a new tab. Shows no ids or raw failure codes. An approved split with `boardReady:false` shows "Out of date"; the line reloads when the transcript revision or boundary changes |
+| Card (reader) | `shared/components/meeting-tracker/RecordingAndTranscriptCard.js` (`PresentationVideoLine`) | Slice 5. Staff only. GETs the route (hidden unless `available: true`), polls every 15 s while any split is `queued`/`cutting`/`uploading`/`registering`, POSTs start and approve, links the staff open route in a new tab. Shows no ids or raw failure codes. An approved split with `boardReady:false` shows "Out of date"; the line reloads when the transcript revision or boundary changes |
 | Sandbox adapter | `lib/services/meeting-tracker-recordings/presentation-video-sandbox.js` | The only `@vercel/sandbox` user (OIDC auth); create, get, run, poll, stop, snapshots, delete, tagged list |
 | Cron | `pages/api/cron/drain-presentation-video-splits.js` | Every minute, `maxDuration` 300, 270 s work deadline (matrix row) |
 | Open route | `pages/api/meeting-tracker/visits/[requestId]/presentation-video-splits/[splitId]/open.js` | GET; 302 to a fresh Graph download URL for the unregistered output after an id, size and quickXorHash match (matrix row). Built on branch `claude/stage4-slice4` |
