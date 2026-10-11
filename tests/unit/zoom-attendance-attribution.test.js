@@ -27,10 +27,12 @@ it('groups exact names across waiting/admitted rows, hides waiting-only, links d
   const review = await buildAttendanceReview(args, fetch);
   expect(fetch).toHaveBeenCalledWith(provenance.zoom.meetingUuid);
   expect(review.decision.rows).toEqual([
-    { displayName: 'Alex Example', kept: true, speakerIds: ['A'], lastLeaveAt: '2026-10-09T16:00:18Z', kind: 'attendee' },
-    { displayName: 'Silent', kept: true, speakerIds: [], lastLeaveAt: '2026-10-09T16:00:15Z', kind: 'attendee' },
+    // D2 revised (owner, 2026-10-10): hinted leavers start unchecked; other voices stay checked.
+    { displayName: 'Alex Example', kept: false, speakerIds: ['A'], lastLeaveAt: '2026-10-09T16:00:18Z', kind: 'attendee' },
+    { displayName: 'Silent', kept: false, speakerIds: [], lastLeaveAt: '2026-10-09T16:00:15Z', kind: 'attendee' },
     { displayName: 'Speaker B', kept: true, speakerIds: ['B'], lastLeaveAt: null, kind: 'voice' },
   ]);
+  expect(review.decision.excludedSpeakerIds).toEqual(['A']);
   expect(review.waitingRoomOnlyCount).toBe(1);
   expect(review.leftBeforeEnd).toEqual([true, true, false]);
 });

@@ -59,11 +59,11 @@ describe('Video line', () => {
     expect(screen.queryByTestId('presentation-video-line')).not.toBeInTheDocument();
   });
 
-  test('none: Not started with a Create button', async () => {
+  test('none: Not made yet with a Create button', async () => {
     route();
     await renderLine();
     const el = await line();
-    expect(el).toHaveTextContent('Not started');
+    expect(el).toHaveTextContent('Not made yet');
     expect(within(el).getByRole('button', { name: 'Create presentation video' })).toBeEnabled();
   });
 
@@ -75,19 +75,20 @@ describe('Video line', () => {
     expect(within(el).queryByRole('button')).not.toBeInTheDocument();
   });
 
-  test('review: Open link and approve button', async () => {
+  test('review: the name opens the video, approve is inline and re-create is in the menu', async () => {
     route({ state: { splits: { available: true, splits: [split()] } } });
     await renderLine();
     const el = await line();
     expect(el).toHaveTextContent('Ready to check');
-    const open = within(el).getByRole('link', { name: 'Open video' });
+    const open = within(el).getByRole('link', { name: 'Presentation video' });
     expect(open).toHaveAttribute('href', `/api/meeting-tracker/visits/${REQUEST_ID}/presentation-video-splits/${SPLIT_ID}/open`);
     expect(open).toHaveAttribute('target', '_blank');
-    expect(open).toHaveAttribute('rel', 'noreferrer');
+    expect(open).toHaveAttribute('rel', 'noopener noreferrer');
     expect(within(el).getByRole('button', { name: 'Check the ending and approve' })).toBeInTheDocument();
     expect(within(el).queryByRole('button', { name: 'Create presentation video' })).not.toBeInTheDocument();
     // Staff can replace a video that is waiting for its check (e.g. after fixing the presentation end), behind a confirm.
-    fireEvent.click(within(el).getByRole('button', { name: 'Create it again' }));
+    fireEvent.click(within(el).getByRole('button', { name: 'More actions for presentation video' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Create it again' }));
     expect(within(el).getByRole('alertdialog')).toHaveTextContent('This discards the video waiting for your check and makes a new one.');
   });
 
@@ -97,13 +98,15 @@ describe('Video line', () => {
     expect(await line()).toHaveTextContent('Approving…');
   });
 
-  test('approved: Open plus re-create behind a confirm that posts start', async () => {
+  test('approved: the name opens it and re-create sits in the menu behind a confirm that posts start', async () => {
     route({ state: { splits: { available: true, splits: [split({ state: 'approved', boardReady: true }), split({ id: OLD_ID, state: 'superseded', createdAt: '2026-10-01T10:00:00Z' })] } } });
     await renderLine();
     const el = await line();
-    expect(el).toHaveTextContent('Approved for the Board');
-    expect(within(el).getByRole('link', { name: 'Open video' })).toBeInTheDocument();
-    fireEvent.click(within(el).getByRole('button', { name: 'Create presentation video' }));
+    expect(el).toHaveTextContent('Approved');
+    expect(within(el).getByRole('link', { name: 'Presentation video' })).toBeInTheDocument();
+    expect(within(el).queryByRole('button', { name: 'Create presentation video' })).not.toBeInTheDocument();
+    fireEvent.click(within(el).getByRole('button', { name: 'More actions for presentation video' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Create presentation video' }));
     expect(state.posts).toHaveLength(0);
     expect(within(el).getByText('This replaces the approved video once the new one is approved.')).toBeInTheDocument();
     fireEvent.click(within(el).getByRole('button', { name: 'Create again' }));
@@ -174,7 +177,7 @@ describe('actions', () => {
     state.splits = { available: true, splits: [split({ state: 'approved', boardReady: true })] };
     fireEvent.click(within(el).getByRole('button', { name: 'Approve video' }));
     await waitFor(() => expect(state.posts).toEqual([{ action: 'approve', splitId: SPLIT_ID }]));
-    await waitFor(() => expect(el).toHaveTextContent('Approved for the Board'));
+    await waitFor(() => expect(el).toHaveTextContent('Approved'));
   });
 
   test('declining the confirm sends nothing', async () => {
@@ -244,7 +247,7 @@ describe('registering recovery and failed refreshes', () => {
     state.splits = { available: true, splits: [split({ state: 'approved', boardReady: true })] };
     fireEvent.click(within(el).getByRole('button', { name: 'Finish approving' }));
     await waitFor(() => expect(state.posts).toEqual([{ action: 'approve', splitId: SPLIT_ID }]));
-    await waitFor(() => expect(el).toHaveTextContent('Approved for the Board'));
+    await waitFor(() => expect(el).toHaveTextContent('Approved'));
   });
 
   test('a live claim (409 in progress) shows the wait message and keeps Approving', async () => {
@@ -269,7 +272,7 @@ describe('registering recovery and failed refreshes', () => {
     state.splits = () => { throw new Error('network down'); };
     fireEvent.click(within(el).getByRole('button', { name: 'Create presentation video' }));
     await waitFor(() => expect(el).toHaveTextContent('Couldn’t refresh the video status. Retrying…'));
-    expect(el).toHaveTextContent('Video: Working…');
+    expect(el).toHaveTextContent('Working…');
     expect(within(el).queryByRole('button', { name: 'Create presentation video' })).not.toBeInTheDocument();
     const before = getCount();
     await advance(15_500);
@@ -288,7 +291,7 @@ describe('registering recovery and failed refreshes', () => {
     expect(el).toHaveTextContent('Couldn’t load the video status.');
     state.splits = { available: true, splits: [] };
     fireEvent.click(within(el).getByRole('button', { name: 'Retry' }));
-    await waitFor(() => expect(el).toHaveTextContent('Not started'));
+    await waitFor(() => expect(el).toHaveTextContent('Not made yet'));
     expect(container.textContent).not.toMatch(/presentation_video_|network down/);
   });
 });
@@ -300,16 +303,18 @@ describe('Board readiness of an approved video', () => {
     const el = await line();
     expect(el).toHaveTextContent('Out of date');
     expect(el).toHaveTextContent('The transcript or video changed. Create it again.');
-    expect(el).not.toHaveTextContent('Approved for the Board');
-    expect(within(el).queryByRole('link', { name: 'Open video' })).not.toBeInTheDocument();
+    expect(el).not.toHaveTextContent('Approved');
+    expect(within(el).queryByRole('link', { name: 'Presentation video' })).not.toBeInTheDocument();
     fireEvent.click(within(el).getByRole('button', { name: 'Create presentation video' }));
     await waitFor(() => expect(state.posts).toEqual([{ action: 'start' }]));
   });
 
-  test('boardReady true shows Approved for the Board', async () => {
+  test('boardReady true shows Approved with no Board-status note', async () => {
     route({ state: { splits: { available: true, splits: [split({ state: 'approved', boardReady: true })] } } });
     await renderLine();
-    expect(await line()).toHaveTextContent('Approved for the Board');
+    const el = await line();
+    expect(el).toHaveTextContent('Approved');
+    expect(el).not.toHaveTextContent('Couldn’t check the Board status.');
   });
 
   test('boardReady unknown shows Approved with a small note', async () => {
@@ -317,7 +322,6 @@ describe('Board readiness of an approved video', () => {
     await renderLine();
     const el = await line();
     expect(el).toHaveTextContent('Approved');
-    expect(el).not.toHaveTextContent('Approved for the Board');
     expect(el).toHaveTextContent('Couldn’t check the Board status.');
   });
 
@@ -328,10 +332,168 @@ describe('Board readiness of an approved video', () => {
     state.splits = { available: true, splits: [split({ state: 'approved', boardReady: true })] };
     fireEvent.click(within(el).getByRole('button', { name: 'Check the ending and approve' }));
     fireEvent.click(within(el).getByRole('button', { name: 'Approve video' }));
-    await waitFor(() => expect(el).toHaveTextContent('Approved for the Board'));
+    await waitFor(() => expect(el).toHaveTextContent('Approved'));
     state.splits = { available: true, splits: [split({ state: 'approved', boardReady: false })] };
     // Mounting again (as a reload does) reads the Board status afresh.
     const again = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     await waitFor(() => expect(within(again.container).getByTestId('presentation-video-line')).toHaveTextContent('Out of date'));
+  });
+});
+
+describe('an open confirmation is bound to the video it was opened for (Codex whole-branch review)', () => {
+  test('a Refresh that brings in a different video closes the approval and never approves it', async () => {
+    route({ state: { splits: { available: true, splits: [split()] } } });
+    await renderLine();
+    const el = await line();
+    fireEvent.click(within(el).getByRole('button', { name: 'Check the ending and approve' }));
+    expect(within(el).getByRole('alertdialog', { name: 'Approve the presentation video' })).toBeInTheDocument();
+    // Another session replaced the video: B is now the newest one waiting for its check.
+    state.splits = { available: true, splits: [split({ id: OLD_ID, createdAt: '2026-10-11T10:00:00Z' }), split()] };
+    fireEvent.click(screen.getByTestId('card-refresh'));
+    await waitFor(() => expect(within(el).queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(state.posts).toHaveLength(0);
+    // Approving B needs its own confirmation, and it names B.
+    fireEvent.click(within(el).getByRole('button', { name: 'Check the ending and approve' }));
+    fireEvent.click(within(el).getByRole('button', { name: 'Approve video' }));
+    await waitFor(() => expect(state.posts).toEqual([{ action: 'approve', splitId: OLD_ID }]));
+  });
+});
+
+describe('Board materials readiness list', () => {
+  const readiness = () => screen.findByTestId('board-readiness-video');
+  const older = (over = {}) => split({ id: OLD_ID, state: 'approved', boardReady: true, createdAt: '2026-10-09T10:00:00Z', ...over });
+  test.each([
+    ['approved and served', [split({ state: 'approved', boardReady: true })], 'bound', 'On the Board page'],
+    ['approved but out of date', [split({ state: 'approved', boardReady: false })], 'stale', 'Not yet'],
+    ['approved with an unknown Board status', [split({ state: 'approved', boardReady: null })], 'unknown', 'Status unknown'],
+    ['waiting for its check, with none approved', [split({ state: 'review' })], undefined, 'Not yet'],
+    // An older approved video stays on the Board while a newer one is made (Codex round 2, four-card commit).
+    ['being made again while the older one is served', [split({ state: 'queued' }), older()], 'bound', 'On the Board page'],
+    ['made again and waiting for its check while the older one is served', [split({ state: 'review' }), older()], 'bound', 'On the Board page'],
+    ['made again and failed while the older one is served', [split({ state: 'failed', failureCode: 'upload_failed' }), older()], 'bound', 'On the Board page'],
+  ])('a video %s reads from the same load as its row', async (_l, splits, board, label) => {
+    route({ state: { splits: { available: true, splits, ...(board ? { boardVideo: { status: board } } : {}) } } });
+    await renderLine();
+    await line();
+    expect(await readiness()).toHaveTextContent(label);
+    // Status only: the video's actions stay in the Presentation card.
+    expect(within(screen.getByTestId('card-board-materials')).queryAllByRole('button').map((b) => b.textContent).join(' ')).not.toMatch(/approve|create/i);
+    expect(getCount()).toBe(1);
+  });
+
+  test('the video line is left out when the feature is off for the request', async () => {
+    route({ state: { splits: { available: false, splits: [] } } });
+    await renderLine();
+    await waitFor(() => expect(getCount()).toBeGreaterThan(0));
+    expect(screen.getByTestId('board-readiness-transcript')).toBeInTheDocument();
+    expect(screen.queryByTestId('board-readiness-video')).not.toBeInTheDocument();
+  });
+
+  test('approving the video in the Presentation card turns its Board line on', async () => {
+    let approved = false;
+    route({
+      state: { splits: () => response({ available: true, splits: [split(approved ? { state: 'approved', boardReady: true } : {})], ...(approved ? { boardVideo: { status: 'bound' } } : {}) }) },
+      post: () => { approved = true; return response({ split: { id: SPLIT_ID, state: 'approved' } }); },
+    });
+    await renderLine();
+    expect(await readiness()).toHaveTextContent('Not yet');
+    fireEvent.click(within(await line()).getByRole('button', { name: 'Check the ending and approve' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Approve video' }));
+    await waitFor(() => expect(screen.getByTestId('board-readiness-video')).toHaveTextContent('On the Board page'));
+  });
+});
+
+describe('Board readiness of the video follows the transcript revision (Codex review, four-card commit)', () => {
+  test('a changed presentation end whose video re-read fails shows Status unknown, not the old On', async () => {
+    route({ state: { splits: { available: true, splits: [split({ state: 'approved', boardReady: true })], boardVideo: { status: 'bound' } } } });
+    const base = global.fetch;
+    let endMs = 62900;
+    let failSplits = false;
+    global.fetch = jest.fn(async (url, options = {}) => {
+      const path = String(url);
+      if (path.endsWith('/transcriptions')) {
+        const body = collection();
+        body.currentArtifact.presentationEnd.endMs = endMs;
+        return response(body);
+      }
+      if (failSplits && path.endsWith('/presentation-video-splits') && (options.method || 'GET') === 'GET') return response({ error: 'down' }, 500);
+      return base(url, options);
+    });
+    await renderLine();
+    await waitFor(() => expect(screen.getByTestId('board-readiness-video')).toHaveTextContent('On the Board page'));
+    endMs = 70000;
+    failSplits = true;
+    fireEvent.click(screen.getByTestId('card-refresh'));
+    await waitFor(() => expect(screen.getByTestId('board-readiness-video')).toHaveTextContent('Status unknown'));
+    expect(screen.getByTestId('board-readiness-video')).not.toHaveTextContent('On the Board page');
+  });
+});
+
+describe('Board readiness when the approved video is outside the recent splits (Codex round 3, four-card commit)', () => {
+  test('no Board status in the response but a Presentation video record exists: Status unknown, never Not yet', async () => {
+    const failed = Array.from({ length: 10 }, (_v, i) => split({ id: `eeeeeeee-eeee-4eee-8eee-${String(i).padStart(12, '0')}`, state: 'failed', failureCode: 'upload_failed' }));
+    route({ state: { splits: { available: true, splits: failed } } });
+    const base = global.fetch;
+    global.fetch = jest.fn(async (url, options = {}) => {
+      if (String(url).endsWith('/presentation-materials')) {
+        return response({ materials: [transcriptRow(), { artifactId: OLD_ID, artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_VIDEO, backing: 'file', filename: 'presentation.mp4' }], uploads: [] });
+      }
+      return base(url, options);
+    });
+    await renderLine();
+    await waitFor(() => expect(screen.getByTestId('board-readiness-video')).toHaveTextContent('Status unknown'));
+  });
+});
+
+describe('an absent Board status proves no video only when the split list is the whole history (Codex round 4)', () => {
+  const failedSplits = (n) => Array.from({ length: n }, (_v, i) => split({ id: `ffffffff-ffff-4fff-8fff-${String(i).padStart(12, '0')}`, state: 'failed', failureCode: 'upload_failed' }));
+  test.each([
+    ['ten attempts (a full list) and materials without a video record', 10, 'Status unknown'],
+    ['nine attempts (the whole history) and no video record', 9, 'Not yet'],
+  ])('%s', async (_l, n, label) => {
+    route({ state: { splits: { available: true, splits: failedSplits(n) } } });
+    await renderLine();
+    await waitFor(() => expect(screen.getByTestId('board-readiness-video')).toHaveTextContent(label));
+  });
+});
+
+describe('Board readiness of the video follows the recording too (Codex round 5, four-card commit)', () => {
+  test('replacing the recording re-reads the video status; a failed re-read is Status unknown, not the old On', async () => {
+    const RECORDING_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const RECORDING_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const zoomUrl = 'https://zoom.us/rec/share/new-recording';
+    const recordingRow = (id) => ({ artifactId: id, artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING, backing: 'external',
+      externalUrl: id === RECORDING_A ? 'https://zoom.us/rec/share/old-recording' : zoomUrl, slotVersion: 1, createdAt: '2026-10-09T10:00:00Z' });
+    if (!globalThis.crypto) globalThis.crypto = {};
+    if (!globalThis.crypto.randomUUID) globalThis.crypto.randomUUID = () => '99999999-9999-4999-8999-999999999999';
+    let recording = RECORDING_A;
+    let failSplits = false;
+    route({ state: { splits: { available: true, splits: [split({ state: 'approved', boardReady: true })], boardVideo: { status: 'bound' } } } });
+    const base = global.fetch;
+    global.fetch = jest.fn(async (url, options = {}) => {
+      const path = String(url);
+      const method = options.method || 'GET';
+      if (path.endsWith('/presentation-materials')) {
+        if (method === 'PATCH') {
+          recording = RECORDING_B;
+          return response({ materials: [transcriptRow(), recordingRow(RECORDING_B)], uploads: [] });
+        }
+        return response({ materials: [transcriptRow(), recordingRow(recording)], uploads: [] });
+      }
+      if (failSplits && path.endsWith('/presentation-video-splits') && method === 'GET') return response({ error: 'down' }, 500);
+      return base(url, options);
+    });
+    await renderLine();
+    await waitFor(() => expect(screen.getByTestId('board-readiness-video')).toHaveTextContent('On the Board page'));
+    const reads = getCount();
+    failSplits = true;
+    fireEvent.click(within(screen.getByTestId('step-recording')).getByRole('button', { name: 'More actions for get the recording' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Replace recording or transcript' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Replace recording' }));
+    fireEvent.change(screen.getByLabelText(/^Zoom link/), { target: { value: zoomUrl } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Zoom link' }));
+    expect(await screen.findByText('Zoom recording link saved.')).toBeInTheDocument();
+    await waitFor(() => expect(getCount()).toBeGreaterThan(reads));
+    await waitFor(() => expect(screen.getByTestId('board-readiness-video')).toHaveTextContent('Status unknown'));
   });
 });

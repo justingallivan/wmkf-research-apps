@@ -205,8 +205,8 @@ describe('standalone Copy video', () => {
   test('a meeting without audio, and an earlier import, offer Copy video; Import-able meetings do not', async () => {
     route();
     const panel = await openPanel();
-    expect(within(panel).getAllByRole('button', { name: 'Copy video' })).toHaveLength(2);
-    fireEvent.click(within(panel).getAllByRole('button', { name: 'Copy video' })[1]);
+    expect(within(panel).getAllByRole('button', { name: /^Copy video/ })).toHaveLength(2);
+    fireEvent.click(within(panel).getAllByRole('button', { name: /^Copy video/ })[1]);
     await waitFor(() => expect(posts('video')).toHaveLength(1));
     expect(posts('video')[0].body).toEqual({ action: 'start', meetingUuid: UUID_C, replaces: null });
     expect(posts('audio')).toHaveLength(0);
@@ -216,12 +216,13 @@ describe('standalone Copy video', () => {
       backing: 'file', filename: 'transcript.txt', createdAt: '2026-10-04T22:24:00.000Z', slotVersion: 3, webUrl: 'https://example.sharepoint.com/t.txt' };
     route({ state: { materials: [transcript] } });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Replace audio or transcript' }));
+    fireEvent.click(await within(await screen.findByTestId('step-recording')).findByRole('button', { name: /^More actions for/ }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Replace recording or transcript' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Import from Zoom' }));
     const panel = await screen.findByTestId('zoom-import');
-    expect(within(panel).getAllByRole('button', { name: 'Copy video' })).toHaveLength(3);
+    expect(within(panel).getAllByRole('button', { name: /^Copy video/ })).toHaveLength(3);
     expect(within(panel).getByRole('radio', { name: /Oct 5/ })).toBeEnabled();
-    fireEvent.click(within(panel).getAllByRole('button', { name: 'Copy video' })[0]);
+    fireEvent.click(within(panel).getAllByRole('button', { name: /^Copy video/ })[0]);
     await waitFor(() => expect(posts('video')).toHaveLength(1));
     expect(posts('video')[0].body).toEqual({ action: 'start', meetingUuid: UUID_A, replaces: null });
     expect(posts('audio')).toHaveLength(0);
@@ -230,15 +231,23 @@ describe('standalone Copy video', () => {
     const off = list().meetings.map(({ audio, transcript, import: i, ...rest }) => rest);
     route({ state: { list: { available: true, windowDays: 30, videoCopyAvailable: true, meetings: off } } });
     const panel = await openPanel();
-    expect(within(panel).getAllByRole('button', { name: 'Copy video' })).toHaveLength(3);
+    expect(within(panel).getAllByRole('button', { name: /^Copy video/ })).toHaveLength(3);
     expect(within(panel).queryByText(/No audio yet/)).not.toBeInTheDocument();
     for (const radio of within(panel).getAllByRole('radio')) expect(radio).toBeDisabled();
   });
   test('Copy video asks the replace confirmation too, and resends with replaces', async () => {
     route({ videoPost: (body) => (body.replaces === null ? conflict('zoom_video_replace_confirmation_required', { winner }) : response({ copy: { id: COPY_ID, state: 'queued' } }, 202)) });
     const panel = await openPanel();
-    fireEvent.click(within(panel).getAllByRole('button', { name: 'Copy video' })[1]);
-    fireEvent.click(await within(panel).findByRole('button', { name: 'Replace and continue' }));
+    const button = within(panel).getAllByRole('button', { name: /^Copy video/ })[1];
+    // The action sits inside its own recording's box and names that recording (redesign §5).
+    const meetingRow = button.closest('[data-testid="zoom-meeting-row"]');
+    expect(meetingRow).not.toBeNull();
+    expect(button).toHaveAccessibleName(`Copy video from ${within(meetingRow).getByRole('radio').closest('label').querySelector('.font-medium').textContent}`);
+    fireEvent.click(button);
+    // The replace confirmation opens in the clicked row, not after the list, and takes focus.
+    const dialog = await within(meetingRow).findByRole('alertdialog', { name: 'Replace the current recording' });
+    await waitFor(() => expect(document.activeElement).toBe(dialog));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Replace and continue' }));
     await waitFor(() => expect(posts('video')).toHaveLength(2));
     expect(posts('video')[1].body.replaces).toEqual({ artifactId: WINNER_ID, slotVersion: 3 });
     expect(posts('audio')).toHaveLength(0);
@@ -247,7 +256,7 @@ describe('standalone Copy video', () => {
     route({ state: { copies: { available: true, copies: [copy({ meetingUuid: UUID_A })] } } });
     const panel = await openPanel();
     await waitFor(() => expect(screen.getByTestId('video-copy-status')).toBeInTheDocument());
-    expect(within(panel).queryByRole('button', { name: 'Copy video' })).not.toBeInTheDocument();
+    expect(within(panel).queryByRole('button', { name: /^Copy video/ })).not.toBeInTheDocument();
   });
 });
 
@@ -386,7 +395,7 @@ test('no GUID appears anywhere in the rendered card with copies, a winner and th
   route({ state: { copies: { available: true, copies: [copy({ state: 'failed', failureCode: 'zoom_video_session_expired' })] } },
     videoPost: () => conflict('zoom_video_replace_confirmation_required', { winner }) });
   const panel = await openPanel();
-  fireEvent.click(within(panel).getAllByRole('button', { name: 'Copy video' })[0]);
+  fireEvent.click(within(panel).getAllByRole('button', { name: /^Copy video/ })[0]);
   await within(panel).findByText(/This will replace/);
   expect(screen.getByTestId('recording-and-transcript-card').textContent).not.toMatch(GUID);
 });

@@ -13,6 +13,8 @@ import { Button } from '../Layout';
 import EmailSendFeedback from '../EmailSendFeedback';
 import MaterialsEmailModal from './MaterialsEmailModal';
 import StaffMaterialUpload from './StaffMaterialUpload';
+import ArtifactRow from './ArtifactRow';
+import OverflowMenu from '../workbench/OverflowMenu';
 import { SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED } from '../../config/siteVisitMaterials';
 import { siteVisitMaterialsScanRejectionMessage, siteVisitMaterialsScanRejectionReason } from '../../utils/site-visit-materials-scan-rejection';
 
@@ -42,20 +44,13 @@ function uploadJobsForSlot(collection, slot) {
   return Array.isArray(collection?.uploadJobs) ? collection.uploadJobs.filter((job) => job?.slot === slot) : [];
 }
 
-function OpenFileLink({ file }) {
+// The https link to a received file, or null; the row's name becomes the link (Site Visit redesign §3.2).
+function safeFileUrl(file) {
   if (typeof file?.webUrl !== 'string') return null;
-  let url;
   try {
-    url = new URL(file.webUrl);
-    if (url.protocol !== 'https:' || url.username || url.password) return null;
+    const url = new URL(file.webUrl);
+    return url.protocol === 'https:' && !url.username && !url.password ? url.toString() : null;
   } catch { return null; }
-  return (
-    <a href={url.toString()} target="_blank" rel="noopener noreferrer"
-      aria-label={`Open file: ${file.filename} (opens in a new tab)`}
-      className="shrink-0 rounded px-2 py-2 text-sm font-semibold text-blue-700 underline underline-offset-4 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
-      Open file
-    </a>
-  );
 }
 
 function UploadJobNotice({ jobs, programCoordinator }) {
@@ -195,6 +190,11 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
     }
   };
 
+  const uploadRefs = useRef({});
+  const [blockedUploads, setBlockedUploads] = useState({});
+  const setUploadBlocked = useCallback((slot, blocked) => {
+    setBlockedUploads((current) => (Boolean(current[slot]) === blocked ? current : { ...current, [slot]: blocked }));
+  }, []);
   if (unavailable) return null;
 
   const seenEmails = new Set();
@@ -227,8 +227,9 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
 
   return (
     <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm" data-testid="site-visit-materials-card">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+      {/* One heading line: title, state phrase, the next step as the one inline action, the rest in a menu. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-xl font-semibold text-gray-900">Applicant materials</h2>
           <p className="mt-1 text-sm text-gray-600">
             {collection
@@ -236,9 +237,24 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
               : 'Ask the applicant for the presentation, its source file, and participant bios. They upload through one link; the files appear on the briefing page.'}
           </p>
         </div>
-        {!loading && !collection && (
-          <Button type="button" loading={busy} onClick={() => setComposerAction('create')}>Request materials</Button>
-        )}
+        <div className="flex items-center gap-2">
+          {!loading && !collection && (
+            <Button type="button" loading={busy} onClick={() => setComposerAction('create')}>Request materials</Button>
+          )}
+          {collection && collection.state === 'missing' && (
+            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setComposerAction('remind')}>Send reminder</Button>
+          )}
+          {collection && collection.state === 'received' && !hasBlockingJobs && (
+            <Button type="button" size="sm" loading={busy} onClick={() => act('ready', {}, 'Marked ready.')}>Confirm the files open</Button>
+          )}
+          {collection && (
+            <OverflowMenu label="More actions for applicant materials" items={[
+              collection.state !== 'closed' && collection.contributorUrl && { key: 'copy', label: copied ? 'Copied' : 'Copy contributor link', onSelect: copyLink },
+              collection.state !== 'closed' && { key: 'invite', label: collection.invitedAt ? 'Send invitation again' : 'Send invitation', disabled: busy, onSelect: () => setComposerAction('invite') },
+              SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED && { key: 'other', label: 'Add other file', disabled: busy || Boolean(blockedUploads.other), onSelect: () => uploadRefs.current.other?.open() },
+            ]} />
+          )}
+        </div>
       </div>
 
       {error && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
@@ -249,84 +265,73 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
 
       {collection && (
         <>
-          <dl className="mt-4 grid gap-3 text-sm text-gray-800 md:grid-cols-3">
-            <div><dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Due</dt><dd className={collection.overdue ? 'mt-1 font-medium text-amber-800' : 'mt-1'}>{formatDate(collection.dueAt)}{collection.overdue ? ' · overdue' : ''}</dd></div>
-            <div><dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Link open until</dt><dd className="mt-1">{formatDate(collection.closesAt)}</dd></div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Sent to</dt>
-              <dd className="mt-1">
-                {contacts.length ? contacts.map((person) => `${person.name || person.email}${person.email ? ` (${person.email})` : ''}`).join(', ') : 'No contacts on file'}
-                {liaisonNote}
-                {collection.invitedAt ? ` · invited ${formatDateTime(collection.invitedAt)}` : ' · invitation not sent'}
-                {collection.lastReminderAt ? ` · reminded ${formatDateTime(collection.lastReminderAt)}` : ''}
-              </dd>
-            </div>
-          </dl>
+          <p className="mt-3 text-sm text-gray-700" data-testid="materials-metadata">
+            <span className={collection.overdue ? 'font-medium text-amber-800' : ''}>Due {formatDate(collection.dueAt)}{collection.overdue ? ' · overdue' : ''}</span>
+            <span className="text-gray-400"> · </span>Link open until {formatDate(collection.closesAt)}
+            <span className="text-gray-400"> · </span>Sent to {contacts.length ? contacts.map((person) => `${person.name || person.email}${person.email ? ` (${person.email})` : ''}`).join(', ') : 'No contacts on file'}
+            {liaisonNote}
+            {collection.invitedAt ? ` · invited ${formatDateTime(collection.invitedAt)}` : ' · invitation not sent'}
+            {collection.lastReminderAt ? ` · reminded ${formatDateTime(collection.lastReminderAt)}` : ''}
+          </p>
 
-          <ul className="mt-4 divide-y divide-gray-100 rounded-lg border border-gray-200">
-            {collection.checklist.map((item) => (
-              <li key={item.key} className="flex flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                <div className="min-w-0 flex-1 break-words">
-                  <p className={item.waived && !item.received ? 'text-gray-400 line-through' : 'font-medium text-gray-900'}>{item.label}</p>
-                  <p className="text-xs text-gray-500">
-                    {item.received ? `${uploadJobsForSlot(collection, item.key).some((job) => BLOCKING_UPLOAD_STATUSES.has(job.status)) ? 'Previously received' : 'Received'} ${formatDateTime(item.received.receivedAt)} · ${item.received.filename}${item.received.uploadedByStaff ? ' · staff upload' : ''}${item.waived ? ' · waived' : ''}` : item.waived ? 'Waived' : 'Missing'}
-                  </p>
-                  <UploadJobNotice jobs={uploadJobsForSlot(collection, item.key)} programCoordinator={collection.programCoordinator} />
-                </div>
-                <div className="flex shrink-0 items-start justify-end gap-4" data-testid={`materials-row-actions-${item.key}`}>
-                  <OpenFileLink file={item.received} />
-                  {collection.state !== 'closed' && !item.received && (
-                    <button type="button" disabled={busy} onClick={() => act('waive', { key: item.key, waived: !item.waived })} className="py-2 text-xs font-semibold text-gray-600 underline underline-offset-4 hover:text-gray-900 disabled:opacity-50">
-                      {item.waived ? 'Require again' : 'Waive'}
-                    </button>
-                  )}
-                  <StaffMaterialUpload
-                    requestId={requestId}
-                    slot={item.key}
-                    label={item.received ? 'Upload updated file' : 'Upload file'}
-                    disabled={busy || uploadJobsForSlot(collection, item.key).some((job) => BLOCKING_UPLOAD_STATUSES.has(job.status))}
-                    onUploaded={() => { setNotice(`${item.label} saved.`); void load(); }}
-                  />
-                </div>
-              </li>
-            ))}
+          <ul className="mt-3 divide-y divide-gray-100 border-t border-gray-200">
+            {collection.checklist.map((item) => {
+              const jobs = uploadJobsForSlot(collection, item.key);
+              const replacing = jobs.some((job) => BLOCKING_UPLOAD_STATUSES.has(job.status));
+              const uploadDisabled = busy || replacing;
+              const status = item.received
+                ? (replacing ? { tone: 'gray', label: 'Replacing…' } : { tone: 'green', label: 'Received' })
+                : item.waived ? { tone: 'gray', label: 'Waived' }
+                  : { tone: collection.overdue ? 'amber' : 'gray', label: 'Missing' };
+              const detail = item.received
+                ? `${replacing ? 'Previously received ' : ''}${formatDateTime(item.received.receivedAt)} · ${item.received.filename}${item.received.uploadedByStaff ? ' · staff upload' : ''}${item.waived ? ' · waived' : ''}`
+                : null;
+              const canWaive = collection.state !== 'closed' && !item.received;
+              const uploader = (
+                <StaffMaterialUpload
+                  ref={(node) => { uploadRefs.current[item.key] = node; }}
+                  requestId={requestId}
+                  slot={item.key}
+                  label={item.received ? 'Upload updated file' : 'Upload file'}
+                  disabled={uploadDisabled}
+                  showTrigger={!item.received}
+                  onBlockedChange={(blocked) => setUploadBlocked(item.key, blocked)}
+                  onUploaded={() => { setNotice(`${item.label} saved.`); void load(); }}
+                />
+              );
+              return (
+                <ArtifactRow key={item.key} testId={`materials-row-${item.key}`} name={item.label} href={safeFileUrl(item.received)}
+                  status={status} detail={detail}
+                  // One position for the uploader in every state, so a missing-to-received refresh never remounts it
+                  // and drops an unfinished upload's Retry (Codex review, commit 5).
+                  action={uploader}
+                  menuItems={[
+                    item.received && { key: 'replace', label: 'Upload updated file', disabled: uploadDisabled || Boolean(blockedUploads[item.key]), onSelect: () => uploadRefs.current[item.key]?.open() },
+                    canWaive && { key: 'waive', label: item.waived ? 'Require again' : 'Waive', disabled: busy, onSelect: () => act('waive', { key: item.key, waived: !item.waived }) },
+                  ]}>
+                  <UploadJobNotice jobs={jobs} programCoordinator={collection.programCoordinator} />
+                </ArtifactRow>
+              );
+            })}
             {collection.other.map((file) => (
-              <li key={file.artifactId} className="flex flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                <div className="min-w-0 flex-1 break-words"><p className="font-medium text-gray-900">Other: {file.filename}</p><p className="text-xs text-gray-500">Received {formatDateTime(file.receivedAt)}{file.uploadedByStaff ? ' · staff upload' : ''}</p></div>
-                <OpenFileLink file={file} />
-              </li>
+              <ArtifactRow key={file.artifactId} testId="materials-row-other-file" name={`Other: ${file.filename}`} href={safeFileUrl(file)}
+                status={{ tone: 'green', label: 'Received' }}
+                detail={`${formatDateTime(file.receivedAt)}${file.uploadedByStaff ? ' · staff upload' : ''}`} />
             ))}
             {uploadJobs.filter((job) => job.slot === 'other').map((job) => (
-              <li key={job.jobId} className="px-4 py-3 text-sm">
+              <li key={job.jobId} className="py-3 text-sm">
                 <p className="font-medium text-gray-900">Other: {job.filename || 'Additional material'}</p>
                 <UploadJobNotice jobs={[job]} programCoordinator={collection.programCoordinator} />
               </li>
             ))}
           </ul>
           {SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED && (
-            <div className="mt-2 flex justify-end">
-              <StaffMaterialUpload requestId={requestId} slot="other" label="Add other file" disabled={busy} onUploaded={() => { setNotice('Additional file saved.'); void load(); }} />
-            </div>
+            <StaffMaterialUpload ref={(node) => { uploadRefs.current.other = node; }} requestId={requestId} slot="other" label="Add other file" disabled={busy} showTrigger={false}
+              onBlockedChange={(blocked) => setUploadBlocked('other', blocked)}
+              onUploaded={() => { setNotice('Additional file saved.'); void load(); }} />
           )}
-
-          {collection.state !== 'closed' && (
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              {collection.contributorUrl && (
-                <button type="button" onClick={copyLink} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50">{copied ? 'Copied' : 'Copy contributor link'}</button>
-              )}
-              <button type="button" disabled={busy} onClick={() => setComposerAction('invite')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50">
-                {collection.invitedAt ? 'Send invitation again' : 'Send invitation'}
-              </button>
-              {collection.state === 'missing' && (
-                <button type="button" disabled={busy} onClick={() => setComposerAction('remind')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50">Send reminder</button>
-              )}
-              {collection.state === 'received' && !hasBlockingJobs && (
-                <Button type="button" loading={busy} onClick={() => act('ready', {}, 'Marked ready.')}>Confirm the files open</Button>
-              )}
-              {collection.state === 'received' && hasBlockingJobs && (
-                <p className="text-sm text-amber-900" role="status">Confirm readiness after every upload is finished and any attention item is resolved.</p>
-              )}
-            </div>
+          {collection.state === 'received' && hasBlockingJobs && (
+            <p className="mt-3 text-sm text-amber-900" role="status">Confirm readiness after every upload is finished and any attention item is resolved.</p>
           )}
         </>
       )}

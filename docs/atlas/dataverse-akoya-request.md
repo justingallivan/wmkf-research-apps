@@ -208,6 +208,11 @@ Sample row had **364 total fields** (vendor + WMKF + standard Dataverse audit fi
   Dynamics client intentionally
 - (NOT `pages/api/integrity-screener/*`, NOT `pages/api/virtual-review-panel.js` — both read no Dataverse. `integrity-service.js` imports only Postgres `sql`; `virtual-review-panel.js` is a single file (not a directory) that's PDF-upload-driven and Postgres-backed via `PanelReviewService`.)
 - `lib/dataverse/adapters/reviewer-suggestion.js` `findByPD` — joins requests by lead PD
+- `lib/services/site-visit/logistics-service.js` `getRequestIdentity` — **[BRANCH-BUILT
+  2026-10-11 on `claude/site-visit-redesign`; not merged]** read-only number, title,
+  applicant institution, grant program and meeting date for the Site Visit page header. Only
+  the Meeting Tracker visit GET opts in (`includeRequestIdentity`); a failed read returns
+  `request: null`.
 - `lib/services/reviewer-contact-reconciliation.js` →
   `grantRequestAdapter.findByPotentialReviewerSlots` — capped read across the
   five legacy reviewer lookups for optional Find-card prior-request context;

@@ -2,7 +2,7 @@
 title: Site Visit page redesign
 domain: transcription
 kind: plan
-status: proposed
+status: built-in-branch
 summary: "Proposal to rework the Meeting Tracker Site Visit page under DESIGN.md's Page Structure rules: each finished artifact becomes one row (name is the link, audience and status chips, a … menu), steps collapse once done, the Board link sits with what the Board sees, and the queue's card notes are sorted into layout, client-behavior and server slices."
 owner: product-engineering
 related:
@@ -15,8 +15,9 @@ related:
 
 # Site Visit page redesign
 
-Status: **proposed; scope decided** (Session 593, 2026-10-10/11). Planning only; no
-code. The owner answered §8: the whole page is in scope, the Board link sits on the
+Status: **built on `claude/site-visit-redesign`** (Session 593, 2026-10-11): commits 1-7 are
+built and each was approved by Codex adversarial review; not merged. See §9.6 for the
+build log and §10 for what remains. Scope was decided before the build. The owner answered §8: the whole page is in scope, the Board link sits on the
 Results "Board page" heading, and TXT/VTT downloads live in the row menu. The build brief
 (§9: reusable pieces, header identity source, action inventory, commit order,
 verification) is written; the build has not started.
@@ -77,6 +78,10 @@ maps to a named rule:
 Page type: **Record Detail** (one visit for one request).
 
 ## 3. Page layout (proposed)
+
+> **Revised by owner decisions 7-10 (§8.2):** the Recording and transcript card is now four
+> cards (Recording setup, Presentation, Staff discussion, Board materials). The mockup below
+> shows the first build.
 
 Mockup values (institution, dates, durations, counts) are illustrative.
 
@@ -159,6 +164,11 @@ The same row pattern as Results (§4):
 
 ## 4. Results step (the screenshot), proposed
 
+> **Superseded in layout by §8.2 (owner, 2026-10-11):** the rows below now sit in the
+> Presentation and Staff discussion cards, and the Board link heads a Board materials card
+> at the bottom with a status-only readiness list. Row anatomy and the state table (§4.1)
+> are unchanged.
+
 ```
 3  Results
    BOARD PAGE            Link expires Dec 31          [Copy link]  [Open Board page]  …
@@ -185,7 +195,8 @@ The same row pattern as Results (§4):
   one muted line ("Shows applicant materials and the three items below. No email
   is sent.").
 - **"…" menu per row** holds the actions that apply to that row's current state:
-  - Transcripts: Download TXT, Download VTT, Regenerate (only when stale).
+  - Full meeting transcript: Download TXT, Download VTT. (The split transcripts have no
+    download route; see §9.3.)
   - Summaries: Summarize again, Open draft (when one exists).
   - Video: Create again, Show cut details.
   - Recording: Replace recording, Upload manually.
@@ -315,6 +326,42 @@ is automatic.
    sees (§4), not as the page header's primary action.
 3. **TXT and VTT downloads live in the row's "…" menu**, for the split transcripts
    and the full meeting transcript alike.
+
+### 8.1 Owner decisions before the remaining build (2026-10-11)
+
+4. **Header identity:** add the opt-in read-only request lookup on the Meeting Tracker visit
+   endpoint (§9.2).
+5. **Branch:** after the build and its final review, push `claude/site-visit-redesign` only;
+   no merge or Production deploy. The owner merges.
+6. **Attendees picker:** a search box plus a selected list with Required/Optional per
+   person (§3.1).
+
+### 8.2 Owner decisions after the first desktop look (2026-10-11)
+
+The Board section is used rarely (an interested member); every staff member uses this page.
+So the results are organized for staff:
+
+7. **Four cards in work order:** Recording setup (steps 1 and 2; the one Refresh for all four
+   cards sits on its heading), then **Presentation** (video, summary, transcript; order revised
+   by decision 11), then **Staff discussion** (summary, transcript), then **Board materials** at the bottom. Setup
+   comes first because every result depends on it; once done its steps are one line each.
+8. ~~The full meeting recording and full meeting transcript sit in Staff discussion.~~
+   **Superseded by decision 12.**
+9. **Board materials:** the link actions (Generate, Copy, Open, Issue new link) plus a
+   status-only readiness list: Presentation transcript, Presentation summary and (when the
+   feature is on for the request) Presentation video, each "On the Board page", "Not yet" or
+   "Status unknown". Actions stay in the Presentation card. Applicant materials are not
+   repeated: the card's data does not include them, and the Applicant materials card lists
+   them; the Board card's note says the Board page shows them.
+10. The per-row "Not on the Board page until it is generated" note is removed; the readiness
+    list carries that.
+11. **Row order (owner, later 2026-10-11):** Presentation video, Presentation summary,
+    Presentation transcript; then Staff discussion summary, Staff discussion transcript. Summary
+    before transcript in each card.
+12. **No full recording in the results.** The full recording will be deleted at the Stage 5
+    deadline, so staff see only the presentation video. The full meeting transcript is the source
+    of the split transcripts, so "Open full transcript" and its TXT/VTT downloads live in step 1's
+    "…" menu in Recording setup.
 
 ## 9. Build brief (Session 593, 2026-10-11)
 
@@ -446,7 +493,7 @@ work is in progress. Builders tick each line off in the slice that moves it, and
 | Check again (`:2777`, `:2779`) | summary block | card Refresh |
 | Load latest (`:2805`), Publish summary, Save draft, Discard draft (`:2827-2835`) | draft editor | unchanged (open editor); the row's inline action **Review and publish** opens it |
 | Open (split transcripts, `:3020`) | transcript lines | the transcript name is the link |
-| Download TXT / VTT (split transcripts) | not offered | row menu (owner decision 3) |
+| Download TXT / VTT (split transcripts) | not offered | still not offered: the download route serves only the full TRANSCRIPT artifact (`downloadMeetingTranscript`, `lib/services/meeting-tracker-transcription/service.js:615-622`), so adding it is a server change outside this build |
 | Open video (`:3148`) | video line | the video name is the link (streams once C3 ships) |
 | Check the ending and approve / Approve video / Not yet (`:3149`, `:3157-3158`) | video line | inline action on the video row; confirmation unchanged |
 | Finish approving (`:3150`) | video line | inline action |
@@ -499,3 +546,309 @@ work is in progress. Builders tick each line off in the slice that moves it, and
   (`impeccable detect --json`), then the finish review.
 - Desktop check in a browser on a test request. Rendering this page reads
   Production Dataverse, so the owner either authorizes it or drives it.
+
+### 9.6 Build log
+
+**Commit 1, Results rows** (branch `claude/site-visit-redesign`: `b48649a14`, `a644baa6f`,
+and the round-1 fix). Codex adversarial review: round 1 found that an open Summarize
+confirmation could act on a changed target (high), which is now fixed. The confirmation is bound to a
+signature of the transcript and each target's draft and load state, with two
+regression tests. Round 2 approved with no material findings. As built, with these deviations from §4 and §9.3:
+
+- **Unmet prerequisites keep the old card's behavior:** the action is absent and the
+  reason shows as a note under the row (for example "Generate the discussion
+  transcript first."). It is not yet a disabled menu item labeled with its reason
+  (§4). Commit 2 revisits this when steps 1 and 2 collapse.
+- **Draft summaries keep the editor open under the row.** There is no separate
+  inline "Review and publish" action; the open editor is the action.
+- **Approved video:** `boardReady === true` and `== null` both read "Approved". The
+  unknown case adds the note "Couldn't check the Board status." The Board page group
+  heading carries what "for the Board" used to say.
+- **Split transcripts have no downloads** (no download route; §9.3).
+- **Board link:** "Issue new link" is in the heading's menu while the link reads, and
+  inline when the link cannot be read.
+- **Not yet converged on `Button`:** the card's `BTN`/`BTN_PRIMARY` strings remain.
+  Row actions use the outline `BTN`, so the only ink buttons in Results are confirm
+  buttons. Convergence is scheduled with commit 3 (card behavior).
+- **Pre-existing, unchanged:** `SummaryBlock`'s `published` falls back to the
+  collection's presentation `transcriptSummary` for both kinds while the summary read
+  is not current. The row's chip and detail are guarded by `summaryStatusCurrent`, so
+  this does not misrender. It is left for a separate fix.
+
+**Commit 2, steps 1 and 2 collapse.** As built:
+
+- `Step` takes a one-line `summary` and `menuItems`. Step 1, once done, reads "Published … ·
+  version … · MP4 recording · added …" with a menu holding **Replace recording or
+  transcript**; opening it shows a **Close** button. Step 2, once done, reads
+  "Presentation ends at … · confirmed …" with **Edit speaker names** and **Edit
+  presentation end** in its menu.
+- **Generate moved to Results.** It is an inline **Generate transcripts** on the first split
+  transcript row that is stale or missing (one button; the endpoint makes both). Step 2 no
+  longer turns current because of it, and Results turns current instead. Row details:
+  "Not on the Board page until it is generated" (presentation), "Made from an earlier
+  transcript", "Confirm the presentation end in step 2".
+- "Other ways to add a recording" is renamed **Upload manually**.
+- Each Zoom recording is one box: radio, details, its own **Copy video** (accessible name
+  "Copy video from <time>") and, when asked, its replace confirmation. Moving focus to the
+  confirmation is commit 3.
+- **Deviations:** Earlier runs stay where they were (a collapsed `<details>` after the
+  steps), not a step 1 menu item, because a ready but unreviewed run must stay
+  discoverable. Step 2's summary shows no speaker count, since the count is not loaded
+  without the transcript content. The open step 2 now uses a `BTN` for "Edit presentation
+  end" where it had a blue text link (One Button Vocabulary).
+
+**Commit 2 review:** Codex approved in round 1 with no material findings.
+
+**Commit 3, card behavior.** As built:
+
+- **One card Refresh** in the card heading (`data-testid="card-refresh"`). It reloads the
+  transcription status, the materials and Board link, the Zoom list (when open) and the
+  presentation video. It replaces the conflict banner's Refresh, the progress line's
+  Refresh and the Zoom "Refresh list".
+- **Kept in place, by DESIGN.md's State Rule** (a failed load gets its Retry where it
+  failed): summary **Check again**, **Refresh transcription status** and the video's
+  **Retry**. The speaker editor's **Refresh** also stays, because it preserves unsaved
+  edits. The card Refresh also re-reads each summary once (Codex round 3, below).
+- **Own-write staleness:** cancelling a run that had already moved on now reloads and
+  shows a single warning. It no longer adds a red error plus an "Another session changed
+  this" banner. That banner is kept for real 409 conflicts and now points to the card
+  Refresh.
+- **Old-transcript edits gated:** while a newer transcription is running or waiting to be
+  checked, Edit speaker names, Edit presentation end and Set presentation end are
+  disabled. In the step 2 menu each label carries "· wait for the newer transcript"; in
+  the open step a note explains why.
+- **Replace confirmation takes focus** (and scrolls into view) when it opens in its row.
+- **Deferred to commit 3b:** converging the card's `BTN`/`BTN_PRIMARY`/`BTN_LINK` strings on
+  the shared `Button` (a mechanical change across the file, kept separate so this
+  behavior commit stays reviewable).
+- Mutation checks: removing the gate, the focus call, or the conflict reset each fails its
+  new test.
+- **Codex round 1 (needs-attention, two medium findings):** (a) a discarded or unreadable ready
+  run kept blocking edits; (b) the summary row's "Set end to enable summary" skipped the
+  gate. Fixed by computing `newerTranscriptPending` in `useTranscription`. It is true for a
+  running run not being cancelled, or a ready run whose content is still reviewable (not
+  cleaned up, purged or unreadable). `beginEditNames` refuses while it holds, so every
+  entry point is gated, and the summary action shows the reason. Regression tests cover
+  discarded and expired runs and the summary action; reverting the gate fails all three.
+- **Codex round 2 (needs-attention, one medium):** the ready-run check followed the focused
+  run, so reviewing an older run from Earlier runs lifted the gate. It is now independent
+  of focus. Pending means a running run not being cancelled, or an unpublished, reviewable
+  ready run created after the latest published run, so an old unpublished run does not
+  block forever. Two regression tests: focus switch stays blocked (fails with the
+  focus-based check), and an older unpublished run does not block. The server's
+  `createMeetingCorrection` checks only the current artifact; Codex noted it, and it stays
+  a UI gate in this build.
+- **Codex round 3 (needs-attention, one medium):** the card Refresh did not re-read summary
+  drafts, so a draft created, edited or discarded in another session stayed unseen. Now,
+  after the collection reload settles, the card bumps a token that `useSummaryKind` turns
+  into one `loadSummary()` per kind. It skips when a key-change read is pending or in
+  flight (`summaryLoadedKey !== summaryLoadKey` or loading), and `wantsSummary` is read at
+  render time. Result: one read per kind per Refresh, and the read-scripted race tests are
+  unchanged. Two regression tests (a draft created elsewhere appears; a draft edited
+  elsewhere becomes a conflict that keeps local text) fail when the read is removed.
+- **Codex round 4 (needs-attention, one medium):** a key-change read that finished before
+  the rest of Refresh settled was followed by a second read. The fix runs in two phases:
+  the card bumps `summaryRefresh.begin` at the start, and each kind records its read
+  sequence. On `settle`, a kind reads only if no read started since `begin`. Regression:
+  materials are held until the key-change read completes, and Refresh still produces
+  exactly one read; the test fails without the sequence check. The owner approved this
+  round (2026-10-11).
+- **Codex round 5 (needs-attention, one medium):** `z.refresh` discarded the Zoom list
+  promise, so Refresh re-enabled before the list settled. It now returns the read, and the
+  button stays disabled while the list is refreshing. Regression: a held Zoom response
+  keeps Refresh disabled and a second click starts no request (fails with both reverted).
+- **Codex round 6: approve**, no material findings. Commit 3 is closed.
+
+**Commit 3b, shared Button.** Converted all 46 card `<button>`s that used the `BTN` or
+`BTN_PRIMARY` styles to the shared `Button` (`size="sm"`, `variant` outline or primary), and
+removed `BTN_PRIMARY`. Kept: `BTN` on the one `<a>` styled as a button (Open Board page) and
+the underlined `BTN_LINK` text actions (disclosures such as Upload manually, and quiet
+actions such as Cancel this transcription or Discard draft), because `Button` has no
+text-link variant. Converting those would mean adding a variant to the shared component,
+which is outside this build.
+- Codex review of 3b: approve (all 46 conversions checked by AST comparison).
+
+**Commit 4, hinted leavers start unchecked.** `buildAttendanceReview` computes the
+`leftBeforeEnd` hints first, sets each row's `kept` to the opposite, and derives
+`excludedSpeakerIds` from the unchecked rows before `normalizeDiscussionAttribution` (which
+requires them to match). Plan D2 in `ZOOM_ATTENDANCE_ATTRIBUTION_PLAN_2026-10-09.md` is
+revised in the same commit. The card seeds its checkboxes from the decision rows, so no
+UI change was needed; a saved attribution is unaffected.
+- Codex review of commit 4: approve.
+
+**Commit 5, Applicant materials rows.** As built (§3.2):
+
+- Each checklist item is an `ArtifactRow`. The name is the link to the received file
+  (`OpenFileLink` is removed). Status is Received, Replacing…, Waived, or Missing (amber
+  when overdue). The detail keeps the date, filename, "staff upload", "waived" and
+  "Previously received" wording.
+- **Missing or waived item:** an inline **Upload file** (`StaffMaterialUpload`, now a
+  shared `Button`). **Received item:** **Upload updated file** in the row menu, which opens
+  the row's hidden uploader through a ref `open()`. Progress, errors and Retry still render
+  in the row. The uploader reports `onBlockedChange`, so the menu item disables while an
+  earlier file awaits Retry. Its file input stays a single stable element.
+- **Waive / Require again** are in the row menu (not offered on received or closed rows,
+  as before).
+- **Heading:** one next-step action (**Request materials**, **Send reminder** when missing,
+  **Confirm the files open** when received with no blocking jobs) and a card menu with
+  Copy contributor link, Send invitation (again) and Add other file. The Due / Link open
+  until / Sent to grid is one metadata line.
+- Separate commit: the "Use proposed then Save" test raced its own "Saved" label (it
+  failed 3 of 4 batched runs); it now waits for the PATCH and its re-render. Test-only.
+- **Codex round 1 for commit 5 (needs-attention, one medium):** the uploader moved between
+  the row's action slot and its children when an item became received, so a refresh
+  remounted it and dropped an unfinished upload's Retry. It now stays in the action slot
+  in every state, and only its trigger visibility and wrapper class change. Regression: a
+  missing row with a retryable finalize, then another row's Waive refreshes in this row's
+  receipt; the same Retry button remains and re-finalizes the same staging id (fails with
+  the old placement).
+
+**Commit 6, one attendee picker** (owner decision 6: a search box plus a list). As built:
+
+- New `AttendeePicker`. A search box over the directory (up to 8 matches; a person with no
+  email is listed, disabled, with `noEmailHint` on hover) and a list of the people chosen,
+  each with a Required / Optional toggle and Remove. **Staff and Board attendees** replace
+  the two chip fieldsets that rendered every person twice. The saved
+  `requiredAttendees` / `optionalAttendees` / `organizer` shapes are unchanged; adding
+  goes to Required, and switching role reuses the existing one-role-per-person `toggleIn`.
+- **Organizer** uses the same picker in single mode (staff only), with **Change**.
+- Applicant-side attendees (AkoyaGo suggestions plus manual entry) are unchanged.
+- **Deviation:** the read-only Visit details summary is left as built. It is already
+  read-first and compact (a two-column definition list) and already shows names, not ids.
+- **Codex round 1 for commit 6 (needs-attention, one medium):** the per-list limit (100,
+  manual rows included) blocked adds once Required was full and let role changes overfill
+  a list, which makes the server reject the whole save. Adds now go to Required, or to
+  Optional when Required is full; role changes never overfill their destination (guarded
+  inside the state update), and a toggle into a full list is disabled with the reason. The
+  search disables only when both lists are full. Three boundary tests; the Optional-add
+  test fails when adds always go to Required.
+- Codex round 2 for commit 6: approve.
+
+**Commit 7, header identity** (owner decision 4). As built:
+
+- `getSiteVisitLogistics` takes an opt-in `includeRequestIdentity`. The new dependency
+  `getRequestIdentity` reads `akoya_request` (number, title, applicant, grant program,
+  meeting date) through `grantRequestAdapter.getById`, in parallel with the existing
+  reads. It projects `request: { requestNumber, title, institution, grantProgram,
+  cycleLabel }`, the same derivations as `resolve-request-service.js`; a failed read
+  returns `null`. Only the Meeting Tracker visit GET passes the flag, so the Workbench read
+  is unchanged (tested).
+- The header keeps "Site visit · #number" (from the URL until loaded) and adds one
+  metadata line: "Institution — Title · Program · Cycle".
+- Docs: API route security matrix row; Atlas `dataverse-akoya-request.md` read paths and
+  `dataverse-wmkf-sitevisit.md` consumers (marked branch-built, not merged).
+- **Deferred, open for the owner:** the header status chip (§3). An accurate chip needs
+  state the page does not hold: the materials collection state from its card and Board
+  readiness from the Results rows, including the video line's own fetch. Building it means
+  lifting that state or adding reads. A partial chip would contradict the cards it
+  summarizes, so this build leaves it out.
+- **Codex round 1 for commit 7 (needs-attention, one medium):** the identity survived
+  client-side navigation between visits, and loads were unguarded. The identity is now
+  stored with its request id, and stale loads drop their state, error and loading updates.
+  Two same-mount A→B tests fail with the guards removed. Round 2: approve.
+
+**Commit 8, docs.** Plan status, the remaining-work list below, the work queue item, the
+Impeccable surface brief (its "not a redesign" scope is superseded), and a pointer from the
+2026-10-04 card plan. The detector over the changed UI files found nothing.
+
+**Final whole-branch Codex review (needs-attention, one high):** an open video approval
+confirmation submitted the newest split id at click time, so a Refresh that brought in a
+different video could approve one nobody had checked. Confirmations now carry the split
+id they were opened for, render only while that split is still newest and confirmable,
+and approve exactly that id. Regression: open the approval for A, refresh into B, and the
+confirmation closes with no request; approving B needs its own confirmation and posts B
+(fails with the old behavior).
+
+**Four-card layout (owner decisions 7-10, §8.2):** `TranscriptWorkflow` renders four sibling
+cards from the same state, so the paired Summarize confirmation, the Generate anchor and the
+Refresh are unchanged. The presentation video's load moved into `usePresentationVideo`, which
+the video row and the Board readiness list share (one GET; it loads only once the cards show
+products, as the row did). `publishedSummaryOf` is shared by the summary block and the
+readiness list, so the "On the Board page" status for the summary matches the "Published" chip.
+Tests: card order and placement; readiness for the transcript, the summary (bound or stale)
+and the video (served, out of date, unknown, in review, feature off, and turning on after
+approval, with one load). Mutation checks: each readiness rule, broken, fails its test.
+Codex round 1 (needs-attention, two medium): (a) after the presentation end changed, a failed
+video re-read kept the old "On the Board page"; the hook now records the revision each successful
+read was made for, and the readiness list says "Status unknown" unless the read is current and
+succeeded. (b) With the transcript collection failed to load, the summary read reports
+`not_needed`, which the list showed as "Not yet"; it is now "Status unknown". Each has a
+regression test that fails without its fix.
+Codex round 2 (needs-attention, one medium): the video readiness read only the newest split,
+but an older approved video stays on the Board while a newer one is made. It now uses the
+server's aggregate `boardVideo.status` (`bound` → On, `unknown` → Status unknown, absent or
+`missing`/`stale` → Not yet), still behind the revision and failure guards. Regression cases:
+a newer queued, in-review or failed split beside an older served one stays "On the Board
+page" (all three fail under the old newest-only rule).
+Codex round 3 (needs-attention, two medium): (a) a failed transcript refresh kept the last
+collection, so the list repeated an old "On the Board page"; `useTranscription` now exposes
+`collectionCurrent` (false after a failed read until the next success) and the transcript and
+summary lines say "Status unknown" without it. (b) The server adds `boardVideo` only when an
+approved split is among its 10 most recent, so an older approval behind ten failed attempts made
+the status absent; absent now means "Not yet" only when no Presentation video record exists among
+the staff materials (the Board binds from the same winners), otherwise "Status unknown". Each has
+a regression test that fails without its fix.
+Codex round 4 (needs-attention, one medium): (b) still trusted possibly stale materials as proof of
+absence. An absent `boardVideo` now means "Not yet" only when the splits list is shorter than the
+server's 10-row limit (the list is unfiltered, `presentation-video-split-store.js`
+`listPresentationVideoSplitSnapshotsForRequest`, so a shorter list is the whole history) and no
+Presentation video record exists; otherwise "Status unknown". Regression: ten failed attempts with no
+video record is unknown, nine is "Not yet" (fails without the history check).
+Codex round 5 (needs-attention, one medium): replacing the recording (Copy video or a new Zoom
+link) reloads only the materials, so the video status was not re-read although the Board stops
+serving a cut of the old recording. The video status key now includes the recording's id and slot
+version, so a recording change re-reads it (and a failed re-read is "Status unknown"). Regression:
+save a new Zoom link with the splits read failing; fails without the recording in the key.
+Codex round 6 (needs-attention, one medium), **accepted by the owner (2026-10-11), not fixed**: if a
+recording save succeeds and the materials reload right after it fails, the video status key does not
+change, so the readiness line can keep an old "On the Board page" until the next successful Refresh.
+The card shows the materials load error at the same time. Recorded in §10.
+
+**Row order and full recording (owner decisions 11-12, §8.2):** summary before transcript in both
+result cards; the full-recording row is removed; the full meeting transcript's Open and TXT/VTT
+downloads moved to step 1's menu. Tests: row order (fails if the discussion rows are swapped back),
+no full-recording link anywhere, the step-1 menu items and their links.
+Codex (needs-attention, one medium): the full transcript was reachable only while step 1 was
+collapsed, so opening it for a replacement hid it. Open and the downloads now stay in step 1's menu
+whenever a transcript exists; only "Replace recording or transcript" needs the collapsed step.
+Regression: open step 1 and the menu still has Open and TXT (fails with the collapsed-only gate);
+an uploaded transcript gets Open without downloads.
+
+## 10. Remaining after the build (2026-10-11)
+
+- **Owner:** merge decision. The branch is pushed and not merged (owner decision 5). It is
+  Tier 1 runtime UI plus one read-only server read, so promote it deliberately.
+- **Owner:** a desktop check on a real request. The page reads Production, so the owner
+  runs it or authorizes it. The build was checked in jsdom and through static
+  renders of the card.
+- **Open design item:** the header status chip (§9.6 commit 7).
+- **Server slices C1-C3 (§6), not started:** automatic split-transcript generation after a
+  publish with a confirmed end; the real reason a presentation video was superseded; and
+  streaming the review video instead of downloading it.
+- **Not converged:** the underlined `BTN_LINK` text actions (no text-link variant in
+  `Button`).
+- **Server-side gap noted by Codex (commit 3):** `createMeetingCorrection` does not refuse
+  while a newer transcription is pending; the gate is UI-only.
+
+- **Accepted gap (owner, 2026-10-11):** Board readiness after a recording save whose materials reload
+  fails (§9.6, Codex round 6). Fix if it is ever seen: after a confirmed recording save, show the video
+  line as "Status unknown" until a fresh read succeeds.
+
+### 10.1 Owner desktop check findings (2026-10-11, held until the check is done)
+
+1. **[DONE 2026-10-11, owner approved removal]** **Leftover "Refresh transcription status" button** in the Results summary block
+   (`RecordingAndTranscriptCard.js`, three sites: the status-unknown button and the two
+   "Transcript status is unavailable" branches). It predates the redesign (`132eac566`)
+   and duplicates the card Refresh. Fix: remove the buttons; the note reads "Transcript
+   status is unavailable. Use Refresh in Recording setup to check whether this transcript can
+   be summarized."; the two tests that clicked it now use the Recording setup Refresh.
+2. **Local setup:** `.env.local` lacks `MEETING_TRACKER_SCHEMA_READY=on`, so localhost shows
+   "Meeting Tracker is not yet enabled". Not a code defect.
+3. **[DONE 2026-10-11]** **Contradictory waiting line.** With a transcript present but its status
+   unavailable, both result cards said "…appear here once the presentation end is checked" above the
+   rows they said were not there. The line now shows only when a card has no rows; the rows' chips
+   carry the state otherwise. Regression fails with the old condition.
+4. **Local setup, not a code defect:** besides `MEETING_TRACKER_SCHEMA_READY`, localhost needs
+   `MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY`, `MEETING_TRACKER_TRANSCRIPTION_ACCESS`,
+   `SITE_VISIT_MATERIALS_SCHEMA_READY` and `PRESENTATION_VIDEO_SPLIT_ACCESS` to show transcripts,
+   applicant materials and the presentation video; unset, each feature reports itself off.

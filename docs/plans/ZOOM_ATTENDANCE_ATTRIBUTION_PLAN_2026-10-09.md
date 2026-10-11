@@ -84,7 +84,12 @@ Source: an owner-run, read-only, shape-only run of `node scripts/probe-zoom-reco
   - `|(recordingEnd − recordingStart) − audioDurationMs| ≤ 2 s`;
   - the leave time is more than 10 s before `recordingStart + endMs`.
 
-  Otherwise show no hint. Hints never uncheck anyone automatically: everyone starts checked, per Justin.
+  Otherwise show no hint. ~~Hints never uncheck anyone automatically: everyone starts checked, per Justin.~~
+  **Revised by the owner on 2026-10-10, after the first live use (1003222):** a row with the
+  "left before the presentation ended" hint starts **unchecked**. Everyone else, and every
+  other-voice row, starts checked. A misaligned recording shows no hints, so it is
+  unaffected. Built in `attendance-service.js` on `claude/site-visit-redesign` (Site Visit
+  redesign commit 4).
 
 ### Fallback
 

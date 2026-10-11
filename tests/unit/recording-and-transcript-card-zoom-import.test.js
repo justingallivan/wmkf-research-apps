@@ -95,7 +95,7 @@ test('available: meetings list by Pacific date and time, the manual inputs colla
   expect(within(panel).getByRole('radio', { name: /Oct 3/ })).toBeDisabled();
   expect(screen.queryByTestId('generate-form')).not.toBeInTheDocument();
   expect(screen.queryByText('Video recording')).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Other ways to add a recording' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Upload manually' }));
   expect(screen.getByTestId('generate-form')).toBeInTheDocument();
   expect(screen.getByText('Video recording')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Upload a finished transcript instead' })).toBeInTheDocument();
@@ -149,7 +149,8 @@ test('a busy import keeps step 1 open even when a finished transcript would have
     '/zoom-imports': { method: 'POST', respond: async () => { await gate; return response({ import: { id: 'i1', state: 'started', failureCode: null }, job: { id: JOB_ID } }); } },
   });
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Replace audio or transcript' }));
+  fireEvent.click(await within(await screen.findByTestId('step-recording')).findByRole('button', { name: /^More actions for/ }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Replace recording or transcript' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Import from Zoom' }));
   const panel = await screen.findByTestId('zoom-import');
   fireEvent.click(within(panel).getByRole('radio', { name: /Oct 4/ }));
@@ -347,7 +348,7 @@ describe('the Zoom list follows the server while the panel is open', () => {
     await waitFor(() => expect(within(panel).getByRole('radio', { name: /Oct 5/ })).toBeEnabled());
   });
 
-  test('Refresh list turns an importing meeting whose lease expired into a retryable one', async () => {
+  test('the card Refresh turns an importing meeting whose lease expired into a retryable one', async () => {
     let zoomState = 'importing';
     const importing = () => zoomList({ meetings: zoomList().meetings.map((m, i) => (i === 0 ? { ...m, import: { state: 'importing', jobId: null, failureCode: null } } : m)) });
     const expired = () => zoomList({ meetings: zoomList().meetings.map((m, i) => (i === 0 ? { ...m, import: { state: 'failed', jobId: null, failureCode: 'zoom_import_lease_expired' } } : m)) });
@@ -355,9 +356,11 @@ describe('the Zoom list follows the server while the panel is open', () => {
     const panel = await openPanel();
     expect(within(panel).getByRole('radio', { name: /Oct 5/ })).toBeDisabled();
     zoomState = 'expired';
-    fireEvent.click(within(panel).getByRole('button', { name: 'Refresh list' }));
+    // One Refresh for the card replaces the list's own Refresh list (redesign §6 B).
+    expect(within(panel).queryByRole('button', { name: 'Refresh list' })).toBeNull();
+    fireEvent.click(screen.getByTestId('card-refresh'));
     await waitFor(() => expect(within(panel).getByRole('radio', { name: /Oct 5/ })).toBeEnabled());
-    expect(within(panel).getByRole('button', { name: 'Refresh list' })).toBeEnabled();
+    await waitFor(() => expect(screen.getByTestId('card-refresh')).toBeEnabled());
   });
 
   test('a collection change while the panel was never opened makes no Zoom list request', async () => {
@@ -375,6 +378,27 @@ describe('the Zoom list follows the server while the panel is open', () => {
     expect(zoomListCalls()).toBe(0);
   });
 
+  test('the card Refresh waits for the Zoom list: it stays disabled and a second click starts nothing (Codex round 5)', async () => {
+    let release = null;
+    let listReads = 0;
+    route({}, { '/zoom-recordings': { respond: () => {
+      listReads += 1;
+      return listReads === 1 ? response(zoomList()) : new Promise((resolve) => { release = () => resolve(response(zoomList())); });
+    } } });
+    await openPanel();
+    const refresh = screen.getByTestId('card-refresh');
+    await waitFor(() => expect(refresh).toBeEnabled());
+    fireEvent.click(refresh);
+    await waitFor(() => expect(release).not.toBeNull());
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    expect(refresh).toBeDisabled();
+    fireEvent.click(refresh);
+    expect(listReads).toBe(2);
+    await act(async () => { release(); });
+    await waitFor(() => expect(refresh).toBeEnabled());
+    expect(listReads).toBe(2);
+  });
+
   test('re-reading the same jobs does not refetch the Zoom list', async () => {
     const state = { collection: collection({ jobs: [queuedJob('queued')] }) };
     route(state, { '/zoom-recordings': { respond: () => response(zoomList()) } });
@@ -383,10 +407,11 @@ describe('the Zoom list follows the server while the panel is open', () => {
     await screen.findByTestId('zoom-import');
     const before = zoomListCalls();
     state.collection = collection({ jobs: [queuedJob('queued')] });
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    fireEvent.click(screen.getByTestId('card-refresh'));
     await waitFor(() => expect(global.fetch.mock.calls.filter(([u]) => String(u).endsWith('/transcriptions')).length).toBeGreaterThan(1));
     await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
-    expect(zoomListCalls()).toBe(before);
+    // The card Refresh reads the list once; identical jobs add no second read.
+    expect(zoomListCalls()).toBe(before + 1);
   });
 });
 

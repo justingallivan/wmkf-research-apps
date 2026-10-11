@@ -5,7 +5,8 @@
  * Bytes go browser-direct to private staging, then staff-finalize scans,
  * stores, and registers them inline; the page must stay open until it ends.
  */
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { Button } from '../Layout';
 import { requestEnvelope } from '../../utils/api-request';
 import { siteVisitMaterialsScanRejectionMessage } from '../../utils/site-visit-materials-scan-rejection';
 
@@ -32,7 +33,9 @@ function isTerminalFinalize(status) {
   return Number.isInteger(status) && status >= 400 && status < 500 && status !== 409 && status !== 429;
 }
 
-export default function StaffMaterialUpload({ requestId, slot, label, disabled = false, onUploaded }) {
+// `showTrigger={false}` hides the button so a row menu can start the upload through the ref's `open()` (Site Visit
+// redesign §3.2); progress, errors and Retry still show here either way.
+function StaffMaterialUpload({ requestId, slot, label, disabled = false, onUploaded, showTrigger = true, onBlockedChange }, ref) {
   const [phase, setPhase] = useState(null);
   const [percent, setPercent] = useState(null);
   const [error, setError] = useState(null);
@@ -142,10 +145,15 @@ export default function StaffMaterialUpload({ requestId, slot, label, disabled =
   };
 
   const busy = Boolean(phase);
+  const blocked = disabled || busy || Boolean(pending);
+  useImperativeHandle(ref, () => ({ open: () => { if (!blocked) inputRef.current?.click(); } }), [blocked]);
+  // A row menu that starts this upload mirrors whether it can (an unfinished earlier file blocks another).
+  useEffect(() => { onBlockedChange?.(blocked); }, [blocked]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     // Fixed width so progress and error text wrap inside the control instead of
     // widening the row's action column and pushing "Open file" sideways.
-    <div className="w-44 py-2 text-right">
+    // Same element in every state (only its class changes), so the input and Retry state survive a re-render.
+    <div className={showTrigger || busy || error || pending ? 'w-44 text-right' : 'text-right'}>
       <input
         ref={inputRef}
         type="file"
@@ -155,14 +163,11 @@ export default function StaffMaterialUpload({ requestId, slot, label, disabled =
         onChange={(event) => { void upload(event.target.files?.[0]); }}
         data-testid={`staff-upload-input-${slot}`}
       />
-      <button
-        type="button"
-        disabled={disabled || busy || Boolean(pending)}
-        onClick={() => inputRef.current?.click()}
-        className="text-xs font-semibold text-gray-700 underline underline-offset-4 hover:text-gray-900 disabled:opacity-50"
-      >
-        {label}
-      </button>
+      {showTrigger && (
+        <Button type="button" size="sm" variant="outline" disabled={blocked} onClick={() => inputRef.current?.click()}>
+          {label}
+        </Button>
+      )}
       {busy && <p className="mt-1 text-xs text-blue-800" role="status">{phase}{percent !== null ? ` ${percent}%` : ''}</p>}
       {error && <p className="mt-1 text-xs text-red-800" role="alert">{error}</p>}
       {pending && !busy && <p className="mt-1 text-xs text-gray-700">Press Retry to finish saving the earlier file first.</p>}
@@ -179,3 +184,5 @@ export default function StaffMaterialUpload({ requestId, slot, label, disabled =
     </div>
   );
 }
+
+export default forwardRef(StaffMaterialUpload);
