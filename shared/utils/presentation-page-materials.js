@@ -4,6 +4,13 @@ const PDF = 'application/pdf';
 
 export const isType = (material, type) => String(material?.contentType || '').split(';')[0].trim().toLowerCase() === type;
 
+// Word files the server can convert to PDF for viewing (open route mode=pdf).
+const WORD_TYPES = new Set([
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
+]);
+export const isWord = (material) => WORD_TYPES.has(String(material?.contentType || '').split(';')[0].trim().toLowerCase());
+
 // "1003222 Site Visit Participant Bios.docx" -> "Site Visit Participant Bios": no request number, no extension.
 export function displayName(filename) {
   const name = String(filename || '')

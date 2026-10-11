@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Play } from 'lucide-react';
 import { requestJson } from '../../../shared/utils/api-request.js';
-import { arrangeMaterials, displayName, isType } from '../../../shared/utils/presentation-page-materials.js';
+import { arrangeMaterials, displayName, isType, isWord } from '../../../shared/utils/presentation-page-materials.js';
 import SummaryText from '../../../shared/components/SummaryText.js';
 import {
   PRESENTATION_SUMMARY_HEADINGS,
@@ -112,7 +112,7 @@ function Video({ token, material }) {
 
 // Microsoft serves every file as a download, so a PDF is fetched here and handed to the browser's own
 // viewer as a local copy. The tab is opened first, inside the click, so it is not blocked.
-function usePdfViewer(token, material) {
+function usePdfViewer(token, material, viewMode = 'open') {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const open = async () => {
@@ -122,7 +122,7 @@ function usePdfViewer(token, material) {
     try {
       if (tab) tab.opener = null;
       // eslint-disable-next-line no-restricted-syntax -- raw fetch: binary PDF bytes via the open route's redirect to Microsoft (not JSON); allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
-      const response = await fetch(endpoint(token, material, 'open'));
+      const response = await fetch(endpoint(token, material, viewMode));
       if (!response.ok) throw new Error(`status ${response.status}`);
       const url = URL.createObjectURL(new Blob([await response.arrayBuffer()], { type: PDF }));
       if (tab && !tab.closed) tab.location.href = url;
@@ -152,8 +152,8 @@ function MaterialRow({ name, primary, secondary = null, note = null }) {
   );
 }
 
-function PdfRow({ token, name, pdf, download, downloadLabel }) {
-  const viewer = usePdfViewer(token, pdf);
+function PdfRow({ token, name, pdf, download, downloadLabel, viewMode = 'open' }) {
+  const viewer = usePdfViewer(token, pdf, viewMode);
   return (
     <MaterialRow
       name={name}
@@ -202,9 +202,13 @@ function Materials({ token, proposal, slidesPdf, slidesOriginal, others }) {
           />
         )}
         {!slidesPdf && slidesOriginal && <DownloadRow token={token} name="Slides" file={slidesOriginal} />}
-        {others.map((material) => (isType(material, PDF)
-          ? <PdfRow key={material.member} token={token} name={displayName(material.filename)} pdf={material} download={material} downloadLabel="Download PDF" />
-          : <DownloadRow key={material.member} token={token} name={displayName(material.filename)} file={material} />))}
+        {others.map((material) => {
+          const name = displayName(material.filename);
+          if (isType(material, PDF)) return <PdfRow key={material.member} token={token} name={name} pdf={material} download={material} downloadLabel="Download PDF" />;
+          // Word files open as a PDF copy Microsoft converts on the server; the original stays downloadable.
+          if (isWord(material)) return <PdfRow key={material.member} token={token} name={name} pdf={material} download={material} downloadLabel="Download Word" viewMode="pdf" />;
+          return <DownloadRow key={material.member} token={token} name={name} file={material} />;
+        })}
       </ul>
     </section>
   );

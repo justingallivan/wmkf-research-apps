@@ -54,6 +54,7 @@ function response() {
     setHeader: jest.fn(function setHeader(name, value) { this.headers[name] = value; }),
     status: jest.fn(function status(code) { this.statusCode = code; return this; }),
     json: jest.fn(function json(body) { this.body = body; return this; }),
+    send: jest.fn(function send(body) { this.body = body; return this; }),
     redirect: jest.fn(function redirect(code, url) { this.statusCode = code; this.redirectUrl = url; return this; }),
   };
 }
@@ -178,6 +179,20 @@ test('a throttled proposal check never touches the media budget, and media actio
   await openHandler({ method: 'GET', query: { token: 't', member: 'proposal', mode: 'open' }, headers: {}, socket: {} }, media);
   expect(checkPresentationMediaRateLimit).toHaveBeenCalledTimes(1);
   expect(media.redirect).toHaveBeenCalledWith(302, 'https://tenant.sharepoint.com/short');
+});
+
+test('open route mode pdf serves the converted bytes inline from this origin', async () => {
+  const bytes = Buffer.from('%PDF-1.7 x');
+  resolvePresentationMember.mockResolvedValue({ kind: 'pdf', buffer: bytes });
+  const res = response();
+  await openHandler({ method: 'GET', query: { token: 't', member: `material:${LINK_ID}`, mode: 'pdf' }, headers: {}, socket: {} }, res);
+  expect(checkPresentationMediaRateLimit).toHaveBeenCalledTimes(1);
+  expect(res.redirect).not.toHaveBeenCalled();
+  expect(res.statusCode).toBe(200);
+  expect(res.headers['Content-Type']).toBe('application/pdf');
+  expect(res.headers['Content-Disposition']).toBe('inline; filename="document.pdf"');
+  expect(res.headers['X-Content-Type-Options']).toBe('nosniff');
+  expect(res.body).toBe(bytes);
 });
 
 test('open route refuses an unknown mode before any work', async () => {

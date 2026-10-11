@@ -141,6 +141,20 @@ test('a confirmed absence (404) is not retried', async () => {
   }
 });
 
+test('Word bios open as a converted PDF and keep a Download Word link', async () => {
+  const tab = { closed: false, location: { href: '' }, close: jest.fn() };
+  window.open = jest.fn(() => tab);
+  global.fetch = jest.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(4) }));
+  URL.createObjectURL = jest.fn(() => 'blob:bios');
+  URL.revokeObjectURL = jest.fn();
+  render(<PresentationMaterialsPage />);
+  fireEvent.click(await screen.findByRole('button', { name: 'View site visit participant bios' }));
+  await waitFor(() => expect(tab.location.href).toBe('blob:bios'));
+  expect(global.fetch.mock.calls[0][0]).toContain('mode=pdf');
+  expect(global.fetch.mock.calls[0][0]).toContain(encodeURIComponent(BIOS.member));
+  expect(screen.getByRole('link', { name: 'Download Word' }).getAttribute('href')).toContain('mode=download');
+});
+
 test('PowerPoint-only slides offer one Download slides action', async () => {
   requestJson.mockResolvedValueOnce(context([SLIDES_PPTX]));
   render(<PresentationMaterialsPage />);

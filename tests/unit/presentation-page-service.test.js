@@ -442,6 +442,48 @@ test('resolver serves a current portal Applicant Slides file', async () => {
   await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: `material:${SLIDES_ID}`, mode: 'watch' }, deps));
 });
 
+describe('Word files open as a converted PDF (mode pdf)', () => {
+  const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  const BIOS_ID = '77777777-7777-4777-8777-777777777777';
+  const bios = (over = {}) => fileRow(BIOS_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.OTHER_APPLICANT_MATERIALS, 'site-visit-materials-portal',
+    { wmkf_filename: 'bios.docx', wmkf_contenttype: DOCX, ...over });
+  const wordMedia = (over = {}) => jest.fn(async (driveId, itemId) => ({
+    driveId, itemId, filename: 'bios.docx', mimeType: DOCX, size: 20_633, malware: null,
+    downloadUrl: 'https://tenant.sharepoint.com/download?bios=1', ...over,
+  }));
+  const PDF_BYTES = Buffer.from('%PDF-1.7 converted');
+  const deps = (over = {}) => dependencies([bios()], { resolveMediaDownloadUrl: wordMedia(), convertToPdf: jest.fn(async () => PDF_BYTES), ...over });
+  const pdf = (d, member = `material:${BIOS_ID}`) => resolvePresentationMember({ requestId: REQUEST_ID, member, mode: 'pdf' }, d);
+
+  test('an applicant Word file converts through Microsoft and returns the PDF bytes', async () => {
+    const d = deps();
+    await expect(pdf(d)).resolves.toEqual({ kind: 'pdf', buffer: PDF_BYTES });
+    expect(d.convertToPdf).toHaveBeenCalledWith(`drive-${BIOS_ID}`, `item-${BIOS_ID}`);
+  });
+
+  test.each([
+    ['a PDF (already viewable)', { resolveMediaDownloadUrl: wordMedia({ mimeType: 'application/pdf', filename: 'bios.pdf' }) }],
+    ['a Word type with the wrong extension', { resolveMediaDownloadUrl: wordMedia({ filename: 'bios.html' }) }],
+    ['a source over the size cap', { resolveMediaDownloadUrl: wordMedia({ size: 26 * 1024 * 1024 }) }],
+    ['a malware flag', { resolveMediaDownloadUrl: wordMedia({ malware: { description: 'x' } }) }],
+    ['output that is not a PDF', { convertToPdf: jest.fn(async () => Buffer.from('<html>')) }],
+    ['output over the response cap', { convertToPdf: jest.fn(async () => Buffer.concat([Buffer.from('%PDF-'), Buffer.alloc(4 * 1024 * 1024)])) }],
+  ])('refuses %s', async (_label, over) => {
+    await expectNotFound(pdf(deps(over)));
+  });
+
+  test('a failed conversion is temporary (503)', async () => {
+    await expect(pdf(deps({ convertToPdf: jest.fn(async () => { throw new Error('graph down'); }) }))).rejects.toMatchObject({ httpStatus: 503 });
+  });
+
+  test('mode pdf is refused for post-presentation rows and the proposal', async () => {
+    const d = dependencies([fullTranscript(), summaryRow()], { resolveMediaDownloadUrl: textMedia('summary.pdf', 'application/pdf'), convertToPdf: jest.fn() });
+    await expectNotFound(pdf(d, `material:${SUMMARY_ID}`));
+    await expectNotFound(pdf(deps(), 'proposal'));
+    expect(d.convertToPdf).not.toHaveBeenCalled();
+  });
+});
+
 test('resolver rejects non-allowlisted producers before Graph', async () => {
   const forbidden = fileRow(SLIDES_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES, 'some-other-producer');
   const deps = dependencies([forbidden]);
