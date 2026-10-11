@@ -56,6 +56,10 @@ function dependencies(rows, overrides = {}) {
       driveId, itemId, filename: 'material.pdf', mimeType: 'application/pdf',
       size: 90_000_000, malware: null, downloadUrl: 'https://tenant.sharepoint.com/download?short=1',
     })),
+    // The approved cut matching the video fixture (drive / video-item); the Board route checks the video's bytes against it.
+    getApprovedVideoCut: jest.fn(async () => ({
+      output_drive_id: 'drive', output_item_id: 'video-item', output_size: 1000, output_quickxor_hash: 'qxh-1',
+    })),
     ...overrides,
   };
 }
@@ -316,7 +320,7 @@ describe('presentation video', () => {
   const vf = require('../helpers/presentation-video-fixtures.js');
   const videoMedia = (over = {}) => jest.fn(async (driveId, itemId) => ({
     driveId, itemId, filename: 'presentation-video.mp4', mimeType: 'video/mp4', malware: null, eTag: 'video-etag-1',
-    downloadUrl: 'https://tenant.sharepoint.com/download?short=1', ...over,
+    size: 1000, quickXorHash: 'qxh-1', downloadUrl: 'https://tenant.sharepoint.com/download?short=1', ...over,
   }));
   const bound = () => [vf.transcriptRow(), vf.recordingRow(), vf.videoRow()];
   const member = (id = vf.VIDEO_ID) => ({ requestId: REQUEST_ID, member: `material:${id}` });
@@ -355,16 +359,41 @@ describe('presentation video', () => {
     expect(deps.resolveMediaDownloadUrl).not.toHaveBeenCalled();
   });
 
-  test('a bound video opens, watches and downloads by redirect with MP4 only, and the pinned eTag is enforced', async () => {
+  test('a bound video opens, watches and downloads by redirect with MP4 only, bound to the approved cut', async () => {
     for (const mode of ['open', 'watch', 'download']) {
       const deps = dependencies(bound(), { resolveMediaDownloadUrl: videoMedia() });
       expect(await resolvePresentationMember({ ...member(), mode }, deps))
         .toMatchObject({ kind: 'file', mimeType: 'video/mp4', redirectUrl: 'https://tenant.sharepoint.com/download?short=1' });
+      expect(deps.getApprovedVideoCut).toHaveBeenCalledWith(REQUEST_ID, vf.VIDEO_ID);
     }
-    const replaced = dependencies(bound(), { resolveMediaDownloadUrl: videoMedia({ eTag: 'video-etag-2' }) });
-    await expectNotFound(resolvePresentationMember({ ...member(), mode: 'watch' }, replaced));
     for (const over of [{ mimeType: 'text/plain' }, { mimeType: 'video/webm' }, { filename: 'presentation-video.txt' }, { malware: { x: 1 } }]) {
       await expectNotFound(resolvePresentationMember({ ...member(), mode: 'open' }, dependencies(bound(), { resolveMediaDownloadUrl: videoMedia(over) })));
+    }
+  });
+
+  test('a metadata-only eTag bump still serves the video (live 2026-10-10: eTag moved, size and quickXorHash unchanged)', async () => {
+    for (const mode of ['open', 'watch', 'download']) {
+      const bumped = dependencies(bound(), { resolveMediaDownloadUrl: videoMedia({ eTag: 'video-etag-2' }) });
+      expect(await resolvePresentationMember({ ...member(), mode }, bumped)).toMatchObject({ kind: 'file' });
+    }
+  });
+
+  const cut = (over) => jest.fn(async () => ({
+    output_drive_id: 'drive', output_item_id: 'video-item', output_size: 1000, output_quickxor_hash: 'qxh-1', ...over,
+  }));
+  test.each([
+    ['hash changed', () => ({ resolveMediaDownloadUrl: videoMedia({ quickXorHash: 'qxh-2' }) })],
+    ['size changed', () => ({ resolveMediaDownloadUrl: videoMedia({ size: 1001 }) })],
+    ['no live hash', () => ({ resolveMediaDownloadUrl: videoMedia({ quickXorHash: null }) })],
+    ['no approved cut', () => ({ getApprovedVideoCut: jest.fn(async () => null) })],
+    ['cut has no hash', () => ({ getApprovedVideoCut: cut({ output_quickxor_hash: null }) })],
+    ['cut has no size', () => ({ getApprovedVideoCut: cut({ output_size: null }) })],
+    ['cut is another item', () => ({ getApprovedVideoCut: cut({ output_item_id: 'other-item' }) })],
+    ['cut is another drive', () => ({ getApprovedVideoCut: cut({ output_drive_id: 'other-drive' }) })],
+  ])('the video is never served when its bytes cannot be bound to the approved cut (%s)', async (_label, makeOverrides) => {
+    for (const mode of ['open', 'watch', 'download']) {
+      const deps = dependencies(bound(), { resolveMediaDownloadUrl: videoMedia(), ...makeOverrides() });
+      await expectNotFound(resolvePresentationMember({ ...member(), mode }, deps));
     }
   });
 

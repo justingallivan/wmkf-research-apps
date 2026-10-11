@@ -223,17 +223,17 @@ sequence.
   frame decoding in the cut script's probe/accept steps with packet timestamps
   where the recipe allows; a privacy-recipe change, so full Codex review.
   Detail: `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md` "First real cut".
-- **Board file check uses the SharePoint eTag (2026-10-10).** [OPEN —
-  follow-up to the Stage 4 content-identity fix] `pinnedBytesMatch` in
-  `lib/services/post-presentation-materials/presentation-page-service.js`
-  serves a Board file only while the live eTag equals Dataverse's
-  `wmkf_sharepointetag`. SharePoint bumps a video's eTag on metadata-only
-  changes (live: source MP4 eTag `,3` -> `,4` with size, quickXorHash, cTag,
-  versionId and lastModified unchanged), so an approved presentation video
-  could stop opening on the Board link. Dataverse stores no content hash, so
-  the fix needs a decision (store a content identity at approval, or accept
-  matching size + versionId). Verify on the first approved video whether its
-  eTag moves after approval.
+- **Board file check uses the SharePoint eTag (2026-10-10).** [VIDEO FIXED
+  2026-10-11 (Session 594); transcripts OPEN, low priority] The approved
+  1003222 video's eTag moved after approval with size and quickXorHash
+  unchanged, so the Board link refused it. The video is now bound by the
+  approved cut's size and quickXorHash. The Presentation Transcript and
+  Transcript Summary still compare eTag (`pinnedBytesMatch` in
+  `lib/services/post-presentation-materials/presentation-page-service.js`);
+  owner chose to leave them until one breaks (fails closed: the file will not
+  open). Fix if needed: compare size + `publication.versionId`, which Graph's
+  default item response omits, so `resolveMediaDownloadUrl` must request it
+  explicitly. Detail: `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md` "Board link fix".
 - **Speaker-name picker should offer the Zoom call's participants
   (2026-10-10).** [OPEN — owner request] "People on this request" in the
   speaker-name editor (`RecordingAndTranscriptCard.js`, option groups PI,

@@ -280,6 +280,16 @@ describe('slice 4 approval writers', () => {
     expect(await store.findAbandonedRegisteringPresentationVideoSplit({ requestId: REQ })).toMatchObject({ id: ID, presentation_end_ms: 10 });
     expect(calls[0].text).toContain("state = 'registering' AND (approval_claim_token IS NULL OR approval_claimed_at <= NOW() - INTERVAL '180 seconds')");
   });
+  test('getApprovedByDocument returns the approved cut registered as that request document, with a numeric size', async () => {
+    const { store, calls } = harness(() => [{ id: ID, output_size: '448768873', output_quickxor_hash: 'h' }]);
+    expect(await store.getApprovedPresentationVideoByDocument({ requestId: REQ, requestDocumentId: DOC }))
+      .toMatchObject({ id: ID, output_size: 448768873, output_quickxor_hash: 'h' });
+    expect(calls[0].text).toContain("WHERE request_id = $1 AND request_document_id = $2 AND state = 'approved'");
+    expect(calls[0].params).toEqual([REQ, DOC]);
+    const none = harness(() => []);
+    expect(await none.store.getApprovedPresentationVideoByDocument({ requestId: REQ, requestDocumentId: DOC })).toBeNull();
+    await expect(none.store.getApprovedPresentationVideoByDocument({ requestId: REQ, requestDocumentId: 'x' })).rejects.toThrow();
+  });
   test('getForApproval returns the full row scoped to the request', async () => {
     const { store, calls } = harness(() => [{ id: ID, lineage: { a: 1 }, output_size: '3' }]);
     expect(await store.getPresentationVideoSplitForApproval({ id: ID, requestId: REQ })).toMatchObject({ lineage: { a: 1 }, output_size: 3 });
