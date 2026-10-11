@@ -1489,7 +1489,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
       if (current()) setCorrectionDetail(detail => detail ? { ...detail, correction: result.correction } : detail);
     }).catch(error => {
       if (current()) setError(errorMessage(error, 'Attendance could not be loaded. Refresh to try again.'));
-    }).finally(() => { if (current()) setBusy(null); });
+    }).finally(() => { if (isCurrent(generation)) setBusy(value => (value === 'attendance' ? null : value)); });
   }, [correction, attendanceReview, dirtyNames, dirtyEnd, busy, baselineEndMs, requestId, editorKey, basePath, isCurrent]);
 
   // Load the run under review once it is readable; one attempt per run and status so a failure cannot loop.
@@ -1578,7 +1578,8 @@ function useTranscription(requestId, { onMaterialsChanged }) {
           setError(errorMessage(saveError, 'Your changes could not be saved.'));
         }
       } finally {
-        if (isCurrent(generation) && editorKeyRef.current === targetKey) setBusy(null);
+        // Release only this save's flag, independent of the editor key (see publishCorrection).
+        if (isCurrent(generation)) setBusy(current => (current === 'speakers' ? null : current));
       }
       return;
     }
