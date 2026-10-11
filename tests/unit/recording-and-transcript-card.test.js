@@ -78,6 +78,22 @@ function openRowMenu(rowElement) {
   fireEvent.click(within(rowElement).getByRole('button', { name: /^More actions for/ }));
 }
 // The consent checkbox lives in the confirmation a Summarize action opens, not on the page.
+// A finished step keeps its actions in a "…" menu; an open step shows them as buttons.
+async function stepAction(label, stepTestId = 'step-review') {
+  const step = await screen.findByTestId(stepTestId);
+  await waitFor(() => expect(within(step).queryByRole('button', { name: label })
+    || within(step).queryByRole('button', { name: /^More actions for/ })).toBeTruthy());
+  const direct = within(step).queryByRole('button', { name: label });
+  if (direct) { fireEvent.click(direct); return; }
+  fireEvent.click(within(step).getByRole('button', { name: /^More actions for/ }));
+  fireEvent.click(screen.getByRole('menuitem', { name: label }));
+}
+function stepMenuItem(label, stepTestId = 'step-review') {
+  const trigger = within(screen.getByTestId(stepTestId)).getByRole('button', { name: /^More actions for/ });
+  if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger);
+  return screen.getByRole('menuitem', { name: label });
+}
+
 async function openSummarize(name, scopeElement = null) {
   const scope = scopeElement ? within(scopeElement) : screen;
   fireEvent.click(await scope.findByRole('button', { name }));
@@ -453,7 +469,7 @@ test('publishing an edited-names draft closes the editor for any result and list
       : response({ correction, content, currentArtifact: artifact, candidates: [] })) },
   });
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit speaker names' }));
+  await stepAction('Edit speaker names');
   const publish = await screen.findByRole('button', { name: 'Publish transcript' });
   await waitFor(() => expect(publish).toBeEnabled());
   fireEvent.click(publish);
@@ -490,7 +506,7 @@ test('a saved names draft is resumed with a GET instead of creating a second dra
   route(state, { [`/corrections/${OP_ID}`]: { method: 'GET', respond: () => response({ correction, content, currentArtifact: artifact, candidates: [] }) } });
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
   const button = await screen.findByRole('button', { name: 'Continue editing names' });
-  expect(screen.getByTestId('current-transcript-line').parentElement).toHaveTextContent('Unpublished name edits saved');
+  expect(screen.getByTestId('step-recording')).toHaveTextContent('Unpublished name edits saved');
   await waitFor(() => expect(button).toBeEnabled());
   fireEvent.click(button);
   await waitFor(() => expect(screen.getByLabelText('Name for Speaker A')).toHaveValue('Yara'));
@@ -584,7 +600,7 @@ describe('presentation end', () => {
       [`/corrections/${CORRECTION_ID}`]: { method: 'PATCH', respond: (path, options) => { patchBody = JSON.parse(options.body); return response({ correction: draftCorrection({ version: 2, presentationEndMs: null }) }); } },
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit speaker names' }));
+    await stepAction('Edit speaker names');
     const select = await screen.findByLabelText('Presentation ends after');
     expect(select).toHaveValue('62900');
     fireEvent.change(select, { target: { value: '' } });
@@ -604,18 +620,18 @@ describe('presentation end', () => {
     } } });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     expect(await screen.findByText(`Presentation ends at 01:02 · confirmed ${shortDate(CONFIRMED_AT)}`)).toBeInTheDocument();
-    expect(screen.getByText('The Board link shows no transcript until the presentation transcript is generated.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Generate presentation and discussion transcripts' }));
+    expect(row('presentation-transcript-row')).toHaveTextContent('Not on the Board page until it is generated');
+    fireEvent.click(within(row('presentation-transcript-row')).getByRole('button', { name: 'Generate transcripts' }));
     await waitFor(() => expect(row('presentation-transcript-row')).toHaveTextContent('Ready'));
     expect(postBody).toEqual({ expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: 'e'.repeat(64) });
-    expect(screen.queryByRole('button', { name: 'Generate presentation and discussion transcripts' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Generate transcripts' })).not.toBeInTheDocument();
   });
 
   test('confirmed and bound shows the ready line and no Generate button', async () => {
     route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     expect(await findRow('presentation-transcript-row')).toHaveTextContent('Ready');
-    expect(screen.queryByRole('button', { name: 'Generate presentation and discussion transcripts' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Generate transcripts' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Set presentation end' })).not.toBeInTheDocument();
   });
 
@@ -625,7 +641,7 @@ describe('presentation end', () => {
       '/corrections': { method: 'POST', respond: () => response(correctionDetail(artifact, { correction: draftCorrection({ presentationEndMs: 62900 }) })) },
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit presentation end' }));
+    await stepAction('Edit presentation end');
     expect(await screen.findByRole('heading', { name: 'Edit speaker names and presentation end' })).toBeInTheDocument();
     expect(screen.getByLabelText('Presentation ends after')).toHaveValue('62900');
   });
@@ -656,7 +672,7 @@ describe('presentation end', () => {
       return routed(url, options);
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit speaker names' }));
+    await stepAction('Edit speaker names');
     expect(await screen.findByText(/including a names-only change, withholds the Board presentation transcript and summary/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Name for Speaker A'), { target: { value: 'Alex' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
@@ -665,24 +681,25 @@ describe('presentation end', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Publish transcript' }));
     expect(await screen.findByText(/Generate the presentation and staff discussion transcripts, then summarize again/)).toBeInTheDocument();
     // Live 2026-10-10: the publish closed the editor and its busy flag was never cleared, so these stayed greyed.
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Generate presentation and discussion transcripts' })).toBeEnabled());
-    expect(screen.getByRole('button', { name: 'Edit speaker names' })).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Generate transcripts' })).toBeEnabled());
+    expect(stepMenuItem('Edit speaker names')).toBeEnabled();
   });
 
   test('both halves bound shows both ready lines; a missing discussion alone shows an info notice and Generate', async () => {
     route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
     const view = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     expect(await findRow('discussion-transcript-row')).toHaveTextContent('Ready');
-    expect(screen.queryByRole('button', { name: 'Generate presentation and discussion transcripts' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Generate transcripts' })).not.toBeInTheDocument();
     view.unmount();
     route({ materials: [transcriptRow()], collection: collection({ jobs: [],
       currentArtifact: boundaryArtifact({ staffDiscussionTranscript: { state: 'missing', artifactId: null } }) }), detail: detailFor({}) });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    expect(await screen.findByText('The staff discussion transcript for this presentation end has not been generated.')).toBeInTheDocument();
+    expect(await findRow('discussion-transcript-row')).toHaveTextContent('Not made yet');
     expect(row('presentation-transcript-row')).toHaveTextContent('Ready');
-    expect(row('discussion-transcript-row')).toHaveTextContent('Not made yet');
-    expect(screen.queryByText('The Board link shows no transcript until the presentation transcript is generated.')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Generate presentation and discussion transcripts' })).toBeInTheDocument();
+    expect(row('presentation-transcript-row')).not.toHaveTextContent('Not on the Board page');
+    // One Generate, on the row that needs it.
+    expect(within(row('discussion-transcript-row')).getByRole('button', { name: 'Generate transcripts' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Generate transcripts' })).toHaveLength(1);
   });
 
   test('a 409 on Generate shows the conflict notice and reloads', async () => {
@@ -691,7 +708,7 @@ describe('presentation end', () => {
       '/presentation-transcript': { method: 'POST', respond: () => response({ code: 'meeting_transcript_current_changed', message: 'The current transcript changed.' }, 409) },
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Generate presentation and discussion transcripts' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate transcripts' }));
     expect(await screen.findByText(/Another session changed this/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
   });
@@ -702,7 +719,7 @@ describe('presentation end', () => {
       '/presentation-transcript': { method: 'POST', respond: () => response({ code: 'presentation_end_not_confirmed', message: 'server words' }, 409) },
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Generate presentation and discussion transcripts' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate transcripts' }));
     expect(await screen.findByText(/Confirm where the presentation ends before generating/)).toBeInTheDocument();
     expect(screen.queryByText(/Another session changed this/)).not.toBeInTheDocument();
   });
@@ -1400,17 +1417,16 @@ describe('presentation summary', () => {
       render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
       fireEvent.click(await openSummarize('Summarize both', await findRow('presentation-summary-block')));
       fireEvent.click(screen.getByRole('button', { name: 'Summarize presentation and discussion' }));
-      const editNames = screen.getByRole('button', { name: 'Edit speaker names' });
-      await waitFor(() => expect(editNames).toBeDisabled());
+      await waitFor(() => expect(stepMenuItem('Edit speaker names')).toBeDisabled());
       await act(async () => { pending.presentation.resolve(); });
       expect(await screen.findByLabelText(/^Draft/)).toHaveValue('What was presented\nQuantum dots.');
-      expect(screen.getByRole('button', { name: 'Edit speaker names' })).toBeDisabled();
+      expect(stepMenuItem('Edit speaker names')).toBeDisabled();
       expect(screen.getByRole('button', { name: 'Publish summary' })).toBeDisabled();
       expect(screen.getByTestId('discussion-summary-block')).toHaveTextContent('Summarizing…');
       expect(within(screen.getByTestId('discussion-summary-block')).getByText(/This can take a few minutes/)).toBeInTheDocument();
       await act(async () => { pending.discussion.resolve(); });
       expect(await screen.findByLabelText(/^Discussion draft/)).toHaveValue('Staff discussed scope.');
-      await waitFor(() => expect(screen.getByRole('button', { name: 'Edit speaker names' })).not.toBeDisabled());
+      await waitFor(() => expect(stepMenuItem('Edit speaker names')).not.toBeDisabled());
     });
 
     test('a reload with a generating run shows its progress and offers no second run', async () => {
@@ -1539,7 +1555,7 @@ describe('step-by-step layout', () => {
     expect(stepState('step-results')).toBe('waiting');
     expect(within(screen.getByTestId('step-review')).getByText('Waiting for a transcript from step 1.')).toBeInTheDocument();
     expect(screen.queryByLabelText(/Transcript file/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Replace audio or transcript' })).not.toBeInTheDocument();
+    expect(within(screen.getByTestId('step-recording')).queryByRole('button', { name: /^More actions for/ })).not.toBeInTheDocument();
   });
 
   test('a finished visit collapses steps 1 and 2 and opens each result by name', async () => {
@@ -1564,7 +1580,7 @@ describe('step-by-step layout', () => {
     openRowMenu(row('full-transcript-row'));
     expect(screen.getByRole('menuitem', { name: 'Download TXT' })).toHaveAttribute('href', expect.stringContaining('/download?format=txt'));
     expect(screen.getByRole('menuitem', { name: 'Download VTT' })).toHaveAttribute('href', expect.stringContaining('/download?format=vtt'));
-    fireEvent.click(screen.getByRole('button', { name: 'Replace audio or transcript' }));
+    fireEvent.click(stepMenuItem('Replace recording or transcript', 'step-recording'));
     expect(screen.getByLabelText(/Audio file/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Replace recording' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
@@ -1574,7 +1590,7 @@ describe('step-by-step layout', () => {
   test('a chosen audio file keeps step 1 open even though a transcript exists', async () => {
     route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Replace audio or transcript' }));
+    await stepAction('Replace recording or transcript', 'step-recording');
     fireEvent.change(screen.getByLabelText(/Audio file/), { target: { files: [new File(['a'], 'visit.m4a', { type: 'audio/mp4' })] } });
     expect(await screen.findByText(/visit\.m4a/)).toBeInTheDocument();
     expect(stepState('step-recording')).toBe('current');
@@ -1591,14 +1607,16 @@ describe('step-by-step layout', () => {
     expect(stepState('step-review')).toBe('waiting');
   });
 
-  test('a stale presentation transcript sends the user back to step 2 to regenerate', async () => {
+  test('a stale presentation transcript is regenerated from its Results row; step 2 stays done', async () => {
     route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact({ presentationTranscript: { state: 'stale', artifactId: ARTIFACT_ID } }) }), detail: detailFor({}) });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     const presentationRow = await findRow('presentation-transcript-row');
     expect(presentationRow).toHaveTextContent('Out of date');
-    expect(presentationRow).toHaveTextContent('Generate it in step 2');
-    expect(stepState('step-review')).toBe('current');
-    expect(within(screen.getByTestId('step-review')).getByRole('button', { name: 'Generate presentation and discussion transcripts' })).toBeInTheDocument();
+    expect(presentationRow).toHaveTextContent('Not on the Board page until it is generated');
+    expect(within(presentationRow).getByRole('button', { name: 'Generate transcripts' })).toBeInTheDocument();
+    expect(stepState('step-review')).toBe('done');
+    expect(stepState('step-results')).toBe('current');
+    expect(within(screen.getByTestId('step-review')).queryByRole('button', { name: 'Generate transcripts' })).toBeNull();
     expect(within(screen.getByTestId('step-results')).queryByRole('link', { name: 'Presentation transcript' })).not.toBeInTheDocument();
   });
 });
@@ -1747,7 +1765,7 @@ test('attendance shares the boundary step, previews exclusion, and confirms once
     } },
   });
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit speaker names' }));
+  await stepAction('Edit speaker names');
   const editor = await screen.findByTestId('presentation-end-editor');
   const silent = within(editor).getByRole('checkbox', { name: /Silent attendee/ });
   const voice = within(editor).getByRole('checkbox', { name: 'Speaker B' });
@@ -1769,7 +1787,7 @@ test('failed attendance can retry after explicit Refresh at the same draft versi
     '/corrections': { respond: () => response(correctionDetail(artifact, { correction: draft })) },
   });
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit speaker names' }));
+  await stepAction('Edit speaker names');
   expect(await screen.findByText('Temporary attendance error')).toBeInTheDocument();
   expect(attempts).toBe(1);
   fireEvent.click(within(screen.getByTestId('transcript-review')).getByRole('button', { name: 'Refresh' }));
@@ -1786,7 +1804,7 @@ test.each(['success', 'failure'])('late attendance %s cannot update a different 
     '/corrections': { respond: () => response(correctionDetail(artifact, { correction: draft })) },
   });
   const view = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Edit speaker names' }));
+  await stepAction('Edit speaker names');
   await waitFor(() => expect(finish).toBeDefined());
   view.rerender(<RecordingAndTranscriptCard requestId="99999999-9999-4999-8999-999999999999" />);
   await act(async () => finish(outcome === 'success' ? response({ correction: attendanceDraft() }) : response({ error: 'Late attendance failure' }, 503)));

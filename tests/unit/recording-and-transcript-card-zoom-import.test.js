@@ -95,7 +95,7 @@ test('available: meetings list by Pacific date and time, the manual inputs colla
   expect(within(panel).getByRole('radio', { name: /Oct 3/ })).toBeDisabled();
   expect(screen.queryByTestId('generate-form')).not.toBeInTheDocument();
   expect(screen.queryByText('Video recording')).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Other ways to add a recording' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Upload manually' }));
   expect(screen.getByTestId('generate-form')).toBeInTheDocument();
   expect(screen.getByText('Video recording')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Upload a finished transcript instead' })).toBeInTheDocument();
@@ -149,7 +149,8 @@ test('a busy import keeps step 1 open even when a finished transcript would have
     '/zoom-imports': { method: 'POST', respond: async () => { await gate; return response({ import: { id: 'i1', state: 'started', failureCode: null }, job: { id: JOB_ID } }); } },
   });
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Replace audio or transcript' }));
+  fireEvent.click(await within(await screen.findByTestId('step-recording')).findByRole('button', { name: /^More actions for/ }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Replace recording or transcript' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Import from Zoom' }));
   const panel = await screen.findByTestId('zoom-import');
   fireEvent.click(within(panel).getByRole('radio', { name: /Oct 4/ }));

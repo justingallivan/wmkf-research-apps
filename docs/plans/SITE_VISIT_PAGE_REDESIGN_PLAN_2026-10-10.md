@@ -528,3 +528,25 @@ regression tests. Round 2 approved with no material findings. As built, with the
   collection's presentation `transcriptSummary` for both kinds while the summary read
   is not current. The row's chip and detail are guarded by `summaryStatusCurrent`, so
   this does not misrender. It is left for a separate fix.
+
+**Commit 2, steps 1 and 2 collapse.** As built:
+
+- `Step` takes a one-line `summary` and `menuItems`. Step 1, once done, reads "Published … ·
+  version … · MP4 recording · added …" with a menu holding **Replace recording or
+  transcript**; opening it shows a **Close** button. Step 2, once done, reads
+  "Presentation ends at … · confirmed …" with **Edit speaker names** and **Edit
+  presentation end** in its menu.
+- **Generate moved to Results.** It is an inline **Generate transcripts** on the first split
+  transcript row that is stale or missing (one button; the endpoint makes both). Step 2 no
+  longer turns current because of it, and Results turns current instead. Row details:
+  "Not on the Board page until it is generated" (presentation), "Made from an earlier
+  transcript", "Confirm the presentation end in step 2".
+- "Other ways to add a recording" is renamed **Upload manually**.
+- Each Zoom recording is one box: radio, details, its own **Copy video** (accessible name
+  "Copy video from <time>") and, when asked, its replace confirmation. Moving focus to the
+  confirmation is commit 3.
+- **Deviations:** Earlier runs stay where they were (a collapsed `<details>` after the
+  steps), not a step 1 menu item, because a ready but unreviewed run must stay
+  discoverable. Step 2's summary shows no speaker count, since the count is not loaded
+  without the transcript content. The open step 2 now uses a `BTN` for "Edit presentation
+  end" where it had a blue text link (One Button Vocabulary).

@@ -26,7 +26,7 @@ export default function ArtifactRow({ name, href = null, status = null, detail =
           {status && <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_TONES[status.tone] || STATUS_TONES.gray}`}>{status.label}</span>}
         </div>
         <div className="col-span-2 min-w-0 text-sm tabular-nums text-gray-600 md:col-span-1">{detail}</div>
-        <div className="col-span-2 flex items-center justify-start gap-2 md:col-span-1 md:justify-end">
+        <div className="col-span-2 flex items-center justify-end gap-2 md:col-span-1">
           {action}
           <OverflowMenu label={`More actions for ${String(name).toLowerCase()}`} items={menuItems} />
         </div>
