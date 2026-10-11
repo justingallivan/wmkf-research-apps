@@ -13,6 +13,8 @@ import { normalizeZoomPaste } from '../../../lib/services/post-presentation-mate
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../config/requestDocument';
 import { PAIRED_SUMMARY_ACKNOWLEDGMENT, SUMMARY_TEXT_MAX_CHARS } from '../../config/transcriptSummary';
 import { Button } from '../Layout';
+import ArtifactRow from './ArtifactRow';
+import OverflowMenu from '../workbench/OverflowMenu';
 import { formatTranscriptTurnTime, getTranscriptSpeakers, groupTranscriptByTurn } from '../../../lib/services/transcription-pilot/transcript-format';
 import { MAX_TRANSCRIPTION_BYTES as MAX_AUDIO_BYTES, MAX_TRANSCRIPTION_MIB } from '../../../lib/services/transcription-pilot/limits';
 
@@ -2693,30 +2695,30 @@ const SUMMARY_BLOCK_COPY = Object.freeze({
   }),
 });
 
-// One acknowledgment and one button for both kinds (plan D6, D9); kinds that already have a draft or a current
-// published summary are left to their own rerun action.
-function PairedSummarizeForm({ t }) {
-  const kinds = t.pairedSummaryKinds;
-  const running = t.busy === 'summarize';
-  const label = kinds.length === 2 ? 'Summarize presentation and discussion'
+// One acknowledgment and one confirm button for both kinds (plan D6, D9). It opens under the row whose action asked
+// for it, so consent is given at the moment a summary is requested rather than kept on screen (redesign §4).
+function summarizeLabel(kinds) {
+  return kinds.length === 2 ? 'Summarize presentation and discussion'
     : kinds[0] === 'discussion' ? 'Summarize staff discussion' : 'Summarize presentation';
+}
+function SummarizeConfirm({ t, kinds, onClose }) {
   return (
-    <div className="mt-4" data-testid="paired-summary-form">
+    <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3" data-testid="paired-summary-form">
       <label htmlFor="paired-summary-ack" className="flex items-start gap-2 text-sm leading-6 text-gray-900">
         <input id="paired-summary-ack" type="checkbox" className="mt-1.5" checked={t.summaryAck} disabled={Boolean(t.busy)}
           onChange={(event) => t.setSummaryAck(event.target.checked)} />
         <span>{PAIRED_SUMMARY_ACKNOWLEDGMENT.text}</span>
       </label>
-      {(kinds.length > 0 || running) && (
-        <button type="button" onClick={() => void t.summarizeKinds(kinds)} disabled={Boolean(t.busy) || !t.summaryAck || !kinds.length}
-          className={`mt-2 ${BTN_PRIMARY}`}>{running ? 'Summarizing…' : label}</button>
-      )}
-      {running && <p className="mt-1 text-xs text-gray-600" aria-live="polite">This can take a few minutes. Keep this page open.</p>}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => { onClose(); void t.summarizeKinds(kinds); }} disabled={Boolean(t.busy) || !t.summaryAck || !kinds.length}
+          className={BTN_PRIMARY}>{summarizeLabel(kinds)}</button>
+        <button type="button" onClick={() => { t.setSummaryAck(false); onClose(); }} disabled={Boolean(t.busy)} className={BTN}>Cancel</button>
+      </div>
     </div>
   );
 }
 
-function SummaryBlock({ t, s, kind = 'presentation', materials = [] }) {
+function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = null, setRequest = () => {} }) {
   const copy = SUMMARY_BLOCK_COPY[kind];
   const busyKeys = SUMMARY_KIND_UI[kind].busy;
   const artifact = t.collection?.currentArtifact;
@@ -2758,24 +2760,50 @@ function SummaryBlock({ t, s, kind = 'presentation', materials = [] }) {
               : s.summaryReadState === 'not_needed' && !artifact ? 'Summary status cannot be checked until transcript status is available.'
                 : 'Summary status has not been checked.';
   // Per-kind rerun, offered for a stuck 'publishing' draft too: the server retires it only when no publish holds it.
-  // It sends one POST through the paired handler and uses the shared acknowledgment at the top of step 3.
+  // It sends one POST through the paired handler, after the consent in SummarizeConfirm.
   const againLabel = draft ? 'Replace draft with a new summary'
     : failed || runAbandoned ? 'Try again'
       : ['bound', 'stale'].includes(published?.state) ? 'Summarize again' : null;
-  const againForm = kindReady && summaryCurrent && !s.summaryConflict && !notRecorded && againLabel && !(generatingRun && !runAbandoned) && (
-    <button type="button" onClick={() => void t.summarizeKinds([kind])} disabled={Boolean(t.busy) || !t.summaryAck}
-      className={`mt-3 ${BTN}`}>{againLabel}</button>
-  );
+  const againAllowed = kindReady && summaryCurrent && !s.summaryConflict && !notRecorded && againLabel && !(generatingRun && !runAbandoned);
+  // The paired request (every eligible kind) is offered once: on the presentation row, or on the discussion row when
+  // only the discussion is eligible. A per-kind rerun stays available beside it: inline when the summary failed, was
+  // abandoned or is out of date, otherwise in the row menu.
+  const paired = t.collection?.currentArtifact?.presentationTranscript?.state === 'bound' ? t.pairedSummaryKinds : [];
+  const pairedHere = paired.length > 0 && paired[0] === kind;
+  const pairedSingleHere = pairedHere && paired.length === 1;
+  const open = (kinds) => { t.setSummaryAck(false); setRequest({ kinds, anchor: kind }); };
+  const rerunInline = !pairedHere && againAllowed && !draft && (failed || runAbandoned || published?.state === 'stale');
+  const rerunInMenu = againAllowed && !pairedSingleHere && !rerunInline;
+  const pairedLabel = paired.length === 2 ? 'Summarize both' : againLabel === 'Try again' ? 'Try again' : ['bound', 'stale'].includes(published?.state) ? 'Summarize again' : 'Summarize';
+  const action = pairedHere
+    ? <button type="button" onClick={() => open(paired)} disabled={Boolean(t.busy)} className={BTN}>{pairedLabel}</button>
+    : rerunInline
+      ? <button type="button" onClick={() => open([kind])} disabled={Boolean(t.busy)} className={BTN}>{againLabel}</button>
+      : null;
+  const menuItems = rerunInMenu ? [{ key: 'again', label: againLabel, disabled: Boolean(t.busy), onSelect: () => open([kind]) }] : [];
+  const status = notRecorded ? { tone: 'gray', label: 'Not recorded' }
+    : s.summarizing || (generatingRun && !runAbandoned && summaryCurrent) ? { tone: 'gray', label: 'Summarizing…' }
+      : !summaryStatusCurrent && s.summaryReadState === 'loading' ? { tone: 'gray', label: 'Checking…' }
+        : published?.state === 'bound' && summaryStatusCurrent ? { tone: 'green', label: 'Published' }
+          : published?.state === 'stale' && summaryStatusCurrent ? { tone: 'amber', label: 'Out of date' }
+            : published?.state === 'not_confirmed' && published?.artifactId && summaryStatusCurrent ? { tone: 'amber', label: 'Not confirmed' }
+              : draft ? { tone: 'blue', label: 'Draft ready' }
+                : failed || runAbandoned ? { tone: 'amber', label: 'Did not finish' }
+                  : publishedLine === copy.none ? { tone: 'gray', label: 'Not made yet' }
+                    : { tone: 'gray', label: 'Status unknown' };
+  const detail = published?.state === 'bound' && summaryStatusCurrent ? fmtDateTime(published.publishedAt) : null;
+  // The published state carries its meaning in the chip and the group heading; only the other states keep a sentence.
+  const note = notRecorded ? 'Nothing was recorded after the presentation ended.'
+    : ['Published', 'Not made yet', 'Summarizing…', 'Draft ready'].includes(status.label) ? null
+      : publishedLine;
   return (
-    <div className="mt-4 border-t border-gray-100 pt-4" data-testid={copy.testId}>
-      <h4 className="text-sm font-semibold text-gray-950">{copy.title}</h4>
-      <p className="mt-1 text-sm leading-6 text-gray-900">{notRecorded ? 'Not recorded. No staff discussion was recorded after the presentation ended.' : publishedLine}</p>
-      {s.summarizing && <p className="mt-1 text-sm text-gray-800" aria-live="polite">Summarizing… This can take a few minutes. Keep this page open.</p>}
+    <ArtifactRow name={copy.title} href={summaryUrl} status={status} detail={detail} action={action} menuItems={menuItems} testId={copy.testId}>
+      {note && <p className="mt-1 text-sm leading-6 text-gray-700">{note}</p>}
+      {s.summarizing && <p className="mt-1 text-sm text-gray-800" aria-live="polite">This can take a few minutes. Keep this page open.</p>}
       {!s.summarizing && generatingRun && summaryCurrent && (runAbandoned
         ? <p className="mt-1 text-sm text-gray-700">The summary started {fmtDateTime(generatingRun.createdAt)} did not finish.</p>
         : <div className="mt-1 text-sm text-gray-800" aria-live="polite"><p>Summarizing… started {fmtDateTime(generatingRun.createdAt)}.</p>
           <button type="button" onClick={() => void s.loadSummary()} disabled={Boolean(t.busy) || s.summaryReadState === 'loading'} className={`mt-2 ${BTN}`}>Check again</button></div>)}
-      {summaryUrl && <a className={`mt-2 inline-flex ${BTN}`} href={summaryUrl} target="_blank" rel="noopener noreferrer">Open published summary</a>}
       {s.summaryReadState === 'unavailable' && s.wantsSummary && <button type="button" onClick={() => void s.loadSummary()} disabled={Boolean(t.busy)} className={`mt-2 ${BTN}`}>Check again</button>}
       {kind === 'presentation' && compactSummaryStatusUnknown && <button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.loading ? 'Refreshing…' : 'Refresh transcription status'}</button>}
       {s.summaryReadState === 'unavailable' && <p className="mt-1 text-sm text-amber-900">Current summary status is unavailable. Any published file shown above reflects the latest material list.</p>}
@@ -2797,6 +2825,7 @@ function SummaryBlock({ t, s, kind = 'presentation', materials = [] }) {
             ? <div className="mt-1 text-sm text-gray-700"><p>Confirm where the presentation ends before generating the presentation transcript and summary.</p><button type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.savedDraft ? 'Continue editing presentation end' : 'Set end to enable summary'}</button></div>
             : <p className="mt-1 text-sm text-gray-700">Generate the presentation transcript before summarizing it.</p>)}
       {failed && <p className="mt-1 text-sm text-gray-700">The last summary attempt did not produce a draft.</p>}
+      {request?.anchor === kind && <SummarizeConfirm t={t} kinds={request.kinds} onClose={() => setRequest(null)} />}
       {s.summaryConflict && (
         <div className="mt-3" data-testid="summary-draft-conflict">
           <Notice tone="warning">This draft is no longer current. Your edits are preserved below, but they are not a current server draft. Load latest to replace these edits with the current server state.</Notice>
@@ -2839,10 +2868,9 @@ function SummaryBlock({ t, s, kind = 'presentation', materials = [] }) {
           </div>
         </div>
       )}
-      {againForm}
       {s.summaryError && <div className="mt-3"><Notice>{s.summaryError}</Notice></div>}
       {s.summaryNotice && <div className="mt-3"><Notice tone="success">{s.summaryNotice}</Notice></div>}
-    </div>
+    </ArtifactRow>
   );
 }
 
@@ -3008,18 +3036,18 @@ function Step({ number, title, state, action, testId, children }) {
   );
 }
 
-function DerivativeLine({ state, label, boundText, material }) {
+// A presentation or staff discussion transcript cut from the published transcript at the confirmed end.
+const DERIVATIVE_STATUS = Object.freeze({
+  bound: { tone: 'green', label: 'Ready' },
+  stale: { tone: 'amber', label: 'Out of date' },
+  missing: { tone: 'gray', label: 'Not made yet' },
+});
+function DerivativeRow({ state, label, material, testId }) {
   const url = state === 'bound' && material ? safeMaterialUrl(material) : null;
-  const text = state === 'bound' ? boundText
-    : state === 'stale' ? `${label} is out of date. Generate it again in step 2.`
-      : state === 'missing' ? `${label} not generated yet.`
-        : `${label} not available yet.`;
-  return (
-    <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-      <p className="text-sm text-gray-900">{text}</p>
-      {url && <a className={BTN} href={url} target="_blank" rel="noopener noreferrer">Open</a>}
-    </div>
-  );
+  const status = DERIVATIVE_STATUS[state] || { tone: 'gray', label: 'Not available' };
+  const detail = state === 'bound' ? fmtDateTime(material?.createdAt)
+    : state === 'stale' || state === 'missing' ? 'Generate it in step 2' : null;
+  return <ArtifactRow name={label} href={url} status={status} detail={detail} testId={testId} />;
 }
 
 // Stage 4 slice 5: the Video line under Presentation. Hidden when the feature is off for this request. Staff only; ids
@@ -3116,10 +3144,8 @@ function PresentationVideoLine({ requestId, revisionKey = '' }) {
 
   if (!loaded && loadFailed) {
     return (
-      <div className="mt-3" data-testid="presentation-video-line">
-        <p className="text-sm leading-6 text-gray-900"><span className="font-medium">Video:</span> Couldn’t load the video status.</p>
-        <button type="button" onClick={() => void load()} className={`mt-1 ${BTN}`}>Retry</button>
-      </div>
+      <ArtifactRow name="Presentation video" status={{ tone: 'gray', label: 'Not loaded' }} detail="Couldn’t load the video status." testId="presentation-video-line"
+        action={<button type="button" onClick={() => void load()} className={BTN}>Retry</button>} />
     );
   }
   if (!available) return null;
@@ -3129,26 +3155,32 @@ function PresentationVideoLine({ requestId, revisionKey = '' }) {
   const canCreate = !processing;
   // An approved video the Board no longer serves (transcript, end or recording changed since) is out of date.
   const boardStale = state === 'approved' && newest.boardReady === false;
-  let status = 'Not started';
-  if (state === 'queued' || state === 'cutting' || state === 'uploading') status = 'Working…';
-  else if (state === 'review') status = 'Ready to check';
-  else if (state === 'registering') status = 'Approving…';
-  else if (state === 'approved') status = boardStale ? 'Out of date' : newest.boardReady === true ? 'Approved for the Board' : 'Approved';
-  else if (state === 'superseded') status = 'Out of date';
-  else if (state === 'failed') status = 'Failed';
+  let status = { tone: 'gray', label: 'Not made yet' };
+  if (state === 'queued' || state === 'cutting' || state === 'uploading') status = { tone: 'gray', label: 'Working…' };
+  else if (state === 'review') status = { tone: 'blue', label: 'Ready to check' };
+  else if (state === 'registering') status = { tone: 'gray', label: 'Approving…' };
+  else if (state === 'approved') status = boardStale ? { tone: 'amber', label: 'Out of date' } : { tone: 'green', label: 'Approved' };
+  else if (state === 'superseded') status = { tone: 'amber', label: 'Out of date' };
+  else if (state === 'failed') status = { tone: 'red', label: 'Failed' };
+  const current = state === 'review' || (state === 'approved' && !boardStale);
+  // A current video is replaced from the menu (behind a confirmation); anything else offers creation inline.
+  const createLabel = state === 'review' ? 'Create it again' : 'Create presentation video';
+  const startCreate = () => (current ? setConfirming('recreate') : void create());
+  const action = state === 'review'
+    ? <button type="button" onClick={() => setConfirming('approve')} disabled={busy} className={BTN}>Check the ending and approve</button>
+    : state === 'registering'
+      ? <button type="button" onClick={() => void approve()} disabled={busy} className={BTN}>{busy ? 'Working…' : 'Finish approving'}</button>
+      : canCreate && !current
+        ? <button type="button" onClick={startCreate} disabled={busy} className={BTN}>{busy ? 'Working…' : createLabel}</button>
+        : null;
+  const menuItems = canCreate && current ? [{ key: 'recreate', label: createLabel, disabled: busy, onSelect: startCreate }] : [];
+  const detail = state === 'approved' && newest.boardReady == null ? 'Couldn’t check the Board status.' : null;
   return (
-    <div className="mt-3" data-testid="presentation-video-line" aria-live="polite">
-      <p className="text-sm leading-6 text-gray-900"><span className="font-medium">Video:</span> {status}</p>
-      {loadFailed && <p className="text-xs text-gray-700">Couldn’t refresh the video status. Retrying…</p>}
-      {boardStale && <p className="text-xs text-gray-700">{PV_STALE_TEXT}</p>}
-      {state === 'approved' && newest.boardReady == null && <p className="text-xs text-gray-700">Couldn’t check the Board status.</p>}
-      {state === 'superseded' && <p className="text-xs text-gray-700">{PV_STALE_TEXT}</p>}
-      {state === 'failed' && <p className="text-xs text-gray-700">{PV_REASON_TEXT(newest.failureCode)}</p>}
-      <div className="mt-1 flex flex-wrap items-center gap-2">
-        {(state === 'review' || (state === 'approved' && !boardStale)) && <a className={BTN} href={openHref} target="_blank" rel="noreferrer">Open video</a>}
-        {state === 'review' && <button type="button" onClick={() => setConfirming('approve')} disabled={busy} className={BTN_PRIMARY}>Check the ending and approve</button>}
-        {state === 'registering' && <button type="button" onClick={() => void approve()} disabled={busy} className={BTN_PRIMARY}>{busy ? 'Working…' : 'Finish approving'}</button>}
-        {canCreate && <button type="button" onClick={() => ((state === 'approved' && !boardStale) || state === 'review' ? setConfirming('recreate') : void create())} disabled={busy} className={BTN}>{busy ? 'Working…' : (state === 'review' ? 'Create it again' : 'Create presentation video')}</button>}
+    <ArtifactRow name="Presentation video" href={current ? openHref : null} status={status} detail={detail} action={action} menuItems={menuItems} testId="presentation-video-line">
+      <div aria-live="polite">
+        {loadFailed && <p className="mt-1 text-xs text-gray-700">Couldn’t refresh the video status. Retrying…</p>}
+        {(boardStale || state === 'superseded') && <p className="mt-1 text-sm text-gray-700">{PV_STALE_TEXT}</p>}
+        {state === 'failed' && <p className="mt-1 text-sm text-gray-700">{PV_REASON_TEXT(newest.failureCode)}</p>}
       </div>
       {confirming === 'approve' && (
         <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="alertdialog" aria-label="Approve the presentation video">
@@ -3169,13 +3201,14 @@ function PresentationVideoLine({ requestId, revisionKey = '' }) {
         </div>
       )}
       {message && <div className="mt-2"><Notice tone={message.tone}>{message.text}</Notice></div>}
-    </div>
+    </ArtifactRow>
   );
 }
 
 function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef }) {
   const [step1Open, setStep1Open] = useState(false);
   const [uploadInstead, setUploadInstead] = useState(false);
+  const [summarizeRequest, setSummarizeRequest] = useState(null); // { kinds, anchor } while a Summarize confirmation is open
   const materials = m.data?.materials || [];
   const byType = (type) => materials.find((item) => Number(item.artifactType) === type) || null;
   const material = byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT);
@@ -3315,35 +3348,41 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef }) {
 
       <Step number={3} title="Results" state={step3State} testId="step-results">
         {step3State === 'waiting' && <p className="mt-2 text-sm text-gray-700">The presentation and staff discussion transcripts and their summaries appear here after step 2.</p>}
-        {showProducts && <>
-        {boundaryState === 'bound' && <PairedSummarizeForm t={t} />}
-        <div className="mt-4">
-          <h4 className="text-sm font-semibold text-gray-950">Presentation</h4>
-          <p className="text-xs text-gray-600">Eligible for the Board page.</p>
-          <DerivativeLine state={boundaryState} label="Presentation transcript" boundText="Presentation transcript ready for the Board link." material={presentationMaterial} />
-          <SummaryBlock t={t} s={t.presentationSummary} materials={materials} />
-          <PresentationVideoLine requestId={requestId} revisionKey={`${artifact?.id || ''}:${artifact?.fingerprint || ''}:${artifact?.presentationEnd?.endMs ?? ''}`} />
-        </div>
-        <div className="mt-5 border-t border-gray-200 pt-4">
-          <h4 className="text-sm font-semibold text-gray-950">Staff discussion</h4>
-          <p className="text-xs text-gray-600">Staff only. Never included on the Board page.</p>
-          <DerivativeLine state={discussionState} label="Staff discussion transcript" boundText="Staff discussion transcript saved for staff." material={discussionMaterial} />
-          <SummaryBlock t={t} s={t.discussionSummary} kind="discussion" materials={materials} />
-        </div>
-        </>}
-        {(material || recordingUrl) && <div className="mt-5 border-t border-gray-200 pt-4">
-          <h4 className="text-sm font-semibold text-gray-950">Full meeting</h4>
-          <p className="text-xs text-gray-600">Staff only.</p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            {recordingUrl && <a className={BTN} href={recordingUrl} target="_blank" rel="noopener noreferrer">Open recording</a>}
-            {generated && artifact && <>
-              <a className={BTN} href={`${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=txt`}>Download TXT</a>
-              <a className={BTN} href={`${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=vtt`}>Download VTT</a>
-            </>}
-            {!generated && openUrl && <a className={BTN} href={openUrl} target="_blank" rel="noopener noreferrer">Open transcript</a>}
-          </div>
-        </div>}
-        <PresentationLinkBlock m={m} />
+        <section className="mt-4" aria-labelledby="results-board-heading">
+          <BoardPageHeading m={m} />
+          {showProducts && (
+            <ul className="mt-1 divide-y divide-gray-100 border-t border-gray-200">
+              <DerivativeRow state={boundaryState} label="Presentation transcript" material={presentationMaterial} testId="presentation-transcript-row" />
+              <SummaryBlock t={t} s={t.presentationSummary} materials={materials} request={summarizeRequest} setRequest={setSummarizeRequest} />
+              <PresentationVideoLine requestId={requestId} revisionKey={`${artifact?.id || ''}:${artifact?.fingerprint || ''}:${artifact?.presentationEnd?.endMs ?? ''}`} />
+            </ul>
+          )}
+        </section>
+        {(showProducts || material || recordingUrl) && (
+          <section className="mt-6" aria-labelledby="results-staff-heading">
+            <h4 id="results-staff-heading" className="text-sm font-semibold text-gray-950">Staff only</h4>
+            <ul className="mt-1 divide-y divide-gray-100 border-t border-gray-200">
+              {showProducts && <>
+                <DerivativeRow state={discussionState} label="Staff discussion transcript" material={discussionMaterial} testId="discussion-transcript-row" />
+                <SummaryBlock t={t} s={t.discussionSummary} kind="discussion" materials={materials} request={summarizeRequest} setRequest={setSummarizeRequest} />
+              </>}
+              {recordingUrl && (
+                <ArtifactRow name="Full meeting recording" href={recordingUrl} testId="full-recording-row"
+                  status={{ tone: 'gray', label: recording.backing === 'external' ? 'Zoom link' : 'Saved' }}
+                  detail={fmtDateTime(recording.createdAt)} />
+              )}
+              {material && (
+                <ArtifactRow name="Full meeting transcript" href={openUrl} testId="full-transcript-row"
+                  status={generated ? { tone: 'green', label: 'Published' } : { tone: 'gray', label: 'Uploaded' }}
+                  detail={fmtDateTime(material.createdAt)}
+                  menuItems={generated && artifact ? [
+                    { key: 'txt', label: 'Download TXT', href: `${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=txt`, download: true },
+                    { key: 'vtt', label: 'Download VTT', href: `${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=vtt`, download: true },
+                  ] : []} />
+              )}
+            </ul>
+          </section>
+        )}
       </Step>
       <EarlierRuns t={t} />
     </div>
@@ -3427,41 +3466,39 @@ function RecordingBlock({ m, z }) {
   );
 }
 
-function PresentationLinkBlock({ m }) {
+// The "Board page" group heading: what the Board link shows sits directly under it (redesign §4). The raw URL is
+// never printed; it appears only in the manual-copy field when the clipboard is unavailable.
+function BoardPageHeading({ m }) {
   const { link, linkBusy, linkError, linkCopied, manualCopy, confirmReissue } = m;
+  const expires = link?.expiresAt ? new Date(link.expiresAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : null;
   return (
-    <section className="mt-5 border-t border-gray-200 pt-4" data-testid="presentation-link-controls">
-      <h4 className="text-sm font-semibold text-gray-950">Board presentation link</h4>
-      <p className="mt-1 text-xs text-gray-600">This materials-only link does not send email or change recipients.</p>
-      <p className="mt-1 text-xs text-gray-600">The Board page can include applicant materials and current presentation transcript and summary. It excludes the full recording and staff discussion.</p>
-      {!link && <Button type="button" size="sm" className="mt-3" loading={linkBusy} disabled={linkBusy} onClick={() => m.mutateLink('ensure')}>Generate link</Button>}
-      {link && (
-        <>
-          {link.url ? (
-            <>
-              <p className="mt-3 truncate font-mono text-xs text-gray-500" title={link.url}>{link.url}</p>
-              <a className="mt-2 inline-flex text-sm font-semibold text-blue-800 underline" href={link.url} target="_blank" rel="noopener noreferrer">Open Board page</a>
-              {manualCopy && <input aria-label="Presentation link for manual copy" readOnly value={link.url} onFocus={(event) => event.currentTarget.select()} className="mt-2 w-full rounded border border-gray-300 p-2 font-mono text-xs" />}
-              <p className="mt-1 text-xs text-gray-500">Expires {new Date(link.expiresAt).toLocaleDateString()}.</p>
-            </>
-          ) : <p className="mt-2 text-sm text-amber-800">The current link cannot be read. Issue a new link to replace it.</p>}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {link.url && <Button type="button" size="sm" variant="outline" onClick={m.copyLink}>{linkCopied ? 'Copied' : 'Copy link'}</Button>}
-            {!confirmReissue && <Button type="button" size="sm" variant="outline" disabled={linkBusy} onClick={() => m.setConfirmReissue(true)}>Issue new link</Button>}
+    <div data-testid="presentation-link-controls">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <h4 id="results-board-heading" className="text-sm font-semibold text-gray-950">Board page</h4>
+        {link?.url && expires && <span className="text-xs text-gray-600">Link expires {expires}</span>}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {!link && <Button type="button" size="sm" variant="outline" loading={linkBusy} disabled={linkBusy} onClick={() => m.mutateLink('ensure')}>Generate link</Button>}
+          {link?.url && <Button type="button" size="sm" variant="outline" onClick={m.copyLink}>{linkCopied ? 'Copied' : 'Copy link'}</Button>}
+          {link?.url && <a className={BTN} href={link.url} target="_blank" rel="noopener noreferrer">Open Board page</a>}
+          {link && <OverflowMenu label="More actions for the Board link" items={[
+            { key: 'reissue', label: 'Issue new link', disabled: linkBusy || confirmReissue, onSelect: () => m.setConfirmReissue(true) },
+          ]} />}
+        </div>
+      </div>
+      <p className="mt-1 text-xs text-gray-600">Shows the applicant materials and the presentation items below, never the full recording or the staff discussion. Making or copying the link sends no email.</p>
+      {link && !link.url && <p className="mt-2 text-sm text-amber-800">The current link cannot be read. Issue a new link to replace it.</p>}
+      {manualCopy && link?.url && <input aria-label="Presentation link for manual copy" readOnly value={link.url} onFocus={(event) => event.currentTarget.select()} className="mt-2 w-full rounded border border-gray-300 p-2 font-mono text-xs" />}
+      {confirmReissue && (
+        <div className="mt-3 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+          <p>The current presentation link will stop working immediately.</p>
+          <div className="mt-2 flex gap-2">
+            <Button type="button" size="sm" loading={linkBusy} disabled={linkBusy} onClick={() => m.mutateLink('reissue')}>Issue new link</Button>
+            <Button type="button" size="sm" variant="outline" disabled={linkBusy} onClick={() => m.setConfirmReissue(false)}>Keep current link</Button>
           </div>
-          {confirmReissue && (
-            <div className="mt-3 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-              <p>The current presentation link will stop working immediately.</p>
-              <div className="mt-2 flex gap-2">
-                <Button type="button" size="sm" loading={linkBusy} disabled={linkBusy} onClick={() => m.mutateLink('reissue')}>Issue new link</Button>
-                <Button type="button" size="sm" variant="outline" disabled={linkBusy} onClick={() => m.setConfirmReissue(false)}>Keep current link</Button>
-              </div>
-            </div>
-          )}
-        </>
+        </div>
       )}
       {linkError && <p role="alert" className="mt-2 text-sm text-red-700">{linkError}</p>}
-    </section>
+    </div>
   );
 }
 

@@ -71,6 +71,19 @@ function route(state, handlers = {}) {
   });
 }
 
+// Results rows (Site Visit redesign §4): each artifact is a row whose status chip and name carry what prose used to.
+const row = (testId) => screen.getByTestId(testId);
+const findRow = (testId) => screen.findByTestId(testId);
+function openRowMenu(rowElement) {
+  fireEvent.click(within(rowElement).getByRole('button', { name: /^More actions for/ }));
+}
+// The consent checkbox lives in the confirmation a Summarize action opens, not on the page.
+async function openSummarize(name, scopeElement = null) {
+  const scope = scopeElement ? within(scopeElement) : screen;
+  fireEvent.click(await scope.findByRole('button', { name }));
+  return screen.getByLabelText(/may be sent to Anthropic/);
+}
+
 test('the visit fragment scrolls to the card once after it mounts', async () => {
   const scrollIntoView = jest.fn();
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView });
@@ -145,8 +158,10 @@ test('an existing Board page can be opened and its included and excluded materia
   });
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
   expect(await screen.findByRole('link', { name: 'Open Board page' })).toHaveAttribute('href', 'https://example.test/external/presentation/token');
-  expect(screen.getByText(/can include applicant materials and current presentation transcript and summary/)).toBeInTheDocument();
-  expect(screen.getByText(/excludes the full recording and staff discussion/)).toBeInTheDocument();
+  expect(screen.getByText(/Shows the applicant materials and the presentation items below/)).toBeInTheDocument();
+  expect(screen.getByText(/never the full recording or the staff discussion/)).toBeInTheDocument();
+  // The raw link is never printed; it is reached through Open and Copy.
+  expect(screen.queryByText('https://example.test/external/presentation/token')).toBeNull();
   expect(global.fetch.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false);
 });
 
@@ -579,7 +594,7 @@ describe('presentation end', () => {
     expect(await screen.findByText(`Presentation ends at 01:02 · confirmed ${shortDate(CONFIRMED_AT)}`)).toBeInTheDocument();
     expect(screen.getByText('The Board link shows no transcript until the presentation transcript is generated.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Generate presentation and discussion transcripts' }));
-    await waitFor(() => expect(screen.getByText('Presentation transcript ready for the Board link.')).toBeInTheDocument());
+    await waitFor(() => expect(row('presentation-transcript-row')).toHaveTextContent('Ready'));
     expect(postBody).toEqual({ expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: 'e'.repeat(64) });
     expect(screen.queryByRole('button', { name: 'Generate presentation and discussion transcripts' })).not.toBeInTheDocument();
   });
@@ -587,7 +602,7 @@ describe('presentation end', () => {
   test('confirmed and bound shows the ready line and no Generate button', async () => {
     route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    expect(await screen.findByText('Presentation transcript ready for the Board link.')).toBeInTheDocument();
+    expect(await findRow('presentation-transcript-row')).toHaveTextContent('Ready');
     expect(screen.queryByRole('button', { name: 'Generate presentation and discussion transcripts' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Set presentation end' })).not.toBeInTheDocument();
   });
@@ -645,14 +660,15 @@ describe('presentation end', () => {
   test('both halves bound shows both ready lines; a missing discussion alone shows an info notice and Generate', async () => {
     route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
     const view = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    expect(await screen.findByText('Staff discussion transcript saved for staff.')).toBeInTheDocument();
+    expect(await findRow('discussion-transcript-row')).toHaveTextContent('Ready');
     expect(screen.queryByRole('button', { name: 'Generate presentation and discussion transcripts' })).not.toBeInTheDocument();
     view.unmount();
     route({ materials: [transcriptRow()], collection: collection({ jobs: [],
       currentArtifact: boundaryArtifact({ staffDiscussionTranscript: { state: 'missing', artifactId: null } }) }), detail: detailFor({}) });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     expect(await screen.findByText('The staff discussion transcript for this presentation end has not been generated.')).toBeInTheDocument();
-    expect(screen.getByText('Presentation transcript ready for the Board link.')).toBeInTheDocument();
+    expect(row('presentation-transcript-row')).toHaveTextContent('Ready');
+    expect(row('discussion-transcript-row')).toHaveTextContent('Not made yet');
     expect(screen.queryByText('The Board link shows no transcript until the presentation transcript is generated.')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Generate presentation and discussion transcripts' })).toBeInTheDocument();
   });
@@ -740,11 +756,14 @@ describe('presentation summary', () => {
       return original(url, options);
     })(global.fetch.getMockImplementation()));
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    const button = await screen.findByRole('button', { name: 'Summarize presentation and discussion' });
+    await waitFor(() => expect(row('presentation-summary-block')).toHaveTextContent('Not made yet'));
+    expect(row('discussion-summary-block')).toHaveTextContent('Not made yet');
+    // One paired action, on the presentation row only.
+    expect(within(row('discussion-summary-block')).queryByRole('button', { name: 'Summarize both' })).toBeNull();
+    const ack = await openSummarize('Summarize both', row('presentation-summary-block'));
+    const button = screen.getByRole('button', { name: 'Summarize presentation and discussion' });
     expect(button).toBeDisabled();
-    expect(screen.getByText('No summary published yet.')).toBeInTheDocument();
-    expect(screen.getByText('No discussion summary published yet.')).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText(/may be sent to Anthropic/));
+    fireEvent.click(ack);
     expect(button).not.toBeDisabled();
     fireEvent.click(button);
     expect(await screen.findByLabelText(/^Draft/)).toHaveValue('What was presented\nQuantum dots.');
@@ -753,7 +772,10 @@ describe('presentation summary', () => {
     expect(postBodies).toHaveLength(2);
     expect(postBodies).toEqual(expect.arrayContaining([expected, { ...expected, kind: 'discussion' }]));
     expect(screen.getByText(/Slide text was not included/)).toBeInTheDocument();
-    // The acknowledgment is per request: it is cleared after a run.
+    // The acknowledgment is per request: the confirmation closes on the run, and reopening it starts unchecked.
+    expect(screen.queryByLabelText(/may be sent to Anthropic/)).toBeNull();
+    openRowMenu(row('presentation-summary-block'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Replace draft with a new summary' }));
     expect(screen.getByLabelText(/may be sent to Anthropic/)).not.toBeChecked();
   });
 
@@ -775,8 +797,10 @@ describe('presentation summary', () => {
     })(global.fetch.getMockImplementation()));
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     expect(await screen.findByLabelText(/^Draft/)).toHaveValue('What was presented\nQuantum dots.');
+    openRowMenu(row('presentation-summary-block'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Replace draft with a new summary' }));
     fireEvent.click(screen.getByLabelText(/may be sent to Anthropic/));
-    fireEvent.click(screen.getByRole('button', { name: 'Replace draft with a new summary' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Summarize presentation' }));
     expect(await screen.findByText(/A newer draft was saved elsewhere, so nothing was replaced/)).toBeInTheDocument();
     expect(postBody).toEqual({ acknowledgmentVersion: ACK, expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: 'e'.repeat(64),
       replaceDraft: { draftId: DRAFT_ID, expectedVersion: 2 } });
@@ -795,7 +819,7 @@ describe('presentation summary', () => {
       '/summary-draft': { method: 'GET', respond: () => response(summaryState({ transcriptSummary: published, slidesChangedSinceSummary: null })) },
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    expect(await screen.findByText(/Available to staff and eligible for the Board link/)).toBeInTheDocument();
+    await waitFor(() => expect(row('presentation-summary-block')).toHaveTextContent(`Published${shortDate(CONFIRMED_AT)}`));
     expect(screen.queryByTestId('summary-slides-changed')).toBeNull();
   });
 
@@ -807,9 +831,10 @@ describe('presentation summary', () => {
       '/summary-draft': { method: 'GET', respond: () => response(summaryState({ transcriptSummary: published })) },
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    expect(await screen.findByRole('link', { name: 'Open published summary' })).toHaveAttribute('href', summaryMaterial.webUrl);
-    // The link comes from the material list; the status line waits for the summary read.
-    expect(await screen.findByText(/Available to staff and eligible for the Board link/)).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Presentation summary' })).toHaveAttribute('href', summaryMaterial.webUrl);
+    // The link comes from the material list; the status waits for the summary read.
+    await waitFor(() => expect(row('presentation-summary-block')).toHaveTextContent(`Published${shortDate(CONFIRMED_AT)}`));
+    expect(within(row('presentation-summary-block')).queryByRole('link', { name: /^Open/ })).toBeNull();
   });
 
   test('a draft from an earlier transcript version cannot be published', async () => {
@@ -939,7 +964,7 @@ describe('presentation summary', () => {
       presentationTranscript: { state: 'missing', artifactId: null }, transcriptSummary: notPublished,
     }) }), detail: detailFor({}) });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    expect(await screen.findByText('No summary published yet.')).toBeInTheDocument();
+    expect(await findRow('presentation-summary-block')).toHaveTextContent('Not made yet');
     expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/summary-draft'))).toBe(false);
   });
 
@@ -990,7 +1015,7 @@ describe('presentation summary', () => {
     expect(await screen.findByTestId('summary-draft-conflict')).toHaveTextContent('This draft is no longer current.');
     expect(screen.getByLabelText('Preserved unsaved edits')).toHaveValue('Recover this edit');
     expect(screen.queryByLabelText(/^Draft/)).toBeNull();
-    expect(screen.getByText('No summary published yet.')).toBeInTheDocument();
+    expect(row('presentation-summary-block')).toHaveTextContent('Not made yet');
     expect(summaryReads).toBe(1);
   });
 
@@ -1043,8 +1068,9 @@ describe('presentation summary', () => {
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     expect(await screen.findByText(/A summary artifact exists. Its eligibility for the Board link is not confirmed/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open published summary' })).toHaveAttribute('href', summaryMaterial.webUrl);
-    expect(screen.queryByText('No summary published yet.')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Presentation summary' })).toHaveAttribute('href', summaryMaterial.webUrl);
+    expect(row('presentation-summary-block')).toHaveTextContent('Not confirmed');
+    expect(row('presentation-summary-block')).not.toHaveTextContent('Not made yet');
   });
 
   test('an older background summary GET cannot restore a stale draft version after saving local edits', async () => {
@@ -1188,8 +1214,8 @@ describe('presentation summary', () => {
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Publish summary' }));
-    expect(await screen.findByText(/Available to staff and eligible for the Board link/)).toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: 'Open published summary' })).toHaveAttribute('href', summaryMaterial.webUrl);
+    await waitFor(() => expect(row('presentation-summary-block')).toHaveTextContent(`Published${shortDate(CONFIRMED_AT)}`));
+    expect(await screen.findByRole('link', { name: 'Presentation summary' })).toHaveAttribute('href', summaryMaterial.webUrl);
     expect(screen.getByTestId('presentation-summary-block')).not.toHaveTextContent('The published summary is from an earlier transcript version');
     expect(screen.getAllByRole('alert').some((node) => node.textContent.includes('Response was lost after publish.'))).toBe(true);
     expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/transcriptions'))).toHaveLength(2);
@@ -1206,7 +1232,8 @@ describe('presentation summary', () => {
     expect(screen.getByRole('button', { name: 'Publish summary' })).not.toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Save draft' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Discard draft' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Replace draft with a new summary' })).toBeDisabled();
+    openRowMenu(row('presentation-summary-block'));
+    expect(screen.getByRole('menuitem', { name: 'Replace draft with a new summary' })).toBeEnabled();
   });
 
   test('an unfinished publish from an earlier transcript version can still be replaced by a new summary', async () => {
@@ -1215,8 +1242,12 @@ describe('presentation summary', () => {
     });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     expect(await screen.findByRole('button', { name: 'Publish summary' })).toBeDisabled();
+    openRowMenu(row('presentation-summary-block'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Replace draft with a new summary' }));
+    const confirm = screen.getByRole('button', { name: 'Summarize presentation' });
+    expect(confirm).toBeDisabled();
     fireEvent.click(screen.getByLabelText(/may be sent to Anthropic/));
-    expect(screen.getByRole('button', { name: 'Replace draft with a new summary' })).not.toBeDisabled();
+    expect(confirm).not.toBeDisabled();
   });
 
   test('a stale published summary remains available to staff and is withheld from the Board link', async () => {
@@ -1260,9 +1291,8 @@ describe('presentation summary', () => {
       pairedRoute({ presentation: summaryState({ draft: readyDraft(), draftMatchesTranscript: true }),
         post: (body) => { posts.push(body); return ready(body); } });
       render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-      const button = await screen.findByRole('button', { name: 'Summarize staff discussion' });
-      fireEvent.click(screen.getByLabelText(/may be sent to Anthropic/));
-      fireEvent.click(button);
+      fireEvent.click(await openSummarize('Summarize', await findRow('discussion-summary-block')));
+      fireEvent.click(screen.getByRole('button', { name: 'Summarize staff discussion' }));
       expect(await screen.findByLabelText(/^Discussion draft/)).toHaveValue('Staff discussed scope.');
       expect(posts).toEqual([expect.objectContaining({ kind: 'discussion' })]);
       expect(posts[0]).not.toHaveProperty('replaceDraft');
@@ -1286,17 +1316,17 @@ describe('presentation summary', () => {
         },
       });
       render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-      fireEvent.click(await screen.findByLabelText(/may be sent to Anthropic/));
+      fireEvent.click(await openSummarize('Summarize both', await findRow('presentation-summary-block')));
       fireEvent.click(screen.getByRole('button', { name: 'Summarize presentation and discussion' }));
       const discussionBlock = await screen.findByTestId('discussion-summary-block');
       const presentationBlock = screen.getByTestId('presentation-summary-block');
-      expect(await within(discussionBlock).findByRole('button', { name: 'Try again' })).toBeDisabled();
+      expect(await within(discussionBlock).findByRole('button', { name: 'Try again' })).toBeEnabled();
       expect(within(discussionBlock).getByText('The summary could not be generated.')).toBeInTheDocument();
       expect(within(presentationBlock).queryByRole('button', { name: 'Try again' })).toBeNull();
       expect(within(presentationBlock).getByLabelText(/^Draft/)).toHaveValue('What was presented\nQuantum dots.');
       expect(posts).toHaveLength(2);
-      fireEvent.click(screen.getByLabelText(/may be sent to Anthropic/));
-      fireEvent.click(within(discussionBlock).getByRole('button', { name: 'Try again' }));
+      fireEvent.click(await openSummarize('Try again', discussionBlock));
+      fireEvent.click(screen.getByRole('button', { name: 'Summarize staff discussion' }));
       expect(await within(discussionBlock).findByLabelText(/^Discussion draft/)).toHaveValue('Staff discussed scope.');
       expect(posts).toHaveLength(3);
       expect(posts[2]).toEqual(expect.objectContaining({ kind: 'discussion' }));
@@ -1307,7 +1337,7 @@ describe('presentation summary', () => {
       const pending = { presentation: deferred(), discussion: deferred() };
       pairedRoute({ post: (body) => pending[body.kind || 'presentation'].promise.then(() => ready(body)) });
       render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-      fireEvent.click(await screen.findByLabelText(/may be sent to Anthropic/));
+      fireEvent.click(await openSummarize('Summarize both', await findRow('presentation-summary-block')));
       fireEvent.click(screen.getByRole('button', { name: 'Summarize presentation and discussion' }));
       const editNames = screen.getByRole('button', { name: 'Edit speaker names' });
       await waitFor(() => expect(editNames).toBeDisabled());
@@ -1315,7 +1345,8 @@ describe('presentation summary', () => {
       expect(await screen.findByLabelText(/^Draft/)).toHaveValue('What was presented\nQuantum dots.');
       expect(screen.getByRole('button', { name: 'Edit speaker names' })).toBeDisabled();
       expect(screen.getByRole('button', { name: 'Publish summary' })).toBeDisabled();
-      expect(within(screen.getByTestId('discussion-summary-block')).getByText(/Summarizing… This can take a few minutes/)).toBeInTheDocument();
+      expect(screen.getByTestId('discussion-summary-block')).toHaveTextContent('Summarizing…');
+      expect(within(screen.getByTestId('discussion-summary-block')).getByText(/This can take a few minutes/)).toBeInTheDocument();
       await act(async () => { pending.discussion.resolve(); });
       expect(await screen.findByLabelText(/^Discussion draft/)).toHaveValue('Staff discussed scope.');
       await waitFor(() => expect(screen.getByRole('button', { name: 'Edit speaker names' })).not.toBeDisabled());
@@ -1328,7 +1359,9 @@ describe('presentation summary', () => {
       const discussionBlock = await screen.findByTestId('discussion-summary-block');
       expect(await within(discussionBlock).findByText(/^Summarizing… started/)).toBeInTheDocument();
       expect(within(discussionBlock).queryByRole('button', { name: 'Try again' })).toBeNull();
-      expect(await screen.findByRole('button', { name: 'Summarize presentation' })).toBeInTheDocument();
+      // Only the presentation can be summarized; its confirmation names it alone.
+      await openSummarize('Summarize', await findRow('presentation-summary-block'));
+      expect(screen.getByRole('button', { name: 'Summarize presentation' })).toBeInTheDocument();
     });
 
     test('an abandoned generating run offers Try again', async () => {
@@ -1344,10 +1377,12 @@ describe('presentation summary', () => {
         lastFailure: { code: 'staff_discussion_not_recorded', at: CONFIRMED_AT } }) });
       render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
       const discussionBlock = await screen.findByTestId('discussion-summary-block');
-      expect(await within(discussionBlock).findByText(/^Not recorded\./)).toBeInTheDocument();
+      await waitFor(() => expect(discussionBlock).toHaveTextContent('Not recorded'));
+      expect(discussionBlock).toHaveTextContent('Nothing was recorded after the presentation ended.');
       expect(within(discussionBlock).queryByText(/did not produce a draft/)).toBeNull();
       expect(within(discussionBlock).queryByRole('button')).toBeNull();
-      expect(await screen.findByRole('button', { name: 'Summarize presentation' })).toBeInTheDocument();
+      await openSummarize('Summarize', await findRow('presentation-summary-block'));
+      expect(screen.getByRole('button', { name: 'Summarize presentation' })).toBeInTheDocument();
     });
 
     test('a 422 not recorded on the paired click shows Not recorded, not an error', async () => {
@@ -1361,10 +1396,10 @@ describe('presentation summary', () => {
         },
       });
       render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-      fireEvent.click(await screen.findByLabelText(/may be sent to Anthropic/));
+      fireEvent.click(await openSummarize('Summarize both', await findRow('presentation-summary-block')));
       fireEvent.click(screen.getByRole('button', { name: 'Summarize presentation and discussion' }));
       const discussionBlock = await screen.findByTestId('discussion-summary-block');
-      expect(await within(discussionBlock).findByText(/^Not recorded\./)).toBeInTheDocument();
+      await waitFor(() => expect(discussionBlock).toHaveTextContent('Not recorded'));
       expect(within(discussionBlock).queryByText('No staff discussion was recorded after the presentation ended.')).toBeNull();
     });
 
@@ -1376,9 +1411,14 @@ describe('presentation summary', () => {
           state: { materials: [transcriptRow()], collection: pairedCollection({ staffDiscussionSummary: discussionPublished }), detail: detailFor({}) } });
         const view = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
         const discussionBlock = await screen.findByTestId('discussion-summary-block');
-        await within(discussionBlock).findByText(discussionPublished.state === 'bound' ? /Staff only\.$/ : /earlier transcript version/);
+        await waitFor(() => expect(discussionBlock).toHaveTextContent(discussionPublished.state === 'bound' ? 'Published' : 'earlier transcript version'));
         expect(discussionBlock.textContent).not.toMatch(/Board/);
-        expect(within(discussionBlock).getByRole('button', { name: 'Summarize again' })).toBeInTheDocument();
+        if (discussionPublished.state === 'bound') {
+          openRowMenu(discussionBlock);
+          expect(screen.getByRole('menuitem', { name: 'Summarize again' })).toBeInTheDocument();
+        } else {
+          expect(within(discussionBlock).getByRole('button', { name: 'Summarize again' })).toBeInTheDocument();
+        }
         view.unmount();
       }
     });
@@ -1390,8 +1430,10 @@ describe('presentation summary', () => {
       render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
       const discussionBlock = await screen.findByTestId('discussion-summary-block');
       await within(discussionBlock).findByLabelText(/^Discussion draft/);
+      openRowMenu(discussionBlock);
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Replace draft with a new summary' }));
       fireEvent.click(screen.getByLabelText(/may be sent to Anthropic/));
-      fireEvent.click(within(discussionBlock).getByRole('button', { name: 'Replace draft with a new summary' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Summarize staff discussion' }));
       await waitFor(() => expect(posts).toHaveLength(1));
       expect(posts[0]).toEqual(expect.objectContaining({ kind: 'discussion', replaceDraft: { draftId: DISCUSSION_DRAFT_ID, expectedVersion: 4 } }));
     });
@@ -1415,7 +1457,7 @@ describe('presentation summary', () => {
       fireEvent.change(discussionText, { target: { value: 'Unsaved staff notes.' } });
       fireEvent.click(within(screen.getByTestId('presentation-summary-block')).getByRole('button', { name: 'Publish summary' }));
       expect(await screen.findByText(/Summary published. Available to staff and eligible/)).toBeInTheDocument();
-      await screen.findByText(/^Published .*eligible for the Board link\.$/);
+      await waitFor(() => expect(row('presentation-summary-block')).toHaveTextContent(`Published${shortDate(CONFIRMED_AT)}`));
       expect(screen.getByLabelText(/^Discussion draft/)).toHaveValue('Unsaved staff notes.');
       expect(screen.queryByTestId('summary-draft-conflict')).toBeNull();
       // Each kind's load key holds only its own published state (plan D9).
@@ -1445,17 +1487,22 @@ describe('step-by-step layout', () => {
     const recording = { artifactId: 'rec-1', artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING, backing: 'external', createdAt: '2026-10-04T21:00:00.000Z', externalUrl: 'https://zoom.us/rec/share/abc' };
     route({ materials: [transcriptRow(), presentation, discussion, recording], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    expect(await screen.findByText('Presentation transcript ready for the Board link.')).toBeInTheDocument();
+    expect(await findRow('presentation-transcript-row')).toHaveTextContent('Ready');
     expect(stepState('step-recording')).toBe('done');
     expect(stepState('step-review')).toBe('done');
     expect(stepState('step-results')).toBe('current');
     expect(screen.queryByLabelText(/Audio file/)).not.toBeInTheDocument();
     const results = screen.getByTestId('step-results');
-    const opens = within(results).getAllByRole('link', { name: 'Open' }).map((link) => link.getAttribute('href'));
-    expect(opens).toEqual([presentation.webUrl, discussion.webUrl]);
-    expect(within(results).getByText('Staff discussion transcript saved for staff.')).toBeInTheDocument();
-    expect(within(results).getByRole('link', { name: 'Open recording' })).toHaveAttribute('href', recording.externalUrl);
-    expect(within(results).getByRole('link', { name: 'Download TXT' })).toBeInTheDocument();
+    // Each result opens by its name; there is no separate Open button.
+    expect(within(results).queryAllByRole('link', { name: /^Open/ })).toHaveLength(0);
+    expect(within(results).getByRole('link', { name: 'Presentation transcript' })).toHaveAttribute('href', presentation.webUrl);
+    expect(within(results).getByRole('link', { name: 'Staff discussion transcript' })).toHaveAttribute('href', discussion.webUrl);
+    expect(within(results).getByRole('link', { name: 'Full meeting recording' })).toHaveAttribute('href', recording.externalUrl);
+    // The full transcript's text downloads live in its row menu (owner decision 3).
+    expect(within(results).queryByRole('link', { name: 'Download TXT' })).toBeNull();
+    openRowMenu(row('full-transcript-row'));
+    expect(screen.getByRole('menuitem', { name: 'Download TXT' })).toHaveAttribute('href', expect.stringContaining('/download?format=txt'));
+    expect(screen.getByRole('menuitem', { name: 'Download VTT' })).toHaveAttribute('href', expect.stringContaining('/download?format=vtt'));
     fireEvent.click(screen.getByRole('button', { name: 'Replace audio or transcript' }));
     expect(screen.getByLabelText(/Audio file/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Replace recording' })).toBeInTheDocument();
@@ -1486,10 +1533,12 @@ describe('step-by-step layout', () => {
   test('a stale presentation transcript sends the user back to step 2 to regenerate', async () => {
     route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact({ presentationTranscript: { state: 'stale', artifactId: ARTIFACT_ID } }) }), detail: detailFor({}) });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-    expect(await screen.findByText('Presentation transcript is out of date. Generate it again in step 2.')).toBeInTheDocument();
+    const presentationRow = await findRow('presentation-transcript-row');
+    expect(presentationRow).toHaveTextContent('Out of date');
+    expect(presentationRow).toHaveTextContent('Generate it in step 2');
     expect(stepState('step-review')).toBe('current');
     expect(within(screen.getByTestId('step-review')).getByRole('button', { name: 'Generate presentation and discussion transcripts' })).toBeInTheDocument();
-    expect(within(screen.getByTestId('step-results')).queryByRole('link', { name: 'Open' })).not.toBeInTheDocument();
+    expect(within(screen.getByTestId('step-results')).queryByRole('link', { name: 'Presentation transcript' })).not.toBeInTheDocument();
   });
 });
 

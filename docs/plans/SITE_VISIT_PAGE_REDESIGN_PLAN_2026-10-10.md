@@ -185,7 +185,8 @@ The same row pattern as Results (§4):
   one muted line ("Shows applicant materials and the three items below. No email
   is sent.").
 - **"…" menu per row** holds the actions that apply to that row's current state:
-  - Transcripts: Download TXT, Download VTT, Regenerate (only when stale).
+  - Full meeting transcript: Download TXT, Download VTT. (The split transcripts have no
+    download route; see §9.3.)
   - Summaries: Summarize again, Open draft (when one exists).
   - Video: Create again, Show cut details.
   - Recording: Replace recording, Upload manually.
@@ -446,7 +447,7 @@ work is in progress. Builders tick each line off in the slice that moves it, and
 | Check again (`:2777`, `:2779`) | summary block | card Refresh |
 | Load latest (`:2805`), Publish summary, Save draft, Discard draft (`:2827-2835`) | draft editor | unchanged (open editor); the row's inline action **Review and publish** opens it |
 | Open (split transcripts, `:3020`) | transcript lines | the transcript name is the link |
-| Download TXT / VTT (split transcripts) | not offered | row menu (owner decision 3) |
+| Download TXT / VTT (split transcripts) | not offered | still not offered: the download route serves only the full TRANSCRIPT artifact (`downloadMeetingTranscript`, `lib/services/meeting-tracker-transcription/service.js:615-622`), so adding it is a server change outside this build |
 | Open video (`:3148`) | video line | the video name is the link (streams once C3 ships) |
 | Check the ending and approve / Approve video / Not yet (`:3149`, `:3157-3158`) | video line | inline action on the video row; confirmation unchanged |
 | Finish approving (`:3150`) | video line | inline action |
