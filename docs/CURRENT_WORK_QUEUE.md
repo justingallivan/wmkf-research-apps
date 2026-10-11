@@ -178,6 +178,14 @@ sequence.
     everyone else and every "other voice" row stays checked. The hint already
     requires aligned recording times, so a misaligned transcript is unaffected.
     Update D2 in the plan in the same change.
+  - **Generate the split transcripts automatically after publish.** After
+    publishing a transcript, step 3 shows "Presentation transcript is out of
+    date. Generate it again in step 2." and the same for the staff discussion,
+    with a separate "Generate presentation and discussion transcripts" button
+    in step 2. Staff could not tell what that meant (owner, 1003222,
+    2026-10-10). Publishing with a confirmed presentation end should start that
+    generation itself, and step 3 should say what is happening in plain words
+    rather than "out of date".
 - **Speaker-name picker should offer the Zoom call's participants
   (2026-10-10).** [OPEN — owner request] "People on this request" in the
   speaker-name editor (`RecordingAndTranscriptCard.js`, option groups PI,
