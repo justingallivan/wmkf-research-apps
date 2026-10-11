@@ -34,7 +34,11 @@ reviews, consultant feedback, or staff brief.
 > non-buffering open route (`member=proposal`). Reviews, review bundle, consultant feedback,
 > staff brief, attendee list, join link and request number stay excluded. The page was also
 > redesigned the same day (video, AI-generated summary on the page, proposal/slides/bios; no
-> full transcript listed).
+> full transcript listed). Codex review (round 2, medium) noted that a downloaded proposal keeps
+> its SharePoint name `Proposal_{requestNumber}.pdf`; rejected by the orchestrator as outside this
+> page's boundary: the "no request number" rule covers the page and its context response, and
+> other downloads here already carry it (applicant file names; the published summary is named
+> `{requestNum}-Presentation-Summary-….txt`). Renaming would require proxying the bytes.
 
 Locked product decisions from 2026-09-21 plus review resolutions accepted 2026-09-22:
 
