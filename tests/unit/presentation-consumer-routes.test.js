@@ -149,6 +149,26 @@ test('open route re-verifies membership and redirects without buffering media', 
   expect(res.headers['Referrer-Policy']).toBe('no-referrer');
 });
 
+test('open route mode check answers with the descriptor as JSON, never a redirect', async () => {
+  resolvePresentationMember.mockResolvedValue({ kind: 'available', material: { member: 'proposal', kind: 'proposal', filename: null } });
+  const res = response();
+  await openHandler({
+    method: 'GET', query: { token: 't', member: 'proposal', mode: 'check' }, headers: {}, socket: {},
+  }, res);
+  expect(resolvePresentationMember).toHaveBeenCalledWith({ requestId: REQUEST_ID, member: 'proposal', mode: 'check' });
+  expect(res.redirect).not.toHaveBeenCalled();
+  expect(res.statusCode).toBe(200);
+  expect(res.body).toEqual({ ok: true, material: { member: 'proposal', kind: 'proposal', filename: null } });
+  expect(res.headers['Cache-Control']).toBe('private, no-store');
+});
+
+test('open route refuses an unknown mode before any work', async () => {
+  const res = response();
+  await openHandler({ method: 'GET', query: { token: 't', member: 'proposal', mode: 'list' }, headers: {}, socket: {} }, res);
+  expect(res.statusCode).toBe(404);
+  expect(resolvePresentationMember).not.toHaveBeenCalled();
+});
+
 test('GET staff link is read-only and returns the current live row', async () => {
   getLivePresentationLink.mockResolvedValue({ id: LINK_ID });
   const res = response();

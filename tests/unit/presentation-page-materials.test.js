@@ -21,11 +21,6 @@ test('after the visit: video and summary are picked out regardless of arrival or
   expect(arranged.video.member).toBe('vid');
   expect(arranged.summary.member).toBe('sum');
   expect(arranged.slidesOriginal).toBeNull();
-  expect(arranged.proposal).toBeNull();
-});
-
-test('the proposal is picked out when listed', () => {
-  expect(arrangeMaterials([m('proposal', 'proposal', 'application/pdf')]).proposal.member).toBe('proposal');
 });
 
 test('a second PDF of slides is never labeled as the PowerPoint; extras list on their own', () => {
