@@ -89,7 +89,7 @@ function world({ splits = [splitRow()], docs = [transcriptRow(), recordingRow()]
       siteId: 'site', driveId, id: itemId, name: 'presentation-video.mp4', size: 4000, webUrl: 'https://sp.example/v.mp4',
       eTag: 'out-etag-1', versionId: '2.0', lastModified: '2026-10-10T00:00:00Z', quickXorHash: 'qx', ...item,
     })),
-    resolveMediaDownloadUrl: jest.fn(async (driveId, itemId) => ({ driveId, itemId, eTag: 'out-etag-1', malware: null, filename: 'v.mp4', mimeType: 'video/mp4', downloadUrl: 'https://tenant.sharepoint.com/dl' })),
+    resolveMediaDownloadUrl: jest.fn(async (driveId, itemId) => ({ driveId, itemId, eTag: 'out-etag-1', size: 4000, quickXorHash: 'qx', malware: null, filename: 'v.mp4', mimeType: 'video/mp4', downloadUrl: 'https://tenant.sharepoint.com/dl' })),
     acquireSlotLease: jest.fn(async () => ({ fence_version: ++fence })),
     getSlotLease: jest.fn(async () => null),
     renewSlotLease: jest.fn(async lease => ({ fence_version: lease.fenceVersion })),
@@ -128,6 +128,12 @@ describe('approve: happy path', () => {
     expect(deps.releaseSlotLease).toHaveBeenCalledTimes(1);
     // The attempted flag is durable before the create call.
     expect(store.markPresentationVideoApprovalAttempted.mock.invocationCallOrder[0]).toBeLessThan(deps.createDocument.mock.invocationCallOrder[0]);
+  });
+  test('a metadata-only output eTag bump (size and hash unchanged) does not block approval, and the live eTag is registered', async () => {
+    const { deps, store, documents } = world({ item: { eTag: 'out-etag-2' } });
+    await approvePresentationVideoSplit(args(), deps);
+    expect(store.rows[0]).toMatchObject({ state: 'approved' });
+    expect(documents.find(d => d.wmkf_artifacttype === 100000011)).toMatchObject({ wmkf_sharepointetag: 'out-etag-2' });
   });
   test('an older approved cut is superseded in Postgres and, by the slot fence, in Dataverse', async () => {
     const old = videoRow({ wmkf_requestdocumentid: OLD_DOC, wmkf_slotversion: 2, wmkf_generationkey: 'o'.repeat(64) });
@@ -172,7 +178,9 @@ describe('approve: stale frozen identity (reconciliation)', () => {
     ['presentation end moved', () => ({ docs: [transcriptRow(manifest({ presentationEnd: { endMs: 1000, confirmedBy: 5, confirmedAt: '2026-10-05T19:00:00.000Z' } })), recordingRow()] })],
     ['recording replaced', () => ({ docs: [transcriptRow(), recordingRow({ wmkf_sharepointetag: 'rec-etag-2' })] })],
     ['transcript gone', () => ({ docs: [recordingRow()] })],
-    ['output eTag changed', () => ({ item: { eTag: 'out-etag-2' } })],
+    ['output size changed', () => ({ item: { size: 4001 } })],
+    ['output quickXorHash missing live', () => ({ item: { quickXorHash: undefined } })],
+    ['output quickXorHash missing on the row', () => ({ splits: [splitRow({ output_quickxor_hash: null })] })],
     ['output quickXorHash changed', () => ({ item: { quickXorHash: 'other' } })],
     ['output item gone', () => ({ item: { id: 'other-item' } })],
   ])('%s: no registration, split settled superseded, 409 approval_stale', async (_l, make) => {
@@ -261,7 +269,7 @@ describe('approve: retry identity and lost responses', () => {
 });
 
 describe('staff review open', () => {
-  test.each(['review', 'registering', 'approved'])('redirects a %s row after matching the live item id and eTag', async (state) => {
+  test.each(['review', 'registering', 'approved'])('redirects a %s row after matching the live item id, size and hash', async (state) => {
     const { deps } = world({ splits: [splitRow({ state })] });
     expect(await resolvePresentationVideoSplitOpen({ requestId: REQUEST_ID, splitId: SPLIT }, deps))
       .toEqual({ redirectUrl: 'https://tenant.sharepoint.com/dl', filename: 'v.mp4', mimeType: 'video/mp4' });
@@ -276,14 +284,39 @@ describe('staff review open', () => {
     const { deps } = world({ splits: [] });
     expect(await rejection(resolvePresentationVideoSplitOpen({ requestId: REQUEST_ID, splitId: SPLIT }, deps))).toMatchObject({ httpStatus: 404 });
   });
-  test('a changed eTag, a different item, malware or a non-https URL is refused', async () => {
-    for (const over of [{ eTag: 'changed' }, { itemId: 'other' }, { malware: { x: 1 } }]) {
+  test('a metadata-only eTag change (size and hash unchanged) still redirects', async () => {
+    const { deps } = world({ item: { eTag: 'out-etag-2' } });
+    deps.resolveMediaDownloadUrl.mockImplementation(async (driveId, itemId) => ({ driveId, itemId, eTag: 'out-etag-2', size: 4000, quickXorHash: 'qx', malware: null, downloadUrl: 'https://x.example/d' }));
+    expect(await resolvePresentationVideoSplitOpen({ requestId: REQUEST_ID, splitId: SPLIT }, deps)).toMatchObject({ redirectUrl: 'https://x.example/d' });
+  });
+  test('changed output content (hash or size on the URL response) is 409 presentation_video_output_changed', async () => {
+    for (const over of [{ quickXorHash: 'other' }, { quickXorHash: null }, { size: 4001 }, { itemId: 'other-item' }]) {
       const { deps } = world();
-      deps.resolveMediaDownloadUrl.mockImplementation(async (driveId, itemId) => ({ driveId, itemId, eTag: 'out-etag-1', malware: null, downloadUrl: 'https://x.example/d', ...over }));
+      deps.resolveMediaDownloadUrl.mockImplementation(async (driveId, itemId) => ({ driveId, itemId, eTag: 'out-etag-1', size: 4000, quickXorHash: 'qx', malware: null, downloadUrl: 'https://x.example/d', ...over }));
+      expect(await rejection(resolvePresentationVideoSplitOpen({ requestId: REQUEST_ID, splitId: SPLIT }, deps)))
+        .toMatchObject({ httpStatus: 409, code: 'presentation_video_output_changed' });
+    }
+  });
+  test('a same-size replacement is refused even when a separate metadata read would still match (no metadata/URL race)', async () => {
+    const { deps } = world();
+    deps.resolveMediaDownloadUrl.mockImplementation(async (driveId, itemId) => ({ driveId, itemId, eTag: 'out-etag-9', size: 4000, quickXorHash: 'replaced', malware: null, downloadUrl: 'https://x.example/replaced' }));
+    expect(await rejection(resolvePresentationVideoSplitOpen({ requestId: REQUEST_ID, splitId: SPLIT }, deps)))
+      .toMatchObject({ httpStatus: 409, code: 'presentation_video_output_changed' });
+  });
+  test('a row without a recorded size or hash is 404', async () => {
+    for (const over of [{ output_quickxor_hash: null }, { output_size: null }]) {
+      const { deps } = world({ splits: [splitRow(over)] });
+      expect(await rejection(resolvePresentationVideoSplitOpen({ requestId: REQUEST_ID, splitId: SPLIT }, deps))).toMatchObject({ httpStatus: 404 });
+    }
+  });
+  test('a different media size, item, malware or a non-https URL is refused', async () => {
+    for (const over of [{ size: 1 }, { itemId: 'other' }, { malware: { x: 1 } }]) {
+      const { deps } = world();
+      deps.resolveMediaDownloadUrl.mockImplementation(async (driveId, itemId) => ({ driveId, itemId, eTag: 'out-etag-1', size: 4000, quickXorHash: 'qx', malware: null, downloadUrl: 'https://x.example/d', ...over }));
       expect(await rejection(resolvePresentationVideoSplitOpen({ requestId: REQUEST_ID, splitId: SPLIT }, deps))).toMatchObject({ httpStatus: expect.any(Number) });
     }
     const { deps } = world();
-    deps.resolveMediaDownloadUrl.mockImplementation(async (driveId, itemId) => ({ driveId, itemId, eTag: 'out-etag-1', downloadUrl: 'http://x.example/d' }));
+    deps.resolveMediaDownloadUrl.mockImplementation(async (driveId, itemId) => ({ driveId, itemId, eTag: 'out-etag-1', size: 4000, quickXorHash: 'qx', downloadUrl: 'http://x.example/d' }));
     expect(await rejection(resolvePresentationVideoSplitOpen({ requestId: REQUEST_ID, splitId: SPLIT }, deps))).toMatchObject({ httpStatus: 502 });
   });
 });
