@@ -787,6 +787,11 @@ server's 10-row limit (the list is unfiltered, `presentation-video-split-store.j
 `listPresentationVideoSplitSnapshotsForRequest`, so a shorter list is the whole history) and no
 Presentation video record exists; otherwise "Status unknown". Regression: ten failed attempts with no
 video record is unknown, nine is "Not yet" (fails without the history check).
+Codex round 5 (needs-attention, one medium): replacing the recording (Copy video or a new Zoom
+link) reloads only the materials, so the video status was not re-read although the Board stops
+serving a cut of the old recording. The video status key now includes the recording's id and slot
+version, so a recording change re-reads it (and a failed re-read is "Status unknown"). Regression:
+save a new Zoom link with the splits read failing; fails without the recording in the key.
 
 ## 10. Remaining after the build (2026-10-11)
 

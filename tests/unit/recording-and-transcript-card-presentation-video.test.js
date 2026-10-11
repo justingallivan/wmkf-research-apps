@@ -456,3 +456,44 @@ describe('an absent Board status proves no video only when the split list is the
     await waitFor(() => expect(screen.getByTestId('board-readiness-video')).toHaveTextContent(label));
   });
 });
+
+describe('Board readiness of the video follows the recording too (Codex round 5, four-card commit)', () => {
+  test('replacing the recording re-reads the video status; a failed re-read is Status unknown, not the old On', async () => {
+    const RECORDING_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const RECORDING_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const zoomUrl = 'https://zoom.us/rec/share/new-recording';
+    const recordingRow = (id) => ({ artifactId: id, artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING, backing: 'external',
+      externalUrl: id === RECORDING_A ? 'https://zoom.us/rec/share/old-recording' : zoomUrl, slotVersion: 1, createdAt: '2026-10-09T10:00:00Z' });
+    if (!globalThis.crypto) globalThis.crypto = {};
+    if (!globalThis.crypto.randomUUID) globalThis.crypto.randomUUID = () => '99999999-9999-4999-8999-999999999999';
+    let recording = RECORDING_A;
+    let failSplits = false;
+    route({ state: { splits: { available: true, splits: [split({ state: 'approved', boardReady: true })], boardVideo: { status: 'bound' } } } });
+    const base = global.fetch;
+    global.fetch = jest.fn(async (url, options = {}) => {
+      const path = String(url);
+      const method = options.method || 'GET';
+      if (path.endsWith('/presentation-materials')) {
+        if (method === 'PATCH') {
+          recording = RECORDING_B;
+          return response({ materials: [transcriptRow(), recordingRow(RECORDING_B)], uploads: [] });
+        }
+        return response({ materials: [transcriptRow(), recordingRow(recording)], uploads: [] });
+      }
+      if (failSplits && path.endsWith('/presentation-video-splits') && method === 'GET') return response({ error: 'down' }, 500);
+      return base(url, options);
+    });
+    await renderLine();
+    await waitFor(() => expect(screen.getByTestId('board-readiness-video')).toHaveTextContent('On the Board page'));
+    const reads = getCount();
+    failSplits = true;
+    fireEvent.click(within(screen.getByTestId('step-recording')).getByRole('button', { name: 'More actions for get the recording' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Replace recording or transcript' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Replace recording' }));
+    fireEvent.change(screen.getByLabelText(/^Zoom link/), { target: { value: zoomUrl } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Zoom link' }));
+    expect(await screen.findByText('Zoom recording link saved.')).toBeInTheDocument();
+    await waitFor(() => expect(getCount()).toBeGreaterThan(reads));
+    await waitFor(() => expect(screen.getByTestId('board-readiness-video')).toHaveTextContent('Status unknown'));
+  });
+});

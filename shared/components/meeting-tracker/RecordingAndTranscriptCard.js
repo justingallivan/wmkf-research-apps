@@ -3394,9 +3394,11 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
     || byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY) || t.presentationSummary.summaryDraft || t.presentationSummary.summaryConflict || artifact?.transcriptSummary?.artifactId
     || byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY) || t.discussionSummary.summaryDraft || t.discussionSummary.summaryConflict
     || artifact?.staffDiscussionSummary?.artifactId);
+  // The Board serves the approved cut only for the current transcript, presentation end and recording, so a change to
+  // any of them re-reads the video status (the recording part: Codex round 5, four-card commit).
   const video = usePresentationVideo(requestId, {
     enabled: showProducts, refreshToken,
-    revisionKey: `${artifact?.id || ''}:${artifact?.fingerprint || ''}:${artifact?.presentationEnd?.endMs ?? ''}`,
+    revisionKey: `${artifact?.id || ''}:${artifact?.fingerprint || ''}:${artifact?.presentationEnd?.endMs ?? ''}:${recording?.artifactId || ''}:${recording?.slotVersion ?? ''}`,
   });
 
   const manualAdd = <>
