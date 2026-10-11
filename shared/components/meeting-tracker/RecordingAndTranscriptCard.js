@@ -3378,7 +3378,6 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
   const editBlocked = Boolean(t.busy) || newerPending;
   const pendingSuffix = newerPending ? ' · wait for the newer transcript' : '';
   const canGenerate = editable && Boolean(presentationEnd) && !editing;
-  const resultsWaiting = !(boundaryState === 'bound' || (canGenerate && needsGenerate));
   const generateAnchor = !canGenerate ? null : ['missing', 'stale'].includes(boundaryState) ? 'presentation'
     : ['missing', 'stale'].includes(discussionState) ? 'discussion' : null;
   const generateButton = <Button size="sm" variant="outline" type="button" onClick={t.generatePresentationTranscript} disabled={Boolean(t.busy)}>{t.busy === 'presentation-transcript' ? 'Generating…' : 'Generate transcripts'}</Button>;
@@ -3394,6 +3393,9 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
     || artifact?.staffDiscussionSummary?.artifactId);
   // The Board serves the approved cut only for the current transcript, presentation end and recording, so a change to
   // any of them re-reads the video status (the recording part: Codex round 5, four-card commit).
+  // The waiting line stands in for rows only when there are none; when rows show, their own chips say what is missing
+  // or unknown, so the line would contradict them (owner desktop check, 2026-10-11).
+  const resultsWaiting = !(boundaryState === 'bound' || (canGenerate && needsGenerate)) && !showProducts;
   const video = usePresentationVideo(requestId, {
     enabled: showProducts, refreshToken,
     revisionKey: `${artifact?.id || ''}:${artifact?.fingerprint || ''}:${artifact?.presentationEnd?.endMs ?? ''}:${recording?.artifactId || ''}:${recording?.slotVersion ?? ''}`,

@@ -844,3 +844,11 @@ an uploaded transcript gets Open without downloads.
    be summarized."; the two tests that clicked it now use the Recording setup Refresh.
 2. **Local setup:** `.env.local` lacks `MEETING_TRACKER_SCHEMA_READY=on`, so localhost shows
    "Meeting Tracker is not yet enabled". Not a code defect.
+3. **[DONE 2026-10-11]** **Contradictory waiting line.** With a transcript present but its status
+   unavailable, both result cards said "…appear here once the presentation end is checked" above the
+   rows they said were not there. The line now shows only when a card has no rows; the rows' chips
+   carry the state otherwise. Regression fails with the old condition.
+4. **Local setup, not a code defect:** besides `MEETING_TRACKER_SCHEMA_READY`, localhost needs
+   `MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY`, `MEETING_TRACKER_TRANSCRIPTION_ACCESS`,
+   `SITE_VISIT_MATERIALS_SCHEMA_READY` and `PRESENTATION_VIDEO_SPLIT_ACCESS` to show transcripts,
+   applicant materials and the presentation video; unset, each feature reports itself off.

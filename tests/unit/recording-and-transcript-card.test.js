@@ -431,6 +431,17 @@ test('a failed transcript refresh after a good load turns Board readiness to Sta
   await waitFor(() => expect(screen.getByTestId('board-readiness-transcript')).toHaveTextContent('On the Board page'));
 });
 
+test('with rows shown but transcript status unavailable, neither card also says its results appear later (owner desktop check)', async () => {
+  route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: null }), detail: detailFor({}) }, {
+    '/transcriptions': { method: 'GET', respond: () => response({ error: 'down' }, 503) },
+  });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  await findRow('presentation-transcript-row');
+  expect(await screen.findByText(/Transcript status is unavailable\. Use Refresh in Recording setup/)).toBeInTheDocument();
+  expect(within(screen.getByTestId('card-presentation')).queryByText(/appear here once/)).toBeNull();
+  expect(within(screen.getByTestId('card-staff-discussion')).queryByText(/appear here once/)).toBeNull();
+});
+
 test('the cards run in work order: recording setup, presentation, staff discussion, then Board materials', async () => {
   route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
