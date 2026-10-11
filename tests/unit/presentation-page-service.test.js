@@ -472,6 +472,19 @@ describe('Word files open as a converted PDF (mode pdf)', () => {
     await expectNotFound(pdf(deps(over)));
   });
 
+  test('output Graph stopped reading at the cap is refused (404), so the page offers the Word download', async () => {
+    const tooBig = jest.fn(async () => { throw Object.assign(new Error('limit'), { code: 'graph_download_size_limit' }); });
+    await expectNotFound(pdf(deps({ convertToPdf: tooBig })));
+  });
+
+  test('the default conversion dependency passes the byte cap and time limit', async () => {
+    const { GraphService } = require('../../lib/services/graph-service.js');
+    const spy = jest.spyOn(GraphService, 'downloadFileAsPdf').mockResolvedValue(Buffer.from('%PDF-'));
+    await _internal.DEFAULT_DEPENDENCIES.convertToPdf('d', 'i');
+    expect(spy).toHaveBeenCalledWith('d', 'i', { maxBytes: 4 * 1024 * 1024, timeoutMs: 20_000 });
+    spy.mockRestore();
+  });
+
   test('a failed conversion is temporary (503)', async () => {
     await expect(pdf(deps({ convertToPdf: jest.fn(async () => { throw new Error('graph down'); }) }))).rejects.toMatchObject({ httpStatus: 503 });
   });
