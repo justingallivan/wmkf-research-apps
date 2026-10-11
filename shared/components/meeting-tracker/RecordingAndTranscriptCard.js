@@ -2770,16 +2770,23 @@ function SummarizeConfirm({ t, kinds, valid, onClose }) {
   );
 }
 
+// The published summary as the card knows it: the summary read when it is current for this transcript, otherwise the
+// transcript collection's copy. Shared by SummaryBlock and the Board materials readiness list.
+function publishedSummaryOf(t, s) {
+  const summaryStatusCurrent = ['ready', 'not_needed'].includes(s.summaryReadState) && s.summaryLoadedKey === s.summaryLoadKey;
+  const published = summaryStatusCurrent
+    ? s.summary?.transcriptSummary || null
+    : t.collection?.currentArtifact?.transcriptSummary || null;
+  return { summaryStatusCurrent, published };
+}
+
 function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = null, setRequest = () => {} }) {
   const copy = SUMMARY_BLOCK_COPY[kind];
   const busyKeys = SUMMARY_KIND_UI[kind].busy;
   const artifact = t.collection?.currentArtifact;
   const collectionPublished = artifact?.[SUMMARY_KIND_UI[kind].publishedKey];
   const summaryCurrent = s.summaryReadState === 'ready' && s.summaryLoadedKey === s.summaryLoadKey;
-  const summaryStatusCurrent = ['ready', 'not_needed'].includes(s.summaryReadState) && s.summaryLoadedKey === s.summaryLoadKey;
-  const published = summaryStatusCurrent
-    ? s.summary?.transcriptSummary || null
-    : artifact?.transcriptSummary || null;
+  const { summaryStatusCurrent, published } = publishedSummaryOf(t, s);
   const collectionSaysNoSummary = collectionPublished?.state === 'missing'
     || (collectionPublished && [null, undefined].includes(collectionPublished.artifactId));
   const compactSummaryStatusUnknown = Boolean(artifact?.id && !collectionPublished
@@ -3119,13 +3126,12 @@ const DERIVATIVE_STATUS = Object.freeze({
   stale: { tone: 'amber', label: 'Out of date' },
   missing: { tone: 'gray', label: 'Not made yet' },
 });
-function DerivativeRow({ state, label, material, testId, action = null, needsEnd = false, boardNote = false }) {
+function DerivativeRow({ state, label, material, testId, action = null, needsEnd = false }) {
   const url = state === 'bound' && material ? safeMaterialUrl(material) : null;
   const status = DERIVATIVE_STATUS[state] || { tone: 'gray', label: 'Not available' };
   const pending = state === 'stale' || state === 'missing';
   const detail = state === 'bound' ? fmtDateTime(material?.createdAt)
     : pending && needsEnd ? 'Confirm the presentation end in step 2'
-      : pending && boardNote ? 'Not on the Board page until it is generated'
         : state === 'stale' ? 'Made from an earlier transcript' : null;
   return <ArtifactRow name={label} href={url} status={status} detail={detail} action={action} testId={testId} />;
 }
@@ -3148,7 +3154,9 @@ const PV_IN_PROGRESS_TEXT = 'Approval is still in progress. Try again in a few m
 const PV_GENERIC_FAILURE = 'Something went wrong. Try again.';
 const PV_REASON_TEXT = (code) => PV_FAILURE_TEXT[code] || PV_GENERIC_FAILURE;
 
-function PresentationVideoLine({ requestId, revisionKey = '', refreshToken = 0 }) {
+// The presentation video's state, shared by its row in the Presentation card and the Board materials readiness list,
+// so both read one fetch. Loads only once the card shows its products (`enabled`).
+function usePresentationVideo(requestId, { enabled = true, revisionKey = '', refreshToken = 0 } = {}) {
   const path = `${API_PATH}/${encodeURIComponent(requestId || '')}/presentation-video-splits`;
   const [available, setAvailable] = useState(false);
   const [splits, setSplits] = useState([]);
@@ -3164,7 +3172,7 @@ function PresentationVideoLine({ requestId, revisionKey = '', refreshToken = 0 }
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
   const load = useCallback(async () => {
-    if (!requestId) return;
+    if (!requestId || !enabled) return;
     const sequence = ++sequenceRef.current;
     try {
       const body = await requestJson(path, { method: 'GET', fallbackMessage: 'The presentation video could not be loaded.' });
@@ -3180,7 +3188,7 @@ function PresentationVideoLine({ requestId, revisionKey = '', refreshToken = 0 }
       // Keep what is shown; the interval below keeps retrying.
       if (mountedRef.current && sequenceRef.current === sequence) setLoadFailed(true);
     }
-  }, [path, requestId]);
+  }, [path, requestId, enabled]);
   useEffect(() => {
     const timer = window.setTimeout(() => { void load(); }, 0);
     return () => window.clearTimeout(timer);
@@ -3229,7 +3237,17 @@ function PresentationVideoLine({ requestId, revisionKey = '', refreshToken = 0 }
     && (confirming.kind === 'approve' ? newestState === 'review'
       : newestState === 'review' || (newestState === 'approved' && newest?.boardReady !== false));
   // A stale confirmation is never rendered (it shows only while it matches the newest video in a confirmable state).
+  return {
+    path, available, newest, processing, busy, message, confirming, setConfirming, loaded, loadFailed,
+    load, create, approve, confirmTargetLive,
+  };
+}
 
+function PresentationVideoLine({ v }) {
+  const {
+    path, available, newest, processing, busy, message, confirming, setConfirming, loaded, loadFailed,
+    load, create, approve, confirmTargetLive,
+  } = v;
   if (!loaded && loadFailed) {
     return (
       <ArtifactRow name="Presentation video" status={{ tone: 'gray', label: 'Not loaded' }} detail="Couldn’t load the video status." testId="presentation-video-line"
@@ -3293,7 +3311,7 @@ function PresentationVideoLine({ requestId, revisionKey = '', refreshToken = 0 }
   );
 }
 
-function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshToken = 0 }) {
+function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshToken = 0, shell, setupHeader }) {
   const [step1Open, setStep1Open] = useState(false);
   const [uploadInstead, setUploadInstead] = useState(false);
   const [summarizeRequest, setSummarizeRequest] = useState(null); // { kinds, anchor } while a Summarize confirmation is open
@@ -3329,7 +3347,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
     || z.busy || z.videoBusy || z.hasActiveCopy || t.uploadProgress !== null || t.confirmNoVtt || ['upload', 'upload-captions', 'starting'].includes(t.busy));
   const step1Done = Boolean(material || readyForReview) && !step1Working;
   const step1Expanded = !step1Done || step1Open;
-  // Generating the split transcripts is a Results action now, so step 2 is done once the end is confirmed.
+  // Generating the split transcripts is a Presentation card action, so step 2 is done once the end is confirmed.
   const step2State = reviewOpen || (editable && (!presentationEnd || t.savedDraft)) ? 'current'
     : editable && presentationEnd ? 'done' : 'waiting';
   const step2Collapsed = step2State === 'done' && !reviewOpen && !editing;
@@ -3339,7 +3357,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
   const editBlocked = Boolean(t.busy) || newerPending;
   const pendingSuffix = newerPending ? ' · wait for the newer transcript' : '';
   const canGenerate = editable && Boolean(presentationEnd) && !editing;
-  const step3State = boundaryState === 'bound' || (canGenerate && needsGenerate) ? 'current' : 'waiting';
+  const resultsWaiting = !(boundaryState === 'bound' || (canGenerate && needsGenerate));
   const generateAnchor = !canGenerate ? null : ['missing', 'stale'].includes(boundaryState) ? 'presentation'
     : ['missing', 'stale'].includes(discussionState) ? 'discussion' : null;
   const generateButton = <Button size="sm" variant="outline" type="button" onClick={t.generatePresentationTranscript} disabled={Boolean(t.busy)}>{t.busy === 'presentation-transcript' ? 'Generating…' : 'Generate transcripts'}</Button>;
@@ -3353,6 +3371,10 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
     || byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY) || t.presentationSummary.summaryDraft || t.presentationSummary.summaryConflict || artifact?.transcriptSummary?.artifactId
     || byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY) || t.discussionSummary.summaryDraft || t.discussionSummary.summaryConflict
     || artifact?.staffDiscussionSummary?.artifactId);
+  const video = usePresentationVideo(requestId, {
+    enabled: showProducts, refreshToken,
+    revisionKey: `${artifact?.id || ''}:${artifact?.fingerprint || ''}:${artifact?.presentationEnd?.endMs ?? ''}`,
+  });
 
   const manualAdd = <>
     {!active && <GenerateForm t={t} />}
@@ -3373,7 +3395,9 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
   );
 
   return (
-    <div>
+    <>
+    <section className={shell} data-testid="card-recording-setup" aria-labelledby="recording-transcript-title">
+      {setupHeader}
       {m.error && <div className="mt-3"><Notice>{m.error}</Notice></div>}
       {m.notice && <div className="mt-3"><Notice tone="info">{m.notice}</Notice></div>}
       {t.error && <div className="mt-3"><Notice>{t.error}</Notice></div>}
@@ -3450,48 +3474,78 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
             </p>}
       </Step>
 
-      <Step number={3} title="Results" state={step3State} testId="step-results">
-        {step3State === 'waiting' && <p className="mt-2 text-sm text-gray-700">The presentation and staff discussion transcripts and their summaries appear here after step 2.</p>}
-        <section className="mt-4" aria-labelledby="results-board-heading">
-          <BoardPageHeading m={m} />
-          {showProducts && (
-            <ul className="mt-1 divide-y divide-gray-100 border-t border-gray-200">
-              <DerivativeRow state={boundaryState} label="Presentation transcript" material={presentationMaterial} testId="presentation-transcript-row"
-                action={generateAnchor === 'presentation' ? generateButton : null} needsEnd={editable && !presentationEnd} boardNote />
-              <SummaryBlock t={t} s={t.presentationSummary} materials={materials} request={summarizeRequest} setRequest={setSummarizeRequest} />
-              <PresentationVideoLine requestId={requestId} refreshToken={refreshToken} revisionKey={`${artifact?.id || ''}:${artifact?.fingerprint || ''}:${artifact?.presentationEnd?.endMs ?? ''}`} />
-            </ul>
-          )}
-        </section>
-        {(showProducts || material || recordingUrl) && (
-          <section className="mt-6" aria-labelledby="results-staff-heading">
-            <h4 id="results-staff-heading" className="text-sm font-semibold text-gray-950">Staff only</h4>
-            <ul className="mt-1 divide-y divide-gray-100 border-t border-gray-200">
-              {showProducts && <>
-                <DerivativeRow state={discussionState} label="Staff discussion transcript" material={discussionMaterial} testId="discussion-transcript-row"
-                  action={generateAnchor === 'discussion' ? generateButton : null} needsEnd={editable && !presentationEnd} />
-                <SummaryBlock t={t} s={t.discussionSummary} kind="discussion" materials={materials} request={summarizeRequest} setRequest={setSummarizeRequest} />
-              </>}
-              {recordingUrl && (
-                <ArtifactRow name="Full meeting recording" href={recordingUrl} testId="full-recording-row"
-                  status={{ tone: 'gray', label: recording.backing === 'external' ? 'Zoom link' : 'Saved' }}
-                  detail={fmtDateTime(recording.createdAt)} />
-              )}
-              {material && (
-                <ArtifactRow name="Full meeting transcript" href={openUrl} testId="full-transcript-row"
-                  status={generated ? { tone: 'green', label: 'Published' } : { tone: 'gray', label: 'Uploaded' }}
-                  detail={fmtDateTime(material.createdAt)}
-                  menuItems={generated && artifact ? [
-                    { key: 'txt', label: 'Download TXT', href: `${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=txt`, download: true },
-                    { key: 'vtt', label: 'Download VTT', href: `${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=vtt`, download: true },
-                  ] : []} />
-              )}
-            </ul>
-          </section>
-        )}
-      </Step>
       <EarlierRuns t={t} />
-    </div>
+    </section>
+
+    <section className={shell} data-testid="card-presentation" aria-labelledby="presentation-card-title">
+      <h2 id="presentation-card-title" className="text-lg font-semibold text-gray-950">Presentation</h2>
+      {resultsWaiting && <p className="mt-2 text-sm text-gray-700">The presentation transcript and summary appear here once the presentation end is checked.</p>}
+      {showProducts && (
+        <ul className="mt-3 divide-y divide-gray-100 border-t border-gray-200">
+          <PresentationVideoLine v={video} />
+          <DerivativeRow state={boundaryState} label="Presentation transcript" material={presentationMaterial} testId="presentation-transcript-row"
+            action={generateAnchor === 'presentation' ? generateButton : null} needsEnd={editable && !presentationEnd} />
+          <SummaryBlock t={t} s={t.presentationSummary} materials={materials} request={summarizeRequest} setRequest={setSummarizeRequest} />
+        </ul>
+      )}
+    </section>
+
+    <section className={shell} data-testid="card-staff-discussion" aria-labelledby="staff-discussion-card-title">
+      <h2 id="staff-discussion-card-title" className="text-lg font-semibold text-gray-950">Staff discussion</h2>
+      {resultsWaiting && <p className="mt-2 text-sm text-gray-700">The staff discussion transcript and summary appear here once the presentation end is checked.</p>}
+      {(showProducts || material || recordingUrl) && (
+        <ul className="mt-3 divide-y divide-gray-100 border-t border-gray-200">
+          {showProducts && <>
+            <DerivativeRow state={discussionState} label="Staff discussion transcript" material={discussionMaterial} testId="discussion-transcript-row"
+              action={generateAnchor === 'discussion' ? generateButton : null} needsEnd={editable && !presentationEnd} />
+            <SummaryBlock t={t} s={t.discussionSummary} kind="discussion" materials={materials} request={summarizeRequest} setRequest={setSummarizeRequest} />
+          </>}
+          {recordingUrl && (
+            <ArtifactRow name="Full meeting recording" href={recordingUrl} testId="full-recording-row"
+              status={{ tone: 'gray', label: recording.backing === 'external' ? 'Zoom link' : 'Saved' }}
+              detail={fmtDateTime(recording.createdAt)} />
+          )}
+          {material && (
+            <ArtifactRow name="Full meeting transcript" href={openUrl} testId="full-transcript-row"
+              status={generated ? { tone: 'green', label: 'Published' } : { tone: 'gray', label: 'Uploaded' }}
+              detail={fmtDateTime(material.createdAt)}
+              menuItems={generated && artifact ? [
+                { key: 'txt', label: 'Download TXT', href: `${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=txt`, download: true },
+                { key: 'vtt', label: 'Download VTT', href: `${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=vtt`, download: true },
+              ] : []} />
+          )}
+        </ul>
+      )}
+    </section>
+
+    <section className={shell} data-testid="card-board-materials" aria-labelledby="board-card-title">
+      <BoardPageHeading m={m} />
+      <BoardReadiness t={t} boundaryState={boundaryState} video={video} />
+    </section>
+    </>
+  );
+}
+
+// Board materials readiness (owner decision 2026-10-11): one line per presentation item the Board page can show, with
+// whether it is there now. Status only; the actions stay in the Presentation card. Applicant materials are listed by
+// the Applicant materials card and are not repeated here.
+const BOARD_ON = { tone: 'green', label: 'On the Board page' };
+const BOARD_NOT_YET = { tone: 'gray', label: 'Not yet' };
+const BOARD_UNKNOWN = { tone: 'gray', label: 'Status unknown' };
+function BoardReadiness({ t, boundaryState, video }) {
+  const { summaryStatusCurrent, published } = publishedSummaryOf(t, t.presentationSummary);
+  const transcript = boundaryState === 'bound' ? BOARD_ON : !t.collection ? BOARD_UNKNOWN : BOARD_NOT_YET;
+  const summary = !summaryStatusCurrent ? BOARD_UNKNOWN : published?.state === 'bound' ? BOARD_ON : BOARD_NOT_YET;
+  const newest = video.newest;
+  const videoStatus = !video.loaded ? null
+    : newest?.state === 'approved' && newest.boardReady === true ? BOARD_ON
+      : newest?.state === 'approved' && newest.boardReady == null ? BOARD_UNKNOWN : BOARD_NOT_YET;
+  return (
+    <ul className="mt-3 divide-y divide-gray-100 border-t border-gray-200" data-testid="board-readiness" aria-label="On the Board page">
+      <ArtifactRow name="Presentation transcript" status={transcript} testId="board-readiness-transcript" />
+      <ArtifactRow name="Presentation summary" status={summary} testId="board-readiness-summary" />
+      {video.available && videoStatus && <ArtifactRow name="Presentation video" status={videoStatus} testId="board-readiness-video" />}
+    </ul>
   );
 }
 
@@ -3572,7 +3626,7 @@ function RecordingBlock({ m, z }) {
   );
 }
 
-// The "Board page" group heading: what the Board link shows sits directly under it (redesign §4). The raw URL is
+// The Board materials card heading and link actions; what the Board page shows is listed under it (BoardReadiness). The raw URL is
 // never printed; it appears only in the manual-copy field when the clipboard is unavailable.
 function BoardPageHeading({ m }) {
   const { link, linkBusy, linkError, linkCopied, manualCopy, confirmReissue } = m;
@@ -3580,7 +3634,7 @@ function BoardPageHeading({ m }) {
   return (
     <div data-testid="presentation-link-controls">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <h4 id="results-board-heading" className="text-sm font-semibold text-gray-950">Board page</h4>
+        <h2 id="board-card-title" className="text-lg font-semibold text-gray-950">Board materials</h2>
         {link?.url && expires && <span className="text-xs text-gray-600">Link expires {expires}</span>}
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {!link && <Button type="button" size="sm" variant="outline" loading={linkBusy} disabled={linkBusy} onClick={() => m.mutateLink('ensure')}>Generate link</Button>}
@@ -3592,7 +3646,7 @@ function BoardPageHeading({ m }) {
           ]} />}
         </div>
       </div>
-      <p className="mt-1 text-xs text-gray-600">Shows the applicant materials and the presentation items below, never the full recording or the staff discussion. Making or copying the link sends no email.</p>
+      <p className="mt-1 text-xs text-gray-600">The Board page shows the applicant materials and the presentation items below once they are ready, never the full recording or the staff discussion. Making or copying the link sends no email.</p>
       {link && !link.url && <p className="mt-2 text-sm text-amber-800">The current link cannot be read. Issue a new link to replace it.</p>}
       {manualCopy && link?.url && <input aria-label="Presentation link for manual copy" readOnly value={link.url} onFocus={(event) => event.currentTarget.select()} className="mt-2 w-full rounded border border-gray-300 p-2 font-mono text-xs" />}
       {confirmReissue && (
@@ -3624,8 +3678,8 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
     hashScrollDoneRef.current = true;
     card.scrollIntoView?.({ block: 'start' });
   }, []);
-  const heading = <h2 className="text-lg font-semibold text-gray-950">Recording and transcript</h2>;
-  // One Refresh for the whole card (redesign §6 B): transcription status, materials and Board link, the Zoom list, the
+  const heading = <h2 className="text-lg font-semibold text-gray-950">Recording setup</h2>;
+  // One Refresh for all four cards (redesign §6 B): transcription status, materials and Board link, the Zoom list, the
   // presentation video and then both summaries (once each; see useSummaryKind). A failed load keeps its own Retry where
   // it failed (DESIGN.md State Rule), and the speaker editor keeps its Refresh, which preserves unsaved edits.
   const [refreshing, setRefreshing] = useState(false);
@@ -3647,20 +3701,25 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
   };
   const shell = 'mt-8 min-w-0 rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6';
   if (m.unavailable) return <section id="recording-and-transcript-card" className={shell} data-testid="recording-and-transcript-card">{heading}<p className="mt-2 text-sm text-gray-700">Recording and transcript are not available for this request.</p></section>;
+  // One Refresh on the Recording setup card covers all four cards (they share one data set).
+  const setupHeader = (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div id="recording-transcript-title">{heading}</div>
+      {m.data && <Button size="sm" variant="outline" type="button" data-testid="card-refresh" onClick={() => void refreshAll()} disabled={refreshing || z.refreshing || t.loading || Boolean(t.busy)}>{refreshing ? 'Refreshing…' : 'Refresh'}</Button>}
+    </div>
+  );
   return (
-    <section id="recording-and-transcript-card" className={shell} data-testid="recording-and-transcript-card" aria-labelledby="recording-transcript-title">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div id="recording-transcript-title">{heading}</div>
-        {m.data && <Button size="sm" variant="outline" type="button" data-testid="card-refresh" onClick={() => void refreshAll()} disabled={refreshing || z.refreshing || t.loading || Boolean(t.busy)}>{refreshing ? 'Refreshing…' : 'Refresh'}</Button>}
-      </div>
-      {m.loading && !m.data && <p className="mt-4 text-sm text-gray-500">Loading…</p>}
-      {m.error && !m.data && <div className="mt-4"><Notice>{m.error}</Notice></div>}
-      {m.data && (
-        <div className="mt-2">
-          <TranscriptWorkflow m={m} t={t} z={z} requestId={requestId} transcriptInputRef={transcriptInputRef} refreshToken={refreshToken} />
-        </div>
-      )}
-    </section>
+    <div id="recording-and-transcript-card" className="min-w-0" data-testid="recording-and-transcript-card">
+      {m.data
+        ? <TranscriptWorkflow m={m} t={t} z={z} requestId={requestId} transcriptInputRef={transcriptInputRef} refreshToken={refreshToken} shell={shell} setupHeader={setupHeader} />
+        : (
+          <section className={shell} data-testid="card-recording-setup" aria-labelledby="recording-transcript-title">
+            {setupHeader}
+            {m.loading && <p className="mt-4 text-sm text-gray-500">Loading…</p>}
+            {m.error && <div className="mt-4"><Notice>{m.error}</Notice></div>}
+          </section>
+        )}
+    </div>
   );
 }
 

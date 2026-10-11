@@ -79,6 +79,10 @@ Page type: **Record Detail** (one visit for one request).
 
 ## 3. Page layout (proposed)
 
+> **Revised by owner decisions 7-10 (§8.2):** the Recording and transcript card is now four
+> cards (Recording setup, Presentation, Staff discussion, Board materials). The mockup below
+> shows the first build.
+
 Mockup values (institution, dates, durations, counts) are illustrative.
 
 ```
@@ -159,6 +163,11 @@ The same row pattern as Results (§4):
   transcriptions", collapsed (Section Order: history comes last).
 
 ## 4. Results step (the screenshot), proposed
+
+> **Superseded in layout by §8.2 (owner, 2026-10-11):** the rows below now sit in the
+> Presentation and Staff discussion cards, and the Board link heads a Board materials card
+> at the bottom with a status-only readiness list. Row anatomy and the state table (§4.1)
+> are unchanged.
 
 ```
 3  Results
@@ -326,6 +335,26 @@ is automatic.
    no merge or Production deploy. The owner merges.
 6. **Attendees picker:** a search box plus a selected list with Required/Optional per
    person (§3.1).
+
+### 8.2 Owner decisions after the first desktop look (2026-10-11)
+
+The Board section is used rarely (an interested member); every staff member uses this page.
+So the results are organized for staff:
+
+7. **Four cards in work order:** Recording setup (steps 1 and 2; the one Refresh for all four
+   cards sits on its heading), then **Presentation** (video, transcript, summary), then
+   **Staff discussion** (transcript, summary), then **Board materials** at the bottom. Setup
+   comes first because every result depends on it; once done its steps are one line each.
+8. **The full meeting recording and full meeting transcript sit in Staff discussion.** There
+   is no discussion video, so the full recording is how staff watch the discussion.
+9. **Board materials:** the link actions (Generate, Copy, Open, Issue new link) plus a
+   status-only readiness list: Presentation transcript, Presentation summary and (when the
+   feature is on for the request) Presentation video, each "On the Board page", "Not yet" or
+   "Status unknown". Actions stay in the Presentation card. Applicant materials are not
+   repeated: the card's data does not include them, and the Applicant materials card lists
+   them; the Board card's note says the Board page shows them.
+10. The per-row "Not on the Board page until it is generated" note is removed; the readiness
+    list carries that.
 
 ## 9. Build brief (Session 593, 2026-10-11)
 
@@ -723,6 +752,16 @@ and approve exactly that id. Regression: open the approval for A, refresh into B
 confirmation closes with no request; approving B needs its own confirmation and posts B
 (fails with the old behavior).
 
+**Four-card layout (owner decisions 7-10, §8.2):** `TranscriptWorkflow` renders four sibling
+cards from the same state, so the paired Summarize confirmation, the Generate anchor and the
+Refresh are unchanged. The presentation video's load moved into `usePresentationVideo`, which
+the video row and the Board readiness list share (one GET; it loads only once the cards show
+products, as the row did). `publishedSummaryOf` is shared by the summary block and the
+readiness list, so the "On the Board page" status for the summary matches the "Published" chip.
+Tests: card order and placement; readiness for the transcript, the summary (bound or stale)
+and the video (served, out of date, unknown, in review, feature off, and turning on after
+approval, with one load). Mutation checks: each readiness rule, broken, fails its test.
+
 ## 10. Remaining after the build (2026-10-11)
 
 - **Owner:** merge decision. The branch is pushed and not merged (owner decision 5). It is
@@ -738,3 +777,14 @@ confirmation closes with no request; approving B needs its own confirmation and 
   `Button`).
 - **Server-side gap noted by Codex (commit 3):** `createMeetingCorrection` does not refuse
   while a newer transcription is pending; the gate is UI-only.
+
+### 10.1 Owner desktop check findings (2026-10-11, held until the check is done)
+
+1. **Leftover "Refresh transcription status" button** in the Results summary block
+   (`RecordingAndTranscriptCard.js`, three sites: the status-unknown button and the two
+   "Transcript status is unavailable" branches). It predates the redesign (`132eac566`)
+   and duplicates the card Refresh. Fix: remove the buttons; the note reads "Transcript
+   status is unavailable. Use Refresh above to check whether this transcript can be
+   summarized."; move the two tests that click it to the card Refresh.
+2. **Local setup:** `.env.local` lacks `MEETING_TRACKER_SCHEMA_READY=on`, so localhost shows
+   "Meeting Tracker is not yet enabled". Not a code defect.

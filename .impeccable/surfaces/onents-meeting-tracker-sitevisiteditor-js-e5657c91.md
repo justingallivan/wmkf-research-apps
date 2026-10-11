@@ -11,11 +11,11 @@ Scope: the whole Site Visit page was redesigned under DESIGN.md's Page Structure
 
 ## Direction contract
 
-THESIS: Every finished artifact is one row. Its name is the link, status is a chip, re-run and replace actions live in a "…" menu, and only the next step is a visible action. Audience is a group heading ("Board page", "Staff only"), not a sentence per item.
+THESIS: Every finished artifact is one row. Its name is the link, status is a chip, re-run and replace actions live in a "…" menu, and only the next step is a visible action. Results are organized for staff, who all use this page: a Presentation card and a Staff discussion card. The Board, used rarely, gets one card at the bottom with its link and a status-only list of what it shows.
 
 OWN-WORLD: Inherit DESIGN.md (Clear Workbench). Neutral surfaces, ink primary only for confirmations, semantic chips, and the shared `Button` and Workbench `OverflowMenu`. No new visual identity.
 
-STORY: The header names the request (number, institution, title, program, cycle). Visit details is read first, with editing behind Edit. In the edit form, organizer and attendees are search pickers, with each person Required or Optional. In Applicant materials, each item is a row and the heading shows the one next step. In Recording and transcript, steps collapse to one line once done; Results lists the Board page items (with the Board link on the group heading) and then the Staff only items.
+STORY: The header names the request (number, institution, title, program, cycle). Visit details is read first, with editing behind Edit. In the edit form, organizer and attendees are search pickers, with each person Required or Optional. In Applicant materials, each item is a row and the heading shows the one next step. Then four cards in work order (owner, 2026-10-11): Recording setup (steps 1 and 2, one line each once done, and the one Refresh), Presentation (video, transcript, summary), Staff discussion (transcript, summary, full meeting recording and transcript), and Board materials (link actions plus a readiness list).
 
 FIRST VIEWPORT: Header, the Visit details summary, and the top of Applicant materials. Desktop first; narrow widths only avoid overflow.
 

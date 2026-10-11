@@ -358,3 +358,42 @@ describe('an open confirmation is bound to the video it was opened for (Codex wh
     await waitFor(() => expect(state.posts).toEqual([{ action: 'approve', splitId: OLD_ID }]));
   });
 });
+
+describe('Board materials readiness list', () => {
+  const readiness = () => screen.findByTestId('board-readiness-video');
+  test.each([
+    ['approved and served', split({ state: 'approved', boardReady: true }), 'On the Board page'],
+    ['approved but out of date', split({ state: 'approved', boardReady: false }), 'Not yet'],
+    ['approved with an unknown Board status', split({ state: 'approved', boardReady: null }), 'Status unknown'],
+    ['waiting for its check', split({ state: 'review' }), 'Not yet'],
+  ])('a video %s reads from the same load as its row', async (_l, row, label) => {
+    route({ state: { splits: { available: true, splits: [row] } } });
+    await renderLine();
+    await line();
+    expect(await readiness()).toHaveTextContent(label);
+    // Status only: the video's actions stay in the Presentation card.
+    expect(within(screen.getByTestId('card-board-materials')).queryAllByRole('button').map((b) => b.textContent).join(' ')).not.toMatch(/approve|create/i);
+    expect(getCount()).toBe(1);
+  });
+
+  test('the video line is left out when the feature is off for the request', async () => {
+    route({ state: { splits: { available: false, splits: [] } } });
+    await renderLine();
+    await waitFor(() => expect(getCount()).toBeGreaterThan(0));
+    expect(screen.getByTestId('board-readiness-transcript')).toBeInTheDocument();
+    expect(screen.queryByTestId('board-readiness-video')).not.toBeInTheDocument();
+  });
+
+  test('approving the video in the Presentation card turns its Board line on', async () => {
+    let approved = false;
+    route({
+      state: { splits: () => response({ available: true, splits: [split(approved ? { state: 'approved', boardReady: true } : {})] }) },
+      post: () => { approved = true; return response({ split: { id: SPLIT_ID, state: 'approved' } }); },
+    });
+    await renderLine();
+    expect(await readiness()).toHaveTextContent('Not yet');
+    fireEvent.click(within(await line()).getByRole('button', { name: 'Check the ending and approve' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Approve video' }));
+    await waitFor(() => expect(screen.getByTestId('board-readiness-video')).toHaveTextContent('On the Board page'));
+  });
+});

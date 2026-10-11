@@ -174,7 +174,7 @@ test('an existing Board page can be opened and its included and excluded materia
   });
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
   expect(await screen.findByRole('link', { name: 'Open Board page' })).toHaveAttribute('href', 'https://example.test/external/presentation/token');
-  expect(screen.getByText(/Shows the applicant materials and the presentation items below/)).toBeInTheDocument();
+  expect(screen.getByText(/The Board page shows the applicant materials and the presentation items below once they are ready/)).toBeInTheDocument();
   expect(screen.getByText(/never the full recording or the staff discussion/)).toBeInTheDocument();
   // The raw link is never printed; it is reached through Open and Copy.
   expect(screen.queryByText('https://example.test/external/presentation/token')).toBeNull();
@@ -388,14 +388,31 @@ test('a generated transcript with no collection is not labelled uploaded', async
   expect(screen.queryByText(/cannot be edited here/)).not.toBeInTheDocument();
 });
 
-test('with no transcript, the results step explains what comes first instead of listing empty products', async () => {
+test('with no transcript, the Presentation and Staff discussion cards explain what comes first instead of listing empty products', async () => {
   route({ materials: [], collection: collection({ jobs: [], currentArtifact: null }), detail: detailFor({}) });
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
-  const results = await screen.findByTestId('step-results');
-  expect(within(results).getByText(/appear here after step 2/)).toBeInTheDocument();
+  const presentationCard = await screen.findByTestId('card-presentation');
+  expect(within(presentationCard).getByText(/appear here once the presentation end is checked/)).toBeInTheDocument();
+  expect(within(screen.getByTestId('card-staff-discussion')).getByText(/appear here once the presentation end is checked/)).toBeInTheDocument();
   expect(screen.queryByTestId('presentation-summary-block')).not.toBeInTheDocument();
   expect(within(screen.getByTestId('step-review')).getByText('Waiting for a transcript from step 1.')).toBeInTheDocument();
-  expect(within(results).getByTestId('presentation-link-controls')).toBeInTheDocument();
+  const boardCard = screen.getByTestId('card-board-materials');
+  expect(within(boardCard).getByTestId('presentation-link-controls')).toBeInTheDocument();
+  expect(within(boardCard).getByTestId('board-readiness-transcript')).toHaveTextContent('Not yet');
+});
+
+test('the cards run in work order: recording setup, presentation, staff discussion, then Board materials', async () => {
+  route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  await findRow('presentation-transcript-row');
+  const order = Array.from(screen.getByTestId('recording-and-transcript-card').querySelectorAll('[data-testid^="card-"]'))
+    .map((card) => card.getAttribute('data-testid')).filter((id) => id !== 'card-refresh');
+  expect(order).toEqual(['card-recording-setup', 'card-presentation', 'card-staff-discussion', 'card-board-materials']);
+  expect(within(screen.getByTestId('card-recording-setup')).getByTestId('card-refresh')).toBeInTheDocument();
+  expect(within(screen.getByTestId('card-presentation')).getByTestId('presentation-transcript-row')).toBeInTheDocument();
+  expect(within(screen.getByTestId('card-staff-discussion')).getByTestId('discussion-transcript-row')).toBeInTheDocument();
+  expect(within(screen.getByTestId('card-staff-discussion')).getByTestId('full-transcript-row')).toBeInTheDocument();
+  expect(within(screen.getByTestId('card-presentation')).queryByTestId('full-transcript-row')).toBeNull();
 });
 
 test('a manual transcript keeps the summary task visible but explains that timed generated turns are required', async () => {
@@ -624,9 +641,11 @@ describe('presentation end', () => {
     } } });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     expect(await screen.findByText(`Presentation ends at 01:02 · confirmed ${shortDate(CONFIRMED_AT)}`)).toBeInTheDocument();
-    expect(row('presentation-transcript-row')).toHaveTextContent('Not on the Board page until it is generated');
+    expect(row('presentation-transcript-row')).toHaveTextContent('Made from an earlier transcript');
+    expect(screen.getByTestId('board-readiness-transcript')).toHaveTextContent('Not yet');
     fireEvent.click(within(row('presentation-transcript-row')).getByRole('button', { name: 'Generate transcripts' }));
     await waitFor(() => expect(row('presentation-transcript-row')).toHaveTextContent('Ready'));
+    expect(screen.getByTestId('board-readiness-transcript')).toHaveTextContent('On the Board page');
     expect(postBody).toEqual({ expectedCurrentArtifactId: ARTIFACT_ID, expectedCurrentFingerprint: 'e'.repeat(64) });
     expect(screen.queryByRole('button', { name: 'Generate transcripts' })).not.toBeInTheDocument();
   });
@@ -700,7 +719,7 @@ describe('presentation end', () => {
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     expect(await findRow('discussion-transcript-row')).toHaveTextContent('Not made yet');
     expect(row('presentation-transcript-row')).toHaveTextContent('Ready');
-    expect(row('presentation-transcript-row')).not.toHaveTextContent('Not on the Board page');
+    expect(screen.getByTestId('board-readiness-transcript')).toHaveTextContent('On the Board page');
     // One Generate, on the row that needs it.
     expect(within(row('discussion-transcript-row')).getByRole('button', { name: 'Generate transcripts' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Generate transcripts' })).toHaveLength(1);
@@ -1085,6 +1104,19 @@ describe('presentation summary', () => {
       });
       return reads;
     }
+
+    test.each([
+      ['a published summary is on the Board page', 'bound', 'On the Board page'],
+      ['an out-of-date summary is not', 'stale', 'Not yet'],
+    ])('Board materials readiness: %s', async (_l, stateName, label) => {
+      const summary = { ...published, state: stateName };
+      route({ materials: [transcriptRow()], collection: withSummary({ transcriptSummary: summary }), detail: detailFor({}) }, {
+        '/summary-draft': { method: 'GET', respond: () => response(summaryState({ transcriptSummary: summary })) },
+      });
+      render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+      await waitFor(() => expect(screen.getByTestId('board-readiness-summary')).toHaveTextContent(label));
+      expect(row('presentation-summary-block')).toHaveTextContent(stateName === 'bound' ? 'Published' : 'Out of date');
+    });
 
     test('a draft created in another session appears after Refresh, with one read', async () => {
       const reads = setup([
@@ -1626,7 +1658,7 @@ describe('step-by-step layout', () => {
     expect(await screen.findByLabelText(/Audio file/)).toBeInTheDocument();
     expect(stepState('step-recording')).toBe('current');
     expect(stepState('step-review')).toBe('waiting');
-    expect(stepState('step-results')).toBe('waiting');
+    expect(within(screen.getByTestId('card-presentation')).getByText(/appear here once the presentation end is checked/)).toBeInTheDocument();
     expect(within(screen.getByTestId('step-review')).getByText('Waiting for a transcript from step 1.')).toBeInTheDocument();
     expect(screen.queryByLabelText(/Transcript file/)).not.toBeInTheDocument();
     expect(within(screen.getByTestId('step-recording')).queryByRole('button', { name: /^More actions for/ })).not.toBeInTheDocument();
@@ -1641,16 +1673,18 @@ describe('step-by-step layout', () => {
     expect(await findRow('presentation-transcript-row')).toHaveTextContent('Ready');
     expect(stepState('step-recording')).toBe('done');
     expect(stepState('step-review')).toBe('done');
-    expect(stepState('step-results')).toBe('current');
+    expect(within(screen.getByTestId('card-presentation')).queryByText(/appear here once/)).toBeNull();
     expect(screen.queryByLabelText(/Audio file/)).not.toBeInTheDocument();
-    const results = screen.getByTestId('step-results');
+    const presentationCard = screen.getByTestId('card-presentation');
+    const discussionCard = screen.getByTestId('card-staff-discussion');
     // Each result opens by its name; there is no separate Open button.
-    expect(within(results).queryAllByRole('link', { name: /^Open( published summary| video| recording| transcript)?$/ })).toHaveLength(0);
-    expect(within(results).getByRole('link', { name: 'Presentation transcript' })).toHaveAttribute('href', presentation.webUrl);
-    expect(within(results).getByRole('link', { name: 'Staff discussion transcript' })).toHaveAttribute('href', discussion.webUrl);
-    expect(within(results).getByRole('link', { name: 'Full meeting recording' })).toHaveAttribute('href', recording.externalUrl);
+    expect(within(screen.getByTestId('recording-and-transcript-card')).queryAllByRole('link', { name: /^Open( published summary| video| recording| transcript)?$/ })).toHaveLength(0);
+    expect(within(presentationCard).getByRole('link', { name: 'Presentation transcript' })).toHaveAttribute('href', presentation.webUrl);
+    expect(within(discussionCard).getByRole('link', { name: 'Staff discussion transcript' })).toHaveAttribute('href', discussion.webUrl);
+    // There is no discussion video; staff watch the discussion in the full recording, which sits with it.
+    expect(within(discussionCard).getByRole('link', { name: 'Full meeting recording' })).toHaveAttribute('href', recording.externalUrl);
     // The full transcript's text downloads live in its row menu (owner decision 3).
-    expect(within(results).queryByRole('link', { name: 'Download TXT' })).toBeNull();
+    expect(within(discussionCard).queryByRole('link', { name: 'Download TXT' })).toBeNull();
     openRowMenu(row('full-transcript-row'));
     expect(screen.getByRole('menuitem', { name: 'Download TXT' })).toHaveAttribute('href', expect.stringContaining('/download?format=txt'));
     expect(screen.getByRole('menuitem', { name: 'Download VTT' })).toHaveAttribute('href', expect.stringContaining('/download?format=vtt'));
@@ -1752,17 +1786,17 @@ describe('step-by-step layout', () => {
     expect(stepState('step-review')).toBe('waiting');
   });
 
-  test('a stale presentation transcript is regenerated from its Results row; step 2 stays done', async () => {
+  test('a stale presentation transcript is regenerated from its Presentation card row; step 2 stays done', async () => {
     route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact({ presentationTranscript: { state: 'stale', artifactId: ARTIFACT_ID } }) }), detail: detailFor({}) });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
     const presentationRow = await findRow('presentation-transcript-row');
     expect(presentationRow).toHaveTextContent('Out of date');
-    expect(presentationRow).toHaveTextContent('Not on the Board page until it is generated');
+    expect(presentationRow).toHaveTextContent('Made from an earlier transcript');
+    expect(screen.getByTestId('board-readiness-transcript')).toHaveTextContent('Not yet');
     expect(within(presentationRow).getByRole('button', { name: 'Generate transcripts' })).toBeInTheDocument();
     expect(stepState('step-review')).toBe('done');
-    expect(stepState('step-results')).toBe('current');
     expect(within(screen.getByTestId('step-review')).queryByRole('button', { name: 'Generate transcripts' })).toBeNull();
-    expect(within(screen.getByTestId('step-results')).queryByRole('link', { name: 'Presentation transcript' })).not.toBeInTheDocument();
+    expect(within(screen.getByTestId('card-presentation')).queryByRole('link', { name: 'Presentation transcript' })).not.toBeInTheDocument();
   });
 });
 
