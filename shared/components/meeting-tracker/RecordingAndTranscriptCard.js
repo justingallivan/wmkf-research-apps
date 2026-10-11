@@ -3154,7 +3154,9 @@ function PresentationVideoLine({ requestId, revisionKey = '', refreshToken = 0 }
   const [splits, setSplits] = useState([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);
-  const [confirming, setConfirming] = useState(null); // 'approve' | 'recreate'
+  // { kind: 'approve' | 'recreate', splitId } — bound to the video it was opened for, so a refresh that brings in a
+  // different video closes it instead of approving one nobody checked (Codex whole-branch review).
+  const [confirming, setConfirming] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const mountedRef = useRef(true);
@@ -3221,7 +3223,12 @@ function PresentationVideoLine({ requestId, revisionKey = '', refreshToken = 0 }
     }
   };
   const create = () => post({ action: 'start' }, 'The presentation video could not be started. Try again.');
-  const approve = () => post({ action: 'approve', splitId: newest.id }, 'The video could not be approved. Try again.');
+  const approve = (splitId) => post({ action: 'approve', splitId }, 'The video could not be approved. Try again.');
+  const newestState = newest?.state || null;
+  const confirmTargetLive = Boolean(confirming) && confirming.splitId === (newest?.id || null)
+    && (confirming.kind === 'approve' ? newestState === 'review'
+      : newestState === 'review' || (newestState === 'approved' && newest?.boardReady !== false));
+  // A stale confirmation is never rendered (it shows only while it matches the newest video in a confirmable state).
 
   if (!loaded && loadFailed) {
     return (
@@ -3246,11 +3253,11 @@ function PresentationVideoLine({ requestId, revisionKey = '', refreshToken = 0 }
   const current = state === 'review' || (state === 'approved' && !boardStale);
   // A current video is replaced from the menu (behind a confirmation); anything else offers creation inline.
   const createLabel = state === 'review' ? 'Create it again' : 'Create presentation video';
-  const startCreate = () => (current ? setConfirming('recreate') : void create());
+  const startCreate = () => (current ? setConfirming({ kind: 'recreate', splitId: newest?.id || null }) : void create());
   const action = state === 'review'
-    ? <Button size="sm" variant="outline" type="button" onClick={() => setConfirming('approve')} disabled={busy}>Check the ending and approve</Button>
+    ? <Button size="sm" variant="outline" type="button" onClick={() => setConfirming({ kind: 'approve', splitId: newest.id })} disabled={busy}>Check the ending and approve</Button>
     : state === 'registering'
-      ? <Button size="sm" variant="outline" type="button" onClick={() => void approve()} disabled={busy}>{busy ? 'Working…' : 'Finish approving'}</Button>
+      ? <Button size="sm" variant="outline" type="button" onClick={() => void approve(newest.id)} disabled={busy}>{busy ? 'Working…' : 'Finish approving'}</Button>
       : canCreate && !current
         ? <Button size="sm" variant="outline" type="button" onClick={startCreate} disabled={busy}>{busy ? 'Working…' : createLabel}</Button>
         : null;
@@ -3263,16 +3270,16 @@ function PresentationVideoLine({ requestId, revisionKey = '', refreshToken = 0 }
         {(boardStale || state === 'superseded') && <p className="mt-1 text-sm text-gray-700">{PV_STALE_TEXT}</p>}
         {state === 'failed' && <p className="mt-1 text-sm text-gray-700">{PV_REASON_TEXT(newest.failureCode)}</p>}
       </div>
-      {confirming === 'approve' && (
+      {confirmTargetLive && confirming.kind === 'approve' && (
         <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="alertdialog" aria-label="Approve the presentation video">
           <p>Approve this video for the Board? Board members will be able to watch it.</p>
           <div className="mt-2 flex gap-2">
-            <Button size="sm" variant="primary" type="button" onClick={() => void approve()} disabled={busy}>Approve video</Button>
+            <Button size="sm" variant="primary" type="button" onClick={() => void approve(confirming.splitId)} disabled={busy}>Approve video</Button>
             <Button size="sm" variant="outline" type="button" onClick={() => setConfirming(null)} disabled={busy}>Not yet</Button>
           </div>
         </div>
       )}
-      {confirming === 'recreate' && (
+      {confirmTargetLive && confirming.kind === 'recreate' && (
         <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="alertdialog" aria-label="Create the presentation video again">
           <p>{state === 'review' ? 'This discards the video waiting for your check and makes a new one.' : 'This replaces the approved video once the new one is approved.'}</p>
           <div className="mt-2 flex gap-2">

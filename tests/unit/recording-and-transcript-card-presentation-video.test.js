@@ -339,3 +339,22 @@ describe('Board readiness of an approved video', () => {
     await waitFor(() => expect(within(again.container).getByTestId('presentation-video-line')).toHaveTextContent('Out of date'));
   });
 });
+
+describe('an open confirmation is bound to the video it was opened for (Codex whole-branch review)', () => {
+  test('a Refresh that brings in a different video closes the approval and never approves it', async () => {
+    route({ state: { splits: { available: true, splits: [split()] } } });
+    await renderLine();
+    const el = await line();
+    fireEvent.click(within(el).getByRole('button', { name: 'Check the ending and approve' }));
+    expect(within(el).getByRole('alertdialog', { name: 'Approve the presentation video' })).toBeInTheDocument();
+    // Another session replaced the video: B is now the newest one waiting for its check.
+    state.splits = { available: true, splits: [split({ id: OLD_ID, createdAt: '2026-10-11T10:00:00Z' }), split()] };
+    fireEvent.click(screen.getByTestId('card-refresh'));
+    await waitFor(() => expect(within(el).queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(state.posts).toHaveLength(0);
+    // Approving B needs its own confirmation, and it names B.
+    fireEvent.click(within(el).getByRole('button', { name: 'Check the ending and approve' }));
+    fireEvent.click(within(el).getByRole('button', { name: 'Approve video' }));
+    await waitFor(() => expect(state.posts).toEqual([{ action: 'approve', splitId: OLD_ID }]));
+  });
+});

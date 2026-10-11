@@ -715,6 +715,14 @@ UI change was needed; a saved attribution is unaffected.
 Impeccable surface brief (its "not a redesign" scope is superseded), and a pointer from the
 2026-10-04 card plan. The detector over the changed UI files found nothing.
 
+**Final whole-branch Codex review (needs-attention, one high):** an open video approval
+confirmation submitted the newest split id at click time, so a Refresh that brought in a
+different video could approve one nobody had checked. Confirmations now carry the split
+id they were opened for, render only while that split is still newest and confirmable,
+and approve exactly that id. Regression: open the approval for A, refresh into B, and the
+confirmation closes with no request; approving B needs its own confirmation and posts B
+(fails with the old behavior).
+
 ## 10. Remaining after the build (2026-10-11)
 
 - **Owner:** merge decision. The branch is pushed and not merged (owner decision 5). It is
