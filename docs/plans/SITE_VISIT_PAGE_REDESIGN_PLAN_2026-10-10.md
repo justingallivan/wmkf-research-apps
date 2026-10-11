@@ -665,3 +665,16 @@ UI change was needed; a saved attribution is unaffected.
   missing row with a retryable finalize, then another row's Waive refreshes in this row's
   receipt; the same Retry button remains and re-finalizes the same staging id (fails with
   the old placement).
+
+**Commit 6, one attendee picker** (owner decision 6: a search box plus a list). As built:
+
+- New `AttendeePicker`. A search box over the directory (up to 8 matches; a person with no
+  email is listed, disabled, with `noEmailHint` on hover) and a list of the people chosen,
+  each with a Required / Optional toggle and Remove. **Staff and Board attendees** replace
+  the two chip fieldsets that rendered every person twice. The saved
+  `requiredAttendees` / `optionalAttendees` / `organizer` shapes are unchanged; adding
+  goes to Required, and switching role reuses the existing one-role-per-person `toggleIn`.
+- **Organizer** uses the same picker in single mode (staff only), with **Change**.
+- Applicant-side attendees (AkoyaGo suggestions plus manual entry) are unchanged.
+- **Deviation:** the read-only Visit details summary is left as built. It is already
+  read-first and compact (a two-column definition list) and already shows names, not ids.

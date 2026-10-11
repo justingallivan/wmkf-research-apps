@@ -14,6 +14,7 @@ import Layout, { Button } from '../Layout';
 import { SITE_VISIT_FORMAT, SITE_VISIT_FORMAT_LABEL, SITE_VISIT_LIMITS } from '../../config/siteVisit';
 import SiteVisitMaterialsCard from './SiteVisitMaterialsCard';
 import RecordingAndTranscriptCard from './RecordingAndTranscriptCard';
+import AttendeePicker from './AttendeePicker';
 
 const DEFAULT_TIME_ZONE = 'America/Los_Angeles';
 
@@ -92,7 +93,7 @@ async function readJson(url, options, fallback) {
   return body;
 }
 
-const NO_EMAIL_SECTION_HINT = 'Greyed names have no email on file; hover a name for the reason.';
+const NO_EMAIL_SECTION_HINT = 'Names marked “no email” cannot be added; hover a name for the reason.';
 export const noEmailHint = (person) => person?.linked
   ? 'No email on file. The linked Dataverse contact is inactive, missing, or has no primary email; fix or relink the contact, or unlink the roster row.'
   : 'No email on file. Add a preferred email on the Expertise Finder roster before this person can be added.';
@@ -240,6 +241,17 @@ export default function SiteVisitEditor() {
       [other]: current[other].filter((row) => !sameRef(row, ref)),
     };
   });
+  // Staff and Board attendees (redesign §3.1): one list, each person Required or Optional.
+  const removeAttendee = (ref) => setForm((current) => ({
+    ...current,
+    requiredAttendees: current.requiredAttendees.filter((row) => !sameRef(row, ref)),
+    optionalAttendees: current.optionalAttendees.filter((row) => !sameRef(row, ref)),
+  }));
+  const attendeeRole = (ref) => (form.optionalAttendees.some((row) => sameRef(row, ref)) ? 'optional' : 'required');
+  const setAttendeeRole = (ref, role) => {
+    if (attendeeRole(ref) === role) return;
+    toggleIn(role === 'optional' ? 'optionalAttendees' : 'requiredAttendees', ref);
+  };
   const addManual = () => {
     const email = manual.email.trim().toLowerCase();
     if (!email) return;
@@ -331,37 +343,27 @@ export default function SiteVisitEditor() {
           <fieldset className="mt-6 border-t border-gray-100 pt-5">
             <legend className="text-base font-semibold text-gray-900">Organizer</legend>
             <p className="mt-1 text-sm text-gray-600">The staff member who owns the visit and the calendar entry.</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {recipients.staff.map((person) => (
-                <Chip key={refKey(person.ref)} selected={sameRef(form.organizer, person.ref)} disabled={busy} onClick={() => updateForm('organizer', sameRef(form.organizer, person.ref) ? null : person.ref)}>{person.name}</Chip>
-              ))}
-              {recipients.staff.length === 0 && <p className="text-sm text-gray-500">No staff found in the directory.</p>}
+            <div className="mt-3">
+              {recipients.staff.length === 0
+                ? <p className="text-sm text-gray-500">No staff found in the directory.</p>
+                : <AttendeePicker single label="Organizer" people={recipients.staff} selected={form.organizer ? [form.organizer] : []}
+                  onAdd={(ref) => updateForm('organizer', ref)} onRemove={() => updateForm('organizer', null)} disabled={busy} hintFor={noEmailHint} />}
             </div>
           </fieldset>
 
-          {[['requiredAttendees', 'Required attendees'], ['optionalAttendees', 'Optional attendees']].map(([role, label]) => (
-            <fieldset key={role} className="mt-6 border-t border-gray-100 pt-5">
-              <legend className="text-base font-semibold text-gray-900">{label}</legend>
-              <div className="mt-3 grid gap-4 md:grid-cols-2">
-                {[['Staff', recipients.staff], ['Board', recipients.board]].map(([group, rows]) => (
-                  <div key={group}>
-                    <h2 className="text-sm font-semibold text-gray-700">{group}</h2>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {rows.map((person) => {
-                        const selected = form[role].some((ref) => sameRef(ref, person.ref));
-                        const noEmail = !person.email;
-                        return (
-                          <Chip key={refKey(person.ref)} selected={selected} disabled={busy || (noEmail && !selected)} title={noEmail ? noEmailHint(person) : undefined} onClick={() => toggleIn(role, person.ref)}>{person.name}{noEmail ? ' · no email' : ''}</Chip>
-                        );
-                      })}
-                      {rows.length === 0 && <p className="text-sm text-gray-500">No eligible people found.</p>}
-                      {rows.some((person) => !person.email) && <p className="w-full text-xs text-gray-500">{NO_EMAIL_SECTION_HINT}</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </fieldset>
-          ))}
+          <fieldset className="mt-6 border-t border-gray-100 pt-5">
+            <legend className="text-base font-semibold text-gray-900">Staff and Board attendees</legend>
+            <p className="mt-1 text-sm text-gray-600">Each person is Required or Optional on the calendar entry.</p>
+            <div className="mt-3">
+              {recipients.staff.length + recipients.board.length === 0
+                ? <p className="text-sm text-gray-500">No eligible people found.</p>
+                : <AttendeePicker label="Find a staff or Board member" people={[...recipients.staff, ...recipients.board]}
+                  selected={[...form.requiredAttendees, ...form.optionalAttendees]} roles={attendeeRole}
+                  onAdd={(ref) => toggleIn('requiredAttendees', ref)} onRemove={removeAttendee} onRole={setAttendeeRole}
+                  disabled={busy} hintFor={noEmailHint} full={form.requiredAttendees.length >= SITE_VISIT_LIMITS.attendeesPerRole} />}
+              {[...recipients.staff, ...recipients.board].some((person) => !person.email) && <p className="mt-2 text-xs text-gray-500">{NO_EMAIL_SECTION_HINT}</p>}
+            </div>
+          </fieldset>
 
           <fieldset className="mt-6 border-t border-gray-100 pt-5">
             <legend className="text-base font-semibold text-gray-900">Applicant-side attendees</legend>
