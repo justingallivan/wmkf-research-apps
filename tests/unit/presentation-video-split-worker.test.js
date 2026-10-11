@@ -326,9 +326,10 @@ describe('failures and supersedes', () => {
   test('a source_hash_mismatch cut receipt supersedes the split instead of failing it', async () => {
     const w = world();
     await toCutting(w);
-    w.files[`${WORK}/receipt.json`] = json({ ok: false, code: 'source_hash_mismatch' });
+    w.files[`${WORK}/receipt.json`] = json({ ok: false, code: 'source_hash_mismatch', sourceQuickXorHash: 'computed-qx' });
     w.setCommand('cmd-1', 3);
     expect(await w.tick()).toMatchObject({ outcome: 'superseded', code: 'presentation_video_source_changed' });
+    expect(w.logs).toContainEqual(expect.objectContaining({ event: 'presentation_video_source_hash_mismatch', expected: 'qx', computed: 'computed-qx' }));
   });
 
   test('revalidation runs again before the upload phase', async () => {
