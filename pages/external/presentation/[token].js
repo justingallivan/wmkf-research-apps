@@ -152,8 +152,8 @@ function MaterialRow({ name, action, note = null }) {
 }
 
 // View opens a PDF in the browser (Office files as a PDF copy Microsoft converts on the server). The
-// original is offered only if viewing fails, so a reader is never stuck.
-function ViewRow({ token, name, file, viewMode = 'open' }) {
+// original (for slides, the PowerPoint when there is one) is offered only if viewing fails.
+function ViewRow({ token, name, file, viewMode = 'open', fallback = file }) {
   const viewer = usePdfViewer(token, file, viewMode);
   return (
     <MaterialRow
@@ -166,7 +166,7 @@ function ViewRow({ token, name, file, viewMode = 'open' }) {
       note={viewer.failed && (
         <p role="status" className="mt-3 text-base text-gray-600">
           This file could not be opened in the browser.{' '}
-          <a href={endpoint(token, file, 'download')} className={LINK}>Download it instead</a>
+          <a href={endpoint(token, fallback, 'download')} className={LINK}>Download it instead</a>
         </p>
       )}
     />
@@ -201,7 +201,9 @@ function Materials({ token, proposal, slidesPdf, slidesOriginal, others }) {
       <SectionHeading>Materials</SectionHeading>
       <ul className="mt-4 divide-y divide-gray-200 border-y border-gray-200">
         {proposal && <ViewRow token={token} name="Proposal" file={proposal} />}
-        {slides && <FileRow token={token} name="Slides" file={slides} />}
+        {slidesPdf
+          ? <ViewRow token={token} name="Slides" file={slidesPdf} fallback={slidesOriginal || slidesPdf} />
+          : slidesOriginal && <FileRow token={token} name="Slides" file={slidesOriginal} />}
         {others.map((material) => <FileRow key={material.member} token={token} name={displayName(material.filename)} file={material} />)}
       </ul>
     </section>

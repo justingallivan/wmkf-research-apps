@@ -197,7 +197,10 @@ test('a failed slides fetch closes the blank tab and says what to do', async () 
   render(<PresentationMaterialsPage />);
   fireEvent.click(await screen.findByRole('button', { name: 'View slides' }));
   expect(await screen.findByText(/This file could not be opened in the browser/)).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Download it instead' }).getAttribute('href')).toContain('mode=download');
+  const fallback = screen.getByRole('link', { name: 'Download it instead' }).getAttribute('href');
+  expect(fallback).toContain('mode=download');
+  // The paired PowerPoint is the fallback, not the PDF that just failed.
+  expect(fallback).toContain(encodeURIComponent(SLIDES_PPTX.member));
   expect(tab.close).toHaveBeenCalled();
 });
 
