@@ -1,4 +1,45 @@
-# Session 593 Prompt: Stage 4 live (first cut approved); Board-link eTag check; Recording and transcript card redesign
+# Session 594 Prompt: Site Visit redesign shipped; CI green again
+
+## Session 593 close — Site Visit page redesign built, owner-checked, merged and deployed; CI install failure fixed (Claude, main, 2026-10-11 PT)
+
+### What Was Completed
+
+1. **Site Visit page redesign shipped.** Built on `claude/site-visit-redesign` with a Codex adversarial review per commit, owner desktop check on localhost, merged `c574e9e7d`, Production deployment Ready (GitHub deployment for the merge SHA). Docs marked shipped `450272aa0`.
+   - Owner decisions 7-12 (plan §8.2): four cards in work order (Recording setup, Presentation, Staff discussion, Board materials); summary before transcript; no full-recording row (full recording will be deleted at Stage 5); full meeting transcript Open + TXT/VTT in step 1's menu.
+   - Board materials card: link actions plus a status-only readiness list (`usePresentationVideo`, `publishedSummaryOf`, `collectionCurrent`); six Codex rounds on readiness edge cases; round 6 gap owner-accepted (plan §10).
+   - Desktop-check fixes: leftover "Refresh transcription status" buttons removed; contradictory waiting line removed.
+2. **CI fixed (PR #472, merge `9aca02fa2`).** Tests and E2E had failed at `npm ci` on every `main` push since `0aca28b9e`: npm 11 wrote a lock that CI's Node 22 / npm 10 rejects (missing nested `chokidar@5`, `readdirp@5`). Added only those two entries; also hardened one CI-timing-sensitive card test. Tests and E2E green on `main`. Memory: `project-ci-npm10-lockfile-parity.md` (`169bff8c1`).
+3. `.gitignore` ignores Word lock files under `shared/templates` (`4f5c97d28`); stale lock file deleted.
+
+### Next Items
+
+#### Verified Open
+
+1. **Site Visit redesign remaining work** (plan §10): header status chip; server slices C1-C3 (auto-generate after publish, real cancel reason, stream the review video); `BTN_LINK` convergence; server-side gate in `createMeetingCorrection` while a newer transcript is pending.
+   Evidence: `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md` §10.
+
+#### Owner Decision Needed
+
+1. Optional row renames ("Presentation recording", "Discussion summary/transcript"); current labels kept. Evidence: Session 593 conversation; `RecordingAndTranscriptCard.js` row labels.
+2. Delete the merged remote branch `claude/site-visit-redesign`? (offered, not answered).
+3. Carried from Session 592, not rechecked this session: widen `PRESENTATION_VIDEO_SPLIT_ACCESS`; Stage 4 SharePoint-writer threat model; Proposal Ranking PR #463 and dry run.
+
+#### Verify Before Acting
+
+1. Carried from Session 592, not rechecked: Board link check for the approved 1003222 video (`pinnedBytesMatch`); Stage 4 worktrees to remove after confirming no uncommitted work; Sessions 588-590 carryover (Proposal Ranking cleanup, paired-summaries checks, PR #470 cleanup test).
+
+### Gotchas
+
+- Localhost needs `MEETING_TRACKER_SCHEMA_READY`, `MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY`, `MEETING_TRACKER_TRANSCRIPTION_ACCESS`, `SITE_VISIT_MATERIALS_SCHEMA_READY`, `PRESENTATION_VIDEO_SPLIT_ACCESS` set to see the full Site Visit page; unset, each feature reports itself off. Owner added `MEETING_TRACKER_SCHEMA_READY` only. Local actions write to the app's Postgres/Blob and call providers even though Dataverse writes are blocked.
+- Before pushing dependency changes, check the lock with `npx -y npm@10 ci --dry-run` (CI is npm 10).
+- `git merge -F -` does not read stdin; use a message file.
+- Codex's review sandbox cannot run jest; all test results come from local runs.
+
+**Milestone determination:** the Site Visit redesign shipped to Production, so a DEVELOPMENT_LOG entry was added.
+
+---
+
+## Session 593 Prompt (superseded): Stage 4 live (first cut approved); Board-link eTag check; Recording and transcript card redesign
 
 ## Session 592 close — Stage 4 presentation video built, merged and first real cut approved; three live fixes (Claude orchestrating, Sonnet builds, Codex reviews; main, 2026-10-10 PT)
 

@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Site Visit page redesigned for staff (Session 593)
+
+**Milestone:** The Meeting Tracker Site Visit page was rebuilt under DESIGN.md's Page Structure rules: each finished item is one row (name is the link, a status chip, a "…" menu), finished steps collapse to one line, and results sit in staff-first cards (Recording setup, Presentation, Staff discussion, Board materials with a status-only readiness list). The full recording is no longer shown to staff.
+**Sessions:** 593 (Claude building, Codex adversarial review on every commit; owner desktop check on localhost). Merge `c574e9e7d`; docs `450272aa0`.
+**Ship state:**
+- Header shows institution, title, program and cycle (new read-only request lookup on the visit GET); organizer and attendees use a search-and-list picker with Required/Optional.
+- Applicant materials are rows with one next step on the heading; one Refresh for the recording cards.
+- Open: header status chip; server slices C1-C3; an owner-accepted Board-readiness gap after a failed post-save reload.
+**Why it matters:** the page staff use on every visit no longer repeats "Open" and status prose per item; the rarely used Board view moved to the bottom.
+**Pointers:** `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md` (§8.2 decisions, §9.6 log, §10 open); `shared/components/meeting-tracker/RecordingAndTranscriptCard.js`, `ArtifactRow.js`, `AttendeePicker.js`.
+
 ## October 2026 — Presentation video cut from the Zoom recording (Session 592)
 
 **Milestone:** Staff can cut the copied Zoom MP4 at the confirmed presentation end in a Vercel Sandbox, check the ending, and approve it; approval registers a Dataverse "Presentation Video" (100000011) the Board and briefing pages can play. First real cut (1003222) approved 2026-10-10.
