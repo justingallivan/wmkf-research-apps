@@ -21,3 +21,14 @@ export const PAIRED_SUMMARY_ACKNOWLEDGMENT = Object.freeze({
 
 // Bounds shared by the editor and the server.
 export const SUMMARY_TEXT_MAX_CHARS = 100000;
+
+// The section headings the presentation summary prompt asks for, in order
+// (shared/config/prompts/meeting-presentation-summary.js). Readers use them to show a
+// published summary with structure; staff may edit a draft, so readers must tolerate their absence.
+export const PRESENTATION_SUMMARY_HEADINGS = Object.freeze([
+  'What was presented',
+  'Questions and answers',
+  'Open points',
+]);
+// Under these headings the prompt asks for short lines, so readers show them as a list.
+export const PRESENTATION_SUMMARY_LIST_HEADINGS = Object.freeze(['Open points']);

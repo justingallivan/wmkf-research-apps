@@ -57,6 +57,8 @@ function dependencies(rows, overrides = {}) {
       size: 90_000_000, malware: null, downloadUrl: 'https://tenant.sharepoint.com/download?short=1',
     })),
     // The approved cut matching the video fixture (drive / video-item); the Board route checks the video's bytes against it.
+    // No summary bytes by default: the summary lists with text null. Tests that read it override this.
+    downloadFile: jest.fn(async () => { throw new Error('no summary bytes in this test'); }),
     getApprovedVideoCut: jest.fn(async () => ({
       output_drive_id: 'drive', output_item_id: 'video-item', output_size: 1000, output_quickxor_hash: 'qxh-1',
     })),
@@ -128,21 +130,69 @@ async function expectNotFound(promise) {
   await expect(promise).rejects.toMatchObject({ httpStatus: 404 });
 }
 
-test('context lists applicant files plus only the bound Presentation Transcript and summary, and leaks no internals', async () => {
+test('context lists applicant files plus only the bound summary (the Presentation Transcript stays unlisted), and leaks no internals', async () => {
   const slides = fileRow(SLIDES_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES, 'site-visit-materials-portal');
   const forbidden = fileRow('66666666-6666-4666-8666-666666666666', REQUEST_DOCUMENT_ARTIFACT_TYPE.CONSULTANT_FEEDBACK, 'consultant-feedback');
   const deps = dependencies([slides, fileRecording(), fullTranscript(), derivative(), summaryRow(), forbidden]);
   const context = await buildPresentationContext(
     { requestId: REQUEST_ID, link: { expires_at: new Date('2026-11-24T12:00:00Z') } }, deps,
   );
-  expect(context.materials.map((item) => item.member)).toEqual([
-    `material:${SLIDES_ID}`, `material:${PRESENTATION_ID}`, `material:${SUMMARY_ID}`,
-  ]);
+  expect(context.materials.map((item) => item.member)).toEqual([`material:${SLIDES_ID}`, `material:${SUMMARY_ID}`]);
+  expect(context.materials.map((item) => item.kind)).toEqual(['slides', 'summary']);
   expect(context.materials.every((item) => item.canWatch === false)).toBe(true);
   const json = JSON.stringify(context);
   for (const leak of ['1003220', 'sharepoint.com', 'consultant', REVISION, 'presentationEnd', 'generationkey', 'schemaVersion']) {
     expect(json).not.toContain(leak);
   }
+});
+
+describe('summary text on the page', () => {
+  const crypto = require('crypto');
+  const BOM = Buffer.from([0xef, 0xbb, 0xbf]);
+  const TEXT = 'What was presented\nThe PI described the approach.\n';
+  const bytes = Buffer.concat([BOM, Buffer.from(TEXT, 'utf8')]);
+  const sha = crypto.createHash('sha256').update(bytes).digest('hex');
+  const published = (over = {}) => summaryRow({ wmkf_filesize: bytes.length, wmkf_contenthash: sha, wmkf_filename: 'summary.txt', ...over });
+  const context = (rows, downloadFile) => buildPresentationContext({ requestId: REQUEST_ID },
+    dependencies(rows, { downloadFile }));
+  const summaryOf = (ctx) => ctx.materials.find((item) => item.kind === 'summary');
+
+  test('the published summary is read, bound by size and SHA-256, and returned without its BOM', async () => {
+    const downloadFile = jest.fn(async () => ({ buffer: bytes }));
+    const ctx = await context([fullTranscript(), published()], downloadFile);
+    expect(summaryOf(ctx).text).toBe(TEXT);
+    expect(downloadFile).toHaveBeenCalledTimes(1);
+    expect(downloadFile.mock.calls[0][2]).toEqual({ maxBytes: expect.any(Number) });
+  });
+
+  test.each([
+    ['the bytes differ from the published hash', () => [published()], async () => ({ buffer: Buffer.concat([BOM, Buffer.from(TEXT.replace('PI', 'Pl'), 'utf8')]) })],
+    ['the size differs', () => [published({ wmkf_filesize: bytes.length + 1 })], async () => ({ buffer: bytes })],
+    ['the row has no content hash', () => [published({ wmkf_contenthash: null })], async () => ({ buffer: bytes })],
+    ['the download fails', () => [published()], async () => { throw new Error('graph down'); }],
+    ['the bytes are not UTF-8', () => [published({ wmkf_filesize: 2, wmkf_contenthash: crypto.createHash('sha256').update(Buffer.from([0xc3, 0x28])).digest('hex') })], async () => ({ buffer: Buffer.from([0xc3, 0x28]) })],
+  ])('the summary still lists but carries no text when %s', async (_label, rows, download) => {
+    const ctx = await context([fullTranscript(), ...rows()], jest.fn(download));
+    expect(summaryOf(ctx)).toMatchObject({ member: `material:${SUMMARY_ID}`, text: null });
+  });
+
+  test('a stalled summary read does not hold back the page: past the deadline the summary lists with no text', async () => {
+    const stalled = jest.fn(() => new Promise(() => {}));
+    const slides = fileRow(SLIDES_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES, 'site-visit-materials-portal');
+    const started = Date.now();
+    const ctx = await buildPresentationContext({ requestId: REQUEST_ID },
+      dependencies([slides, fullTranscript(), published()], { downloadFile: stalled, summaryReadDeadlineMs: 50 }));
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(summaryOf(ctx)).toMatchObject({ text: null });
+    expect(ctx.materials.map((item) => item.kind)).toEqual(['slides', 'summary']);
+  });
+
+  test('only the summary is downloaded; slides and other files are never read for the page', async () => {
+    const downloadFile = jest.fn(async () => ({ buffer: bytes }));
+    const slides = fileRow(SLIDES_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES, 'site-visit-materials-portal');
+    await context([slides, fullTranscript(), derivative(), published()], downloadFile);
+    expect(downloadFile).toHaveBeenCalledTimes(1);
+  });
 });
 
 test('the default findDocuments opts into the transcript bundle', async () => {
