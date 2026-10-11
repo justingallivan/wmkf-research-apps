@@ -1322,7 +1322,14 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   const [noVttConfirmation, setNoVttConfirmation] = useState(null);
   const [acknowledged, setAcknowledged] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
-  const [busy, setBusy] = useState(null);
+  const [busy, setBusyState] = useState(null);
+  // Owned busy flags (publish, save, attendance load): each clears only if it still owns the flag, independent of the
+  // editor key, so closing the editor cannot strand it and a stale action cannot release a newer one. Every other
+  // setBusy disowns, so a stale owned action never releases a flag another action set.
+  const busyOwnerRef = useRef(null);
+  const setBusy = (value) => { busyOwnerRef.current = null; setBusyState(value); };
+  const claimBusy = (value) => { const owner = {}; busyOwnerRef.current = owner; setBusyState(value); return owner; };
+  const releaseBusy = (owner) => { if (busyOwnerRef.current === owner) { busyOwnerRef.current = null; setBusyState(null); } };
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [conflict, setConflict] = useState(false);
@@ -1482,14 +1489,14 @@ function useTranscription(requestId, { onMaterialsChanged }) {
     const sequence = detailSeqRef.current;
     const target = editorKey;
     const current = () => isCurrent(generation) && sequence === detailSeqRef.current && editorKeyRef.current === target;
-    setBusy('attendance');
+    const owner = claimBusy('attendance');
     requestJson(`${basePath}/corrections/${encodeURIComponent(correction.operationId)}/attendance`, {
       method: 'POST', body: { expectedVersion: correction.version }, fallbackMessage: 'Attendance could not be loaded.',
     }).then(result => {
       if (current()) setCorrectionDetail(detail => detail ? { ...detail, correction: result.correction } : detail);
     }).catch(error => {
       if (current()) setError(errorMessage(error, 'Attendance could not be loaded. Refresh to try again.'));
-    }).finally(() => { if (current()) setBusy(null); });
+    }).finally(() => { if (isCurrent(generation)) releaseBusy(owner); });
   }, [correction, attendanceReview, dirtyNames, dirtyEnd, busy, baselineEndMs, requestId, editorKey, basePath, isCurrent]);
 
   // Load the run under review once it is readable; one attempt per run and status so a failure cannot loop.
@@ -1556,7 +1563,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
     const generation = generationRef.current;
     const targetKey = editorKey;
     if (correction) {
-      setBusy('speakers');
+      const owner = claimBusy('speakers');
       setError(null);
       setNotice(null);
       try {
@@ -1578,7 +1585,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
           setError(errorMessage(saveError, 'Your changes could not be saved.'));
         }
       } finally {
-        if (isCurrent(generation) && editorKeyRef.current === targetKey) setBusy(null);
+        if (isCurrent(generation)) releaseBusy(owner);
       }
       return;
     }
@@ -1622,7 +1629,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
     }
     const generation = generationRef.current;
     const targetKey = editorKey;
-    setBusy('publish');
+    const owner = claimBusy('publish');
     setError(null);
     setNotice(null);
     try {
@@ -1653,7 +1660,9 @@ function useTranscription(requestId, { onMaterialsChanged }) {
         }
       }
     } finally {
-      if (isCurrent(generation) && editorKeyRef.current === targetKey) setBusy(null);
+      // A successful publish closes the editor (setCorrectionDetail(null)) before this runs; keying the clear to the
+      // editor left every busy-disabled control greyed until a reload (live, 2026-10-10).
+      if (isCurrent(generation)) releaseBusy(owner);
     }
   };
 
