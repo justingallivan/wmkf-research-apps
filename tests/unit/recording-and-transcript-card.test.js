@@ -1100,6 +1100,35 @@ describe('presentation summary', () => {
       expect(reads.count).toBe(2);
     });
 
+    test('a key-change read that finishes before the rest of Refresh is the only read (Codex round 4)', async () => {
+      const state = { materials: [transcriptRow()], collection: withSummary({ transcriptSummary: published }), detail: detailFor({}) };
+      const reads = { presentation: 0, discussion: 0 };
+      let releaseMaterials = null;
+      let materialLoads = 0;
+      route(state, {
+        'kind=discussion': { method: 'GET', respond: () => { reads.discussion += 1; return response(EMPTY_DISCUSSION_SUMMARY); } },
+        '/summary-draft': { method: 'GET', respond: () => { reads.presentation += 1; return response(summaryState({ transcriptSummary: published })); } },
+        '/presentation-materials': { method: 'GET', respond: () => {
+          materialLoads += 1;
+          const body = response({ materials: state.materials, uploads: [] });
+          return materialLoads === 1 ? body : new Promise((resolve) => { releaseMaterials = () => resolve(body); });
+        } },
+      });
+      render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+      await waitFor(() => expect(row('presentation-summary-block')).toHaveTextContent('Published'));
+      const before = { ...reads };
+      // The transcript changes, so each summary's own key-change read runs and finishes while materials are delayed.
+      state.collection = withSummary({ fingerprint: 'f'.repeat(64), transcriptSummary: published });
+      fireEvent.click(screen.getByTestId('card-refresh'));
+      await waitFor(() => expect(reads.presentation).toBe(before.presentation + 1));
+      await waitFor(() => expect(releaseMaterials).not.toBeNull());
+      await act(async () => { releaseMaterials(); });
+      await waitFor(() => expect(screen.getByTestId('card-refresh')).toBeEnabled());
+      await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+      expect(reads.presentation).toBe(before.presentation + 1);
+      expect(reads.discussion).toBeLessThanOrEqual(before.discussion + 1);
+    });
+
     test('a draft edited elsewhere becomes a conflict that keeps the local unsaved text', async () => {
       setup([
         summaryState({ transcriptSummary: published, draft: readyDraft(), draftMatchesTranscript: true }),

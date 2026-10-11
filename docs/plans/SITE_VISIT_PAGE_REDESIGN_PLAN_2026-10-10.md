@@ -600,3 +600,10 @@ regression tests. Round 2 approved with no material findings. As built, with the
   render time. Result: one read per kind per Refresh, and the read-scripted race tests are
   unchanged. Two regression tests (a draft created elsewhere appears; a draft edited
   elsewhere becomes a conflict that keeps local text) fail when the read is removed.
+- **Codex round 4 (needs-attention, one medium):** a key-change read that finished before
+  the rest of Refresh settled was followed by a second read. The fix runs in two phases:
+  the card bumps `summaryRefresh.begin` at the start, and each kind records its read
+  sequence. On `settle`, a kind reads only if no read started since `begin`. Regression:
+  materials are held until the key-change read completes, and Refresh still produces
+  exactly one read; the test fails without the sequence check. The owner approved this
+  round (2026-10-11).

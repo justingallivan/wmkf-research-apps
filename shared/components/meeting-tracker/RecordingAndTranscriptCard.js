@@ -1049,6 +1049,8 @@ const SUMMARY_KIND_UI = Object.freeze({
   }),
 });
 const SUMMARY_KIND_ORDER = Object.freeze(['presentation', 'discussion']);
+// The card Refresh's two phases for the summary hooks: `begin` when it starts, `settle` once its loads have settled.
+const REFRESH_IDLE = Object.freeze({ begin: 0, settle: 0 });
 // A generating row older than the server's abandon window (360 s) can be retried.
 const SUMMARY_RUN_ABANDON_MS = 360 * 1000;
 function summaryRunAbandoned(draft) {
@@ -1065,7 +1067,7 @@ function pairedSummaryEligible(h) {
 // One summary kind's draft, review and publish state (plan §4.3, §16; paired summaries plan D9). The caller owns
 // `busy` for generation and the acknowledgment; every write is dropped when the card changed or this kind's load key moved on.
 function useSummaryKind(kind, { requestId, basePath, currentArtifact, busy, setBusy, generationRef, isCurrent,
-  loadCollection, onMaterialsChangedRef, summaryRefreshToken = 0 }) {
+  loadCollection, onMaterialsChangedRef, summaryRefresh = REFRESH_IDLE }) {
   const spec = SUMMARY_KIND_UI[kind];
   const summaryPath = `${basePath}/summary-draft`;
   const summarySequenceRef = useRef(0);
@@ -1177,19 +1179,27 @@ function useSummaryKind(kind, { requestId, basePath, currentArtifact, busy, setB
     return () => { cancelled = true; };
   }, [summaryLoadKey, wantsSummary, loadSummary, spec]);
 
-  // The card's Refresh (bumped after the collection reload settles) re-reads this kind once, so a draft created, edited
-  // or discarded in another session shows up (Codex review round 3, redesign commit 3). A pending or in-flight
-  // key-change read takes precedence: it already covers the refresh, so this skips rather than reading twice. The read
-  // keeps unsaved local text through loadSummary's own draft-version rules.
-  const handledRefreshRef = useRef(summaryRefreshToken);
+  // The card's Refresh re-reads this kind exactly once, so a draft created, edited or discarded in another session
+  // shows up (Codex review rounds 3-4, redesign commit 3). At the Refresh's start this kind notes how many reads it
+  // had started; when the Refresh settles it reads only if none started since. A key-change read caused by the
+  // collection reload (pending, in flight, or already finished) therefore covers it. The read keeps unsaved local
+  // text through loadSummary's own draft-version rules.
+  const refreshBaselineRef = useRef(null);
   useEffect(() => {
-    if (handledRefreshRef.current === summaryRefreshToken) return;
-    handledRefreshRef.current = summaryRefreshToken;
+    if (summaryRefresh.begin) refreshBaselineRef.current = summarySequenceRef.current;
+  }, [summaryRefresh.begin]);
+  const handledRefreshRef = useRef(summaryRefresh.settle);
+  useEffect(() => {
+    if (handledRefreshRef.current === summaryRefresh.settle) return undefined;
+    handledRefreshRef.current = summaryRefresh.settle;
+    const baseline = refreshBaselineRef.current;
+    refreshBaselineRef.current = null;
+    if (baseline === null || summarySequenceRef.current > baseline) return undefined;
     if (!wantsSummary || summaryLoadedKey !== summaryLoadKey || summaryReadState === 'loading') return undefined;
     let cancelled = false;
     Promise.resolve().then(() => { if (!cancelled) void loadSummary(); });
     return () => { cancelled = true; };
-  }, [summaryRefreshToken]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [summaryRefresh.settle]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The paired handler holds `busy` and checks the acknowledgment; this kind tracks only its own run.
   const summarize = async () => {
@@ -1320,7 +1330,7 @@ function useSummaryKind(kind, { requestId, basePath, currentArtifact, busy, setB
   };
 }
 
-function useTranscription(requestId, { onMaterialsChanged, summaryRefreshToken = 0 }) {
+function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFRESH_IDLE }) {
   const basePath = `${API_PATH}/${encodeURIComponent(requestId || '')}/transcriptions`;
   const [collection, setCollection] = useState(null);
   const [collectionCheckedAt, setCollectionCheckedAt] = useState(0);
@@ -1957,7 +1967,7 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefreshToken =
   // ---- Summaries: one hook per kind, sharing the generation guard and `busy`. ----
   const [summaryAck, setSummaryAck] = useState(false);
   const summaryHookArgs = { requestId, basePath, currentArtifact: collection?.currentArtifact || null,
-    busy, setBusy, generationRef, isCurrent, loadCollection, onMaterialsChangedRef, summaryRefreshToken };
+    busy, setBusy, generationRef, isCurrent, loadCollection, onMaterialsChangedRef, summaryRefresh };
   const presentationSummary = useSummaryKind('presentation', summaryHookArgs);
   const discussionSummary = useSummaryKind('discussion', summaryHookArgs);
   const summaryHooks = { presentation: presentationSummary, discussion: discussionSummary };
@@ -3597,8 +3607,8 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
   const transcriptInputRef = useRef(null);
   const hashScrollDoneRef = useRef(false);
   const m = useMaterials(requestId, transcriptInputRef);
-  const [summaryRefreshToken, setSummaryRefreshToken] = useState(0);
-  const t = useTranscription(requestId, { onMaterialsChanged: m.load, summaryRefreshToken });
+  const [summaryRefresh, setSummaryRefresh] = useState(REFRESH_IDLE);
+  const t = useTranscription(requestId, { onMaterialsChanged: m.load, summaryRefresh });
   const jobsSignature = t.jobs.map((job) => `${job.id}:${job.status}:${job.cleanupPending === true ? 'c' : ''}`).join('|');
   const z = useZoomImport(requestId, { onImported: t.loadCollection, jobsSignature, onVideoCopied: m.load });
   useEffect(() => {
@@ -3617,13 +3627,14 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
   const refreshAll = async () => {
     setRefreshing(true);
     setRefreshToken((value) => value + 1);
+    setSummaryRefresh((value) => ({ ...value, begin: value.begin + 1 }));
     try {
       await Promise.allSettled([
         t.loadCollection(),
         m.load(),
         z.status === 'available' ? z.refresh() : null,
       ]);
-      setSummaryRefreshToken((value) => value + 1);
+      setSummaryRefresh((value) => ({ ...value, settle: value.settle + 1 }));
     } finally {
       setRefreshing(false);
     }
