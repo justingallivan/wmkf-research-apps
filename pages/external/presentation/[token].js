@@ -10,6 +10,8 @@ import {
 } from '../../../shared/config/transcriptSummary.js';
 
 const PDF = 'application/pdf';
+// Retries at +20 s and +65 s: the second always lands after the 60 s rate window has reset.
+const PROPOSAL_CHECK_RETRY_DELAYS_MS = [20_000, 45_000];
 const BUTTON = 'inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-base font-semibold text-gray-800 transition-colors duration-200 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60';
 const LINK = 'text-base font-semibold text-gray-700 underline decoration-gray-300 underline-offset-4 transition-colors duration-200 hover:text-gray-900 hover:decoration-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 rounded-sm';
 
@@ -200,8 +202,8 @@ function Materials({ token, proposal, slidesPdf, slidesOriginal, others }) {
   );
 }
 
-function Page({ token, data }) {
-  const { video, summary, proposal, slidesPdf, slidesOriginal, others } = arrangeMaterials(data.materials);
+function Page({ token, data, proposal }) {
+  const { video, summary, slidesPdf, slidesOriginal, others } = arrangeMaterials(data.materials);
   const heading = data.proposalTitle || data.title;
   const expires = data.expiresAt ? new Date(data.expiresAt) : null;
   return (
@@ -259,6 +261,7 @@ export default function PresentationMaterialsPage() {
   const router = useRouter();
   const token = typeof router.query.token === 'string' ? router.query.token : '';
   const [state, setState] = useState({ status: 'loading' });
+  const [proposal, setProposal] = useState(null);
 
   useEffect(() => {
     if (!token) return undefined;
@@ -275,13 +278,35 @@ export default function PresentationMaterialsPage() {
     return () => { current = false; controller.abort(); };
   }, [token]);
 
+  // The proposal lookup searches SharePoint completely and takes several seconds, so the page renders
+  // first and adds the Proposal row only when the server confirms the one reviewer PDF.
+  // A 404 means there is no single reviewer PDF; a temporary failure (429, 503, network) retries twice.
+  useEffect(() => {
+    if (!token || state.status !== 'ready') return undefined;
+    const controller = new AbortController();
+    let current = true;
+    let timer = null;
+    const check = (attempt) => {
+      requestJson(`/api/external/presentation/${encodeURIComponent(token)}/open?member=proposal&mode=check`, {
+        method: 'GET', signal: controller.signal, fallbackMessage: 'The proposal is not available.',
+      }).then((body) => {
+        if (current && body?.ok && body.material?.member === 'proposal') setProposal(body.material);
+      }).catch((error) => {
+        if (!current || error?.status === 404 || attempt >= PROPOSAL_CHECK_RETRY_DELAYS_MS.length) return;
+        timer = window.setTimeout(() => check(attempt + 1), PROPOSAL_CHECK_RETRY_DELAYS_MS[attempt]);
+      });
+    };
+    check(0);
+    return () => { current = false; controller.abort(); if (timer) window.clearTimeout(timer); };
+  }, [token, state.status]);
+
   return (
     <main className="min-h-screen bg-white px-4 py-12 text-gray-900 selection:bg-gray-200 sm:px-6 sm:py-16">
       <div className="mx-auto max-w-3xl">
         {state.status === 'loading' && <p className="text-lg text-gray-600">Loading…</p>}
         {state.status === 'error' && <p className="rounded-xl bg-red-50 px-6 py-5 text-lg text-red-900">This presentation link is unavailable or has expired.</p>}
         {state.status === 'retry' && <p className="rounded-xl bg-amber-50 px-6 py-5 text-lg text-amber-950">Presentation materials are temporarily unavailable. Try again shortly.</p>}
-        {state.status === 'ready' && <Page token={token} data={state.data} />}
+        {state.status === 'ready' && <Page token={token} data={state.data} proposal={proposal} />}
       </div>
     </main>
   );

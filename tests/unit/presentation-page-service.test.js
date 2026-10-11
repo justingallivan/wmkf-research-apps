@@ -157,30 +157,45 @@ describe('the proposal (external-reviewer PDF; owner decision 2026-10-11)', () =
   }));
   const withProposal = (over = {}) => dependencies([], { listReviewerProposal: jest.fn(async () => [PDF_FILE]), resolveMediaDownloadUrl: proposalMedia(), ...over });
 
-  test('exactly one reviewer PDF lists first as a Proposal with no filename or request number', async () => {
+  test('the context never waits on or lists the proposal (the page asks with mode check)', async () => {
     const deps = withProposal();
     const ctx = await buildPresentationContext({ requestId: REQUEST_ID }, deps);
-    expect(ctx.materials[0]).toEqual(expect.objectContaining({ member: 'proposal', kind: 'proposal', filename: null, canDownload: true, canWatch: false }));
+    expect(ctx.materials).toEqual([]);
+    expect(deps.listReviewerProposal).not.toHaveBeenCalled();
+  });
+
+  test('mode check runs every gate and returns only the page descriptor: no URL, filename or request number', async () => {
+    const deps = withProposal();
+    const result = await resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode: 'check' }, deps);
+    expect(result).toEqual({ kind: 'available', material: expect.objectContaining({ member: 'proposal', kind: 'proposal', filename: null }) });
     expect(deps.listReviewerProposal).toHaveBeenCalledWith(REQUEST_ID, '1003220');
-    const json = JSON.stringify(ctx);
-    for (const leak of ['1003220', 'Proposal_', 'proposal-item', 'Reviewer Materials', 'akoya_request"']) expect(json).not.toContain(leak);
+    expect(deps.resolveMediaDownloadUrl).toHaveBeenCalledWith('proposal-drive', 'proposal-item');
+    const json = JSON.stringify(result);
+    for (const leak of ['1003220', 'Proposal_', 'proposal-item', 'sharepoint.com', 'download']) expect(json).not.toContain(leak);
   });
 
   test.each([
     ['no reviewer PDF', () => jest.fn(async () => [])],
     ['two matching files', () => jest.fn(async () => [PDF_FILE, { ...PDF_FILE, id: 'other' }])],
-    ['the lookup fails', () => jest.fn(async () => { throw new Error('graph down'); })],
-  ])('%s lists no proposal and opens nothing', async (_label, lister) => {
-    const deps = withProposal({ listReviewerProposal: lister() });
-    expect((await buildPresentationContext({ requestId: REQUEST_ID }, deps)).materials).toEqual([]);
-    await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode: 'open' }, deps));
+  ])('%s: check, open and download all refuse with 404 (confirmed absence)', async (_label, lister) => {
+    for (const mode of ['check', 'open', 'download']) {
+      await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode }, withProposal({ listReviewerProposal: lister() })));
+    }
   });
 
-  test('a stalled lookup does not hold back the page', async () => {
-    const deps = withProposal({ listReviewerProposal: jest.fn(() => new Promise(() => {})), proposalLookupDeadlineMs: 50 });
-    const started = Date.now();
-    expect((await buildPresentationContext({ requestId: REQUEST_ID }, deps)).materials).toEqual([]);
-    expect(Date.now() - started).toBeLessThan(2000);
+  test('a failed lookup is temporary (503), not absence, and the next lookup can succeed', async () => {
+    const lister = jest.fn()
+      .mockRejectedValueOnce(new Error('graph down'))
+      .mockResolvedValueOnce([PDF_FILE]);
+    const deps = withProposal({ listReviewerProposal: lister });
+    await expect(resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode: 'check' }, deps))
+      .rejects.toMatchObject({ httpStatus: 503 });
+    await expect(resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode: 'check' }, deps))
+      .resolves.toMatchObject({ kind: 'available' });
+  });
+
+  test('mode check is refused for every other member', async () => {
+    await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: `material:${SUMMARY_ID}`, mode: 'check' }, withProposal()));
   });
 
   test('open and download redirect to a fresh Microsoft URL for the exact reviewer PDF; watch never does', async () => {
@@ -200,10 +215,12 @@ describe('the proposal (external-reviewer PDF; owner decision 2026-10-11)', () =
     ['flagged as malware', { malware: { description: 'x' } }],
     ['a different item', { itemId: 'other-item' }],
     ['a non-https URL', { downloadUrl: 'http://tenant.sharepoint.com/download' }],
-  ])('a live item with %s is never served', async (_label, over) => {
+  ])('a live item with %s is never served or reported available', async (_label, over) => {
     const media = jest.fn(async (driveId, itemId) => ({ driveId, itemId, filename: 'Proposal_1003220.pdf', mimeType: 'application/pdf', malware: null,
       downloadUrl: 'https://tenant.sharepoint.com/download?proposal=1', ...over }));
-    await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode: 'open' }, withProposal({ resolveMediaDownloadUrl: media })));
+    for (const mode of ['open', 'check']) {
+      await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode }, withProposal({ resolveMediaDownloadUrl: media })));
+    }
   });
 
   test('other non-material members are still refused', async () => {
@@ -240,14 +257,16 @@ describe('strict reviewer-PDF lookup (Codex review: partial listings must not lo
     expect((await listReviewerProposalStrict(REQUEST_ID, '1003220', { getBuckets: buckets, listFiles })).map((f) => f.id)).toEqual(['p1']);
   });
 
-  test('end to end: one bucket failing while the other holds a copy serves no proposal at context or open', async () => {
+  test('end to end: one bucket failing while the other holds a copy is neither reported available nor opened', async () => {
     const listFiles = jest.fn(async (library) => { if (library === 'akoya_request') throw failing(); return [ARCHIVED]; });
     const deps = dependencies([], {
       listReviewerProposal: (id, num) => listReviewerProposalStrict(id, num, { getBuckets: buckets, listFiles }),
       resolveMediaDownloadUrl: jest.fn(async (driveId, itemId) => ({ driveId, itemId, filename: 'Proposal_1003220.pdf', mimeType: 'application/pdf', malware: null, downloadUrl: 'https://tenant.sharepoint.com/d' })),
     });
-    expect((await buildPresentationContext({ requestId: REQUEST_ID }, deps)).materials).toEqual([]);
-    await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode: 'open' }, deps));
+    for (const mode of ['check', 'open']) {
+      await expect(resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode }, deps))
+        .rejects.toMatchObject({ httpStatus: 503 });
+    }
   });
 
   test('the default dependency uses the strict lookup', () => {
