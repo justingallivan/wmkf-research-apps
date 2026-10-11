@@ -110,11 +110,11 @@ function Video({ token, material }) {
   );
 }
 
-function ViewPdfButton({ token, material, children }) {
+// Microsoft serves every file as a download, so a PDF is fetched here and handed to the browser's own
+// viewer as a local copy. The tab is opened first, inside the click, so it is not blocked.
+function usePdfViewer(token, material) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
-  // Microsoft serves every file as a download, so the PDF is fetched here and handed to the
-  // browser's own viewer as a local copy. The tab is opened first, inside the click, so it is not blocked.
   const open = async () => {
     const tab = window.open('', '_blank');
     setBusy(true);
@@ -135,25 +135,49 @@ function ViewPdfButton({ token, material, children }) {
       setBusy(false);
     }
   };
+  return { open, busy, failed };
+}
+
+// One grid for every row: name, a fixed-width main action, then a download link, so actions align.
+function MaterialRow({ name, primary, secondary = null, note = null }) {
   return (
-    <>
-      <button type="button" onClick={open} disabled={busy} className={BUTTON}>{busy ? 'Opening…' : children}</button>
-      {failed && (
-        <p role="status" className="basis-full text-base text-gray-600">
-          This file could not be opened here.{' '}
-          <a href={endpoint(token, material, 'download')} className={LINK}>Download it instead</a>
-        </p>
-      )}
-    </>
+    <li className="py-5">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 sm:grid sm:grid-cols-[minmax(0,1fr)_10rem_12rem] sm:gap-6">
+        <p className="basis-full text-lg font-medium text-gray-900">{name}</p>
+        <div className="flex">{primary}</div>
+        <div className="flex">{secondary}</div>
+      </div>
+      {note}
+    </li>
   );
 }
 
-function MaterialRow({ name, children }) {
+function PdfRow({ token, name, pdf, download, downloadLabel }) {
+  const viewer = usePdfViewer(token, pdf);
   return (
-    <li className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-      <p className="text-lg font-medium text-gray-900">{name}</p>
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">{children}</div>
-    </li>
+    <MaterialRow
+      name={name}
+      primary={(
+        <button type="button" onClick={viewer.open} disabled={viewer.busy} aria-label={`View ${name.toLowerCase()}`} className={`${BUTTON} sm:w-full`}>
+          {viewer.busy ? 'Opening…' : 'View'}
+        </button>
+      )}
+      secondary={<a href={endpoint(token, download, 'download')} className={LINK}>{downloadLabel}</a>}
+      note={viewer.failed && (
+        <p role="status" className="mt-3 text-base text-gray-600">
+          This file could not be opened in the browser. Use {downloadLabel} instead.
+        </p>
+      )}
+    />
+  );
+}
+
+function DownloadRow({ token, name, file }) {
+  return (
+    <MaterialRow
+      name={name}
+      primary={<a href={endpoint(token, file, 'download')} aria-label={`Download ${name.toLowerCase()}`} className={`${BUTTON} sm:w-full`}>Download</a>}
+    />
   );
 }
 
@@ -167,36 +191,20 @@ function Materials({ token, proposal, slidesPdf, slidesOriginal, others }) {
     <section className="mt-16">
       <SectionHeading>Materials</SectionHeading>
       <ul className="mt-4 divide-y divide-gray-200 border-y border-gray-200">
-        {proposal && (
-          <MaterialRow name="Proposal">
-            <ViewPdfButton token={token} material={proposal}>View proposal</ViewPdfButton>
-            <a href={endpoint(token, proposal, 'download')} className={LINK}>Download PDF</a>
-          </MaterialRow>
+        {proposal && <PdfRow token={token} name="Proposal" pdf={proposal} download={proposal} downloadLabel="Download PDF" />}
+        {slidesPdf && (
+          <PdfRow
+            token={token}
+            name="Slides"
+            pdf={slidesPdf}
+            download={slidesOriginal || slidesPdf}
+            downloadLabel={slidesOriginal ? 'Download PowerPoint' : 'Download PDF'}
+          />
         )}
-        {(slidesPdf || slidesOriginal) && (
-          <MaterialRow name="Slides">
-            {slidesPdf ? (
-              <>
-                <ViewPdfButton token={token} material={slidesPdf}>View slides</ViewPdfButton>
-                {slidesOriginal
-                  ? <a href={endpoint(token, slidesOriginal, 'download')} className={LINK}>Download PowerPoint</a>
-                  : <a href={endpoint(token, slidesPdf, 'download')} className={LINK}>Download PDF</a>}
-              </>
-            ) : (
-              <a href={endpoint(token, slidesOriginal, 'download')} className={BUTTON}>Download slides</a>
-            )}
-          </MaterialRow>
-        )}
-        {others.map((material) => (
-          <MaterialRow key={material.member} name={displayName(material.filename)}>
-            {isType(material, PDF) ? (
-              <>
-                <ViewPdfButton token={token} material={material}>View</ViewPdfButton>
-                <a href={endpoint(token, material, 'download')} className={LINK}>Download PDF</a>
-              </>
-            ) : <a href={endpoint(token, material, 'download')} className={BUTTON}>Download</a>}
-          </MaterialRow>
-        ))}
+        {!slidesPdf && slidesOriginal && <DownloadRow token={token} name="Slides" file={slidesOriginal} />}
+        {others.map((material) => (isType(material, PDF)
+          ? <PdfRow key={material.member} token={token} name={displayName(material.filename)} pdf={material} download={material} downloadLabel="Download PDF" />
+          : <DownloadRow key={material.member} token={token} name={displayName(material.filename)} file={material} />))}
       </ul>
     </section>
   );

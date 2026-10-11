@@ -177,8 +177,7 @@ test('a failed slides fetch closes the blank tab and says what to do', async () 
   global.fetch = jest.fn(async () => ({ ok: false, status: 404 }));
   render(<PresentationMaterialsPage />);
   fireEvent.click(await screen.findByRole('button', { name: 'View slides' }));
-  expect(await screen.findByText(/This file could not be opened here/)).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Download it instead' }).getAttribute('href')).toContain('mode=download');
+  expect(await screen.findByText('This file could not be opened in the browser. Use Download PowerPoint instead.')).toBeInTheDocument();
   expect(tab.close).toHaveBeenCalled();
 });
 
@@ -187,7 +186,7 @@ test('PDF-only slides and extra PDFs always keep a direct download beside View',
   requestJson.mockResolvedValueOnce(context([SLIDES_PDF, extraPdf]));
   render(<PresentationMaterialsPage />);
   expect(await screen.findByRole('button', { name: 'View slides' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'View' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'View letters of support' })).toBeInTheDocument();
   await screen.findByRole('button', { name: 'View proposal' });
   const downloads = screen.getAllByRole('link', { name: 'Download PDF' })
     .filter((a) => !a.getAttribute('href').includes('member=proposal'));
