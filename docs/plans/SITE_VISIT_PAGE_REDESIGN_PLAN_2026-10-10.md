@@ -658,3 +658,10 @@ UI change was needed; a saved attribution is unaffected.
   until / Sent to grid is one metadata line.
 - Separate commit: the "Use proposed then Save" test raced its own "Saved" label (it
   failed 3 of 4 batched runs); it now waits for the PATCH and its re-render. Test-only.
+- **Codex round 1 for commit 5 (needs-attention, one medium):** the uploader moved between
+  the row's action slot and its children when an item became received, so a refresh
+  remounted it and dropped an unfinished upload's Retry. It now stays in the action slot
+  in every state, and only its trigger visibility and wrapper class change. Regression: a
+  missing row with a retryable finalize, then another row's Waive refreshes in this row's
+  receipt; the same Retry button remains and re-finalizes the same staging id (fails with
+  the old placement).

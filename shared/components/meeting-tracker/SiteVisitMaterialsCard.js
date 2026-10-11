@@ -302,12 +302,13 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
               return (
                 <ArtifactRow key={item.key} testId={`materials-row-${item.key}`} name={item.label} href={safeFileUrl(item.received)}
                   status={status} detail={detail}
-                  action={!item.received ? uploader : null}
+                  // One position for the uploader in every state, so a missing-to-received refresh never remounts it
+                  // and drops an unfinished upload's Retry (Codex review, commit 5).
+                  action={uploader}
                   menuItems={[
                     item.received && { key: 'replace', label: 'Upload updated file', disabled: uploadDisabled || Boolean(blockedUploads[item.key]), onSelect: () => uploadRefs.current[item.key]?.open() },
                     canWaive && { key: 'waive', label: item.waived ? 'Require again' : 'Waive', disabled: busy, onSelect: () => act('waive', { key: item.key, waived: !item.waived }) },
                   ]}>
-                  {item.received && uploader}
                   <UploadJobNotice jobs={jobs} programCoordinator={collection.programCoordinator} />
                 </ArtifactRow>
               );

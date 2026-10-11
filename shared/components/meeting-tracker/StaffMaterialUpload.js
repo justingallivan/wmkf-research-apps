@@ -152,7 +152,8 @@ function StaffMaterialUpload({ requestId, slot, label, disabled = false, onUploa
   return (
     // Fixed width so progress and error text wrap inside the control instead of
     // widening the row's action column and pushing "Open file" sideways.
-    <div className={showTrigger ? 'w-44 text-right' : 'text-left'}>
+    // Same element in every state (only its class changes), so the input and Retry state survive a re-render.
+    <div className={showTrigger || busy || error || pending ? 'w-44 text-right' : 'text-right'}>
       <input
         ref={inputRef}
         type="file"

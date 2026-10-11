@@ -375,6 +375,44 @@ describe('staff replacement upload (staff replacement plan §3.4)', () => {
     expect(row).toContainElement(screen.getByRole('button', { name: 'Retry' }));
   });
 
+  test('a missing row that becomes received on refresh keeps an unfinished upload and its Retry (Codex review, commit 5)', async () => {
+    const posts = [];
+    let received = false;
+    let finalizes = 0;
+    const withReceipt = () => {
+      const data = collection();
+      if (received) data.checklist[1].received = { artifactId: 's', filename: 'deck.pptx', receivedAt: '2026-10-06T00:00:00Z', uploadedByStaff: true };
+      return data;
+    };
+    global.fetch = jest.fn(async (url, options = {}) => {
+      if (options.method === 'POST') {
+        const body = JSON.parse(options.body);
+        posts.push([url.split('/materials')[1], body]);
+        if (url.endsWith('/staff-upload-token')) return response({ ok: true, stagingId: STAGING, pathname: 'p', clientToken: 'ct', contentType: 'application/vnd.ms-powerpoint' });
+        if (url.endsWith('/staff-finalize')) {
+          finalizes += 1;
+          if (finalizes === 1) { received = true; return response({ ok: false, reason: 'supersede_failed' }, 503); }
+          return response({ ok: true, slot: 'presentation_source', filename: 'deck.pptx' });
+        }
+        if (body.action === 'waive') return response({ success: true, collection: withReceipt() });
+      }
+      return response({ success: true, collection: withReceipt() });
+    });
+    render(<SiteVisitMaterialsCard requestId={REQUEST_ID} requestNumber="1003222" />);
+    await screen.findByTestId('materials-row-presentation_source');
+    fireEvent.change(screen.getByTestId('staff-upload-input-presentation_source'), { target: { files: [new File(['ppt'], 'deck.pptx', { type: 'application/vnd.ms-powerpoint' })] } });
+    const retry = await within(rowOf('presentation_source')).findByRole('button', { name: 'Retry' });
+    // Another action refreshes the collection, which now shows this slot's receipt.
+    fireEvent.click(rowMenuItem('participant_bios', 'Waive'));
+    await waitFor(() => expect(rowOf('presentation_source')).toHaveTextContent('Received'));
+    expect(within(rowOf('presentation_source')).getByRole('button', { name: 'Retry' })).toBe(retry);
+    fireEvent.click(retry);
+    await waitFor(() => expect(posts.filter(([path]) => path === '/staff-finalize')).toHaveLength(2));
+    const finalizeBodies = posts.filter(([path]) => path === '/staff-finalize').map(([, body]) => body);
+    expect(finalizeBodies[1]).toEqual(finalizeBodies[0]);
+    expect(finalizeBodies[1].stagingId).toBe(STAGING);
+  });
+
   test('the row menu\'s Upload updated file opens that row\'s file picker', async () => {
     global.fetch = jest.fn(async () => response({ success: true, collection: collection() }));
     const click = jest.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function record() { record.target = this; });
