@@ -3435,16 +3435,16 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
       <Step number={1} title="Get the recording" state={step1Done ? 'done' : 'current'} testId="step-recording"
         summary={step1Done && !step1Open && recordingSummary}
         action={step1Done && step1Open && <Button size="sm" variant="outline" type="button" onClick={() => setStep1Open(false)} aria-expanded>Close</Button>}
-        menuItems={step1Done && !step1Open ? [
+        menuItems={[
           // The full meeting transcript is the source of the split transcripts, so it lives with setup (owner,
-          // 2026-10-11), not with the results.
+          // 2026-10-11), not with the results. It stays reachable while step 1 is open or a replacement is under way.
           ...(openUrl ? [{ key: 'open-full', label: 'Open full transcript', href: openUrl }] : []),
           ...(generated && artifact ? [
             { key: 'txt', label: 'Download full transcript (TXT)', href: `${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=txt`, download: true },
             { key: 'vtt', label: 'Download full transcript (VTT)', href: `${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=vtt`, download: true },
           ] : []),
-          { key: 'replace', label: 'Replace recording or transcript', onSelect: () => setStep1Open(true) },
-        ] : []}>
+          ...(step1Done && !step1Open ? [{ key: 'replace', label: 'Replace recording or transcript', onSelect: () => setStep1Open(true) }] : []),
+        ]}>
         {!(step1Done && !step1Open) && <div className="mt-2 text-sm leading-6 text-gray-900">{recordingSummary}</div>}
         {generated && !editing && t.savedDraft && <p className="mt-1 text-xs text-gray-600">Unpublished name edits saved {fmtDateTime(t.savedDraft.createdAt)}</p>}
         {!material && readyForReview && <p className="mt-1 text-sm text-gray-700">A new transcript is ready to check in step 2.</p>}

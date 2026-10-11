@@ -808,6 +808,11 @@ The card shows the materials load error at the same time. Recorded in §10.
 result cards; the full-recording row is removed; the full meeting transcript's Open and TXT/VTT
 downloads moved to step 1's menu. Tests: row order (fails if the discussion rows are swapped back),
 no full-recording link anywhere, the step-1 menu items and their links.
+Codex (needs-attention, one medium): the full transcript was reachable only while step 1 was
+collapsed, so opening it for a replacement hid it. Open and the downloads now stay in step 1's menu
+whenever a transcript exists; only "Replace recording or transcript" needs the collapsed step.
+Regression: open step 1 and the menu still has Open and TXT (fails with the collapsed-only gate);
+an uploaded transcript gets Open without downloads.
 
 ## 10. Remaining after the build (2026-10-11)
 

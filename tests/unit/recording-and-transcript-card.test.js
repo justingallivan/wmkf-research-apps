@@ -292,6 +292,9 @@ test('an uploaded transcript with no source bundle shows no editor and says name
   expect(screen.getByText(/speaker names cannot be edited here/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Edit speaker names' })).not.toBeInTheDocument();
   expect(screen.queryByLabelText(/Name for Speaker/)).not.toBeInTheDocument();
+  // An uploaded transcript opens from step 1's menu but has no generated TXT/VTT downloads.
+  expect(stepMenuItem('Open full transcript', 'step-recording')).toHaveAttribute('href', 'https://example.sharepoint.com/transcript.txt');
+  expect(screen.queryByRole('menuitem', { name: /Download full transcript/ })).toBeNull();
 });
 
 test('when transcription is not enabled, step 1 states the reason and offers the transcript upload directly', async () => {
@@ -1724,6 +1727,11 @@ describe('step-by-step layout', () => {
     fireEvent.click(stepMenuItem('Replace recording or transcript', 'step-recording'));
     expect(screen.getByLabelText(/Audio file/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Replace recording' })).toBeInTheDocument();
+    // While step 1 is open for a replacement, the existing full transcript stays reachable (Codex review, decisions 11-12).
+    expect(stepMenuItem('Open full transcript', 'step-recording')).toHaveAttribute('href', 'https://example.sharepoint.com/transcript.txt');
+    expect(screen.getByRole('menuitem', { name: 'Download full transcript (TXT)' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Replace recording or transcript' })).toBeNull();
+    fireEvent.keyDown(document.activeElement || document.body, { key: 'Escape' });
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.queryByLabelText(/Audio file/)).not.toBeInTheDocument();
   });
