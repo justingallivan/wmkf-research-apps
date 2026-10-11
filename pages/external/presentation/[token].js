@@ -159,12 +159,18 @@ function SectionHeading({ children }) {
   return <h2 className="text-2xl font-semibold text-gray-900">{children}</h2>;
 }
 
-function Materials({ token, slidesPdf, slidesOriginal, others }) {
-  if (!slidesPdf && !slidesOriginal && others.length === 0) return null;
+function Materials({ token, proposal, slidesPdf, slidesOriginal, others }) {
+  if (!proposal && !slidesPdf && !slidesOriginal && others.length === 0) return null;
   return (
     <section className="mt-16">
-      <SectionHeading>Slides and materials</SectionHeading>
+      <SectionHeading>Materials</SectionHeading>
       <ul className="mt-4 divide-y divide-gray-200 border-y border-gray-200">
+        {proposal && (
+          <MaterialRow name="Proposal">
+            <ViewPdfButton token={token} material={proposal}>View proposal</ViewPdfButton>
+            <a href={endpoint(token, proposal, 'download')} className={LINK}>Download PDF</a>
+          </MaterialRow>
+        )}
         {(slidesPdf || slidesOriginal) && (
           <MaterialRow name="Slides">
             {slidesPdf ? (
@@ -195,7 +201,7 @@ function Materials({ token, slidesPdf, slidesOriginal, others }) {
 }
 
 function Page({ token, data }) {
-  const { video, summary, slidesPdf, slidesOriginal, others } = arrangeMaterials(data.materials);
+  const { video, summary, proposal, slidesPdf, slidesOriginal, others } = arrangeMaterials(data.materials);
   const heading = data.proposalTitle || data.title;
   const expires = data.expiresAt ? new Date(data.expiresAt) : null;
   return (
@@ -221,7 +227,10 @@ function Page({ token, data }) {
 
       {summary && (
         <section className="mt-16">
-          <SectionHeading>Summary</SectionHeading>
+          <div className="flex flex-wrap items-center gap-3">
+            <SectionHeading>Summary</SectionHeading>
+            <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">AI-generated</span>
+          </div>
           <div className="mt-6">
             {summary.text ? (
               <SummaryText text={summary.text} headings={PRESENTATION_SUMMARY_HEADINGS} listHeadings={PRESENTATION_SUMMARY_LIST_HEADINGS} />
@@ -235,7 +244,7 @@ function Page({ token, data }) {
         </section>
       )}
 
-      <Materials token={token} slidesPdf={slidesPdf} slidesOriginal={slidesOriginal} others={others} />
+      <Materials token={token} proposal={proposal} slidesPdf={slidesPdf} slidesOriginal={slidesOriginal} others={others} />
 
       {expires && !Number.isNaN(expires.getTime()) && (
         <p className="mt-16 text-sm text-gray-500">
