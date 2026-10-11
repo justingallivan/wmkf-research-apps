@@ -37,3 +37,36 @@ test('deleteSandbox also asks the API to delete orphan snapshots', async () => {
   await adapter.deleteSandbox({ handle: { delete: del } });
   expect(del).toHaveBeenCalledWith({ deleteOrphanSnapshots: true });
 });
+
+describe('commandState (live 2026-10-10: the non-waiting GET kept exitCode null after the command exited)', () => {
+  const box = command => ({ handle: { getCommand: jest.fn(async () => command) } });
+
+  test('a finished command whose non-waiting exitCode is null reports the waited exit code', async () => {
+    const command = { exitCode: null, wait: jest.fn(async () => ({ exitCode: 0 })) };
+    expect(await adapter.commandState(box(command), 'cmd-1')).toEqual({ exitCode: 0 });
+    expect(command.wait).toHaveBeenCalledWith({ signal: expect.any(AbortSignal) });
+  });
+
+  test('a non-zero waited exit code is reported as is', async () => {
+    const command = { exitCode: null, wait: jest.fn(async () => ({ exitCode: 3 })) };
+    expect(await adapter.commandState(box(command), 'cmd-1')).toEqual({ exitCode: 3 });
+  });
+
+  test('an exit code on the non-waiting GET is used without waiting', async () => {
+    const command = { exitCode: 0, wait: jest.fn() };
+    expect(await adapter.commandState(box(command), 'cmd-1')).toEqual({ exitCode: 0 });
+    expect(command.wait).not.toHaveBeenCalled();
+  });
+
+  test('a still-running command: the bounded wait aborts and the state is running (null)', async () => {
+    const command = { exitCode: null, wait: jest.fn(({ signal }) => new Promise((resolve, reject) => {
+      signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+    })) };
+    expect(await adapter.commandState(box(command), 'cmd-1', 20)).toEqual({ exitCode: null });
+  });
+
+  test('a wait error that is not the abort propagates', async () => {
+    const command = { exitCode: null, wait: jest.fn(async () => { throw Object.assign(new Error('boom'), { response: { status: 500 } }); }) };
+    await expect(adapter.commandState(box(command), 'cmd-1')).rejects.toThrow('boom');
+  });
+});
