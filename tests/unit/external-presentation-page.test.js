@@ -79,6 +79,45 @@ test('no Proposal row when the server does not confirm the reviewer PDF', async 
   expect(screen.queryByText('Proposal')).not.toBeInTheDocument();
 });
 
+test('a throttled proposal check retries and adds the row when it later succeeds', async () => {
+  jest.useFakeTimers();
+  let checks = 0;
+  requestJson.mockImplementation(async (url) => {
+    if (!url.includes('mode=check')) return context([SLIDES_PDF]);
+    checks += 1;
+    if (checks === 1) throw Object.assign(new Error('busy'), { status: 429 });
+    return { ok: true, material: PROPOSAL };
+  });
+  try {
+    render(<PresentationMaterialsPage />);
+    await waitFor(() => expect(checks).toBe(1));
+    expect(screen.queryByText('Proposal')).not.toBeInTheDocument();
+    jest.advanceTimersByTime(15_000);
+    expect(await screen.findByRole('button', { name: 'View proposal' })).toBeInTheDocument();
+    expect(checks).toBe(2);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test('a confirmed absence (404) is not retried', async () => {
+  jest.useFakeTimers();
+  let checks = 0;
+  requestJson.mockImplementation(async (url) => {
+    if (!url.includes('mode=check')) return context([SLIDES_PDF]);
+    checks += 1;
+    throw Object.assign(new Error('not found'), { status: 404 });
+  });
+  try {
+    render(<PresentationMaterialsPage />);
+    await waitFor(() => expect(checks).toBe(1));
+    jest.advanceTimersByTime(60_000);
+    expect(checks).toBe(1);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
 test('PowerPoint-only slides offer one Download slides action', async () => {
   requestJson.mockResolvedValueOnce(context([SLIDES_PPTX]));
   render(<PresentationMaterialsPage />);

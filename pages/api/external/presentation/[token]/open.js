@@ -1,6 +1,9 @@
 /** Reverify membership, then redirect directly to Zoom or a fresh Microsoft URL. */
 import { verifyPresentationToken } from '../../../../../lib/external/verify-presentation-token.js';
-import { checkPresentationMediaRateLimit } from '../../../../../lib/external/presentation-media-rate-limit.js';
+import {
+  checkPresentationMediaRateLimit,
+  checkPresentationProposalCheckRateLimit,
+} from '../../../../../lib/external/presentation-media-rate-limit.js';
 import { withDalContext } from '../../../../../lib/dataverse/core/context.js';
 import { resolvePresentationMember } from '../../../../../lib/services/post-presentation-materials/presentation-page-service.js';
 import { ServiceHttpError } from '../../../../../lib/services/service-http-error.js';
@@ -24,7 +27,10 @@ export default async function handler(req, res) {
   const member = Array.isArray(req.query.member) ? '' : String(req.query.member || '');
   const mode = Array.isArray(req.query.mode) ? '' : String(req.query.mode || 'open');
   if (!token || !member || !['open', 'watch', 'download', 'check'].includes(mode)) return unavailable(res);
-  const rate = await checkPresentationMediaRateLimit(req, token);
+  // mode=check is the page's automatic proposal check: its own budget, so page loads never use media capacity.
+  const rate = mode === 'check'
+    ? await checkPresentationProposalCheckRateLimit(req, token)
+    : await checkPresentationMediaRateLimit(req, token);
   if (!rate.ok) {
     res.setHeader('Retry-After', String(rate.retryAfterSeconds));
     return unavailable(res, rate.reason === 'rate_limited' ? 429 : 503, rate.reason);

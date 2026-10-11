@@ -10,6 +10,8 @@ import {
 } from '../../../shared/config/transcriptSummary.js';
 
 const PDF = 'application/pdf';
+const PROPOSAL_CHECK_RETRIES = 2;
+const PROPOSAL_CHECK_RETRY_MS = 15_000;
 const BUTTON = 'inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-base font-semibold text-gray-800 transition-colors duration-200 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60';
 const LINK = 'text-base font-semibold text-gray-700 underline decoration-gray-300 underline-offset-4 transition-colors duration-200 hover:text-gray-900 hover:decoration-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 rounded-sm';
 
@@ -278,16 +280,24 @@ export default function PresentationMaterialsPage() {
 
   // The proposal lookup searches SharePoint completely and takes several seconds, so the page renders
   // first and adds the Proposal row only when the server confirms the one reviewer PDF.
+  // A 404 means there is no single reviewer PDF; a temporary failure (429, 503, network) retries twice.
   useEffect(() => {
     if (!token || state.status !== 'ready') return undefined;
     const controller = new AbortController();
     let current = true;
-    requestJson(`/api/external/presentation/${encodeURIComponent(token)}/open?member=proposal&mode=check`, {
-      method: 'GET', signal: controller.signal, fallbackMessage: 'The proposal is not available.',
-    }).then((body) => {
-      if (current && body?.ok && body.material?.member === 'proposal') setProposal(body.material);
-    }).catch(() => { /* no proposal row */ });
-    return () => { current = false; controller.abort(); };
+    let timer = null;
+    const check = (attempt) => {
+      requestJson(`/api/external/presentation/${encodeURIComponent(token)}/open?member=proposal&mode=check`, {
+        method: 'GET', signal: controller.signal, fallbackMessage: 'The proposal is not available.',
+      }).then((body) => {
+        if (current && body?.ok && body.material?.member === 'proposal') setProposal(body.material);
+      }).catch((error) => {
+        if (!current || error?.status === 404 || attempt >= PROPOSAL_CHECK_RETRIES) return;
+        timer = window.setTimeout(() => check(attempt + 1), PROPOSAL_CHECK_RETRY_MS);
+      });
+    };
+    check(0);
+    return () => { current = false; controller.abort(); if (timer) window.clearTimeout(timer); };
   }, [token, state.status]);
 
   return (

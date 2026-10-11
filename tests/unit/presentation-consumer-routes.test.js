@@ -15,6 +15,7 @@ jest.mock('../../lib/external/rate-limit', () => ({
 jest.mock('../../lib/external/presentation-media-rate-limit', () => ({
   checkPresentationContextRateLimit: jest.fn(),
   checkPresentationMediaRateLimit: jest.fn(),
+  checkPresentationProposalCheckRateLimit: jest.fn(),
 }));
 jest.mock('../../lib/services/post-presentation-materials/presentation-page-service', () => ({
   buildPresentationContext: jest.fn(),
@@ -33,6 +34,7 @@ import { recordTokenOutcome } from '../../lib/external/rate-limit.js';
 import {
   checkPresentationContextRateLimit,
   checkPresentationMediaRateLimit,
+  checkPresentationProposalCheckRateLimit,
 } from '../../lib/external/presentation-media-rate-limit.js';
 import {
   buildPresentationContext,
@@ -62,6 +64,7 @@ beforeEach(() => {
   isMeetingTrackerSchemaReady.mockReturnValue(true);
   checkPresentationContextRateLimit.mockResolvedValue({ ok: true });
   checkPresentationMediaRateLimit.mockResolvedValue({ ok: true });
+  checkPresentationProposalCheckRateLimit.mockResolvedValue({ ok: true });
   verifyPresentationToken.mockResolvedValue({ ok: true, requestId: REQUEST_ID, link: { id: LINK_ID } });
 });
 
@@ -160,6 +163,21 @@ test('open route mode check answers with the descriptor as JSON, never a redirec
   expect(res.statusCode).toBe(200);
   expect(res.body).toEqual({ ok: true, material: { member: 'proposal', kind: 'proposal', filename: null } });
   expect(res.headers['Cache-Control']).toBe('private, no-store');
+  expect(checkPresentationProposalCheckRateLimit).toHaveBeenCalledTimes(1);
+  expect(checkPresentationMediaRateLimit).not.toHaveBeenCalled();
+});
+
+test('a throttled proposal check never touches the media budget, and media actions still use it', async () => {
+  checkPresentationProposalCheckRateLimit.mockResolvedValue({ ok: false, reason: 'rate_limited', retryAfterSeconds: 9 });
+  const res = response();
+  await openHandler({ method: 'GET', query: { token: 't', member: 'proposal', mode: 'check' }, headers: {}, socket: {} }, res);
+  expect(res.statusCode).toBe(429);
+  expect(checkPresentationMediaRateLimit).not.toHaveBeenCalled();
+  resolvePresentationMember.mockResolvedValue({ kind: 'file', redirectUrl: 'https://tenant.sharepoint.com/short' });
+  const media = response();
+  await openHandler({ method: 'GET', query: { token: 't', member: 'proposal', mode: 'open' }, headers: {}, socket: {} }, media);
+  expect(checkPresentationMediaRateLimit).toHaveBeenCalledTimes(1);
+  expect(media.redirect).toHaveBeenCalledWith(302, 'https://tenant.sharepoint.com/short');
 });
 
 test('open route refuses an unknown mode before any work', async () => {
