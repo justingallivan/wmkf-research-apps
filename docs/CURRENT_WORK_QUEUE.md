@@ -186,6 +186,11 @@ sequence.
     2026-10-10). Publishing with a confirmed presentation end should start that
     generation itself, and step 3 should say what is happening in plain words
     rather than "out of date".
+  - **Say why a presentation video was cancelled.** A superseded cut shows
+    "Video: Out of date. The transcript or video changed. Create it again." even
+    when the worker cancelled it for its own reasons (first live cut, 1003222,
+    2026-10-10: a SharePoint metadata-only eTag bump). Show the actual reason,
+    and never suggest "again" when a retry cannot succeed.
 - **Card stays busy after a successful transcript publish (2026-10-10).**
   [OPEN — defect, found live on 1003222] In `RecordingAndTranscriptCard.js`
   the publish handler closes the editor on success (`setCorrectionDetail(null)`,
@@ -196,6 +201,17 @@ sequence.
   names) stays greyed until a page reload. Fix: clear `busy` on the success
   path regardless of the editor key, and add a test that the generate button
   is enabled after a successful publish.
+- **Board file check uses the SharePoint eTag (2026-10-10).** [OPEN —
+  follow-up to the Stage 4 content-identity fix] `pinnedBytesMatch` in
+  `lib/services/post-presentation-materials/presentation-page-service.js`
+  serves a Board file only while the live eTag equals Dataverse's
+  `wmkf_sharepointetag`. SharePoint bumps a video's eTag on metadata-only
+  changes (live: source MP4 eTag `,3` -> `,4` with size, quickXorHash, cTag,
+  versionId and lastModified unchanged), so an approved presentation video
+  could stop opening on the Board link. Dataverse stores no content hash, so
+  the fix needs a decision (store a content identity at approval, or accept
+  matching size + versionId). Verify on the first approved video whether its
+  eTag moves after approval.
 - **Speaker-name picker should offer the Zoom call's participants
   (2026-10-10).** [OPEN — owner request] "People on this request" in the
   speaker-name editor (`RecordingAndTranscriptCard.js`, option groups PI,
