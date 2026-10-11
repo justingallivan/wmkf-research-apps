@@ -41,14 +41,13 @@ test('after the visit: video first, then the formatted summary, then one Slides 
   expect(screen.getByText('AI-generated')).toBeInTheDocument();
   expect(await screen.findByRole('button', { name: 'View proposal' })).toBeInTheDocument();
   expect(requestJson.mock.calls.map(([url]) => url)).toContain('/api/external/presentation/presentation-token/open?member=proposal&mode=check');
-  expect(screen.getAllByRole('link', { name: 'Download PDF' })[0].getAttribute('href')).toContain('member=proposal');
   expect(screen.getByRole('heading', { level: 3, name: 'Questions and answers' })).toBeInTheDocument();
   expect(screen.getByText('Send the budget breakdown.').tagName).toBe('LI');
   expect(screen.getByText('Slides')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'View slides' })).toBeInTheDocument();
-  const pptx = screen.getByRole('link', { name: 'Download PowerPoint' });
-  expect(pptx.getAttribute('href')).toContain('/api/external/presentation/presentation-token/open?');
-  expect(pptx.getAttribute('href')).toContain('mode=download');
+  // One action per row: View only. No download links, and the PowerPoint original is not offered.
+  expect(screen.queryAllByRole('link')).toHaveLength(0);
+  expect(screen.getByRole('button', { name: 'View site visit participant bios' })).toBeInTheDocument();
   expect(screen.getByText('Site Visit Participant Bios')).toBeInTheDocument();
   const text = document.body.textContent;
   for (const hidden of ['.pdf', '.pptx', '.docx', '.mp4', '.txt', 'MB', 'bytes', '1003222', 'Transcript Summary', 'Applicant Slides']) {
@@ -141,7 +140,7 @@ test('a confirmed absence (404) is not retried', async () => {
   }
 });
 
-test('Word bios open as a converted PDF and keep a Download Word link', async () => {
+test('Word bios open as a converted PDF', async () => {
   const tab = { closed: false, location: { href: '' }, close: jest.fn() };
   window.open = jest.fn(() => tab);
   global.fetch = jest.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(4) }));
@@ -152,15 +151,21 @@ test('Word bios open as a converted PDF and keep a Download Word link', async ()
   await waitFor(() => expect(tab.location.href).toBe('blob:bios'));
   expect(global.fetch.mock.calls[0][0]).toContain('mode=pdf');
   expect(global.fetch.mock.calls[0][0]).toContain(encodeURIComponent(BIOS.member));
-  expect(screen.getByRole('link', { name: 'Download Word' }).getAttribute('href')).toContain('mode=download');
 });
 
-test('PowerPoint-only slides offer one Download slides action', async () => {
-  requestJson.mockResolvedValueOnce(context([SLIDES_PPTX]));
+test('PowerPoint-only slides view as a converted PDF; an unconvertible file keeps one Download', async () => {
+  const image = { ...BIOS, member: 'material:88888888-8888-4888-8888-888888888888', filename: '1003222 Lab photo.png', contentType: 'image/png' };
+  requestJson.mockResolvedValueOnce(context([SLIDES_PPTX, image]));
+  const tab = { closed: false, location: { href: '' }, close: jest.fn() };
+  window.open = jest.fn(() => tab);
+  global.fetch = jest.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(4) }));
+  URL.createObjectURL = jest.fn(() => 'blob:slides');
+  URL.revokeObjectURL = jest.fn();
   render(<PresentationMaterialsPage />);
-  const link = await screen.findByRole('link', { name: 'Download slides' });
-  expect(link.getAttribute('href')).toContain('mode=download');
-  expect(screen.queryByRole('button', { name: 'View slides' })).not.toBeInTheDocument();
+  fireEvent.click(await screen.findByRole('button', { name: 'View slides' }));
+  await waitFor(() => expect(tab.location.href).toBe('blob:slides'));
+  expect(global.fetch.mock.calls[0][0]).toContain('mode=pdf');
+  expect(screen.getByRole('link', { name: 'Download lab photo' }).getAttribute('href')).toContain('mode=download');
 });
 
 test('a summary the server could not verify offers the file instead of text', async () => {
@@ -191,22 +196,19 @@ test('a failed slides fetch closes the blank tab and says what to do', async () 
   global.fetch = jest.fn(async () => ({ ok: false, status: 404 }));
   render(<PresentationMaterialsPage />);
   fireEvent.click(await screen.findByRole('button', { name: 'View slides' }));
-  expect(await screen.findByText('This file could not be opened in the browser. Use Download PowerPoint instead.')).toBeInTheDocument();
+  expect(await screen.findByText(/This file could not be opened in the browser/)).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Download it instead' }).getAttribute('href')).toContain('mode=download');
   expect(tab.close).toHaveBeenCalled();
 });
 
-test('PDF-only slides and extra PDFs always keep a direct download beside View', async () => {
+test('extra PDFs get their own View row and no download links', async () => {
   const extraPdf = { ...BIOS, member: 'material:66666666-6666-4666-8666-666666666666', filename: '1003222 Letters of support.pdf', contentType: 'application/pdf' };
   requestJson.mockResolvedValueOnce(context([SLIDES_PDF, extraPdf]));
   render(<PresentationMaterialsPage />);
   expect(await screen.findByRole('button', { name: 'View slides' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'View letters of support' })).toBeInTheDocument();
   await screen.findByRole('button', { name: 'View proposal' });
-  const downloads = screen.getAllByRole('link', { name: 'Download PDF' })
-    .filter((a) => !a.getAttribute('href').includes('member=proposal'));
-  expect(downloads).toHaveLength(2);
-  expect(downloads.map((a) => a.getAttribute('href')).every((href) => href.includes('mode=download'))).toBe(true);
-  expect(screen.queryByRole('link', { name: 'Download PowerPoint' })).not.toBeInTheDocument();
+  expect(screen.queryAllByRole('link')).toHaveLength(0);
 });
 
 test.each([429, 503])('temporary context status %s asks the holder to retry', async (status) => {

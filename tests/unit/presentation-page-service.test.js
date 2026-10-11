@@ -442,7 +442,7 @@ test('resolver serves a current portal Applicant Slides file', async () => {
   await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: `material:${SLIDES_ID}`, mode: 'watch' }, deps));
 });
 
-describe('Word files open as a converted PDF (mode pdf)', () => {
+describe('Office files open as a converted PDF (mode pdf)', () => {
   const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
   const BIOS_ID = '77777777-7777-4777-8777-777777777777';
   const bios = (over = {}) => fileRow(BIOS_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.OTHER_APPLICANT_MATERIALS, 'site-visit-materials-portal',
@@ -464,7 +464,8 @@ describe('Word files open as a converted PDF (mode pdf)', () => {
   test.each([
     ['a PDF (already viewable)', { resolveMediaDownloadUrl: wordMedia({ mimeType: 'application/pdf', filename: 'bios.pdf' }) }],
     ['a Word type with the wrong extension', { resolveMediaDownloadUrl: wordMedia({ filename: 'bios.html' }) }],
-    ['a source over the size cap', { resolveMediaDownloadUrl: wordMedia({ size: 26 * 1024 * 1024 }) }],
+    ['a source over the size cap', { resolveMediaDownloadUrl: wordMedia({ size: 51 * 1024 * 1024 }) }],
+    ['a non-Office type', { resolveMediaDownloadUrl: wordMedia({ mimeType: 'image/png', filename: 'bios.png' }) }],
     ['a malware flag', { resolveMediaDownloadUrl: wordMedia({ malware: { description: 'x' } }) }],
     ['output that is not a PDF', { convertToPdf: jest.fn(async () => Buffer.from('<html>')) }],
     ['output over the response cap', { convertToPdf: jest.fn(async () => Buffer.concat([Buffer.from('%PDF-'), Buffer.alloc(4 * 1024 * 1024)])) }],
@@ -483,6 +484,15 @@ describe('Word files open as a converted PDF (mode pdf)', () => {
     await _internal.DEFAULT_DEPENDENCIES.convertToPdf('d', 'i');
     expect(spy).toHaveBeenCalledWith('d', 'i', { maxBytes: 4 * 1024 * 1024, timeoutMs: 20_000 });
     spy.mockRestore();
+  });
+
+  test.each([
+    ['PowerPoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'deck.pptx', REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES],
+    ['Excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'budget.xlsx', REQUEST_DOCUMENT_ARTIFACT_TYPE.OTHER_APPLICANT_MATERIALS],
+  ])('an applicant %s file converts too', async (_label, mimeType, filename, artifactType) => {
+    const row = fileRow(BIOS_ID, artifactType, 'site-visit-materials-portal', { wmkf_filename: filename, wmkf_contenttype: mimeType });
+    const d = dependencies([row], { resolveMediaDownloadUrl: wordMedia({ mimeType, filename, size: 35_000_000 }), convertToPdf: jest.fn(async () => PDF_BYTES) });
+    await expect(pdf(d)).resolves.toEqual({ kind: 'pdf', buffer: PDF_BYTES });
   });
 
   test('a failed conversion is temporary (503)', async () => {
