@@ -213,6 +213,48 @@ describe('the proposal (external-reviewer PDF; owner decision 2026-10-11)', () =
   });
 });
 
+describe('strict reviewer-PDF lookup (Codex review: partial listings must not look unique)', () => {
+  const { listReviewerProposalStrict } = require('../../lib/services/post-presentation-materials/presentation-page-service.js');
+  const MATCH = { id: 'p1', name: 'Proposal_1003220.pdf', folder: 'active/Reviewer Materials' };
+  const ARCHIVED = { id: 'p2', name: 'Proposal_1003220.pdf', folder: 'archive/Reviewer Materials' };
+  const INTERNAL = { id: 'x', name: 'Research Phase I Application_2026.pdf', folder: 'active/Reviewer Materials' };
+  const buckets = async () => [{ library: 'akoya_request', folder: 'active' }, { library: 'archive_lib', folder: 'archive' }];
+  const failing = (code) => Object.assign(new Error('list failed'), code ? { code } : {});
+
+  test('lists completely and strictly, returning every canonical match with its library', async () => {
+    const listFiles = jest.fn(async (library) => (library === 'akoya_request' ? [MATCH, INTERNAL] : [ARCHIVED]));
+    const found = await listReviewerProposalStrict(REQUEST_ID, '1003220', { getBuckets: buckets, listFiles });
+    expect(found.map((f) => [f.id, f.library])).toEqual([['p1', 'akoya_request'], ['p2', 'archive_lib']]);
+    expect(listFiles.mock.calls[0][2]).toEqual(expect.objectContaining({ failOnTruncation: true, failOnDepthLimit: true }));
+  });
+
+  test('a bucket that fails (timeout, 503, truncation) throws instead of leaving another copy looking unique', async () => {
+    for (const error of [failing(), failing('graph_file_list_truncated'), Object.assign(failing(), { status: 503 })]) {
+      const listFiles = jest.fn(async (library) => { if (library === 'akoya_request') throw error; return [ARCHIVED]; });
+      await expect(listReviewerProposalStrict(REQUEST_ID, '1003220', { getBuckets: buckets, listFiles })).rejects.toBe(error);
+    }
+  });
+
+  test('only a folder confirmed absent is treated as empty', async () => {
+    const listFiles = jest.fn(async (library) => { if (library === 'archive_lib') throw failing('graph_folder_not_found'); return [MATCH]; });
+    expect((await listReviewerProposalStrict(REQUEST_ID, '1003220', { getBuckets: buckets, listFiles })).map((f) => f.id)).toEqual(['p1']);
+  });
+
+  test('end to end: one bucket failing while the other holds a copy serves no proposal at context or open', async () => {
+    const listFiles = jest.fn(async (library) => { if (library === 'akoya_request') throw failing(); return [ARCHIVED]; });
+    const deps = dependencies([], {
+      listReviewerProposal: (id, num) => listReviewerProposalStrict(id, num, { getBuckets: buckets, listFiles }),
+      resolveMediaDownloadUrl: jest.fn(async (driveId, itemId) => ({ driveId, itemId, filename: 'Proposal_1003220.pdf', mimeType: 'application/pdf', malware: null, downloadUrl: 'https://tenant.sharepoint.com/d' })),
+    });
+    expect((await buildPresentationContext({ requestId: REQUEST_ID }, deps)).materials).toEqual([]);
+    await expectNotFound(resolvePresentationMember({ requestId: REQUEST_ID, member: 'proposal', mode: 'open' }, deps));
+  });
+
+  test('the default dependency uses the strict lookup', () => {
+    expect(String(_internal.DEFAULT_DEPENDENCIES.listReviewerProposal)).toContain('listReviewerProposalStrict');
+  });
+});
+
 describe('summary text on the page', () => {
   const crypto = require('crypto');
   const BOM = Buffer.from([0xef, 0xbb, 0xbf]);
