@@ -1,4 +1,5 @@
 /** @jest-environment node */
+import crypto from 'node:crypto';
 jest.mock('../../lib/dataverse/adapters/request-document.js', () => ({ findByRequest: jest.fn(), findByGenerationKey: jest.fn() }));
 jest.mock('../../lib/services/graph-service.js', () => ({ GraphService: { downloadFile: jest.fn(), getFileMetadataById: jest.fn() } }));
 jest.mock('../../lib/services/post-presentation-materials/material-service.js', () => ({
@@ -24,7 +25,8 @@ import * as publisher from '../../lib/services/post-presentation-materials/mater
 import * as binding from '../../lib/services/meeting-tracker-transcription/binding.js';
 import * as store from '../../lib/services/transcription-pilot/store.js';
 import { buildMeetingTranscriptFiles, buildMeetingTranscriptManifest } from '../../lib/services/meeting-tracker-transcription/bundle.js';
-import { presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey, transcriptSummaryBindingFingerprint } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
+import { presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey, transcriptSummaryBindingFingerprint,
+  staffDiscussionSummaryBindingFingerprint } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE, REQUEST_DOCUMENT_LIFECYCLE_STATE, REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument.js';
 import { getMeetingCorrectionDraft, createMeetingCorrection, updateMeetingCorrection, publishMeetingCorrection,
   getMeetingTranscriptionOverview } from '../../lib/services/meeting-tracker-transcription/service.js';
@@ -168,15 +170,20 @@ describe('correction draft presentation end', () => {
   });
 
   test('publish freezes the receipt boundary into the bundle identity, as an ISO instant', async () => {
+    const decision = { version: 1, rows: [], excludedSpeakerIds: [], attendance: { status: 'unavailable', fetchedAt: '2026-10-05T12:00:00.000Z' } };
+    const stable = value => value && typeof value === 'object' ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stable(value[key])}`).join(',')}}` : JSON.stringify(value);
+    const context = crypto.createHash('sha256').update(stable({ operationId: draftId, sourceRevisionId: revisionId,
+      fingerprint: generated.inputSha256, sourceProvenance: null, endMs: 3000, speakerNames })).digest('hex');
     store.getMeetingTranscriptPublication.mockResolvedValue(draft({ presentation_end_ms: 3000,
-      presentation_end_confirmed_by: 12, presentation_end_confirmed_at: new Date('2026-10-05T12:00:00.000Z') }));
+      presentation_end_confirmed_by: 12, presentation_end_confirmed_at: new Date('2026-10-05T12:00:00.000Z'),
+      discussion_attribution: decision, attendance_review: { id: 'review', decision, context } }));
     publisher.prepareMeetingTranscriptBundlePublication.mockResolvedValue({ candidatePaths: { txt: 'a', vtt: 'b', source: 'c' } });
     store.freezeMeetingTranscriptCorrectionDraft.mockResolvedValue(null);
     await expect(publishMeetingCorrection({ requestId, ownerProfileId: 12, actingUserSystemId: actor,
       operationId: draftId, body: { expectedVersion: 2 } })).rejects.toMatchObject({ code: 'meeting_transcript_correction_changed' });
     const frozenInput = store.freezeMeetingTranscriptCorrectionDraft.mock.calls[0][0].frozenInputSha256;
     const expected = buildMeetingTranscriptFiles({ content, speakerNames, identity: { requestId, siteVisitActivityId: visitId,
-      revisionId: draftId, operationId: draftId, sourceRevisionId: revisionId,
+      revisionId: draftId, operationId: draftId, sourceRevisionId: revisionId, discussionAttribution: decision,
       presentationEnd: { endMs: 3000, confirmedBy: 12, confirmedAt: '2026-10-05T12:00:00.000Z' } } });
     expect(frozenInput).toBe(expected.inputSha256);
   });
@@ -232,6 +239,21 @@ describe('overview currentArtifact', () => {
     documents.findByRequest.mockResolvedValue({ records: [transcriptRow] });
     expect((await getMeetingTranscriptionOverview({ requestId, ownerProfileId: 12 })).currentArtifact.staffDiscussionTranscript)
       .toEqual({ state: 'missing', artifactId: null });
+  });
+
+  test('the staff discussion summary is reported separately and binds only by its own fingerprint (paired summaries plan D8)', async () => {
+    const discussionSummaryId = '99999999-9999-4999-8999-999999999992';
+    const identity = { requestId, sourceRevisionId: revisionId, presentationEndMs: 2000 };
+    const discussionSummaryRow = (fingerprint) => ({ ...presentationRow(`discussion-summary-key-${fingerprint}`),
+      wmkf_requestdocumentid: discussionSummaryId, wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY,
+      wmkf_inputfingerprint: fingerprint });
+    documents.findByRequest.mockResolvedValue({ records: [transcriptRow, discussionSummaryRow(staffDiscussionSummaryBindingFingerprint(identity))] });
+    const bound = (await getMeetingTranscriptionOverview({ requestId, ownerProfileId: 12 })).currentArtifact;
+    expect(bound.staffDiscussionSummary).toMatchObject({ state: 'bound', artifactId: discussionSummaryId });
+    expect(bound.transcriptSummary).toMatchObject({ state: 'missing', artifactId: null });
+    documents.findByRequest.mockResolvedValue({ records: [transcriptRow, discussionSummaryRow(transcriptSummaryBindingFingerprint(identity))] });
+    expect((await getMeetingTranscriptionOverview({ requestId, ownerProfileId: 12 })).currentArtifact.staffDiscussionSummary)
+      .toMatchObject({ state: 'stale', artifactId: discussionSummaryId });
   });
 
   test('the summary is bound by its input fingerprint; a stale one stays visible to staff with its id', async () => {

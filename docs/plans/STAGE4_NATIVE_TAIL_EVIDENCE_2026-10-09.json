@@ -1,0 +1,406 @@
+{
+  "scope": "Generated-media end-tail provenance only; no acceptance relaxation",
+  "stage_a_status": "NOT PASSED",
+  "prior_evidence_sha256": "1ff4554d73263bd716dce93f072885f2e91c6a833344ea55a53c4c63c6b41a87",
+  "harness_sha256": "a9a71d5f8747751867772a5ea48c6dec9ecdf9cb67acfc554fe8fbb17dba865f",
+  "ffmpeg": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+  "cases": [
+    {
+      "case": "offset",
+      "output_sha256": "2eb214454e3b914234a852e582a303ed3903be91f0f057d4776719c5b7cb00f0",
+      "isolated_pcm_sha256": "996efef8ce99f123dea93bcd95ae04841e35c5580acff86a8aff0405a4cb4e2f",
+      "isolated_samples": 4427993,
+      "normal_decoded_samples": 4427993,
+      "elementary_decoded_samples": 4429824,
+      "audio_time_base": "1/48000",
+      "fresh_safe_AAC_sha256": "edc90c5e59a253b0495e9ccca526c8032dcc24467f1dbff7ec27041c093412cd",
+      "priming_samples": 1024,
+      "actual_post_input_padding_samples": 807,
+      "final_packet": {
+        "codec_type": "audio",
+        "stream_index": 1,
+        "pts": 4427776,
+        "pts_time": "92.245333",
+        "dts": 4427776,
+        "dts_time": "92.245333",
+        "duration": 217,
+        "duration_time": "0.004521",
+        "size": "7",
+        "pos": "1733804",
+        "flags": "K__",
+        "data_hash": "SHA256:8a3734dbcb6f4f91174047b0e347cbbd65a57aca20511f53b8488f8da10ff600",
+        "side_data_list": [
+          {
+            "side_data_type": "Skip Samples",
+            "skip_samples": 0,
+            "discard_padding": 807,
+            "skip_reason": 0,
+            "discard_reason": 0
+          }
+        ]
+      },
+      "complete_native_pcm_sha256": "23aadf228b8bb43b18775bc4ec2f028629a89e3038401f4caea232b435427b3e",
+      "comparisons": [
+        {
+          "prior_case": "negative_offset-trial-1",
+          "native_pcm_sha256": "82778362b581923fed8810d7511be91fbffb7880315b29988e36ce618e11d824",
+          "native_samples": 4427776,
+          "missing_samples_per_channel": 217,
+          "shared_prefix_bit_identical": true,
+          "source_tail": {
+            "samples_per_channel": 217,
+            "rms": 0.10740113352800368,
+            "peak": 0.2455420196056366,
+            "nonzero_values": 434
+          },
+          "native_missing_tail": {
+            "samples_per_channel": 217,
+            "rms": 0.10354670594322934,
+            "peak": 0.23853036761283875,
+            "nonzero_values": 434
+          },
+          "native_source_tail_correlation": 0.9986964481467855,
+          "classification": "retained_input_missing"
+        },
+        {
+          "prior_case": "offset-trial-3",
+          "native_pcm_sha256": "82778362b581923fed8810d7511be91fbffb7880315b29988e36ce618e11d824",
+          "native_samples": 4427776,
+          "missing_samples_per_channel": 217,
+          "shared_prefix_bit_identical": true,
+          "source_tail": {
+            "samples_per_channel": 217,
+            "rms": 0.10740113352800368,
+            "peak": 0.2455420196056366,
+            "nonzero_values": 434
+          },
+          "native_missing_tail": {
+            "samples_per_channel": 217,
+            "rms": 0.10354670594322934,
+            "peak": 0.23853036761283875,
+            "nonzero_values": 434
+          },
+          "native_source_tail_correlation": 0.9986964481467855,
+          "classification": "retained_input_missing"
+        },
+        {
+          "prior_case": "pause_gap-trial-3",
+          "native_pcm_sha256": "82778362b581923fed8810d7511be91fbffb7880315b29988e36ce618e11d824",
+          "native_samples": 4427776,
+          "missing_samples_per_channel": 217,
+          "shared_prefix_bit_identical": true,
+          "source_tail": {
+            "samples_per_channel": 217,
+            "rms": 0.10740113352800368,
+            "peak": 0.2455420196056366,
+            "nonzero_values": 434
+          },
+          "native_missing_tail": {
+            "samples_per_channel": 217,
+            "rms": 0.10354670594322934,
+            "peak": 0.23853036761283875,
+            "nonzero_values": 434
+          },
+          "native_source_tail_correlation": 0.9986964481467855,
+          "classification": "retained_input_missing"
+        },
+        {
+          "prior_case": "negative_offset-trial-3",
+          "native_pcm_sha256": "82778362b581923fed8810d7511be91fbffb7880315b29988e36ce618e11d824",
+          "native_samples": 4427776,
+          "missing_samples_per_channel": 217,
+          "shared_prefix_bit_identical": true,
+          "source_tail": {
+            "samples_per_channel": 217,
+            "rms": 0.10740113352800368,
+            "peak": 0.2455420196056366,
+            "nonzero_values": 434
+          },
+          "native_missing_tail": {
+            "samples_per_channel": 217,
+            "rms": 0.10354670594322934,
+            "peak": 0.23853036761283875,
+            "nonzero_values": 434
+          },
+          "native_source_tail_correlation": 0.9986964481467855,
+          "classification": "retained_input_missing"
+        }
+      ],
+      "classification_controls": {
+        "remove_only_actual_padding": "only_post_input_samples_omitted",
+        "remove_one_retained_sample": "retained_input_missing",
+        "changed_earlier_audio": "not_a_tail_only_omission"
+      }
+    },
+    {
+      "case": "drift",
+      "output_sha256": "18d9b325c04e7c91155f2f1fa8893dc64bc65d6ac1e8abea42b278b81ba738d5",
+      "isolated_pcm_sha256": "7111cbcb6e86ac0613ce94794e7613b325eeec71cf956e0d88141fb6ffb295a7",
+      "isolated_samples": 4427991,
+      "normal_decoded_samples": 4427991,
+      "elementary_decoded_samples": 4429824,
+      "audio_time_base": "1/48000",
+      "fresh_safe_AAC_sha256": "3aa29d624093824fdb99fb2165e384937ebf4edb226157ee249b986e927f7814",
+      "priming_samples": 1024,
+      "actual_post_input_padding_samples": 809,
+      "final_packet": {
+        "codec_type": "audio",
+        "stream_index": 1,
+        "pts": 4427776,
+        "pts_time": "92.245333",
+        "dts": 4427776,
+        "dts_time": "92.245333",
+        "duration": 215,
+        "duration_time": "0.004479",
+        "size": "7",
+        "pos": "1733803",
+        "flags": "K__",
+        "data_hash": "SHA256:8a3734dbcb6f4f91174047b0e347cbbd65a57aca20511f53b8488f8da10ff600",
+        "side_data_list": [
+          {
+            "side_data_type": "Skip Samples",
+            "skip_samples": 0,
+            "discard_padding": 809,
+            "skip_reason": 0,
+            "discard_reason": 0
+          }
+        ]
+      },
+      "complete_native_pcm_sha256": "76e25a5834a64e3e2bfaa0ae3fb5d355755c2b5cd357d54bfb1f8ed167463201",
+      "comparisons": [
+        {
+          "prior_case": "drift-trial-2",
+          "native_pcm_sha256": "dcc1b65224a1a4f2ebb8af77ea1a25fc7ac7aaaf2a948bb2a11865c37562b9b4",
+          "native_samples": 4427776,
+          "missing_samples_per_channel": 215,
+          "shared_prefix_bit_identical": true,
+          "source_tail": {
+            "samples_per_channel": 215,
+            "rms": 0.10781026060691787,
+            "peak": 0.2455420196056366,
+            "nonzero_values": 430
+          },
+          "native_missing_tail": {
+            "samples_per_channel": 215,
+            "rms": 0.10560748680922086,
+            "peak": 0.24593979120254517,
+            "nonzero_values": 430
+          },
+          "native_source_tail_correlation": 0.9979666709704595,
+          "classification": "retained_input_missing"
+        }
+      ],
+      "classification_controls": {
+        "remove_only_actual_padding": "only_post_input_samples_omitted",
+        "remove_one_retained_sample": "retained_input_missing",
+        "changed_earlier_audio": "not_a_tail_only_omission"
+      }
+    }
+  ],
+  "fresh_reads": [
+    {
+      "case": "offset-1",
+      "output_sha256": "2eb214454e3b914234a852e582a303ed3903be91f0f057d4776719c5b7cb00f0",
+      "native_pcm_sha256": "82778362b581923fed8810d7511be91fbffb7880315b29988e36ce618e11d824",
+      "native_samples": 4427776,
+      "missing_samples": 217,
+      "shared_prefix_bit_identical": true,
+      "classification": "retained_input_missing",
+      "native_probe": {
+        "audio_clock_error": 0,
+        "audio_end": 92.24533333333333,
+        "audio_samples": 4427776,
+        "audio_tracks": 1,
+        "decoder": "Apple AVFoundation AVAssetReader",
+        "missing_sample_durations": 2766,
+        "native_frame_step": 0.03333333333333333,
+        "native_track_end": 92.2,
+        "private_video_frames": 0,
+        "valid_video_intervals": true,
+        "video_clock_error": 0,
+        "video_end": 92.2,
+        "video_frames": 2766,
+        "video_tracks": 1
+      }
+    },
+    {
+      "case": "offset-2",
+      "output_sha256": "2eb214454e3b914234a852e582a303ed3903be91f0f057d4776719c5b7cb00f0",
+      "native_pcm_sha256": "23aadf228b8bb43b18775bc4ec2f028629a89e3038401f4caea232b435427b3e",
+      "native_samples": 4427993,
+      "missing_samples": 0,
+      "shared_prefix_bit_identical": true,
+      "classification": "no_omission",
+      "native_probe": {
+        "audio_clock_error": 0,
+        "audio_end": 92.24985416666667,
+        "audio_samples": 4427993,
+        "audio_tracks": 1,
+        "decoder": "Apple AVFoundation AVAssetReader",
+        "missing_sample_durations": 2766,
+        "native_frame_step": 0.03333333333333333,
+        "native_track_end": 92.2,
+        "private_video_frames": 0,
+        "valid_video_intervals": true,
+        "video_clock_error": 0,
+        "video_end": 92.2,
+        "video_frames": 2766,
+        "video_tracks": 1
+      }
+    },
+    {
+      "case": "offset-3",
+      "output_sha256": "2eb214454e3b914234a852e582a303ed3903be91f0f057d4776719c5b7cb00f0",
+      "native_pcm_sha256": "23aadf228b8bb43b18775bc4ec2f028629a89e3038401f4caea232b435427b3e",
+      "native_samples": 4427993,
+      "missing_samples": 0,
+      "shared_prefix_bit_identical": true,
+      "classification": "no_omission",
+      "native_probe": {
+        "audio_clock_error": 0,
+        "audio_end": 92.24985416666667,
+        "audio_samples": 4427993,
+        "audio_tracks": 1,
+        "decoder": "Apple AVFoundation AVAssetReader",
+        "missing_sample_durations": 2766,
+        "native_frame_step": 0.03333333333333333,
+        "native_track_end": 92.2,
+        "private_video_frames": 0,
+        "valid_video_intervals": true,
+        "video_clock_error": 0,
+        "video_end": 92.2,
+        "video_frames": 2766,
+        "video_tracks": 1
+      }
+    },
+    {
+      "case": "offset-4",
+      "output_sha256": "2eb214454e3b914234a852e582a303ed3903be91f0f057d4776719c5b7cb00f0",
+      "native_pcm_sha256": "82778362b581923fed8810d7511be91fbffb7880315b29988e36ce618e11d824",
+      "native_samples": 4427776,
+      "missing_samples": 217,
+      "shared_prefix_bit_identical": true,
+      "classification": "retained_input_missing",
+      "native_probe": {
+        "audio_clock_error": 0,
+        "audio_end": 92.24533333333333,
+        "audio_samples": 4427776,
+        "audio_tracks": 1,
+        "decoder": "Apple AVFoundation AVAssetReader",
+        "missing_sample_durations": 2766,
+        "native_frame_step": 0.03333333333333333,
+        "native_track_end": 92.2,
+        "private_video_frames": 0,
+        "valid_video_intervals": true,
+        "video_clock_error": 0,
+        "video_end": 92.2,
+        "video_frames": 2766,
+        "video_tracks": 1
+      }
+    },
+    {
+      "case": "drift-1",
+      "output_sha256": "18d9b325c04e7c91155f2f1fa8893dc64bc65d6ac1e8abea42b278b81ba738d5",
+      "native_pcm_sha256": "76e25a5834a64e3e2bfaa0ae3fb5d355755c2b5cd357d54bfb1f8ed167463201",
+      "native_samples": 4427991,
+      "missing_samples": 0,
+      "shared_prefix_bit_identical": true,
+      "classification": "no_omission",
+      "native_probe": {
+        "audio_clock_error": 0,
+        "audio_end": 92.24981249999999,
+        "audio_samples": 4427991,
+        "audio_tracks": 1,
+        "decoder": "Apple AVFoundation AVAssetReader",
+        "missing_sample_durations": 2766,
+        "native_frame_step": 0.03333333333333333,
+        "native_track_end": 92.2,
+        "private_video_frames": 0,
+        "valid_video_intervals": true,
+        "video_clock_error": 0,
+        "video_end": 92.2,
+        "video_frames": 2766,
+        "video_tracks": 1
+      }
+    },
+    {
+      "case": "drift-2",
+      "output_sha256": "18d9b325c04e7c91155f2f1fa8893dc64bc65d6ac1e8abea42b278b81ba738d5",
+      "native_pcm_sha256": "dcc1b65224a1a4f2ebb8af77ea1a25fc7ac7aaaf2a948bb2a11865c37562b9b4",
+      "native_samples": 4427776,
+      "missing_samples": 215,
+      "shared_prefix_bit_identical": true,
+      "classification": "retained_input_missing",
+      "native_probe": {
+        "audio_clock_error": 0,
+        "audio_end": 92.24533333333333,
+        "audio_samples": 4427776,
+        "audio_tracks": 1,
+        "decoder": "Apple AVFoundation AVAssetReader",
+        "missing_sample_durations": 2766,
+        "native_frame_step": 0.03333333333333333,
+        "native_track_end": 92.2,
+        "private_video_frames": 0,
+        "valid_video_intervals": true,
+        "video_clock_error": 0,
+        "video_end": 92.2,
+        "video_frames": 2766,
+        "video_tracks": 1
+      }
+    },
+    {
+      "case": "drift-3",
+      "output_sha256": "18d9b325c04e7c91155f2f1fa8893dc64bc65d6ac1e8abea42b278b81ba738d5",
+      "native_pcm_sha256": "76e25a5834a64e3e2bfaa0ae3fb5d355755c2b5cd357d54bfb1f8ed167463201",
+      "native_samples": 4427991,
+      "missing_samples": 0,
+      "shared_prefix_bit_identical": true,
+      "classification": "no_omission",
+      "native_probe": {
+        "audio_clock_error": 0,
+        "audio_end": 92.2498125,
+        "audio_samples": 4427991,
+        "audio_tracks": 1,
+        "decoder": "Apple AVFoundation AVAssetReader",
+        "missing_sample_durations": 2766,
+        "native_frame_step": 0.03333333333333333,
+        "native_track_end": 92.2,
+        "private_video_frames": 0,
+        "valid_video_intervals": true,
+        "video_clock_error": 0,
+        "video_end": 92.2,
+        "video_frames": 2766,
+        "video_tracks": 1
+      }
+    },
+    {
+      "case": "drift-4",
+      "output_sha256": "18d9b325c04e7c91155f2f1fa8893dc64bc65d6ac1e8abea42b278b81ba738d5",
+      "native_pcm_sha256": "dcc1b65224a1a4f2ebb8af77ea1a25fc7ac7aaaf2a948bb2a11865c37562b9b4",
+      "native_samples": 4427776,
+      "missing_samples": 215,
+      "shared_prefix_bit_identical": true,
+      "classification": "retained_input_missing",
+      "native_probe": {
+        "audio_clock_error": 0,
+        "audio_end": 92.24533333333333,
+        "audio_samples": 4427776,
+        "audio_tracks": 1,
+        "decoder": "Apple AVFoundation AVAssetReader",
+        "missing_sample_durations": 2766,
+        "native_frame_step": 0.03333333333333333,
+        "native_track_end": 92.2,
+        "private_video_frames": 0,
+        "valid_video_intervals": true,
+        "video_clock_error": 0,
+        "video_end": 92.2,
+        "video_frames": 2766,
+        "video_tracks": 1
+      }
+    }
+  ],
+  "native_source_sha256": "b16a3df709b236d7b8f060130e78c0f82051986f121577ade1c21c192917ebec",
+  "conclusion": "Omitted samples overlap retained encoder input; not an end-padding exemption.",
+  "acceptance_check_changed": false,
+  "bounded_forensic_assertions_passed": true
+}

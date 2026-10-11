@@ -16,7 +16,7 @@ const METHODS = [
   'downloadFileAsPdf', 'downloadFileByPath', 'getFileMetadataByPath',
   'ensureFolderPath', 'searchFiles', 'uploadFile', 'uploadFileLarge',
   'createBrowserUploadSession', 'getBrowserUploadSessionStatus',
-  'cancelBrowserUploadSession', 'resolveMediaDownloadUrl', 'readMediaRange',
+  'cancelBrowserUploadSession', 'putUploadSessionChunk', 'resolveMediaDownloadUrl', 'readMediaRange',
   'replaceFileContent', 'deleteFile', 'deleteFileWithEtag', 'clearCaches',
 ];
 const STATE = [
@@ -86,6 +86,7 @@ const REAL_SOURCE_OPTIONS = {
     createBrowserUploadSession: `${GRAPH}/upload-session.js`,
     getBrowserUploadSessionStatus: `${GRAPH}/upload-session.js`,
     cancelBrowserUploadSession: `${GRAPH}/upload-session.js`,
+    putUploadSessionChunk: `${GRAPH}/upload-session.js`,
     resolveMediaDownloadUrl: `${GRAPH}/media.js`,
     readMediaRange: `${GRAPH}/media.js`,
     searchFiles: `${GRAPH}/search.js`,
@@ -139,6 +140,7 @@ const REAL_SOURCE_OPTIONS = {
     createBrowserUploadSession: { target: `${GRAPH}/upload-session.js`, binding: 'createBrowserUploadSession' },
     getBrowserUploadSessionStatus: { target: `${GRAPH}/upload-session.js`, binding: 'getBrowserUploadSessionStatus' },
     cancelBrowserUploadSession: { target: `${GRAPH}/upload-session.js`, binding: 'cancelBrowserUploadSession' },
+    putUploadSessionChunk: { target: `${GRAPH}/upload-session.js`, binding: 'putUploadSessionChunk' },
     resolveMediaDownloadUrl: { target: `${GRAPH}/media.js`, binding: 'resolveMediaDownloadUrl' },
     readMediaRange: { target: `${GRAPH}/media.js`, binding: 'readMediaRange' },
     searchFiles: { target: `${GRAPH}/search.js`, binding: 'searchFiles' },

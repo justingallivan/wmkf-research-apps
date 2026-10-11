@@ -39,12 +39,14 @@ test('Workbench GET passes the presentation summary through only with a ready pr
   requireAppAccess.mockResolvedValue({ session: { user: { dynamicsSystemuserId: REQUEST_ID } } });
   const presentationSummary = { text: 'What was presented', stale: false, publishedAt: '2026-10-05T15:00:00Z' };
   getSiteVisitLogistics.mockResolvedValue({ siteVisit: null, materials: [], presentationMaterialsStatus: 'ready',
-    presentationMaterials: [], presentationMaterialConflicts: [], presentationSummary });
+    presentationMaterials: [], presentationMaterialConflicts: [], presentationSummary,
+    discussionSummary: { text: 'Main points raised', stale: false, publishedAt: '2026-10-06T15:00:00Z' } });
   const res = { statusCode: 200, body: null };
   res.status = (code) => { res.statusCode = code; return res; };
   res.json = (body) => { res.body = body; return res; };
   await handler({ method: 'GET', query: { requestId: REQUEST_ID } }, res);
-  expect(res.body).toMatchObject({ presentationMaterialsStatus: 'ready', presentationSummary });
+  expect(res.body).toMatchObject({ presentationMaterialsStatus: 'ready', presentationSummary,
+    discussionSummary: { text: 'Main points raised' } });
 
   getSiteVisitLogistics.mockResolvedValue({ siteVisit: null, materials: [], presentationMaterialsStatus: 'disabled', presentationSummary });
   await handler({ method: 'GET', query: { requestId: REQUEST_ID } }, res);

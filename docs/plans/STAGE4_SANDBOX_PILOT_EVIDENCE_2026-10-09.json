@@ -1,0 +1,301 @@
+{
+ "scope": "Stage 4 synthetic Vercel Sandbox pilot, Session 591; generated media only",
+ "sandbox": {
+  "region": "iad1",
+  "vcpus": 2,
+  "memory_mb": 4096,
+  "image": "vercel/sandbox/universal (Ubuntu 26.04.1, x86_64)",
+  "persistent": false
+ },
+ "ffmpeg": {
+  "build": "BtbN autobuild-2026-10-08-13-05 ffmpeg-n9.0.2-23-g27b46f0fbc-linux64-gpl-9.0",
+  "sha256": "14020417ff8ef01470e8cb771355e65c37aff62b80fb0be41eeb7611d1360902"
+ },
+ "runs": {
+  "short": {
+   "label": "short",
+   "arch": "x86_64",
+   "nproc": 2,
+   "ffmpeg_sha256": "14020417ff8ef01470e8cb771355e65c37aff62b80fb0be41eeb7611d1360902",
+   "cut_s": 120.437,
+   "phases": [
+    {
+     "label": "filters",
+     "seconds": 0.02,
+     "exit": 0,
+     "cpu_seconds": 0.02,
+     "peak_rss_mb_children": 25
+    },
+    {
+     "label": "fixture",
+     "seconds": 33.31,
+     "exit": 0,
+     "cpu_seconds": 54.07,
+     "peak_rss_mb_children": 862
+    },
+    {
+     "label": "audio_decode_trim",
+     "seconds": 0.22,
+     "exit": 0,
+     "cpu_seconds": 0.35,
+     "peak_rss_mb_children": 862
+    },
+    {
+     "label": "audio_encode",
+     "seconds": 2.9,
+     "exit": 0,
+     "cpu_seconds": 3.01,
+     "peak_rss_mb_children": 862
+    },
+    {
+     "label": "audio_encode_independent",
+     "seconds": 3.2,
+     "exit": 0,
+     "cpu_seconds": 3.33,
+     "peak_rss_mb_children": 862
+    },
+    {
+     "label": "video_encode",
+     "seconds": 27.44,
+     "exit": 0,
+     "cpu_seconds": 51.53,
+     "peak_rss_mb_children": 862
+    },
+    {
+     "label": "mux",
+     "seconds": 0.1,
+     "exit": 0,
+     "cpu_seconds": 0.14,
+     "peak_rss_mb_children": 862
+    },
+    {
+     "label": "probe_output",
+     "seconds": 0.04,
+     "exit": 0,
+     "cpu_seconds": 0.04,
+     "peak_rss_mb_children": 862
+    },
+    {
+     "label": "probe_video_packets",
+     "seconds": 0.04,
+     "exit": 0,
+     "cpu_seconds": 0.04,
+     "peak_rss_mb_children": 862
+    },
+    {
+     "label": "audio_md5_output",
+     "seconds": 0.09,
+     "exit": 0,
+     "cpu_seconds": 0.11,
+     "peak_rss_mb_children": 862
+    },
+    {
+     "label": "audio_md5_independent",
+     "seconds": 0.08,
+     "exit": 0,
+     "cpu_seconds": 0.1,
+     "peak_rss_mb_children": 862
+    },
+    {
+     "label": "last_frame_png",
+     "seconds": 0.12,
+     "exit": 0,
+     "cpu_seconds": 0.14,
+     "peak_rss_mb_children": 862
+    }
+   ],
+   "fixture": {
+    "duration_s": 150.0,
+    "private_s": 120.437,
+    "drawtext": true,
+    "bytes": 5765262
+   },
+   "kept": {
+    "frames": 3010,
+    "samples": 5780976
+   },
+   "acceptance": {
+    "video_frames": 3010,
+    "video_frames_expected": 3010,
+    "last_video_end_s": 120.4,
+    "cut_s": 120.437,
+    "audio_duration_samples": 5780976,
+    "samples_kept": 5780976,
+    "audio_packets": 5647,
+    "audio_payload_equals_independent_encode": true,
+    "tail_440hz": 0.14994,
+    "tail_3000hz": 0.0,
+    "last_frame_rgb_mean": [
+     236,
+     238,
+     248
+    ],
+    "failures": []
+   },
+   "outcome": "accepted",
+   "output_bytes": 3143253,
+   "declared_output_exists": true,
+   "peak_scratch_bytes": 37093896
+  },
+  "long": {
+   "label": "long",
+   "arch": "x86_64",
+   "nproc": 2,
+   "ffmpeg_sha256": "14020417ff8ef01470e8cb771355e65c37aff62b80fb0be41eeb7611d1360902",
+   "cut_s": 2875.437,
+   "phases": [
+    {
+     "label": "filters",
+     "seconds": 0.02,
+     "exit": 0,
+     "cpu_seconds": 0.02,
+     "peak_rss_mb_children": 25
+    },
+    {
+     "label": "fixture",
+     "seconds": 745.37,
+     "exit": 0,
+     "cpu_seconds": 1233.58,
+     "peak_rss_mb_children": 879
+    },
+    {
+     "label": "audio_decode_trim",
+     "seconds": 4.34,
+     "exit": 0,
+     "cpu_seconds": 7.42,
+     "peak_rss_mb_children": 879
+    },
+    {
+     "label": "audio_encode",
+     "seconds": 67.51,
+     "exit": 0,
+     "cpu_seconds": 70.84,
+     "peak_rss_mb_children": 879
+    },
+    {
+     "label": "audio_encode_independent",
+     "seconds": 65.98,
+     "exit": 0,
+     "cpu_seconds": 69.14,
+     "peak_rss_mb_children": 879
+    },
+    {
+     "label": "video_encode",
+     "seconds": 617.06,
+     "exit": 0,
+     "cpu_seconds": 1189.84,
+     "peak_rss_mb_children": 879
+    },
+    {
+     "label": "mux",
+     "seconds": 1.52,
+     "exit": 0,
+     "cpu_seconds": 2.51,
+     "peak_rss_mb_children": 879
+    },
+    {
+     "label": "probe_output",
+     "seconds": 0.06,
+     "exit": 0,
+     "cpu_seconds": 0.06,
+     "peak_rss_mb_children": 879
+    },
+    {
+     "label": "probe_video_packets",
+     "seconds": 0.5,
+     "exit": 0,
+     "cpu_seconds": 0.48,
+     "peak_rss_mb_children": 879
+    },
+    {
+     "label": "audio_md5_output",
+     "seconds": 1.36,
+     "exit": 0,
+     "cpu_seconds": 1.84,
+     "peak_rss_mb_children": 879
+    },
+    {
+     "label": "audio_md5_independent",
+     "seconds": 1.34,
+     "exit": 0,
+     "cpu_seconds": 1.84,
+     "peak_rss_mb_children": 879
+    },
+    {
+     "label": "last_frame_png",
+     "seconds": 0.35,
+     "exit": 0,
+     "cpu_seconds": 0.52,
+     "peak_rss_mb_children": 879
+    }
+   ],
+   "fixture": {
+    "duration_s": 3600.0,
+    "private_s": 2875.437,
+    "drawtext": true,
+    "bytes": 137373881
+   },
+   "kept": {
+    "frames": 71885,
+    "samples": 138020976
+   },
+   "acceptance": {
+    "video_frames": 71885,
+    "video_frames_expected": 71885,
+    "last_video_end_s": 2875.4,
+    "cut_s": 2875.437,
+    "audio_duration_samples": 138020976,
+    "samples_kept": 138020976,
+    "audio_packets": 134788,
+    "audio_payload_equals_independent_encode": true,
+    "tail_440hz": 0.14997,
+    "tail_3000hz": 1e-05,
+    "last_frame_rgb_mean": [
+     236,
+     238,
+     248
+    ],
+    "failures": []
+   },
+   "outcome": "accepted",
+   "output_bytes": 74689790,
+   "declared_output_exists": true,
+   "peak_scratch_bytes": 884584188
+  }
+ },
+ "failure_cases": {
+  "interrupt": {
+   "killed_exit": -9,
+   "partial_exists": true,
+   "partial_playable": false,
+   "note": "interrupt path never renames; declared output absent by construction"
+  },
+  "diskfull": {
+   "outcome": "rejected",
+   "reason": "insufficient_scratch during audio_decode_trim",
+   "declared_output_exists": false,
+   "first_attempt": "300 MB headroom was enough for a 10-minute cut (test design error); 40 MB attempt crashed writing the receipt (fixed); third attempt passed"
+  },
+  "sandbox_timeout": {
+   "timeout_min": 4,
+   "duration_s": 240.9,
+   "active_cpu_s": 463.9,
+   "resume": "refused: no snapshot available",
+   "snapshots_after": 0
+  }
+ },
+ "usage": {
+  "s4-probe-1": {
+   "duration_s": 12.6
+  },
+  "s4-timeout-1": {
+   "duration_s": 240.9,
+   "active_cpu_s": 463.9
+  },
+  "s4-main-1": {
+   "duration_s": 2430.35,
+   "active_cpu_s": 3831.7
+  }
+ },
+ "cleanup": "after each sandbox: stop + remove; vercel sandbox list --all and snapshots list empty; exec on removed name returns 404"
+}

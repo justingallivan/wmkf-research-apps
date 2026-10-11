@@ -14,12 +14,19 @@ import {
   listPresentationMaterialUploads,
   markPresentationMaterialUploadSessionClosed,
   recordPresentationMaterialUploadCandidate,
-  recordPresentationMaterialUploadRecoverySession,
   refreshPresentationMaterialUploadSession,
   releasePresentationMaterialUpload,
   releasePresentationMaterialUploadCleanupLease,
   renewPresentationMaterialUploadCleanupLease,
   renewPresentationMaterialUploadLease,
+  markPresentationMaterialUploadFailed,
+  recordPresentationMaterialUploadSession,
+  renewPresentationMaterialUploadRecovery,
+  releasePresentationMaterialUploadRecovery,
+  markPresentationMaterialUploadRecoveryTerminal,
+  markPresentationMaterialUploadRecoveryUncertain,
+  recordPresentationMaterialUploadRecoverySession,
+  abandonPresentationMaterialUpload,
 } from '../../lib/services/post-presentation-materials/upload-intent-store.js';
 
 const INPUT = {
@@ -41,11 +48,11 @@ beforeEach(() => {
 
 test('intent reads and claims are bound to upload, request, and creating actor', async () => {
   await getPresentationMaterialUpload(INPUT);
-  expect(statement()).toContain('WHERE id = ? AND request_id = ? AND actor_id = ? LIMIT 1');
+  expect(statement()).toContain("WHERE id = ? AND request_id = ? AND actor_id = ? AND origin = 'browser' LIMIT 1");
 
   await claimPresentationMaterialUpload(INPUT);
   const claim = statement();
-  expect(claim).toContain('WHERE id = ? AND request_id = ? AND actor_id = ?');
+  expect(claim).toContain("WHERE id = ? AND request_id = ? AND actor_id = ? AND origin = 'browser'");
   expect(claim).toContain("state IN ('initiated', 'uploaded')");
   expect(claim).toContain('(lease_token IS NULL OR lease_expires_at <= NOW())');
   expect(claim).toContain("state = 'finalizing' AND lease_expires_at <= NOW()");
@@ -223,4 +230,90 @@ test('completion is candidate-gated and atomically clears the preauthenticated U
   expect(text).toContain('lease_token = NULL');
   expect(text).toContain('candidate_item_id IS NOT NULL');
   expect(text).toContain('lease_expires_at > NOW()');
+});
+
+const BROWSER_ONLY = "origin = 'browser'";
+const CANDIDATE = { siteId: 'site', driveId: 'drive', itemId: 'item', versionId: '1.0', eTag: 'etag', size: 100 };
+
+test('browser reads, claims and unleased writers are isolated to origin browser', async () => {
+  await listPresentationMaterialUploads(INPUT);
+  expect(statement()).toContain(`actor_id = ? AND ${BROWSER_ONLY} AND state NOT IN`);
+
+  await claimPresentationMaterialUpload(INPUT);
+  expect(statement()).toContain(`actor_id = ? AND ${BROWSER_ONLY} AND intent_expires_at > NOW()`);
+
+  await claimPresentationMaterialUploadRecovery(INPUT);
+  expect(statement()).toContain(`actor_id = ? AND ${BROWSER_ONLY} AND state IN ('initiated', 'failed')`);
+
+  await recordPresentationMaterialUploadSession({
+    uploadId: INPUT.uploadId, uploadUrlCiphertext: 'sealed', expiresAt: 'x', intentExpiresAt: 'y',
+  });
+  expect(statement()).toContain(`WHERE id = ? AND ${BROWSER_ONLY} AND state = 'initiated'`);
+
+  await markPresentationMaterialUploadFailed({ uploadId: INPUT.uploadId, lastError: 'e' });
+  expect(statement()).toContain(`WHERE id = ? AND ${BROWSER_ONLY} AND state = 'initiated'`);
+
+  await markPresentationMaterialUploadSessionClosed({ ...INPUT, uploadUrlCiphertext: 'sealed', lastError: 'e' });
+  expect(statement()).toContain(`(lease_token IS NULL OR lease_expires_at <= NOW()) AND ${BROWSER_ONLY}`);
+
+  await recordPresentationMaterialUploadCandidate({ ...INPUT, leaseToken: null, candidate: CANDIDATE });
+  expect(statement()).toContain(`AND NOT (state = 'failed' AND candidate_item_id IS NOT NULL) AND ${BROWSER_ONLY}`);
+});
+
+test('session refresh exempts only a caller holding a lease token from the browser origin predicate', async () => {
+  await refreshPresentationMaterialUploadSession({
+    ...INPUT, uploadUrlCiphertext: 'sealed', expiresAt: 'x', intentExpiresAt: 'y',
+  });
+  expect(statement()).toContain(`AND (?::uuid IS NOT NULL OR ${BROWSER_ONLY})`);
+  const params = sql.mock.calls.at(-1).slice(1);
+  expect(params.filter((value) => value === INPUT.leaseToken)).toHaveLength(2);
+
+  await refreshPresentationMaterialUploadSession({
+    ...INPUT, leaseToken: undefined, uploadUrlCiphertext: 'sealed', expiresAt: 'x', intentExpiresAt: 'y',
+  });
+  expect(sql.mock.calls.at(-1).slice(1)).not.toContain(INPUT.leaseToken);
+  expect(sql.mock.calls.at(-1).slice(1).filter((value) => value === null)).toHaveLength(2);
+});
+
+test('the token-keyed candidate writer stays origin-agnostic', async () => {
+  await recordPresentationMaterialUploadCandidate({ ...INPUT, candidate: CANDIDATE });
+  expect(statement()).not.toContain('origin');
+});
+
+test('token-keyed, recovery and cleanup functions never mention origin', async () => {
+  const calls = [
+    () => renewPresentationMaterialUploadLease(INPUT),
+    () => releasePresentationMaterialUpload(INPUT),
+    () => completePresentationMaterialUpload({ ...INPUT, requestDocumentId: INPUT.uploadId }),
+    () => renewPresentationMaterialUploadRecovery(INPUT),
+    () => releasePresentationMaterialUploadRecovery(INPUT),
+    () => markPresentationMaterialUploadRecoveryTerminal(INPUT),
+    () => markPresentationMaterialUploadRecoveryUncertain(INPUT),
+    () => cancelPresentationMaterialUploadRecovery(INPUT),
+    () => recordPresentationMaterialUploadRecoverySession({ ...INPUT, uploadUrlCiphertext: 's', expiresAt: 'x', intentExpiresAt: 'y' }),
+    () => claimPresentationMaterialUploadsForCleanup(),
+    () => releasePresentationMaterialUploadCleanupLease(INPUT),
+    () => renewPresentationMaterialUploadCleanupLease(INPUT),
+    () => abandonPresentationMaterialUpload(INPUT),
+    () => bindPresentationMaterialUploadForCleanup({ ...INPUT, requestDocumentId: INPUT.uploadId }),
+  ];
+  for (const call of calls) {
+    sql.mockClear();
+    await call();
+    expect(statement()).not.toContain('origin');
+  }
+});
+
+test('intent creation writes origin explicitly, browser by default and zoom_copy only when passed', async () => {
+  const row = {
+    id: INPUT.uploadId, requestId: INPUT.requestId, siteVisitId: INPUT.requestId, actorId: INPUT.actorId,
+    artifactType: 100000005, originalDisplayFilename: 'r.mp4', validatedMimeType: 'video/mp4', declaredSize: 100,
+    clientResumeFingerprint: 'a'.repeat(64), libraryName: 'l', folderPath: 'f', physicalFilename: 'p.mp4',
+    generationKey: 'b'.repeat(64), intentExpiresAt: '2026-09-28T12:00:00Z',
+  };
+  await insertPresentationMaterialUpload(row);
+  expect(statement()).toContain('intent_expires_at, origin ) VALUES');
+  expect(sql.mock.calls.at(-1).at(-1)).toBe('browser');
+  await insertPresentationMaterialUpload({ ...row, origin: 'zoom_copy' });
+  expect(sql.mock.calls.at(-1).at(-1)).toBe('zoom_copy');
 });

@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     const body = req.body;
     // The two-key shape leaves the presentation end untouched; the three-key shape sets it or clears it (null).
     const keys = body && typeof body === 'object' && !Array.isArray(body) ? Object.keys(body).sort().join(',') : '';
-    if (!['expectedVersion,speakerNames', 'expectedVersion,presentationEndMs,speakerNames'].includes(keys)
+    if (!['expectedVersion,speakerNames', 'expectedVersion,presentationEndMs,speakerNames', 'attendanceConfirmation,expectedVersion,speakerNames'].includes(keys)
       || !Number.isSafeInteger(body.expectedVersion)) return res.status(400).json({ error: 'The correction-label request is invalid.' });
   }
   res.setHeader('Cache-Control','private, no-store');

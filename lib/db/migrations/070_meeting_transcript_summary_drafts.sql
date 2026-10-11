@@ -9,8 +9,9 @@
 -- published). Once a registry write is attempted the row records it and can no
 -- longer return to 'ready'. Publishing, discarding, superseding, or expiring the
 -- draft clears the text and keeps the metadata. The published text lives in governed SharePoint, registered as a
--- Transcript Summary request-document row. Stage 3 extends artifact_type with
--- 100000010 (Staff Discussion Summary).
+-- Transcript Summary request-document row. The proposed Stage 2 paired-summaries
+-- plan (docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md) extends artifact_type
+-- with 100000010 (Staff Discussion Summary).
 CREATE TABLE IF NOT EXISTS meeting_transcript_summary_drafts (
   id UUID PRIMARY KEY,
   request_id UUID NOT NULL,

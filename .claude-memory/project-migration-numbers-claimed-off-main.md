@@ -1,8 +1,8 @@
 ---
 name: project-migration-numbers-claimed-off-main
-description: "Before picking a Postgres migration number, check shared Production `schema_migrations` and numbers claimed on unmerged branches. 055 and 070 were applied to Production before merging; as of 2026-10-05 main ends at 071 (067, 070 and 071 all applied before or at merge) and the next free number is 072."
+description: "Before picking a Postgres migration number, check shared Production `schema_migrations` and numbers claimed on unmerged branches. 055, 070, 071, 074 and 078 were applied to Production before merging; as of 2026-10-10 Production and main end at 080: 079 (zoom_video_copies recording times) and 080 (presentation_video_splits) were both owner-applied before merge and are merged; the next free number is 081."
 status: active
-last_verified: 2026-10-05 via lib/db/migrations on main (68 files, ends at 069) and a scan of every remote branch for 065-079
+last_verified: 2026-10-10 via owner-run apply-migrations output (078 applied; 1 applied, 77 skipped) and merge 06ef45ee8 to main
 metadata:
   type: project
 ---
@@ -68,6 +68,41 @@ origin/main`, 2026-09-30]. The episode shows why "the next number after
   067 has since merged to `main` in PR #432 (2026-10-05); commit `81fcfae6c` records it as
   applied to Production. 070 merged in PR #440. 071 (`071_summary_draft_slides_identity.sql`) merged in
   PR #441 and was applied before merge (owner run 2026-10-05: 1 applied, 70 skipped,
-  71 total). `main` now ends at 071; the next free number is 072.
+  71 total). 072 and 073 merged to `main` afterwards (Final Writeup handoff emails and digests).
+- [VERIFIED 2026-10-08, read-only `schema_migrations` read] Production held 070–073. 074
+  (`074_zoom_recording_imports.sql`, Zoom recording import) was applied by the owner's `!` run from
+  `codex/meeting-transcript-ux` before merge: 1 applied, 73 skipped, `applied_by`
+  `claude-s586-zoom-import-2026-10-08`. It merged to `main` in PR #464. The next free number is 075.
+- [VERIFIED 2026-10-09, Session 591, owner-run read-only `schema_migrations` read] Production's
+  highest rows are 076 (`076_zoom_video_copies.sql`, applied 2026-10-09 15:00Z) and 075; `main` also
+  ends at 076, and no local or remote branch carries 077-089. **077 is reserved** for Codex's
+  transcript-provenance slice (`codex/transcription-labels`; `zoom_recording_imports` provenance
+  columns and `meeting_transcript_publications.frozen_source_provenance`). Stage 4's split-job
+  migration and Codex's later policy migration take 078 onward, claimed at build time.
+  The tracker column is `name`, not `filename`.
+- [VERIFIED 2026-10-09, Session 591] 077 (`077_zoom_transcript_provenance.sql`) merged to `main` in
+  `f3cc08540` and is applied to Production (owner statement: applied and verified; not re-read by Claude).
+  At that allocation checkpoint no branch carried 078-089. **078 is now built** on
+  `codex/zoom-attendance` as `078_zoom_attendance_attribution.sql`; applied to Production and merged
+  to `main` in `06ef45ee8` (see the next entry). Contract: `docs/plans/ZOOM_ATTENDANCE_ATTRIBUTION_PLAN_2026-10-09.md`.
+  **079 is reserved** for Stage 4 (split-job table plus `zoom_video_copies` recording times). Owner
+  approved both (coordination file `/tmp/zoom-stage4-attendance-coordination.md`, outside the repo).
+- [VERIFIED 2026-10-10, owner `!` run output] `078_zoom_attendance_attribution.sql` was applied to Production
+  from the `codex/zoom-attendance` worktree before merge (1 applied, 77 skipped, 78 total; `applied_by`
+  `codex-attendance-2026-10-09`). That worktree has no `.env.local`, so the run used
+  `node --env-file=../WMKF_Apps/.env.local scripts/apply-migrations.js`. Merged to `main` in `06ef45ee8`.
+  079 remains reserved for Stage 4.
+- [VERIFIED 2026-10-10, Session 592, via `git log` on `claude/stage4-slice1`] Stage 4 split its allocation.
+  **079** is `079_zoom_video_copy_recording_times.sql` (commit `27819c8c6`, worktree
+  `/Users/gallivan/Code/WMKF_Apps-stage4`): two nullable columns, so the owner can apply it early.
+  **080** is reserved for the split-job table (slice 2 of `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md`).
+  The next free number is 081.
+- [VERIFIED 2026-10-10, Session 592, via `git log` on `claude/stage4-build`] **080** is
+  `080_presentation_video_splits.sql` (Stage 4 slices 2-5), on branch `claude/stage4-build`. It was approved by Codex
+  adversarial review, owner-applied from `/Users/gallivan/Code/WMKF_Apps-stage4` on 2026-10-10 (1 applied,
+  79 skipped, 80 total), then merged to `main` the same day.
+- [VERIFIED 2026-10-10, owner `!` run output] `079_zoom_video_copy_recording_times.sql` was applied to Production
+  from the `WMKF_Apps-stage4` worktree before merge (1 applied, 78 skipped, 79 total), using
+  `node --env-file=../WMKF_Apps/.env.local scripts/apply-migrations.js`. Merged to `main` in `894826cd5`.
 - Auto-mode permissions block Claude from running `apply-migrations.js` against
   the shared database even with owner authorization; the owner runs it with `!`.

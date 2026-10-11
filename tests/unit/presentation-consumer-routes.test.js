@@ -15,6 +15,7 @@ jest.mock('../../lib/external/rate-limit', () => ({
 jest.mock('../../lib/external/presentation-media-rate-limit', () => ({
   checkPresentationContextRateLimit: jest.fn(),
   checkPresentationMediaRateLimit: jest.fn(),
+  checkPresentationProposalCheckRateLimit: jest.fn(),
 }));
 jest.mock('../../lib/services/post-presentation-materials/presentation-page-service', () => ({
   buildPresentationContext: jest.fn(),
@@ -33,6 +34,7 @@ import { recordTokenOutcome } from '../../lib/external/rate-limit.js';
 import {
   checkPresentationContextRateLimit,
   checkPresentationMediaRateLimit,
+  checkPresentationProposalCheckRateLimit,
 } from '../../lib/external/presentation-media-rate-limit.js';
 import {
   buildPresentationContext,
@@ -52,6 +54,7 @@ function response() {
     setHeader: jest.fn(function setHeader(name, value) { this.headers[name] = value; }),
     status: jest.fn(function status(code) { this.statusCode = code; return this; }),
     json: jest.fn(function json(body) { this.body = body; return this; }),
+    send: jest.fn(function send(body) { this.body = body; return this; }),
     redirect: jest.fn(function redirect(code, url) { this.statusCode = code; this.redirectUrl = url; return this; }),
   };
 }
@@ -62,6 +65,7 @@ beforeEach(() => {
   isMeetingTrackerSchemaReady.mockReturnValue(true);
   checkPresentationContextRateLimit.mockResolvedValue({ ok: true });
   checkPresentationMediaRateLimit.mockResolvedValue({ ok: true });
+  checkPresentationProposalCheckRateLimit.mockResolvedValue({ ok: true });
   verifyPresentationToken.mockResolvedValue({ ok: true, requestId: REQUEST_ID, link: { id: LINK_ID } });
 });
 
@@ -147,6 +151,55 @@ test('open route re-verifies membership and redirects without buffering media', 
   expect(res.redirect).toHaveBeenCalledWith(302, 'https://tenant.sharepoint.com/short');
   expect(res.body).toBeNull();
   expect(res.headers['Referrer-Policy']).toBe('no-referrer');
+});
+
+test('open route mode check answers with the descriptor as JSON, never a redirect', async () => {
+  resolvePresentationMember.mockResolvedValue({ kind: 'available', material: { member: 'proposal', kind: 'proposal', filename: null } });
+  const res = response();
+  await openHandler({
+    method: 'GET', query: { token: 't', member: 'proposal', mode: 'check' }, headers: {}, socket: {},
+  }, res);
+  expect(resolvePresentationMember).toHaveBeenCalledWith({ requestId: REQUEST_ID, member: 'proposal', mode: 'check' });
+  expect(res.redirect).not.toHaveBeenCalled();
+  expect(res.statusCode).toBe(200);
+  expect(res.body).toEqual({ ok: true, material: { member: 'proposal', kind: 'proposal', filename: null } });
+  expect(res.headers['Cache-Control']).toBe('private, no-store');
+  expect(checkPresentationProposalCheckRateLimit).toHaveBeenCalledTimes(1);
+  expect(checkPresentationMediaRateLimit).not.toHaveBeenCalled();
+});
+
+test('a throttled proposal check never touches the media budget, and media actions still use it', async () => {
+  checkPresentationProposalCheckRateLimit.mockResolvedValue({ ok: false, reason: 'rate_limited', retryAfterSeconds: 9 });
+  const res = response();
+  await openHandler({ method: 'GET', query: { token: 't', member: 'proposal', mode: 'check' }, headers: {}, socket: {} }, res);
+  expect(res.statusCode).toBe(429);
+  expect(checkPresentationMediaRateLimit).not.toHaveBeenCalled();
+  resolvePresentationMember.mockResolvedValue({ kind: 'file', redirectUrl: 'https://tenant.sharepoint.com/short' });
+  const media = response();
+  await openHandler({ method: 'GET', query: { token: 't', member: 'proposal', mode: 'open' }, headers: {}, socket: {} }, media);
+  expect(checkPresentationMediaRateLimit).toHaveBeenCalledTimes(1);
+  expect(media.redirect).toHaveBeenCalledWith(302, 'https://tenant.sharepoint.com/short');
+});
+
+test('open route mode pdf serves the converted bytes inline from this origin', async () => {
+  const bytes = Buffer.from('%PDF-1.7 x');
+  resolvePresentationMember.mockResolvedValue({ kind: 'pdf', buffer: bytes });
+  const res = response();
+  await openHandler({ method: 'GET', query: { token: 't', member: `material:${LINK_ID}`, mode: 'pdf' }, headers: {}, socket: {} }, res);
+  expect(checkPresentationMediaRateLimit).toHaveBeenCalledTimes(1);
+  expect(res.redirect).not.toHaveBeenCalled();
+  expect(res.statusCode).toBe(200);
+  expect(res.headers['Content-Type']).toBe('application/pdf');
+  expect(res.headers['Content-Disposition']).toBe('inline; filename="document.pdf"');
+  expect(res.headers['X-Content-Type-Options']).toBe('nosniff');
+  expect(res.body).toBe(bytes);
+});
+
+test('open route refuses an unknown mode before any work', async () => {
+  const res = response();
+  await openHandler({ method: 'GET', query: { token: 't', member: 'proposal', mode: 'list' }, headers: {}, socket: {} }, res);
+  expect(res.statusCode).toBe(404);
+  expect(resolvePresentationMember).not.toHaveBeenCalled();
 });
 
 test('GET staff link is read-only and returns the current live row', async () => {

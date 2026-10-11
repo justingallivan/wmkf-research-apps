@@ -10,6 +10,96 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Board presentation page redesigned for board members (Session 594)
+
+**Milestone:** the outside Board page became a usable reading surface: video, on-page AI-generated summary, proposal, slides and bios, each opening in the browser.
+**Sessions:** 594.
+**Ship state:**
+- Approved video bound by size + quickXorHash (SharePoint eTag bumps no longer break the Board link).
+- Summary shown on the page only when its bytes match the published SHA-256; full transcript unlisted.
+- Proposal (external-reviewer PDF) offered by owner decision, via a strict complete lookup checked after render.
+- View opens PDFs as local copies (CSP `connect-src` tenant on this page only); Office files convert to PDF, bounded 4 MB / 20 s.
+**Why it matters:** board members get what they need without filenames, downloads or broken links.
+**Pointers:** `pages/external/presentation/[token].js`; `lib/services/post-presentation-materials/presentation-page-service.js`; merges `81dbc6c66`, `f35ae70f7`, `35d5456d2`, `e05bbd962`, `700619a76`, `7b9746f7b`.
+
+## October 2026 — Site Visit page redesigned for staff (Session 593)
+
+**Milestone:** The Meeting Tracker Site Visit page was rebuilt under DESIGN.md's Page Structure rules: each finished item is one row (name is the link, a status chip, a "…" menu), finished steps collapse to one line, and results sit in staff-first cards (Recording setup, Presentation, Staff discussion, Board materials with a status-only readiness list). The full recording is no longer shown to staff.
+**Sessions:** 593 (Claude building, Codex adversarial review on every commit; owner desktop check on localhost). Merge `c574e9e7d`; docs `450272aa0`.
+**Ship state:**
+- Header shows institution, title, program and cycle (new read-only request lookup on the visit GET); organizer and attendees use a search-and-list picker with Required/Optional.
+- Applicant materials are rows with one next step on the heading; one Refresh for the recording cards.
+- Open: header status chip; server slices C1-C3; an owner-accepted Board-readiness gap after a failed post-save reload.
+**Why it matters:** the page staff use on every visit no longer repeats "Open" and status prose per item; the rarely used Board view moved to the bottom.
+**Pointers:** `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md` (§8.2 decisions, §9.6 log, §10 open); `shared/components/meeting-tracker/RecordingAndTranscriptCard.js`, `ArtifactRow.js`, `AttendeePicker.js`.
+
+## October 2026 — Presentation video cut from the Zoom recording (Session 592)
+
+**Milestone:** Staff can cut the copied Zoom MP4 at the confirmed presentation end in a Vercel Sandbox, check the ending, and approve it; approval registers a Dataverse "Presentation Video" (100000011) the Board and briefing pages can play. First real cut (1003222) approved 2026-10-10.
+**Sessions:** 592 (Opus orchestrating, Sonnet building, Codex adversarial review per slice). Merge `e53cb4b9a` (migrations 079, 080, owner-applied); live fixes `c277afa8f` (content identity), `02a5bd146` (command exit code), `4d23ff779` (card busy flag).
+**Ship state:**
+- Pinned FFmpeg 9.0.2 from private Blob; source verified by size + quickXorHash inside the sandbox; frame- and sample-exact cut with privacy proofs on both decode paths; Graph upload verified by size + hash.
+- Access gated by `PRESENTATION_VIDEO_SPLIT_ACCESS` (test request only so far); 40 min and about $0.14 CPU for a 60-minute presentation on 2 vCPU.
+- Open: Board link eTag check (`pinnedBytesMatch`), speed-ups, card redesign.
+**Why it matters:** the Board sees only the presentation, never the staff discussion, without anyone editing video by hand.
+**Pointers:** `docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md`; `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md`; `lib/services/meeting-tracker-recordings/presentation-video-*.js`.
+
+## October 2026 — Zoom transcript provenance and attendance-based discussion attribution (Session 591)
+
+**Milestone:** When Duncan confirms a transcript's presentation end, the same step now lists everyone admitted to the Zoom meeting (silent people included), all checked; unchecking someone makes their discussion turns read "Unidentified speaker". Underneath, every Zoom-imported transcript now carries a frozen, content-free record of the exact recording files it came from.
+**Sessions:** 591 (Claude orchestrating, Codex building). Provenance merge `f3cc08540` (migration 077); attendance merge `06ef45ee8` (migration 078, `7ddc5a4e7` + `3af9267de`); both migrations applied by the owner before merge; Production deployment of `06ef45ee8` succeeded.
+**Ship state:**
+- Import binds the exact Zoom file (ID, type, size, start/end; a same-size replacement is rejected) and freezes file hashes before transcription; corrections and recovery carry the same source identity; transcript bundle v6 then v7.
+- Attendance comes from the Zoom participants report by the frozen meeting UUID only; people grouped by display name; waiting-room-only hidden behind a count; unavailable or partial attendance falls back to the voices list. Presentation turns, names, timestamps and the presentation end never change.
+- Legacy transcripts stay "source unknown"; not yet exercised on a live meeting.
+**Why it matters:** the discussion transcript no longer credits people who had left, and Stage 4 can prove which recording a transcript came from.
+**Pointers:** `docs/plans/ZOOM_TRANSCRIPT_PROVENANCE_PLAN_2026-10-09.md`; `docs/plans/ZOOM_ATTENDANCE_ATTRIBUTION_PLAN_2026-10-09.md`; `lib/services/meeting-tracker-transcription/{source-provenance,attendance-service,discussion-attribution}.js`.
+
+## October 2026 — Zoom meeting videos copy into SharePoint (Session 590)
+
+**Milestone:** Staff can copy a site visit's Zoom meeting MP4 into the request's SharePoint folder as its staff-only Recording, from the same picker that imports the audio. `ZOOM_VIDEO_COPY_ACCESS=on` in Production.
+**Sessions:** 589 (build, Codex-approved round 5) and 590 (release). Migration 076 applied; merges `c79f79807` (step 0: origin column, browser isolation), `780fab218` (Stage 3b), `cb2640a88` (picker fixes), `306ba183f` (quickXorHash record).
+**Ship state:**
+- An every-minute cron copies one meeting at a time in resumable ranged chunks through a Graph upload session, then registers it under the slot fence. Replacing a staff MP4 needs explicit confirmation.
+- Mode D on test request 1003222: 149,405,180 bytes in 92 s, staff MP4 superseded, absent from the Board page.
+- Picker: **Copy video** on its own once a transcript exists; import lines follow the transcription job's status.
+**Why it matters:** the full meeting video now lives in governed WMKF storage, the input Stage 4 will cut into a Board-eligible presentation video.
+**Pointers:** `docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md`; `docs/atlas/postgres-zoom-video-copies.md`; `lib/services/meeting-tracker-recordings/video-copy-{store,service,worker}.js`; next stage `docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md`.
+
+## October 2026 — Paired presentation and staff discussion summaries ship (Sessions 588–589)
+
+**Milestone:** One Meeting Tracker action drafts both the presentation summary and a staff-only staff discussion summary. Each kind is reviewed, edited and published separately.
+**Sessions:** 588–589. Release step 0 merge `82c6cb26d`; Stage 2 merge `5b8225ed8` (Production deployment 6952181551). Claude built and reviewed; Codex adversarial passes (backend: one medium finding, fixed; card: approve).
+**Ship state:**
+- New artifact type 100000010 Staff Discussion Summary, migration 075 and prompt `meeting-transcript.staff-discussion-summary` v1, all provisioned by the owner 2026-10-09. The Board and briefing links never serve it.
+- The server refuses to replace a ready draft unless the request names it (fixes an old-tab overwrite of edited presentation drafts). An empty staff discussion shows "Not recorded" with no provider call.
+- Accepted on test request 1003222 2026-10-09. Staff Deliberations and the card show both summaries. The Board and briefing pages list only the presentation summary, and both refuse the discussion row by direct id (404). The reload during a run and a draft edit were not observed.
+**Why it matters:** staff get a summary of their own deliberation without risking it reaching the Board page, and edited drafts can no longer be silently discarded.
+**Pointers:** `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md`; `lib/services/post-presentation-materials/transcript-summary-service.js`; `summary-draft-store.js`; `shared/components/meeting-tracker/RecordingAndTranscriptCard.js`.
+
+## October 2026 — Transcription queue hardened; staff can cancel stuck runs (Session 587)
+
+**Milestone:** A transcript that fails validation no longer blocks the transcription queue, and staff can cancel a queued or stuck transcription from the Meeting Tracker card.
+**Sessions:** 587. PRs #467 (`e2e6ef6f4`), #468 (`c5030df33`), #469 (`99ca8d413`), #470 (`ee773977b`). Sonnet built; Claude reviewed; Codex adversarial passes (#468: high, medium, then approve; #469: high, medium, high, then approve; #470: approve).
+**Ship state:**
+- Deterministic save-validation errors fail the job and free the global slot. A provider-ID conflict mid-save goes to `submission_uncertain`. Logs carry only allowlisted error codes.
+- Staff can cancel queued, processing and saving runs. The confirm text warns that AssemblyAI may still finish and bill. A cancelled queued run no longer blocks a replacement or a Zoom re-import, and an in-flight cancel keeps its Zoom claim until the job ends.
+- Imported Zoom audio gets a Pacific-time name. The runbook now records the recovery recipe for Workflow runs pinned to an old deployment.
+**Why it matters:** this closes the S586 outage class (one bad transcript blocking all transcription) and gives staff a way out of a stuck job without the browser console.
+**Pointers:** `lib/services/transcription-pilot/worker.js`; `shared/components/meeting-tracker/RecordingAndTranscriptCard.js`; `lib/services/meeting-tracker-recordings/import-service.js`; `docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_RUNBOOK_2026-09-30.md` (Recovery and abandonment).
+
+## October 2026 — Import from Zoom ships; transcription queue incident fixed (Session 586)
+
+**Milestone:** Staff can import a site visit's audio and Zoom transcript directly from WMKF's Zoom account into Meeting Tracker transcription. The recording card is now a three-step flow.
+**Sessions:** 586. PR #464 (merge `441140e6e`), #465 (`e3b841005`), #466 (`cd8b5a5c7`). Claude planned and reviewed; Sonnet built; Codex ran adversarial passes (#464: high, medium, then approve; #466: high, then approve).
+**Ship state:**
+- Internal Zoom S2S OAuth app (read-only recording scopes); approved host list in `ZOOM_RECORDING_HOSTS`; migration 074 `zoom_recording_imports` applied to Production. Live import on 1003010 ran end to end, with 5 speakers named from the Zoom transcript.
+- Incident (about 11:55–13:12 PT): a 24,213-character utterance exceeded the 20,000 cap and retried in `saving` indefinitely, blocking the global transcription slot. The cap is now 200,000. Recovery needed cancelling the pinned Vercel Workflow runs and running the recovery cron.
+- Speaker matching now moves a strongly matched turn when the label's own speaker has no caption there.
+- Not yet built: MP4 copy to SharePoint (3b), paired summaries (2), turn splitting, and fail-fast transcription save errors.
+**Why it matters:** this removes the manual Zoom download and upload. The incident showed that one bad transcript can block every transcription, and that a worker fix doesn't reach in-flight runs.
+**Pointers:** `docs/plans/ZOOM_RECORDING_IMPORT_PLAN_2026-10-08.md`; `docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md`; `lib/services/meeting-tracker-recordings/`; `lib/services/transcription-pilot/{limits,worker,zoom-vtt}.js`.
+
 ## October 2026 — Leadership daily digest completes the group-review handoff (Session 584)
 
 **Milestone:** Each night at 07:00 UTC, every Leadership-persona staff member gets one email from the system mailbox listing the Research writeups newly sent to leadership review. All five group-review handoff stages are now live.

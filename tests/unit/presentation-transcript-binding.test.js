@@ -2,6 +2,7 @@
 import {
   bindPresentationTranscript, bindStaffDiscussionTranscript, confirmedPresentationEnd, presentationTranscriptGenerationKey,
   staffDiscussionTranscriptGenerationKey, bindTranscriptSummary, transcriptSummaryBindingFingerprint,
+  bindStaffDiscussionSummary, staffDiscussionSummaryBindingFingerprint,
 } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../shared/config/requestDocument.js';
 
@@ -119,6 +120,35 @@ describe('transcript summary binding', () => {
   test('no confirmed boundary leaves the summary unbound but reports the candidate', () => {
     const result = bindTranscriptSummary([transcriptRow(manifest({ presentationEnd: null })), summary()], REQUEST_ID);
     expect(result).toMatchObject({ reason: 'boundary_not_confirmed', summary: null, candidate: { wmkf_requestdocumentid: 'doc-s' } });
+  });
+});
+
+describe('staff discussion summary binding (paired summaries plan D3)', () => {
+  const identity = { requestId: REQUEST_ID, sourceRevisionId: REVISION, presentationEndMs: 70_000 };
+  const fingerprint = staffDiscussionSummaryBindingFingerprint(identity);
+  const discussionSummary = (overrides = {}) => ({ ...derivativeRow('unique-per-publish'), wmkf_requestdocumentid: 'doc-d',
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY, wmkf_inputfingerprint: fingerprint, ...overrides });
+
+  test('binds on its own fingerprint', () => {
+    expect(bindStaffDiscussionSummary([transcriptRow(), discussionSummary()], REQUEST_ID))
+      .toMatchObject({ reason: 'bound', summary: { wmkf_requestdocumentid: 'doc-d' } });
+  });
+
+  test('its fingerprint differs from the presentation summary fingerprint and the derivative keys', () => {
+    expect(new Set([fingerprint, transcriptSummaryBindingFingerprint(identity), presentationTranscriptGenerationKey(identity),
+      staffDiscussionTranscriptGenerationKey(identity)]).size).toBe(4);
+  });
+
+  test('a discussion summary never binds as the presentation summary, and the reverse', () => {
+    expect(bindTranscriptSummary([transcriptRow(), discussionSummary()], REQUEST_ID)).toMatchObject({ reason: 'summary_missing', summary: null });
+    const presentationFingerprintOnDiscussion = discussionSummary({ wmkf_inputfingerprint: transcriptSummaryBindingFingerprint(identity) });
+    expect(bindStaffDiscussionSummary([transcriptRow(), presentationFingerprintOnDiscussion], REQUEST_ID))
+      .toMatchObject({ reason: 'summary_stale', summary: null });
+  });
+
+  test('a moved boundary makes it stale', () => {
+    const moved = manifest({ presentationEnd: { endMs: 65_000, confirmedBy: 5, confirmedAt: '2026-10-05T18:30:00.000Z' } });
+    expect(bindStaffDiscussionSummary([transcriptRow(moved), discussionSummary()], REQUEST_ID)).toMatchObject({ reason: 'summary_stale' });
   });
 });
 

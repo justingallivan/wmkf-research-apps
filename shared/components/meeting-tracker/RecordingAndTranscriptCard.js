@@ -1,3 +1,4 @@
+import { resolveDiscussionAttribution } from '../../../lib/services/meeting-tracker-transcription/presentation-boundary';
 /** Site Visit "Recording and transcript" card: recording, transcript upload/generation, speaker names, board link. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiRequestError, requestEnvelope, requestJson } from '../../utils/api-request';
@@ -10,8 +11,10 @@ import {
 } from '../../utils/graph-browser-upload';
 import { normalizeZoomPaste } from '../../../lib/services/post-presentation-materials/material-model';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../config/requestDocument';
-import { PRESENTATION_SUMMARY_ACKNOWLEDGMENT, SUMMARY_TEXT_MAX_CHARS } from '../../config/transcriptSummary';
+import { PAIRED_SUMMARY_ACKNOWLEDGMENT, SUMMARY_TEXT_MAX_CHARS } from '../../config/transcriptSummary';
 import { Button } from '../Layout';
+import ArtifactRow from './ArtifactRow';
+import OverflowMenu from '../workbench/OverflowMenu';
 import { formatTranscriptTurnTime, getTranscriptSpeakers, groupTranscriptByTurn } from '../../../lib/services/transcription-pilot/transcript-format';
 import { MAX_TRANSCRIPTION_BYTES as MAX_AUDIO_BYTES, MAX_TRANSCRIPTION_MIB } from '../../../lib/services/transcription-pilot/limits';
 
@@ -882,6 +885,24 @@ const API_PATH = '/api/meeting-tracker/visits';
 const MAX_VTT_BYTES = 4_000_000;
 const ALIGNMENT_ACTIVE = new Set(['pending', 'running']);
 const ACTIVE_STATUSES = new Set(['uploading', 'queued', 'submitting', 'processing', 'saving']);
+const BLOCKING_STATUSES = new Set(['queued', 'submitting', 'processing', 'saving']);
+function isRetiredUploading(job) {
+  return job.status === 'uploading' && (job.cleanupPending === true
+    || (job.expires_at != null && new Date(job.expires_at).getTime() <= Date.now()));
+}
+// Mirrors the server guard on DELETE (requestMeetingJobCleanup): a queued run, or one already with the transcription
+// service (processing/saving), that is not already being cleaned up. `submitting` is refused by the server, and an
+// uncertain submission keeps its own reconcile/abandon flow.
+const IN_FLIGHT_STATUSES = new Set(['processing', 'saving']);
+const canCancelRun = (job) => (job?.status === 'queued' || IN_FLIGHT_STATUSES.has(job?.status)) && job.cleanupPending !== true;
+// A cancelled queued run stays 'queued' until its audio is cleaned up, which can take days for an uploaded file. It no
+// longer blocks a new transcription.
+const isCancelledRun = (job) => job?.status === 'queued' && job.cleanupPending === true;
+// A cancelled in-flight run keeps holding the server slot until the worker deletes the provider copy and the run turns
+// 'failed' (usually the next wake), so it keeps blocking and shows as Cancelling.
+const isCancellingRun = (job) => IN_FLIGHT_STATUSES.has(job?.status) && job.cleanupPending === true;
+const CANCEL_CONFIRM = 'Cancel this transcription? The audio file you chose for it is deleted, so you will need to choose it again to start over. A published transcript is not affected.';
+const CANCEL_IN_FLIGHT_CONFIRM = 'Cancel this transcription? It is already with the transcription service, which may still finish it, and it may still be billed. The audio file you chose for it is deleted, so you will need to choose it again to start over. A published transcript is not affected.';
 const UNRESOLVED_PUBLICATION = new Set(['publishing', 'retryable', 'unknown', 'published_reconcile']);
 const PUBLISHED_FOR_JOB = new Set(['published', 'published_reconcile', 'unknown']);
 const ALIGNMENT_REASONS = {
@@ -902,7 +923,6 @@ const PROGRESS_VERBS = {
 };
 const FOCUS_RING = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600';
 const BTN = `inline-flex min-h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 ${FOCUS_RING} disabled:cursor-not-allowed disabled:opacity-50`;
-const BTN_PRIMARY = `inline-flex min-h-10 items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 ${FOCUS_RING} focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700`;
 const BTN_LINK = `text-sm font-medium text-gray-700 underline underline-offset-2 hover:text-gray-950 ${FOCUS_RING} disabled:cursor-not-allowed disabled:opacity-50`;
 const INPUT = `mt-1 block min-h-10 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-100`;
 const FILE_INPUT = `${INPUT} file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-gray-900`;
@@ -1006,23 +1026,338 @@ function Chip({ tone = 'gray', children }) {
   return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${classes}`}>{children}</span>;
 }
 
-function useTranscription(requestId, { onMaterialsChanged }) {
+// Per-kind card wiring for the summary hook. Response bodies use `transcriptSummary` for either kind's published state.
+const SUMMARY_KIND_UI = Object.freeze({
+  presentation: Object.freeze({
+    query: '', postBody: Object.freeze({}), transcriptKey: 'presentationTranscript', publishedKey: 'transcriptSummary',
+    acknowledgmentVersion: PAIRED_SUMMARY_ACKNOWLEDGMENT.version,
+    busy: Object.freeze({ save: 'summary-save', discard: 'summary-discard', publish: 'summary-publish' }),
+    loadFailure: 'The presentation summary could not be loaded.',
+    readyNotice: (result) => (result.slidesIncluded
+      ? 'Draft ready, made from the presentation transcript and the applicant slides. Review it before publishing.'
+      : 'Draft ready, made from the presentation transcript. Slide text was not included. Review it before publishing.'),
+    publishedNotice: 'Summary published. Available to staff and eligible for the Board link.',
+  }),
+  discussion: Object.freeze({
+    query: '?kind=discussion', postBody: Object.freeze({ kind: 'discussion' }), transcriptKey: 'staffDiscussionTranscript',
+    publishedKey: 'staffDiscussionSummary', acknowledgmentVersion: PAIRED_SUMMARY_ACKNOWLEDGMENT.version,
+    busy: Object.freeze({ save: 'discussion-summary-save', discard: 'discussion-summary-discard', publish: 'discussion-summary-publish' }),
+    loadFailure: 'The staff discussion summary could not be loaded.',
+    readyNotice: () => 'Draft ready, made from the staff discussion transcript. Review it before publishing.',
+    publishedNotice: 'Summary published. Staff only; never included on the Board page.',
+  }),
+});
+const SUMMARY_KIND_ORDER = Object.freeze(['presentation', 'discussion']);
+// The card Refresh's two phases for the summary hooks: `begin` when it starts, `settle` once its loads have settled.
+const REFRESH_IDLE = Object.freeze({ begin: 0, settle: 0 });
+// A generating row older than the server's abandon window (360 s) can be retried.
+const SUMMARY_RUN_ABANDON_MS = 360 * 1000;
+function summaryRunAbandoned(draft) {
+  return draft?.state === 'generating' && Date.now() - Date.parse(draft.createdAt) > SUMMARY_RUN_ABANDON_MS;
+}
+// The paired click summarizes a kind only when its half is bound and it has no draft or current published summary
+// (owner decision 2); the server separately refuses to replace a ready draft (plan D2).
+function pairedSummaryEligible(h) {
+  const draft = h.summary?.draft;
+  return h.transcriptBound && h.summaryReadState === 'ready' && h.summaryLoadedKey === h.summaryLoadKey && !h.summaryConflict
+    && (!draft || summaryRunAbandoned(draft)) && h.summary?.transcriptSummary?.state !== 'bound' && h.summary?.discussionNotRecorded !== true;
+}
+
+// One summary kind's draft, review and publish state (plan §4.3, §16; paired summaries plan D9). The caller owns
+// `busy` for generation and the acknowledgment; every write is dropped when the card changed or this kind's load key moved on.
+function useSummaryKind(kind, { requestId, basePath, currentArtifact, busy, setBusy, generationRef, isCurrent,
+  loadCollection, onMaterialsChangedRef, summaryRefresh = REFRESH_IDLE }) {
+  const spec = SUMMARY_KIND_UI[kind];
+  const summaryPath = `${basePath}/summary-draft`;
+  const summarySequenceRef = useRef(0);
+  const [summary, setSummary] = useState(null);
+  const [summaryText, setSummaryText] = useState('');
+  const [summaryConflict, setSummaryConflict] = useState(null);
+  const summaryRef = useRef(summary);
+  const summaryTextRef = useRef(summaryText);
+  const summaryConflictRef = useRef(summaryConflict);
+  summaryRef.current = summary;
+  summaryTextRef.current = summaryText;
+  summaryConflictRef.current = summaryConflict;
+  const summaryDirtyRef = useRef(false);
+  const [summaryReadState, setSummaryReadState] = useState('idle');
+  const [summaryLoadedKey, setSummaryLoadedKey] = useState(null);
+  const summaryReadErrorRef = useRef(false);
+  const [summaryError, setSummaryError] = useState(null);
+  const [summaryNotice, setSummaryNotice] = useState(null);
+  const [summarizing, setSummarizing] = useState(false);
+  const currentArtifactRef = useRef(currentArtifact);
+  currentArtifactRef.current = currentArtifact;
+  const transcriptBound = currentArtifact?.[spec.transcriptKey]?.state === 'bound';
+  const publishedInCollection = currentArtifact?.[spec.publishedKey];
+  // Each kind's key holds only its own transcript half and published state, so one kind's publish never drops the other's result.
+  const summaryLoadKey = `${currentArtifact?.id || ''}|${currentArtifact?.fingerprint || ''}|${currentArtifact?.presentationEnd?.endMs ?? ''}|${transcriptBound}|${publishedInCollection?.state || ''}|${publishedInCollection?.artifactId || ''}`;
+  const summaryLoadKeyRef = useRef(summaryLoadKey);
+  summaryLoadKeyRef.current = summaryLoadKey;
+  const isCurrentSummaryRequest = useCallback((generation, key) => isCurrent(generation) && summaryLoadKeyRef.current === key, [isCurrent]);
+  // A 'publishing' draft is one whose publish did not finish: it is read-only and can only be published again.
+  const summaryDraft = ['ready', 'publishing'].includes(summary?.draft?.state) ? summary.draft : null;
+  const summaryDirty = summaryDraft?.state === 'ready' && summaryText !== (summaryDraft.text || '');
+  const summaryLocalTextPending = summaryDraft?.state === 'publishing' && summaryText !== (summaryDraft.text || '');
+  summaryDirtyRef.current = summaryDirty || summaryLocalTextPending || Boolean(summaryConflict);
+  const changeSummaryText = useCallback((value) => {
+    setSummaryText(value);
+  }, []);
+
+  const loadSummary = useCallback(async ({ replaceText = false } = {}) => {
+    if (!requestId) return;
+    const generation = generationRef.current;
+    const sequence = ++summarySequenceRef.current;
+    setSummaryReadState('loading');
+    try {
+      const body = await requestJson(`${summaryPath}${spec.query}`, { method: 'GET', fallbackMessage: spec.loadFailure });
+      if (!isCurrentSummaryRequest(generation, summaryLoadKey) || summarySequenceRef.current !== sequence) return;
+      const keepLocalDraft = !replaceText && summaryDirtyRef.current;
+      const previous = summaryRef.current;
+      const existingConflict = replaceText ? null : summaryConflictRef.current;
+      if (existingConflict) {
+        setSummary(body);
+      } else if (keepLocalDraft && previous?.draft) {
+        const sameDraftVersion = previous.draft.id === body?.draft?.id && previous.draft.version === body?.draft?.version;
+        if (!sameDraftVersion) {
+          setSummary(body);
+          setSummaryConflict({ draftId: previous.draft.id, version: previous.draft.version, text: summaryTextRef.current });
+        } else {
+          setSummary({
+            ...body,
+            draft: { ...body.draft, id: previous.draft.id, version: previous.draft.version, text: previous.draft.text },
+            draftMatchesTranscript: body.draftMatchesTranscript === true,
+          });
+        }
+      } else {
+        setSummary(body);
+      }
+      if (summaryReadErrorRef.current) {
+        summaryReadErrorRef.current = false;
+        setSummaryError(null);
+      }
+      setSummaryReadState('ready');
+      setSummaryLoadedKey(summaryLoadKey);
+      if (replaceText) setSummaryConflict(null);
+      if (replaceText || !keepLocalDraft) {
+        const nextText = ['ready', 'publishing'].includes(body?.draft?.state) ? body.draft.text || '' : '';
+        setSummaryText(nextText);
+      }
+    } catch (loadError) {
+      if (!isCurrentSummaryRequest(generation, summaryLoadKey) || summarySequenceRef.current !== sequence) return;
+      setSummaryReadState('unavailable');
+      setSummaryLoadedKey(summaryLoadKey);
+      if (![404, 503].includes(loadError?.status)) {
+        summaryReadErrorRef.current = true;
+        setSummaryError(errorMessage(loadError, spec.loadFailure));
+      }
+    }
+  }, [requestId, summaryPath, spec, generationRef, isCurrentSummaryRequest, summaryLoadKey]);
+
+  const wantsSummary = Boolean(currentArtifact?.id && (transcriptBound || publishedInCollection?.artifactId));
+  useEffect(() => {
+    let cancelled = false;
+    if (!wantsSummary) {
+      summarySequenceRef.current += 1;
+      if (summaryReadErrorRef.current) {
+        summaryReadErrorRef.current = false;
+        setSummaryError(null);
+      }
+      const current = currentArtifactRef.current;
+      const previous = summaryRef.current;
+      if (!summaryConflictRef.current && summaryDirtyRef.current && previous?.draft) {
+        setSummaryConflict({ draftId: previous.draft.id, version: previous.draft.version, text: summaryTextRef.current });
+      }
+      setSummary(current ? { draft: null, draftMatchesTranscript: false, lastFailure: null,
+        transcriptSummary: current[spec.publishedKey] || null } : null);
+      setSummaryReadState('not_needed');
+      setSummaryLoadedKey(summaryLoadKey);
+      return () => { cancelled = true; };
+    }
+    Promise.resolve().then(() => { if (!cancelled && wantsSummary) void loadSummary(); });
+    return () => { cancelled = true; };
+  }, [summaryLoadKey, wantsSummary, loadSummary, spec]);
+
+  // The card's Refresh re-reads this kind exactly once, so a draft created, edited or discarded in another session
+  // shows up (Codex review rounds 3-4, redesign commit 3). At the Refresh's start this kind notes how many reads it
+  // had started; when the Refresh settles it reads only if none started since. A key-change read caused by the
+  // collection reload (pending, in flight, or already finished) therefore covers it. The read keeps unsaved local
+  // text through loadSummary's own draft-version rules.
+  const refreshBaselineRef = useRef(null);
+  useEffect(() => {
+    if (summaryRefresh.begin) refreshBaselineRef.current = summarySequenceRef.current;
+  }, [summaryRefresh.begin]);
+  const handledRefreshRef = useRef(summaryRefresh.settle);
+  useEffect(() => {
+    if (handledRefreshRef.current === summaryRefresh.settle) return undefined;
+    handledRefreshRef.current = summaryRefresh.settle;
+    const baseline = refreshBaselineRef.current;
+    refreshBaselineRef.current = null;
+    if (baseline === null || summarySequenceRef.current > baseline) return undefined;
+    if (!wantsSummary || summaryLoadedKey !== summaryLoadKey || summaryReadState === 'loading') return undefined;
+    let cancelled = false;
+    Promise.resolve().then(() => { if (!cancelled) void loadSummary(); });
+    return () => { cancelled = true; };
+  }, [summaryRefresh.settle]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The paired handler holds `busy` and checks the acknowledgment; this kind tracks only its own run.
+  const summarize = async () => {
+    if (!currentArtifact?.id) return;
+    const generation = generationRef.current;
+    summarySequenceRef.current += 1;
+    setSummarizing(true);
+    summaryReadErrorRef.current = false;
+    setSummaryError(null);
+    setSummaryNotice(null);
+    try {
+      const result = await requestJson(summaryPath, {
+        method: 'POST',
+        // Replacing names the shown draft; the server refuses to discard any other ready draft (paired summaries plan D2).
+        body: { ...spec.postBody, acknowledgmentVersion: spec.acknowledgmentVersion,
+          expectedCurrentArtifactId: currentArtifact.id, expectedCurrentFingerprint: currentArtifact.fingerprint,
+          ...(summaryDraft ? { replaceDraft: { draftId: summaryDraft.id, expectedVersion: summaryDraft.version } } : {}) },
+        fallbackMessage: 'The summary could not be generated.',
+      });
+      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return;
+      setSummary((previous) => ({ ...(previous || {}), draft: result.draft, draftMatchesTranscript: true, lastFailure: null,
+        transcriptSummary: result.transcriptSummary || previous?.transcriptSummary }));
+      setSummaryConflict(null);
+      setSummaryLoadedKey(summaryLoadKey);
+      setSummaryReadState('ready');
+      changeSummaryText(result.draft?.text || '');
+      setSummaryNotice(spec.readyNotice(result));
+    } catch (summaryFailure) {
+      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return;
+      const code = summaryFailure?.payload?.code;
+      // Not recorded is a durable server marker (plan D4); the reload shows it, so it is not an error.
+      if (code !== 'staff_discussion_not_recorded') {
+        setSummaryError(code === 'summary_draft_exists'
+          ? 'A newer draft was saved elsewhere, so nothing was replaced. The latest draft is loaded; review it before summarizing again.'
+          : errorMessage(summaryFailure, 'The summary could not be generated.'));
+      }
+      await loadSummary();
+    } finally {
+      if (isCurrent(generation)) setSummarizing(false);
+    }
+  };
+
+  const saveSummaryDraft = async () => {
+    if (summaryConflict || summaryDraft?.state !== 'ready' || busy) return null;
+    const generation = generationRef.current;
+    summarySequenceRef.current += 1;
+    setBusy(spec.busy.save);
+    summaryReadErrorRef.current = false;
+    setSummaryError(null);
+    setSummaryNotice(null);
+    try {
+      const result = await requestJson(summaryPath, {
+        method: 'PATCH', body: { draftId: summaryDraft.id, expectedVersion: summaryDraft.version, text: summaryText },
+        fallbackMessage: 'The draft could not be saved.',
+      });
+      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return null;
+      setSummary((previous) => ({ ...(previous || {}), draft: result.draft }));
+      changeSummaryText(result.draft?.text || '');
+      setSummaryNotice('Draft saved.');
+      await loadSummary({ replaceText: true });
+      return result.draft;
+    } catch (saveFailure) {
+      if (isCurrentSummaryRequest(generation, summaryLoadKey)) setSummaryError(errorMessage(saveFailure, 'The draft could not be saved.'));
+      return null;
+    } finally {
+      if (isCurrent(generation)) setBusy(null);
+    }
+  };
+
+  const discardSummaryDraft = async () => {
+    if (summaryConflict || summaryDraft?.state !== 'ready' || busy) return;
+    const generation = generationRef.current;
+    summarySequenceRef.current += 1;
+    setBusy(spec.busy.discard);
+    summaryReadErrorRef.current = false;
+    setSummaryError(null);
+    setSummaryNotice(null);
+    try {
+      await requestJson(summaryPath, { method: 'DELETE', body: { draftId: summaryDraft.id, expectedVersion: summaryDraft.version },
+        fallbackMessage: 'The draft could not be discarded.' });
+      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return;
+      changeSummaryText('');
+      setSummary((previous) => ({ ...(previous || {}), draft: null, draftMatchesTranscript: false }));
+      setSummaryNotice('Draft discarded.');
+      await loadSummary({ replaceText: true });
+    } catch (discardFailure) {
+      if (isCurrentSummaryRequest(generation, summaryLoadKey)) setSummaryError(errorMessage(discardFailure, 'The draft could not be discarded.'));
+    } finally {
+      if (isCurrent(generation)) setBusy(null);
+    }
+  };
+
+  const publishSummaryDraft = async () => {
+    if (summaryConflict || !summaryDraft || busy) return;
+    const generation = generationRef.current;
+    let draft = summaryDraft;
+    if (summaryDirty) {
+      draft = await saveSummaryDraft();
+      if (!draft || !isCurrentSummaryRequest(generation, summaryLoadKey)) return;
+    }
+    summarySequenceRef.current += 1;
+    setBusy(spec.busy.publish);
+    summaryReadErrorRef.current = false;
+    setSummaryError(null);
+    setSummaryNotice(null);
+    try {
+      await requestJson(`${summaryPath}/publish`, { method: 'POST', body: { draftId: draft.id, expectedVersion: draft.version },
+        fallbackMessage: 'The summary could not be published.' });
+      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return;
+      changeSummaryText('');
+      setSummary((previous) => ({ ...(previous || {}), draft: null }));
+      setSummaryNotice(spec.publishedNotice);
+      await Promise.allSettled([loadCollection(), loadSummary({ replaceText: true }), onMaterialsChangedRef.current?.()]);
+    } catch (publishFailure) {
+      if (isCurrentSummaryRequest(generation, summaryLoadKey)) {
+        setSummaryError(errorMessage(publishFailure, 'The summary could not be published.'));
+        await Promise.allSettled([loadCollection(), loadSummary(), onMaterialsChangedRef.current?.()]);
+      }
+    } finally {
+      if (isCurrent(generation)) setBusy(null);
+    }
+  };
+
+  return {
+    summary, summaryDraft, summaryText, setSummaryText: changeSummaryText, summaryDirty, summaryLocalTextPending, summaryConflict,
+    summaryError, summaryNotice, summaryReadState, wantsSummary, summaryLoadKey, summaryLoadedKey, transcriptBound, summarizing,
+    summarize, saveSummaryDraft, discardSummaryDraft, publishSummaryDraft, loadSummary,
+  };
+}
+
+function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFRESH_IDLE }) {
   const basePath = `${API_PATH}/${encodeURIComponent(requestId || '')}/transcriptions`;
   const [collection, setCollection] = useState(null);
   const [collectionCheckedAt, setCollectionCheckedAt] = useState(0);
+  // A failed refresh keeps the last collection on screen; this marks it as not current, so a status claim (the Board
+  // readiness list) can say it is unknown instead of repeating an old answer (Codex round 3, four-card commit).
+  const [collectionReadFailed, setCollectionReadFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [focusId, setFocusId] = useState(null);
   const [detail, setDetail] = useState(null);
   const [correctionDetail, setCorrectionDetail] = useState(null);
   const [names, setNames] = useState({});
   const [endEdit, setEndEdit] = useState(null);
+  const [attendanceEdit, setAttendanceEdit] = useState(null);
+  const attendanceAttemptRef = useRef(null);
   const [suggestionPicks, setSuggestionPicks] = useState({});
   const [audioFile, setAudioFile] = useState(null);
   const [vttFile, setVttFile] = useState(null);
   const [noVttConfirmation, setNoVttConfirmation] = useState(null);
   const [acknowledged, setAcknowledged] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
-  const [busy, setBusy] = useState(null);
+  const [busy, setBusyState] = useState(null);
+  // Owned busy flags (publish, save, attendance load): each clears only if it still owns the flag, independent of the
+  // editor key, so closing the editor cannot strand it and a stale action cannot release a newer one. Every other
+  // setBusy disowns, so a stale owned action never releases a flag another action set.
+  const busyOwnerRef = useRef(null);
+  const setBusy = (value) => { busyOwnerRef.current = null; setBusyState(value); };
+  const claimBusy = (value) => { const owner = {}; busyOwnerRef.current = owner; setBusyState(value); return owner; };
+  const releaseBusy = (owner) => { if (busyOwnerRef.current === owner) { busyOwnerRef.current = null; setBusyState(null); } };
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [conflict, setConflict] = useState(false);
@@ -1055,6 +1390,17 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   const focusJob = (focusId && jobs.find((job) => job.id === focusId)) || newestJob;
   const focusPublished = Boolean(focusJob) && publications.some((row) => row.inputJobId === focusJob.id && PUBLISHED_FOR_JOB.has(row.state));
   const showReview = Boolean(focusJob) && (focusId === focusJob.id || !focusPublished);
+  // A newer transcript is on its way: a run still transcribing (not being cancelled), or an unpublished ready run,
+  // newer than the latest published run, whose content can still be reviewed. While one exists, editing the
+  // published transcript would open the older one, so every edit entry point is gated here (queue: "Old-transcript
+  // edit buttons look current"; Codex review rounds 1-2, redesign commit 3). This does not depend on which run is
+  // focused for review, and a discarded, expired, purged or unreadable run never blocks.
+  const isPublishedJob = (job) => publications.some((row) => row.inputJobId === job.id && PUBLISHED_FOR_JOB.has(row.state));
+  const latestPublishedAt = jobs.filter(isPublishedJob).map((job) => String(job.created_at || '')).sort().pop() || '';
+  const reviewableReady = (job) => job.status === 'ready' && job.contentAccessAllowed === true && !job.cleanup_requested_at
+    && !job.content_purged_at && job.cleanupPending !== true;
+  const newerTranscriptPending = jobs.some((job) => BLOCKING_STATUSES.has(job.status) && !isCancelledRun(job) && job.cleanupPending !== true)
+    || jobs.some((job) => reviewableReady(job) && !isPublishedJob(job) && String(job.created_at || '') > latestPublishedAt);
   const selectedJob = focusJob && detail?.job?.id === focusJob.id ? detail.job : focusJob;
   const correction = correctionDetail?.correction || null;
   const content = correction ? correctionDetail.content : detail?.job?.id === focusJob?.id ? detail?.content : null;
@@ -1070,7 +1416,17 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   const baselineEndMs = correction && Number.isSafeInteger(correction.presentationEndMs) ? correction.presentationEndMs : null;
   const presentationEndMs = correction && endEdit?.key === editorKey ? endEdit.value : baselineEndMs;
   const dirtyEnd = presentationEndMs !== baselineEndMs;
-  const dirty = dirtyNames || dirtyEnd;
+  const attendanceReview = correction?.attendanceReview || null;
+  const attendanceDecision = attendanceReview?.decision || null;
+  const attendanceKept = attendanceReview ? (attendanceEdit?.id === attendanceReview.id ? attendanceEdit.kept
+    : (correction.discussionAttribution || attendanceDecision).rows.map(row => row.kept)) : [];
+  const dirtyAttendance = Boolean(attendanceReview && attendanceEdit?.id === attendanceReview.id
+    && JSON.stringify(attendanceKept) !== JSON.stringify((correction.discussionAttribution || attendanceDecision).rows.map(row => row.kept)));
+  const dirty = dirtyNames || dirtyEnd || dirtyAttendance;
+  const setAttendanceKept = (index, kept) => setAttendanceEdit({ id: attendanceReview.id,
+    kept: attendanceKept.map((value, position) => position === index ? kept : value) });
+  const previewDecision = !dirtyNames && !dirtyEnd && attendanceDecision ? { excludedSpeakerIds: attendanceDecision.rows
+    .filter((row, index) => !attendanceKept[index]).flatMap(row => row.speakerIds) } : null;
   const setPresentationEndMs = (value) => setEndEdit({ key: editorKey, value: Number.isSafeInteger(value) ? value : null });
 
   // Seed the editor from the server whenever the edited target changes, and adopt newly arrived
@@ -1101,6 +1457,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
       if (!isLatest()) return;
       setCollection(body);
       setCollectionCheckedAt(Date.now());
+      setCollectionReadFailed(false);
       setError(null);
       setConflict(false);
       setDetail((currentDetail) => {
@@ -1112,7 +1469,10 @@ function useTranscription(requestId, { onMaterialsChanged }) {
         return Number(fresh.version) >= Number(currentDetail.job.version) ? { ...currentDetail, job: fresh } : currentDetail;
       });
     } catch (loadError) {
-      if (isLatest() && loadError?.name !== 'AbortError') setError(errorMessage(loadError, 'Transcription status could not be loaded.'));
+      if (isLatest() && loadError?.name !== 'AbortError') {
+        setCollectionReadFailed(true);
+        setError(errorMessage(loadError, 'Transcription status could not be loaded.'));
+      }
     } finally {
       if (isLatest()) setLoading(false);
     }
@@ -1145,6 +1505,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   }, [basePath, isCurrent, requestId]);
 
   const loadCorrection = useCallback(async (operationId) => {
+    attendanceAttemptRef.current = null;
     const generation = generationRef.current;
     const sequence = ++detailSeqRef.current;
     const current = () => isCurrent(generation) && detailSeqRef.current === sequence;
@@ -1161,6 +1522,25 @@ function useTranscription(requestId, { onMaterialsChanged }) {
       if (current()) setBusy(null);
     }
   }, [basePath, isCurrent]);
+
+  useEffect(() => {
+    if (!correction || attendanceReview || dirtyNames || dirtyEnd || busy || !Number.isSafeInteger(baselineEndMs)) return;
+    const key = `${requestId}:${correction.operationId}:${correction.version}`;
+    if (attendanceAttemptRef.current === key) return;
+    attendanceAttemptRef.current = key;
+    const generation = generationRef.current;
+    const sequence = detailSeqRef.current;
+    const target = editorKey;
+    const current = () => isCurrent(generation) && sequence === detailSeqRef.current && editorKeyRef.current === target;
+    const owner = claimBusy('attendance');
+    requestJson(`${basePath}/corrections/${encodeURIComponent(correction.operationId)}/attendance`, {
+      method: 'POST', body: { expectedVersion: correction.version }, fallbackMessage: 'Attendance could not be loaded.',
+    }).then(result => {
+      if (current()) setCorrectionDetail(detail => detail ? { ...detail, correction: result.correction } : detail);
+    }).catch(error => {
+      if (current()) setError(errorMessage(error, 'Attendance could not be loaded. Refresh to try again.'));
+    }).finally(() => { if (isCurrent(generation)) releaseBusy(owner); });
+  }, [correction, attendanceReview, dirtyNames, dirtyEnd, busy, baselineEndMs, requestId, editorKey, basePath, isCurrent]);
 
   // Load the run under review once it is readable; one attempt per run and status so a failure cannot loop.
   useEffect(() => {
@@ -1226,12 +1606,13 @@ function useTranscription(requestId, { onMaterialsChanged }) {
     const generation = generationRef.current;
     const targetKey = editorKey;
     if (correction) {
-      setBusy('speakers');
+      const owner = claimBusy('speakers');
       setError(null);
       setNotice(null);
       try {
         const result = await requestJson(`${basePath}/corrections/${encodeURIComponent(correction.operationId)}`, {
-          method: 'PATCH', body: { expectedVersion: correction.version, speakerNames: names, ...(dirtyEnd ? { presentationEndMs } : {}) },
+          method: 'PATCH', body: { expectedVersion: correction.version, speakerNames: names, ...(dirtyEnd ? { presentationEndMs } : {}),
+            ...(!dirtyNames && !dirtyEnd && attendanceReview ? { attendanceConfirmation: { reviewId: attendanceReview.id, kept: attendanceKept } } : {}) },
           fallbackMessage: 'Your changes could not be saved.',
         });
         if (!isCurrent(generation)) return;
@@ -1242,12 +1623,12 @@ function useTranscription(requestId, { onMaterialsChanged }) {
         setNotice('Changes saved.');
         setConflict(false);
       } catch (saveError) {
-        if (isCurrent(generation)) {
+        if (isCurrent(generation) && editorKeyRef.current === targetKey) {
           setConflict(saveError?.status === 409);
           setError(errorMessage(saveError, 'Your changes could not be saved.'));
         }
       } finally {
-        if (isCurrent(generation)) setBusy(null);
+        if (isCurrent(generation)) releaseBusy(owner);
       }
       return;
     }
@@ -1284,18 +1665,29 @@ function useTranscription(requestId, { onMaterialsChanged }) {
 
   const publishCorrection = async () => {
     const artifact = correctionDetail?.currentArtifact;
-    if (!correction || !artifact || dirty || !speakerIds.length || correction.state !== 'draft' || busy) return;
+    if (!correction || !artifact || dirtyNames || dirtyEnd || !attendanceReview || !speakerIds.length || correction.state !== 'draft' || busy) return;
     if (artifact.id !== correction.expectedCurrentArtifactId || artifact.fingerprint !== correction.expectedCurrentFingerprint) {
       setError('The published transcript changed after you started editing. Cancel, then choose Edit speaker names again.');
       return;
     }
     const generation = generationRef.current;
-    setBusy('publish');
+    const targetKey = editorKey;
+    const owner = claimBusy('publish');
     setError(null);
     setNotice(null);
     try {
-      const result = await requestJson(`${basePath}/corrections/${encodeURIComponent(correction.operationId)}/publish`, { method: 'POST', body: { expectedVersion: correction.version }, fallbackMessage: 'The edited transcript could not be published.' });
-      if (!isCurrent(generation)) return;
+      let version = correction.version;
+      if (!correction.discussionAttribution || dirtyAttendance) {
+        const saved = await requestJson(`${basePath}/corrections/${encodeURIComponent(correction.operationId)}`, {
+          method: 'PATCH', body: { expectedVersion: version, speakerNames: names,
+            attendanceConfirmation: { reviewId: attendanceReview.id, kept: attendanceKept } }, fallbackMessage: 'Attendance could not be confirmed.',
+        });
+        if (!isCurrent(generation) || editorKeyRef.current !== `c:${correction.operationId}`) return;
+        version = saved.correction.version;
+        setCorrectionDetail(detail => detail ? { ...detail, correction: saved.correction } : detail);
+      }
+      const result = await requestJson(`${basePath}/corrections/${encodeURIComponent(correction.operationId)}/publish`, { method: 'POST', body: { expectedVersion: version }, fallbackMessage: 'The edited transcript could not be published.' });
+      if (!isCurrent(generation) || editorKeyRef.current !== targetKey) return;
       if (result.currentArtifact) setCollection((state) => (state ? { ...state, currentArtifact: result.currentArtifact } : state));
       announcePublication(result.publication || { state: 'unknown' }, false);
       if (result.publication?.state === 'published') setNotice('Transcript updated. Generate the presentation and staff discussion transcripts, then summarize again to restore Board derivatives.');
@@ -1303,15 +1695,17 @@ function useTranscription(requestId, { onMaterialsChanged }) {
       await loadCollection();
       await onMaterialsChangedRef.current?.();
     } catch (publishError) {
-      if (isCurrent(generation)) {
+      if (isCurrent(generation) && editorKeyRef.current === targetKey) {
         await loadCollection();
-        if (isCurrent(generation)) {
+        if (isCurrent(generation) && editorKeyRef.current === targetKey) {
           setConflict(publishError?.status === 409);
           setError(errorMessage(publishError, 'The edited transcript could not be published.'));
         }
       }
     } finally {
-      if (isCurrent(generation)) setBusy(null);
+      // A successful publish closes the editor (setCorrectionDetail(null)) before this runs; keying the clear to the
+      // editor left every busy-disabled control greyed until a reload (live, 2026-10-10).
+      if (isCurrent(generation)) releaseBusy(owner);
     }
   };
 
@@ -1354,7 +1748,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
 
   const beginEditNames = async () => {
     const artifact = collection?.currentArtifact;
-    if (!artifact?.bundleEditable || busy) return;
+    if (!artifact?.bundleEditable || busy || newerTranscriptPending) return;
     if (savedDraft) {
       setSuggestionPicks({});
       setNotice(null);
@@ -1383,21 +1777,32 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   const cancelEditNames = () => { detailSeqRef.current += 1; setCorrectionDetail(null); setConflict(false); setError(null); setSuggestionPicks({}); };
 
   const discardRun = async (job) => {
-    if (!job || busy || !globalThis.confirm?.('Discard this draft?')) return;
+    const cancelling = canCancelRun(job);
+    if (!job || busy || !globalThis.confirm?.(cancelling ? (job.status === 'queued' ? CANCEL_CONFIRM : CANCEL_IN_FLIGHT_CONFIRM) : 'Discard this draft?')) return;
     const generation = generationRef.current;
-    setBusy('discard');
+    setBusy(cancelling ? 'cancel' : 'discard');
     setError(null);
     try {
-      await requestJson(`${basePath}/${encodeURIComponent(job.id)}`, { method: 'DELETE', body: { expectedVersion: job.version }, fallbackMessage: 'The draft could not be discarded.' });
+      await requestJson(`${basePath}/${encodeURIComponent(job.id)}`, { method: 'DELETE', body: { expectedVersion: job.version }, fallbackMessage: cancelling ? 'The transcription could not be cancelled.' : 'The draft could not be discarded.' });
       if (!isCurrent(generation)) return;
       if (detail?.job?.id === job.id) setDetail(null);
       if (focusId === job.id) setFocusId(null);
-      setNotice('Draft discarded.');
+      setNotice(cancelling ? 'Transcription cancelled.' : 'Draft discarded.');
       await loadCollection();
     } catch (discardError) {
       if (isCurrent(generation)) {
-        setConflict(discardError?.status === 409);
-        setError(errorMessage(discardError, 'The draft could not be discarded.'));
+        const stale = discardError?.status === 409;
+        if (stale && cancelling) {
+          // The run had moved on since the card last loaded. Reload, then say so once: no conflict banner, since the
+          // card is now current and nothing was lost (owner note 2026-10-10: stacked banners for one action).
+          await loadCollection();
+          if (!isCurrent(generation)) return;
+          setConflict(false);
+          setNotice('This transcription could not be cancelled because it had already moved on. The latest status is shown; try again if it is still running.');
+          return;
+        }
+        setConflict(stale);
+        setError(errorMessage(discardError, cancelling ? 'The transcription could not be cancelled.' : 'The draft could not be discarded.'));
       }
     } finally {
       if (isCurrent(generation)) setBusy(null);
@@ -1565,242 +1970,355 @@ function useTranscription(requestId, { onMaterialsChanged }) {
     }
   };
 
-  // ---- Presentation summary (plan §4.3, §16): draft, review, publish. Shares the generation guard. ----
-  const summaryPath = `${basePath}/summary-draft`;
-  const summarySequenceRef = useRef(0);
-  const [summary, setSummary] = useState(null);
-  const [summaryText, setSummaryText] = useState('');
-  const [summaryConflict, setSummaryConflict] = useState(null);
-  const summaryRef = useRef(summary);
-  const summaryTextRef = useRef(summaryText);
-  const summaryConflictRef = useRef(summaryConflict);
-  summaryRef.current = summary;
-  summaryTextRef.current = summaryText;
-  summaryConflictRef.current = summaryConflict;
-  const summaryDirtyRef = useRef(false);
-  const [summaryReadState, setSummaryReadState] = useState('idle');
-  const [summaryLoadedKey, setSummaryLoadedKey] = useState(null);
-  const summaryReadErrorRef = useRef(false);
+  // ---- Summaries: one hook per kind, sharing the generation guard and `busy`. ----
   const [summaryAck, setSummaryAck] = useState(false);
-  const [summaryError, setSummaryError] = useState(null);
-  const [summaryNotice, setSummaryNotice] = useState(null);
-  const currentArtifact = collection?.currentArtifact || null;
-  const currentArtifactRef = useRef(currentArtifact);
-  currentArtifactRef.current = currentArtifact;
-  const presentationBound = currentArtifact?.presentationTranscript?.state === 'bound';
-  const summaryLoadKey = `${currentArtifact?.id || ''}|${currentArtifact?.fingerprint || ''}|${currentArtifact?.presentationEnd?.endMs ?? ''}|${presentationBound}|${currentArtifact?.transcriptSummary?.state || ''}|${currentArtifact?.transcriptSummary?.artifactId || ''}`;
-  const summaryLoadKeyRef = useRef(summaryLoadKey);
-  summaryLoadKeyRef.current = summaryLoadKey;
-  const isCurrentSummaryRequest = useCallback((generation, key) => isCurrent(generation) && summaryLoadKeyRef.current === key, [isCurrent]);
-  // A 'publishing' draft is one whose publish did not finish: it is read-only and can only be published again.
-  const summaryDraft = ['ready', 'publishing'].includes(summary?.draft?.state) ? summary.draft : null;
-  const summaryDirty = summaryDraft?.state === 'ready' && summaryText !== (summaryDraft.text || '');
-  const summaryLocalTextPending = summaryDraft?.state === 'publishing' && summaryText !== (summaryDraft.text || '');
-  summaryDirtyRef.current = summaryDirty || summaryLocalTextPending || Boolean(summaryConflict);
-  const changeSummaryText = useCallback((value) => {
-    setSummaryText(value);
-  }, []);
+  const summaryHookArgs = { requestId, basePath, currentArtifact: collection?.currentArtifact || null,
+    busy, setBusy, generationRef, isCurrent, loadCollection, onMaterialsChangedRef, summaryRefresh };
+  const presentationSummary = useSummaryKind('presentation', summaryHookArgs);
+  const discussionSummary = useSummaryKind('discussion', summaryHookArgs);
+  const summaryHooks = { presentation: presentationSummary, discussion: discussionSummary };
+  const pairedSummaryKinds = SUMMARY_KIND_ORDER.filter((kind) => pairedSummaryEligible(summaryHooks[kind]));
 
-  const loadSummary = useCallback(async ({ replaceText = false } = {}) => {
-    if (!requestId) return;
+  // One lock for the whole run (plan D9): `busy` clears only after every kind's POST settles, and each kind's
+  // result lands on its own. A single-kind Try again or Summarize again goes through here with one kind.
+  const summarizeKinds = async (kinds) => {
+    const runs = kinds.map((kind) => summaryHooks[kind]).filter(Boolean);
+    if (!collection?.currentArtifact?.id || busy || !summaryAck || !runs.length) return;
     const generation = generationRef.current;
-    const sequence = ++summarySequenceRef.current;
-    setSummaryReadState('loading');
-    try {
-      const body = await requestJson(summaryPath, { method: 'GET', fallbackMessage: 'The presentation summary could not be loaded.' });
-      if (!isCurrentSummaryRequest(generation, summaryLoadKey) || summarySequenceRef.current !== sequence) return;
-      const keepLocalDraft = !replaceText && summaryDirtyRef.current;
-      const previous = summaryRef.current;
-      const existingConflict = replaceText ? null : summaryConflictRef.current;
-      if (existingConflict) {
-        setSummary(body);
-      } else if (keepLocalDraft && previous?.draft) {
-        const sameDraftVersion = previous.draft.id === body?.draft?.id && previous.draft.version === body?.draft?.version;
-        if (!sameDraftVersion) {
-          setSummary(body);
-          setSummaryConflict({ draftId: previous.draft.id, version: previous.draft.version, text: summaryTextRef.current });
-        } else {
-          setSummary({
-            ...body,
-            draft: { ...body.draft, id: previous.draft.id, version: previous.draft.version, text: previous.draft.text },
-            draftMatchesTranscript: body.draftMatchesTranscript === true,
-          });
-        }
-      } else {
-        setSummary(body);
-      }
-      if (summaryReadErrorRef.current) {
-        summaryReadErrorRef.current = false;
-        setSummaryError(null);
-      }
-      setSummaryReadState('ready');
-      setSummaryLoadedKey(summaryLoadKey);
-      if (replaceText) setSummaryConflict(null);
-      if (replaceText || !keepLocalDraft) {
-        const nextText = ['ready', 'publishing'].includes(body?.draft?.state) ? body.draft.text || '' : '';
-        setSummaryText(nextText);
-      }
-    } catch (loadError) {
-      if (!isCurrentSummaryRequest(generation, summaryLoadKey) || summarySequenceRef.current !== sequence) return;
-      setSummaryReadState('unavailable');
-      setSummaryLoadedKey(summaryLoadKey);
-      if (![404, 503].includes(loadError?.status)) {
-        summaryReadErrorRef.current = true;
-        setSummaryError(errorMessage(loadError, 'The presentation summary could not be loaded.'));
-      }
-    }
-  }, [requestId, summaryPath, isCurrentSummaryRequest, summaryLoadKey]);
-
-  const wantsSummary = Boolean(currentArtifact?.id && (presentationBound || currentArtifact?.transcriptSummary?.artifactId));
-  useEffect(() => {
-    let cancelled = false;
-    if (!wantsSummary) {
-      summarySequenceRef.current += 1;
-      if (summaryReadErrorRef.current) {
-        summaryReadErrorRef.current = false;
-        setSummaryError(null);
-      }
-      const current = currentArtifactRef.current;
-      const previous = summaryRef.current;
-      if (!summaryConflictRef.current && summaryDirtyRef.current && previous?.draft) {
-        setSummaryConflict({ draftId: previous.draft.id, version: previous.draft.version, text: summaryTextRef.current });
-      }
-      setSummary(current ? { draft: null, draftMatchesTranscript: false, lastFailure: null,
-        transcriptSummary: current.transcriptSummary || null } : null);
-      setSummaryReadState('not_needed');
-      setSummaryLoadedKey(summaryLoadKey);
-      return () => { cancelled = true; };
-    }
-    Promise.resolve().then(() => { if (!cancelled && wantsSummary) void loadSummary(); });
-    return () => { cancelled = true; };
-  }, [summaryLoadKey, wantsSummary, loadSummary]);
-
-  const summarize = async () => {
-    if (!currentArtifact?.id || busy || !summaryAck) return;
-    const generation = generationRef.current;
-    summarySequenceRef.current += 1;
     setBusy('summarize');
-    summaryReadErrorRef.current = false;
-    setSummaryError(null);
-    setSummaryNotice(null);
     try {
-      const result = await requestJson(summaryPath, {
-        method: 'POST',
-        body: { acknowledgmentVersion: PRESENTATION_SUMMARY_ACKNOWLEDGMENT.version,
-          expectedCurrentArtifactId: currentArtifact.id, expectedCurrentFingerprint: currentArtifact.fingerprint },
-        fallbackMessage: 'The summary could not be generated.',
-      });
-      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return;
-      setSummary((previous) => ({ ...(previous || {}), draft: result.draft, draftMatchesTranscript: true, lastFailure: null,
-        transcriptSummary: result.transcriptSummary || previous?.transcriptSummary }));
-      setSummaryConflict(null);
-      setSummaryLoadedKey(summaryLoadKey);
-      setSummaryReadState('ready');
-      changeSummaryText(result.draft?.text || '');
-      setSummaryAck(false);
-      setSummaryNotice(result.slidesIncluded
-        ? 'Draft ready, made from the presentation transcript and the applicant slides. Review it before publishing.'
-        : 'Draft ready, made from the presentation transcript. Slide text was not included. Review it before publishing.');
-    } catch (summaryFailure) {
-      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return;
-      setSummaryError(errorMessage(summaryFailure, 'The summary could not be generated.'));
-      await loadSummary();
+      await Promise.allSettled(runs.map((run) => run.summarize()));
     } finally {
-      if (isCurrent(generation)) setBusy(null);
-    }
-  };
-
-  const saveSummaryDraft = async () => {
-    if (summaryConflict || summaryDraft?.state !== 'ready' || busy) return null;
-    const generation = generationRef.current;
-    summarySequenceRef.current += 1;
-    setBusy('summary-save');
-    summaryReadErrorRef.current = false;
-    setSummaryError(null);
-    setSummaryNotice(null);
-    try {
-      const result = await requestJson(summaryPath, {
-        method: 'PATCH', body: { draftId: summaryDraft.id, expectedVersion: summaryDraft.version, text: summaryText },
-        fallbackMessage: 'The draft could not be saved.',
-      });
-      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return null;
-      setSummary((previous) => ({ ...(previous || {}), draft: result.draft }));
-      changeSummaryText(result.draft?.text || '');
-      setSummaryNotice('Draft saved.');
-      await loadSummary({ replaceText: true });
-      return result.draft;
-    } catch (saveFailure) {
-      if (isCurrentSummaryRequest(generation, summaryLoadKey)) setSummaryError(errorMessage(saveFailure, 'The draft could not be saved.'));
-      return null;
-    } finally {
-      if (isCurrent(generation)) setBusy(null);
-    }
-  };
-
-  const discardSummaryDraft = async () => {
-    if (summaryConflict || summaryDraft?.state !== 'ready' || busy) return;
-    const generation = generationRef.current;
-    summarySequenceRef.current += 1;
-    setBusy('summary-discard');
-    summaryReadErrorRef.current = false;
-    setSummaryError(null);
-    setSummaryNotice(null);
-    try {
-      await requestJson(summaryPath, { method: 'DELETE', body: { draftId: summaryDraft.id, expectedVersion: summaryDraft.version },
-        fallbackMessage: 'The draft could not be discarded.' });
-      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return;
-      changeSummaryText('');
-      setSummary((previous) => ({ ...(previous || {}), draft: null, draftMatchesTranscript: false }));
-      setSummaryNotice('Draft discarded.');
-      await loadSummary({ replaceText: true });
-    } catch (discardFailure) {
-      if (isCurrentSummaryRequest(generation, summaryLoadKey)) setSummaryError(errorMessage(discardFailure, 'The draft could not be discarded.'));
-    } finally {
-      if (isCurrent(generation)) setBusy(null);
-    }
-  };
-
-  const publishSummaryDraft = async () => {
-    if (summaryConflict || !summaryDraft || busy) return;
-    const generation = generationRef.current;
-    let draft = summaryDraft;
-    if (summaryDirty) {
-      draft = await saveSummaryDraft();
-      if (!draft || !isCurrentSummaryRequest(generation, summaryLoadKey)) return;
-    }
-    summarySequenceRef.current += 1;
-    setBusy('summary-publish');
-    summaryReadErrorRef.current = false;
-    setSummaryError(null);
-    setSummaryNotice(null);
-    try {
-      await requestJson(`${summaryPath}/publish`, { method: 'POST', body: { draftId: draft.id, expectedVersion: draft.version },
-        fallbackMessage: 'The summary could not be published.' });
-      if (!isCurrentSummaryRequest(generation, summaryLoadKey)) return;
-      changeSummaryText('');
-      setSummary((previous) => ({ ...(previous || {}), draft: null }));
-      setSummaryNotice('Summary published. Available to staff and eligible for the Board link.');
-      await Promise.allSettled([loadCollection(), loadSummary({ replaceText: true }), onMaterialsChangedRef.current?.()]);
-    } catch (publishFailure) {
-      if (isCurrentSummaryRequest(generation, summaryLoadKey)) {
-        setSummaryError(errorMessage(publishFailure, 'The summary could not be published.'));
-        await Promise.allSettled([loadCollection(), loadSummary(), onMaterialsChangedRef.current?.()]);
+      if (isCurrent(generation)) {
+        setBusy(null);
+        setSummaryAck(false);
       }
-    } finally {
-      if (isCurrent(generation)) setBusy(null);
     }
   };
 
   return {
-    summary, summaryDraft, summaryText, setSummaryText: changeSummaryText, summaryDirty, summaryLocalTextPending, summaryConflict, summaryAck, setSummaryAck, summaryError, summaryNotice, summaryReadState, wantsSummary,
-    summaryLoadKey, summaryLoadedKey,
-    summarize, saveSummaryDraft, discardSummaryDraft, publishSummaryDraft, loadSummary,
-    basePath, collection, collectionCheckedAt, savedDraft, loading, jobs, publications, newestJob, focusJob, showReview, selectedJob,
+    presentationSummary, discussionSummary, summaryAck, setSummaryAck, pairedSummaryKinds, summarizeKinds,
+    basePath, collection, collectionCheckedAt, collectionCurrent: Boolean(collection) && !collectionReadFailed, savedDraft, loading, jobs, publications, newestJob, focusJob, showReview, selectedJob,
+    attendanceReview, attendanceDecision, attendanceKept, setAttendanceKept, previewDecision,
     correction, correctionDetail, content, speakerIds, names, setNames: editNames, baseline, dirtyNames, dirtyEnd, dirty, presentationEndMs, setPresentationEndMs, suggestionPicks, setSuggestionPicks,
     detail, audioFile, vttFile, setVttFile, acknowledged, setAcknowledged, uploadProgress, busy, error, notice, conflict,
     closeAcknowledgedId, setCloseAcknowledgedId, confirmNoVtt, setNoVttConfirmation,
-    loadCollection, reviewRun, refreshReview, saveNames, publishJob, publishCorrection, generatePresentationTranscript, beginEditNames, cancelEditNames,
+    newerTranscriptPending, loadCollection, reviewRun, refreshReview, saveNames, publishJob, publishCorrection, generatePresentationTranscript, beginEditNames, cancelEditNames,
     discardRun, checkPublication, closePublication, chooseFiles, uploadAndStart,
+  };
+}
+
+// Import from Zoom (Stage 3a, docs/plans/ZOOM_RECORDING_IMPORT_PLAN_2026-10-08.md). The list is fetched only when staff
+// open the panel, never on mount. Anything other than `available === true` means unavailable, so existing mocks and
+// environments without Zoom keep today's step 1. Every async write is dropped when the card changed or unmounted.
+const COPY_ACTIVE_STATES = new Set(['queued', 'copying', 'registering']);
+const COPY_POLL_MS = 10_000;
+const megabytes = (value) => `${Math.round((Number(value) || 0) / 1_000_000).toLocaleString()} MB`;
+const copyPercent = (copy) => (copy.declaredSize > 0 ? Math.max(0, Math.min(100, Math.floor((copy.bytesConfirmed / copy.declaredSize) * 100))) : 0);
+
+// Plain-language start errors by code. Server messages never carry ids, but the copy here is owned by the card.
+const VIDEO_START_MESSAGES = {
+  zoom_video_copy_active: 'Another video is already being copied for this request. Wait for it to finish or cancel it.',
+  zoom_video_copy_in_progress: 'Another video is already being copied for this request. Wait for it to finish or cancel it.',
+  zoom_video_reconciliation_pending: 'An earlier copy is still being checked. Try again in a few minutes.',
+  zoom_video_winner_unversioned: 'The current recording cannot be replaced from here. Upload the video manually.',
+  zoom_video_missing: 'That meeting has no video recording yet.',
+  zoom_video_segmented: 'That meeting was recorded in several video parts. Upload the video manually.',
+  zoom_video_too_large: 'That video is too large to copy. Upload it manually.',
+  zoom_video_copy_not_available: 'Video copy is not available.',
+};
+
+// Why a copy stopped, by failure-code family. Unknown codes get the generic line.
+function videoFailureMessage(code) {
+  const value = String(code || '');
+  if (value === 'zoom_video_recording_replaced') return 'A newer recording was saved while the video was copying, so the copy was not used.';
+  if (value === 'zoom_video_receipt_conflict') return 'This video was already copied for this request, so this copy was not used.';
+  if (value === 'request_document_actor_unavailable') return 'The staff account that started this copy could not be used. Ask an administrator to check it.';
+  if (value === 'zoom_recording_changed' || value === 'zoom_video_host_not_approved') return 'The recording in Zoom changed or is no longer available, so the copy stopped.';
+  if (/^zoom_(download_denied|download_invalid|range_unsupported|not_found|auth_failed|unavailable|rate_limited)$/.test(value)) return 'Zoom would not provide the video. Try again in a few minutes.';
+  if (/^zoom_video_(session|upload|cancel|registration|receipt|path)/.test(value)) return 'The video could not be saved to SharePoint. Try again.';
+  return 'The video copy did not finish. Try again.';
+}
+
+function useZoomImport(requestId, { onImported, jobsSignature, onVideoCopied }) {
+  const basePath = `${API_PATH}/${encodeURIComponent(requestId || '')}`;
+  const [status, setStatus] = useState('idle'); // idle | loading | available | unavailable | failed
+  const [windowDays, setWindowDays] = useState(30);
+  const [meetings, setMeetings] = useState([]);
+  const [selectedUuid, setSelectedUuid] = useState(null);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [showOther, setShowOther] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const lastSignatureRef = useRef(jobsSignature);
+  const generationRef = useRef(0);
+  const mountedRef = useRef(false);
+  const listSequenceRef = useRef(0);
+  const onImportedRef = useRef(onImported);
+  useEffect(() => { onImportedRef.current = onImported; }, [onImported]);
+  // Stage 3b video copy. Anything other than `available === true` means off. `copies` is newest first.
+  const [copyAvailable, setCopyAvailable] = useState(false);
+  const [copies, setCopies] = useState([]);
+  const [videoBusy, setVideoBusy] = useState(false);
+  const [videoMessage, setVideoMessage] = useState(null); // { origin, tone, text }
+  const [confirm, setConfirm] = useState(null); // { meetingUuid, winner, origin, withAudio }
+  const copiesRef = useRef([]);
+  const copySequenceRef = useRef(0);
+  const onVideoCopiedRef = useRef(onVideoCopied);
+  useEffect(() => { onVideoCopiedRef.current = onVideoCopied; }, [onVideoCopied]);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; generationRef.current += 1; listSequenceRef.current += 1; copySequenceRef.current += 1; };
+  }, []);
+  // The card is keyed by requestId, so a different request remounts this hook with a clean panel.
+  const isCurrent = useCallback((generation) => mountedRef.current && generationRef.current === generation, []);
+
+  const loadList = useCallback(async ({ quiet = false } = {}) => {
+    if (!requestId) return;
+    const generation = generationRef.current;
+    const sequence = ++listSequenceRef.current;
+    const isLatest = () => isCurrent(generation) && listSequenceRef.current === sequence;
+    if (!quiet) setStatus('loading'); else setRefreshing(true);
+    try {
+      const body = await requestJson(`${basePath}/zoom-recordings`, { method: 'GET', fallbackMessage: 'Zoom recordings could not be loaded.' });
+      if (!isLatest()) return;
+      if (body?.available === true && Array.isArray(body.meetings)) {
+        setMeetings(body.meetings);
+        setWindowDays(Number.isInteger(body.windowDays) ? body.windowDays : 30);
+        setStatus('available');
+      } else if (!quiet) setStatus('unavailable');
+    } catch (loadError) {
+      if (isLatest() && loadError?.name !== 'AbortError' && !quiet) setStatus('failed');
+    } finally {
+      if (isLatest()) setRefreshing(false);
+    }
+  }, [basePath, isCurrent, requestId]);
+
+  // Read-only Postgres snapshot (no Zoom call). Dropped when the card changed or a newer read started.
+  const loadCopies = useCallback(async () => {
+    if (!requestId) return;
+    const generation = generationRef.current;
+    const sequence = ++copySequenceRef.current;
+    try {
+      const body = await requestJson(`${basePath}/zoom-video-copies`, { method: 'GET', fallbackMessage: 'Video copies could not be loaded.' });
+      if (!isCurrent(generation) || copySequenceRef.current !== sequence) return;
+      const next = body?.available === true && Array.isArray(body.copies)
+        ? body.copies.filter((copy) => copy && typeof copy.id === 'string' && typeof copy.state === 'string').map((copy) => ({
+          id: copy.id, meetingUuid: typeof copy.meetingUuid === 'string' ? copy.meetingUuid : '', state: copy.state,
+          bytesConfirmed: Number(copy.bytesConfirmed) || 0, declaredSize: Number(copy.declaredSize) || 0,
+          failureCode: typeof copy.failureCode === 'string' ? copy.failureCode : null, cancelRequested: copy.cancelRequested === true,
+          createdAt: copy.createdAt || null,
+        })) : [];
+      const finished = copiesRef.current.some((old) => COPY_ACTIVE_STATES.has(old.state) && next.some((copy) => copy.id === old.id && copy.state === 'copied'));
+      copiesRef.current = next;
+      setCopyAvailable(body?.available === true && Array.isArray(body.copies));
+      setCopies(next);
+      if (finished) { void onVideoCopiedRef.current?.(); }
+    } catch {
+      // Keep what is shown; the next poll or action retries.
+    }
+  }, [basePath, isCurrent, requestId]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadCopies(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadCopies]);
+  const hasActiveCopy = copies.some((copy) => COPY_ACTIVE_STATES.has(copy.state));
+  // Poll only while a copy is running; the interval is cleared on a terminal state and on unmount.
+  useEffect(() => {
+    if (!hasActiveCopy) return undefined;
+    const timer = setInterval(() => { void loadCopies(); }, COPY_POLL_MS);
+    return () => clearInterval(timer);
+  }, [hasActiveCopy, loadCopies]);
+  const currentCopy = [...copies].sort((a, b) => Number(COPY_ACTIVE_STATES.has(b.state)) - Number(COPY_ACTIVE_STATES.has(a.state))
+    || String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0] || null;
+  const copyForMeeting = (meeting) => {
+    const known = copies.find((copy) => copy.meetingUuid === meeting.meetingUuid);
+    if (known) return known;
+    const listed = meeting.video?.copy;
+    return listed && typeof listed.state === 'string'
+      ? { id: listed.id, meetingUuid: meeting.meetingUuid, state: listed.state, bytesConfirmed: 0, declaredSize: Number(meeting.video.bytes) || 0, failureCode: listed.failureCode || null, cancelRequested: false }
+      : null;
+  };
+  const videoStartable = (meeting) => {
+    if (!copyAvailable || hasActiveCopy || !meeting?.video || meeting.video.tooLarge || meeting.video.segmented) return false;
+    const copy = copyForMeeting(meeting);
+    return !copy || copy.state === 'failed' || copy.state === 'cancelled';
+  };
+
+  // One POST for the video start. Returns { outcome: started | confirm | stale | error | dropped }.
+  const startVideo = async (meetingUuid, replaces, generation, origin) => {
+    try {
+      const body = await requestJson(`${basePath}/zoom-video-copies`, {
+        method: 'POST', body: { action: 'start', meetingUuid, replaces }, fallbackMessage: 'The video copy could not be started.',
+      });
+      if (!isCurrent(generation)) return { outcome: 'dropped' };
+      if (body?.copy && typeof body.copy.id === 'string') {
+        const placeholder = { id: body.copy.id, meetingUuid, state: String(body.copy.state || 'queued'), bytesConfirmed: 0, declaredSize: 0, failureCode: null, cancelRequested: false, createdAt: new Date().toISOString() };
+        copiesRef.current = [placeholder, ...copiesRef.current.filter((copy) => copy.id !== placeholder.id)];
+        setCopies(copiesRef.current);
+      }
+      setVideoMessage({ origin, tone: 'info', text: body?.replayed ? 'This video was already copied.' : 'Video copy started. This can take several minutes. You can leave this page.' });
+      void loadCopies();
+      return { outcome: 'started' };
+    } catch (startError) {
+      if (!isCurrent(generation) || startError?.name === 'AbortError') return { outcome: 'dropped' };
+      const code = startError?.payload?.code;
+      const winner = startError?.payload?.winner;
+      if (code === 'zoom_video_replace_confirmation_required' && winner && typeof winner.artifactId === 'string' && Number.isSafeInteger(winner.slotVersion)) {
+        return { outcome: 'confirm', winner };
+      }
+      if (code === 'zoom_video_replace_stale') return { outcome: 'stale' };
+      setVideoMessage({ origin, tone: 'error', text: VIDEO_START_MESSAGES[code] || startError?.message || 'The video copy could not be started.' });
+      void loadCopies();
+      return { outcome: 'error' };
+    }
+  };
+
+  // Copy video on its own (earlier imports, transcription off, no audio) and Try again.
+  const copyVideo = async (meetingUuid, origin) => {
+    if (busy || videoBusy || !requestId) return;
+    const generation = generationRef.current;
+    setVideoBusy(true);
+    setVideoMessage(null);
+    setConfirm(null);
+    try {
+      const result = await startVideo(meetingUuid, null, generation, origin);
+      if (result.outcome === 'confirm' && isCurrent(generation)) setConfirm({ meetingUuid, winner: result.winner, origin, withAudio: false });
+    } finally {
+      if (isCurrent(generation)) setVideoBusy(false);
+    }
+  };
+
+  const cancelCopy = async (copyId) => {
+    if (videoBusy || !requestId) return;
+    const generation = generationRef.current;
+    setVideoBusy(true);
+    setVideoMessage(null);
+    try {
+      await requestJson(`${basePath}/zoom-video-copies`, { method: 'POST', body: { action: 'cancel', copyId }, fallbackMessage: 'The video copy could not be cancelled.' });
+    } catch (cancelError) {
+      if (isCurrent(generation) && cancelError?.name !== 'AbortError') {
+        setVideoMessage({ origin: 'block', tone: 'error', text: cancelError?.payload?.code === 'zoom_video_copy_saving'
+          ? 'The video is being saved and can no longer be cancelled.' : (cancelError?.message || 'The video copy could not be cancelled.') });
+      }
+    } finally {
+      if (isCurrent(generation)) { setVideoBusy(false); void loadCopies(); }
+    }
+  };
+
+  const openPanel = useCallback(() => { void loadList(); }, [loadList]);
+  // Returns the read so the card Refresh can wait for it (Codex review round 5, redesign commit 3).
+  const refresh = useCallback(() => loadList({ quiet: true }), [loadList]);
+
+  // Once the panel has been opened, a real change in the transcription jobs (id and status) quietly reloads the list so
+  // meeting states follow the server. Nothing is fetched while the panel has never been opened, and an unchanged
+  // signature never refetches.
+  useEffect(() => {
+    if (status !== 'available') { lastSignatureRef.current = jobsSignature; return; }
+    if (lastSignatureRef.current === jobsSignature) return;
+    lastSignatureRef.current = jobsSignature;
+    void loadList({ quiet: true });
+  }, [status, jobsSignature, loadList]);
+
+  // The existing audio import POST, unchanged in behavior. Its result and error are its own.
+  const sendAudio = async (meeting, generation) => {
+    try {
+      const body = await requestJson(`${basePath}/zoom-imports`, {
+        method: 'POST', body: { meetingUuid: meeting.meetingUuid, nonSensitiveAcknowledged: true },
+        fallbackMessage: 'The Zoom import could not be completed.',
+      });
+      if (!isCurrent(generation)) return;
+      const result = body?.import;
+      setMeetings((current) => current.map((item) => (item.meetingUuid === meeting.meetingUuid && result
+        ? { ...item, import: { state: result.state, jobId: body?.job?.id || null, failureCode: result.failureCode || null } } : item)));
+      setSelectedUuid(null);
+      setAcknowledged(false);
+      await onImportedRef.current?.();
+    } catch (importError) {
+      if (!isCurrent(generation)) return;
+      setError(importError?.message || 'The Zoom import could not be completed.');
+      void loadList({ quiet: true });
+    }
+  };
+
+  // Import starts the audio import and the video copy as two independent POSTs. When the video start needs the replace
+  // confirmation, nothing else is sent until staff confirm.
+  const importSelected = async () => {
+    const meeting = meetings.find((item) => item.meetingUuid === selectedUuid);
+    if (!meeting || !acknowledged || busy || videoBusy || !requestId) return;
+    const generation = generationRef.current;
+    setBusy(true);
+    setError(null);
+    setVideoMessage(null);
+    setConfirm(null);
+    try {
+      if (videoStartable(meeting)) {
+        const result = await startVideo(meeting.meetingUuid, null, generation, 'picker');
+        if (result.outcome === 'confirm') {
+          if (isCurrent(generation)) setConfirm({ meetingUuid: meeting.meetingUuid, winner: result.winner, origin: 'picker', withAudio: true });
+          return;
+        }
+        if (result.outcome === 'dropped') return;
+      }
+      await sendAudio(meeting, generation);
+    } finally {
+      if (isCurrent(generation)) setBusy(false);
+    }
+  };
+
+  // Declining keeps the current file: the video is not copied, but an Import still imports the audio.
+  const declineReplace = async () => {
+    const pending = confirm;
+    setConfirm(null);
+    if (!pending?.withAudio || busy || videoBusy || !requestId) return;
+    const meeting = meetings.find((item) => item.meetingUuid === pending.meetingUuid);
+    if (!meeting) return;
+    const generation = generationRef.current;
+    setBusy(true);
+    setError(null);
+    setVideoMessage({ origin: pending.origin, tone: 'info', text: 'The current recording file was kept. The video was not copied.' });
+    try {
+      await sendAudio(meeting, generation);
+    } finally {
+      if (isCurrent(generation)) setBusy(false);
+    }
+  };
+  const confirmReplace = async () => {
+    const pending = confirm;
+    if (!pending || busy || videoBusy || !requestId) return;
+    const generation = generationRef.current;
+    setConfirm(null);
+    setVideoMessage(null);
+    setError(null);
+    if (pending.withAudio) setBusy(true); else setVideoBusy(true);
+    try {
+      let result = await startVideo(pending.meetingUuid, { artifactId: pending.winner.artifactId, slotVersion: pending.winner.slotVersion }, generation, pending.origin);
+      if (result.outcome === 'stale') {
+        // The current recording changed: reload and ask again with the new file.
+        void loadList({ quiet: true });
+        result = await startVideo(pending.meetingUuid, null, generation, pending.origin);
+      }
+      if (result.outcome === 'confirm') {
+        if (isCurrent(generation)) setConfirm({ ...pending, winner: result.winner });
+        return;
+      }
+      if (result.outcome === 'dropped') return;
+      if (pending.withAudio) {
+        const meeting = meetings.find((item) => item.meetingUuid === pending.meetingUuid);
+        if (meeting) await sendAudio(meeting, generation);
+      }
+    } finally {
+      if (isCurrent(generation)) { setBusy(false); setVideoBusy(false); }
+    }
+  };
+
+  return {
+    status, windowDays, meetings, selectedUuid, setSelectedUuid, acknowledged, setAcknowledged, busy, error,
+    showOther, toggleOther: () => setShowOther((value) => !value), openPanel, importSelected, refresh, refreshing,
+    copyAvailable, hasActiveCopy, currentCopy, copyForMeeting, videoStartable, videoBusy, videoMessage, confirm,
+    copyVideo, cancelCopy, confirmReplace, declineReplace,
   };
 }
 
@@ -1873,7 +2391,7 @@ function SpeakerEditor({ t, alignment, readOnly }) {
                 </label>
                 {rowSuggestions.length > 0 && <div className="flex flex-wrap items-center gap-2">
                   {rowSuggestions.map((name) => (
-                    <button key={name} type="button" disabled={disabled} onClick={() => setNames((c) => ({ ...c, [speaker]: name }))} className={BTN}>Use {name}</button>
+                    <Button size="sm" variant="outline" key={name} type="button" disabled={disabled} onClick={() => setNames((c) => ({ ...c, [speaker]: name }))}>Use {name}</Button>
                   ))}
                 </div>}
                 {candidates.length > 0 && <label htmlFor={`${controlId}-pick`} className="block text-xs font-medium text-gray-700">
@@ -1938,7 +2456,7 @@ function PresentationEndEditor({ t, readOnly }) {
       {proposed && Number.isSafeInteger(proposed.endMs) && proposed.endMs !== selected && (
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-900">
           <span>Proposed: {formatTranscriptTurnTime(proposed.endMs)} — last turn by {proposedName}</span>
-          <button type="button" disabled={disabled} onClick={() => setPresentationEndMs(proposed.endMs)} className={BTN}>Use proposed</button>
+          <Button size="sm" variant="outline" type="button" disabled={disabled} onClick={() => setPresentationEndMs(proposed.endMs)}>Use proposed</Button>
         </div>
       )}
       {(proposed?.skipped || []).filter((line) => Number.isSafeInteger(line?.endMs)).map((line) => (
@@ -1946,7 +2464,7 @@ function PresentationEndEditor({ t, readOnly }) {
           <Notice tone="info">
             Skipped a short line attributed to {String(names?.[line.speakerId] || '').trim() || `Speaker ${line.speakerId}`} at {formatTranscriptTurnTime(line.startMs)}: “{clip(line.text, 80)}” It came {Math.round(line.gapMs / 60_000)} minutes after the last longer applicant line, so it may belong to someone else.
           </Notice>
-          {line.endMs !== selected && <button type="button" disabled={disabled} onClick={() => setPresentationEndMs(line.endMs)} className={`mt-2 ${BTN}`}>Use this line instead</button>}
+          {line.endMs !== selected && <Button size="sm" variant="outline" type="button" disabled={disabled} onClick={() => setPresentationEndMs(line.endMs)} className="mt-2">Use this line instead</Button>}
         </div>
       ))}
       <label className="mt-2 block text-xs font-medium text-gray-700">
@@ -1974,6 +2492,22 @@ function PresentationEndEditor({ t, readOnly }) {
         </div>
       )}
       {selected === null && <p className="mt-2 text-xs text-gray-600">Not confirmed. The Board link shows no transcript.</p>}
+      {selected !== null && (t.dirtyNames || t.dirtyEnd) && <p className="mt-3 text-xs text-gray-600">Save changes to review attendance.</p>}
+      {t.attendanceReview && !t.dirtyNames && !t.dirtyEnd && <fieldset className="mt-4 space-y-2" disabled={disabled}>
+        <legend className="text-sm font-semibold">Discussion attendance</legend>
+        <p className="text-xs text-gray-600">Uncheck anyone whose discussion turns should say “Unidentified speaker”. Publish to confirm.</p>
+        {t.attendanceReview.decision.attendance.status !== 'complete' && <p className="text-xs text-gray-600">Attendance is unavailable or incomplete. Review the voices in the discussion.</p>}
+        {['attendee', 'voice'].map(kind => <div key={kind}>
+          {kind === 'voice' && t.attendanceDecision.rows.some(row => row.kind === kind) && <p className="mt-3 text-xs font-semibold">Other voices in the discussion</p>}
+          {t.attendanceDecision.rows.map((row, index) => row.kind === kind && <label key={index} className="flex items-start gap-2 text-sm">
+            <input type="checkbox" checked={t.attendanceKept[index]} onChange={event => t.setAttendanceKept(index, event.target.checked)} />
+            <span>{row.displayName}{row.lastLeaveAt && <span className="ml-2 text-xs text-gray-600">Left {new Date(row.lastLeaveAt).toLocaleString('en-US', { timeZone: t.attendanceReview.timeZone || 'UTC', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}</span>}
+              {t.attendanceReview.leftBeforeEnd[index] && <span className="block text-xs text-gray-600">Left before the presentation ended</span>}</span>
+          </label>)}
+        </div>)}
+        {t.attendanceReview.waitingRoomOnlyCount > 0 && <p className="text-xs text-gray-600">{t.attendanceReview.waitingRoomOnlyCount} stayed in the waiting room.</p>}
+      </fieldset>}
+
     </div>
   );
 }
@@ -2011,7 +2545,8 @@ function ReviewBlock({ t }) {
   const staleCorrection = Boolean(correction) && (t.correctionDetail?.currentArtifact?.id !== correction.expectedCurrentArtifactId
     || t.correctionDetail?.currentArtifact?.fingerprint !== correction.expectedCurrentFingerprint);
   const publishBlockedReason = matchingActive ? 'Matching still running'
-    : dirty ? (correction ? 'Save changes first' : 'Save names first')
+    : (t.dirtyNames || t.dirtyEnd) ? (correction ? 'Save changes first' : 'Save names first')
+      : correction && !t.attendanceReview ? 'Review attendance first'
       : !hasTurns ? 'Publishing needs timed speaker turns.'
         : staleCorrection ? 'The published transcript changed. Cancel and start again.'
           : correction ? (correction.state !== 'draft' ? 'This edit was already published.' : null)
@@ -2020,7 +2555,7 @@ function ReviewBlock({ t }) {
                 : status !== 'ready' ? 'Only a ready run can be published.' : null;
   const canReview = correction ? Boolean(t.content) : status === 'ready' && job?.contentAccessAllowed === true && Boolean(t.content);
   const title = correction ? 'Edit speaker names and presentation end' : displayName(job);
-  const showRefresh = matchingActive || conflict || (status === 'ready' && !t.content && Boolean(t.error));
+  const showRefresh = matchingActive || conflict || (correction && Boolean(t.error)) || (status === 'ready' && !t.content && Boolean(t.error));
   const base = t.basePath;
 
   return (
@@ -2032,7 +2567,7 @@ function ReviewBlock({ t }) {
             ? <p className="mt-1 text-xs text-gray-600">Changes names and where the presentation ends. The wording and timestamps stay the same.</p>
             : <p className="mt-1 text-sm text-gray-700">{RUN_STATE_LABELS[status] || 'Unknown'}{job?.ready_at ? ` ${fmtDateTime(job.ready_at)}` : ''}{job?.needsAttention ? ' · Needs attention' : ''}</p>}
         </div>
-        {showRefresh && <button type="button" onClick={t.refreshReview} disabled={Boolean(busy)} className={BTN}>{busy === 'loading' ? 'Refreshing…' : 'Refresh'}</button>}
+        {showRefresh && <Button size="sm" variant="outline" type="button" onClick={t.refreshReview} disabled={Boolean(busy)}>{busy === 'loading' ? 'Refreshing…' : 'Refresh'}</Button>}
       </div>
       {!correction && status === 'submission_uncertain' && <div className="mt-3"><Notice tone="warning">We could not confirm this recording was accepted for transcription. Do not start another transcription for the same recording until this run is resolved.</Notice></div>}
       {!correction && job?.contentDeletionObserved && <div className="mt-3"><Notice tone="info">This draft’s text is no longer available.</Notice></div>}
@@ -2049,11 +2584,11 @@ function ReviewBlock({ t }) {
         {alignmentShown && ALIGNMENT_REASONS[alignmentStatus] && <p className="mt-3 text-sm leading-5 text-gray-700">{ALIGNMENT_REASONS[alignmentStatus]}</p>}
         <SpeakerEditor t={{ ...t, collection }} alignment={alignment} readOnly={matchingActive || (correction && correction.state !== 'draft')} />
         {correction && <PresentationEndEditor t={t} readOnly={correction.state !== 'draft'} />}
-        <TranscriptPreview content={t.content} names={t.names} />
+        <TranscriptPreview content={resolveDiscussionAttribution(t.content, t.presentationEndMs, t.previewDecision)} names={t.names} />
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className="mr-auto text-xs text-gray-600" aria-live="polite">{correction ? (dirty ? 'Unsaved changes' : 'Saved') : (dirty ? 'Unsaved name changes' : 'Names saved')}</span>
-          <button type="button" onClick={t.saveNames} disabled={!dirty || Boolean(busy) || matchingActive} className={BTN}>{busy === 'speakers' ? (correction ? 'Saving…' : 'Saving names…') : (correction ? 'Save changes' : 'Save names')}</button>
-          <button type="button" onClick={correction ? t.publishCorrection : t.publishJob} disabled={Boolean(publishBlockedReason) || Boolean(busy)} className={BTN_PRIMARY}>{busy === 'publish' ? 'Publishing…' : 'Publish transcript'}</button>
+          <Button size="sm" variant="outline" type="button" onClick={t.saveNames} disabled={!dirty || Boolean(busy) || matchingActive}>{busy === 'speakers' ? (correction ? 'Saving…' : 'Saving names…') : (correction ? 'Save changes' : 'Save names')}</Button>
+          <Button size="sm" variant="primary" type="button" onClick={correction ? t.publishCorrection : t.publishJob} disabled={Boolean(publishBlockedReason) || Boolean(busy)}>{busy === 'publish' ? 'Publishing…' : 'Publish transcript'}</Button>
         </div>
         {correction && <div className="mt-2"><Notice tone="warning">Publishing this correction, including a names-only change, withholds the Board presentation transcript and summary until you generate the presentation transcripts and summarize again.</Notice></div>}
         {publishBlockedReason && <p className="mt-2 text-xs leading-5 text-gray-600">{publishBlockedReason}</p>}
@@ -2090,8 +2625,8 @@ function AttentionBlock({ t }) {
               <p className="font-medium">{copy}</p>
               {row.errorCode && <p className="mt-1 break-all text-xs text-amber-900">Reference: {row.errorCode}</p>}
               <div className="mt-2 flex flex-wrap gap-2">
-                <button type="button" onClick={() => void t.checkPublication(row)} disabled={Boolean(busy)} className={BTN}>{busy === `check-${row.operationId}` ? 'Checking…' : action}</button>
-                {waited && <button type="button" onClick={() => void t.closePublication(row)} disabled={Boolean(busy) || t.closeAcknowledgedId !== row.operationId} className={BTN}>{busy === `close-${row.operationId}` ? 'Closing…' : 'Close this attempt'}</button>}
+                <Button size="sm" variant="outline" type="button" onClick={() => void t.checkPublication(row)} disabled={Boolean(busy)}>{busy === `check-${row.operationId}` ? 'Checking…' : action}</Button>
+                {waited && <Button size="sm" variant="outline" type="button" onClick={() => void t.closePublication(row)} disabled={Boolean(busy) || t.closeAcknowledgedId !== row.operationId}>{busy === `close-${row.operationId}` ? 'Closing…' : 'Close this attempt'}</Button>}
               </div>
               {waited && <label className="mt-2 flex items-start gap-2 text-xs leading-5"><input type="checkbox" checked={t.closeAcknowledgedId === row.operationId} disabled={Boolean(busy)} onChange={(event) => t.setCloseAcknowledgedId(event.target.checked ? row.operationId : null)} className="mt-0.5 h-4 w-4 rounded border-amber-500" /><span>Closing stops retries. Any partly saved files stay in SharePoint, and the current transcript is not changed.</span></label>}
               {!waited && row.quarantineUntil && <p className="mt-2 text-xs leading-5">You can close this attempt after {fmtDateTime(row.quarantineUntil)}.</p>}
@@ -2104,7 +2639,8 @@ function AttentionBlock({ t }) {
 }
 
 function EarlierRuns({ t }) {
-  const runs = t.showReview ? t.jobs.filter((job) => job.id !== t.focusJob?.id) : t.jobs.filter((job) => job.id !== t.newestJob?.id);
+  const shownAbove = t.showReview ? t.focusJob?.id : t.newestJob?.id;
+  const runs = t.jobs.filter((job) => job.id !== shownAbove || isCancelledRun(job));
   if (!runs.length) return null;
   return (
     <details className="mt-5" data-testid="earlier-runs">
@@ -2116,13 +2652,14 @@ function EarlierRuns({ t }) {
               <p className="break-words text-sm font-medium text-gray-900">{displayName(job)}</p>
               <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-600">
                 {job.ready_at && <Chip>Ready {fmtDateTime(job.ready_at)}</Chip>}
-                <Chip tone={job.status === 'ready' ? 'green' : ACTIVE_STATUSES.has(job.status) ? 'blue' : job.status === 'submission_uncertain' ? 'amber' : 'gray'}>{RUN_STATE_LABELS[job.status] || 'Unknown'}</Chip>
+                <Chip tone={job.status === 'ready' ? 'green' : ACTIVE_STATUSES.has(job.status) && !isCancelledRun(job) && !isCancellingRun(job) ? 'blue' : job.status === 'submission_uncertain' ? 'amber' : 'gray'}>{isCancelledRun(job) ? 'Cancelled' : isCancellingRun(job) ? 'Cancelling…' : RUN_STATE_LABELS[job.status] || 'Unknown'}</Chip>
               </p>
             </div>
             {job.status === 'ready' && <div className="flex items-center gap-3">
-              <button type="button" onClick={() => t.reviewRun(job)} disabled={Boolean(t.busy) && t.busy !== 'speakers'} className={BTN}>Review</button>
+              <Button size="sm" variant="outline" type="button" onClick={() => t.reviewRun(job)} disabled={Boolean(t.busy) && t.busy !== 'speakers'}>Review</Button>
               <button type="button" onClick={() => void t.discardRun(job)} disabled={Boolean(t.busy)} className={BTN_LINK}>Discard this draft</button>
             </div>}
+            {canCancelRun(job) && <button type="button" onClick={() => void t.discardRun(job)} disabled={Boolean(t.busy)} className={BTN_LINK}>{t.busy === 'cancel' ? 'Cancelling…' : 'Cancel this transcription'}</button>}
           </li>
         ))}
       </ul>
@@ -2152,12 +2689,12 @@ function GenerateForm({ t }) {
         <span>This recording is non-sensitive and may be sent to our transcription provider.{vttFile ? ' Excerpts of both transcripts are also sent to Anthropic to match speaker names.' : ''} Transcription uses paid credits.</span>
       </label>
       {t.uploadProgress !== null && <div className="mt-3" aria-live="polite"><div className="flex justify-between text-xs text-gray-700"><span>{busy === 'upload-captions' ? 'Uploading Zoom captions' : t.uploadProgress < 100 ? 'Uploading to private storage' : 'Upload complete'}</span><span>{t.uploadProgress}%</span></div><progress className="mt-1 h-2 w-full accent-gray-900" max="100" value={t.uploadProgress} aria-label="Private upload progress" /></div>}
-      <button type="button" onClick={t.uploadAndStart} disabled={!audioFile || Boolean(audioError) || Boolean(vttError) || Boolean(sizeError) || !t.acknowledged || Boolean(busy)} className={`mt-3 ${BTN_PRIMARY}`}>{busy === 'upload' ? 'Uploading…' : busy === 'upload-captions' ? 'Uploading Zoom captions…' : busy === 'starting' ? 'Starting transcription…' : 'Start transcription'}</button>
+      <Button size="sm" variant="primary" type="button" onClick={t.uploadAndStart} disabled={!audioFile || Boolean(audioError) || Boolean(vttError) || Boolean(sizeError) || !t.acknowledged || Boolean(busy)} className="mt-3">{busy === 'upload' ? 'Uploading…' : busy === 'upload-captions' ? 'Uploading Zoom captions…' : busy === 'starting' ? 'Starting transcription…' : 'Start transcription'}</Button>
       {t.confirmNoVtt && !vttFile && !busy && <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-5 text-amber-950" role="alert">
         <p>Add Zoom captions to name speakers automatically?</p>
         <div className="mt-2 flex flex-wrap gap-2">
-          <button type="button" onClick={() => { t.setNoVttConfirmation(null); vttInputRef.current?.focus(); }} className={BTN}>Add Zoom captions</button>
-          <button type="button" onClick={t.uploadAndStart} className={BTN}>Continue without it</button>
+          <Button size="sm" variant="outline" type="button" onClick={() => { t.setNoVttConfirmation(null); vttInputRef.current?.focus(); }}>Add Zoom captions</Button>
+          <Button size="sm" variant="outline" type="button" onClick={t.uploadAndStart}>Continue without it</Button>
         </div>
       </div>}
     </div>
@@ -2181,218 +2718,864 @@ function UploadForm({ m, inputRef }) {
       {m.transcriptFile && <p className="mt-2 break-all text-xs text-gray-700">{m.transcriptFile.name}</p>}
       {m.transcriptProgress !== null && <p className="mt-2 text-xs text-gray-600">Uploading: {m.transcriptProgress}%</p>}
       {m.transcriptError && <p role="alert" className="mt-2 text-sm text-red-800">{m.transcriptError}</p>}
-      <button type="button" onClick={m.uploadTranscript} disabled={!m.transcriptFile || m.transcriptBusy} className={`mt-3 ${BTN_PRIMARY}`}>{m.transcriptBusy ? 'Uploading…' : m.transcriptStagedId ? 'Finish transcript' : 'Upload transcript'}</button>
+      <Button size="sm" variant="primary" type="button" onClick={m.uploadTranscript} disabled={!m.transcriptFile || m.transcriptBusy} className="mt-3">{m.transcriptBusy ? 'Uploading…' : m.transcriptStagedId ? 'Finish transcript' : 'Upload transcript'}</Button>
     </div>
   );
 }
 
-function SummaryBlock({ t, materials = [] }) {
+const SUMMARY_BLOCK_COPY = Object.freeze({
+  presentation: Object.freeze({
+    title: 'Presentation summary', testId: 'presentation-summary-block', draftLabel: 'Draft',
+    materialType: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, none: 'No summary published yet.',
+    published: (at) => `Published ${at}. Available to staff and eligible for the Board link.`,
+    stale: 'The published summary is from an earlier transcript version. It remains available to staff; it is withheld from the Board link. Summarize again to replace it.',
+    notConfirmed: 'A summary artifact exists. Its eligibility for the Board link is not confirmed for the current presentation.',
+  }),
+  // Staff only: no Board eligibility copy (plan D9).
+  discussion: Object.freeze({
+    title: 'Staff discussion summary', testId: 'discussion-summary-block', draftLabel: 'Discussion draft',
+    materialType: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY, none: 'No discussion summary published yet.',
+    published: (at) => `Published ${at}. Staff only.`,
+    stale: 'The published discussion summary is from an earlier transcript version. It remains available to staff. Summarize again to replace it.',
+    notConfirmed: 'A discussion summary exists. It is not confirmed for the current presentation end.',
+  }),
+});
+
+// One acknowledgment and one confirm button for both kinds (plan D6, D9). It opens under the row whose action asked
+// for it, so consent is given at the moment a summary is requested rather than kept on screen (redesign §4).
+function summarizeLabel(kinds) {
+  return kinds.length === 2 ? 'Summarize presentation and discussion'
+    : kinds[0] === 'discussion' ? 'Summarize staff discussion' : 'Summarize presentation';
+}
+// What a Summarize confirmation was opened for: the transcript, each target kind's load state, draft identity and
+// conflict. If any of it changes while the confirmation is open, the confirmation closes (Codex review, commit 1),
+// so an acknowledgment never carries over to a target the user did not see.
+function summaryTargetKey(h) {
+  const draft = h?.summary?.draft || null;
+  return [h?.summaryLoadKey, h?.summaryLoadedKey, h?.summaryReadState, draft?.id || '', draft?.version ?? '', draft?.state || '',
+    h?.summaryConflict ? 'conflict' : '', h?.summary?.transcriptSummary?.state || ''].join(':');
+}
+function summarizeSignature(t, mode, kinds) {
   const artifact = t.collection?.currentArtifact;
-  const summaryCurrent = t.summaryReadState === 'ready' && t.summaryLoadedKey === t.summaryLoadKey;
-  const summaryStatusCurrent = ['ready', 'not_needed'].includes(t.summaryReadState) && t.summaryLoadedKey === t.summaryLoadKey;
-  const published = summaryStatusCurrent
-    ? t.summary?.transcriptSummary || null
-    : artifact?.transcriptSummary || null;
-  const collectionSaysNoSummary = artifact?.transcriptSummary?.state === 'missing'
-    || (artifact?.transcriptSummary && [null, undefined].includes(artifact.transcriptSummary.artifactId));
-  const compactSummaryStatusUnknown = Boolean(artifact?.id && !artifact.transcriptSummary
-    && !summaryCurrent && t.summaryReadState !== 'loading');
-  const presentationReady = artifact?.presentationTranscript?.state === 'bound';
-  const transcriptMaterial = materials.find((item) => Number(item.artifactType) === REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT) || null;
-  const summaryMaterial = materials.find((item) => Number(item.artifactType) === REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY) || null;
-  const summaryUrl = summaryMaterial ? safeMaterialUrl(summaryMaterial) : null;
-  const draft = t.summaryDraft;
-  const summarizing = t.busy === 'summarize';
-  const ackId = 'presentation-summary-ack';
-  const publishedLine = !summaryStatusCurrent && t.summaryReadState === 'loading'
-    ? 'Checking summary status for the current transcript…'
-    : !summaryStatusCurrent && artifact?.id && (artifact.bundleEditable || artifact.transcriptSummary?.artifactId)
-        ? t.summaryReadState === 'unavailable' ? 'Summary status unavailable.' : 'Summary status for this transcript has not been checked.'
-      : published?.state === 'bound'
-    ? `Published ${fmtDateTime(published.publishedAt)}. Available to staff and eligible for the Board link.`
-    : published?.state === 'stale'
-      ? 'The published summary is from an earlier transcript version. It remains available to staff; it is withheld from the Board link. Summarize again to replace it.'
-      : published?.state === 'not_confirmed' && published?.artifactId
-        ? 'A summary artifact exists. Its eligibility for the Board link is not confirmed for the current presentation.'
-      : t.summaryReadState === 'unavailable' ? 'Summary status unavailable.'
-        : compactSummaryStatusUnknown ? 'Summary status unavailable.'
-        : collectionSaysNoSummary ? 'No summary published yet.'
-          : summaryCurrent && t.summary ? 'No summary published yet.'
-            : t.error && !artifact ? 'Summary status unavailable.'
-              : t.summaryReadState === 'not_needed' && !artifact ? 'Summary status cannot be checked until transcript status is available.'
-                : 'Summary status has not been checked.';
-  // Offered for a stuck 'publishing' draft too: the server retires it only when no publish holds it.
-  const summarizeForm = presentationReady && summaryCurrent && !t.summaryConflict && (
-    <div className="mt-3">
-      <label htmlFor={ackId} className="flex items-start gap-2 text-sm leading-6 text-gray-900">
-        <input id={ackId} type="checkbox" className="mt-1.5" checked={t.summaryAck} disabled={Boolean(t.busy)}
+  const hooks = { presentation: t.presentationSummary, discussion: t.discussionSummary };
+  return [mode, kinds.join(','), artifact?.id || '', artifact?.fingerprint || '', artifact?.presentationEnd?.endMs ?? '',
+    ...kinds.map((kind) => summaryTargetKey(hooks[kind]))].join('|');
+}
+function SummarizeConfirm({ t, kinds, valid, onClose }) {
+  return (
+    <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3" data-testid="paired-summary-form">
+      <label htmlFor="paired-summary-ack" className="flex items-start gap-2 text-sm leading-6 text-gray-900">
+        <input id="paired-summary-ack" type="checkbox" className="mt-1.5" checked={t.summaryAck} disabled={Boolean(t.busy)}
           onChange={(event) => t.setSummaryAck(event.target.checked)} />
-        <span>{PRESENTATION_SUMMARY_ACKNOWLEDGMENT.text}</span>
+        <span>{PAIRED_SUMMARY_ACKNOWLEDGMENT.text}</span>
       </label>
-      <button type="button" onClick={t.summarize} disabled={Boolean(t.busy) || !t.summaryAck || Boolean(t.summaryConflict)} className={`mt-2 ${draft ? BTN : BTN_PRIMARY}`}>
-        {summarizing ? 'Summarizing…' : draft ? 'Replace draft with a new summary' : 'Summarize presentation'}
-      </button>
-      {summarizing && <p className="mt-1 text-xs text-gray-600" aria-live="polite">This can take a few minutes. Keep this page open.</p>}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="primary" type="button" onClick={() => { onClose(); if (valid) void t.summarizeKinds(kinds); }} disabled={!valid || Boolean(t.busy) || !t.summaryAck || !kinds.length}>{summarizeLabel(kinds)}</Button>
+        <Button size="sm" variant="outline" type="button" onClick={() => { t.setSummaryAck(false); onClose(); }} disabled={Boolean(t.busy)}>Cancel</Button>
+      </div>
     </div>
   );
+}
+
+// The published summary as the card knows it: the summary read when it is current for this transcript, otherwise the
+// transcript collection's copy. Shared by SummaryBlock and the Board materials readiness list.
+function publishedSummaryOf(t, s) {
+  const summaryStatusCurrent = ['ready', 'not_needed'].includes(s.summaryReadState) && s.summaryLoadedKey === s.summaryLoadKey;
+  const published = summaryStatusCurrent
+    ? s.summary?.transcriptSummary || null
+    : t.collection?.currentArtifact?.transcriptSummary || null;
+  return { summaryStatusCurrent, published };
+}
+
+function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = null, setRequest = () => {} }) {
+  const copy = SUMMARY_BLOCK_COPY[kind];
+  const busyKeys = SUMMARY_KIND_UI[kind].busy;
+  const artifact = t.collection?.currentArtifact;
+  const collectionPublished = artifact?.[SUMMARY_KIND_UI[kind].publishedKey];
+  const summaryCurrent = s.summaryReadState === 'ready' && s.summaryLoadedKey === s.summaryLoadKey;
+  const { summaryStatusCurrent, published } = publishedSummaryOf(t, s);
+  const collectionSaysNoSummary = collectionPublished?.state === 'missing'
+    || (collectionPublished && [null, undefined].includes(collectionPublished.artifactId));
+  const compactSummaryStatusUnknown = Boolean(artifact?.id && !collectionPublished
+    && !summaryCurrent && s.summaryReadState !== 'loading');
+  const presentationReady = artifact?.presentationTranscript?.state === 'bound';
+  const transcriptMaterial = materials.find((item) => Number(item.artifactType) === REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT) || null;
+  const summaryMaterial = materials.find((item) => Number(item.artifactType) === copy.materialType) || null;
+  const summaryUrl = summaryMaterial ? safeMaterialUrl(summaryMaterial) : null;
+  const draft = s.summaryDraft;
+  const kindReady = s.transcriptBound;
+  const generatingRun = s.summary?.draft?.state === 'generating' ? s.summary.draft : null;
+  const runAbandoned = summaryRunAbandoned(generatingRun);
+  const notRecorded = kind === 'discussion' && summaryCurrent && s.summary?.discussionNotRecorded === true;
+  const failed = summaryCurrent && Boolean(s.summary?.lastFailure) && !draft && !notRecorded;
+  const publishedLine = !summaryStatusCurrent && s.summaryReadState === 'loading'
+    ? 'Checking summary status for the current transcript…'
+    : !summaryStatusCurrent && artifact?.id && (artifact.bundleEditable || collectionPublished?.artifactId)
+        ? s.summaryReadState === 'unavailable' ? 'Summary status unavailable.' : 'Summary status for this transcript has not been checked.'
+      : published?.state === 'bound'
+    ? copy.published(fmtDateTime(published.publishedAt))
+    : published?.state === 'stale'
+      ? copy.stale
+      : published?.state === 'not_confirmed' && published?.artifactId
+        ? copy.notConfirmed
+      : s.summaryReadState === 'unavailable' ? 'Summary status unavailable.'
+        : compactSummaryStatusUnknown ? 'Summary status unavailable.'
+        : collectionSaysNoSummary ? copy.none
+          : summaryCurrent && s.summary ? copy.none
+            : t.error && !artifact ? 'Summary status unavailable.'
+              : s.summaryReadState === 'not_needed' && !artifact ? 'Summary status cannot be checked until transcript status is available.'
+                : 'Summary status has not been checked.';
+  // Per-kind rerun, offered for a stuck 'publishing' draft too: the server retires it only when no publish holds it.
+  // It sends one POST through the paired handler, after the consent in SummarizeConfirm.
+  const againLabel = draft ? 'Replace draft with a new summary'
+    : failed || runAbandoned ? 'Try again'
+      : ['bound', 'stale'].includes(published?.state) ? 'Summarize again' : null;
+  const againAllowed = kindReady && summaryCurrent && !s.summaryConflict && !notRecorded && againLabel && !(generatingRun && !runAbandoned);
+  // The paired request (every eligible kind) is offered once: on the presentation row, or on the discussion row when
+  // only the discussion is eligible. A per-kind rerun stays available beside it: inline when the summary failed, was
+  // abandoned or is out of date, otherwise in the row menu.
+  const paired = t.collection?.currentArtifact?.presentationTranscript?.state === 'bound' ? t.pairedSummaryKinds : [];
+  const pairedHere = paired.length > 0 && paired[0] === kind;
+  const pairedSingleHere = pairedHere && paired.length === 1;
+  const open = (mode, kinds) => { t.setSummaryAck(false); setRequest({ mode, kinds, anchor: kind, signature: summarizeSignature(t, mode, kinds) }); };
+  const rerunInline = !pairedHere && againAllowed && !draft && (failed || runAbandoned || published?.state === 'stale');
+  const rerunInMenu = againAllowed && !pairedSingleHere && !rerunInline;
+  const pairedLabel = paired.length === 2 ? 'Summarize both' : againLabel === 'Try again' ? 'Try again' : ['bound', 'stale'].includes(published?.state) ? 'Summarize again' : 'Summarize';
+  const action = pairedHere
+    ? <Button size="sm" variant="outline" type="button" onClick={() => open('paired', paired)} disabled={Boolean(t.busy)}>{pairedLabel}</Button>
+    : rerunInline
+      ? <Button size="sm" variant="outline" type="button" onClick={() => open('single', [kind])} disabled={Boolean(t.busy)}>{againLabel}</Button>
+      : null;
+  // An open confirmation stays valid only while the action that opened it is still offered for the same targets.
+  const mine = request?.anchor === kind ? request : null;
+  const stillOffered = mine?.mode === 'paired'
+    ? pairedHere && paired.join(',') === mine.kinds.join(',')
+    : mine?.mode === 'single' && againAllowed && !pairedSingleHere;
+  const requestValid = Boolean(mine && stillOffered && summarizeSignature(t, mine.mode, mine.kinds) === mine.signature);
+  const closeStale = Boolean(mine) && !requestValid;
+  useEffect(() => {
+    if (!closeStale) return;
+    t.setSummaryAck(false);
+    setRequest(null);
+  }, [closeStale]); // eslint-disable-line react-hooks/exhaustive-deps
+  const menuItems = rerunInMenu ? [{ key: 'again', label: againLabel, disabled: Boolean(t.busy), onSelect: () => open('single', [kind]) }] : [];
+  const status = notRecorded ? { tone: 'gray', label: 'Not recorded' }
+    : s.summarizing || (generatingRun && !runAbandoned && summaryCurrent) ? { tone: 'gray', label: 'Summarizing…' }
+      : !summaryStatusCurrent && s.summaryReadState === 'loading' ? { tone: 'gray', label: 'Checking…' }
+        : published?.state === 'bound' && summaryStatusCurrent ? { tone: 'green', label: 'Published' }
+          : published?.state === 'stale' && summaryStatusCurrent ? { tone: 'amber', label: 'Out of date' }
+            : published?.state === 'not_confirmed' && published?.artifactId && summaryStatusCurrent ? { tone: 'amber', label: 'Not confirmed' }
+              : draft ? { tone: 'blue', label: 'Draft ready' }
+                : failed || runAbandoned ? { tone: 'amber', label: 'Did not finish' }
+                  : publishedLine === copy.none ? { tone: 'gray', label: 'Not made yet' }
+                    : { tone: 'gray', label: 'Status unknown' };
+  const detail = published?.state === 'bound' && summaryStatusCurrent ? fmtDateTime(published.publishedAt) : null;
+  // The published state carries its meaning in the chip and the group heading; only the other states keep a sentence.
+  const note = notRecorded ? 'Nothing was recorded after the presentation ended.'
+    : ['Published', 'Not made yet', 'Summarizing…', 'Draft ready'].includes(status.label) ? null
+      : publishedLine;
   return (
-    <div className="mt-4 border-t border-gray-100 pt-4" data-testid="presentation-summary-block">
-      <h4 className="text-sm font-semibold text-gray-950">Presentation summary</h4>
-      <p className="mt-1 text-sm leading-6 text-gray-900">{publishedLine}</p>
-      {summaryUrl && <a className={`mt-2 inline-flex ${BTN}`} href={summaryUrl} target="_blank" rel="noopener noreferrer">Open published summary</a>}
-      {t.summaryReadState === 'unavailable' && t.wantsSummary && <button type="button" onClick={() => void t.loadSummary()} disabled={Boolean(t.busy)} className={`mt-2 ${BTN}`}>Check again</button>}
-      {compactSummaryStatusUnknown && <button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.loading ? 'Refreshing…' : 'Refresh transcription status'}</button>}
-      {t.summaryReadState === 'unavailable' && <p className="mt-1 text-sm text-amber-900">Current summary status is unavailable. Any published file shown above reflects the latest material list.</p>}
-      {(published?.state === 'bound' || published?.state === 'stale') && t.summary?.slidesChangedSinceSummary === true && (
+    <ArtifactRow name={copy.title} href={summaryUrl} status={status} detail={detail} action={action} menuItems={menuItems} testId={copy.testId}>
+      {note && <p className="mt-1 text-sm leading-6 text-gray-700">{note}</p>}
+      {s.summarizing && <p className="mt-1 text-sm text-gray-800" aria-live="polite">This can take a few minutes. Keep this page open.</p>}
+      {!s.summarizing && generatingRun && summaryCurrent && (runAbandoned
+        ? <p className="mt-1 text-sm text-gray-700">The summary started {fmtDateTime(generatingRun.createdAt)} did not finish.</p>
+        : <div className="mt-1 text-sm text-gray-800" aria-live="polite"><p>Summarizing… started {fmtDateTime(generatingRun.createdAt)}.</p>
+          <Button size="sm" variant="outline" type="button" onClick={() => void s.loadSummary()} disabled={Boolean(t.busy) || s.summaryReadState === 'loading'} className="mt-2">Check again</Button></div>)}
+      {s.summaryReadState === 'unavailable' && s.wantsSummary && <Button size="sm" variant="outline" type="button" onClick={() => void s.loadSummary()} disabled={Boolean(t.busy)} className="mt-2">Check again</Button>}
+      {s.summaryReadState === 'unavailable' && <p className="mt-1 text-sm text-amber-900">Current summary status is unavailable. Any published file shown above reflects the latest material list.</p>}
+      {kind === 'presentation' && (published?.state === 'bound' || published?.state === 'stale') && s.summary?.slidesChangedSinceSummary === true && (
         <p className="mt-1 text-sm leading-6 text-amber-900" data-testid="summary-slides-changed">The applicant slides were updated after this summary was made. Summarize again to include them.</p>
       )}
-      {!presentationReady && !t.correction && (!transcriptMaterial
+      {kind === 'discussion' && presentationReady && !kindReady && !t.correction && (
+        <p className="mt-1 text-sm text-gray-700">Generate the discussion transcript first.</p>
+      )}
+      {kind === 'presentation' && !presentationReady && !t.correction && (!transcriptMaterial
         ? <p className="mt-1 text-sm text-gray-700">Add a transcript first. Upload a transcript file or generate one from audio.</p>
         : !artifact
-          ? <div className="mt-1 text-sm text-gray-700"><p>Transcript status is unavailable. Refresh transcription status to check whether this transcript can be summarized.</p><button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.loading ? 'Refreshing…' : 'Refresh transcription status'}</button></div>
+          ? <p className="mt-1 text-sm text-gray-700">Transcript status is unavailable. Use Refresh in Recording setup to check whether this transcript can be summarized.</p>
           : artifact.bundleEditable === false
           ? <p className="mt-1 text-sm text-gray-700">A generated transcript with timed speaker turns is required. Uploaded transcript files cannot be split into presentation and discussion sections here.</p>
           : artifact.bundleEditable !== true
-            ? <div className="mt-1 text-sm text-gray-700"><p>Transcript status is unavailable. Refresh transcription status to check whether this transcript can be summarized.</p><button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.loading ? 'Refreshing…' : 'Refresh transcription status'}</button></div>
+            ? <p className="mt-1 text-sm text-gray-700">Transcript status is unavailable. Use Refresh in Recording setup to check whether this transcript can be summarized.</p>
             : !artifact.presentationEnd
-            ? <div className="mt-1 text-sm text-gray-700"><p>Confirm where the presentation ends before generating the presentation transcript and summary.</p><button type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.savedDraft ? 'Continue editing presentation end' : 'Set end to enable summary'}</button></div>
+            ? <div className="mt-1 text-sm text-gray-700"><p>Confirm where the presentation ends before generating the presentation transcript and summary.</p><Button size="sm" variant="outline" type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy) || t.newerTranscriptPending} className="mt-2">{t.savedDraft ? 'Continue editing presentation end' : 'Set end to enable summary'}</Button>{t.newerTranscriptPending && <p className="mt-1 text-xs text-gray-600">Wait for the newer transcript before setting the end.</p>}</div>
             : <p className="mt-1 text-sm text-gray-700">Generate the presentation transcript before summarizing it.</p>)}
-      {summaryCurrent && t.summary?.lastFailure && !draft && <p className="mt-1 text-sm text-gray-700">The last summary attempt did not produce a draft.</p>}
-      {t.summaryConflict && (
+      {failed && <p className="mt-1 text-sm text-gray-700">The last summary attempt did not produce a draft.</p>}
+      {requestValid && <SummarizeConfirm t={t} kinds={mine.kinds} valid={requestValid} onClose={() => setRequest(null)} />}
+      {s.summaryConflict && (
         <div className="mt-3" data-testid="summary-draft-conflict">
           <Notice tone="warning">This draft is no longer current. Your edits are preserved below, but they are not a current server draft. Load latest to replace these edits with the current server state.</Notice>
-          <label htmlFor="presentation-summary-recovery-text" className="mt-2 block text-sm font-medium text-gray-900">Preserved unsaved edits</label>
-          <textarea id="presentation-summary-recovery-text" rows={14} className={`${INPUT} font-mono`} value={t.summaryConflict.text} readOnly />
-          <button type="button" onClick={() => void t.loadSummary({ replaceText: true })}
-            disabled={Boolean(t.busy) || t.summaryReadState === 'loading'} className={`mt-2 ${BTN}`}>Load latest</button>
+          <label htmlFor={`${kind}-summary-recovery-text`} className="mt-2 block text-sm font-medium text-gray-900">Preserved unsaved edits</label>
+          <textarea id={`${kind}-summary-recovery-text`} rows={14} className={`${INPUT} font-mono`} value={s.summaryConflict.text} readOnly />
+          <Button size="sm" variant="outline" type="button" onClick={() => void s.loadSummary({ replaceText: true })}
+            disabled={Boolean(t.busy) || s.summaryReadState === 'loading'} className="mt-2">Load latest</Button>
         </div>
       )}
-      {draft && !t.summaryConflict && (
+      {draft && !s.summaryConflict && (
         <div className="mt-3">
-          {!summaryCurrent ? <Notice tone="info">Checking whether this draft matches the current transcript.</Notice> : !t.summary?.draftMatchesTranscript && (
+          {!summaryCurrent ? <Notice tone="info">Checking whether this draft matches the current transcript.</Notice> : !s.summary?.draftMatchesTranscript && (
             <Notice tone="warning">This draft was made from an earlier transcript version or presentation end. Summarize again before publishing.</Notice>
           )}
-          <label htmlFor="presentation-summary-text" className="mt-2 block text-sm font-medium text-gray-900">
-            Draft{draft.edited ? ' (edited)' : ''} · expires {fmtDateTime(draft.expiresAt)}
+          <label htmlFor={`${kind}-summary-text`} className="mt-2 block text-sm font-medium text-gray-900">
+            {copy.draftLabel}{draft.edited ? ' (edited)' : ''} · expires {fmtDateTime(draft.expiresAt)}
           </label>
           {draft.state === 'publishing' && (
             <>
               <Notice tone="warning">Publishing this draft did not finish. Publish it again to complete it, or summarize again to start over. It cannot be edited or discarded.</Notice>
-              {t.summaryLocalTextPending && <Notice tone="warning">The text shown includes unsaved edits, but this draft is already publishing and cannot include them. Publishing again uses its saved version; summarize again to replace it.</Notice>}
+              {s.summaryLocalTextPending && <Notice tone="warning">The text shown includes unsaved edits, but this draft is already publishing and cannot include them. Publishing again uses its saved version; summarize again to replace it.</Notice>}
             </>
           )}
-          <textarea id="presentation-summary-text" rows={14} className={`${INPUT} font-mono`} value={t.summaryText}
+          <textarea id={`${kind}-summary-text`} rows={14} className={`${INPUT} font-mono`} value={s.summaryText}
             maxLength={SUMMARY_TEXT_MAX_CHARS} disabled={Boolean(t.busy) || draft.state !== 'ready'}
-            onChange={(event) => t.setSummaryText(event.target.value)} />
+            onChange={(event) => s.setSummaryText(event.target.value)} />
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button type="button" onClick={t.publishSummaryDraft} className={BTN_PRIMARY}
-              disabled={Boolean(t.busy) || !summaryCurrent || !t.summary?.draftMatchesTranscript || !t.summaryText.trim()}>
-              {t.busy === 'summary-publish' ? 'Publishing…' : 'Publish summary'}
-            </button>
+            <Button size="sm" variant="primary" type="button" onClick={s.publishSummaryDraft} 
+              disabled={Boolean(t.busy) || !summaryCurrent || !s.summary?.draftMatchesTranscript || !s.summaryText.trim()}>
+              {t.busy === busyKeys.publish ? 'Publishing…' : 'Publish summary'}
+            </Button>
             {draft.state === 'ready' && <>
-              <button type="button" onClick={() => void t.saveSummaryDraft()} className={BTN} disabled={Boolean(t.busy) || !t.summaryDirty || !t.summaryText.trim()}>
-                {t.busy === 'summary-save' ? 'Saving…' : 'Save draft'}
-              </button>
-              <button type="button" onClick={t.discardSummaryDraft} className={BTN_LINK} disabled={Boolean(t.busy)}>
-                {t.busy === 'summary-discard' ? 'Discarding…' : 'Discard draft'}
+              <Button size="sm" variant="outline" type="button" onClick={() => void s.saveSummaryDraft()}  disabled={Boolean(t.busy) || !s.summaryDirty || !s.summaryText.trim()}>
+                {t.busy === busyKeys.save ? 'Saving…' : 'Save draft'}
+              </Button>
+              <button type="button" onClick={s.discardSummaryDraft} className={BTN_LINK} disabled={Boolean(t.busy)}>
+                {t.busy === busyKeys.discard ? 'Discarding…' : 'Discard draft'}
               </button>
             </>}
           </div>
         </div>
       )}
-      {summarizeForm}
-      {t.summaryError && <div className="mt-3"><Notice>{t.summaryError}</Notice></div>}
-      {t.summaryNotice && <div className="mt-3"><Notice tone="success">{t.summaryNotice}</Notice></div>}
+      {s.summaryError && <div className="mt-3"><Notice>{s.summaryError}</Notice></div>}
+      {s.summaryNotice && <div className="mt-3"><Notice tone="success">{s.summaryNotice}</Notice></div>}
+    </ArtifactRow>
+  );
+}
+
+function fmtPacific(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Unknown time';
+  return `${date.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} PT`;
+}
+
+function videoPickerLine(video, copy) {
+  if (!video) return 'Video: none yet';
+  if (video.tooLarge) return 'Video: too large to copy. Upload it manually.';
+  if (video.segmented) return 'Video: recorded in several parts. Upload it manually.';
+  if (!copy) return 'Video: not copied';
+  if (copy.state === 'queued') return 'Video: waiting to copy';
+  if (copy.state === 'copying') return copy.declaredSize > 0 ? `Video: copying ${megabytes(copy.bytesConfirmed)} of ${megabytes(copy.declaredSize)}` : 'Video: copying';
+  if (copy.state === 'registering') return 'Video: saving';
+  if (copy.state === 'copied') return 'Video: copied';
+  if (copy.state === 'failed') return 'Video: copy failed';
+  if (copy.state === 'cancelled') return 'Video: cancelled';
+  return 'Video: not copied';
+}
+
+// Decision 8: the copy replaces a recording file already saved for this request, so staff confirm first. The file's
+// name and size come from the server; its internal identity is only sent back as `replaces`.
+function ReplaceConfirm({ z }) {
+  const winner = z.confirm?.winner;
+  // It opens in the clicked row; focus moves to it so the click visibly did something (queue: off-screen confirmation).
+  const ref = useRef(null);
+  useEffect(() => {
+    ref.current?.focus();
+    ref.current?.scrollIntoView?.({ block: 'nearest' });
+  }, []);
+  return (
+    <div ref={ref} tabIndex={-1} className="mt-3 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600" role="alertdialog" aria-label="Replace the current recording">
+      <p>This will replace the recording file already saved for this request. Continue?</p>
+      {winner?.filename && <p className="mt-1 text-xs">Current file: {winner.filename}{Number(winner.size) > 0 ? ` (${formatBytes(winner.size)})` : ''}</p>}
+      <div className="mt-2 flex gap-2">
+        <Button size="sm" variant="primary" type="button" onClick={() => void z.confirmReplace()} disabled={z.busy || z.videoBusy}>Replace and continue</Button>
+        <Button size="sm" variant="outline" type="button" onClick={() => void z.declineReplace()} disabled={z.busy || z.videoBusy}>Keep current file</Button>
+      </div>
     </div>
   );
 }
 
-function TranscriptBlock({ m, t, transcriptInputRef }) {
-  const [openForm, setOpenForm] = useState(null);
-  const material = (m.data?.materials || []).find((item) => Number(item.artifactType) === REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT) || null;
+// Copy progress for the Recording slot. Staff-only; no internal ids are shown.
+function VideoCopyStatus({ z }) {
+  const copy = z.currentCopy;
+  const message = z.videoMessage?.origin === 'block' ? z.videoMessage : null;
+  if (!z.copyAvailable || (!copy && !message && !z.confirm)) return null;
+  const active = copy && COPY_ACTIVE_STATES.has(copy.state);
+  return (
+    <div className="mt-4" data-testid="video-copy-status" aria-live="polite">
+      {copy?.state === 'queued' && <p className="text-sm text-gray-800">Waiting to copy the video from Zoom.</p>}
+      {copy?.state === 'copying' && <>
+        <p className="text-sm text-gray-800">Copying the video from Zoom into SharePoint.</p>
+        <progress className="mt-2 w-full" max="100" value={copyPercent(copy)} aria-label="Video copy progress" />
+        <p className="mt-1 text-xs text-gray-700">{copyPercent(copy)}%{copy.declaredSize > 0 ? ` · ${megabytes(copy.bytesConfirmed)} of ${megabytes(copy.declaredSize)}` : ''}</p>
+      </>}
+      {copy?.state === 'registering' && <p className="text-sm text-gray-800">Saving…</p>}
+      {copy?.state === 'copied' && <p className="text-sm text-gray-800">The video was copied from Zoom.</p>}
+      {copy?.state === 'cancelled' && <p className="text-sm text-gray-800">Video copy cancelled.</p>}
+      {copy?.state === 'failed' && <Notice tone="warning">Video copy needs attention. {videoFailureMessage(copy.failureCode)}</Notice>}
+      {(copy?.state === 'queued' || copy?.state === 'copying') && (copy.cancelRequested
+        ? <p className="mt-1 text-xs text-gray-700">Cancelling…</p>
+        : <button type="button" onClick={() => void z.cancelCopy(copy.id)} disabled={z.videoBusy} className={`mt-2 ${BTN_LINK}`}>Cancel copy</button>)}
+      {copy?.state === 'failed' && copy.meetingUuid && !active
+        && <Button size="sm" variant="outline" type="button" onClick={() => void z.copyVideo(copy.meetingUuid, 'block')} disabled={z.busy || z.videoBusy || z.hasActiveCopy} className="mt-2">Try again</Button>}
+      {z.confirm?.origin === 'block' && <ReplaceConfirm z={z} />}
+      {message && <div className="mt-2"><Notice tone={message.tone === 'error' ? 'error' : 'info'}>{message.text}</Notice></div>}
+    </div>
+  );
+}
+
+function ZoomImportSection({ z, activeJob, transcriptionBusy, hasTranscript }) {
+  if (z.status === 'unavailable') return null;
+  if (z.status === 'idle') {
+    return <button type="button" onClick={z.openPanel} className={`mt-4 ${BTN_LINK}`}>Import from Zoom</button>;
+  }
+  if (z.status === 'loading') return <p className="mt-4 text-sm text-gray-700" aria-live="polite">Loading Zoom recordings…</p>;
+  if (z.status === 'failed') {
+    return (
+      <div className="mt-4 text-sm text-gray-700">
+        <p>Zoom recordings could not be loaded.</p>
+        <button type="button" onClick={z.openPanel} className={`mt-1 ${BTN_LINK}`}>Try again</button>
+      </div>
+    );
+  }
+  const selected = z.meetings.find((item) => item.meetingUuid === z.selectedUuid) || null;
+  const blocked = Boolean(activeJob) || transcriptionBusy;
+  return (
+    <div className="mt-4" data-testid="zoom-import">
+      <h4 className="text-sm font-semibold text-gray-950">Import from Zoom</h4>
+      <p className="mt-1 text-xs text-gray-600">Recordings from the last {z.windowDays} days. Times are Pacific.{z.refreshing ? ' Refreshing…' : ''}</p>
+      {z.meetings.length === 0
+        ? <p className="mt-2 text-sm text-gray-700">No Zoom recordings were found.</p>
+        : <fieldset className="mt-2 space-y-1" disabled={z.busy}>
+          <legend className="sr-only">Zoom meeting</legend>
+          {z.meetings.map((meeting) => {
+            const state = meeting.import?.state || null;
+            const chosen = state === 'started' || state === 'importing';
+            const audioOffered = meeting.audio !== undefined;
+            const hasAudio = Boolean(meeting.audio);
+            const copy = z.copyAvailable && meeting.video !== undefined ? z.copyForMeeting(meeting) : null;
+            const detail = [
+              Number.isFinite(meeting.durationMinutes) ? `${meeting.durationMinutes} min` : null,
+              !audioOffered ? null : !hasAudio ? 'No audio yet' : meeting.transcript ? 'Audio + Zoom transcript' : 'Audio only',
+              state === 'started' ? (meeting.import?.transcriptReady ? 'Imported, transcript ready' : 'Imported, transcribing…') : state === 'importing' ? 'Importing…'
+                : state === 'failed' ? (meeting.import?.failureCode === 'zoom_import_job_ended' ? 'Last transcription did not finish' : 'Last import did not finish') : null,
+            ].filter(Boolean).join(' · ');
+            const videoLine = !z.copyAvailable || meeting.video === undefined ? null : videoPickerLine(meeting.video, copy);
+            const id = `zoom-meeting-${meeting.meetingUuid}`;
+            // Import covers the video for a meeting staff can still import, unless the request already has a
+            // transcript: then Copy video is offered on its own so staff need not re-import and re-transcribe.
+            const ownButton = z.videoStartable(meeting) && (hasTranscript || !(hasAudio && !chosen));
+            return (
+              // One box per recording: the radio (which recording to import) and that recording's own video action
+              // and replace confirmation sit inside it, so nothing reads as belonging to the next row.
+              <div key={meeting.meetingUuid} data-testid="zoom-meeting-row" className={`rounded-lg border border-gray-200 px-3 py-2 text-sm ${hasAudio && !chosen ? 'bg-white' : 'bg-gray-50 text-gray-600'}`}>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <label htmlFor={id} className={`flex min-w-0 flex-1 items-start gap-2 ${hasAudio && !chosen ? 'cursor-pointer' : ''}`}>
+                    <input id={id} type="radio" name="zoom-meeting" checked={z.selectedUuid === meeting.meetingUuid} disabled={!hasAudio || chosen || z.busy}
+                      onChange={() => z.setSelectedUuid(meeting.meetingUuid)} className="mt-1 h-4 w-4 border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-600" />
+                    <span><span className="font-medium text-gray-900">{fmtPacific(meeting.startTime)}</span><span className="block text-xs text-gray-700">{detail}</span>
+                      {videoLine && <span className="block text-xs text-gray-700">{videoLine}</span>}</span>
+                  </label>
+                  {ownButton && (
+                    <Button size="sm" variant="outline" type="button" onClick={() => void z.copyVideo(meeting.meetingUuid, 'picker')} disabled={z.busy || z.videoBusy}>
+                      {copy?.state === 'failed' ? 'Try again' : 'Copy video'}<span className="sr-only"> from {fmtPacific(meeting.startTime)}</span>
+                    </Button>
+                  )}
+                </div>
+                {z.confirm?.origin === 'picker' && z.confirm.meetingUuid === meeting.meetingUuid && <ReplaceConfirm z={z} />}
+              </div>
+            );
+          })}
+        </fieldset>}
+      {z.confirm?.origin === 'picker' && !z.meetings.some((meeting) => meeting.meetingUuid === z.confirm.meetingUuid) && <ReplaceConfirm z={z} />}
+      {z.videoMessage?.origin === 'picker' && <div className="mt-3"><Notice tone={z.videoMessage.tone === 'error' ? 'error' : 'info'}>{z.videoMessage.text}</Notice></div>}
+      {selected && <>
+        <label className="mt-3 flex items-start gap-2 text-xs leading-5 text-gray-800">
+          <input type="checkbox" checked={z.acknowledged} disabled={z.busy} onChange={(event) => z.setAcknowledged(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-600" />
+          <span>This recording is non-sensitive and may be sent to our transcription provider.{selected.transcript ? ' Excerpts of both transcripts are also sent to Anthropic to match speaker names.' : ''} Transcription uses paid credits.</span>
+        </label>
+        <Button size="sm" variant="primary" type="button" onClick={z.importSelected} disabled={!z.acknowledged || z.busy || z.videoBusy || Boolean(z.confirm) || blocked} className="mt-3">{z.busy ? 'Importing from Zoom…' : z.videoStartable(selected) ? 'Import, transcribe and copy video' : 'Import and transcribe'}</Button>
+        {z.videoStartable(selected) && !z.busy && <p className="mt-2 text-xs text-gray-600">The video will also be copied from Zoom into SharePoint. This can take several minutes.</p>}
+        {blocked && !z.busy && <p className="mt-2 text-xs text-gray-600">Another transcription is already running. Wait for it to finish.</p>}
+      </>}
+      {z.busy && <p className="mt-2 text-xs text-gray-700" aria-live="polite">Copying the recording from Zoom. This can take a few minutes. Keep this page open.</p>}
+      {z.error && <div className="mt-3"><Notice>{z.error}</Notice></div>}
+    </div>
+  );
+}
+
+// A finished step collapses to one line: title, check, a short summary and a "…" menu (Finished-Work Rule).
+function Step({ number, title, state, action, summary = null, menuItems = [], testId, children }) {
+  const done = state === 'done';
+  const current = state === 'current';
+  const marker = done ? 'bg-green-700 text-white' : current ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-600';
+  return (
+    <section className={`mt-4 rounded-lg border p-4 ${current ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-50'}`} data-testid={testId} data-step-state={state} aria-labelledby={`${testId}-title`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 id={`${testId}-title`} className={`flex items-center gap-2 text-base font-semibold ${state === 'waiting' ? 'text-gray-600' : 'text-gray-950'}`}>
+          <span aria-hidden="true" className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs ${marker}`}>{done ? '✓' : number}</span>
+          {title}
+          {done && <span className="sr-only"> (done)</span>}
+        </h3>
+        {summary && <div className="min-w-0 flex-1 text-sm text-gray-700">{summary}</div>}
+        <div className="flex items-center gap-2">
+          {action}
+          <OverflowMenu label={`More actions for ${String(title).toLowerCase()}`} items={menuItems} />
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+// A presentation or staff discussion transcript cut from the published transcript at the confirmed end.
+const DERIVATIVE_STATUS = Object.freeze({
+  bound: { tone: 'green', label: 'Ready' },
+  stale: { tone: 'amber', label: 'Out of date' },
+  missing: { tone: 'gray', label: 'Not made yet' },
+});
+function DerivativeRow({ state, label, material, testId, action = null, needsEnd = false }) {
+  const url = state === 'bound' && material ? safeMaterialUrl(material) : null;
+  const status = DERIVATIVE_STATUS[state] || { tone: 'gray', label: 'Not available' };
+  const pending = state === 'stale' || state === 'missing';
+  const detail = state === 'bound' ? fmtDateTime(material?.createdAt)
+    : pending && needsEnd ? 'Confirm the presentation end in step 2'
+        : state === 'stale' ? 'Made from an earlier transcript' : null;
+  return <ArtifactRow name={label} href={url} status={status} detail={detail} action={action} testId={testId} />;
+}
+
+// Stage 4 slice 5: the Video line under Presentation. Hidden when the feature is off for this request. Staff only; ids
+// and raw codes are never rendered (the id only appears in the Open link target).
+const PV_POLL_MS = 15_000;
+// The splits GET returns a request's most recent splits up to this many (presentation-video-split-service LIST_LIMIT),
+// unfiltered. Fewer than this is the whole history.
+const PV_SERVER_LIST_LIMIT = 10;
+const PV_PROCESSING = new Set(['queued', 'cutting', 'uploading', 'registering']);
+const PV_STALE_TEXT = 'The transcript or video changed. Create it again.';
+const PV_FAILURE_TEXT = Object.freeze({
+  unsupported_timeline: 'This recording’s timing can’t be cut safely (it has gaps or shifted tracks).',
+  insufficient_scratch: 'The recording was too large to cut. Ask for help if this keeps happening.',
+  source_download_failed: 'The recording could not be downloaded to cut it. Try again.',
+  upload_failed: 'The cut video could not be saved. Try again.',
+  presentation_video_source_changed: PV_STALE_TEXT,
+  presentation_video_transcript_changed: PV_STALE_TEXT,
+  presentation_video_approval_stale: PV_STALE_TEXT,
+});
+const PV_IN_PROGRESS_TEXT = 'Approval is still in progress. Try again in a few minutes.';
+const PV_GENERIC_FAILURE = 'Something went wrong. Try again.';
+const PV_REASON_TEXT = (code) => PV_FAILURE_TEXT[code] || PV_GENERIC_FAILURE;
+
+// The presentation video's state, shared by its row in the Presentation card and the Board materials readiness list,
+// so both read one fetch. Loads only once the card shows its products (`enabled`).
+function usePresentationVideo(requestId, { enabled = true, revisionKey = '', refreshToken = 0 } = {}) {
+  const path = `${API_PATH}/${encodeURIComponent(requestId || '')}/presentation-video-splits`;
+  const [available, setAvailable] = useState(false);
+  const [splits, setSplits] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState(null);
+  // { kind: 'approve' | 'recreate', splitId } — bound to the video it was opened for, so a refresh that brings in a
+  // different video closes it instead of approving one nobody checked (Codex whole-branch review).
+  const [confirming, setConfirming] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  // The transcript revision the last successful read was made for. The Board serves an approved video only for the
+  // current revision, so a status read for an earlier one is not evidence about now (Codex review, four-card commit).
+  const [loadedKey, setLoadedKey] = useState(null);
+  // What the Board serves now ('bound' | 'missing' | 'stale' | 'unknown'), from the server's aggregate check. An older
+  // approved video stays on the Board while a newer one is made, so the newest split alone cannot answer this.
+  const [boardStatus, setBoardStatus] = useState(null);
+  const [historyComplete, setHistoryComplete] = useState(false);
+  const mountedRef = useRef(true);
+  const sequenceRef = useRef(0);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
+
+  const load = useCallback(async () => {
+    if (!requestId || !enabled) return;
+    const sequence = ++sequenceRef.current;
+    try {
+      const body = await requestJson(path, { method: 'GET', fallbackMessage: 'The presentation video could not be loaded.' });
+      if (!mountedRef.current || sequenceRef.current !== sequence) return;
+      const rows = body?.available === true && Array.isArray(body.splits)
+        ? body.splits.filter((s) => s && typeof s.id === 'string' && typeof s.state === 'string')
+          .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))) : [];
+      setAvailable(body?.available === true && Array.isArray(body.splits));
+      setSplits(rows);
+      setLoaded(true);
+      setLoadFailed(false);
+      setLoadedKey(revisionKey);
+      setBoardStatus(typeof body?.boardVideo?.status === 'string' ? body.boardVideo.status : null);
+      setHistoryComplete(Array.isArray(body?.splits) && body.splits.length < PV_SERVER_LIST_LIMIT);
+    } catch {
+      // Keep what is shown; the interval below keeps retrying.
+      if (mountedRef.current && sequenceRef.current === sequence) setLoadFailed(true);
+    }
+  }, [path, requestId, enabled, revisionKey]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
+    // A changed transcript or boundary can make an approved video stale, so look again without a reload; the card's
+    // Refresh also bumps refreshToken.
+  }, [load, revisionKey, refreshToken]);
+  const newest = splits[0] || null;
+  const processing = splits.some((s) => PV_PROCESSING.has(s.state));
+  useEffect(() => {
+    if (!processing && !loadFailed) return undefined;
+    const timer = setInterval(() => { void load(); }, PV_POLL_MS);
+    return () => clearInterval(timer);
+  }, [processing, loadFailed, load]);
+
+  const post = async (body, fallbackMessage) => {
+    setBusy(true); setMessage(null); setConfirming(null);
+    try {
+      const result = await requestJson(path, { method: 'POST', body, fallbackMessage });
+      if (!mountedRef.current) return;
+      // Show the server's answer now, so a failed refresh cannot hide it (and staff do not start a second cut).
+      const row = result?.split;
+      if (row && typeof row.id === 'string' && typeof row.state === 'string') {
+        setSplits((old) => {
+          const known = old.find((item) => item.id === row.id);
+          const next = { createdAt: new Date().toISOString(), failureCode: null, ...known, id: row.id, state: row.state };
+          return [next, ...old.filter((item) => item.id !== row.id)];
+        });
+        setLoaded(true); setAvailable(true);
+      }
+      await load();
+    } catch (error) {
+      if (!mountedRef.current) return;
+      const code = error?.payload?.code;
+      const stale = code === 'presentation_video_approval_stale';
+      const inProgress = code === 'presentation_video_approval_in_progress';
+      setMessage({ tone: stale || inProgress ? 'warning' : 'error', text: stale ? PV_STALE_TEXT : inProgress ? PV_IN_PROGRESS_TEXT : (error?.message || fallbackMessage) });
+      await load();
+    } finally {
+      if (mountedRef.current) setBusy(false);
+    }
+  };
+  const create = () => post({ action: 'start' }, 'The presentation video could not be started. Try again.');
+  const approve = (splitId) => post({ action: 'approve', splitId }, 'The video could not be approved. Try again.');
+  const newestState = newest?.state || null;
+  const confirmTargetLive = Boolean(confirming) && confirming.splitId === (newest?.id || null)
+    && (confirming.kind === 'approve' ? newestState === 'review'
+      : newestState === 'review' || (newestState === 'approved' && newest?.boardReady !== false));
+  // A stale confirmation is never rendered (it shows only while it matches the newest video in a confirmable state).
+  return {
+    path, available, newest, processing, busy, message, confirming, setConfirming, loaded, loadFailed,
+    load, create, approve, confirmTargetLive,
+    // True only while the shown status was read successfully for the current transcript revision.
+    statusCurrent: loaded && !loadFailed && loadedKey === revisionKey,
+    boardStatus, historyComplete,
+  };
+}
+
+function PresentationVideoLine({ v }) {
+  const {
+    path, available, newest, processing, busy, message, confirming, setConfirming, loaded, loadFailed,
+    load, create, approve, confirmTargetLive,
+  } = v;
+  if (!loaded && loadFailed) {
+    return (
+      <ArtifactRow name="Presentation video" status={{ tone: 'gray', label: 'Not loaded' }} detail="Couldn’t load the video status." testId="presentation-video-line"
+        action={<Button size="sm" variant="outline" type="button" onClick={() => void load()}>Retry</Button>} />
+    );
+  }
+  if (!available) return null;
+  const state = newest?.state || null;
+  const openHref = newest ? `${path}/${encodeURIComponent(newest.id)}/open` : null;
+  // A video waiting for its check can be replaced (the server supersedes it), e.g. after fixing the presentation end.
+  const canCreate = !processing;
+  // An approved video the Board no longer serves (transcript, end or recording changed since) is out of date.
+  const boardStale = state === 'approved' && newest.boardReady === false;
+  let status = { tone: 'gray', label: 'Not made yet' };
+  if (state === 'queued' || state === 'cutting' || state === 'uploading') status = { tone: 'gray', label: 'Working…' };
+  else if (state === 'review') status = { tone: 'blue', label: 'Ready to check' };
+  else if (state === 'registering') status = { tone: 'gray', label: 'Approving…' };
+  else if (state === 'approved') status = boardStale ? { tone: 'amber', label: 'Out of date' } : { tone: 'green', label: 'Approved' };
+  else if (state === 'superseded') status = { tone: 'amber', label: 'Out of date' };
+  else if (state === 'failed') status = { tone: 'red', label: 'Failed' };
+  const current = state === 'review' || (state === 'approved' && !boardStale);
+  // A current video is replaced from the menu (behind a confirmation); anything else offers creation inline.
+  const createLabel = state === 'review' ? 'Create it again' : 'Create presentation video';
+  const startCreate = () => (current ? setConfirming({ kind: 'recreate', splitId: newest?.id || null }) : void create());
+  const action = state === 'review'
+    ? <Button size="sm" variant="outline" type="button" onClick={() => setConfirming({ kind: 'approve', splitId: newest.id })} disabled={busy}>Check the ending and approve</Button>
+    : state === 'registering'
+      ? <Button size="sm" variant="outline" type="button" onClick={() => void approve(newest.id)} disabled={busy}>{busy ? 'Working…' : 'Finish approving'}</Button>
+      : canCreate && !current
+        ? <Button size="sm" variant="outline" type="button" onClick={startCreate} disabled={busy}>{busy ? 'Working…' : createLabel}</Button>
+        : null;
+  const menuItems = canCreate && current ? [{ key: 'recreate', label: createLabel, disabled: busy, onSelect: startCreate }] : [];
+  const detail = state === 'approved' && newest.boardReady == null ? 'Couldn’t check the Board status.' : null;
+  return (
+    <ArtifactRow name="Presentation video" href={current ? openHref : null} status={status} detail={detail} action={action} menuItems={menuItems} testId="presentation-video-line">
+      <div aria-live="polite">
+        {loadFailed && <p className="mt-1 text-xs text-gray-700">Couldn’t refresh the video status. Retrying…</p>}
+        {(boardStale || state === 'superseded') && <p className="mt-1 text-sm text-gray-700">{PV_STALE_TEXT}</p>}
+        {state === 'failed' && <p className="mt-1 text-sm text-gray-700">{PV_REASON_TEXT(newest.failureCode)}</p>}
+      </div>
+      {confirmTargetLive && confirming.kind === 'approve' && (
+        <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="alertdialog" aria-label="Approve the presentation video">
+          <p>Approve this video for the Board? Board members will be able to watch it.</p>
+          <div className="mt-2 flex gap-2">
+            <Button size="sm" variant="primary" type="button" onClick={() => void approve(confirming.splitId)} disabled={busy}>Approve video</Button>
+            <Button size="sm" variant="outline" type="button" onClick={() => setConfirming(null)} disabled={busy}>Not yet</Button>
+          </div>
+        </div>
+      )}
+      {confirmTargetLive && confirming.kind === 'recreate' && (
+        <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="alertdialog" aria-label="Create the presentation video again">
+          <p>{state === 'review' ? 'This discards the video waiting for your check and makes a new one.' : 'This replaces the approved video once the new one is approved.'}</p>
+          <div className="mt-2 flex gap-2">
+            <Button size="sm" variant="primary" type="button" onClick={() => void create()} disabled={busy}>Create again</Button>
+            <Button size="sm" variant="outline" type="button" onClick={() => setConfirming(null)} disabled={busy}>Keep current video</Button>
+          </div>
+        </div>
+      )}
+      {message && <div className="mt-2"><Notice tone={message.tone}>{message.text}</Notice></div>}
+    </ArtifactRow>
+  );
+}
+
+function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshToken = 0, shell, setupHeader }) {
+  const [step1Open, setStep1Open] = useState(false);
+  const [uploadInstead, setUploadInstead] = useState(false);
+  const [summarizeRequest, setSummarizeRequest] = useState(null); // { kinds, anchor } while a Summarize confirmation is open
+  const materials = m.data?.materials || [];
+  const byType = (type) => materials.find((item) => Number(item.artifactType) === type) || null;
+  const material = byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT);
+  const recording = byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING);
   const line = describeCurrentTranscript({ material, collection: t.collection });
   const artifact = t.collection?.currentArtifact;
   const generated = line.kind === 'generated';
   const openUrl = material ? safeMaterialUrl(material) : null;
   const featureEnabled = t.collection?.featureState === 'enabled';
   const generateReason = !t.collection ? 'Not available right now' : !featureEnabled ? 'Not enabled for this request' : null;
-  const active = t.jobs.find((job) => ACTIVE_STATUSES.has(job.status)) || null;
+  // Only queued or running work blocks step 1. A stranded 'uploading' job (failed import or abandoned upload) never
+  // does; it only shows progress while this browser is uploading and the job is not retired or past its window.
+  const active = t.jobs.find((job) => BLOCKING_STATUSES.has(job.status) && !isCancelledRun(job)) || null;
+  const uploadingHere = ['upload', 'upload-captions', 'starting'].includes(t.busy)
+    ? t.jobs.find((job) => job.status === 'uploading' && !isRetiredUploading(job)) || null : null;
+  const progressJob = active || uploadingHere;
   const editing = Boolean(t.correction);
-  const showBoundary = generated && Boolean(artifact?.bundleEditable) && !editing;
   const presentationEnd = artifact?.presentationEnd && Number.isSafeInteger(artifact.presentationEnd.endMs) ? artifact.presentationEnd : null;
   const boundaryState = artifact?.presentationTranscript?.state;
   const discussionState = artifact?.staffDiscussionTranscript?.state;
   const needsGenerate = ['missing', 'stale'].includes(boundaryState) || ['missing', 'stale'].includes(discussionState);
   const reviewOpen = editing || Boolean(t.showReview && t.focusJob && !ACTIVE_STATUSES.has(t.focusJob.status));
-  const toggle = (form) => setOpenForm((value) => (value === form ? null : form));
+  const readyForReview = !editing && reviewOpen && t.focusJob?.status === 'ready';
+  const editable = generated && Boolean(artifact?.bundleEditable);
+
+  // Step 1 stays open while anything in it is in progress, so a chosen file or a running upload never disappears.
+  const step1Working = Boolean(active || m.transfer || (m.data?.uploads || []).length || m.file || m.busyUploadId || m.recoveryBusyId
+    || m.zoomBusy || m.transcriptFile || m.transcriptStagedId || m.transcriptBusy || t.audioFile || t.vttFile
+    || z.busy || z.videoBusy || z.hasActiveCopy || t.uploadProgress !== null || t.confirmNoVtt || ['upload', 'upload-captions', 'starting'].includes(t.busy));
+  const step1Done = Boolean(material || readyForReview) && !step1Working;
+  const step1Expanded = !step1Done || step1Open;
+  // Generating the split transcripts is a Presentation card action, so step 2 is done once the end is confirmed.
+  const step2State = reviewOpen || (editable && (!presentationEnd || t.savedDraft)) ? 'current'
+    : editable && presentationEnd ? 'done' : 'waiting';
+  const step2Collapsed = step2State === 'done' && !reviewOpen && !editing;
+  // While a newer transcription is running or waiting to be checked, the published transcript's edit actions would
+  // open the older transcript, so they are disabled with the reason (queue: "Old-transcript edit buttons look current").
+  const newerPending = t.newerTranscriptPending;
+  const editBlocked = Boolean(t.busy) || newerPending;
+  const pendingSuffix = newerPending ? ' · wait for the newer transcript' : '';
+  const canGenerate = editable && Boolean(presentationEnd) && !editing;
+  const generateAnchor = !canGenerate ? null : ['missing', 'stale'].includes(boundaryState) ? 'presentation'
+    : ['missing', 'stale'].includes(discussionState) ? 'discussion' : null;
+  const generateButton = <Button size="sm" variant="outline" type="button" onClick={t.generatePresentationTranscript} disabled={Boolean(t.busy)}>{t.busy === 'presentation-transcript' ? 'Generating…' : 'Generate transcripts'}</Button>;
+  const presentationEndText = presentationEnd
+    ? `Presentation ends at ${formatTranscriptTurnTime(presentationEnd.endMs)}${presentationEnd.confirmedAt ? ` · confirmed ${fmtDateTime(presentationEnd.confirmedAt)}` : ''}`
+    : null;
+  const presentationMaterial = byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT);
+  const discussionMaterial = byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT);
+  // With no transcript yet there is nothing to report per product, unless something was already made.
+  const showProducts = Boolean(material || presentationMaterial || discussionMaterial
+    || byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY) || t.presentationSummary.summaryDraft || t.presentationSummary.summaryConflict || artifact?.transcriptSummary?.artifactId
+    || byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY) || t.discussionSummary.summaryDraft || t.discussionSummary.summaryConflict
+    || artifact?.staffDiscussionSummary?.artifactId);
+  // The Board serves the approved cut only for the current transcript, presentation end and recording, so a change to
+  // any of them re-reads the video status (the recording part: Codex round 5, four-card commit).
+  // The waiting line stands in for rows only when there are none; when rows show, their own chips say what is missing
+  // or unknown, so the line would contradict them (owner desktop check, 2026-10-11).
+  const resultsWaiting = !(boundaryState === 'bound' || (canGenerate && needsGenerate)) && !showProducts;
+  const video = usePresentationVideo(requestId, {
+    enabled: showProducts, refreshToken,
+    revisionKey: `${artifact?.id || ''}:${artifact?.fingerprint || ''}:${artifact?.presentationEnd?.endMs ?? ''}:${recording?.artifactId || ''}:${recording?.slotVersion ?? ''}`,
+  });
+
+  const manualAdd = <>
+    {!active && <GenerateForm t={t} />}
+    <button type="button" onClick={() => setUploadInstead((value) => !value)} aria-expanded={uploadInstead} className={`mt-3 ${BTN_LINK}`}>Upload a finished transcript instead</button>
+    {uploadInstead && <UploadForm m={m} inputRef={transcriptInputRef} />}
+  </>;
+  const recordingBlock = <div className="mt-5 border-t border-gray-200 pt-4"><RecordingBlock m={m} z={z} /></div>;
+  const recordingSummary = (
+    <p className="min-w-0">
+      <span data-testid="current-transcript-line">{line.text}</span>
+      <span aria-hidden="true" className="text-gray-400"> · </span>
+      <span data-testid="current-recording-line">
+        {recording
+          ? `${recording.backing === 'external' ? 'Zoom recording link' : 'MP4 recording'}${recording.createdAt ? ` · added ${fmtDateTime(recording.createdAt)}` : ''}`
+          : 'No recording yet'}
+      </span>
+    </p>
+  );
+
   return (
-    <section className="mt-6 border-t border-gray-200 pt-5" aria-labelledby="recording-transcript-transcript-title">
-      <h3 id="recording-transcript-transcript-title" className="text-base font-semibold text-gray-950">Transcript</h3>
-      <p className="mt-2 text-sm leading-6 text-gray-900" data-testid="current-transcript-line">{line.text}</p>
-      {generated && !editing && t.savedDraft && <p className="mt-1 text-xs text-gray-600">Unpublished name edits saved {fmtDateTime(t.savedDraft.createdAt)}</p>}
-      {line.kind === 'uploaded' && <p className="mt-1 text-xs text-gray-600">Uploaded file · speaker names cannot be edited here.</p>}
-      {material && <div className="mt-2 flex flex-wrap items-center gap-2">
-        {generated && artifact && <>
-          <a className={BTN} href={`${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=txt`}>Download TXT</a>
-          <a className={BTN} href={`${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=vtt`}>Download VTT</a>
-          {!editing && <button type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy)} className={BTN}>{t.busy === 'create-draft' ? 'Opening…' : t.savedDraft ? 'Continue editing names' : 'Edit speaker names'}</button>}
-        </>}
-        {!generated && openUrl && <a className={BTN} href={openUrl} target="_blank" rel="noopener noreferrer">Open</a>}
-      </div>}
-      {showBoundary && (
-        <div className="mt-3" data-testid="presentation-end-line">
-          {!presentationEnd ? <>
-            <p className="text-sm leading-6 text-gray-900">Presentation end not confirmed. The Board link shows no transcript until a program coordinator confirms where the presentation ends.</p>
-            {!t.savedDraft && <button type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.busy === 'create-draft' ? 'Opening…' : 'Set presentation end'}</button>}
-          </> : <>
-            <p className="text-sm leading-6 text-gray-900">Presentation ends at {formatTranscriptTurnTime(presentationEnd.endMs)}{presentationEnd.confirmedAt ? ` · confirmed ${fmtDateTime(presentationEnd.confirmedAt)}` : ''}</p>
-            <button type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy)} className="mt-2 text-sm font-semibold text-blue-800 underline">{t.savedDraft ? 'Continue editing presentation end' : 'Edit presentation end'}</button>
-            {boundaryState === 'bound' && <p className="mt-1 text-sm text-gray-900">Presentation transcript ready for the Board link.</p>}
-            {discussionState === 'bound' && <p className="mt-1 text-sm text-gray-900">Staff discussion transcript saved for staff.</p>}
-            {needsGenerate && <div className="mt-2">
-              {['missing', 'stale'].includes(boundaryState)
-                ? <Notice tone="warning">The Board link shows no transcript until the presentation transcript is generated.</Notice>
-                : <Notice tone="info">The staff discussion transcript for this presentation end has not been generated.</Notice>}
-              <button type="button" onClick={t.generatePresentationTranscript} disabled={Boolean(t.busy)} className={`mt-2 ${BTN_PRIMARY}`}>{t.busy === 'presentation-transcript' ? 'Generating…' : 'Generate presentation and discussion transcripts'}</button>
-            </div>}
-          </>}
-        </div>
-      )}
-      <SummaryBlock t={t} materials={m.data?.materials || []} />
-      <div className="mt-4 flex flex-wrap items-start gap-3">
-        <button type="button" onClick={() => toggle('upload')} aria-expanded={openForm === 'upload'} className={BTN}>Upload a transcript</button>
-        <div>
-          <button type="button" onClick={() => toggle('generate')} aria-expanded={openForm === 'generate'} disabled={Boolean(generateReason)} className={BTN}>Generate from audio</button>
-          {generateReason && <p className="mt-1 text-xs text-gray-600">{generateReason}</p>}
-        </div>
-      </div>
-      {openForm === 'upload' && <UploadForm m={m} inputRef={transcriptInputRef} />}
-      {openForm === 'generate' && !generateReason && <GenerateForm t={t} />}
-      {t.error && <div className="mt-4"><Notice>{t.error}</Notice></div>}
-      {t.notice && <div className="mt-4"><Notice tone={/could not|did not|still needs/.test(t.notice) ? 'warning' : 'success'}>{t.notice}</Notice></div>}
-      {active && !editing && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-800" aria-live="polite" data-testid="transcript-progress">
-          <p>{PROGRESS_VERBS[active.status]} {displayName(active)}{active.created_at ? ` · started ${fmtTime(active.created_at)}` : ''}</p>
-          <button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={BTN}>{t.loading ? 'Refreshing…' : 'Refresh'}</button>
-        </div>
-      )}
+    <>
+    <section className={shell} data-testid="card-recording-setup" aria-labelledby="recording-transcript-title">
+      {setupHeader}
+      {m.error && <div className="mt-3"><Notice>{m.error}</Notice></div>}
+      {m.notice && <div className="mt-3"><Notice tone="info">{m.notice}</Notice></div>}
+      {t.error && <div className="mt-3"><Notice>{t.error}</Notice></div>}
+      {t.notice && <div className="mt-3"><Notice tone={/could not|did not|still needs/.test(t.notice) ? 'warning' : 'success'}>{t.notice}</Notice></div>}
       {!reviewOpen && t.conflict && (
-        <div className="mt-4" role="alert">
-          <Notice tone="warning">Another session changed this. Refresh to load the latest version.</Notice>
-          <button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.loading ? 'Refreshing…' : 'Refresh'}</button>
+        <div className="mt-3" role="alert">
+          <Notice tone="warning">Another session changed this. Use Refresh above to load the latest version.</Notice>
         </div>
       )}
-      {reviewOpen && <ReviewBlock t={t} />}
       <AttentionBlock t={t} />
+
+      <Step number={1} title="Get the recording" state={step1Done ? 'done' : 'current'} testId="step-recording"
+        summary={step1Done && !step1Open && recordingSummary}
+        action={step1Done && step1Open && <Button size="sm" variant="outline" type="button" onClick={() => setStep1Open(false)} aria-expanded>Close</Button>}
+        menuItems={[
+          // The full meeting transcript is the source of the split transcripts, so it lives with setup (owner,
+          // 2026-10-11), not with the results. It stays reachable while step 1 is open or a replacement is under way.
+          ...(openUrl ? [{ key: 'open-full', label: 'Open full transcript', href: openUrl }] : []),
+          ...(generated && artifact ? [
+            { key: 'txt', label: 'Download full transcript (TXT)', href: `${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=txt`, download: true },
+            { key: 'vtt', label: 'Download full transcript (VTT)', href: `${t.basePath}/materials/${encodeURIComponent(artifact.id)}/download?format=vtt`, download: true },
+          ] : []),
+          ...(step1Done && !step1Open ? [{ key: 'replace', label: 'Replace recording or transcript', onSelect: () => setStep1Open(true) }] : []),
+        ]}>
+        {!(step1Done && !step1Open) && <div className="mt-2 text-sm leading-6 text-gray-900">{recordingSummary}</div>}
+        {generated && !editing && t.savedDraft && <p className="mt-1 text-xs text-gray-600">Unpublished name edits saved {fmtDateTime(t.savedDraft.createdAt)}</p>}
+        {!material && readyForReview && <p className="mt-1 text-sm text-gray-700">A new transcript is ready to check in step 2.</p>}
+        {line.kind === 'uploaded' && <p className="mt-1 text-xs text-gray-600">Uploaded file · speaker names cannot be edited here.</p>}
+        {progressJob && !editing && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-800" aria-live="polite" data-testid="transcript-progress">
+            <p>{isCancellingRun(progressJob) ? 'Cancelling this transcription…' : `${PROGRESS_VERBS[progressJob.status]} ${displayName(progressJob)}${progressJob.created_at ? ` · started ${fmtTime(progressJob.created_at)}` : ''}`}</p>
+            <span className="flex items-center gap-3">
+              {canCancelRun(progressJob) && <button type="button" onClick={() => void t.discardRun(progressJob)} disabled={Boolean(t.busy)} className={BTN_LINK}>{t.busy === 'cancel' ? 'Cancelling…' : 'Cancel this transcription'}</button>}
+            </span>
+          </div>
+        )}
+        {step1Expanded && <>
+          {generateReason
+            ? <>
+              <p className="mt-4 text-sm text-gray-700">Transcribing from audio: <span>{generateReason}</span></p>
+              <UploadForm m={m} inputRef={transcriptInputRef} />
+            </>
+            : <>
+              <ZoomImportSection z={z} activeJob={active} transcriptionBusy={Boolean(t.busy)} hasTranscript={Boolean(material)} />
+              {z.status === 'available'
+                ? <div className="mt-4 border-t border-gray-200 pt-3">
+                  <button type="button" onClick={z.toggleOther} aria-expanded={z.showOther} className={BTN_LINK}>Upload manually</button>
+                  {(z.showOther || z.hasActiveCopy) && <>{manualAdd}{recordingBlock}</>}
+                </div>
+                : <>{manualAdd}{recordingBlock}</>}
+            </>}
+          {generateReason && recordingBlock}
+        </>}
+      </Step>
+
+      <Step number={2} title="Check speaker names and where the presentation ends" state={step2State} testId="step-review"
+        summary={step2Collapsed && <p data-testid="presentation-end-line">{presentationEndText}</p>}
+        menuItems={step2Collapsed ? [
+          { key: 'names', label: `${t.savedDraft ? 'Continue editing names' : 'Edit speaker names'}${pendingSuffix}`, disabled: editBlocked, onSelect: t.beginEditNames },
+          { key: 'end', label: `${t.savedDraft ? 'Continue editing presentation end' : 'Edit presentation end'}${pendingSuffix}`, disabled: editBlocked, onSelect: t.beginEditNames },
+        ] : []}>
+        {reviewOpen && <ReviewBlock t={t} />}
+        {step2Collapsed ? null : editable && !editing ? <>
+            {reviewOpen && <p className="mt-4 border-t border-gray-200 pt-4 text-sm font-semibold text-gray-950">Current published transcript</p>}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="outline" type="button" onClick={t.beginEditNames} disabled={editBlocked}>{t.busy === 'create-draft' ? 'Opening…' : t.savedDraft ? 'Continue editing names' : 'Edit speaker names'}</Button>
+            </div>
+            {newerPending && <p className="mt-1 text-xs text-gray-600">These edit the published transcript. Wait for the newer transcript before editing.</p>}
+            <div className="mt-3" data-testid="presentation-end-line">
+              {!presentationEnd ? <>
+                <p className="text-sm leading-6 text-gray-900">Presentation end not confirmed. The Board link shows no transcript until a program coordinator confirms where the presentation ends.</p>
+                {!t.savedDraft && <Button size="sm" variant="outline" type="button" onClick={t.beginEditNames} disabled={editBlocked} className="mt-2">{t.busy === 'create-draft' ? 'Opening…' : 'Set presentation end'}</Button>}
+              </> : <>
+                <p className="text-sm leading-6 text-gray-900">{presentationEndText}</p>
+                <Button size="sm" variant="outline" type="button" onClick={t.beginEditNames} disabled={editBlocked} className="mt-2">{t.savedDraft ? 'Continue editing presentation end' : 'Edit presentation end'}</Button>
+              </>}
+            </div>
+          </>
+            : !reviewOpen && <p className="mt-2 text-sm text-gray-700">
+              {!material ? 'Waiting for a transcript from step 1.'
+                : line.kind === 'uploaded' ? 'An uploaded transcript file cannot be checked or split here. To name speakers and separate the presentation from the staff discussion, transcribe the meeting audio in step 1.'
+                  : 'Waiting for transcript status.'}
+            </p>}
+      </Step>
+
       <EarlierRuns t={t} />
     </section>
+
+    <section className={shell} data-testid="card-presentation" aria-labelledby="presentation-card-title">
+      <h2 id="presentation-card-title" className="text-lg font-semibold text-gray-950">Presentation</h2>
+      {resultsWaiting && <p className="mt-2 text-sm text-gray-700">The presentation transcript and summary appear here once the presentation end is checked.</p>}
+      {showProducts && (
+        <ul className="mt-3 divide-y divide-gray-100 border-t border-gray-200">
+          <PresentationVideoLine v={video} />
+          <SummaryBlock t={t} s={t.presentationSummary} materials={materials} request={summarizeRequest} setRequest={setSummarizeRequest} />
+          <DerivativeRow state={boundaryState} label="Presentation transcript" material={presentationMaterial} testId="presentation-transcript-row"
+            action={generateAnchor === 'presentation' ? generateButton : null} needsEnd={editable && !presentationEnd} />
+        </ul>
+      )}
+    </section>
+
+    <section className={shell} data-testid="card-staff-discussion" aria-labelledby="staff-discussion-card-title">
+      <h2 id="staff-discussion-card-title" className="text-lg font-semibold text-gray-950">Staff discussion</h2>
+      {resultsWaiting && <p className="mt-2 text-sm text-gray-700">The staff discussion transcript and summary appear here once the presentation end is checked.</p>}
+      {showProducts && (
+        <ul className="mt-3 divide-y divide-gray-100 border-t border-gray-200">
+          <SummaryBlock t={t} s={t.discussionSummary} kind="discussion" materials={materials} request={summarizeRequest} setRequest={setSummarizeRequest} />
+          <DerivativeRow state={discussionState} label="Staff discussion transcript" material={discussionMaterial} testId="discussion-transcript-row"
+            action={generateAnchor === 'discussion' ? generateButton : null} needsEnd={editable && !presentationEnd} />
+        </ul>
+      )}
+    </section>
+
+    <section className={shell} data-testid="card-board-materials" aria-labelledby="board-card-title">
+      <BoardPageHeading m={m} />
+      <BoardReadiness t={t} boundaryState={boundaryState} video={video} hasVideoMaterial={Boolean(byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_VIDEO))} />
+    </section>
+    </>
   );
 }
 
-function RecordingBlock({ m }) {
+// Board materials readiness (owner decision 2026-10-11): one line per presentation item the Board page can show, with
+// whether it is there now. Status only; the actions stay in the Presentation card. Applicant materials are listed by
+// the Applicant materials card and are not repeated here.
+const BOARD_ON = { tone: 'green', label: 'On the Board page' };
+const BOARD_NOT_YET = { tone: 'gray', label: 'Not yet' };
+const BOARD_UNKNOWN = { tone: 'gray', label: 'Status unknown' };
+function BoardReadiness({ t, boundaryState, video, hasVideoMaterial }) {
+  const { summaryStatusCurrent, published } = publishedSummaryOf(t, t.presentationSummary);
+  // Without a current transcript collection (never loaded, or its last refresh failed) both answers are unknown; the
+  // summary read also reports 'not_needed' without one, which is not evidence of absence.
+  const transcript = !t.collectionCurrent ? BOARD_UNKNOWN : boundaryState === 'bound' ? BOARD_ON : BOARD_NOT_YET;
+  const summary = !t.collectionCurrent || !summaryStatusCurrent ? BOARD_UNKNOWN : published?.state === 'bound' ? BOARD_ON : BOARD_NOT_YET;
+  // The server adds boardVideo only when an approved split is among its recent ones, so an absent status proves no
+  // approved video exists only when that list is the whole history; otherwise an older approval may still be served
+  // (Codex rounds 3-4). A Presentation video record among the staff materials also makes absence unproven.
+  const absenceProven = video.historyComplete && !hasVideoMaterial;
+  const videoStatus = !video.loaded ? null
+    : !video.statusCurrent ? BOARD_UNKNOWN
+    : video.boardStatus === 'bound' ? BOARD_ON
+      : video.boardStatus === 'unknown' || (!video.boardStatus && !absenceProven) ? BOARD_UNKNOWN : BOARD_NOT_YET;
+  return (
+    <ul className="mt-3 divide-y divide-gray-100 border-t border-gray-200" data-testid="board-readiness" aria-label="On the Board page">
+      <ArtifactRow name="Presentation transcript" status={transcript} testId="board-readiness-transcript" />
+      <ArtifactRow name="Presentation summary" status={summary} testId="board-readiness-summary" />
+      {video.available && videoStatus && <ArtifactRow name="Presentation video" status={videoStatus} testId="board-readiness-video" />}
+    </ul>
+  );
+}
+
+function RecordingBlock({ m, z }) {
   const [replaceOpen, setReplaceOpen] = useState(false);
   const recording = (m.data?.materials || []).find((item) => Number(item.artifactType) === REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING) || null;
-  const openUrl = recording ? safeMaterialUrl(recording) : null;
   const intents = m.data?.uploads || [];
   const confirmed = m.transfer?.confirmedBytes || 0;
   const inFlight = Math.max(0, (m.transfer?.inFlightBytes || confirmed) - confirmed);
@@ -2400,21 +3583,10 @@ function RecordingBlock({ m }) {
   const showInputs = !recording || replaceOpen || lockedByWork || Boolean(m.file) || intents.length > 0;
   return (
     <section aria-labelledby="recording-transcript-recording-title">
-      <h3 id="recording-transcript-recording-title" className="text-base font-semibold text-gray-950">Recording</h3>
-      <p className="mt-1 text-xs text-gray-600">Zoom link or MP4. Saving a new one replaces the current one.</p>
-      {m.error && <div className="mt-3"><Notice>{m.error}</Notice></div>}
-      {m.notice && <div className="mt-3"><Notice tone="info">{m.notice}</Notice></div>}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-gray-900" data-testid="current-recording-line">
-          {recording
-            ? `${recording.backing === 'external' ? 'Zoom recording link' : 'MP4 recording'}${recording.createdAt ? ` · added ${fmtDateTime(recording.createdAt)}` : ''}`
-            : 'No recording yet'}
-        </p>
-        <div className="flex items-center gap-2">
-          {openUrl && <a href={openUrl} target="_blank" rel="noopener noreferrer" className={BTN}>Open</a>}
-          {recording && !showInputs && <button type="button" onClick={() => setReplaceOpen(true)} className={BTN}>Replace recording</button>}
-        </div>
-      </div>
+      <h4 id="recording-transcript-recording-title" className="text-sm font-semibold text-gray-950">Video recording</h4>
+      <p className="mt-1 text-xs text-gray-600">Zoom link or MP4, kept for staff. Saving a new one replaces the current one.</p>
+      <VideoCopyStatus z={z} />
+      {recording && !showInputs && <Button size="sm" variant="outline" type="button" onClick={() => setReplaceOpen(true)} className="mt-3">Replace recording</Button>}
       {showInputs && <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="recording-transcript-zoom-link" className="block text-xs font-medium text-gray-700">Zoom link (paste the share message if it has a passcode)</label>
@@ -2478,41 +3650,40 @@ function RecordingBlock({ m }) {
   );
 }
 
-function PresentationLinkBlock({ m }) {
+// The Board materials card heading and link actions; what the Board page shows is listed under it (BoardReadiness). The raw URL is
+// never printed; it appears only in the manual-copy field when the clipboard is unavailable.
+function BoardPageHeading({ m }) {
   const { link, linkBusy, linkError, linkCopied, manualCopy, confirmReissue } = m;
+  const expires = link?.expiresAt ? new Date(link.expiresAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : null;
   return (
-    <section className="mt-6 border-t border-gray-200 pt-5" data-testid="presentation-link-controls">
-      <h3 className="text-base font-semibold text-gray-950">Board presentation link</h3>
-      <p className="mt-1 text-xs text-gray-600">This materials-only link does not send email or change recipients.</p>
-      <p className="mt-1 text-xs text-gray-600">The Board page can include applicant materials and current presentation transcript and summary. It excludes the full recording and staff discussion.</p>
-      {!link && <Button type="button" size="sm" className="mt-3" loading={linkBusy} disabled={linkBusy} onClick={() => m.mutateLink('ensure')}>Generate link</Button>}
-      {link && (
-        <>
-          {link.url ? (
-            <>
-              <p className="mt-3 truncate font-mono text-xs text-gray-500" title={link.url}>{link.url}</p>
-              <a className="mt-2 inline-flex text-sm font-semibold text-blue-800 underline" href={link.url} target="_blank" rel="noopener noreferrer">Open Board page</a>
-              {manualCopy && <input aria-label="Presentation link for manual copy" readOnly value={link.url} onFocus={(event) => event.currentTarget.select()} className="mt-2 w-full rounded border border-gray-300 p-2 font-mono text-xs" />}
-              <p className="mt-1 text-xs text-gray-500">Expires {new Date(link.expiresAt).toLocaleDateString()}.</p>
-            </>
-          ) : <p className="mt-2 text-sm text-amber-800">The current link cannot be read. Issue a new link to replace it.</p>}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {link.url && <Button type="button" size="sm" variant="outline" onClick={m.copyLink}>{linkCopied ? 'Copied' : 'Copy link'}</Button>}
-            {!confirmReissue && <Button type="button" size="sm" variant="outline" disabled={linkBusy} onClick={() => m.setConfirmReissue(true)}>Issue new link</Button>}
+    <div data-testid="presentation-link-controls">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <h2 id="board-card-title" className="text-lg font-semibold text-gray-950">Board materials</h2>
+        {link?.url && expires && <span className="text-xs text-gray-600">Link expires {expires}</span>}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {!link && <Button type="button" size="sm" variant="outline" loading={linkBusy} disabled={linkBusy} onClick={() => m.mutateLink('ensure')}>Generate link</Button>}
+          {link?.url && <Button type="button" size="sm" variant="outline" onClick={m.copyLink}>{linkCopied ? 'Copied' : 'Copy link'}</Button>}
+          {link?.url && <a className={BTN} href={link.url} target="_blank" rel="noopener noreferrer">Open Board page</a>}
+          {link && !link.url && !confirmReissue && <Button type="button" size="sm" variant="outline" disabled={linkBusy} onClick={() => m.setConfirmReissue(true)}>Issue new link</Button>}
+          {link?.url && <OverflowMenu label="More actions for the Board link" items={[
+            { key: 'reissue', label: 'Issue new link', disabled: linkBusy || confirmReissue, onSelect: () => m.setConfirmReissue(true) },
+          ]} />}
+        </div>
+      </div>
+      <p className="mt-1 text-xs text-gray-600">The Board page shows the applicant materials and the presentation items below once they are ready, never the full recording or the staff discussion. Making or copying the link sends no email.</p>
+      {link && !link.url && <p className="mt-2 text-sm text-amber-800">The current link cannot be read. Issue a new link to replace it.</p>}
+      {manualCopy && link?.url && <input aria-label="Presentation link for manual copy" readOnly value={link.url} onFocus={(event) => event.currentTarget.select()} className="mt-2 w-full rounded border border-gray-300 p-2 font-mono text-xs" />}
+      {confirmReissue && (
+        <div className="mt-3 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+          <p>The current presentation link will stop working immediately.</p>
+          <div className="mt-2 flex gap-2">
+            <Button type="button" size="sm" loading={linkBusy} disabled={linkBusy} onClick={() => m.mutateLink('reissue')}>Issue new link</Button>
+            <Button type="button" size="sm" variant="outline" disabled={linkBusy} onClick={() => m.setConfirmReissue(false)}>Keep current link</Button>
           </div>
-          {confirmReissue && (
-            <div className="mt-3 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-              <p>The current presentation link will stop working immediately.</p>
-              <div className="mt-2 flex gap-2">
-                <Button type="button" size="sm" loading={linkBusy} disabled={linkBusy} onClick={() => m.mutateLink('reissue')}>Issue new link</Button>
-                <Button type="button" size="sm" variant="outline" disabled={linkBusy} onClick={() => m.setConfirmReissue(false)}>Keep current link</Button>
-              </div>
-            </div>
-          )}
-        </>
+        </div>
       )}
       {linkError && <p role="alert" className="mt-2 text-sm text-red-700">{linkError}</p>}
-    </section>
+    </div>
   );
 }
 
@@ -2520,7 +3691,10 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
   const transcriptInputRef = useRef(null);
   const hashScrollDoneRef = useRef(false);
   const m = useMaterials(requestId, transcriptInputRef);
-  const t = useTranscription(requestId, { onMaterialsChanged: m.load });
+  const [summaryRefresh, setSummaryRefresh] = useState(REFRESH_IDLE);
+  const t = useTranscription(requestId, { onMaterialsChanged: m.load, summaryRefresh });
+  const jobsSignature = t.jobs.map((job) => `${job.id}:${job.status}:${job.cleanupPending === true ? 'c' : ''}`).join('|');
+  const z = useZoomImport(requestId, { onImported: t.loadCollection, jobsSignature, onVideoCopied: m.load });
   useEffect(() => {
     if (hashScrollDoneRef.current || typeof window === 'undefined' || window.location.hash !== '#recording-and-transcript-card') return;
     const card = document.getElementById('recording-and-transcript-card');
@@ -2528,22 +3702,48 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
     hashScrollDoneRef.current = true;
     card.scrollIntoView?.({ block: 'start' });
   }, []);
-  const heading = <h2 className="text-lg font-semibold text-gray-950">Recording and transcript</h2>;
+  const heading = <h2 className="text-lg font-semibold text-gray-950">Recording setup</h2>;
+  // One Refresh for all four cards (redesign §6 B): transcription status, materials and Board link, the Zoom list, the
+  // presentation video and then both summaries (once each; see useSummaryKind). A failed load keeps its own Retry where
+  // it failed (DESIGN.md State Rule), and the speaker editor keeps its Refresh, which preserves unsaved edits.
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshToken, setRefreshToken] = useState(0);
+  const refreshAll = async () => {
+    setRefreshing(true);
+    setRefreshToken((value) => value + 1);
+    setSummaryRefresh((value) => ({ ...value, begin: value.begin + 1 }));
+    try {
+      await Promise.allSettled([
+        t.loadCollection(),
+        m.load(),
+        z.status === 'available' ? z.refresh() : null,
+      ]);
+      setSummaryRefresh((value) => ({ ...value, settle: value.settle + 1 }));
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const shell = 'mt-8 min-w-0 rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6';
   if (m.unavailable) return <section id="recording-and-transcript-card" className={shell} data-testid="recording-and-transcript-card">{heading}<p className="mt-2 text-sm text-gray-700">Recording and transcript are not available for this request.</p></section>;
-  return (
-    <section id="recording-and-transcript-card" className={shell} data-testid="recording-and-transcript-card" aria-labelledby="recording-transcript-title">
+  // One Refresh on the Recording setup card covers all four cards (they share one data set).
+  const setupHeader = (
+    <div className="flex flex-wrap items-center justify-between gap-2">
       <div id="recording-transcript-title">{heading}</div>
-      {m.loading && !m.data && <p className="mt-4 text-sm text-gray-500">Loading…</p>}
-      {m.error && !m.data && <div className="mt-4"><Notice>{m.error}</Notice></div>}
-      {m.data && (
-        <div className="mt-4">
-          <RecordingBlock m={m} />
-          <TranscriptBlock m={m} t={t} transcriptInputRef={transcriptInputRef} />
-          <PresentationLinkBlock m={m} />
-        </div>
-      )}
-    </section>
+      {m.data && <Button size="sm" variant="outline" type="button" data-testid="card-refresh" onClick={() => void refreshAll()} disabled={refreshing || z.refreshing || t.loading || Boolean(t.busy)}>{refreshing ? 'Refreshing…' : 'Refresh'}</Button>}
+    </div>
+  );
+  return (
+    <div id="recording-and-transcript-card" className="min-w-0" data-testid="recording-and-transcript-card">
+      {m.data
+        ? <TranscriptWorkflow m={m} t={t} z={z} requestId={requestId} transcriptInputRef={transcriptInputRef} refreshToken={refreshToken} shell={shell} setupHeader={setupHeader} />
+        : (
+          <section className={shell} data-testid="card-recording-setup" aria-labelledby="recording-transcript-title">
+            {setupHeader}
+            {m.loading && <p className="mt-4 text-sm text-gray-500">Loading…</p>}
+            {m.error && <div className="mt-4"><Notice>{m.error}</Notice></div>}
+          </section>
+        )}
+    </div>
   );
 }
 

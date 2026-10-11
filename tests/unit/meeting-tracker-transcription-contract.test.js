@@ -41,6 +41,17 @@ describe('Meeting Tracker generated transcript bundle', () => {
     { speaker: 'B', start: 125000, end: 127300, text: 'WEBVTT and --> are transcript text.' },
   ] };
 
+  it('accepts an utterance over the former 20,000-character cap and rejects one over the shared cap', () => {
+    const long = { utterances: [{ speaker: 'A', start: 0, end: 600000, text: 'y'.repeat(24_213) }] };
+    const generated = buildMeetingTranscriptFiles({ content: long, speakerNames: { A: 'PI' }, identity });
+    const parsed = parseVerifiedMeetingTranscriptSource(generated.files.source.bytes, {
+      size: generated.files.source.bytes.length, sha256: generated.files.source.sha256,
+    }, identity);
+    expect(parsed.content.utterances[0].text).toHaveLength(24_213);
+    const tooLong = { utterances: [{ speaker: 'A', start: 0, end: 600000, text: 'y'.repeat(200_001) }] };
+    expect(() => buildMeetingTranscriptFiles({ content: tooLong, speakerNames: {}, identity })).toThrow();
+  });
+
   it('round-trips exact bounded source bytes and hash for later corrections', () => {
     const generated = buildMeetingTranscriptFiles({ content, speakerNames: { A: 'PI', B: 'Co-PI' }, identity });
     expect(generated.files.source.bytes.length).toBeLessThanOrEqual(4_000_000);
@@ -79,12 +90,12 @@ describe('Meeting Tracker generated transcript bundle', () => {
   const timedContent = { text: 'go now', utterances: [{ speaker: 'A', start: 0, end: 70_000,
     text: 'go now', words: [{ start: 58_000, end: 59_000, text: 'go' }, { start: 61_000, end: 62_000, text: 'now' }] }] };
 
-  it('embeds fully aligned optional word timings in formatter v2+ source; the default v5 TXT is one turn paragraph, BOM-prefixed, with no boundary', () => {
+  it('embeds fully aligned optional word timings in formatter v2+ source; the default v7 TXT is one turn paragraph, BOM-prefixed, with no boundary', () => {
     const generated = buildMeetingTranscriptFiles({ content: timedContent, speakerNames: {}, identity });
     const parsed = parseVerifiedMeetingTranscriptSource(generated.files.source.bytes,
       { size: generated.files.source.bytes.length, sha256: generated.files.source.sha256 }, identity);
-    expect(parsed.formatterVersion).toBe('5');
-    expect(generated.sourceContent.schemaVersion).toBe(5);
+    expect(parsed.formatterVersion).toBe('7');
+    expect(generated.sourceContent.schemaVersion).toBe(7);
     expect(generated.sourceContent.presentationEnd).toBeNull();
     expect(generated.presentationEnd).toBeNull();
     expect(parsed.presentationEnd).toBeNull();
@@ -131,7 +142,7 @@ describe('Meeting Tracker generated transcript bundle', () => {
         contentType: { txt: 'text/plain; charset=utf-8', vtt: 'text/vtt; charset=utf-8', source: 'application/json' }[role],
       }]));
       const manifest = buildMeetingTranscriptManifest({ identity: { ...identity, presentationEnd: boundary }, files });
-      expect(manifest.schemaVersion).toBe(5);
+      expect(manifest.schemaVersion).toBe(7);
       expect(manifest.presentationEnd).toEqual(boundary);
       expect(validateMeetingTranscriptManifest({ ...manifest, presentationEnd: null })).toBeTruthy();
       expect(() => validateMeetingTranscriptManifest({ ...manifest, schemaVersion: 3, formatterVersion: '3' })).toThrow('invalid_transcript_bundle');

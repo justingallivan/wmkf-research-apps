@@ -16,6 +16,8 @@ export const REQUEST_DOCUMENT_ARTIFACT_TYPE = Object.freeze({
   RECORDING: 100000005,
   TRANSCRIPT: 100000006,
   TRANSCRIPT_SUMMARY: 100000007,
+  STAFF_DISCUSSION_SUMMARY: 100000010,
+  PRESENTATION_VIDEO: 100000011,
   CONSULTANT_FEEDBACK: 100000008,
   PRE_RESEARCH_PRESENTATION_BRIEF: 100000009,
   PRESENTATION_TRANSCRIPT: 100000012,
@@ -31,6 +33,8 @@ export const REQUEST_DOCUMENT_ARTIFACT_LABEL = Object.freeze({
   [REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING]: 'Recording',
   [REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT]: 'Transcript',
   [REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY]: 'Transcript Summary',
+  [REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY]: 'Staff Discussion Summary',
+  [REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_VIDEO]: 'Presentation Video',
   [REQUEST_DOCUMENT_ARTIFACT_TYPE.CONSULTANT_FEEDBACK]: 'Consultant Feedback',
   [REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_RESEARCH_PRESENTATION_BRIEF]: 'Pre-Research Presentation Brief',
   [REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT]: 'Presentation Transcript',
@@ -95,8 +99,8 @@ export const PRE_SITE_VISIT_CONTRACT = Object.freeze({
   artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
   promptName: 'pre-site-visit.proposal-core.generate',
   templateId: 'phase-ii-pre-site-visit',
-  // Render-contract v7 uses v6 OOXML with a zero-inset left value column.
-  templateVersion: '7',
+  // Render-contract v9 uses v8 OOXML with 12pt after the city/state line.
+  templateVersion: '9',
   relativeFolder: 'Artifacts/Pre-Site Visit',
   producer: 'request-workbench',
   contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

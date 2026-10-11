@@ -1490,6 +1490,7 @@ export default function StaffDeliberationsTab({
           status="loaded"
           materials={siteVisitContext.presentationMaterials || EMPTY_LIST}
           summary={siteVisitContext.presentationSummary || null}
+          discussionSummary={siteVisitContext.discussionSummary || null}
         />
       )}
     </Step>

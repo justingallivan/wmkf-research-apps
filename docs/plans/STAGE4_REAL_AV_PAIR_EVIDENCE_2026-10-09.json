@@ -1,0 +1,23 @@
+{
+  "scope": "One owner-approved real pair, read-only, Session 590 (2026-10-09). Media held in the session scratchpad and deleted after measurement; no content retained.",
+  "request": "1003222 (test request)",
+  "zoom_meeting_start_utc": "2026-10-08T17:46:21Z",
+  "sources": {
+    "mp4": {"origin": "SharePoint copy registered by Stage 3b (Recording slot version 2)", "bytes": 149405180, "audio": "aac LC 48000 Hz stereo, 157533 frames, start 0, duration 3360.704 s", "video": "h264 High 1920x1080, 25/1 fps, 84018 frames, start 0", "other_streams": "1 data stream (bin_data, 3 frames)"},
+    "m4a": {"origin": "Zoom audio_only file, downloaded with probe-zoom-recordings.mjs --only audio_only", "bytes": 36298035, "audio": "aac LC 48000 Hz stereo, 157533 frames, start 0, duration 3360.704 s"}
+  },
+  "comparisons": {
+    "audio_packet_framemd5_lines_differing": 0,
+    "audio_packet_count_mp4": 157533,
+    "audio_packet_count_m4a": 157533,
+    "decoded_audio_md5_equal": true,
+    "edit_lists_equal": true,
+    "video_frame_interval_histogram_seconds": {"0.040": 84017}
+  },
+  "commands": [
+    "ffprobe -show_entries format/stream timing on both files",
+    "ffmpeg -map 0:a:0 -c copy -f framemd5 (each file), diff",
+    "ffmpeg -map 0:a:0 -f md5 (decoded PCM, each file)",
+    "ffprobe -select_streams v:0 -show_entries packet=pts_time, interval histogram"
+  ]
+}

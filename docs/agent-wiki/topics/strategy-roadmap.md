@@ -503,7 +503,8 @@ document inventory, and individual implementation plans do not establish priorit
   without reopening the parked general intake product; it accepts PDF/PPTX and
   additional uploads while active, capped at 1 GB per file and 20 current
   applicant files per request. Files land inside the request's governed
-  SharePoint folder under `Site Visit/Applicant Materials/Slides` or `Other`.
+  SharePoint folder under the flat `Site Visit - Slides`,
+  `Site Visit - Participant Bios`, or `Site Visit - Other` folder.
   Successful uploads, replacements, and deletions are batched into a short
   automated digest to the lead PD plus the still-to-be-defined relevant staff
   audience. A program coordinator may be among the recipients, but the design

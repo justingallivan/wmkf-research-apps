@@ -971,6 +971,7 @@ The middleware generates a unique cryptographic nonce for each request via `cryp
 | `font-src` | `'self'` |
 | `connect-src` | Baseline: `'self'`, `https://vercel.com`, `https://*.vercel-insights.com` |
 | `connect-src` (exact Meeting Tracker visit upload page only) | Baseline plus `https://*.up.1drv.com` and the exact canonical tenant `https://appriver3651007194.sharepoint.com` |
+| `connect-src` (exact external presentation-materials page only) | Baseline plus the exact canonical tenant `https://appriver3651007194.sharepoint.com` (View fetches the PDF through the open route's redirect; 2026-10-11) |
 | `media-src` (exact external presentation-materials page only) | `'self'` and the exact canonical tenant `https://appriver3651007194.sharepoint.com` |
 | `frame-ancestors` | `'none'` |
 | `upgrade-insecure-requests` | (enforces HTTPS for all subresources) |

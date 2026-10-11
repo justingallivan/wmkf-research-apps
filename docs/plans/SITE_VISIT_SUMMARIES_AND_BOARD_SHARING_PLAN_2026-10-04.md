@@ -2,10 +2,11 @@
 title: Site Visit summaries, Staff Deliberations follow-up, and Board sharing
 domain: transcription
 kind: plan
-status: draft
-summary: "Split one Site Visit recording at the point the applicants leave, summarize the presentation and the staff discussion separately, surface both to PDs on the Staff Deliberations page with the full source material, and share only the presentation part with Board members through the existing outside links; also closes a current exposure where outside links serve the full transcript."
+status: historical
+summary: "Historical October 4–5 design and build record. The October 7 recording-workflow plan supersedes forward scope for Zoom import, video splitting, paired summaries and retention."
 owner: product-engineering
 related:
+  - docs/plans/MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md
   - docs/plans/SITE_VISIT_TRANSCRIPT_CARD_REDESIGN_PLAN_2026-10-04.md
   - docs/plans/POST_RESEARCH_PRESENTATION_MATERIALS_PLAN_2026-09-21.md
   - docs/DELIBERATION_BRIEFING_PAGE_PLAN.md
@@ -15,6 +16,10 @@ related:
 ---
 
 # Site Visit summaries, Staff Deliberations follow-up, and Board sharing
+
+This document preserves the October 4–5 design and build history. All sections below, including proposed stages, owner-run instructions and migration numbers, describe that historical checkpoint. The [October 7 recording workflow plan](MEETING_RECORDING_WORKFLOW_PLAN_2026-10-07.md) owns current forward scope: in-app video splitting, paired summary generation, Zoom import and automatic discussion/source retention. Do not execute the historical Stage 3/4 instructions as a current worklist.
+
+## Historical design and delivery record
 
 Status: Stage 1 Production-live (PR #434 merge `32664485b`, Production deployment 6863898521 success; migration 068 applied and picklist 100000012 inserted (owner-run, re-read verified) 2026-10-05; §11, §12);
 accepted on test request 1003222 by the owner 2026-10-05 (§13). Stage 2
@@ -35,7 +40,7 @@ decisions complete (§3, §7, §16).
 3. Generate outside links to share with Board members: the presentation
    video and transcript, ideally with the staff discussion separated out.
 
-## 2. Current state
+## 2. Baseline on October 4
 
 **[VERIFIED via `shared/components/workbench/ResearchPresentationFollowUp.js`]**
 The follow-up segment already exists with three fixed rows: Recording,

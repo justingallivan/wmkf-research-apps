@@ -135,6 +135,125 @@ sequence.
   cap can track the four-hour duration cap instead of memory. Verify the
   200 MiB cap first with a real two-to-three-hour recording in production.
 
+- **Redesign the Recording and transcript card (2026-10-10).** [OPEN — owner
+  request, scheduled after the first real Stage 4 cut] The Meeting Tracker
+  card (`shared/components/meeting-tracker/RecordingAndTranscriptCard.js`) grew
+  stage by stage and now reads as a mess for an ordinary Zoom import. Do one
+  design pass over the whole card, not piecemeal patches. **Proposal (Session
+  593, scope widened to the whole Site Visit page by the owner):**
+  `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md`. **[SHIPPED: built on
+  `claude/site-visit-redesign` in Session 593 and merged to `main` 2026-10-11 (`c574e9e7d`) and deployed to Production.]** Built:
+  result rows in four staff-first cards (Recording setup, Presentation, Staff discussion,
+  Board materials with a readiness list; no full-recording row; owner decisions 7-12, plan §8.2), collapsed steps, Upload manually, Copy video in its row with an in-row
+  replace confirmation, one card Refresh, quiet own-write staleness, old-transcript edits
+  gated, hinted leavers unchecked. Still open: auto-generate after publish, the real
+  cancel reason, streaming the review video (plan §6 C1-C3), and the header status chip
+  (plan §10). Owner observations
+  and screenshots from Session 592:
+  - **"Copy video" is ambiguous.** In the "Import from Zoom" list each link sits
+    outside and below its recording's box, so it reads as belonging to the next
+    row as easily as the previous one. The list also mixes two selections: the
+    radio button (which recording to import) and the per-row video copy. Put
+    the action inside its recording's row and name the recording in it.
+  - **The replace confirmation is off screen.** When the request already has a
+    recording, "Copy video" asks for a replace confirmation that renders after
+    the whole list (`ReplaceConfirm` below the fieldset), so the click appears
+    to do nothing. Show it in the clicked row, or scroll to it and move focus.
+  - **Stacked banners for one action.** After an import plus a replace
+    confirmation the card showed a red "This transcription changed…" and a
+    yellow "Another session changed this. Refresh…" banner at once, though
+    nothing had failed: the card had only gone stale from its own actions.
+    Refresh after the card's own writes, and reserve warnings for real
+    conflicts.
+  - **Three refresh controls** (the banner's Refresh, the transcription line's
+    Refresh, and "Refresh list"). Collapse them to one.
+  - **Hide the manual upload paths unless needed.** Zoom is now the preferred
+    source. Show the manual MP4 upload ("Upload MP4") and the manual transcript
+    upload ("Upload a finished transcript instead") only behind a secondary
+    "Upload manually" disclosure, or when Zoom is unavailable for the request.
+  - **Order the steps** so the path reads import from Zoom, then transcript,
+    then confirm the presentation end, then the presentation video.
+  - **Old-transcript edit buttons look current.** While a newer Zoom
+    transcription is pending, "Edit presentation end" still opens the older
+    published transcript (`beginEditNames` edits `collection.currentArtifact`),
+    so staff land in a different recording's transcript. De-emphasise or hide
+    the published transcript's edit actions while a newer one is pending.
+  - **Start hinted leavers unchecked in "Discussion attendance".** [SHIPPED with the Site Visit
+    redesign, commit 4; merged 2026-10-11] Reverses
+    owner decision D2 of `docs/plans/ZOOM_ATTENDANCE_ATTRIBUTION_PLAN_2026-10-09.md`
+    ("everyone starts checked"), by owner request after the first live use
+    (1003222, 2026-10-10): people flagged "Left before the presentation ended"
+    were still checked. Rows whose `leftBeforeEnd` hint is true should start
+    `kept: false` (`attendance-service.js` builds every row `kept: true`);
+    everyone else and every "other voice" row stays checked. The hint already
+    requires aligned recording times, so a misaligned transcript is unaffected.
+    Update D2 in the plan in the same change.
+  - **Generate the split transcripts automatically after publish.** After
+    publishing a transcript, step 3 shows "Presentation transcript is out of
+    date. Generate it again in step 2." and the same for the staff discussion,
+    with a separate "Generate presentation and discussion transcripts" button
+    in step 2. Staff could not tell what that meant (owner, 1003222,
+    2026-10-10). Publishing with a confirmed presentation end should start that
+    generation itself, and step 3 should say what is happening in plain words
+    rather than "out of date".
+  - **Say why a presentation video was cancelled.** A superseded cut shows
+    "Video: Out of date. The transcript or video changed. Create it again." even
+    when the worker cancelled it for its own reasons (first live cut, 1003222,
+    2026-10-10: a SharePoint metadata-only eTag bump). Show the actual reason,
+    and never suggest "again" when a retry cannot succeed.
+  - **Play the presentation video for review instead of downloading it.** The
+    staff open link (`resolvePresentationVideoSplitOpen`) redirects to Graph's
+    download URL, so the browser downloads 450 MB (first live cut, 2026-10-10).
+    Stream it instead: the SharePoint web view, or the Board link's watch mode.
+- **Card stays busy after a successful transcript publish (2026-10-10).**
+  [FIXED 2026-10-10 — branch `claude/card-publish-busy`, Codex approve round 3; owner-token busy claims for publish, save and attendance] In `RecordingAndTranscriptCard.js`
+  the publish handler closes the editor on success (`setCorrectionDetail(null)`,
+  which changes `editorKey`), awaits `loadCollection()`, and only then clears
+  `busy` in `finally` under `editorKeyRef.current === targetKey`. By then the
+  ref has moved, so `busy` stays `'publish'` and every `disabled={Boolean(t.busy)}`
+  control (Generate presentation and discussion transcripts, Edit speaker
+  names) stays greyed until a page reload. Fix: clear `busy` on the success
+  path regardless of the editor key, and add a test that the generate button
+  is enabled after a successful publish.
+- **Speed up the presentation video cut (2026-10-10).** [OPEN — from the
+  first real cut, 1003222: 40 min on 2 vCPUs; encode 22 min, probe and accept
+  checks about 15 min] (1) Set `PRESENTATION_VIDEO_SANDBOX_VCPUS=4` in
+  Production (no code). (2) After a measured 4-vCPU run, lower
+  `PRESENTATION_VIDEO_SANDBOX_TIMEOUT_MS` from 3 h to about 90 min. (3) Replace
+  frame decoding in the cut script's probe/accept steps with packet timestamps
+  where the recipe allows; a privacy-recipe change, so full Codex review.
+  Detail: `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md` "First real cut".
+- **Show transcripts and summaries formatted in the browser across the suite
+  (2026-10-11).** [OPEN — owner request, Session 594] Staff surfaces download
+  transcripts and summaries as plain `.txt` files (Microsoft serves every file
+  as a download), with no formatting. The Board page now shows the
+  presentation summary on the page through the shared
+  `shared/components/SummaryText.js` (headings from
+  `PRESENTATION_SUMMARY_HEADINGS`). Apply the same viewer to staff surfaces
+  (Site Visit card rows, Workbench), add heading constants for the staff
+  discussion summary, and decide how full transcripts should read in the
+  browser. The owner chose "Board page now, suite next".
+- **Board file check uses the SharePoint eTag (2026-10-10).** [VIDEO FIXED
+  2026-10-11 (Session 594); transcripts OPEN, low priority] The approved
+  1003222 video's eTag moved after approval with size and quickXorHash
+  unchanged, so the Board link refused it. The video is now bound by the
+  approved cut's size and quickXorHash. The Presentation Transcript and
+  Transcript Summary still compare eTag (`pinnedBytesMatch` in
+  `lib/services/post-presentation-materials/presentation-page-service.js`);
+  owner chose to leave them until one breaks (fails closed: the file will not
+  open). Fix if needed: compare size + `publication.versionId`, which Graph's
+  default item response omits, so `resolveMediaDownloadUrl` must request it
+  explicitly. Detail: `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md` "Board link fix".
+- **Speaker-name picker should offer the Zoom call's participants
+  (2026-10-10).** [OPEN — owner request] "People on this request" in the
+  speaker-name editor (`RecordingAndTranscriptCard.js`, option groups PI,
+  Co-PI, Saved staff, Saved attendee) is built from the request and its
+  invitation. That was defensible before Zoom import; for a transcript with
+  verified Zoom provenance it should default to the people on the call, from
+  the same Zoom participants report the attendance attribution already
+  fetches (`attendance-service.js`). Keep the request people as a secondary
+  group or fallback for uploads and when attendance is unavailable.
+
 ## Audit follow-ups — verified open, not silently prioritized
 - **Hard-coded late-2026 `expiresAt` dates in unit-test fixtures (2026-09-27, S546).** **[CLOSED
   2026-10-08 UTC, S584: no clock dependence.]** All seven files pass at 05:48 UTC on 2026-10-08

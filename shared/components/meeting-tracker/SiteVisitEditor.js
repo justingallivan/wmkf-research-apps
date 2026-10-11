@@ -6,7 +6,7 @@
  * page, and the Share email already read. Attendees are staff/Board references
  * from the tracker's recipient directory plus manual applicant-side entries.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requestEnvelope } from '../../utils/api-request';
@@ -14,6 +14,7 @@ import Layout, { Button } from '../Layout';
 import { SITE_VISIT_FORMAT, SITE_VISIT_FORMAT_LABEL, SITE_VISIT_LIMITS } from '../../config/siteVisit';
 import SiteVisitMaterialsCard from './SiteVisitMaterialsCard';
 import RecordingAndTranscriptCard from './RecordingAndTranscriptCard';
+import AttendeePicker from './AttendeePicker';
 
 const DEFAULT_TIME_ZONE = 'America/Los_Angeles';
 
@@ -92,7 +93,7 @@ async function readJson(url, options, fallback) {
   return body;
 }
 
-const NO_EMAIL_SECTION_HINT = 'Greyed names have no email on file; hover a name for the reason.';
+const NO_EMAIL_SECTION_HINT = 'Names marked “no email” cannot be added; hover a name for the reason.';
 export const noEmailHint = (person) => person?.linked
   ? 'No email on file. The linked Dataverse contact is inactive, missing, or has no primary email; fix or relink the contact, or unlink the roster row.'
   : 'No email on file. Add a preferred email on the Expertise Finder roster before this person can be added.';
@@ -189,6 +190,13 @@ export default function SiteVisitEditor() {
   const [notice, setNotice] = useState(null);
   const [applicantAttendees, setApplicantAttendees] = useState([]);
   const [applicantAttendeesUnavailable, setApplicantAttendeesUnavailable] = useState(false);
+  // Header identity from the visit GET (redesign §9.2), stored with the request it belongs to so a client-side move to
+  // another visit never shows the previous request's name (Codex review, commit 7); null keeps the number-only header.
+  const [identityEntry, setIdentityEntry] = useState(null);
+  const requestIdentity = identityEntry && identityEntry.requestId === requestId ? identityEntry.value : null;
+  // The request the page is showing now; a load for any other request is dropped when it settles.
+  const currentRequestRef = useRef(requestId);
+  useEffect(() => { currentRequestRef.current = requestId; }, [requestId]);
   // A saved visit opens read-only (DESIGN.md Read-First Rule). Keyed to the
   // request so a client-side move to another visit starts read-only again.
   const [editingFor, setEditingFor] = useState(null);
@@ -196,6 +204,8 @@ export default function SiteVisitEditor() {
 
   const load = useCallback(async () => {
     if (!requestId) return;
+    const forRequest = requestId;
+    const stillCurrent = () => currentRequestRef.current === forRequest;
     setLoading(true);
     setError(null);
     try {
@@ -205,6 +215,7 @@ export default function SiteVisitEditor() {
         readJson(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}`, undefined, 'The site visit could not be loaded.'),
         readJson('/api/meeting-tracker/recipients', undefined, 'The attendee directory could not be loaded.'),
       ]);
+      if (!stillCurrent()) return;
       if (visitSettled.status === 'rejected') throw visitSettled.reason;
       if (recipientSettled.status === 'rejected') throw recipientSettled.reason;
       const visitBody = visitSettled.value;
@@ -216,10 +227,11 @@ export default function SiteVisitEditor() {
       setRecipients(directory);
       setApplicantAttendees(visitBody.applicantAttendees || []);
       setApplicantAttendeesUnavailable(visitBody.applicantAttendeesUnavailable === true);
+      setIdentityEntry({ requestId: forRequest, value: visitBody.request && typeof visitBody.request === 'object' ? visitBody.request : null });
     } catch (loadError) {
-      setError(`${loadError.message} Please try again. If the problem continues, contact an administrator.`);
+      if (stillCurrent()) setError(`${loadError.message} Please try again. If the problem continues, contact an administrator.`);
     } finally {
-      setLoading(false);
+      if (stillCurrent()) setLoading(false);
     }
   }, [requestId, requestNumber]);
 
@@ -240,6 +252,30 @@ export default function SiteVisitEditor() {
       [other]: current[other].filter((row) => !sameRef(row, ref)),
     };
   });
+  // Staff and Board attendees (redesign §3.1): one list, each person Required or Optional.
+  const removeAttendee = (ref) => setForm((current) => ({
+    ...current,
+    requiredAttendees: current.requiredAttendees.filter((row) => !sameRef(row, ref)),
+    optionalAttendees: current.optionalAttendees.filter((row) => !sameRef(row, ref)),
+  }));
+  const attendeeRole = (ref) => (form.optionalAttendees.some((row) => sameRef(row, ref)) ? 'optional' : 'required');
+  // Each list holds at most attendeesPerRole people, manual applicant rows included; the server rejects the whole save
+  // otherwise. Adding goes to Required, or to Optional when Required is full; a role change never overfills its
+  // destination (Codex review, commit 6).
+  const ROLE_LIMIT = SITE_VISIT_LIMITS.attendeesPerRole;
+  const addAttendee = (ref) => setForm((current) => {
+    if ([...current.requiredAttendees, ...current.optionalAttendees].some((row) => sameRef(row, ref))) return current;
+    if (current.requiredAttendees.length < ROLE_LIMIT) return { ...current, requiredAttendees: [...current.requiredAttendees, ref] };
+    if (current.optionalAttendees.length < ROLE_LIMIT) return { ...current, optionalAttendees: [...current.optionalAttendees, ref] };
+    return current;
+  });
+  const setAttendeeRole = (ref, role) => setForm((current) => {
+    const to = role === 'optional' ? 'optionalAttendees' : 'requiredAttendees';
+    const from = role === 'optional' ? 'requiredAttendees' : 'optionalAttendees';
+    if (current[to].some((row) => sameRef(row, ref)) || current[to].length >= ROLE_LIMIT) return current;
+    return { ...current, [to]: [...current[to], ref], [from]: current[from].filter((row) => !sameRef(row, ref)) };
+  });
+  const roleFull = (role) => (role === 'optional' ? form.optionalAttendees : form.requiredAttendees).length >= ROLE_LIMIT;
   const addManual = () => {
     const email = manual.email.trim().toLowerCase();
     if (!email) return;
@@ -305,7 +341,13 @@ export default function SiteVisitEditor() {
     <Layout title={visit ? 'Site visit' : 'Schedule site visit'}>
       <div className="pt-6 mb-6">
         {backLink}
-        <h1 className="mt-3 text-2xl font-semibold text-gray-900">{visit ? 'Site visit' : 'Schedule the site visit'}{requestNumber ? ` · #${requestNumber}` : ''}</h1>
+        <h1 className="mt-3 text-2xl font-semibold text-gray-900">{visit ? 'Site visit' : 'Schedule the site visit'}{(requestIdentity?.requestNumber || requestNumber) ? ` · #${requestIdentity?.requestNumber || requestNumber}` : ''}</h1>
+        {requestIdentity && (requestIdentity.institution || requestIdentity.title || requestIdentity.grantProgram || requestIdentity.cycleLabel) && (
+          <p className="mt-1 text-sm text-gray-600" data-testid="visit-request-identity">
+            {[[requestIdentity.institution, requestIdentity.title].filter(Boolean).join(' — '), requestIdentity.grantProgram, requestIdentity.cycleLabel]
+              .filter((part) => typeof part === 'string' && part).join(' · ')}
+          </p>
+        )}
         {(!visit || editing) && <p className="mt-2 text-sm text-gray-600">The date here feeds the Staff Deliberations rail, the cycle view, the briefing page, and the Share email's calendar entry.</p>}
       </div>
 
@@ -331,37 +373,27 @@ export default function SiteVisitEditor() {
           <fieldset className="mt-6 border-t border-gray-100 pt-5">
             <legend className="text-base font-semibold text-gray-900">Organizer</legend>
             <p className="mt-1 text-sm text-gray-600">The staff member who owns the visit and the calendar entry.</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {recipients.staff.map((person) => (
-                <Chip key={refKey(person.ref)} selected={sameRef(form.organizer, person.ref)} disabled={busy} onClick={() => updateForm('organizer', sameRef(form.organizer, person.ref) ? null : person.ref)}>{person.name}</Chip>
-              ))}
-              {recipients.staff.length === 0 && <p className="text-sm text-gray-500">No staff found in the directory.</p>}
+            <div className="mt-3">
+              {recipients.staff.length === 0
+                ? <p className="text-sm text-gray-500">No staff found in the directory.</p>
+                : <AttendeePicker single label="Organizer" people={recipients.staff} selected={form.organizer ? [form.organizer] : []}
+                  onAdd={(ref) => updateForm('organizer', ref)} onRemove={() => updateForm('organizer', null)} disabled={busy} hintFor={noEmailHint} />}
             </div>
           </fieldset>
 
-          {[['requiredAttendees', 'Required attendees'], ['optionalAttendees', 'Optional attendees']].map(([role, label]) => (
-            <fieldset key={role} className="mt-6 border-t border-gray-100 pt-5">
-              <legend className="text-base font-semibold text-gray-900">{label}</legend>
-              <div className="mt-3 grid gap-4 md:grid-cols-2">
-                {[['Staff', recipients.staff], ['Board', recipients.board]].map(([group, rows]) => (
-                  <div key={group}>
-                    <h2 className="text-sm font-semibold text-gray-700">{group}</h2>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {rows.map((person) => {
-                        const selected = form[role].some((ref) => sameRef(ref, person.ref));
-                        const noEmail = !person.email;
-                        return (
-                          <Chip key={refKey(person.ref)} selected={selected} disabled={busy || (noEmail && !selected)} title={noEmail ? noEmailHint(person) : undefined} onClick={() => toggleIn(role, person.ref)}>{person.name}{noEmail ? ' · no email' : ''}</Chip>
-                        );
-                      })}
-                      {rows.length === 0 && <p className="text-sm text-gray-500">No eligible people found.</p>}
-                      {rows.some((person) => !person.email) && <p className="w-full text-xs text-gray-500">{NO_EMAIL_SECTION_HINT}</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </fieldset>
-          ))}
+          <fieldset className="mt-6 border-t border-gray-100 pt-5">
+            <legend className="text-base font-semibold text-gray-900">Staff and Board attendees</legend>
+            <p className="mt-1 text-sm text-gray-600">Each person is Required or Optional on the calendar entry.</p>
+            <div className="mt-3">
+              {recipients.staff.length + recipients.board.length === 0
+                ? <p className="text-sm text-gray-500">No eligible people found.</p>
+                : <AttendeePicker label="Find a staff or Board member" people={[...recipients.staff, ...recipients.board]}
+                  selected={[...form.requiredAttendees, ...form.optionalAttendees]} roles={attendeeRole}
+                  onAdd={addAttendee} onRemove={removeAttendee} onRole={setAttendeeRole} roleFull={roleFull}
+                  disabled={busy} hintFor={noEmailHint} full={roleFull('required') && roleFull('optional')} />}
+              {[...recipients.staff, ...recipients.board].some((person) => !person.email) && <p className="mt-2 text-xs text-gray-500">{NO_EMAIL_SECTION_HINT}</p>}
+            </div>
+          </fieldset>
 
           <fieldset className="mt-6 border-t border-gray-100 pt-5">
             <legend className="text-base font-semibold text-gray-900">Applicant-side attendees</legend>

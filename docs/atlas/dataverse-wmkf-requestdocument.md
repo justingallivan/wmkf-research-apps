@@ -6,7 +6,7 @@ status: active
 summary: Governed request-artifact registry with Production-proved same-item Final lineage, explicit group-review attribution, and the Production-live leadership-review transition (2026-09-07).
 canonical: false
 owner: product-engineering
-last_verified: 2026-10-05
+last_verified: 2026-10-08
 related:
   - lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json
   - lib/dataverse/schema/wave16-request-document-registry/zz_akoya_request_pre_rp_brief_pointer.json
@@ -28,6 +28,7 @@ related:
   - lib/utils/post-presentation-materials-readiness.js
   - lib/utils/meeting-transcript-bundle-readiness.js
   - lib/dataverse/adapters/request-document.js
+  - lib/services/meeting-tracker-recordings/video-copy-worker.js
   - lib/services/initial-assessment/artifact-service.js
   - lib/services/initial-assessment/controls-service.js
   - lib/services/pre-site-visit/distribution-service.js
@@ -383,6 +384,24 @@ Production Request Document row was created by this release smoke.
   - ends `wmkf_name` in "(staff upload)" instead of "(applicant upload)".
 
   See `docs/plans/STAFF_APPLICANT_MATERIALS_REPLACEMENT_PLAN_2026-10-05.md`.
+- Recording producers (post-presentation `RECORDING`, producer
+  `meeting-tracker-post-presentation`). **[Second path built on branch
+  `claude/zoom-copy`, merged 2026-10-09 (`780fab218`, Production deployment 6965242102); `ZOOM_VIDEO_COPY_ACCESS=on` since 2026-10-09 (owner, after one Mode D copy on 1003222); migration 076 applied 2026-10-09; live.]**
+  Besides the Zoom link and the staff-browser MP4 upload, Stage 3b adds a
+  server copy of the Zoom meeting MP4: staff-only, started from the Meeting
+  Tracker card, moved by the every-minute `drain-zoom-video-copies` worker into
+  the request's `Post Site Visit Materials` folder through a Graph upload
+  session, then registered by the same shared `finalizeClaimedMp4Upload` that the
+  browser path uses. The registry row therefore has the same shape as a browser
+  MP4 Recording (file-backed, Ready, slot-versioned, signature- and
+  malware-validated, supersedes the captured predecessor) and no new writer row.
+  The only added rule is decision 8: when the current Recording winner is a
+  SharePoint MP4, staff must confirm replacing it; the copy stores that winner's
+  document id and slot version and aborts at finalize with
+  `zoom_video_recording_replaced` if a newer non-Zoom-link winner appeared. The
+  actor is the staff member who started the copy (`REQUIRED`). The Recording is
+  never served to outside pages. State, leases and receipt identities live in
+  [postgres-zoom-video-copies.md](postgres-zoom-video-copies.md).
 - `wmkf_requestdocument` owns the request/cycle relationship, typed artifact and
   lifecycle state, producer operation state, stable Graph site/drive/item
   identity, upload/finalization eTag/version snapshot, and
@@ -699,8 +718,9 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   `shared/config/requestDocument.js` and the Wave 16 record). Inserted by the
   owner-run, dry-run-default sibling script
   `scripts/extend-requestdocument-artifacttype-presentation-transcript.mjs`.
-  Values `100000010` (Staff Discussion Summary) and `100000011` (Board
-  Presentation Recording) are reserved for Stages 3 and 4 and are not inserted.
+  Values `100000010` (Staff Discussion Summary, paired summaries Stage 2; see
+  below; inserted in Production 2026-10-09 by its owner-run script) and
+  `100000011` (Presentation Video, Stage 4; see the Presentation Video writer below; **not inserted** in any environment).
   Postgres migration `068_presentation_transcript_boundary.sql` admits all three
   in the shared slot-lease and upload `artifact_type` CHECKs (the fresh-install
   bootstrap runs manifest migrations for real, so there is no inline mirror).
@@ -790,6 +810,32 @@ must never serve the full `TRANSCRIPT` or `RECORDING` rows.
   fails closed, so any republish (including a names edit) hides it outside until
   re-summarized (owner decision, plan §16 decision A). Staff surfaces keep
   showing a stale summary with a note. The eTag pin above applies.
+- **Staff Discussion Summary writer** (`100000010`;
+  `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md` D1, D3, D7, D8;
+  **[PRODUCTION-LIVE 2026-10-09: merge `5b8225ed8`, Production deployment 6952181551 success; picklist value,
+  prompt v1 and migration 075 provisioned 2026-10-09 by the owner. Acceptance on
+  1003222 2026-10-09: both outside routes 404 the discussion row.]**): the same service publishes a reviewed draft
+  of the discussion kind (`SUMMARY_KINDS.discussion`) from the bound Staff
+  Discussion Transcript, never slides, as a BOM-prefixed TXT under
+  `Site Visit - Staff Discussion Summary/`, prompt
+  `meeting-transcript.staff-discussion-summary`. The binding is
+  `wmkf_inputfingerprint` over
+  `meeting-tracker-post-presentation:<request id>:100000010:<revisionId>:<endMs>`
+  (`staffDiscussionSummaryBindingFingerprint`, `bindStaffDiscussionSummary`);
+  the generation key and stale handling follow the Transcript Summary above.
+  A draft is published only as its own stored kind (`summary_draft_kind_unsupported`
+  otherwise), so a discussion draft can never become a Board-visible Transcript
+  Summary. Staff-only: it is in `POST_PRESENTATION_ARTIFACT_TYPES`
+  (`material-model.js`), but neither outside allowlist names it
+  (`presentation-page-service` `OUTSIDE_POST_PRESENTATION_TYPES`,
+  `briefing-page-service` `outsidePostPresentationRows`). Staff readers: the
+  Meeting Tracker collection DTO (`staffDiscussionSummary`), the Recording and
+  transcript card, and the Workbench logistics feed shown on Staff
+  Deliberations (inline with Read more, owner decision 5). The value is added by
+  the owner-run, dry-run-default
+  `scripts/extend-requestdocument-artifacttype-staff-discussion-summary.mjs`
+  and mirrored in `shared/config/requestDocument.js` and the Wave 16 record.
+- **Presentation Video writer** (`100000011`, Stage 4 slice 4, **[BUILT on branch `claude/stage4-slice4`; not merged; picklist value not inserted: the owner runs the dry-run-default `scripts/extend-requestdocument-artifacttype-presentation-video.mjs`; migration 080 not applied]**; plan `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md`): one row per approved cut of the copied Zoom MP4 at the confirmed presentation end. The only writer is `approvePresentationVideoSplit` (`lib/services/meeting-tracker-recordings/presentation-video-approval-service.js`, `REQUIRED` actor policy, registered in `scripts/check-request-document-writers.js`), run by a staff approval, never by the cron. The row is `DRAFT` / `READY` with `wmkf_producer` `meeting-tracker-post-presentation`, the unique-per-split `wmkf_generationkey` (`presentationVideoGenerationKey`: SHA-256 over `<producer>:<request id>:100000011:split:<split id>`), the binding on `wmkf_inputfingerprint` (`presentationVideoFingerprint`: SHA-256 over the versioned string of producer, request, type, transcript revision, `endMs`, source Recording document id and SharePoint eTag), the SharePoint identity of the cut (`Post Site Visit Materials/`, `video/mp4`) and the slot fence for the type. An unapproved cut has no row. Readers: both outside pages (`presentation-page-service`, `briefing-page-service`) list and open it only when `bindPresentationVideo` returns `bound` (current transcript revision, boundary and RECORDING winner id and eTag all match; no current TRANSCRIPT means `stale`, the Stage 5 fail-closed rule), serve `video/mp4` for this type only, allow `watch` for this type only, and keep the pinned-eTag check at open; the buffering briefing document route still refuses producer rows. Staff readers: `POST_PRESENTATION_ARTIFACT_TYPES` (`material-model.js`) and the Workbench logistics feed (`MATERIAL_TYPES`). It is never a RECORDING: no reader maps it to type 100000005, and the pre-site distribution `MATERIAL_TYPES` excludes it. Stage 5 must add an authorized-retirement transition before deleting a TRANSCRIPT or RECORDING row an approved video depends on.
 - **Boundary proposal, stray-line guard** (Production-live 2026-10-05: PR #437
   merge `9dfec5479`, deployment 6865805766 success): a short applicant
   line (three words or fewer) that starts more than two minutes after the

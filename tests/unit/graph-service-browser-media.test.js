@@ -92,7 +92,7 @@ test('resolves one-shot media and reads only the requested signature range', asy
     id: 'item-1',
     name: 'proof.mp4',
     size: 80_000_000,
-    file: { mimeType: 'video/mp4' },
+    file: { mimeType: 'video/mp4', hashes: { quickXorHash: 'qx-live' } },
     '@microsoft.graph.downloadUrl': 'https://media.example/one-shot',
   };
   global.fetch
@@ -102,7 +102,7 @@ test('resolves one-shot media and reads only the requested signature range', asy
 
   await expect(GraphService.resolveMediaDownloadUrl('drive-1', 'item-1')).resolves.toMatchObject({
     driveId: 'drive-1', itemId: 'item-1', downloadUrl: 'https://media.example/one-shot', mimeType: 'video/mp4',
-    eTag: metadata.eTag || null,
+    eTag: metadata.eTag || null, quickXorHash: 'qx-live',
   });
   await expect(GraphService.readMediaRange('drive-1', 'item-1', { start: 0, end: 31 })).resolves.toMatchObject({
     itemId: 'item-1', bytes: Buffer.alloc(32), contentRange: 'bytes 0-31/80000000',

@@ -82,6 +82,12 @@ const sharedAuthProxy = withAuth(
       // tenant-hosted session URL for the governed SharePoint drive.
       connectSrc += ` ${GRAPH_UPLOAD_ORIGIN} ${SHAREPOINT_CANONICAL_ORIGIN}`;
     }
+    if (isPresentationMaterialsPage) {
+      // View slides / View proposal fetch the PDF through the open route's redirect to the
+      // tenant's short-lived download URL (Microsoft serves every file as a download), then
+      // show a local copy. Same single origin media-src already allows; this page only.
+      connectSrc += ` ${SHAREPOINT_CANONICAL_ORIGIN}`;
+    }
     if (isTranscriptionPilotPage) {
       // Browser-direct private Blob uploads are scoped to this authenticated
       // Admin surface and use short-lived single-path client tokens.

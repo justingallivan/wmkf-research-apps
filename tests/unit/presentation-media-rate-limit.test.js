@@ -2,6 +2,7 @@
 import {
   checkPresentationContextRateLimit,
   checkPresentationMediaRateLimit,
+  checkPresentationProposalCheckRateLimit,
 } from '../../lib/external/presentation-media-rate-limit.js';
 
 const req = { headers: { 'x-forwarded-for': '203.0.113.8' }, socket: {} };
@@ -54,5 +55,21 @@ test('page context uses a separate fail-closed bucket and budget from media acti
   await expect(checkPresentationContextRateLimit(req, 'token', {
     query: async () => { throw new Error('postgres down'); },
     now: () => 10_000,
+  })).resolves.toEqual({ ok: false, reason: 'rate_limit_unavailable', retryAfterSeconds: 5 });
+});
+
+test('the automatic proposal check uses its own fail-closed buckets and the page-load budget, never the media buckets', async () => {
+  const seen = [];
+  const query = (hits) => async (strings, ...values) => {
+    seen.push(values);
+    return { rows: [{ bucket_key: values[0], hit_count: hits }, { bucket_key: values[2], hit_count: 1 }] };
+  };
+  await expect(checkPresentationProposalCheckRateLimit(req, 'token', { query: query(30), now: () => 10_000 })).resolves.toEqual({ ok: true });
+  await expect(checkPresentationProposalCheckRateLimit(req, 'token', { query: query(31), now: () => 10_000 }))
+    .resolves.toMatchObject({ ok: false, reason: 'rate_limited' });
+  expect(seen[0][0]).toMatch(/^presentation-proposal-check-tok:/);
+  expect(seen[0][2]).toMatch(/^presentation-proposal-check-ip:/);
+  await expect(checkPresentationProposalCheckRateLimit(req, 'token', {
+    query: async () => { throw new Error('postgres down'); }, now: () => 10_000,
   })).resolves.toEqual({ ok: false, reason: 'rate_limit_unavailable', retryAfterSeconds: 5 });
 });

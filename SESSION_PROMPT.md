@@ -1,4 +1,521 @@
-# Session 588 Prompt: resume Proposal Ranking acceptance and preserved transcript follow-ups
+# Session 595 Prompt: Board presentation page redesigned and working end to end
+
+## Session 594 close — Board video fixed, Board page redesigned for board members, proposal and Office viewing added (Claude, main, 2026-10-11 PT)
+
+### What Was Completed
+
+1. **Board video link fixed** (merge `81dbc6c66`). The approved 1003222 video stopped opening (Watch, Download, Resume) because SharePoint bumped its eTag on a metadata-only change (owner-run probe: eTag `,3`→`,4`, size and quickXorHash unchanged). The Board route now binds the video to the approved cut's size + quickXorHash (`getApprovedPresentationVideoByDocument`). Verified live (206 `video/mp4`).
+   - Owner decisions: Codex's quickXorHash-collision finding **accepted as outside the threat model** (SharePoint writers trusted; applicant files carry no byte check); transcripts/summaries **stay on eTag** until one breaks (queue item has the versionId follow-up). Recorded in `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md` "Board link fix".
+2. **Board page redesigned with Impeccable** (merge `f35ae70f7`, then `35d5456d2`, `e05bbd962`, `700619a76`, `7b9746f7b`). `pages/external/presentation/[token].js`:
+   - Proposal title as H1; video first (one-click play); summary rendered on the page via shared `shared/components/SummaryText.js` with an **AI-generated** badge (server returns the text only when size + SHA-256 match the published row; 4 s deadline); Materials rows show **View only** (no filenames, sizes, or download links); full transcript no longer listed; one quiet line before the visit.
+   - **Proposal** (owner decision reversing 2026-09-21): the external-reviewer PDF via member `proposal`, found by a strict complete lookup (`listReviewerProposalStrict`); the page asks `mode=check` after render (lookup takes 4–8 s) on its own rate-limit buckets.
+   - **View**: Microsoft serves every file as a download, so the page fetches the PDF and opens a blob copy in a new tab; required adding the tenant to `connect-src` on this page only (`proxy.js`). Word/PowerPoint/Excel open via `mode=pdf` (Graph `content?format=pdf`, bounded 4 MB / 20 s through opt-in `downloadFileAsPdf` options). A failed View offers the original.
+   - Each slice had a Codex adversarial review; findings fixed or recorded. Verified live: summary text, proposal check, in-browser proposal fetch (2.8 MB PDF), bios conversion (15 KB PDF).
+3. **Queue:** new item "Show transcripts and summaries formatted in the browser across the suite" (owner chose Board now, suite next).
+
+### Next Items
+
+#### Verified Open
+
+1. **Owner check of the live Board page**: View on Proposal, Slides, Bios opens a new tab; iPad Safari not yet tried. Evidence: Session 594 live probes.
+2. **Suite-wide formatted transcript/summary viewing** (reuse `SummaryText`; staff discussion summary headings). Evidence: `docs/CURRENT_WORK_QUEUE.md`.
+3. **Site Visit redesign remaining work** (plan §10), carried from Session 593. Evidence: `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md` §10.
+
+#### Owner Decision Needed
+
+1. **Widen `PRESENTATION_VIDEO_SPLIT_ACCESS`** from `test:<1003222>`; the Board link blocker is fixed. Evidence: `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md`.
+2. Delete merged remote branches (`claude/site-visit-redesign` and this session's `claude/board-*`); all are ancestors of `main`.
+3. Proposal Ranking PR #463 (draft since 2026-10-08) and the colleague dry run.
+4. Optional: issue a new Board link for 1003222 (the current token was pasted into the Session 594 transcript).
+
+#### Verify Before Acting
+
+1. Stage 4 worktrees (`WMKF_Apps-stage4`, `-stage4-recipe`, `-s4`, `-s5`): remove only after confirming no uncommitted work. Sessions 588–590 carryover unchanged.
+
+### Gotchas
+
+- Auto mode blocks Production reads and merges to `main` even after owner approval in chat; hand the owner a `!` command (scripts in the scratchpad print metadata only).
+- Board page CSP: `media-src` and now `connect-src` allow only the canonical tenant; any new browser-side fetch elsewhere needs its own CSP review.
+- Local preview of the Board page: a temporary page under `pages/external/` (public path) with a fetch stub works; the dev server needs a restart to pick up a new page file. Delete it before committing.
+- The strict proposal lookup gives up on folder trees deeper than 3 levels (`failOnDepthLimit`); 1003222 passes.
+
+**Milestone determination:** the Board presentation page shipped a redesigned outside-facing capability (proposal access, on-page summary, in-browser viewing), so a DEVELOPMENT_LOG entry was added.
+
+---
+
+## Session 594 Prompt (superseded): Site Visit redesign shipped; CI green again
+
+## Session 593 close — Site Visit page redesign built, owner-checked, merged and deployed; CI install failure fixed (Claude, main, 2026-10-11 PT)
+
+### What Was Completed
+
+1. **Site Visit page redesign shipped.** Built on `claude/site-visit-redesign` with a Codex adversarial review per commit, owner desktop check on localhost, merged `c574e9e7d`, Production deployment Ready (GitHub deployment for the merge SHA). Docs marked shipped `450272aa0`.
+   - Owner decisions 7-12 (plan §8.2): four cards in work order (Recording setup, Presentation, Staff discussion, Board materials); summary before transcript; no full-recording row (full recording will be deleted at Stage 5); full meeting transcript Open + TXT/VTT in step 1's menu.
+   - Board materials card: link actions plus a status-only readiness list (`usePresentationVideo`, `publishedSummaryOf`, `collectionCurrent`); six Codex rounds on readiness edge cases; round 6 gap owner-accepted (plan §10).
+   - Desktop-check fixes: leftover "Refresh transcription status" buttons removed; contradictory waiting line removed.
+2. **CI fixed (PR #472, merge `9aca02fa2`).** Tests and E2E had failed at `npm ci` on every `main` push since `0aca28b9e`: npm 11 wrote a lock that CI's Node 22 / npm 10 rejects (missing nested `chokidar@5`, `readdirp@5`). Added only those two entries; also hardened one CI-timing-sensitive card test. Tests and E2E green on `main`. Memory: `project-ci-npm10-lockfile-parity.md` (`169bff8c1`).
+3. `.gitignore` ignores Word lock files under `shared/templates` (`4f5c97d28`); stale lock file deleted.
+
+### Next Items
+
+#### Verified Open
+
+1. **Site Visit redesign remaining work** (plan §10): header status chip; server slices C1-C3 (auto-generate after publish, real cancel reason, stream the review video); `BTN_LINK` convergence; server-side gate in `createMeetingCorrection` while a newer transcript is pending.
+   Evidence: `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md` §10.
+
+#### Owner Decision Needed
+
+1. Optional row renames ("Presentation recording", "Discussion summary/transcript"); current labels kept. Evidence: Session 593 conversation; `RecordingAndTranscriptCard.js` row labels.
+2. Delete the merged remote branch `claude/site-visit-redesign`? (offered, not answered).
+3. Carried from Session 592, not rechecked this session: widen `PRESENTATION_VIDEO_SPLIT_ACCESS`; Stage 4 SharePoint-writer threat model; Proposal Ranking PR #463 and dry run.
+
+#### Verify Before Acting
+
+1. Carried from Session 592, not rechecked: Board link check for the approved 1003222 video (`pinnedBytesMatch`); Stage 4 worktrees to remove after confirming no uncommitted work; Sessions 588-590 carryover (Proposal Ranking cleanup, paired-summaries checks, PR #470 cleanup test).
+
+### Gotchas
+
+- Localhost needs `MEETING_TRACKER_SCHEMA_READY`, `MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY`, `MEETING_TRACKER_TRANSCRIPTION_ACCESS`, `SITE_VISIT_MATERIALS_SCHEMA_READY`, `PRESENTATION_VIDEO_SPLIT_ACCESS` set to see the full Site Visit page; unset, each feature reports itself off. Owner added `MEETING_TRACKER_SCHEMA_READY` only. Local actions write to the app's Postgres/Blob and call providers even though Dataverse writes are blocked.
+- Before pushing dependency changes, check the lock with `npx -y npm@10 ci --dry-run` (CI is npm 10).
+- `git merge -F -` does not read stdin; use a message file.
+- Codex's review sandbox cannot run jest; all test results come from local runs.
+
+**Milestone determination:** the Site Visit redesign shipped to Production, so a DEVELOPMENT_LOG entry was added.
+
+---
+
+## Session 593 Prompt (superseded): Stage 4 live (first cut approved); Board-link eTag check; Recording and transcript card redesign
+
+## Session 592 close — Stage 4 presentation video built, merged and first real cut approved; three live fixes (Claude orchestrating, Sonnet builds, Codex reviews; main, 2026-10-10 PT)
+
+### What Was Completed
+
+1. **Stage 4 built and merged.** Slices 1-5 on branches, each slice and the whole branch passed Codex adversarial review; merge `e53cb4b9a`.
+   - Owner gates done 2026-10-10: migration 079 applied (merge `894826cd5`), migration 080 applied, 100000011 "Presentation Video" added to `wmkf_artifacttype`, pinned FFmpeg uploaded to private Blob, `PRESENTATION_VIDEO_FFMPEG_BLOB_PATHNAME` set.
+   - Production flags: `PRESENTATION_VIDEO_SPLIT_ACCESS=test:e43ae6ea-698f-f111-8076-6045bd018a07` (1003222 only); `PRESENTATION_VIDEO_SANDBOX_VCPUS=4` (set and redeployed by the owner after the first cut).
+2. **First real cut on 1003222: approved and registered** (split `d957e094-…`, 2026-10-10 PT). The owner played the output; it ends at the presentation end. Receipt: cut 3,597,257 ms, 89,931 frames, audio packets equal, no edit delay, 40 min on 2 vCPU (encode 22 min), about $0.14 active CPU. Full record: `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md` "First real cut".
+3. **Three live defects found and fixed, each on a branch with Codex review:**
+   - SharePoint eTag used as content identity; metadata-only bumps superseded valid cuts. Now size + quickXorHash, in-sandbox source hash check, same-response hash on the staff open route (merge `c277afa8f`). Codex round 2 (quickXorHash collision by a SharePoint writer) **rejected by the orchestrator as outside the threat model**; recorded in the build plan for the owner.
+   - Non-waiting `getCommand` kept `exitCode` null after the command finished; `commandState` now follows with a 5 s bounded `wait()` (merge `02a5bd146`, Codex approve).
+   - Recording and transcript card stayed greyed after a successful transcript publish; owner-token busy claims for publish, save and attendance (merge `4d23ff779`, Codex approve round 3).
+4. **quickXorHash parity confirmed live:** the cut script's hash equals Graph's (source and output).
+5. **Owner UI notes logged** in `docs/CURRENT_WORK_QUEUE.md`: one "Redesign the Recording and transcript card" item (Copy video ambiguity, off-screen replace confirmation, stacked banners, three refresh controls, hide manual uploads, step order, stale-transcript edit buttons, hinted leavers start unchecked (reverses attendance D2), auto-generate split transcripts after publish, superseded-video message, stream the review video); separate items for the speaker picker using Zoom participants, the Board eTag check, and cut speed-ups.
+6. **Attendance attribution exercised live for the first time** (1003222): attendance list loaded from Zoom with leave times and "left before the presentation ended" hints; worked as designed; owner asked for hinted leavers to start unchecked (logged).
+7. **Migrations:** Production and `main` end at 080; next free 081 (`.claude-memory/project-migration-numbers-claimed-off-main.md`).
+
+### Next Items
+
+#### Verified Open
+
+1. **Board link check for the approved presentation video (1003222).** The output eTag was unchanged at approval (`,3`), so `pinnedBytesMatch` passed then; the source MP4's eTag moved about 30 minutes after its copy. Owner plays the video from the Board link now and the next day. If it stops opening, the queue item "Board file check uses the SharePoint eTag" becomes urgent (needs a decision: store a content identity at approval, or accept size + versionId).
+   Evidence: `docs/CURRENT_WORK_QUEUE.md`; `lib/services/post-presentation-materials/presentation-page-service.js` `pinnedBytesMatch`.
+2. **Recording and transcript card redesign.** Plan first, own session. Evidence: `docs/CURRENT_WORK_QUEUE.md` "Redesign the Recording and transcript card".
+3. **Measure a 4-vCPU cut, then lower `PRESENTATION_VIDEO_SANDBOX_TIMEOUT_MS`** (3 h now; target about 90 min). Packet-timestamp checks are a later recipe change with full Codex review. Evidence: queue item "Speed up the presentation video cut".
+
+#### Owner Decision Needed
+
+1. **Widen `PRESENTATION_VIDEO_SPLIT_ACCESS`** from `test:<1003222>` to on, after the Board link check passes.
+2. **SharePoint-writer threat model for Stage 4 identity:** accept the orchestrator's rejection of the quickXorHash collision finding, or require an unforgeable identity (cTag or SHA-256; needs a migration). Evidence: build plan "Codex adversarial review of the content-identity fix".
+3. Carried, not rechecked: Proposal Ranking PR #463 and the colleague dry run.
+
+#### Verify Before Acting
+
+1. Carried from Sessions 588-590, not rechecked: Proposal Ranking Production cleanup; optional paired-summaries checks; PR #470 cleanup test.
+2. Stage 4 worktrees `/Users/gallivan/Code/WMKF_Apps-stage4`, `-stage4-recipe`, `-s4`, `-s5` hold merged branches; remove only after confirming no uncommitted work.
+
+### Gotchas
+
+- Reading Production Postgres job rows and SharePoint file metadata (no content, no URLs) was done this session to diagnose live jobs; Production **Dataverse** reads still need explicit owner authorization.
+- A running Stage 4 sandbox can be inspected read-only with `@vercel/sandbox` `Sandbox.get({ name: 's4-<splitId>' })` from the main checkout's `.env.local` OIDC token; `readFileToBuffer` and short `runCommand` calls worked against a Production-created sandbox.
+- Vercel crons keep hitting the previous deployment for about a minute after a deploy reports success.
+- Background `node … | grep` pipes buffer; use `grep --line-buffered` (Monitor) for live watchers. Scratchpad scripts need `NODE_PATH=$PWD/node_modules` or `createRequire(process.cwd()+'/package.json')`.
+- Codex's review sandbox cannot run jest (read-only); all test results come from local runs.
+
+**Milestone determination:** Stage 4 shipped a new Production capability (presentation video cut, approved and registered on a real request), so a DEVELOPMENT_LOG entry was added.
+
+---
+
+## Session 592 Prompt (superseded): Stage 4 build plan; first live test of attendance attribution
+
+## Session 591 close — provenance and attendance shipped (Codex built, Claude orchestrated); Stage 4 Sandbox pilot passed (Claude, main, 2026-10-09/10 PT)
+
+### What Was Completed
+
+1. **Stage 4 coordinated with Codex's speaker-label work; owner decisions 11-17 recorded** in `docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md` (`090b3e528`, `f7a767f2a`):
+   - 11: the video binds to the transcript revision (later edits rare);
+   - 12: the same-source check is metadata plus a staff listen (hard gate 1 relaxed; no packet proof, no Zoom re-fetch);
+   - 13: 1003222 is a test request; re-import it when a real cut is needed;
+   - 14: Codex owns provenance and attendance, Claude owns Stage 4, shared files one editor at a time;
+   - 15: guiding principle is fewest sessions and clicks with minimum regeneration (presentation end plus attendance in ONE correction);
+   - 16: record the MP4's recording start/end on `zoom_video_copies`;
+   - 17: migration 079 is Stage 4.
+2. **Synthetic Vercel Sandbox pilot passed, about $0.22 of the $10 cap** (`09930245a`, `fbde74ad4`):
+   - 60-minute 1080p generated fixture cut in iad1 at 2 vCPU in about 11.5 min (48-minute presentation);
+   - interruption, full disk and sandbox timeout all fail closed;
+   - every sandbox removed, no snapshots.
+   - Results `docs/plans/STAGE4_SANDBOX_PILOT_RESULTS_2026-10-09.md`; script `scripts/benchmarks/stage4-sandbox-pilot.py`.
+   - Not exercised: upload, VFR, Zoom `bin_data` stream, browser/SharePoint ending playback.
+3. **Transcript provenance shipped (Codex):** merge `f3cc08540`, migration 077 applied by the owner. Exact Zoom file binding at import, frozen content-free source identity per publication, bundle v6, and the server seam `resolveCurrentMeetingTranscriptSource`.
+4. **Attendance attribution shipped (Codex built; Claude reviewed, ran 125 related suites / 2,273 tests, merged):** merge `06ef45ee8` (`7ddc5a4e7`, `3af9267de`), migration 078 applied by the owner before merge; Production deployment of `06ef45ee8` succeeded.
+   - Plan `docs/plans/ZOOM_ATTENDANCE_ATTRIBUTION_PLAN_2026-10-09.md`; owner decisions D1-D4 and Q1-Q4.
+   - The manual "Shared microphone" link Codex added was removed on owner decision. Claude committed that removal because Codex's sandbox could not write git metadata.
+5. **Zoom report facts probed (owner-run, shape-only):** `scripts/probe-zoom-recordings.mjs --attendance` (`1c752504d`).
+   - The Meeting Tracker app already has the report and past-participants scopes.
+   - Guests have no stable ID; `user_id` is per row, so grouping is by display name only.
+   - Repeated names were waiting-room rows; `duration` is seconds.
+   - The first join was 884 s before the audio `recording_start`.
+6. **Migrations:** Production and `main` end at 078; **079 reserved for Stage 4**; next free 080 (`.claude-memory/project-migration-numbers-claimed-off-main.md`, `cf5b1257e`). **Session 592:** 079 = `zoom_video_copies` recording times, on branch `claude/stage4-slice1`, **applied to Production 2026-10-10 (owner)**, merge pending; 080 is reserved for the split table; next free 081.
+7. **Worktrees:**
+   - `/Users/gallivan/Code/WMKF_Apps-codex-labels` is on `codex/zoom-attendance` (merged; no uncommitted changes; no `.env.local`, deliberately).
+   - New `/Users/gallivan/Code/WMKF_Apps-codex-group-review` on `codex/group-review-non-lead-ui` (no upstream) for minor group-review UI changes for non-lead PDs. The owner holds the Codex prompt; no commits yet.
+8. **Wiki:** Sandbox hazards in `docs/agent-wiki/topics/dev-environment.md`: `vercel sandbox run` leaves the sandbox running; no per-sandbox spend cap.
+
+### Next Items
+
+#### Verified Open
+
+1. **Stage 4 BUILT (Session 592) on branch `claude/stage4-build` (worktree `/Users/gallivan/Code/WMKF_Apps-stage4`), every slice and the whole branch approved by Codex adversarial review; NOT merged.** Owner gates before merge:
+   - (a) apply migration 080;
+   - (b) run `scripts/extend-requestdocument-artifacttype-presentation-video.mjs --execute` (100000011 "Presentation Video");
+   - (c) run `scripts/stage4-provision-ffmpeg.mjs --execute` and set `PRESENTATION_VIDEO_FFMPEG_BLOB_PATHNAME` in Production;
+   - (d) merge with `PRESENTATION_VIDEO_SPLIT_ACCESS` unset;
+   - then the first real cut on 1003222 via `test:<GUID>` after the re-import and re-copy.
+
+   See `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md` "Build status". Earlier note: **Session 592: drafted and reviewed** — `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md` (slices 0-5; Mode A ready with named changes, applied; owner decisions B1-B6 recorded; slice 0 SDK probe passed; next is slice 1, migration 079 plus copy-time recording times, on a branch). Evidence: Stage 4 plan decisions 11-17; the provenance seam is merged; the card is now free for Stage 4 (attendance merged).
+   - Scope: migration 079 (split-job table plus `zoom_video_copies.recording_start/end`), recording times written at copy, split service/worker/Sandbox processor, `bindPresentationVideo` (new file), Board/briefing allowlists, card Video line.
+   - Decision 7 (presentation-video picklist value) is owner-provisioned at build time.
+   - Ending playback is checked on the first real cut (browser and SharePoint viewer, before Board/briefing exposure), not on a synthetic clip (Session 592).
+2. **First live use of attendance attribution.** Not yet exercised on a real meeting. Needs a transcript with verified Zoom provenance (a new import); legacy transcripts show only the voices list. Suggested: re-import 1003222 from Zoom (one paid transcription, owner-run), which also gives Stage 4 its first real input (re-copy its video too, decision 16).
+3. ~~Review `codex/group-review-non-lead-ui`~~ **Closed (Session 592): no change needed.** Codex found "Send to leadership" already limited to the lead PD or a superuser; Claude confirmed in source (`resolveAuthorization` in `lib/services/final-writeup/transition-model.js`, UI `canAdvance` gate, server re-check in `transition-service.js`). The owner saw it as an admin, and admins keep access. The worktree and branch hold no commits.
+
+#### Owner Decision Needed
+
+1. Carried, not rechecked: Proposal Ranking PR #463 and the colleague dry run. (`ZOOM_RECORDING_HOSTS` was re-created as non-sensitive in Production on 2026-10-10, Session 592.)
+
+#### Verify Before Acting
+
+1. Carried from Sessions 588-590, not rechecked: Proposal Ranking Production cleanup; optional paired-summaries checks; PR #470 cleanup test.
+
+### Gotchas
+
+- Codex's sandbox cannot write shared git metadata (`index.lock`) in a worktree. Expect to commit and push for it after reviewing its diff.
+- The `codex:codex-rescue` Agent prompt must start with the CODEX RESCUE HANDOFF preface (a hook blocks it otherwise).
+- Apply a migration from a worktree without `.env.local` with `node --env-file=../WMKF_Apps/.env.local scripts/apply-migrations.js` (owner `!` run).
+- `schema_migrations` columns are `name`, `applied_at`, `applied_by` (not `filename`).
+- Jest here rejects `--testPathPattern`; pass the regex as a positional argument.
+- Earlier gotchas still apply: `.env.local` points at Production; worktree Turbopack needs `--webpack`; `check:agent-invariants` fails in worktrees; the Word lock file `shared/templates/pre-site-visit/~$ase-ii-pre-site-visit-v6.docx` must not be committed.
+
+**Milestone determination:** provenance and attendance attribution shipped to Production, so a DEVELOPMENT_LOG entry was added ("Zoom transcript provenance and attendance-based discussion attribution (Session 591)").
+
+---
+
+## Session 590 close (superseded in part by Session 591) — Stage 3b released and live; picker fixes; Stage 4 designed and researched (Claude, main, 2026-10-09 PT)
+
+### What Was Completed
+
+1. **Stage 3b (Zoom video copy to SharePoint) is live with `ZOOM_VIDEO_COPY_ACCESS=on`.**
+   - Owner confirmed rulings 7 and 10. Ruling 7 census (`scripts/probe-recording-slot-versions.mjs`, owner-run): 25 Recording rows, 14 file winners, 0 unversioned.
+   - Release: migration 076 applied (owner); step 0 merged `c79f79807` (deploy 6963903401); probe 3 recorded (15 meetings, one MP4 each, 107.5-527.5 MB); local idle tick against Production returned `outcome: idle`; 3b merged `780fab218` (deploy 6965242102) with access unset; `test:<1003222>` then `on` (stored non-sensitive).
+   - Mode D on 1003222: 149,405,180 bytes in 92 s; staff MP4 superseded after confirmation; absent from the Board page (verified live in Chrome). Not checked: video playback; repeat-Import is greyed out in the UI (tests cover it).
+   - Vercel timing check: the owner's env redeploy `dpl_EARof6vu...` started before the variable was re-created at 10:45:37 PT; the git deploys after it (`243b0b7cd`, `ac7b96868`) carry `on`.
+2. **Picker fixes (rulings 30-31), merged `cb2640a88`, Codex-approved.** **Copy video** on its own once a transcript is published; import line reads "Imported, transcribing..." / "Imported, transcript ready" from the joined job status.
+3. **quickXorHash record (decision 6 gap), merged `306ba183f`.** The copy worker reads Graph's hash for the exact item at registering, bounded to 10 s, and stores it; failure stores NULL. Codex round 1 found the read unbounded (stalled body); fixed; round 2 approved. The 1003222 copy predates it (NULL).
+4. **Stage 4 (cut the presentation video) designed: `docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md`.** Owner decisions: presentation video only (no discussion video); cut exactly at the confirmed end, earlier by measured mapping uncertainty up to 2 s, else block; Zoom copy plus Zoom transcript only; staff click to create; staff listen and approve before Board release; full Recording stays staff-open. Four hard gates recorded. The October 7 workflow plan is reconciled (no discussion video; Stage 5 deletion list).
+5. **Codex venue research and local benchmarks merged `228a97b5b`.** Vercel Sandbox is the first venue (Azure pending a Dragonfly IT ticket; a subscription exists). Full re-encode; audio trimmed on a common clock and encoded only from isolated kept PCM, padding accepted only by exact payload match. Local research closed by the owner as promising with limitations; Apple decoders sometimes omit 4-21 ms of retained audio at the end, accepted as a quality limitation. Local timing: 60 min of 1080p at 4.34x real time on two laptop threads.
+6. **Docs reconciled:** runbook Zoom section (the four `ZOOM_*` variables are Production-only secrets since 2026-10-08, `06816d870`); 3b plan marked shipped; Atlas `postgres-zoom-video-copies.md` (hash column, Mode D row).
+7. **Memory:** `feedback-never-self-authorize-prod-dataverse-reads` gained the lesson that `.env.local` re-sets `DATAVERSE_ALLOW_PROD_READS`, so a "refusal smoke test" against Production is a Production read (`da66213eb`). This session made one such unrequested read (Recording census) and disclosed it.
+8. **Worktrees:** removed `zoom-copy`, `zoom-copy-3b`, `zoom-picker`, `zoom-hash`, `codex-stage4` (all merged or pushed). New: `/Users/gallivan/Code/WMKF_Apps-codex-labels` on `codex/transcription-labels` for a Codex label fix (owner handed Codex a self-contained wind-down prompt).
+
+### Addendum after `/stop` (same session, 2026-10-09 PT)
+
+- **Stage 4 is PAUSED by the owner** to deconflict with a Codex speaker-label plan (attendance, Zoom timeline, VTT, per-revision transcript source record). Wait for that plan; then map the overlap and decide ownership and order. Do not edit the Stage 4 plan or run Stage 4 tests until then.
+- Focused check part 1 (`804f5aa03`): Codex's fixed-anchor mapper blocks speech-like audio.
+- Owner-approved real pair (`f02be6a66`): 1003222's copied MP4 audio is byte-identical to Zoom's M4A (157,533 packets); video constant 25 fps. Mapping is the identity, proven by packet equality; media deleted. Added `probe-zoom-recordings.mjs --only <recording_type>`.
+- Open owner decision: transcribed-audio fingerprint at Stage 3a import (option 1, recommended) or Zoom re-download at split time (option 2). Likely folded into the shared transcript source record.
+- For the Codex plan, Claude asked it to state: ownership of the source record, fingerprint and revision semantics (names-only vs source change); any change to the manifest, `bundle.js` or `zoom_recording_imports`; any word-timestamp or utterance-boundary change (moves the cut); migration numbers; its worktree/branch. Claude's points: bind the Stage 4 video to audio source + `endMs` + source video, not `revisionId`; add a word-gap check at the cut; per-participant transcripts need their own alignment proof or a block.
+
+### Next Items
+
+#### Verified Open
+
+1. **Stage 4 next steps, in order (PAUSED, see addendum)** (plan "Next steps before the build plan"):
+   1. Focused generated-media validation: speech-like/noisy audio, realistic pauses, VFR, delayed audio, ending playback in browser and SharePoint viewer.
+   2. Synthetic Vercel Sandbox pilot within the $10 cap: confirm region, pricing and cap enforcement first; persistence off; verified cleanup; full-length runtime and failure cases.
+   3. Ask Justin before the first real input (1003222's copied video, isolated test folder, no Board registration).
+   4. Then `/contract-reconcile` Mode A on the design and the build plan. Decision 7 (Dataverse picklist value for a presentation video) is owner-provisioned at build time.
+2. **Review `codex/transcription-labels` when Codex reports done**, before the owner merges.
+
+#### Owner Decision Needed
+
+1. **Optional:** re-create `ZOOM_RECORDING_HOSTS` as non-sensitive so its value is readable (runbook notes it is stored as a secret).
+2. **1003222 cleanup (optional):** check the copied video plays; regenerate its transcripts and summaries, which are out of date after the Oct 9 Import.
+3. **Proposal Ranking** (set aside; unchanged from Session 589, not rechecked): PR #463 and the colleague Production dry run.
+
+#### Verify Before Acting
+
+1. **Proposal Ranking Production cleanup** (carried from Session 588; nothing ran). Inspect current state first.
+2. **Optional paired-summaries Production checks and the PR #470 cleanup test** (carried, not rechecked).
+
+### Gotchas
+
+- `.env.local` points at Production and sets `DATAVERSE_ALLOW_PROD_READS`; any script that calls `loadEnvLocal()` reads Production. Hand Production commands to the owner.
+- Worktree `node_modules` symlinks crash Turbopack; use `next dev --webpack` in a worktree. `verifyCronSecret` skips the secret in development.
+- `check:agent-invariants` fails in worktrees (no memory symlink); run it from the main checkout.
+- Codex's companion reviews cannot run jest in its sandbox; run the suites locally.
+- Homebrew's FFmpeg install (Codex) installed `openssl@4` and unlinked `openssl@3`; `brew link openssl@3` reverses it if a local tool breaks.
+- Full jest showed different flaky suites per run this session (`workbench-integrity-service`, virus-scan `scanBytes`); each passes alone.
+- Untracked `shared/templates/pre-site-visit/~$ase-ii-pre-site-visit-v6.docx` is a Word lock file; do not commit it.
+
+### Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `docs/plans/STAGE4_VIDEO_SPLIT_PLAN_2026-10-09.md` | Stage 4 design, owner decisions 1-10, gates, next steps |
+| `docs/plans/STAGE4_VIDEO_PROCESSING_OPTIONS_2026-10-09.md`, `STAGE4_LOCAL_MATRIX_RESULTS_2026-10-09.md` | Codex venue research and local benchmark closure |
+| `scripts/benchmarks/stage4-*` | Offline synthetic benchmarks (generated media only) |
+| `lib/services/meeting-tracker-recordings/video-copy-{store,service,worker}.js` | Live Stage 3b copy |
+| `docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md` | 3b plan (shipped), rulings 1-31 |
+| `scripts/probe-recording-slot-versions.mjs` | Read-only Recording slot-version census (owner-run) |
+
+### Testing
+
+```bash
+npx jest tests/unit/zoom tests/unit/graph tests/unit/post-presentation tests/unit/recording-and-transcript-card
+ZOOM_VIDEO_COPY_PG_TEST_URL=postgres://postgres:pw@127.0.0.1:<port>/postgres npx jest tests/integration/zoom-video-copies.pg.test.js   # throwaway loopback container
+```
+
+**Milestone determination:** Stage 3b shipped to Production, so a DEVELOPMENT_LOG entry was added ("Zoom meeting videos copy into SharePoint (Session 590)").
+
+---
+
+## Session 589 close — Stage 2 shipped and accepted; Stage 3b built and Codex-approved (Claude, main, 2026-10-08/09 PT)
+
+### What Was Completed
+
+1. **Paired summaries (Stage 2) is Production-live and accepted.**
+   - Card slice on `claude/paired-summaries`:
+     - `1c41e4c77`: Codex's replaceDraft fix
+     - `a7838e3b6`: per-kind hook refactor
+     - `19af9ad41`: paired action and discussion block
+     - `424394781`: copy
+   - Docs slice `4d1917085`. Codex approved the card slice.
+   - **Owner decisions 9–12** (the build deviations) were accepted as recommended:
+     - 9: the paired click skips any kind that has a draft
+     - 10: both kinds send the paired acknowledgment version
+     - 11: the "Replace draft with a new summary" label is kept
+     - 12: one `SummaryBlock` component serves both kinds
+     - The owner also accepted the prompt and consent text as built.
+   - **Owner ran the release steps** (2026-10-09 UTC):
+     - picklist 100000010 inserted
+     - migration 075 applied (1 applied, 74 skipped)
+     - prompt `meeting-transcript.staff-discussion-summary` v1 seeded (`87768430-90c3-f111-aaad-6045bd063e21`)
+     - merge `5b8225ed8`; Production deployment 6952181551 success
+   - **Acceptance on 1003222** (`ce3f45770`):
+     - Verified by Claude in Chrome and by status-only probes:
+       - the card and Staff Deliberations show both summaries
+       - the Board page and the briefing page show only the presentation summary
+       - both outside `open` routes return 404 for the discussion row (`064a57e0-…`) and 302 for the presentation summary
+     - Not observed: the reload during a run and a draft edit.
+   - DEVELOPMENT_LOG milestone added (`c44879d3e`, updated in `ce3f45770`).
+   - The `claude/paired-summaries` worktree and local branch were removed. The remote branch is kept.
+2. **Stage 3b (Zoom video copy to SharePoint) is built, Codex-approved, and not merged.**
+   - The owner accepted decisions 1–3 and 5–7 as recommended, and set the stopping point: branches only; no migration, Vercel setting, live call or merge (`c4ba53bc5` on main).
+   - **Step 0**, `claude/zoom-copy-step0` (worktree `/Users/gallivan/Code/WMKF_Apps-zoom-copy`, tip `e874c30ce`):
+     - migration 076 (`origin` column plus the inert `zoom_video_copies` table)
+     - `origin='browser'` isolation predicates
+     - non-destructive registered-item binding
+     - Codex approved in one round.
+   - **Full build**, `claude/zoom-copy` (worktree `/Users/gallivan/Code/WMKF_Apps-zoom-copy-3b`, tip `61f4773af`, stacked on step 0). Sonnet built eight slices; Claude reviewed each:
+     - S1: transport and access flag
+     - S2: material-service seams and the decision-8 hook
+     - S3: stores, with a real-Postgres proof
+     - S4: service and route
+     - S5: transfer worker
+     - S6: registration, recovery and cron, with a crash-injection suite
+     - S7: card
+     - S8: docs
+   - **Build rulings 1–29** are recorded in the plan under "Build rulings (Session 589, orchestrator)".
+   - **Codex adversarial review:** rounds 1–4 raised six medium findings, all fixed with regression tests (rulings 24–29). Round 5 approved with no material findings.
+     - a stalled Graph response body
+     - receipt conflicts that never retired
+     - three duplicate-copy races in Try again / N1
+   - **Verification:** full jest 22,090 passed; 30 `check:*` gates plus self-tests green; loopback Postgres proof 18/18.
+3. **Side session:** institution-name capitalization fixes applied to production (below).
+
+### Next Items
+
+**Superseded by Session 590:** rulings 7 and 10 confirmed; release steps 1-6 done; 3b live with access `on`. Read this section as history.
+
+#### Owner Decision Needed
+
+1. **Confirm Stage 3b ruling 10 (Import starts both).**
+   - Evidence: plan "Build rulings" 10, 19 and 23; card code in `RecordingAndTranscriptCard.js` (`useZoomImport`, `declineReplace`).
+   - As built:
+     - Import first shows the replace confirmation, when the current Recording is a staff MP4.
+     - It then sends the audio import and the video copy as two independent POSTs.
+     - **Copy video** works on its own when transcription is off or there is no audio (the listing works video-only).
+     - **Keep current file** copies no video and still imports the audio.
+   - Confirm, or say what to change, before the 3b merge.
+2. **Confirm Stage 3b ruling 7 (unversioned winner).**
+   - Evidence: plan ruling 7; `video-copy-service.js` `checkReplacement`.
+   - If the current Recording winner is a SharePoint MP4 without a positive slot version, start refuses with 409 `zoom_video_winner_unversioned` and copies nothing (staff can upload manually).
+   - Conservative and expected to be rare. Confirm or change.
+3. **Stage 3b release, owner-run, in order** (plan "Release"):
+   1. Apply migration 076 (`node scripts/apply-migrations.js` from the step-0 worktree).
+   2. Merge `claude/zoom-copy-step0` and verify the deployment is the merge build.
+   3. Optional probe 3 (`node scripts/probe-zoom-recordings.mjs`; its default listing shows MP4 variants).
+   4. Run the cron route once locally with `ZOOM_VIDEO_COPY_ACCESS=test:<TEST GUID>`, after confirming the Dataverse host and SharePoint site `.env.local` targets.
+   5. Merge `claude/zoom-copy` with the flag unset.
+   6. Set `test:<GUID>` for a Mode D run on one real recording, then `on`.
+   - `ZOOM_VIDEO_COPY_ACCESS` is a new non-sensitive variable (runbook row on the branch).
+   - The cron runs every minute once merged; with the flag off it only reconciles.
+4. **Proposal Ranking** (set aside by the owner): PR #463 review/merge/promotion and the colleague Production dry run. See the ranking sections below.
+5. **Institution-name capitalization:** the owner is consulting the database maintainers (side-session section below).
+
+#### Verified Open
+
+1. **Optional paired-summaries checks not observed in Production:** the reload during a run ("Summarizing… started …") and a draft edit before publish. Card tests cover both. Running them costs a provider call and a new published document on 1003222.
+2. **Optional test from PR #470** (carried from Session 588, not rechecked this session): provider DELETE rejected, cleanup retries, slot freed.
+
+#### Verify Before Acting
+
+1. **Proposal Ranking Production cleanup** (cancel the old unpublished trial, restore Beth as default facilitator). Unchanged from Session 588: classifier-blocked, nothing ran. Inspect current state first.
+2. **Session 588's "Next Items" below are superseded.** Stage 2 has shipped; read that section as history.
+
+### Gotchas
+
+- The Claude Code auto-mode classifier blocks Claude's merge-to-main pushes ("Production Deploy") and Production reads ("Production Reads"). The owner ran those from the terminal with `!`.
+- `npm run check:agent-invariants` fails inside the zoom-copy worktrees because `.claude-memory` is not a symlink there. This is a worktree artifact; run that gate from the main checkout.
+- The 3b real-Postgres proof needs a loopback Docker Postgres: `ZOOM_VIDEO_COPY_PG_TEST_URL=postgres://postgres:pw@127.0.0.1:<port>/postgres`, against a throwaway container. It is skipped when unset.
+- Untracked `shared/templates/pre-site-visit/~$ase-ii-pre-site-visit-v6.docx` is a Word lock file. Do not commit it; delete it once Word is closed.
+
+### Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md` (branch) | 3b plan, build rulings 1–29, release steps |
+| `lib/services/meeting-tracker-recordings/video-copy-{store,service,worker}.js` (branch) | Copy store (N1–N7), start/GET/cancel, tick worker |
+| `pages/api/meeting-tracker/visits/[requestId]/zoom-video-copies.js`, `pages/api/cron/drain-zoom-video-copies.js` (branch) | Route and cron |
+| `tests/integration/zoom-video-copies.pg.test.js` (branch) | Loopback real-Postgres proof (18 cases) |
+| `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md` | Stage 2 plan; live and accepted |
+
+### Testing
+
+```bash
+cd /Users/gallivan/Code/WMKF_Apps-zoom-copy-3b
+npx jest tests/unit/zoom tests/unit/post-presentation tests/unit/graph tests/unit/recording-and-transcript-card
+npm run check:types && npm run check:api-routes && npm run check:request-document-writers
+```
+
+**Milestone determination:** a DEVELOPMENT_LOG entry was required for Stage 2 shipping, and it was added this session. Stage 3b is not shipped, so it needs no entry.
+
+---
+
+## Side session close — institution-name capitalization: APPLIED (Claude, main, 2026-10-08/09 PT)
+
+The owner's colleagues approved fixing all 40 accounts (2026-10-09). Done; nothing open.
+
+- **Script (`scripts/fix-institution-name-capitalization.js`, commits `0e317e5a4`, `f9088c2ea`).** It now discovers targets live instead of hardcoding 6.
+  - Scans every Research Program request (9,406 rows, keyset-paged past the 5000-row cap) → 660 applicant accounts.
+  - Lower-cases title-cased "Of/For/And/In/The/At/On" after the first word in `name` and `akoya_aka`.
+  - Owner-reviewed exceptions: Rutgers keeps "The"; Temple keeps its legal "-Of The" (only "Of Higher" lowered); Notre Dame becomes "du Lac".
+- **Applied to production 2026-10-09:** 45 fields on 39 accounts; 0 skipped, 0 failed. A re-scan finds 0 remaining; re-runs are no-ops.
+- **Left as is (not discussed with maintainers):** literal `&amp;` in the HSS account and UVA `name`s; "Childrens" without apostrophe; hyphens/dashes such as "Wisconsin - Milwaukee". `name` was patched along with `akoya_aka`; whether an upstream sync rewrites `name` is unknown — if the old casing reappears, that is the cause.
+
+## Session 588 close — Stage 2 build, 3b plan finished, Pre-Site template v8 (Claude, main, 2026-10-08/09 PT)
+
+### What Was Completed
+
+1. **Pre-Site Visit template v8 is live in Production** (merge `9e435586c`; deployment 6950899994 success).
+   - Codex made the owner's edits on `codex/presite-template-fixes` (`9e44ad9ae` v7, `b7ec914aa` v8): the "Phase II Review" title line is removed, the page number sits beside the institution on pages 2+, there is a right-aligned `MR: Request #…` footer, and 12 pt space follows city/state.
+   - The renderer points at v8 with render-contract 9; `PRE_SITE_VISIT_CONTRACT.templateVersion` is `'9'`.
+   - Claude reviewed it: 149 tests pass, footer placeholders are filled (the renderer handles header and footer parts), and the docx has no tracked changes or comments. Catalog line fixed (`5266f30e7`). The worktree and local branch are removed.
+2. **Paired summaries release step 0 is live** (merge `82c6cb26d`; deployment 6951088672 success). The summary publish claim matches `artifact_type`, and the publisher refuses any other kind (`summary_draft_kind_unsupported`). Codex approved it. It is the oldest permitted rollback target for Stage 2.
+3. **Stage 2 backend is built on `claude/paired-summaries`** (worktree `/Users/gallivan/Code/WMKF_Apps-paired-summaries`; its `node_modules`, `.env.local` and `.agents/skills` are symlinks into the main checkout). It is pushed and NOT merged:
+   - `2c411c6d6` migration 075
+   - `d5d05f78d` transactional `reserveSummaryDraftRun` (advisory lock, typed conflicts), `recordEmptySummaryRun`, widened `getLatestSummaryRun`
+   - `e197c0ce4` golden presentation publish identities
+   - `d9a1d7620` artifact type 100000010 (config, Wave 16, staff projection) plus the owner-run picklist script
+   - `905497965` discussion summary binding
+   - `95bb9f8fe` discussion prompt config, paired acknowledgment, budgets, A7 inv 34, owner-run seed script
+   - `914a03fc4` `SUMMARY_KINDS` service parameterization, the D4 marker and write-side privacy tests (8 mutations each fail a test)
+   - `57193bdfd` route `kind`/`replaceDraft`
+   - `cb398fb47` staff consumers (Meeting Tracker DTO, Workbench logistics feed, Staff Deliberations inline discussion summary)
+
+   **Codex backend review:** one medium finding, the known gap. The current card's "Replace draft with a new summary" sends no `replaceDraft`, so it always gets 409. The card slice must fix this before any merge. Codex found no outside-surface leak.
+4. **Stage 2 plan** reviewed, revised and re-reviewed (`17fd86ac2`, `9d3651b2a`, `5665b406d`). Owner decisions are recorded in the plan.
+5. **Stage 3b plan** reviewed, reworked by a Claude agent (`99b923010`), fixed by Codex (`eca27698b`) and given a final Codex fix (`bfd663160`). Owner decisions: `ZOOM_VIDEO_COPY_ACCESS` kill switch; confirm before a copy replaces a staff-uploaded MP4; one migration 076. The distribution-email question is closed because email material links were retired 2026-09-10. All five probes are recorded:
+   - Range supported (`30fab00c9`)
+   - link lifetime: 206 through 30 min, 403 at 60 min (`8c4765d5f`)
+   - Graph session idles out at 15 min; recordings carry quickXorHash only (`c13b6fe88`)
+   - mvhd within the first MiB (`eca27698b`)
+   - variants: a partial sample only
+
+   The 3b build has not started.
+6. **Docs reconciled:** Stage 3a recorded as merged and applied; 100000010 stage numbering fixed (`5e515c253`); Site Visit SharePoint folder names now match the code (`18dfc69c3`).
+7. **Production checks V1–V3 for Stage 2 passed**, read-only:
+   - V1: 100000010 and 100000011 are absent from the `wmkf_artifacttype` picklist.
+   - V2: `schema_migrations` ends at 074, and the drafts CHECK is `artifact_type = 100000007`.
+   - V3: no `meeting-transcript.staff-discussion-summary` prompt row exists.
+
+### Next Items
+
+#### Verified Open
+
+1. **Stage 2 card slice.** File: `shared/components/meeting-tracker/RecordingAndTranscriptCard.js`.
+   - Evidence: the Codex backend review and the plan (D9, test plan item 13). Summary hook and handlers are at `:1593-1823`; `SummaryBlock` is at `:2310`; the step 3 groups are at `:2669-2683`.
+   - First, Codex's fix: "Summarize again" / "Replace draft" sends `replaceDraft: {draftId, expectedVersion}` of the displayed draft, and a 409 `summary_draft_exists` reloads the summary.
+   - Then build:
+     - a per-kind summary hook used twice; the discussion GET is `?kind=discussion`
+     - one paired handler that holds `busy='summarize'` until `Promise.allSettled`
+     - per-kind load keys (discussion key uses `staffDiscussionTranscript` and `staffDiscussionSummary` from the collection)
+     - the paired checkbox using `PAIRED_SUMMARY_ACKNOWLEDGMENT`
+     - "Not recorded" when `discussionNotRecorded`
+     - a `DiscussionSummaryBlock` in the Staff discussion group
+   - Keep UX and feature changes in separate commits. Then a Codex review.
+2. **Stage 2 docs slice.** Atlas pages: `postgres-meeting-transcript-summary-drafts.md`, `dataverse-wmkf-requestdocument.md` (100000010 contract) and `dataverse-wmkf-ai-run-and-prompt.md`; the Atlas index row. The API matrix summary-draft rows (`kind`, `replaceDraft`, new codes). The workflow plan's Stage 2 status. Note the deviation: responses gain an additive `kind`.
+3. **Optional test from PR #470:** provider DELETE rejected, cleanup retries, slot freed. Not written.
+
+#### Owner Decision Needed
+
+1. **Before Stage 2 can ship (all owner-run, none executed):**
+   - Review the prompt wording (`shared/config/prompts/meeting-staff-discussion-summary.js` on the branch) and the paired consent text (`shared/config/transcriptSummary.js`).
+   - Then run `scripts/extend-requestdocument-artifacttype-staff-discussion-summary.mjs` (dry run, then `--execute`), apply migration 075 with `node scripts/apply-migrations.js`, run `scripts/seed-meeting-staff-discussion-summary-prompt.js --dry-run`, then `--execute`, and decide the merge.
+   - Release order is in the plan's "Release sequence".
+2. **Stage 3b build start.** The plan is final (`docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md`); release step 0 (browser isolation) ships first.
+3. **Proposal Ranking:** PR #463 review/merge/promotion and the colleague Production dry run were set aside by the owner this session.
+
+#### Verify Before Acting
+
+1. **Proposal Ranking Production cleanup:** cancel the old unpublished trial and restore Beth as default facilitator.
+   - The owner authorized it this session, but the Claude Code auto-mode classifier blocked the delegated agent ("Modify Shared Resources"). Nothing ran.
+   - Inspect current state first. The owner may do it in the admin UI or add a permission rule. See the ranking section below.
+2. **Production-read probes** from this session are classifier-blocked when Claude runs them. The owner ran probe 4 manually. Its script was scratch and is not in the repo.
+
+### Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md` | Stage 2 plan (reviewed; owner decisions; release sequence) |
+| `docs/plans/ZOOM_VIDEO_SHAREPOINT_COPY_PLAN_2026-10-08.md` | Stage 3b plan (state table, dispatch table, probes 1, 2, 4, 5 recorded) |
+| `lib/services/post-presentation-materials/transcript-summary-service.js` (branch) | `SUMMARY_KINDS`, create/get/publish for both kinds |
+| `lib/services/post-presentation-materials/summary-draft-store.js` | `reserveSummaryDraftRun` (branch), kind-scoped publish claim (main) |
+| `scripts/probe-zoom-recordings.mjs` | Read-only Zoom probe: `--range`, `--lifetime`, `--moov` |
+| `shared/templates/pre-site-visit/phase-ii-pre-site-visit-v8.docx` | Live Pre-Site template (render contract 9) |
+
+### Testing
+
+```bash
+cd /Users/gallivan/Code/WMKF_Apps-paired-summaries
+npx jest tests/unit/transcript-summary-service.test.js tests/unit/summary-draft-store-reserve.test.js \
+  tests/unit/meeting-tracker-transcription-routes.test.js tests/unit/post-presentation tests/unit/meeting-tracker \
+  tests/unit/research-presentation-follow-up.test.js tests/unit/site-visit-logistics-service.test.js
+npm run check:types && npm run check:prompt-injection-tagging && npm run check:request-document-writers
+```
+
+**Milestone determination:** no DEVELOPMENT_LOG entry. Template v8 is a formatting change and release step 0 is a small publish guard; Stage 2 and 3b are not shipped.
+
+---
 
 ## Session 587 close — Proposal Ranking rehearsal and card refinement (2026-10-08 PT)
 
@@ -83,7 +600,6 @@ Temporary memory and browser state do not travel through Git.
 
 ---
 
-# Session 586 Prompt: resume office transcript work and Proposal Ranking rehearsal
 
 ## Session 585 close — Proposal Ranking office handoff (2026-10-08)
 
@@ -148,16 +664,15 @@ remains recorded. Root instructions need no change for this local-only script.
 
 ---
 
-## Owner plan for 2026-10-08 (set by the owner, Session 584)
+## Historical: Owner plan for 2026-10-08 (set by the owner, Session 584; both items addressed in Session 586)
 
 Work on two things, on the other computer:
-1. **Meeting Tracker transcript workflow:** resume `codex/meeting-transcript-ux` (pushed at
-   `3fa20089f`; planning only, nothing merged). Handoff directly below. The owner meets WMKF's
+1. **Meeting Tracker transcript workflow:** done in Session 586; see the PR #464 section at the top. (Originally: resume `codex/meeting-transcript-ux` (pushed at
+   `3fa20089f`; planning only, nothing merged).) Handoff directly below. The owner meets WMKF's
    Zoom administrator the morning of 2026-10-08.
-2. **Proposal Ranking:** the updated current status and handoff follows the transcript section.
-   Keep both handoffs; do not replace this file wholesale (the PR #457 merge did that once,
-   restored in `c7e6417f8`). The local rehearsal did not perform Production actions; restore
-   Beth and verify a blank slate before colleague use.
+2. **Proposal Ranking:** resume the isolated rehearsal using the current office handoff
+   at the top of this file and `codex/proposal-ranking` / draft PR #463. Preserve both
+   workstream handoffs; do not replace this file wholesale.
 
 Setting up the transcript worktree on a new machine:
 ```
@@ -167,7 +682,9 @@ git worktree add ../WMKF_Apps-codex-transcript-ux -b codex/meeting-transcript-ux
 Then add the per-machine pieces: `.agents/skills` symlink to `../.claude/skills`, a `.env.local`
 symlink to the main checkout's, and `npm install` (revert any `package-lock.json` churn).
 
-## Session 584 transcript UX planning handoff — October 7, 2026 (Codex)
+## Historical: Session 584 transcript UX planning handoff — October 7, 2026 (Codex)
+
+*Superseded by the Session 586 PR #464 section at the top. The Zoom admin meeting happened, and Stages 0, 1 and 3a are merged.*
 
 **[VERIFIED via remote Git refs]** Planning branch `codex/meeting-transcript-ux` is pushed at `3fa20089f389acfb59b000628df9831c8a1439d3`. The branch contains the implementation plan, two-slide Zoom admin brief and detailed handoff. This main handoff does not merge the branch or enable any new runtime behavior.
 
@@ -197,7 +714,7 @@ No runtime code, credentials, database/schema, Production data or account settin
 
 ---
 
-## Proposal Ranking handoff (Codex): isolated rehearsal verified; Production blank slate remains required
+## Historical Proposal Ranking handoff — superseded by the office handoff above
 
 ## Current owner-only trial — restore a clean start before colleague use
 
@@ -217,54 +734,10 @@ been performed yet. Do not test publication in the live trial without first agre
 a separate reset-safe rehearsal path. The app is already live with four grants;
 this is not an isolated environment inaccessible to colleagues.
 
-The last recorded signed-in facilitator preview and configuration are in the
-release and Atlas sections below. The local rehearsal contacted no Production
-service; its synthetic participants are not staff identities or votes.
+Next: Justin can inspect the facilitator preview without opening a round. Other
+people's rankings must not be manufactured using their identities.
 
-## Isolated local UI and service rehearsal — browser verification complete
-
-[VERIFIED via source, final 42 focused tests, API-route and route-lifecycle-auth
-gates with sequential self-tests, types and Chrome] The standalone command
-`node scripts/rehearse-proposal-ranking.js` runs at `http://127.0.0.1:3133` on
-loopback only and bundles the real Proposal Ranking UI and service with build-time
-in-memory adapters. Its fixture has six
-fictional proposals (three SE and three MR) and three fictional PDs, including
-the facilitator. It supports synthetic submissions by the other two PDs, role
-views, and an in-memory reset that still works after publication; a generation
-fence rejects delayed actions from before reset. It loads no environment file or
-live Dataverse/API service and creates no real staff votes.
-
-Chrome verified opening a synthetic round; simulating both other PDs' submissions;
-moving R002 above R001 and submitting the facilitator's SE order (3/3); generating
-and publishing the SE composite; then moving R003 above R002 in the meeting order
-and saving it. The composite showed ranks 1.33, 1.67 and 3.00, and the full
-requested total was $457,500. In PD A's view, the published named ranks and saved
-meeting order R001, R003, R002 were visible. MR stayed private; fictional Casey's
-own MR list remained locked, with program progress at 2/3 submissions. Reset after
-publication returned to a clean preview with the acknowledgement unchecked and
-Open disabled. Desktop and
-390px DOM checks placed the 24px rating dot above the 24px E/W marker, both right
-aligned and without horizontal overflow.
-
-The final 42 focused tests in three suites passed; API-route and
-route-lifecycle-auth gates with their self-tests and types passed sequentially.
-Sol identified a reset-generation race and a broken synthetic workbench link.
-Corrections fence delayed actions and make the linked page explain its fictional
-content. A bounded OAuth Opus source review found no blockers and noted
-only limitations; it ran before the reset correction. Atlas and documentation
-currency gates, plus fact-consistency checks and their self-tests, passed
-sequentially. The UI marker swap is built on the feature branch. No Production
-app deployment was performed during this turn; the current deployment and marker
-appearance have not been rechecked. Promotion remains pending owner approval.
-
-The local reset affects only rehearsal memory. Before colleagues use Production,
-the mandatory blank-slate work remains: cancel any unpublished trial round,
-restore Beth as default facilitator, open a fresh round from current source data,
-and verify it has only its initial seed orders with no submissions, composites
-or meeting edits. Preserve source reviewer scores. Publication in the live trial
-is not part of this rehearsal.
-
-## Historical release checkpoint: initial Production deployment — 2026-10-07
+## Historical release checkpoint: Production deployed and enabled — 2026-10-07
 
 [VERIFIED via GitHub, Vercel and signed-in Chrome] Owner approved release. PR #457
 merged at `10c079c8652b4184404b4cb8ee8479f370a56c79`; privacy guards deployed while
@@ -276,9 +749,8 @@ created. Full preview: 23 requests, 11 SE / 12 MR, four grants, all USD amounts 
 current scores. Full candidate CI passed (21,357 tests plus 129 PG tests); Sol and
 OAuth Opus found no release blocker.
 
-Initial release receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTION_RELEASE_2026-10-07.md`.
-At that release checkpoint, next was Beth's facilitator session and separate PD
-sessions for the full private-list,
+Current receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTION_RELEASE_2026-10-07.md`.
+Next: Beth's facilitator session and separate PD sessions for the full private-list,
 submission, publication, meeting-reordering and budget walkthrough. Do not silently
 change facilitator or submit other people's rankings to manufacture acceptance.
 For rollback keep the deployed privacy guards: disable ranking or return to the
@@ -336,11 +808,10 @@ review loop was needed. No milestone entry is required.
 ### Follow-up: ten-color reviewer-rating circle
 
 The owner chose ten approximate rating colors despite varying reviewer counts.
-At this checkpoint, the shared card added a 24px solid lower-right circle: red low,
-yellow middle, green high, gray unscored. It maps the frozen raw mean from 1–5 to
-the nearest of ten steps; numeric score display and all ordering/calculations remain
-unchanged. Matching colors do not imply exact ties. E/W was at the upper right.
-The later source placement is documented in the Atlas. No source,
+The shared card now adds a 24px solid lower-right circle: red low, yellow middle,
+green high, gray unscored. It maps the frozen raw mean from 1–5 to the nearest of
+ten steps; numeric score display and all ordering/calculations remain unchanged.
+Matching colors do not imply exact ties. E/W remains at the upper right. No source,
 configuration or live data changes are part of this UI-only addition. Validation:
 126 ranking/Explorer tests, lint, types and relevant gates pass; desktop/mobile
 component renders confirm all colors, gray fallback and no overflow. Luna built;
@@ -857,13 +1328,3 @@ npx jest tests/unit/final-writeup tests/unit/workbench-final-writeup-route.test.
 ```
 
 (Session 580 and earlier main handoffs: `git show 444a2d8f0:SESSION_PROMPT.md`.)
-
-[VERIFIED deployed and browser-checked] PR #462 merged as
-`f7a75fc5358649ab30765504ea6e6b35cdf00bb4`; Production deployment
-`dpl_FNFvVWUzPaiNgdQ7Uh1DgK526hHx` is READY with live aliases. Justin's refreshed
-D26 facilitator preview displays names on all 23 cards, no unavailable/N/A labels,
-including Johns Hopkins, UT Southwestern and UC Santa Barbara. Open acknowledgement
-remains unchecked; no round was opened. Full CI passed on `e9d40cfc5`; the final
-merge `cc6ef1823` changed only SESSION_PROMPT.md to retain the concurrently restored
-main handoff, passed documentation gates, and had identical runtime/test source.
-The mandatory unpublished-trial reset before colleague use remains in force.

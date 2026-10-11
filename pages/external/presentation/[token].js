@@ -1,14 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
+import { Play } from 'lucide-react';
 import { requestJson } from '../../../shared/utils/api-request.js';
+import { arrangeMaterials, displayName, isOffice, isType } from '../../../shared/utils/presentation-page-materials.js';
+import SummaryText from '../../../shared/components/SummaryText.js';
+import {
+  PRESENTATION_SUMMARY_HEADINGS,
+  PRESENTATION_SUMMARY_LIST_HEADINGS,
+} from '../../../shared/config/transcriptSummary.js';
 
-function bytesLabel(value) {
-  const bytes = Number(value);
-  if (!Number.isFinite(bytes) || bytes <= 0) return null;
-  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
-  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-  return `${bytes.toLocaleString()} bytes`;
-}
+const PDF = 'application/pdf';
+// Retries at +20 s and +65 s: the second always lands after the 60 s rate window has reset.
+const PROPOSAL_CHECK_RETRY_DELAYS_MS = [20_000, 45_000];
+const BUTTON = 'inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-base font-semibold text-gray-800 transition-colors duration-200 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60';
+const LINK = 'text-base font-semibold text-gray-700 underline decoration-gray-300 underline-offset-4 transition-colors duration-200 hover:text-gray-900 hover:decoration-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 rounded-sm';
 
 function endpoint(token, material, mode, attempt = 0) {
   const params = new URLSearchParams({ member: material.member, mode });
@@ -16,7 +21,7 @@ function endpoint(token, material, mode, attempt = 0) {
   return `/api/external/presentation/${encodeURIComponent(token)}/open?${params}`;
 }
 
-function Recording({ token, material }) {
+function Video({ token, material }) {
   const videoRef = useRef(null);
   const lastTimeRef = useRef(0);
   const pendingSeekRef = useRef(null);
@@ -26,20 +31,16 @@ function Recording({ token, material }) {
   const [status, setStatus] = useState('');
   const [canResume, setCanResume] = useState(false);
 
-  if (material.backing === 'external') {
-    return <a href={endpoint(token, material, 'watch')} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-blue-800 underline">Watch on Zoom</a>;
-  }
-
   const resolveWatch = (position = null) => {
     const video = videoRef.current;
     if (!video) return;
     attemptRef.current += 1;
     pendingSeekRef.current = position;
     setCanResume(false);
-    setStatus('Resolving a fresh Microsoft media URL…');
+    setStatus('Loading the video…');
     video.src = endpoint(token, material, 'watch', attemptRef.current);
     video.load();
-    void video.play().catch(() => setStatus('Press Play in the video controls to continue.'));
+    void video.play().catch(() => setStatus('Press play to start.'));
   };
 
   const start = () => {
@@ -51,12 +52,12 @@ function Recording({ token, material }) {
   const onError = () => {
     if (!retriedRef.current) {
       retriedRef.current = true;
-      setStatus('Playback stopped. Trying one fresh Microsoft media resolution…');
+      setStatus('The video stopped. Reconnecting…');
       resolveWatch(lastTimeRef.current);
       return;
     }
     setCanResume(true);
-    setStatus('Playback stopped again. Choose Resume watch to request a fresh link.');
+    setStatus('The video stopped again.');
   };
   const onLoadedMetadata = () => {
     const video = videoRef.current;
@@ -66,46 +67,201 @@ function Recording({ token, material }) {
     if (Number.isFinite(video.duration) && video.duration > 0) {
       video.currentTime = Math.min(position, Math.max(0, video.duration - 0.25));
     }
-    void video.play().catch(() => setStatus('Position restored. Press Play to continue.'));
+    void video.play().catch(() => setStatus('Press play to continue.'));
   };
 
   return (
     <div>
-      {!playing && <button type="button" onClick={start} className="text-sm font-semibold text-blue-800 underline">Watch recording</button>}
-      {playing && (
-        <>
+      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-gray-900">
+        {playing ? (
           <video
             ref={videoRef}
             controls
+            playsInline
             preload="metadata"
             onError={onError}
             onLoadedMetadata={onLoadedMetadata}
             onPlaying={() => setStatus('')}
             onTimeUpdate={(event) => { lastTimeRef.current = event.currentTarget.currentTime; }}
-            className="mt-3 aspect-video w-full rounded-lg bg-black"
+            className="h-full w-full"
           />
-          {canResume && <button type="button" onClick={() => resolveWatch(lastTimeRef.current)} className="mt-2 text-sm font-semibold text-blue-800 underline">Resume watch</button>}
-          {status && <p role="status" className="mt-2 text-sm text-amber-900">{status}</p>}
-        </>
+        ) : (
+          <button
+            type="button"
+            onClick={start}
+            className="group absolute inset-0 flex flex-col items-center justify-center gap-4 text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-white/70"
+          >
+            <span className="flex h-20 w-20 items-center justify-center rounded-full bg-white text-gray-900 shadow-[0_8px_24px_-6px_rgb(0_0_0/0.5)] transition-transform duration-300 ease-out group-hover:scale-105 group-active:scale-95">
+              <Play aria-hidden="true" className="ml-1 h-9 w-9" fill="currentColor" strokeWidth={0} />
+            </span>
+            <span className="text-lg font-semibold">Watch the presentation</span>
+          </button>
+        )}
+      </div>
+      {(status || canResume) && (
+        <div className="mt-3 flex flex-wrap items-center gap-4">
+          {status && <p role="status" className="text-base text-gray-600">{status}</p>}
+          {canResume && (
+            <button type="button" onClick={() => resolveWatch(lastTimeRef.current)} className={BUTTON}>Resume</button>
+          )}
+        </div>
       )}
     </div>
   );
 }
 
-function Material({ token, material }) {
-  const size = bytesLabel(material.size);
+// Microsoft serves every file as a download, so a PDF is fetched here and handed to the browser's own
+// viewer as a local copy. The tab is opened first, inside the click, so it is not blocked.
+function usePdfViewer(token, material, viewMode = 'open') {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const open = async () => {
+    const tab = window.open('', '_blank');
+    setBusy(true);
+    setFailed(false);
+    try {
+      if (tab) tab.opener = null;
+      // eslint-disable-next-line no-restricted-syntax -- raw fetch: binary PDF bytes via the open route's redirect to Microsoft (not JSON); allowlisted per CLIENT_REQUEST_LAYER_PLAN §2.6
+      const response = await fetch(endpoint(token, material, viewMode));
+      if (!response.ok) throw new Error(`status ${response.status}`);
+      const url = URL.createObjectURL(new Blob([await response.arrayBuffer()], { type: PDF }));
+      if (tab && !tab.closed) tab.location.href = url;
+      else window.location.href = url;
+      window.setTimeout(() => URL.revokeObjectURL(url), 10 * 60_000);
+    } catch {
+      if (tab && !tab.closed) tab.close();
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return { open, busy, failed };
+}
+
+// One grid for every row: the name, then a fixed-width action, so actions align.
+function MaterialRow({ name, action, note = null }) {
   return (
-    <li className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{material.label}</p>
-      <p className="mt-1 font-medium text-gray-900">{material.filename}</p>
-      {size && <p className="mt-1 text-xs text-gray-500">{size}</p>}
-      <div className="mt-3 flex flex-wrap gap-4">
-        {material.canWatch && <Recording token={token} material={material} />}
-        {material.canDownload && (
-          <a href={endpoint(token, material, 'download')} className="text-sm font-semibold text-blue-800 underline">Download</a>
-        )}
+    <li className="py-5">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 sm:grid sm:grid-cols-[minmax(0,1fr)_10rem] sm:gap-6">
+        <p className="basis-full text-lg font-medium text-gray-900">{name}</p>
+        <div className="flex">{action}</div>
       </div>
+      {note}
     </li>
+  );
+}
+
+// View opens a PDF in the browser (Office files as a PDF copy Microsoft converts on the server). The
+// original (for slides, the PowerPoint when there is one) is offered only if viewing fails.
+function ViewRow({ token, name, file, viewMode = 'open', fallback = file }) {
+  const viewer = usePdfViewer(token, file, viewMode);
+  return (
+    <MaterialRow
+      name={name}
+      action={(
+        <button type="button" onClick={viewer.open} disabled={viewer.busy} aria-label={`View ${name.toLowerCase()}`} className={`${BUTTON} sm:w-full`}>
+          {viewer.busy ? 'Opening…' : 'View'}
+        </button>
+      )}
+      note={viewer.failed && (
+        <p role="status" className="mt-3 text-base text-gray-600">
+          This file could not be opened in the browser.{' '}
+          <a href={endpoint(token, fallback, 'download')} className={LINK}>Download it instead</a>
+        </p>
+      )}
+    />
+  );
+}
+
+// Files Microsoft cannot convert (for example an image) can only be downloaded.
+function DownloadRow({ token, name, file }) {
+  return (
+    <MaterialRow
+      name={name}
+      action={<a href={endpoint(token, file, 'download')} aria-label={`Download ${name.toLowerCase()}`} className={`${BUTTON} sm:w-full`}>Download</a>}
+    />
+  );
+}
+
+function FileRow({ token, name, file }) {
+  if (isType(file, PDF)) return <ViewRow token={token} name={name} file={file} />;
+  if (isOffice(file)) return <ViewRow token={token} name={name} file={file} viewMode="pdf" />;
+  return <DownloadRow token={token} name={name} file={file} />;
+}
+
+function SectionHeading({ children }) {
+  return <h2 className="text-2xl font-semibold text-gray-900">{children}</h2>;
+}
+
+function Materials({ token, proposal, slidesPdf, slidesOriginal, others }) {
+  const slides = slidesPdf || slidesOriginal;
+  if (!proposal && !slides && others.length === 0) return null;
+  return (
+    <section className="mt-16">
+      <SectionHeading>Materials</SectionHeading>
+      <ul className="mt-4 divide-y divide-gray-200 border-y border-gray-200">
+        {proposal && <ViewRow token={token} name="Proposal" file={proposal} />}
+        {slidesPdf
+          ? <ViewRow token={token} name="Slides" file={slidesPdf} fallback={slidesOriginal || slidesPdf} />
+          : slidesOriginal && <FileRow token={token} name="Slides" file={slidesOriginal} />}
+        {others.map((material) => <FileRow key={material.member} token={token} name={displayName(material.filename)} file={material} />)}
+      </ul>
+    </section>
+  );
+}
+
+function Page({ token, data, proposal }) {
+  const { video, summary, slidesPdf, slidesOriginal, others } = arrangeMaterials(data.materials);
+  const heading = data.proposalTitle || data.title;
+  const expires = data.expiresAt ? new Date(data.expiresAt) : null;
+  return (
+    <>
+      <header>
+        <h1 className="text-3xl font-semibold leading-tight tracking-tight text-gray-900 text-balance sm:text-4xl sm:leading-tight">{heading}</h1>
+        <p className="mt-3 text-lg text-gray-600">
+          {data.proposalTitle && data.title ? `${data.title} · Research presentation` : 'Research presentation'}
+        </p>
+      </header>
+
+      {!video && !summary && (
+        <p className="mt-10 rounded-xl bg-gray-50 px-6 py-5 text-lg text-gray-700">
+          The presentation recording and summary will be added after the site visit.
+        </p>
+      )}
+
+      {video && (
+        <section className="mt-10" aria-label="Presentation video">
+          <Video token={token} material={video} />
+        </section>
+      )}
+
+      {summary && (
+        <section className="mt-16">
+          <div className="flex flex-wrap items-center gap-3">
+            <SectionHeading>Summary</SectionHeading>
+            <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">AI-generated</span>
+          </div>
+          <div className="mt-6">
+            {summary.text ? (
+              <SummaryText text={summary.text} headings={PRESENTATION_SUMMARY_HEADINGS} listHeadings={PRESENTATION_SUMMARY_LIST_HEADINGS} />
+            ) : (
+              <p className="text-lg text-gray-700">
+                The summary could not be shown here.{' '}
+                <a href={endpoint(token, summary, 'download')} className={LINK}>Download the summary</a>
+              </p>
+            )}
+          </div>
+        </section>
+      )}
+
+      <Materials token={token} proposal={proposal} slidesPdf={slidesPdf} slidesOriginal={slidesOriginal} others={others} />
+
+      {expires && !Number.isNaN(expires.getTime()) && (
+        <p className="mt-16 text-sm text-gray-500">
+          This link expires {expires.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}.
+        </p>
+      )}
+    </>
   );
 }
 
@@ -113,6 +269,7 @@ export default function PresentationMaterialsPage() {
   const router = useRouter();
   const token = typeof router.query.token === 'string' ? router.query.token : '';
   const [state, setState] = useState({ status: 'loading' });
+  const [proposal, setProposal] = useState(null);
 
   useEffect(() => {
     if (!token) return undefined;
@@ -129,29 +286,35 @@ export default function PresentationMaterialsPage() {
     return () => { current = false; controller.abort(); };
   }, [token]);
 
+  // The proposal lookup searches SharePoint completely and takes several seconds, so the page renders
+  // first and adds the Proposal row only when the server confirms the one reviewer PDF.
+  // A 404 means there is no single reviewer PDF; a temporary failure (429, 503, network) retries twice.
+  useEffect(() => {
+    if (!token || state.status !== 'ready') return undefined;
+    const controller = new AbortController();
+    let current = true;
+    let timer = null;
+    const check = (attempt) => {
+      requestJson(`/api/external/presentation/${encodeURIComponent(token)}/open?member=proposal&mode=check`, {
+        method: 'GET', signal: controller.signal, fallbackMessage: 'The proposal is not available.',
+      }).then((body) => {
+        if (current && body?.ok && body.material?.member === 'proposal') setProposal(body.material);
+      }).catch((error) => {
+        if (!current || error?.status === 404 || attempt >= PROPOSAL_CHECK_RETRY_DELAYS_MS.length) return;
+        timer = window.setTimeout(() => check(attempt + 1), PROPOSAL_CHECK_RETRY_DELAYS_MS[attempt]);
+      });
+    };
+    check(0);
+    return () => { current = false; controller.abort(); if (timer) window.clearTimeout(timer); };
+  }, [token, state.status]);
+
   return (
-    <main className="min-h-screen bg-gray-50 px-4 py-10 text-gray-900">
-      <div className="mx-auto max-w-4xl">
-        {state.status === 'loading' && <p>Loading research presentation materials…</p>}
-        {state.status === 'error' && <p className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-900">This presentation link is unavailable or has expired.</p>}
-        {state.status === 'retry' && <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950">Presentation materials are temporarily unavailable. Try again shortly.</p>}
-        {state.status === 'ready' && (
-          <>
-            <header>
-              <p className="text-sm font-medium text-gray-600">{state.data.title}</p>
-              <h1 className="mt-1 text-3xl font-semibold">Research presentation materials</h1>
-              {state.data.proposalTitle && <p className="mt-2 text-gray-700">{state.data.proposalTitle}</p>}
-            </header>
-            {state.data.materials.length === 0 ? (
-              <p className="mt-8 rounded-xl border border-gray-200 bg-white p-5">Presentation materials have not been added yet.</p>
-            ) : (
-              <ul className="mt-8 space-y-4">
-                {state.data.materials.map((material) => <Material key={material.member} token={token} material={material} />)}
-              </ul>
-            )}
-            {state.data.expiresAt && <p className="mt-8 text-xs text-gray-500">This link expires {new Date(state.data.expiresAt).toLocaleDateString()}.</p>}
-          </>
-        )}
+    <main className="min-h-screen bg-white px-4 py-12 text-gray-900 selection:bg-gray-200 sm:px-6 sm:py-16">
+      <div className="mx-auto max-w-3xl">
+        {state.status === 'loading' && <p className="text-lg text-gray-600">Loading…</p>}
+        {state.status === 'error' && <p className="rounded-xl bg-red-50 px-6 py-5 text-lg text-red-900">This presentation link is unavailable or has expired.</p>}
+        {state.status === 'retry' && <p className="rounded-xl bg-amber-50 px-6 py-5 text-lg text-amber-950">Presentation materials are temporarily unavailable. Try again shortly.</p>}
+        {state.status === 'ready' && <Page token={token} data={state.data} proposal={proposal} />}
       </div>
     </main>
   );

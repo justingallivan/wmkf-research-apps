@@ -9,8 +9,9 @@ import {
   REQUEST_DOCUMENT_OPERATION_STATUS,
 } from '../../shared/config/requestDocument';
 import { SITE_VISIT_FORMAT } from '../../shared/config/siteVisit';
+import { meetingDateToCycleCode, cycleCodeToLabel } from '../../lib/utils/cycle-code';
 import {
-  presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey, transcriptSummaryBindingFingerprint,
+  presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey, staffDiscussionSummaryBindingFingerprint, transcriptSummaryBindingFingerprint,
 } from '../../lib/services/post-presentation-materials/presentation-transcript-binding';
 import { createHash } from 'node:crypto';
 import { PARTY_NAVIGATION_PROPERTY } from '../../lib/dataverse/adapters/site-visit';
@@ -63,6 +64,11 @@ function dependencies(overrides = {}) {
   };
   return {
     schemaReady: jest.fn(() => true),
+    getRequestIdentity: jest.fn(async () => ({
+      akoya_requestid: REQUEST_ID, akoya_requestnum: '1003222', akoya_title: 'Quantum dots for imaging',
+      wmkf_meetingdate: '2026-12-11T00:00:00Z', _akoya_applicantid_value_formatted: 'Example University',
+      _wmkf_grantprogram_value_formatted: 'Research Program',
+    })),
     getRequest: jest.fn(async () => ({
       akoya_requestid: REQUEST_ID,
       akoya_requeststatus: 'Phase II Pending',
@@ -321,6 +327,20 @@ describe('staff feed binds the transcript derivatives to the current boundary', 
       expect(failed.result.presentationSummary).toMatchObject({ text: null });
     });
 
+    test('a published staff discussion summary is returned separately, never as the presentation summary (paired summaries plan D8)', async () => {
+      const DISCUSSION_SUMMARY_ID = '66666666-6666-4666-8666-66666666666b';
+      const discussionSummary = { ...derivative(DISCUSSION_SUMMARY_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY, () => 'unique-d', 1_800_000),
+        wmkf_inputfingerprint: staffDiscussionSummaryBindingFingerprint({ requestId: REQUEST_ID, sourceRevisionId: REVISION, presentationEndMs: 1_800_000 }),
+        wmkf_contenthash: createHash('sha256').update(BYTES).digest('hex'), createdon: '2026-10-06T15:00:00Z' };
+      const { result, summarySlidesChanged } = await summaryFeed([transcript(1_800_000), discussionSummary]);
+      expect(result.discussionSummary).toEqual({ text: TEXT, stale: false, publishedAt: '2026-10-06T15:00:00Z', slidesChanged: false });
+      expect(result.presentationSummary).toBeNull();
+      expect(summarySlidesChanged).not.toHaveBeenCalled();
+      const both = await summaryFeed([transcript(1_800_000), summary(1_800_000), discussionSummary]);
+      expect(both.result.presentationSummary).toMatchObject({ text: TEXT, publishedAt: '2026-10-05T15:00:00Z' });
+      expect(both.result.discussionSummary).toMatchObject({ text: TEXT, publishedAt: '2026-10-06T15:00:00Z' });
+    });
+
     test('nothing is read unless the caller asks, and null without a summary row', async () => {
       const off = await summaryFeed([transcript(1_800_000), summary(1_800_000)], { include: false });
       expect(off.result).not.toHaveProperty('presentationSummary');
@@ -345,10 +365,30 @@ test('a failed applicant-contact read leaves the tracker visit usable and report
   expect(result.applicantAttendeesUnavailable).toBe(true);
 });
 
+test('the Meeting Tracker opt-in adds the request identity for the page header (Site Visit redesign §9.2)', async () => {
+  const deps = dependencies();
+  const result = await getSiteVisitLogistics({ requestId: REQUEST_ID, includeRequestIdentity: true }, deps);
+  expect(deps.getRequestIdentity).toHaveBeenCalledWith(REQUEST_ID);
+  const cycleCode = meetingDateToCycleCode('2026-12-11T00:00:00Z');
+  expect(result.request).toEqual({
+    requestNumber: '1003222', title: 'Quantum dots for imaging', institution: 'Example University',
+    grantProgram: 'Research Program', cycleLabel: cycleCode ? cycleCodeToLabel(cycleCode) : null,
+  });
+});
+
+test('a failed identity read leaves the visit usable and returns a null request', async () => {
+  const result = await getSiteVisitLogistics({ requestId: REQUEST_ID, includeRequestIdentity: true }, dependencies({
+    getRequestIdentity: jest.fn(async () => { throw new Error('Dataverse unavailable'); }),
+  }));
+  expect(result.request).toBeNull();
+  expect(result.siteVisit).toBeNull();
+});
+
 test('the default Workbench read omits applicant suggestions and their Dataverse lookup', async () => {
   const deps = dependencies();
   const result = await getSiteVisitLogistics({ requestId: REQUEST_ID }, deps);
   expect(deps.resolveApplicantContacts).not.toHaveBeenCalled();
+  expect(deps.getRequestIdentity).not.toHaveBeenCalled();
   expect(result).toEqual({
     siteVisit: null,
     materials: [],

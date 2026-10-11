@@ -518,7 +518,7 @@ source, not a proven live schedule. Deletion targets only exact persisted paths 
 provider transcript IDs. A requested DELETE immediately blocks further content
 access but does not cancel remote work, claim successful erasure, or release an
 unknown active slot. Transient cleanup failures retain exact tombstones for
-retry. Keep `TRANSCRIPTION_PILOT_ENABLED` and
+retry. Staff "Cancel this transcription" (the same DELETE) is offered for `queued`, `processing` and `saving` runs (owner decision 2026-10-08): AssemblyAI may still finish and bill the work, and the run holds its slot until cleanup turns it `failed`; `submitting` and `submission_uncertain` are not offered. Keep `TRANSCRIPTION_PILOT_ENABLED` and
 `TRANSCRIPTION_SUBMISSIONS_ENABLED` disabled when pausing user work; do not
 disable the cleanup/recovery drain if deployed jobs still require cleanup.
 
@@ -571,6 +571,19 @@ overwrite, and read back/hash-verified before ready.
   exact local paths and eventually purges the minimized receipt. Keep unresolved
   remote identifiers only as long as exact cleanup/reconciliation requires;
   do not extend content retention to make recovery convenient.
+- A Vercel Workflow run stays pinned to the deployment it started on, so a
+  merged worker fix does not reach jobs already in flight [VERIFIED 2026-10-08,
+  S586, via Vercel log `deploymentId` on `/.well-known/workflow/v1/flow`]. After
+  deploying a fix to `lib/services/transcription-pilot/worker.js` or anything a
+  workflow step calls:
+  1. Delete duplicate queued jobs first, or they also run on the old code.
+  2. Cancel each run started before the deploy in the Vercel Workflows view.
+  3. Run `/api/cron/drain-transcriptions?recovery=1`. Recovery
+     (`recoverTerminalTranscriptionWorkflowDispatch` in `store.js`) resets the
+     dispatch to pending and starts a new run on the current deployment.
+  Jobs keep their state; a job in `saving` re-polls its finished provider
+  transcript with no second submission. In S586 this recovered three stuck
+  jobs to `ready` within 3 minutes.
 
 ## Stop conditions
 

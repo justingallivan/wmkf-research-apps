@@ -1,5 +1,5 @@
 /** @jest-environment jsdom */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import SiteVisitEditor, { noEmailHint, withApplicantAttendees } from '../../shared/components/meeting-tracker/SiteVisitEditor';
 
 let routerQuery = {};
@@ -134,7 +134,9 @@ test('a new visit: the form posts the fields the logistics service expects, with
   fireEvent.change(screen.getByLabelText('Starts'), { target: { value: '2026-10-01T09:00' } });
   fireEvent.change(screen.getByLabelText('Ends'), { target: { value: '2026-10-01T12:00' } });
   fireEvent.change(screen.getByLabelText('Location or meeting link'), { target: { value: 'Campus' } });
-  fireEvent.click(screen.getAllByRole('button', { name: 'Duncan Staff' })[0]); // organizer chips render first
+  // Organizer is a single-person search picker (Site Visit redesign §3.1).
+  fireEvent.change(screen.getByLabelText('Organizer'), { target: { value: 'dun' } });
+  fireEvent.click(screen.getByRole('button', { name: /Choose Duncan Staff/ }));
   fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'PI' } });
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'PI@example.edu' } });
   fireEvent.click(screen.getByRole('button', { name: 'Add' }));
@@ -217,4 +219,170 @@ test('a saved visit opens as a read-only summary: names not ids, a short meeting
   fireEvent.click(screen.getByRole('button', { name: 'Edit visit details' }));
   expect(screen.getByLabelText('Location or meeting link')).toHaveValue('https://zoom.example/j/123?pwd=secret');
   expect(global.fetch.mock.calls.some(([, options]) => options?.method === 'PATCH')).toBe(false);
+});
+
+describe('one attendee picker (Site Visit redesign §3.1)', () => {
+  const visit = { activityId: 'a1', etag: 'W/"1"', subject: 'Site Visit — #1003222', description: '', startLocal: '2026-10-01T09:00', endLocal: '2026-10-01T12:00', timeZone: 'America/Los_Angeles', format: 100000001, locationOrLink: 'Campus', organizer: { kind: 'staff', profileId: 7 }, requiredAttendees: [{ kind: 'roster', rosterId: 3 }], optionalAttendees: [] };
+  const withNoEmail = { ...recipients, staff: [...recipients.staff, { ref: { kind: 'staff', profileId: 9 }, name: 'Pat Noemail', email: '', linked: false }] };
+  function route() {
+    global.fetch = jest.fn(async (url, options = {}) => {
+      const target = String(url);
+      if (target.includes('/recipients')) return response(withNoEmail);
+      if (target.endsWith('/materials') || target.endsWith('/presentation-materials')) return response({ error: 'not enabled' }, 503);
+      if (options.method === 'PATCH') return response({ success: true, siteVisit: visit });
+      return response({ success: true, siteVisit: visit });
+    });
+  }
+  async function openEditor() {
+    route();
+    render(<SiteVisitEditor />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit visit details' }));
+  }
+
+  test('each person appears once; the saved roles show; add, switch role and remove send the same ref shape', async () => {
+    await openEditor();
+    // Not every name rendered twice: the directory is searched, not listed.
+    expect(screen.queryByRole('button', { name: /Chris Staff/ })).toBeNull();
+    const chosen = screen.getByRole('list', { name: 'Find a staff or Board member: chosen' });
+    expect(within(chosen).getByRole('group', { name: 'Board Member: attendance' })).toBeInTheDocument();
+    expect(within(chosen).getByRole('button', { name: 'Required' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.change(screen.getByLabelText('Find a staff or Board member'), { target: { value: 'chris' } });
+    fireEvent.click(screen.getByRole('button', { name: /Add Chris Staff/ }));
+    fireEvent.click(within(within(chosen).getByRole('group', { name: 'Chris Staff: attendance' })).getByRole('button', { name: 'Optional' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Board Member' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save site visit' }));
+    await waitFor(() => expect(global.fetch.mock.calls.some(([, o]) => o?.method === 'PATCH')).toBe(true));
+    const payload = JSON.parse(global.fetch.mock.calls.find(([, o]) => o?.method === 'PATCH')[1].body);
+    expect(payload.requiredAttendees).toEqual([]);
+    expect(payload.optionalAttendees).toEqual([{ kind: 'staff', profileId: 8 }]);
+    expect(payload.organizer).toEqual({ kind: 'staff', profileId: 7 });
+  });
+
+  test('a person with no email is listed but cannot be added, with the reason on hover', async () => {
+    await openEditor();
+    fireEvent.change(screen.getByLabelText('Find a staff or Board member'), { target: { value: 'pat' } });
+    const option = screen.getByRole('button', { name: /Add Pat Noemail · no email/ });
+    expect(option).toBeDisabled();
+    expect(option).toHaveAttribute('title', noEmailHint({ linked: false }));
+  });
+
+  describe('the 100-per-list limit, manual applicant rows included (Codex review, commit 6)', () => {
+    const manualRows = (n, prefix) => Array.from({ length: n }, (_, i) => ({ kind: 'manual', name: `${prefix} ${i}`, email: `${prefix}${i}@example.edu` }));
+    async function openWith(required, optional) {
+      const full = { ...visit, requiredAttendees: required, optionalAttendees: optional };
+      global.fetch = jest.fn(async (url, options = {}) => {
+        const target = String(url);
+        if (target.includes('/recipients')) return response(withNoEmail);
+        if (target.endsWith('/materials') || target.endsWith('/presentation-materials')) return response({ error: 'not enabled' }, 503);
+        if (options.method === 'PATCH') return response({ success: true, siteVisit: full });
+        return response({ success: true, siteVisit: full });
+      });
+      render(<SiteVisitEditor />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Edit visit details' }));
+    }
+    const saved = async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save site visit' }));
+      await waitFor(() => expect(global.fetch.mock.calls.some(([, o]) => o?.method === 'PATCH')).toBe(true));
+      return JSON.parse(global.fetch.mock.calls.find(([, o]) => o?.method === 'PATCH')[1].body);
+    };
+
+    test('with Required full, a new person is added to Optional', async () => {
+      await openWith(manualRows(100, 'r'), []);
+      fireEvent.change(screen.getByLabelText('Find a staff or Board member'), { target: { value: 'chris' } });
+      fireEvent.click(screen.getByRole('button', { name: /Add Chris Staff/ }));
+      const payload = await saved();
+      expect(payload.requiredAttendees).toHaveLength(100);
+      expect(payload.optionalAttendees).toEqual([{ kind: 'staff', profileId: 8 }]);
+    });
+
+    test('a role change into a full list is refused and leaves the selection as it was', async () => {
+      await openWith([{ kind: 'roster', rosterId: 3 }], manualRows(100, 'o'));
+      const toggle = within(screen.getByRole('group', { name: 'Board Member: attendance' })).getByRole('button', { name: 'Optional' });
+      expect(toggle).toBeDisabled();
+      expect(toggle).toHaveAttribute('title', 'The Optional list is full.');
+      fireEvent.click(toggle);
+      const payload = await saved();
+      expect(payload.requiredAttendees).toEqual([{ kind: 'roster', rosterId: 3 }]);
+      expect(payload.optionalAttendees).toHaveLength(100);
+    });
+
+    test('with both lists full the search is disabled', async () => {
+      await openWith(manualRows(100, 'r'), manualRows(100, 'o'));
+      expect(screen.getByLabelText('Find a staff or Board member')).toBeDisabled();
+      expect(screen.getByText('Both attendee lists are full.')).toBeInTheDocument();
+    });
+  });
+
+  test('the organizer can be changed through its picker', async () => {
+    await openEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Change organizer' }));
+    fireEvent.change(screen.getByLabelText('Organizer'), { target: { value: 'chris' } });
+    fireEvent.click(screen.getByRole('button', { name: /Choose Chris Staff/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save site visit' }));
+    await waitFor(() => expect(global.fetch.mock.calls.some(([, o]) => o?.method === 'PATCH')).toBe(true));
+    expect(JSON.parse(global.fetch.mock.calls.find(([, o]) => o?.method === 'PATCH')[1].body).organizer).toEqual({ kind: 'staff', profileId: 8 });
+  });
+});
+
+test('the header shows the request identity from the visit read, and only the number when it is missing (redesign §9.2)', async () => {
+  const visit = { activityId: 'a1', etag: 'W/"1"', subject: 'S', description: '', startLocal: '2026-10-01T09:00', endLocal: '2026-10-01T12:00', timeZone: 'America/Los_Angeles', format: 100000001, locationOrLink: 'Campus', organizer: { kind: 'staff', profileId: 7 }, requiredAttendees: [], optionalAttendees: [] };
+  const route = (request) => {
+    global.fetch = jest.fn(async (url) => {
+      const target = String(url);
+      if (target.includes('/recipients')) return response(recipients);
+      if (target.endsWith('/materials') || target.endsWith('/presentation-materials')) return response({ error: 'not enabled' }, 503);
+      return response({ success: true, siteVisit: visit, request });
+    });
+  };
+  route({ requestNumber: '1003222', title: 'Quantum dots for imaging', institution: 'Example University', grantProgram: 'Research Program', cycleLabel: 'December 2026' });
+  const view = render(<SiteVisitEditor />);
+  expect(await screen.findByTestId('visit-request-identity')).toHaveTextContent('Example University — Quantum dots for imaging · Research Program · December 2026');
+  expect(screen.getByRole('heading', { name: /^Site visit · #1003222/ })).toBeInTheDocument();
+  view.unmount();
+  route(null);
+  render(<SiteVisitEditor />);
+  expect(await screen.findByRole('heading', { name: /^Site visit · #1003222/ })).toBeInTheDocument();
+  expect(screen.queryByTestId('visit-request-identity')).toBeNull();
+});
+
+describe('header identity follows client-side navigation between visits (Codex review, commit 7)', () => {
+  const B_ID = '22222222-2222-4222-8222-222222222222';
+  const visitFor = (n) => ({ activityId: `a${n}`, etag: 'W/"1"', subject: 'S', description: '', startLocal: '2026-10-01T09:00', endLocal: '2026-10-01T12:00', timeZone: 'America/Los_Angeles', format: 100000001, locationOrLink: 'Campus', organizer: { kind: 'staff', profileId: 7 }, requiredAttendees: [], optionalAttendees: [] });
+  const identity = (n, title) => ({ requestNumber: n, title, institution: 'Example University', grantProgram: 'Research Program', cycleLabel: 'December 2026' });
+
+  test('A then a failed B shows B\'s number and none of A\'s identity', async () => {
+    global.fetch = jest.fn(async (url) => {
+      const target = String(url);
+      if (target.includes('/recipients')) return response(recipients);
+      if (target.endsWith('/materials') || target.endsWith('/presentation-materials')) return response({ error: 'not enabled' }, 503);
+      if (target.includes(B_ID)) return response({ error: 'down' }, 500);
+      return response({ success: true, siteVisit: visitFor(1), request: identity('1003222', 'Request A') });
+    });
+    const view = render(<SiteVisitEditor />);
+    expect(await screen.findByTestId('visit-request-identity')).toHaveTextContent('Request A');
+    routerQuery = { requestId: B_ID, n: '1009999' };
+    view.rerender(<SiteVisitEditor />);
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByTestId('visit-request-identity')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('#1009999');
+  });
+
+  test('a late response for A cannot overwrite B', async () => {
+    let releaseA = null;
+    global.fetch = jest.fn((url) => {
+      const target = String(url);
+      if (target.includes('/recipients')) return Promise.resolve(response(recipients));
+      if (target.endsWith('/materials') || target.endsWith('/presentation-materials')) return Promise.resolve(response({ error: 'not enabled' }, 503));
+      if (target.includes(B_ID)) return Promise.resolve(response({ success: true, siteVisit: visitFor(2), request: identity('1009999', 'Request B') }));
+      return new Promise((resolve) => { releaseA = () => resolve(response({ success: true, siteVisit: visitFor(1), request: identity('1003222', 'Request A') })); });
+    });
+    const view = render(<SiteVisitEditor />);
+    await waitFor(() => expect(releaseA).not.toBeNull());
+    routerQuery = { requestId: B_ID, n: '1009999' };
+    view.rerender(<SiteVisitEditor />);
+    expect(await screen.findByTestId('visit-request-identity')).toHaveTextContent('Request B');
+    await act(async () => { releaseA(); });
+    expect(screen.getByTestId('visit-request-identity')).toHaveTextContent('Request B');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('#1009999');
+  });
 });
