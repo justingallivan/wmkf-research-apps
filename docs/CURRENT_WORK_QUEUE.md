@@ -139,7 +139,9 @@ sequence.
   request, scheduled after the first real Stage 4 cut] The Meeting Tracker
   card (`shared/components/meeting-tracker/RecordingAndTranscriptCard.js`) grew
   stage by stage and now reads as a mess for an ordinary Zoom import. Do one
-  design pass over the whole card, not piecemeal patches. Owner observations
+  design pass over the whole card, not piecemeal patches. **Proposal (Session
+  593, scope widened to the whole Site Visit page by the owner):**
+  `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md`. Owner observations
   and screenshots from Session 592:
   - **"Copy video" is ambiguous.** In the "Import from Zoom" list each link sits
     outside and below its recording's box, so it reads as belonging to the next
