@@ -144,6 +144,13 @@ sequence.
   will copy. Fix: put the action inside its recording's row (for example next
   to "Video: not copied") and name the recording in it. Screenshot:
   owner, Session 592.
+  Second defect, same list: when the request already has a recording, "Copy
+  video" asks for a replace confirmation, but that confirmation renders after
+  the whole list (`ReplaceConfirm` below the fieldset in
+  `RecordingAndTranscriptCard.js`), off screen. The click appears to do
+  nothing, and nothing is copied until staff scroll down and confirm. Fix:
+  show the confirmation inside the clicked row, or scroll it into view and
+  move focus to it.
 
 ## Audit follow-ups — verified open, not silently prioritized
 - **Hard-coded late-2026 `expiresAt` dates in unit-test fixtures (2026-09-27, S546).** **[CLOSED
