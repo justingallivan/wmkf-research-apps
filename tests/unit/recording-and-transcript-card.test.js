@@ -1072,6 +1072,47 @@ describe('presentation summary', () => {
     });
   });
 
+  describe('the card Refresh re-reads summaries whose transcript did not change (Codex review round 3, redesign commit 3)', () => {
+    const published = { state: 'bound', artifactId: DRAFT_ID, publishedAt: CONFIRMED_AT };
+    function setup(responses) {
+      const reads = { count: 0 };
+      route({ materials: [transcriptRow()], collection: withSummary({ transcriptSummary: published }), detail: detailFor({}) }, {
+        '/summary-draft': { method: 'GET', respond: () => {
+          reads.count += 1;
+          return response(responses[Math.min(reads.count, responses.length) - 1]);
+        } },
+      });
+      return reads;
+    }
+
+    test('a draft created in another session appears after Refresh, with one read', async () => {
+      const reads = setup([
+        summaryState({ transcriptSummary: published }),
+        summaryState({ transcriptSummary: published, draft: readyDraft({ text: 'Made in another tab.' }), draftMatchesTranscript: true }),
+      ]);
+      render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+      await waitFor(() => expect(row('presentation-summary-block')).toHaveTextContent('Published'));
+      expect(screen.queryByLabelText(/^Draft/)).toBeNull();
+      expect(reads.count).toBe(1);
+      fireEvent.click(screen.getByTestId('card-refresh'));
+      expect(await screen.findByLabelText(/^Draft/)).toHaveValue('Made in another tab.');
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+      expect(reads.count).toBe(2);
+    });
+
+    test('a draft edited elsewhere becomes a conflict that keeps the local unsaved text', async () => {
+      setup([
+        summaryState({ transcriptSummary: published, draft: readyDraft(), draftMatchesTranscript: true }),
+        summaryState({ transcriptSummary: published, draft: readyDraft({ version: 3, text: 'Edited in another tab.' }), draftMatchesTranscript: true }),
+      ]);
+      render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+      fireEvent.change(await screen.findByLabelText(/^Draft/), { target: { value: 'My unsaved edit' } });
+      fireEvent.click(screen.getByTestId('card-refresh'));
+      expect(await screen.findByTestId('summary-draft-conflict')).toHaveTextContent('This draft is no longer current.');
+      expect(screen.getByLabelText('Preserved unsaved edits')).toHaveValue('My unsaved edit');
+    });
+  });
+
   test('losing the confirmed boundary preserves dirty text in recovery when no summary read is needed', async () => {
     const state = { materials: [transcriptRow()], collection: collection({
       jobs: [job({ status: 'queued', contentAccessAllowed: false })],

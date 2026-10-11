@@ -1065,7 +1065,7 @@ function pairedSummaryEligible(h) {
 // One summary kind's draft, review and publish state (plan §4.3, §16; paired summaries plan D9). The caller owns
 // `busy` for generation and the acknowledgment; every write is dropped when the card changed or this kind's load key moved on.
 function useSummaryKind(kind, { requestId, basePath, currentArtifact, busy, setBusy, generationRef, isCurrent,
-  loadCollection, onMaterialsChangedRef }) {
+  loadCollection, onMaterialsChangedRef, summaryRefreshToken = 0 }) {
   const spec = SUMMARY_KIND_UI[kind];
   const summaryPath = `${basePath}/summary-draft`;
   const summarySequenceRef = useRef(0);
@@ -1176,6 +1176,20 @@ function useSummaryKind(kind, { requestId, basePath, currentArtifact, busy, setB
     Promise.resolve().then(() => { if (!cancelled && wantsSummary) void loadSummary(); });
     return () => { cancelled = true; };
   }, [summaryLoadKey, wantsSummary, loadSummary, spec]);
+
+  // The card's Refresh (bumped after the collection reload settles) re-reads this kind once, so a draft created, edited
+  // or discarded in another session shows up (Codex review round 3, redesign commit 3). A pending or in-flight
+  // key-change read takes precedence: it already covers the refresh, so this skips rather than reading twice. The read
+  // keeps unsaved local text through loadSummary's own draft-version rules.
+  const handledRefreshRef = useRef(summaryRefreshToken);
+  useEffect(() => {
+    if (handledRefreshRef.current === summaryRefreshToken) return;
+    handledRefreshRef.current = summaryRefreshToken;
+    if (!wantsSummary || summaryLoadedKey !== summaryLoadKey || summaryReadState === 'loading') return undefined;
+    let cancelled = false;
+    Promise.resolve().then(() => { if (!cancelled) void loadSummary(); });
+    return () => { cancelled = true; };
+  }, [summaryRefreshToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The paired handler holds `busy` and checks the acknowledgment; this kind tracks only its own run.
   const summarize = async () => {
@@ -1306,7 +1320,7 @@ function useSummaryKind(kind, { requestId, basePath, currentArtifact, busy, setB
   };
 }
 
-function useTranscription(requestId, { onMaterialsChanged }) {
+function useTranscription(requestId, { onMaterialsChanged, summaryRefreshToken = 0 }) {
   const basePath = `${API_PATH}/${encodeURIComponent(requestId || '')}/transcriptions`;
   const [collection, setCollection] = useState(null);
   const [collectionCheckedAt, setCollectionCheckedAt] = useState(0);
@@ -1943,7 +1957,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   // ---- Summaries: one hook per kind, sharing the generation guard and `busy`. ----
   const [summaryAck, setSummaryAck] = useState(false);
   const summaryHookArgs = { requestId, basePath, currentArtifact: collection?.currentArtifact || null,
-    busy, setBusy, generationRef, isCurrent, loadCollection, onMaterialsChangedRef };
+    busy, setBusy, generationRef, isCurrent, loadCollection, onMaterialsChangedRef, summaryRefreshToken };
   const presentationSummary = useSummaryKind('presentation', summaryHookArgs);
   const discussionSummary = useSummaryKind('discussion', summaryHookArgs);
   const summaryHooks = { presentation: presentationSummary, discussion: discussionSummary };
@@ -3583,7 +3597,8 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
   const transcriptInputRef = useRef(null);
   const hashScrollDoneRef = useRef(false);
   const m = useMaterials(requestId, transcriptInputRef);
-  const t = useTranscription(requestId, { onMaterialsChanged: m.load });
+  const [summaryRefreshToken, setSummaryRefreshToken] = useState(0);
+  const t = useTranscription(requestId, { onMaterialsChanged: m.load, summaryRefreshToken });
   const jobsSignature = t.jobs.map((job) => `${job.id}:${job.status}:${job.cleanupPending === true ? 'c' : ''}`).join('|');
   const z = useZoomImport(requestId, { onImported: t.loadCollection, jobsSignature, onVideoCopied: m.load });
   useEffect(() => {
@@ -3594,10 +3609,9 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
     card.scrollIntoView?.({ block: 'start' });
   }, []);
   const heading = <h2 className="text-lg font-semibold text-gray-950">Recording and transcript</h2>;
-  // One Refresh for the whole card (redesign §6 B): transcription status, materials and Board link, the Zoom list and
-  // the presentation video. Summaries reload from their own load keys when the transcript changes. A failed load
-  // keeps its own Retry where it failed (DESIGN.md State Rule), and the speaker editor keeps its Refresh, which
-  // preserves unsaved edits.
+  // One Refresh for the whole card (redesign §6 B): transcription status, materials and Board link, the Zoom list, the
+  // presentation video and then both summaries (once each; see useSummaryKind). A failed load keeps its own Retry where
+  // it failed (DESIGN.md State Rule), and the speaker editor keeps its Refresh, which preserves unsaved edits.
   const [refreshing, setRefreshing] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
   const refreshAll = async () => {
@@ -3609,6 +3623,7 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
         m.load(),
         z.status === 'available' ? z.refresh() : null,
       ]);
+      setSummaryRefreshToken((value) => value + 1);
     } finally {
       setRefreshing(false);
     }

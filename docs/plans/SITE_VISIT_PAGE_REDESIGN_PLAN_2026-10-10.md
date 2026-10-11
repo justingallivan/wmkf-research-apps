@@ -562,9 +562,7 @@ regression tests. Round 2 approved with no material findings. As built, with the
 - **Kept in place, by DESIGN.md's State Rule** (a failed load gets its Retry where it
   failed): summary **Check again**, **Refresh transcription status** and the video's
   **Retry**. The speaker editor's **Refresh** also stays, because it preserves unsaved
-  edits. The card Refresh does not re-read the summaries: their load keys already reload
-  them when the transcript changes, and an extra read raced the draft-edit guards that the
-  tests protect.
+  edits. The card Refresh also re-reads each summary once (Codex round 3, below).
 - **Own-write staleness:** cancelling a run that had already moved on now reloads and
   shows a single warning. It no longer adds a red error plus an "Another session changed
   this" banner. That banner is kept for real 409 conflicts and now points to the card
@@ -594,3 +592,11 @@ regression tests. Round 2 approved with no material findings. As built, with the
   focus-based check), and an older unpublished run does not block. The server's
   `createMeetingCorrection` checks only the current artifact; Codex noted it, and it stays
   a UI gate in this build.
+- **Codex round 3 (needs-attention, one medium):** the card Refresh did not re-read summary
+  drafts, so a draft created, edited or discarded in another session stayed unseen. Now,
+  after the collection reload settles, the card bumps a token that `useSummaryKind` turns
+  into one `loadSummary()` per kind. It skips when a key-change read is pending or in
+  flight (`summaryLoadedKey !== summaryLoadKey` or loading), and `wantsSummary` is read at
+  render time. Result: one read per kind per Refresh, and the read-scripted race tests are
+  unchanged. Two regression tests (a draft created elsewhere appears; a draft edited
+  elsewhere becomes a conflict that keeps local text) fail when the read is removed.
