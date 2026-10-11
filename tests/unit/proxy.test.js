@@ -190,12 +190,18 @@ describe('proxy CSP function', () => {
     const mediaSrc = page.headers.get('Content-Security-Policy')
       .split('; ').find(d => d.startsWith('media-src'));
     expect(mediaSrc).toBe("media-src 'self' https://appriver3651007194.sharepoint.com");
+    const connectSrc = page.headers.get('Content-Security-Policy')
+      .split('; ').find(d => d.startsWith('connect-src'));
+    expect(connectSrc).toContain(' https://appriver3651007194.sharepoint.com');
+    expect(connectSrc).not.toContain('up.1drv.com');
     for (const url of [
       'https://applications.example/external/presentation/',
       'https://applications.example/external/presentation/token/extra',
       'https://applications.example/external/presentationish/token',
     ]) {
-      expect(proxyFn(makeReq({}, url)).headers.get('Content-Security-Policy')).not.toContain('media-src');
+      const csp = proxyFn(makeReq({}, url)).headers.get('Content-Security-Policy');
+      expect(csp).not.toContain('media-src');
+      expect(csp).not.toContain('sharepoint.com');
     }
   });
 
