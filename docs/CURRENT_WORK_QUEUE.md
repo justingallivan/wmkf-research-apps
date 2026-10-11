@@ -196,7 +196,7 @@ sequence.
     download URL, so the browser downloads 450 MB (first live cut, 2026-10-10).
     Stream it instead: the SharePoint web view, or the Board link's watch mode.
 - **Card stays busy after a successful transcript publish (2026-10-10).**
-  [OPEN — defect, found live on 1003222] In `RecordingAndTranscriptCard.js`
+  [FIXED 2026-10-10 — branch `claude/card-publish-busy`, Codex approve round 3; owner-token busy claims for publish, save and attendance] In `RecordingAndTranscriptCard.js`
   the publish handler closes the editor on success (`setCorrectionDetail(null)`,
   which changes `editorKey`), awaits `loadCollection()`, and only then clears
   `busy` in `finally` under `editorKeyRef.current === targetKey`. By then the
