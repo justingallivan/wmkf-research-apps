@@ -186,6 +186,16 @@ sequence.
     2026-10-10). Publishing with a confirmed presentation end should start that
     generation itself, and step 3 should say what is happening in plain words
     rather than "out of date".
+- **Card stays busy after a successful transcript publish (2026-10-10).**
+  [OPEN — defect, found live on 1003222] In `RecordingAndTranscriptCard.js`
+  the publish handler closes the editor on success (`setCorrectionDetail(null)`,
+  which changes `editorKey`), awaits `loadCollection()`, and only then clears
+  `busy` in `finally` under `editorKeyRef.current === targetKey`. By then the
+  ref has moved, so `busy` stays `'publish'` and every `disabled={Boolean(t.busy)}`
+  control (Generate presentation and discussion transcripts, Edit speaker
+  names) stays greyed until a page reload. Fix: clear `busy` on the success
+  path regardless of the editor key, and add a test that the generate button
+  is enabled after a successful publish.
 - **Speaker-name picker should offer the Zoom call's participants
   (2026-10-10).** [OPEN — owner request] "People on this request" in the
   speaker-name editor (`RecordingAndTranscriptCard.js`, option groups PI,
