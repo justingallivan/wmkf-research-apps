@@ -135,22 +135,35 @@ sequence.
   cap can track the four-hour duration cap instead of memory. Verify the
   200 MiB cap first with a real two-to-three-hour recording in production.
 
-- **Zoom import list: "Copy video" is ambiguous (2026-10-10).** [OPEN — owner
-  note, not scheduled] On the Recording and transcript card's "Import from
-  Zoom" list, each "Copy video" link sits outside and below its recording's
-  box, so it reads as belonging to the next row as easily as the previous one.
-  The list also mixes two selections: the radio button (which recording to
-  import) and the per-row video copy. Staff cannot tell which recording a click
-  will copy. Fix: put the action inside its recording's row (for example next
-  to "Video: not copied") and name the recording in it. Screenshot:
-  owner, Session 592.
-  Second defect, same list: when the request already has a recording, "Copy
-  video" asks for a replace confirmation, but that confirmation renders after
-  the whole list (`ReplaceConfirm` below the fieldset in
-  `RecordingAndTranscriptCard.js`), off screen. The click appears to do
-  nothing, and nothing is copied until staff scroll down and confirm. Fix:
-  show the confirmation inside the clicked row, or scroll it into view and
-  move focus to it.
+- **Redesign the Recording and transcript card (2026-10-10).** [OPEN — owner
+  request, scheduled after the first real Stage 4 cut] The Meeting Tracker
+  card (`shared/components/meeting-tracker/RecordingAndTranscriptCard.js`) grew
+  stage by stage and now reads as a mess for an ordinary Zoom import. Do one
+  design pass over the whole card, not piecemeal patches. Owner observations
+  and screenshots from Session 592:
+  - **"Copy video" is ambiguous.** In the "Import from Zoom" list each link sits
+    outside and below its recording's box, so it reads as belonging to the next
+    row as easily as the previous one. The list also mixes two selections: the
+    radio button (which recording to import) and the per-row video copy. Put
+    the action inside its recording's row and name the recording in it.
+  - **The replace confirmation is off screen.** When the request already has a
+    recording, "Copy video" asks for a replace confirmation that renders after
+    the whole list (`ReplaceConfirm` below the fieldset), so the click appears
+    to do nothing. Show it in the clicked row, or scroll to it and move focus.
+  - **Stacked banners for one action.** After an import plus a replace
+    confirmation the card showed a red "This transcription changed…" and a
+    yellow "Another session changed this. Refresh…" banner at once, though
+    nothing had failed: the card had only gone stale from its own actions.
+    Refresh after the card's own writes, and reserve warnings for real
+    conflicts.
+  - **Three refresh controls** (the banner's Refresh, the transcription line's
+    Refresh, and "Refresh list"). Collapse them to one.
+  - **Hide the manual upload paths unless needed.** Zoom is now the preferred
+    source. Show the manual MP4 upload ("Upload MP4") and the manual transcript
+    upload ("Upload a finished transcript instead") only behind a secondary
+    "Upload manually" disclosure, or when Zoom is unavailable for the request.
+  - **Order the steps** so the path reads import from Zoom, then transcript,
+    then confirm the presentation end, then the presentation video.
 
 ## Audit follow-ups — verified open, not silently prioritized
 - **Hard-coded late-2026 `expiresAt` dates in unit-test fixtures (2026-09-27, S546).** **[CLOSED
