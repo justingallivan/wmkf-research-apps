@@ -1364,6 +1364,13 @@ function useTranscription(requestId, { onMaterialsChanged }) {
   const focusJob = (focusId && jobs.find((job) => job.id === focusId)) || newestJob;
   const focusPublished = Boolean(focusJob) && publications.some((row) => row.inputJobId === focusJob.id && PUBLISHED_FOR_JOB.has(row.state));
   const showReview = Boolean(focusJob) && (focusId === focusJob.id || !focusPublished);
+  // A newer transcript is on its way: a run still transcribing (not being cancelled), or a ready run whose content can
+  // still be reviewed. While it is, editing the published transcript would open the older one, so every edit entry
+  // point is gated here (queue: "Old-transcript edit buttons look current"; Codex review, redesign commit 3). A
+  // discarded, expired or purged run never blocks.
+  const newerTranscriptPending = jobs.some((job) => BLOCKING_STATUSES.has(job.status) && !isCancelledRun(job) && job.cleanupPending !== true)
+    || Boolean(showReview && focusJob && !ACTIVE_STATUSES.has(focusJob.status) && focusJob.status === 'ready'
+      && focusJob.contentAccessAllowed === true && !focusJob.cleanup_requested_at && !focusJob.content_purged_at && focusJob.cleanupPending !== true);
   const selectedJob = focusJob && detail?.job?.id === focusJob.id ? detail.job : focusJob;
   const correction = correctionDetail?.correction || null;
   const content = correction ? correctionDetail.content : detail?.job?.id === focusJob?.id ? detail?.content : null;
@@ -1707,7 +1714,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
 
   const beginEditNames = async () => {
     const artifact = collection?.currentArtifact;
-    if (!artifact?.bundleEditable || busy) return;
+    if (!artifact?.bundleEditable || busy || newerTranscriptPending) return;
     if (savedDraft) {
       setSuggestionPicks({});
       setNotice(null);
@@ -1962,7 +1969,7 @@ function useTranscription(requestId, { onMaterialsChanged }) {
     correction, correctionDetail, content, speakerIds, names, setNames: editNames, baseline, dirtyNames, dirtyEnd, dirty, presentationEndMs, setPresentationEndMs, suggestionPicks, setSuggestionPicks,
     detail, audioFile, vttFile, setVttFile, acknowledged, setAcknowledged, uploadProgress, busy, error, notice, conflict,
     closeAcknowledgedId, setCloseAcknowledgedId, confirmNoVtt, setNoVttConfirmation,
-    loadCollection, reviewRun, refreshReview, saveNames, publishJob, publishCorrection, generatePresentationTranscript, beginEditNames, cancelEditNames,
+    newerTranscriptPending, loadCollection, reviewRun, refreshReview, saveNames, publishJob, publishCorrection, generatePresentationTranscript, beginEditNames, cancelEditNames,
     discardRun, checkPublication, closePublication, chooseFiles, uploadAndStart,
   };
 }
@@ -2852,7 +2859,7 @@ function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = n
           : artifact.bundleEditable !== true
             ? <div className="mt-1 text-sm text-gray-700"><p>Transcript status is unavailable. Refresh transcription status to check whether this transcript can be summarized.</p><button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.loading ? 'Refreshing…' : 'Refresh transcription status'}</button></div>
             : !artifact.presentationEnd
-            ? <div className="mt-1 text-sm text-gray-700"><p>Confirm where the presentation ends before generating the presentation transcript and summary.</p><button type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.savedDraft ? 'Continue editing presentation end' : 'Set end to enable summary'}</button></div>
+            ? <div className="mt-1 text-sm text-gray-700"><p>Confirm where the presentation ends before generating the presentation transcript and summary.</p><button type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy) || t.newerTranscriptPending} className={`mt-2 ${BTN}`}>{t.savedDraft ? 'Continue editing presentation end' : 'Set end to enable summary'}</button>{t.newerTranscriptPending && <p className="mt-1 text-xs text-gray-600">Wait for the newer transcript before setting the end.</p>}</div>
             : <p className="mt-1 text-sm text-gray-700">Generate the presentation transcript before summarizing it.</p>)}
       {failed && <p className="mt-1 text-sm text-gray-700">The last summary attempt did not produce a draft.</p>}
       {requestValid && <SummarizeConfirm t={t} kinds={mine.kinds} valid={requestValid} onClose={() => setRequest(null)} />}
@@ -3294,7 +3301,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
   const step2Collapsed = step2State === 'done' && !reviewOpen && !editing;
   // While a newer transcription is running or waiting to be checked, the published transcript's edit actions would
   // open the older transcript, so they are disabled with the reason (queue: "Old-transcript edit buttons look current").
-  const newerPending = Boolean(active) || readyForReview;
+  const newerPending = t.newerTranscriptPending;
   const editBlocked = Boolean(t.busy) || newerPending;
   const pendingSuffix = newerPending ? ' · wait for the newer transcript' : '';
   const canGenerate = editable && Boolean(presentationEnd) && !editing;

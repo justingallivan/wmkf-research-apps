@@ -1598,6 +1598,31 @@ describe('step-by-step layout', () => {
     expect(screen.getByRole('menuitem', { name: 'Edit presentation end · wait for the newer transcript' })).toBeDisabled();
   });
 
+  test.each([
+    ['discarded (cleanup requested)', { contentAccessAllowed: true, cleanup_requested_at: '2026-10-10T20:00:00.000Z' }],
+    ['unreadable (expired)', { contentAccessAllowed: false }],
+  ])('a %s ready run does not block the published transcript edits', async (_label, overrides) => {
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [job({ status: 'ready', ...overrides })], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    await findRow('presentation-transcript-row');
+    const review = screen.getByTestId('step-review');
+    const control = (label) => within(review).queryByRole('button', { name: label }) || stepMenuItem(label);
+    expect(control('Edit speaker names')).toBeEnabled();
+    expect(control('Edit presentation end')).toBeEnabled();
+    expect(review).not.toHaveTextContent('Wait for the newer transcript');
+  });
+
+  test('the summary row\'s Set end action is gated while a newer transcription runs', async () => {
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [job({ status: 'queued', contentAccessAllowed: false })],
+      currentArtifact: boundaryArtifact({ presentationEnd: null, presentationTranscript: { state: 'not_confirmed', artifactId: null },
+        staffDiscussionTranscript: { state: 'not_confirmed', artifactId: null } }) }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    const summaryRow = await findRow('presentation-summary-block');
+    expect(await within(summaryRow).findByRole('button', { name: 'Set end to enable summary' })).toBeDisabled();
+    expect(summaryRow).toHaveTextContent('Wait for the newer transcript before setting the end.');
+    expect(within(screen.getByTestId('step-review')).getByRole('button', { name: 'Set presentation end' })).toBeDisabled();
+  });
+
   test('with no newer transcription the same edit actions are enabled', async () => {
     route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
     render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);

@@ -579,3 +579,10 @@ regression tests. Round 2 approved with no material findings. As built, with the
   behavior commit stays reviewable).
 - Mutation checks: removing the gate, the focus call, or the conflict reset each fails its
   new test.
+- **Codex round 1 (needs-attention, two medium findings):** (a) a discarded or unreadable ready
+  run kept blocking edits; (b) the summary row's "Set end to enable summary" skipped the
+  gate. Fixed by computing `newerTranscriptPending` in `useTranscription`. It is true for a
+  running run not being cancelled, or a ready run whose content is still reviewable (not
+  cleaned up, purged or unreadable). `beginEditNames` refuses while it holds, so every
+  entry point is gated, and the summary action shows the reason. Regression tests cover
+  discarded and expired runs and the summary action; reverting the gate fails all three.
