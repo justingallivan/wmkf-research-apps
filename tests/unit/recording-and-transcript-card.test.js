@@ -1764,8 +1764,10 @@ describe('step-by-step layout', () => {
     await findRow('presentation-transcript-row');
     const review = screen.getByTestId('step-review');
     const control = (label) => within(review).queryByRole('button', { name: label }) || stepMenuItem(label);
-    expect(control('Edit speaker names')).toBeEnabled();
-    expect(control('Edit presentation end')).toBeEnabled();
+    // The card can still be settling its first loads when the row appears (seen on the slower CI runner), so wait for
+    // the settled state rather than reading it once.
+    await waitFor(() => expect(control('Edit speaker names')).toBeEnabled());
+    await waitFor(() => expect(control('Edit presentation end')).toBeEnabled());
     expect(review).not.toHaveTextContent('Wait for the newer transcript');
   });
 
