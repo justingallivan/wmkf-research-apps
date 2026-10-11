@@ -412,6 +412,22 @@ test('when the transcript list fails to load, Board readiness says Status unknow
   expect(within(board).queryByText('Not yet')).toBeNull();
 });
 
+test('a failed transcript refresh after a good load turns Board readiness to Status unknown (Codex round 3, four-card commit)', async () => {
+  let fail = false;
+  route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) }, {
+    '/transcriptions': { method: 'GET', respond: () => (fail ? response({ error: 'down' }, 500) : response(collection({ jobs: [], currentArtifact: boundaryArtifact() }))) },
+  });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByTestId('board-readiness-transcript')).toHaveTextContent('On the Board page'));
+  fail = true;
+  fireEvent.click(screen.getByTestId('card-refresh'));
+  await waitFor(() => expect(screen.getByTestId('board-readiness-transcript')).toHaveTextContent('Status unknown'));
+  expect(screen.getByTestId('board-readiness-summary')).toHaveTextContent('Status unknown');
+  fail = false;
+  fireEvent.click(screen.getByTestId('card-refresh'));
+  await waitFor(() => expect(screen.getByTestId('board-readiness-transcript')).toHaveTextContent('On the Board page'));
+});
+
 test('the cards run in work order: recording setup, presentation, staff discussion, then Board materials', async () => {
   route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
   render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);

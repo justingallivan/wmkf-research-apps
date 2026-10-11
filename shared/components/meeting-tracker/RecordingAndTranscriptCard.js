@@ -1333,6 +1333,9 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFR
   const basePath = `${API_PATH}/${encodeURIComponent(requestId || '')}/transcriptions`;
   const [collection, setCollection] = useState(null);
   const [collectionCheckedAt, setCollectionCheckedAt] = useState(0);
+  // A failed refresh keeps the last collection on screen; this marks it as not current, so a status claim (the Board
+  // readiness list) can say it is unknown instead of repeating an old answer (Codex round 3, four-card commit).
+  const [collectionReadFailed, setCollectionReadFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [focusId, setFocusId] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -1454,6 +1457,7 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFR
       if (!isLatest()) return;
       setCollection(body);
       setCollectionCheckedAt(Date.now());
+      setCollectionReadFailed(false);
       setError(null);
       setConflict(false);
       setDetail((currentDetail) => {
@@ -1465,7 +1469,10 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFR
         return Number(fresh.version) >= Number(currentDetail.job.version) ? { ...currentDetail, job: fresh } : currentDetail;
       });
     } catch (loadError) {
-      if (isLatest() && loadError?.name !== 'AbortError') setError(errorMessage(loadError, 'Transcription status could not be loaded.'));
+      if (isLatest() && loadError?.name !== 'AbortError') {
+        setCollectionReadFailed(true);
+        setError(errorMessage(loadError, 'Transcription status could not be loaded.'));
+      }
     } finally {
       if (isLatest()) setLoading(false);
     }
@@ -1991,7 +1998,7 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFR
 
   return {
     presentationSummary, discussionSummary, summaryAck, setSummaryAck, pairedSummaryKinds, summarizeKinds,
-    basePath, collection, collectionCheckedAt, savedDraft, loading, jobs, publications, newestJob, focusJob, showReview, selectedJob,
+    basePath, collection, collectionCheckedAt, collectionCurrent: Boolean(collection) && !collectionReadFailed, savedDraft, loading, jobs, publications, newestJob, focusJob, showReview, selectedJob,
     attendanceReview, attendanceDecision, attendanceKept, setAttendanceKept, previewDecision,
     correction, correctionDetail, content, speakerIds, names, setNames: editNames, baseline, dirtyNames, dirtyEnd, dirty, presentationEndMs, setPresentationEndMs, suggestionPicks, setSuggestionPicks,
     detail, audioFile, vttFile, setVttFile, acknowledged, setAcknowledged, uploadProgress, busy, error, notice, conflict,
@@ -3531,7 +3538,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
 
     <section className={shell} data-testid="card-board-materials" aria-labelledby="board-card-title">
       <BoardPageHeading m={m} />
-      <BoardReadiness t={t} boundaryState={boundaryState} video={video} />
+      <BoardReadiness t={t} boundaryState={boundaryState} video={video} hasVideoMaterial={Boolean(byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_VIDEO))} />
     </section>
     </>
   );
@@ -3543,16 +3550,19 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
 const BOARD_ON = { tone: 'green', label: 'On the Board page' };
 const BOARD_NOT_YET = { tone: 'gray', label: 'Not yet' };
 const BOARD_UNKNOWN = { tone: 'gray', label: 'Status unknown' };
-function BoardReadiness({ t, boundaryState, video }) {
+function BoardReadiness({ t, boundaryState, video, hasVideoMaterial }) {
   const { summaryStatusCurrent, published } = publishedSummaryOf(t, t.presentationSummary);
-  const transcript = boundaryState === 'bound' ? BOARD_ON : !t.collection ? BOARD_UNKNOWN : BOARD_NOT_YET;
-  // Without a loaded transcript collection the summary read reports 'not_needed', which is not evidence of absence.
-  const summary = !t.collection || !summaryStatusCurrent ? BOARD_UNKNOWN : published?.state === 'bound' ? BOARD_ON : BOARD_NOT_YET;
-  // No boardVideo in the response means no approved video exists, so nothing is on the Board.
+  // Without a current transcript collection (never loaded, or its last refresh failed) both answers are unknown; the
+  // summary read also reports 'not_needed' without one, which is not evidence of absence.
+  const transcript = !t.collectionCurrent ? BOARD_UNKNOWN : boundaryState === 'bound' ? BOARD_ON : BOARD_NOT_YET;
+  const summary = !t.collectionCurrent || !summaryStatusCurrent ? BOARD_UNKNOWN : published?.state === 'bound' ? BOARD_ON : BOARD_NOT_YET;
+  // The server adds boardVideo only when an approved split is among its recent ones, so an absent status proves nothing
+  // while a Presentation video record exists (an older approval can fall outside that window). With no such record
+  // the Board cannot serve a video: it binds from the same winners this list comes from.
   const videoStatus = !video.loaded ? null
     : !video.statusCurrent ? BOARD_UNKNOWN
     : video.boardStatus === 'bound' ? BOARD_ON
-      : video.boardStatus === 'unknown' ? BOARD_UNKNOWN : BOARD_NOT_YET;
+      : video.boardStatus === 'unknown' || (!video.boardStatus && hasVideoMaterial) ? BOARD_UNKNOWN : BOARD_NOT_YET;
   return (
     <ul className="mt-3 divide-y divide-gray-100 border-t border-gray-200" data-testid="board-readiness" aria-label="On the Board page">
       <ArtifactRow name="Presentation transcript" status={transcript} testId="board-readiness-transcript" />

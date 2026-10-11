@@ -428,3 +428,19 @@ describe('Board readiness of the video follows the transcript revision (Codex re
     expect(screen.getByTestId('board-readiness-video')).not.toHaveTextContent('On the Board page');
   });
 });
+
+describe('Board readiness when the approved video is outside the recent splits (Codex round 3, four-card commit)', () => {
+  test('no Board status in the response but a Presentation video record exists: Status unknown, never Not yet', async () => {
+    const failed = Array.from({ length: 10 }, (_v, i) => split({ id: `eeeeeeee-eeee-4eee-8eee-${String(i).padStart(12, '0')}`, state: 'failed', failureCode: 'upload_failed' }));
+    route({ state: { splits: { available: true, splits: failed } } });
+    const base = global.fetch;
+    global.fetch = jest.fn(async (url, options = {}) => {
+      if (String(url).endsWith('/presentation-materials')) {
+        return response({ materials: [transcriptRow(), { artifactId: OLD_ID, artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_VIDEO, backing: 'file', filename: 'presentation.mp4' }], uploads: [] });
+      }
+      return base(url, options);
+    });
+    await renderLine();
+    await waitFor(() => expect(screen.getByTestId('board-readiness-video')).toHaveTextContent('Status unknown'));
+  });
+});

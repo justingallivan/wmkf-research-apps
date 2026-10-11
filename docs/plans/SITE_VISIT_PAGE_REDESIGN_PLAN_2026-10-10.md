@@ -773,6 +773,14 @@ server's aggregate `boardVideo.status` (`bound` → On, `unknown` → Status unk
 `missing`/`stale` → Not yet), still behind the revision and failure guards. Regression cases:
 a newer queued, in-review or failed split beside an older served one stays "On the Board
 page" (all three fail under the old newest-only rule).
+Codex round 3 (needs-attention, two medium): (a) a failed transcript refresh kept the last
+collection, so the list repeated an old "On the Board page"; `useTranscription` now exposes
+`collectionCurrent` (false after a failed read until the next success) and the transcript and
+summary lines say "Status unknown" without it. (b) The server adds `boardVideo` only when an
+approved split is among its 10 most recent, so an older approval behind ten failed attempts made
+the status absent; absent now means "Not yet" only when no Presentation video record exists among
+the staff materials (the Board binds from the same winners), otherwise "Status unknown". Each has
+a regression test that fails without its fix.
 
 ## 10. Remaining after the build (2026-10-11)
 
