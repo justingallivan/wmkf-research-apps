@@ -136,7 +136,12 @@ function ViewPdfButton({ token, material, children }) {
   return (
     <>
       <button type="button" onClick={open} disabled={busy} className={BUTTON}>{busy ? 'Opening…' : children}</button>
-      {failed && <p role="status" className="basis-full text-base text-gray-600">The slides could not be opened. Try again, or download them.</p>}
+      {failed && (
+        <p role="status" className="basis-full text-base text-gray-600">
+          This file could not be opened here.{' '}
+          <a href={endpoint(token, material, 'download')} className={LINK}>Download it instead</a>
+        </p>
+      )}
     </>
   );
 }
@@ -165,7 +170,9 @@ function Materials({ token, slidesPdf, slidesOriginal, others }) {
             {slidesPdf ? (
               <>
                 <ViewPdfButton token={token} material={slidesPdf}>View slides</ViewPdfButton>
-                {slidesOriginal && <a href={endpoint(token, slidesOriginal, 'download')} className={LINK}>Download PowerPoint</a>}
+                {slidesOriginal
+                  ? <a href={endpoint(token, slidesOriginal, 'download')} className={LINK}>Download PowerPoint</a>
+                  : <a href={endpoint(token, slidesPdf, 'download')} className={LINK}>Download PDF</a>}
               </>
             ) : (
               <a href={endpoint(token, slidesOriginal, 'download')} className={BUTTON}>Download slides</a>
@@ -174,9 +181,12 @@ function Materials({ token, slidesPdf, slidesOriginal, others }) {
         )}
         {others.map((material) => (
           <MaterialRow key={material.member} name={displayName(material.filename)}>
-            {isType(material, PDF)
-              ? <ViewPdfButton token={token} material={material}>View</ViewPdfButton>
-              : <a href={endpoint(token, material, 'download')} className={BUTTON}>Download</a>}
+            {isType(material, PDF) ? (
+              <>
+                <ViewPdfButton token={token} material={material}>View</ViewPdfButton>
+                <a href={endpoint(token, material, 'download')} className={LINK}>Download PDF</a>
+              </>
+            ) : <a href={endpoint(token, material, 'download')} className={BUTTON}>Download</a>}
           </MaterialRow>
         ))}
       </ul>

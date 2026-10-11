@@ -176,6 +176,17 @@ describe('summary text on the page', () => {
     expect(summaryOf(ctx)).toMatchObject({ member: `material:${SUMMARY_ID}`, text: null });
   });
 
+  test('a stalled summary read does not hold back the page: past the deadline the summary lists with no text', async () => {
+    const stalled = jest.fn(() => new Promise(() => {}));
+    const slides = fileRow(SLIDES_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES, 'site-visit-materials-portal');
+    const started = Date.now();
+    const ctx = await buildPresentationContext({ requestId: REQUEST_ID },
+      dependencies([slides, fullTranscript(), published()], { downloadFile: stalled, summaryReadDeadlineMs: 50 }));
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(summaryOf(ctx)).toMatchObject({ text: null });
+    expect(ctx.materials.map((item) => item.kind)).toEqual(['slides', 'summary']);
+  });
+
   test('only the summary is downloaded; slides and other files are never read for the page', async () => {
     const downloadFile = jest.fn(async () => ({ buffer: bytes }));
     const slides = fileRow(SLIDES_ID, REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES, 'site-visit-materials-portal');
