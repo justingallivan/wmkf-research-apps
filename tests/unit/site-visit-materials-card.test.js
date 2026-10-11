@@ -1,5 +1,5 @@
 /** @jest-environment jsdom */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { StrictMode } from 'react';
 import SiteVisitMaterialsCard from '../../shared/components/meeting-tracker/SiteVisitMaterialsCard';
 
@@ -24,6 +24,18 @@ const collection = (overrides = {}) => ({
   contributorUrl: 'https://apps.test/external/materials/tok', createdAt: '2026-09-15T17:00:00Z',
   ...overrides,
 });
+
+// Site Visit redesign §3.2: each item is a row whose name opens the file; row and card actions live in "…" menus.
+const rowOf = (key) => screen.getByTestId(`materials-row-${key}`);
+function openMenu(trigger) { if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger); }
+function rowMenuItem(key, label) {
+  openMenu(within(rowOf(key)).getByRole('button', { name: /^More actions for/ }));
+  return screen.getByRole('menuitem', { name: label });
+}
+async function cardMenuItem(label) {
+  openMenu(await screen.findByRole('button', { name: 'More actions for applicant materials' }));
+  return screen.getByRole('menuitem', { name: label });
+}
 
 test('before a collection exists the card opens a preview composer and sends action=create with reviewed content', async () => {
   global.fetch = jest.fn(async (url, options = {}) => {
@@ -54,7 +66,7 @@ test('a created collection opens the resend composer and surfaces preview failur
     return response({ success: true, collection: collection({ invitedAt: null }) });
   });
   render(<SiteVisitMaterialsCard requestId={REQUEST_ID} requestNumber="1003222" />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Send invitation' }));
+  fireEvent.click(await cardMenuItem('Send invitation'));
   fireEvent.click(await screen.findByRole('button', { name: 'Refresh preview' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('preview unavailable');
 });
@@ -98,10 +110,25 @@ test('existing collection preserves waive, ready, and unavailable behaviors', as
     return response({ success: true, collection: collection() });
   });
   render(<SiteVisitMaterialsCard requestId={REQUEST_ID} requestNumber="1003222" />);
-  fireEvent.click((await screen.findAllByRole('button', { name: 'Waive' }))[0]);
+  await screen.findByTestId('materials-row-presentation_source');
+  fireEvent.click(rowMenuItem('presentation_source', 'Waive'));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Confirm the files open' })).toBeInTheDocument());
   const waive = global.fetch.mock.calls.find(([, o]) => o?.method === 'POST' && JSON.parse(o.body).action === 'waive');
   expect(JSON.parse(waive[1].body)).toEqual({ action: 'waive', key: 'presentation_source', waived: true });
+});
+
+test.each([
+  ['missing', { state: 'missing' }, 'Send reminder', ['Confirm the files open']],
+  ['received', { state: 'received', missing: [] }, 'Confirm the files open', ['Send reminder']],
+  ['closed', { state: 'closed' }, null, ['Send reminder', 'Confirm the files open']],
+])('the heading offers one next step for a %s collection', async (_label, overrides, shown, hidden) => {
+  global.fetch = jest.fn(async () => response({ success: true, collection: collection(overrides) }));
+  render(<SiteVisitMaterialsCard requestId={REQUEST_ID} requestNumber="1003222" />);
+  await screen.findByTestId('materials-metadata');
+  if (shown) expect(screen.getByRole('button', { name: shown })).toBeInTheDocument();
+  for (const name of hidden) expect(screen.queryByRole('button', { name })).toBeNull();
+  // Copy link and invitation live in the card menu, not as footer buttons.
+  expect(screen.queryByRole('button', { name: 'Copy contributor link' })).toBeNull();
 });
 
 test('late request A load cannot overwrite request B', async () => {
@@ -180,15 +207,15 @@ test.each(['missing', 'closed'])('received checklist and other files open in a n
   data.checklist[0].received.webUrl = 'https://tenant.sharepoint.com/presentation.pdf';
   global.fetch = jest.fn(async () => response({ success: true, collection: data }));
   render(<SiteVisitMaterialsCard requestId={REQUEST_ID} />);
-  const links = await screen.findAllByRole('link', { name: /^Open file:/ });
-  expect(links).toHaveLength(2);
+  // The item name is the link (redesign §3.2); there is no separate Open file control.
+  const links = [await screen.findByRole('link', { name: 'Presentation (PDF)' }), screen.getByRole('link', { name: 'Other: Supporting.pdf' })];
   expect(links[0]).toHaveAttribute('href', data.checklist[0].received.webUrl);
   expect(links[1]).toHaveAttribute('href', data.other[0].webUrl);
   for (const link of links) {
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(link).toHaveAccessibleName(/opens in a new tab/);
   }
+  expect(screen.queryByRole('link', { name: /^Open file/ })).toBeNull();
   expect(global.fetch).toHaveBeenCalledTimes(1);
 });
 
@@ -198,7 +225,7 @@ test.each([undefined, '', 'not a URL', 'javascript:alert(1)', 'http://tenant.sha
   global.fetch = jest.fn(async () => response({ success: true, collection: data }));
   render(<SiteVisitMaterialsCard requestId={REQUEST_ID} />);
   await screen.findByText(/1003222 Site Visit Presentation.pdf/);
-  expect(screen.queryByRole('link', { name: /^Open file:/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link')).not.toBeInTheDocument();
 });
 
 test('pending replacement opens only the previous receipt and never the unfinished job', async () => {
@@ -206,8 +233,9 @@ test('pending replacement opens only the previous receipt and never the unfinish
   data.checklist[0].received.webUrl = 'https://tenant.sharepoint.com/previous.pdf';
   global.fetch = jest.fn(async () => response({ success: true, collection: data }));
   render(<SiteVisitMaterialsCard requestId={REQUEST_ID} />);
-  const link = await screen.findByRole('link', { name: /^Open file:/ });
+  const link = await screen.findByRole('link', { name: 'Presentation (PDF)' });
   expect(link).toHaveAttribute('href', 'https://tenant.sharepoint.com/previous.pdf');
+  expect(screen.getAllByRole('link')).toHaveLength(1);
   expect(screen.getByText(/Previously received/)).toBeInTheDocument();
 });
 
@@ -226,11 +254,14 @@ describe('staff replacement upload (staff replacement plan §3.4)', () => {
     });
     global.fetch = jest.fn(async () => response({ success: true, collection: closed }));
     render(<SiteVisitMaterialsCard requestId={REQUEST_ID} requestNumber="1003222" />);
-    expect(await screen.findAllByRole('button', { name: 'Upload updated file' })).toHaveLength(2);
-    const bios = screen.getByText('Participant bios (PDF or Word)');
-    expect(bios.className).not.toMatch(/line-through/);
-    expect(screen.getByText(/bios\.pdf · staff upload · waived/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Waive' })).toBeNull();
+    await screen.findByTestId('materials-row-presentation_pdf');
+    expect(rowMenuItem('presentation_pdf', 'Upload updated file')).toBeEnabled();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(rowMenuItem('participant_bios', 'Upload updated file')).toBeEnabled();
+    expect(screen.queryByRole('menuitem', { name: 'Waive' })).toBeNull();
+    const bios = rowOf('participant_bios');
+    expect(bios.innerHTML).not.toMatch(/line-through/);
+    expect(bios).toHaveTextContent(/bios\.pdf · staff upload · waived/);
   });
 
   test('choosing a file mints a staff token, uploads to staging, finalizes, and reloads the card', async () => {
@@ -244,7 +275,7 @@ describe('staff replacement upload (staff replacement plan §3.4)', () => {
       return response({ success: true, collection: collection() });
     });
     render(<SiteVisitMaterialsCard requestId={REQUEST_ID} requestNumber="1003222" />);
-    await screen.findByRole('button', { name: 'Upload updated file' });
+    await screen.findByTestId('materials-row-presentation_pdf');
     const file = new File(['%PDF'], 'Updated deck.pdf', { type: 'application/pdf' });
     fireEvent.change(screen.getByTestId('staff-upload-input-presentation_pdf'), { target: { files: [file] } });
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Presentation (PDF) saved.'));
@@ -274,7 +305,7 @@ describe('staff replacement upload (staff replacement plan §3.4)', () => {
   }
   const choose = async () => {
     render(<SiteVisitMaterialsCard requestId={REQUEST_ID} requestNumber="1003222" />);
-    await screen.findByRole('button', { name: 'Upload updated file' });
+    await screen.findByTestId('materials-row-presentation_pdf');
     fireEvent.change(screen.getByTestId('staff-upload-input-presentation_pdf'), { target: { files: [new File(['%PDF'], 'd.pdf', { type: 'application/pdf' })] } });
   };
 
@@ -301,7 +332,7 @@ describe('staff replacement upload (staff replacement plan §3.4)', () => {
     await choose();
     const retry = await screen.findByRole('button', { name: 'Retry' });
     const input = screen.getByTestId('staff-upload-input-presentation_pdf');
-    expect(screen.getByRole('button', { name: 'Upload updated file' })).toBeDisabled();
+    await waitFor(() => expect(rowMenuItem('presentation_pdf', 'Upload updated file')).toBeDisabled());
     expect(input).toBeDisabled();
     expect(screen.getByText('Press Retry to finish saving the earlier file first.')).toBeInTheDocument();
 
@@ -316,7 +347,7 @@ describe('staff replacement upload (staff replacement plan §3.4)', () => {
     expect(posts[2][1]).toEqual({ stagingId: STAGING, slot: 'presentation_pdf' });
     expect(mockPut).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Upload updated file' })).toBeEnabled();
+    await waitFor(() => expect(rowMenuItem('presentation_pdf', 'Upload updated file')).toBeEnabled());
     expect(input).toBeEnabled();
   });
 
@@ -325,11 +356,11 @@ describe('staff replacement upload (staff replacement plan §3.4)', () => {
     await choose();
     expect(await screen.findByRole('alert')).toHaveTextContent('That file type is not accepted for this item.');
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Upload updated file' })).toBeEnabled();
+    expect(rowMenuItem('presentation_pdf', 'Upload updated file')).toBeEnabled();
     expect(screen.getByTestId('staff-upload-input-presentation_pdf')).toBeEnabled();
   });
 
-  test('each row keeps Open file and the upload control in one right-hand actions group; status text stays inside the fixed-width control', async () => {
+  test('upload status, errors and Retry stay inside their own row; the menu item opens that row\'s file picker', async () => {
     finalizeScript([{ status: 503, body: { ok: false, reason: 'supersede_failed' } }]);
     const linked = collection();
     linked.checklist[0].received.webUrl = 'https://sp.example/deck.pdf';
@@ -337,12 +368,22 @@ describe('staff replacement upload (staff replacement plan §3.4)', () => {
     global.fetch = jest.fn(async (url, options = {}) => (options.method === 'POST' ? scripted(url, options) : response({ success: true, collection: linked })));
     await choose();
     await screen.findByRole('button', { name: 'Retry' });
-    const actions = screen.getByTestId('materials-row-actions-presentation_pdf');
-    expect(actions).toContainElement(screen.getAllByRole('link', { name: /Open file/ })[0]);
-    expect(actions).toContainElement(screen.getByTestId('staff-upload-input-presentation_pdf'));
-    const control = screen.getByTestId('staff-upload-input-presentation_pdf').parentElement;
-    expect(control.className).toMatch(/\bw-44\b/);
-    expect(control).toContainElement(screen.getByRole('alert'));
+    const row = rowOf('presentation_pdf');
+    expect(within(row).getByRole('link', { name: 'Presentation (PDF)' })).toHaveAttribute('href', 'https://sp.example/deck.pdf');
+    expect(row).toContainElement(screen.getByTestId('staff-upload-input-presentation_pdf'));
+    expect(row).toContainElement(screen.getByRole('alert'));
+    expect(row).toContainElement(screen.getByRole('button', { name: 'Retry' }));
+  });
+
+  test('the row menu\'s Upload updated file opens that row\'s file picker', async () => {
+    global.fetch = jest.fn(async () => response({ success: true, collection: collection() }));
+    const click = jest.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function record() { record.target = this; });
+    render(<SiteVisitMaterialsCard requestId={REQUEST_ID} requestNumber="1003222" />);
+    await screen.findByTestId('materials-row-presentation_pdf');
+    fireEvent.click(rowMenuItem('presentation_pdf', 'Upload updated file'));
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(click.mock.contexts[0]).toBe(screen.getByTestId('staff-upload-input-presentation_pdf'));
+    click.mockRestore();
   });
 
   test('a refused finalize shows its reason and does not claim success', async () => {
@@ -354,7 +395,7 @@ describe('staff replacement upload (staff replacement plan §3.4)', () => {
       return response({ success: true, collection: collection() });
     });
     render(<SiteVisitMaterialsCard requestId={REQUEST_ID} requestNumber="1003222" />);
-    await screen.findByRole('button', { name: 'Upload updated file' });
+    await screen.findByTestId('materials-row-presentation_pdf');
     fireEvent.change(screen.getByTestId('staff-upload-input-presentation_pdf'), { target: { files: [new File(['%PDF'], 'd.pdf', { type: 'application/pdf' })] } });
     expect(await screen.findByRole('alert')).toHaveTextContent('Another upload for this item is still being saved');
     expect(screen.queryByText('Presentation (PDF) saved.')).toBeNull();

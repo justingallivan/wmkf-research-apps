@@ -637,3 +637,24 @@ which is outside this build.
 requires them to match). Plan D2 in `ZOOM_ATTENDANCE_ATTRIBUTION_PLAN_2026-10-09.md` is
 revised in the same commit. The card seeds its checkboxes from the decision rows, so no
 UI change was needed; a saved attribution is unaffected.
+- Codex review of commit 4: approve.
+
+**Commit 5, Applicant materials rows.** As built (§3.2):
+
+- Each checklist item is an `ArtifactRow`. The name is the link to the received file
+  (`OpenFileLink` is removed). Status is Received, Replacing…, Waived, or Missing (amber
+  when overdue). The detail keeps the date, filename, "staff upload", "waived" and
+  "Previously received" wording.
+- **Missing or waived item:** an inline **Upload file** (`StaffMaterialUpload`, now a
+  shared `Button`). **Received item:** **Upload updated file** in the row menu, which opens
+  the row's hidden uploader through a ref `open()`. Progress, errors and Retry still render
+  in the row. The uploader reports `onBlockedChange`, so the menu item disables while an
+  earlier file awaits Retry. Its file input stays a single stable element.
+- **Waive / Require again** are in the row menu (not offered on received or closed rows,
+  as before).
+- **Heading:** one next-step action (**Request materials**, **Send reminder** when missing,
+  **Confirm the files open** when received with no blocking jobs) and a card menu with
+  Copy contributor link, Send invitation (again) and Add other file. The Due / Link open
+  until / Sent to grid is one metadata line.
+- Separate commit: the "Use proposed then Save" test raced its own "Saved" label (it
+  failed 3 of 4 batched runs); it now waits for the PATCH and its re-render. Test-only.
