@@ -6,7 +6,7 @@
  * page, and the Share email already read. Attendees are staff/Board references
  * from the tracker's recipient directory plus manual applicant-side entries.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { requestEnvelope } from '../../utils/api-request';
@@ -190,8 +190,13 @@ export default function SiteVisitEditor() {
   const [notice, setNotice] = useState(null);
   const [applicantAttendees, setApplicantAttendees] = useState([]);
   const [applicantAttendeesUnavailable, setApplicantAttendeesUnavailable] = useState(false);
-  // Header identity from the visit GET (redesign §9.2); null keeps the number-only header.
-  const [requestIdentity, setRequestIdentity] = useState(null);
+  // Header identity from the visit GET (redesign §9.2), stored with the request it belongs to so a client-side move to
+  // another visit never shows the previous request's name (Codex review, commit 7); null keeps the number-only header.
+  const [identityEntry, setIdentityEntry] = useState(null);
+  const requestIdentity = identityEntry && identityEntry.requestId === requestId ? identityEntry.value : null;
+  // The request the page is showing now; a load for any other request is dropped when it settles.
+  const currentRequestRef = useRef(requestId);
+  useEffect(() => { currentRequestRef.current = requestId; }, [requestId]);
   // A saved visit opens read-only (DESIGN.md Read-First Rule). Keyed to the
   // request so a client-side move to another visit starts read-only again.
   const [editingFor, setEditingFor] = useState(null);
@@ -199,6 +204,8 @@ export default function SiteVisitEditor() {
 
   const load = useCallback(async () => {
     if (!requestId) return;
+    const forRequest = requestId;
+    const stillCurrent = () => currentRequestRef.current === forRequest;
     setLoading(true);
     setError(null);
     try {
@@ -208,6 +215,7 @@ export default function SiteVisitEditor() {
         readJson(`/api/meeting-tracker/visits/${encodeURIComponent(requestId)}`, undefined, 'The site visit could not be loaded.'),
         readJson('/api/meeting-tracker/recipients', undefined, 'The attendee directory could not be loaded.'),
       ]);
+      if (!stillCurrent()) return;
       if (visitSettled.status === 'rejected') throw visitSettled.reason;
       if (recipientSettled.status === 'rejected') throw recipientSettled.reason;
       const visitBody = visitSettled.value;
@@ -219,11 +227,11 @@ export default function SiteVisitEditor() {
       setRecipients(directory);
       setApplicantAttendees(visitBody.applicantAttendees || []);
       setApplicantAttendeesUnavailable(visitBody.applicantAttendeesUnavailable === true);
-      setRequestIdentity(visitBody.request && typeof visitBody.request === 'object' ? visitBody.request : null);
+      setIdentityEntry({ requestId: forRequest, value: visitBody.request && typeof visitBody.request === 'object' ? visitBody.request : null });
     } catch (loadError) {
-      setError(`${loadError.message} Please try again. If the problem continues, contact an administrator.`);
+      if (stillCurrent()) setError(`${loadError.message} Please try again. If the problem continues, contact an administrator.`);
     } finally {
-      setLoading(false);
+      if (stillCurrent()) setLoading(false);
     }
   }, [requestId, requestNumber]);
 

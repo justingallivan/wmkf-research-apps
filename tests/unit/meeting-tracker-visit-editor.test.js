@@ -1,5 +1,5 @@
 /** @jest-environment jsdom */
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import SiteVisitEditor, { noEmailHint, withApplicantAttendees } from '../../shared/components/meeting-tracker/SiteVisitEditor';
 
 let routerQuery = {};
@@ -343,4 +343,46 @@ test('the header shows the request identity from the visit read, and only the nu
   render(<SiteVisitEditor />);
   expect(await screen.findByRole('heading', { name: /^Site visit · #1003222/ })).toBeInTheDocument();
   expect(screen.queryByTestId('visit-request-identity')).toBeNull();
+});
+
+describe('header identity follows client-side navigation between visits (Codex review, commit 7)', () => {
+  const B_ID = '22222222-2222-4222-8222-222222222222';
+  const visitFor = (n) => ({ activityId: `a${n}`, etag: 'W/"1"', subject: 'S', description: '', startLocal: '2026-10-01T09:00', endLocal: '2026-10-01T12:00', timeZone: 'America/Los_Angeles', format: 100000001, locationOrLink: 'Campus', organizer: { kind: 'staff', profileId: 7 }, requiredAttendees: [], optionalAttendees: [] });
+  const identity = (n, title) => ({ requestNumber: n, title, institution: 'Example University', grantProgram: 'Research Program', cycleLabel: 'December 2026' });
+
+  test('A then a failed B shows B\'s number and none of A\'s identity', async () => {
+    global.fetch = jest.fn(async (url) => {
+      const target = String(url);
+      if (target.includes('/recipients')) return response(recipients);
+      if (target.endsWith('/materials') || target.endsWith('/presentation-materials')) return response({ error: 'not enabled' }, 503);
+      if (target.includes(B_ID)) return response({ error: 'down' }, 500);
+      return response({ success: true, siteVisit: visitFor(1), request: identity('1003222', 'Request A') });
+    });
+    const view = render(<SiteVisitEditor />);
+    expect(await screen.findByTestId('visit-request-identity')).toHaveTextContent('Request A');
+    routerQuery = { requestId: B_ID, n: '1009999' };
+    view.rerender(<SiteVisitEditor />);
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByTestId('visit-request-identity')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('#1009999');
+  });
+
+  test('a late response for A cannot overwrite B', async () => {
+    let releaseA = null;
+    global.fetch = jest.fn((url) => {
+      const target = String(url);
+      if (target.includes('/recipients')) return Promise.resolve(response(recipients));
+      if (target.endsWith('/materials') || target.endsWith('/presentation-materials')) return Promise.resolve(response({ error: 'not enabled' }, 503));
+      if (target.includes(B_ID)) return Promise.resolve(response({ success: true, siteVisit: visitFor(2), request: identity('1009999', 'Request B') }));
+      return new Promise((resolve) => { releaseA = () => resolve(response({ success: true, siteVisit: visitFor(1), request: identity('1003222', 'Request A') })); });
+    });
+    const view = render(<SiteVisitEditor />);
+    await waitFor(() => expect(releaseA).not.toBeNull());
+    routerQuery = { requestId: B_ID, n: '1009999' };
+    view.rerender(<SiteVisitEditor />);
+    expect(await screen.findByTestId('visit-request-identity')).toHaveTextContent('Request B');
+    await act(async () => { releaseA(); });
+    expect(screen.getByTestId('visit-request-identity')).toHaveTextContent('Request B');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('#1009999');
+  });
 });
