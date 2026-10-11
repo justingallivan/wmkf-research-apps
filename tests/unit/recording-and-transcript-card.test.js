@@ -571,9 +571,10 @@ describe('presentation end', () => {
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
     expect(screen.getByText('Save changes first')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-    await waitFor(() => expect(screen.getByText('Saved')).toBeInTheDocument());
-    expect(patchBody).toEqual({ expectedVersion: 1, speakerNames: {}, presentationEndMs: 62900 });
-    expect(screen.queryByRole('button', { name: 'Use proposed' })).not.toBeInTheDocument();
+    // "Saved" is already on screen before this save, so wait for the PATCH and its re-render, not just the label.
+    await waitFor(() => expect(patchBody).toEqual({ expectedVersion: 1, speakerNames: {}, presentationEndMs: 62900 }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Use proposed' })).not.toBeInTheDocument());
+    expect(screen.getByText('Saved')).toBeInTheDocument();
   });
 
   test('a skipped short line is shown with its speaker, time, and text, and Use this line instead selects it', async () => {
