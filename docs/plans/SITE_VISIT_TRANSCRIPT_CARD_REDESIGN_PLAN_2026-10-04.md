@@ -17,7 +17,7 @@ related:
 Status: built on `feature/site-visit-transcript-card` (see §13); awaiting owner merge and Production acceptance.
 
 > **Superseded again (2026-10-11):** the whole Site Visit page, including this card, was
-> redesigned on `claude/site-visit-redesign`; see
+> redesigned (merged 2026-10-11); see
 > [SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md](SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md).
 > The sections below are history.
 

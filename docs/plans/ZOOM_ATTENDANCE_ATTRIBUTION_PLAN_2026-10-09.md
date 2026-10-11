@@ -88,8 +88,8 @@ Source: an owner-run, read-only, shape-only run of `node scripts/probe-zoom-reco
   **Revised by the owner on 2026-10-10, after the first live use (1003222):** a row with the
   "left before the presentation ended" hint starts **unchecked**. Everyone else, and every
   other-voice row, starts checked. A misaligned recording shows no hints, so it is
-  unaffected. Built in `attendance-service.js` on `claude/site-visit-redesign` (Site Visit
-  redesign commit 4).
+  unaffected. Built in `attendance-service.js` (Site Visit
+  redesign commit 4; merged to `main` 2026-10-11).
 
 ### Fallback
 

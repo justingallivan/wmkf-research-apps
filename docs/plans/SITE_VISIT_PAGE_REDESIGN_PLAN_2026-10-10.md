@@ -2,7 +2,7 @@
 title: Site Visit page redesign
 domain: transcription
 kind: plan
-status: built-in-branch
+status: shipped
 summary: "Proposal to rework the Meeting Tracker Site Visit page under DESIGN.md's Page Structure rules: each finished artifact becomes one row (name is the link, audience and status chips, a … menu), steps collapse once done, the Board link sits with what the Board sees, and the queue's card notes are sorted into layout, client-behavior and server slices."
 owner: product-engineering
 related:
@@ -15,8 +15,8 @@ related:
 
 # Site Visit page redesign
 
-Status: **built on `claude/site-visit-redesign`** (Session 593, 2026-10-11): commits 1-7 are
-built and each was approved by Codex adversarial review; not merged. See §9.6 for the
+Status: **shipped.** Built on `claude/site-visit-redesign` (Session 593, 2026-10-11), each commit
+reviewed by Codex, then merged to `main` 2026-10-11 (`c574e9e7d`) and deployed to Production after the owner's desktop check. See §9.6 for the
 build log and §10 for what remains. Scope was decided before the build. The owner answered §8: the whole page is in scope, the Board link sits on the
 Results "Board page" heading, and TXT/VTT downloads live in the row menu. The build brief
 (§9: reusable pieces, header identity source, action inventory, commit order,
@@ -736,7 +736,7 @@ UI change was needed; a saved attribution is unaffected.
 - The header keeps "Site visit · #number" (from the URL until loaded) and adds one
   metadata line: "Institution — Title · Program · Cycle".
 - Docs: API route security matrix row; Atlas `dataverse-akoya-request.md` read paths and
-  `dataverse-wmkf-sitevisit.md` consumers (marked branch-built, not merged).
+  `dataverse-wmkf-sitevisit.md` consumers (merged 2026-10-11).
 - **Deferred, open for the owner:** the header status chip (§3). An accurate chip needs
   state the page does not hold: the materials collection state from its card and Board
   readiness from the Results rows, including the video line's own fetch. Building it means
@@ -816,11 +816,8 @@ an uploaded transcript gets Open without downloads.
 
 ## 10. Remaining after the build (2026-10-11)
 
-- **Owner:** merge decision. The branch is pushed and not merged (owner decision 5). It is
-  Tier 1 runtime UI plus one read-only server read, so promote it deliberately.
-- **Owner:** a desktop check on a real request. The page reads Production, so the owner
-  runs it or authorizes it. The build was checked in jsdom and through static
-  renders of the card.
+- **[DONE]** Owner desktop check on a real request (localhost, 2026-10-11; findings in §10.1) and
+  merge (owner, 2026-10-11; `c574e9e7d`, Production deployment Ready).
 - **Open design item:** the header status chip (§9.6 commit 7).
 - **Server slices C1-C3 (§6), not started:** automatic split-transcript generation after a
   publish with a confirmed end; the real reason a presentation video was superseded; and

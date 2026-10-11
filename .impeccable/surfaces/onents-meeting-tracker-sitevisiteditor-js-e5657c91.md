@@ -7,7 +7,7 @@ related_targets: ["shared/components/meeting-tracker/RecordingAndTranscriptCard.
 
 # Site Visit page (Record Detail)
 
-Scope: the whole Site Visit page was redesigned under DESIGN.md's Page Structure rules on branch `claude/site-visit-redesign` (2026-10-11; plan `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md`). Mode: Operate. Page type: Record Detail. This supersedes the earlier "transcription extension, not a redesign" scope. Staff schedule the visit, collect applicant materials, import the Zoom recording, check speakers and the presentation end, and publish what the Board sees.
+Scope: the whole Site Visit page was redesigned under DESIGN.md's Page Structure rules (merged to `main` 2026-10-11; plan `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md`). Mode: Operate. Page type: Record Detail. This supersedes the earlier "transcription extension, not a redesign" scope. Staff schedule the visit, collect applicant materials, import the Zoom recording, check speakers and the presentation end, and publish what the Board sees.
 
 ## Direction contract
 
@@ -21,6 +21,6 @@ FIRST VIEWPORT: Header, the Visit details summary, and the top of Applicant mate
 
 FORM: `ArtifactRow` (name link, status chip, detail, inline action or menu) is the shared row for Results and Applicant materials. Consent to send material to the LLM provider is asked in an inline confirmation at the moment of Summarize, never kept on screen.
 
-FINISH: unreviewed and undocumented is unfinished. Each build slice had Codex adversarial review; the detector run on 2026-10-11 found no issues. Open: the header status chip (plan §9.6 commit 7) and a live desktop check on a real request (owner-run, because the page reads Production).
+FINISH: unreviewed and undocumented is unfinished. Each build slice had Codex adversarial review; the detector run on 2026-10-11 found no issues. Open: the header status chip (plan §9.6 commit 7) The owner's live desktop check was done on 2026-10-11 (findings in plan §10.1).
 
 Verification: synthetic content in jsdom suites for every slice; mutation checks for each behavior fix. No new raster assets; DESIGN.md is unchanged.

@@ -141,8 +141,8 @@ sequence.
   stage by stage and now reads as a mess for an ordinary Zoom import. Do one
   design pass over the whole card, not piecemeal patches. **Proposal (Session
   593, scope widened to the whole Site Visit page by the owner):**
-  `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md`. **[BUILT on branch
-  `claude/site-visit-redesign`, Session 593, 2026-10-11; pushed, not merged.]** Built:
+  `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md`. **[SHIPPED: built on
+  `claude/site-visit-redesign` in Session 593 and merged to `main` 2026-10-11 (`c574e9e7d`) and deployed to Production.]** Built:
   result rows in four staff-first cards (Recording setup, Presentation, Staff discussion,
   Board materials with a readiness list; no full-recording row; owner decisions 7-12, plan §8.2), collapsed steps, Upload manually, Copy video in its row with an in-row
   replace confirmation, one card Refresh, quiet own-write staleness, old-transcript edits
@@ -178,8 +178,8 @@ sequence.
     published transcript (`beginEditNames` edits `collection.currentArtifact`),
     so staff land in a different recording's transcript. De-emphasise or hide
     the published transcript's edit actions while a newer one is pending.
-  - **Start hinted leavers unchecked in "Discussion attendance".** [BUILT on branch
-    `claude/site-visit-redesign`, commit 4; not merged] Reverses
+  - **Start hinted leavers unchecked in "Discussion attendance".** [SHIPPED with the Site Visit
+    redesign, commit 4; merged 2026-10-11] Reverses
     owner decision D2 of `docs/plans/ZOOM_ATTENDANCE_ATTRIBUTION_PLAN_2026-10-09.md`
     ("everyone starts checked"), by owner request after the first live use
     (1003222, 2026-10-10): people flagged "Left before the presentation ended"
