@@ -792,6 +792,10 @@ link) reloads only the materials, so the video status was not re-read although t
 serving a cut of the old recording. The video status key now includes the recording's id and slot
 version, so a recording change re-reads it (and a failed re-read is "Status unknown"). Regression:
 save a new Zoom link with the splits read failing; fails without the recording in the key.
+Codex round 6 (needs-attention, one medium), **accepted by the owner (2026-10-11), not fixed**: if a
+recording save succeeds and the materials reload right after it fails, the video status key does not
+change, so the readiness line can keep an old "On the Board page" until the next successful Refresh.
+The card shows the materials load error at the same time. Recorded in §10.
 
 ## 10. Remaining after the build (2026-10-11)
 
@@ -808,6 +812,10 @@ save a new Zoom link with the splits read failing; fails without the recording i
   `Button`).
 - **Server-side gap noted by Codex (commit 3):** `createMeetingCorrection` does not refuse
   while a newer transcription is pending; the gate is UI-only.
+
+- **Accepted gap (owner, 2026-10-11):** Board readiness after a recording save whose materials reload
+  fails (§9.6, Codex round 6). Fix if it is ever seen: after a confirmed recording save, show the video
+  line as "Status unknown" until a fresh read succeeds.
 
 ### 10.1 Owner desktop check findings (2026-10-11, held until the check is done)
 
