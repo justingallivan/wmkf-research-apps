@@ -165,6 +165,18 @@ test('an existing Board page can be opened and its included and excluded materia
   expect(global.fetch.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false);
 });
 
+test('an unreadable Board link offers Issue new link inline, behind its confirmation', async () => {
+  route({ materials: [], collection: collection({ jobs: [], currentArtifact: null }), detail: detailFor({}) }, {
+    '/presentation-link': { respond: () => response({ link: { url: null, expiresAt: '2026-11-01T00:00:00.000Z' } }) },
+  });
+  render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+  expect(await screen.findByText('The current link cannot be read. Issue a new link to replace it.')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'More actions for the Board link' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Issue new link' }));
+  expect(screen.getByText('The current presentation link will stop working immediately.')).toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(false);
+});
+
 test('seeds names from the job on load, then adopts names that arrive when matching finishes', async () => {
   let current = { speaker_names: { A: 'Alex Lee' } };
   const state = { collection: collection({ jobs: [job(current)] }), detail: () => detailFor(current)() };
@@ -1494,7 +1506,7 @@ describe('step-by-step layout', () => {
     expect(screen.queryByLabelText(/Audio file/)).not.toBeInTheDocument();
     const results = screen.getByTestId('step-results');
     // Each result opens by its name; there is no separate Open button.
-    expect(within(results).queryAllByRole('link', { name: /^Open/ })).toHaveLength(0);
+    expect(within(results).queryAllByRole('link', { name: /^Open( published summary| video| recording| transcript)?$/ })).toHaveLength(0);
     expect(within(results).getByRole('link', { name: 'Presentation transcript' })).toHaveAttribute('href', presentation.webUrl);
     expect(within(results).getByRole('link', { name: 'Staff discussion transcript' })).toHaveAttribute('href', discussion.webUrl);
     expect(within(results).getByRole('link', { name: 'Full meeting recording' })).toHaveAttribute('href', recording.externalUrl);

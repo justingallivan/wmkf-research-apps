@@ -3480,7 +3480,8 @@ function BoardPageHeading({ m }) {
           {!link && <Button type="button" size="sm" variant="outline" loading={linkBusy} disabled={linkBusy} onClick={() => m.mutateLink('ensure')}>Generate link</Button>}
           {link?.url && <Button type="button" size="sm" variant="outline" onClick={m.copyLink}>{linkCopied ? 'Copied' : 'Copy link'}</Button>}
           {link?.url && <a className={BTN} href={link.url} target="_blank" rel="noopener noreferrer">Open Board page</a>}
-          {link && <OverflowMenu label="More actions for the Board link" items={[
+          {link && !link.url && !confirmReissue && <Button type="button" size="sm" variant="outline" disabled={linkBusy} onClick={() => m.setConfirmReissue(true)}>Issue new link</Button>}
+          {link?.url && <OverflowMenu label="More actions for the Board link" items={[
             { key: 'reissue', label: 'Issue new link', disabled: linkBusy || confirmReissue, onSelect: () => m.setConfirmReissue(true) },
           ]} />}
         </div>

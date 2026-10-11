@@ -500,3 +500,28 @@ work is in progress. Builders tick each line off in the slice that moves it, and
   (`impeccable detect --json`), then the finish review.
 - Desktop check in a browser on a test request. Rendering this page reads
   Production Dataverse, so the owner either authorizes it or drives it.
+
+### 9.6 Build log
+
+**Commit 1, Results rows** (branch `claude/site-visit-redesign`, `b48649a14` plus a
+follow-up amend commit). As built, with these deviations from §4 and §9.3:
+
+- **Unmet prerequisites keep the old card's behavior:** the action is absent and the
+  reason shows as a note under the row (for example "Generate the discussion
+  transcript first."). It is not yet a disabled menu item labeled with its reason
+  (§4). Commit 2 revisits this when steps 1 and 2 collapse.
+- **Draft summaries keep the editor open under the row.** There is no separate
+  inline "Review and publish" action; the open editor is the action.
+- **Approved video:** `boardReady === true` and `== null` both read "Approved". The
+  unknown case adds the note "Couldn't check the Board status." The Board page group
+  heading carries what "for the Board" used to say.
+- **Split transcripts have no downloads** (no download route; §9.3).
+- **Board link:** "Issue new link" is in the heading's menu while the link reads, and
+  inline when the link cannot be read.
+- **Not yet converged on `Button`:** the card's `BTN`/`BTN_PRIMARY` strings remain.
+  Row actions use the outline `BTN`, so the only ink buttons in Results are confirm
+  buttons. Convergence is scheduled with commit 3 (card behavior).
+- **Pre-existing, unchanged:** `SummaryBlock`'s `published` falls back to the
+  collection's presentation `transcriptSummary` for both kinds while the summary read
+  is not current. The row's chip and detail are guarded by `summaryStatusCurrent`, so
+  this does not misrender. It is left for a separate fix.
