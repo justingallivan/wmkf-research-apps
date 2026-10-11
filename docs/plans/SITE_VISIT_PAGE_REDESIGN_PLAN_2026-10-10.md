@@ -317,6 +317,15 @@ is automatic.
 3. **TXT and VTT downloads live in the row's "…" menu**, for the split transcripts
    and the full meeting transcript alike.
 
+### 8.1 Owner decisions before the remaining build (2026-10-11)
+
+4. **Header identity:** add the opt-in read-only request lookup on the Meeting Tracker visit
+   endpoint (§9.2).
+5. **Branch:** after the build and its final review, push `claude/site-visit-redesign` only;
+   no merge or Production deploy. The owner merges.
+6. **Attendees picker:** a search box plus a selected list with Required/Optional per
+   person (§3.1).
+
 ## 9. Build brief (Session 593, 2026-10-11)
 
 Branch `claude/site-visit-redesign` off `main`, Tier 1 runtime UI (campaign release
@@ -612,3 +621,11 @@ regression tests. Round 2 approved with no material findings. As built, with the
   button stays disabled while the list is refreshing. Regression: a held Zoom response
   keeps Refresh disabled and a second click starts no request (fails with both reverted).
 - **Codex round 6: approve**, no material findings. Commit 3 is closed.
+
+**Commit 3b, shared Button.** Converted all 46 card `<button>`s that used the `BTN` or
+`BTN_PRIMARY` styles to the shared `Button` (`size="sm"`, `variant` outline or primary), and
+removed `BTN_PRIMARY`. Kept: `BTN` on the one `<a>` styled as a button (Open Board page) and
+the underlined `BTN_LINK` text actions (disclosures such as Upload manually, and quiet
+actions such as Cancel this transcription or Discard draft), because `Button` has no
+text-link variant. Converting those would mean adding a variant to the shared component,
+which is outside this build.

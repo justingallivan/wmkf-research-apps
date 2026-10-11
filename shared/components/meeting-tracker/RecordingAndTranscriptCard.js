@@ -923,7 +923,6 @@ const PROGRESS_VERBS = {
 };
 const FOCUS_RING = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600';
 const BTN = `inline-flex min-h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 ${FOCUS_RING} disabled:cursor-not-allowed disabled:opacity-50`;
-const BTN_PRIMARY = `inline-flex min-h-10 items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 ${FOCUS_RING} focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-700`;
 const BTN_LINK = `text-sm font-medium text-gray-700 underline underline-offset-2 hover:text-gray-950 ${FOCUS_RING} disabled:cursor-not-allowed disabled:opacity-50`;
 const INPUT = `mt-1 block min-h-10 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-100`;
 const FILE_INPUT = `${INPUT} file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-gray-900`;
@@ -2385,7 +2384,7 @@ function SpeakerEditor({ t, alignment, readOnly }) {
                 </label>
                 {rowSuggestions.length > 0 && <div className="flex flex-wrap items-center gap-2">
                   {rowSuggestions.map((name) => (
-                    <button key={name} type="button" disabled={disabled} onClick={() => setNames((c) => ({ ...c, [speaker]: name }))} className={BTN}>Use {name}</button>
+                    <Button size="sm" variant="outline" key={name} type="button" disabled={disabled} onClick={() => setNames((c) => ({ ...c, [speaker]: name }))}>Use {name}</Button>
                   ))}
                 </div>}
                 {candidates.length > 0 && <label htmlFor={`${controlId}-pick`} className="block text-xs font-medium text-gray-700">
@@ -2450,7 +2449,7 @@ function PresentationEndEditor({ t, readOnly }) {
       {proposed && Number.isSafeInteger(proposed.endMs) && proposed.endMs !== selected && (
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-900">
           <span>Proposed: {formatTranscriptTurnTime(proposed.endMs)} — last turn by {proposedName}</span>
-          <button type="button" disabled={disabled} onClick={() => setPresentationEndMs(proposed.endMs)} className={BTN}>Use proposed</button>
+          <Button size="sm" variant="outline" type="button" disabled={disabled} onClick={() => setPresentationEndMs(proposed.endMs)}>Use proposed</Button>
         </div>
       )}
       {(proposed?.skipped || []).filter((line) => Number.isSafeInteger(line?.endMs)).map((line) => (
@@ -2458,7 +2457,7 @@ function PresentationEndEditor({ t, readOnly }) {
           <Notice tone="info">
             Skipped a short line attributed to {String(names?.[line.speakerId] || '').trim() || `Speaker ${line.speakerId}`} at {formatTranscriptTurnTime(line.startMs)}: “{clip(line.text, 80)}” It came {Math.round(line.gapMs / 60_000)} minutes after the last longer applicant line, so it may belong to someone else.
           </Notice>
-          {line.endMs !== selected && <button type="button" disabled={disabled} onClick={() => setPresentationEndMs(line.endMs)} className={`mt-2 ${BTN}`}>Use this line instead</button>}
+          {line.endMs !== selected && <Button size="sm" variant="outline" type="button" disabled={disabled} onClick={() => setPresentationEndMs(line.endMs)} className="mt-2">Use this line instead</Button>}
         </div>
       ))}
       <label className="mt-2 block text-xs font-medium text-gray-700">
@@ -2561,7 +2560,7 @@ function ReviewBlock({ t }) {
             ? <p className="mt-1 text-xs text-gray-600">Changes names and where the presentation ends. The wording and timestamps stay the same.</p>
             : <p className="mt-1 text-sm text-gray-700">{RUN_STATE_LABELS[status] || 'Unknown'}{job?.ready_at ? ` ${fmtDateTime(job.ready_at)}` : ''}{job?.needsAttention ? ' · Needs attention' : ''}</p>}
         </div>
-        {showRefresh && <button type="button" onClick={t.refreshReview} disabled={Boolean(busy)} className={BTN}>{busy === 'loading' ? 'Refreshing…' : 'Refresh'}</button>}
+        {showRefresh && <Button size="sm" variant="outline" type="button" onClick={t.refreshReview} disabled={Boolean(busy)}>{busy === 'loading' ? 'Refreshing…' : 'Refresh'}</Button>}
       </div>
       {!correction && status === 'submission_uncertain' && <div className="mt-3"><Notice tone="warning">We could not confirm this recording was accepted for transcription. Do not start another transcription for the same recording until this run is resolved.</Notice></div>}
       {!correction && job?.contentDeletionObserved && <div className="mt-3"><Notice tone="info">This draft’s text is no longer available.</Notice></div>}
@@ -2581,8 +2580,8 @@ function ReviewBlock({ t }) {
         <TranscriptPreview content={resolveDiscussionAttribution(t.content, t.presentationEndMs, t.previewDecision)} names={t.names} />
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className="mr-auto text-xs text-gray-600" aria-live="polite">{correction ? (dirty ? 'Unsaved changes' : 'Saved') : (dirty ? 'Unsaved name changes' : 'Names saved')}</span>
-          <button type="button" onClick={t.saveNames} disabled={!dirty || Boolean(busy) || matchingActive} className={BTN}>{busy === 'speakers' ? (correction ? 'Saving…' : 'Saving names…') : (correction ? 'Save changes' : 'Save names')}</button>
-          <button type="button" onClick={correction ? t.publishCorrection : t.publishJob} disabled={Boolean(publishBlockedReason) || Boolean(busy)} className={BTN_PRIMARY}>{busy === 'publish' ? 'Publishing…' : 'Publish transcript'}</button>
+          <Button size="sm" variant="outline" type="button" onClick={t.saveNames} disabled={!dirty || Boolean(busy) || matchingActive}>{busy === 'speakers' ? (correction ? 'Saving…' : 'Saving names…') : (correction ? 'Save changes' : 'Save names')}</Button>
+          <Button size="sm" variant="primary" type="button" onClick={correction ? t.publishCorrection : t.publishJob} disabled={Boolean(publishBlockedReason) || Boolean(busy)}>{busy === 'publish' ? 'Publishing…' : 'Publish transcript'}</Button>
         </div>
         {correction && <div className="mt-2"><Notice tone="warning">Publishing this correction, including a names-only change, withholds the Board presentation transcript and summary until you generate the presentation transcripts and summarize again.</Notice></div>}
         {publishBlockedReason && <p className="mt-2 text-xs leading-5 text-gray-600">{publishBlockedReason}</p>}
@@ -2619,8 +2618,8 @@ function AttentionBlock({ t }) {
               <p className="font-medium">{copy}</p>
               {row.errorCode && <p className="mt-1 break-all text-xs text-amber-900">Reference: {row.errorCode}</p>}
               <div className="mt-2 flex flex-wrap gap-2">
-                <button type="button" onClick={() => void t.checkPublication(row)} disabled={Boolean(busy)} className={BTN}>{busy === `check-${row.operationId}` ? 'Checking…' : action}</button>
-                {waited && <button type="button" onClick={() => void t.closePublication(row)} disabled={Boolean(busy) || t.closeAcknowledgedId !== row.operationId} className={BTN}>{busy === `close-${row.operationId}` ? 'Closing…' : 'Close this attempt'}</button>}
+                <Button size="sm" variant="outline" type="button" onClick={() => void t.checkPublication(row)} disabled={Boolean(busy)}>{busy === `check-${row.operationId}` ? 'Checking…' : action}</Button>
+                {waited && <Button size="sm" variant="outline" type="button" onClick={() => void t.closePublication(row)} disabled={Boolean(busy) || t.closeAcknowledgedId !== row.operationId}>{busy === `close-${row.operationId}` ? 'Closing…' : 'Close this attempt'}</Button>}
               </div>
               {waited && <label className="mt-2 flex items-start gap-2 text-xs leading-5"><input type="checkbox" checked={t.closeAcknowledgedId === row.operationId} disabled={Boolean(busy)} onChange={(event) => t.setCloseAcknowledgedId(event.target.checked ? row.operationId : null)} className="mt-0.5 h-4 w-4 rounded border-amber-500" /><span>Closing stops retries. Any partly saved files stay in SharePoint, and the current transcript is not changed.</span></label>}
               {!waited && row.quarantineUntil && <p className="mt-2 text-xs leading-5">You can close this attempt after {fmtDateTime(row.quarantineUntil)}.</p>}
@@ -2650,7 +2649,7 @@ function EarlierRuns({ t }) {
               </p>
             </div>
             {job.status === 'ready' && <div className="flex items-center gap-3">
-              <button type="button" onClick={() => t.reviewRun(job)} disabled={Boolean(t.busy) && t.busy !== 'speakers'} className={BTN}>Review</button>
+              <Button size="sm" variant="outline" type="button" onClick={() => t.reviewRun(job)} disabled={Boolean(t.busy) && t.busy !== 'speakers'}>Review</Button>
               <button type="button" onClick={() => void t.discardRun(job)} disabled={Boolean(t.busy)} className={BTN_LINK}>Discard this draft</button>
             </div>}
             {canCancelRun(job) && <button type="button" onClick={() => void t.discardRun(job)} disabled={Boolean(t.busy)} className={BTN_LINK}>{t.busy === 'cancel' ? 'Cancelling…' : 'Cancel this transcription'}</button>}
@@ -2683,12 +2682,12 @@ function GenerateForm({ t }) {
         <span>This recording is non-sensitive and may be sent to our transcription provider.{vttFile ? ' Excerpts of both transcripts are also sent to Anthropic to match speaker names.' : ''} Transcription uses paid credits.</span>
       </label>
       {t.uploadProgress !== null && <div className="mt-3" aria-live="polite"><div className="flex justify-between text-xs text-gray-700"><span>{busy === 'upload-captions' ? 'Uploading Zoom captions' : t.uploadProgress < 100 ? 'Uploading to private storage' : 'Upload complete'}</span><span>{t.uploadProgress}%</span></div><progress className="mt-1 h-2 w-full accent-gray-900" max="100" value={t.uploadProgress} aria-label="Private upload progress" /></div>}
-      <button type="button" onClick={t.uploadAndStart} disabled={!audioFile || Boolean(audioError) || Boolean(vttError) || Boolean(sizeError) || !t.acknowledged || Boolean(busy)} className={`mt-3 ${BTN_PRIMARY}`}>{busy === 'upload' ? 'Uploading…' : busy === 'upload-captions' ? 'Uploading Zoom captions…' : busy === 'starting' ? 'Starting transcription…' : 'Start transcription'}</button>
+      <Button size="sm" variant="primary" type="button" onClick={t.uploadAndStart} disabled={!audioFile || Boolean(audioError) || Boolean(vttError) || Boolean(sizeError) || !t.acknowledged || Boolean(busy)} className="mt-3">{busy === 'upload' ? 'Uploading…' : busy === 'upload-captions' ? 'Uploading Zoom captions…' : busy === 'starting' ? 'Starting transcription…' : 'Start transcription'}</Button>
       {t.confirmNoVtt && !vttFile && !busy && <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-5 text-amber-950" role="alert">
         <p>Add Zoom captions to name speakers automatically?</p>
         <div className="mt-2 flex flex-wrap gap-2">
-          <button type="button" onClick={() => { t.setNoVttConfirmation(null); vttInputRef.current?.focus(); }} className={BTN}>Add Zoom captions</button>
-          <button type="button" onClick={t.uploadAndStart} className={BTN}>Continue without it</button>
+          <Button size="sm" variant="outline" type="button" onClick={() => { t.setNoVttConfirmation(null); vttInputRef.current?.focus(); }}>Add Zoom captions</Button>
+          <Button size="sm" variant="outline" type="button" onClick={t.uploadAndStart}>Continue without it</Button>
         </div>
       </div>}
     </div>
@@ -2712,7 +2711,7 @@ function UploadForm({ m, inputRef }) {
       {m.transcriptFile && <p className="mt-2 break-all text-xs text-gray-700">{m.transcriptFile.name}</p>}
       {m.transcriptProgress !== null && <p className="mt-2 text-xs text-gray-600">Uploading: {m.transcriptProgress}%</p>}
       {m.transcriptError && <p role="alert" className="mt-2 text-sm text-red-800">{m.transcriptError}</p>}
-      <button type="button" onClick={m.uploadTranscript} disabled={!m.transcriptFile || m.transcriptBusy} className={`mt-3 ${BTN_PRIMARY}`}>{m.transcriptBusy ? 'Uploading…' : m.transcriptStagedId ? 'Finish transcript' : 'Upload transcript'}</button>
+      <Button size="sm" variant="primary" type="button" onClick={m.uploadTranscript} disabled={!m.transcriptFile || m.transcriptBusy} className="mt-3">{m.transcriptBusy ? 'Uploading…' : m.transcriptStagedId ? 'Finish transcript' : 'Upload transcript'}</Button>
     </div>
   );
 }
@@ -2764,9 +2763,8 @@ function SummarizeConfirm({ t, kinds, valid, onClose }) {
         <span>{PAIRED_SUMMARY_ACKNOWLEDGMENT.text}</span>
       </label>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button type="button" onClick={() => { onClose(); if (valid) void t.summarizeKinds(kinds); }} disabled={!valid || Boolean(t.busy) || !t.summaryAck || !kinds.length}
-          className={BTN_PRIMARY}>{summarizeLabel(kinds)}</button>
-        <button type="button" onClick={() => { t.setSummaryAck(false); onClose(); }} disabled={Boolean(t.busy)} className={BTN}>Cancel</button>
+        <Button size="sm" variant="primary" type="button" onClick={() => { onClose(); if (valid) void t.summarizeKinds(kinds); }} disabled={!valid || Boolean(t.busy) || !t.summaryAck || !kinds.length}>{summarizeLabel(kinds)}</Button>
+        <Button size="sm" variant="outline" type="button" onClick={() => { t.setSummaryAck(false); onClose(); }} disabled={Boolean(t.busy)}>Cancel</Button>
       </div>
     </div>
   );
@@ -2830,9 +2828,9 @@ function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = n
   const rerunInMenu = againAllowed && !pairedSingleHere && !rerunInline;
   const pairedLabel = paired.length === 2 ? 'Summarize both' : againLabel === 'Try again' ? 'Try again' : ['bound', 'stale'].includes(published?.state) ? 'Summarize again' : 'Summarize';
   const action = pairedHere
-    ? <button type="button" onClick={() => open('paired', paired)} disabled={Boolean(t.busy)} className={BTN}>{pairedLabel}</button>
+    ? <Button size="sm" variant="outline" type="button" onClick={() => open('paired', paired)} disabled={Boolean(t.busy)}>{pairedLabel}</Button>
     : rerunInline
-      ? <button type="button" onClick={() => open('single', [kind])} disabled={Boolean(t.busy)} className={BTN}>{againLabel}</button>
+      ? <Button size="sm" variant="outline" type="button" onClick={() => open('single', [kind])} disabled={Boolean(t.busy)}>{againLabel}</Button>
       : null;
   // An open confirmation stays valid only while the action that opened it is still offered for the same targets.
   const mine = request?.anchor === kind ? request : null;
@@ -2869,9 +2867,9 @@ function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = n
       {!s.summarizing && generatingRun && summaryCurrent && (runAbandoned
         ? <p className="mt-1 text-sm text-gray-700">The summary started {fmtDateTime(generatingRun.createdAt)} did not finish.</p>
         : <div className="mt-1 text-sm text-gray-800" aria-live="polite"><p>Summarizing… started {fmtDateTime(generatingRun.createdAt)}.</p>
-          <button type="button" onClick={() => void s.loadSummary()} disabled={Boolean(t.busy) || s.summaryReadState === 'loading'} className={`mt-2 ${BTN}`}>Check again</button></div>)}
-      {s.summaryReadState === 'unavailable' && s.wantsSummary && <button type="button" onClick={() => void s.loadSummary()} disabled={Boolean(t.busy)} className={`mt-2 ${BTN}`}>Check again</button>}
-      {kind === 'presentation' && compactSummaryStatusUnknown && <button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.loading ? 'Refreshing…' : 'Refresh transcription status'}</button>}
+          <Button size="sm" variant="outline" type="button" onClick={() => void s.loadSummary()} disabled={Boolean(t.busy) || s.summaryReadState === 'loading'} className="mt-2">Check again</Button></div>)}
+      {s.summaryReadState === 'unavailable' && s.wantsSummary && <Button size="sm" variant="outline" type="button" onClick={() => void s.loadSummary()} disabled={Boolean(t.busy)} className="mt-2">Check again</Button>}
+      {kind === 'presentation' && compactSummaryStatusUnknown && <Button size="sm" variant="outline" type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className="mt-2">{t.loading ? 'Refreshing…' : 'Refresh transcription status'}</Button>}
       {s.summaryReadState === 'unavailable' && <p className="mt-1 text-sm text-amber-900">Current summary status is unavailable. Any published file shown above reflects the latest material list.</p>}
       {kind === 'presentation' && (published?.state === 'bound' || published?.state === 'stale') && s.summary?.slidesChangedSinceSummary === true && (
         <p className="mt-1 text-sm leading-6 text-amber-900" data-testid="summary-slides-changed">The applicant slides were updated after this summary was made. Summarize again to include them.</p>
@@ -2882,13 +2880,13 @@ function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = n
       {kind === 'presentation' && !presentationReady && !t.correction && (!transcriptMaterial
         ? <p className="mt-1 text-sm text-gray-700">Add a transcript first. Upload a transcript file or generate one from audio.</p>
         : !artifact
-          ? <div className="mt-1 text-sm text-gray-700"><p>Transcript status is unavailable. Refresh transcription status to check whether this transcript can be summarized.</p><button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.loading ? 'Refreshing…' : 'Refresh transcription status'}</button></div>
+          ? <div className="mt-1 text-sm text-gray-700"><p>Transcript status is unavailable. Refresh transcription status to check whether this transcript can be summarized.</p><Button size="sm" variant="outline" type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className="mt-2">{t.loading ? 'Refreshing…' : 'Refresh transcription status'}</Button></div>
           : artifact.bundleEditable === false
           ? <p className="mt-1 text-sm text-gray-700">A generated transcript with timed speaker turns is required. Uploaded transcript files cannot be split into presentation and discussion sections here.</p>
           : artifact.bundleEditable !== true
-            ? <div className="mt-1 text-sm text-gray-700"><p>Transcript status is unavailable. Refresh transcription status to check whether this transcript can be summarized.</p><button type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className={`mt-2 ${BTN}`}>{t.loading ? 'Refreshing…' : 'Refresh transcription status'}</button></div>
+            ? <div className="mt-1 text-sm text-gray-700"><p>Transcript status is unavailable. Refresh transcription status to check whether this transcript can be summarized.</p><Button size="sm" variant="outline" type="button" onClick={() => void t.loadCollection()} disabled={t.loading || Boolean(t.busy)} className="mt-2">{t.loading ? 'Refreshing…' : 'Refresh transcription status'}</Button></div>
             : !artifact.presentationEnd
-            ? <div className="mt-1 text-sm text-gray-700"><p>Confirm where the presentation ends before generating the presentation transcript and summary.</p><button type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy) || t.newerTranscriptPending} className={`mt-2 ${BTN}`}>{t.savedDraft ? 'Continue editing presentation end' : 'Set end to enable summary'}</button>{t.newerTranscriptPending && <p className="mt-1 text-xs text-gray-600">Wait for the newer transcript before setting the end.</p>}</div>
+            ? <div className="mt-1 text-sm text-gray-700"><p>Confirm where the presentation ends before generating the presentation transcript and summary.</p><Button size="sm" variant="outline" type="button" onClick={t.beginEditNames} disabled={Boolean(t.busy) || t.newerTranscriptPending} className="mt-2">{t.savedDraft ? 'Continue editing presentation end' : 'Set end to enable summary'}</Button>{t.newerTranscriptPending && <p className="mt-1 text-xs text-gray-600">Wait for the newer transcript before setting the end.</p>}</div>
             : <p className="mt-1 text-sm text-gray-700">Generate the presentation transcript before summarizing it.</p>)}
       {failed && <p className="mt-1 text-sm text-gray-700">The last summary attempt did not produce a draft.</p>}
       {requestValid && <SummarizeConfirm t={t} kinds={mine.kinds} valid={requestValid} onClose={() => setRequest(null)} />}
@@ -2897,8 +2895,8 @@ function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = n
           <Notice tone="warning">This draft is no longer current. Your edits are preserved below, but they are not a current server draft. Load latest to replace these edits with the current server state.</Notice>
           <label htmlFor={`${kind}-summary-recovery-text`} className="mt-2 block text-sm font-medium text-gray-900">Preserved unsaved edits</label>
           <textarea id={`${kind}-summary-recovery-text`} rows={14} className={`${INPUT} font-mono`} value={s.summaryConflict.text} readOnly />
-          <button type="button" onClick={() => void s.loadSummary({ replaceText: true })}
-            disabled={Boolean(t.busy) || s.summaryReadState === 'loading'} className={`mt-2 ${BTN}`}>Load latest</button>
+          <Button size="sm" variant="outline" type="button" onClick={() => void s.loadSummary({ replaceText: true })}
+            disabled={Boolean(t.busy) || s.summaryReadState === 'loading'} className="mt-2">Load latest</Button>
         </div>
       )}
       {draft && !s.summaryConflict && (
@@ -2919,14 +2917,14 @@ function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = n
             maxLength={SUMMARY_TEXT_MAX_CHARS} disabled={Boolean(t.busy) || draft.state !== 'ready'}
             onChange={(event) => s.setSummaryText(event.target.value)} />
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button type="button" onClick={s.publishSummaryDraft} className={BTN_PRIMARY}
+            <Button size="sm" variant="primary" type="button" onClick={s.publishSummaryDraft} 
               disabled={Boolean(t.busy) || !summaryCurrent || !s.summary?.draftMatchesTranscript || !s.summaryText.trim()}>
               {t.busy === busyKeys.publish ? 'Publishing…' : 'Publish summary'}
-            </button>
+            </Button>
             {draft.state === 'ready' && <>
-              <button type="button" onClick={() => void s.saveSummaryDraft()} className={BTN} disabled={Boolean(t.busy) || !s.summaryDirty || !s.summaryText.trim()}>
+              <Button size="sm" variant="outline" type="button" onClick={() => void s.saveSummaryDraft()}  disabled={Boolean(t.busy) || !s.summaryDirty || !s.summaryText.trim()}>
                 {t.busy === busyKeys.save ? 'Saving…' : 'Save draft'}
-              </button>
+              </Button>
               <button type="button" onClick={s.discardSummaryDraft} className={BTN_LINK} disabled={Boolean(t.busy)}>
                 {t.busy === busyKeys.discard ? 'Discarding…' : 'Discard draft'}
               </button>
@@ -2975,8 +2973,8 @@ function ReplaceConfirm({ z }) {
       <p>This will replace the recording file already saved for this request. Continue?</p>
       {winner?.filename && <p className="mt-1 text-xs">Current file: {winner.filename}{Number(winner.size) > 0 ? ` (${formatBytes(winner.size)})` : ''}</p>}
       <div className="mt-2 flex gap-2">
-        <button type="button" onClick={() => void z.confirmReplace()} disabled={z.busy || z.videoBusy} className={BTN_PRIMARY}>Replace and continue</button>
-        <button type="button" onClick={() => void z.declineReplace()} disabled={z.busy || z.videoBusy} className={BTN}>Keep current file</button>
+        <Button size="sm" variant="primary" type="button" onClick={() => void z.confirmReplace()} disabled={z.busy || z.videoBusy}>Replace and continue</Button>
+        <Button size="sm" variant="outline" type="button" onClick={() => void z.declineReplace()} disabled={z.busy || z.videoBusy}>Keep current file</Button>
       </div>
     </div>
   );
@@ -3004,7 +3002,7 @@ function VideoCopyStatus({ z }) {
         ? <p className="mt-1 text-xs text-gray-700">Cancelling…</p>
         : <button type="button" onClick={() => void z.cancelCopy(copy.id)} disabled={z.videoBusy} className={`mt-2 ${BTN_LINK}`}>Cancel copy</button>)}
       {copy?.state === 'failed' && copy.meetingUuid && !active
-        && <button type="button" onClick={() => void z.copyVideo(copy.meetingUuid, 'block')} disabled={z.busy || z.videoBusy || z.hasActiveCopy} className={`mt-2 ${BTN}`}>Try again</button>}
+        && <Button size="sm" variant="outline" type="button" onClick={() => void z.copyVideo(copy.meetingUuid, 'block')} disabled={z.busy || z.videoBusy || z.hasActiveCopy} className="mt-2">Try again</Button>}
       {z.confirm?.origin === 'block' && <ReplaceConfirm z={z} />}
       {message && <div className="mt-2"><Notice tone={message.tone === 'error' ? 'error' : 'info'}>{message.text}</Notice></div>}
     </div>
@@ -3064,9 +3062,9 @@ function ZoomImportSection({ z, activeJob, transcriptionBusy, hasTranscript }) {
                       {videoLine && <span className="block text-xs text-gray-700">{videoLine}</span>}</span>
                   </label>
                   {ownButton && (
-                    <button type="button" onClick={() => void z.copyVideo(meeting.meetingUuid, 'picker')} disabled={z.busy || z.videoBusy} className={BTN}>
+                    <Button size="sm" variant="outline" type="button" onClick={() => void z.copyVideo(meeting.meetingUuid, 'picker')} disabled={z.busy || z.videoBusy}>
                       {copy?.state === 'failed' ? 'Try again' : 'Copy video'}<span className="sr-only"> from {fmtPacific(meeting.startTime)}</span>
-                    </button>
+                    </Button>
                   )}
                 </div>
                 {z.confirm?.origin === 'picker' && z.confirm.meetingUuid === meeting.meetingUuid && <ReplaceConfirm z={z} />}
@@ -3081,7 +3079,7 @@ function ZoomImportSection({ z, activeJob, transcriptionBusy, hasTranscript }) {
           <input type="checkbox" checked={z.acknowledged} disabled={z.busy} onChange={(event) => z.setAcknowledged(event.target.checked)} className="mt-0.5 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-600" />
           <span>This recording is non-sensitive and may be sent to our transcription provider.{selected.transcript ? ' Excerpts of both transcripts are also sent to Anthropic to match speaker names.' : ''} Transcription uses paid credits.</span>
         </label>
-        <button type="button" onClick={z.importSelected} disabled={!z.acknowledged || z.busy || z.videoBusy || Boolean(z.confirm) || blocked} className={`mt-3 ${BTN_PRIMARY}`}>{z.busy ? 'Importing from Zoom…' : z.videoStartable(selected) ? 'Import, transcribe and copy video' : 'Import and transcribe'}</button>
+        <Button size="sm" variant="primary" type="button" onClick={z.importSelected} disabled={!z.acknowledged || z.busy || z.videoBusy || Boolean(z.confirm) || blocked} className="mt-3">{z.busy ? 'Importing from Zoom…' : z.videoStartable(selected) ? 'Import, transcribe and copy video' : 'Import and transcribe'}</Button>
         {z.videoStartable(selected) && !z.busy && <p className="mt-2 text-xs text-gray-600">The video will also be copied from Zoom into SharePoint. This can take several minutes.</p>}
         {blocked && !z.busy && <p className="mt-2 text-xs text-gray-600">Another transcription is already running. Wait for it to finish.</p>}
       </>}
@@ -3228,7 +3226,7 @@ function PresentationVideoLine({ requestId, revisionKey = '', refreshToken = 0 }
   if (!loaded && loadFailed) {
     return (
       <ArtifactRow name="Presentation video" status={{ tone: 'gray', label: 'Not loaded' }} detail="Couldn’t load the video status." testId="presentation-video-line"
-        action={<button type="button" onClick={() => void load()} className={BTN}>Retry</button>} />
+        action={<Button size="sm" variant="outline" type="button" onClick={() => void load()}>Retry</Button>} />
     );
   }
   if (!available) return null;
@@ -3250,11 +3248,11 @@ function PresentationVideoLine({ requestId, revisionKey = '', refreshToken = 0 }
   const createLabel = state === 'review' ? 'Create it again' : 'Create presentation video';
   const startCreate = () => (current ? setConfirming('recreate') : void create());
   const action = state === 'review'
-    ? <button type="button" onClick={() => setConfirming('approve')} disabled={busy} className={BTN}>Check the ending and approve</button>
+    ? <Button size="sm" variant="outline" type="button" onClick={() => setConfirming('approve')} disabled={busy}>Check the ending and approve</Button>
     : state === 'registering'
-      ? <button type="button" onClick={() => void approve()} disabled={busy} className={BTN}>{busy ? 'Working…' : 'Finish approving'}</button>
+      ? <Button size="sm" variant="outline" type="button" onClick={() => void approve()} disabled={busy}>{busy ? 'Working…' : 'Finish approving'}</Button>
       : canCreate && !current
-        ? <button type="button" onClick={startCreate} disabled={busy} className={BTN}>{busy ? 'Working…' : createLabel}</button>
+        ? <Button size="sm" variant="outline" type="button" onClick={startCreate} disabled={busy}>{busy ? 'Working…' : createLabel}</Button>
         : null;
   const menuItems = canCreate && current ? [{ key: 'recreate', label: createLabel, disabled: busy, onSelect: startCreate }] : [];
   const detail = state === 'approved' && newest.boardReady == null ? 'Couldn’t check the Board status.' : null;
@@ -3269,8 +3267,8 @@ function PresentationVideoLine({ requestId, revisionKey = '', refreshToken = 0 }
         <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="alertdialog" aria-label="Approve the presentation video">
           <p>Approve this video for the Board? Board members will be able to watch it.</p>
           <div className="mt-2 flex gap-2">
-            <button type="button" onClick={() => void approve()} disabled={busy} className={BTN_PRIMARY}>Approve video</button>
-            <button type="button" onClick={() => setConfirming(null)} disabled={busy} className={BTN}>Not yet</button>
+            <Button size="sm" variant="primary" type="button" onClick={() => void approve()} disabled={busy}>Approve video</Button>
+            <Button size="sm" variant="outline" type="button" onClick={() => setConfirming(null)} disabled={busy}>Not yet</Button>
           </div>
         </div>
       )}
@@ -3278,8 +3276,8 @@ function PresentationVideoLine({ requestId, revisionKey = '', refreshToken = 0 }
         <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="alertdialog" aria-label="Create the presentation video again">
           <p>{state === 'review' ? 'This discards the video waiting for your check and makes a new one.' : 'This replaces the approved video once the new one is approved.'}</p>
           <div className="mt-2 flex gap-2">
-            <button type="button" onClick={() => void create()} disabled={busy} className={BTN_PRIMARY}>Create again</button>
-            <button type="button" onClick={() => setConfirming(null)} disabled={busy} className={BTN}>Keep current video</button>
+            <Button size="sm" variant="primary" type="button" onClick={() => void create()} disabled={busy}>Create again</Button>
+            <Button size="sm" variant="outline" type="button" onClick={() => setConfirming(null)} disabled={busy}>Keep current video</Button>
           </div>
         </div>
       )}
@@ -3337,7 +3335,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
   const step3State = boundaryState === 'bound' || (canGenerate && needsGenerate) ? 'current' : 'waiting';
   const generateAnchor = !canGenerate ? null : ['missing', 'stale'].includes(boundaryState) ? 'presentation'
     : ['missing', 'stale'].includes(discussionState) ? 'discussion' : null;
-  const generateButton = <button type="button" onClick={t.generatePresentationTranscript} disabled={Boolean(t.busy)} className={BTN}>{t.busy === 'presentation-transcript' ? 'Generating…' : 'Generate transcripts'}</button>;
+  const generateButton = <Button size="sm" variant="outline" type="button" onClick={t.generatePresentationTranscript} disabled={Boolean(t.busy)}>{t.busy === 'presentation-transcript' ? 'Generating…' : 'Generate transcripts'}</Button>;
   const presentationEndText = presentationEnd
     ? `Presentation ends at ${formatTranscriptTurnTime(presentationEnd.endMs)}${presentationEnd.confirmedAt ? ` · confirmed ${fmtDateTime(presentationEnd.confirmedAt)}` : ''}`
     : null;
@@ -3382,7 +3380,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
 
       <Step number={1} title="Get the recording" state={step1Done ? 'done' : 'current'} testId="step-recording"
         summary={step1Done && !step1Open && recordingSummary}
-        action={step1Done && step1Open && <button type="button" onClick={() => setStep1Open(false)} aria-expanded className={BTN}>Close</button>}
+        action={step1Done && step1Open && <Button size="sm" variant="outline" type="button" onClick={() => setStep1Open(false)} aria-expanded>Close</Button>}
         menuItems={step1Done && !step1Open ? [{ key: 'replace', label: 'Replace recording or transcript', onSelect: () => setStep1Open(true) }] : []}>
         {!(step1Done && !step1Open) && <div className="mt-2 text-sm leading-6 text-gray-900">{recordingSummary}</div>}
         {generated && !editing && t.savedDraft && <p className="mt-1 text-xs text-gray-600">Unpublished name edits saved {fmtDateTime(t.savedDraft.createdAt)}</p>}
@@ -3425,16 +3423,16 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
         {step2Collapsed ? null : editable && !editing ? <>
             {reviewOpen && <p className="mt-4 border-t border-gray-200 pt-4 text-sm font-semibold text-gray-950">Current published transcript</p>}
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <button type="button" onClick={t.beginEditNames} disabled={editBlocked} className={BTN}>{t.busy === 'create-draft' ? 'Opening…' : t.savedDraft ? 'Continue editing names' : 'Edit speaker names'}</button>
+              <Button size="sm" variant="outline" type="button" onClick={t.beginEditNames} disabled={editBlocked}>{t.busy === 'create-draft' ? 'Opening…' : t.savedDraft ? 'Continue editing names' : 'Edit speaker names'}</Button>
             </div>
             {newerPending && <p className="mt-1 text-xs text-gray-600">These edit the published transcript. Wait for the newer transcript before editing.</p>}
             <div className="mt-3" data-testid="presentation-end-line">
               {!presentationEnd ? <>
                 <p className="text-sm leading-6 text-gray-900">Presentation end not confirmed. The Board link shows no transcript until a program coordinator confirms where the presentation ends.</p>
-                {!t.savedDraft && <button type="button" onClick={t.beginEditNames} disabled={editBlocked} className={`mt-2 ${BTN}`}>{t.busy === 'create-draft' ? 'Opening…' : 'Set presentation end'}</button>}
+                {!t.savedDraft && <Button size="sm" variant="outline" type="button" onClick={t.beginEditNames} disabled={editBlocked} className="mt-2">{t.busy === 'create-draft' ? 'Opening…' : 'Set presentation end'}</Button>}
               </> : <>
                 <p className="text-sm leading-6 text-gray-900">{presentationEndText}</p>
-                <button type="button" onClick={t.beginEditNames} disabled={editBlocked} className={`mt-2 ${BTN}`}>{t.savedDraft ? 'Continue editing presentation end' : 'Edit presentation end'}</button>
+                <Button size="sm" variant="outline" type="button" onClick={t.beginEditNames} disabled={editBlocked} className="mt-2">{t.savedDraft ? 'Continue editing presentation end' : 'Edit presentation end'}</Button>
               </>}
             </div>
           </>
@@ -3503,7 +3501,7 @@ function RecordingBlock({ m, z }) {
       <h4 id="recording-transcript-recording-title" className="text-sm font-semibold text-gray-950">Video recording</h4>
       <p className="mt-1 text-xs text-gray-600">Zoom link or MP4, kept for staff. Saving a new one replaces the current one.</p>
       <VideoCopyStatus z={z} />
-      {recording && !showInputs && <button type="button" onClick={() => setReplaceOpen(true)} className={`mt-3 ${BTN}`}>Replace recording</button>}
+      {recording && !showInputs && <Button size="sm" variant="outline" type="button" onClick={() => setReplaceOpen(true)} className="mt-3">Replace recording</Button>}
       {showInputs && <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="recording-transcript-zoom-link" className="block text-xs font-medium text-gray-700">Zoom link (paste the share message if it has a passcode)</label>
@@ -3646,7 +3644,7 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
     <section id="recording-and-transcript-card" className={shell} data-testid="recording-and-transcript-card" aria-labelledby="recording-transcript-title">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div id="recording-transcript-title">{heading}</div>
-        {m.data && <button type="button" data-testid="card-refresh" onClick={() => void refreshAll()} disabled={refreshing || z.refreshing || t.loading || Boolean(t.busy)} className={BTN}>{refreshing ? 'Refreshing…' : 'Refresh'}</button>}
+        {m.data && <Button size="sm" variant="outline" type="button" data-testid="card-refresh" onClick={() => void refreshAll()} disabled={refreshing || z.refreshing || t.loading || Boolean(t.busy)}>{refreshing ? 'Refreshing…' : 'Refresh'}</Button>}
       </div>
       {m.loading && !m.data && <p className="mt-4 text-sm text-gray-500">Loading…</p>}
       {m.error && !m.data && <div className="mt-4"><Notice>{m.error}</Notice></div>}
