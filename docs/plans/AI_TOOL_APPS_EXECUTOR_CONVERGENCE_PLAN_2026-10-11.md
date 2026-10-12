@@ -19,7 +19,7 @@ related:
 
 Candidate **A** from `LARGEST_UNPLANNED_REFACTOR_SCOPE_2026-10-11.md`. The file name keeps
 "executor convergence" for link stability; the plan no longer moves these apps onto the Executor
-(owner decision 2026-10-12, §8). Status: **draft — decisions recorded, stages not started.** Tier 2
+(owner decision 2026-10-12, §8). Status: **Stages 0–5 live in Production (merge `f56125cfa`, 2026-10-12); owner live checks passed; Stage 6 not started.** Tier 2
 runtime work: a branch per stage, PR, owner promotion. Every stage also needs its prompt rows seeded in
 Preview and Production by the owner-run seed script (a Dataverse write; `DATAVERSE_TARGET_INTERLOCK`
 applies).
@@ -380,3 +380,9 @@ model. A failed live check → `git revert` the route commit; rows stay.
   the Node ESM seed script); a missing row now returns 503 before input validation in the evaluator.
   **Not done, owner-gated:** seeding, merge, live checks; Stage 6 (retire old builders, docs) after all
   five are live.
+- 2026-10-12: **Live.** Owner authorized seeding production Dataverse; the interlock denied the
+  agent's local→production write, and the owner ran the seed with the operator
+  `DATAVERSE_PROD_WRITE_ACK` (§3.3 of `docs/DATAVERSE_TARGET_WRITE_INTERLOCK_PLAN.md`): 14 rows created
+  at v1, verified by a dry run reporting `refuse` for all 14. Merged `f56125cfa` (PR #474); the
+  production deployment of that commit (`wmkfresearchapps-qud4rgq5z`) is Ready. **Owner live checks
+  passed** (owner report, 2026-10-12). Next: Stage 6 — retire the old builders and update the docs.
