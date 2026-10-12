@@ -49,6 +49,7 @@ describe('inline presentation summary', () => {
   test('shows the first section with Read more, then the whole text', () => {
     render(<ResearchPresentationFollowUp status="loaded" materials={[summaryRow]}
       summary={{ text: TEXT, stale: false, publishedAt: '2026-10-05T15:00:00Z' }} />);
+    expect(screen.queryByRole('link', { name: 'Open presentation summary' })).not.toBeInTheDocument();
     const block = screen.getByTestId('presentation-summary-text');
     expect(block).toHaveTextContent('Quantum dots for imaging.');
     expect(block).not.toHaveTextContent('Asked about cost.');
@@ -125,10 +126,10 @@ describe('inline staff discussion summary (paired summaries plan D8, owner decis
   const discussionRow = { artifactType: 100000010, filename: 'discussion.txt', backing: 'file', webUrl: 'https://tenant.sharepoint.com/discussion.txt' };
   const TEXT = 'Main points raised\nThe budget looks high.\n\nQuestions and concerns\nWho owns the follow-up?\n\nFollow-ups and decisions\nNone noted.';
 
-  test('shows its link, a staff-only note, the first section and Read more', () => {
+  test('shows a staff-only note, the first section and Read more, without a redundant link', () => {
     render(<ResearchPresentationFollowUp status="loaded" materials={[discussionRow]}
       discussionSummary={{ text: TEXT, stale: false, publishedAt: '2026-10-06T15:00:00Z' }} />);
-    expect(screen.getByRole('link', { name: /Open staff discussion summary/ })).toHaveAttribute('href', discussionRow.webUrl);
+    expect(screen.queryByRole('link', { name: /Open staff discussion summary/ })).not.toBeInTheDocument();
     expect(screen.getByText('Staff only. Never included on the Board page.')).toBeInTheDocument();
     const block = screen.getByTestId('discussion-summary-text');
     expect(block).toHaveTextContent('The budget looks high.');
@@ -148,6 +149,12 @@ describe('inline staff discussion summary (paired summaries plan D8, owner decis
     const block = screen.getByTestId('discussion-summary-text');
     expect(block).toHaveTextContent('from an earlier transcript version');
     expect(block).not.toHaveTextContent('Board link');
+  });
+
+  test('the link stays when the discussion summary text could not be read', () => {
+    render(<ResearchPresentationFollowUp status="loaded" materials={[discussionRow]}
+      discussionSummary={{ text: null, stale: false, publishedAt: '2026-10-06T15:00:00Z' }} />);
+    expect(screen.getByRole('link', { name: /Open staff discussion summary/ })).toHaveAttribute('href', discussionRow.webUrl);
   });
 
   test('no inline discussion block without its summary row', () => {

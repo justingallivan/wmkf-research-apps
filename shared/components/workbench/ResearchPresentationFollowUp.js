@@ -12,8 +12,8 @@ const SLOTS = [
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT, label: 'Transcript', action: 'Open transcript' },
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT, label: 'Presentation transcript', action: 'Open presentation transcript' },
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT, label: 'Staff discussion transcript', action: 'Open staff discussion transcript' },
-  { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY, label: 'Staff discussion summary', action: 'Open staff discussion summary' },
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, label: 'Presentation summary', action: 'Open presentation summary' },
+  { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY, label: 'Staff discussion summary', action: 'Open staff discussion summary' },
 ];
 
 // Each summary's sections are fixed by its prompt; until "Read more" the first one is shown,
@@ -85,6 +85,12 @@ export default function ResearchPresentationFollowUp({ status, materials = [], s
     .filter(Boolean);
   const summarySlot = present.find((slot) => slot.type === REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY);
   const discussionSlot = present.find((slot) => slot.type === REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY);
+  // A summary shown below needs no link; one whose text could not be read keeps its link.
+  const shownBelow = new Set([
+    summarySlot && summary?.text ? summarySlot.type : null,
+    discussionSlot && discussionSummary?.text ? discussionSlot.type : null,
+  ]);
+  const linked = present.filter((slot) => !shownBelow.has(slot.type));
   return (
     <div className="mt-3" data-testid="research-presentation-follow-up">
       <h4 className="text-sm font-semibold text-gray-900">Recording and transcripts</h4>
@@ -95,9 +101,9 @@ export default function ResearchPresentationFollowUp({ status, materials = [], s
       {status === 'loaded' && present.length === 0 && (
         <p className="mt-1 text-sm text-gray-600">The recording and transcripts appear here after the Meeting Tracker publishes them.</p>
       )}
-      {status === 'loaded' && present.length > 0 && (
+      {status === 'loaded' && linked.length > 0 && (
         <ul className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm">
-          {present.map((slot) => (
+          {linked.map((slot) => (
             <li key={slot.type}>
               {slot.href ? (
                 <a href={slot.href} target="_blank" rel="noopener noreferrer"
