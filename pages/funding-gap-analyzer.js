@@ -56,9 +56,10 @@ function FundingGapAnalyzer() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
+      let serverError = null;
 
       try {
-        while (true) {
+        while (!serverError) {
           const { done, value } = await reader.read();
           if (done) break;
 
@@ -70,42 +71,49 @@ function FundingGapAnalyzer() {
           buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
           for (const line of lines) {
-            if (line && line.startsWith('data: ')) {
-              try {
-                const jsonString = line.slice(6).trim();
+            if (!line || !line.startsWith('data: ')) continue;
 
-                if (jsonString && jsonString !== '' && jsonString !== 'null') {
-                  const data = JSON.parse(jsonString);
+            const jsonString = line.slice(6).trim();
+            if (!jsonString || jsonString === 'null') continue;
 
-                  if (data && typeof data === 'object') {
-                    if (typeof data.progress === 'number') {
-                      setProgress(data.progress);
-                    }
+            let data;
+            try {
+              data = JSON.parse(jsonString);
+            } catch (parseError) {
+              console.error('Parse error:', parseError);
+              // Continue on parse errors
+              continue;
+            }
 
-                    if (data.message) {
-                      setProgressText(String(data.message));
-                    }
+            if (!data || typeof data !== 'object') continue;
 
-                    if (data.complete && data.results) {
-                      setResults(data.results);
-                    }
+            if (typeof data.progress === 'number') {
+              setProgress(data.progress);
+            }
 
-                    if (data.error) {
-                      throw new Error(data.error);
-                    }
-                  }
-                }
-              } catch (parseError) {
-                console.error('Parse error:', parseError);
-                // Continue on parse errors
-                continue;
-              }
+            if (data.message) {
+              setProgressText(String(data.message));
+            }
+
+            if (data.complete && data.results) {
+              setResults(data.results);
+            }
+
+            // A server error frame ends the run; report it after the stream loop
+            // so the server's message reaches the page instead of being swallowed.
+            if (data.error) {
+              serverError = String(data.error);
+              break;
             }
           }
         }
       } catch (streamError) {
         console.error('Streaming error:', streamError);
         throw new Error('Failed to process server response stream');
+      }
+
+      if (serverError) {
+        throw new Error(serverError);
       }
 
       setProgressText('Analysis complete!');
