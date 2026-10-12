@@ -1,7 +1,7 @@
 # Proposal Ranking API contract
 
 Status: implementation contract for the first Proposal Ranking release. It is
-updated for the 2026-10-08 owner decisions removing excusal, adding explicit dry-run erasure and combined meeting orders, after revision 3 of `PROPOSAL_RANKING_DESIGN_2026-10-07.md`. Runtime
+updated for the 2026-10-11 science-first meeting/export decisions and the 2026-10-08 owner decisions removing excusal, adding explicit dry-run erasure and combined meeting orders, after revision 3 of `PROPOSAL_RANKING_DESIGN_2026-10-07.md`. Runtime
 activation is now enabled in Production; multi-identity acceptance remains pending. Sandbox and Production schema/application-role setup are verified;
 bounded persistence checks and direct-table denial for the tested sandbox staff
 identity passed. Production facilitator/grants and four-participant direct-table/search
@@ -165,6 +165,10 @@ returns `unavailable` with all three values null. Failed/capped source reads sti
 reject preview/open; they never become a zero or unavailable fallback. Older
 snapshots are not backfilled and render unavailable. The card labels are **Prior
 research funding** and **Latest qualifying award**, with a provisional disclosure.
+Geography and research history render only in published Meeting list cards.
+Individual rankings, opening preview and facilitator preparation hide them. This
+is presentation staging, not response redaction; authorized frozen snapshots
+still carry both fields.
 This context changes no scientific score, seed/composite order, eligibility or
 cumulative requested amount. The existing draft-writeup funding logic is unchanged.
 
@@ -205,9 +209,11 @@ This makes the final confirmation stale when submissions or policy change.
 
 All order writes require an exact permutation of that program's frozen proposal
 IDs. `save` applies only to an unsubmitted own list; `submit` atomically stores the
-final order and lock. `edit` applies to a meeting order in `composite-draft` for
-the facilitator only; the captured roster gains edit permission only after that
-program is `published`. `generate` applies to a meeting list in `collecting`, and
+final order and lock. `edit` applies only to a `published` meeting order for the
+current facilitator or captured roster. Unpublished composite edits are rejected.
+First publication restores the immutable calculated composite order as the working
+order, including for older drafts reordered before this change. Subsequent
+published edits remain independent of that calculation. `generate` applies to a meeting list in `collecting`, and
 `publish` applies to a generated list in `composite-draft`. The response's meeting
 `etag` is required for each transition or edit.
 
@@ -239,6 +245,15 @@ to SE, MR and combined orders are independent; no regeneration is provided.
 It has no individual ballots. The shared row uses normal published-list visibility,
 ETag-guarded `edit` and totals over the full union of frozen proposals. `save`,
 `submit`, `generate` and `publish` reject `co`. Dry-run erasure includes this row.
+
+## Meeting-list CSV export (feature branch; not yet promoted)
+
+Staff should settle SE and MR separately before combining them; this guidance
+adds no completion flag or lock. Published SE, MR and combined lists offer a
+browser-generated CSV of the saved order from the authorized response. Export
+is disabled while changes are pending or unresolved and never uses an unsaved
+local drag order. Other devices still require refresh to see changes. No API action,
+server persistence or finalization state is introduced.
 
 ## Explicit dry runs (feature branch; not yet promoted)
 

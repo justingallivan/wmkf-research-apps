@@ -3,7 +3,7 @@ import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
 import { Button, Card, PageHeader } from '../Layout';
 import { conventionalCycles, cycleCodeToLabel, resolveWorkingCycle } from '../../../lib/utils/cycle-code';
 import { createOperationId, loadProposalRanking, sendProposalRankingAction } from './client';
-import { buildCumulativeTotals, errorMessage, formatMoney, moveProposal, PROGRAMS, pdRankColor } from './model';
+import { buildCumulativeTotals, buildRankingCsv, errorMessage, formatMoney, moveProposal, PROGRAMS, pdRankColor } from './model';
 
 const EMPTY_CAPABILITIES = {
   preview: false, open: false, saveOwnList: false, submitOwnList: false,
@@ -52,7 +52,7 @@ function ResearchFundingContext({ history }) {
   </div>;
 }
 
-function ProposalCardRow({ proposal, position, programCount, total, score, rank, editable, dragging, dragProvided }) {
+function ProposalCardRow({ proposal, position, programCount, total, score, rank, editable, dragging, dragProvided, showInstitutionContext = false }) {
   const amount = proposal.amountMinorUnits == null
     ? 'Requested amount unavailable'
     : formatMoney(proposal.amountMinorUnits, proposal.currency);
@@ -78,7 +78,7 @@ function ProposalCardRow({ proposal, position, programCount, total, score, rank,
         <div className="relative min-w-0 flex-1 space-y-3 p-4">
           <div className="absolute right-4 top-4 flex gap-2">
             <span aria-label={`Program: ${proposal.programKey.toUpperCase()}`} className="inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-gray-500 text-sm font-semibold text-gray-800">{proposal.programKey.toUpperCase()}</span>
-            {(proposal.institutionGeography === 'East' || proposal.institutionGeography === 'West') && <span
+            {showInstitutionContext && (proposal.institutionGeography === 'East' || proposal.institutionGeography === 'West') && <span
               role="img"
               aria-label={`${proposal.institutionGeography} institution`}
               title={`${proposal.institutionGeography} institution`}
@@ -96,7 +96,7 @@ function ProposalCardRow({ proposal, position, programCount, total, score, rank,
                 {proposal.leadName && <span>Lead PD: {proposal.leadName}</span>}
                 {rank?.disagreement && <span className="rounded-md bg-amber-100 px-2 py-0.5 text-amber-900">Disagreement</span>}
               </div>}
-              <ResearchFundingContext history={proposal.researchFunding} />
+              {showInstitutionContext && <ResearchFundingContext history={proposal.researchFunding} />}
               <div className="mt-3 space-y-3">
                 <div className="flex flex-wrap items-center gap-1.5 text-sm">
                   <span className="mr-1 font-medium text-gray-700">Reviews</span>
@@ -146,7 +146,7 @@ function ProposalCardRow({ proposal, position, programCount, total, score, rank,
   );
 }
 
-function ProposalOrder({ list, proposals, order, editable, saveState, composite, remoteOrder, onMove, onRetry }) {
+function ProposalOrder({ list, proposals, order, editable, saveState, composite, remoteOrder, onMove, onRetry, showInstitutionContext = false }) {
   const [dropPosition, setDropPosition] = useState(null);
   const previewId = useId();
   const byId = useMemo(() => new Map(proposals.map((proposal) => [proposal.requestId, proposal])), [proposals]);
@@ -185,6 +185,7 @@ function ProposalOrder({ list, proposals, order, editable, saveState, composite,
               return <Draggable key={requestId} draggableId={requestId} index={position} isDragDisabled={!editable}>
                 {(dragProvided, dragSnapshot) => <ProposalCardRow
                   proposal={proposal}
+                  showInstitutionContext={showInstitutionContext}
                   position={position}
                   programCount={proposals.filter((item) => item.programKey === proposal.programKey).length}
                   total={totalsById.get(requestId)}
@@ -267,8 +268,20 @@ function ProgramPanel({ response, program, isFacilitator, view, localOrders, rem
   const totalSubmissions = programData.progress || { required: 0, submitted: 0, outstandingNames: [] };
   const activeConfirmation = view === 'facilitate' && pendingConfirmation?.programKey === program.key ? pendingConfirmation : null;
   const currentConfirmations = confirmations || response.confirmations;
-  const meetingCanEdit = Boolean(response.round.state === 'active' && response.viewer.capabilities.editMeetingOrder && (meetingStatus === 'composite-draft' || published));
+  const meetingCanEdit = Boolean(response.round.state === 'active' && response.viewer.capabilities.editMeetingOrder && published);
   const listKey = meeting?.listKey;
+  const exportOrder = () => {
+    if (!published || actionBusy || hasUnresolvedSave) return;
+    const csv = buildRankingCsv(meeting.order, proposals);
+    const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `proposal-ranking-${response.cycleCode}-${program.key}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
   return <section aria-labelledby={`program-heading-${program.key}`} className="mt-5">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -276,12 +289,14 @@ function ProgramPanel({ response, program, isFacilitator, view, localOrders, rem
         {!combined && programData.proposalIds?.length > 0 && <p className="mt-1 text-sm text-gray-600">{totalSubmissions.submitted} of {totalSubmissions.required} required PD submissions received.</p>}
       </div>
       <div className="flex flex-wrap gap-2">
+        {view === 'meeting' && published && <Button type="button" variant="outline" size="sm" disabled={actionBusy || hasUnresolvedSave} onClick={exportOrder}>Export ranked list</Button>}
         {view === 'facilitate' && response.round.state === 'active' && response.viewer.capabilities.generate && (meetingStatus === 'collecting' || (combined && !meeting)) && <Button type="button" size="sm" disabled={actionBusy || hasUnresolvedSave || !currentConfirmations.generate?.[program.key]} onClick={() => setPendingConfirmation({ action: 'generate', programKey: program.key })}>{combined ? 'Create combined meeting list' : `Generate ${program.shortLabel} draft`}</Button>}
         {view === 'facilitate' && response.round.state === 'active' && response.viewer.capabilities.publish && meetingStatus === 'composite-draft' && <Button type="button" size="sm" disabled={actionBusy || hasUnresolvedSave || !currentConfirmations.publish?.[program.key]} onClick={() => setPendingConfirmation({ action: 'publish', programKey: program.key })}>Publish {program.shortLabel}</Button>}
       </div>
     </div>
       {activeConfirmation?.action === 'generate' && <ConfirmationBox confirmation={currentConfirmations.generate?.[program.key]} label={combined ? 'create the shared combined meeting list' : `generate the ${program.label} draft`} busy={actionBusy} onConfirm={() => onGenerate(program.key)} onCancel={() => setPendingConfirmation(null)} />}
       {activeConfirmation?.action === 'publish' && <ConfirmationBox confirmation={currentConfirmations.publish?.[program.key]} label={`publish the ${program.label} order`} busy={actionBusy} onConfirm={() => onPublish(program.key)} onCancel={() => setPendingConfirmation(null)} />}
+    {combined && !meeting && <p className="mt-3 text-sm text-gray-600">Settle the separate SE and MR meeting orders before creating the combined list.</p>}
     {programData.proposalIds?.length === 0 ? <p className="mt-4 rounded-lg bg-gray-50 p-4 text-sm text-gray-600">No proposals in this program. No individual lists or composite are required.</p> : <>
       {view === 'meeting' && !published && <StatusBanner className="mt-3">{combined ? 'Waiting for the facilitator to create the combined meeting list.' : 'This program has not been published yet. Your own list is in My rankings.'}</StatusBanner>}
       {view === 'facilitate' && published && <StatusBanner className="mt-3">Published. Continue the discussion in Meeting list.</StatusBanner>}
@@ -291,15 +306,16 @@ function ProgramPanel({ response, program, isFacilitator, view, localOrders, rem
       {meeting && generated && ((view === 'facilitate' && isFacilitator && !published) || (view === 'meeting' && published && (isFacilitator || response.viewer.isRosterParticipant))) && <div className="mt-6 border-t border-gray-200 pt-5">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="text-base font-semibold text-gray-900">{published ? 'Shared meeting order' : 'Facilitator composite draft'}</h3>
-            <p className="mt-1 text-sm text-gray-600">{combined ? 'Starting order compares PD average ranks while preserving each program’s order at creation. Edits here and in SE or MR are independent.' : 'The original PD rankings remain separate from this meeting order.'}</p>
+            <h3 className="text-base font-semibold text-gray-900">{published ? 'Shared meeting order' : 'Calculated starting order'}</h3>
+            <p className="mt-1 text-sm text-gray-600">{combined ? 'Starting order compares PD average ranks while preserving each program’s order at creation. Edits here and in SE or MR are independent.' : published ? 'The original PD rankings remain separate from this meeting order.' : 'Publish this calculated order unchanged to begin the group discussion. Cards can be moved in the meeting.'}</p>
           </div>
           {published && <p className="text-sm text-green-800">Changes save to the shared order. Refresh on other devices to see updates.</p>}
         </div>
         <ProposalOrder
           list={meeting}
+          showInstitutionContext={published}
           proposals={proposals}
-          order={localOrders[listKey]}
+          order={published ? localOrders[listKey] : meeting.composite?.baselineOrder}
           editable={meetingCanEdit && !actionBusy}
           saveState={saveStates[listKey]}
           composite={meeting.composite}

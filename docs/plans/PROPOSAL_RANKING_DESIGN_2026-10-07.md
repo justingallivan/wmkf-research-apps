@@ -1,6 +1,6 @@
 # Proposal Ranking — design for review
 
-Date: 2026-10-07. Revision: 3 (Opus revision-2 findings incorporated). Status: **Source implemented; sandbox/Production schema and role setup verified; sandbox persistence rehearsal verified; Production deployed/enabled; full browser rehearsal pending.**
+Date: 2026-10-07. Revision: 3 (Opus revision-2 findings incorporated). Status: **Source implemented; sandbox/Production schema and role setup verified; sandbox persistence rehearsal verified; Production deployed/enabled; full browser rehearsal pending. Science-first meeting/export changes remain branch-only.**
 Owner: Justin. Design consolidation: Codex. Requested reviewer: Claude Opus.
 Authority: owner decisions in the Proposal Ranking planning conversation.
 
@@ -42,8 +42,10 @@ grant approvals, award amounts, or change proposal lifecycle status.
   SE can be generated and published even if MR is unfinished, and vice versa.
   The facilitator generates separate composite drafts. Each proposal's composite score is its average submitted
   position, with equal weight for each PD; lower average ranks first.
-- The facilitator may reorder the draft and publishes it when ready. Before that,
-  the composite drafts are visible only to the facilitator.
+- The facilitator reviews the calculated draft without reordering it, then publishes
+  that calculated order as the meeting starting point. Before publication, drafts
+  are visible only to the facilitator. First publication restores the immutable
+  calculated order even for a legacy draft edited under the earlier behavior.
 - After publication, participants see the shared order and named individual PD
   ranks, supporting discussion of who favors or questions a proposal.
 - Participants can edit the published order; staff coordinate who is driving.
@@ -73,20 +75,20 @@ grant approvals, award amounts, or change proposal lifecycle status.
 
 Each row shows current position, organization, proposal title, full amount
 requested, external peer-review score summary, and a link to the proposal.
-Owner addition (2026-10-07): show a prominent **E** or **W** at the card's upper
-right for the applicant institution's East/West classification. Use the verified
-`account.wmkf_eastwest` field through `akoya_applicantid`, not state or name inference.
-Freeze it with the other card details; missing, unknown or older absent values show
-no letter. This is a deliberation cue, not an automatic score or funding adjustment.
-Owner addition (2026-10-07): a 24px solid circle at the lower right summarizes the
-frozen average reviewer rating with ten discrete red→orange→yellow→green colors.
-Map the raw mean from 1 through 5 to the nearest of ten equally spaced steps;
-missing/invalid/unscored means use gray. The hover text and accessible name give
-the numeric score. Matching colors indicate approximate strength, not an exact
-tie. Numeric score display, seed ordering and composite calculations are unchanged.
+Current feature-branch cards show the program badge at the upper right, with an
+**E** or **W** institution badge beside it only in published Meeting list views.
+Use the verified `account.wmkf_eastwest` through `akoya_applicantid`; missing,
+unknown or older absent values show no geography badge. Individual reviewer grades
+and their numeric mean remain visible during preparation and meeting discussion.
+Published cards also show named PD ranks and their average, with color based on
+within-program rank. These displays do not change scientific scores or ordering.
 
 Owner addition (2026-10-11; local implementation, not deployed): show **Prior
-research funding** and **Latest qualifying award** alongside institution geography.
+research funding** and **Latest qualifying award** alongside institution geography
+only in published Meeting list cards. Hide both geography and research history in
+My rankings, opening preview and facilitator preparation, including individual
+reference lists and the unpublished composite. This is presentation staging; the
+frozen snapshot and authorized API response retain those fields.
 Use the linked applicant account's ordinary Research-program awards, excluding
 directed gifts, matching/gift support, buildings/capital support, endowments,
 teaching awards, Special Grants and Young Scholars; retain project-specific
@@ -302,8 +304,10 @@ Delete privilege on ranking lists only for dry-run erasure; live application is 
   moving collecting to draft. Inputs are immutable. Repeat generation returns the
   existing result without resetting meeting edits. The voter set stays fixed.
 - Publish conditionally updates the meeting row version that the facilitator
-  reviewed. This atomically exposes its current order and corresponding source
-  ranks. Repeat publication does not reset its timestamp or order.
+  reviewed. First publication atomically restores the immutable calculated composite
+  order as the working order and exposes corresponding source ranks. Unpublished
+  meeting edits are rejected. Repeat publication does not reset its timestamp or
+  subsequent published meeting edits.
 - Before generation, show outstanding PD submissions in either program. Before
   first publication, name the other program's outstanding submissions and confirm
   that cancellation will no longer be available. Confirmations bind to current
@@ -359,6 +363,12 @@ view, and creates a directly shared list without a second publication step. Defa
 before publication and Meeting list for a published program. Do not permit view
 switching while saves are pending or unresolved. Rehearsal-only identity links
 open separately labeled tabs; they are not part of the signed-in production UI.
+
+Staff settle SE and MR separately before combining them. This is meeting guidance,
+not a new completion state or lock. Published SE, MR and combined Meeting lists
+offer a browser-generated CSV of the saved order. Pending or unresolved saves
+disable export. The download creates no server record, new route or finalization
+state. It reflects the saved list in that browser; other devices still require refresh.
 
 Move cards optimistically; sum snapshot amounts locally. Serialize saves, retaining
 only the latest queued drag, with submission/publication disabled until confirmed.

@@ -102,3 +102,23 @@ export function errorMessage(error) {
   if (error.status === 503) return error.message || 'Proposal Ranking is temporarily unavailable. Try again later.';
   return error.message || 'Proposal Ranking could not complete that action.';
 }
+
+/** Export the displayed program's saved meeting order; never infer a funding decision. */
+export function buildRankingCsv(order, proposals) {
+  const byId = new Map(proposals.map((proposal) => [proposal.requestId, proposal]));
+  const cell = (value) => {
+    const text = String(value ?? '');
+    const safe = /^[\s]*[=+@-]/.test(text) ? `'${text}` : text;
+    return `"${safe.replace(/"/g, '""')}"`;
+  };
+  const rows = [['Rank', 'Program', 'Request number', 'Institution', 'Proposal', 'Requested amount', 'Currency']];
+  order.forEach((id, index) => {
+    const proposal = byId.get(id);
+    if (!proposal) throw new Error('The saved ranking contains an unavailable proposal. Refresh before exporting.');
+    const amount = Number.isSafeInteger(proposal.amountMinorUnits) && Number.isInteger(proposal.currency?.precision)
+      ? (proposal.amountMinorUnits / (10 ** proposal.currency.precision)).toFixed(proposal.currency.precision) : '';
+    rows.push([index + 1, proposal.programKey.toUpperCase(), proposal.requestNumber, proposal.organization,
+      proposal.title, amount, proposal.currency?.code]);
+  });
+  return rows.map((row) => row.map(cell).join(',')).join('\r\n') + '\r\n';
+}

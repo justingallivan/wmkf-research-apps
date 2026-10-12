@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import ProposalRankingApp from '../../shared/components/proposal-ranking/ProposalRankingApp';
-import { buildCumulativeTotals, formatMoney, formatScore, moveProposal, pdRankColor, reviewerScoreIndicator } from '../../shared/components/proposal-ranking/model';
+import { buildCumulativeTotals, buildRankingCsv, formatMoney, formatScore, moveProposal, pdRankColor, reviewerScoreIndicator } from '../../shared/components/proposal-ranking/model';
 import { conventionalCycles, resolveWorkingCycle } from '../../lib/utils/cycle-code';
 
 async function dragDown(handle) {
@@ -163,7 +163,7 @@ describe('Proposal Ranking page', () => {
     expect(confirmGenerate.compareDocumentPosition(individual) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(individual.closest('details')).not.toHaveAttribute('open');
     fireEvent.click(confirmGenerate);
-    const draftHeading = await screen.findByRole('heading', { name: 'Facilitator composite draft' });
+    const draftHeading = await screen.findByRole('heading', { name: 'Calculated starting order' });
     const collapsed = screen.getByText('Individual PD rankings').closest('details');
     expect(collapsed).not.toHaveAttribute('open');
     expect(draftHeading.compareDocumentPosition(collapsed) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -348,7 +348,7 @@ describe('Proposal Ranking page', () => {
   });
 
   test('shows history context, provisional and no-award states while legacy snapshots stay unavailable', async () => {
-    const response = roundResponse();
+    const response = roundResponse({ published: true });
     const proposals = response.round.snapshot.proposals;
     proposals[0].researchFunding = { status: 'available', totalUsd: 10500000, lastAwardCycle: '2014-12', qualifyingGrantCount: 3 };
     proposals[1].researchFunding = { status: 'available', totalUsd: 0, lastAwardCycle: null, qualifyingGrantCount: 0 };
@@ -364,7 +364,7 @@ describe('Proposal Ranking page', () => {
   });
 
   test('shows East and West on shared cards and omits geography for unknown or older snapshot values', async () => {
-    const response = roundResponse();
+    const response = roundResponse({ published: true });
     response.round.snapshot.proposals[0].institutionGeography = 'East';
     response.round.snapshot.proposals[1].institutionGeography = 'West';
     response.round.snapshot.proposals[2].institutionGeography = 'North';
@@ -769,9 +769,74 @@ test('bottom-aligns staff rankings and budget without a divider', async () => {
 });
 
 test('groups program and geography in outlined upper-right badges', async () => {
-  mockLoad.mockResolvedValue(roundResponse());
+  mockLoad.mockResolvedValue(roundResponse({ published: true }));
   render(<ProposalRankingApp />);
   const east = await screen.findByRole('img', { name: 'East institution' });
   expect(east.parentElement).toHaveClass('absolute', 'right-4', 'top-4');
   expect(within(east.parentElement).getByLabelText('Program: SE')).toHaveClass('rounded-full', 'border-2', 'h-10', 'w-10');
+});
+
+
+test('keeps institutional context out of individual PD rankings, even after publication', async () => {
+  const response = roundResponse({ published: true });
+  response.round.snapshot.proposals = REQUESTS.map((p) => ({ ...p, institutionGeography: 'West',
+    researchFunding: { status: 'available', totalUsd: 10500000, lastAwardCycle: '2014-12', qualifyingGrantCount: 3 } }));
+  mockLoad.mockResolvedValue(response);
+  render(<ProposalRankingApp />);
+  expect(await screen.findAllByText('$10,500,000')).toHaveLength(4);
+  fireEvent.click(screen.getByRole('button', { name: 'My rankings' }));
+  expect(screen.queryByText('Prior research funding')).not.toBeInTheDocument();
+  expect(screen.queryByRole('img', { name: 'West institution' })).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Average reviewer grade: 4.2')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Export ranked list' })).not.toBeInTheDocument();
+});
+
+test('shows the calculated baseline without draft editing or institutional context', async () => {
+  const response = roundResponse({ facilitator: true, published: true, order: [...INITIAL_ORDER].reverse() });
+  response.programs.se.meetingStatus = 'composite-draft';
+  response.programs.se.meeting.status = 'composite-draft';
+  response.viewer.capabilities.publish = true;
+  response.round.snapshot.proposals = REQUESTS.map((p) => ({ ...p, institutionGeography: 'West',
+    researchFunding: { status: 'available', totalUsd: 10500000, lastAwardCycle: '2014-12', qualifyingGrantCount: 3 } }));
+  mockLoad.mockResolvedValue(response);
+  render(<ProposalRankingApp />);
+  expect(await screen.findByText('Calculated starting order')).toBeInTheDocument();
+  expect(screen.getAllByLabelText('Rank 1: First proposal').length).toBeGreaterThan(0);
+  expect(screen.queryByRole('button', { name: /Drag .* to reorder/ })).not.toBeInTheDocument();
+  expect(screen.queryByText('Prior research funding')).not.toBeInTheDocument();
+  expect(screen.queryByRole('img', { name: 'West institution' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Publish SE' })).toBeEnabled();
+});
+
+test('exports the saved meeting order and disables export while a move is saving', async () => {
+  const saving = deferred();
+  mockLoad.mockResolvedValue(roundResponse({ published: true }));
+  mockSend.mockReturnValue(saving.promise);
+  const create = jest.fn(() => 'blob:ranking');
+  const revoke = jest.fn();
+  URL.createObjectURL = create;
+  URL.revokeObjectURL = revoke;
+  const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  render(<ProposalRankingApp />);
+  const download = await screen.findByRole('button', { name: 'Export ranked list' });
+  fireEvent.click(download);
+  expect(create).toHaveBeenCalledWith(expect.any(Blob));
+  expect(click).toHaveBeenCalledTimes(1);
+  expect(click.mock.instances[0].download).toBe(`proposal-ranking-${CYCLE}-se.csv`);
+  await dragDown(screen.getByRole('button', { name: 'Drag First proposal to reorder' }));
+  expect(download).toBeDisabled();
+  fireEvent.click(download);
+  expect(click).toHaveBeenCalledTimes(1);
+  await act(async () => saving.resolve(roundResponse({ published: true, order: mockSend.mock.calls[0][0].order })));
+  await waitFor(() => expect(download).toBeEnabled());
+  click.mockRestore();
+});
+
+test('CSV preserves rank order, quotes multiline text, escapes formulas and leaves missing amounts blank', () => {
+  const proposals = [{ ...REQUESTS[0], title: '=formula', organization: 'A, "B"\nC' },
+    { ...REQUESTS[1], amountMinorUnits: null }];
+  const csv = buildRankingCsv(['request-2', 'request-1'], proposals);
+  expect(csv).toContain('"1","SE","1002","West Institute","Second proposal","","USD"');
+  expect(csv).toContain('"2","SE","1001","A, ""B""\nC","\'=formula","100.00","USD"');
+  expect(() => buildRankingCsv(['missing'], proposals)).toThrow(/unavailable proposal/);
 });

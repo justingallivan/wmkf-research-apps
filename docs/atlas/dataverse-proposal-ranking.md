@@ -9,8 +9,8 @@ was PR #462 merge
 `f7a75fc5358649ab30765504ea6e6b35cdf00bb4`, deployment
 `dpl_FNFvVWUzPaiNgdQ7Uh1DgK526hHx`, which was READY with live aliases. At that
 verification, Justin's refreshed D26 facilitator preview displayed all 23
-institution names. The upper-right rating dot / lower-right E/W marker placement
-is built on the feature branch. No Production app deployment was performed during
+institution names. Current feature-branch cards show upper-right program/EW badges and reviewer
+grade pills; E/W appears only in published Meeting list views. No Production app deployment was performed during
 this turn, and the current deployment and marker appearance have not been
 rechecked. The full multi-identity lifecycle remains unverified. The initial PR
 #457 deployment is a historical checkpoint; trial reset requirements are below.
@@ -57,12 +57,31 @@ No currency conversion is performed.
 `preview-service.js` carries the summary into the preview fingerprint and frozen
 proposal snapshot; `service.js` returns the authorized snapshot to
 `shared/components/proposal-ranking/ProposalRankingApp.js`. Cards show **Prior
-research funding** and **Latest qualifying award**, plus a provisional disclosure.
+research funding** and **Latest qualifying award**, plus a provisional disclosure,
+only in published Meeting list views. Individual rankings, opening preview and
+facilitator preparation hide research history and East/West; the frozen snapshot
+and authorized response still retain the fields.
 Older snapshots show unavailable and are not backfilled. Scientific scores, seed
 and composite ordering, eligibility and cumulative requested-budget amounts are
 unchanged. No source write or draft-writeup change is part of this feature. This
 section records source behavior only; it does not claim tests passed, deployment,
 a new round, or live transaction verification.
+
+## Science-first meeting preparation and export — 2026-10-11 (branch only)
+
+Owner-approved behavior: each unpublished SE/MR composite remains in calculated
+order for facilitator review. The service rejects unpublished meeting edits; first
+publication restores the immutable calculated order, including older edited drafts.
+Published working lists remain editable without changing submitted ballots or scores.
+
+The published Meeting list offers a browser-generated CSV of its saved SE, MR or
+combined order. Pending or unresolved saves disable export. It adds no API route,
+server persistence, finalization state or lock. Refresh remains necessary to see
+other devices' changes. Staff settle SE and MR separately before combining them;
+this guidance adds no lifecycle state.
+
+This section describes the feature-branch contract, not deployment or live
+transaction verification. Existing release and colleague-handoff requirements remain.
 
 ## Office portability — 2026-10-08
 
@@ -478,11 +497,12 @@ paragraph retains the verdict, scope and disposition. OAuth authentication was
 verified as `claude.ai`; API-key environment variables were removed.
 
 
-## Approximate reviewer-rating color — 2026-10-07
+## Historical approximate reviewer-rating color — 2026-10-07
 
 The initial shared-card implementation displayed a 24px lower-right circle using
 ten solid colors from red through yellow to green, from the frozen `score.mean`.
-The marker-placement follow-up below moves it to the upper-right.
+The later marker-placement checkpoint moved it to the upper-right; the current
+card instead uses reviewer-grade pills, as described in the current placement section.
 `reviewerScoreIndicator` in
 `shared/components/proposal-ranking/model.js` selects
 `Math.round(((mean - 1) / 4) * 9)` for finite means in [1,5] with at least one rated
@@ -591,11 +611,12 @@ merge `cc6ef1823` changed only SESSION_PROMPT.md to retain the concurrently rest
 main handoff, passed documentation gates, and had identical runtime/test source.
 The mandatory unpublished-trial reset before colleague use remains in force.
 
-## Card marker placement — 2026-10-07
+## Current card context placement — feature branch
 
-[VERIFIED via current feature-branch source] `ProposalRankingApp.js` now places
-the 24px colored reviewer-rating dot at the card's upper right and the accessible
-East/West initial at the lower right. Both keep their existing size and named
-image role/label/title. No Production app deployment was performed during this
-turn, and the current deployment and marker appearance have not been rechecked.
-It changes no score, ordering, eligibility, snapshot or persisted data.
+[VERIFIED via current `ProposalRankingApp.js` source] Program and institution
+geography badges sit at the upper right. Geography is visible only in published
+Meeting list cards, alongside research history; preparation views hide both.
+Reviewer-grade pills and their numeric mean remain visible in all card views.
+Named PD ranks and their average appear on composite/meeting cards. No Production
+deployment or current live appearance is claimed here. These displays change no
+scientific score, calculation, eligibility or frozen source data.

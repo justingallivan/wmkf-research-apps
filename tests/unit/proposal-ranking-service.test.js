@@ -284,14 +284,16 @@ describe('Proposal Ranking service access and voting', () => {
     })).rejects.toMatchObject({ status: 403, code: 'access_denied' });
 
     resolveProfileToSystemUser.mockResolvedValue({ systemuserid: facilitatorId });
-    const edited = await handleProposalRankingAction({
+    await expect(handleProposalRankingAction({
       action: 'edit', profileId: 'profile-facilitator',
       body: {
         action: 'edit', roundId: round.wmkf_proposalrankingroundid, programKey: 'se', order: [seId],
         etag: generatedMeeting.etag, policyRevision: response.round.policyRevision,
         operationId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
       },
-    });
+    })).rejects.toMatchObject({ status: 403, code: 'access_denied' });
+    rows[2].wmkf_orderjson = JSON.stringify([]);
+    const edited = await handleProposalRankingGet({ roundId: round.wmkf_proposalrankingroundid, profileId: 'profile-facilitator' });
     const published = await handleProposalRankingAction({
       action: 'publish', profileId: 'profile-facilitator',
       body: {
@@ -302,6 +304,7 @@ describe('Proposal Ranking service access and voting', () => {
       },
     });
     expect(published.programs.se.meeting.status).toBe('published');
+    expect(published.programs.se.meeting.order).toEqual(response.programs.se.meeting.composite.baselineOrder);
 
     resolveProfileToSystemUser.mockResolvedValue({ systemuserid: participantId });
     const participantEdit = await handleProposalRankingAction({
