@@ -224,15 +224,14 @@ sequence.
   where the recipe allows; a privacy-recipe change, so full Codex review.
   Detail: `docs/plans/STAGE4_BUILD_PLAN_2026-10-10.md` "First real cut".
 - **Show transcripts and summaries formatted in the browser across the suite
-  (2026-10-11).** [OPEN — owner request, Session 594] Staff surfaces download
-  transcripts and summaries as plain `.txt` files (Microsoft serves every file
-  as a download), with no formatting. The Board page now shows the
-  presentation summary on the page through the shared
-  `shared/components/SummaryText.js` (headings from
-  `PRESENTATION_SUMMARY_HEADINGS`). Apply the same viewer to staff surfaces
-  (Site Visit card rows, Workbench), add heading constants for the staff
-  discussion summary, and decide how full transcripts should read in the
-  browser. The owner chose "Board page now, suite next".
+  (2026-10-11).** [SHIPPED 2026-10-11, Session 595] Workbench summaries render
+  with their headings and lists through the shared `SummaryText` (merge
+  `99c91df93`); a staff reading page `/workbench/read` shows transcripts
+  (timed speaker turns) and summaries formatted, opened from the Workbench and
+  the Site Visit card; the Workbench also plays the approved presentation video
+  inline (merge `b9d0d0ff2`). Plan and live verification:
+  `docs/plans/STAFF_READER_AND_VIDEO_PLAN_2026-10-11.md`. Out of scope and
+  unchanged: the transcription rehearsal page and the admin transcription pilot.
 - **Board file check uses the SharePoint eTag (2026-10-10).** [VIDEO FIXED
   2026-10-11 (Session 594); transcripts OPEN, low priority] The approved
   1003222 video's eTag moved after approval with size and quickXorHash
