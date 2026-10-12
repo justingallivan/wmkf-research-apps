@@ -679,8 +679,9 @@ function MultiPerspectiveEvaluator() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
+      let serverError = null;
 
-      while (true) {
+      while (!serverError) {
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -692,32 +693,43 @@ function MultiPerspectiveEvaluator() {
         buffer = lines.pop() || '';
 
         for (const line of lines) {
-          if (line && line.startsWith('data: ')) {
-            try {
-              const jsonString = line.slice(6).trim();
-              if (jsonString && jsonString !== '' && jsonString !== 'null') {
-                const data = JSON.parse(jsonString);
+          if (!line || !line.startsWith('data: ')) continue;
 
-                if (data && typeof data === 'object') {
-                  if (typeof data.progress === 'number') {
-                    setProgress(data.progress);
-                  }
-                  if (data.message) {
-                    setProgressText(String(data.message));
-                  }
-                  if (data.stage) {
-                    setProgressStage(data.stage);
-                  }
-                  if (data.results) {
-                    setResults(data.results);
-                  }
-                }
-              }
-            } catch (parseError) {
-              continue;
-            }
+          const jsonString = line.slice(6).trim();
+          if (!jsonString || jsonString === 'null') continue;
+
+          let data;
+          try {
+            data = JSON.parse(jsonString);
+          } catch (parseError) {
+            continue;
+          }
+
+          if (!data || typeof data !== 'object') continue;
+
+          // A fatal server error ends the run; report it after the stream loop.
+          if (data.event === 'error') {
+            serverError = String(data.message || data.error || 'The server reported an error.');
+            break;
+          }
+
+          if (typeof data.progress === 'number') {
+            setProgress(data.progress);
+          }
+          if (data.message) {
+            setProgressText(String(data.message));
+          }
+          if (data.stage) {
+            setProgressStage(data.stage);
+          }
+          if (data.results) {
+            setResults(data.results);
           }
         }
+      }
+
+      if (serverError) {
+        throw new Error(serverError);
       }
 
       setProgressText('Evaluation complete!');
