@@ -558,5 +558,19 @@ describe('the page header status report matches the Board materials list (redesi
     fireEvent.click(screen.getByTestId('card-refresh'));
     await waitFor(() => expect(onStatusChange.mock.calls.at(-1)[0]).toMatchObject({ available: true, board: shownKeys() }));
   });
+
+  test('a failed first video read reports unknown, not a missing line, and recovers once a read succeeds (Codex round 2)', async () => {
+    let failSplits = true;
+    route({ state: { splits: () => (failSplits ? response({ error: 'down' }, 500)
+      : response({ available: true, splits: [split({ state: 'approved', boardReady: true })], boardVideo: { status: 'bound' } })) } });
+    const onStatusChange = jest.fn();
+    await renderLine({ onStatusChange });
+    await waitFor(() => expect(onStatusChange.mock.calls.at(-1)?.[0].board).toContain('unknown'));
+    expect(screen.queryByTestId('board-readiness-video')).not.toBeInTheDocument();
+    failSplits = false;
+    fireEvent.click(screen.getByTestId('card-refresh'));
+    await readinessVideo();
+    await waitFor(() => expect(onStatusChange.mock.calls.at(-1)[0].board).toEqual(shownKeys()));
+  });
 });
 const readinessVideo = () => screen.findByTestId('board-readiness-video');

@@ -3402,9 +3402,12 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
   const boardReadiness = resolveBoardReadiness({ t, boundaryState, video, hasVideoMaterial: Boolean(byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_VIDEO)) });
   // Report what the Board materials list shows to the page header's status chip. Until the first video read settles the
   // list may still gain a video line, so the chip waits rather than calling the page ready early.
+  // A first read that failed has not shown whether the video feature is on, so it counts as unknown (Codex round 2).
   const videoPending = boardReadiness.videoPending || (showProducts && !video.loaded && !video.loadFailed);
+  const videoNeverRead = showProducts && !video.loaded && video.loadFailed;
   const boardSignature = [boardReadiness.transcript.key, boardReadiness.summary.key,
-    ...(boardReadiness.video ? [boardReadiness.video.key] : []), ...(videoPending ? ['pending'] : [])].join(',');
+    ...(boardReadiness.video ? [boardReadiness.video.key] : []), ...(videoPending ? ['pending'] : []),
+    ...(videoNeverRead ? ['unknown'] : [])].join(',');
   const hasTranscript = Boolean(material);
   // A failed refresh keeps the cached materials on screen, so the chip says unknown until a read succeeds again.
   const readFailed = Boolean(m.readFailed);
