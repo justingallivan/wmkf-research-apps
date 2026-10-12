@@ -333,3 +333,50 @@ model. A failed live check → `git revert` the route commit; rows stay.
   adversarial review: approve, no findings). §§0, 2–7 rewritten for the seam design; §1 kept as the
   `b3135037c` baseline with a supersession note. Next: Stage 0.
 
+- 2026-10-12: **Build started; design amendments from Sonnet reconnaissance (orchestrator: Opus).**
+  These override §3 where they conflict.
+  1. **A7 preamble is code-owned, never in the row.** `lib/utils/prompt-validators.js:20-24` rejects
+     `UNTRUSTED CONTENT RULES:` / `WMKF-UNTRUSTED-CONTENT` / `[[WMKF-` in body and system text, so a
+     row containing the preamble could never be re-published from `/admin`. Follow the Reviewer
+     Finder precedent (`reviewer-prompt-composer.js:135`): a shared composer prepends
+     `buildUntrustedContentPreamble(nonces)` to the interpolated template. Staff cannot remove it, so
+     the §3.5 marker assertion is replaced by construction. Parity is byte-equal where the builder
+     already puts the preamble first; a builder that places it elsewhere is STOP-AND-ASK.
+  2. **Wrapping and branch logic move into code helpers next to each row definition.** Funding-gap
+     analyze, literature synthesize/compare and every evaluator text stage wrap inside the builder and
+     mint their own nonces. Each `shared/config/prompts/<app>-dynamics.js` exports, per row, the row
+     definition plus a variables helper (named `…Variables`, not `…Prompt`, so the prompt-injection
+     gate's builder-name drift rule does not fire) that wraps untrusted content, pre-computes every
+     branch/loop into variables and returns `{ variables, nonces }`. The route calls helper →
+     resolver → composer → `LLMClient`.
+  3. **Composer fails loud on an unfilled slot** (`{{x}}` left after the single-pass `interpolate`)
+     and on a declared-but-unused variable mismatch is left to `/admin` publish validation.
+  4. **Max tokens:** read from the row (`wmkf_ai_maxtokens`, set by the seed). `/admin` shows it
+     read-only (`PromptTemplatesSection.js:347-400`) and does not edit it; making it editable is a
+     separate UI change for the owner to request. Temperature: routes keep today's constants;
+     `LLMClient` drops them for models that reject it.
+  5. **Provider gate:** the extracted model resolution rejects any non-Anthropic provider (the tool
+     routes call `LLMClient`, Anthropic only) and any unreviewed model.
+  6. **Removed `APP_MODELS` keys:** `/api/admin/models` stops listing them; a stored
+     `model_override:<key>` row becomes unreachable. Report any such rows to the owner at hand-off;
+     do not delete them.
+  7. **Gate registration:** each surface adds its `-dynamics.js` to `promptFiles` and
+     `lib/services/tool-prompt-resolver.js` (and the composer) to `callSiteFiles`; old builders stay
+     declared until Stage 6.
+  8. Editing is superuser-only (`requireSuperuser`, `pages/api/admin/prompts/index.js:21`).
+- 2026-10-12: **Stages 0–5 built (Sonnet builds, Opus review, Codex adversarial).** Branch
+  `claude/tool-prompts-plan-a`. 14 rows: `expertise-finder.match`; `funding-gap.extract|analyze`;
+  `expense-reporter.extract-document|extract-image`; `literature-analyzer.extract-paper|synthesize|compare`;
+  `multi-perspective.initial-analysis|proposal-summary|optimist|skeptic|neutral|integrator`. Byte-parity
+  tests under `tests/unit/tool-prompt-parity/` for every builder branch (deterministic nonces), each
+  mutation-checked. Codex: Stage 0+1 round 1 needs-attention (3 medium: validated admin edits that
+  could not compose → `composeToolPromptPair` with one merged map; bundled fallback too broad →
+  transient-only `isTransientDataverseError`; unseeded row opaque → 503 `tool_prompt_unavailable`),
+  round 2 approve; Stages 2–5 approve, no findings. Gates: all green except `check:agent-wiki`, which
+  fails only in a worktree lacking the per-machine `.agents/skills` symlink (passes with it and on
+  `main`); build passes; full suite 23,277 passed. Recorded deviations: `{{a7_preamble}}` slot (not
+  prepend-only) so builders that place the preamble mid-prompt keep byte parity; evaluator constants
+  copied into `multi-perspective-dynamics.js` with a deep-equal test (the old module cannot load under
+  the Node ESM seed script); a missing row now returns 503 before input validation in the evaluator.
+  **Not done, owner-gated:** seeding, merge, live checks; Stage 6 (retire old builders, docs) after all
+  five are live.

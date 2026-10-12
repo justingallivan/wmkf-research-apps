@@ -180,7 +180,17 @@ const SURFACES = [
     // Multimodal: the Stage-1 concept page is an Anthropic document content
     // block — no text to wrap. The A7 control is the multimodal preamble.
     multimodal: true,
-    promptFiles: ['shared/config/prompts/multi-perspective-evaluator.js'],
+    promptFiles: [
+      'shared/config/prompts/multi-perspective-evaluator.js',
+      // Seam-backed row definitions + variables helpers (convergence plan Stage 5).
+      'shared/config/prompts/multi-perspective-dynamics.js',
+    ],
+    callSiteFiles: [
+      'pages/api/evaluate-multi-perspective.js',
+      // The A7 preamble is composed in code at the resolver seam.
+      'lib/services/tool-prompt-resolver.js',
+      'lib/services/tool-prompt-composer.js',
+    ],
     // Call-site-granular: every builder must carry the preamble in its own body.
     builders: [
       'createInitialAnalysisPrompt',
@@ -198,7 +208,17 @@ const SURFACES = [
     id: 'analyze-literature',
     inv: 9,
     status: 'migrated',
-    promptFiles: ['shared/config/prompts/literature-analyzer.js'],
+    promptFiles: [
+      'shared/config/prompts/literature-analyzer.js',
+      // Seam-backed row definitions + variables helpers (convergence plan Stage 4).
+      'shared/config/prompts/literature-analyzer-dynamics.js',
+    ],
+    callSiteFiles: [
+      'pages/api/analyze-literature.js',
+      // The A7 preamble is composed in code at the resolver seam.
+      'lib/services/tool-prompt-resolver.js',
+      'lib/services/tool-prompt-composer.js',
+    ],
     builders: [
       'createPaperExtractionPrompt',
       'createSynthesisPrompt',
@@ -209,8 +229,17 @@ const SURFACES = [
     id: 'analyze-funding-gap',
     inv: 10,
     status: 'migrated',
-    promptFiles: ['shared/config/prompts/funding-gap-analyzer.js'],
-    callSiteFiles: ['pages/api/analyze-funding-gap.js'],
+    promptFiles: [
+      'shared/config/prompts/funding-gap-analyzer.js',
+      // Seam-backed row definitions + variables helpers (convergence plan Stage 2).
+      'shared/config/prompts/funding-gap-dynamics.js',
+    ],
+    callSiteFiles: [
+      'pages/api/analyze-funding-gap.js',
+      // The A7 preamble is composed in code at the resolver seam.
+      'lib/services/tool-prompt-resolver.js',
+      'lib/services/tool-prompt-composer.js',
+    ],
     builders: [
       'createFundingExtractionPrompt',
       'createFundingAnalysisPrompt',
@@ -221,21 +250,39 @@ const SURFACES = [
     // Route-local prompt. The image path is multimodal (receipt image
     // content block, preamble-controlled); the PDF path embeds extracted
     // text, which the route wraps — so this surface has a genuine wrap site
-    // and is NOT multimodal-flagged. Both markers live in the route file.
+    // and is NOT multimodal-flagged. The route wraps; the composer adds the preamble.
     id: 'process-expenses',
     inv: 11,
     status: 'migrated',
-    callSiteFiles: ['pages/api/process-expenses.js'],
+    promptFiles: [
+      'shared/config/prompts/expense-reporter.js',
+      // Seam-backed row definitions + variables helpers (convergence plan Stage 3).
+      'shared/config/prompts/expense-reporter-dynamics.js',
+    ],
+    callSiteFiles: [
+      'pages/api/process-expenses.js',
+      // The A7 preamble is composed in code at the resolver seam.
+      'lib/services/tool-prompt-resolver.js',
+      'lib/services/tool-prompt-composer.js',
+    ],
+    builders: ['createExpenseExtractionPrompt'],
   },
   {
     id: 'expertise-finder',
     inv: 13,
     status: 'migrated',
-    promptFiles: ['shared/config/prompts/expertise-finder.js'],
+    promptFiles: [
+      'shared/config/prompts/expertise-finder.js',
+      // Seam-backed row definition + variables helper (convergence plan Stage 1).
+      'shared/config/prompts/expertise-finder-dynamics.js',
+    ],
     callSiteFiles: [
       'pages/api/expertise-finder/match.js',
       // batch-match's call site moved with the Route→Service extraction (Stage 5 batch 1).
       'lib/services/expertise-finder/batch-match-service.js',
+      // The A7 preamble is composed in code at the resolver seam.
+      'lib/services/tool-prompt-resolver.js',
+      'lib/services/tool-prompt-composer.js',
     ],
     // buildCacheableSystemPrompt self-carries the preamble; buildUserPrompt
     // builds the user message and relies on the system-prompt preamble.

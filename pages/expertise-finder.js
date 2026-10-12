@@ -738,6 +738,8 @@ function BatchTab() {
             ...prev,
             [proposal.requestId]: { error: data.error || error.message, availableFiles: data.availableFiles },
           }));
+          // A missing/ambiguous prompt row fails every proposal the same way: stop the batch.
+          if (data?.code === 'tool_prompt_unavailable') break;
         } else {
           setResults(prev => ({
             ...prev,

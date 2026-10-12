@@ -24,8 +24,6 @@ export const BASE_CONFIG = {
   // shared/config/reviewPanelSeats.js and validated by the admin API.
   APP_MODELS: {
     // 'concept-evaluator' deprecated 2026-04-25 (archived to /_archived).
-    'multi-perspective-evaluator': { model: 'sonnet', visionModel: 'sonnet', fallback: 'haiku' },
-    'literature-analyzer':         { model: 'sonnet', visionModel: 'sonnet', fallback: 'haiku' },
     'batch-phase-i':               { model: 'sonnet', fallback: 'haiku' },
     'batch-phase-ii':              { model: 'sonnet', fallback: 'haiku' },
     'phase-i-writeup':             { model: 'sonnet', fallback: 'haiku' },
@@ -45,10 +43,8 @@ export const BASE_CONFIG = {
     'reviewer-exclusion':          { model: 'haiku',  fallback: 'haiku' },
     'reviewers':                   { model: 'sonnet', fallback: 'haiku' },
     'peer-review-summarizer':      { model: 'sonnet', fallback: 'haiku' },
-    'funding-analysis':            { model: 'sonnet', fallback: 'haiku' },
     'qa':                          { model: 'sonnet', fallback: 'haiku' },
     'refine':                      { model: 'sonnet', fallback: 'haiku' },
-    'expense-reporter':            { model: 'haiku',  fallback: 'haiku' },
     'contact-enrichment':          { model: 'haiku',  fallback: 'haiku' },
     'email-personalization':       { model: 'haiku',  fallback: 'haiku' },
     'dynamics-explorer':           { model: 'haiku',  fallback: 'haiku' },
@@ -56,7 +52,6 @@ export const BASE_CONFIG = {
     // missing from this map, so it silently inherited CLAUDE.DEFAULT_MODEL
     // ('sonnet') until S573 (2026-10-04, owner decision: Haiku when available).
     'integrity-screener':          { model: 'haiku',  fallback: 'sonnet' },
-    'expertise-finder':            { model: 'sonnet', fallback: 'haiku' },
     // 'virtual-review-panel' retired 2026-10-04 (Session 573); legacy multi-LLM panel
     // archived to /_archived. Successor is 'review-panel' below.
     'review-panel': {

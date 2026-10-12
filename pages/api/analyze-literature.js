@@ -8,13 +8,17 @@ import { requireAcceptedLlmResponse } from '../../lib/utils/llm-response';
  * 2. Claude to synthesize findings across all papers
  */
 
-import { BASE_CONFIG, getModelForApp } from '../../shared/config/baseConfig';
-import { loadModelOverrides } from '../../lib/services/model-override-loader';
+import { BASE_CONFIG } from '../../shared/config/baseConfig';
 import {
-  createPaperExtractionPrompt,
-  createSynthesisPrompt,
-  createComparisonPrompt
-} from '../../shared/config/prompts/literature-analyzer';
+  LITERATURE_EXTRACT_PAPER_ROW,
+  LITERATURE_SYNTHESIZE_ROW,
+  LITERATURE_COMPARE_ROW,
+  buildLiteratureExtractVariables,
+  buildLiteratureSynthesisVariables,
+  buildLiteratureCompareVariables,
+} from '../../shared/config/prompts/literature-analyzer-dynamics';
+import { resolveToolPrompt, toolPromptUnavailable } from '../../lib/services/tool-prompt-resolver';
+import { composeToolPromptPair } from '../../lib/services/tool-prompt-composer';
 import { requireAppAccess } from '../../lib/utils/auth';
 import { LLMClient } from '../../lib/services/llm-client';
 import { nextRateLimiter } from '../../shared/api/middleware/rateLimiter';
@@ -37,8 +41,6 @@ export default async function handler(req, res) {
   const allowed = await limiter(req, res);
   if (allowed !== true) return;
 
-  await loadModelOverrides();
-
   try {
     const { files, options = {} } = req.body;
     const { focusTopic, generateComparison, comparisonType } = options;
@@ -53,6 +55,16 @@ export default async function handler(req, res) {
     if (!files || files.length === 0) {
       return res.status(400).json({ error: 'No files provided' });
     }
+
+    // Resolve the prompt rows once per request, before streaming starts, so a
+    // missing/ambiguous row is a plain 503 JSON instead of per-paper error results.
+    const rows = {
+      extract: await resolveToolPrompt(LITERATURE_EXTRACT_PAPER_ROW.promptName, LITERATURE_EXTRACT_PAPER_ROW),
+      synthesize: await resolveToolPrompt(LITERATURE_SYNTHESIZE_ROW.promptName, LITERATURE_SYNTHESIZE_ROW),
+      compare: generateComparison
+        ? await resolveToolPrompt(LITERATURE_COMPARE_ROW.promptName, LITERATURE_COMPARE_ROW)
+        : null,
+    };
 
     // Set headers for streaming response
     res.setHeader('Content-Type', 'text/plain');
@@ -84,7 +96,7 @@ export default async function handler(req, res) {
         const base64 = Buffer.from(fileBuffer).toString('base64');
 
         // Extract paper information using Vision API
-        const extractedData = await extractPaperInfo(base64, apiKey, userProfileId);
+        const extractedData = await extractPaperInfo(base64, rows.extract, apiKey, userProfileId);
 
         if (extractedData && !extractedData.error) {
           extractedPapers.push({
@@ -139,7 +151,7 @@ export default async function handler(req, res) {
       sendProgress(res, 75, 'Generating synthesis across papers...');
 
       try {
-        synthesis = await generateSynthesis(successfulPapers, focusTopic, apiKey, userProfileId);
+        synthesis = await generateSynthesis(successfulPapers, focusTopic, rows.synthesize, apiKey, userProfileId);
         sendEvent(res, 'synthesis_complete', { success: true });
       } catch (synthError) {
         console.error('Synthesis error:', synthError);
@@ -150,7 +162,7 @@ export default async function handler(req, res) {
       if (generateComparison && successfulPapers.length >= 2) {
         sendProgress(res, 90, 'Generating comparison...');
         try {
-          comparison = await generateComparisonData(successfulPapers, comparisonType || 'findings', apiKey, userProfileId);
+          comparison = await generateComparisonData(successfulPapers, comparisonType || 'findings', rows.compare, apiKey, userProfileId);
         } catch (compError) {
           console.error('Comparison error:', compError);
           comparison = { error: compError.message };
@@ -190,11 +202,15 @@ export default async function handler(req, res) {
     console.error('API error:', error);
     // Once progress frames have gone out, a JSON 500 can no longer be sent;
     // end the stream with an error event the page reports.
+    const unavailable = toolPromptUnavailable(error);
     if (res.headersSent) {
-      sendEvent(res, 'error', { message: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED });
+      sendEvent(res, 'error', unavailable
+        ? { message: unavailable.error, code: unavailable.code }
+        : { message: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED });
       res.end();
       return;
     }
+    if (unavailable) return res.status(503).json(unavailable);
     res.status(500).json({
       error: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED,
       details: process.env.NODE_ENV === 'development' ? error.message : undefined,
@@ -218,26 +234,40 @@ function sendEvent(res, event, data) {
 }
 
 /**
+ * Compose a resolved row with the variables helper's output (A7 preamble is filled
+ * in code). The request shape matches today's: the composed body is the user text;
+ * a system prompt is sent only if an /admin edit made one non-empty.
+ */
+function composeRow(row, { variables, nonces }) {
+  return composeToolPromptPair({ systemPrompt: row.systemPrompt, body: row.body }, variables, { nonces });
+}
+
+function systemOf(composed) {
+  return composed.systemPrompt ? { system: composed.systemPrompt } : {};
+}
+
+/**
  * Extract information from a single paper using Vision API
  */
-async function extractPaperInfo(base64Pdf, apiKey, userProfileId) {
-  const prompt = createPaperExtractionPrompt();
+async function extractPaperInfo(base64Pdf, row, apiKey, userProfileId) {
+  const composed = composeRow(row, buildLiteratureExtractVariables());
 
   const claude = new LLMClient({
     apiKey,
-    model: getModelForApp('literature-analyzer', 'visionModel'),
+    model: row.model,
     appName: 'literature-analyzer',
     userProfileId,
   });
   const { text: responseText } = requireAcceptedLlmResponse(await claude.complete({
+    ...systemOf(composed),
     messages: [{
       role: 'user',
       content: [
         { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64Pdf } },
-        { type: 'text', text: prompt },
+        { type: 'text', text: composed.body },
       ],
     }],
-    maxTokens: 4000,
+    maxTokens: row.maxTokens,
   }));
 
   // Parse JSON response
@@ -262,18 +292,19 @@ async function extractPaperInfo(base64Pdf, apiKey, userProfileId) {
 /**
  * Generate synthesis across multiple papers
  */
-async function generateSynthesis(papers, focusTopic, apiKey, userProfileId) {
-  const prompt = createSynthesisPrompt(papers, focusTopic);
+async function generateSynthesis(papers, focusTopic, row, apiKey, userProfileId) {
+  const composed = composeRow(row, buildLiteratureSynthesisVariables(papers, focusTopic));
 
   const claude = new LLMClient({
     apiKey,
-    model: getModelForApp('literature-analyzer'),
+    model: row.model,
     appName: 'literature-analyzer',
     userProfileId,
   });
   const { text: responseText } = requireAcceptedLlmResponse(await claude.complete({
-    messages: [{ role: 'user', content: prompt }],
-    maxTokens: 6000,
+    ...systemOf(composed),
+    messages: [{ role: 'user', content: composed.body }],
+    maxTokens: row.maxTokens,
     temperature: 0.3,
   }));
 
@@ -297,18 +328,19 @@ async function generateSynthesis(papers, focusTopic, apiKey, userProfileId) {
 /**
  * Generate comparison across papers
  */
-async function generateComparisonData(papers, comparisonType, apiKey, userProfileId) {
-  const prompt = createComparisonPrompt(papers, comparisonType);
+async function generateComparisonData(papers, comparisonType, row, apiKey, userProfileId) {
+  const composed = composeRow(row, buildLiteratureCompareVariables(papers, comparisonType));
 
   const claude = new LLMClient({
     apiKey,
-    model: getModelForApp('literature-analyzer'),
+    model: row.model,
     appName: 'literature-analyzer',
     userProfileId,
   });
   const { text: responseText } = requireAcceptedLlmResponse(await claude.complete({
-    messages: [{ role: 'user', content: prompt }],
-    maxTokens: 4000,
+    ...systemOf(composed),
+    messages: [{ role: 'user', content: composed.body }],
+    maxTokens: row.maxTokens,
     temperature: 0.3,
   }));
 

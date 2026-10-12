@@ -2,7 +2,7 @@
  * Unit tests for lib/services/expertise-finder/batch-match-service.js
  * (Stage 5 batch 1). Logic-level; SharePoint adapter, Graph, pdf, sql, and
  * LLM mocked. Pins the explicit ServiceHttpError bodies (the multi-key
- * envelopes) and the fallback-model + usage-logging behavior.
+ * envelopes) and the resolved-model (no fallback) + usage-logging behavior.
  *
  * @jest-environment node
  */
@@ -19,6 +19,12 @@ jest.mock('../../lib/services/graph-service', () => ({
 jest.mock('../../lib/services/llm-client', () => ({
   LLMClient: jest.fn(),
 }));
+jest.mock('../../lib/services/tool-prompt-resolver', () => ({
+  ...jest.requireActual('../../lib/services/tool-prompt-resolver'),
+  resolveToolPrompt: jest.fn(async (_name, def) => ({
+    systemPrompt: def.systemPrompt, body: def.body, model: 'claude-resolved', maxTokens: 1234, source: 'bundled', version: null,
+  })),
+}));
 jest.mock('../../lib/utils/usage-logger', () => ({
   logUsage: jest.fn(),
   estimateCostCents: jest.fn(() => 5),
@@ -30,6 +36,7 @@ import * as locAdapter from '../../lib/dataverse/adapters/sharepoint-document-lo
 import { GraphService } from '../../lib/services/graph-service';
 import { LLMClient } from '../../lib/services/llm-client';
 import { logUsage } from '../../lib/utils/usage-logger';
+import { resolveToolPrompt } from '../../lib/services/tool-prompt-resolver';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import { batchMatch } from '../../lib/services/expertise-finder/batch-match-service';
 
@@ -139,5 +146,46 @@ describe('batchMatch', () => {
     expect(caught.httpStatus).toBe(500);
     expect(caught.body).toMatchObject({ error: 'Failed to process proposal', requestNumber: 'R-1000' });
     expect(logUsage).toHaveBeenCalledWith(expect.objectContaining({ status: 'error', errorMessage: 'dataverse down' }));
+  });
+
+  it('calls the LLM once with the resolved model, max tokens and composed prompts; no fallback', async () => {
+    primeGoldenPath();
+    const complete = jest.fn().mockResolvedValue({
+      content: [{ text: '{"proposal_summary":{"title":"T"}}' }],
+      usage: { inputTokens: 1, outputTokens: 1 }, model: 'm',
+    });
+    LLMClient.mockImplementation(() => ({ complete }));
+    const r = await batchMatch({ ...ARGS, additionalNotes: 'note' });
+    expect(resolveToolPrompt).toHaveBeenCalledWith('expertise-finder.match', expect.objectContaining({ promptName: 'expertise-finder.match' }));
+    expect(LLMClient).toHaveBeenCalledWith(expect.objectContaining({ model: 'claude-resolved' }));
+    const arg = complete.mock.calls[0][0];
+    expect(arg.maxTokens).toBe(1234);
+    expect(arg.temperature).toBe(0.2);
+    expect(arg.system[0]).toMatchObject({ type: 'text', cache_control: { type: 'ephemeral' } });
+    expect(arg.system[0].text).toContain('UNTRUSTED CONTENT RULES:');
+    expect(arg.messages[0].content).toContain('## ADDITIONAL CONTEXT FROM USER\nnote');
+    expect(r.metadata.model).toBe('claude-resolved');
+  });
+
+  it('a provider error is not retried on another model and surfaces as the 500 envelope', async () => {
+    primeGoldenPath();
+    const complete = jest.fn().mockRejectedValue(new Error('provider down'));
+    LLMClient.mockImplementation(() => ({ complete }));
+    await expect(batchMatch(ARGS)).rejects.toMatchObject({ httpStatus: 500, body: { error: 'Failed to process proposal' } });
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(logUsage).toHaveBeenCalledWith(expect.objectContaining({ status: 'error', model: 'claude-resolved' }));
+  });
+
+  it.each([
+    ['PROMPT_NOT_FOUND', 'not set up yet'],
+    ['PROMPT_DUPLICATE_CURRENT', 'more than one current version'],
+  ])('a resolver %s surfaces as an actionable 503 and no LLM call', async (code, text) => {
+    primeGoldenPath();
+    resolveToolPrompt.mockRejectedValueOnce(Object.assign(new Error('no row'), { code }));
+    await expect(batchMatch(ARGS)).rejects.toMatchObject({
+      httpStatus: 503,
+      body: { code: 'tool_prompt_unavailable', error: expect.stringContaining(text), requestNumber: 'R-1000' },
+    });
+    expect(LLMClient).not.toHaveBeenCalled();
   });
 });

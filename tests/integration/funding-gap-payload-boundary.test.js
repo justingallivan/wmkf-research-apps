@@ -26,7 +26,20 @@ jest.mock('../../shared/config/baseConfig', () => ({
   BASE_CONFIG: {
     ERROR_MESSAGES: { PROCESSING_FAILED: 'Processing failed' },
   },
-  getModelForApp: jest.fn(() => 'claude-test'),
+}));
+
+// Re-pointed (convergence plan Stage 2): the route resolves its prompt text, model
+// and max tokens through resolveToolPrompt; bundled definitions stand in for rows.
+jest.mock('../../lib/services/tool-prompt-resolver', () => ({
+  ...jest.requireActual('../../lib/services/tool-prompt-resolver'),
+  resolveToolPrompt: jest.fn(async (_name, def) => ({
+    systemPrompt: def.systemPrompt,
+    body: def.body,
+    model: 'claude-test',
+    maxTokens: def.maxTokens,
+    source: 'bundled',
+    version: null,
+  })),
 }));
 
 let mockedProposalText = '';

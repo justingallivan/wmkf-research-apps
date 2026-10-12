@@ -12,8 +12,6 @@ const MODEL_TYPE_LABELS = {
 // APP_MODELS keys (e.g. APP_MODELS uses 'batch-phase-i' while the registry
 // uses 'batch-phase-i-summaries'), so this is maintained inline.
 const APP_MODEL_NAMES = {
-  'multi-perspective-evaluator': 'Multi-Perspective Evaluator',
-  'literature-analyzer': 'Literature Analyzer',
   'batch-phase-i': 'Batch Phase I',
   'batch-phase-ii': 'Batch Phase II',
   'phase-i-writeup': 'Phase I Writeup',
@@ -22,14 +20,11 @@ const APP_MODEL_NAMES = {
   'reviewer-exclusion': 'Reviewer Exclusion Parser',
   'reviewers': 'Reviewers',
   'peer-review-summarizer': 'Peer Review Summarizer',
-  'funding-analysis': 'Funding Analysis',
   'qa': 'Q&A',
   'refine': 'Refinement',
-  'expense-reporter': 'Expense Reporter',
   'contact-enrichment': 'Contact Enrichment',
   'email-personalization': 'Email Personalization',
   'dynamics-explorer': 'Dynamics Explorer',
-  'expertise-finder': 'Expertise Finder',
   // 'virtual-review-panel' (legacy multi-LLM panel) retired 2026-10-04 (Session 573).
   'review-panel': 'Review Panel',
   'grant-reporting': 'Grant Reporting',
