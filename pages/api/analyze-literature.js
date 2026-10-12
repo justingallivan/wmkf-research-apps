@@ -188,6 +188,13 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('API error:', error);
+    // Once progress frames have gone out, a JSON 500 can no longer be sent;
+    // end the stream with an error event the page reports.
+    if (res.headersSent) {
+      sendEvent(res, 'error', { message: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED });
+      res.end();
+      return;
+    }
     res.status(500).json({
       error: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED,
       details: process.env.NODE_ENV === 'development' ? error.message : undefined,
