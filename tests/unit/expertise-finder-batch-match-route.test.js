@@ -9,7 +9,11 @@
  */
 
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
-jest.mock('../../lib/services/model-override-loader', () => ({ loadModelOverrides: jest.fn().mockResolvedValue() }));
+jest.mock('../../lib/services/tool-prompt-resolver', () => ({
+  resolveToolPrompt: jest.fn(async (_name, def) => ({
+    systemPrompt: def.systemPrompt, body: def.body, model: 'claude-resolved', maxTokens: 1234, source: 'bundled', version: null,
+  })),
+}));
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (label, fn) => fn(),
 }));

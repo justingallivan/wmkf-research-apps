@@ -21,7 +21,6 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
-import { loadModelOverrides } from '../../../lib/services/model-override-loader';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { batchMatch } from '../../../lib/services/expertise-finder/batch-match-service';
@@ -35,8 +34,6 @@ export default async function handler(req, res) {
 
   const access = await requireAppAccess(req, res, APP_KEY);
   if (!access) return;
-
-  await loadModelOverrides();
 
   const { requestId, requestNumber, additionalNotes } = req.body || {};
 

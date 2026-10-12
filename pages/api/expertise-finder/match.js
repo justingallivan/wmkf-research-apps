@@ -17,9 +17,13 @@ import { requireAcceptedLlmResponse } from '../../../lib/utils/llm-response';
 import pdf from 'pdf-parse';
 import { sql } from '@vercel/postgres';
 import { requireAppAccess } from '../../../lib/utils/auth';
-import { BASE_CONFIG, getModelForApp, getFallbackModelForApp } from '../../../shared/config/baseConfig';
-import { loadModelOverrides } from '../../../lib/services/model-override-loader';
-import { buildCacheableSystemPrompt, buildUserPrompt } from '../../../shared/config/prompts/expertise-finder';
+import { BASE_CONFIG } from '../../../shared/config/baseConfig';
+import { resolveToolPrompt } from '../../../lib/services/tool-prompt-resolver';
+import { composeToolPrompt } from '../../../lib/services/tool-prompt-composer';
+import {
+  EXPERTISE_FINDER_MATCH_ROW,
+  buildExpertiseMatchVariables,
+} from '../../../shared/config/prompts/expertise-finder-dynamics';
 import { logUsage, estimateCostCents } from '../../../lib/utils/usage-logger';
 import { LLMClient } from '../../../lib/services/llm-client';
 import { fetchPublicBlob } from '../../../lib/utils/public-blob-fetch';
@@ -42,11 +46,8 @@ export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, APP_KEY);
   if (!access) return;
 
-  await loadModelOverrides();
-
   const startTime = Date.now();
-  const primaryModel = getModelForApp(APP_KEY);
-  const fallbackModel = getFallbackModelForApp(APP_KEY);
+  let resolved = null; // set once the prompt row resolves; used for error-path usage logging
 
   try {
     const { file, additionalNotes } = req.body;
@@ -89,7 +90,6 @@ export default async function handler(req, res) {
     // static portion is marked with `cache_control: ephemeral` so repeat
     // matches within the 5-min TTL only pay for the variable suffix. Roster
     // edits naturally invalidate the cache.
-    const systemPrompt = buildCacheableSystemPrompt(rosterResult.rows);
     const proposalPayload = wrapUntrustedContent({
       text: proposalText,
       source: 'expertise-finder.match.proposalText',
@@ -97,19 +97,19 @@ export default async function handler(req, res) {
       maxChars: EXPERTISE_FINDER_PROPOSAL_MAX_CHARS,
       label: 'research proposal',
     });
-    const userPrompt = buildUserPrompt(proposalPayload.text, additionalNotes);
 
-    let result;
-    let modelUsed = primaryModel;
+    const { systemVariables, bodyVariables } = buildExpertiseMatchVariables({
+      rosterMembers: rosterResult.rows,
+      wrappedProposal: proposalPayload.text,
+      additionalNotes,
+    });
+    resolved = await resolveToolPrompt(EXPERTISE_FINDER_MATCH_ROW.promptName, EXPERTISE_FINDER_MATCH_ROW);
+    const systemPrompt = composeToolPrompt(resolved.systemPrompt, systemVariables, { nonces: [] });
+    const userPrompt = composeToolPrompt(resolved.body, bodyVariables, { nonces: null });
 
-    try {
-      result = await callClaude(apiKey, primaryModel, systemPrompt, userPrompt);
-    } catch (primaryError) {
-      if (primaryError.code === 'model_refusal') throw primaryError;
-      console.warn(`[ExpertiseFinder] Primary model (${primaryModel}) failed: ${primaryError.message}, trying fallback...`);
-      modelUsed = fallbackModel;
-      result = await callClaude(apiKey, fallbackModel, systemPrompt, userPrompt);
-    }
+    // No fallback model (owner decision D4): one attempt with the resolved model.
+    const modelUsed = resolved.model;
+    const result = await callClaude(apiKey, modelUsed, resolved.maxTokens, systemPrompt, userPrompt);
 
     const latencyMs = Date.now() - startTime;
 
@@ -195,7 +195,7 @@ export default async function handler(req, res) {
     logUsage({
       userProfileId: access.profileId,
       appName: APP_KEY,
-      model: primaryModel,
+      model: resolved?.model || 'unresolved',
       inputTokens: 0,
       outputTokens: 0,
       latencyMs,
@@ -210,15 +210,14 @@ export default async function handler(req, res) {
   }
 }
 
-async function callClaude(apiKey, model, systemPrompt, userPrompt) {
+async function callClaude(apiKey, model, maxTokens, systemPrompt, userPrompt) {
   // appName intentionally omitted — the route logs usage itself so it can
-  // record `modelUsed` (which may be the fallback) instead of the requested
-  // model and reflect the route-level retry semantics.
+  // record the resolved `modelUsed`.
   const claude = new LLMClient({ apiKey, model });
   const r = requireAcceptedLlmResponse(await claude.complete({
     system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: userPrompt }],
-    maxTokens: 4096,
+    maxTokens,
     temperature: 0.2,
   }));
   return {
