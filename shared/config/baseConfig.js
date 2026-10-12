@@ -25,7 +25,6 @@ export const BASE_CONFIG = {
   APP_MODELS: {
     // 'concept-evaluator' deprecated 2026-04-25 (archived to /_archived).
     'multi-perspective-evaluator': { model: 'sonnet', visionModel: 'sonnet', fallback: 'haiku' },
-    'literature-analyzer':         { model: 'sonnet', visionModel: 'sonnet', fallback: 'haiku' },
     'batch-phase-i':               { model: 'sonnet', fallback: 'haiku' },
     'batch-phase-ii':              { model: 'sonnet', fallback: 'haiku' },
     'phase-i-writeup':             { model: 'sonnet', fallback: 'haiku' },

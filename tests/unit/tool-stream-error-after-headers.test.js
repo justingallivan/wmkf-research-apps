@@ -9,6 +9,11 @@ jest.mock('../../lib/services/model-override-loader', () => ({ loadModelOverride
 // Each file's fetch fails; both routes catch that per file and keep going.
 jest.mock('../../lib/utils/public-blob-fetch', () => ({ fetchPublicBlob: async () => ({ ok: false, statusText: 'Not Found' }) }));
 jest.mock('../../lib/utils/usage-logger', () => ({ logUsage: jest.fn() }));
+// analyze-literature resolves its prompt rows before streaming; return the bundled rows.
+jest.mock('../../lib/services/tool-prompt-resolver', () => ({
+  ...jest.requireActual('../../lib/services/tool-prompt-resolver'),
+  resolveToolPrompt: async (_name, def) => ({ ...def, source: 'bundled' }),
+}));
 jest.mock('../../lib/services/llm-client', () => ({ LLMClient: jest.fn(() => ({ complete: jest.fn() })) }));
 
 import analyzeLiterature from '../../pages/api/analyze-literature';

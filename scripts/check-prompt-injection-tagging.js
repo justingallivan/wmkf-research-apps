@@ -198,7 +198,17 @@ const SURFACES = [
     id: 'analyze-literature',
     inv: 9,
     status: 'migrated',
-    promptFiles: ['shared/config/prompts/literature-analyzer.js'],
+    promptFiles: [
+      'shared/config/prompts/literature-analyzer.js',
+      // Seam-backed row definitions + variables helpers (convergence plan Stage 4).
+      'shared/config/prompts/literature-analyzer-dynamics.js',
+    ],
+    callSiteFiles: [
+      'pages/api/analyze-literature.js',
+      // The A7 preamble is composed in code at the resolver seam.
+      'lib/services/tool-prompt-resolver.js',
+      'lib/services/tool-prompt-composer.js',
+    ],
     builders: [
       'createPaperExtractionPrompt',
       'createSynthesisPrompt',
