@@ -7,7 +7,7 @@
  * types are enforced before the values reach the query layer.
  */
 
-/** Schema for `createFundingExtractionPrompt` output. */
+/** Schema for the `funding-gap.extract` row (shared/config/prompts/funding-gap-dynamics.js, buildFundingExtractVariables) output. */
 export const FUNDING_EXTRACTION_SCHEMA = {
   type: 'object',
   fields: {
