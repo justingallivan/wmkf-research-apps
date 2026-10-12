@@ -250,7 +250,7 @@ const SURFACES = [
     // Route-local prompt. The image path is multimodal (receipt image
     // content block, preamble-controlled); the PDF path embeds extracted
     // text, which the route wraps — so this surface has a genuine wrap site
-    // and is NOT multimodal-flagged. Both markers live in the route file.
+    // and is NOT multimodal-flagged. The route wraps; the composer adds the preamble.
     id: 'process-expenses',
     inv: 11,
     status: 'migrated',
