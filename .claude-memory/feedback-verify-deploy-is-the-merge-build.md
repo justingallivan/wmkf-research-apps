@@ -1,6 +1,6 @@
 ---
 name: feedback-verify-deploy-is-the-merge-build
-description: Before announcing a merge is live, confirm the newest production deployment was created after the merge commit and is Ready; an alias reporting Ready may still be the previous build (S510, 2026-09-13).
+description: Before announcing a merge is live, find the production deployment by commit SHA (vercel ls --prod -m githubCommitSha=<sha>) and confirm it is Ready; an alias reporting Ready may still be the previous build (S510, 2026-09-13).
 metadata:
   type: feedback
 status: active
@@ -9,7 +9,8 @@ status: active
 ## Recall Rule
 Read after any push or merge to `main`, before telling the owner something is live or launching a cron or run that must execute the new code.
 
-Do: `vercel ls`, take the newest `target production` deployment, confirm its `created` time is after the merge commit and its status is Ready.
+Do: identify the deployment by commit, not by recency — `vercel ls --prod -m githubCommitSha=$(git rev-parse <merge-sha>)` lists only the build of that commit; report its URL and status. If it is still building, poll that same filtered command until Ready/Error. Never poll "newest Production row is Ready": an earlier build that is already Ready satisfies it immediately (owner, 2026-10-12, S598: "Your deployment checks almost never work").
+(Older method, still valid as a cross-check: the newest `target production` deployment's `created` time is after the merge commit and its status is Ready.)
 Do not: treat `vercel inspect <alias>` reporting Ready as proof the merge deployed.
 Ground truth: `vercel ls`; the GitHub deployments API for the merge commit.
 
