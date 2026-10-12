@@ -930,7 +930,6 @@ const PROGRESS_VERBS = {
 };
 const FOCUS_RING = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600';
 const BTN = `inline-flex min-h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 ${FOCUS_RING} disabled:cursor-not-allowed disabled:opacity-50`;
-const BTN_LINK = `text-sm font-medium text-gray-700 underline underline-offset-2 hover:text-gray-950 ${FOCUS_RING} disabled:cursor-not-allowed disabled:opacity-50`;
 const INPUT = `mt-1 block min-h-10 w-full min-w-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:cursor-not-allowed disabled:bg-gray-100`;
 const FILE_INPUT = `${INPUT} file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-gray-900`;
 
@@ -2595,8 +2594,8 @@ function ReviewBlock({ t }) {
       {conflict && <p className="mt-3 text-sm text-amber-950" role="alert">Another session changed this. Refresh to load the latest version; your edits stay in the fields.</p>}
       <div className="mt-3">
         {correction
-          ? <button type="button" onClick={t.cancelEditNames} disabled={Boolean(busy)} className={BTN_LINK}>Cancel</button>
-          : status === 'ready' && <button type="button" onClick={() => t.discardRun(job)} disabled={Boolean(busy)} className={BTN_LINK}>Discard this draft</button>}
+          ? <Button variant="link" type="button" onClick={t.cancelEditNames} disabled={Boolean(busy)}>Cancel</Button>
+          : status === 'ready' && <Button variant="link" type="button" onClick={() => t.discardRun(job)} disabled={Boolean(busy)}>Discard this draft</Button>}
       </div>
     </div>
   );
@@ -2656,9 +2655,9 @@ function EarlierRuns({ t }) {
             </div>
             {job.status === 'ready' && <div className="flex items-center gap-3">
               <Button size="sm" variant="outline" type="button" onClick={() => t.reviewRun(job)} disabled={Boolean(t.busy) && t.busy !== 'speakers'}>Review</Button>
-              <button type="button" onClick={() => void t.discardRun(job)} disabled={Boolean(t.busy)} className={BTN_LINK}>Discard this draft</button>
+              <Button variant="link" type="button" onClick={() => void t.discardRun(job)} disabled={Boolean(t.busy)}>Discard this draft</Button>
             </div>}
-            {canCancelRun(job) && <button type="button" onClick={() => void t.discardRun(job)} disabled={Boolean(t.busy)} className={BTN_LINK}>{t.busy === 'cancel' ? 'Cancelling…' : 'Cancel this transcription'}</button>}
+            {canCancelRun(job) && <Button variant="link" type="button" onClick={() => void t.discardRun(job)} disabled={Boolean(t.busy)}>{t.busy === 'cancel' ? 'Cancelling…' : 'Cancel this transcription'}</Button>}
           </li>
         ))}
       </ul>
@@ -2937,9 +2936,9 @@ function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = n
               <Button size="sm" variant="outline" type="button" onClick={() => void s.saveSummaryDraft()}  disabled={Boolean(t.busy) || !s.summaryDirty || !s.summaryText.trim()}>
                 {t.busy === busyKeys.save ? 'Saving…' : 'Save draft'}
               </Button>
-              <button type="button" onClick={s.discardSummaryDraft} className={BTN_LINK} disabled={Boolean(t.busy)}>
+              <Button variant="link" type="button" onClick={s.discardSummaryDraft} disabled={Boolean(t.busy)}>
                 {t.busy === busyKeys.discard ? 'Discarding…' : 'Discard draft'}
-              </button>
+              </Button>
             </>}
           </div>
         </div>
@@ -3012,7 +3011,7 @@ function VideoCopyStatus({ z }) {
       {copy?.state === 'failed' && <Notice tone="warning">Video copy needs attention. {videoFailureMessage(copy.failureCode)}</Notice>}
       {(copy?.state === 'queued' || copy?.state === 'copying') && (copy.cancelRequested
         ? <p className="mt-1 text-xs text-gray-700">Cancelling…</p>
-        : <button type="button" onClick={() => void z.cancelCopy(copy.id)} disabled={z.videoBusy} className={`mt-2 ${BTN_LINK}`}>Cancel copy</button>)}
+        : <Button variant="link" type="button" onClick={() => void z.cancelCopy(copy.id)} disabled={z.videoBusy} className="mt-2">Cancel copy</Button>)}
       {copy?.state === 'failed' && copy.meetingUuid && !active
         && <Button size="sm" variant="outline" type="button" onClick={() => void z.copyVideo(copy.meetingUuid, 'block')} disabled={z.busy || z.videoBusy || z.hasActiveCopy} className="mt-2">Try again</Button>}
       {z.confirm?.origin === 'block' && <ReplaceConfirm z={z} />}
@@ -3024,14 +3023,14 @@ function VideoCopyStatus({ z }) {
 function ZoomImportSection({ z, activeJob, transcriptionBusy, hasTranscript }) {
   if (z.status === 'unavailable') return null;
   if (z.status === 'idle') {
-    return <button type="button" onClick={z.openPanel} className={`mt-4 ${BTN_LINK}`}>Import from Zoom</button>;
+    return <Button variant="link" type="button" onClick={z.openPanel} className="mt-4">Import from Zoom</Button>;
   }
   if (z.status === 'loading') return <p className="mt-4 text-sm text-gray-700" aria-live="polite">Loading Zoom recordings…</p>;
   if (z.status === 'failed') {
     return (
       <div className="mt-4 text-sm text-gray-700">
         <p>Zoom recordings could not be loaded.</p>
-        <button type="button" onClick={z.openPanel} className={`mt-1 ${BTN_LINK}`}>Try again</button>
+        <Button variant="link" type="button" onClick={z.openPanel} className="mt-1">Try again</Button>
       </div>
     );
   }
@@ -3418,7 +3417,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
 
   const manualAdd = <>
     {!active && <GenerateForm t={t} />}
-    <button type="button" onClick={() => setUploadInstead((value) => !value)} aria-expanded={uploadInstead} className={`mt-3 ${BTN_LINK}`}>Upload a finished transcript instead</button>
+    <Button variant="link" type="button" onClick={() => setUploadInstead((value) => !value)} aria-expanded={uploadInstead} className="mt-3">Upload a finished transcript instead</Button>
     {uploadInstead && <UploadForm m={m} inputRef={transcriptInputRef} />}
   </>;
   const recordingBlock = <div className="mt-5 border-t border-gray-200 pt-4"><RecordingBlock m={m} z={z} /></div>;
@@ -3470,7 +3469,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-800" aria-live="polite" data-testid="transcript-progress">
             <p>{isCancellingRun(progressJob) ? 'Cancelling this transcription…' : `${PROGRESS_VERBS[progressJob.status]} ${displayName(progressJob)}${progressJob.created_at ? ` · started ${fmtTime(progressJob.created_at)}` : ''}`}</p>
             <span className="flex items-center gap-3">
-              {canCancelRun(progressJob) && <button type="button" onClick={() => void t.discardRun(progressJob)} disabled={Boolean(t.busy)} className={BTN_LINK}>{t.busy === 'cancel' ? 'Cancelling…' : 'Cancel this transcription'}</button>}
+              {canCancelRun(progressJob) && <Button variant="link" type="button" onClick={() => void t.discardRun(progressJob)} disabled={Boolean(t.busy)}>{t.busy === 'cancel' ? 'Cancelling…' : 'Cancel this transcription'}</Button>}
             </span>
           </div>
         )}
@@ -3484,7 +3483,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
               <ZoomImportSection z={z} activeJob={active} transcriptionBusy={Boolean(t.busy)} hasTranscript={Boolean(material)} />
               {z.status === 'available'
                 ? <div className="mt-4 border-t border-gray-200 pt-3">
-                  <button type="button" onClick={z.toggleOther} aria-expanded={z.showOther} className={BTN_LINK}>Upload manually</button>
+                  <Button variant="link" type="button" onClick={z.toggleOther} aria-expanded={z.showOther}>Upload manually</Button>
                   {(z.showOther || z.hasActiveCopy) && <>{manualAdd}{recordingBlock}</>}
                 </div>
                 : <>{manualAdd}{recordingBlock}</>}

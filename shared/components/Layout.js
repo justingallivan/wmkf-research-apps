@@ -451,6 +451,19 @@ export function Button({
   className = '',
   ...props
 }) {
+  // A quiet underlined text action (disclosures, Cancel, Discard): no padding, background or size scale.
+  if (variant === 'link') {
+    return (
+      <button
+        className={`text-sm font-medium text-gray-700 underline underline-offset-2 hover:text-gray-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+        disabled={disabled || loading}
+        {...props}
+      >
+        {children}
+      </button>
+    );
+  }
+
   const baseClasses = 'inline-flex items-center justify-center font-semibold rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2';
 
   const variants = {
