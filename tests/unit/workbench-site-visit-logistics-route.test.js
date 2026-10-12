@@ -30,7 +30,7 @@ test('Workbench GET returns only visit and materials, even if the service gains 
   await handler({ method: 'GET', query: { requestId: REQUEST_ID } }, res);
 
   expect(requireAppAccess).toHaveBeenCalledWith(expect.anything(), res, 'reviewers');
-  expect(getSiteVisitLogistics).toHaveBeenCalledWith({ requestId: REQUEST_ID, includePresentationSummaryText: true, writeupViewer: expect.objectContaining({ isSuperuser: false }) });
+  expect(getSiteVisitLogistics).toHaveBeenCalledWith({ requestId: REQUEST_ID, includePresentationSummaryText: true, includePresentationVideoState: true, writeupViewer: expect.objectContaining({ isSuperuser: false }) });
   expect(res.statusCode).toBe(200);
   expect(res.body).toEqual({ success: true, siteVisit: { activityId: 'a1' }, materials: [{ artifactId: 'm1' }] });
 });
@@ -47,9 +47,12 @@ test('Workbench GET passes the presentation summary through only with a ready pr
   await handler({ method: 'GET', query: { requestId: REQUEST_ID } }, res);
   expect(res.body).toMatchObject({ presentationMaterialsStatus: 'ready', presentationSummary,
     discussionSummary: { text: 'Main points raised' } });
+  // The service omitted the video state, so the route reports it as not playable (strict true only).
+  expect(res.body.presentationVideoPlayable).toBe(false);
 
   getSiteVisitLogistics.mockResolvedValue({ siteVisit: null, materials: [], presentationMaterialsStatus: 'disabled', presentationSummary });
   await handler({ method: 'GET', query: { requestId: REQUEST_ID } }, res);
   expect(res.body).not.toHaveProperty('presentationSummary');
+  expect(res.body).not.toHaveProperty('presentationVideoPlayable');
 });
 

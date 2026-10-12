@@ -1,5 +1,5 @@
 /** @jest-environment jsdom */
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import ResearchPresentationFollowUp from '../../shared/components/workbench/ResearchPresentationFollowUp.js';
 
 jest.mock('../../shared/components/Layout', () => ({ Card: ({ children }) => <div>{children}</div> }));
@@ -20,7 +20,7 @@ test('renders loading, unavailable, loaded-empty, Zoom, SharePoint transcript, a
     { artifactType: 100000013, filename: 'discussion.txt', backing: 'file', webUrl: 'https://tenant.sharepoint.com/discussion.txt' },
     { artifactType: 100000007, filename: 'summary.docx', backing: 'file', webUrl: 'https://tenant.sharepoint.com/summary.docx' },
   ]} />);
-  expect(screen.getByRole('link', { name: 'Watch recording' })).toHaveAttribute('href', 'https://zoom.us/rec/share/x?pwd=y');
+  expect(screen.getByRole('link', { name: 'Watch full recording' })).toHaveAttribute('href', 'https://zoom.us/rec/share/x?pwd=y');
   expect(screen.getByRole('link', { name: 'Open full transcript' })).toHaveAttribute('href', 'https://tenant.sharepoint.com/transcript.pdf');
   expect(screen.getByRole('link', { name: 'Open presentation transcript' })).toHaveAttribute('href', 'https://tenant.sharepoint.com/presentation.txt');
   expect(screen.getByRole('link', { name: 'Open staff discussion transcript' })).toHaveAttribute('href', 'https://tenant.sharepoint.com/discussion.txt');
@@ -34,7 +34,7 @@ test('only published items are listed', () => {
     { artifactType: 100000006, filename: 'x-Transcript-guid.txt', backing: 'file', webUrl: 'https://tenant.sharepoint.com/t.txt' },
   ]} />);
   expect(screen.getAllByRole('listitem')).toHaveLength(1);
-  expect(screen.queryByRole('link', { name: 'Watch recording' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Watch full recording' })).not.toBeInTheDocument();
 });
 
 test('disabled projection does not masquerade as an empty collection', () => {
@@ -161,5 +161,37 @@ describe('inline staff discussion summary (paired summaries plan D8, owner decis
     render(<ResearchPresentationFollowUp status="loaded" materials={[]}
       discussionSummary={{ text: TEXT, stale: false, publishedAt: null }} />);
     expect(screen.queryByTestId('discussion-summary-text')).not.toBeInTheDocument();
+  });
+});
+
+describe('inline presentation video (staff reader plan §4)', () => {
+  const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
+  const videoRow = { artifactType: 100000011, filename: 'presentation-video.mp4', backing: 'file', webUrl: 'https://tenant.sharepoint.com/v.mp4' };
+  const recording = { artifactType: 100000005, filename: 'Zoom recording', backing: 'external', externalUrl: 'https://zoom.us/rec/share/x' };
+
+  beforeEach(() => {
+    jest.spyOn(window.HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+    jest.spyOn(window.HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve());
+    jest.useFakeTimers();
+  });
+  afterEach(() => { jest.useRealTimers(); jest.restoreAllMocks(); });
+
+  test('plays the approved video from the Workbench route; the full recording stays a link', () => {
+    const { container } = render(<ResearchPresentationFollowUp requestId={REQUEST_ID} videoPlayable status="loaded" materials={[videoRow, recording]} />);
+    expect(screen.getByRole('link', { name: 'Watch full recording' })).toHaveAttribute('href', 'https://zoom.us/rec/share/x');
+    expect(screen.queryByText('presentation-video.mp4')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Watch the presentation' }));
+    act(() => { jest.runAllTimers(); });
+    const video = container.querySelector('video');
+    expect(video.getAttribute('src')).toBe(`/api/workbench/site-visit/presentation-video?requestId=${REQUEST_ID}&attempt=1`);
+  });
+
+  test.each([
+    ['the server says it cannot play', { requestId: REQUEST_ID, videoPlayable: false, materials: [videoRow] }],
+    ['no request id', { requestId: null, videoPlayable: true, materials: [videoRow] }],
+    ['no video item', { requestId: REQUEST_ID, videoPlayable: true, materials: [recording] }],
+  ])('no player when %s', (_label, props) => {
+    render(<ResearchPresentationFollowUp status="loaded" {...props} />);
+    expect(screen.queryByTestId('presentation-video')).not.toBeInTheDocument();
   });
 });

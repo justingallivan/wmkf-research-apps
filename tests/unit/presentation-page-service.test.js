@@ -2,6 +2,7 @@
 import {
   buildPresentationContext,
   resolvePresentationMember,
+  resolveStaffPresentationVideo,
   _internal,
 } from '../../lib/services/post-presentation-materials/presentation-page-service.js';
 import {
@@ -651,5 +652,64 @@ describe('presentation video', () => {
     const deps = dependencies([vf.transcriptRow(), vf.recordingRow(), vf.videoRow({ wmkf_producer: 'someone-else' })], { resolveMediaDownloadUrl: videoMedia() });
     expect((await buildPresentationContext({ requestId: REQUEST_ID }, deps)).materials).toEqual([]);
     await expectNotFound(resolvePresentationMember({ ...member(), mode: 'open' }, deps));
+  });
+});
+
+
+// ---- Staff playback of the approved video (Workbench; staff reader plan §1) ----------------------------------
+describe('staff presentation video', () => {
+  const vf = require('../helpers/presentation-video-fixtures.js');
+  const videoMedia = (over = {}) => jest.fn(async (driveId, itemId) => ({
+    driveId, itemId, filename: 'presentation-video.mp4', mimeType: 'video/mp4', malware: null, eTag: 'video-etag-1',
+    size: 1000, quickXorHash: 'qxh-1', downloadUrl: 'https://tenant.sharepoint.com/download?short=1', ...over,
+  }));
+  const bound = () => [vf.transcriptRow(), vf.recordingRow(), vf.videoRow()];
+  const staffDeps = (rows, over = {}) => dependencies(rows, {
+    resolveMediaDownloadUrl: videoMedia(), presentationSchemaReady: () => true, presentationRequestAllowed: () => true, ...over,
+  });
+
+  test('redirects to the approved video, checked against the approved cut', async () => {
+    const deps = staffDeps(bound());
+    expect(await resolveStaffPresentationVideo({ requestId: REQUEST_ID }, deps))
+      .toEqual({ redirectUrl: 'https://tenant.sharepoint.com/download?short=1' });
+    expect(deps.getApprovedVideoCut).toHaveBeenCalledWith(REQUEST_ID, vf.VIDEO_ID);
+    expect(deps.resolveMediaDownloadUrl).toHaveBeenCalledWith('drive', 'video-item');
+  });
+
+  test('never serves the full recording: without a bound video there is nothing to play', async () => {
+    const deps = staffDeps([vf.transcriptRow(), vf.recordingRow()]);
+    await expectNotFound(resolveStaffPresentationVideo({ requestId: REQUEST_ID }, deps));
+    expect(deps.resolveMediaDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['schema not ready', { presentationSchemaReady: () => false }],
+    ['request not allowed', { presentationRequestAllowed: () => false }],
+    ['hash changed', { resolveMediaDownloadUrl: videoMedia({ quickXorHash: 'qxh-2' }) }],
+    ['size changed', { resolveMediaDownloadUrl: videoMedia({ size: 1001 }) }],
+    ['no approved cut', { getApprovedVideoCut: jest.fn(async () => null) }],
+    ['not MP4', { resolveMediaDownloadUrl: videoMedia({ mimeType: 'video/webm' }) }],
+    ['wrong extension', { resolveMediaDownloadUrl: videoMedia({ filename: 'presentation-video.txt' }) }],
+    ['malware flagged', { resolveMediaDownloadUrl: videoMedia({ malware: { x: 1 } }) }],
+    ['other item resolved', { resolveMediaDownloadUrl: jest.fn(async (driveId) => ({ ...(await videoMedia()(driveId, 'video-item')), itemId: 'other' })) }],
+    ['plain-http redirect', { resolveMediaDownloadUrl: videoMedia({ downloadUrl: 'http://tenant.sharepoint.com/x' }) }],
+    ['credentialed redirect', { resolveMediaDownloadUrl: videoMedia({ downloadUrl: 'https://u:p@tenant.sharepoint.com/x' }) }],
+  ])('404 when %s', async (_label, over) => {
+    await expectNotFound(resolveStaffPresentationVideo({ requestId: REQUEST_ID }, staffDeps(bound(), over)));
+  });
+
+  test.each([
+    ['stale video (recording replaced)', () => [vf.transcriptRow(), vf.recordingRow({ wmkf_sharepointetag: 'rec-etag-2' }), vf.videoRow()]],
+    ['another producer', () => [vf.transcriptRow(), vf.recordingRow(), vf.videoRow({ wmkf_producer: 'someone-else' })]],
+  ])('404 for a %s', async (_label, makeRows) => {
+    const deps = staffDeps(makeRows());
+    await expectNotFound(resolveStaffPresentationVideo({ requestId: REQUEST_ID }, deps));
+    expect(deps.resolveMediaDownloadUrl).not.toHaveBeenCalled();
+  });
+
+  test('404 for a non-GUID request without reading anything', async () => {
+    const deps = staffDeps(bound());
+    await expectNotFound(resolveStaffPresentationVideo({ requestId: 'not-a-guid' }, deps));
+    expect(deps.findDocuments).not.toHaveBeenCalled();
   });
 });

@@ -86,6 +86,7 @@ test('derives siteVisit, materials, and suggested recipients from the logistics 
     presentationMaterialConflicts: [],
     presentationSummary: null,
     discussionSummary: null,
+    presentationVideoPlayable: false,
   }));
 });
 
@@ -110,6 +111,7 @@ test.each([
     presentationMaterialConflicts: [],
     presentationSummary: null,
     discussionSummary: null,
+    presentationVideoPlayable: false,
   }));
 });
 
@@ -132,6 +134,7 @@ test('yields empty suggestions when no visit is scheduled', async () => {
     presentationMaterialConflicts: [],
     presentationSummary: null,
     discussionSummary: null,
+    presentationVideoPlayable: false,
   }));
 });
 

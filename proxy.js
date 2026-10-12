@@ -40,6 +40,8 @@ const GRAPH_UPLOAD_ORIGIN = 'https://*.up.1drv.com';
 const PRESENTATION_UPLOAD_PAGE = /^\/meeting-tracker\/visits\/[^/]+\/?$/;
 const TRANSCRIPTION_PILOT_PAGE = /^\/admin\/transcription-pilot(?:\/|$)/;
 const PRESENTATION_MATERIALS_PAGE = /^\/external\/presentation\/[^/]+\/?$/;
+// Outside-facing and auth surfaces; every other page is a staff page.
+const NON_STAFF_PAGE = /^\/(?:external|apply|auth|api)(?:\/|$)/;
 
 const sharedAuthProxy = withAuth(
   function applyCsp(req) {
@@ -55,6 +57,7 @@ const sharedAuthProxy = withAuth(
     const isPresentationUploadPage = PRESENTATION_UPLOAD_PAGE.test(pathname);
     const isTranscriptionPilotPage = TRANSCRIPTION_PILOT_PAGE.test(pathname);
     const isPresentationMaterialsPage = PRESENTATION_MATERIALS_PAGE.test(pathname);
+    const isStaffPage = !NON_STAFF_PAGE.test(pathname);
 
     // Build CSP directives
     // Dev: Turbopack injects inline scripts without nonces, needs unsafe-inline + unsafe-eval.
@@ -103,9 +106,12 @@ const sharedAuthProxy = withAuth(
       `frame-ancestors 'none'`,
     ];
 
-    if (isPresentationMaterialsPage) {
-      // Graph's short-lived download URL for this governed drive is hosted on
-      // the canonical tenant. Other pages retain default-src 'self'.
+    if (isPresentationMaterialsPage || isStaffPage) {
+      // Graph's short-lived download URL for this governed drive is hosted on the canonical
+      // tenant. Staff pages get it app-wide because a CSP is fixed per document: a Workbench
+      // reached by client-side navigation keeps the policy of the page it started on
+      // (docs/plans/STAFF_READER_AND_VIDEO_PLAN_2026-10-11.md §5). Other outside-facing pages
+      // retain default-src 'self'.
       directives.push(`media-src 'self' ${SHAREPOINT_CANONICAL_ORIGIN}`);
     }
 
