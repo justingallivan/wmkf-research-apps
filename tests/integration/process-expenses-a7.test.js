@@ -38,8 +38,11 @@ jest.mock('../../shared/api/handlers/fileProcessor', () => ({
 }));
 
 const llmCalls = [];
+let mockConstructorError = null;
 jest.mock('../../lib/services/llm-client', () => ({
-  LLMClient: jest.fn().mockImplementation(() => ({
+  LLMClient: jest.fn().mockImplementation(() => {
+    if (mockConstructorError) throw mockConstructorError;
+    return {
     complete: jest.fn(async ({ messages }) => {
       llmCalls.push(messages);
       return {
@@ -50,11 +53,13 @@ jest.mock('../../lib/services/llm-client', () => ({
         model: 'claude-test',
       };
     }),
-  })),
+    };
+  }),
 }));
 
 beforeEach(() => {
   llmCalls.length = 0;
+  mockConstructorError = null;
   clearAppAccessCache();
   process.env.CLAUDE_API_KEY = 'sk-ant-test';
 });
@@ -97,5 +102,31 @@ describe('/api/process-expenses A7 hardening (#11)', () => {
     const textBlock = content.find((b) => b.type === 'text');
     expect(textBlock.text).toContain('UNTRUSTED CONTENT RULES:');
     expect(textBlock.text).toContain('ATTACHED IMAGE');
+  });
+});
+
+describe('/api/process-expenses error after streaming starts', () => {
+  test('sends an error frame and ends the stream instead of throwing', async () => {
+    mockConstructorError = new Error('client setup failed');
+    jest.resetModules();
+    mockAuthenticatedUser(2, ['expense-reporter']);
+    const handler = (await import('../../pages/api/process-expenses')).default;
+    const req = createMockReq({
+      method: 'POST',
+      headers: { origin: 'http://localhost:3000', host: 'localhost:3000' },
+      body: { files: [{ filename: 'receipt.pdf', url: 'https://test.public.blob.vercel-storage.com/r.pdf' }] },
+    });
+    const res = createMockRes();
+    res.writeHead = jest.fn(() => { res.headersSent = true; });
+    res.write = jest.fn();
+    res.end = jest.fn();
+
+    await expect(handler(req, res)).resolves.not.toThrow();
+
+    const frames = res.write.mock.calls.map(([chunk]) => chunk);
+    const errorFrame = frames.find((chunk) => chunk.includes('"type":"error"'));
+    expect(errorFrame).toBeDefined();
+    expect(JSON.parse(errorFrame.replace(/^data: /, '').trim()).error).toBe('Failed to process document');
+    expect(res.end).toHaveBeenCalled();
   });
 });

@@ -150,6 +150,15 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Declared outside the try so the catch can report an error after headers are sent.
+  const sendError = (error) => {
+    res.write(`data: ${JSON.stringify({
+      type: 'error',
+      error,
+      timestamp: new Date().toISOString()
+    })}\n\n`);
+  };
+
   try {
     const { files } = req.body;
 
@@ -185,14 +194,6 @@ export default async function handler(req, res) {
 
     const sendData = (data) => {
       res.write(`data: ${JSON.stringify(data)}\n\n`);
-    };
-
-    const sendError = (error) => {
-      res.write(`data: ${JSON.stringify({
-        type: 'error',
-        error,
-        timestamp: new Date().toISOString()
-      })}\n\n`);
     };
 
     const claudeClient = new LLMClient({
