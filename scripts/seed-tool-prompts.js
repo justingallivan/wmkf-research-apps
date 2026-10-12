@@ -18,7 +18,7 @@
  * version-preserving recovery publish, never an in-place overwrite. --execute requires
  * DATAVERSE_TARGET_INTERLOCK=on (same guard as seed-review-panel-prompts.js).
  */
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 
 export const PROMPTSTATUS_PUBLISHED = 682090001;
@@ -56,7 +56,12 @@ export async function loadManifestRows(appKey) {
   try {
     mod = await import(`../shared/config/prompts/${file}-dynamics.js`);
   } catch (err) {
-    if (err?.code === 'ERR_MODULE_NOT_FOUND' || err?.code === 'MODULE_NOT_FOUND' || /Cannot find module/.test(err?.message || '')) {
+    // Only a missing manifest itself means "not built yet"; a broken import inside an
+    // existing manifest must surface as-is.
+    const manifestMissing = (err?.code === 'ERR_MODULE_NOT_FOUND' || err?.code === 'MODULE_NOT_FOUND')
+      && (err?.message || '').includes(`${file}-dynamics.js`)
+      && !existsSync(new URL(`../shared/config/prompts/${file}-dynamics.js`, import.meta.url));
+    if (manifestMissing) {
       throw new Error(`No manifest for "${appKey}": shared/config/prompts/${file}-dynamics.js does not exist yet.`);
     }
     throw err;
