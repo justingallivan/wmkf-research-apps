@@ -15,10 +15,6 @@ import { AiWorkspace } from '../shared/components/admin/workspaces/AiWorkspace';
 import { TestRequestsWorkspace } from '../shared/components/admin/workspaces/TestRequestsWorkspace';
 import { PeopleWorkspace } from '../shared/components/admin/workspaces/PeopleWorkspace';
 
-export { default as DynamicsFeedbackSection } from '../shared/components/admin/DynamicsFeedbackSection';
-export { default as AppAccessSection } from '../shared/components/admin/AppAccessSection';
-export { OperationsWorkspace, WorkflowsWorkspace, AiWorkspace, PeopleWorkspace };
-
 export function WorkspaceContent({ workspace, view }) {
   switch (workspace) {
     case 'operations':

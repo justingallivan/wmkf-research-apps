@@ -12,7 +12,7 @@
  * commit.
  */
 import { fireEvent, render, screen, waitFor, act } from '@testing-library/react';
-import { PeopleWorkspace } from '../../pages/admin';
+import { PeopleWorkspace } from '../../shared/components/admin/workspaces/PeopleWorkspace';
 
 const jsonResponse = (status, body) => ({
   ok: status >= 200 && status < 300,

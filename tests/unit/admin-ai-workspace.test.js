@@ -9,7 +9,7 @@
  * each migration commit.
  */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { AiWorkspace } from '../../pages/admin';
+import { AiWorkspace } from '../../shared/components/admin/workspaces/AiWorkspace';
 
 const jsonResponse = (status, body) => ({
   ok: status >= 200 && status < 300,

@@ -11,7 +11,7 @@
  * unchanged after each migration commit.
  */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { WorkflowsWorkspace } from '../../pages/admin';
+import { WorkflowsWorkspace } from '../../shared/components/admin/workspaces/WorkflowsWorkspace';
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const partial = (text) => new RegExp(escapeRegex(text));
