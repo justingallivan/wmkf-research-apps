@@ -54,7 +54,7 @@ test('manifest table covers the five apps; unknown key or missing file errors cl
   expect(Object.keys(APP_MANIFEST_FILES).sort()).toEqual(
     ['expense-reporter', 'expertise-finder', 'funding-gap', 'literature-analyzer', 'multi-perspective']);
   await expect(loadManifestRows('nope')).rejects.toThrow(/Unknown app "nope"/);
-  await expect(loadManifestRows('expense-reporter')).rejects.toThrow(/does not exist yet/);
+  await expect(loadManifestRows('literature-analyzer')).rejects.toThrow(/does not exist yet/);
 });
 
 test('CLI exits 1 for an unknown app key without touching Dataverse', () => {
