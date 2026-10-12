@@ -10,7 +10,7 @@
  * fills; the proposal text is wrapped by the route and passed as `proposal_text`.
  * The preamble is general-form (no nonces), matching the cacheable builder.
  */
-import { buildRosterContext } from './expertise-finder';
+import { buildRosterContext } from './expertise-finder.js';
 
 const SYSTEM_TEMPLATE = `You are a scientific expertise matching system for the W.M. Keck Foundation. You analyze research proposals and match them to the most qualified internal reviewers based on deep domain expertise. Always respond with valid JSON. Never force-fit a poor match — honestly flag gaps when no roster member can evaluate a proposal's core claims.
 

@@ -13,7 +13,7 @@
  * untrusted-content preamble (general form, no nonce — stays cacheable).
  */
 
-import { buildUntrustedContentPreamble } from '../../../lib/utils/ai-payload-boundary';
+import { buildUntrustedContentPreamble } from '../../../lib/utils/ai-payload-boundary.js';
 
 /**
  * Build the roster context block from database records.
