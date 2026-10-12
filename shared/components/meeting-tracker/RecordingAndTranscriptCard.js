@@ -18,6 +18,7 @@ import OverflowMenu from '../workbench/OverflowMenu';
 import { formatTranscriptTurnTime, getTranscriptSpeakers, groupTranscriptByTurn } from '../../../lib/services/transcription-pilot/transcript-format';
 import { MAX_TRANSCRIPTION_BYTES as MAX_AUDIO_BYTES, MAX_TRANSCRIPTION_MIB } from '../../../lib/services/transcription-pilot/limits';
 import { staffReaderHref } from '../../utils/staff-reader';
+import { BLOCKING_STATUSES, PUBLISHED_FOR_JOB, isCancelledRun, isNewerMeetingTranscriptPending } from '../../utils/meeting-transcript-pending';
 
 const MP4_MAX_BYTES = 2_000_000_000;
 const TRANSCRIPT_MAX_BYTES = 25 * 1024 * 1024;
@@ -892,7 +893,6 @@ const API_PATH = '/api/meeting-tracker/visits';
 const MAX_VTT_BYTES = 4_000_000;
 const ALIGNMENT_ACTIVE = new Set(['pending', 'running']);
 const ACTIVE_STATUSES = new Set(['uploading', 'queued', 'submitting', 'processing', 'saving']);
-const BLOCKING_STATUSES = new Set(['queued', 'submitting', 'processing', 'saving']);
 function isRetiredUploading(job) {
   return job.status === 'uploading' && (job.cleanupPending === true
     || (job.expires_at != null && new Date(job.expires_at).getTime() <= Date.now()));
@@ -902,16 +902,12 @@ function isRetiredUploading(job) {
 // uncertain submission keeps its own reconcile/abandon flow.
 const IN_FLIGHT_STATUSES = new Set(['processing', 'saving']);
 const canCancelRun = (job) => (job?.status === 'queued' || IN_FLIGHT_STATUSES.has(job?.status)) && job.cleanupPending !== true;
-// A cancelled queued run stays 'queued' until its audio is cleaned up, which can take days for an uploaded file. It no
-// longer blocks a new transcription.
-const isCancelledRun = (job) => job?.status === 'queued' && job.cleanupPending === true;
 // A cancelled in-flight run keeps holding the server slot until the worker deletes the provider copy and the run turns
 // 'failed' (usually the next wake), so it keeps blocking and shows as Cancelling.
 const isCancellingRun = (job) => IN_FLIGHT_STATUSES.has(job?.status) && job.cleanupPending === true;
 const CANCEL_CONFIRM = 'Cancel this transcription? The audio file you chose for it is deleted, so you will need to choose it again to start over. A published transcript is not affected.';
 const CANCEL_IN_FLIGHT_CONFIRM = 'Cancel this transcription? It is already with the transcription service, which may still finish it, and it may still be billed. The audio file you chose for it is deleted, so you will need to choose it again to start over. A published transcript is not affected.';
 const UNRESOLVED_PUBLICATION = new Set(['publishing', 'retryable', 'unknown', 'published_reconcile']);
-const PUBLISHED_FOR_JOB = new Set(['published', 'published_reconcile', 'unknown']);
 const ALIGNMENT_REASONS = {
   abstained: 'The Zoom captions did not match the speakers confidently. Name them by hand.',
   no_speakers: 'The Zoom captions have no speaker labels.',
@@ -1397,17 +1393,9 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFR
   const focusJob = (focusId && jobs.find((job) => job.id === focusId)) || newestJob;
   const focusPublished = Boolean(focusJob) && publications.some((row) => row.inputJobId === focusJob.id && PUBLISHED_FOR_JOB.has(row.state));
   const showReview = Boolean(focusJob) && (focusId === focusJob.id || !focusPublished);
-  // A newer transcript is on its way: a run still transcribing (not being cancelled), or an unpublished ready run,
-  // newer than the latest published run, whose content can still be reviewed. While one exists, editing the
-  // published transcript would open the older one, so every edit entry point is gated here (queue: "Old-transcript
-  // edit buttons look current"; Codex review rounds 1-2, redesign commit 3). This does not depend on which run is
-  // focused for review, and a discarded, expired, purged or unreadable run never blocks.
-  const isPublishedJob = (job) => publications.some((row) => row.inputJobId === job.id && PUBLISHED_FOR_JOB.has(row.state));
-  const latestPublishedAt = jobs.filter(isPublishedJob).map((job) => String(job.created_at || '')).sort().pop() || '';
-  const reviewableReady = (job) => job.status === 'ready' && job.contentAccessAllowed === true && !job.cleanup_requested_at
-    && !job.content_purged_at && job.cleanupPending !== true;
-  const newerTranscriptPending = jobs.some((job) => BLOCKING_STATUSES.has(job.status) && !isCancelledRun(job) && job.cleanupPending !== true)
-    || jobs.some((job) => reviewableReady(job) && !isPublishedJob(job) && String(job.created_at || '') > latestPublishedAt);
+  // While a newer transcript is on its way, editing the published transcript would open the older one, so every edit
+  // entry point is gated here; createMeetingCorrection refuses on the server with the same rule.
+  const newerTranscriptPending = isNewerMeetingTranscriptPending({ jobs, publications });
   const selectedJob = focusJob && detail?.job?.id === focusJob.id ? detail.job : focusJob;
   const correction = correctionDetail?.correction || null;
   const content = correction ? correctionDetail.content : detail?.job?.id === focusJob?.id ? detail?.content : null;

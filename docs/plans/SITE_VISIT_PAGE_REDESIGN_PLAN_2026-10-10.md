@@ -637,7 +637,7 @@ regression tests. Round 2 approved with no material findings. As built, with the
   block forever. Two regression tests: focus switch stays blocked (fails with the
   focus-based check), and an older unpublished run does not block. The server's
   `createMeetingCorrection` checks only the current artifact; Codex noted it, and it stays
-  a UI gate in this build.
+  a UI gate in this build. (Historical: closed by the server guard in §10, 2026-10-11.)
 - **Codex round 3 (needs-attention, one medium):** the card Refresh did not re-read summary
   drafts, so a draft created, edited or discarded in another session stayed unseen. Now,
   after the collection reload settles, the card bumps a token that `useSummaryKind` turns
@@ -824,8 +824,11 @@ an uploaded transcript gets Open without downloads.
   streaming the review video instead of downloading it.
 - **Not converged:** the underlined `BTN_LINK` text actions (no text-link variant in
   `Button`).
-- **Server-side gap noted by Codex (commit 3):** `createMeetingCorrection` does not refuse
-  while a newer transcription is pending; the gate is UI-only.
+- **[BUILT 2026-10-11, branch `claude/correction-newer-pending-gate`]** Server-side gap noted by Codex
+  (commit 3): `createMeetingCorrection` now refuses with `409 meeting_transcript_newer_pending` while a
+  newer transcription is pending. The rule lives in `shared/utils/meeting-transcript-pending.js` and the
+  card's edit gate uses the same function, so the two cannot drift. Still UI-only: loading, saving or
+  publishing an existing correction draft (the card's saved-draft path) does not re-check the rule.
 
 - **Accepted gap (owner, 2026-10-11):** Board readiness after a recording save whose materials reload
   fails (§9.6, Codex round 6). Fix if it is ever seen: after a confirmed recording save, show the video

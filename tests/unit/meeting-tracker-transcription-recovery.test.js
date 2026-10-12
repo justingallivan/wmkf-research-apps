@@ -14,7 +14,7 @@ jest.mock('../../lib/services/post-presentation-materials/slot-lease-store.js', 
 jest.mock('../../lib/services/meeting-tracker-transcription/binding.js', () => ({
   loadMeetingTranscriptionBinding: jest.fn(), getMeetingTranscriptionCandidates: jest.fn(),
 }));
-jest.mock('../../lib/services/transcription-pilot/runtime.js', () => ({ getMeetingTranscriptionJobContent: jest.fn() }));
+jest.mock('../../lib/services/transcription-pilot/runtime.js', () => ({ getMeetingTranscriptionJobContent: jest.fn(), projectMeetingTranscriptionJob: jest.fn() }));
 jest.mock('../../lib/services/transcription-pilot/provider.js', () => ({}));
 jest.mock('../../lib/services/transcription-pilot/workflow-dispatch.js', () => ({}));
 jest.mock('../../lib/services/transcription-pilot/store.js', () => Object.fromEntries([
@@ -24,6 +24,7 @@ jest.mock('../../lib/services/transcription-pilot/store.js', () => Object.fromEn
   'markMeetingTranscriptPublicationChecked', 'closeMeetingPublicationAfterQuarantine',
   'getMeetingTranscriptionJob', 'freezeMeetingPublicationFromJob', 'freezeMeetingTranscriptCorrectionDraft',
   'closeMeetingPublicationWithoutWrites', 'closeMeetingPublicationJobLease', 'createMeetingTranscriptCorrectionDraft',
+  'listMeetingTranscriptionJobs', 'listMeetingTranscriptPublications',
 ].map(name => [name, jest.fn()])));
 
 import { getZoomImportForJob } from '../../lib/services/meeting-tracker-recordings/import-store';
@@ -49,6 +50,8 @@ const oldEnv = { access: process.env.MEETING_TRACKER_TRANSCRIPTION_ACCESS,
   bundle: process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY };
 beforeEach(() => {
   jest.resetAllMocks();
+  store.listMeetingTranscriptionJobs.mockResolvedValue([]);
+  store.listMeetingTranscriptPublications.mockResolvedValue([]);
   process.env.MEETING_TRACKER_TRANSCRIPTION_ACCESS = 'on';
   process.env.MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY = 'on';
   process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = 'on';

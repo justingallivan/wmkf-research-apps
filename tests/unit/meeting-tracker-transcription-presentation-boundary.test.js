@@ -24,6 +24,7 @@ import { GraphService } from '../../lib/services/graph-service.js';
 import * as publisher from '../../lib/services/post-presentation-materials/material-service.js';
 import * as binding from '../../lib/services/meeting-tracker-transcription/binding.js';
 import * as store from '../../lib/services/transcription-pilot/store.js';
+import * as runtime from '../../lib/services/transcription-pilot/runtime.js';
 import { buildMeetingTranscriptFiles, buildMeetingTranscriptManifest } from '../../lib/services/meeting-tracker-transcription/bundle.js';
 import { presentationTranscriptGenerationKey, staffDiscussionTranscriptGenerationKey, transcriptSummaryBindingFingerprint,
   staffDiscussionSummaryBindingFingerprint } from '../../lib/services/post-presentation-materials/presentation-transcript-binding.js';
@@ -67,6 +68,8 @@ function transcriptRowFor(files, bundle) {
 
 beforeEach(() => {
   jest.resetAllMocks();
+  store.listMeetingTranscriptionJobs.mockResolvedValue([]);
+  store.listMeetingTranscriptPublications.mockResolvedValue([]);
   process.env.MEETING_TRACKER_TRANSCRIPTION_ACCESS = 'on';
   process.env.MEETING_TRACKER_TRANSCRIPTION_SCHEMA_READY = 'on';
   process.env.MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY = 'on';
@@ -289,5 +292,46 @@ describe('overview currentArtifact', () => {
     const overview = await getMeetingTranscriptionOverview({ requestId, ownerProfileId: 12 });
     expect(documents.findByRequest).toHaveBeenCalledWith(requestId, { includeMeetingTranscriptBundle: true });
     expect(overview.currentArtifact.id).toBe(artifactId);
+  });
+});
+
+describe('correction create refuses while a newer transcript is pending (server mirror of the card gate)', () => {
+  // Raw store rows through the real job projection: Date created_at and snake_case cleanup fields, as Postgres returns them.
+  const { projectMeetingTranscriptionJob: realProjection } = jest.requireActual('../../lib/services/transcription-pilot/runtime.js');
+  const publishedJobId = '88888888-8888-4888-8888-888888888888';
+  const newerJobId = '99999999-9999-4999-8999-999999999999';
+  const job = (overrides) => ({ id: newerJobId, status: 'ready', created_at: new Date('2026-10-05T10:00:00Z'),
+    output_pathname: 'out.json', cleanup_requested_at: null, local_cleanup_completed_at: null, content_purged_at: null,
+    expires_at: null, ...overrides });
+  const publishedJob = job({ id: publishedJobId, created_at: new Date('2026-10-04T10:00:00Z') });
+  const published = { operation_id: revisionId, state: 'published', input_job_id: publishedJobId };
+
+  beforeEach(() => {
+    runtime.projectMeetingTranscriptionJob.mockImplementation(realProjection);
+    store.listMeetingTranscriptPublications.mockResolvedValue([published]);
+    store.createMeetingTranscriptCorrectionDraft.mockResolvedValue({ operation_id: draftId });
+    store.getMeetingTranscriptPublication.mockResolvedValue(draft());
+  });
+
+  test.each([
+    ['a run still transcribing', job({ status: 'processing', output_pathname: null })],
+    ['an unpublished reviewable ready run newer than the published one', job()],
+  ])('refuses with %s', async (_label, pending) => {
+    store.listMeetingTranscriptionJobs.mockResolvedValue([pending, publishedJob]);
+    await expect(createMeetingCorrection({ requestId, ownerProfileId: 12, artifactId }))
+      .rejects.toMatchObject({ code: 'meeting_transcript_newer_pending', httpStatus: 409 });
+    expect(store.createMeetingTranscriptCorrectionDraft).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['a cancelled queued run', job({ status: 'queued', output_pathname: null, cleanup_requested_at: new Date('2026-10-05T11:00:00Z') })],
+    ['an unpublished ready run older than the published one', job({ created_at: new Date('2026-10-03T10:00:00Z') })],
+    ['a ready run whose content was purged', job({ content_purged_at: new Date('2026-10-05T11:00:00Z') })],
+    ['a ready run with no readable output', job({ output_pathname: null })],
+    ['only the published run', publishedJob],
+  ])('allows with %s', async (_label, other) => {
+    store.listMeetingTranscriptionJobs.mockResolvedValue(other === publishedJob ? [publishedJob] : [other, publishedJob]);
+    await createMeetingCorrection({ requestId, ownerProfileId: 12, artifactId });
+    expect(store.createMeetingTranscriptCorrectionDraft).toHaveBeenCalled();
   });
 });
