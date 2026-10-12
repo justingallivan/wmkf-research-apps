@@ -18,7 +18,9 @@ related:
 # AI tool apps → Executor convergence — staged plan
 
 Candidate **A** from `LARGEST_UNPLANNED_REFACTOR_SCOPE_2026-10-11.md`. Source baseline `origin/main`
-`b3135037c`. Status: **draft — not authorized.** Tier 2 runtime work: branch per stage, PR, owner
+`b3135037c`. Status: **draft — not authorized.** **2026-10-12 owner decisions (§8) replace the
+Executor approach with the prompt-resolver seam for every call; §§0–7 below still describe the original
+Executor design and are pending a rewrite.** Tier 2 runtime work: branch per stage, PR, owner
 promotion; every stage also needs Dataverse prompt rows seeded in Preview and Production by the
 owner-run seed script (a Dataverse write; `DATAVERSE_TARGET_INTERLOCK` applies).
 
@@ -275,3 +277,25 @@ tests from Stage 7; no visual redesign (Impeccable review is a separate ask).
   `sendError` `ReferenceError` recorded as a latent bug; five (not three) `llm-client` module-mock tests;
   matrix side-effects column; several line citations. Verdict after corrections: ready for owner review;
   **Stage 0 cannot start without D7**.
+- 2026-10-12: **Owner decisions (review with Claude, Session 598).**
+  - **D7 — adopted, narrowed:** staff editability is a sufficient trigger for moving a prompt into
+    Dataverse (alongside cross-surface sharing). Migration stays per-prompt, not a blanket sweep.
+    Context: the owner reports most of the five apps are rarely used; the value is editing prompts
+    and models without a redeploy.
+  - **Approach changed — no Executor.** Every call (not only the three multimodal ones) uses the
+    prompt-resolver seam that Reviewer Finder has used since S222 (`lib/services/reviewer-prompt-resolver.js`):
+    prompt text read from the current Dataverse row, transient Dataverse error → bundled template,
+    0 / >1 current rows → fail loud; the route keeps its own `LLMClient` call and its A7 wrapping.
+    The resolver is reviewer-finder-specific today, so a generalized helper is new work.
+  - **D8 — model lives on the row:** the app reads its model from the same row as its prompt, so the
+    model stays visible and editable in `/admin` → Prompt Templates; these apps leave the Model Config
+    section so there is never a second setting. Owner: a model that is not visible in `/admin` is too
+    easy to lose track of.
+  - **D4 — no fallback model** (vision model = the row's model). Today's transport retries are not
+    changed by this decision.
+  - **D3 moot** (no `wmkf_ai_run` rows: the seam does not use the Executor). **D2 moot** (every call
+    uses the seam). **D9 largely moot** (route-built A7 framing is unchanged).
+  - **Still open:** D1 scope and order (which apps first), D5 streaming unification, D6 page shell,
+    whether the row's `maxTokens`/`temperature` are honored like the model (proposed: yes, so no
+    row field is silently ignored). The two latent bugs (expense-reporter `sendError`, funding-gap page
+    swallowing error frames) are to be fixed separately, independent of this plan.

@@ -170,8 +170,10 @@ hangs off events and state transitions:
      which live in **three places** per the A7 surface taxonomy: `shared/config/prompts/`,
      route-local, and service-local (e.g. the since-archived `panel-review-service.js`). **Prompt migration is a named workstream, not a background detail.**
      Migration is **demand-driven**: a prompt moves to Dataverse when it becomes **shared** (a second
-     caller, esp. PA). *(Open fork: does staff-editability* also *force a Dataverse home, or only
-     cross-surface sharing? — unresolved.)* The live application-definition count is
+     caller, esp. PA) **or when the owner wants staff to edit it (and its model) without a redeploy**
+     — owner decision 2026-10-12, recorded in
+     `docs/plans/AI_TOOL_APPS_EXECUTOR_CONVERGENCE_PLAN_2026-10-11.md` §8. Editability alone does not
+     require the Executor; it may use the prompt-resolver seam. The live application-definition count is
      [12](CANONICAL_COUNTS.md#app-definition-count); do not copy that scalar into prose without the
      canonical pointer.
 2. **Identity & access scoping** — who sees what (per-app grants, active-user checks, superuser;
@@ -372,7 +374,6 @@ artifact — see "Open / deferred").
 
 ## Open / deferred
 
-- Staff-editability vs. cross-surface-sharing as the prompt→Dataverse trigger (fork, unresolved).
 - Promotion governance (Postgres→Dataverse).
 - Executor release-ordering / rollback ownership across runtimes.
 - The dependency/**sequencing** pass (the original goal) — do after persist + drift reconcile.
