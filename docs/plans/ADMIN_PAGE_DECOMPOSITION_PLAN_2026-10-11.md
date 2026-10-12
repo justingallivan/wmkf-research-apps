@@ -313,4 +313,16 @@ before trying it (`admin-view-coverage` covers first render only).
   once `UsageSection` moved — `import Layout from '../shared/components/Layout'`. Opus could not run
   `next build` in its temp worktree (Turbopack rejects a symlinked `node_modules`); the orchestrator ran
   `npm run build` in the build worktree after the fix instead.
+- 2026-10-11: **Stages 3–4 built** (Sonnet, one dispatch, seven commits `9c7dc03d7`..`55be9922c`):
+  Stage 3 Honorarium / ReviewerReleaseAttachments / ReviewerCampaignTimeline / ReviewerTimeBudget;
+  Stage 4 RoleManagement (+`ROLE_OPTIONS`), AppAccess (named re-export kept), DynamicsIdentity.
+  `pages/admin.js` 1,762 → 629. The page no longer imports `api-request` or `APP_REGISTRY` (both
+  moved with their last users; use counts proven per commit). The four Workflows `*_DATAVERSE_FIELDS`
+  constants stay with `WorkflowsWorkspace`. Gates green at every commit; `npm run build` at HEAD run by the
+  orchestrator: exit 0.
+- 2026-10-11: **Stages 3–4 review (Opus, fresh context): APPROVE, no findings.** Full multiset check:
+  1,139 non-import lines removed from the page = 1,139 added across the 7 files; each file a contiguous
+  byte-identical baseline run; per-commit suite green at 9c7dc03d7, a7c7f38e8, 44296dc02; amended commit
+  carries no leftovers. Only standing note: `useRef` (baseline-unused) — the orchestrator rules that Stage 5,
+  which rewrites the page's import block anyway, drops it, and records that here as a deliberate call.
 
