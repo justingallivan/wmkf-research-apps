@@ -31,3 +31,23 @@ test('a variable value containing {{x}} is not re-expanded and is not an unfille
   expect(composeToolPrompt('A {{a}} B {{x}}', { a: 'see {{x}}', x: 'REAL' })).toBe('A see {{x}} B REAL');
   expect(composeToolPrompt('A {{a}}', { a: 'literal {{x}}' })).toBe('A literal {{x}}');
 });
+
+describe('reserved {{a7_preamble}} slot', () => {
+  test('is substituted in place and not prepended', () => {
+    const out = composeToolPrompt('Intro\n\n{{a7_preamble}}\n\nTask {{v}}', { v: 'X' }, { nonces: ['n1'] });
+    expect(out).toBe(`Intro\n\n${buildUntrustedContentPreamble(['n1'])}\n\nTask X`);
+    expect(out.startsWith('Intro')).toBe(true);
+  });
+  test('empty nonce array still fills the slot', () => {
+    expect(composeToolPrompt('A\n\n{{a7_preamble}}\n\nB', {}, { nonces: [] }))
+      .toBe(`A\n\n${buildUntrustedContentPreamble([])}\n\nB`);
+  });
+  test('null nonces with a slot throws', () => {
+    expect(() => composeToolPrompt('A {{a7_preamble}}', {}, { nonces: null })).toThrow(/a7_preamble/);
+    expect(() => composeToolPrompt('A {{a7_preamble}}', {})).toThrow(/a7_preamble/);
+  });
+  test('caller-supplied a7_preamble throws', () => {
+    expect(() => composeToolPrompt('A {{a7_preamble}}', { a7_preamble: 'x' }, { nonces: [] })).toThrow(/reserved/);
+    expect(() => composeToolPrompt('A', { a7_preamble: 'x' }, { nonces: [] })).toThrow(/reserved/);
+  });
+});
