@@ -42,8 +42,8 @@ function route(handlers = {}) {
   });
 }
 const getCount = () => global.fetch.mock.calls.filter(([url, o]) => String(url).endsWith('/presentation-video-splits') && (o?.method || 'GET') === 'GET').length;
-async function renderLine() {
-  const view = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+async function renderLine(props = {}) {
+  const view = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} {...props} />);
   await screen.findByText(/Presentation ends at/);
   return view;
 }
@@ -497,3 +497,83 @@ describe('Board readiness of the video follows the recording too (Codex round 5,
     await waitFor(() => expect(screen.getByTestId('board-readiness-video')).toHaveTextContent('Status unknown'));
   });
 });
+
+describe('the page header status report matches the Board materials list (redesign §10 header chip)', () => {
+  const LABEL_KEY = { 'On the Board page': 'on', 'Not yet': 'not_yet', 'Status unknown': 'unknown' };
+  const shownKeys = () => ['board-readiness-transcript', 'board-readiness-summary', 'board-readiness-video']
+    .map((id) => screen.queryByTestId(id)).filter(Boolean)
+    .map((row) => Object.entries(LABEL_KEY).find(([label]) => row.textContent.includes(label))?.[1]);
+  test.each([
+    ['served', { status: 'bound' }, [split({ state: 'approved', boardReady: true })]],
+    ['out of date', { status: 'stale' }, [split({ state: 'approved', boardReady: false })]],
+    ['unknown', { status: 'unknown' }, [split({ state: 'approved', boardReady: null })]],
+  ])('with the video %s, the reported lines are the shown lines', async (_l, boardVideo, splits) => {
+    route({ state: { splits: { available: true, splits, boardVideo } } });
+    const onStatusChange = jest.fn();
+    await renderLine({ onStatusChange });
+    await readinessVideo();
+    await waitFor(() => expect(onStatusChange.mock.calls.at(-1)[0].board).toEqual(shownKeys()));
+    expect(onStatusChange.mock.calls.at(-1)[0]).toMatchObject({ available: true, hasTranscript: true });
+    expect(shownKeys()).toHaveLength(3);
+  });
+
+  test('with the video feature off, only the two shown lines are reported', async () => {
+    route({ state: { splits: { available: false, splits: [] } } });
+    const onStatusChange = jest.fn();
+    await renderLine({ onStatusChange });
+    await waitFor(() => expect(getCount()).toBeGreaterThan(0));
+    await waitFor(() => expect(onStatusChange.mock.calls.at(-1)[0].board).toEqual(shownKeys()));
+    expect(shownKeys()).toHaveLength(2);
+  });
+
+  test('before the first video read settles, the report says pending so the chip waits', async () => {
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    route({ state: { splits: async () => { await gate; return response({ available: true, splits: [split({ state: 'approved', boardReady: true })], boardVideo: { status: 'bound' } }); } } });
+    const onStatusChange = jest.fn();
+    await renderLine({ onStatusChange });
+    await waitFor(() => expect(onStatusChange).toHaveBeenCalled());
+    expect(onStatusChange.mock.calls.at(-1)[0].board).toContain('pending');
+    release();
+    await waitFor(() => expect(onStatusChange.mock.calls.at(-1)[0].board).not.toContain('pending'));
+  });
+
+  test('a refresh whose materials read fails reports unknown while the cached rows stay, and recovers on the next success (Codex review)', async () => {
+    route({ state: { splits: { available: true, splits: [split({ state: 'approved', boardReady: true })], boardVideo: { status: 'bound' } } } });
+    const base = global.fetch;
+    let failMaterials = false;
+    global.fetch = jest.fn(async (url, options = {}) => {
+      if (failMaterials && String(url).endsWith('/presentation-materials')) return response({ error: 'down' }, 500);
+      return base(url, options);
+    });
+    const onStatusChange = jest.fn();
+    await renderLine({ onStatusChange });
+    await readinessVideo();
+    await waitFor(() => expect(onStatusChange.mock.calls.at(-1)[0]).toMatchObject({ available: true, board: shownKeys() }));
+    failMaterials = true;
+    fireEvent.click(screen.getByTestId('card-refresh'));
+    await waitFor(() => expect(onStatusChange.mock.calls.at(-1)[0]).toEqual({ available: false, hasTranscript: false, board: [] }));
+    expect(screen.getByTestId('board-readiness-transcript')).toBeInTheDocument();
+    failMaterials = false;
+    fireEvent.click(screen.getByTestId('card-refresh'));
+    await waitFor(() => expect(onStatusChange.mock.calls.at(-1)[0]).toMatchObject({ available: true, board: shownKeys() }));
+  });
+
+  test('a failed first video read reports unknown, not a missing line, and recovers once a read succeeds (Codex round 2)', async () => {
+    let failSplits = true;
+    route({ state: { splits: () => (failSplits ? response({ error: 'down' }, 500)
+      : response({ available: true, splits: [split({ state: 'approved', boardReady: true })], boardVideo: { status: 'bound' } })) } });
+    const onStatusChange = jest.fn();
+    await renderLine({ onStatusChange });
+    await waitFor(() => expect(getCount()).toBeGreaterThan(0));
+    // Once the transcript and summary lines have settled, the only unknown entry is the unread video.
+    await waitFor(() => expect(onStatusChange.mock.calls.at(-1)[0].board).toEqual([...shownKeys(), 'unknown']));
+    expect(shownKeys()).not.toContain('unknown');
+    expect(screen.queryByTestId('board-readiness-video')).not.toBeInTheDocument();
+    failSplits = false;
+    fireEvent.click(screen.getByTestId('card-refresh'));
+    await readinessVideo();
+    await waitFor(() => expect(onStatusChange.mock.calls.at(-1)[0].board).toEqual(shownKeys()));
+  });
+});
+const readinessVideo = () => screen.findByTestId('board-readiness-video');

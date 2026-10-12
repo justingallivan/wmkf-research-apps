@@ -73,7 +73,7 @@ function UploadJobNotice({ jobs, programCoordinator }) {
   );
 }
 
-export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
+export default function SiteVisitMaterialsCard({ requestId, requestNumber, onStatusChange }) {
   const [collection, setCollection] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -81,6 +81,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
   const [notice, setNotice] = useState(null);
   const [emailFeedback, setEmailFeedback] = useState(null);
   const [unavailable, setUnavailable] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [composerAction, setComposerAction] = useState(null);
   const generationRef = useRef(0);
@@ -106,8 +107,10 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
       if (resStatus === 503) { setUnavailable(true); return; }
       if (!resOk) throw new Error(body.error || 'The materials collection could not be loaded.');
       setCollection(body.collection || null);
+      setLoadFailed(false);
       setError(null);
     } catch (loadError) {
+      if (mountedRef.current && generation === generationRef.current && loadGeneration === loadGenerationRef.current) setLoadFailed(true);
       if (mountedRef.current && generation === generationRef.current && loadGeneration === loadGenerationRef.current) setError(`${loadError.message} Please try again. If the problem continues, contact an administrator.`);
     } finally {
       if (mountedRef.current && generation === generationRef.current && loadGeneration === loadGenerationRef.current) setLoading(false);
@@ -118,6 +121,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
     generationRef.current += 1;
     setCollection(null);
     setUnavailable(false);
+    setLoadFailed(false);
     setError(null);
     setEmailFeedback(null);
     setBusy(false);
@@ -195,7 +199,6 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
   const setUploadBlocked = useCallback((slot, blocked) => {
     setBlockedUploads((current) => (Boolean(current[slot]) === blocked ? current : { ...current, [slot]: blocked }));
   }, []);
-  if (unavailable) return null;
 
   const seenEmails = new Set();
   const contacts = collection ? ['pi', 'liaison'].map((role) => collection.contacts?.[role]).filter((person) => {
@@ -220,10 +223,20 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
     : uploadJobs.filter((job) => job?.status === 'needs_attention').length;
   const hasBlockingJobs = processingCount > 0 || attentionCount > 0
     || uploadJobs.some((job) => BLOCKING_UPLOAD_STATUSES.has(job?.status));
-  const collectionStateCopy = collection?.state === 'closed' ? STATE_COPY.closed
-    : attentionCount > 0 || collection?.state === 'needs_attention' ? STATE_COPY.needs_attention
-      : processingCount > 0 || collection?.state === 'processing' ? STATE_COPY.processing
-        : STATE_COPY[collection?.state] || 'Materials status is unavailable.';
+  // One state key drives the heading copy and the page header's status chip, so the two cannot disagree.
+  const collectionStateKey = collection?.state === 'closed' ? 'closed'
+    : attentionCount > 0 || collection?.state === 'needs_attention' ? 'needs_attention'
+      : processingCount > 0 || collection?.state === 'processing' ? 'processing'
+        : STATE_COPY[collection?.state] ? collection.state : null;
+  const collectionStateCopy = STATE_COPY[collectionStateKey] || 'Materials status is unavailable.';
+  const reportedKey = unavailable || loadFailed ? 'unavailable' : loading && !collection ? null
+    : !collection || (collectionStateKey === 'missing' && !collection.invitedAt) ? 'not_requested'
+      : collectionStateKey || 'unavailable';
+  const reportedOverdue = collection?.overdue === true;
+  useEffect(() => {
+    if (onStatusChange && reportedKey) onStatusChange({ key: reportedKey, overdue: reportedOverdue });
+  }, [onStatusChange, reportedKey, reportedOverdue]);
+  if (unavailable) return null;
 
   return (
     <section className="mt-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm" data-testid="site-visit-materials-card">

@@ -5,7 +5,7 @@
  */
 import OverflowMenu from '../workbench/OverflowMenu';
 
-const STATUS_TONES = Object.freeze({
+export const STATUS_TONES = Object.freeze({
   green: 'bg-green-50 text-green-800',
   amber: 'bg-amber-50 text-amber-900',
   blue: 'bg-blue-50 text-blue-800',

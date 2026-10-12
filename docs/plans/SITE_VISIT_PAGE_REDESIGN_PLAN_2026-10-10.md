@@ -741,7 +741,7 @@ UI change was needed; a saved attribution is unaffected.
   state the page does not hold: the materials collection state from its card and Board
   readiness from the Results rows, including the video line's own fetch. Building it means
   lifting that state or adding reads. A partial chip would contradict the cards it
-  summarizes, so this build leaves it out.
+  summarizes, so this build leaves it out. (Historical: built later the same day by lifting each card's reported state; see §10.)
 - **Codex round 1 for commit 7 (needs-attention, one medium):** the identity survived
   client-side navigation between visits, and loads were unguarded. The identity is now
   stored with its request id, and stale loads drop their state, error and loading updates.
@@ -818,7 +818,30 @@ an uploaded transcript gets Open without downloads.
 
 - **[DONE]** Owner desktop check on a real request (localhost, 2026-10-11; findings in §10.1) and
   merge (owner, 2026-10-11; `c574e9e7d`, Production deployment Ready).
-- **Open design item:** the header status chip (§9.6 commit 7).
+- **[SHIPPED 2026-10-12; owner desktop check passed on 1003222 (Board page ready)]** Header status chip
+  (§9.6 commit 7). Owner chose to lift the state (each card reports what it already shows; the editor does not
+  re-fetch). Resolver `shared/utils/site-visit-header-status.js`; the Board list and the chip share
+  `resolveBoardReadiness`. Codex: round 1 (a failed recording refresh with cached data kept reporting) and round 2
+  (a failed first video read dropped the video line) fixed with regressions; round 3 approve. Mapping, first
+  unfinished stage wins (owner decisions 2026-10-11 for the rows marked *):
+
+  | Input (as the card shows it) | Chip |
+  | --- | --- |
+  | Either card has not reported yet, or the video readiness line is still loading | no chip |
+  | Materials: load failed, or materials unavailable for the request* | Status unknown (gray) |
+  | Materials: no collection, or a collection whose invitation was never sent | Materials not requested (gray) |
+  | Materials: waiting on the applicant | Waiting on materials (gray; amber when overdue) |
+  | Materials: saving an upload* | Waiting on materials (gray) |
+  | Materials: an upload needs attention, or every item is in and the files need checking* | Materials need attention (amber) |
+  | Materials: ready, or closed (contributor link expired)* | next stage |
+  | Recording card: unavailable for the request or its load failed* | Status unknown (gray) |
+  | No meeting transcript (the TRANSCRIPT artifact step 1 uses; survives the Stage 5 recording deletion)* | No recording yet (gray) |
+  | Any shown Board readiness line is "Status unknown"* | Status unknown (gray) |
+  | Any shown Board readiness line is "Not yet" | Board page incomplete (amber) |
+  | Every shown Board readiness line is "On the Board page" (the video line counts only when it is shown) | Board page ready (green) |
+
+  The materials key follows the card's own heading precedence (closed, then needs attention, then saving), not the
+  tracker list's classifier, so the chip cannot contradict the card.
 - **Server slices C1-C3 (§6), not started:** automatic split-transcript generation after a
   publish with a confirmed end; the real reason a presentation video was superseded; and
   streaming the review video instead of downloading it.
