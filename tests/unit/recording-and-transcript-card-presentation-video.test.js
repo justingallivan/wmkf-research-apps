@@ -565,7 +565,10 @@ describe('the page header status report matches the Board materials list (redesi
       : response({ available: true, splits: [split({ state: 'approved', boardReady: true })], boardVideo: { status: 'bound' } })) } });
     const onStatusChange = jest.fn();
     await renderLine({ onStatusChange });
-    await waitFor(() => expect(onStatusChange.mock.calls.at(-1)?.[0].board).toContain('unknown'));
+    await waitFor(() => expect(getCount()).toBeGreaterThan(0));
+    // Once the transcript and summary lines have settled, the only unknown entry is the unread video.
+    await waitFor(() => expect(onStatusChange.mock.calls.at(-1)[0].board).toEqual([...shownKeys(), 'unknown']));
+    expect(shownKeys()).not.toContain('unknown');
     expect(screen.queryByTestId('board-readiness-video')).not.toBeInTheDocument();
     failSplits = false;
     fireEvent.click(screen.getByTestId('card-refresh'));
