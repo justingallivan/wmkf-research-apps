@@ -2,10 +2,16 @@ import { requireAcceptedLlmResponse } from '../../lib/utils/llm-response';
 import { LLMClient } from '../../lib/services/llm-client';
 import { createFileProcessor } from '../../shared/api/handlers/fileProcessor';
 import { nextRateLimiter } from '../../shared/api/middleware/rateLimiter';
-import { createFundingExtractionPrompt, createFundingAnalysisPrompt } from '../../shared/config/prompts/funding-gap-analyzer';
+import {
+  FUNDING_GAP_EXTRACT_ROW,
+  FUNDING_GAP_ANALYZE_ROW,
+  buildFundingExtractVariables,
+  buildFundingAnalyzeVariables,
+} from '../../shared/config/prompts/funding-gap-dynamics';
+import { resolveToolPrompt, toolPromptUnavailable } from '../../lib/services/tool-prompt-resolver';
+import { composeToolPromptPair } from '../../lib/services/tool-prompt-composer';
 import { queryNSFforPI, queryNSFforKeywords, queryNIHforPI, queryNIHforKeywords, queryUSASpending, formatCurrency, formatDate } from '../../lib/fundingApis';
-import { BASE_CONFIG, getModelForApp } from '../../shared/config/baseConfig';
-import { loadModelOverrides } from '../../lib/services/model-override-loader';
+import { BASE_CONFIG } from '../../shared/config/baseConfig';
 import { requireAppAccess } from '../../lib/utils/auth';
 import { fetchPublicBlob } from '../../lib/utils/public-blob-fetch';
 import {
@@ -40,7 +46,6 @@ export default async function handler(req, res) {
   // Require authentication + app access
   const access = await requireAppAccess(req, res, 'funding-gap-analyzer');
   if (!access) return;
-  await loadModelOverrides();
 
   // Apply rate limiting
   const rateLimitResult = await rateLimiter(req, res);
@@ -65,6 +70,21 @@ export default async function handler(req, res) {
 
     const userProfileId = access.profileId;
 
+    // Resolve both prompt rows once per request, before streaming starts, so a
+    // missing/ambiguous row is a plain 503 JSON instead of per-file error results.
+    const extractRow = await resolveToolPrompt(FUNDING_GAP_EXTRACT_ROW.promptName, FUNDING_GAP_EXTRACT_ROW);
+    const analyzeRow = await resolveToolPrompt(FUNDING_GAP_ANALYZE_ROW.promptName, FUNDING_GAP_ANALYZE_ROW);
+
+    // Compose + send with the resolved model/max tokens. Request shape matches
+    // today's: the composed body is the single user message; a system prompt is
+    // sent only if an /admin edit made one non-empty.
+    const compose = (row, { variables, nonces }) =>
+      composeToolPromptPair({ systemPrompt: row.systemPrompt, body: row.body }, variables, { nonces });
+    const requestShape = (composed) => ({
+      ...(composed.systemPrompt ? { system: composed.systemPrompt } : {}),
+      messages: [{ role: 'user', content: composed.body }],
+    });
+
     // Set headers for streaming response
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -79,12 +99,15 @@ export default async function handler(req, res) {
       console.log('Progress:', message);
     };
 
-    const claudeClient = new LLMClient({
+    // LLMClient binds the model at construction; the two rows may name different models.
+    const clientFor = (row) => new LLMClient({
       apiKey,
-      model: getModelForApp('funding-analysis'),
+      model: row.model,
       appName: 'funding-analysis',
       userProfileId,
     });
+    const extractClient = clientFor(extractRow);
+    const analyzeClient = clientFor(analyzeRow);
     const fileProcessor = createFileProcessor();
 
     const allProposals = [];
@@ -124,16 +147,16 @@ export default async function handler(req, res) {
           maxChars: FUNDING_GAP_PROPOSAL_MAX_CHARS,
           label: 'research proposal',
         });
-        const extractionPrompt = createFundingExtractionPrompt(
-          extractionPayload.text,
-          [extractionPayload.nonce],
-        );
+        const extractionComposed = compose(extractRow, buildFundingExtractVariables({
+          wrappedProposal: extractionPayload.text,
+          nonces: [extractionPayload.nonce],
+        }));
         let extractionResponse;
 
         try {
-          ({ text: extractionResponse } = requireAcceptedLlmResponse(await claudeClient.complete({
-            messages: [{ role: 'user', content: extractionPrompt }],
-            maxTokens: 1000,
+          ({ text: extractionResponse } = requireAcceptedLlmResponse(await extractClient.complete({
+            ...requestShape(extractionComposed),
+            maxTokens: extractRow.maxTokens,
             temperature: 0.3,
           })));
         } catch (claudeError) {
@@ -385,13 +408,13 @@ export default async function handler(req, res) {
           searchYears: searchYears
         };
 
-        const analysisPrompt = createFundingAnalysisPrompt(analysisData);
+        const analysisComposed = compose(analyzeRow, buildFundingAnalyzeVariables(analysisData));
 
         let analysisResponse;
         try {
-          ({ text: analysisResponse } = requireAcceptedLlmResponse(await claudeClient.complete({
-            messages: [{ role: 'user', content: analysisPrompt }],
-            maxTokens: 4000,
+          ({ text: analysisResponse } = requireAcceptedLlmResponse(await analyzeClient.complete({
+            ...requestShape(analysisComposed),
+            maxTokens: analyzeRow.maxTokens,
             temperature: 0.4,
           })));
           sendProgress(`Analysis complete for ${file.filename}`, baseProgress + 75);
@@ -487,11 +510,22 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Error in funding gap analyzer API:', error);
-    res.write(`data: ${JSON.stringify({
-      error: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED,
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-      complete: true
-    })}\n\n`);
+    const unavailable = toolPromptUnavailable(error);
+    if (!res.headersSent) {
+      // Failed before streaming started (e.g. prompt row unavailable): plain JSON.
+      if (unavailable) return res.status(503).json(unavailable);
+      return res.status(500).json({
+        error: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      });
+    }
+    res.write(`data: ${JSON.stringify(unavailable
+      ? { error: unavailable.error, code: unavailable.code, complete: true }
+      : {
+        error: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+        complete: true
+      })}\n\n`);
     res.end();
   }
 }

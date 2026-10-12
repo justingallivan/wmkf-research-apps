@@ -209,8 +209,17 @@ const SURFACES = [
     id: 'analyze-funding-gap',
     inv: 10,
     status: 'migrated',
-    promptFiles: ['shared/config/prompts/funding-gap-analyzer.js'],
-    callSiteFiles: ['pages/api/analyze-funding-gap.js'],
+    promptFiles: [
+      'shared/config/prompts/funding-gap-analyzer.js',
+      // Seam-backed row definitions + variables helpers (convergence plan Stage 2).
+      'shared/config/prompts/funding-gap-dynamics.js',
+    ],
+    callSiteFiles: [
+      'pages/api/analyze-funding-gap.js',
+      // The A7 preamble is composed in code at the resolver seam.
+      'lib/services/tool-prompt-resolver.js',
+      'lib/services/tool-prompt-composer.js',
+    ],
     builders: [
       'createFundingExtractionPrompt',
       'createFundingAnalysisPrompt',

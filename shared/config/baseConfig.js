@@ -45,7 +45,6 @@ export const BASE_CONFIG = {
     'reviewer-exclusion':          { model: 'haiku',  fallback: 'haiku' },
     'reviewers':                   { model: 'sonnet', fallback: 'haiku' },
     'peer-review-summarizer':      { model: 'sonnet', fallback: 'haiku' },
-    'funding-analysis':            { model: 'sonnet', fallback: 'haiku' },
     'qa':                          { model: 'sonnet', fallback: 'haiku' },
     'refine':                      { model: 'sonnet', fallback: 'haiku' },
     'expense-reporter':            { model: 'haiku',  fallback: 'haiku' },

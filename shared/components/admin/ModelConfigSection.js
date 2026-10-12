@@ -22,7 +22,6 @@ const APP_MODEL_NAMES = {
   'reviewer-exclusion': 'Reviewer Exclusion Parser',
   'reviewers': 'Reviewers',
   'peer-review-summarizer': 'Peer Review Summarizer',
-  'funding-analysis': 'Funding Analysis',
   'qa': 'Q&A',
   'refine': 'Refinement',
   'expense-reporter': 'Expense Reporter',
