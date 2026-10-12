@@ -3328,7 +3328,7 @@ function PresentationVideoLine({ v }) {
   );
 }
 
-function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshToken = 0, shell, setupHeader }) {
+function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshToken = 0, shell, setupHeader, onStatusChange }) {
   const [step1Open, setStep1Open] = useState(false);
   const [uploadInstead, setUploadInstead] = useState(false);
   const [summarizeRequest, setSummarizeRequest] = useState(null); // { kinds, anchor } while a Summarize confirmation is open
@@ -3395,6 +3395,16 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
     enabled: showProducts, refreshToken,
     revisionKey: `${artifact?.id || ''}:${artifact?.fingerprint || ''}:${artifact?.presentationEnd?.endMs ?? ''}:${recording?.artifactId || ''}:${recording?.slotVersion ?? ''}`,
   });
+  const boardReadiness = resolveBoardReadiness({ t, boundaryState, video, hasVideoMaterial: Boolean(byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_VIDEO)) });
+  // Report what the Board materials list shows to the page header's status chip. Until the first video read settles the
+  // list may still gain a video line, so the chip waits rather than calling the page ready early.
+  const videoPending = boardReadiness.videoPending || (showProducts && !video.loaded && !video.loadFailed);
+  const boardSignature = [boardReadiness.transcript.key, boardReadiness.summary.key,
+    ...(boardReadiness.video ? [boardReadiness.video.key] : []), ...(videoPending ? ['pending'] : [])].join(',');
+  const hasTranscript = Boolean(material);
+  useEffect(() => {
+    onStatusChange?.({ available: true, hasTranscript, board: boardSignature.split(',') });
+  }, [onStatusChange, hasTranscript, boardSignature]);
 
   const manualAdd = <>
     {!active && <GenerateForm t={t} />}
@@ -3533,7 +3543,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
 
     <section className={shell} data-testid="card-board-materials" aria-labelledby="board-card-title">
       <BoardPageHeading m={m} />
-      <BoardReadiness t={t} boundaryState={boundaryState} video={video} hasVideoMaterial={Boolean(byType(REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_VIDEO))} />
+      <BoardReadiness readiness={boardReadiness} />
     </section>
     </>
   );
@@ -3542,10 +3552,12 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
 // Board materials readiness (owner decision 2026-10-11): one line per presentation item the Board page can show, with
 // whether it is there now. Status only; the actions stay in the Presentation card. Applicant materials are listed by
 // the Applicant materials card and are not repeated here.
-const BOARD_ON = { tone: 'green', label: 'On the Board page' };
-const BOARD_NOT_YET = { tone: 'gray', label: 'Not yet' };
-const BOARD_UNKNOWN = { tone: 'gray', label: 'Status unknown' };
-function BoardReadiness({ t, boundaryState, video, hasVideoMaterial }) {
+const BOARD_ON = { key: 'on', tone: 'green', label: 'On the Board page' };
+const BOARD_NOT_YET = { key: 'not_yet', tone: 'gray', label: 'Not yet' };
+const BOARD_UNKNOWN = { key: 'unknown', tone: 'gray', label: 'Status unknown' };
+// The list and the page header's status chip both read this, so the chip summarizes exactly the lines shown. The video
+// line is null when it is not shown; videoPending is true while the video feature is on but its state is still loading.
+function resolveBoardReadiness({ t, boundaryState, video, hasVideoMaterial }) {
   const { summaryStatusCurrent, published } = publishedSummaryOf(t, t.presentationSummary);
   // Without a current transcript collection (never loaded, or its last refresh failed) both answers are unknown; the
   // summary read also reports 'not_needed' without one, which is not evidence of absence.
@@ -3559,11 +3571,14 @@ function BoardReadiness({ t, boundaryState, video, hasVideoMaterial }) {
     : !video.statusCurrent ? BOARD_UNKNOWN
     : video.boardStatus === 'bound' ? BOARD_ON
       : video.boardStatus === 'unknown' || (!video.boardStatus && !absenceProven) ? BOARD_UNKNOWN : BOARD_NOT_YET;
+  return { transcript, summary, video: video.available ? videoStatus : null, videoPending: Boolean(video.available && !videoStatus) };
+}
+function BoardReadiness({ readiness }) {
   return (
     <ul className="mt-3 divide-y divide-gray-100 border-t border-gray-200" data-testid="board-readiness" aria-label="On the Board page">
-      <ArtifactRow name="Presentation transcript" status={transcript} testId="board-readiness-transcript" />
-      <ArtifactRow name="Presentation summary" status={summary} testId="board-readiness-summary" />
-      {video.available && videoStatus && <ArtifactRow name="Presentation video" status={videoStatus} testId="board-readiness-video" />}
+      <ArtifactRow name="Presentation transcript" status={readiness.transcript} testId="board-readiness-transcript" />
+      <ArtifactRow name="Presentation summary" status={readiness.summary} testId="board-readiness-summary" />
+      {readiness.video && <ArtifactRow name="Presentation video" status={readiness.video} testId="board-readiness-video" />}
     </ul>
   );
 }
@@ -3682,7 +3697,7 @@ function BoardPageHeading({ m }) {
   );
 }
 
-function RecordingAndTranscriptCardForRequest({ requestId }) {
+function RecordingAndTranscriptCardForRequest({ requestId, onStatusChange }) {
   const transcriptInputRef = useRef(null);
   const hashScrollDoneRef = useRef(false);
   const m = useMaterials(requestId, transcriptInputRef);
@@ -3719,6 +3734,11 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
     }
   };
   const shell = 'mt-8 min-w-0 rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6';
+  // Without the materials data the four cards cannot say where the visit stands, so the header chip shows it as unknown.
+  const cardUnavailable = Boolean(m.unavailable || (!m.data && m.error));
+  useEffect(() => {
+    if (cardUnavailable) onStatusChange?.({ available: false, hasTranscript: false, board: [] });
+  }, [onStatusChange, cardUnavailable]);
   if (m.unavailable) return <section id="recording-and-transcript-card" className={shell} data-testid="recording-and-transcript-card">{heading}<p className="mt-2 text-sm text-gray-700">Recording and transcript are not available for this request.</p></section>;
   // One Refresh on the Recording setup card covers all four cards (they share one data set).
   const setupHeader = (
@@ -3730,7 +3750,7 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
   return (
     <div id="recording-and-transcript-card" className="min-w-0" data-testid="recording-and-transcript-card">
       {m.data
-        ? <TranscriptWorkflow m={m} t={t} z={z} requestId={requestId} transcriptInputRef={transcriptInputRef} refreshToken={refreshToken} shell={shell} setupHeader={setupHeader} />
+        ? <TranscriptWorkflow m={m} t={t} z={z} requestId={requestId} transcriptInputRef={transcriptInputRef} refreshToken={refreshToken} shell={shell} setupHeader={setupHeader} onStatusChange={onStatusChange} />
         : (
           <section className={shell} data-testid="card-recording-setup" aria-labelledby="recording-transcript-title">
             {setupHeader}
@@ -3742,7 +3762,7 @@ function RecordingAndTranscriptCardForRequest({ requestId }) {
   );
 }
 
-export default function RecordingAndTranscriptCard({ requestId }) {
+export default function RecordingAndTranscriptCard({ requestId, onStatusChange }) {
   if (!requestId) return null;
-  return <RecordingAndTranscriptCardForRequest key={requestId} requestId={requestId} />;
+  return <RecordingAndTranscriptCardForRequest key={requestId} requestId={requestId} onStatusChange={onStatusChange} />;
 }

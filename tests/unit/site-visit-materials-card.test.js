@@ -439,3 +439,44 @@ describe('staff replacement upload (staff replacement plan §3.4)', () => {
     expect(screen.queryByText('Presentation (PDF) saved.')).toBeNull();
   });
 });
+
+describe('status report for the page header chip (redesign §10)', () => {
+  const lastReport = (spy) => spy.mock.calls.at(-1)?.[0];
+  test.each([
+    ['waiting on the applicant', {}, { key: 'missing', overdue: false }, 'Waiting on the applicant.'],
+    ['overdue', { overdue: true }, { key: 'missing', overdue: true }, 'Waiting on the applicant.'],
+    ['never invited', { invitedAt: null }, { key: 'not_requested', overdue: false }, 'Waiting on the applicant.'],
+    ['every item in, files to check', { state: 'received' }, { key: 'received', overdue: false }, 'Every required item is in.'],
+    // The card's heading puts closed above an attention count; the report follows the same order.
+    ['closed with an upload needing attention', { state: 'closed', attentionCount: 1 }, { key: 'closed', overdue: false }, 'Closed. The contributor link has expired.'],
+    ['saving an upload', { processingCount: 1 }, { key: 'processing', overdue: false }, 'Upload received.'],
+    ['ready', { state: 'ready' }, { key: 'ready', overdue: false }, 'Ready. The files open on the briefing page.'],
+  ])('%s: the report uses the same state as the heading', async (_label, overrides, expected, heading) => {
+    global.fetch = jest.fn(async () => response({ success: true, collection: collection(overrides) }));
+    const onStatusChange = jest.fn();
+    render(<SiteVisitMaterialsCard requestId={REQUEST_ID} onStatusChange={onStatusChange} />);
+    expect(await within(screen.getByTestId('site-visit-materials-card')).findByText(new RegExp(heading.replace(/[.]/g, '\\.')))).toBeInTheDocument();
+    await waitFor(() => expect(lastReport(onStatusChange)).toEqual(expected));
+  });
+
+  test('no collection yet reports not requested; nothing is reported while loading', async () => {
+    let release;
+    global.fetch = jest.fn(() => new Promise((resolve) => { release = () => resolve(response({ success: true, collection: null })); }));
+    const onStatusChange = jest.fn();
+    render(<SiteVisitMaterialsCard requestId={REQUEST_ID} onStatusChange={onStatusChange} />);
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    expect(onStatusChange).not.toHaveBeenCalled();
+    release();
+    await waitFor(() => expect(lastReport(onStatusChange)).toEqual({ key: 'not_requested', overdue: false }));
+  });
+
+  test.each([
+    ['a failed load', () => response({ error: 'down' }, 500)],
+    ['materials unavailable for the request', () => response({ error: 'not enabled' }, 503)],
+  ])('%s reports unavailable', async (_label, reply) => {
+    global.fetch = jest.fn(async () => reply());
+    const onStatusChange = jest.fn();
+    render(<SiteVisitMaterialsCard requestId={REQUEST_ID} onStatusChange={onStatusChange} />);
+    await waitFor(() => expect(lastReport(onStatusChange)).toEqual({ key: 'unavailable', overdue: false }));
+  });
+});

@@ -818,7 +818,27 @@ an uploaded transcript gets Open without downloads.
 
 - **[DONE]** Owner desktop check on a real request (localhost, 2026-10-11; findings in §10.1) and
   merge (owner, 2026-10-11; `c574e9e7d`, Production deployment Ready).
-- **Open design item:** the header status chip (§9.6 commit 7).
+- **Header status chip (§9.6 commit 7): building 2026-10-11 on `claude/site-visit-status-chip`.** Owner chose
+  to lift the state (each card reports what it already shows; the editor does not re-fetch). Mapping, first
+  unfinished stage wins (owner decisions 2026-10-11 for the rows marked *):
+
+  | Input (as the card shows it) | Chip |
+  | --- | --- |
+  | Either card has not reported yet, or the video readiness line is still loading | no chip |
+  | Materials: load failed, or materials unavailable for the request* | Status unknown (gray) |
+  | Materials: no collection, or a collection whose invitation was never sent | Materials not requested (gray) |
+  | Materials: waiting on the applicant | Waiting on materials (gray; amber when overdue) |
+  | Materials: saving an upload* | Waiting on materials (gray) |
+  | Materials: an upload needs attention, or every item is in and the files need checking* | Materials need attention (amber) |
+  | Materials: ready, or closed (contributor link expired)* | next stage |
+  | Recording card: unavailable for the request or its load failed* | Status unknown (gray) |
+  | No meeting transcript (the TRANSCRIPT artifact step 1 uses; survives the Stage 5 recording deletion)* | No recording yet (gray) |
+  | Any shown Board readiness line is "Status unknown"* | Status unknown (gray) |
+  | Any shown Board readiness line is "Not yet" | Board page incomplete (amber) |
+  | Every shown Board readiness line is "On the Board page" (the video line counts only when it is shown) | Board page ready (green) |
+
+  The materials key follows the card's own heading precedence (closed, then needs attention, then saving), not the
+  tracker list's classifier, so the chip cannot contradict the card.
 - **Server slices C1-C3 (§6), not started:** automatic split-transcript generation after a
   publish with a confirmed end; the real reason a presentation video was superseded; and
   streaming the review video instead of downloading it.

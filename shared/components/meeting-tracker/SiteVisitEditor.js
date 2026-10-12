@@ -15,6 +15,8 @@ import { SITE_VISIT_FORMAT, SITE_VISIT_FORMAT_LABEL, SITE_VISIT_LIMITS } from '.
 import SiteVisitMaterialsCard from './SiteVisitMaterialsCard';
 import RecordingAndTranscriptCard from './RecordingAndTranscriptCard';
 import AttendeePicker from './AttendeePicker';
+import { STATUS_TONES } from './ArtifactRow';
+import { resolveSiteVisitHeaderStatus } from '../../utils/site-visit-header-status';
 
 const DEFAULT_TIME_ZONE = 'America/Los_Angeles';
 
@@ -194,6 +196,15 @@ export default function SiteVisitEditor() {
   // another visit never shows the previous request's name (Codex review, commit 7); null keeps the number-only header.
   const [identityEntry, setIdentityEntry] = useState(null);
   const requestIdentity = identityEntry && identityEntry.requestId === requestId ? identityEntry.value : null;
+  // The header status chip summarizes what the Applicant materials card and the Board materials list report (redesign
+  // §3 and §10). Reports are kept with the request they belong to, like the identity above.
+  const [statusReports, setStatusReports] = useState(null);
+  const reportMaterials = useCallback((materials) => setStatusReports((current) => (
+    current?.requestId === requestId ? { ...current, materials } : { requestId, materials })), [requestId]);
+  const reportRecording = useCallback((recording) => setStatusReports((current) => (
+    current?.requestId === requestId ? { ...current, recording } : { requestId, recording })), [requestId]);
+  const headerStatus = statusReports?.requestId === requestId
+    ? resolveSiteVisitHeaderStatus(statusReports.materials, statusReports.recording) : null;
   // The request the page is showing now; a load for any other request is dropped when it settles.
   const currentRequestRef = useRef(requestId);
   useEffect(() => { currentRequestRef.current = requestId; }, [requestId]);
@@ -341,7 +352,12 @@ export default function SiteVisitEditor() {
     <Layout title={visit ? 'Site visit' : 'Schedule site visit'}>
       <div className="pt-6 mb-6">
         {backLink}
-        <h1 className="mt-3 text-2xl font-semibold text-gray-900">{visit ? 'Site visit' : 'Schedule the site visit'}{(requestIdentity?.requestNumber || requestNumber) ? ` · #${requestIdentity?.requestNumber || requestNumber}` : ''}</h1>
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h1 className="text-2xl font-semibold text-gray-900">{visit ? 'Site visit' : 'Schedule the site visit'}{(requestIdentity?.requestNumber || requestNumber) ? ` · #${requestIdentity?.requestNumber || requestNumber}` : ''}</h1>
+          {visit && headerStatus && (
+            <span data-testid="visit-header-status" className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-sm font-medium ${STATUS_TONES[headerStatus.tone] || STATUS_TONES.gray}`}>{headerStatus.label}</span>
+          )}
+        </div>
         {requestIdentity && (requestIdentity.institution || requestIdentity.title || requestIdentity.grantProgram || requestIdentity.cycleLabel) && (
           <p className="mt-1 text-sm text-gray-600" data-testid="visit-request-identity">
             {[[requestIdentity.institution, requestIdentity.title].filter(Boolean).join(' — '), requestIdentity.grantProgram, requestIdentity.cycleLabel]
@@ -439,8 +455,8 @@ export default function SiteVisitEditor() {
         </form>
       )}
 
-      {!loading && visit && <SiteVisitMaterialsCard requestId={requestId} requestNumber={requestNumber} />}
-      {!loading && visit && <RecordingAndTranscriptCard requestId={requestId} />}
+      {!loading && visit && <SiteVisitMaterialsCard key={requestId} requestId={requestId} requestNumber={requestNumber} onStatusChange={reportMaterials} />}
+      {!loading && visit && <RecordingAndTranscriptCard requestId={requestId} onStatusChange={reportRecording} />}
 
       {/* The page is long: the exit is reachable at the bottom as well as in
           the header (owner, 2026-09-10, on the session page). */}
