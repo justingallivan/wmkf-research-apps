@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  *
  * T3 (Stage 3) per-call-site contract matrix for the inline admin sections
- * reachable through `OperationsWorkspace` (pages/admin.js): HealthSection
+ * reachable through `OperationsWorkspace` (shared/components/admin/workspaces/OperationsWorkspace.js; section line refs are historical pages/admin.js positions): HealthSection
  * (:212), HealthHistorySection (:323), SystemAlertsSection (:497, :509),
  * MaintenanceSection (:640), SecretExpirationSection (:763, :791),
  * DynamicsFeedbackSection (:2131, :2154 — already exported, extended here

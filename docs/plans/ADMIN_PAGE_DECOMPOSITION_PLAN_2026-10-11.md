@@ -325,4 +325,26 @@ before trying it (`admin-view-coverage` covers first render only).
   byte-identical baseline run; per-commit suite green at 9c7dc03d7, a7c7f38e8, 44296dc02; amended commit
   carries no leftovers. Only standing note: `useRef` (baseline-unused) — the orchestrator rules that Stage 5,
   which rewrites the page's import block anyway, drops it, and records that here as a deliberate call.
+- 2026-10-11: **Stage 5 built** (Sonnet; `52282fb7c` ResourceLinks, `bbc98408b` five `workspaces/*.js` with
+  their 15 `*_DATAVERSE_FIELDS` constants (Ai 2, Operations 1, TestRequests 1, Workflows 11), `fec0470ef`
+  import block pruned incl. `useRef`, `7a0a7dfe6` six test imports re-pointed + both transitional
+  re-exports deleted). `pages/admin.js` 629 → **120 lines**: imports, `export function WorkspaceContent`,
+  `export default function AdminDashboard`, nothing else. `grep -rl "pages/admin'" tests/unit` →
+  `admin-view-coverage.test.js` only. Gates at `7a0a7dfe6`: 8-file suite 172/172, lint, `check:types`,
+  `npm run build`, full `npm test` (1,345 suites / 22,693 tests passed, 49 s), `check:api-routes`,
+  `check:docs-catalog` — all exit 0.
+- 2026-10-11: **Stage 5 + whole-branch review (Opus, fresh context): APPROVE WITH NITS.** Pure move holds
+  (residuals: two blank separators, the two deleted re-exports, two export keywords); every constant is
+  defined and used once in the workspace that passes it; whole branch b96713a6e..HEAD adds exactly 23 files
+  under `shared/components/admin/`, modifies only the page, 7 tests (import/path lines) and this plan;
+  ESLint warning count unchanged (10 `set-state-in-effect`, all moved with their sections). Nit applied by the
+  orchestrator: four test header comments still said "(pages/admin.js)" — now name the workspace file and
+  mark their section line refs as historical.
+- 2026-10-11: **Stage 5 step 5 (durable docs) done by the orchestrator:**
+  `.claude-memory/project-dynamics-feedback-admin-shipped.md` (4 lines) and
+  `.claude-memory/project-admin-dashboard.md` (ground truth + `last_verified`) now name
+  `shared/components/admin/DynamicsFeedbackSection.js` / `shared/components/admin/**` as the live layout;
+  dated plans, audits and briefs citing `pages/admin.js:<line>` are left as historical records (plan rule).
+  `docs/agent-wiki/topics/dataverse-dynamics.md:153` describes a past event and already points at the
+  extracted file. Stage 6 (code splitting): **omitted** per Decision 5 default — no measurement was requested.
 
