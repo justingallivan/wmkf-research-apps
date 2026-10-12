@@ -10,6 +10,19 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Tool-app prompts and models editable in Admin → Prompt Templates (Plan A, Session 598)
+
+**Milestone:** the five standalone AI tool apps (Expertise Finder, Funding Gap Analyzer, Expense Reporter, Literature Analyzer, Multi-Perspective Evaluator) read their prompt text, model and max tokens from 14 Dataverse prompt rows, so superusers change prompts and models without a redeploy. Not the Executor: routes keep their own `LLMClient` calls and write no `wmkf_ai_run` rows.
+**Sessions:** 598 (Opus orchestrating; Sonnet built each stage, Opus reviewed, Codex adversarial review; approved after round-1 fixes on Stages 0-1).
+**Ship state:**
+- Live in Production 2026-10-12 (merge `f56125cfa`, PR #474); the owner-run seed created 14 rows at v1 and the owner's live checks passed. The five apps left `APP_MODELS` / Model Config; the model lives on the row (max tokens read-only in the admin UI); no fallback model.
+- Seam: `lib/services/tool-prompt-resolver.js` (bundled fallback only on transient Dataverse errors; missing or duplicate row = 503 `tool_prompt_unavailable`), `tool-prompt-composer.js` (code-owned A7 preamble in `{{a7_preamble}}`), `prompt-model-resolution.js` (shared with the Executor), `scripts/seed-tool-prompts.js`.
+- Stage 6 close-out: the old hand-written builder modules are deleted; 408 golden fixtures (`tests/fixtures/tool-prompt-golden/`) lock the composed prompt bytes; living docs reconciled.
+**Why it matters:** low-use apps no longer need a code change to tune a prompt or move to a newer model, and a model is never set in two places.
+**Pointers:** `docs/plans/AI_TOOL_APPS_EXECUTOR_CONVERGENCE_PLAN_2026-10-11.md` §8; `docs/PROMPT_STORAGE_DESIGN.md` (implementation boundary).
+
+---
+
 ## October 2026 — Site Visit page: header status chip, server-side correction gate, Button link variant (Session 597)
 
 **Milestone:** the Site Visit page now says where a visit stands in one header chip, the server (not just the page) refuses to edit a published transcript while a newer one is on its way, and the shared `Button` has a text-link variant.

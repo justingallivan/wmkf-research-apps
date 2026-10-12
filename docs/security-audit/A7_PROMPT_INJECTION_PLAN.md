@@ -3,6 +3,12 @@
 **Status:** Parts 0–6 SHIPPED (Parts 0–4 Session 174 2026-05-21; Parts 5–6
 Session 176 2026-05-22). The original 24-surface inventory below is historical;
 `scripts/check-prompt-injection-tagging.js` is the current source registry.
+**Update 2026-10-12 (Plan A, Stage 6):** the hand-written builders behind rows 8–11 and 13
+(`multi-perspective-evaluator`, `literature-analyzer`, `funding-gap-analyzer`, expense reporter,
+`expertise-finder`) were retired. Those prompts are now Dataverse rows seeded from
+`shared/config/prompts/<app>-dynamics.js`; wrapping stays in the route/variables helpers and the
+preamble is code-owned via `lib/services/tool-prompt-composer.js` (`{{a7_preamble}}`). The gate's
+surfaces 8–11 and 13 register those files; the table below keeps the 2026-05 builder names.
 Created 2026-05-21 (Session 173). Revised 2026-05-21 (Session 174) after a
 Codex review against the live codebase — see "Revision log" at the foot.
 **Deploy step (Part 2) — DONE 2026-05-22 (S176):** `scripts/seed-phase-i-summary-prompt.js --execute`

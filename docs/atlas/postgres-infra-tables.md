@@ -101,8 +101,10 @@ RBAC scaffolding for the explorer write tools. Restrictions table is empty; a 27
 **Source of truth:** Postgres.
 Internal staff/consultant/board roster + per-proposal match history. Production
 consumers are `pages/api/expertise-finder/{match,batch-match,roster,history}.js`;
-production prompt rules live in
-`shared/config/prompts/expertise-finder.js`. The isolated
+production prompt rules live in the Dataverse `expertise-finder.match`
+prompt row (definition and bundled fallback:
+`shared/config/prompts/expertise-finder-dynamics.js`; resolved by
+`lib/services/tool-prompt-resolver.js`). The isolated
 `modules/expertise_matching` reference/demo has no production caller.
 Migration 035 added nullable normalized `preferred_email`. Migration 050 is
 **[PRODUCTION-LIVE 2026-09-14; applied and read back]** and adds nullable
