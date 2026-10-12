@@ -19,7 +19,7 @@ import { buildUntrustedContentPreamble } from '../../../lib/utils/ai-payload-bou
  * Build the roster context block from database records.
  * Groups by role_type for clarity in the prompt.
  */
-function buildRosterContext(rosterMembers) {
+export function buildRosterContext(rosterMembers) {
   const staff = rosterMembers.filter(m => m.role_type === 'Research Program Staff');
   const consultants = rosterMembers.filter(m => m.role_type === 'Consultant');
   const board = rosterMembers.filter(m => m.role_type === 'Board');
