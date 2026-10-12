@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { Play } from 'lucide-react';
 import { requestJson } from '../../../shared/utils/api-request.js';
 import { arrangeMaterials, displayName, isOffice, isType } from '../../../shared/utils/presentation-page-materials.js';
 import SummaryText from '../../../shared/components/SummaryText.js';
+import PresentationVideoPlayer from '../../../shared/components/PresentationVideoPlayer.js';
 import {
   PRESENTATION_SUMMARY_HEADINGS,
   PRESENTATION_SUMMARY_LIST_HEADINGS,
@@ -22,92 +22,7 @@ function endpoint(token, material, mode, attempt = 0) {
 }
 
 function Video({ token, material }) {
-  const videoRef = useRef(null);
-  const lastTimeRef = useRef(0);
-  const pendingSeekRef = useRef(null);
-  const attemptRef = useRef(0);
-  const retriedRef = useRef(false);
-  const [playing, setPlaying] = useState(false);
-  const [status, setStatus] = useState('');
-  const [canResume, setCanResume] = useState(false);
-
-  const resolveWatch = (position = null) => {
-    const video = videoRef.current;
-    if (!video) return;
-    attemptRef.current += 1;
-    pendingSeekRef.current = position;
-    setCanResume(false);
-    setStatus('Loading the video…');
-    video.src = endpoint(token, material, 'watch', attemptRef.current);
-    video.load();
-    void video.play().catch(() => setStatus('Press play to start.'));
-  };
-
-  const start = () => {
-    setPlaying(true);
-    retriedRef.current = false;
-    lastTimeRef.current = 0;
-    window.setTimeout(() => resolveWatch(), 0);
-  };
-  const onError = () => {
-    if (!retriedRef.current) {
-      retriedRef.current = true;
-      setStatus('The video stopped. Reconnecting…');
-      resolveWatch(lastTimeRef.current);
-      return;
-    }
-    setCanResume(true);
-    setStatus('The video stopped again.');
-  };
-  const onLoadedMetadata = () => {
-    const video = videoRef.current;
-    const position = pendingSeekRef.current;
-    pendingSeekRef.current = null;
-    if (!video || position === null) return;
-    if (Number.isFinite(video.duration) && video.duration > 0) {
-      video.currentTime = Math.min(position, Math.max(0, video.duration - 0.25));
-    }
-    void video.play().catch(() => setStatus('Press play to continue.'));
-  };
-
-  return (
-    <div>
-      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-gray-900">
-        {playing ? (
-          <video
-            ref={videoRef}
-            controls
-            playsInline
-            preload="metadata"
-            onError={onError}
-            onLoadedMetadata={onLoadedMetadata}
-            onPlaying={() => setStatus('')}
-            onTimeUpdate={(event) => { lastTimeRef.current = event.currentTarget.currentTime; }}
-            className="h-full w-full"
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={start}
-            className="group absolute inset-0 flex flex-col items-center justify-center gap-4 text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-white/70"
-          >
-            <span className="flex h-20 w-20 items-center justify-center rounded-full bg-white text-gray-900 shadow-[0_8px_24px_-6px_rgb(0_0_0/0.5)] transition-transform duration-300 ease-out group-hover:scale-105 group-active:scale-95">
-              <Play aria-hidden="true" className="ml-1 h-9 w-9" fill="currentColor" strokeWidth={0} />
-            </span>
-            <span className="text-lg font-semibold">Watch the presentation</span>
-          </button>
-        )}
-      </div>
-      {(status || canResume) && (
-        <div className="mt-3 flex flex-wrap items-center gap-4">
-          {status && <p role="status" className="text-base text-gray-600">{status}</p>}
-          {canResume && (
-            <button type="button" onClick={() => resolveWatch(lastTimeRef.current)} className={BUTTON}>Resume</button>
-          )}
-        </div>
-      )}
-    </div>
-  );
+  return <PresentationVideoPlayer srcFor={(attempt) => endpoint(token, material, 'watch', attempt)} />;
 }
 
 // Microsoft serves every file as a download, so a PDF is fetched here and handed to the browser's own

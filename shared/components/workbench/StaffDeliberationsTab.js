@@ -1487,6 +1487,8 @@ export default function StaffDeliberationsTab({
       {siteVisitContext?.presentationMaterialsStatus === 'loaded'
         && (due || (siteVisitContext.presentationMaterials || EMPTY_LIST).length > 0) && (
         <ResearchPresentationFollowUp
+          requestId={requestId}
+          videoPlayable={siteVisitContext.presentationVideoPlayable === true}
           status="loaded"
           materials={siteVisitContext.presentationMaterials || EMPTY_LIST}
           summary={siteVisitContext.presentationSummary || null}

@@ -1184,7 +1184,7 @@ test('the presentation follow-up mounts only after the server enables its projec
   view.rerender(<StaffDeliberationsTab requestId={REQUEST_ID} />);
   const followUp = screen.getByTestId('research-presentation-follow-up');
   expect(within(followUp.closest('li')).getByRole('heading', { name: /^Presentation/ })).toBeInTheDocument();
-  expect(within(followUp).getByRole('link', { name: 'Watch recording' })).toHaveAttribute('href', 'https://zoom.us/rec/share/x');
+  expect(within(followUp).getByRole('link', { name: 'Watch full recording' })).toHaveAttribute('href', 'https://zoom.us/rec/share/x');
 });
 
 test('once the brief is shared the materials card renders inside the panel, above Email history', async () => {

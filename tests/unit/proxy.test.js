@@ -205,6 +205,26 @@ describe('proxy CSP function', () => {
     }
   });
 
+  test('staff pages may play media from the tenant; outside-facing pages may not (staff reader plan §5)', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'production';
+    const base = proxyFn(makeReq({}, 'https://applications.example/')).headers.get('Content-Security-Policy');
+    for (const path of ['/', '/workbench/abc', '/workbench', '/meeting-tracker/visits/x', '/admin']) {
+      const csp = proxyFn(makeReq({}, `https://applications.example${path}`)).headers.get('Content-Security-Policy');
+      expect(csp.split('; ').find(d => d.startsWith('media-src'))).toBe("media-src 'self' https://appriver3651007194.sharepoint.com");
+    }
+    // Only media-src is added: the other directives of a plain staff page carry no tenant origin.
+    expect(base.split('; ').filter(d => !d.startsWith('media-src')).join('; ')).not.toContain('sharepoint.com');
+    for (const path of ['/external/review/token', '/external/briefing/token', '/apply', '/apply/x', '/auth/signin', '/externalish']) {
+      const csp = proxyFn(makeReq({}, `https://applications.example${path}`)).headers.get('Content-Security-Policy');
+      if (path === '/externalish') {
+        expect(csp).toContain('media-src');
+      } else {
+        expect(csp).not.toContain('media-src');
+      }
+    }
+  });
+
   test('retired proof paths receive no Microsoft CSP exception in Preview', () => {
     process.env.NODE_ENV = 'production';
     process.env.VERCEL_ENV = 'preview';
@@ -215,7 +235,8 @@ describe('proxy CSP function', () => {
     ));
     const uploadCsp = uploadProof.headers.get('Content-Security-Policy');
     expect(uploadCsp).not.toContain('https://*.up.1drv.com');
-    expect(uploadCsp).not.toContain('https://appriver3651007194.sharepoint.com');
+    // A staff page: only the app-wide staff media-src names the tenant, never connect-src.
+    expect(uploadCsp.split('; ').find(d => d.startsWith('connect-src'))).not.toContain('sharepoint.com');
 
     const playbackProof = proxyFn(makeReq(
       {},

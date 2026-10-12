@@ -6,14 +6,16 @@ import {
   PRESENTATION_SUMMARY_HEADINGS, PRESENTATION_SUMMARY_LIST_HEADINGS,
 } from '../../config/transcriptSummary';
 import SummaryText, { parseSummaryText } from '../SummaryText';
+import PresentationVideoPlayer from '../PresentationVideoPlayer';
+import { staffReaderHref } from '../../utils/staff-reader';
 
 const SLOTS = [
-  { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING, label: 'Recording', action: 'Watch recording' },
-  { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT, label: 'Transcript', action: 'Open transcript' },
+  { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING, label: 'Full recording', action: 'Watch full recording' },
+  { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT, label: 'Full transcript', action: 'Open full transcript' },
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_TRANSCRIPT, label: 'Presentation transcript', action: 'Open presentation transcript' },
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_TRANSCRIPT, label: 'Staff discussion transcript', action: 'Open staff discussion transcript' },
-  { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY, label: 'Staff discussion summary', action: 'Open staff discussion summary' },
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, label: 'Presentation summary', action: 'Open presentation summary' },
+  { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY, label: 'Staff discussion summary', action: 'Open staff discussion summary' },
 ];
 
 // Each summary's sections are fixed by its prompt; until "Read more" the first one is shown,
@@ -73,18 +75,31 @@ function SummaryBlock({ summary, format = PRESENTATION_SUMMARY, testId = 'presen
 // Rendered inside the Presentation step of the Staff deliberations tab: one
 // link per published item (file names carry internal ids, so they are not
 // shown), and the summary's opening with Read more.
-export default function ResearchPresentationFollowUp({ status, materials = [], summary = null, discussionSummary = null }) {
+export default function ResearchPresentationFollowUp({ requestId = null, videoPlayable = false, status, materials = [], summary = null, discussionSummary = null }) {
   if (status === 'disabled') return null;
   const byType = new Map(materials.map((material) => [Number(material.artifactType), material]));
   const present = SLOTS
     .map((slot) => {
       const material = byType.get(slot.type);
       if (!material) return null;
-      return { ...slot, href: material.backing === 'external' ? material.externalUrl : material.webUrl };
+      // Plain-text transcripts and summaries open formatted on the reading page; anything else opens in SharePoint or Zoom.
+      return { ...slot, href: staffReaderHref(requestId, material)
+        || (material.backing === 'external' ? material.externalUrl : material.webUrl) };
     })
     .filter(Boolean);
   const summarySlot = present.find((slot) => slot.type === REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY);
   const discussionSlot = present.find((slot) => slot.type === REQUEST_DOCUMENT_ARTIFACT_TYPE.STAFF_DISCUSSION_SUMMARY);
+  // A summary shown below needs no link; one whose text could not be read keeps its link.
+  const shownBelow = new Set([
+    summarySlot && summary?.text ? summarySlot.type : null,
+    discussionSlot && discussionSummary?.text ? discussionSlot.type : null,
+  ]);
+  const linked = present.filter((slot) => !shownBelow.has(slot.type));
+  // The approved presentation cut plays here (the server re-checks it against the approved cut);
+  // the full recording stays a link because it includes the staff discussion.
+  const video = byType.get(REQUEST_DOCUMENT_ARTIFACT_TYPE.PRESENTATION_VIDEO);
+  const showVideo = Boolean(requestId && videoPlayable && video && video.backing === 'file');
+  const videoSrc = (attempt) => `/api/workbench/site-visit/presentation-video?${new URLSearchParams({ requestId, attempt: String(attempt) })}`;
   return (
     <div className="mt-3" data-testid="research-presentation-follow-up">
       <h4 className="text-sm font-semibold text-gray-900">Recording and transcripts</h4>
@@ -95,9 +110,14 @@ export default function ResearchPresentationFollowUp({ status, materials = [], s
       {status === 'loaded' && present.length === 0 && (
         <p className="mt-1 text-sm text-gray-600">The recording and transcripts appear here after the Meeting Tracker publishes them.</p>
       )}
-      {status === 'loaded' && present.length > 0 && (
-        <ul className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm">
-          {present.map((slot) => (
+      {status === 'loaded' && showVideo && (
+        <div className="mt-2 max-w-3xl" data-testid="presentation-video">
+          <PresentationVideoPlayer key={requestId} srcFor={videoSrc} size="compact" />
+        </div>
+      )}
+      {status === 'loaded' && linked.length > 0 && (
+        <ul className={`${showVideo ? 'mt-3' : 'mt-1'} flex flex-wrap gap-x-5 gap-y-1 text-sm`}>
+          {linked.map((slot) => (
             <li key={slot.type}>
               {slot.href ? (
                 <a href={slot.href} target="_blank" rel="noopener noreferrer"

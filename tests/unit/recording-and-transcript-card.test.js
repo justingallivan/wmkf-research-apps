@@ -297,6 +297,24 @@ test('an uploaded transcript with no source bundle shows no editor and says name
   expect(screen.queryByRole('menuitem', { name: /Download full transcript/ })).toBeNull();
 });
 
+test('a plain-text transcript opens formatted on the staff reading page; a PDF keeps its SharePoint link (staff reader plan §4)', async () => {
+  for (const [overrides, expected] of [
+    [{ contentType: 'text/plain; charset=utf-8' }, `/workbench/read?request=${REQUEST_ID}&document=${ARTIFACT_ID}`],
+    [{ contentType: 'application/pdf', filename: 'Transcript.pdf', webUrl: 'https://example.sharepoint.com/Transcript.pdf' }, 'https://example.sharepoint.com/Transcript.pdf'],
+  ]) {
+    route({
+      materials: [transcriptRow(overrides)],
+      collection: collection({ jobs: [], currentArtifact: { id: ARTIFACT_ID, fingerprint: 'b'.repeat(64), bundleEditable: false } }),
+      detail: detailFor({}),
+    });
+    const view = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    await screen.findByTestId('current-transcript-line');
+    expect(stepMenuItem('Open full transcript', 'step-recording')).toHaveAttribute('href', expected);
+    fireEvent.keyDown(document.activeElement || document.body, { key: 'Escape' });
+    view.unmount();
+  }
+});
+
 test('when transcription is not enabled, step 1 states the reason and offers the transcript upload directly', async () => {
   const state = { collection: collection({ featureState: 'disabled', jobs: [], currentArtifact: null }), detail: detailFor({}) };
   const uploaded = transcriptRow({ filename: 'zoom.vtt' });

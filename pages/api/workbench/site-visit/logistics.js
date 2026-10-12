@@ -64,7 +64,7 @@ export default async function handler(req, res) {
           actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
         });
         const result = await getSiteVisitLogistics({
-          requestId, includePresentationSummaryText: true, writeupViewer,
+          requestId, includePresentationSummaryText: true, includePresentationVideoState: true, writeupViewer,
         });
         return res.status(200).json({
           success: true,
@@ -76,6 +76,7 @@ export default async function handler(req, res) {
             presentationMaterialConflicts: result.presentationMaterialConflicts,
             presentationSummary: result.presentationSummary ?? null,
             discussionSummary: result.discussionSummary ?? null,
+            presentationVideoPlayable: result.presentationVideoPlayable === true,
           } : {}),
         });
       }

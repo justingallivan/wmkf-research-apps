@@ -645,3 +645,24 @@ describe('draft writeup stays out of materials until group review', () => {
     expect(result.materials).toHaveLength(count);
   });
 });
+
+describe('Workbench presentation video state (staff reader plan §1)', () => {
+  const vf = require('../helpers/presentation-video-fixtures.js');
+  const read = (records, options = {}) => getSiteVisitLogistics({ requestId: REQUEST_ID, ...options }, dependencies({
+    findDocumentsByRequest: jest.fn(async () => ({ records })),
+    presentationSchemaReady: () => true, presentationRequestAllowed: () => true,
+  }));
+
+  test('playable only when the video is bound to the current transcript, boundary and recording', async () => {
+    const bound = [vf.transcriptRow(), vf.recordingRow(), vf.videoRow()];
+    expect((await read(bound, { includePresentationVideoState: true })).presentationVideoPlayable).toBe(true);
+    const replaced = [vf.transcriptRow(), vf.recordingRow({ wmkf_sharepointetag: 'rec-etag-2' }), vf.videoRow()];
+    expect((await read(replaced, { includePresentationVideoState: true })).presentationVideoPlayable).toBe(false);
+    expect((await read([vf.transcriptRow(), vf.recordingRow()], { includePresentationVideoState: true })).presentationVideoPlayable).toBe(false);
+  });
+
+  test('absent unless the caller asks (the Meeting Tracker read is unchanged)', async () => {
+    const result = await read([vf.transcriptRow(), vf.recordingRow(), vf.videoRow()]);
+    expect(result).not.toHaveProperty('presentationVideoPlayable');
+  });
+});

@@ -57,7 +57,9 @@ export default function RequireAppAccess({ appKey, children }) {
     );
   }
 
-  if (!hasAccess(appKey)) {
+  // `appKey` may be a list: any one grant opens the page (the server re-checks).
+  const keys = Array.isArray(appKey) ? appKey : [appKey];
+  if (!keys.some((key) => hasAccess(key))) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md w-full mx-4">
