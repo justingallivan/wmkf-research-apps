@@ -818,7 +818,7 @@ an uploaded transcript gets Open without downloads.
 
 - **[DONE]** Owner desktop check on a real request (localhost, 2026-10-11; findings in §10.1) and
   merge (owner, 2026-10-11; `c574e9e7d`, Production deployment Ready).
-- **[BUILT 2026-10-11, branch `claude/site-visit-status-chip`; owner desktop check pending]** Header status chip
+- **[SHIPPED 2026-10-12; owner desktop check passed on 1003222 (Board page ready)]** Header status chip
   (§9.6 commit 7). Owner chose to lift the state (each card reports what it already shows; the editor does not
   re-fetch). Resolver `shared/utils/site-visit-header-status.js`; the Board list and the chip share
   `resolveBoardReadiness`. Codex: round 1 (a failed recording refresh with cached data kept reporting) and round 2
