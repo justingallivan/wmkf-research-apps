@@ -7,11 +7,12 @@
  * Plan C file moves cannot drop or duplicate a request or a section. Updating
  * an expectation below requires a deliberate reason noted in the plan's Stage Log.
  *
- * Every URL resolves 200 with `{}`; query strings are stripped before comparing.
+ * Every URL resolves 200 with `{}`; full URLs (query strings included) are compared, and
+ * duplicates are kept so a doubled request fails.
  * Two views cannot render under a bare `{}` (they dereference arrays), so those
  * URLs return the minimal shape the existing workspace tests use:
  *   /api/admin/maintenance (MaintenanceSection, operations:jobs) -> { jobs: [] }
- *   /api/admin/models (ModelConfigSection, ai:models) -> the config in admin-ai-workspace.test.js
+ *   /api/admin/models (ModelConfigSection, ai:models) -> { apps: [] }
  * Views are rendered one at a time (AdminDashboard is not rendered here).
  */
 import { act, render, screen } from '@testing-library/react';
@@ -26,7 +27,7 @@ const jsonResponse = (status, body) => ({
 
 const MINIMAL_BODIES = {
   '/api/admin/maintenance': { jobs: [] },
-  '/api/admin/models': { apps: [], availableModels: [], tiers: [], defaultModel: 'x' },
+  '/api/admin/models': { apps: [] },
 };
 
 const EXPECTED_FETCHES = {
@@ -34,16 +35,16 @@ const EXPECTED_FETCHES = {
     '/api/admin/alerts',
     '/api/admin/maintenance',
     '/api/admin/secrets',
-    '/api/admin/stats',
+    '/api/admin/stats?period=7d',
     '/api/health',
   ],
   'operations:health': [
-    '/api/admin/health-history',
+    '/api/admin/health-history?hours=24',
     '/api/health',
   ],
   'operations:incidents': [
     '/api/admin/alerts',
-    '/api/admin/operational-events',
+    '/api/admin/operational-events?status=open',
   ],
   'operations:jobs': [
     '/api/admin/maintenance',
@@ -55,7 +56,7 @@ const EXPECTED_FETCHES = {
     '/api/admin/alert-recipients',
   ],
   'operations:feedback': [
-    '/api/dynamics-explorer/feedback',
+    '/api/dynamics-explorer/feedback?status=new',
   ],
   'operations:dynamics-safeguards': [
     '/api/dynamics-explorer/restrictions',
@@ -70,7 +71,7 @@ const EXPECTED_FETCHES = {
     '/api/admin/review-questions',
   ],
   'workflows:proposal-ranking': [
-    '/api/app-access',
+    '/api/app-access?all=true',
   ],
   'workflows:final-writeups': [
     '/api/admin/final-writeup-matrix-audiences',
@@ -89,7 +90,7 @@ const EXPECTED_FETCHES = {
     '/api/admin/test-requests/runs',
   ],
   'ai:usage': [
-    '/api/admin/stats',
+    '/api/admin/stats?period=30d',
   ],
   'ai:models': [
     '/api/admin/models',
@@ -101,13 +102,13 @@ const EXPECTED_FETCHES = {
   ],
   'people:roles': [
     '/api/dynamics-explorer/roles',
-    '/api/user-profiles',
+    '/api/user-profiles?all=true',
   ],
   'people:app-access': [
-    '/api/app-access',
+    '/api/app-access?all=true',
   ],
   'people:identity': [
-    '/api/user-profiles',
+    '/api/user-profiles?all=true',
   ],
 };
 
@@ -220,7 +221,7 @@ describe('admin view coverage', () => {
           render(<WorkspaceContent workspace={ws.key} view={view.key} />);
         });
         await settle();
-        const fetched = [...new Set(urls.map((u) => u.split('?')[0]))].sort();
+        const fetched = urls.slice().sort(); // full URLs, duplicates kept: a doubled fetch must fail
         const headings = screen.queryAllByRole('heading').map((h) => h.textContent.trim()).sort();
         expect(fetched).toEqual(EXPECTED_FETCHES[id]);
         expect(headings).toEqual(EXPECTED_HEADINGS[id]);

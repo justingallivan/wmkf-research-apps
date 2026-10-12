@@ -258,3 +258,20 @@ before trying it (`admin-view-coverage` covers first render only).
   `DynamicsFeedbackSection` fetch URLs corrected; `ResourceLinks` consumers are Operations and Ai. Minor:
   `SERVICE_LABELS` users, `visitedLocations` mount behavior noted for Stage 0, memory files to reconcile
   named precisely. Verdict after corrections: ready for owner review; not authorized.
+
+- 2026-10-11: **Stage 0 built** on `claude/admin-decomposition` (Sonnet; commit `fad38462a`). Baseline
+  re-probe: `pages/admin.js` 3,649 lines; 26 `^(export )?function [A-Z]` matches (+ the default export);
+  `shared/components/admin` 25 files; tests importing `pages/admin'`: the 6 listed in §1 plus the new
+  `admin-view-coverage.test.js`; source-text couplings: `admin-models.test.js` (and
+  `admin-transcription-pilot-page.test.js`, which imports `pages/admin/transcription-pilot` and is out of
+  scope). Coverage test: 21 views; two views need a minimal body (`/api/admin/maintenance` → `{jobs:[]}`,
+  `/api/admin/models` → `{apps:[]}`). Gates at `fad38462a`: targeted jest 172/172, full jest 22,693 passed,
+  lint 0 errors, `check:types`, `npm run build` all green.
+- 2026-10-11: **Stage 0 review (Opus, fresh context): REWORK → fixed by the orchestrator** (small,
+  deterministic edits; not re-dispatched). Blocking: the capture deduped URLs with a `Set`, so a doubled
+  fetch could never fail — now full URLs, duplicates kept (mutation M3 confirmed the gap). Should-fix:
+  query strings were stripped although every one is deterministic — now pinned (`?period=7d/30d`,
+  `?hours=24`, `?status=open/new`, `?all=true`; 9 expectations updated, no baseline duplicates). Nit: models
+  mock trimmed to `{apps:[]}` (verified sufficient). Settling: five 20 ms `act` flushes judged
+  deterministic (mock resolves in microtasks; no timer-gated fetch in any rendered view). Note for Stage 5
+  step 4: `admin-view-coverage.test.js` legitimately imports `pages/admin` for `WorkspaceContent`.
