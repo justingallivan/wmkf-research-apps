@@ -17,16 +17,14 @@ import { requireAcceptedLlmResponse } from '../../lib/utils/llm-response';
 import { BASE_CONFIG } from '../../shared/config/baseConfig';
 import { splitPdfToPages } from '../../lib/utils/pdf-page-splitter';
 import {
-  selectDatabasesForResearchArea,
-  EVALUATION_FRAMEWORKS
-} from '../../shared/config/prompts/multi-perspective-evaluator';
-import {
   MULTI_PERSPECTIVE_INITIAL_ANALYSIS_ROW,
   MULTI_PERSPECTIVE_PROPOSAL_SUMMARY_ROW,
   MULTI_PERSPECTIVE_OPTIMIST_ROW,
   MULTI_PERSPECTIVE_SKEPTIC_ROW,
   MULTI_PERSPECTIVE_NEUTRAL_ROW,
   MULTI_PERSPECTIVE_INTEGRATOR_ROW,
+  EVALUATION_FRAMEWORKS,
+  selectDatabasesForResearchArea,
   buildMultiPerspectiveInitialVariables,
   buildMultiPerspectiveSummaryVariables,
   buildMultiPerspectiveVariables,

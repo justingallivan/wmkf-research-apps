@@ -22,9 +22,8 @@ const MP_CONCEPT_MAX_CHARS = 20_000;
 const MP_LITERATURE_MAX_CHARS = 60_000;
 const MP_PERSPECTIVE_MAX_CHARS = 40_000;
 
-// Mirror of KECK_FUNDING_GUIDELINES / EVALUATION_FRAMEWORKS in multi-perspective-evaluator.js
-// (that module's extensionless imports cannot load under the Node ESM seed script; a parity
-// test asserts these stay deep-equal to the oracle until Stage 6 retires it).
+// Single home for KECK_FUNDING_GUIDELINES / EVALUATION_FRAMEWORKS / selectDatabasesForResearchArea:
+// the route and the seed script both import them from here (explicit .js specifiers, Node-ESM loadable).
 export const KECK_FUNDING_GUIDELINES = {
   fundingPriorities: [
     'High-impact research in basic physical, life, and biomedical sciences, including instrumentation and engineering in service of basic science',
@@ -781,4 +780,44 @@ export function buildMultiPerspectiveIntegratorVariables(initialAnalysis, optimi
     },
     nonces: [concept.nonce, optimist.nonce, skeptic.nonce, neutral.nonce],
   };
+}
+
+/**
+ * Determine which databases to search based on research area
+ */
+export function selectDatabasesForResearchArea(researchArea) {
+  const area = (researchArea || '').toLowerCase();
+
+  // Life sciences
+  if (area.includes('biology') || area.includes('biomedical') ||
+      area.includes('genetics') || area.includes('genomics') ||
+      area.includes('molecular') || area.includes('cell') ||
+      area.includes('neuroscience') || area.includes('immunology') ||
+      area.includes('cancer') || area.includes('medical') ||
+      area.includes('biochem') || area.includes('microbiology')) {
+    return { pubmed: true, biorxiv: true, arxiv: false, chemrxiv: false };
+  }
+
+  // Chemistry
+  if (area.includes('chemistry') || area.includes('chemical') ||
+      area.includes('polymer') || area.includes('catalysis') ||
+      area.includes('synthesis') || area.includes('materials')) {
+    return { pubmed: true, chemrxiv: true, arxiv: false, biorxiv: false };
+  }
+
+  // Physics, Math, CS
+  if (area.includes('physics') || area.includes('mathematics') ||
+      area.includes('computer science') || area.includes('machine learning') ||
+      area.includes('artificial intelligence') || area.includes('quantum') ||
+      area.includes('astrophysics') || area.includes('astronomy')) {
+    return { pubmed: false, arxiv: true, biorxiv: false, chemrxiv: false };
+  }
+
+  // Engineering - could be in multiple places
+  if (area.includes('engineering')) {
+    return { pubmed: true, arxiv: true, biorxiv: false, chemrxiv: false };
+  }
+
+  // Default: PubMed only (most comprehensive)
+  return { pubmed: true, arxiv: false, biorxiv: false, chemrxiv: false };
 }
