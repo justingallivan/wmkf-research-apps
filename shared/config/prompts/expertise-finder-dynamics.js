@@ -2,8 +2,7 @@
  * Dynamics-backed prompt row for the Expertise Finder (convergence plan Stage 1).
  *
  * Source of truth for the `expertise-finder.match` wmkf_ai_prompt row AND the
- * resolver's bundled fallback. The old builders in ./expertise-finder.js stay as
- * the parity oracle (tests/unit/tool-prompt-parity/expertise-finder.test.js).
+ * resolver's bundled fallback. The composed bytes are locked by golden fixtures (tests/fixtures/tool-prompt-golden/expertise-finder.json, tests/unit/tool-prompt-parity/expertise-finder.test.js).
  *
  * A7: the untrusted-content preamble is code-owned. The system template carries
  * the reserved `{{a7_preamble}}` slot (declared required) which composeToolPrompt
@@ -177,7 +176,7 @@ export function buildRosterContext(rosterMembers) {
 /**
  * One merged variable map for composeToolPromptPair (a `{{var}}` may live in
  * either template after an /admin edit). `additional_notes_block` is exactly what
- * the old buildUserPrompt ternary emitted ('' when absent).
+ * the retired buildUserPrompt ternary emitted ('' when absent).
  */
 export function buildExpertiseMatchVariables({ rosterMembers, wrappedProposal, additionalNotes = '' }) {
   return {

@@ -2,15 +2,14 @@
  * Dynamics-backed prompt rows for the Multi-Perspective Evaluator (convergence plan Stage 5).
  *
  * Source of truth for the six `multi-perspective.*` wmkf_ai_prompt rows AND the
- * resolver's bundled fallback. The old builders in ./multi-perspective-evaluator.js
- * stay as the parity oracle (tests/unit/tool-prompt-parity/multi-perspective.test.js).
+ * resolver's bundled fallback. The composed bytes are locked by golden fixtures (tests/fixtures/tool-prompt-golden/multi-perspective.json, tests/unit/tool-prompt-parity/multi-perspective.test.js).
  *
  * A7: the untrusted-content preamble is code-owned. Every body template opens with
  * the reserved `{{a7_preamble}}` slot, which composeToolPromptPair fills from the
  * nonces the variables helpers return. Stage 1 carries the concept page as a PDF
  * document block (no text to wrap), so its helper returns an empty nonce list. The
  * downstream stages wrap the Stage-1 analysis, the literature results and prior
- * model output in the helpers below, in the same order as the old builders.
+ * model output in the helpers below, in the same order as the retired hand-written builders.
  * Framework-specific text and every list/branch is pre-computed into variables.
  */
 import {
@@ -713,7 +712,7 @@ export function buildMultiPerspectiveInitialVariables() {
   };
 }
 
-/** Variables for multi-perspective.proposal-summary. Same two wraps, in the same order, as createProposalSummaryPrompt. */
+/** Variables for multi-perspective.proposal-summary. Same two wraps, in the same order, as the retired createProposalSummaryPrompt. */
 export function buildMultiPerspectiveSummaryVariables(initialAnalysis, literatureResults) {
   const concept = wrapConceptAnalysis(initialAnalysis, 'multi-perspective.proposal-summary.concept');
   const literature = wrapUntrustedContent({
@@ -755,7 +754,7 @@ export function buildMultiPerspectiveVariables(initialAnalysis, literatureResult
   };
 }
 
-/** Variables for multi-perspective.integrator. Same four wraps, in the same order, as createIntegratorPrompt. */
+/** Variables for multi-perspective.integrator. Same four wraps, in the same order, as the retired createIntegratorPrompt. */
 export function buildMultiPerspectiveIntegratorVariables(initialAnalysis, optimistResult, skepticResult, neutralResult, framework) {
   const frameworkDef = frameworkFor(framework);
   const concept = wrapConceptAnalysis(initialAnalysis, 'multi-perspective.integrator.concept');

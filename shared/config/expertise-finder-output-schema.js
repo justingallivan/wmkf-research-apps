@@ -33,7 +33,7 @@ const namedRationale = (rationaleKey) => ({
   },
 });
 
-/** Schema for `buildCacheableSystemPrompt`/`buildUserPrompt` match output. */
+/** Schema for `expertise-finder.match` row output (`prompts/expertise-finder-dynamics.js`). */
 export const EXPERTISE_MATCH_SCHEMA = {
   type: 'object',
   fields: {

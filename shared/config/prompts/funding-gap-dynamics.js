@@ -3,9 +3,8 @@
  * (convergence plan Stage 2).
  *
  * Source of truth for the `funding-gap.extract` and `funding-gap.analyze`
- * wmkf_ai_prompt rows AND the resolver's bundled fallback. The old builders in
- * ./funding-gap-analyzer.js stay as the parity oracle
- * (tests/unit/tool-prompt-parity/funding-gap.test.js).
+ * wmkf_ai_prompt rows AND the resolver's bundled fallback. The composed bytes are
+ * locked by golden fixtures (tests/fixtures/tool-prompt-golden/funding-gap.json, tests/unit/tool-prompt-parity/funding-gap.test.js).
  *
  * A7: the untrusted-content preamble is code-owned. Each body template opens
  * with the reserved `{{a7_preamble}}` slot which composeToolPromptPair fills
@@ -250,7 +249,7 @@ export function buildFundingExtractVariables({ wrappedProposal, nonces }) {
 /**
  * Variables for funding-gap.analyze. Performs the SAME three wrapUntrustedContent
  * calls, in the SAME order and with the same arguments, as the bundled
- * createFundingAnalysisPrompt (so deterministic nonces line up in the parity test)
+ * the retired createFundingAnalysisPrompt (so deterministic nonces line up with the golden fixture)
  * and pre-computes every usaSpendingData.disabled branch and keyword list.
  */
 export function buildFundingAnalyzeVariables(data) {

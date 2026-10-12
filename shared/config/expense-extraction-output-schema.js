@@ -17,7 +17,7 @@ const optStr = (maxLength) => ({
   maxLength,
 });
 
-/** Schema for `createExpenseExtractionPrompt` output. */
+/** Schema for `expense-reporter.extract-document` / `.extract-image` row output (`prompts/expense-reporter-dynamics.js`). */
 export const EXPENSE_EXTRACTION_SCHEMA = {
   type: 'object',
   fields: {

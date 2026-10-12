@@ -3,8 +3,7 @@
  *
  * Source of truth for the `expense-reporter.extract-document` (PDF/text path) and
  * `expense-reporter.extract-image` (image path) wmkf_ai_prompt rows AND the
- * resolver's bundled fallback. The old builder in ./expense-reporter.js stays as
- * the parity oracle (tests/unit/tool-prompt-parity/expense-reporter.test.js).
+ * resolver's bundled fallback. The composed bytes are locked by golden fixtures (tests/fixtures/tool-prompt-golden/expense-reporter.json, tests/unit/tool-prompt-parity/expense-reporter.test.js).
  *
  * A7: the untrusted-content preamble is code-owned. Each body template opens with
  * the reserved `{{a7_preamble}}` slot, filled by composeToolPromptPair. Today's
