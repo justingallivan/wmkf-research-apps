@@ -34,22 +34,41 @@ export function parseSummaryText(text, { headings = [], listHeadings = [] } = {}
   return sections.filter((section) => section.heading || section.lines.length > 0);
 }
 
-export default function SummaryText({ text, headings, listHeadings, headingLevel = 3 }) {
+// `reading` is the Board page's reading size; `compact` sits inside dense staff panels.
+const SIZES = {
+  reading: {
+    stack: 'space-y-10',
+    heading: 'text-xl font-semibold text-gray-900 text-balance',
+    gap: 'mt-4',
+    list: 'list-disc space-y-2 pl-6 text-lg leading-8 text-gray-800 marker:text-gray-400',
+    paragraphs: 'space-y-5 text-lg leading-8 text-gray-800',
+  },
+  compact: {
+    stack: 'space-y-4',
+    heading: 'text-sm font-semibold text-gray-600',
+    gap: 'mt-1',
+    list: 'list-disc space-y-1 pl-5 text-sm leading-6 text-gray-800 marker:text-gray-400',
+    paragraphs: 'space-y-2 text-sm leading-6 text-gray-800',
+  },
+};
+
+export default function SummaryText({ text, headings, listHeadings, headingLevel = 3, size = 'reading', maxSections }) {
   const Heading = `h${headingLevel}`;
-  const sections = parseSummaryText(text, { headings, listHeadings });
+  const classes = SIZES[size] || SIZES.reading;
+  const sections = parseSummaryText(text, { headings, listHeadings }).slice(0, maxSections);
   return (
-    <div className="space-y-10">
+    <div className={classes.stack}>
       {sections.map((section, index) => (
         <section key={`${section.heading || 'text'}-${index}`}>
           {section.heading && (
-            <Heading className="text-xl font-semibold text-gray-900 text-balance">{section.heading}</Heading>
+            <Heading className={classes.heading}>{section.heading}</Heading>
           )}
           {section.list ? (
-            <ul className={`${section.heading ? 'mt-4' : ''} list-disc space-y-2 pl-6 text-lg leading-8 text-gray-800 marker:text-gray-400`}>
+            <ul className={`${section.heading ? classes.gap : ''} ${classes.list}`}>
               {section.lines.map((line, lineIndex) => <li key={lineIndex}>{line}</li>)}
             </ul>
           ) : (
-            <div className={`${section.heading ? 'mt-4' : ''} space-y-5 text-lg leading-8 text-gray-800`}>
+            <div className={`${section.heading ? classes.gap : ''} ${classes.paragraphs}`}>
               {section.lines.map((line, lineIndex) => <p key={lineIndex}>{line}</p>)}
             </div>
           )}
