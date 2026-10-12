@@ -364,3 +364,19 @@ model. A failed live check → `git revert` the route commit; rows stay.
      `lib/services/tool-prompt-resolver.js` (and the composer) to `callSiteFiles`; old builders stay
      declared until Stage 6.
   8. Editing is superuser-only (`requireSuperuser`, `pages/api/admin/prompts/index.js:21`).
+- 2026-10-12: **Stages 0–5 built (Sonnet builds, Opus review, Codex adversarial).** Branch
+  `claude/tool-prompts-plan-a`. 14 rows: `expertise-finder.match`; `funding-gap.extract|analyze`;
+  `expense-reporter.extract-document|extract-image`; `literature-analyzer.extract-paper|synthesize|compare`;
+  `multi-perspective.initial-analysis|proposal-summary|optimist|skeptic|neutral|integrator`. Byte-parity
+  tests under `tests/unit/tool-prompt-parity/` for every builder branch (deterministic nonces), each
+  mutation-checked. Codex: Stage 0+1 round 1 needs-attention (3 medium: validated admin edits that
+  could not compose → `composeToolPromptPair` with one merged map; bundled fallback too broad →
+  transient-only `isTransientDataverseError`; unseeded row opaque → 503 `tool_prompt_unavailable`),
+  round 2 approve; Stages 2–5 approve, no findings. Gates: all green except `check:agent-wiki`, which
+  fails only in a worktree lacking the per-machine `.agents/skills` symlink (passes with it and on
+  `main`); build passes; full suite 23,277 passed. Recorded deviations: `{{a7_preamble}}` slot (not
+  prepend-only) so builders that place the preamble mid-prompt keep byte parity; evaluator constants
+  copied into `multi-perspective-dynamics.js` with a deep-equal test (the old module cannot load under
+  the Node ESM seed script); a missing row now returns 503 before input validation in the evaluator.
+  **Not done, owner-gated:** seeding, merge, live checks; Stage 6 (retire old builders, docs) after all
+  five are live.
