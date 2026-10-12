@@ -9,6 +9,15 @@ import {
   saveSiteVisitLogistics,
 } from '../../../../lib/services/site-visit/logistics-service';
 import { resolveWriteupViewer } from '../../../../lib/services/pre-site-visit/writeup-visibility';
+import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../../../shared/config/requestDocument';
+
+// The full meeting recording includes the staff discussion, so on the Workbench only superusers
+// receive it (owner 2026-10-11); everyone else has the presentation video, transcripts and summaries.
+function withoutRecording(list) {
+  return Array.isArray(list)
+    ? list.filter((item) => Number(item?.artifactType) !== REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING)
+    : list;
+}
 
 export const config = {
   api: { bodyParser: { sizeLimit: '64kb' } },
@@ -66,13 +75,14 @@ export default async function handler(req, res) {
         const result = await getSiteVisitLogistics({
           requestId, includePresentationSummaryText: true, includePresentationVideoState: true, writeupViewer,
         });
+        const seesRecording = role === 'superuser';
         return res.status(200).json({
           success: true,
           siteVisit: result.siteVisit,
-          materials: result.materials,
+          materials: seesRecording ? result.materials : withoutRecording(result.materials),
           presentationMaterialsStatus: result.presentationMaterialsStatus,
           ...(result.presentationMaterialsStatus === 'ready' ? {
-            presentationMaterials: result.presentationMaterials,
+            presentationMaterials: seesRecording ? result.presentationMaterials : withoutRecording(result.presentationMaterials),
             presentationMaterialConflicts: result.presentationMaterialConflicts,
             presentationSummary: result.presentationSummary ?? null,
             discussionSummary: result.discussionSummary ?? null,
