@@ -54,7 +54,27 @@ test('manifest table covers the five apps; unknown key or missing file errors cl
   expect(Object.keys(APP_MANIFEST_FILES).sort()).toEqual(
     ['expense-reporter', 'expertise-finder', 'funding-gap', 'literature-analyzer', 'multi-perspective']);
   await expect(loadManifestRows('nope')).rejects.toThrow(/Unknown app "nope"/);
-  await expect(loadManifestRows('multi-perspective')).rejects.toThrow(/does not exist yet/);
+  await expect(loadManifestRows('multi-perspective')).resolves.toHaveLength(6);
+});
+
+// Every app now has a manifest, so exercise the missing-manifest branch by faking the
+// import failure and the file-existence probe for one real key (production code untouched).
+test('a manifest that does not exist errors as "does not exist yet"', async () => {
+  jest.resetModules();
+  jest.doMock('../../shared/config/prompts/multi-perspective-dynamics.js', () => {
+    const err = new Error("Cannot find module '../shared/config/prompts/multi-perspective-dynamics.js'");
+    err.code = 'MODULE_NOT_FOUND';
+    throw err;
+  });
+  jest.doMock('fs', () => ({ ...jest.requireActual('fs'), existsSync: () => false }));
+  try {
+    const { loadManifestRows: load } = require('../../scripts/seed-tool-prompts.js');
+    await expect(load('multi-perspective')).rejects.toThrow(/does not exist yet/);
+  } finally {
+    jest.dontMock('../../shared/config/prompts/multi-perspective-dynamics.js');
+    jest.dontMock('fs');
+    jest.resetModules();
+  }
 });
 
 test('CLI exits 1 for an unknown app key without touching Dataverse', () => {
