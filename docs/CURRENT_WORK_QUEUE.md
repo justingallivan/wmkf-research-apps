@@ -870,7 +870,9 @@ These are valid directions but are not current app-team delivery commitments:
   and its fresh-install versions V55–V59 collide with `main`'s. Record: GitHub branch and draft
   PR #328 (do not merge); plan `docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md`
   exists only on that branch. If revived, restart from a fresh Stage 0 census on `main`; do not
-  rebase the branch. Its fresh-install finding (five migration-only tables) is handled separately.
+  rebase the branch. Its Stage 0 "five migration-only tables" finding is not a fresh-install
+  gap: `setup-database.js` replays `lib/db/migrations-manifest.json` via
+  `scripts/lib/fresh-database-bootstrap.js`, verified on a throwaway Postgres 16 2026-10-12.
 - Flat `lib/services` relocation (Plan B) — tabled by the owner 2026-10-12 (Session 598):
   navigation-only benefit against a repo-wide rename. Revival notes, including the
   `reviewer-engagement/` boundary-gate hazard, are in
