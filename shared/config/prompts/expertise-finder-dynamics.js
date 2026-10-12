@@ -2,15 +2,13 @@
  * Dynamics-backed prompt row for the Expertise Finder (convergence plan Stage 1).
  *
  * Source of truth for the `expertise-finder.match` wmkf_ai_prompt row AND the
- * resolver's bundled fallback. The old builders in ./expertise-finder.js stay as
- * the parity oracle (tests/unit/tool-prompt-parity/expertise-finder.test.js).
+ * resolver's bundled fallback. The composed bytes are locked by golden fixtures (tests/fixtures/tool-prompt-golden/expertise-finder.json, tests/unit/tool-prompt-parity/expertise-finder.test.js).
  *
  * A7: the untrusted-content preamble is code-owned. The system template carries
  * the reserved `{{a7_preamble}}` slot (declared required) which composeToolPrompt
  * fills; the proposal text is wrapped by the route and passed as `proposal_text`.
  * The preamble is general-form (no nonces), matching the cacheable builder.
  */
-import { buildRosterContext } from './expertise-finder.js';
 
 const SYSTEM_TEMPLATE = `You are a scientific expertise matching system for the W.M. Keck Foundation. You analyze research proposals and match them to the most qualified internal reviewers based on deep domain expertise. Always respond with valid JSON. Never force-fit a poor match — honestly flag gaps when no roster member can evaluate a proposal's core claims.
 
@@ -133,9 +131,52 @@ export const EXPERTISE_FINDER_MATCH_ROW = {
 export const TOOL_PROMPT_ROWS = [EXPERTISE_FINDER_MATCH_ROW];
 
 /**
+ * Build the roster context block from database records.
+ * Groups by role_type for clarity in the prompt.
+ */
+export function buildRosterContext(rosterMembers) {
+  const staff = rosterMembers.filter(m => m.role_type === 'Research Program Staff');
+  const consultants = rosterMembers.filter(m => m.role_type === 'Consultant');
+  const board = rosterMembers.filter(m => m.role_type === 'Board');
+
+  function formatMember(m) {
+    const lines = [`**${m.name}** — ${m.role || 'N/A'}, ${m.affiliation || 'N/A'}`];
+    if (m.primary_fields) lines.push(`  Fields: ${m.primary_fields}`);
+    if (m.keywords) lines.push(`  Keywords: ${m.keywords}`);
+    if (m.subfields_specialties) lines.push(`  Subfields: ${m.subfields_specialties}`);
+    if (m.methods_techniques) lines.push(`  Methods: ${m.methods_techniques}`);
+    if (m.expertise) lines.push(`  Expertise: ${m.expertise}`);
+    if (m.keck_affiliation) lines.push(`  Keck Affiliation: ${m.keck_affiliation}`);
+    return lines.join('\n');
+  }
+
+  let context = '';
+
+  if (staff.length > 0) {
+    context += '## RESEARCH PROGRAM STAFF (eligible for primary/secondary PD assignment)\n\n';
+    context += staff.map(formatMember).join('\n\n');
+    context += '\n\n';
+  }
+
+  if (consultants.length > 0) {
+    context += '## CONSULTANTS (flag if expertise overlaps with proposal)\n\n';
+    context += consultants.map(formatMember).join('\n\n');
+    context += '\n\n';
+  }
+
+  if (board.length > 0) {
+    context += '## BOARD MEMBERS (flag if proposal may be of personal scientific interest)\n\n';
+    context += board.map(formatMember).join('\n\n');
+    context += '\n\n';
+  }
+
+  return context;
+}
+
+/**
  * One merged variable map for composeToolPromptPair (a `{{var}}` may live in
  * either template after an /admin edit). `additional_notes_block` is exactly what
- * the old buildUserPrompt ternary emitted ('' when absent).
+ * the retired buildUserPrompt ternary emitted ('' when absent).
  */
 export function buildExpertiseMatchVariables({ rosterMembers, wrappedProposal, additionalNotes = '' }) {
   return {

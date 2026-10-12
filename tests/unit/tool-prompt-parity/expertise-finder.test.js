@@ -1,5 +1,4 @@
 /** @jest-environment node */
-import { buildCacheableSystemPrompt, buildUserPrompt } from '../../../shared/config/prompts/expertise-finder';
 import {
   EXPERTISE_FINDER_MATCH_ROW as ROW,
   TOOL_PROMPT_ROWS,
@@ -8,6 +7,8 @@ import {
 import { composeToolPromptPair } from '../../../lib/services/tool-prompt-composer';
 import { validatePromptTemplatePair } from '../../../lib/utils/prompt-validators';
 import { DATA_CLASSES, wrapUntrustedContent } from '../../../lib/utils/ai-payload-boundary';
+import { expectGolden } from '../../helpers/golden';
+import { withDeterministicNonces } from '../../helpers/prompt-parity';
 
 const member = (o) => ({ name: 'N', role: 'R', affiliation: 'A', ...o });
 const ROSTERS = {
@@ -21,13 +22,13 @@ const ROSTERS = {
   'unknown-role-only': [member({ name: 'Fay', role_type: 'Other' })],
   empty: [],
 };
-const PROPOSAL = wrapUntrustedContent({
+const PROPOSAL = withDeterministicNonces(['p1'], () => wrapUntrustedContent({
   text: 'Proposal with {{braces}} and ${dollar} and `ticks`',
   source: 'parity.test',
   dataClass: DATA_CLASSES.PROPOSAL_TEXT,
   maxChars: 100000,
   label: 'research proposal',
-}).text;
+}).text);
 const NOTES = [['no notes', ''], ['undefined notes', undefined], ['with notes', 'Focus on methods.\nSecond line.']];
 const compose = (roster, wrapped, notes) => {
   const variables = buildExpertiseMatchVariables({ rosterMembers: roster, wrappedProposal: wrapped, additionalNotes: notes });
@@ -38,11 +39,11 @@ const compose = (roster, wrapped, notes) => {
 describe('expertise-finder.match parity with the bundled builders', () => {
   for (const [rname, roster] of Object.entries(ROSTERS)) {
     test(`system prompt byte-equal: ${rname}`, () => {
-      expect(compose(roster, PROPOSAL, '').system).toBe(buildCacheableSystemPrompt(roster));
+      expectGolden('expertise-finder', compose(roster, PROPOSAL, '').system);
     });
     for (const [nname, notes] of NOTES) {
       test(`body byte-equal: ${rname} / ${nname}`, () => {
-        expect(compose(roster, PROPOSAL, notes).body).toBe(buildUserPrompt(PROPOSAL, notes));
+        expectGolden('expertise-finder', compose(roster, PROPOSAL, notes).body);
       });
     }
   }

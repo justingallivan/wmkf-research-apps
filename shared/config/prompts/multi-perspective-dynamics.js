@@ -2,15 +2,14 @@
  * Dynamics-backed prompt rows for the Multi-Perspective Evaluator (convergence plan Stage 5).
  *
  * Source of truth for the six `multi-perspective.*` wmkf_ai_prompt rows AND the
- * resolver's bundled fallback. The old builders in ./multi-perspective-evaluator.js
- * stay as the parity oracle (tests/unit/tool-prompt-parity/multi-perspective.test.js).
+ * resolver's bundled fallback. The composed bytes are locked by golden fixtures (tests/fixtures/tool-prompt-golden/multi-perspective.json, tests/unit/tool-prompt-parity/multi-perspective.test.js).
  *
  * A7: the untrusted-content preamble is code-owned. Every body template opens with
  * the reserved `{{a7_preamble}}` slot, which composeToolPromptPair fills from the
  * nonces the variables helpers return. Stage 1 carries the concept page as a PDF
  * document block (no text to wrap), so its helper returns an empty nonce list. The
  * downstream stages wrap the Stage-1 analysis, the literature results and prior
- * model output in the helpers below, in the same order as the old builders.
+ * model output in the helpers below, in the same order as the retired hand-written builders.
  * Framework-specific text and every list/branch is pre-computed into variables.
  */
 import {
@@ -22,9 +21,8 @@ const MP_CONCEPT_MAX_CHARS = 20_000;
 const MP_LITERATURE_MAX_CHARS = 60_000;
 const MP_PERSPECTIVE_MAX_CHARS = 40_000;
 
-// Mirror of KECK_FUNDING_GUIDELINES / EVALUATION_FRAMEWORKS in multi-perspective-evaluator.js
-// (that module's extensionless imports cannot load under the Node ESM seed script; a parity
-// test asserts these stay deep-equal to the oracle until Stage 6 retires it).
+// Single home for KECK_FUNDING_GUIDELINES / EVALUATION_FRAMEWORKS / selectDatabasesForResearchArea:
+// the route and the seed script both import them from here (explicit .js specifiers, Node-ESM loadable).
 export const KECK_FUNDING_GUIDELINES = {
   fundingPriorities: [
     'High-impact research in basic physical, life, and biomedical sciences, including instrumentation and engineering in service of basic science',
@@ -714,7 +712,7 @@ export function buildMultiPerspectiveInitialVariables() {
   };
 }
 
-/** Variables for multi-perspective.proposal-summary. Same two wraps, in the same order, as createProposalSummaryPrompt. */
+/** Variables for multi-perspective.proposal-summary. Same two wraps, in the same order, as the retired createProposalSummaryPrompt. */
 export function buildMultiPerspectiveSummaryVariables(initialAnalysis, literatureResults) {
   const concept = wrapConceptAnalysis(initialAnalysis, 'multi-perspective.proposal-summary.concept');
   const literature = wrapUntrustedContent({
@@ -756,7 +754,7 @@ export function buildMultiPerspectiveVariables(initialAnalysis, literatureResult
   };
 }
 
-/** Variables for multi-perspective.integrator. Same four wraps, in the same order, as createIntegratorPrompt. */
+/** Variables for multi-perspective.integrator. Same four wraps, in the same order, as the retired createIntegratorPrompt. */
 export function buildMultiPerspectiveIntegratorVariables(initialAnalysis, optimistResult, skepticResult, neutralResult, framework) {
   const frameworkDef = frameworkFor(framework);
   const concept = wrapConceptAnalysis(initialAnalysis, 'multi-perspective.integrator.concept');
@@ -781,4 +779,44 @@ export function buildMultiPerspectiveIntegratorVariables(initialAnalysis, optimi
     },
     nonces: [concept.nonce, optimist.nonce, skeptic.nonce, neutral.nonce],
   };
+}
+
+/**
+ * Determine which databases to search based on research area
+ */
+export function selectDatabasesForResearchArea(researchArea) {
+  const area = (researchArea || '').toLowerCase();
+
+  // Life sciences
+  if (area.includes('biology') || area.includes('biomedical') ||
+      area.includes('genetics') || area.includes('genomics') ||
+      area.includes('molecular') || area.includes('cell') ||
+      area.includes('neuroscience') || area.includes('immunology') ||
+      area.includes('cancer') || area.includes('medical') ||
+      area.includes('biochem') || area.includes('microbiology')) {
+    return { pubmed: true, biorxiv: true, arxiv: false, chemrxiv: false };
+  }
+
+  // Chemistry
+  if (area.includes('chemistry') || area.includes('chemical') ||
+      area.includes('polymer') || area.includes('catalysis') ||
+      area.includes('synthesis') || area.includes('materials')) {
+    return { pubmed: true, chemrxiv: true, arxiv: false, biorxiv: false };
+  }
+
+  // Physics, Math, CS
+  if (area.includes('physics') || area.includes('mathematics') ||
+      area.includes('computer science') || area.includes('machine learning') ||
+      area.includes('artificial intelligence') || area.includes('quantum') ||
+      area.includes('astrophysics') || area.includes('astronomy')) {
+    return { pubmed: false, arxiv: true, biorxiv: false, chemrxiv: false };
+  }
+
+  // Engineering - could be in multiple places
+  if (area.includes('engineering')) {
+    return { pubmed: true, arxiv: true, biorxiv: false, chemrxiv: false };
+  }
+
+  // Default: PubMed only (most comprehensive)
+  return { pubmed: true, arxiv: false, biorxiv: false, chemrxiv: false };
 }

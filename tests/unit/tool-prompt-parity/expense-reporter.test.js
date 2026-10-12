@@ -1,5 +1,4 @@
 /** @jest-environment node */
-import { createExpenseExtractionPrompt } from '../../../shared/config/prompts/expense-reporter';
 import {
   EXPENSE_EXTRACT_DOCUMENT_ROW,
   EXPENSE_EXTRACT_IMAGE_ROW,
@@ -11,6 +10,7 @@ import { composeToolPromptPair } from '../../../lib/services/tool-prompt-compose
 import { validatePromptTemplatePair } from '../../../lib/utils/prompt-validators';
 import { DATA_CLASSES, wrapUntrustedContent } from '../../../lib/utils/ai-payload-boundary';
 import { withDeterministicNonces } from '../../helpers/prompt-parity';
+import { expectGolden } from '../../helpers/golden';
 
 const compose = (row, { variables, nonces }) =>
   composeToolPromptPair({ systemPrompt: row.systemPrompt, body: row.body }, variables, { nonces });
@@ -29,13 +29,12 @@ describe('expense-reporter.extract-document parity (PDF/text path)', () => {
   for (const fileName of FILE_NAMES) {
     for (const text of TEXTS) {
       test(`byte-equal: ${fileName} / ${text.slice(0, 12)}`, () => {
-        const oldOut = withDeterministicNonces(['x1'], () => createExpenseExtractionPrompt(wrap(text).text, fileName, 'pdf'));
         const newOut = withDeterministicNonces(['x1'], () => compose(
           EXPENSE_EXTRACT_DOCUMENT_ROW,
           buildExpenseDocumentVariables({ wrappedDocumentText: wrap(text).text, fileName }),
         ));
         expect(newOut.systemPrompt).toBe('');
-        expect(newOut.body).toBe(oldOut);
+        expectGolden('expense-reporter', newOut.body);
       });
     }
   }
@@ -44,10 +43,9 @@ describe('expense-reporter.extract-document parity (PDF/text path)', () => {
 describe('expense-reporter.extract-image parity (image path)', () => {
   for (const [fileName, fileType] of [['receipt.png', 'png'], ['r {{x}} $&.jpg', 'jpg'], ['r.JPEG', 'JPEG'], ["it's.jpeg", 'jpeg']]) {
     test(`byte-equal: ${fileName}`, () => {
-      const oldOut = createExpenseExtractionPrompt('', fileName, fileType);
       const newOut = compose(EXPENSE_EXTRACT_IMAGE_ROW, buildExpenseImageVariables({ fileName }));
       expect(newOut.systemPrompt).toBe('');
-      expect(newOut.body).toBe(oldOut);
+      expectGolden('expense-reporter', newOut.body);
       expect(newOut.body).toContain('ATTACHED IMAGE');
     });
   }

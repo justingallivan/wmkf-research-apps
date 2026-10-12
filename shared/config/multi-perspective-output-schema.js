@@ -43,7 +43,7 @@ const criteriaEvaluations = {
   type: 'array', required: false, default: [], maxItems: 30, of: criterionEvaluation,
 };
 
-/** Stage 1 — `createInitialAnalysisPrompt`. */
+/** Stage 1 — `multi-perspective.initial-analysis` row. */
 export const INITIAL_ANALYSIS_SCHEMA = {
   type: 'object',
   fields: {
@@ -74,7 +74,7 @@ export const INITIAL_ANALYSIS_SCHEMA = {
   },
 };
 
-/** Stage 2.5 — `createProposalSummaryPrompt`. */
+/** Stage 2.5 — `multi-perspective.proposal-summary` row. */
 export const PROPOSAL_SUMMARY_SCHEMA = {
   type: 'object',
   fields: {
@@ -87,7 +87,7 @@ export const PROPOSAL_SUMMARY_SCHEMA = {
   },
 };
 
-/** Stage 3a — `createOptimistPrompt`. */
+/** Stage 3a — `multi-perspective.optimist` row. */
 export const OPTIMIST_SCHEMA = {
   type: 'object',
   fields: {
@@ -105,7 +105,7 @@ export const OPTIMIST_SCHEMA = {
   },
 };
 
-/** Stage 3b — `createSkepticPrompt`. */
+/** Stage 3b — `multi-perspective.skeptic` row. */
 export const SKEPTIC_SCHEMA = {
   type: 'object',
   fields: {
@@ -127,7 +127,7 @@ export const SKEPTIC_SCHEMA = {
   },
 };
 
-/** Stage 3c — `createNeutralPrompt`. */
+/** Stage 3c — `multi-perspective.neutral` row. */
 export const NEUTRAL_SCHEMA = {
   type: 'object',
   fields: {
@@ -151,7 +151,7 @@ export const PERSPECTIVE_SCHEMAS = {
   neutral: NEUTRAL_SCHEMA,
 };
 
-/** Stage 4 — `createIntegratorPrompt`. */
+/** Stage 4 — `multi-perspective.integrator` row. */
 export const INTEGRATOR_SCHEMA = {
   type: 'object',
   fields: {

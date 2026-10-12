@@ -181,7 +181,6 @@ const SURFACES = [
     // block — no text to wrap. The A7 control is the multimodal preamble.
     multimodal: true,
     promptFiles: [
-      'shared/config/prompts/multi-perspective-evaluator.js',
       // Seam-backed row definitions + variables helpers (convergence plan Stage 5).
       'shared/config/prompts/multi-perspective-dynamics.js',
     ],
@@ -191,25 +190,15 @@ const SURFACES = [
       'lib/services/tool-prompt-resolver.js',
       'lib/services/tool-prompt-composer.js',
     ],
-    // Call-site-granular: every builder must carry the preamble in its own body.
-    builders: [
-      'createInitialAnalysisPrompt',
-      'createProposalSummaryPrompt',
-      'createOptimistPrompt',
-      'createSkepticPrompt',
-      'createNeutralPrompt',
-      'createIntegratorPrompt',
-    ],
   },
   {
     // Stage 1 paper extraction is multimodal (PDF document block); Stage 2
-    // synthesis/comparison wrap the re-fed extracted-paper text in-builder,
-    // so this surface has a genuine wrap site and is not multimodal-flagged.
+    // synthesis/comparison wrap the re-fed extracted-paper text in the variables
+    // helper, so this surface has a genuine wrap site and is not multimodal-flagged.
     id: 'analyze-literature',
     inv: 9,
     status: 'migrated',
     promptFiles: [
-      'shared/config/prompts/literature-analyzer.js',
       // Seam-backed row definitions + variables helpers (convergence plan Stage 4).
       'shared/config/prompts/literature-analyzer-dynamics.js',
     ],
@@ -219,18 +208,12 @@ const SURFACES = [
       'lib/services/tool-prompt-resolver.js',
       'lib/services/tool-prompt-composer.js',
     ],
-    builders: [
-      'createPaperExtractionPrompt',
-      'createSynthesisPrompt',
-      'createComparisonPrompt',
-    ],
   },
   {
     id: 'analyze-funding-gap',
     inv: 10,
     status: 'migrated',
     promptFiles: [
-      'shared/config/prompts/funding-gap-analyzer.js',
       // Seam-backed row definitions + variables helpers (convergence plan Stage 2).
       'shared/config/prompts/funding-gap-dynamics.js',
     ],
@@ -239,11 +222,6 @@ const SURFACES = [
       // The A7 preamble is composed in code at the resolver seam.
       'lib/services/tool-prompt-resolver.js',
       'lib/services/tool-prompt-composer.js',
-    ],
-    builders: [
-      'createFundingExtractionPrompt',
-      'createFundingAnalysisPrompt',
-      'createBatchFundingSummaryPrompt',
     ],
   },
   {
@@ -255,7 +233,6 @@ const SURFACES = [
     inv: 11,
     status: 'migrated',
     promptFiles: [
-      'shared/config/prompts/expense-reporter.js',
       // Seam-backed row definitions + variables helpers (convergence plan Stage 3).
       'shared/config/prompts/expense-reporter-dynamics.js',
     ],
@@ -265,14 +242,12 @@ const SURFACES = [
       'lib/services/tool-prompt-resolver.js',
       'lib/services/tool-prompt-composer.js',
     ],
-    builders: ['createExpenseExtractionPrompt'],
   },
   {
     id: 'expertise-finder',
     inv: 13,
     status: 'migrated',
     promptFiles: [
-      'shared/config/prompts/expertise-finder.js',
       // Seam-backed row definition + variables helper (convergence plan Stage 1).
       'shared/config/prompts/expertise-finder-dynamics.js',
     ],
@@ -283,12 +258,6 @@ const SURFACES = [
       // The A7 preamble is composed in code at the resolver seam.
       'lib/services/tool-prompt-resolver.js',
       'lib/services/tool-prompt-composer.js',
-    ],
-    // buildCacheableSystemPrompt self-carries the preamble; buildUserPrompt
-    // builds the user message and relies on the system-prompt preamble.
-    builders: [
-      'buildCacheableSystemPrompt',
-      { name: 'buildUserPrompt', routePreamble: true },
     ],
   },
   {

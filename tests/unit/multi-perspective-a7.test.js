@@ -4,18 +4,38 @@
  *
  * Stage 1 sends the concept page as an Anthropic document content block, so
  * the A7 control is the multimodal preamble in the prompt text. Every stage
- * builder must carry it.
+ * (composed from its bundled row) must carry it.
  */
 
 import {
-  createInitialAnalysisPrompt,
-  createProposalSummaryPrompt,
-  createOptimistPrompt,
-  createSkepticPrompt,
-  createNeutralPrompt,
-  createIntegratorPrompt,
+  MULTI_PERSPECTIVE_INITIAL_ANALYSIS_ROW,
+  MULTI_PERSPECTIVE_PROPOSAL_SUMMARY_ROW,
+  MULTI_PERSPECTIVE_OPTIMIST_ROW,
+  MULTI_PERSPECTIVE_SKEPTIC_ROW,
+  MULTI_PERSPECTIVE_NEUTRAL_ROW,
+  MULTI_PERSPECTIVE_INTEGRATOR_ROW,
   EVALUATION_FRAMEWORKS,
-} from '../../shared/config/prompts/multi-perspective-evaluator';
+  buildMultiPerspectiveInitialVariables,
+  buildMultiPerspectiveSummaryVariables,
+  buildMultiPerspectiveVariables,
+  buildMultiPerspectiveIntegratorVariables,
+} from '../../shared/config/prompts/multi-perspective-dynamics';
+import { composeToolPromptPair } from '../../lib/services/tool-prompt-composer';
+
+const compose = (row, { variables, nonces }) =>
+  composeToolPromptPair({ systemPrompt: row.systemPrompt, body: row.body }, variables, { nonces }).body;
+
+// Composed-prompt equivalents of the retired per-stage builders.
+const createInitialAnalysisPrompt = () =>
+  compose(MULTI_PERSPECTIVE_INITIAL_ANALYSIS_ROW, buildMultiPerspectiveInitialVariables());
+const createProposalSummaryPrompt = (a, l) =>
+  compose(MULTI_PERSPECTIVE_PROPOSAL_SUMMARY_ROW, buildMultiPerspectiveSummaryVariables(a, l));
+const perspective = (row) => (a, l, fw) => compose(row, buildMultiPerspectiveVariables(a, l, fw));
+const createOptimistPrompt = perspective(MULTI_PERSPECTIVE_OPTIMIST_ROW);
+const createSkepticPrompt = perspective(MULTI_PERSPECTIVE_SKEPTIC_ROW);
+const createNeutralPrompt = perspective(MULTI_PERSPECTIVE_NEUTRAL_ROW);
+const createIntegratorPrompt = (a, o, s, n, fw) =>
+  compose(MULTI_PERSPECTIVE_INTEGRATOR_ROW, buildMultiPerspectiveIntegratorVariables(a, o, s, n, fw));
 
 const framework = Object.values(EVALUATION_FRAMEWORKS)[0];
 const analysis = { title: 'T', summary: 'S', researchArea: 'bio', keywords: [] };

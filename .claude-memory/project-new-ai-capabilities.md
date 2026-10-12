@@ -4,7 +4,7 @@ description: Two new capabilities planned — compliance screening against Found
 type: project
 status: active
 scope: strategy
-last_verified: 2026-07-27 via Expertise Finder page/route source, production-call-path search, and source-absence check for compliance screening
+last_verified: 2026-10-12 via Expertise Finder route/resolver source and expertise-finder-dynamics.js (prompt now a Dataverse row); compliance-screening absence last checked 2026-07-27
 ---
 
 ## Recall Rule
@@ -14,8 +14,9 @@ Read this when: scoping the Compliance Screening capability, or someone asks abo
 Do:
 - Treat Staff-Proposal Matching as SHIPPED with a UI as Expertise Finder
   (`pages/api/expertise-finder/{match,batch-match,roster,history}.js` +
-  `expertise-finder.js`; production prompt rules in
-  `shared/config/prompts/expertise-finder.js`).
+  `expertise-finder.js`; production prompt rules in the Dataverse
+  `expertise-finder.match` row, seeded from
+  `shared/config/prompts/expertise-finder-dynamics.js`).
 - Build Compliance Screening (still unbuilt) via batch eval against historical Phase I proposals → iterate prompts → deploy as PA triggers; full PDFs but text-only extraction for cost at scale.
 
 Do not:
@@ -25,7 +26,8 @@ Do not:
   isolated reference/demo with no production caller.
 
 Ground truth: `pages/api/expertise-finder/*.js`, `expertise-finder.js`, and
-`shared/config/prompts/expertise-finder.js`; production-call-path search found
+`shared/config/prompts/expertise-finder-dynamics.js` (row definition; live text
+is edited in Admin → Prompt Templates); production-call-path search found
 no caller from the app/API into `modules/expertise_matching`. Compliance-screen
 code was confirmed absent by the S209 source search.
 
@@ -40,7 +42,9 @@ Two new AI capabilities to develop via batch evaluation → production deploymen
 **2. Staff-Proposal Matching** (three tiers) — **SHIPPED as Expertise Finder
 (S209 update)**: `pages/api/expertise-finder/{match,batch-match,roster,history}.js`
 + `expertise-finder.js` page (a real web UI, contra the "no UI" note below);
-production rules live in `shared/config/prompts/expertise-finder.js`.
+production rules live in the `expertise-finder.match` prompt row
+(`shared/config/prompts/expertise-finder-dynamics.js`, resolved via
+`lib/services/tool-prompt-resolver.js`).
 `modules/expertise_matching` remains a non-production reference/demo. The
 staff/consultant/board tiers are all covered.
 - **Staff lead:** Coarse matching (~16 staff, by program area)

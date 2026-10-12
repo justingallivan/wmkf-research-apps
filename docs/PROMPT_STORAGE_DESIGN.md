@@ -16,7 +16,7 @@ related:
 
 # Prompt Storage — Current Boundary and Historical Design
 
-## Current implementation boundary (reconciled 2026-07-27)
+## Current implementation boundary (reconciled 2026-10-12)
 
 **Shipped in source:**
 
@@ -28,6 +28,22 @@ related:
   `pages/api/admin/prompts/`;
 - append-only Postgres publication audit; and
 - repository seed paths for bootstrap/recovery.
+- a second, non-Executor consumption path for the five standalone tool apps
+  (Plan A, live 2026-10-12): `lib/services/tool-prompt-resolver.js`
+  (`resolveToolPrompt`: current row, bundled fallback only on transient Dataverse
+  errors, 0 or >1 current rows fail loud as 503 `tool_prompt_unavailable`) and
+  `lib/services/tool-prompt-composer.js` (`composeToolPromptPair`; the A7 preamble
+  is code-owned via the `{{a7_preamble}}` slot). Model resolution is shared with
+  the Executor through `lib/services/prompt-model-resolution.js`. The routes keep
+  their own `LLMClient` calls and write no `wmkf_ai_run` rows. Fourteen rows —
+  `expertise-finder.match`, `funding-gap.extract|analyze`,
+  `expense-reporter.extract-document|extract-image`,
+  `literature-analyzer.extract-paper|synthesize|compare`,
+  `multi-perspective.initial-analysis|proposal-summary|optimist|skeptic|neutral|integrator`
+  — are defined in `shared/config/prompts/<app>-dynamics.js` and seeded by
+  `scripts/seed-tool-prompts.js`; the apps' models live on the rows (edited in
+  Prompt Templates), not in Model Config. Design and log:
+  `docs/plans/AI_TOOL_APPS_EXECUTOR_CONVERGENCE_PLAN_2026-10-11.md`.
 
 **Not built as described by the historical design below:**
 

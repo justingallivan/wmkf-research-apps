@@ -3,8 +3,7 @@
  *
  * Source of truth for the `literature-analyzer.extract-paper`, `.synthesize` and
  * `.compare` wmkf_ai_prompt rows AND the resolver's bundled fallback. The old
- * builders in ./literature-analyzer.js stay as the parity oracle
- * (tests/unit/tool-prompt-parity/literature-analyzer.test.js).
+ * builders are retired; the composed bytes are locked by golden fixtures (tests/fixtures/tool-prompt-golden/literature-analyzer.json, tests/unit/tool-prompt-parity/literature-analyzer.test.js).
  *
  * A7: the untrusted-content preamble is code-owned. Each body template opens with
  * the reserved `{{a7_preamble}}` slot, which composeToolPromptPair fills from the
@@ -296,7 +295,7 @@ export function buildLiteratureExtractVariables() {
 
 /**
  * Variables for literature-analyzer.synthesize. Same single wrapUntrustedContent
- * call, with the same arguments, as the bundled createSynthesisPrompt.
+ * call, with the same arguments, as the retired createSynthesisPrompt.
  */
 export function buildLiteratureSynthesisVariables(papers, focusTopic = null) {
   const wrappedSummaries = wrapUntrustedContent({
@@ -323,7 +322,7 @@ export function buildLiteratureSynthesisVariables(papers, focusTopic = null) {
 
 /**
  * Variables for literature-analyzer.compare. Same single wrapUntrustedContent
- * call, with the same arguments, as the bundled createComparisonPrompt.
+ * call, with the same arguments, as the retired createComparisonPrompt.
  */
 export function buildLiteratureCompareVariables(papers, comparisonType = 'findings') {
   const wrappedSummaries = wrapUntrustedContent({

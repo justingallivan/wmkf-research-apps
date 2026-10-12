@@ -123,7 +123,7 @@ New AI capabilities (compliance screening, PD assignment, staff matching) are de
 2. **Summary + keyword extraction** — generate summary and keywords for Dynamics fields (lifecycle step 4)
 3. **PD assignment by specialty area** — route proposals to the right program director (lifecycle step 6, rules to be built from scratch)
 4. **Phase II compliance** — similar to Phase I but requirements may differ (lifecycle step 14)
-5. **Staff-proposal matching** — route to staff lead, flag for consultant, identify relevant board members. **Now powered by the Expertise Finder app** (`pages/expertise-finder.js`) with the roster managed in Vercel Postgres (`expertise_roster` table). Prompt template at `shared/config/prompts/expertise-finder.js`. When validated, hand prompt to Connor for automated PowerAutomate flow.
+5. **Staff-proposal matching** — route to staff lead, flag for consultant, identify relevant board members. **Now powered by the Expertise Finder app** (`pages/expertise-finder.js`) with the roster managed in Vercel Postgres (`expertise_roster` table). Prompt text and model live in the `expertise-finder.match` Dataverse prompt row, editable in Admin → Prompt Templates (row definition: `shared/config/prompts/expertise-finder-dynamics.js`). When validated, hand prompt to Connor for automated PowerAutomate flow.
 
 ### What to build
 

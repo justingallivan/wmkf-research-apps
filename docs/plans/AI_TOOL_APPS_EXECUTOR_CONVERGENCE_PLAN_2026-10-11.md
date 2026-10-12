@@ -19,7 +19,7 @@ related:
 
 Candidate **A** from `LARGEST_UNPLANNED_REFACTOR_SCOPE_2026-10-11.md`. The file name keeps
 "executor convergence" for link stability; the plan no longer moves these apps onto the Executor
-(owner decision 2026-10-12, §8). Status: **Stages 0–5 live in Production (merge `f56125cfa`, 2026-10-12); owner live checks passed; Stage 6 not started.** Tier 2
+(owner decision 2026-10-12, §8). Status: **Stages 0–5 live in Production (merge `f56125cfa`, 2026-10-12); owner live checks passed; Stage 6 (close-out) complete on branch `claude/plan-a-stage-6`, pending owner promotion.** Stages 0–6 complete. Tier 2
 runtime work: a branch per stage, PR, owner promotion. Every stage also needs its prompt rows seeded in
 Preview and Production by the owner-run seed script (a Dataverse write; `DATAVERSE_TARGET_INTERLOCK`
 applies).
@@ -264,7 +264,7 @@ model. A failed live check → `git revert` the route commit; rows stay.
   `callClaudeWithRetry`'s same-model retries; delete its fallback-model switch (D4). Re-point
   `multi-perspective-refusal.test.js`. Remove `multi-perspective-evaluator` from Model Config.
 
-### Stage 6 — Close-out
+### Stage 6 — Close-out — **DONE (2026-10-12, branch `claude/plan-a-stage-6`; see §8)**
 - `grep -rn "getModelForApp('\(multi-perspective-evaluator\|literature-analyzer\|funding-analysis\|expense-reporter\|expertise-finder\)'" lib pages shared` → nothing.
 - Retire the old builders now that the rows' bundled definitions are the fallback (after confirming
   no other importer; the prompt-injection gate registrations move with them).
@@ -386,3 +386,29 @@ model. A failed live check → `git revert` the route commit; rows stay.
   at v1, verified by a dry run reporting `refuse` for all 14. Merged `f56125cfa` (PR #474); the
   production deployment of that commit (`wmkfresearchapps-qud4rgq5z`) is Ready. **Owner live checks
   passed** (owner report, 2026-10-12). Next: Stage 6 — retire the old builders and update the docs.
+- 2026-10-12: **Stage 6 (close-out) done** on `claude/plan-a-stage-6` (code half by Sonnet, docs half by Sonnet).
+  - **Golden fixtures replace the oracle:** `tests/fixtures/tool-prompt-golden/*.json` hold 408 recorded
+    strings (expense-reporter 10, expertise-finder 16, funding-gap 11, literature-analyzer 29,
+    multi-perspective 342), recorded from the old builders under deterministic nonces; the parity tests under
+    `tests/unit/tool-prompt-parity/` now assert composed output byte-equal to them (`tests/helpers/golden.js`).
+    A7 tests (`expertise-finder-a7`, `multi-perspective-a7`, `part6-prompts-a7`) re-pointed at the composed
+    tool-prompt output. One test was dropped: the one for `createBatchFundingSummaryPrompt`, which was never
+    wired into any route.
+  - **Live helpers have single homes:** `KECK_FUNDING_GUIDELINES`, `EVALUATION_FRAMEWORKS`,
+    `selectDatabasesForResearchArea` live in `multi-perspective-dynamics.js`; `buildRosterContext` in
+    `expertise-finder-dynamics.js`; `scripts/audit-system-prompt-sizes.js` imports from there.
+  - **Old modules deleted:** `shared/config/prompts/{expertise-finder,funding-gap-analyzer,expense-reporter,literature-analyzer,multi-perspective-evaluator}.js`
+    and their `shared/config/index.js` re-exports; the prompt-injection gate's surfaces 8–11 and 13 no longer
+    list them.
+  - **Docs reconciled:** `AI_DATA_FLOW_MATRIX`, `PROMPT_STORAGE_DESIGN` (implementation boundary),
+    `SERVICE_AND_UTILITY_CATALOG` (resolver, composer, model-resolution, seed CLI), `agent-wiki/topics/prompt-executor`,
+    `atlas/postgres-infra-tables`, `BACKEND_AUTOMATION_PLAN`, `PROMPT_LEGACY_AUDIT` (update note),
+    `security-audit/A7_PROMPT_INJECTION_PLAN` (update note), `J27_TRANSITION_REGISTER` (J27-008 re-pointed),
+    memory `project-new-ai-capabilities`; code comments in the `*-dynamics.js` headers and the three output-schema
+    files name the current rows. `API_ROUTE_SECURITY_MATRIX` needed no change (no stale file references).
+  - **Historical, intentionally unchanged:** `AI_PROMPTS_DETAILED` (status: historical), `PROMPT_CACHING_PLAN`
+    (historical), `PDF_EXPORT` (page-file names, not prompt modules), `NOMENCLATURE_GLOSSARY`
+    (`concept-evaluator` entry), `docs/audits/*`, `docs/plans/data/DIRECT_LLM_ROUTE_PROFILES_2026-10-11.md`,
+    `docs/plans/J27_REGISTER_RECONCILIATION_DECISIONS_2026-09-08.md`, `docs/security-audit/*.json` scan results,
+    `DOWNLOAD_PROXY_DESIGN_2026-06-11`, `P2_PRIVATE_BLOB_MIGRATION` (app keys only), `_archived/*`, past
+    `DEVELOPMENT_LOG.md` entries.

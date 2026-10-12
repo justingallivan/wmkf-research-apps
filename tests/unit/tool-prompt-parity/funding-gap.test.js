@@ -1,5 +1,4 @@
 /** @jest-environment node */
-import { createFundingExtractionPrompt, createFundingAnalysisPrompt } from '../../../shared/config/prompts/funding-gap-analyzer';
 import {
   FUNDING_GAP_EXTRACT_ROW,
   FUNDING_GAP_ANALYZE_ROW,
@@ -11,6 +10,7 @@ import { composeToolPromptPair } from '../../../lib/services/tool-prompt-compose
 import { validatePromptTemplatePair } from '../../../lib/utils/prompt-validators';
 import { DATA_CLASSES, wrapUntrustedContent } from '../../../lib/utils/ai-payload-boundary';
 import { withDeterministicNonces } from '../../helpers/prompt-parity';
+import { expectGolden } from '../../helpers/golden';
 
 const wrapProposal = (text) => wrapUntrustedContent({
   text,
@@ -28,10 +28,6 @@ const PROPOSALS = {
 describe('funding-gap.extract parity', () => {
   for (const [name, text] of Object.entries(PROPOSALS)) {
     test(`byte-equal: ${name}`, () => {
-      const oldOut = withDeterministicNonces(['x1'], () => {
-        const p = wrapProposal(text);
-        return createFundingExtractionPrompt(p.text, [p.nonce]);
-      });
       const newOut = withDeterministicNonces(['x1'], () => {
         const p = wrapProposal(text);
         const { variables, nonces } = buildFundingExtractVariables({ wrappedProposal: p.text, nonces: [p.nonce] });
@@ -42,7 +38,7 @@ describe('funding-gap.extract parity', () => {
         );
       });
       expect(newOut.systemPrompt).toBe('');
-      expect(newOut.body).toBe(oldOut);
+      expectGolden('funding-gap', newOut.body);
     });
   }
 });
@@ -80,10 +76,9 @@ const composeAnalyze = (data) => withDeterministicNonces(SEEDS, () => {
 
 describe('funding-gap.analyze parity', () => {
   test.each(Object.entries(FIXTURES))('byte-equal: %s', (_n, data) => {
-    const oldOut = withDeterministicNonces(SEEDS, () => createFundingAnalysisPrompt(data));
     const out = composeAnalyze(data);
     expect(out.systemPrompt).toBe('');
-    expect(out.body).toBe(oldOut);
+    expectGolden('funding-gap', out.body);
   });
 
   test('the usa-disabled and usa-enabled outputs differ (branches are exercised)', () => {

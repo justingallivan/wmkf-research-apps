@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-18
+last_verified: 2026-10-12
 stale_after_days: 90
 owner: ai-platform
 source_files:
@@ -10,6 +10,9 @@ source_files:
   - lib/services/executor-budget-service.js
   - lib/services/reviewer-prompt-resolver.js
   - lib/services/reviewer-prompt-composer.js
+  - lib/services/tool-prompt-resolver.js
+  - lib/services/tool-prompt-composer.js
+  - lib/services/prompt-model-resolution.js
   - lib/services/prompt-store.js
 canonical_docs:
   - docs/EXECUTOR_CONTRACT.md
@@ -38,6 +41,7 @@ reviewer-finder prompt migration.
 
 - Use `lib/services/llm-client.js` for provider calls. The Executor alone may reach OpenAI, through `lib/services/openai-client.js`, and only when the caller passes `allowedProviders` including `openai`; prompt publishing stays Claude-only (VRP Phase A0, 2026-09-12; see `docs/EXECUTOR_CONTRACT.md` § Provider dispatch).
 - Use `lib/services/execute-prompt.js` for shared Executor behavior.
+- **Second, non-Executor consumption path (Plan A, live 2026-10-12):** the five standalone tool apps (expertise-finder match + batch, funding-gap, expense reporter, literature analyzer, multi-perspective evaluator) keep their own `LLMClient` calls and read prompt text, model and max tokens from 14 `wmkf_ai_prompt` rows via `lib/services/tool-prompt-resolver.js` (`resolveToolPrompt`: bundled fallback only on transient Dataverse errors; 0 or >1 current rows fail loud, 503 `tool_prompt_unavailable`) and `lib/services/tool-prompt-composer.js` (`composeToolPromptPair`; the A7 preamble is code-owned in the `{{a7_preamble}}` slot). Model resolution is shared with the Executor through `lib/services/prompt-model-resolution.js`. No `wmkf_ai_run` rows, no fallback model; the apps are not in `APP_MODELS` / Model Config. Row definitions + variables helpers: `shared/config/prompts/<app>-dynamics.js`; seed CLI `scripts/seed-tool-prompts.js`; composed bytes locked by `tests/fixtures/tool-prompt-golden/`. Do not describe these apps as Executor consumers or as using bundled `buildUserPrompt`-style builders (retired 2026-10-12).
 - Prompt claims must trace resolver, composer, runtime caller, fallback behavior, and tests.
 - **requestId trust-boundary chokepoint:** `executePrompt` interpolates `requestId` into a raw
   Dataverse key predicate via `grantRequestAdapter.getById/updateById` → `akoya_requests(${id})`.
@@ -196,6 +200,7 @@ audit 2026-09-18: 8 current prompts, e.g. `cycle-dossier.research-plan` on Opus 
 - Reviewer prompt migration: `project-reviewer-prompt-dataverse-migration`.
 - Prompt injection/security: `project-a7-prompt-injection-hardening`.
 - Thinking-default budget truncation (zero-text `max_tokens`): `project-executor-thinking-budget-truncation`.
+- Tool-app prompt rows (Plan A: the resolver/composer seam beside the Executor, the 14 rows, no fallback model): `docs/plans/AI_TOOL_APPS_EXECUTOR_CONVERGENCE_PLAN_2026-10-11.md` §8.
 - Prompt governance (Tier-1 rows, create-only seeds, versioned admin publish; routed here from the memory router 2026-10-05): `project-prompt-governance`.
 
 ## Standard Probe

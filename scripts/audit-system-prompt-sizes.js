@@ -111,17 +111,22 @@ const MODEL = COUNT_MODEL;
   }
 
   // ── 4. expertise-finder ─────────────────────────────────────────────────
-  // Post-S144 the routes pass a cacheable system block built from
-  // buildCacheableSystemPrompt(roster). Measure the realistic shipped size
-  // with a representative roster — the real call path varies with active
+  // The match routes pass a cacheable system block composed from the bundled
+  // row (resolver fallback) + the roster variables. Measure the realistic
+  // shipped size with a representative roster — the real call path varies with active
   // roster, but a typical foundation roster falls in this shape.
   {
-    const { buildCacheableSystemPrompt } = await import('../shared/config/prompts/expertise-finder.js');
+    const { EXPERTISE_FINDER_MATCH_ROW, buildExpertiseMatchVariables } = await import('../shared/config/prompts/expertise-finder-dynamics.js');
+    const { composeToolPromptPair } = await import('../lib/services/tool-prompt-composer.js');
     const synthRoster = buildSyntheticRoster();
-    const sys = buildCacheableSystemPrompt(synthRoster);
+    const { systemPrompt: sys } = composeToolPromptPair(
+      { systemPrompt: EXPERTISE_FINDER_MATCH_ROW.systemPrompt, body: EXPERTISE_FINDER_MATCH_ROW.body },
+      buildExpertiseMatchVariables({ rosterMembers: synthRoster, wrappedProposal: '', additionalNotes: '' }),
+      { nonces: [] },
+    );
     rows.push({
       app: `expertise-finder (roster of ${synthRoster.length})`,
-      desc: 'buildCacheableSystemPrompt with representative active roster',
+      desc: 'composed expertise-finder.match system prompt with representative active roster',
       tokens: await countTokens(sys),
       hasCacheControl: true,
     });

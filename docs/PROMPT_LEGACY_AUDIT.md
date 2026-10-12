@@ -94,6 +94,16 @@ summarizer path), `phase-i-summaries.js`, `phase-i-writeup.js`, `multi-perspecti
 `literature-analyzer.js`, `integrity-screener.js`, `email-reviewer.js`,
 `grant-reporting.js`, `dynamics-explorer.js`. These are audited below too.
 
+> **Update 2026-10-12 (Plan A, Stage 6).** `multi-perspective-evaluator.js`,
+> `expertise-finder.js`, `funding-gap-analyzer.js`, `literature-analyzer.js` (and
+> `expense-reporter.js`) no longer exist: those five tool apps now read 14
+> `wmkf_ai_prompt` rows (`expertise-finder.match`, `funding-gap.*`,
+> `expense-reporter.*`, `literature-analyzer.*`, `multi-perspective.*`) seeded from
+> `shared/config/prompts/<app>-dynamics.js` and resolved by
+> `lib/services/tool-prompt-resolver.js` (not the Executor). The table rows below
+> that name those modules are the July snapshot; the findings still apply to the
+> row text.
+
 ---
 
 ## Per-prompt evaluation

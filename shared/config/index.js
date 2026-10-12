@@ -44,14 +44,6 @@ export {
   extractReviewerInfo
 } from './prompts/peer-reviewer';
 
-// Prompt functions - Funding Gap Analyzer
-export {
-  createFundingExtractionPrompt,
-  createFundingAnalysisPrompt,
-  createBatchFundingSummaryPrompt,
-  getFundingExtractionLimit
-} from './prompts/funding-gap-analyzer';
-
 // Common utilities
 export {
   truncateText,
