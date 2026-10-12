@@ -863,6 +863,18 @@ These are valid directions but are not current app-team delivery commitments:
   reintroducing a weak-overlap attribution hole. Not forgotten work. Reopen only on a new
   owner decision with a recording that exhibits the problem. Rationale and evidence:
   `docs/plans/ZOOM_VTT_SPEAKER_MAPPING_PLAN_2026-10-04.md` § "Deliberately NOT merged".
+- Postgres access layer (one client seam, per-domain stores, raw-SQL ratchet, real-Postgres
+  contract lane) — owner stopped after Stage 0 to regroup (2026-09-23); work continued past
+  that point on `claude/postgres-access-layer` (Stages 1–2 and part of 3, last commit labelled
+  unreviewed WIP). Tabled 2026-10-12 (Session 598): the branch is ~1,860 commits behind `main`
+  and its fresh-install versions V55–V59 collide with `main`'s. Record: GitHub branch and draft
+  PR #328 (do not merge); plan `docs/plans/POSTGRES_ACCESS_LAYER_MIGRATION_PLAN_2026-09-23.md`
+  exists only on that branch. If revived, restart from a fresh Stage 0 census on `main`; do not
+  rebase the branch. Its fresh-install finding (five migration-only tables) is handled separately.
+- Flat `lib/services` relocation (Plan B) — tabled by the owner 2026-10-12 (Session 598):
+  navigation-only benefit against a repo-wide rename. Revival notes, including the
+  `reviewer-engagement/` boundary-gate hazard, are in
+  `docs/plans/FLAT_SERVICES_RELOCATION_PLAN_2026-10-11.md` §7.
 
 ## Completed implementation records — not backlog
 
