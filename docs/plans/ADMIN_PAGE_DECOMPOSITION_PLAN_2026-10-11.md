@@ -275,3 +275,19 @@ before trying it (`admin-view-coverage` covers first render only).
   mock trimmed to `{apps:[]}` (verified sufficient). Settling: five 20 ms `act` flushes judged
   deterministic (mock resolves in microtasks; no timer-gated fetch in any rendered view). Note for Stage 5
   step 4: `admin-view-coverage.test.js` legitimately imports `pages/admin` for `WorkspaceContent`.
+- 2026-10-11: **Stage 1 built** (Sonnet; six commits `d357edd78`..`899324c6b`, one per move group rather
+  than one per stage — each individually green, kept as-is for reviewability). `pages/admin.js` 3,649 →
+  2,427 lines; 8 new files under `shared/components/admin/` (`health-status.js` + 7 sections). Tests
+  unchanged; 8-file admin suite green at every commit; `check:types`, `npm run build`, full
+  `--testPathPatterns 'admin|Section'` run (22,693 passed) green at HEAD. `ALERT_RECIPIENT_DATAVERSE_FIELDS`
+  stays in the page (used by `OperationsWorkspace`), per Decision 1.
+- 2026-10-11: **Stage 1 review (Opus, fresh context): APPROVE WITH NITS.** Pure-move proof: every moved
+  block is a contiguous byte-identical run of the baseline file; removed-vs-added non-import lines are an
+  equal 1,161-line multiset. Should-fix applied by the orchestrator: the `DataverseFieldInfoButton` default
+  import became unused at commit 4 (its only JSX use moved with `SecretExpirationSection`) — now a
+  named-only import. Nits recorded: `Fragment` was stale from commit 2 to 5 (HEAD correct); `useRef` was
+  already unused at baseline and is left alone (out of scope). Note: this repo's ESLint config does not
+  report unused imports, so "lints clean" is not evidence of import hygiene — reviewers count uses.
+  Orchestrator's independent spot check (`MaintenanceSection` vs baseline lines 658–779): identical modulo
+  import header and export keyword.
+

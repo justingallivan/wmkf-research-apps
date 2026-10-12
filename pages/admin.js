@@ -12,7 +12,7 @@ import DefaultFacilitatorSettings from '../shared/components/proposal-ranking/De
 import SiteVisitMaterialsDefaultsSection from '../shared/components/admin/SiteVisitMaterialsDefaultsSection';
 import FinalWriteupMatrixAudiencesSection from '../shared/components/admin/FinalWriteupMatrixAudiencesSection';
 import DynamicsExplorerRestrictionsSection from '../shared/components/admin/DynamicsExplorerRestrictionsSection';
-import DataverseFieldInfoButton, {
+import {
   appSystemSettingField,
   appSystemSettingPattern,
 } from '../shared/components/admin/DataverseFieldInfoButton';
