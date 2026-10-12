@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Staff read transcripts and summaries in the browser; Workbench plays the presentation video (Session 595)
+
+**Milestone:** staff no longer download plain `.txt` files: a reading page shows transcripts and summaries formatted, the Workbench shows summaries with headings and lists, and the Workbench plays the approved presentation video inline.
+**Sessions:** 595 (Claude building, Codex adversarial review on the plan and every slice).
+**Ship state:**
+- `/workbench/read` (reviewers or meeting-tracker): timed speaker turns for transcripts, `SummaryText` for summaries; text route TXT-only, size + SHA-256 bound, 3 MB source / 4 MB response budgets.
+- Workbench video via `/api/workbench/site-visit/presentation-video`, bound to the approved cut like the Board page; staff pages allow `media-src` from the SharePoint tenant app-wide (CSP is per document).
+- Workbench full recording link is superuser-only (declutter); Meeting Tracker unchanged. `PRESENTATION_VIDEO_SPLIT_ACCESS=on` in Production.
+**Why it matters:** the sources for the working writeup are readable where staff work, without SharePoint downloads.
+**Pointers:** `docs/plans/STAFF_READER_AND_VIDEO_PLAN_2026-10-11.md`; merges `99c91df93`, `b9d0d0ff2`, `4a73c847e`.
+
 ## October 2026 — Board presentation page redesigned for board members (Session 594)
 
 **Milestone:** the outside Board page became a usable reading surface: video, on-page AI-generated summary, proposal, slides and bios, each opening in the browser.

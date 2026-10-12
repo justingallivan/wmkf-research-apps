@@ -1,4 +1,56 @@
-# Session 595 Prompt: Board presentation page redesigned and working end to end
+# Session 596 Prompt: Site Visit redesign remaining work (plan §10); Proposal Ranking with Codex
+
+## Session 595 close — staff reading page, Workbench presentation video, video cut on for all requests (Claude, main, 2026-10-11 PT)
+
+### What Was Completed
+
+1. **Board page owner check closed:** View on Proposal, Slides and Bios works on desktop and iPad Safari (owner).
+2. **Codex set up for Proposal Ranking:** worktree `/Users/gallivan/Code/WMKF_Apps-codex-proposal-ranking` on `codex/proposal-ranking` (draft PR #463), fast-forwarded and merged with current `main` (`5ec0133ca`, pushed; 131 ranking tests pass; npm 10 lock check passes). The owner holds the coordination prompt. The branch's own handoff names a worktree path that no longer exists; the prompt corrects it.
+3. **`PRESENTATION_VIDEO_SPLIT_ACCESS=on` in Production** (owner, stored as Config, live with deployment of `e54c4fcac`). Atlas Stage 4 status corrected (`e54c4fcac`). Vercel CLI 63 stores new variables as Secret unless `--type config` (runbook note).
+4. **Housekeeping (owner-run):** Stage 4 worktrees `-stage4`, `-stage4-recipe`, `-stage4-s4`, `-stage4-s5` removed; 8 local and 7 remote merged branches deleted, each confirmed merged first.
+5. **Workbench summaries with headings and lists** (merge `99c91df93`): shared `SummaryText` gains a compact size; `DISCUSSION_SUMMARY_HEADINGS` added; collapsed preview capped at 700 characters (Codex finding).
+6. **Staff reading page and Workbench video** (merge `b9d0d0ff2`; plan `docs/plans/STAFF_READER_AND_VIDEO_PLAN_2026-10-11.md`, Codex approved the plan in round 2 and each slice):
+   - `/workbench/read` (reviewers or meeting-tracker): transcripts as timed speaker turns (`TranscriptText`), summaries via `SummaryText`; opened from Workbench and Site Visit card links for plain-text items; PDF/DOCX/VTT keep SharePoint.
+   - `GET /api/workbench/site-visit/presentation-text`: five types, TXT only, size + SHA-256, 3 MB source / 4 MB response budgets.
+   - `GET /api/workbench/site-visit/presentation-video`: approved cut only (Board rule); logistics feed adds `presentationVideoPlayable` for the Workbench only; shared `PresentationVideoPlayer` used by the Board page too.
+   - Owner decision: every staff page allows `media-src` from the SharePoint tenant (CSP is fixed per document; client navigation).
+   - Summary links hidden when the summary is shown; "Open full transcript" / "Watch full recording" labels.
+   - Verified live in the owner's session on 1003222: video plays and seeks after a direct load and after in-app navigation; reading page shows the real presentation transcript.
+7. **Workbench full recording superuser-only** (merge `4a73c847e`, `9c4dbad45`): server drops the RECORDING item for non-superusers. Owner rationale: declutter daily use, not secrecy; Meeting Tracker keeps it.
+8. Queue item "Show transcripts and summaries formatted in the browser" closed (`71d7a4e5d`).
+
+### Next Items
+
+#### Verified Open
+
+1. **Site Visit redesign remaining work** (owner chose next session): header status chip; server slices C1-C3 (auto-generate split transcripts after publish, real cancel reason, stream the review video); `BTN_LINK` convergence; server-side gate in `createMeetingCorrection` while a newer transcript is pending. Evidence: `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md` §10.
+2. **Review Codex's Proposal Ranking work when it reports** (worktree above; Claude does not edit ranking files meanwhile). Evidence: `git -C /Users/gallivan/Code/WMKF_Apps-codex-proposal-ranking log main..codex/proposal-ranking`.
+3. **Measure a 4-vCPU cut, then lower `PRESENTATION_VIDEO_SANDBOX_TIMEOUT_MS`** (3 h now; target about 90 min); more cuts will now happen since the flag is on. Evidence: `docs/CREDENTIALS_RUNBOOK.md` Stage 4 table; queue "Speed up the presentation video cut".
+
+#### Owner Decision Needed
+
+1. Proposal Ranking PR #463 merge/promotion, Production cleanup (old unpublished trial, default facilitator) and the colleague dry run. Evidence: Session 587 ranking handoff below; Codex now owns the branch.
+2. Delete merged remote branches from this session: `claude/workbench-summary-text`, `claude/workbench-summary-links`, `claude/staff-reader-video`, `claude/workbench-recording-superuser` (all merged into `main`; confirm with `git merge-base --is-ancestor`).
+
+#### Do Not Reopen Without New Decision
+
+1. New Board link for 1003222: owner said not needed (Session 595).
+2. Widening `PRESENTATION_VIDEO_SPLIT_ACCESS`: done (`on`).
+3. Meeting Tracker recording visibility: stays for Meeting Tracker users (owner, Session 595).
+
+### Gotchas
+
+- `vercel env add` (CLI 63) defaults to Secret; pass `--type config` for readable flags, and `--value` rather than `echo`.
+- Chrome defers media loading in a hidden tab: test video playback in the visible tab (a hidden-tab stall looked like a CSP failure).
+- Unauthenticated `curl` of a staff page redirects before the CSP is applied, so it cannot show the staff `media-src`.
+- Local previews of staff pages: `Reader` in `pages/workbench/read.js` takes a `Shell` prop; a temporary page under `pages/external/` with a fake `AppAccessContext` value and a fetch stub works. Delete it before committing.
+- Codex review sandbox cannot run jest; all test results come from local runs (full unit suite 21,931 passing at `71a5b37aa`).
+
+**Milestone determination:** staff reading page and Workbench presentation video shipped to Production, so a DEVELOPMENT_LOG entry was added.
+
+---
+
+## Session 595 Prompt (superseded): Board presentation page redesigned and working end to end
 
 ## Session 594 close — Board video fixed, Board page redesigned for board members, proposal and Office viewing added (Claude, main, 2026-10-11 PT)
 
