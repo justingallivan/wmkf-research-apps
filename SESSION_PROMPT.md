@@ -1,4 +1,111 @@
-# Session 598 Prompt: Owner checks (/admin, Plans A/B); Site Visit server slices C1–C3; Proposal Ranking paused
+# Session 599 Prompt: Plan A done; Site Visit server slices C1–C3; worktree pruning; /admin live check
+
+## Session 598 close — tool-app prompts and models editable in /admin (Plan A, Stages 0–6), four streaming-error fixes, Plans B and Postgres parked (Claude Opus orchestrating Sonnet + Codex, shared checkout `main`, 2026-10-12 PT)
+
+### What Was Completed
+
+1. **J27 gate red → green.** Two register rows re-pointed from `pages/admin.js` to the admin section
+   files after the Session 596 split (`d5d284258`).
+2. **Four streaming tool-app error bugs fixed (Production).** Expense Reporter `sendError` scope
+   (`ReferenceError` after headers); Funding Gap page swallowing error frames; Literature Analyzer and
+   Multi-Perspective Evaluator routes trying `res.status(500).json` after streaming and pages ignoring
+   error frames (now `event:'error'`; per-paper `paper_error` stays non-fatal). Codex approve. Merge
+   `a804f63bc`, deploy Ready.
+3. **Plan A — tool-app prompts and models editable in Admin → Prompt Templates (Production).**
+   Owner decisions: editability is a sufficient prompt→Dataverse trigger (SYSTEM_MODEL fork resolved,
+   `ce311e82c`); no Executor — shared resolver seam; model on the row (apps removed from Model Config);
+   no fallback model; no temperature (verified against Anthropic's live Haiku 5.5 / Sonnet 5.5
+   migration guides). Built Stages 0–5 (Sonnet builds, Opus review, Codex: Stage 0+1 round 1 three
+   medium findings fixed, then approve; Stages 2–5 approve). 14 rows seeded in production Dataverse by
+   the owner with the operator `DATAVERSE_PROD_WRITE_ACK` (the interlock correctly denied the agent's
+   local→prod write); merge `f56125cfa` (PR #474); owner live checks passed. Stage 6 close-out: 408
+   golden fixtures replace the old builders, old modules deleted, docs reconciled; Codex approve; merge
+   `10d89b54a`, deploy Ready. Plan: `docs/plans/AI_TOOL_APPS_EXECUTOR_CONVERGENCE_PLAN_2026-10-11.md` §8.
+4. **Plan B (flat `lib/services` relocation) tabled** with a gate hazard recorded (moving files into
+   `reviewer-engagement/` silently exempts them from `check:reviewer-engagement-boundary`) (`9a5183d4f`).
+5. **Postgres access layer parked** (branch + draft PR #328 kept on GitHub; local worktree removed);
+   its "five migration-only tables" finding is NOT a gap — fresh install replays the migration manifest
+   (verified on a throwaway Postgres 16) (`d997d7e2a`, `e173de308`).
+6. **Cleanup:** 8 merged remote branches deleted; worktrees removed: `WMKF_Apps-refactor-plan`,
+   `WMKF_Apps-admin-decomp`, `WMKF_Apps-codex` (transcription-pilot), `WMKF_Apps-factory-form`,
+   `.codex/worktrees/test-request-design` (local-only commits, superseded in `main`; last `d6bb6ac05`),
+   `.codex/worktrees/debugging`, `WMKF_Apps-investigate`.
+7. **Memory:** deploys are verified by commit SHA (`vercel ls --prod -m githubCommitSha=<sha>`), never
+   "newest Ready row" — owner: "Your deployment checks almost never work" (`0323116a7`).
+
+### Commits (first-parent on `main`)
+- `d5d284258` J27 re-point · `ce311e82c` Plan A decisions · `a804f63bc` merge error fixes
+- `9c8ad0789` Plan A rewrite · `f56125cfa` merge Plan A Stages 0–5 · `0323116a7` deploy memory
+- `a29de4921` Plan A live · `10d89b54a` merge Stage 6 · `9a5183d4f` Plan B tabled
+- `d997d7e2a`, `e173de308` work-queue parking
+
+## Next Items
+
+### Verified Open
+
+1. **Site Visit server slices C1–C3** (plan §6/§10, not started). Evidence:
+   `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md` §10.
+2. **Correction-draft server re-check** (load/save/publish of an existing draft while a newer transcript
+   is pending is blocked only in the page). Evidence: same plan §10.
+3. **Measure a 4-vCPU cut, then lower `PRESENTATION_VIDEO_SANDBOX_TIMEOUT_MS`** (carried, not
+   rechecked). Evidence: `docs/CREDENTIALS_RUNBOOK.md` Stage 4 table.
+
+### Owner Decision Needed
+
+1. **Remove 14 fully merged worktrees** (verified 2026-10-12: every commit in `origin/main`, no
+   uncommitted changes): `codex/feature-request`, `codex/deliberations-card-guidance`,
+   `codex/workbench-responsiveness`, `codex/factory-reviewer-b4-runtime`,
+   `codex/test-request-email-recipients`, `codex/zoom-attendance`, `codex/meeting-transcript-ux`,
+   `codex/test-request-preview-integration`, `claude/ui-work`, `claude/factory-recipe4c-presite-personnel`,
+   `claude/factory-recipe4a-composition`, three `.claude/worktrees/agent-*`. Re-run the merged/dirty check
+   before removing. Keep `codex/proposal-ranking` (paused) and `codex/leadership-dashboard-testing`
+   (recommended keep, owner has not decided; holds the only copy of `docs/audits/LEADERSHIP_DASHBOARD_READINESS_2026-10-04.md`
+   plus an uncommitted `package-lock.json` change).
+2. **Owner live check of `/admin`** after the Session 596 decomposition (not recorded as done).
+3. **Proposal Ranking stays paused** (PR #463 draft, open). Resume with the owner's process decisions.
+4. **Optional Plan A follow-ups (owner to request):** make max tokens editable in Prompt Templates
+   (read-only today, `PromptTemplatesSection.js`); add Sonnet 5.5 / Haiku 5.5 to the model registry
+   (`lib/services/model-capabilities.js`; tiers resolve to `claude-sonnet-5` / `claude-haiku-4-5`).
+5. **Widen the auto-mode merge rule** for temporary-worktree pushes (carried).
+
+### Parked
+
+1. **Flat `lib/services` relocation (Plan B)** — `docs/plans/FLAT_SERVICES_RELOCATION_PLAN_2026-10-11.md` §7.
+2. **Postgres access layer** — `docs/CURRENT_WORK_QUEUE.md` Parked; GitHub branch
+   `claude/postgres-access-layer`, PR #328 (do not merge).
+
+### Verify Before Acting
+
+1. **Dependabot PR #471** (still open): keep the lock npm-10 compatible (`npx -y npm@10 ci --dry-run`).
+2. **Stale `model_override:<key>` rows** for the five Plan A apps may sit unreachable in Postgres app
+   settings; harmless. Delete only on an explicit owner request after listing them.
+
+### Do Not Reopen Without New Decision
+
+1. Plan A design (seam not Executor, model on the row, no fallback model, no temperature) — §8.
+2. The five-table "fresh-install gap" — not a gap (`e173de308`).
+3. Session 597's list (header chip, correction gate, `BTN_LINK`).
+
+### Gotchas
+
+- The prompt rows are editable by superusers only; an `/admin` edit that removes `{{a7_preamble}}` or
+  changes variables is rejected at publish (declared == used), so the injection preamble cannot be
+  dropped from `/admin`.
+- Production Dataverse writes from a local script need the operator to set
+  `DATAVERSE_PROD_WRITE_ACK="<purpose> <YYYY-MM-DD>"` in their own shell; the agent hands over the
+  command (`!` prefix), never sets it.
+- `.env.local` targets production Dataverse (`wmkf.crm.dynamics.com`); seed dry runs are production reads.
+- `grep` in this shell is a wrapper that treats `lib/utils/ai-payload-boundary.js` as binary — use
+  `command grep -a`.
+- New worktrees lack the per-machine `.agents/skills` symlink, which turns `check:agent-wiki` red there
+  only; create it (`mkdir -p .agents && ln -s ../.claude/skills .agents/skills`).
+
+**Milestone determination:** Plan A shipped a new production capability — DEVELOPMENT_LOG entry exists
+("Tool-app prompts and models editable in Admin → Prompt Templates (Plan A, Session 598)").
+
+---
+
+## Session 598 Prompt (superseded): Owner checks (/admin, Plans A/B); Site Visit server slices C1–C3; Proposal Ranking paused
 
 ## Session 597 close — Site Visit header chip, server-side correction gate, Button link variant shipped (Claude, shared checkout, 2026-10-11/12 PT)
 
