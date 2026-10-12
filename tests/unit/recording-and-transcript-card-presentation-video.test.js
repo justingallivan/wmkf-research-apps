@@ -537,5 +537,26 @@ describe('the page header status report matches the Board materials list (redesi
     release();
     await waitFor(() => expect(onStatusChange.mock.calls.at(-1)[0].board).not.toContain('pending'));
   });
+
+  test('a refresh whose materials read fails reports unknown while the cached rows stay, and recovers on the next success (Codex review)', async () => {
+    route({ state: { splits: { available: true, splits: [split({ state: 'approved', boardReady: true })], boardVideo: { status: 'bound' } } } });
+    const base = global.fetch;
+    let failMaterials = false;
+    global.fetch = jest.fn(async (url, options = {}) => {
+      if (failMaterials && String(url).endsWith('/presentation-materials')) return response({ error: 'down' }, 500);
+      return base(url, options);
+    });
+    const onStatusChange = jest.fn();
+    await renderLine({ onStatusChange });
+    await readinessVideo();
+    await waitFor(() => expect(onStatusChange.mock.calls.at(-1)[0]).toMatchObject({ available: true, board: shownKeys() }));
+    failMaterials = true;
+    fireEvent.click(screen.getByTestId('card-refresh'));
+    await waitFor(() => expect(onStatusChange.mock.calls.at(-1)[0]).toEqual({ available: false, hasTranscript: false, board: [] }));
+    expect(screen.getByTestId('board-readiness-transcript')).toBeInTheDocument();
+    failMaterials = false;
+    fireEvent.click(screen.getByTestId('card-refresh'));
+    await waitFor(() => expect(onStatusChange.mock.calls.at(-1)[0]).toMatchObject({ available: true, board: shownKeys() }));
+  });
 });
 const readinessVideo = () => screen.findByTestId('board-readiness-video');

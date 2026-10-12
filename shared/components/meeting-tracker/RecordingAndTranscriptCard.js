@@ -186,6 +186,8 @@ function useMaterials(requestId, transcriptInputRef) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [unavailable, setUnavailable] = useState(false);
+  // True while the latest materials read failed; cached data stays on screen, but the header chip must not trust it.
+  const [readFailed, setReadFailed] = useState(false);
   const [file, setFile] = useState(null);
   const [zoomText, setZoomText] = useState('');
   const [zoomBusy, setZoomBusy] = useState(false);
@@ -292,9 +294,11 @@ function useMaterials(requestId, transcriptInputRef) {
       if (!result.ok) throw result.error;
       setData(result.data);
       setUnavailable(false);
+      setReadFailed(false);
       setError(null);
       void loadLink(generation);
     } catch (loadError) {
+      if (isCurrentRead()) setReadFailed(true);
       if (isCurrentRead()) setError(loadError.message || 'Presentation materials could not be loaded.');
     } finally {
       if (isCurrentRead()) setLoading(false);
@@ -876,7 +880,7 @@ function useMaterials(requestId, transcriptInputRef) {
   };
   return {
     changeZoomText, chooseTranscriptFile, requestPause,
-    data, loading, unavailable, file, setFile, zoomText, setZoomText, zoomBusy, zoomError, setZoomError,
+    data, loading, unavailable, readFailed, file, setFile, zoomText, setZoomText, zoomBusy, zoomError, setZoomError,
     transcriptFile, setTranscriptFile, transcriptBusy, transcriptProgress, transcriptStagedId, setTranscriptStagedId,
     setTranscriptProgress, transcriptError, setTranscriptError, error, notice, busyUploadId, recoveryBusyId,
     confirmCancelId, setConfirmCancelId, transfer, setTransfer, pauseRequested, setPauseRequested, link, linkBusy,
@@ -3402,9 +3406,12 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
   const boardSignature = [boardReadiness.transcript.key, boardReadiness.summary.key,
     ...(boardReadiness.video ? [boardReadiness.video.key] : []), ...(videoPending ? ['pending'] : [])].join(',');
   const hasTranscript = Boolean(material);
+  // A failed refresh keeps the cached materials on screen, so the chip says unknown until a read succeeds again.
+  const readFailed = Boolean(m.readFailed);
   useEffect(() => {
-    onStatusChange?.({ available: true, hasTranscript, board: boardSignature.split(',') });
-  }, [onStatusChange, hasTranscript, boardSignature]);
+    onStatusChange?.(readFailed ? { available: false, hasTranscript: false, board: [] }
+      : { available: true, hasTranscript, board: boardSignature.split(',') });
+  }, [onStatusChange, readFailed, hasTranscript, boardSignature]);
 
   const manualAdd = <>
     {!active && <GenerateForm t={t} />}
@@ -3735,7 +3742,7 @@ function RecordingAndTranscriptCardForRequest({ requestId, onStatusChange }) {
   };
   const shell = 'mt-8 min-w-0 rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6';
   // Without the materials data the four cards cannot say where the visit stands, so the header chip shows it as unknown.
-  const cardUnavailable = Boolean(m.unavailable || (!m.data && m.error));
+  const cardUnavailable = Boolean(m.unavailable || (!m.data && m.readFailed));
   useEffect(() => {
     if (cardUnavailable) onStatusChange?.({ available: false, hasTranscript: false, board: [] });
   }, [onStatusChange, cardUnavailable]);
