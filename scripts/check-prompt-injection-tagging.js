@@ -231,11 +231,18 @@ const SURFACES = [
     id: 'expertise-finder',
     inv: 13,
     status: 'migrated',
-    promptFiles: ['shared/config/prompts/expertise-finder.js'],
+    promptFiles: [
+      'shared/config/prompts/expertise-finder.js',
+      // Seam-backed row definition + variables helper (convergence plan Stage 1).
+      'shared/config/prompts/expertise-finder-dynamics.js',
+    ],
     callSiteFiles: [
       'pages/api/expertise-finder/match.js',
       // batch-match's call site moved with the Route→Service extraction (Stage 5 batch 1).
       'lib/services/expertise-finder/batch-match-service.js',
+      // The A7 preamble is composed in code at the resolver seam.
+      'lib/services/tool-prompt-resolver.js',
+      'lib/services/tool-prompt-composer.js',
     ],
     // buildCacheableSystemPrompt self-carries the preamble; buildUserPrompt
     // builds the user message and relies on the system-prompt preamble.
