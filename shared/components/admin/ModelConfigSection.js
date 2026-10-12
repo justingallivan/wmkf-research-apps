@@ -24,7 +24,6 @@ const APP_MODEL_NAMES = {
   'peer-review-summarizer': 'Peer Review Summarizer',
   'qa': 'Q&A',
   'refine': 'Refinement',
-  'expense-reporter': 'Expense Reporter',
   'contact-enrichment': 'Contact Enrichment',
   'email-personalization': 'Email Personalization',
   'dynamics-explorer': 'Dynamics Explorer',

@@ -234,7 +234,18 @@ const SURFACES = [
     id: 'process-expenses',
     inv: 11,
     status: 'migrated',
-    callSiteFiles: ['pages/api/process-expenses.js'],
+    promptFiles: [
+      'shared/config/prompts/expense-reporter.js',
+      // Seam-backed row definitions + variables helpers (convergence plan Stage 3).
+      'shared/config/prompts/expense-reporter-dynamics.js',
+    ],
+    callSiteFiles: [
+      'pages/api/process-expenses.js',
+      // The A7 preamble is composed in code at the resolver seam.
+      'lib/services/tool-prompt-resolver.js',
+      'lib/services/tool-prompt-composer.js',
+    ],
+    builders: ['createExpenseExtractionPrompt'],
   },
   {
     id: 'expertise-finder',

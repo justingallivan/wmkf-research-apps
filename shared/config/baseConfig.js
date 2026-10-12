@@ -47,7 +47,6 @@ export const BASE_CONFIG = {
     'peer-review-summarizer':      { model: 'sonnet', fallback: 'haiku' },
     'qa':                          { model: 'sonnet', fallback: 'haiku' },
     'refine':                      { model: 'sonnet', fallback: 'haiku' },
-    'expense-reporter':            { model: 'haiku',  fallback: 'haiku' },
     'contact-enrichment':          { model: 'haiku',  fallback: 'haiku' },
     'email-personalization':       { model: 'haiku',  fallback: 'haiku' },
     'dynamics-explorer':           { model: 'haiku',  fallback: 'haiku' },
