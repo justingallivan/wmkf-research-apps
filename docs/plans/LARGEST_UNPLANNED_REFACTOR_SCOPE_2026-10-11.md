@@ -68,11 +68,14 @@ Ranked by (size of change) × (value) with the owner decisions each one needs. E
   unplanned work with user-visible payoff (staff-editable prompts, consistent tool UX, uniform AI
   safety boundaries), it follows the architecture's own stated target (SYSTEM_MODEL realization 1:
   "N prompts + a few adapter shapes"), and there is a proven in-repo template for one conversion
-  (`docs/PEER_REVIEW_EXECUTOR_MIGRATION_PLAN.md`, S344). It needs three owner rulings before stages
-  can be written: streaming routes in or out; sunset pages excluded or retired first; the
-  prompt-home fork. Scope without the sunset pages: 5 live apps (`multi-perspective-evaluator`,
-  `literature-analyzer`, `funding-gap-analyzer`, `expense-reporter`, `expertise-finder`) plus the
-  `cron/log-analysis` route and the shared page shell.
+  (`docs/PEER_REVIEW_EXECUTOR_MIGRATION_PLAN.md`, S344). **But it proposes a policy change:** recorded
+  memory says prompt migration is demand-driven, so Plan A's Stage 0 cannot start until the owner
+  adopts staff editability as a sufficient trigger (Plan A decision D7). Its other rulings are the
+  multimodal seam (D2), the retry/fallback semantics change (D4), audit-row volume (D3), and where staff
+  pick the model (D8) — nine in all, listed in Plan A §2. Scope by default: the 5 live apps
+  (`multi-perspective-evaluator`, `literature-analyzer`, `funding-gap-analyzer`, `expense-reporter`,
+  `expertise-finder`) plus the shared page shell as a conditional late stage; sunset pages and
+  `cron/log-analysis` excluded (D1).
 - **If "streamline code" governs and risk appetite is low: Candidate B.** Purely mechanical, no
   runtime behavior change, and exactly the shape of "order of file moves" — but zero end-user
   value and a wide literal-path blast radius across tests, gates, scripts and memory, with a

@@ -23,7 +23,8 @@ promotion; every stage also needs Dataverse prompt rows seeded in Preview and Pr
 owner-run seed script (a Dataverse write; `DATAVERSE_TARGET_INTERLOCK` applies).
 
 The detailed per-route facts this plan rests on were gathered by a fresh-context agent at
-`b3135037c` and are reproduced where load-bearing; every `[VERIFIED]` cites file:line in that tree.
+`b3135037c` and are committed as `docs/plans/data/DIRECT_LLM_ROUTE_PROFILES_2026-10-11.md` (read it before
+any stage); they are reproduced here where load-bearing, and every `[VERIFIED]` cites file:line in that tree.
 
 ## 0. Executor instructions (read first)
 
