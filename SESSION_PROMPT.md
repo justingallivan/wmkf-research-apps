@@ -1,4 +1,131 @@
-# Session 597 Prompt: Decide on Plans A/B; Proposal Ranking review; Site Visit §10 remainder
+# Session 598 Prompt: Owner checks (/admin, Plans A/B); Site Visit server slices C1–C3; Proposal Ranking paused
+
+## Session 597 close — Site Visit header chip, server-side correction gate, Button link variant shipped (Claude, shared checkout, 2026-10-11/12 PT)
+
+Numbering: this session started as "596" alongside the Fable session whose close sits below. It is recorded as
+**597** so the two do not collide; the next session is 598.
+
+### What Was Completed
+
+1. **Correction gate (Production).** `createMeetingCorrection` returns 409 `meeting_transcript_newer_pending`
+   ("A newer transcript is on its way. Wait for it before editing the published transcript.") while a newer
+   transcription is pending. The rule lives in `shared/utils/meeting-transcript-pending.js` and the card uses
+   the same helper. Codex approve. Merge `b3135037c`, deploy verified. **Remaining UI-only gap:** loading,
+   saving or publishing an existing correction draft is not re-checked on the server.
+2. **Header status chip (Production).** `shared/utils/site-visit-header-status.js`; the Applicant materials
+   card and the Recording and transcript card each report their own state (`onStatusChange`), and the
+   `SiteVisitEditor` header shows the first unfinished stage (mapping table in plan §10). Owner decisions:
+   closed collection = finished; "recording" = a published meeting transcript (survives Stage 5 deletion).
+   Codex three rounds (two real findings fixed: stale data after a failed Refresh; failed first video read),
+   then approve. Owner desktop check on 1003222 ("Board page ready", all three Board lines on). Merge
+   `cbb2269ed`, deploy verified.
+3. **Button link variant (Production).** Shared `Button` `variant="link"` (`shared/components/Layout.js`)
+   replaces all 11 `BTN_LINK` actions in `RecordingAndTranscriptCard.js`; no visual change. **DESIGN.md
+   rule 11** now lists `link` for quiet in-place actions (owner chose updating the rule over outline buttons).
+   Codex approve. Merge `ee3d60c60` (pushed by the owner after the classifier blocked the push), deploy
+   verified Ready.
+4. **Merge permission.** `~/.claude/settings.json` `autoMode.allow` gained an owner-approved rule for merging
+   reviewed `claude/*`/`codex/*` branches into `main` and pushing when the owner says to merge. It does not
+   reliably cover `git push origin HEAD:main` from a temporary worktree (blocked once, allowed once); see
+   `.claude-memory/feedback-merge-to-main-from-temp-worktree.md`.
+5. **Local preview setting found:** `.env.local` also needs `MEETING_TRACKER_TRANSCRIPT_BUNDLE_SCHEMA_READY=on`
+   (Production has it since 2026-10-02). Without it the summary status reads 503 and the presentation video
+   row wrongly shows "Out of date". The owner added it.
+6. **Proposal Ranking paused** (Codex handoff, incorporated at the owner's request; details under Owner
+   Decision Needed).
+
+### Commits
+- `e4dd53353` correction gate → merge `b3135037c`
+- `e6961b4d3`, `efcca8bb2`, `99abcc932`, `bc92b35b8`, `e33a9a613`, `3b66ca5e6` header chip → merge `cbb2269ed`
+- `0a3295de5`, `cdef0dc03` link variant + DESIGN.md rule 11 → merge `ee3d60c60`
+
+## Next Items
+
+### Verified Open
+
+1. **Site Visit server slices C1–C3** (plan §6/§10, not started): C1 generate split transcripts automatically
+   after a publish with a confirmed end; C2 the real reason a presentation video was superseded; C3 stream the
+   review video instead of downloading it. Evidence: `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md` §10.
+2. **Correction-draft server re-check** (load/save/publish of an existing draft while a newer transcript is
+   pending is blocked only in the page). Evidence: plan §10 gate entry; `lib/services/meeting-tracker-transcription/service.js`.
+3. **Fix `process-expenses.js` `sendError` scope bug** — still present 2026-10-12 (declared inside `try`
+   at :190, called from `catch` at :429). Evidence: Session 596 item 5 below.
+4. **Measure a 4-vCPU cut, then lower `PRESENTATION_VIDEO_SANDBOX_TIMEOUT_MS`** from 3 h to about 90 min
+   (carried, not rechecked). Evidence: `docs/CREDENTIALS_RUNBOOK.md` Stage 4 table.
+
+### Owner Decision Needed
+
+1. **Owner live check of `/admin`** after the Session 596 decomposition (`56a1945c5`, deployed). Evidence:
+   Session 596 Next Items below.
+2. **Plan A D1–D9 (D7 first) and Plan B D1–D6.** Evidence: Session 596 Owner Decision Needed below.
+3. **Proposal Ranking is paused** while Justin considers the process with colleagues and leadership. No
+   ranking code change, merge, deployment or live-data operation is authorized. **Resume with Justin's
+   process decisions, not implementation.**
+   - Saved implementation: checkout `/Users/gallivan/Code/WMKF_Apps-codex-proposal-ranking`, branch
+     `codex/proposal-ranking`, draft PR #463 (head `0d161d60f`, verified 2026-10-12). `5edcac077` adds
+     institutional research funding context; `0d161d60f` hides it during individual ranking, preserves
+     calculated meeting starting orders and adds CSV export. Codex reports a clean tree, 167 ranking tests
+     and the isolated meeting/export rehearsal passing. Unmerged and undeployed.
+   - Discussion proposal (not approved policy; the app does not implement it):
+     `/Users/gallivan/Documents/Codex/2026-10-11/justin-requests-a-separate-research-task/outputs/Research_Funding_Recommendation_Proposal.docx`.
+     Sequence: (1) every PD places each proposal A—fund / B—maybe fund / C—don't fund, plus "I'm comfortable
+     with this placement" or "I'm not sure"; (2) discuss the science within SE and MR, focusing on
+     uncertainty and disagreement; (3) PDs revisit placements and give individual program rankings;
+     (4) equally weighted average ranks are starting orders for collective deliberation; (5) develop the
+     overall recommendation, considering budget and institutional context at the margins.
+   - Preserve: everyone responds, no passes (rare conflicts handled by discussion, not coded exceptions);
+     uncertainty is not opposition; agreement informed by colleagues is not multiple independent technical
+     validations; "worth funding but below budget" differs from "not recommended on merit"; settle SE and MR
+     separately before cross-program choices (program ranks do not establish cross-program equivalence); the
+     general 2:1 West/East target is by award count, not dollars, and not mandatory each cycle; funding
+     history uses qualifying regular Research-program awards (excluding directed gifts, buildings,
+     endowments, teaching awards, Special Grants, Young Scholars); institutional considerations get no
+     numerical points and do not change scientific scores; leadership keeps its own notes (no required
+     discussion-note workflow or finalization lock).
+   - Open leadership questions: timing of individual rankings; whether every PD needs an overall ranking;
+     whether ties are acceptable; what individual results accompany the collective list.
+   - Continuity: preserve the idle Codex chat "Continue Proposal Ranking work" and the receiving chat
+     `01a12d8b-9bf0-7003-aa82-479c67fd6421` (reconciliation + latest proposal). The original workbook
+     `/Users/gallivan/Downloads/D26_PD_ranking_sheet.blank.xlsx` is unchanged.
+   - Existing trial cleanup, facilitator restoration and colleague dry runs need fresh state verification
+     and explicit authorization.
+4. **Delete merged remote branches** — all verified ancestors of `origin/main` on 2026-10-12:
+   `claude/site-visit-status-chip`, `claude/button-link-variant`, `claude/correction-newer-pending-gate`,
+   `claude/admin-decomposition`, `claude/workbench-summary-text`, `claude/workbench-summary-links`,
+   `claude/staff-reader-video`, `claude/workbench-recording-superuser`. Re-run
+   `git merge-base --is-ancestor origin/<b> origin/main` before deleting.
+5. **Remove Session 596 worktrees** `WMKF_Apps-refactor-plan` and `WMKF_Apps-admin-decomp` (still present;
+   the latter holds `main`, which is why `git checkout main` fails in the shared checkout).
+6. **Widen the auto-mode merge rule** to cover pushing a tested merge from a temporary worktree, or keep
+   handing the owner the push command. Evidence: item 4 above.
+
+### Verify Before Acting
+
+1. **Dependabot PR #471** (17 minor/patch bumps, still open): keep the lock npm-10 compatible
+   (`npx -y npm@10 ci --dry-run`) before merging. Evidence: `project-ci-npm10-lockfile-parity.md`.
+
+### Do Not Reopen Without New Decision
+
+1. Site Visit header chip, correction gate, `BTN_LINK` convergence — shipped (merges above).
+2. An out-of-date presentation video leaves the Board page, so the chip already drops to "Board page
+   incomplete"; no separate chip rule needed (owner agreed 2026-10-12).
+3. Session 596's list below (route-shell helper NO; Workbench code splitting / client cache).
+
+### Gotchas
+
+- The shared checkout (`/Users/gallivan/Code/WMKF_Apps`) is left on the merged branch
+  `claude/button-link-variant` with a dev server possibly still running on :3000; `main` is held by
+  `WMKF_Apps-admin-decomp`. Switch branches deliberately at session start.
+- Safari's Tab key skips buttons by default (Option-Tab), so ask the owner to check focus rings in Chrome.
+- GitHub records no Vercel deployment/status for these `main` pushes; check `vercel ls --prod` once.
+- `profile-settings-email-signature.test.js` failed once under full-suite load and passes alone (flaky).
+
+**Milestone determination:** three Production changes shipped (chip, server gate, Button variant); a
+DEVELOPMENT_LOG entry was added (Session 597).
+
+---
+
+## Session 597 Prompt (superseded): Decide on Plans A/B; Proposal Ranking review; Site Visit §10 remainder
 
 ## Session 596 close — refactor census, three staged plans, admin page decomposition shipped (Fable orchestrating Sonnet/Opus/Codex, 2026-10-11/12 PT)
 

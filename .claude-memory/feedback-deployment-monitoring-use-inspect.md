@@ -15,6 +15,13 @@ metadata:
 After a push or explicit deployment, identify the deployment URL once and inspect
 that deployment directly. Do not base readiness on a listing-row grep.
 
+**Recurrence S597 (2026-10-12):** two more home-rolled loops. (1) Polling GitHub commit statuses for a
+Vercel context: for these `main` pushes GitHub recorded **no** Production deployment or status at all,
+so the loop could never finish. (2) A `vercel ls | grep Production` loop the owner interrupted
+("what are you waiting for?"). A single `vercel ls --prod` showed the deploy Ready within a minute.
+Do one direct check (newest `--prod` row created after the push), and if it is still building, use
+`vercel inspect <that deployment url> --wait` in the background; tell the owner what is being waited on.
+
 [VERIFIED historically via S267 and S311 CLI observations.] In those sessions,
 `vercel inspect <deployment-url>` exposed a direct status while `vercel ls` row
 matching intermittently returned nothing. The exact status formatting and observed

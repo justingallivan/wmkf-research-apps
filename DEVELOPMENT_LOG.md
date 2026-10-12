@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Site Visit page: header status chip, server-side correction gate, Button link variant (Session 597)
+
+**Milestone:** the Site Visit page now says where a visit stands in one header chip, the server (not just the page) refuses to edit a published transcript while a newer one is on its way, and the shared `Button` has a text-link variant.
+**Sessions:** 597 (Claude building, Codex adversarial review on each change; ran concurrently with Session 596).
+**Ship state:**
+- Header chip: the first unfinished stage (Materials not requested → Waiting on materials → Materials need attention → No recording yet → Board page incomplete → Board page ready; gray Status unknown when a card cannot load). Reported by the two cards themselves, so it cannot contradict them. Owner-checked on 1003222.
+- `createMeetingCorrection` returns 409 `meeting_transcript_newer_pending` while a newer transcription is pending; the rule is shared with the card (`shared/utils/meeting-transcript-pending.js`).
+- `Button variant="link"` replaces the card's 11 `BTN_LINK` actions (no visual change); DESIGN.md rule 11 now allows it for quiet in-place actions.
+**Why it matters:** staff see a visit's state at a glance, and the transcript correction guard no longer depends on the browser.
+**Pointers:** `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md` §10; `shared/utils/site-visit-header-status.js`; merges `b3135037c`, `cbb2269ed`, `ee3d60c60`.
+
 ## October 2026 — Admin page decomposed: pages/admin.js is a 120-line shell (Session 596)
 
 **Milestone:** the admin surface's code now lives where every other admin section already lived. `pages/admin.js` went from 3,649 lines (27 inline components) to 120 lines (imports, `WorkspaceContent`, `AdminDashboard`); 16 sections, a `health-status.js` helper, `ResourceLinks` and five `workspaces/*.js` files (carrying their `*_DATAVERSE_FIELDS` constants) sit under `shared/components/admin/`.
