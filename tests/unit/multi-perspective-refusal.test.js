@@ -2,7 +2,11 @@
 const mockComplete = jest.fn();
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn(async () => ({ profileId: 'staff' })) }));
 jest.mock('../../shared/api/middleware/rateLimiter', () => ({ nextRateLimiter: () => async () => true }));
-jest.mock('../../lib/services/model-override-loader', () => ({ loadModelOverrides: async () => {} }));
+// The route resolves its six prompt rows before streaming; return the bundled rows.
+jest.mock('../../lib/services/tool-prompt-resolver', () => ({
+  ...jest.requireActual('../../lib/services/tool-prompt-resolver'),
+  resolveToolPrompt: async (_name, def) => ({ ...def, source: 'bundled' }),
+}));
 jest.mock('../../lib/utils/public-blob-fetch', () => ({ fetchPublicBlob: async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(1) }) }));
 jest.mock('../../lib/utils/pdf-page-splitter', () => ({ splitPdfToPages: async () => [{ pageNumber: 1, base64: 'test-pdf' }] }));
 jest.mock('../../lib/utils/usage-logger', () => ({ logUsage: jest.fn() }));
@@ -12,7 +16,7 @@ import handler from '../../pages/api/evaluate-multi-perspective';
 
 beforeEach(() => { mockComplete.mockReset(); process.env.CLAUDE_API_KEY = 'test-key'; });
 
-test.each([1, 2, 3])('refusal at stage-call %i stops downstream evaluation and fallback', async refusedAt => {
+test.each([1, 2, 3])('refusal at stage-call %i stops downstream evaluation', async refusedAt => {
   let call = 0;
   mockComplete.mockImplementation(async () => {
     call++;

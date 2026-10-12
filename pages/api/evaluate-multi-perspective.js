@@ -14,19 +14,26 @@ import { requireAcceptedLlmResponse } from '../../lib/utils/llm-response';
  * Stage 4 (Fan-in): Integrator synthesizes all perspectives
  */
 
-import { BASE_CONFIG, getModelForApp, getFallbackModelForApp } from '../../shared/config/baseConfig';
-import { loadModelOverrides } from '../../lib/services/model-override-loader';
+import { BASE_CONFIG } from '../../shared/config/baseConfig';
 import { splitPdfToPages } from '../../lib/utils/pdf-page-splitter';
 import {
-  createInitialAnalysisPrompt,
-  createProposalSummaryPrompt,
-  createOptimistPrompt,
-  createSkepticPrompt,
-  createNeutralPrompt,
-  createIntegratorPrompt,
   selectDatabasesForResearchArea,
   EVALUATION_FRAMEWORKS
 } from '../../shared/config/prompts/multi-perspective-evaluator';
+import {
+  MULTI_PERSPECTIVE_INITIAL_ANALYSIS_ROW,
+  MULTI_PERSPECTIVE_PROPOSAL_SUMMARY_ROW,
+  MULTI_PERSPECTIVE_OPTIMIST_ROW,
+  MULTI_PERSPECTIVE_SKEPTIC_ROW,
+  MULTI_PERSPECTIVE_NEUTRAL_ROW,
+  MULTI_PERSPECTIVE_INTEGRATOR_ROW,
+  buildMultiPerspectiveInitialVariables,
+  buildMultiPerspectiveSummaryVariables,
+  buildMultiPerspectiveVariables,
+  buildMultiPerspectiveIntegratorVariables,
+} from '../../shared/config/prompts/multi-perspective-dynamics';
+import { resolveToolPrompt, toolPromptUnavailable } from '../../lib/services/tool-prompt-resolver';
+import { composeToolPromptPair } from '../../lib/services/tool-prompt-composer';
 import { requireAppAccess } from '../../lib/utils/auth';
 import { logUsage } from '../../lib/utils/usage-logger';
 import { LLMClient } from '../../lib/services/llm-client';
@@ -86,7 +93,28 @@ export default async function handler(req, res) {
   const allowed = await limiter(req, res);
   if (allowed !== true) return;
 
-  await loadModelOverrides();
+  // Resolve all six prompt rows once per request, before any header or frame is
+  // written, so a missing/ambiguous row is a plain 503 JSON instead of per-concept errors.
+  let rows;
+  try {
+    rows = {
+      initial: await resolveToolPrompt(MULTI_PERSPECTIVE_INITIAL_ANALYSIS_ROW.promptName, MULTI_PERSPECTIVE_INITIAL_ANALYSIS_ROW),
+      summary: await resolveToolPrompt(MULTI_PERSPECTIVE_PROPOSAL_SUMMARY_ROW.promptName, MULTI_PERSPECTIVE_PROPOSAL_SUMMARY_ROW),
+      optimist: await resolveToolPrompt(MULTI_PERSPECTIVE_OPTIMIST_ROW.promptName, MULTI_PERSPECTIVE_OPTIMIST_ROW),
+      skeptic: await resolveToolPrompt(MULTI_PERSPECTIVE_SKEPTIC_ROW.promptName, MULTI_PERSPECTIVE_SKEPTIC_ROW),
+      neutral: await resolveToolPrompt(MULTI_PERSPECTIVE_NEUTRAL_ROW.promptName, MULTI_PERSPECTIVE_NEUTRAL_ROW),
+      integrator: await resolveToolPrompt(MULTI_PERSPECTIVE_INTEGRATOR_ROW.promptName, MULTI_PERSPECTIVE_INTEGRATOR_ROW),
+    };
+  } catch (error) {
+    console.error('Prompt resolution error:', error);
+    const unavailable = toolPromptUnavailable(error);
+    if (unavailable) return res.status(503).json(unavailable);
+    return res.status(500).json({
+      error: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      timestamp: new Date().toISOString()
+    });
+  }
 
   // Set headers for streaming response
   res.setHeader('Content-Type', 'text/plain');
@@ -155,6 +183,7 @@ export default async function handler(req, res) {
               page,
               apiKey,
               framework,
+              rows,
               res,
               processedPages,
               totalPages,
@@ -210,11 +239,15 @@ export default async function handler(req, res) {
     console.error('API error:', error);
     // Once progress frames have gone out, a JSON 500 can no longer be sent;
     // end the stream with an error event the page reports.
+    const unavailable = toolPromptUnavailable(error);
     if (res.headersSent) {
-      sendEvent('error', { message: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED });
+      sendEvent('error', unavailable
+        ? { message: unavailable.error, code: unavailable.code }
+        : { message: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED });
       res.end();
       return;
     }
+    if (unavailable) return res.status(503).json(unavailable);
     res.status(500).json({
       error: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED,
       details: process.env.NODE_ENV === 'development' ? error.message : undefined,
@@ -249,14 +282,14 @@ export async function processWithConcurrency(items, processorFn, limit) {
 /**
  * Evaluate a single concept using the multi-perspective approach
  */
-async function evaluateSingleConceptMultiPerspective(page, apiKey, framework, res, processedCount, totalCount, userProfileId) {
+async function evaluateSingleConceptMultiPerspective(page, apiKey, framework, rows, res, processedCount, totalCount, userProfileId) {
   const { pageNumber, base64 } = page;
   const progressBase = 10 + Math.round((processedCount / totalCount) * 85);
 
   try {
     // Stage 1: Initial analysis via Vision API
     sendProgress(res, progressBase, `Analyzing concept ${pageNumber} of ${totalCount}...`, 'initial-analysis');
-    const initialAnalysis = await performInitialAnalysis(base64, apiKey, userProfileId);
+    const initialAnalysis = await performInitialAnalysis(base64, rows.initial, apiKey, userProfileId);
 
     if (!initialAnalysis || initialAnalysis.error) {
       throw new Error(initialAnalysis?.error || 'Initial analysis failed');
@@ -316,7 +349,7 @@ async function evaluateSingleConceptMultiPerspective(page, apiKey, framework, re
 
     // Stage 2.5: Generate proposal summary
     sendProgress(res, progressBase + 10, `Generating proposal summary for concept ${pageNumber}...`, 'proposal-summary');
-    const proposalSummary = await generateProposalSummary(initialAnalysis, literatureResults, apiKey, userProfileId);
+    const proposalSummary = await generateProposalSummary(initialAnalysis, literatureResults, rows.summary, apiKey, userProfileId);
 
     // Stage 3 (Fan-out): Three parallel perspectives
     sendProgress(res, progressBase + 18, `Running multi-perspective analysis (Optimist, Skeptic, Neutral)...`, 'perspectives');
@@ -325,6 +358,7 @@ async function evaluateSingleConceptMultiPerspective(page, apiKey, framework, re
       initialAnalysis,
       literatureResults,
       framework,
+      rows,
       apiKey,
       userProfileId
     );
@@ -344,6 +378,7 @@ async function evaluateSingleConceptMultiPerspective(page, apiKey, framework, re
       perspectiveResults.skeptic,
       perspectiveResults.neutral,
       framework,
+      rows.integrator,
       apiKey,
       userProfileId
     );
@@ -407,11 +442,11 @@ async function evaluateSingleConceptMultiPerspective(page, apiKey, framework, re
 /**
  * Run all three perspectives in parallel using Promise.allSettled
  */
-async function runPerspectivesInParallel(initialAnalysis, literatureResults, framework, apiKey, userProfileId) {
+async function runPerspectivesInParallel(initialAnalysis, literatureResults, framework, rows, apiKey, userProfileId) {
   const perspectivePromises = [
-    callPerspective('optimist', createOptimistPrompt, initialAnalysis, literatureResults, framework, apiKey, userProfileId),
-    callPerspective('skeptic', createSkepticPrompt, initialAnalysis, literatureResults, framework, apiKey, userProfileId),
-    callPerspective('neutral', createNeutralPrompt, initialAnalysis, literatureResults, framework, apiKey, userProfileId)
+    callPerspective('optimist', rows.optimist, initialAnalysis, literatureResults, framework, apiKey, userProfileId),
+    callPerspective('skeptic', rows.skeptic, initialAnalysis, literatureResults, framework, apiKey, userProfileId),
+    callPerspective('neutral', rows.neutral, initialAnalysis, literatureResults, framework, apiKey, userProfileId)
   ];
 
   const results = await Promise.allSettled(perspectivePromises);
@@ -428,19 +463,20 @@ async function runPerspectivesInParallel(initialAnalysis, literatureResults, fra
 /**
  * Call a single perspective
  */
-async function callPerspective(name, createPromptFn, initialAnalysis, literatureResults, framework, apiKey, userProfileId) {
-  const prompt = createPromptFn(initialAnalysis, literatureResults, framework);
+async function callPerspective(name, row, initialAnalysis, literatureResults, framework, apiKey, userProfileId) {
+  const composed = composeRow(row, buildMultiPerspectiveVariables(initialAnalysis, literatureResults, framework));
 
   const requestBody = {
-    max_tokens: 2500,
+    ...systemOf(composed),
+    max_tokens: row.maxTokens,
     temperature: 0.3,
     messages: [{
       role: 'user',
-      content: prompt
+      content: composed.body
     }]
   };
 
-  const { data } = await callClaudeWithRetry(requestBody, apiKey, 'model', userProfileId);
+  const { data } = await callClaudeWithRetry(requestBody, apiKey, row.model, userProfileId);
   const responseText = data.content[0].text;
 
   // Parse JSON response
@@ -466,25 +502,26 @@ async function callPerspective(name, createPromptFn, initialAnalysis, literature
 /**
  * Perform the integration step
  */
-async function performIntegration(initialAnalysis, optimistResult, skepticResult, neutralResult, framework, apiKey, userProfileId) {
-  const prompt = createIntegratorPrompt(
+async function performIntegration(initialAnalysis, optimistResult, skepticResult, neutralResult, framework, row, apiKey, userProfileId) {
+  const composed = composeRow(row, buildMultiPerspectiveIntegratorVariables(
     initialAnalysis,
     optimistResult,
     skepticResult,
     neutralResult,
     framework
-  );
+  ));
 
   const requestBody = {
-    max_tokens: 3500,
+    ...systemOf(composed),
+    max_tokens: row.maxTokens,
     temperature: 0.3,
     messages: [{
       role: 'user',
-      content: prompt
+      content: composed.body
     }]
   };
 
-  const { data } = await callClaudeWithRetry(requestBody, apiKey, 'model', userProfileId);
+  const { data } = await callClaudeWithRetry(requestBody, apiKey, row.model, userProfileId);
   const responseText = data.content[0].text;
 
   // Parse JSON response
@@ -510,20 +547,22 @@ async function performIntegration(initialAnalysis, optimistResult, skepticResult
 /**
  * Stage 2.5: Generate proposal summary
  */
-async function generateProposalSummary(initialAnalysis, literatureResults, apiKey, userProfileId) {
-  const prompt = createProposalSummaryPrompt(initialAnalysis, literatureResults);
+async function generateProposalSummary(initialAnalysis, literatureResults, row, apiKey, userProfileId) {
+  // Composed outside the try, as the old prompt builder was.
+  const composed = composeRow(row, buildMultiPerspectiveSummaryVariables(initialAnalysis, literatureResults));
 
   const requestBody = {
-    max_tokens: 1500,
+    ...systemOf(composed),
+    max_tokens: row.maxTokens,
     temperature: 0.3,
     messages: [{
       role: 'user',
-      content: prompt
+      content: composed.body
     }]
   };
 
   try {
-    const { data } = await callClaudeWithRetry(requestBody, apiKey, 'model', userProfileId);
+    const { data } = await callClaudeWithRetry(requestBody, apiKey, row.model, userProfileId);
     const responseText = data.content[0].text;
 
     // Parse JSON response
@@ -560,17 +599,15 @@ function isRetryableError(status, errorText) {
 }
 
 /**
- * Make a Claude API request with retry logic and fallback model
+ * Make a Claude API request with same-model retries (no fallback model, owner decision D4).
+ * `model` is the resolved row's concrete model id.
  */
-async function callClaudeWithRetry(requestBody, apiKey, modelType = 'model', userProfileId = null) {
+async function callClaudeWithRetry(requestBody, apiKey, model, userProfileId = null) {
   const startTime = Date.now();
-  const primaryModel = getModelForApp('multi-perspective-evaluator', modelType);
-  const fallbackModel = getFallbackModelForApp('multi-perspective-evaluator');
 
   let lastError = null;
   let delay = RETRY_CONFIG.INITIAL_DELAY_MS;
 
-  // Try primary model with retries
   for (let attempt = 0; attempt <= RETRY_CONFIG.MAX_RETRIES; attempt++) {
     if (attempt > 0) {
       console.log(`[MultiPerspective] Retry attempt ${attempt}/${RETRY_CONFIG.MAX_RETRIES} after ${delay}ms...`);
@@ -582,7 +619,7 @@ async function callClaudeWithRetry(requestBody, apiKey, modelType = 'model', use
       // Use LLMClient with retries disabled — this route owns its own retry
       // loop with custom isRetryableError() semantics. The wrapper still
       // gives us safeFetch + abort + redaction.
-      const claude = new LLMClient({ apiKey, model: primaryModel, maxRetries: 0 });
+      const claude = new LLMClient({ apiKey, model, maxRetries: 0 });
       let r;
       try {
         r = requireAcceptedLlmResponse(await claude.complete(toCompleteOpts(requestBody)));
@@ -605,8 +642,7 @@ async function callClaudeWithRetry(requestBody, apiKey, modelType = 'model', use
       // Match legacy return shape: { data: <raw API response> }
       return {
         data: { content: r.content, model: r.model, usage: { input_tokens: r.usage.inputTokens, output_tokens: r.usage.outputTokens } },
-        usedFallback: false,
-        model: primaryModel,
+        model,
       };
     } catch (error) {
       if (error.message && !error.message.includes('Claude API error')) {
@@ -616,32 +652,21 @@ async function callClaudeWithRetry(requestBody, apiKey, modelType = 'model', use
     }
   }
 
-  // All retries failed, try fallback model
-  console.log(`[MultiPerspective] Primary model (${primaryModel}) failed, trying fallback (${fallbackModel})...`);
+  // All same-model retries failed.
+  throw lastError;
+}
 
-  const fallback = new LLMClient({ apiKey, model: fallbackModel, maxRetries: 0 });
-  let r;
-  try {
-    r = requireAcceptedLlmResponse(await fallback.complete(toCompleteOpts(requestBody)));
-  } catch (err) {
-    if (err.code === 'model_refusal') throw err;
-    console.error('[MultiPerspective] Fallback model also failed:', err.message?.substring(0, 200));
-    throw lastError || err;
-  }
-  logUsage({
-    userProfileId,
-    appName: 'multi-perspective-evaluator',
-    model: r.model,
-    inputTokens: r.usage.inputTokens,
-    outputTokens: r.usage.outputTokens,
-    latencyMs: Date.now() - startTime,
-  });
-  console.log(`[MultiPerspective] Fallback model succeeded`);
-  return {
-    data: { content: r.content, model: r.model, usage: { input_tokens: r.usage.inputTokens, output_tokens: r.usage.outputTokens } },
-    usedFallback: true,
-    model: fallbackModel,
-  };
+/**
+ * Compose a resolved row with the variables helper's output (A7 preamble is filled
+ * in code). The composed body is the user text; a system prompt is sent only if an
+ * /admin edit made one non-empty.
+ */
+function composeRow(row, { variables, nonces }) {
+  return composeToolPromptPair({ systemPrompt: row.systemPrompt, body: row.body }, variables, { nonces });
+}
+
+function systemOf(composed) {
+  return composed.systemPrompt ? { system: composed.systemPrompt } : {};
 }
 
 // Translate a legacy Anthropic body into LLMClient.complete() opts.
@@ -657,11 +682,12 @@ function toCompleteOpts(body) {
 /**
  * Stage 1: Initial analysis using Claude Vision API
  */
-async function performInitialAnalysis(base64Pdf, apiKey, userProfileId) {
-  const prompt = createInitialAnalysisPrompt();
+async function performInitialAnalysis(base64Pdf, row, apiKey, userProfileId) {
+  const composed = composeRow(row, buildMultiPerspectiveInitialVariables());
 
   const requestBody = {
-    max_tokens: 2000,
+    ...systemOf(composed),
+    max_tokens: row.maxTokens,
     messages: [{
       role: 'user',
       content: [
@@ -675,17 +701,13 @@ async function performInitialAnalysis(base64Pdf, apiKey, userProfileId) {
         },
         {
           type: 'text',
-          text: prompt
+          text: composed.body
         }
       ]
     }]
   };
 
-  const { data, usedFallback, model } = await callClaudeWithRetry(requestBody, apiKey, 'visionModel', userProfileId);
-
-  if (usedFallback) {
-    console.log(`[MultiPerspective] Initial analysis used fallback model: ${model}`);
-  }
+  const { data } = await callClaudeWithRetry(requestBody, apiKey, row.model, userProfileId);
 
   const responseText = data.content[0].text;
 

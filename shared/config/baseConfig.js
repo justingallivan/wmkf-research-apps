@@ -24,7 +24,6 @@ export const BASE_CONFIG = {
   // shared/config/reviewPanelSeats.js and validated by the admin API.
   APP_MODELS: {
     // 'concept-evaluator' deprecated 2026-04-25 (archived to /_archived).
-    'multi-perspective-evaluator': { model: 'sonnet', visionModel: 'sonnet', fallback: 'haiku' },
     'batch-phase-i':               { model: 'sonnet', fallback: 'haiku' },
     'batch-phase-ii':              { model: 'sonnet', fallback: 'haiku' },
     'phase-i-writeup':             { model: 'sonnet', fallback: 'haiku' },

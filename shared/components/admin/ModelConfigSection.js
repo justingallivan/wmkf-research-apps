@@ -12,7 +12,6 @@ const MODEL_TYPE_LABELS = {
 // APP_MODELS keys (e.g. APP_MODELS uses 'batch-phase-i' while the registry
 // uses 'batch-phase-i-summaries'), so this is maintained inline.
 const APP_MODEL_NAMES = {
-  'multi-perspective-evaluator': 'Multi-Perspective Evaluator',
   'batch-phase-i': 'Batch Phase I',
   'batch-phase-ii': 'Batch Phase II',
   'phase-i-writeup': 'Phase I Writeup',

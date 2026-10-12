@@ -180,7 +180,17 @@ const SURFACES = [
     // Multimodal: the Stage-1 concept page is an Anthropic document content
     // block — no text to wrap. The A7 control is the multimodal preamble.
     multimodal: true,
-    promptFiles: ['shared/config/prompts/multi-perspective-evaluator.js'],
+    promptFiles: [
+      'shared/config/prompts/multi-perspective-evaluator.js',
+      // Seam-backed row definitions + variables helpers (convergence plan Stage 5).
+      'shared/config/prompts/multi-perspective-dynamics.js',
+    ],
+    callSiteFiles: [
+      'pages/api/evaluate-multi-perspective.js',
+      // The A7 preamble is composed in code at the resolver seam.
+      'lib/services/tool-prompt-resolver.js',
+      'lib/services/tool-prompt-composer.js',
+    ],
     // Call-site-granular: every builder must carry the preamble in its own body.
     builders: [
       'createInitialAnalysisPrompt',

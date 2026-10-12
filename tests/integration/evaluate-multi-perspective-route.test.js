@@ -148,4 +148,106 @@ describe('/api/evaluate-multi-perspective route', () => {
     }
     for (const c of mockCtorArgs) expect(c.maxRetries).toBe(0);
   });
+
+  test('uses the resolved model and max tokens per stage (vision row for Stage 1)', async () => {
+    await run();
+    expect(mockResolve.mock.calls.map((c) => c[0]).sort()).toEqual([
+      'multi-perspective.initial-analysis', 'multi-perspective.integrator', 'multi-perspective.neutral',
+      'multi-perspective.optimist', 'multi-perspective.proposal-summary', 'multi-perspective.skeptic',
+    ]);
+    expect(mockResolve).toHaveBeenCalledTimes(6);
+    const by = Object.fromEntries(mockCompleteArgs.map((c) => [stageOf(c.messages[0].content), c]));
+    expect(mockCtorArgs.map((c) => c.model)).toEqual(Array(6).fill('claude-resolved'));
+    expect(by['initial-analysis'].maxTokens).toBe(2007);
+    expect(by['proposal-summary'].maxTokens).toBe(1507);
+    expect(by.optimist.maxTokens).toBe(2507);
+    expect(by.skeptic.maxTokens).toBe(2507);
+    expect(by.neutral.maxTokens).toBe(2507);
+    expect(by.integrator.maxTokens).toBe(3507);
+  });
+
+  test('each row uses its own resolved model', async () => {
+    mockResolve.mockImplementation(async (name, def) => resolvedFrom(`m-${name.split('.')[1]}`, 0)(name, def));
+    await run();
+    const byStage = Object.fromEntries(mockCompleteArgs.map((c) => [stageOf(c.messages[0].content), c.__model]));
+    expect(byStage).toEqual({
+      'initial-analysis': 'm-initial-analysis', 'proposal-summary': 'm-proposal-summary', optimist: 'm-optimist',
+      skeptic: 'm-skeptic', neutral: 'm-neutral', integrator: 'm-integrator',
+    });
+  });
+
+  test('a non-empty system template is sent as system', async () => {
+    mockResolve.mockImplementation(async (_n, def) => ({ systemPrompt: 'SYS RULES', body: def.body, model: 'm', maxTokens: 10 }));
+    await run();
+    expect(mockCompleteArgs.every((c) => c.system === 'SYS RULES')).toBe(true);
+  });
+
+  describe('same-model retries, no fallback model', () => {
+    let timeoutSpy;
+    beforeEach(() => {
+      timeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((fn) => { fn(); return 0; });
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+    });
+    afterEach(() => {
+      timeoutSpy.mockRestore();
+      console.error.mockRestore();
+    });
+    const overloaded = () => Object.assign(new Error('Claude API error: overloaded'), { status: 529 });
+
+    test('a persistently overloaded Stage 1 retries 4 times on the resolved model, then errors without a fallback model', async () => {
+      mockBehavior = (_o, stage) => { if (stage === 'initial-analysis') throw overloaded(); return null; };
+      const res = await run();
+      expect(mockCompleteArgs).toHaveLength(4);
+      expect(mockCtorArgs.map((c) => c.model)).toEqual(Array(4).fill('claude-resolved'));
+      const last = frames(res).at(-1);
+      expect(last.results.concepts[0].error).toBeTruthy();
+      expect(last.results.summary.errors).toBe(1);
+    });
+
+    test('a transient failure then success uses 2 calls on the same model', async () => {
+      let n = 0;
+      mockBehavior = (_o, stage) => { if (stage === 'initial-analysis' && n++ === 0) throw overloaded(); return null; };
+      const res = await run();
+      expect(mockCompleteArgs.filter((c) => Array.isArray(c.messages[0].content))).toHaveLength(2);
+      expect(new Set(mockCtorArgs.map((c) => c.model))).toEqual(new Set(['claude-resolved']));
+      expect(frames(res).at(-1).results.summary.successfulEvaluations).toBe(1);
+    });
+  });
+
+  test('PROMPT_NOT_FOUND before streaming returns 503 JSON, sets no stream headers and never calls the model', async () => {
+    mockResolve.mockRejectedValue(Object.assign(new Error('nf'), { code: 'PROMPT_NOT_FOUND' }));
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await run();
+    console.error.mockRestore();
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(res._data).toMatchObject({ code: 'tool_prompt_unavailable', error: expect.stringContaining('Prompt Templates') });
+    expect(res.setHeader).not.toHaveBeenCalledWith('Transfer-Encoding', 'chunked');
+    expect(res.write).not.toHaveBeenCalled();
+    expect(mockCompleteArgs).toHaveLength(0);
+  });
+
+  test('other resolver failure before streaming returns a JSON 500, not an SSE frame', async () => {
+    mockResolve.mockRejectedValue(new Error('unreviewed model'));
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await run();
+    console.error.mockRestore();
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.write).not.toHaveBeenCalled();
+  });
+
+  test('an unavailable-prompt error after frames ends the stream with an actionable error event', async () => {
+    const files = {
+      length: 1,
+      *[Symbol.iterator]() {
+        yield ONE_FILE[0];
+        throw Object.assign(new Error('nf'), { code: 'PROMPT_NOT_FOUND' });
+      },
+    };
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await run({ files, markSentOnWrite: true });
+    console.error.mockRestore();
+    expect(res.status).not.toHaveBeenCalled();
+    expect(frames(res).at(-1)).toEqual({ event: 'error', message: expect.stringContaining('Prompt Templates'), code: 'tool_prompt_unavailable' });
+    expect(res.end).toHaveBeenCalled();
+  });
 });
