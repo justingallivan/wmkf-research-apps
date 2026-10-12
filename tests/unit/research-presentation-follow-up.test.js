@@ -106,6 +106,21 @@ test('a long summary without the expected headings is cut at a length, then show
   expect(block).toHaveTextContent('Closing sentence.');
 });
 
+test('a long opening section followed by more headings stays a bounded preview (Codex review)', () => {
+  const longText = `What was presented\n${'Opening words. '.repeat(400)}Opening end.\n\nQuestions and answers\nAsked about cost.`;
+  render(<ResearchPresentationFollowUp status="loaded"
+    materials={[{ artifactType: 100000007, filename: 's.txt', backing: 'file', webUrl: 'https://tenant.sharepoint.com/s.txt' }]}
+    summary={{ text: longText, stale: false, publishedAt: '2026-10-05T15:00:00Z' }} />);
+  const block = screen.getByTestId('presentation-summary-text');
+  expect(block.textContent.length).toBeLessThan(900);
+  expect(block).not.toHaveTextContent('Opening end.');
+  fireEvent.click(screen.getByRole('button', { name: 'Read more' }));
+  expect(block).toHaveTextContent('Opening end.');
+  expect(block).toHaveTextContent('Asked about cost.');
+  fireEvent.click(screen.getByRole('button', { name: 'Show less' }));
+  expect(block.textContent.length).toBeLessThan(900);
+});
+
 describe('inline staff discussion summary (paired summaries plan D8, owner decision 5)', () => {
   const discussionRow = { artifactType: 100000010, filename: 'discussion.txt', backing: 'file', webUrl: 'https://tenant.sharepoint.com/discussion.txt' };
   const TEXT = 'Main points raised\nThe budget looks high.\n\nQuestions and concerns\nWho owns the follow-up?\n\nFollow-ups and decisions\nNone noted.';

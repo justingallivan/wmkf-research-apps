@@ -49,10 +49,8 @@ test('the discussion headings are exactly the ones the staff discussion prompt a
   expect(DISCUSSION_SUMMARY_LIST_HEADINGS.every((heading) => DISCUSSION_SUMMARY_HEADINGS.includes(heading))).toBe(true);
 });
 
-test('maxSections limits the rendered sections; compact size uses the small type scale', () => {
-  const { container } = render(<SummaryText text={SAMPLE} {...OPTIONS} size="compact" maxSections={1} />);
-  expect(screen.getAllByRole('heading').map((h) => h.textContent)).toEqual(['What was presented']);
-  expect(screen.queryByText('A staff member asked about cost. The PI said Z.')).not.toBeInTheDocument();
+test('compact size uses the small type scale', () => {
+  const { container } = render(<SummaryText text={SAMPLE} {...OPTIONS} size="compact" />);
   expect(container.innerHTML).toMatch(/text-sm/);
   expect(container.innerHTML).not.toMatch(/text-lg/);
 });

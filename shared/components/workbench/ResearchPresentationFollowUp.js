@@ -16,11 +16,23 @@ const SLOTS = [
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, label: 'Presentation summary', action: 'Open presentation summary' },
 ];
 
-// Each summary's sections are fixed by its prompt; the first one is shown until "Read more".
-// Text without those headings (an edited draft) is cut at a length instead.
+// Each summary's sections are fixed by its prompt; until "Read more" the first one is shown,
+// capped at a length so a long opening (or text without the headings) stays a preview.
 const PRESENTATION_SUMMARY = { headings: PRESENTATION_SUMMARY_HEADINGS, listHeadings: PRESENTATION_SUMMARY_LIST_HEADINGS };
 const DISCUSSION_SUMMARY = { headings: DISCUSSION_SUMMARY_HEADINGS, listHeadings: DISCUSSION_SUMMARY_LIST_HEADINGS };
-const COLLAPSED_FALLBACK_CHARS = 700;
+const COLLAPSED_MAX_CHARS = 700;
+
+// Returns the preview and whether it hides anything.
+function collapsedPreview(text, format) {
+  const sections = parseSummaryText(text, format);
+  const first = sections[0];
+  if (!first) return { preview: text, hidesText: false };
+  const opening = [first.heading, ...first.lines].filter(Boolean).join('\n');
+  if (opening.length > COLLAPSED_MAX_CHARS) {
+    return { preview: `${opening.slice(0, COLLAPSED_MAX_CHARS).trim()}…`, hidesText: true };
+  }
+  return { preview: opening, hidesText: sections.length > 1 };
+}
 
 function formatDate(value) {
   const date = value ? new Date(value) : null;
@@ -33,11 +45,7 @@ function SummaryBlock({ summary, format = PRESENTATION_SUMMARY, testId = 'presen
   const [expanded, setExpanded] = useState(false);
   const published = formatDate(summary.publishedAt);
   const text = summary.text || '';
-  const sections = parseSummaryText(text, format);
-  const bySection = sections.length > 1;
-  const byLength = !bySection && text.length > COLLAPSED_FALLBACK_CHARS;
-  const canExpand = bySection || byLength;
-  const collapsedText = byLength ? `${text.slice(0, COLLAPSED_FALLBACK_CHARS).trim()}…` : text;
+  const { preview, hidesText: canExpand } = collapsedPreview(text, format);
   return (
     <div className="mt-0.5" data-testid={testId}>
       <p className="text-xs text-gray-500">
@@ -48,8 +56,7 @@ function SummaryBlock({ summary, format = PRESENTATION_SUMMARY, testId = 'presen
       {text && (
         <>
           <div className="mt-2">
-            <SummaryText text={expanded ? text : collapsedText} {...format} headingLevel={5} size="compact"
-              maxSections={canExpand && !expanded && bySection ? 1 : undefined} />
+            <SummaryText text={expanded || !canExpand ? text : preview} {...format} headingLevel={5} size="compact" />
           </div>
           {canExpand && (
             <button type="button" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded}

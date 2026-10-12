@@ -52,10 +52,10 @@ const SIZES = {
   },
 };
 
-export default function SummaryText({ text, headings, listHeadings, headingLevel = 3, size = 'reading', maxSections }) {
+export default function SummaryText({ text, headings, listHeadings, headingLevel = 3, size = 'reading' }) {
   const Heading = `h${headingLevel}`;
   const classes = SIZES[size] || SIZES.reading;
-  const sections = parseSummaryText(text, { headings, listHeadings }).slice(0, maxSections);
+  const sections = parseSummaryText(text, { headings, listHeadings });
   return (
     <div className={classes.stack}>
       {sections.map((section, index) => (
