@@ -3544,7 +3544,7 @@ function ResourceLinks({ title, links }) {
   );
 }
 
-function WorkspaceContent({ workspace, view }) {
+export function WorkspaceContent({ workspace, view }) {
   switch (workspace) {
     case 'operations':
       return <OperationsWorkspace view={view} />;
