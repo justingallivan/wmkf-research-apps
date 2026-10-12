@@ -741,7 +741,7 @@ UI change was needed; a saved attribution is unaffected.
   state the page does not hold: the materials collection state from its card and Board
   readiness from the Results rows, including the video line's own fetch. Building it means
   lifting that state or adding reads. A partial chip would contradict the cards it
-  summarizes, so this build leaves it out.
+  summarizes, so this build leaves it out. (Historical: built later the same day by lifting each card's reported state; see §10.)
 - **Codex round 1 for commit 7 (needs-attention, one medium):** the identity survived
   client-side navigation between visits, and loads were unguarded. The identity is now
   stored with its request id, and stale loads drop their state, error and loading updates.
@@ -818,8 +818,11 @@ an uploaded transcript gets Open without downloads.
 
 - **[DONE]** Owner desktop check on a real request (localhost, 2026-10-11; findings in §10.1) and
   merge (owner, 2026-10-11; `c574e9e7d`, Production deployment Ready).
-- **Header status chip (§9.6 commit 7): building 2026-10-11 on `claude/site-visit-status-chip`.** Owner chose
-  to lift the state (each card reports what it already shows; the editor does not re-fetch). Mapping, first
+- **[BUILT 2026-10-11, branch `claude/site-visit-status-chip`; owner desktop check pending]** Header status chip
+  (§9.6 commit 7). Owner chose to lift the state (each card reports what it already shows; the editor does not
+  re-fetch). Resolver `shared/utils/site-visit-header-status.js`; the Board list and the chip share
+  `resolveBoardReadiness`. Codex: round 1 (a failed recording refresh with cached data kept reporting) and round 2
+  (a failed first video read dropped the video line) fixed with regressions; round 3 approve. Mapping, first
   unfinished stage wins (owner decisions 2026-10-11 for the rows marked *):
 
   | Input (as the card shows it) | Chip |
