@@ -1,4 +1,115 @@
-# Session 596 Prompt: Site Visit redesign remaining work (plan §10); Proposal Ranking with Codex
+# Session 597 Prompt: Decide on Plans A/B; Proposal Ranking review; Site Visit §10 remainder
+
+## Session 596 close — refactor census, three staged plans, admin page decomposition shipped (Fable orchestrating Sonnet/Opus/Codex, 2026-10-11/12 PT)
+
+### What Was Completed
+
+1. **Reconnaissance without disturbing concurrent agents** (read-only): another Claude session held the
+   shared checkout on a feature branch for the whole session; this session worked only in its own
+   worktrees (`WMKF_Apps-refactor-plan`, then `WMKF_Apps-admin-decomp`). The idle Ultrareview cloud
+   sessions were confirmed harmless (their branches are gone).
+2. **Census of the largest unplanned refactor** — `docs/plans/LARGEST_UNPLANNED_REFACTOR_SCOPE_2026-10-11.md`.
+   Most obvious candidates were already decided (route-shell helper: owner NO; Workbench code splitting:
+   measured and rejected; client cache: omitted; size-only splits: survey). Three live candidates ranked.
+3. **Three staged plans**, each verified by a fresh-context agent with mismatches logged:
+   - **A** `AI_TOOL_APPS_EXECUTOR_CONVERGENCE_PLAN_2026-10-11.md` — 9 owner decisions first. Finding:
+     recorded policy says prompt migration is *demand-driven* (`project-system-model.md:37`), so A proposes a
+     policy change and cannot start without D7. The "streaming" apps make unary model calls; the real
+     Executor gaps are three multimodal call sites and per-call `wmkf_ai_run` rows.
+   - **B** `FLAT_SERVICES_RELOCATION_PLAN_2026-10-11.md` — four waves driven by a codemod + census; 176-row
+     ledger and notes under `docs/plans/data/`, probe scripts `scripts/probe-flat-services-ledger*.py`.
+   - **C** `ADMIN_PAGE_DECOMPOSITION_PLAN_2026-10-11.md` — executed this session (below).
+4. **Plan C executed end to end** (owner-chosen pipeline: Sonnet builds, Opus reviews each stage, Fable
+   final review + fixes, Codex adversarial review after Stage 1 and at the end): `pages/admin.js` 3,649 →
+   120 lines; 23 new files under `shared/components/admin/`; pure moves (byte-identical, multiset-checked;
+   Codex AST diff 53/53); new 21-view coverage test; full suite 22,693 green; memory reconciled.
+   **Merged `56a1945c5` (PR #473), ready to deploy; owner has not yet checked `/admin` live.** Stage 6
+   (code splitting) omitted by plan default. Every verdict is in the plan's §7.
+5. **Bug found in passing, not fixed:** `pages/api/process-expenses.js` declares `sendError` inside the
+   `try` (:190) and calls it from the `catch` (:429) → `ReferenceError` on the after-headers error path.
+
+### Commits (all on `main` via PR #473, merge `56a1945c5`)
+- `1e34ddeec`, `9283a67da` — census + three plans + ledger/probe scripts/route profiles
+- `fad38462a`, `b96713a6e` — Stage 0 coverage test (+ Opus fixes)
+- `d357edd78`..`899324c6b`, `99fadde01` — Stage 1 (Operations sections) + review fix
+- `13494d27e`, `f875ff01a`, `b87d0e12e` — Stage 2 (AI sections) + review fix
+- `9c7dc03d7`..`55be9922c`, `85fbc0a79` — Stages 3–4 (Workflows, People sections) + log
+- `52282fb7c`..`7a0a7dfe6`, `d3126e433`, `0ce8898e3` — Stage 5 (workspaces, constants, test re-points) + reconciliation + logs
+
+## Next Items
+
+### Verified Open
+
+1. **Owner live check of `/admin` after deploy** (every workspace/view renders; this is a pure move but the
+   production deployment of `56a1945c5` has not been eyeballed). Evidence: PR #473 merged; CI 12/12 green;
+   no live check recorded in the plan's §7.
+2. **Review Codex's Proposal Ranking work** — PR #463 is still a draft, updated 2026-10-12, worktree clean
+   at `0d161d60f` ("Keep PD preparation science-first and export meeting rankings"). Evidence:
+   `gh pr view 463`; `git -C /Users/gallivan/Code/WMKF_Apps-codex-proposal-ranking log -1`.
+3. **Fix `process-expenses.js` `sendError` scope bug** (one line; Tier 0/1). Evidence: item 5 above;
+   `docs/plans/AI_TOOL_APPS_EXECUTOR_CONVERGENCE_PLAN_2026-10-11.md` §1.1 row 4.
+4. **Measure a 4-vCPU cut, then lower `PRESENTATION_VIDEO_SANDBOX_TIMEOUT_MS`** (carried from Session 595,
+   not rechecked). Evidence: `docs/CREDENTIALS_RUNBOOK.md` Stage 4 table; queue "Speed up the presentation
+   video cut".
+
+### Owner Decision Needed
+
+1. **Plan A (AI tool apps → Executor): D1–D9**, above all **D7** — adopt staff editability as a sufficient
+   trigger for moving a Vercel-only prompt into Dataverse (reverses the recorded demand-driven framing), or
+   shelve A. Evidence: plan §2; `.claude-memory/project-system-model.md:37`;
+   `.claude-memory/feedback-cycle-vs-executor-scope.md`.
+2. **Plan B (flat `lib/services` relocation): D1–D6** — review the 77 `med`/`low` ledger rows, confirm the 9
+   new directories, name merge windows. Evidence: plan §2; `docs/plans/data/FLAT_SERVICES_MOVE_LEDGER_2026-10-11.tsv`.
+3. **Admin Stage 6 (per-workspace dynamic import)**: omitted by default; reopen only with a bundle
+   measurement and the 5 % gate. Evidence: plan Decision 5; Codex #2 verdict in §7.
+4. **Proposal Ranking PR #463 merge/promotion, Production cleanup, colleague dry run** (carried). Evidence:
+   Session 587 handoff; Codex owns the branch.
+5. **Delete merged remote branches**: `claude/admin-decomposition`, `claude/correction-newer-pending-gate`
+   (both ancestors of `origin/main`) and Session 595's four (`claude/workbench-summary-text`,
+   `claude/workbench-summary-links`, `claude/staff-reader-video`, `claude/workbench-recording-superuser`).
+   Confirm each with `git merge-base --is-ancestor origin/<b> origin/main` before deleting.
+6. **Remove this session's worktrees** `WMKF_Apps-refactor-plan` (local branch `claude/refactor-scope-plan`,
+   never pushed; its commits are in `main` via #473) and `WMKF_Apps-admin-decomp` (now on `main`). Both
+   have `node_modules` installed; each also has a per-worktree `.agents/skills` symlink.
+
+### Verify Before Acting
+
+1. **Site Visit redesign §10 remainder** — another session is mid-flight: the shared checkout sits on
+   `claude/site-visit-status-chip` at `e33a9a613` ("Site Visit header chip built; owner desktop check
+   pending"), unmerged. Do not start the status chip; check that branch/PR state before touching C1–C3,
+   `BTN_LINK` convergence. Evidence: `git -C /Users/gallivan/Code/WMKF_Apps rev-parse --abbrev-ref HEAD`;
+   `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md` §10. The `createMeetingCorrection` gate shipped
+   (`b3135037c`).
+2. **Dependabot PR #471** (17 minor/patch bumps): the lock must stay npm-10 compatible
+   (`npx -y npm@10 ci --dry-run`) before merging. Evidence: `project-ci-npm10-lockfile-parity.md`.
+
+### Do Not Reopen Without New Decision
+
+1. Shared API route-shell helper — owner NO (`docs/ROUTE_SERVICE_CONSOLIDATION_PLAN.md:638`).
+2. Workbench per-tab code splitting (rejected trial, 0.7135 %) and shared client cache (omitted) —
+   `docs/plans/WORKBENCH_RESPONSIVENESS_EXECUTION_2026-09-18.md:36-37`.
+3. Session 595's closed items (Board link for 1003222; `PRESENTATION_VIDEO_SPLIT_ACCESS=on`; Meeting
+   Tracker recording visibility).
+
+### Gotchas
+
+- This repo's ESLint does not report unused imports; prove import hygiene by counting uses (three
+  stages each left one stale import behind until a reviewer counted).
+- Jest 30: the flag is `--testPathPatterns` (plural). `--testPathPatterns 'admin|Section'` matches
+  essentially the whole suite (~50 s), which is fine as a full run.
+- Turbopack refuses `next build` in a worktree whose `node_modules` is a symlink; run builds in a worktree
+  with its own `npm ci`.
+- The shared checkout drifted to other sessions' branches twice this session; every git action here was
+  done in a dedicated worktree, and session docs landed on `main` from `WMKF_Apps-admin-decomp`.
+- A verifier agent's fresh context only covers one document: cross-document contradictions (census
+  vs plan) need an explicit reconciliation pass after corrections.
+
+**Milestone determination:** the admin page decomposition shipped to `main` (production auto-deploys), a
+layout change a future reader will search for, so a DEVELOPMENT_LOG entry was added.
+
+---
+
+## Session 596 Prompt (superseded): Site Visit redesign remaining work (plan §10); Proposal Ranking with Codex
 
 ## Session 595 close — staff reading page, Workbench presentation video, video cut on for all requests (Claude, main, 2026-10-11 PT)
 

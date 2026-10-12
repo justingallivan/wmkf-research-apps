@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Admin page decomposed: pages/admin.js is a 120-line shell (Session 596)
+
+**Milestone:** the admin surface's code now lives where every other admin section already lived. `pages/admin.js` went from 3,649 lines (27 inline components) to 120 lines (imports, `WorkspaceContent`, `AdminDashboard`); 16 sections, a `health-status.js` helper, `ResourceLinks` and five `workspaces/*.js` files (carrying their `*_DATAVERSE_FIELDS` constants) sit under `shared/components/admin/`.
+**Sessions:** 596 (Fable orchestrating; Sonnet built each stage, Opus reviewed each stage, Codex adversarial review after the pilot and at the end — both approve, no material findings).
+**Ship state:**
+- Pure moves only: every block byte-identical to baseline (multiset-checked per stage; Codex AST diff: 53 declarations unchanged, no import cycles). No API, schema or behavior change.
+- New `tests/unit/admin-view-coverage.test.js` pins each of the 21 admin views' fetch URLs (duplicates kept) and headings; six tests re-pointed by import line only; full suite 22,693 green.
+- Code splitting deliberately omitted (no measurement); the census that produced this plan also left two unstarted plans (flat `lib/services` relocation; AI tool apps → Executor, gated on a prompt-home policy ruling).
+**Why it matters:** admin work no longer means editing a 3,600-line page; the layout rule is one place per section and one file per workspace.
+**Pointers:** `docs/plans/ADMIN_PAGE_DECOMPOSITION_PLAN_2026-10-11.md` (§7 is the per-stage audit log), `docs/plans/LARGEST_UNPLANNED_REFACTOR_SCOPE_2026-10-11.md`; merge `56a1945c5` (PR #473).
+
 ## October 2026 — Staff read transcripts and summaries in the browser; Workbench plays the presentation video (Session 595)
 
 **Milestone:** staff no longer download plain `.txt` files: a reading page shows transcripts and summaries formatted, the Workbench shows summaries with headings and lists, and the Workbench plays the approved presentation video inline.
