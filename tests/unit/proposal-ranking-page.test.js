@@ -347,6 +347,22 @@ describe('Proposal Ranking page', () => {
     expect(screen.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
   });
 
+  test('shows history context, provisional and no-award states while legacy snapshots stay unavailable', async () => {
+    const response = roundResponse();
+    const proposals = response.round.snapshot.proposals;
+    proposals[0].researchFunding = { status: 'available', totalUsd: 10500000, lastAwardCycle: '2014-12', qualifyingGrantCount: 3 };
+    proposals[1].researchFunding = { status: 'available', totalUsd: 0, lastAwardCycle: null, qualifyingGrantCount: 0 };
+    proposals[2].researchFunding = { status: 'provisional', totalUsd: 9810000, lastAwardCycle: '2023-06', qualifyingGrantCount: 11 };
+    mockLoad.mockResolvedValue(response);
+    render(<ProposalRankingApp />);
+    expect(await screen.findByText('$10,500,000')).toBeInTheDocument();
+    expect(screen.getByText('December 2014')).toBeInTheDocument();
+    expect(screen.getByText('None on record')).toBeInTheDocument();
+    expect(screen.getByText('$9,810,000 (provisional)')).toBeInTheDocument();
+    expect(screen.getByText('Some historical awards need classification review.')).toBeInTheDocument();
+    expect(screen.getAllByText('Unavailable').length).toBeGreaterThanOrEqual(2);
+  });
+
   test('shows East and West on shared cards and omits geography for unknown or older snapshot values', async () => {
     const response = roundResponse();
     response.round.snapshot.proposals[0].institutionGeography = 'East';

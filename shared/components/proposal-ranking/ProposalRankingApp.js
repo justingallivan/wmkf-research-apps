@@ -33,6 +33,25 @@ function StatusBanner({ kind = 'info', children, className = '' }) {
   return <div role={kind === 'error' ? 'alert' : 'status'} className={`rounded-lg border px-4 py-3 text-sm ${classes[kind]} ${className}`}>{children}</div>;
 }
 
+function ResearchFundingContext({ history }) {
+  const known = (history?.status === 'available' || history?.status === 'provisional')
+    && Number.isFinite(history.totalUsd) && history.totalUsd >= 0
+    && Number.isInteger(history.qualifyingGrantCount) && history.qualifyingGrantCount >= 0;
+  const zero = known && history.qualifyingGrantCount === 0 && history.totalUsd === 0;
+  const cycle = typeof history?.lastAwardCycle === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(history.lastAwardCycle)
+    ? new Date(`${history.lastAwardCycle}-01T00:00:00Z`) : null;
+  const total = known ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(history.totalUsd) : 'Unavailable';
+  const latest = !known ? 'Unavailable' : zero ? 'None on record' : cycle
+    ? new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(cycle) : 'Unavailable';
+  return <div className="mt-3 text-xs text-gray-600">
+    <dl aria-label="Institution research funding history" className="flex flex-wrap gap-x-6 gap-y-2">
+      <div><dt>Prior research funding</dt><dd className="font-medium tabular-nums text-gray-800">{total}{known && history.status === 'provisional' ? ' (provisional)' : ''}</dd></div>
+      <div><dt>Latest qualifying award</dt><dd className="font-medium text-gray-800">{latest}</dd></div>
+    </dl>
+    {known && history.status === 'provisional' && <p className="mt-1 text-amber-800">Some historical awards need classification review.</p>}
+  </div>;
+}
+
 function ProposalCardRow({ proposal, position, programCount, total, score, rank, editable, dragging, dragProvided }) {
   const amount = proposal.amountMinorUnits == null
     ? 'Requested amount unavailable'
@@ -77,6 +96,7 @@ function ProposalCardRow({ proposal, position, programCount, total, score, rank,
                 {proposal.leadName && <span>Lead PD: {proposal.leadName}</span>}
                 {rank?.disagreement && <span className="rounded-md bg-amber-100 px-2 py-0.5 text-amber-900">Disagreement</span>}
               </div>}
+              <ResearchFundingContext history={proposal.researchFunding} />
               <div className="mt-3 space-y-3">
                 <div className="flex flex-wrap items-center gap-1.5 text-sm">
                   <span className="mr-1 font-medium text-gray-700">Reviews</span>

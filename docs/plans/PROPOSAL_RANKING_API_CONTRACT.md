@@ -104,6 +104,12 @@ type ProposalCard = {
   title: string;
   organization: string;
   institutionGeography?: 'East' | 'West' | null; // absent in older frozen snapshots
+  researchFunding?: { // local feature-branch addition; absent/null in older snapshots
+    status: 'available' | 'provisional' | 'unavailable';
+    totalUsd: number | null;
+    lastAwardCycle: string | null; // YYYY-MM
+    qualifyingGrantCount: number | null;
+  } | null;
   programKey: ProgramKey;
   amountMinorUnits: number | null;
   currency: null | { code: string; name: string; precision: number };
@@ -138,6 +144,29 @@ type MeetingView = ListView & {
 participates in the preview fingerprint. Unknown or missing values become null;
 older snapshots may omit the field. Only known values render an E/W marker.
 Geography does not affect ranking calculations or eligibility.
+
+`researchFunding` is institution context added locally on 2026-10-11, not yet
+deployed. The source adapter reads positive historical awards for the exact
+applicant account; `research-funding.js` reconciles the full Program population
+against account rollups before deriving ordinary Research awards. Directed gifts,
+building/capital support, endowments, teaching awards, matching/gift support,
+Special Grants and Young Scholars are excluded. Project-specific research
+fellowships remain eligible. The five named unresolved legacy awards and other
+recognized but non-research-specific support types remain included with
+`provisional` status. Unknown support options or unaudited blank support tags
+return unavailable; ten individually audited blank-tag research awards are
+explicitly allowlisted in the classifier.
+See the Atlas research-funding section for record exceptions and source limits.
+
+The summary participates in the preview fingerprint and freezes with the card.
+`available` with zero count/total means no qualifying award found on the linked
+account; its latest cycle is null. Per-account incomplete or unreconciled history
+returns `unavailable` with all three values null. Failed/capped source reads still
+reject preview/open; they never become a zero or unavailable fallback. Older
+snapshots are not backfilled and render unavailable. The card labels are **Prior
+research funding** and **Latest qualifying award**, with a provisional disclosure.
+This context changes no scientific score, seed/composite order, eligibility or
+cumulative requested amount. The existing draft-writeup funding logic is unchanged.
 
 Privacy rules shape the response, not the client. Before a program is published,
 a roster participant receives only their own individual list and that program's

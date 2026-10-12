@@ -18,6 +18,52 @@ Initial activation and rollback receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTIO
 Earlier dated sections below retain historical setup checkpoints; disabled-state
 statements in those checkpoints are superseded by this release.
 
+## Institution research-funding context — 2026-10-11 (local only)
+
+[VERIFIED via local source inspection; not deployed or live-validated] The source
+adapter `lib/dataverse/adapters/proposal-ranking-source.js` reads positive historical
+awards for eligible proposals' exact applicant account GUIDs, in batches of 20,
+with ordinary/test isolation and complete pagination. There is no date cutoff,
+fuzzy institution matching, or consolidation of separate accounts. It reads award
+currency metadata and the account Program-grant count/sum rollups. Failed or capped
+history/currency queries reject preview/open through the existing complete-read
+contract; no network-error fallback is introduced.
+
+`lib/services/proposal-ranking/research-funding.js` is the pure classifier. It
+first reconciles Program rows with the account rollups, then requires both the
+internal SE/MR identity and broad Research label, an Approved/Active/Closed status,
+a positive USD amount and an interpretable award cycle. Directed gifts, matching/
+gift support, capital/building support, endowments, teaching awards, Special Grants and Young Scholars
+are excluded. Project-specific research fellowships remain eligible. Dated legacy
+exceptions exclude building-related requests 800308, 860843 and 963245 despite
+misleading Research tags. Requests 881024, 860892, 840727, 870929 and 975108 remain
+included pending mixed-purpose/general-fellowship classification and make their
+institution summary provisional. Other recognized but non-research-specific
+support types also produce a provisional summary. Unknown/new support option
+values or unaudited blank support tags return unavailable. Ten blank-tag awards
+individually reviewed in the October 11 audit are allowlisted in the classifier
+by request number as research projects; this does not admit future blank-tag
+records. No institution totals are hardcoded.
+
+The summary is `researchFunding: { status, totalUsd, lastAwardCycle,
+qualifyingGrantCount }`. Status is available, provisional or unavailable. A missing
+account, unresolved required taxonomy, rollup mismatch, or invalid qualifying
+award status/currency/amount/date yields unavailable with null values. Zero with
+available status means no qualifying award found on that linked account, not an
+assertion about all WMKF history. Recency uses a recognized `akoya_fiscalyear`
+month/year label, then meeting date, then decision date, expressed as YYYY-MM.
+No currency conversion is performed.
+
+`preview-service.js` carries the summary into the preview fingerprint and frozen
+proposal snapshot; `service.js` returns the authorized snapshot to
+`shared/components/proposal-ranking/ProposalRankingApp.js`. Cards show **Prior
+research funding** and **Latest qualifying award**, plus a provisional disclosure.
+Older snapshots show unavailable and are not backfilled. Scientific scores, seed
+and composite ordering, eligibility and cumulative requested-budget amounts are
+unchanged. No source write or draft-writeup change is part of this feature. This
+section records source behavior only; it does not claim tests passed, deployment,
+a new round, or live transaction verification.
+
 ## Office portability — 2026-10-08
 
 Implementation is pushed on `codex/proposal-ranking` in draft PR #463 (unmerged).

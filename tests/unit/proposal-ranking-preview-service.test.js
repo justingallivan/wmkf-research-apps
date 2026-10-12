@@ -103,3 +103,25 @@ test('fails closed when the systemuser disabled state is missing', async () => {
   expect(preview.roster[0].active).toBe(false);
   expect(preview.blockingProblems).toContain('A proposal is assigned to a staff identity that is missing or disabled. Correct the assignment before opening.');
 });
+
+
+test('history is frozen and fingerprinted without changing scores, seed order or requested amounts', async () => {
+  const env = { PROPOSAL_RANKING_ENABLED: 'on', PROPOSAL_RANKING_SCHEMA_READY: 'on', TEST_REQUEST_ISOLATION: 'on', SYNTHETIC_REVIEWER_ISOLATION: 'on' };
+  setUpSource(false, 'West');
+  const source = await readProposalRankingSource();
+  source.proposals[0].reviews = [{ received: true, synthetic: false, answer: { answerValue: 5, answerText: 'Excellent' } }];
+  source.proposals.push({ ...source.proposals[0], requestId: 'another-request', requestNumber: '1002', reviews: [{ received: true, synthetic: false, answer: { answerValue: 3, answerText: 'Good' } }] });
+  const base = await buildProposalRankingPreview('D26', env);
+  const history = { status: 'available', totalUsd: 10500000, lastAwardCycle: '2014-12', qualifyingGrantCount: 3 };
+  source.proposals[0].researchFunding = history;
+  const enriched = await buildProposalRankingPreview('D26', env);
+  expect(enriched.snapshot.proposals[0].researchFunding).toEqual(history);
+  expect(enriched.previewFingerprint).not.toBe(base.previewFingerprint);
+  expect(enriched.snapshot.seedOrders).toEqual(base.snapshot.seedOrders);
+  expect(enriched.proposals.map((p) => p.score)).toEqual(base.proposals.map((p) => p.score));
+  expect(enriched.proposals[0].score.mean).toBe(5);
+  expect(enriched.proposals[0].amountMinorUnits).toBe(base.proposals[0].amountMinorUnits);
+  source.proposals[0].amount = null;
+  const noAsk = await buildProposalRankingPreview('D26', env);
+  expect(noAsk.snapshot.proposals[0].researchFunding).toEqual(history);
+});

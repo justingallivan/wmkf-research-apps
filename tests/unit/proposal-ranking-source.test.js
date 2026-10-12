@@ -123,7 +123,7 @@ test('maps only the verified applicant-account East and West options; unknown or
     select: expect.stringContaining('_akoya_applicantid_value'),
   }));
   expect(DynamicsService.queryAllRecords).toHaveBeenCalledWith('accounts', expect.objectContaining({
-    select: 'accountid,name,wmkf_eastwest',
+    select: 'accountid,name,wmkf_eastwest,wmkf_countofprogramgrants,wmkf_sumofprogramgrants',
     filter: expect.stringContaining('accountid eq'),
   }));
   expect(DynamicsService.queryAllRecords.mock.calls.find(([entitySet]) => entitySet === 'akoya_requests')[1].select)
@@ -208,4 +208,36 @@ test('December 2026 trial fails clearly for a malformed request number before do
     SYNTHETIC_REVIEWER_ISOLATION: 'on',
   })).rejects.toThrow('December 2026 Proposal Ranking trial encountered a missing or malformed request number.');
   expect(DynamicsService.queryAllRecords).toHaveBeenCalledTimes(1);
+});
+
+
+test.each([false, true])('institution funding reads are scoped, deduplicated and fail closed on cap=%s', async (capped) => {
+  const applicantId = '44444444-4444-4444-8444-444444444444';
+  DynamicsService.queryAllRecords.mockImplementation(async (entitySet, options) => {
+    if (entitySet === 'akoya_requests' && options.select.includes('akoya_fiscalyear')) return { capped, records: [{
+      _akoya_applicantid_value: applicantId, akoya_requestnum: 'history', akoya_grant: 2000000,
+      wmkf_typeforrollup: 'Program', _akoya_programid_value: RESEARCH_PROGRAM_IDS[0],
+      _wmkf_grantprogram_value_formatted: 'Research', wmkf_supporttype2: '100000033',
+      akoya_requeststatus: 'Closed', akoya_fiscalyear: 'December 2014', _transactioncurrencyid_value: CURRENCY_ID,
+    }] };
+    if (entitySet === 'akoya_requests') return { records: [REQUEST_ID, LEAD_ID].map((id) => ({
+      akoya_requestid: id, akoya_requestnum: '1001', wmkf_meetingdate: '2026-12-10',
+      akoya_requeststatus: 'Phase II Pending', _akoya_programid_value: RESEARCH_PROGRAM_IDS[0], _akoya_applicantid_value: applicantId,
+    })) };
+    if (entitySet === 'accounts') return { records: [{ accountid: applicantId, name: 'Institution', wmkf_countofprogramgrants: 1, wmkf_sumofprogramgrants: 2000000 }] };
+    if (entitySet === 'transactioncurrencies') return { records: [{ transactioncurrencyid: CURRENCY_ID, isocurrencycode: 'USD' }] };
+    if (entitySet === 'wmkf_appreviewersuggestions') return { records: [] };
+    throw new Error('Unexpected read');
+  });
+  const promise = readProposalRankingSource('D26', { TEST_REQUEST_ISOLATION: 'on', SYNTHETIC_REVIEWER_ISOLATION: 'on' });
+  if (capped) await expect(promise).rejects.toThrow('Institution research funding scan reached');
+  else {
+    const source = await promise;
+    expect(source.proposals.map((p) => p.researchFunding)).toEqual(Array(2).fill({ status: 'available', totalUsd: 2000000, lastAwardCycle: '2014-12', qualifyingGrantCount: 1 }));
+  }
+  const reads = DynamicsService.queryAllRecords.mock.calls.filter(([set, options]) => set === 'akoya_requests' && options.select.includes('akoya_fiscalyear'));
+  expect(reads).toHaveLength(1);
+  expect(reads[0][1].filter).toContain(`_akoya_applicantid_value eq ${applicantId}`);
+  expect(reads[0][1].filter).toContain('wmkf_istestrequest');
+  expect(reads[0][1].filter).not.toContain('2026-12');
 });

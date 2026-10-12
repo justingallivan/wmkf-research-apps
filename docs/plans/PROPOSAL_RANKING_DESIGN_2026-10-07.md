@@ -85,6 +85,23 @@ missing/invalid/unscored means use gray. The hover text and accessible name give
 the numeric score. Matching colors indicate approximate strength, not an exact
 tie. Numeric score display, seed ordering and composite calculations are unchanged.
 
+Owner addition (2026-10-11; local implementation, not deployed): show **Prior
+research funding** and **Latest qualifying award** alongside institution geography.
+Use the linked applicant account's ordinary Research-program awards, excluding
+directed gifts, matching/gift support, buildings/capital support, endowments,
+teaching awards, Special Grants and Young Scholars; retain project-specific
+research fellowships. Known unresolved mixed-purpose/general-fellowship records
+and recognized non-research-specific support types remain included with a visible
+provisional disclosure. Unknown support options or unaudited blank support tags
+make the history unavailable; individually audited blank-tag exceptions live in
+the classifier. Missing or unreconciled history is unavailable, never
+silently zero. Award-cycle labels take precedence over administrative decision
+dates. The summary is fingerprinted and frozen at opening; existing snapshots
+are not backfilled and show unavailable. No scientific scores, initial or composite
+ordering, eligibility, or requested-budget totals use this context. The API contract
+and Atlas describe the exact summary and classification limits; draft writeups
+retain their existing funding logic.
+
 The right side shows the sum of that proposal's full requested amount and all
 higher-ranked proposals in that program list. Reordering updates totals immediately.
 Published meeting rows additionally show named submitted PD positions and a
