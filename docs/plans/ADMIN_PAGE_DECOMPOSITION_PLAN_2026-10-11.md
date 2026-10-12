@@ -347,4 +347,16 @@ before trying it (`admin-view-coverage` covers first render only).
   dated plans, audits and briefs citing `pages/admin.js:<line>` are left as historical records (plan rule).
   `docs/agent-wiki/topics/dataverse-dynamics.md:153` describes a past event and already points at the
   extracted file. Stage 6 (code splitting): **omitted** per Decision 5 default — no measurement was requested.
+- 2026-10-11: **Codex adversarial review #2 (final, whole branch vs `origin/main`, `gpt-6-astra`): APPROVE,
+  no material findings.** Codex ran an independent AST comparison: all 53 moved declarations unchanged,
+  import bindings preserved across the 23 new modules, no admin import cycles. Design challenges answered:
+  workspace composition is navigable without a barrel or README; Dataverse field metadata belongs beside its
+  panel consumers (the workspaces); `WorkspaceContent`'s page export is an acceptable test seam; hooks, keys,
+  visited-view retention and Tailwind content coverage are preserved; deferring code splitting is
+  defensible for a structural change but "establishes no performance benefit". Coverage limitations noted
+  (navigation, populated-data failures, races) are not demonstrated regressions. Codex could not rerun
+  tests/build in its read-only sandbox; those results are the orchestrator's supplied evidence (§7 above).
+  **Orchestrator adjudication:** no findings to accept or reject; no Codex/Opus disagreement arose at any
+  stage, so there is no unilateral call to flag before merge. Campaign status: **Stages 0–5 complete on
+  `claude/admin-decomposition`; Stage 6 omitted; awaiting owner merge.**
 
