@@ -133,16 +133,14 @@ export const EXPERTISE_FINDER_MATCH_ROW = {
 export const TOOL_PROMPT_ROWS = [EXPERTISE_FINDER_MATCH_ROW];
 
 /**
- * Variables for composeToolPrompt. `systemVariables` fills the system template,
- * `bodyVariables` the body. `additional_notes_block` is exactly what the old
- * buildUserPrompt ternary emitted ('' when absent).
+ * One merged variable map for composeToolPromptPair (a `{{var}}` may live in
+ * either template after an /admin edit). `additional_notes_block` is exactly what
+ * the old buildUserPrompt ternary emitted ('' when absent).
  */
 export function buildExpertiseMatchVariables({ rosterMembers, wrappedProposal, additionalNotes = '' }) {
   return {
-    systemVariables: { roster_block: buildRosterContext(rosterMembers) },
-    bodyVariables: {
-      proposal_text: wrappedProposal,
-      additional_notes_block: additionalNotes ? `## ADDITIONAL CONTEXT FROM USER\n${additionalNotes}\n` : '',
-    },
+    roster_block: buildRosterContext(rosterMembers),
+    proposal_text: wrappedProposal,
+    additional_notes_block: additionalNotes ? `## ADDITIONAL CONTEXT FROM USER\n${additionalNotes}\n` : '',
   };
 }

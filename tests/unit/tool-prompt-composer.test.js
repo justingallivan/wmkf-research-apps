@@ -51,3 +51,43 @@ describe('reserved {{a7_preamble}} slot', () => {
     expect(() => composeToolPrompt('A', { a7_preamble: 'x' }, { nonces: [] })).toThrow(/reserved/);
   });
 });
+
+describe('composeToolPromptPair', () => {
+  const { composeToolPromptPair } = require('../../lib/services/tool-prompt-composer');
+  const pre = buildUntrustedContentPreamble([]);
+
+  test('one merged variable map fills both templates', () => {
+    expect(composeToolPromptPair({ systemPrompt: 'S {{a}}', body: 'B {{b}}' }, { a: 1, b: 2 }))
+      .toEqual({ systemPrompt: 'S 1', body: 'B 2' });
+  });
+  test('a variable may live in either template', () => {
+    expect(composeToolPromptPair({ systemPrompt: 'S {{b}}', body: 'B {{a}}' }, { a: 1, b: 2 }))
+      .toEqual({ systemPrompt: 'S 2', body: 'B 1' });
+  });
+  test('slot in the system prompt fills in place', () => {
+    expect(composeToolPromptPair({ systemPrompt: 'S\n\n{{a7_preamble}}\n\nT', body: 'B' }, {}, { nonces: [] }))
+      .toEqual({ systemPrompt: `S\n\n${pre}\n\nT`, body: 'B' });
+  });
+  test('slot moved to the body lands in the body', () => {
+    const out = composeToolPromptPair({ systemPrompt: 'S', body: '{{a7_preamble}}\n\nB' }, {}, { nonces: [] });
+    expect(out).toEqual({ systemPrompt: 'S', body: `${pre}\n\nB` });
+  });
+  test('slot in both templates fills both', () => {
+    const out = composeToolPromptPair({ systemPrompt: '{{a7_preamble}}', body: '{{a7_preamble}}' }, {}, { nonces: [] });
+    expect(out).toEqual({ systemPrompt: pre, body: pre });
+  });
+  test('no slot: preamble is prepended to the body, or to the system when the body is empty', () => {
+    expect(composeToolPromptPair({ systemPrompt: 'S', body: 'B' }, {}, { nonces: [] }))
+      .toEqual({ systemPrompt: 'S', body: `${pre}\n\nB` });
+    expect(composeToolPromptPair({ systemPrompt: 'S', body: '' }, {}, { nonces: [] }))
+      .toEqual({ systemPrompt: `${pre}\n\nS`, body: '' });
+  });
+  test('null nonces: no preamble; a slot anywhere throws', () => {
+    expect(composeToolPromptPair({ systemPrompt: 'S', body: 'B' }, {})).toEqual({ systemPrompt: 'S', body: 'B' });
+    expect(() => composeToolPromptPair({ systemPrompt: 'S', body: '{{a7_preamble}}' }, {})).toThrow(/a7_preamble/);
+  });
+  test('caller-supplied a7_preamble and unfilled slots (either template) throw', () => {
+    expect(() => composeToolPromptPair({ systemPrompt: 'S', body: 'B' }, { a7_preamble: 'x' }, { nonces: [] })).toThrow(/reserved/);
+    expect(() => composeToolPromptPair({ systemPrompt: 'S', body: 'B {{zz}}' }, {})).toThrow(/unfilled template slot\(s\): zz/);
+  });
+});

@@ -10,6 +10,7 @@
 
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/services/tool-prompt-resolver', () => ({
+  ...jest.requireActual('../../lib/services/tool-prompt-resolver'),
   resolveToolPrompt: jest.fn(async (_name, def) => ({
     systemPrompt: def.systemPrompt, body: def.body, model: 'claude-resolved', maxTokens: 1234, source: 'bundled', version: null,
   })),

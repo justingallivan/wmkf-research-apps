@@ -18,8 +18,8 @@ import pdf from 'pdf-parse';
 import { sql } from '@vercel/postgres';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { BASE_CONFIG } from '../../../shared/config/baseConfig';
-import { resolveToolPrompt } from '../../../lib/services/tool-prompt-resolver';
-import { composeToolPrompt } from '../../../lib/services/tool-prompt-composer';
+import { resolveToolPrompt, toolPromptUnavailable } from '../../../lib/services/tool-prompt-resolver';
+import { composeToolPromptPair } from '../../../lib/services/tool-prompt-composer';
 import {
   EXPERTISE_FINDER_MATCH_ROW,
   buildExpertiseMatchVariables,
@@ -98,14 +98,17 @@ export default async function handler(req, res) {
       label: 'research proposal',
     });
 
-    const { systemVariables, bodyVariables } = buildExpertiseMatchVariables({
+    const variables = buildExpertiseMatchVariables({
       rosterMembers: rosterResult.rows,
       wrappedProposal: proposalPayload.text,
       additionalNotes,
     });
     resolved = await resolveToolPrompt(EXPERTISE_FINDER_MATCH_ROW.promptName, EXPERTISE_FINDER_MATCH_ROW);
-    const systemPrompt = composeToolPrompt(resolved.systemPrompt, systemVariables, { nonces: [] });
-    const userPrompt = composeToolPrompt(resolved.body, bodyVariables, { nonces: null });
+    const { systemPrompt, body: userPrompt } = composeToolPromptPair(
+      { systemPrompt: resolved.systemPrompt, body: resolved.body },
+      variables,
+      { nonces: [] },
+    );
 
     // No fallback model (owner decision D4): one attempt with the resolved model.
     const modelUsed = resolved.model;
@@ -191,6 +194,7 @@ export default async function handler(req, res) {
   } catch (error) {
     const latencyMs = Date.now() - startTime;
     console.error('[ExpertiseFinder] Match error:', error);
+    const unavailable = toolPromptUnavailable(error);
 
     logUsage({
       userProfileId: access.profileId,
@@ -202,6 +206,9 @@ export default async function handler(req, res) {
       status: 'error',
       errorMessage: error.message,
     });
+
+    // Missing/ambiguous prompt row: actionable 503 for staff, not the generic 500.
+    if (unavailable) return res.status(503).json(unavailable);
 
     return res.status(500).json({
       error: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED,

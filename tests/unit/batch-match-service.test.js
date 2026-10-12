@@ -20,6 +20,7 @@ jest.mock('../../lib/services/llm-client', () => ({
   LLMClient: jest.fn(),
 }));
 jest.mock('../../lib/services/tool-prompt-resolver', () => ({
+  ...jest.requireActual('../../lib/services/tool-prompt-resolver'),
   resolveToolPrompt: jest.fn(async (_name, def) => ({
     systemPrompt: def.systemPrompt, body: def.body, model: 'claude-resolved', maxTokens: 1234, source: 'bundled', version: null,
   })),
@@ -175,10 +176,16 @@ describe('batchMatch', () => {
     expect(logUsage).toHaveBeenCalledWith(expect.objectContaining({ status: 'error', model: 'claude-resolved' }));
   });
 
-  it('a resolver PROMPT_NOT_FOUND surfaces as the 500 envelope', async () => {
+  it.each([
+    ['PROMPT_NOT_FOUND', 'not set up yet'],
+    ['PROMPT_DUPLICATE_CURRENT', 'more than one current version'],
+  ])('a resolver %s surfaces as an actionable 503 and no LLM call', async (code, text) => {
     primeGoldenPath();
-    resolveToolPrompt.mockRejectedValueOnce(Object.assign(new Error('no row'), { code: 'PROMPT_NOT_FOUND' }));
-    await expect(batchMatch(ARGS)).rejects.toMatchObject({ httpStatus: 500, body: { error: 'Failed to process proposal' } });
+    resolveToolPrompt.mockRejectedValueOnce(Object.assign(new Error('no row'), { code }));
+    await expect(batchMatch(ARGS)).rejects.toMatchObject({
+      httpStatus: 503,
+      body: { code: 'tool_prompt_unavailable', error: expect.stringContaining(text), requestNumber: 'R-1000' },
+    });
     expect(LLMClient).not.toHaveBeenCalled();
   });
 });

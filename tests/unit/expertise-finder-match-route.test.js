@@ -14,6 +14,7 @@ jest.mock('../../lib/utils/usage-logger', () => ({
   estimateCostCents: jest.fn(() => 5),
 }));
 jest.mock('../../lib/services/tool-prompt-resolver', () => ({
+  ...jest.requireActual('../../lib/services/tool-prompt-resolver'),
   resolveToolPrompt: jest.fn(async (_n, def) => ({
     systemPrompt: def.systemPrompt, body: def.body, model: 'claude-resolved', maxTokens: 1234, source: 'dataverse', version: 3,
   })),
@@ -93,13 +94,19 @@ test('a provider error is not retried on a fallback model; 500 processing envelo
   expect(logUsage).toHaveBeenCalledWith(expect.objectContaining({ status: 'error', model: 'claude-resolved' }));
 });
 
-test('a resolver PROMPT_NOT_FOUND yields the same 500 processing envelope and no LLM call', async () => {
+test.each([
+  ['PROMPT_NOT_FOUND', 'not set up yet'],
+  ['PROMPT_DUPLICATE_CURRENT', 'more than one current version'],
+])('resolver %s yields an actionable 503 and no LLM call', async (code, text) => {
   const complete = jest.fn();
   prime(complete);
-  resolveToolPrompt.mockRejectedValueOnce(Object.assign(new Error('no row'), { code: 'PROMPT_NOT_FOUND' }));
+  resolveToolPrompt.mockRejectedValueOnce(Object.assign(new Error('no row'), { code }));
   const res = mockRes();
   await handler(req(), res);
-  expect(res.statusCode).toBe(500);
+  expect(res.statusCode).toBe(503);
+  expect(res.body.code).toBe('tool_prompt_unavailable');
+  expect(res.body.error).toContain(text);
+  expect(res.body.error).toContain('Admin');
   expect(complete).not.toHaveBeenCalled();
   expect(logUsage).toHaveBeenCalledWith(expect.objectContaining({ status: 'error', model: 'unresolved' }));
 });
