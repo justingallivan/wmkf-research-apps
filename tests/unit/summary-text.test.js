@@ -1,8 +1,11 @@
 /** @jest-environment jsdom */
 import { render, screen } from '@testing-library/react';
 import SummaryText, { parseSummaryText } from '../../shared/components/SummaryText.js';
-import { PRESENTATION_SUMMARY_HEADINGS, PRESENTATION_SUMMARY_LIST_HEADINGS } from '../../shared/config/transcriptSummary.js';
+import {
+  DISCUSSION_SUMMARY_HEADINGS, DISCUSSION_SUMMARY_LIST_HEADINGS, PRESENTATION_SUMMARY_HEADINGS, PRESENTATION_SUMMARY_LIST_HEADINGS,
+} from '../../shared/config/transcriptSummary.js';
 import { SYSTEM_PROMPT } from '../../shared/config/prompts/meeting-presentation-summary.js';
+import { SYSTEM_PROMPT as DISCUSSION_PROMPT } from '../../shared/config/prompts/meeting-staff-discussion-summary.js';
 
 const OPTIONS = { headings: PRESENTATION_SUMMARY_HEADINGS, listHeadings: PRESENTATION_SUMMARY_LIST_HEADINGS };
 const SAMPLE = [
@@ -37,4 +40,17 @@ test('renders headings at the requested level, paragraphs and a list', () => {
   expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(PRESENTATION_SUMMARY_HEADINGS);
   expect(screen.getByText('They propose Y.').tagName).toBe('P');
   expect(screen.getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Send the budget breakdown.', 'Confirm the start date.']);
+});
+
+test('the discussion headings are exactly the ones the staff discussion prompt asks for, in order', () => {
+  const positions = DISCUSSION_SUMMARY_HEADINGS.map((heading) => DISCUSSION_PROMPT.indexOf(`\n${heading}\n`));
+  expect(positions.every((position) => position > 0)).toBe(true);
+  expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+  expect(DISCUSSION_SUMMARY_LIST_HEADINGS.every((heading) => DISCUSSION_SUMMARY_HEADINGS.includes(heading))).toBe(true);
+});
+
+test('compact size uses the small type scale', () => {
+  const { container } = render(<SummaryText text={SAMPLE} {...OPTIONS} size="compact" />);
+  expect(container.innerHTML).toMatch(/text-sm/);
+  expect(container.innerHTML).not.toMatch(/text-lg/);
 });

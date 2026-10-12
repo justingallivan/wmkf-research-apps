@@ -1,5 +1,5 @@
 /** @jest-environment jsdom */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import ResearchPresentationFollowUp from '../../shared/components/workbench/ResearchPresentationFollowUp.js';
 
 jest.mock('../../shared/components/Layout', () => ({ Card: ({ children }) => <div>{children}</div> }));
@@ -88,10 +88,37 @@ test('a short summary without the Q&A heading is shown whole, never clamped with
   render(<ResearchPresentationFollowUp status="loaded"
     materials={[{ artifactType: 100000007, filename: 's.txt', backing: 'file', webUrl: 'https://tenant.sharepoint.com/s.txt' }]}
     summary={{ text: shortText, stale: false, publishedAt: '2026-10-05T15:00:00Z' }} />);
-  const paragraph = screen.getByText(/Line one\./);
-  expect(paragraph).toHaveTextContent('Line six.');
-  expect(paragraph.className).not.toMatch(/line-clamp/);
+  const block = screen.getByTestId('presentation-summary-text');
+  expect(block).toHaveTextContent('Line one.');
+  expect(block).toHaveTextContent('Line six.');
+  expect(block.innerHTML).not.toMatch(/line-clamp/);
   expect(screen.queryByRole('button', { name: 'Read more' })).not.toBeInTheDocument();
+});
+
+test('a long summary without the expected headings is cut at a length, then shown whole', () => {
+  const longText = `${'Opening words. '.repeat(60)}Closing sentence.`;
+  render(<ResearchPresentationFollowUp status="loaded"
+    materials={[{ artifactType: 100000007, filename: 's.txt', backing: 'file', webUrl: 'https://tenant.sharepoint.com/s.txt' }]}
+    summary={{ text: longText, stale: false, publishedAt: '2026-10-05T15:00:00Z' }} />);
+  const block = screen.getByTestId('presentation-summary-text');
+  expect(block).not.toHaveTextContent('Closing sentence.');
+  fireEvent.click(screen.getByRole('button', { name: 'Read more' }));
+  expect(block).toHaveTextContent('Closing sentence.');
+});
+
+test('a long opening section followed by more headings stays a bounded preview (Codex review)', () => {
+  const longText = `What was presented\n${'Opening words. '.repeat(400)}Opening end.\n\nQuestions and answers\nAsked about cost.`;
+  render(<ResearchPresentationFollowUp status="loaded"
+    materials={[{ artifactType: 100000007, filename: 's.txt', backing: 'file', webUrl: 'https://tenant.sharepoint.com/s.txt' }]}
+    summary={{ text: longText, stale: false, publishedAt: '2026-10-05T15:00:00Z' }} />);
+  const block = screen.getByTestId('presentation-summary-text');
+  expect(block.textContent.length).toBeLessThan(900);
+  expect(block).not.toHaveTextContent('Opening end.');
+  fireEvent.click(screen.getByRole('button', { name: 'Read more' }));
+  expect(block).toHaveTextContent('Opening end.');
+  expect(block).toHaveTextContent('Asked about cost.');
+  fireEvent.click(screen.getByRole('button', { name: 'Show less' }));
+  expect(block.textContent.length).toBeLessThan(900);
 });
 
 describe('inline staff discussion summary (paired summaries plan D8, owner decision 5)', () => {
@@ -109,6 +136,10 @@ describe('inline staff discussion summary (paired summaries plan D8, owner decis
     fireEvent.click(screen.getByRole('button', { name: 'Read more' }));
     expect(block).toHaveTextContent('Who owns the follow-up?');
     expect(screen.queryByTestId('presentation-summary-text')).not.toBeInTheDocument();
+    // Expanded, the prompt's headings read as headings and its short lines as list items.
+    expect(within(block).getAllByRole('heading', { level: 5 }).map((h) => h.textContent))
+      .toEqual(['Main points raised', 'Questions and concerns', 'Follow-ups and decisions']);
+    expect(within(block).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Who owns the follow-up?', 'None noted.']);
   });
 
   test('a stale discussion summary does not mention the Board link', () => {

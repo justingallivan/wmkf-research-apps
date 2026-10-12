@@ -32,3 +32,12 @@ export const PRESENTATION_SUMMARY_HEADINGS = Object.freeze([
 ]);
 // Under these headings the prompt asks for short lines, so readers show them as a list.
 export const PRESENTATION_SUMMARY_LIST_HEADINGS = Object.freeze(['Open points']);
+
+// The staff discussion summary prompt's headings, in order
+// (shared/config/prompts/meeting-staff-discussion-summary.js); the last two are short lines.
+export const DISCUSSION_SUMMARY_HEADINGS = Object.freeze([
+  'Main points raised',
+  'Questions and concerns',
+  'Follow-ups and decisions',
+]);
+export const DISCUSSION_SUMMARY_LIST_HEADINGS = Object.freeze(['Questions and concerns', 'Follow-ups and decisions']);

@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../config/requestDocument';
+import {
+  DISCUSSION_SUMMARY_HEADINGS, DISCUSSION_SUMMARY_LIST_HEADINGS,
+  PRESENTATION_SUMMARY_HEADINGS, PRESENTATION_SUMMARY_LIST_HEADINGS,
+} from '../../config/transcriptSummary';
+import SummaryText, { parseSummaryText } from '../SummaryText';
 
 const SLOTS = [
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING, label: 'Recording', action: 'Watch recording' },
@@ -11,15 +16,22 @@ const SLOTS = [
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY, label: 'Presentation summary', action: 'Open presentation summary' },
 ];
 
-// Each summary's sections are fixed by its prompt; the first one is shown until "Read more".
-const PRESENTATION_SECOND_SECTION = /\n\s*Questions and answers\s*\n/;
-const DISCUSSION_SECOND_SECTION = /\n\s*Questions and concerns\s*\n/;
-const COLLAPSED_FALLBACK_CHARS = 700;
+// Each summary's sections are fixed by its prompt; until "Read more" the first one is shown,
+// capped at a length so a long opening (or text without the headings) stays a preview.
+const PRESENTATION_SUMMARY = { headings: PRESENTATION_SUMMARY_HEADINGS, listHeadings: PRESENTATION_SUMMARY_LIST_HEADINGS };
+const DISCUSSION_SUMMARY = { headings: DISCUSSION_SUMMARY_HEADINGS, listHeadings: DISCUSSION_SUMMARY_LIST_HEADINGS };
+const COLLAPSED_MAX_CHARS = 700;
 
-function firstSection(text, secondSection) {
-  const match = secondSection.exec(text);
-  if (match) return text.slice(0, match.index).trim();
-  return text.length > COLLAPSED_FALLBACK_CHARS ? `${text.slice(0, COLLAPSED_FALLBACK_CHARS).trim()}…` : text;
+// Returns the preview and whether it hides anything.
+function collapsedPreview(text, format) {
+  const sections = parseSummaryText(text, format);
+  const first = sections[0];
+  if (!first) return { preview: text, hidesText: false };
+  const opening = [first.heading, ...first.lines].filter(Boolean).join('\n');
+  if (opening.length > COLLAPSED_MAX_CHARS) {
+    return { preview: `${opening.slice(0, COLLAPSED_MAX_CHARS).trim()}…`, hidesText: true };
+  }
+  return { preview: opening, hidesText: sections.length > 1 };
 }
 
 function formatDate(value) {
@@ -29,11 +41,11 @@ function formatDate(value) {
     : null;
 }
 
-function SummaryText({ summary, secondSection = PRESENTATION_SECOND_SECTION, testId = 'presentation-summary-text', staleNote }) {
+function SummaryBlock({ summary, format = PRESENTATION_SUMMARY, testId = 'presentation-summary-text', staleNote }) {
   const [expanded, setExpanded] = useState(false);
   const published = formatDate(summary.publishedAt);
-  const collapsed = summary.text ? firstSection(summary.text, secondSection) : null;
-  const canExpand = Boolean(summary.text) && collapsed !== summary.text;
+  const text = summary.text || '';
+  const { preview, hidesText: canExpand } = collapsedPreview(text, format);
   return (
     <div className="mt-0.5" data-testid={testId}>
       <p className="text-xs text-gray-500">
@@ -41,13 +53,14 @@ function SummaryText({ summary, secondSection = PRESENTATION_SECOND_SECTION, tes
         {summary.stale ? ` · ${staleNote || 'from an earlier transcript version; the Board link no longer shows it'}` : ''}
         {summary.slidesChanged === true ? ' · the applicant slides were updated after this summary was made' : ''}
       </p>
-      {summary.text && (
+      {text && (
         <>
-          {/* Clamp only when Read more can reveal the rest; a short summary is shown whole. */}
-          <p className={`mt-1 whitespace-pre-line text-sm leading-6 text-gray-800 ${canExpand && !expanded ? 'line-clamp-4' : ''}`}>{expanded ? summary.text : collapsed}</p>
+          <div className="mt-2">
+            <SummaryText text={expanded || !canExpand ? text : preview} {...format} headingLevel={5} size="compact" />
+          </div>
           {canExpand && (
             <button type="button" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded}
-              className="mt-1 text-sm font-semibold text-blue-800 underline">
+              className="mt-2 text-sm font-semibold text-blue-800 underline">
               {expanded ? 'Show less' : 'Read more'}
             </button>
           )}
@@ -100,16 +113,16 @@ export default function ResearchPresentationFollowUp({ status, materials = [], s
         </ul>
       )}
       {status === 'loaded' && summarySlot && summary && (
-        <div className="mt-3 max-w-3xl">
+        <div className="mt-6 max-w-3xl">
           <h4 className="text-sm font-semibold text-gray-900">Presentation summary</h4>
-          <SummaryText summary={summary} />
+          <SummaryBlock summary={summary} />
         </div>
       )}
       {status === 'loaded' && discussionSlot && discussionSummary && (
-        <div className="mt-3 max-w-3xl">
+        <div className="mt-6 max-w-3xl">
           <h4 className="text-sm font-semibold text-gray-900">Staff discussion summary</h4>
           <p className="text-xs text-gray-500">Staff only. Never included on the Board page.</p>
-          <SummaryText summary={discussionSummary} secondSection={DISCUSSION_SECOND_SECTION}
+          <SummaryBlock summary={discussionSummary} format={DISCUSSION_SUMMARY}
             testId="discussion-summary-text" staleNote="from an earlier transcript version" />
         </div>
       )}
