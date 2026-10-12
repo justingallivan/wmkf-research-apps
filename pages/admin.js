@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
-import Layout, { Card } from '../shared/components/Layout';
+import Layout from '../shared/components/Layout';
 import PoliciesSection from '../shared/components/admin/PoliciesSection';
 import OperationalEventsSection from '../shared/components/admin/OperationalEventsSection';
 import ReviewQuestionsSection from '../shared/components/admin/ReviewQuestionsSection';

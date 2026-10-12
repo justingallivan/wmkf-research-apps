@@ -290,4 +290,27 @@ before trying it (`admin-view-coverage` covers first render only).
   report unused imports, so "lints clean" is not evidence of import hygiene — reviewers count uses.
   Orchestrator's independent spot check (`MaintenanceSection` vs baseline lines 658–779): identical modulo
   import header and export keyword.
+- 2026-10-11: **Codex adversarial review #1 (pilot retrospective, Stages 0–1, `--base origin/main`,
+  `gpt-6-astra`): APPROVE, no material findings.** Design challenges answered: pure moves "preserve existing
+  state ownership without committing the application to that architecture permanently"; `health-status.js`
+  "extracts existing shared dependencies rather than introducing new behavior"; keeping workspace constants
+  beside their consumers until Stage 5 is sound; transitional re-exports show no build/tree-shaking blocker
+  (components remain runtime dependencies; production build green). Caveat recorded verbatim in substance:
+  the coverage test "is not behavioral proof by itself" — it misses request methods/bodies, populated-data
+  rendering, failures, races, navigation/state retention, accessibility relationships and section ordering;
+  byte-identical moves plus the existing behavioral tests supply that confidence. Codex did not rerun
+  tests/build itself. Orchestrator disposition: no §3 amendment needed after the pilot; Stages 2–5 proceed
+  under the same rules, and the per-stage byte-identity check stays mandatory precisely because the
+  coverage test alone is insufficient.
+- 2026-10-11: **Stage 2 built** (Sonnet; `13494d27e` ModelConfigSection + its five single-consumer
+  helpers, with the sanctioned one-line `readFileSync` path change in `tests/unit/admin-models.test.js:220`;
+  `f875ff01a` UsageSection + `SummaryCard`/`PERIOD_OPTIONS`/`formatCost`/`formatTokens`). `pages/admin.js`
+  2,427 → 1,762. Pre-check held: `ROLE_OPTIONS` is used once, inside `RoleManagementSection`;
+  `MODEL_CONFIG_DATAVERSE_FIELDS` stays with `AiWorkspace`. Gates green at each commit and at HEAD.
+- 2026-10-11: **Stage 2 review (Opus, fresh context): APPROVE WITH NITS.** Pure-move proof: 666 removed
+  vs 666 added non-import lines, equal multiset; both new files byte-identical to baseline runs modulo
+  header/export/one blank line. Should-fix applied by the orchestrator: `Card` became unused in the page
+  once `UsageSection` moved — `import Layout from '../shared/components/Layout'`. Opus could not run
+  `next build` in its temp worktree (Turbopack rejects a symlinked `node_modules`); the orchestrator ran
+  `npm run build` in the build worktree after the fix instead.
 
