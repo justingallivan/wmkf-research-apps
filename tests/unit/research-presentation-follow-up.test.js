@@ -21,7 +21,7 @@ test('renders loading, unavailable, loaded-empty, Zoom, SharePoint transcript, a
     { artifactType: 100000007, filename: 'summary.docx', backing: 'file', webUrl: 'https://tenant.sharepoint.com/summary.docx' },
   ]} />);
   expect(screen.getByRole('link', { name: 'Watch recording' })).toHaveAttribute('href', 'https://zoom.us/rec/share/x?pwd=y');
-  expect(screen.getByRole('link', { name: 'Open transcript' })).toHaveAttribute('href', 'https://tenant.sharepoint.com/transcript.pdf');
+  expect(screen.getByRole('link', { name: 'Open full transcript' })).toHaveAttribute('href', 'https://tenant.sharepoint.com/transcript.pdf');
   expect(screen.getByRole('link', { name: 'Open presentation transcript' })).toHaveAttribute('href', 'https://tenant.sharepoint.com/presentation.txt');
   expect(screen.getByRole('link', { name: 'Open staff discussion transcript' })).toHaveAttribute('href', 'https://tenant.sharepoint.com/discussion.txt');
   expect(screen.getByRole('link', { name: 'Open presentation summary' })).toHaveAttribute('href', 'https://tenant.sharepoint.com/summary.docx');
