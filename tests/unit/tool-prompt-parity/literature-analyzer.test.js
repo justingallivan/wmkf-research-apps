@@ -1,10 +1,5 @@
 /** @jest-environment node */
 import {
-  createPaperExtractionPrompt,
-  createSynthesisPrompt,
-  createComparisonPrompt,
-} from '../../../shared/config/prompts/literature-analyzer';
-import {
   LITERATURE_EXTRACT_PAPER_ROW,
   LITERATURE_SYNTHESIZE_ROW,
   LITERATURE_COMPARE_ROW,
@@ -16,6 +11,7 @@ import {
 import { composeToolPromptPair } from '../../../lib/services/tool-prompt-composer';
 import { validatePromptTemplatePair } from '../../../lib/utils/prompt-validators';
 import { withDeterministicNonces } from '../../helpers/prompt-parity';
+import { expectGolden } from '../../helpers/golden';
 
 const FULL = {
   title: 'Full Paper',
@@ -42,10 +38,9 @@ const compose = (row, { variables, nonces }) =>
 
 describe('literature-analyzer.extract-paper parity', () => {
   test('byte-equal', () => {
-    const oldOut = createPaperExtractionPrompt();
     const out = compose(LITERATURE_EXTRACT_PAPER_ROW, buildLiteratureExtractVariables());
     expect(out.systemPrompt).toBe('');
-    expect(out.body).toBe(oldOut);
+    expectGolden('literature-analyzer', out.body);
   });
 });
 
@@ -53,19 +48,17 @@ describe('literature-analyzer.synthesize parity', () => {
   for (const [pname, papers] of Object.entries(PAPER_SETS)) {
     for (const [fname, focus] of Object.entries(FOCI)) {
       test(`byte-equal: ${pname} / focus ${fname}`, () => {
-        const oldOut = withDeterministicNonces(['n1'], () => createSynthesisPrompt(papers, focus));
         const out = withDeterministicNonces(['n1'], () =>
           compose(LITERATURE_SYNTHESIZE_ROW, buildLiteratureSynthesisVariables(papers, focus)));
         expect(out.systemPrompt).toBe('');
-        expect(out.body).toBe(oldOut);
+        expectGolden('literature-analyzer', out.body);
       });
     }
   }
   test('default focus argument matches', () => {
-    const oldOut = withDeterministicNonces(['n1'], () => createSynthesisPrompt(PAPER_SETS['two full']));
     const out = withDeterministicNonces(['n1'], () =>
       compose(LITERATURE_SYNTHESIZE_ROW, buildLiteratureSynthesisVariables(PAPER_SETS['two full'])));
-    expect(out.body).toBe(oldOut);
+    expectGolden('literature-analyzer', out.body);
   });
 });
 
@@ -73,11 +66,10 @@ describe('literature-analyzer.compare parity', () => {
   for (const [pname, papers] of Object.entries(PAPER_SETS)) {
     for (const type of ['methods', 'findings', undefined, 'other']) {
       test(`byte-equal: ${pname} / ${String(type)}`, () => {
-        const oldOut = withDeterministicNonces(['n2'], () => createComparisonPrompt(papers, type));
         const out = withDeterministicNonces(['n2'], () =>
           compose(LITERATURE_COMPARE_ROW, buildLiteratureCompareVariables(papers, type)));
         expect(out.systemPrompt).toBe('');
-        expect(out.body).toBe(oldOut);
+        expectGolden('literature-analyzer', out.body);
       });
     }
   }
