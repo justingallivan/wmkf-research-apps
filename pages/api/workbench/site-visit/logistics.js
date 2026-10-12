@@ -11,8 +11,9 @@ import {
 import { resolveWriteupViewer } from '../../../../lib/services/pre-site-visit/writeup-visibility';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../../../shared/config/requestDocument';
 
-// The full meeting recording includes the staff discussion, so on the Workbench only superusers
-// receive it (owner 2026-10-11); everyone else has the presentation video, transcripts and summaries.
+// The full meeting recording is not part of daily Workbench use (staff have the presentation video,
+// transcripts and summaries), so only superusers receive it here (owner 2026-10-11). It stays
+// available in the Meeting Tracker, where recordings are managed.
 function withoutRecording(list) {
   return Array.isArray(list)
     ? list.filter((item) => Number(item?.artifactType) !== REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING)
