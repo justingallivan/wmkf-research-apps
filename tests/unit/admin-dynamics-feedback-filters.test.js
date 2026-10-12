@@ -3,7 +3,7 @@
  */
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { DynamicsFeedbackSection } from '../../pages/admin';
+import DynamicsFeedbackSection from '../../shared/components/admin/DynamicsFeedbackSection';
 
 const feedbackResponse = () => ({
   ok: true,

@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  *
  * T3 (Stage 3) per-call-site contract matrix for the inline admin sections
- * reachable through `WorkflowsWorkspace` (pages/admin.js), view="external-review":
+ * reachable through `WorkflowsWorkspace` (shared/components/admin/workspaces/WorkflowsWorkspace.js; section line refs are historical pages/admin.js positions), view="external-review":
  * HonorariumAmountSection (:2703, :2724), ReviewerReleaseAttachmentsSection
  * (:2796, :2814), ReviewerCampaignTimelineSection (:2877, :2919), and
  * ReviewerTimeBudgetSection (:3054, :3076). All four share one shape: bare
@@ -11,7 +11,7 @@
  * unchanged after each migration commit.
  */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { WorkflowsWorkspace } from '../../pages/admin';
+import { WorkflowsWorkspace } from '../../shared/components/admin/workspaces/WorkflowsWorkspace';
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const partial = (text) => new RegExp(escapeRegex(text));

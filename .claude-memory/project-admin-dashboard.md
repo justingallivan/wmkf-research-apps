@@ -7,7 +7,7 @@ metadata:
   originSessionId: 17893605-3207-451d-8190-118bbacd8141
   status: active
   scope: global
-  last_verified: 2026-07-27 via pages/admin.js, pages/api/admin routes, and current auth/usage source; live user-role assignment not asserted
+  last_verified: 2026-10-11 via pages/admin.js (shell: WorkspaceContent + AdminDashboard), shared/components/admin/** (sections + workspaces/), pages/api/admin routes, and current auth/usage source; live user-role assignment not asserted
 ---
 
 ## Recall Rule
@@ -26,7 +26,7 @@ Do not:
 - Assume usage metrics live anywhere other than the `api_usage_log` table.
 - Treat the historical Justin/profile-2 grant below as current authorization.
 
-Ground truth: `pages/admin.js`, `pages/api/admin/*`,
+Ground truth: `pages/admin.js` (page shell only since 2026-10-11), `shared/components/admin/*` and `shared/components/admin/workspaces/*` (every section and workspace), `pages/api/admin/*`,
 `lib/utils/usage-logger.js`, and `lib/utils/auth.js`; historical for setup
 specifics.
 

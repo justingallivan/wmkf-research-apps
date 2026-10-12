@@ -6,7 +6,7 @@
  * Discard cannot restore stale permissions.
  */
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { AppAccessSection } from '../../pages/admin';
+import AppAccessSection from '../../shared/components/admin/AppAccessSection';
 
 const response = (status, body) => ({
   ok: status >= 200 && status < 300,

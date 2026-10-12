@@ -217,7 +217,7 @@ describe('PUT /api/admin/models', () => {
 describe('admin provider-bound review-panel UI contract', () => {
   const fs = require('fs');
   const path = require('path');
-  const adminSource = fs.readFileSync(path.join(__dirname, '../../pages/admin.js'), 'utf8');
+  const adminSource = fs.readFileSync(path.join(__dirname, '../../shared/components/admin/ModelConfigSection.js'), 'utf8');
 
   it('renders the review panel separately from legacy Claude app rows', () => {
     expect(adminSource).toContain("apps.find(app => app.appKey === 'review-panel')");

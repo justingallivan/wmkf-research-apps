@@ -2,14 +2,14 @@
  * @jest-environment jsdom
  *
  * T3 (Stage 3) per-call-site contract matrix for the inline admin sections
- * reachable through `AiWorkspace` (pages/admin.js): UsageSection (:938,
+ * reachable through `AiWorkspace` (shared/components/admin/workspaces/AiWorkspace.js; section line refs are historical pages/admin.js positions): UsageSection (:938,
  * view="usage") and ModelConfigSection (:1249, :1335, view="models"). Both
  * GET sites pin the verbatim 403 -> "Admin access required" status branch.
  * Run against the unmigrated code first (must pass), then unchanged after
  * each migration commit.
  */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { AiWorkspace } from '../../pages/admin';
+import { AiWorkspace } from '../../shared/components/admin/workspaces/AiWorkspace';
 
 const jsonResponse = (status, body) => ({
   ok: status >= 200 && status < 300,

@@ -1,0 +1,177 @@
+file	lines	purpose	importer_files_total	importer_dirs	test_file_refs	script_refs	doc_memory_refs	proposed_target	confidence	hazard
+lib/services/contact-enrichment-service.js	549	ContactEnrichmentService - Tiered contact information lookup	6	scripts:4; lib/services/workbench:1; pages/api/reviewer-finder:1	20	5	41	contact-enrichment	high	gate-literal
+lib/services/orcid-service.js	633	ORCIDService - Query ORCID API for researcher information	11	scripts:5; lib/services(flat):3; lib/services/contact-enrichment:2	11	5	11	contact-enrichment	med	none
+lib/services/serp-contact-service.js	633	SerpContactService - Google Search for Contact Information	8	scripts:6; lib/services/contact-enrichment:2	6	6	12	contact-enrichment	high	none
+lib/services/email-automation-preferences.js	26	Server-side reader for the per-PD scheduled-email review-all override.	2	lib/services/cron:1; lib/services(flat):1	3	0	3	cron	med	none
+lib/services/grantee-title-service.js	123	Grantee edited-title service.	1	lib/services/cron:1	3	1	3	cron	high	gate-literal
+lib/services/maintenance-service.js	1017	MaintenanceService - Database and blob cleanup operations	23	pages/api/cron:22; pages/api/admin:1	25	0	25	cron	med	none
+lib/services/scheduled-email-service.js	847	Personalized scheduled-email coordinator.	3	pages/api/scheduled-emails:2; lib/services/cron:1	8	0	8	cron	med	none
+lib/services/scheduled-email-store.js	813	Postgres ledger for personalized scheduled email, plus per-PD VIP flags.	6	pages/api/scheduled-emails:3; lib/services/cron:1; lib/services/review-manager:1	7	0	7	cron	med	none
+lib/services/arxiv-service.js	215	ArXivService - Search ArXiv for preprints	2	lib/services/discovery:1; pages/api:1	1	0	4	discovery	high	none
+lib/services/biorxiv-service.js	158	BioRxivService - Search BioRxiv for preprints in life sciences	2	lib/services/discovery:1; pages/api:1	1	0	3	discovery	high	none
+lib/services/chemrxiv-service.js	256	ChemRxivService - Search ChemRxiv for chemistry preprints	2	lib/services/discovery:1; pages/api:1	1	0	3	discovery	high	none
+lib/services/discovery-service.js	691	DiscoveryService - Stage 2 of Expert Reviewer Finder	14	scripts:12; lib/services/workbench:1; pages/api/reviewer-finder:1	21	12	39	discovery	high	none
+lib/services/openalex-service.js	707	OpenAlex API client: authors, works, topics, institutions	14	lib/services(flat):9; lib/services/contact-enrichment:2; lib/services/discovery:1	18	1	12	discovery	med	cross-domain-hub
+lib/services/pubmed-service.js	534	PubMedService - Search PubMed/NCBI for scientific publications	14	scripts:7; lib/services/discovery:3; lib/services(flat):2	9	7	9	discovery	high	cross-domain-hub
+lib/services/dynamics-explorer-request-telemetry.js	130	Dynamics Explorer request telemetry.	2	lib/services(flat):1; pages/api/dynamics-explorer:1	3	0	1	dynamics-explorer	high	none
+lib/services/dynamics-explorer-taxonomy.js	181	Cached live Dataverse taxonomy resolver for Dynamics Explorer	1	lib/services/dynamics-explorer:1	6	1	5	dynamics-explorer	high	gate-literal
+lib/services/dynamics-odata-validator.js	879	OData expression validation and lookup-alias catalog for Explorer	2	lib/services/dynamics-explorer:2	1	0	5	dynamics-explorer	high	none
+lib/services/feedback-service.js	217	FeedbackService - CRUD for dynamics_feedback table	2	pages/api/cron:1; pages/api/dynamics-explorer:1	4	0	0	dynamics-explorer	med	none
+lib/services/field-primer-service.js	345	Field Primer service.	2	lib/services/field-primer:1; scripts:1	5	1	4	field-primer	high	none
+lib/services/sharepoint-target-registry.js	62	Tracked SharePoint site registry.	8	lib/services/graph:3; lib/services/test-requests:3; scripts:2	2	2	0	graph	high	none
+lib/services/deliberation-stage-labels.js	77	Reads the four admin-editable Staff Deliberations rail labels (D6, docs/PC_MEETING_TRACKER_PLAN.md).	2	lib/services/pre-site-visit:1; pages/api/workbench:1	4	0	0	meeting-tracker	med	none
+lib/services/review-answers.js	21	Shared reader for reviewer answer-snapshot child rows (`wmkf_appreviewanswers`).	5	lib/services/review-documents:2; lib/dataverse:1; lib/services/deliberation-briefing:1	10	0	4	review-documents	med	cross-domain-hub
+lib/services/grant-cycles-dataverse.js	294	Dataverse-backed grant-cycle accessors for reviewer-finder and review-manager routes	5	pages/api/reviewer-finder:2; scripts:2; lib/services/review-manager:1	10	2	14	review-manager	med	none
+lib/services/honorarium-config.js	56	Honorarium amount — single Dataverse ground-truth (chunk-4, decided S199).	4	lib/services/review-manager:2; lib/bill:1; pages/api/admin:1	6	0	6	review-manager	med	none
+lib/services/review-draft-service.js	116	ReviewDraftService — CRUD over the review_drafts table (migration 021).	9	scripts:3; lib/services/external-review:1; lib/services/review-manager:1	10	3	5	review-manager	med	cross-domain-hub
+lib/services/review-receipt-guard.js	56	Shared authorization contract for every request-time review receipt write.	4	lib/services/review-manager:2; lib/services/external-review:1; lib/services(flat):1	0	0	4	review-manager	high	none
+lib/services/review-synthesis-content.js	52	Pure review-synthesis input composition.	2	lib/services/review-manager:2	0	0	1	review-manager	high	none
+lib/services/review-synthesis-drain.js	154	Cron drain for queued review-synthesis jobs	1	pages/api/cron:1	3	0	4	review-manager	med	none
+lib/services/review-synthesis-job-service.js	231	Postgres queue for automatic/manual review-synthesis jobs	3	lib/services/review-manager:2; lib/services(flat):1	10	0	1	review-manager	high	none
+lib/services/review-synthesis-readiness.js	211	Pure review-synthesis readiness state machine.	5	lib/services/review-manager:2; scripts:2; lib/services(flat):1	2	2	4	review-manager	high	none
+lib/services/review-upload.js	544	Shared review-upload core.	3	pages/api/external:1; pages/api/review-manager:1; scripts:1	5	3	34	review-manager	med	gate-literal
+lib/services/reviewer-campaign-timeline.js	139	Reviewer campaign timeline defaults.	2	lib/services/review-manager:1; pages/api/review-manager:1	6	0	3	review-manager	med	none
+lib/services/reviewer-due-extension.js	400	Accepted-reviewer due-date extension workflow.	1	pages/api/review-manager:1	5	0	8	review-manager	med	none
+lib/services/reviewer-manual-reminder.js	433	Manual reviewer reminder actions for one selected reviewer at a time.	1	pages/api/review-manager:1	4	0	12	review-manager	med	none
+lib/services/reviewer-release-config.js	41	Reviewer release-materials attachment setting (single Dataverse boolean)	1	pages/api/review-manager:1	0	0	3	review-manager	med	none
+lib/services/reviewer-reminder-candidate.js	22	Side-effect-free OData predicate shared by review-due reminder sweep	3	lib/services(flat):2; scripts:1	1	1	2	review-manager	med	none
+lib/services/reviewer-reminder-eligibility.js	62	Review-due reminder eligibility for the reviewer's existing magic link.	4	lib/services(flat):3; lib/services/review-manager:1	1	0	3	review-manager	high	none
+lib/services/reviewer-reminder-liveness-audit.js	70	Pure report builder for the read-only review-due reminder token audit.	1	scripts:1	1	1	1	review-manager	med	none
+lib/services/reviewer-reminder-personalization.js	145	Per-sender reviewer reminder copy.	3	lib/services(flat):2; pages/api/review-manager:1	5	1	1	review-manager	med	none
+lib/services/reviewer-reminder-sweep.js	521	Reviewer reminder sweeps (reviewer-engagement Phase 3, spec §3.B).	4	lib/services(flat):2; pages/api/cron:1; scripts:1	6	1	18	review-manager	med	none
+lib/services/reviewer-request-authorization.js	134	Authoritative lead-PD/superuser gate for request-bound reviewer mutations.	10	pages/api/review-manager:9; pages/api/reviewer-finder:1	12	0	8	review-manager	high	none
+lib/services/reviewer-subfolder.js	65	Pure per-reviewer SharePoint subfolder naming extracted from review-upload	3	lib/services/test-requests:2; lib/services(flat):1	0	0	0	review-manager	med	none
+lib/services/reviewer-thankyou-sweep.js	204	Reviewer thank-you sweep (reviewer-engagement thank-you automation).	1	pages/api/cron:1	6	0	14	review-manager	med	none
+lib/services/alert-reviewer-affiliation-mismatch.js	217	Staff alert when accepted reviewer self-reported affiliation differs	1	lib/services(flat):1	5	0	8	reviewer-engagement	med	none
+lib/services/alert-reviewer-email-mismatch.js	93	Staff alert when accepted reviewer self-reported email differs	1	lib/services(flat):1	2	0	5	reviewer-engagement	med	none
+lib/services/reviewer-acceptance-drain.js	971	Processes reviewer-acceptance jobs: contact, honorarium, identity follow-ups	1	pages/api/cron:1	4	0	22	reviewer-engagement	med	none
+lib/services/reviewer-acceptance-email.js	185	Renders reviewer acceptance confirmation email from settings keys	2	lib/services(flat):1; pages/api/external:1	4	0	9	reviewer-engagement	med	none
+lib/services/reviewer-acceptance-job-service.js	310	Postgres queue for reviewer_acceptance_jobs (enqueue, claim, lease)	5	scripts:2; lib/services/external-review:1; lib/services(flat):1	6	2	5	reviewer-engagement	med	none
+lib/services/reviewer-email-reconciler.js	279	Backstop recovering enrichment-found reviewer emails that never reached Dataverse	1	pages/api/cron:1	2	0	5	reviewer-engagement	med	none
+lib/services/reviewer-quota.js	107	Reviewer quota → PD notify (reviewer-engagement Phase 4, spec §3.C).	1	lib/services(flat):1	1	0	9	reviewer-engagement	med	none
+lib/services/reviewer-suggestion-sweep.js	130	Sweep stale reviewer-invitation suggestions.	1	pages/api/cron:1	5	0	16	reviewer-engagement	med	none
+lib/services/reviewer-withdrawal.js	114	Late-honorarium cancellation and PD notification on reviewer withdrawal	2	lib/services/external-review:1; lib/services(flat):1	3	0	3	reviewer-engagement	med	none
+lib/services/claude-reviewer-service.js	902	ClaudeReviewerService - Stage 1 of Expert Reviewer Finder	11	scripts:8; pages/api/reviewer-finder:2; lib/services/workbench:1	9	10	14	reviewer-finder	high	gate-literal
+lib/services/reviewer-merge.js	574	Collapse a duplicate wmkf_potentialreviewers row into its survivor	3	scripts:2; pages/api/reviewer-finder:1	3	2	21	reviewer-finder	med	none
+lib/services/reviewer-prompt-composer.js	150	Reviewer-finder prompt composer (S222, Path A seam).	3	scripts:2; lib/services(flat):1	1	2	5	reviewer-finder	high	none
+lib/services/reviewer-prompt-resolver.js	170	Reviewer-finder prompt resolver (S222, Path A seam).	2	lib/services(flat):1; pages/api/reviewer-finder:1	4	1	9	reviewer-finder	high	none
+lib/services/reviewer-request-context.js	357	Trusted request metadata for reviewer analysis.	15	scripts:9; lib/services(flat):2; lib/services/workbench:2	11	9	5	reviewer-finder	high	none
+lib/services/reviewer-time-budget.js	80	Reviewer search time budget — single admin-editable Dataverse setting.	5	pages/api/reviewer-finder:3; lib/services/workbench:1; pages/api/admin:1	8	0	1	reviewer-finder	med	none
+lib/services/consultant-feedback-attachment-service.js	415	Consultant Feedback slice 2 attachment lifecycle	2	pages/api/workbench:2	2	1	4	workbench	med	gate-literal
+lib/services/consultant-feedback-service.js	800	Consultant Feedback slice 1 (docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md §3, §4).	5	pages/api/workbench:3; lib/services(flat):1; lib/services/deliberation-briefing:1	2	0	8	workbench	med	none
+lib/services/grantee-abstract-service.js	93	Grantee abstract service.	1	lib/services/workbench:1	3	1	1	workbench	high	gate-literal
+lib/services/grantee-deliverable-record.js	116	Grantee deliverable package row helper.	12	lib/services/workbench:6; lib/services(flat):3; pages/api/workbench:2	17	0	5	workbench	high	none
+lib/services/grantee-document-assembly.js	187	Canonical assembly model for grantee deliverable document outputs	6	lib/services/pre-site-visit:2; lib/services/workbench:2; pages/api/external:1	6	1	6	workbench	med	none
+lib/services/grantee-document-html.js	113	Presentation (HTML) layer for grantee document assembly model	3	lib/services/workbench:1; pages/api/external:1; pages/api/workbench:1	2	0	2	workbench	high	none
+lib/services/grantee-submit-notification.js	130	Grantee submit notification — tells staff a deliverables package arrived.	1	pages/api/external:1	1	1	3	workbench	med	none
+lib/services/grantee-upload.js	297	Grantee deliverables upload service (chunk 5).	5	lib/services/workbench:2; pages/api/external:2; pages/api/workbench:1	2	0	12	workbench	high	none
+lib/services/reviewer-address-trust-service.js	1275	Server orchestration for reviewer exact-address trust actions.	3	lib/services/workbench:1; pages/api/admin:1; pages/api/workbench:1	6	0	6	workbench	med	none
+lib/services/reviewer-candidate-export.js	161	Reviewer-candidate Excel export (Find tab → "Export to Excel").	1	lib/services/workbench:1	3	0	3	workbench	high	none
+lib/services/reviewer-exclusion-parser.js	172	Parse applicant-supplied excluded-reviewers free text into clean names	2	lib/services/workbench:1; scripts:1	4	1	4	workbench	med	none
+lib/services/reviewer-rollup.js	158	Lightweight per-request reviewer suggestion count rollup	2	lib/services/workbench:1; pages/api/workbench:1	6	1	8	workbench	high	tsconfig-include
+lib/services/reviewer-roster-store.js	1162	Postgres CRUD for reviewer_find_roster durable candidate roster	10	lib/services/workbench:3; scripts:3; lib/services(flat):2	17	3	21	workbench	med	none
+lib/services/workbench-proposal-documents.js	294	Workbench Proposal-tab document listing (server-only).	7	lib/services(flat):2; lib/services/workbench:2; lib/services/field-primer:1	13	0	4	workbench	high	cross-domain-hub
+lib/services/cycle-dossier-documents.js	231	Server-side Cycle Dossier document renderers (PDF/DOCX)	2	lib/services(flat):1; scripts:1	2	1	1	NEW:cycle-dossier	high	none
+lib/services/cycle-dossier-generation.js	459	Cycle Dossier generation stages.	3	lib/services(flat):2; scripts:1	3	1	2	NEW:cycle-dossier	high	gate-literal
+lib/services/cycle-dossier-rollout.js	115	Runtime rollout gates for the D26 Cycle Dossier pilot.	4	lib/services(flat):2; pages/api/cron:1; scripts:1	1	2	2	NEW:cycle-dossier	high	gate-literal
+lib/services/cycle-dossier-service.js	274	Cycle Dossier application service: roster, preview, pinning, launch/retry	3	pages/api/cycle-dossier:2; lib/services(flat):1	4	0	1	NEW:cycle-dossier	high	none
+lib/services/cycle-dossier-sharepoint.js	17	Resolve one authoritative request SharePoint destination for dossier writes	3	lib/services(flat):2; scripts:1	3	1	1	NEW:cycle-dossier	high	gate-literal
+lib/services/cycle-dossier-storage.js	47	Private immutable dossier bytes (Blob) with persisted references	2	lib/services(flat):2	3	0	2	NEW:cycle-dossier	high	none
+lib/services/cycle-dossier-store.js	186	Cycle Dossier operational persistence: leases, budgets, run JSON	5	lib/services(flat):5	5	0	1	NEW:cycle-dossier	high	none
+lib/services/cycle-dossier-worker.js	378	Cycle Dossier durable cron worker with global run lease	1	pages/api/cron:1	2	0	7	NEW:cycle-dossier	high	none
+lib/services/anthropic-admin.js	95	Thin client for the Anthropic Admin API.	1	pages/api/cron:1	2	0	3	NEW:executor	med	none
+lib/services/execute-prompt.js	1413	Phase 0 Executor — Vercel implementation of docs/EXECUTOR_CONTRACT.md.	14	lib/services(flat):5; scripts:2; lib/services/initial-assessment:1	24	14	49	NEW:executor	high	gate-literal
+lib/services/executor-budget-service.js	476	Durable Executor output-budget settings.	10	lib/services(flat):3; lib/services/admin:1; lib/services/field-primer:1	11	0	5	NEW:executor	high	cross-domain-hub
+lib/services/llm-client.js	821	LLMClient — canonical Anthropic API wrapper for app-side Claude calls.	21	pages/api:9; lib/services(flat):5; lib/services/contact-enrichment:1	30	1	21	NEW:executor	high	jest-mock-heavy
+lib/services/model-capabilities.js	323	Reviewed request-shaping capabilities for every Executor provider.	5	lib/services(flat):3; pages/api/admin:1; pages/api/cron:1	10	2	9	NEW:executor	high	gate-literal
+lib/services/model-override-loader.js	67	Server-only loader for model-override settings.	38	scripts:9; pages/api:7; pages/api/reviewer-finder:3	35	11	5	NEW:executor	high	gate-literal
+lib/services/model-resolver.js	183	Model tier resolver.	11	lib/services(flat):8; pages/api/admin:1; pages/api/cron:1	12	3	5	NEW:executor	high	gate-literal
+lib/services/model-review-validation.js	120	Shared write-time guards for reviewed model ids.	6	scripts:4; lib/services/admin:1; pages/api/admin:1	2	4	2	NEW:executor	med	gate-literal
+lib/services/multi-llm-service.js	440	MultiLLMService - Unified interface for calling multiple LLM providers	1	lib/services(flat):1	2	0	13	NEW:executor	med	none
+lib/services/openai-client.js	237	OpenAI Chat Completions transport for the shared Executor provider seam.	1	lib/services(flat):1	3	0	3	NEW:executor	med	none
+lib/services/prompt-resolver.js	150	Fetches Claude prompt templates with per-app dynamic fallback module	3	scripts:3	1	3	6	NEW:executor	med	none
+lib/services/prompt-seed.js	114	Tier-1 system-prompt seeding helper (Dataverse `wmkf_ai_prompts` = source of truth).	10	scripts:10	1	10	6	NEW:executor	med	none
+lib/services/prompt-store.js	78	Prompt store — dependency-free leaf over the `wmkf_ai_prompt` Dataverse table.	13	lib/services(flat):6; scripts:4; lib/services/pre-site-visit:1	10	4	9	NEW:executor	high	cross-domain-hub
+lib/services/institution-affiliation-assessment.js	457	Source-aware affiliation relationship and consumer policy.	3	lib/services(flat):2; scripts:1	3	1	3	NEW:institution-identity	high	none
+lib/services/institution-affiliation-consistency.js	380	Institution consistency for identity corroboration and mismatch alerts.	3	lib/services(flat):2; lib/services/workbench:1	5	0	3	NEW:institution-identity	high	none
+lib/services/institution-affiliation-stage2.js	290	Stage 2 institution presentation orchestration.	2	lib/services(flat):1; lib/services/workbench:1	4	0	0	NEW:institution-identity	high	none
+lib/services/institution-coi-context.js	81	Institution COI context contract/version constants and hashing	0		1	0	2	NEW:institution-identity	med	none
+lib/services/institution-identity-resolver.js	277	Institution identity substrate (Reviewer Identity & Contact roadmap W0).	7	lib/services(flat):2; lib/services/workbench:2; lib/services/reviewer-finder:1	7	1	2	NEW:institution-identity	high	none
+lib/services/institution-structural-sameness.js	155	Provider-independent Tier-0 institution sameness.	0		1	0	0	NEW:institution-identity	med	none
+lib/services/reviewer-institution-auto-resolution-policy.js	279	Dormant Phase 1 composition contract for institution auto-resolution (no runtime caller)	0		1	0	1	NEW:institution-identity	med	none
+lib/services/reviewer-institution-coi-screen.js	75	Shared save-boundary institution COI recomputation.	2	lib/services/reviewer-finder:1; lib/services/workbench:1	2	0	2	NEW:institution-identity	med	none
+lib/services/reviewer-institution-evidence-attestation.js	289	Server binding for the dormant reviewer institution Phase 2 evidence bundle.	5	lib/services/workbench:3; lib/services/reviewer-finder:1; pages/api/reviewer-finder:1	7	0	3	NEW:institution-identity	med	none
+lib/services/reviewer-institution-measurement.js	161	Best-effort, non-authoritative Find institution measurement (migration 051).	5	lib/services/workbench:3; lib/services/reviewer-finder:1; lib/services(flat):1	5	0	2	NEW:institution-identity	med	none
+lib/services/ror-affiliation-assertion-resolver.js	173	Provenance-preserving ROR resolver for AffiliationAssertion.	2	lib/services(flat):1; scripts:1	1	1	1	NEW:institution-identity	high	none
+lib/services/ror-institution-candidate-adapter.js	508	Request-scoped ROR API v2 candidate-union adapter.	3	lib/services(flat):2; scripts:1	1	1	2	NEW:institution-identity	high	none
+lib/services/ror-institution-candidate-contract.js	233	Verdict-free ROR candidate-set contract for production institution resolution.	4	lib/services(flat):4	2	0	1	NEW:institution-identity	high	none
+lib/services/ror-institution-decision.js	405	Veto-first local institution decision policy over verdict-free ROR candidates.	2	lib/services(flat):2	1	0	4	NEW:institution-identity	high	none
+lib/services/ror-institution-evidence.js	295	Local claim parsing and evidence features for ROR institution resolution.	4	lib/services(flat):4	1	0	1	NEW:institution-identity	high	none
+lib/services/ror-institution-identity-resolver.js	210	Production institution resolver used by the reviewer-identity shadow arm.	2	lib/services(flat):1; scripts:1	1	1	6	NEW:institution-identity	high	none
+lib/services/contact-bridge-service.js	257	ContactBridgeService — Entra External ID OID → Dataverse `contact` GUID.	4	pages/api/intake:4	9	0	7	NEW:intake	high	none
+lib/services/intake-audit-service.js	109	IntakeAuditService - append-only audit log for the applicant intake portal.	7	pages/api/intake:4; lib/services/cron:1; lib/services(flat):1	19	1	7	NEW:intake	high	none
+lib/services/intake-draft-service.js	595	IntakeDraftService - CRUD over the intake_drafts table.	6	pages/api/intake:4; lib/services(flat):1; scripts:1	19	1	10	NEW:intake	high	none
+lib/services/membership-service.js	95	MembershipService — Dataverse `wmkf_portalmemberships` reader for the applicant intake portal.	4	pages/api/intake:4	9	0	5	NEW:intake	high	none
+lib/services/integrity-matching-service.js	558	IntegrityMatchingService - Name matching for integrity screening	3	scripts:2; lib/services(flat):1	4	2	4	NEW:integrity-screener	med	none
+lib/services/integrity-service.js	826	IntegrityService - Applicant Integrity Screening	5	pages/api/integrity-screener:3; lib/services/workbench:1; scripts:1	5	2	7	NEW:integrity-screener	med	gate-literal
+lib/services/alert-recipients.js	192	Resolves an alert category to admin email recipients	3	lib/services(flat):1; lib/services/site-visit-materials:1; pages/api/admin:1	6	0	5	NEW:platform	med	none
+lib/services/alert-service.js	388	AlertService - CRUD operations for system_alerts table	20	pages/api/cron:8; lib/services(flat):4; lib/utils:2	20	1	5	NEW:platform	high	cross-domain-hub
+lib/services/app-access-service.js	67	Thin wrapper over the user-app-access storage backend.	11	scripts:3; lib/services/proposal-ranking:2; pages/api:2	14	4	5	NEW:platform	high	gate-literal
+lib/services/database-service.js	519	DatabaseService — Postgres helpers used across the app.	16	lib/services(flat):7; pages/api:3; lib/services/site-visit-materials:2	25	2	16	NEW:platform	high	cross-domain-hub
+lib/services/dataverse-app-access-service.js	168	Dataverse-backed implementation of the user-app-access table.	1	scripts:1	3	1	11	NEW:platform	med	none
+lib/services/dataverse-identity-map.js	192	Bridges Postgres user_profile_id ↔ Dataverse systemuserid.	11	lib/services(flat):4; pages/api/scheduled-emails:3; lib/services/proposal-ranking:2	10	1	12	NEW:platform	high	cross-domain-hub
+lib/services/dataverse-prefs-service.js	150	Dataverse-backed implementation of the user-preferences API.	1	scripts:1	1	1	6	NEW:platform	med	none
+lib/services/dataverse-settings-service.js	283	Dataverse-backed implementation of the system-settings table.	3	scripts:2; lib/services(flat):1	2	2	7	NEW:platform	med	none
+lib/services/dynamics-context.js	243	Dynamics request-scoped context.	153	scripts:142; lib/services/dynamics:4; lib/services/test-requests:3	113	144	22	NEW:platform	med	gate-literal
+lib/services/dynamics-identity-service.js	158	Dynamics Identity Reconciliation	4	pages/api/admin:1; pages/api/auth:1; pages/api/cron:1	6	1	7	NEW:platform	med	cross-domain-hub
+lib/services/dynamics-service.js	479	Dynamics 365 Service	182	scripts:129; lib/dataverse:30; lib/services/dynamics-explorer:8	207	134	61	NEW:platform	med	tsconfig-include
+lib/services/email-defaults.js	53	Read required email default settings; alert on misconfiguration	11	lib/services(flat):6; lib/services/site-visit-materials:2; lib/services/cron:1	13	0	4	NEW:platform	high	cross-domain-hub
+lib/services/email-signature.js	93	Resolve and append sender signature block for request emails	9	lib/services(flat):3; lib/services/cron:1; lib/services/review-manager:1	20	1	5	NEW:platform	high	cross-domain-hub
+lib/services/external-token.js	339	External access token primitive.	16	lib/external:7; lib/services/site-visit-materials:2; pages/api/external:2	23	2	14	NEW:platform	med	cross-domain-hub
+lib/services/graph-service.js	341	Microsoft Graph Service	84	scripts:28; lib/services(flat):10; lib/services/post-presentation-materials:6	62	29	34	NEW:platform	med	jest-mock-heavy
+lib/services/notification-service.js	311	NotificationService — unified system-alert notification.	32	lib/services(flat):12; pages/api/cron:7; lib/bill:2	38	2	17	NEW:platform	high	gate-literal
+lib/services/operational-event-service.js	594	OperationalEventService — durable structured operational events.	16	lib/services(flat):6; lib/services/post-presentation-materials:4; lib/services/meeting-tracker-recordings:2	8	0	3	NEW:platform	high	cross-domain-hub
+lib/services/program-director-resolver.js	124	Program Director resolver: bridges authenticated user → Dynamics systemuser.	9	lib/services(flat):4; lib/services/reviewer-finder:2; lib/services/workbench:2	21	0	4	NEW:platform	med	none
+lib/services/proposal-participants.js	39	Proposal participants — shared reads for a request's people.	8	lib/services(flat):2; lib/services/review-manager:2; lib/services/workbench:2	18	0	2	NEW:platform	med	cross-domain-hub
+lib/services/request-document-actor-service.js	176	Server-only Request Document explicit-actor resolution and observability.	22	lib/services/pre-site-visit:4; lib/services(flat):3; lib/services/post-presentation-materials:3	5	1	5	NEW:platform	high	gate-literal
+lib/services/service-http-error.js	41	Typed HTTP error for Route-to-Service consolidation	268	pages/api/workbench:51; pages/api/meeting-tracker:42; lib/services/workbench:21	75	0	3	NEW:platform	high	jest-mock-heavy
+lib/services/settings-service.js	107	Thin wrapper over the system-settings storage backend.	36	lib/services(flat):9; scripts:6; pages/api/admin:5	37	7	7	NEW:platform	high	gate-literal
+lib/services/vercel-log-drain-ingest.js	317	Vercel Log Drain ingestion — parsing, selection, and mapping.	1	pages/api/webhooks:1	2	0	3	NEW:platform	med	none
+lib/services/review-panel-documents.js	322	Review Panel Phase A DOCX/PDF renderers, private-Blob editions	1	lib/services(flat):1	2	0	1	NEW:review-panel	high	none
+lib/services/review-panel-generation.js	449	Virtual Review Panel Phase A generation stages.	2	lib/services(flat):2	3	0	1	NEW:review-panel	high	none
+lib/services/review-panel-input.js	73	Virtual Review Panel Phase A input resolver.	2	lib/services(flat):2	2	0	2	NEW:review-panel	high	none
+lib/services/review-panel-questions.js	150	Virtual Review Panel Phase A question-set projection.	2	lib/services(flat):2	2	1	1	NEW:review-panel	high	none
+lib/services/review-panel-rollout.js	107	Runtime rollout gates for the Virtual Review Panel Phase A foundation.	3	lib/services(flat):2; pages/api/cron:1	3	0	2	NEW:review-panel	high	none
+lib/services/review-panel-service.js	451	Virtual Review Panel Phase A application service.	2	pages/api/review-panel:2	2	0	3	NEW:review-panel	high	none
+lib/services/review-panel-storage.js	93	Private immutable review-panel bytes (dedicated Blob store, SHA-256 verified)	2	lib/services(flat):2	3	0	2	NEW:review-panel	high	none
+lib/services/review-panel-store.js	686	Virtual Review Panel Phase A persistence (clone of cycle-dossier-store shape)	7	lib/services(flat):5; pages/api/admin:1; pages/api/cron:1	7	0	5	NEW:review-panel	high	none
+lib/services/review-panel-worker.js	782	Virtual Review Panel Phase A durable worker.	1	pages/api/cron:1	2	0	2	NEW:review-panel	high	none
+lib/services/auto-link-reviewer-contact-account.js	168	Acceptance-only, conservative Contact parent-Account enrichment.	1	lib/services(flat):1	1	0	4	NEW:reviewer-identity	med	none
+lib/services/backprop-reviewer-orcid.js	60	Shared reviewer→contact ORCID back-propagation helper (design §5, docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md).	2	lib/bill:1; lib/services/workbench:1	9	0	4	NEW:reviewer-identity	high	none
+lib/services/capture-self-reported-orcid.js	195	Capture a reviewer's SELF-REPORTED ORCID (the reviewer-side twin of PR3 in docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md).	2	lib/services/external-review:1; lib/services(flat):1	3	0	14	NEW:reviewer-identity	high	none
+lib/services/capture-self-reported-reviewer-identity.js	55	Capture reviewer self-reported board-writeup identity fields	1	lib/services(flat):1	1	0	3	NEW:reviewer-identity	high	none
+lib/services/deduplication-service.js	1275	DeduplicationService - Handle researcher name matching and deduplication	15	lib/services(flat):4; scripts:4; lib/services/workbench:2	11	4	20	NEW:reviewer-identity	med	cross-domain-hub
+lib/services/independent-reviewer-identity.js	990	Dormant server-owned `independent-identity/v1` evaluator.	1	lib/services(flat):1	1	0	4	NEW:reviewer-identity	high	none
+lib/services/proposal-pi-identity.js	316	Resolve proposal PI from structured Dataverse data, not LLM text	5	lib/services/workbench:2; pages/api/reviewer-finder:2; lib/services(flat):1	11	0	6	NEW:reviewer-identity	high	none
+lib/services/reviewer-candidate-attestation.js	292	Short-lived bridge until the durable reviewer binding contract exists.	5	lib/services(flat):1; lib/services/reviewer-finder:1; lib/services/workbench:1	8	1	11	NEW:reviewer-identity	med	none
+lib/services/reviewer-contact-audit.js	236	Reviewer Contact Audit — Slice 1 (measurement / audit)	1	lib/services(flat):1	1	0	1	NEW:reviewer-identity	med	none
+lib/services/reviewer-contact-reconciliation.js	485	Search-card reconciliation against Dataverse reviewer/contact rows.	2	lib/services(flat):1; pages/api/reviewer-finder:1	3	0	10	NEW:reviewer-identity	med	none
+lib/services/reviewer-identity-binding-contract.js	308	Identity binding sources, field sources, lineage schema constants and normalizers	2	lib/services(flat):1; scripts:1	2	1	4	NEW:reviewer-identity	high	none
+lib/services/reviewer-identity-binding-writer.js	570	Server-owned, optimistic-concurrency writer for reviewer identity bindings.	1	lib/services(flat):1	3	0	7	NEW:reviewer-identity	high	none
+lib/services/reviewer-identity-evidence.js	656	Builds reviewer identity evidence/notes from OpenAlex, ORCID, resolver	6	lib/services(flat):5; scripts:1	2	1	11	NEW:reviewer-identity	high	none
+lib/services/reviewer-identity-lookup.js	430	Cross-store reviewer identity lookup behind workbench reviewer-lookup	7	scripts:2; lib/services(flat):1; lib/services/reviewer-finder:1	9	2	9	NEW:reviewer-identity	high	none
+lib/services/reviewer-identity-resolver.js	401	ReviewerIdentityResolver — Phase 2, PR1 (docs/REVIEWER_IDENTITY_RESOLVER_PHASE2_DESIGN.md).	17	lib/services(flat):5; lib/services/contact-enrichment:5; scripts:4	7	4	30	NEW:reviewer-identity	high	cross-domain-hub
+lib/services/reviewer-identity-runtime.js	661	Server-owned runtime seam for reviewer identity resolution.	2	lib/services/contact-enrichment:1; lib/services/discovery:1	4	0	9	NEW:reviewer-identity	high	none
+lib/services/reviewer-identity-shadow-log.js	157	Durable best-effort persistence for reviewer-identity shadow comparisons	1	lib/services(flat):1	2	0	2	NEW:reviewer-identity	high	none
+lib/services/reviewer-independent-identity-runtime.js	72	Authoritative runtime adapter for the dormant independent identity evaluator.	2	lib/services/workbench:1; pages/api/reviewer-finder:1	1	0	4	NEW:reviewer-identity	high	none
+lib/services/reviewer-promotion-repair-classifier.js	213	Read-only classifier for historical promotions pointing at email-empty persons	1	scripts:1	1	1	1	NEW:reviewer-identity	med	none
+lib/services/reviewer-work-author-resolver.js	192	Resolves a work's author to a reviewer identity via OpenAlex	5	lib/services/contact-enrichment:3; lib/services/discovery:1; lib/services(flat):1	2	0	7	NEW:reviewer-identity	high	none
+lib/services/reviewer-works-first.js	652	Shared works-first reviewer identity resolver and offline evaluation policy.	3	lib/services(flat):2; scripts:1	1	1	6	NEW:reviewer-identity	high	none
+lib/services/reviewer-works-first-authoritative.js	229	Adapter from the combined W2 policy into the established ReviewerIdentityEvidence result contract.	1	lib/services(flat):1	1	0	0	NEW:reviewer-identity	high	none
+lib/services/sync-reviewer-name-title-to-contact.js	66	Best-effort reviewer engagement → contact identity-field sync.	1	lib/services(flat):1	1	0	3	NEW:reviewer-identity	med	none
+lib/services/cloudmersive-scan.js	304	Cloudmersive advanced virus-scan client.	9	lib/services(flat):3; scripts:2; lib/services/post-presentation-materials:1	5	3	6	NEW:uploads	high	cross-domain-hub
+lib/services/large-upload-admission.js	35	Per-process admission for memory-heavy staged-upload finalizers.	5	lib/services/site-visit-materials:1; pages/api/external:1; pages/api/meeting-tracker:1	5	1	0	NEW:uploads	high	cross-domain-hub
+lib/services/portal-upload-client-failure.js	65	Sanitized, best-effort client telemetry for the browser-direct Blob leg.	2	pages/api/external:1; pages/api/workbench:1	3	0	0	NEW:uploads	high	none
+lib/services/portal-upload-staging.js	987	Durable, actor-bound staging for browser-direct private Blob uploads.	16	pages/api/external:4; pages/api/meeting-tracker:3; pages/api/workbench:3	17	1	9	NEW:uploads	high	cross-domain-hub
+lib/services/sharepoint-cleanup.js	58	Shared SharePoint rollback helper.	5	lib/services(flat):3; lib/services/reviewer-finder:1; lib/services/workbench:1	6	0	2	NEW:uploads	med	none
+lib/services/irs-bmf-service.js	571	IRS BMF Service — reference-data refresh + lookup helpers.	3	pages/api/cron:1; pages/api/irs:1; scripts:1	1	1	7	KEEP-FLAT:standalone IRS reference-data domain with no lib/services sibling (importers pages/api/irs, pages/api/cron, scripts)	low	none

@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  *
  * T3 (Stage 3) per-call-site contract matrix for the inline admin sections
- * reachable through `PeopleWorkspace` (pages/admin.js): RoleManagementSection
+ * reachable through `PeopleWorkspace` (shared/components/admin/workspaces/PeopleWorkspace.js; section line refs are historical pages/admin.js positions): RoleManagementSection
  * (:1583 D1 fix, :1602 D1 fix, :1619, :1642, view="roles"),
  * AppAccessSection (:1788, :1888, :1896, :1953, view="app-access" — extends
  * tests/unit/app-access-admin-partial-refresh.test.js with the axes it does
@@ -12,7 +12,7 @@
  * commit.
  */
 import { fireEvent, render, screen, waitFor, act } from '@testing-library/react';
-import { PeopleWorkspace } from '../../pages/admin';
+import { PeopleWorkspace } from '../../shared/components/admin/workspaces/PeopleWorkspace';
 
 const jsonResponse = (status, body) => ({
   ok: status >= 200 && status < 300,
