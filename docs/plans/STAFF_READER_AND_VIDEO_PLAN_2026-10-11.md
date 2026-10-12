@@ -16,6 +16,7 @@ Queue item: "Show transcripts and summaries formatted in the browser across the 
 2. Scope is the **Site Visit card and the Workbench**. The transcription rehearsal page and the admin transcription pilot keep their TXT/VTT downloads.
 3. The Workbench plays the **approved presentation cut** inline, like the Board page. The full meeting recording stays a "Watch full recording" link (it contains the staff discussion; the Zoom share page cannot be embedded).
 4. The video and the reading page ship together on one branch.
+5. Staff pages may play media from the SharePoint tenant **on every staff page**, not only the Workbench (Codex plan review: a CSP is fixed per document, so a Workbench reached by client-side navigation would keep the policy of the page it started on).
 
 ## Facts this plan rests on
 
@@ -45,15 +46,17 @@ Queue item: "Show transcripts and summaries formatted in the browser across the 
 
 - Guard: `requireAppAccess(req, res, 'reviewers', 'meeting-tracker')` (the page is reached from both apps); `withDalContext`; GUID checks. `/api/workbench` is registered as heterogeneous (`guardAppKeys: null`) in `ROUTE_NAMESPACE_LIFECYCLE`, so a mixed-key route there is allowed [VERIFIED via `shared/config/appRegistry.js:376-382`].
 - Allowed rows: only the current staff winners the Workbench and card already list (same projection as §Facts), and only types TRANSCRIPT, PRESENTATION_TRANSCRIPT, STAFF_DISCUSSION_TRANSCRIPT, TRANSCRIPT_SUMMARY, STAFF_DISCUSSION_SUMMARY. Anything else is 404.
-- TRANSCRIPT reads through `downloadMeetingTranscript({ format: 'txt' })`, so its existing currency and integrity rules apply unchanged. The other four read `wmkf_filesize` bytes with `maxBytes`, require `text/plain`, matching size and SHA-256, fatal UTF-8, and strip the BOM.
-- Text cap: 4 MB of bytes (below the Function response limit). Larger files return `413` and the page offers the SharePoint file.
+- Every type must be TXT: `text/plain` with a `.txt` name, matching size and SHA-256, fatal UTF-8 decoding, BOM stripped. TRANSCRIPT reuses `downloadMeetingTranscript`'s currency and integrity rules with `format: 'txt'`, but that helper can return an uploaded hashed PDF/DOCX (Codex plan review), so the reader adds the TXT checks and a reader-specific download bound. Uploaded PDF, DOCX and VTT transcripts return `415 unsupported_format`; their entry points keep the SharePoint link.
+- Two budgets: the declared file size must be at most 3 MB before any download (downloads use that as `maxBytes`), and the serialized JSON response must be at most 4 MB (`Buffer.byteLength(JSON.stringify(payload))`, since escaping can grow text by about half). Either failure returns a small `413 too_large` and the page offers the SharePoint file.
+- Response fields: `request` identity (number, title), `item` (`kind`, `label`, `publishedAt`, `stale`), `text`, and `links` (SharePoint web URL; TXT download where one exists).
+- `withDalContext` establishes the trusted context for Dataverse access; like every Workbench route, it does not apply Dynamics Explorer per-request restrictions. App access is the boundary, as for the Workbench materials list that already exposes these files' SharePoint links.
 - Stale halves: a summary bound to an earlier transcript is still readable by staff (as the Workbench shows it today) and the response says `stale: true`.
 
 ### 3. Reading page
 
 `pages/workbench/read.js?request=<GUID>&document=<GUID>`, opened in a new tab.
 
-- Gate: shown when the viewer has `reviewers` or `meeting-tracker` (the server re-checks).
+- Gate: shown when the viewer has `reviewers` or `meeting-tracker`, fail-closed while access loads (the server re-checks). Tests cover reviewers-only, meeting-tracker-only, neither, loading and error.
 - Impeccable Read mode, One Shell Rule (shell `max-w-7xl`, main column `max-w-4xl`), Left Header Rule: back line with the request number and title, H1 = the item's label, one metadata line (published date, "AI-generated" for summaries, stale note), and secondary actions (download TXT where available, open in SharePoint).
 - Summaries render with the shared `SummaryText` (reading size) and the matching heading constants.
 - Transcripts render with a new `shared/components/TranscriptText.js`: one turn per `[MM:SS]`/`[H:MM:SS] Speaker: text` paragraph, timestamp in a tabular gutter, speaker in semibold; the v1/v2 minute layout and plain text fall back to paragraphs.
@@ -66,7 +69,9 @@ Queue item: "Show transcripts and summaries formatted in the browser across the 
 
 ### 5. CSP
 
-- `/workbench/[requestId]` gains `media-src 'self' <SharePoint canonical origin>`, matching the Board page; no other directive changes.
+- Every staff page (everything except `/external/*`, `/apply*` and `/auth/*`) gains `media-src 'self' <SharePoint canonical origin>`; the Board page keeps its existing rule. No other directive changes, and no other origin is added.
+- Why app-wide: a CSP is fixed when a document loads. Workbench is often reached by Next.js client navigation (for example `InitialAssessmentsPanel.js`, `AwardeesPanel.js`), which keeps the starting page's policy. A Workbench-only rule would block playback there (Codex plan review, owner decision 5).
+- Tests: the proxy unit tests assert the directive on a staff page, its absence on `/external/*` (other than the Board page), `/apply` and `/auth`, and that no other directive changed. Owner check: play after arriving from another staff page without a reload, and after a direct load.
 - The reading page needs no CSP change (same-origin fetch only).
 
 ## Out of scope
@@ -78,5 +83,7 @@ Queue item: "Show transcripts and summaries formatted in the browser across the 
 ## Verification
 
 - Unit tests for both services (allowlist, gates, integrity failures, stale, cap), both routes (auth, GUID, 404 shape), `TranscriptText` parsing, and the entry-point links.
-- `check:api-routes` (+ matrix rows), `check:route-lifecycle-auth`, `check:route-service-boundary`, `check:trust-boundary-guid`, `check:dataverse-access-layer`, `check:fact-consistency` if route counts are registered, then a Codex adversarial review per slice.
+- Durable surfaces: API route security matrix rows; regenerated `CANONICAL_COUNTS` (API-route and `requireAppAccess` endpoint counts are registered); the Request Document Atlas page (new read paths); `docs/SERVICE_AND_UTILITY_CATALOG.md` for the new service exports.
+- Gates: `check:api-routes`, `check:route-lifecycle-auth`, `check:route-service-boundary`, `check:trust-boundary-guid`, `check:dataverse-access-layer`, `check:fact-consistency`, `check:atlas`, each with its self-test, sequentially; then a Codex adversarial review per slice.
+- Negative tests: hashed PDF/DOCX transcript returns 415; escaping-heavy text and oversized files return 413; a non-allowlisted type or a non-winner document returns 404; a video whose size or hash differs from the approved cut returns 404.
 - Owner check on localhost and live: video plays and seeks on the Workbench for 1003222; each reader opens formatted.
