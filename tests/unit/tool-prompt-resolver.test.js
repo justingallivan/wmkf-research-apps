@@ -78,3 +78,44 @@ test('row without a model uses the bundled model', async () => {
   fetchCurrentPrompt.mockResolvedValue({ ...ROW, wmkf_ai_model: '' });
   expect((await resolveToolPrompt('app.step', BUNDLED)).rawModel).toBe('sonnet');
 });
+
+describe('fallback only on transient errors', () => {
+  const err = (props, msg = 'x') => Object.assign(new Error(msg), props);
+  test.each([
+    ['503', err({ status: 503 })],
+    ['isTransient flag', err({ isTransient: true, status: 500 })],
+    ['429', err({ status: 429 })],
+    ['408', err({ status: 408 })],
+    ['AbortError', err({ name: 'AbortError' })],
+    ['TimeoutError', err({ name: 'TimeoutError' })],
+    ['ETIMEDOUT code', err({ code: 'ETIMEDOUT' })],
+    ['fetch failed', err({}, 'fetch failed')],
+    ['no-response service error', err({ status: null, noResponse: true, isTransient: true })],
+  ])('%s falls back to bundled', async (_n, e) => {
+    fetchCurrentPrompt.mockRejectedValue(e);
+    const r = await resolveToolPrompt('app.step', BUNDLED);
+    expect(r.source).toBe('bundled');
+  });
+
+  test.each([
+    ['400', err({ status: 400 })],
+    ['401', err({ status: 401 })],
+    ['403', err({ status: 403 })],
+    ['404', err({ status: 404 })],
+    ['missing credentials (explicit non-transient 500)', err({ status: 500, isTransient: false }, 'Missing Dynamics 365 environment variables')],
+    ['interlock refusal', err({}, '[dataverse-interlock] denied: deployment=production target=sandbox')],
+    ['programming error', new TypeError('x is not a function')],
+  ])('%s rethrows', async (_n, e) => {
+    fetchCurrentPrompt.mockRejectedValue(e);
+    await expect(resolveToolPrompt('app.step', BUNDLED)).rejects.toBe(e);
+  });
+});
+
+describe('toolPromptUnavailable', () => {
+  const { toolPromptUnavailable } = require('../../lib/services/tool-prompt-resolver');
+  test('recognizes the structural codes only', () => {
+    expect(toolPromptUnavailable({ code: 'PROMPT_NOT_FOUND' })).toMatchObject({ code: 'tool_prompt_unavailable', error: expect.stringContaining('not set up yet') });
+    expect(toolPromptUnavailable({ code: 'PROMPT_DUPLICATE_CURRENT' }).error).toContain('more than one current version');
+    expect(toolPromptUnavailable(new Error('x'))).toBeNull();
+  });
+});
