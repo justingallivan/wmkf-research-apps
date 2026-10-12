@@ -845,9 +845,12 @@ an uploaded transcript gets Open without downloads.
 - **Server slices C1-C3 (§6), not started:** automatic split-transcript generation after a
   publish with a confirmed end; the real reason a presentation video was superseded; and
   streaming the review video instead of downloading it.
-- **Not converged:** the underlined `BTN_LINK` text actions (no text-link variant in
-  `Button`).
-- **[BUILT 2026-10-11, branch `claude/correction-newer-pending-gate`]** Server-side gap noted by Codex
+- **[BUILT 2026-10-12, branch `claude/button-link-variant`; owner desktop check pending]** Text-link
+  variant: the shared `Button` gains `variant="link"` (the former `BTN_LINK` look: underlined gray text,
+  no padding or background, blue keyboard focus ring, dimmed when disabled), and all 11 card `BTN_LINK`
+  actions now use it; the `BTN_LINK` string is gone. Only the one `<a>` styled as a button (Open Board
+  page) keeps the card-local `BTN` string. Test: `tests/unit/layout-button-link-variant.test.js`.
+- **[SHIPPED 2026-10-11, merge `b3135037c`]** Server-side gap noted by Codex
   (commit 3): `createMeetingCorrection` now refuses with `409 meeting_transcript_newer_pending` while a
   newer transcription is pending. The rule lives in `shared/utils/meeting-transcript-pending.js` and the
   card's edit gate uses the same function, so the two cannot drift. Still UI-only: loading, saving or

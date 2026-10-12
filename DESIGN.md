@@ -275,9 +275,10 @@ width, header, and section order:
     using the chip meanings above. Green means confirmed success only; "moved" or
     redirect notices are neutral or blue.
 11. **The One Button Vocabulary Rule.** Buttons come from the shared `Button`
-    component (primary, secondary, outline, danger); no hand-colored
-    `<button>`s. At most one ink primary per region. Text links are for
-    navigation only.
+    component (primary, secondary, outline, danger, link); no hand-colored
+    `<button>`s. At most one ink primary per region. The underlined `link`
+    variant is for quiet in-place actions (Cancel, Discard, a show/hide
+    disclosure); `<a>` text links are for navigation only.
 12. **The Tab Level Rule.** Underline tabs for page sections, a segmented
     control inside a section, chips for filters. At most seven tabs per level, in
     lifecycle order; a tab may carry a status dot or count.
