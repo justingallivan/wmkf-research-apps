@@ -17,7 +17,7 @@ related:
 # Flat `lib/services` relocation — staged plan
 
 Candidate **B** from `LARGEST_UNPLANNED_REFACTOR_SCOPE_2026-10-11.md`. Source baseline `origin/main`
-`b3135037c`. Status: **draft — not authorized.** Tier 0 (no runtime behavior change) but every wave
+`b3135037c`. Status: **tabled by the owner 2026-10-12 (§7) — not authorized.** Tier 0 (no runtime behavior change) but every wave
 touches hundreds of files, so each wave is its own branch + PR with a deliberate merge window (§2 D4).
 
 The move table is `docs/plans/data/FLAT_SERVICES_MOVE_LEDGER_2026-10-11.tsv` (176 rows; columns
@@ -265,3 +265,20 @@ as `check:flat-services` (law: zero flat files) so the layout rule cannot regres
   worktree count 22. Ledger integrity (176 rows, targets, hazards, waves, 10 spot-checked rows) and
   all gate-literal line citations confirmed. Verdict after corrections: ready for owner review; not
   authorized.
+- 2026-10-12: **Tabled by the owner (Session 598)** after a decision walk-through. Reason: navigation-only
+  benefit against ~2,000 path edits and a rebase across renames for every live branch. Carry forward
+  if revived:
+  - **Gate hazard the ledger missed:** `check:reviewer-engagement-boundary` exempts every file under
+    `lib/services/reviewer-engagement/` (`EXEMPT_ENGAGEMENT_DIR`,
+    `scripts/check-reviewer-engagement-boundary.js:154`). The 9 `med` rows targeting that directory
+    would silently gain permission to bind reviewer-suggestion writers; each needs individual review,
+    and non-engagement files belong in `review-manager/`.
+  - **Baseline drift:** 179 flat files on 2026-10-12 (Plan A added `tool-prompt-resolver.js`,
+    `tool-prompt-composer.js`, `prompt-model-resolution.js` — natural home `executor/`). Re-run the
+    ledger generator before any wave.
+  - **Recommendations given (not decisions):** accept the high-confidence rows and the 9 new
+    directories; keep the four heaviest hubs (`dynamics-service`, `dynamics-context`,
+    `service-http-error`, `graph-service`) flat instead of D3's zero-flat end state; no shims (D5);
+    rewrite live docs/memory/wiki only, not dated records (D6, per `.claude/rules/durable-docs.md`);
+    prune dormant worktrees before naming merge windows (D4); if revived, authorize Wave 1 only and
+    reassess.
