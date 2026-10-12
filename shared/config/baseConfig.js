@@ -56,7 +56,6 @@ export const BASE_CONFIG = {
     // missing from this map, so it silently inherited CLAUDE.DEFAULT_MODEL
     // ('sonnet') until S573 (2026-10-04, owner decision: Haiku when available).
     'integrity-screener':          { model: 'haiku',  fallback: 'sonnet' },
-    'expertise-finder':            { model: 'sonnet', fallback: 'haiku' },
     // 'virtual-review-panel' retired 2026-10-04 (Session 573); legacy multi-LLM panel
     // archived to /_archived. Successor is 'review-panel' below.
     'review-panel': {

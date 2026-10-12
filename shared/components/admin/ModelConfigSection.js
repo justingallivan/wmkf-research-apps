@@ -29,7 +29,6 @@ const APP_MODEL_NAMES = {
   'contact-enrichment': 'Contact Enrichment',
   'email-personalization': 'Email Personalization',
   'dynamics-explorer': 'Dynamics Explorer',
-  'expertise-finder': 'Expertise Finder',
   // 'virtual-review-panel' (legacy multi-LLM panel) retired 2026-10-04 (Session 573).
   'review-panel': 'Review Panel',
   'grant-reporting': 'Grant Reporting',
