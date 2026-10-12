@@ -1,6 +1,6 @@
 ---
 title: Staff reading page and Workbench presentation video
-status: planned
+status: built-on-branch
 created: 2026-10-11
 owner: Justin Gallivan
 summary: "Plan for a staff reading page that shows transcripts and summaries formatted in the browser, and for playing the approved presentation video inline on the Workbench Staff deliberations tab."
@@ -9,6 +9,8 @@ summary: "Plan for a staff reading page that shows transcripts and summaries for
 # Staff reading page and Workbench presentation video
 
 Queue item: "Show transcripts and summaries formatted in the browser across the suite" (`docs/CURRENT_WORK_QUEUE.md`). Part A (Workbench summaries through the shared `SummaryText`) shipped 2026-10-11 (merge `99c91df93`). The follow-up on branch `claude/workbench-summary-links` (summary links hidden when the text is shown; "Open full transcript") is held, not merged.
+
+**Build status (2026-10-11):** all three slices built on branch `claude/staff-reader-video` (stacked on `claude/workbench-summary-links`), each with a Codex adversarial review; not merged. Owner checks pending: playback after a direct load and after in-app navigation, and the reading page on real 1003222 items.
 
 ## Owner decisions (2026-10-11, Session 595)
 

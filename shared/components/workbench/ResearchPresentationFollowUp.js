@@ -7,6 +7,7 @@ import {
 } from '../../config/transcriptSummary';
 import SummaryText, { parseSummaryText } from '../SummaryText';
 import PresentationVideoPlayer from '../PresentationVideoPlayer';
+import { staffReaderHref } from '../../utils/staff-reader';
 
 const SLOTS = [
   { type: REQUEST_DOCUMENT_ARTIFACT_TYPE.RECORDING, label: 'Full recording', action: 'Watch full recording' },
@@ -81,7 +82,9 @@ export default function ResearchPresentationFollowUp({ requestId = null, videoPl
     .map((slot) => {
       const material = byType.get(slot.type);
       if (!material) return null;
-      return { ...slot, href: material.backing === 'external' ? material.externalUrl : material.webUrl };
+      // Plain-text transcripts and summaries open formatted on the reading page; anything else opens in SharePoint or Zoom.
+      return { ...slot, href: staffReaderHref(requestId, material)
+        || (material.backing === 'external' ? material.externalUrl : material.webUrl) };
     })
     .filter(Boolean);
   const summarySlot = present.find((slot) => slot.type === REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT_SUMMARY);

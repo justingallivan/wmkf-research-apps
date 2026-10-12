@@ -17,6 +17,7 @@ import ArtifactRow from './ArtifactRow';
 import OverflowMenu from '../workbench/OverflowMenu';
 import { formatTranscriptTurnTime, getTranscriptSpeakers, groupTranscriptByTurn } from '../../../lib/services/transcription-pilot/transcript-format';
 import { MAX_TRANSCRIPTION_BYTES as MAX_AUDIO_BYTES, MAX_TRANSCRIPTION_MIB } from '../../../lib/services/transcription-pilot/limits';
+import { staffReaderHref } from '../../utils/staff-reader';
 
 const MP4_MAX_BYTES = 2_000_000_000;
 const TRANSCRIPT_MAX_BYTES = 25 * 1024 * 1024;
@@ -161,6 +162,12 @@ function transcriptContentType(file) {
     throw new Error('Choose one VTT, text, PDF, or DOCX transcript no larger than 25 MiB. Zoom chat.txt is meeting chat, not a transcript.');
   }
   return TRANSCRIPT_CONTENT_TYPES[extension];
+}
+
+// Plain-text transcripts and summaries open formatted on the staff reading page; anything else
+// (an uploaded PDF/DOCX/VTT transcript, a recording) opens at its SharePoint or Zoom URL.
+function materialHref(requestId, material) {
+  return staffReaderHref(requestId, material) || safeMaterialUrl(material);
 }
 
 function safeMaterialUrl(material) {
@@ -2787,7 +2794,7 @@ function publishedSummaryOf(t, s) {
   return { summaryStatusCurrent, published };
 }
 
-function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = null, setRequest = () => {} }) {
+function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = null, setRequest = () => {}, requestId = null }) {
   const copy = SUMMARY_BLOCK_COPY[kind];
   const busyKeys = SUMMARY_KIND_UI[kind].busy;
   const artifact = t.collection?.currentArtifact;
@@ -2801,7 +2808,7 @@ function SummaryBlock({ t, s, kind = 'presentation', materials = [], request = n
   const presentationReady = artifact?.presentationTranscript?.state === 'bound';
   const transcriptMaterial = materials.find((item) => Number(item.artifactType) === REQUEST_DOCUMENT_ARTIFACT_TYPE.TRANSCRIPT) || null;
   const summaryMaterial = materials.find((item) => Number(item.artifactType) === copy.materialType) || null;
-  const summaryUrl = summaryMaterial ? safeMaterialUrl(summaryMaterial) : null;
+  const summaryUrl = summaryMaterial ? materialHref(requestId, summaryMaterial) : null;
   const draft = s.summaryDraft;
   const kindReady = s.transcriptBound;
   const generatingRun = s.summary?.draft?.state === 'generating' ? s.summary.draft : null;
@@ -3132,8 +3139,8 @@ const DERIVATIVE_STATUS = Object.freeze({
   stale: { tone: 'amber', label: 'Out of date' },
   missing: { tone: 'gray', label: 'Not made yet' },
 });
-function DerivativeRow({ state, label, material, testId, action = null, needsEnd = false }) {
-  const url = state === 'bound' && material ? safeMaterialUrl(material) : null;
+function DerivativeRow({ state, label, material, testId, action = null, needsEnd = false, requestId = null }) {
+  const url = state === 'bound' && material ? materialHref(requestId, material) : null;
   const status = DERIVATIVE_STATUS[state] || { tone: 'gray', label: 'Not available' };
   const pending = state === 'stale' || state === 'missing';
   const detail = state === 'bound' ? fmtDateTime(material?.createdAt)
@@ -3344,7 +3351,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
   const line = describeCurrentTranscript({ material, collection: t.collection });
   const artifact = t.collection?.currentArtifact;
   const generated = line.kind === 'generated';
-  const openUrl = material ? safeMaterialUrl(material) : null;
+  const openUrl = material ? materialHref(requestId, material) : null;
   const featureEnabled = t.collection?.featureState === 'enabled';
   const generateReason = !t.collection ? 'Not available right now' : !featureEnabled ? 'Not enabled for this request' : null;
   // Only queued or running work blocks step 1. A stranded 'uploading' job (failed import or abandoned upload) never
@@ -3517,8 +3524,8 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
       {showProducts && (
         <ul className="mt-3 divide-y divide-gray-100 border-t border-gray-200">
           <PresentationVideoLine v={video} />
-          <SummaryBlock t={t} s={t.presentationSummary} materials={materials} request={summarizeRequest} setRequest={setSummarizeRequest} />
-          <DerivativeRow state={boundaryState} label="Presentation transcript" material={presentationMaterial} testId="presentation-transcript-row"
+          <SummaryBlock t={t} s={t.presentationSummary} materials={materials} request={summarizeRequest} setRequest={setSummarizeRequest} requestId={requestId} />
+          <DerivativeRow state={boundaryState} label="Presentation transcript" material={presentationMaterial} requestId={requestId} testId="presentation-transcript-row"
             action={generateAnchor === 'presentation' ? generateButton : null} needsEnd={editable && !presentationEnd} />
         </ul>
       )}
@@ -3529,8 +3536,8 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
       {resultsWaiting && <p className="mt-2 text-sm text-gray-700">The staff discussion transcript and summary appear here once the presentation end is checked.</p>}
       {showProducts && (
         <ul className="mt-3 divide-y divide-gray-100 border-t border-gray-200">
-          <SummaryBlock t={t} s={t.discussionSummary} kind="discussion" materials={materials} request={summarizeRequest} setRequest={setSummarizeRequest} />
-          <DerivativeRow state={discussionState} label="Staff discussion transcript" material={discussionMaterial} testId="discussion-transcript-row"
+          <SummaryBlock t={t} s={t.discussionSummary} kind="discussion" materials={materials} request={summarizeRequest} setRequest={setSummarizeRequest} requestId={requestId} />
+          <DerivativeRow state={discussionState} label="Staff discussion transcript" material={discussionMaterial} requestId={requestId} testId="discussion-transcript-row"
             action={generateAnchor === 'discussion' ? generateButton : null} needsEnd={editable && !presentationEnd} />
         </ul>
       )}

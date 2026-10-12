@@ -195,3 +195,15 @@ describe('inline presentation video (staff reader plan §4)', () => {
     expect(screen.queryByTestId('presentation-video')).not.toBeInTheDocument();
   });
 });
+
+
+test('with a request id, plain-text transcripts open on the reading page; a PDF transcript keeps SharePoint (staff reader plan §4)', () => {
+  const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
+  render(<ResearchPresentationFollowUp requestId={REQUEST_ID} status="loaded" materials={[
+    { artifactId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', artifactType: 100000012, filename: 'presentation.txt', contentType: 'text/plain', backing: 'file', webUrl: 'https://tenant.sharepoint.com/p.txt' },
+    { artifactId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', artifactType: 100000006, filename: 'transcript.pdf', contentType: 'application/pdf', backing: 'file', webUrl: 'https://tenant.sharepoint.com/t.pdf' },
+  ]} />);
+  expect(screen.getByRole('link', { name: 'Open presentation transcript' }))
+    .toHaveAttribute('href', `/workbench/read?request=${REQUEST_ID}&document=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa`);
+  expect(screen.getByRole('link', { name: 'Open full transcript' })).toHaveAttribute('href', 'https://tenant.sharepoint.com/t.pdf');
+});
