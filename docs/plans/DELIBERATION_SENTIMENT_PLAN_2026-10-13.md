@@ -144,8 +144,9 @@ the number of disagreements and uncertainties.
 - Register it as an A7 surface in `scripts/check-prompt-injection-tagging.js`. Add rows to
   `shared/config/executorBudgets.js`. Add a prompt-config test that pins the variable and output
   flags; mutation check: removing `auditRetention` must fail it.
-- [ASSUMED] The prompt appears on the `/admin` Prompt Templates page with no extra work, like the
-  other seeded prompts (Plan A). Verify during build.
+- The prompt is not hard-coded: the live text lives in Dataverse and is editable in Admin → Prompt
+  Templates, which lists every `wmkf_ai_prompt` row, so a seeded row appears with no extra work
+  [VERIFIED via `pages/api/admin/prompts/index.js:4`]. The seed file is only the starting text.
 
 ### 4.4 Quote check and storage
 
