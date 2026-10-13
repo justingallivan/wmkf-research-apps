@@ -109,7 +109,15 @@ describe('getDiscussionSentimentStatus', () => {
     store.getLatestRun.mockResolvedValue({ id: 'g', status: 'generating', created_at: iso(60), live_generating: true });
     expect((await status()).state).toBe('analyzing');
     store.getLatestRun.mockResolvedValue({ id: 'g', status: 'generating', created_at: iso(400), live_generating: false });
-    expect((await status()).state).toBe('not_analyzed');
+    expect(await status()).toMatchObject({ state: 'not_analyzed', lastRunFailed: true });
+  });
+
+  test('an abandoned generating run newer than the shown result reads as a failed last run; a live one does not', async () => {
+    store.getLatestReadyRun.mockResolvedValue(readyRow());
+    store.getLatestRun.mockResolvedValue({ id: 'g', status: 'generating', created_at: iso(10), live_generating: false });
+    expect(await status()).toMatchObject({ state: 'out_of_date', lastRunFailed: true });
+    store.getLatestRun.mockResolvedValue({ id: 'g', status: 'generating', created_at: iso(10), live_generating: true });
+    expect(await status()).toMatchObject({ state: 'analyzing', lastRunFailed: false });
   });
 
   test('"still analyzing" comes from the database flag, not the app clock', async () => {

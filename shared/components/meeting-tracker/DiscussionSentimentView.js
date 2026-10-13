@@ -160,6 +160,8 @@ export default function DiscussionSentimentView() {
   const loadToken = useRef(0);
   const selectedRef = useRef(new Set());
   const rowSeq = useRef({});
+  // Bumped each time a proposal is ticked, so an action started before an untick never writes to a re-ticked row.
+  const pickSeq = useRef({});
 
   useEffect(() => {
     mountedRef.current = true;
@@ -237,8 +239,9 @@ export default function DiscussionSentimentView() {
 
   const act = async (id, busy, path, body) => {
     // The picker checkbox can still untick a working row, so apply the result only if the row is still
-    // selected and the page is mounted.
-    const alive = () => mountedRef.current && selectedRef.current.has(id);
+    // selected (and not unticked and re-ticked since) and the page is mounted.
+    const pick = pickSeq.current[id];
+    const alive = () => mountedRef.current && selectedRef.current.has(id) && pickSeq.current[id] === pick;
     patchRow(id, { busy, error: null });
     let message = null;
     try {
@@ -261,6 +264,7 @@ export default function DiscussionSentimentView() {
       return;
     }
     selectedRef.current.add(id);
+    pickSeq.current[id] = (pickSeq.current[id] || 0) + 1;
     setRows((current) => ({ ...current, [id]: { proposal, phase: 'loading', data: null, error: null, busy: null } }));
     setOrder((current) => [...current, id]);
     void refresh(id);

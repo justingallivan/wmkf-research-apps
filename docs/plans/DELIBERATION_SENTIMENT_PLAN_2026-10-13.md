@@ -266,6 +266,10 @@ row (no `docs/SERVICE_AND_UTILITY_CATALOG.md` entry: the sibling summary service
   Add rows to `docs/API_ROUTE_SECURITY_MATRIX.md` and `ROUTE_NAMESPACE_LIFECYCLE`.
 - **Staff-only:** never served on the Board presentation page or the briefing link, the same
   rule as the Staff Discussion Summary.
+- **As built (Stage 4, §9):** the picker lists every site visit in the chosen cycle from the existing
+  schedule dashboard, and transcript presence shows only after a proposal is ticked (no list route; the
+  `GET` route reads one request). Owner confirmation of that picker scope and of the sort direction is
+  pending; `ROUTE_NAMESPACE_LIFECYCLE` has no `/api/meeting-tracker` entry, so it is unchanged.
 
 ### 4.6 Consumer contract (Proposal Ranking and others)
 
@@ -411,3 +415,7 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
   the batch (§4.6); Withdraw stays available when the transcript is unbound or stale (`accepted` is returned in the
   `no_transcript` branch); an errored page row has Try again and offers no actions until `ready`; "still analyzing"
   uses the database clock; a token-surface exposure test (§7); supervised-test refusal worded for sentiment.
+- **Stage 4-5 final review fixes (Fable, 2026-10-13):** an action started before a proposal was unticked no longer
+  writes to the re-ticked row (per-pick guard, view test); an abandoned `generating` row (no longer live, not yet
+  marked failed) reads as a failed last run so the page says the last analysis did not finish; matrix accept row
+  lists 404 `sentiment_not_found`; §4.5 carries the as-built picker note.

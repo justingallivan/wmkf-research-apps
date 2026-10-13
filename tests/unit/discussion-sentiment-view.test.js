@@ -184,6 +184,24 @@ test('stale response guard: an analysis that finishes after the page unmounted s
   errors.mockRestore();
 });
 
+test('stale response guard: an analysis that fails after the proposal was unticked and re-ticked writes nothing to the new row', async () => {
+  handlers[`GET ${url(A)}`] = async () => json({ state: 'not_analyzed', run: null, runCurrent: false });
+  const gate = deferred();
+  handlers[`POST ${url(A)}`] = () => gate.promise;
+  render(<DiscussionSentimentView />);
+  await screen.findByLabelText(/Alpha/); tick('Alpha');
+  fireEvent.click(await screen.findByRole('button', { name: 'Analyze' }));
+  await screen.findByText(/Keep this page open/);
+  tick('Alpha'); // unticked while the analysis is running
+  tick('Alpha'); // re-ticked: a fresh row with its own read
+  expect(await screen.findByRole('button', { name: 'Analyze' })).toBeEnabled();
+  const readsBefore = global.fetch.mock.calls.filter(([u, o]) => String(u) === url(A) && o?.method !== 'POST').length;
+  await act(async () => { gate.resolve(json({ error: 'STALE ANALYSIS ERROR', code: 'sentiment_generation_failed' }, false, 502)); });
+  expect(screen.queryByText('STALE ANALYSIS ERROR')).not.toBeInTheDocument();
+  expect(global.fetch.mock.calls.filter(([u, o]) => String(u) === url(A) && o?.method !== 'POST')).toHaveLength(readsBefore);
+  expect(screen.getByRole('button', { name: 'Analyze' })).toBeEnabled();
+});
+
 test('a row whose read failed offers Try again, which reloads it; no action is offered until it is ready', async () => {
   let calls = 0;
   handlers[`GET ${url(A)}`] = async () => { calls += 1; return calls === 1 ? json({ error: 'The analysis could not be loaded. Try again.' }, false, 502) : json(status()); };
