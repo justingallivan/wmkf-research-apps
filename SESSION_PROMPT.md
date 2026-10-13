@@ -1,4 +1,51 @@
-# Session 602 Prompt: Discussion Sentiment calibration (after uploads); transcription cleanup check; security mitigation Release 1
+# Session 603 Prompt: confirm the 1003010 Zoom re-import and video cut; Discussion Sentiment calibration; transcription cleanup check
+
+## Session 602 close — Zoom imports from before provenance capture blocked attendance and the video cut (Claude Opus, worktree `WMKF_Apps-claude-debug` on `claude/debugging`; Codex owned the main checkout; 2026-10-13 PT)
+
+### What Was Completed
+
+1. **Diagnosis: Duncan's report on #1003010 (UC Riverside)** `[VERIFIED via owner-run read-only prod probes]`.
+   - **The import came before provenance capture.** Import `7abbcf18` was made 2026-10-08 12:32 PT. Provenance capture (merge `f3cc08540`) shipped 2026-10-09 20:25 PT. So `selected_recording_files` was NULL.
+   - **No source on publish.** `provenanceFromJob` returns null for such an import. The publication's `frozen_source_provenance` was therefore null, and the resolver returned `legacy_unknown`.
+   - **Effects.** Attendance was never fetched ("Attendance is unavailable or incomplete"; every speaker under "Other voices"). The cut was refused with `presentation_video_source_not_zoom`.
+   - **"Copy from Zoom" greyed out.** The import was still `started` and its job `ready`: one import per meeting.
+   - **Manual re-upload refused by design.** The audio + Zoom transcript publication is `kind: upload`.
+   - **Attendance itself works.** All 11 published Zoom-sourced transcripts with an attendance decision have attendance `complete` (no Zoom-sourced row had another status), with 115 attendee rows that all carry leave times.
+2. **Production repairs (owner ran each with `!`; dry run first, then `--apply`).** Each set one `zoom_recording_imports` row to `state='failed'`, `failure_code='zoom_import_superseded_pre_provenance'`. This mirrors `releaseStartedImportWithEndedJob` (`import-store.js:100`). The guards required the exact id and request, `started`, no recorded files, and a `ready` job.
+   - #1003010: import `7abbcf18…` (job `1c7a713e…`), committed 21:25:52 UTC.
+   - #1002852 (Poly ADP-Ribose, request `e5df0b46…`, imported by profile 17): import `054c348e…` (job `77c7a6cc…`), committed 21:39:40 UTC.
+   - No transcripts, jobs, publications, video copies, sentiment rows or Dataverse rows were touched. The third pre-provenance import (`e43ae6ea…`) had already been re-imported and has a video.
+   - The probe and repair scripts live only in the session scratchpad; they are not tracked.
+3. **Clearer refusal text (Production).**
+   - `presentation-video-split-service.js` now picks the message by resolver status. An uploaded transcript points to publishing the Zoom run (Earlier runs). An unrecorded or mismatched source points to re-importing from Zoom, with an administrator fallback.
+   - The code and status are unchanged. Three new tests fail against the old wording.
+   - Owner chose the copy. Merge `1ed6e33bf` (Tier 0, pushed by the owner); the production deploy was Ready on that sha.
+
+### Commits
+- `1ed6e33bf` fix: name the next step when a presentation video can't use the transcript
+
+## Next Items (Session 602)
+
+### Verified Open
+
+1. **Confirm #1003010 after Duncan re-imports.**
+   - Expected: the new import has `selected_recording_files`, `audioOnlyFileCount` = 1, and audio recording start/end equal to copy `36157ba4` (21:01:31–22:05:52 UTC). Durations already match: 3,861,867 ms vs 64:21.
+   - Attendance should come back `complete`, and the cut should start without `presentation_video_source_mismatch`.
+   - Owner sent (or will send) Duncan the re-import steps.
+2. **#1002852 re-import is optional** (only if a presentation video is needed). Re-publishing may mark its accepted Discussion Sentiment result out of date. Unchecked: confirm before advising re-runs.
+3. Session 601 items below (sentiment calibration, accept results, transcription cleanup check after 2026-10-14 03:00 UTC) were not rechecked this session.
+
+### Verify Before Acting
+- Worktree `/Users/gallivan/Code/WMKF_Apps-claude-debug` (branch `claude/debugging`, no unique commits) plus its memory symlink `~/.claude/projects/-Users-gallivan-Code-WMKF-Apps-claude-debug/memory`. Remove with the owner's OK once item 1 is confirmed.
+
+### Gotchas
+- Auto mode blocked Production reads/writes, `node --check` on a script reading production, and pushes to `main`. The owner ran them with `!`.
+- `attendance_review` is cleared at publish. To judge whether attendance worked, read `frozen_discussion_attribution.attendance.status` instead.
+- `operational_events` has no `created_at`; use `recorded_at` or `last_occurred_at`.
+
+**Milestone determination:** no DEVELOPMENT_LOG entry. This was a support fix: two data repairs and a copy change, with no new capability.
+
+---
 
 ## Session 601 close — Discussion Sentiment meter shipped to Meeting Tracker (Claude Opus orchestrating Sonnet build, Opus/Fable review, Codex adversarial; shared checkout `main`, 2026-10-13 PT)
 
