@@ -18,28 +18,26 @@ The current product authority is [design revision 5](docs/plans/PROPOSAL_RANKING
 and the owner-accepted revision-3 UX direction. The owner authorized implementation,
 smooth dragging and resets at every stage. Source is built on `codex/proposal-ranking-v2`;
 the [implementation plan](docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md)
-records local verification and remaining acceptance. The branch is not merged or deployed.
-Sandbox wave33 fields are applied/exact and Beth is the saved default facilitator.
-Thirteen retained D98 saved-service-persona checks passed (six fictional proposals/four
-enabled sandbox identities); independent SSO/app-grant and source-eligible acceptance
-remain open. A later saved-D98 walkthrough in normal Chrome exercised four trusted
-personas, replacing the earlier port-3136 browser block; no independent SSO, live
-sentiment or reviewer-badge visual proof is claimed. Final second reveal preserved
-the disagreement/cutoff, then full restart returned all four to Preparing with
-confidence cleared and reveal disabled. Keyboard dragging persisted; basic pointer
-movement/save is USER-VERIFIED (“It moves and saves”), while long-list autoscroll
-remains pending. A separate memory-only 100/12
-fixture passed rendering, Find 100, keyboard reorder/Refresh and reset; saved
-maximum-capacity transactions remain unverified. Ordinary source eligibility remains
-zero; the new dedicated D97 source/review fixture passes preview with six rated proposals
-and four roster members. Justin is test facilitator; the actual default remains Beth.
-The test-access setup applied 21 pending test Neon migrations (61 skipped; 82 total),
-configured four real Microsoft-linked profiles, and created explicit Proposal Ranking
-and Meeting Tracker grants in the Dataverse sandbox. Test Preview adaptation is not
-deployed; six marked D97 Requests and synthetic reviews are saved, while independent sign-ins/live sentiment
-remain untested; this is partial provisioning, not a ready-environment claim. See
-`docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md`. Production is unchanged. Dedicated Preview flags are being configured; configuration
-completion and deployment are not yet verified. Historical handoffs below do not
+records local verification and remaining acceptance. Source commit `27e6fdc7c` is
+on READY dedicated Preview `dpl_6cZM8Dfv6copEpM16gMQWx8b6eFZ` at the stable test
+alias; Production is unchanged. Justin real Microsoft SSO, hosted six-proposal/four-PD
+source, opening, MR confidence/reset, combined order `1,4,2,3,6,5`, Ready and own
+reopen passed; reopening left all four Preparing and Reveal disabled. Other accepted staff sign-ins remain pending. Justin is test facilitator; Beth's actual
+default is unchanged. The accepted roster is Justin, Beth, Jean and John Sader (canonical identity verified).
+Rob's two setup-created grants were removed, John's profile/grants and third-Request
+lead were corrected, and the earlier round was canceled/retained by an atomic operator
+correction, not UI Restart. Justin opened the corrected round through hosted UI;
+all four are Preparing with Reveal disabled. Other staff SSO/group walkthrough remain
+pending. Test Neon has zero pending migrations. Preview 3
+`dpl_AKzoUJwZZsdFhu7XVDexuceqQaq2` is READY on the stable test alias.
+The user confirmed smooth 100-card pointer/autoscroll/drop in the memory-only fixture;
+saved maximum-capacity transactions remain unverified. The first-D97 fictional
+sentiment fixture now returns `current` through the real consumer. Four new marked
+TEST files were created in shared akoyaGO SharePoint; no existing files changed.
+This was scripted acceptance with no model call or human analysis, not generation
+or full group-browser proof. Production is unchanged. See
+`docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md`.
+Historical handoffs below do not
 override this authorization or authorize production promotion, writes or trial cleanup.
 Unrelated workstream handoffs retain their existing scope.
 

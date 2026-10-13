@@ -337,11 +337,19 @@ and SE selection after confidence saves. A second reveal retained disagreement a
 the unanimous cutoff; full restart then returned all four to Preparing with confidence
 cleared and reveal disabled. Keyboard dragging persisted, but automated pointer movement
 did not produce an observed saved drop. The user later confirmed basic pointer
-movement/save (“It moves and saves”); long-list autoscroll remains unaccepted. Retained D98 cards have numeric reviewer-distribution keys
+movement/save (“It moves and saves”); 100-card pointer autoscroll/drop is now user-confirmed in the memory-only fixture. Retained D98 cards have numeric reviewer-distribution keys
 and cannot establish reviewer-badge visual acceptance; future fixture generation
 uses labels without rewriting the retained snapshot. The implementation plan and
 `docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md` record the bounded
-proof and remaining long-list autoscroll, independent-user and live-sentiment checks.
+proof and remaining other-staff sign-in and live-sentiment checks. Justin real SSO and hosted opening passed.
 A separate memory-only 100-proposal/12-PD fixture passed rendering, Find 100, keyboard
 100→99 movement, Refresh retention and collective reset; saved maximum-capacity
 transactions remain unverified. DESIGN.md and the suite design system remain unchanged.
+
+Current dedicated Preview follow-up: Preview 3 is READY. The corrected accepted PD
+roster is Beth, Justin, Jean and John Sader; Justin opened the replacement round through
+real hosted UI, all Preparing. Other staff SSO and group walkthrough remain pending.
+The real sentiment reader returns the first-D97 fictional scripted fixture as current;
+this used four new TEST files in shared akoyaGO SharePoint, no existing-file changes,
+no model call and no human analysis. Generation/full group-browser sentiment acceptance
+remain pending. Exact receipts and operator roster correction are in the sandbox audit.

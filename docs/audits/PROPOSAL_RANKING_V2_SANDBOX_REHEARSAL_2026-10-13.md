@@ -96,7 +96,7 @@ returned to the fresh private round with all four Preparing. Screenshot: `/tmp/p
 Keyboard dragging persisted as described above. Automated pointer dragging visibly
 moved the item but did not produce an observed drop/save, including in active Chrome;
 automation alone does not prove pointer behavior. The later user confirmation below
-establishes basic movement/save; long-list autoscroll remains pending.
+establishes basic movement/save; the later manual 100-card autoscroll confirmation is recorded below.
 
 ## Additional bounded checks — 2026-10-13
 
@@ -105,7 +105,7 @@ establishes basic movement/save; long-list autoscroll remains pending.
 card. Find 100 scrolled to the final proposal; keyboard movement changed its position
 from 100 to 99, Refresh retained that in-memory order, and collective reset restored
 position 100. This is UI and in-memory state evidence, not Dataverse persistence or
-maximum-capacity changeset acceptance. Long-list autoscroll remains unaccepted.
+maximum-capacity changeset acceptance. The later manual 100-card autoscroll confirmation is recorded below.
 
 The fresh read-only `/tmp/ranking-remaining-readiness.json` probe again returned zero
 ordinary eligible proposals. Focused API/workflow-service/sentiment-reader tests passed
@@ -130,12 +130,11 @@ profiles are configured: Justin's existing profile plus Beth, Rob and Jean. Expl
 Dataverse sandbox `orgd9e66399.crm.dynamics.com`. No Production database, grants or
 deployment changed.
 
-This is provisioning evidence only. The test Preview adaptation is not deployed,
-the D97 source/review fixture is now saved as described below; independent Microsoft sign-ins have not
-been tested, and live accepted-sentiment acceptance has not run. Do not describe the
-test environment as ready or the independent-user acceptance as passed. The earlier zero-source result describes ordinary eligibility, not the dedicated D97 fixture.
+This is provisioning evidence only. The test Preview adaptation is deployed as recorded below, and the D97 source/review
+fixture is saved. Justin has passed a real Microsoft sign-in; Beth, Rob and Jean
+have not independently signed in. Live accepted-sentiment acceptance has not run. Do not describe full independent-user or live-sentiment acceptance as passed. The earlier zero-source result describes ordinary eligibility, not the dedicated D97 fixture.
 
-## Dedicated D97 source fixture — deployment pending
+## Dedicated D97 source fixture and authenticated Preview
 
 [VERIFIED via `/private/tmp/ranking-d97-proposal-setup.json`,
 `/private/tmp/ranking-d97-review-setup.json` and `/tmp/ranking-d97-preview-probe.log`]
@@ -148,7 +147,7 @@ suggestions (`c31bc841-e260-4a14-9041-8d765ddcc421` through
 `c31bc841-e260-4a14-9041-8d765ddcc426`) supply ratings `[5,4,3,5,2,3]`.
 The dedicated preview probe returned `canOpen: true`, six rated proposals and four
 roster members, with Justin as test facilitator. The actual default remains Beth.
-This proves source preview, not deployed Preview opening or independent SSO.
+This source probe preceded the hosted opening and Justin sign-in recorded below.
 
 Fixture creation exposed the factory's `$top=5` activation truncation on the fifth
 Request: creation returned 201 but workflow restoration verification failed. Complete
@@ -163,28 +162,93 @@ default remains false. The final scoped ranking/identity/factory run passed 230 
 (`/tmp/ranking-final-scoped-tests.log`), as did DAL, reviewer-boundary and API
 gate/self-test pairs. JavaScript lint passed (`/tmp/ranking-final-lint.log`); the CJS
 setup script passed `node --check`, while CJS ESLint hit an existing plugin/config
-mismatch, so no whole-scope lint pass is claimed. Dedicated project Preview flags
-are being configured; their completion and deployment are not yet verified. Build passed before the last small calculation/deduplication
-changes, so those final changes do not inherit a fresh build claim. Preview deployment
-and independent SSO/live-sentiment acceptance remain pending. Production is untouched.
+mismatch, so no whole-scope lint pass is claimed. Dedicated project Preview flags were configured; subsequent access preflight found
+four profiles, four verified staff and zero pending migrations
+(`/tmp/ranking-test-access-readback.log`). Build passed before the last small calculation/deduplication
+changes, so those final changes do not inherit a fresh build claim. The later hosted evidence below supersedes the deployment/Justin sign-in gap;
+other staff sign-ins and live-sentiment acceptance remain pending. Production is untouched.
+
+## Hosted Preview acceptance — partial
+
+[VERIFIED via Vercel deployment and normal Chrome] Initial hosted acceptance of
+source commit `27e6fdc7c` used dedicated Preview `dpl_6cZM8Dfv6copEpM16gMQWx8b6eFZ`
+(READY, Preview target). The preceding READY Preview
+`dpl_3tG72Ytn1f41RZbttqAnHTuVXG4N` allowed Justin's real Microsoft SSO and showed
+six scored proposals/four staff, but first opening returned 503 because
+`PROPOSAL_RANKING_V2_SCHEMA_READY` was missing. The flag was corrected and the
+second Preview successfully opened the hosted round.
+
+Justin saved MR confidence and reset it to 0/3, completed MR/SE confidence, built
+the combined order `1,4,2,3,6,5`, confirmed it and became Ready. Reopening his own
+preparation returned all four to Preparing with facilitator Reveal disabled.
+Anonymous root redirected 307 to sign-in; ranking and app-access returned 401;
+cron maintenance returned 404. No other staff member's independent Microsoft sign-in
+was tested. This is one real user's hosted acceptance, not full multiuser proof.
+
+[USER-VERIFIED] The user confirmed smooth pointer autoscroll and a retained drop
+in the 100-card memory-only fixture. This closes that fixture's manual pointer/
+autoscroll check, not saved maximum-capacity Dataverse acceptance.
+
+## Corrected roster, third Preview and sentiment consumer fixture
+
+[VERIFIED via hosted UI and correction receipts] The canonical staff name is John
+Sader (the owner initially supplied “Seder”), sandbox system user
+`f2cfa564-ac8b-f111-ab10-6045bd02ed59`, enabled and matched to Microsoft object
+`dc4a6b93-453d-4273-8cac-d6aea7c0a0ae`. The accepted roster is Justin, Beth, Jean and
+John. Only Rob's two setup-created grants from 22:34 were removed
+(`/private/tmp/ranking-rob-access-correction.json`). John's profile/grants succeeded
+(`/tmp/ranking-john-access-setup.log`); the third Request's lead PD was corrected to
+John (`/private/tmp/ranking-john-source-correction.json`). Earlier Rob evidence is
+historical, not evidence for the accepted roster.
+
+Round `df971530-9556-4def-8814-6e43ad81c64c` was canceled and retained by an
+ETag-guarded atomic operator correction, **not the UI Restart action**. Justin opened
+corrected round `f48741f0-4560-471d-b51f-ef93db48c152` through the real hosted UI;
+readback confirmed six proposals/private stage and Facilitate showed Beth, Justin,
+Jean and John all Preparing, with Reveal disabled
+(`/private/tmp/ranking-corrected-round-readback.json`, screenshot
+`/private/tmp/ranking-hosted-corrected-roster.png`). Beth, Jean and John's independent SSO
+and the corrected full group walkthrough remain pending.
+
+Dedicated Preview `dpl_AKzoUJwZZsdFhu7XVDexuceqQaq2` is READY, target Preview,
+with the stable alias on deployment `liidw27y9`
+(`/tmp/ranking-test-preview-inspect-3.log`). Material/transcription access is limited
+to first D97 Request `c31bc841-e260-4a14-9041-8d765ddcc401`.
+
+[VERIFIED via `/private/tmp/ranking-d97-sentiment-fixture.json` and
+`/tmp/ranking-sentiment-fixture-recovery.log`] Sandbox canonical sentiment prompt v1
+`a0bc2b5e-59c7-f111-aaaf-70a8a59af221` was seeded create-only. Missing additive
+artifact option 13 was installed in the sandbox and verified by preflight. The
+fixture created four new files in a marked TEST folder in the **shared akoyaGO
+SharePoint site**, not an isolated SharePoint environment; no existing files were
+modified. Missing-document recovery preserved the uploaded files and completed the
+receipt. The real `getDeliberationSentiments` consumer returned `current` for the
+first D97 Request, prompt version 1.
+
+This is explicitly fictional scripted acceptance: no model call, no actual human
+analysis, and no sentiment generation or full group-browser proof. The corrected
+staff sign-ins and group walkthrough remain pending. The production application
+and production Dataverse are unchanged; shared SharePoint received only new marked
+test files.
 
 ## Evidence limits and next acceptance
 
-- These are service-persona checks, **not independent Microsoft SSO, app-grant or
-  authenticated-route acceptance**. Service actor filtering does not prove those layers.
+- The original rehearsal used service personas; later hosted evidence establishes
+  Justin’s real Microsoft SSO only. Beth, Jean and John’s independent staff sign-ins remain pending.
 - Ordinary sandbox eligibility was empty. The dedicated marked D97 fixture now
-  passes source preview; deployed opening and independent-user end-to-end behavior
-  remain unverified. D98 fictional frozen cards alone do not prove source eligibility.
-- No live sentiment acceptance occurred. The browser harness stubs empty enrichment;
-  the stale supplement rejection proves stage fencing, not sentiment access/currentness.
+  passes source preview and hosted opening; full independent-user end-to-end behavior
+  remains unverified. D98 fictional frozen cards alone do not prove source eligibility.
+- The original browser harness stubbed sentiment. The later real consumer read
+  proved the fictional scripted fixture current; generation and full group-browser
+  sentiment acceptance remain unverified.
 - The retained D98 fixture originally used numeric review-distribution keys. Future
   fixture generation now uses rating labels, but frozen D98 was deliberately not
   rewritten. It is unsuitable for reviewer-badge visual proof; persistence, ordering,
   reset and export row-count checks above are unaffected.
 - Saved-browser Dataverse evidence is limited to the six-card/four-persona walkthrough
   above. The separate 100/12 UI fixture is memory-only. Basic pointer movement/save
-  is user-confirmed; independent users, long-list autoscroll and live sentiment
-  still need acceptance.
+  and 100-card autoscroll/drop are user-confirmed; other independent users and live
+  sentiment still need acceptance.
 - The 100-proposal/12-PD supported-cap fixture has local serialization and bounded
   in-memory UI evidence; six saved proposals/four personas do not prove maximum-capacity
   Dataverse transactions.

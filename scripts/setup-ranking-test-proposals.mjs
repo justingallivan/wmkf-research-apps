@@ -21,7 +21,7 @@ const RECEIPT = '/private/tmp/ranking-d97-proposal-setup.json';
 const SOURCE = '46ff3ea9-8933-4f5d-91a9-3ee8ac54dad5';
 const ACCOUNT = '537e3b60-c18f-ee11-8179-000d3a341e8f';
 const CURRENCY = '0bc77bca-2c7b-ee11-8179-00224802aaea';
-const STAFF = ['29b0de0d-4ff7-ee11-a1fd-000d3a3621c7', '1d49fd66-803e-f111-88b4-6045bd015cb0', 'a83a3bf8-507f-ee11-8179-000d3a341e8f', 'b53a3bf8-507f-ee11-8179-000d3a341e8f'];
+const STAFF = ['29b0de0d-4ff7-ee11-a1fd-000d3a3621c7', '1d49fd66-803e-f111-88b4-6045bd015cb0', 'f2cfa564-ac8b-f111-ab10-6045bd02ed59', 'b53a3bf8-507f-ee11-8179-000d3a341e8f'];
 const client = createClient({ resourceUrl: TARGET, token: await getAccessToken(TARGET), allowTestRequestMarkerWrites: true });
 const source = await client.get(`/akoya_requests(${SOURCE})?$select=${SOURCE_SELECT},wmkf_istestrequest`);
 assert(source.ok && source.body.wmkf_istestrequest === true && source.body.akoya_purpose == null && source.body.akoya_request == null && source.body.akoya_requesttype === 100000000, 'Blank template changed');

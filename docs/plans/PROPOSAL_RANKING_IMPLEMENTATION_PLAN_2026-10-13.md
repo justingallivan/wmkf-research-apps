@@ -1,6 +1,6 @@
 # Proposal Ranking — implementation plan
 
-Date: 2026-10-13. Status: **IMPLEMENTATION IN PROGRESS on `codex/proposal-ranking-v2`; UX accepted and app work authorized. Not deployed or enabled.**
+Date: 2026-10-13. Status: **IMPLEMENTATION IN PROGRESS on `codex/proposal-ranking-v2`; UX accepted and app work authorized. Dedicated test Preview deployed; Production unchanged.**
 Product authority: revision 5 of `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md`.
 API boundary: `docs/plans/PROPOSAL_RANKING_API_CONTRACT.md` §§1–5 are existing;
 §6 is the replacement contract. Storage inventory: `docs/atlas/dataverse-proposal-ranking.md`.
@@ -12,7 +12,7 @@ dragging and all-stage resets. [VERIFIED via branch source] The build adds priva
 MR/SE assessment, explicit per-grade paired combined merge, confidence/confirmation,
 ready/reopen, immutable all-ready reveal, collective edits, non-destructive resets,
 paged history, authorized group sentiment and a saved-revision two-sheet workbook.
-The original version-1 path remains separate. No deployment or Production writes occurred;
+The original version-1 path remains separate. No Production writes occurred; dedicated Preview deployment is recorded in the sandbox audit;
 owner-authorized sandbox setup and retained synthetic writes are recorded below.
 
 Selected persistence: additive wave33 `wmkf_workflowjson` (65,536) and
@@ -25,7 +25,7 @@ sandbox run below proves only its bounded Dataverse changesets. Resets retain ol
 
 New creation requires both `PROPOSAL_RANKING_WORKFLOW_V2=on` and
 `PROPOSAL_RANKING_V2_SCHEMA_READY=on`, in addition to existing ranking readiness.
-Unset/other values do not enable v2 creation. Neither flag was enabled by this task.
+Unset/other values do not enable v2 creation. Both flags are enabled in the dedicated Preview; Production is unchanged.
 Once v2 data exists, keep a v2-aware reader as the rollback floor.
 
 [VERIFIED via sandbox setup/readback and saved rehearsal, October 13] Both wave33
@@ -34,8 +34,8 @@ Thirteen retained D98 service-persona checks passed with six fictional proposals
 four enabled sandbox identities, including all-stage resets, stale writes, replay,
 preserved reveals and two-sheet workbook export. This supersedes the earlier absent
 fields/setting probe. Ordinary eligibility was empty; the later dedicated marked D97
-fixture passes source preview with six rated proposals/four staff (see sandbox audit). Independent SSO/app-grant
-acceptance and live sentiment are not established. A later saved-D98 walkthrough
+fixture passes source preview with six rated proposals/four staff (see sandbox audit). Justin real Microsoft SSO and hosted opening passed; other staff sign-ins
+and live sentiment remain pending. A later saved-D98 walkthrough
 in normal Chrome exercised four trusted personas, superseding the earlier port-3136
 browser block. The retained fixture's numeric review
 distribution keys also prevent using it as reviewer-badge visual proof. See the
@@ -47,14 +47,15 @@ scoped lint pass; the current production Turbopack build passed (exit 0) (the bu
 tracing warnings). The 100-proposal / 12-PD reveal fits the additive field cap in a
 serialized fixture. A memory-only 100/12 browser check also passed rendering, Find 100,
 keyboard position 100→99, Refresh retention and collective reset to 100; this does not
-prove saved maximum-capacity transactions or pointer/autoscroll behavior. Tests cover pure calculations, atomic adapter simulations, stale writes,
+prove saved maximum-capacity transactions. The user later confirmed smooth pointer
+autoscroll/drop in that memory-only fixture. Tests cover pure calculations, atomic adapter simulations, stale writes,
 replay after later edits, immutable history, restart, workbook types/provenance, and
 sentiment batching/access loss/reveal races. The isolated browser rehearsal renders
 the actual React component against fictional in-memory workflow state; it is not an
 alternative live backend. Keyboard movement across the funding bar, tally changes,
 collective reset, dialog focus return, reopening and a narrow 390px layout were checked.
 Fresh review found StrictMode refresh, restart-tab and numeric-history ordering bugs;
-all three were fixed with regressions. Independent-user acceptance, long-list autoscroll and final release review
+all three were fixed with regressions. Other staff sign-ins, live sentiment and final release review
 remain open. The later saved-D98 browser walkthrough found and fixed private-list
 totals being calculated against an incomplete program subset and SE selection
 resetting to MR after a confidence save; a populated regression was added. A second
@@ -387,3 +388,11 @@ critique/audit against the working interface. Phase 0 and phase 6a above are new
 gates; the earlier independent review and 25-check receipt cover the preceding plan
 revision, not execution of these reviews. This amendment changes no product rule or
 runtime behavior.
+
+Current dedicated Preview follow-up: Preview 3 is READY. The corrected accepted PD
+roster is Beth, Justin, Jean and John Sader; Justin opened the replacement round through
+real hosted UI, all Preparing. Other staff SSO and group walkthrough remain pending.
+The real sentiment reader returns the first-D97 fictional scripted fixture as current;
+this used four new TEST files in shared akoyaGO SharePoint, no existing-file changes,
+no model call and no human analysis. Generation/full group-browser sentiment acceptance
+remain pending. Exact receipts and operator roster correction are in the sandbox audit.

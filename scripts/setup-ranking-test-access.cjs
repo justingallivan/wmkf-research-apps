@@ -15,7 +15,7 @@ const TARGET = 'https://orgd9e66399.crm.dynamics.com';
 const STAFF = [
   ['29b0de0d-4ff7-ee11-a1fd-000d3a3621c7', '893369cc-1925-40ec-bbc6-6f12b0684a31'],
   ['1d49fd66-803e-f111-88b4-6045bd015cb0', 'efb729ef-4f9a-45fa-9f16-1c50c31f77cf'],
-  ['a83a3bf8-507f-ee11-8179-000d3a341e8f', 'e12b0338-341a-4871-a623-80b8126c4c50'],
+  ['f2cfa564-ac8b-f111-ab10-6045bd02ed59', 'dc4a6b93-453d-4273-8cac-d6aea7c0a0ae'],
   ['b53a3bf8-507f-ee11-8179-000d3a341e8f', '6bc0ee71-4069-42cb-8edf-26b050988997'],
 ];
 async function main() {

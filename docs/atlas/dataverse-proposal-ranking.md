@@ -4,7 +4,7 @@ Last source comparison: 2026-10-13, main `b3219f4aa`; paused local branch
 `codex/proposal-ranking` at `0d161d60f`. **Incumbent source baseline; later sandbox-only v2 evidence is below.**
 Current product authority: revision 5 of
 `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md` (agreed October 13).
-The assessment/reveal/reset workflow is **branch-built on `codex/proposal-ranking-v2`, not deployed or enabled**. The owner accepted UX revision 3 and authorized implementation.
+The assessment/reveal/reset workflow is **deployed to the dedicated test Preview from `codex/proposal-ranking-v2`; not Production**. The owner accepted UX revision 3 and authorized implementation.
 Implementation stages and proposed durable contracts are in
 `docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`; sandbox provisioning is recorded below; Production provisioning is not claimed.
 
@@ -144,17 +144,17 @@ service-persona rehearsal passed, followed by a saved-D98 browser walkthrough wi
 four trusted personas in normal Chrome. The earlier port-3136 browser block is historical.
 Final full browser restart returned all four participants to Preparing, with confidence
 cleared and reveal disabled, after a successful second reveal. Independent SSO/app-grant,
-deployed source opening, live sentiment and long-list autoscroll
-remain open. Basic pointer movement/save is user-confirmed. Ordinary eligibility returned zero; dedicated D97 source preview now passes; a separate
+other staff sign-ins and live sentiment remain open; Justin SSO and hosted opening passed.
+The user confirmed 100-card pointer autoscroll/drop in the memory-only fixture. Basic pointer movement/save is user-confirmed. Ordinary eligibility returned zero; dedicated D97 source preview now passes; a separate
 memory-only 100/12 UI fixture passed rendering/navigation/keyboard/reset checks but
 does not prove saved maximum-capacity transactions. Retained D98 reviewer-distribution keys do not support
 reviewer-badge visual proof. Deliberate promotion remains pending. New creation requires literal-on
 `PROPOSAL_RANKING_WORKFLOW_V2` and `PROPOSAL_RANKING_V2_SCHEMA_READY` in addition to
-existing readiness. Neither was enabled by this task. Full multi-identity acceptance is not established
+existing readiness. Both are enabled in the dedicated Preview; Production is unchanged. Full multi-identity acceptance is not established
 by the historical waiting-state smoke. Only the authorized sandbox schema, default facilitator and retained synthetic ranking
-state changed in this follow-up. No Production change, branch cleanup, merge or deployment occurred.
+state changed in this follow-up. No Production change, branch cleanup or merge occurred; dedicated Preview deployment is recorded below.
 
-## Dedicated authenticated test Preview — source-built, deployment pending
+## Dedicated authenticated test Preview — deployed to dedicated Preview; partial acceptance
 
 [VERIFIED via `lib/services/proposal-ranking/test-policy.js` and the D97 preview probe]
 The explicit `PROPOSAL_RANKING_TEST_ENABLED=on` mode requires the exact dedicated
@@ -164,6 +164,12 @@ does not enable the mode. It scopes test source handling to six marked D97 Reque
 and their fixed test run; synthetic-review inclusion remains false by default outside
 this mode. Justin is the test facilitator without changing Beth's saved default.
 The saved source/review fixture passes preview with six rated proposals and four staff.
-This is working preparation, not deployed Preview, independent SSO or live sentiment
-acceptance. See `docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md`
+Dedicated Preview `dpl_6cZM8Dfv6copEpM16gMQWx8b6eFZ` is READY at the stable test
+alias. Justin Microsoft SSO, hosted opening, confidence/reset, combined order
+`1,4,2,3,6,5`, Ready and own reopen passed. Other staff sign-ins and live sentiment
+remain pending. Third Preview `dpl_AKzoUJwZZsdFhu7XVDexuceqQaq2` is READY. The corrected roster is
+Beth, Justin, Jean and John Sader, all Preparing in a newly opened hosted round.
+The first-D97 scripted fictional sentiment fixture returns `current` through the
+real reader; no model generation or full group-browser acceptance is claimed. Four
+new TEST files reside in shared akoyaGO SharePoint, with existing files unchanged. See `docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md`
 for exact fixture IDs, receipts, factory recovery and remaining limits. Production is unchanged.
