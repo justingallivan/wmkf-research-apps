@@ -6,7 +6,8 @@ jest.mock('../../lib/services/portal-upload-staging.js', () => ({
 }));
 
 import {
-  approvePresentationVideoSplit, resolvePresentationVideoSplitOpen,
+  approvePresentationVideoSplit, resolvePresentationVideoSplitOpen, frozenIdentityStaleCode, frozenIdentityIsCurrent,
+  reconcileAbandonedForStart,
 } from '../../lib/services/meeting-tracker-recordings/presentation-video-approval-service.js';
 import { presentationVideoGenerationKey } from '../../lib/services/post-presentation-materials/presentation-video-binding.js';
 import {
@@ -45,6 +46,7 @@ function fakeStore(rows) {
       Object.assign(r, { state: 'registering', approval_claim_token: token, abandoned: false });
       log.push('claim'); return { ...r };
     }),
+    findAbandonedRegisteringPresentationVideoSplit: jest.fn(async () => { const r = rows.find(x => x.state === 'registering' && abandoned(x)); return r ? { ...r } : null; }),
     getPresentationVideoSplitForApproval: jest.fn(async ({ id }) => (byId(id) ? { ...byId(id) } : null)),
     markPresentationVideoApprovalAttempted: jest.fn(async ({ token }) => { const r = byToken(token); if (!r) return null; r.approval_registration_attempted = true; log.push('attempted'); return { id: r.id }; }),
     releasePresentationVideoApproval: jest.fn(async ({ token }) => {
@@ -56,9 +58,9 @@ function fakeStore(rows) {
       const r = byToken(token); if (!r) return null;
       Object.assign(r, { state: 'approved', request_document_id: requestDocumentId, approved_by_profile_id: approvedBy, approval_claim_token: null }); log.push('approved'); return { id: r.id };
     }),
-    settleStalePresentationVideoApproval: jest.fn(async ({ token, supersededDocumentId }) => {
+    settleStalePresentationVideoApproval: jest.fn(async ({ token, failureCode, supersededDocumentId }) => {
       const r = byToken(token); if (!r) return null;
-      Object.assign(r, { state: 'superseded', failure_code: 'presentation_video_approval_stale', superseded_document_id: supersededDocumentId, approval_claim_token: null }); log.push('settled'); return { id: r.id };
+      Object.assign(r, { state: 'superseded', failure_code: failureCode, superseded_document_id: supersededDocumentId, approval_claim_token: null }); log.push('settled'); return { id: r.id };
     }),
     supersedeApprovedPresentationVideos: jest.fn(async ({ exceptId }) => rows.filter(r => r.state === 'approved' && r.id !== exceptId).map(r => { r.state = 'superseded'; return { id: r.id }; })),
   };
@@ -174,21 +176,21 @@ describe('approve: refusals before any registry write', () => {
 describe('approve: stale frozen identity (reconciliation)', () => {
   const republished = () => transcriptRow(manifest({ revisionId: '44444444-4444-4444-8444-444444444444', operationId: '44444444-4444-4444-8444-444444444444', sourceRevisionId: REVISION }));
   test.each([
-    ['transcript revision changed', () => ({ docs: [republished(), recordingRow()] })],
-    ['presentation end moved', () => ({ docs: [transcriptRow(manifest({ presentationEnd: { endMs: 1000, confirmedBy: 5, confirmedAt: '2026-10-05T19:00:00.000Z' } })), recordingRow()] })],
-    ['recording replaced', () => ({ docs: [transcriptRow(), recordingRow({ wmkf_sharepointetag: 'rec-etag-2' })] })],
-    ['transcript gone', () => ({ docs: [recordingRow()] })],
-    ['output size changed', () => ({ item: { size: 4001 } })],
-    ['output quickXorHash missing live', () => ({ item: { quickXorHash: undefined } })],
-    ['output quickXorHash missing on the row', () => ({ splits: [splitRow({ output_quickxor_hash: null })] })],
-    ['output quickXorHash changed', () => ({ item: { quickXorHash: 'other' } })],
-    ['output item gone', () => ({ item: { id: 'other-item' } })],
-  ])('%s: no registration, split settled superseded, 409 approval_stale', async (_l, make) => {
+    ['transcript revision changed', () => ({ docs: [republished(), recordingRow()] }), 'presentation_video_transcript_changed'],
+    ['presentation end moved', () => ({ docs: [transcriptRow(manifest({ presentationEnd: { endMs: 1000, confirmedBy: 5, confirmedAt: '2026-10-05T19:00:00.000Z' } })), recordingRow()] }), 'presentation_video_transcript_changed'],
+    ['recording replaced', () => ({ docs: [transcriptRow(), recordingRow({ wmkf_sharepointetag: 'rec-etag-2' })] }), 'presentation_video_source_changed'],
+    ['transcript gone', () => ({ docs: [recordingRow()] }), 'presentation_video_transcript_changed'],
+    ['output size changed', () => ({ item: { size: 4001 } }), 'presentation_video_output_changed'],
+    ['output quickXorHash missing live', () => ({ item: { quickXorHash: undefined } }), 'presentation_video_output_changed'],
+    ['output quickXorHash missing on the row', () => ({ splits: [splitRow({ output_quickxor_hash: null })] }), 'presentation_video_output_changed'],
+    ['output quickXorHash changed', () => ({ item: { quickXorHash: 'other' } }), 'presentation_video_output_changed'],
+    ['output item gone', () => ({ item: { id: 'other-item' } }), 'presentation_video_output_changed'],
+  ])('%s: no registration, split settled superseded with the specific code, 409 approval_stale', async (_l, make, code) => {
     const { deps, store, documents } = world(make());
     expect(await rejection(approvePresentationVideoSplit(args(), deps))).toMatchObject({ httpStatus: 409, code: 'presentation_video_approval_stale' });
     expect(deps.createDocument).not.toHaveBeenCalled();
     expect(deps.acquireSlotLease).not.toHaveBeenCalled();
-    expect(store.rows[0]).toMatchObject({ state: 'superseded', failure_code: 'presentation_video_approval_stale', superseded_document_id: null });
+    expect(store.rows[0]).toMatchObject({ state: 'superseded', failure_code: code, superseded_document_id: null });
     expect(documents.some(d => d.wmkf_artifacttype === 100000011)).toBe(false);
   });
   test('stale with an orphan row from a lost create response: the orphan is patched SUPERSEDED and recorded on the split', async () => {
@@ -197,7 +199,7 @@ describe('approve: stale frozen identity (reconciliation)', () => {
       splits: [splitRow({ state: 'registering', approval_claim_token: null, approval_registration_attempted: true })] });
     expect(await rejection(approvePresentationVideoSplit(args(), deps))).toMatchObject({ code: 'presentation_video_approval_stale' });
     expect(documents.find(d => d.wmkf_requestdocumentid === NEW_DOC).wmkf_lifecyclestate).toBe(100000003);
-    expect(store.rows[0]).toMatchObject({ state: 'superseded', superseded_document_id: NEW_DOC });
+    expect(store.rows[0]).toMatchObject({ state: 'superseded', failure_code: 'presentation_video_transcript_changed', superseded_document_id: NEW_DOC });
     expect(deps.createDocument).not.toHaveBeenCalled();
   });
   test('an ambiguous generation key during reconciliation yields the claim and stays registering', async () => {
@@ -205,6 +207,31 @@ describe('approve: stale frozen identity (reconciliation)', () => {
     const { deps, store } = world({ docs: [republished(), recordingRow(), ...dupes] });
     expect(await rejection(approvePresentationVideoSplit(args(), deps))).toMatchObject({ httpStatus: 500, code: 'presentation_video_generation_ambiguous' });
     expect(store.rows[0]).toMatchObject({ state: 'registering', approval_claim_token: null, approval_registration_attempted: true });
+  });
+});
+
+describe('frozenIdentityStaleCode and reconcileAbandonedForStart', () => {
+  const current = (over = {}) => ({
+    boundary: { revisionId: REVISION, presentationEnd: { endMs: END_MS } },
+    recording: { wmkf_requestdocumentid: RECORDING_ID, wmkf_sharepointetag: 'rec-etag-1' }, ...over,
+  });
+  test('returns transcript_changed, source_changed or null', () => {
+    const row = splitRow();
+    expect(frozenIdentityStaleCode(row, current())).toBeNull();
+    expect(frozenIdentityIsCurrent(row, current())).toBe(true);
+    expect(frozenIdentityStaleCode(row, current({ boundary: null }))).toBe('presentation_video_transcript_changed');
+    expect(frozenIdentityStaleCode(row, current({ boundary: { revisionId: REVISION, presentationEnd: { endMs: END_MS + 1 } } }))).toBe('presentation_video_transcript_changed');
+    expect(frozenIdentityStaleCode(row, current({ recording: null }))).toBe('presentation_video_source_changed');
+    expect(frozenIdentityStaleCode(row, current({ recording: { wmkf_requestdocumentid: RECORDING_ID, wmkf_sharepointetag: 'x' } }))).toBe('presentation_video_source_changed');
+    expect(frozenIdentityIsCurrent(row, current({ recording: null }))).toBe(false);
+  });
+  test.each([
+    ['transcript', () => current({ boundary: { revisionId: REVISION, presentationEnd: { endMs: 1 } } }), 'presentation_video_transcript_changed'],
+    ['recording', () => current({ recording: { wmkf_requestdocumentid: RECORDING_ID, wmkf_sharepointetag: 'x' } }), 'presentation_video_source_changed'],
+  ])('an abandoned registering row with a changed %s is settled with the helper code', async (_l, make, code) => {
+    const { deps, store } = world({ splits: [splitRow({ state: 'registering', approval_claim_token: null })] });
+    expect(await reconcileAbandonedForStart({ requestId: REQUEST_ID, actorProfileId: 9, actingUserSystemId: ACTOR, current: make() }, deps)).toBe('reconciled');
+    expect(store.rows[0]).toMatchObject({ state: 'superseded', failure_code: code });
   });
 });
 

@@ -40,7 +40,7 @@ related:
 | sandbox ledger | `sandbox_name`, `sandbox_command_id`, `sandbox_created_at`, `sandbox_cleaned_at`, `cleanup_attempts`, `next_cleanup_at`, usage columns, `cleanup_receipt`. Cleanup is tracked independently of `state`. Written by the slice 3 worker and cleanup sweep (see below). |
 | output | `upload_url_ciphertext`, `upload_session_expires_at`, `output_*`, `verification_receipt`, `request_document_id`, `superseded_document_id`. `upload_*`, `output_*` and `verification_receipt` are written by the slice 3 worker; the document columns are written at approval (slice 4). |
 | approval | `approval_claim_token`, `approval_claimed_at`, `approval_actor_profile_id`, `approval_registration_attempted`, `approved_by_profile_id`, `approved_at`. Writers (slice 4): `claimPresentationVideoApproval`, `markPresentationVideoApprovalAttempted`, `releasePresentationVideoApproval`, `yieldPresentationVideoApproval`, `markPresentationVideoApproved`, `settleStalePresentationVideoApproval`, `supersedeApprovedPresentationVideos`; readers `getPresentationVideoSplitForApproval`, `findAbandonedRegisteringPresentationVideoSplit`. |
-| `failure_code` | Sanitized code. Required when `state = 'failed'`; allowed only on `failed` or `superseded` (`presentation_video_approval_stale`). |
+| `failure_code` | Sanitized code. Required when `state = 'failed'`; allowed only on `failed` or `superseded`. Stale-approval supersedes record `presentation_video_transcript_changed`, `presentation_video_source_changed` or `presentation_video_output_changed`; `presentation_video_approval_stale` is legacy (existing rows only, no longer written). Format-only CHECK, no enumerating CHECK. |
 
 Partial unique indexes: one processing row (`queued`, `cutting`, `uploading`) per request (`idx_presentation_video_splits_processing`) and one awaiting-approval row (`review`, `registering`) per request (`idx_presentation_video_splits_awaiting`).
 
@@ -49,7 +49,7 @@ Partial unique indexes: one processing row (`queued`, `cutting`, `uploading`) pe
 | From | To | Function (`presentation-video-split-store.js`) | Trigger |
 |---|---|---|---|
 | none | `queued` | `startPresentationVideoSplit` | Staff start; one transaction under the advisory lock `presentation_video_split:<request id>`. Refuses (`active`) a processing row, refuses (`approval_in_progress`) any `registering` row (the service then reconciles an abandoned, stale one and retries once; see below), supersedes a `review` row, inserts the row. A unique violation maps to `active`. |
-| `review` | `superseded` | `startPresentationVideoSplit` | A newer start |
+| `review` | `superseded` | `startPresentationVideoSplit` | A newer start (intentionally no `failure_code`: a newer row replaces it) |
 | `queued` | `cutting` | `recordPresentationVideoCutStarted` | Worker: Sandbox created, FFmpeg installed, detached cut command started. `recordPresentationVideoSandboxName` writes the name first (queued, name still null) and `recordPresentationVideoSandboxCreated` stamps `sandbox_created_at`. |
 | `cutting` | `uploading` | `recordPresentationVideoCutReceiptAndUploadStarted` | Worker: cut receipt validated; Graph upload session created, stored sealed with `uploadDriveId` in `verification_receipt`; detached upload command started |
 | `uploading` | `review` | `markPresentationVideoSplitReview` | Worker: the uploaded item's size and quickXorHash equal the cut receipt exactly; clears lease and `upload_url_ciphertext` |
@@ -61,8 +61,8 @@ Partial unique indexes: one processing row (`queued`, `cutting`, `uploading`) pe
 | `registering` | `review` | `releasePresentationVideoApproval` | Error before any registry write (guarded by `NOT approval_registration_attempted`) |
 | `registering` | same | `yieldPresentationVideoApproval` | Error after the attempted flag: token nulled, state kept, so the next approve or start reclaims it at once |
 | `registering` | `approved` | `markPresentationVideoApproved` | Guarded by the token: `request_document_id`, `approved_by_profile_id`, `approved_at` (the session actor) |
-| `registering` | `superseded` | `settleStalePresentationVideoApproval` | Stale-approval reconciliation: `failure_code = presentation_video_approval_stale`, `superseded_document_id` = the orphan Request Document found by generation key, if any. Frees both partial unique indexes. |
-| `approved` | `superseded` | `supersedeApprovedPresentationVideos` | A later approval for the same request |
+| `registering` | `superseded` | `settleStalePresentationVideoApproval` | Stale-approval reconciliation: `failure_code` is the required `failureCode` argument: `presentation_video_transcript_changed` or `presentation_video_source_changed` (from `frozenIdentityStaleCode`) or `presentation_video_output_changed` (saved video file changed or removed). The approve route still answers 409 `presentation_video_approval_stale`.  `superseded_document_id` = the orphan Request Document found by generation key, if any. Frees both partial unique indexes. |
+| `approved` | `superseded` | `supersedeApprovedPresentationVideos` | A later approval for the same request (intentionally no `failure_code`: a newer row replaces it) |
 
 ## Writers and readers
 

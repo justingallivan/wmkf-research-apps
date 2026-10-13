@@ -3157,6 +3157,13 @@ const PV_FAILURE_TEXT = Object.freeze({
   presentation_video_transcript_changed: PV_STALE_TEXT,
   presentation_video_approval_stale: PV_STALE_TEXT,
 });
+// A superseded newest row says what changed; legacy approval_stale, NULL and unknown codes keep PV_STALE_TEXT.
+const PV_SUPERSEDED_TEXT = Object.freeze({
+  presentation_video_transcript_changed: 'The transcript or presentation end changed since this video was cut. Create it again.',
+  presentation_video_source_changed: 'The recording changed since this video was cut. Create it again.',
+  presentation_video_output_changed: 'The saved video file was changed or removed after it was cut. Create it again.',
+});
+const PV_SUPERSEDED_REASON_TEXT = (code) => PV_SUPERSEDED_TEXT[code] || PV_STALE_TEXT;
 const PV_IN_PROGRESS_TEXT = 'Approval is still in progress. Try again in a few minutes.';
 const PV_GENERIC_FAILURE = 'Something went wrong. Try again.';
 const PV_REASON_TEXT = (code) => PV_FAILURE_TEXT[code] || PV_GENERIC_FAILURE;
@@ -3305,7 +3312,8 @@ function PresentationVideoLine({ v }) {
     <ArtifactRow name="Presentation video" href={current ? openHref : null} status={status} detail={detail} action={action} menuItems={menuItems} testId="presentation-video-line">
       <div aria-live="polite">
         {loadFailed && <p className="mt-1 text-xs text-gray-700">Couldn’t refresh the video status. Retrying…</p>}
-        {(boardStale || state === 'superseded') && <p className="mt-1 text-sm text-gray-700">{PV_STALE_TEXT}</p>}
+        {boardStale && <p className="mt-1 text-sm text-gray-700">{PV_STALE_TEXT}</p>}
+        {state === 'superseded' && <p className="mt-1 text-sm text-gray-700">{PV_SUPERSEDED_REASON_TEXT(newest.failureCode)}</p>}
         {state === 'failed' && <p className="mt-1 text-sm text-gray-700">{PV_REASON_TEXT(newest.failureCode)}</p>}
       </div>
       {confirmTargetLive && confirming.kind === 'approve' && (
