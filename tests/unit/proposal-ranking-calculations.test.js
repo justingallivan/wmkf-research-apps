@@ -121,3 +121,18 @@ describe('Proposal Ranking calculations', () => {
     expect(calculateComposite([{ order: ids }], ids).ranges[ids[0]].disagreement).toBe(false);
   });
 });
+
+describe('combined meeting interleaving', () => {
+  const combine = (...sources) => require('../../lib/services/proposal-ranking/calculations.js').combineMeetingOrders(sources.map(([order, averages]) => ({ order, scores: Object.fromEntries(order.map((id, i) => [id, { averageRank: averages[i] }])) })));
+  test('compares the next proposal from each program with SE first on equal scores', () => {
+    expect(combine([['s1', 's2', 's3'], [1, 2.5, 3]], [['m1', 'm2'], [1, 2]])).toEqual(['s1', 'm1', 'm2', 's2', 's3']);
+  });
+  test('preserves meeting decisions even when averages no longer increase within a program', () => {
+    expect(combine([['s2', 's1'], [2, 1]], [['m1', 'm2'], [1, 3]])).toEqual(['m1', 's2', 's1', 'm2']);
+    expect(combine([[], []], [['m1'], [1]])).toEqual(['m1']);
+  });
+  test('rejects duplicate proposals and missing scores', () => {
+    expect(() => combine([['a'], [1]], [['a'], [1]])).toThrow('unique');
+    expect(() => combine([['a'], [NaN]])).toThrow('valid');
+  });
+});

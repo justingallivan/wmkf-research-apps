@@ -1,7 +1,7 @@
 # Proposal Ranking API contract
 
 Status: implementation contract for the first Proposal Ranking release. It is
-derived from revision 3 of `PROPOSAL_RANKING_DESIGN_2026-10-07.md`. Runtime
+updated for the 2026-10-11 science-first meeting/export decisions and the 2026-10-08 owner decisions removing excusal, adding explicit dry-run erasure and combined meeting orders, after revision 3 of `PROPOSAL_RANKING_DESIGN_2026-10-07.md`. Runtime
 activation is now enabled in Production; multi-identity acceptance remains pending. Sandbox and Production schema/application-role setup are verified;
 bounded persistence checks and direct-table denial for the tested sandbox staff
 identity passed. Production facilitator/grants and four-participant direct-table/search
@@ -30,6 +30,7 @@ uses it to resolve repeat and uncertain outcomes.
 
 ```ts
 type ProgramKey = 'se' | 'mr';
+type MeetingKey = ProgramKey | 'co';
 type ListStatus = 'draft' | 'submitted' | 'collecting' | 'composite-draft' | 'published';
 
 type Response = {
@@ -50,14 +51,17 @@ type Response = {
       editMeetingOrder: boolean;
       publish: boolean;
       transferFacilitator: boolean;
-      excuseParticipant: boolean;
+      excuseParticipant: false; // retained wire field; excusal is unavailable
       cancelRound: boolean;
+      resetDryRun: boolean;
     };
   };
   round: null | {
     etag: string;
     policyRevision: number;
     state: 'active' | 'canceled';
+    dryRun: boolean;
+    erased: boolean;
     facilitator: { systemUserId: string; name: string };
     snapshot: {
       proposals: ProposalCard[];
@@ -76,19 +80,21 @@ type Response = {
     previewFingerprint: string;
   };
   confirmations: {
-    generate: Record<ProgramKey, null | { fingerprint: string; message: string; outstandingNames: string[] }>;
+    generate: Record<ProgramKey, null | { fingerprint: string; message: string; outstandingNames: string[] }> & { co?: { fingerprint: string; message: string } };
     publish: Record<ProgramKey, null | { fingerprint: string; message: string; outstandingNames: string[] }>;
-    excuse: null | { fingerprint: string; message: string };
+    excuse: null; // retained wire field
     cancel: null | { fingerprint: string; message: string };
+    resetDryRun: null | { fingerprint: string; message: string };
   };
-  programs: Record<ProgramKey, {
+  programs: Partial<Record<MeetingKey, {
+    available?: boolean; // co only; no combined ballots
     proposalIds: string[];
     progress: { required: number; submitted: number; outstandingNames: string[] };
     ownList: null | ListView;
     facilitatorLists: null | ListView[];
     meeting: null | MeetingView;
     meetingStatus: ListStatus | null;
-  }>;
+  }>>;
   operation: null | { operationId: string; status: 'confirmed' | 'uncertain' | 'superseded'; result: string };
 };
 
@@ -98,6 +104,12 @@ type ProposalCard = {
   title: string;
   organization: string;
   institutionGeography?: 'East' | 'West' | null; // absent in older frozen snapshots
+  researchFunding?: { // local feature-branch addition; absent/null in older snapshots
+    status: 'available' | 'provisional' | 'unavailable';
+    totalUsd: number | null;
+    lastAwardCycle: string | null; // YYYY-MM
+    qualifyingGrantCount: number | null;
+  } | null;
   programKey: ProgramKey;
   amountMinorUnits: number | null;
   currency: null | { code: string; name: string; precision: number };
@@ -106,7 +118,7 @@ type ProposalCard = {
 
 type ListView = {
   listKey: string;
-  programKey: ProgramKey;
+  programKey: MeetingKey;
   owner: null | { systemUserId: string; name: string };
   status: ListStatus;
   order: string[];
@@ -118,7 +130,8 @@ type ListView = {
 
 type MeetingView = ListView & {
   composite: null | {
-    sourceSubmissionIds: string[];
+    sourceSubmissionIds?: string[]; // per-program composites
+    sourceMeetingOrders?: Array<{ programKey: ProgramKey; version: number; order: string[] }>; // combined provenance
     baselineOrder: string[];
     scores: Record<string, { rankSum: number; averageRank: number; tied: boolean }>;
     ranks: Array<{ requestId: string; participants: Array<{ systemUserId: string; name: string; rank: number }>; minRank: number; maxRank: number; disagreement: boolean }>;
@@ -131,6 +144,33 @@ type MeetingView = ListView & {
 participates in the preview fingerprint. Unknown or missing values become null;
 older snapshots may omit the field. Only known values render an E/W marker.
 Geography does not affect ranking calculations or eligibility.
+
+`researchFunding` is institution context added locally on 2026-10-11, not yet
+deployed. The source adapter reads positive historical awards for the exact
+applicant account; `research-funding.js` reconciles the full Program population
+against account rollups before deriving ordinary Research awards. Directed gifts,
+building/capital support, endowments, teaching awards, matching/gift support,
+Special Grants and Young Scholars are excluded. Project-specific research
+fellowships remain eligible. The five named unresolved legacy awards and other
+recognized but non-research-specific support types remain included with
+`provisional` status. Unknown support options or unaudited blank support tags
+return unavailable; ten individually audited blank-tag research awards are
+explicitly allowlisted in the classifier.
+See the Atlas research-funding section for record exceptions and source limits.
+
+The summary participates in the preview fingerprint and freezes with the card.
+`available` with zero count/total means no qualifying award found on the linked
+account; its latest cycle is null. Per-account incomplete or unreconciled history
+returns `unavailable` with all three values null. Failed/capped source reads still
+reject preview/open; they never become a zero or unavailable fallback. Older
+snapshots are not backfilled and render unavailable. The card labels are **Prior
+research funding** and **Latest qualifying award**, with a provisional disclosure.
+Geography and research history render only in published Meeting list cards.
+Individual rankings, opening preview and facilitator preparation hide them. This
+is presentation staging, not response redaction; authorized frozen snapshots
+still carry both fields.
+This context changes no scientific score, seed/composite order, eligibility or
+cumulative requested amount. The existing draft-writeup funding logic is unchanged.
 
 Privacy rules shape the response, not the client. Before a program is published,
 a roster participant receives only their own individual list and that program's
@@ -146,15 +186,16 @@ transfer. Canceled rounds are read-only.
 ```ts
 type Action =
   | { action: 'preview'; cycleCode: string }
-  | { action: 'open'; cycleCode: string; previewFingerprint: string; operationId: string }
+  | { action: 'open'; dryRun?: boolean; cycleCode: string; previewFingerprint: string; operationId: string }
   | { action: 'read'; roundId: string; operationId?: string }
   | { action: 'save'; roundId: string; programKey: ProgramKey; order: string[]; etag: string; policyRevision: number; operationId: string }
   | { action: 'submit'; roundId: string; programKey: ProgramKey; order: string[]; etag: string; policyRevision: number; operationId: string }
   | { action: 'generate'; roundId: string; programKey: ProgramKey; etag: string; policyRevision: number; confirmationFingerprint: string; operationId: string }
-  | { action: 'edit'; roundId: string; programKey: ProgramKey; order: string[]; etag: string; policyRevision: number; operationId: string }
+  | { action: 'edit'; roundId: string; programKey: MeetingKey; order: string[]; etag: string; policyRevision: number; operationId: string }
   | { action: 'publish'; roundId: string; programKey: ProgramKey; etag: string; policyRevision: number; confirmationFingerprint: string; operationId: string }
+  | { action: 'combine'; roundId: string; policyRevision: number; confirmationFingerprint: string; operationId: string }
   | { action: 'transfer'; roundId: string; successorSystemUserId: string; policyRevision: number; operationId: string }
-  | { action: 'excuse'; roundId: string; participantSystemUserId: string; reason: string; policyRevision: number; confirmationFingerprint: string; operationId: string }
+  | { action: 'resetDryRun'; roundId: string; policyRevision: number; confirmationFingerprint: string; operationId: string }
   | { action: 'cancel'; roundId: string; policyRevision: number; confirmationFingerprint: string; operationId: string };
 ```
 
@@ -163,16 +204,84 @@ change returns `409` with the replacement preview and requires the facilitator t
 review it. The server returns confirmation fingerprints in `confirmations` only
 while each transition is available. `generate` and first `publish` tokens are per
 program and bind the policy revision, both programs' submission state, and the
-named outstanding PDs. `excuse` and `cancel` bind the same current round state.
+named outstanding PDs. `cancel` binds the same current round state.
 This makes the final confirmation stale when submissions or policy change.
 
 All order writes require an exact permutation of that program's frozen proposal
 IDs. `save` applies only to an unsubmitted own list; `submit` atomically stores the
-final order and lock. `edit` applies to a meeting order in `composite-draft` for
-the facilitator only; the captured roster gains edit permission only after that
-program is `published`. `generate` applies to a meeting list in `collecting`, and
+final order and lock. `edit` applies only to a `published` meeting order for the
+current facilitator or captured roster. Unpublished composite edits are rejected.
+First publication restores the immutable calculated composite order as the working
+order, including for older drafts reordered before this change. Subsequent
+published edits remain independent of that calculation. `generate` applies to a meeting list in `collecting`, and
 `publish` applies to a generated list in `composite-draft`. The response's meeting
 `etag` is required for each transition or edit.
+
+All captured participants must submit for each nonempty program. `excuse` requests
+are rejected with `400 invalid_request`. Older snapshots and published results are
+retained; a round containing a legacy excusal cannot generate or publish another
+composite (`409 legacy_excusal`). No stored history is rewritten. Opening uses a
+single Open round button without an acknowledgment checkbox; readiness and the
+fresh-preview fingerprint still gate the operation.
+
+## Combined meeting list (feature branch; not yet promoted)
+
+`combine` is facilitator-only after every nonempty SE/MR program is published.
+Its token is `confirmations.generate.co`; it binds the round ETag as well as policy,
+so an intervening meeting edit requires fresh confirmation. One conditional round
+PATCH plus list POST creates the unique `meeting:co` row with `wmkf_programkey: co`
+and published status. Existing two-character schema and application role suffice.
+A repeated creation operation returns current state without overwriting edits; a
+new creation operation rejects an already-existing combined list.
+
+The seed compares the average PD rank at the head of each remaining program order,
+lower first, SE first on equal values. Taking only the head preserves both current
+within-program meeting orders. It is a discussion starting point, not a new ballot
+or external-review score sort. The immutable composite preserves source orders and
+versions, original scores/named ranks and the combined baseline. Subsequent edits
+to SE, MR and combined orders are independent; no regeneration is provided.
+
+`programs.co.available` enables the combined tab for the roster/current facilitator.
+It has no individual ballots. The shared row uses normal published-list visibility,
+ETag-guarded `edit` and totals over the full union of frozen proposals. `save`,
+`submit`, `generate` and `publish` reject `co`. Dry-run erasure includes this row.
+
+## Meeting-list CSV export (feature branch; not yet promoted)
+
+Staff should settle SE and MR separately before combining them; this guidance
+adds no completion flag or lock. Published SE, MR and combined lists offer a
+browser-generated CSV of the saved order from the authorized response. Export
+is disabled while changes are pending or unresolved and never uses an unsaved
+local drag order. Other devices still require refresh to see changes. No API action,
+server persistence or finalization state is introduced.
+
+## Explicit dry runs (feature branch; not yet promoted)
+
+`open.dryRun` defaults to false and accepts only a boolean. It is captured in the
+immutable round snapshot; existing ordinary rounds cannot be relabeled. A retry
+of the creation operation must retain the same mode. All participants see the dry-run
+label; their actual authenticated identities submit their own lists.
+
+`resetDryRun` is available only to the current facilitator of an active round
+whose persisted snapshot has `dryRun: true`, before or after either publication.
+The confirmation fingerprint includes the round ETag, so any intervening save,
+submission, meeting edit or administration change requires fresh confirmation.
+Ordinary rounds reject reset. Dry runs use erasure instead of retained cancellation.
+
+One ETag-conditional changeset deletes every list belonging to the dry run, scrubs
+its snapshot and administration history, marks the round canceled and clears its
+cycle's active pointer. It retains only a content-free round receipt (round/cycle,
+creation/reset operation IDs, facilitator/reset actor and timing) for safe retry
+and delayed-opening detection. An exact retry returns `dry-run-erased`; it cannot
+clear a subsequently opened round. Removed roster participants lose access to the
+old receipt. Source proposals, source external-review scores and other rounds are
+not changed. Opening a replacement is a separate explicit action with fresh inputs.
+
+This erases active application ranking records. Dataverse audit history, backups
+and copies already viewed/exported are outside this operation; their retention
+has not been inspected in this session. Do not promise platform-wide erasure.
+The tracked app-role spec adds Delete only on ranking lists; applying that permission
+in Production and validating it remain separately owner-approved release steps.
 
 ## Errors and outcome handling
 

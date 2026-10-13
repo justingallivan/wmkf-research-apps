@@ -1,8 +1,17 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import ProposalRankingApp from '../../shared/components/proposal-ranking/ProposalRankingApp';
-import { buildCumulativeTotals, formatMoney, formatScore, moveProposal, reviewerScoreIndicator } from '../../shared/components/proposal-ranking/model';
+import { buildCumulativeTotals, buildRankingCsv, formatMoney, formatScore, moveProposal, pdRankColor, reviewerScoreIndicator } from '../../shared/components/proposal-ranking/model';
 import { conventionalCycles, resolveWorkingCycle } from '../../lib/utils/cycle-code';
+
+async function dragDown(handle) {
+  handle.focus();
+  fireEvent.keyDown(handle, { key: ' ', keyCode: 32 });
+  await screen.findByText(/Drop at position/);
+  fireEvent.keyDown(handle, { key: 'ArrowDown', keyCode: 40 });
+  fireEvent.keyDown(handle, { key: ' ', keyCode: 32 });
+  await waitFor(() => expect(screen.queryByText(/Drop at position/)).not.toBeInTheDocument());
+}
 
 const mockLoad = jest.fn();
 const mockSend = jest.fn();
@@ -137,6 +146,102 @@ describe('Proposal Ranking page', () => {
     expect(screen.getByRole('button', { name: 'Generate SE draft' })).toBeInTheDocument();
   });
 
+  test('keeps confirmations and the generated draft above individual lists', async () => {
+    const collecting = roundResponse({ facilitator: true });
+    collecting.programs.se.progress = { required: 2, submitted: 2, outstandingNames: [] };
+    const draft = roundResponse({ facilitator: true, published: true });
+    draft.programs.se.meeting.status = 'composite-draft';
+    draft.programs.se.meetingStatus = 'composite-draft';
+    draft.viewer.capabilities.publish = true;
+    draft.confirmations.publish.se = { fingerprint: 'publish-se', message: 'Publish the reviewed SE order.', outstandingNames: [] };
+    mockLoad.mockResolvedValue(collecting);
+    mockSend.mockResolvedValueOnce(draft).mockResolvedValueOnce(roundResponse({ facilitator: true, published: true }));
+    render(<ProposalRankingApp />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate SE draft' }));
+    const individual = screen.getByText('Individual PD rankings');
+    const confirmGenerate = screen.getByRole('button', { name: 'Confirm generate the Science & Engineering draft' });
+    expect(confirmGenerate.compareDocumentPosition(individual) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(individual.closest('details')).not.toHaveAttribute('open');
+    fireEvent.click(confirmGenerate);
+    const draftHeading = await screen.findByRole('heading', { name: 'Calculated starting order' });
+    const collapsed = screen.getByText('Individual PD rankings').closest('details');
+    expect(collapsed).not.toHaveAttribute('open');
+    expect(draftHeading.compareDocumentPosition(collapsed) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Publish SE' }));
+    const confirmPublish = screen.getByRole('button', { name: 'Confirm publish the Science & Engineering order' });
+    expect(confirmPublish.compareDocumentPosition(draftHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(confirmPublish);
+    expect(await screen.findByRole('heading', { name: 'Shared meeting order' })).toBeInTheDocument();
+    expect(mockSend.mock.calls.map(([action]) => action.action)).toEqual(['generate', 'publish']);
+  });
+
+  test('tells a participant when all lists are submitted and the facilitator is next', async () => {
+    const response = roundResponse();
+    response.programs.se.progress = { required: 2, submitted: 2, outstandingNames: [] };
+    response.programs.se.ownList.status = 'submitted';
+    mockLoad.mockResolvedValue(response);
+    render(<ProposalRankingApp />);
+    expect(await screen.findByText('Submitted—waiting for the facilitator.')).toBeInTheDocument();
+  });
+
+  test('keyboard dragging previews the destination and saves only on drop', async () => {
+    mockLoad.mockResolvedValue(roundResponse());
+    mockSend.mockImplementation((action) => Promise.resolve(roundResponse({ order: action.order, etag: 'list-v2' })));
+    render(<ProposalRankingApp />);
+    const handle = await screen.findByRole('button', { name: 'Drag First proposal to reorder' });
+    expect(screen.queryByRole('button', { name: /Move proposal/ })).not.toBeInTheDocument();
+    expect(screen.getAllByText('Cumulative Budget')).toHaveLength(INITIAL_ORDER.length);
+    handle.focus();
+    fireEvent.keyDown(handle, { key: ' ', keyCode: 32 });
+    expect(await screen.findByText('Drop at position 1 of 4')).toBeInTheDocument();
+    fireEvent.keyDown(handle, { key: 'ArrowDown', keyCode: 40 });
+    expect(await screen.findByText('Drop at position 2 of 4')).toBeInTheDocument();
+    expect(mockSend).not.toHaveBeenCalled();
+    fireEvent.keyDown(handle, { key: ' ', keyCode: 32 });
+    await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(1));
+    expect(mockSend.mock.calls[0][0]).toMatchObject({ action: 'save', order: ['request-2', 'request-1', 'request-3', 'request-4'], etag: 'list-v1' });
+    expect(await screen.findByText('Order saved.')).toBeInTheDocument();
+  });
+
+  test('canceling a keyboard drag preserves the order without saving', async () => {
+    mockLoad.mockResolvedValue(roundResponse());
+    render(<ProposalRankingApp />);
+    const handle = await screen.findByRole('button', { name: 'Drag First proposal to reorder' });
+    handle.focus();
+    fireEvent.keyDown(handle, { key: ' ', keyCode: 32 });
+    await screen.findByText('Drop at position 1 of 4');
+    fireEvent.keyDown(handle, { key: 'ArrowDown', keyCode: 40 });
+    await screen.findByText('Drop at position 2 of 4');
+    fireEvent.keyDown(handle, { key: 'Escape', keyCode: 27 });
+    await waitFor(() => expect(screen.queryByText(/Drop at position/)).not.toBeInTheDocument());
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Rank 1: First proposal')).toBeInTheDocument();
+  });
+
+  test('published dry-run erasure requires explicit confirmation and clears displayed ranking content', async () => {
+    const current = roundResponse({ facilitator: true, published: true });
+    current.round.dryRun = true;
+    current.viewer.capabilities.resetDryRun = true;
+    current.confirmations.resetDryRun = { fingerprint: 'erase-current', message: 'Permanently erase trial rankings.' };
+    const erased = JSON.parse(JSON.stringify(current));
+    erased.round = { ...erased.round, erased: true, state: 'canceled', snapshot: { proposals: [], roster: [], seedOrders: { se: [], mr: [] } } };
+    erased.programs = { se: { proposalIds: [], meeting: null }, mr: { proposalIds: [], meeting: null } };
+    erased.viewer.capabilities = {};
+    erased.confirmations.resetDryRun = null;
+    mockLoad.mockResolvedValue(current);
+    mockSend.mockResolvedValue(erased);
+    render(<ProposalRankingApp />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Facilitate', exact: true }));
+    fireEvent.click(screen.getByText('Round administration'));
+    const erase = screen.getByRole('button', { name: 'Permanently erase dry run' });
+    expect(erase).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: /all rankings in this dry run will be permanently erased/ }));
+    fireEvent.click(erase);
+    await screen.findByText(/Dry-run rankings permanently erased/);
+    expect(screen.queryByText('First proposal')).not.toBeInTheDocument();
+    expect(mockSend.mock.calls[0][0]).toMatchObject({ action: 'resetDryRun', roundId: 'round-1', confirmationFingerprint: 'erase-current', policyRevision: 4 });
+  });
+
   test('serializes saves and keeps the latest queued drag order visible', async () => {
     const firstSave = deferred();
     mockLoad.mockResolvedValue(roundResponse());
@@ -146,15 +251,15 @@ describe('Proposal Ranking page', () => {
     render(<ProposalRankingApp />);
 
     let list = await screen.findByRole('region', { name: 'Current PD SE ranking' });
-    fireEvent.click(within(list).getByRole('button', { name: 'Move proposal 1001 down' }));
+    await dragDown(within(list).getByRole('button', { name: 'Drag First proposal to reorder' }));
     await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(1));
     const firstOrder = ['request-2', 'request-1', 'request-3', 'request-4'];
     expect(mockSend.mock.calls[0][0]).toMatchObject({ action: 'save', order: firstOrder, etag: 'list-v1', policyRevision: 4 });
 
-    fireEvent.click(within(list).getByRole('button', { name: 'Move proposal 1003 down' }));
+    await dragDown(within(list).getByRole('button', { name: 'Drag Third proposal to reorder' }));
     const latestOrder = ['request-2', 'request-1', 'request-4', 'request-3'];
-    expect(within(list).getByText(/Position 3 of 4 · #1004/)).toBeInTheDocument();
-    expect(within(list).getByText(/Position 4 of 4 · #1003/)).toBeInTheDocument();
+    expect(within(list).getByLabelText('Rank 3: Fourth proposal')).toBeInTheDocument();
+    expect(within(list).getByLabelText('Rank 4: Third proposal')).toBeInTheDocument();
 
     await act(async () => {
       firstSave.resolve(roundResponse({ order: firstOrder, etag: 'list-v2' }));
@@ -163,7 +268,7 @@ describe('Proposal Ranking page', () => {
     await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(2));
     expect(mockSend.mock.calls[1][0]).toMatchObject({ action: 'save', order: latestOrder, etag: 'list-v2', policyRevision: 4 });
     await screen.findByText('Order saved.');
-    expect(within(list).getByText(/Position 3 of 4 · #1004/)).toBeInTheDocument();
+    expect(within(list).getByLabelText('Rank 3: Fourth proposal')).toBeInTheDocument();
   });
 
   test('a failed save stays visible as unsaved until refresh and retry use the current ETag', async () => {
@@ -174,7 +279,7 @@ describe('Proposal Ranking page', () => {
     render(<ProposalRankingApp />);
 
     let list = await screen.findByRole('region', { name: 'Current PD SE ranking' });
-    fireEvent.click(within(list).getByRole('button', { name: 'Move proposal 1001 down' }));
+    await dragDown(within(list).getByRole('button', { name: 'Drag First proposal to reorder' }));
     expect(await screen.findByText(/Another change is newer than this order/)).toBeInTheDocument();
     expect(within(list).getByRole('button', { name: 'Submit and lock list' })).toBeDisabled();
 
@@ -199,7 +304,7 @@ describe('Proposal Ranking page', () => {
     render(<ProposalRankingApp />);
 
     const list = await screen.findByRole('region', { name: 'Current PD SE ranking' });
-    fireEvent.click(within(list).getByRole('button', { name: 'Move proposal 1001 down' }));
+    await dragDown(within(list).getByRole('button', { name: 'Drag First proposal to reorder' }));
     await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(2));
     fireEvent.click(await screen.findByRole('button', { name: 'Refresh current state' }));
     await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(3));
@@ -217,8 +322,49 @@ describe('Proposal Ranking page', () => {
     expect(screen.queryByText('Current PD')).not.toBeInTheDocument();
   });
 
+  test('a late save readback cannot restore an erased dry run after refresh', async () => {
+    const initial = roundResponse();
+    initial.round.dryRun = true;
+    const erased = JSON.parse(JSON.stringify(initial));
+    erased.round = { ...erased.round, erased: true, state: 'canceled', snapshot: { proposals: [], roster: [], seedOrders: { se: [], mr: [] } } };
+    erased.programs = { se: { proposalIds: [], meeting: null }, mr: { proposalIds: [], meeting: null } };
+    erased.viewer.capabilities = {};
+    erased.viewer.isRosterParticipant = false;
+    const lateReadback = deferred();
+    mockLoad.mockResolvedValueOnce(initial);
+    mockSend.mockRejectedValueOnce(Object.assign(new Error('Lost save response'), { status: 500 }))
+      .mockImplementationOnce(() => lateReadback.promise)
+      .mockResolvedValueOnce(erased);
+    render(<ProposalRankingApp />);
+    await dragDown(await screen.findByRole('button', { name: 'Drag First proposal to reorder' }));
+    await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh current state' }));
+    await screen.findByText(/Dry-run rankings permanently erased/);
+    await act(async () => { lateReadback.resolve(initial); await lateReadback.promise; });
+    expect(screen.queryByText('First proposal')).not.toBeInTheDocument();
+    expect(screen.queryByText('Your private ranking')).not.toBeInTheDocument();
+    expect(screen.getByText(/Dry-run rankings permanently erased/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
+  });
+
+  test('shows history context, provisional and no-award states while legacy snapshots stay unavailable', async () => {
+    const response = roundResponse({ published: true });
+    const proposals = response.round.snapshot.proposals;
+    proposals[0].researchFunding = { status: 'available', totalUsd: 10500000, lastAwardCycle: '2014-12', qualifyingGrantCount: 3 };
+    proposals[1].researchFunding = { status: 'available', totalUsd: 0, lastAwardCycle: null, qualifyingGrantCount: 0 };
+    proposals[2].researchFunding = { status: 'provisional', totalUsd: 9810000, lastAwardCycle: '2023-06', qualifyingGrantCount: 11 };
+    mockLoad.mockResolvedValue(response);
+    render(<ProposalRankingApp />);
+    expect(await screen.findByText('$10,500,000')).toBeInTheDocument();
+    expect(screen.getByText('December 2014')).toBeInTheDocument();
+    expect(screen.getByText('None on record')).toBeInTheDocument();
+    expect(screen.getByText('$9,810,000 (provisional)')).toBeInTheDocument();
+    expect(screen.getByText('Some historical awards need classification review.')).toBeInTheDocument();
+    expect(screen.getAllByText('Unavailable').length).toBeGreaterThanOrEqual(2);
+  });
+
   test('shows East and West on shared cards and omits geography for unknown or older snapshot values', async () => {
-    const response = roundResponse();
+    const response = roundResponse({ published: true });
     response.round.snapshot.proposals[0].institutionGeography = 'East';
     response.round.snapshot.proposals[1].institutionGeography = 'West';
     response.round.snapshot.proposals[2].institutionGeography = 'North';
@@ -228,23 +374,17 @@ describe('Proposal Ranking page', () => {
 
     expect(await screen.findByRole('img', { name: 'East institution' })).toHaveTextContent('E');
     expect(screen.getByRole('img', { name: 'West institution' })).toHaveTextContent('W');
+    expect(screen.getByRole('img', { name: 'East institution' })).toHaveClass('rounded-full', 'border-2', 'text-sm', 'font-semibold');
+    expect(screen.getByLabelText('Rank 1: First proposal')).toHaveClass('text-3xl');
     expect(screen.getAllByRole('img', { name: /institution$/ })).toHaveLength(2);
   });
 
-  test('renders the reviewer score circle without changing its numeric card score', async () => {
-    const response = roundResponse();
-    mockLoad.mockResolvedValue(response);
+  test('shows numeric reviewer grades without a redundant score disk', async () => {
+    mockLoad.mockResolvedValue(roundResponse());
     render(<ProposalRankingApp />);
 
-    const scored = await screen.findByRole('img', {
-      name: 'Average reviewer score: 4.2 out of 5 (approximate color)',
-    });
-    expect(scored).toHaveStyle({ backgroundColor: reviewerScoreIndicator(REQUESTS[0].score).color });
-    expect(scored).toHaveAttribute('title', 'Average reviewer score: 4.2 out of 5 (approximate color)');
-    expect(screen.getByText('4.2 · 3/3 rated')).toBeInTheDocument();
-
-    const unscored = await screen.findAllByRole('img', { name: 'Average reviewer score: unscored' });
-    expect(unscored[0]).toHaveStyle({ backgroundColor: '#9ca3af' });
+    expect(await screen.findByLabelText('Average reviewer grade: 4.2')).toHaveTextContent('4.2');
+    expect(screen.queryByRole('img', { name: /Average reviewer score:/ })).not.toBeInTheDocument();
   });
 
   test('a facilitator who is a PD can save and submit only their own list', async () => {
@@ -253,22 +393,66 @@ describe('Proposal Ranking page', () => {
     response.viewer.isRosterParticipant = true;
     response.viewer.capabilities.saveOwnList = true;
     response.viewer.capabilities.submitOwnList = true;
+    response.programs.se.ownList = response.programs.se.facilitatorLists[0];
     mockLoad.mockResolvedValue(response);
     mockSend.mockImplementation((action) => {
       const next = JSON.parse(JSON.stringify(response));
       next.programs.se.facilitatorLists[0].order = action.order;
       next.programs.se.facilitatorLists[0].etag = 'list-v2';
+      next.programs.se.ownList = next.programs.se.facilitatorLists[0];
       return Promise.resolve(next);
     });
     render(<ProposalRankingApp />);
     const own = await screen.findByRole('region', { name: 'Current PD SE ranking' });
-    const other = screen.getByRole('region', { name: 'Private Other PD SE ranking' });
-    expect(within(other).queryByRole('button', { name: /Move proposal/ })).not.toBeInTheDocument();
-    expect(within(other).queryByRole('button', { name: 'Submit and lock list' })).not.toBeInTheDocument();
-    fireEvent.click(within(own).getByRole('button', { name: 'Move proposal 1001 down' }));
+    expect(screen.queryByRole('region', { name: 'Private Other PD SE ranking' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Generate SE draft' })).not.toBeInTheDocument();
+    await dragDown(within(own).getByRole('button', { name: 'Drag First proposal to reorder' }));
     await screen.findByText('Order saved.');
     fireEvent.click(within(own).getByRole('button', { name: 'Submit and lock list' }));
     await waitFor(() => expect(mockSend).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'submit', etag: 'list-v2' })));
+  });
+
+  test('facilitator separates own work, read-only reference lists, and collapsed administration', async () => {
+    const response = roundResponse({ facilitator: true });
+    response.viewer.systemUserId = 'pd-self';
+    response.viewer.isRosterParticipant = true;
+    response.viewer.capabilities.saveOwnList = true;
+    response.viewer.capabilities.submitOwnList = true;
+    response.programs.se.ownList = response.programs.se.facilitatorLists[0];
+    mockLoad.mockResolvedValue(response);
+    render(<ProposalRankingApp />);
+    expect(await screen.findByRole('button', { name: 'My rankings' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByText('Individual PD rankings')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Facilitate', exact: true }));
+    expect(screen.getByRole('button', { name: 'Generate SE draft' })).toBeInTheDocument();
+    const references = screen.getByText('Individual PD rankings').closest('details');
+    expect(references).not.toHaveAttribute('open');
+    expect(within(references).queryByRole('button', { name: /Move proposal/, hidden: true })).not.toBeInTheDocument();
+    expect(within(references).queryByRole('button', { name: 'Submit and lock list', hidden: true })).not.toBeInTheDocument();
+    expect(screen.getByText('Round administration').closest('details')).not.toHaveAttribute('open');
+    fireEvent.click(screen.getByRole('button', { name: 'My rankings' }));
+    expect(screen.getByRole('button', { name: 'Submit and lock list' })).toBeInTheDocument();
+    expect(screen.queryByText('Round administration')).not.toBeInTheDocument();
+  });
+
+  test('published meeting view stays separate from own ranking and unpublished MR', async () => {
+    const response = roundResponse({ published: true });
+    response.programs.se.ownList.status = 'submitted';
+    response.programs.mr.proposalIds = INITIAL_ORDER;
+    response.programs.mr.ownList = { ...response.programs.se.ownList, listKey: 'mr-self', status: 'draft' };
+    mockLoad.mockResolvedValue(response);
+    render(<ProposalRankingApp />);
+    expect(await screen.findByRole('button', { name: 'Meeting list' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('button', { name: 'Facilitate', exact: true })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'My rankings' }));
+    expect(screen.getByText('Your private ranking')).toBeInTheDocument();
+    expect(screen.queryByText('Shared meeting order')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'MR', exact: true }));
+    await screen.findByText('Your private ranking');
+    expect(screen.getByRole('button', { name: 'My rankings' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Meeting list' }));
+    expect(screen.getByText('This program has not been published yet. Your own list is in My rankings.')).toBeInTheDocument();
+    expect(screen.queryByText('Shared meeting order')).not.toBeInTheDocument();
   });
 
   test('opening preview shows the roster, lead assignments and review completeness', async () => {
@@ -296,15 +480,15 @@ describe('Proposal Ranking page', () => {
       .mockImplementationOnce((action) => Promise.resolve(roundResponse({ order: action.order, etag: 'list-v3' })));
     render(<ProposalRankingApp />);
     const own = await screen.findByRole('region', { name: 'Current PD SE ranking' });
-    fireEvent.click(within(own).getByRole('button', { name: 'Move proposal 1001 down' }));
+    await dragDown(within(own).getByRole('button', { name: 'Drag First proposal to reorder' }));
     await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(2));
     fireEvent.click(screen.getByRole('button', { name: 'Refresh current state' }));
     await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(3));
     await act(async () => { readback.resolve(roundResponse({ order: savedOrder, etag: 'list-v2' })); await readback.promise; });
     await act(async () => { lateRefresh.resolve(roundResponse()); await lateRefresh.promise; });
     const current = await screen.findByRole('region', { name: 'Current PD SE ranking' });
-    expect(within(current).getByText(/Position 1 of 4 · #1002/)).toBeInTheDocument();
-    fireEvent.click(within(current).getByRole('button', { name: 'Move proposal 1003 down' }));
+    expect(within(current).getByLabelText('Rank 1: Second proposal')).toBeInTheDocument();
+    await dragDown(within(current).getByRole('button', { name: 'Drag Third proposal to reorder' }));
     await waitFor(() => expect(mockSend).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'save', etag: 'list-v2' })));
   });
 
@@ -317,6 +501,36 @@ describe('Proposal Ranking page', () => {
     await waitFor(() => expect(mockLoad).toHaveBeenLastCalledWith({ cycleCode: CYCLE, roundId: undefined }));
   });
 
+  test('does not offer excusal even if an older server advertises the capability', async () => {
+    mockLoad.mockResolvedValue(roundResponse({ facilitator: true }));
+    render(<ProposalRankingApp />);
+    await screen.findByText('Round administration');
+    expect(screen.queryByRole('button', { name: 'Excuse PD' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Excuse a PD')).not.toBeInTheDocument();
+  });
+
+  test.each([true, false])('opening without an acknowledgment preserves canOpen=%s', async (canOpen) => {
+    mockLoad.mockResolvedValue({ mode: 'preview', cycleCode: CYCLE, viewer: { capabilities: { open: true } },
+      preview: { proposals: [REQUESTS[0]], seedOrders: { se: [INITIAL_ORDER[0]], mr: [] }, roster: [],
+        outstandingReviewCount: 0, canOpen, warnings: [], previewFingerprint: 'current-preview' } });
+    mockSend.mockResolvedValue(roundResponse({ facilitator: true }));
+    render(<ProposalRankingApp />);
+    const open = await screen.findByRole('button', { name: 'Open round' });
+    expect(screen.getByRole('checkbox', { name: /Open as a dry run/ })).not.toBeChecked();
+    expect(screen.queryByText(/outstanding external reviews/)).not.toBeInTheDocument();
+    if (canOpen) {
+      expect(open).toBeEnabled();
+      fireEvent.click(open);
+      await waitFor(() => expect(mockSend).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'open', previewFingerprint: 'current-preview', cycleCode: CYCLE,
+      })));
+    } else {
+      expect(open).toBeDisabled();
+      fireEvent.click(open);
+      expect(mockSend).not.toHaveBeenCalled();
+    }
+  });
+
   test('an uncertain opening retries the exact original operation and preview', async () => {
     mockLoad.mockResolvedValue({ mode: 'preview', cycleCode: CYCLE, viewer: { capabilities: { open: true } },
       preview: { proposals: REQUESTS, seedOrders: { se: INITIAL_ORDER, mr: [] }, roster: [],
@@ -324,8 +538,11 @@ describe('Proposal Ranking page', () => {
     mockSend.mockRejectedValueOnce(Object.assign(new Error('Opening uncertain'), { status: 409, code: 'uncertain_outcome' }))
       .mockResolvedValueOnce(roundResponse({ facilitator: true }));
     render(<ProposalRankingApp />);
-    fireEvent.click(await screen.findByRole('checkbox', { name: /I reviewed the proposal pool/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Open round' }));
+    const open = await screen.findByRole('button', { name: 'Open round' });
+    expect(open).toBeEnabled();
+    expect(screen.getByRole('checkbox', { name: /Open as a dry run/ })).not.toBeChecked();
+    expect(screen.getByText('Opening saves the current proposals and review scores for this round.')).toBeInTheDocument();
+    fireEvent.click(open);
     fireEvent.click(await screen.findByRole('button', { name: 'Resolve opening attempt' }));
     await waitFor(() => expect(mockSend).toHaveBeenCalledTimes(2));
     expect(mockSend.mock.calls[1][0]).toEqual(mockSend.mock.calls[0][0]);
@@ -339,10 +556,10 @@ describe('Proposal Ranking page', () => {
     mockSend.mockResolvedValue(newer);
     render(<ProposalRankingApp />);
     const own = await screen.findByRole('region', { name: 'Current PD SE ranking' });
-    fireEvent.click(within(own).getByRole('button', { name: 'Move proposal 1001 down' }));
+    await dragDown(within(own).getByRole('button', { name: 'Drag First proposal to reorder' }));
     expect(await screen.findByText(/Your save completed, but a newer order is now current/)).toBeInTheDocument();
     expect(within(own).getByRole('button', { name: 'Submit and lock list' })).toBeDisabled();
-    expect(within(own).getByText(/Position 1 of 4 · #1002/)).toBeInTheDocument();
+    expect(within(own).getByLabelText('Rank 1: Second proposal')).toBeInTheDocument();
     expect(screen.queryByText('Order saved.')).not.toBeInTheDocument();
   });
 
@@ -354,7 +571,7 @@ describe('Proposal Ranking page', () => {
     expect(await screen.findByText('Shared meeting order')).toBeInTheDocument();
     expect(screen.queryByText('Your private ranking')).not.toBeInTheDocument();
     expect(screen.getByText('Disagreement')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Move proposal 1001 down' }));
+    await dragDown(screen.getByRole('button', { name: 'Drag First proposal to reorder' }));
     await waitFor(() => expect(mockSend).toHaveBeenCalledWith(expect.objectContaining({ action: 'edit', programKey: 'se', etag: 'meeting-v1' })));
   });
 });
@@ -399,4 +616,227 @@ describe('proposal ranking list calculations', () => {
     expect(formatScore({ mean: null, displayMean: null, ratedCount: 0, receivedCount: 4 })).toBe('Not scored');
     expect(formatScore({ displayMean: 4.25, ratedCount: 2, receivedCount: 4 })).toBe('4.3 · 2/4 rated');
   });
+});
+
+
+test('creates the combined list without ballots or a second publication and falls back to SE for a fresh round', async () => {
+  const ready = roundResponse({ facilitator: true, published: true });
+  ready.programs.co = { available: true, proposalIds: INITIAL_ORDER, meeting: null, meetingStatus: null };
+  ready.confirmations.generate.co = { fingerprint: 'combine-current', message: 'Create a shared combined meeting list.' };
+  ready.viewer.capabilities.generate = true;
+  const combined = JSON.parse(JSON.stringify(ready));
+  combined.programs.co.meeting = { ...combined.programs.se.meeting, programKey: 'co', listKey: 'meeting:co' };
+  combined.programs.co.meetingStatus = 'published';
+  combined.confirmations.generate.co = null;
+  mockLoad.mockResolvedValue(ready);
+  mockSend.mockResolvedValueOnce(combined);
+  render(<ProposalRankingApp />);
+  fireEvent.click(await screen.findByRole('button', { name: 'SE + MR' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Create combined meeting list' }));
+  expect(screen.queryByRole('button', { name: 'My rankings' })).not.toBeInTheDocument();
+  expect(screen.queryByText('Individual PD rankings')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm create the shared combined meeting list' }));
+  expect(await screen.findByRole('heading', { name: 'Shared meeting order' })).toBeInTheDocument();
+  expect(mockSend.mock.calls[0][0]).toMatchObject({ action: 'combine', confirmationFingerprint: 'combine-current' });
+  expect(mockSend.mock.calls[0][0]).not.toHaveProperty('programKey');
+  expect(screen.queryByRole('button', { name: /Publish/ })).not.toBeInTheDocument();
+  mockLoad.mockResolvedValue(roundResponse());
+  fireEvent.click(screen.getByRole('button', { name: /Refresh/ }));
+  expect(await screen.findByRole('heading', { name: 'Your private ranking' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'SE + MR' })).not.toBeInTheDocument();
+});
+
+
+test('shows each external review as an inline letter grade without a distribution dropdown', async () => {
+  mockLoad.mockResolvedValue(roundResponse());
+  render(<ProposalRankingApp />);
+  const own = await screen.findByRole('region', { name: 'Current PD SE ranking' });
+  expect(within(own).getAllByText('Reviews')).toHaveLength(4);
+  expect(within(own).getAllByLabelText('Excellent')).toHaveLength(2);
+  expect(within(own).getByLabelText('Good')).toHaveTextContent('G');
+  const average = within(own).getByLabelText('Average reviewer grade: 4.2');
+  expect(average).toHaveTextContent(/^4\.2$/);
+  expect(average).toHaveClass('font-semibold', 'bg-gray-100');
+  expect(within(own).queryByText(/3\/3 rated/)).not.toBeInTheDocument();
+  expect(average.parentElement).toHaveTextContent('Reviews');
+  expect(within(own).getByLabelText('Good').compareDocumentPosition(average) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(within(own).queryByText('Review score:')).not.toBeInTheDocument();
+  expect(within(own).queryByText('Review rating distribution')).not.toBeInTheDocument();
+  expect(within(own).getAllByText('Not scored').length).toBeGreaterThanOrEqual(3);
+});
+
+
+test('shows published PD names and ranks inline without a disclosure', async () => {
+  mockLoad.mockResolvedValue(roundResponse({ published: true }));
+  render(<ProposalRankingApp />);
+  const ranks = await screen.findByRole('list', { name: 'PD ranks' });
+  expect(within(ranks).getByText('Current')).toBeInTheDocument();
+  expect(within(ranks).getByText('Other')).toBeInTheDocument();
+  expect(within(ranks).getByLabelText('Current PD: rank 1 of 4')).toHaveTextContent('1');
+  expect(within(ranks).getByLabelText('Current PD: rank 1 of 4')).toHaveStyle({ backgroundColor: '#15803d33' });
+  expect(within(ranks).getByLabelText('Other PD: rank 2 of 4')).toHaveTextContent('2');
+  expect(ranks.closest('details')).toBeNull();
+  expect(screen.queryByText(/Named PD ranks/)).not.toBeInTheDocument();
+});
+
+
+test('PD rank colors normalize within each program from green first to red last', () => {
+  expect(pdRankColor(1, 12)).toBe('#15803d');
+  expect(pdRankColor(12, 12)).toBe('#b91c1c');
+  expect(pdRankColor(1, 1)).toBe('#15803d');
+  expect(pdRankColor(2, 3)).toBe('#eab308');
+  expect(pdRankColor(0, 12)).toBe('#9ca3af');
+});
+
+test('combined cards color PD ranks against the original program length', async () => {
+  const response = roundResponse({ published: true });
+  response.round.snapshot.proposals = REQUESTS.map((proposal, index) => ({ ...proposal, programKey: index === 3 ? 'mr' : 'se' }));
+  response.programs.co = { ...response.programs.se, available: true, ownList: null, meeting: { ...response.programs.se.meeting, programKey: 'co', listKey: 'meeting:co' } };
+  mockLoad.mockResolvedValue(response);
+  render(<ProposalRankingApp />);
+  fireEvent.click(await screen.findByRole('button', { name: 'SE + MR' }));
+  const badge = await screen.findByLabelText('Other PD: rank 2 of 3');
+  expect(badge).toHaveStyle({ backgroundColor: '#eab30833' });
+});
+
+
+test('uses the linked project title, a prominent rank and a program badge without proposal numbers', async () => {
+  mockLoad.mockResolvedValue(roundResponse());
+  render(<ProposalRankingApp />);
+  const own = await screen.findByRole('region', { name: 'Current PD SE ranking' });
+  expect(within(own).getByRole('link', { name: 'First proposal' })).toHaveAttribute('href', '/workbench/request-1');
+  expect(within(own).getByLabelText('Rank 1: First proposal')).toHaveClass('text-3xl', 'font-bold');
+  expect(within(own).getAllByText('SE')).toHaveLength(4);
+  expect(own).not.toHaveTextContent('1001');
+  expect(own).not.toHaveTextContent('Position');
+  expect(within(own).queryByRole('link', { name: /Open proposal/ })).not.toBeInTheDocument();
+});
+
+
+test('shows the fractional average after PD ranks in a matching colored badge', async () => {
+  const response = roundResponse({ published: true });
+  response.programs.se.meeting.composite.scores['request-1'].averageRank = 2.5;
+  mockLoad.mockResolvedValue(response);
+  render(<ProposalRankingApp />);
+  const ranks = await screen.findByRole('list', { name: 'PD ranks' });
+  const average = within(ranks).getByLabelText('Average PD rank: 2.50');
+  expect(average).toHaveTextContent('2.50');
+  expect(average).toHaveStyle({ backgroundColor: '#eab30833' });
+  expect(within(ranks).getAllByRole('listitem').at(-1)).toHaveTextContent('Average2.50');
+  expect(screen.queryByText('Composite:')).not.toBeInTheDocument();
+  expect(pdRankColor(2.5, 4)).toBe('#eab308');
+});
+
+
+test('places the prominent institution heading above the smaller linked proposal title', async () => {
+  mockLoad.mockResolvedValue(roundResponse());
+  render(<ProposalRankingApp />);
+  const own = await screen.findByRole('region', { name: 'Current PD SE ranking' });
+  const institution = within(own).getByRole('heading', { name: 'North Institute' });
+  const title = within(own).getByRole('link', { name: 'First proposal' });
+  expect(institution).toHaveClass('text-base', 'font-semibold');
+  expect(title.parentElement).toHaveClass('text-sm');
+  expect(institution.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(title).toHaveAttribute('href', '/workbench/request-1');
+});
+
+
+test('groups budget and ranking details in the institution column', async () => {
+  mockLoad.mockResolvedValue(roundResponse({ published: true }));
+  render(<ProposalRankingApp />);
+  const institution = await screen.findByRole('heading', { name: 'North Institute' });
+  const column = institution.parentElement;
+  expect(within(column).getByText('Requested')).toBeInTheDocument();
+  expect(within(column).getByText('Cumulative Budget')).toBeInTheDocument();
+  expect(within(column).getByText('Reviews')).toBeInTheDocument();
+  expect(within(column).getByRole('list', { name: 'PD ranks' })).toBeInTheDocument();
+  expect(within(column).queryByLabelText('Rank 1: First proposal')).not.toBeInTheDocument();
+});
+
+test('bottom-aligns staff rankings and budget without a divider', async () => {
+  mockLoad.mockResolvedValue(roundResponse({ published: true }));
+  render(<ProposalRankingApp />);
+  const institution = await screen.findByRole('heading', { name: 'North Institute' });
+  const column = institution.parentElement;
+  const budget = within(column).getByText('Requested').parentElement.parentElement;
+  const ranks = within(column).getByRole('list', { name: 'PD ranks' });
+  expect(budget).toHaveClass('justify-end', 'text-right', 'ml-auto');
+  expect(budget).not.toHaveClass('border-t');
+  expect(budget.parentElement).toBe(ranks.parentElement);
+  expect(budget.parentElement).toHaveClass('flex', 'items-end', 'justify-between');
+  expect(ranks.compareDocumentPosition(budget) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(within(budget).getByText('Cumulative Budget')).toBeInTheDocument();
+});
+
+test('groups program and geography in outlined upper-right badges', async () => {
+  mockLoad.mockResolvedValue(roundResponse({ published: true }));
+  render(<ProposalRankingApp />);
+  const east = await screen.findByRole('img', { name: 'East institution' });
+  expect(east.parentElement).toHaveClass('absolute', 'right-4', 'top-4');
+  expect(within(east.parentElement).getByLabelText('Program: SE')).toHaveClass('rounded-full', 'border-2', 'h-10', 'w-10');
+});
+
+
+test('keeps institutional context out of individual PD rankings, even after publication', async () => {
+  const response = roundResponse({ published: true });
+  response.round.snapshot.proposals = REQUESTS.map((p) => ({ ...p, institutionGeography: 'West',
+    researchFunding: { status: 'available', totalUsd: 10500000, lastAwardCycle: '2014-12', qualifyingGrantCount: 3 } }));
+  mockLoad.mockResolvedValue(response);
+  render(<ProposalRankingApp />);
+  expect(await screen.findAllByText('$10,500,000')).toHaveLength(4);
+  fireEvent.click(screen.getByRole('button', { name: 'My rankings' }));
+  expect(screen.queryByText('Prior research funding')).not.toBeInTheDocument();
+  expect(screen.queryByRole('img', { name: 'West institution' })).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Average reviewer grade: 4.2')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Export ranked list' })).not.toBeInTheDocument();
+});
+
+test('shows the calculated baseline without draft editing or institutional context', async () => {
+  const response = roundResponse({ facilitator: true, published: true, order: [...INITIAL_ORDER].reverse() });
+  response.programs.se.meetingStatus = 'composite-draft';
+  response.programs.se.meeting.status = 'composite-draft';
+  response.viewer.capabilities.publish = true;
+  response.round.snapshot.proposals = REQUESTS.map((p) => ({ ...p, institutionGeography: 'West',
+    researchFunding: { status: 'available', totalUsd: 10500000, lastAwardCycle: '2014-12', qualifyingGrantCount: 3 } }));
+  mockLoad.mockResolvedValue(response);
+  render(<ProposalRankingApp />);
+  expect(await screen.findByText('Calculated starting order')).toBeInTheDocument();
+  expect(screen.getAllByLabelText('Rank 1: First proposal').length).toBeGreaterThan(0);
+  expect(screen.queryByRole('button', { name: /Drag .* to reorder/ })).not.toBeInTheDocument();
+  expect(screen.queryByText('Prior research funding')).not.toBeInTheDocument();
+  expect(screen.queryByRole('img', { name: 'West institution' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Publish SE' })).toBeEnabled();
+});
+
+test('exports the saved meeting order and disables export while a move is saving', async () => {
+  const saving = deferred();
+  mockLoad.mockResolvedValue(roundResponse({ published: true }));
+  mockSend.mockReturnValue(saving.promise);
+  const create = jest.fn(() => 'blob:ranking');
+  const revoke = jest.fn();
+  URL.createObjectURL = create;
+  URL.revokeObjectURL = revoke;
+  const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  render(<ProposalRankingApp />);
+  const download = await screen.findByRole('button', { name: 'Export ranked list' });
+  fireEvent.click(download);
+  expect(create).toHaveBeenCalledWith(expect.any(Blob));
+  expect(click).toHaveBeenCalledTimes(1);
+  expect(click.mock.instances[0].download).toBe(`proposal-ranking-${CYCLE}-se.csv`);
+  await dragDown(screen.getByRole('button', { name: 'Drag First proposal to reorder' }));
+  expect(download).toBeDisabled();
+  fireEvent.click(download);
+  expect(click).toHaveBeenCalledTimes(1);
+  await act(async () => saving.resolve(roundResponse({ published: true, order: mockSend.mock.calls[0][0].order })));
+  await waitFor(() => expect(download).toBeEnabled());
+  click.mockRestore();
+});
+
+test('CSV preserves rank order, quotes multiline text, escapes formulas and leaves missing amounts blank', () => {
+  const proposals = [{ ...REQUESTS[0], title: '=formula', organization: 'A, "B"\nC' },
+    { ...REQUESTS[1], amountMinorUnits: null }];
+  const csv = buildRankingCsv(['request-2', 'request-1'], proposals);
+  expect(csv).toContain('"1","SE","1002","West Institute","Second proposal","","USD"');
+  expect(csv).toContain('"2","SE","1001","A, ""B""\nC","\'=formula","100.00","USD"');
+  expect(() => buildRankingCsv(['missing'], proposals)).toThrow(/unavailable proposal/);
 });

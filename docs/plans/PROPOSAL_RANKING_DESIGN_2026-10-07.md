@@ -1,6 +1,6 @@
 # Proposal Ranking — design for review
 
-Date: 2026-10-07. Revision: 3 (Opus revision-2 findings incorporated). Status: **Source implemented; sandbox/Production schema and role setup verified; sandbox persistence rehearsal verified; Production deployed/enabled; full browser rehearsal pending.**
+Date: 2026-10-07. Revision: 3 (Opus revision-2 findings incorporated). Status: **Source implemented; sandbox/Production schema and role setup verified; sandbox persistence rehearsal verified; Production deployed/enabled; full browser rehearsal pending. Science-first meeting/export changes remain branch-only.**
 Owner: Justin. Design consolidation: Codex. Requested reviewer: Claude Opus.
 Authority: owner decisions in the Proposal Ranking planning conversation.
 
@@ -18,8 +18,14 @@ grant approvals, award amounts, or change proposal lifecycle status.
   stage name will change; one explicit source-status rule must be used independently
   of UI wording. No reconsidered/deferred proposals and no test requests.
 - Separate Science and Engineering (SE) and Medical Research (MR) lists initially.
-  A cross-program combined list is deferred. Concatenating two program lists is
-  not a valid cross-program preference ranking.
+  After every nonempty program is published, the facilitator can create a shared
+  combined SE + MR meeting list (2026-10-08 owner decision; branch-only).
+  Interleave the current program orders by comparing the next proposal's average
+  PD rank, lower first, SE first on equal values. Preserve each program's current
+  internal order even if meeting edits made scores nonmonotonic. This is a starting
+  point for discussion, not a claim that within-program ranks establish absolute
+  cross-program merit. Staff can then freely reorder the combined list. No new
+  ballots are collected; later edits to the three meeting lists are independent.
 - Participants: distinct lead PDs assigned to the eligible proposals across both
   programs. Every participant ranks every proposal in each program, not just their
   own assigned proposals. No manual participant selection is required in v1.
@@ -36,8 +42,10 @@ grant approvals, award amounts, or change proposal lifecycle status.
   SE can be generated and published even if MR is unfinished, and vice versa.
   The facilitator generates separate composite drafts. Each proposal's composite score is its average submitted
   position, with equal weight for each PD; lower average ranks first.
-- The facilitator may reorder the draft and publishes it when ready. Before that,
-  the composite drafts are visible only to the facilitator.
+- The facilitator reviews the calculated draft without reordering it, then publishes
+  that calculated order as the meeting starting point. Before publication, drafts
+  are visible only to the facilitator. First publication restores the immutable
+  calculated order even for a legacy draft edited under the earlier behavior.
 - After publication, participants see the shared order and named individual PD
   ranks, supporting discussion of who favors or questions a proposal.
 - Participants can edit the published order; staff coordinate who is driving.
@@ -45,12 +53,15 @@ grant approvals, award amounts, or change proposal lifecycle status.
   No real-time synchronization infrastructure in v1.
 - Keep individual submissions and the calculated composite separate from the
   mutable meeting order.
-- The facilitator may exceptionally excuse a PD, with confirmation and a recorded
-  reason, before either program composite has been generated. Exclusion applies
-  to both programs. Retain any submitted list but exclude it from calculation.
-  Every PD submitting is the normal process; excusal is not routine roster editing.
-- The facilitator may cancel a round only while neither program is published.
+- Every captured PD must submit in each nonempty program. No participant excusal
+  is available (owner decision, 2026-10-08; feature branch, not yet promoted).
+- The facilitator may cancel an ordinary round only while neither program is published.
   Retain the canceled round read-only and open a replacement with fresh snapshots.
+- Owner decision (2026-10-08): optionally open an explicitly labeled dry run.
+  Its current facilitator can permanently erase its ranking lists after publication.
+  The round retains only a content-free reset receipt; a new round starts from fresh
+  source inputs. Ordinary rounds cannot be relabeled or erased. This capability and
+  the ranking-list Delete role permission are branch-only, not applied in Production.
 - The current facilitator or a superuser may transfer facilitation to another
   active PD on the captured roster at any point in an active round. Preserve all
   orders and publication state; the former facilitator returns to participant
@@ -58,23 +69,40 @@ grant approvals, award amounts, or change proposal lifecycle status.
 - Freeze all card details, amounts, review-score summaries, and initial order when
   the round opens. No background refresh of those values during a round.
 - No ranking notes, projected-budget input, automatic funding cutoff, or funding
-  decision writeback in v1. An administrative excusal reason is not a ranking note.
+  decision writeback in v1.
 
 ## Card contents and totals
 
 Each row shows current position, organization, proposal title, full amount
 requested, external peer-review score summary, and a link to the proposal.
-Owner addition (2026-10-07): show a prominent **E** or **W** at the card's upper
-right for the applicant institution's East/West classification. Use the verified
-`account.wmkf_eastwest` field through `akoya_applicantid`, not state or name inference.
-Freeze it with the other card details; missing, unknown or older absent values show
-no letter. This is a deliberation cue, not an automatic score or funding adjustment.
-Owner addition (2026-10-07): a 24px solid circle at the lower right summarizes the
-frozen average reviewer rating with ten discrete red→orange→yellow→green colors.
-Map the raw mean from 1 through 5 to the nearest of ten equally spaced steps;
-missing/invalid/unscored means use gray. The hover text and accessible name give
-the numeric score. Matching colors indicate approximate strength, not an exact
-tie. Numeric score display, seed ordering and composite calculations are unchanged.
+Current feature-branch cards show the program badge at the upper right, with an
+**E** or **W** institution badge beside it only in published Meeting list views.
+Use the verified `account.wmkf_eastwest` through `akoya_applicantid`; missing,
+unknown or older absent values show no geography badge. Individual reviewer grades
+and their numeric mean remain visible during preparation and meeting discussion.
+Published cards also show named PD ranks and their average, with color based on
+within-program rank. These displays do not change scientific scores or ordering.
+
+Owner addition (2026-10-11; local implementation, not deployed): show **Prior
+research funding** and **Latest qualifying award** alongside institution geography
+only in published Meeting list cards. Hide both geography and research history in
+My rankings, opening preview and facilitator preparation, including individual
+reference lists and the unpublished composite. This is presentation staging; the
+frozen snapshot and authorized API response retain those fields.
+Use the linked applicant account's ordinary Research-program awards, excluding
+directed gifts, matching/gift support, buildings/capital support, endowments,
+teaching awards, Special Grants and Young Scholars; retain project-specific
+research fellowships. Known unresolved mixed-purpose/general-fellowship records
+and recognized non-research-specific support types remain included with a visible
+provisional disclosure. Unknown support options or unaudited blank support tags
+make the history unavailable; individually audited blank-tag exceptions live in
+the classifier. Missing or unreconciled history is unavailable, never
+silently zero. Award-cycle labels take precedence over administrative decision
+dates. The summary is fingerprinted and frozen at opening; existing snapshots
+are not backfilled and show unavailable. No scientific scores, initial or composite
+ordering, eligibility, or requested-budget totals use this context. The API contract
+and Atlas describe the exact summary and classification limits; draft writeups
+retain their existing funding logic.
 
 The right side shows the sum of that proposal's full requested amount and all
 higher-ranked proposals in that program list. Reordering updates totals immediately.
@@ -136,7 +164,8 @@ These are source observations, not new production probes or deployment claims.
 
 ## Explicit pool and opening contract
 
-Open only through a deliberate facilitator action after preview. The configured
+Open through a single Open round button after preview, without an acknowledgment
+checkbox. Show actual missing-review warnings; omit zero-warning counts. The configured
 CSO identity can preview/open before a roster exists. The preview shows proposal
 membership, assigned PDs, unscored proposals and outstanding review counts.
 A superuser can configure the default facilitator using an active Dynamics user
@@ -166,7 +195,7 @@ app access. Missing/ambiguous/inactive PDs block opening, never remove proposals
 The union of lead PDs across SE/MR is the captured voter roster. Empty program:
 no individual lists or generation required; show No proposals. Both empty: refuse
 opening. One voter is allowed, with no disagreement highlight. At least one
-non-excused voter is required in every nonempty program.
+voter is required in every nonempty program; all captured voters must submit.
 
 Opening performs a fresh full read and compares a preview fingerprint covering
 pool, staff identities, review basis, and card fields. If changed, return the new
@@ -174,7 +203,7 @@ preview for confirmation; do not freeze data other than what was reviewed. The
 source read is a captured dataset, not a claim of a cross-entity Dataverse snapshot
 transaction. Once captured, it supplies every PD's initial list. Later withdrawal
 or data correction does not mutate it; the unpublished cancel/reopen control is
-available. Published pools stay fixed in v1.
+available. Published ordinary pools stay fixed; an explicitly marked dry run can be erased.
 
 ## Architecture and permissions [source implemented; sandbox storage provisioned]
 
@@ -201,7 +230,7 @@ and `wmkf_proposalrankinglist`):
    score/seed/roster snapshot, current facilitator GUID, policy revision, active or
    canceled state, timestamped administration events. Cancel never deletes data.
 3. **List:** unique (round, listKey), where server-derived listKey identifies either
-   an individual program+PD list or the program meeting list. An ordered request-ID
+   an individual program+PD list, program meeting list, or `meeting:co` combined list. An ordered request-ID
    JSON array lives on ONE row. Individual status: draft/submitted. Meeting status:
    collecting/draft/published. Immutable composite calculation and source submission
    IDs sit beside the separately mutable meeting order. Empty programs have no rows.
@@ -222,9 +251,8 @@ App API permissions are mandatory on every read and write. App access alone does
 not grant access to rounds or lists. Before publication a participant gets only
 their own program lists and submission progress; the facilitator gets all. After
 program publication, that program's source ranks and shared order are available
-to the roster. Publishing SE does not expose MR. Excluded PDs remain on the roster
-for meeting participation, with their excluded status visible; their drafts are
-not included in source-rank projections. A superuser alone gets administration
+to the roster. Publishing SE does not expose MR. Legacy excusal flags remain
+visible only as retained history; new generation/publication is blocked for those rounds. A superuser alone gets administration
 metadata for facilitator transfer, not other PDs' private list contents.
 
 The new tables must not be included in ordinary staff Dataverse table privileges.
@@ -249,13 +277,14 @@ trusted DAL context checks and the target/write interlock. The ranking adapter n
 transport; authenticated actors are recorded in mandatory payload fields. Pin
 this in tests. The transport without a caller ID neither impersonates nor enters
 the 403 impersonation-fallback branch; retain all existing context/interlock checks. No global auth/restriction
-bypass, privilege broadening, or silent fallback is authorized by this design.
+bypass or silent fallback is authorized. The owner separately approved preparing
+Delete privilege on ranking lists only for dry-run erasure; live application is pending.
 
 ### Atomic lifecycle and repeat handling
 
 - Every mutation re-reads the round, validates current actor permissions/state and
   client policy revision, and includes a conditional round PATCH and conditional
-  list PATCH in one changeset. This fences facilitator/excusal/cancellation races
+  list PATCH (or POST for combined creation) in one changeset. This fences facilitator/cancellation races
   as well as stale orders. Increment policy revision only for policy changes;
   ordinary list saves still conditionally touch the round version.
 - For another participant's unrelated save, a bounded server retry is permitted
@@ -270,31 +299,32 @@ bypass, privilege broadening, or silent fallback is authorized by this design.
   GUIDs. First coordinator creation uses POST plus a unique cycle key; a confirmed duplicate-key
   failure reloads the winner, while other errors retain their actual classification. Open requests carry a stable operation UUID so an uncertain
   retry resolves the original round and cannot create another after cancellation.
-- Generate only when all non-excused lists for that program are submitted. Store
+- Generate only when all captured participants’ lists for that program are submitted. Store
   source IDs, exact sums/counts/ranges and baseline order in the meeting row while
   moving collecting to draft. Inputs are immutable. Repeat generation returns the
-  existing result without resetting meeting edits. Excusal is forbidden after
-  either meeting list leaves collecting, keeping the voter set stable.
+  existing result without resetting meeting edits. The voter set stays fixed.
 - Publish conditionally updates the meeting row version that the facilitator
-  reviewed. This atomically exposes its current order and corresponding source
-  ranks. Repeat publication does not reset its timestamp or order.
-- Before first generation, name outstanding PD submissions in either program and
-  confirm that excusal will no longer be available. Before first publication,
-  name the other program's outstanding submissions and confirm that cancellation
-  will no longer be available. These confirmations bind to current round policy
-  and submission state. If a PD becomes unavailable afterward, the unfinished
-  program can remain blocked; this is a disclosed v1 limitation, not automatic
-  authority to alter published inputs or waive a vote.
-- Excusal is irreversible within a round; excused PD lists become read-only.
-  An excused PD remains eligible to facilitate because facilitator eligibility is
-  roster-based, not vote-based. Their vote remains excluded. After transfer a
-  former non-roster facilitator has no participant access. The current facilitator
-  and captured roster may edit a published program list.
-- Transfer facilitator/cancel/exceptional excusal use the round version and record
-  actor/time/reason as applicable. Cancellation conditionally clears the active
-  coordinator pointer and marks the round canceled in one changeset, only if no
-  program is published. Canceled rounds reject all mutations; use a new operation
-  UUID for a replacement. Do not support deletion/reopening of submitted lists.
+  reviewed. First publication atomically restores the immutable calculated composite
+  order as the working order and exposes corresponding source ranks. Unpublished
+  meeting edits are rejected. Repeat publication does not reset its timestamp or
+  subsequent published meeting edits.
+- Before generation, show outstanding PD submissions in either program. Before
+  first publication, name the other program's outstanding submissions and confirm
+  that cancellation will no longer be available. Confirmations bind to current
+  policy and submission state. An unavailable PD leaves that program blocked;
+  there is no authority to waive a vote.
+- Older snapshots containing an excusal retain their historical display and saved
+  results but cannot generate or publish another composite. No history is rewritten.
+  After transfer a former non-roster facilitator has no participant access. The
+  current facilitator and captured roster may edit a published program list.
+- Transfer facilitator/cancel use the round version and record actor/time.
+  Cancellation conditionally clears the active coordinator pointer and marks the
+  round canceled in one changeset, only if no program is published. Canceled rounds
+  reject mutations; use a new operation UUID for a replacement. Do not support
+  deletion/reopening of ordinary submitted lists. Explicit dry-run erasure deletes
+  all lists together with a scrubbed receipt and cycle release, using round/list/cycle
+  ETags in one changeset. Its confirmation also binds the round ETag, and exact
+  retries resolve the retained content-free receipt. Source data is never written.
 - For a network timeout, read back by operation/round/list identity. Transport
   exceptions are not proof of rollback: the write may already have committed.
   Return a confirmed result or a clearly uncertain/conflict response, never a
@@ -312,7 +342,8 @@ bypass, privilege broadening, or silent fallback is authorized by this design.
 write/read -> permission-filtered response -> card stack and cumulative totals`.
 Use app key `proposal-ranking`. Named operations are preview/open, read
 round, save own list, submit own list, generate/edit/publish program meeting list,
-transfer facilitator, excuse participant, cancel unpublished round. All request
+combine published program orders, edit the combined meeting list,
+transfer facilitator, cancel unpublished ordinary round, erase explicit dry run. All request
 actors are session-derived. Program/round selectors are validated; errors use
 400 invalid, 403 denied, 409 stale/incomplete, and 503 dependency unavailable.
 
@@ -321,6 +352,23 @@ operation status. Use private/no-store responses. Scope every load/save response
 with a generation token for cycle/round/program changes; clear private data when
 permissions change. A transfer cannot erase data already seen by a former
 facilitator, but subsequent reads/writes must use their new rights.
+
+Owner-approved UI organization (2026-10-08): My rankings contains only the
+participant's own lists, including for a facilitator who votes. Facilitate is the
+facilitator's preparation view: progress, generate/review/publish, collapsed
+read-only individual lists, and collapsed administration. Meeting list contains
+published working orders, independently per program and in the combined SE + MR tab.
+The combined tab appears once every nonempty program is published, has no My rankings
+view, and creates a directly shared list without a second publication step. Default to My rankings
+before publication and Meeting list for a published program. Do not permit view
+switching while saves are pending or unresolved. Rehearsal-only identity links
+open separately labeled tabs; they are not part of the signed-in production UI.
+
+Staff settle SE and MR separately before combining them. This is meeting guidance,
+not a new completion state or lock. Published SE, MR and combined Meeting lists
+offer a browser-generated CSV of the saved order. Pending or unresolved saves
+disable export. The download creates no server record, new route or finalization
+state. It reflects the saved list in that browser; other devices still require refresh.
 
 Move cards optimistically; sum snapshot amounts locally. Serialize saves, retaining
 only the latest queued drag, with submission/publication disabled until confirmed.
@@ -351,7 +399,7 @@ tests verify existing building blocks. Feature-specific tests are now under
 `tests/unit/proposal-ranking-*.test.js`; final integrated results and review are
 recorded separately from this historical planning baseline.
 
-## Review reconciliation
+## Historical revision 2–3 review reconciliation
 
 Original review: `docs/audits/PROPOSAL_RANKING_OPUS_DESIGN_REVIEW_2026-10-07.md`
 (historical assessment of revision 1, not a statement of current design status).

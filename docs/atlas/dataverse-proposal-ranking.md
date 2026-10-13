@@ -1,16 +1,208 @@
 # Proposal Ranking storage and activation
 
-Date: 2026-10-07. Status: **Production deployed and enabled**, with schema, dedicated
-role and four participant grants verified. Justin is the temporary default facilitator
-for the owner-approved trial; Beth must be restored before colleague handoff.
-[VERIFIED via Vercel and Chrome] PR #457 merge `10c079c8` is deployed as
-`dpl_F5ewaS8DRDhABRVyhrG5XHuSRvwf`; Justin's D26 page shows “Round not open”.
-No live ranking round was created during release. The owner subsequently approved
-Justin as default facilitator for testing; the full multi-identity lifecycle remains
-unverified. Trial reset requirements are recorded below.
-Current release and rollback receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTION_RELEASE_2026-10-07.md`.
+Date: 2026-10-07. At last verification, Production was **deployed and enabled**,
+with schema, dedicated role and four participant grants verified. Justin was the
+temporary default facilitator for the owner-approved trial; Beth must be restored
+before colleague handoff.
+[VERIFIED via Vercel and Chrome] The most recently verified Production deployment
+was PR #462 merge
+`f7a75fc5358649ab30765504ea6e6b35cdf00bb4`, deployment
+`dpl_FNFvVWUzPaiNgdQ7Uh1DgK526hHx`, which was READY with live aliases. At that
+verification, Justin's refreshed D26 facilitator preview displayed all 23
+institution names. Current feature-branch cards show upper-right program/EW badges and reviewer
+grade pills; E/W appears only in published Meeting list views. No Production app deployment was performed during
+this turn, and the current deployment and marker appearance have not been
+rechecked. The full multi-identity lifecycle remains unverified. The initial PR
+#457 deployment is a historical checkpoint; trial reset requirements are below.
+Initial activation and rollback receipt: `docs/audits/PROPOSAL_RANKING_PRODUCTION_RELEASE_2026-10-07.md`.
 Earlier dated sections below retain historical setup checkpoints; disabled-state
 statements in those checkpoints are superseded by this release.
+
+## Institution research-funding context — 2026-10-11 (local only)
+
+[VERIFIED via local source inspection; not deployed or live-validated] The source
+adapter `lib/dataverse/adapters/proposal-ranking-source.js` reads positive historical
+awards for eligible proposals' exact applicant account GUIDs, in batches of 20,
+with ordinary/test isolation and complete pagination. There is no date cutoff,
+fuzzy institution matching, or consolidation of separate accounts. It reads award
+currency metadata and the account Program-grant count/sum rollups. Failed or capped
+history/currency queries reject preview/open through the existing complete-read
+contract; no network-error fallback is introduced.
+
+`lib/services/proposal-ranking/research-funding.js` is the pure classifier. It
+first reconciles Program rows with the account rollups, then requires both the
+internal SE/MR identity and broad Research label, an Approved/Active/Closed status,
+a positive USD amount and an interpretable award cycle. Directed gifts, matching/
+gift support, capital/building support, endowments, teaching awards, Special Grants and Young Scholars
+are excluded. Project-specific research fellowships remain eligible. Dated legacy
+exceptions exclude building-related requests 800308, 860843 and 963245 despite
+misleading Research tags. Requests 881024, 860892, 840727, 870929 and 975108 remain
+included pending mixed-purpose/general-fellowship classification and make their
+institution summary provisional. Other recognized but non-research-specific
+support types also produce a provisional summary. Unknown/new support option
+values or unaudited blank support tags return unavailable. Ten blank-tag awards
+individually reviewed in the October 11 audit are allowlisted in the classifier
+by request number as research projects; this does not admit future blank-tag
+records. No institution totals are hardcoded.
+
+The summary is `researchFunding: { status, totalUsd, lastAwardCycle,
+qualifyingGrantCount }`. Status is available, provisional or unavailable. A missing
+account, unresolved required taxonomy, rollup mismatch, or invalid qualifying
+award status/currency/amount/date yields unavailable with null values. Zero with
+available status means no qualifying award found on that linked account, not an
+assertion about all WMKF history. Recency uses a recognized `akoya_fiscalyear`
+month/year label, then meeting date, then decision date, expressed as YYYY-MM.
+No currency conversion is performed.
+
+`preview-service.js` carries the summary into the preview fingerprint and frozen
+proposal snapshot; `service.js` returns the authorized snapshot to
+`shared/components/proposal-ranking/ProposalRankingApp.js`. Cards show **Prior
+research funding** and **Latest qualifying award**, plus a provisional disclosure,
+only in published Meeting list views. Individual rankings, opening preview and
+facilitator preparation hide research history and East/West; the frozen snapshot
+and authorized response still retain the fields.
+Older snapshots show unavailable and are not backfilled. Scientific scores, seed
+and composite ordering, eligibility and cumulative requested-budget amounts are
+unchanged. No source write or draft-writeup change is part of this feature. This
+section records source behavior only; it does not claim tests passed, deployment,
+a new round, or live transaction verification.
+
+## Science-first meeting preparation and export — 2026-10-11 (branch only)
+
+Owner-approved behavior: each unpublished SE/MR composite remains in calculated
+order for facilitator review. The service rejects unpublished meeting edits; first
+publication restores the immutable calculated order, including older edited drafts.
+Published working lists remain editable without changing submitted ballots or scores.
+
+The published Meeting list offers a browser-generated CSV of its saved SE, MR or
+combined order. Pending or unresolved saves disable export. It adds no API route,
+server persistence, finalization state or lock. Refresh remains necessary to see
+other devices' changes. Staff settle SE and MR separately before combining them;
+this guidance adds no lifecycle state.
+
+This section describes the feature-branch contract, not deployment or live
+transaction verification. Existing release and colleague-handoff requirements remain.
+
+## Office portability — 2026-10-08
+
+Implementation is pushed on `codex/proposal-ranking` in draft PR #463 (unmerged).
+The owner requested a documentation-only handoff on main. On the office Mac,
+resume that branch, install repository dependencies if needed, run
+`node scripts/rehearse-proposal-ranking.js`, and open `http://127.0.0.1:3133/`.
+No environment file or credentials are required. Local server processes and memory
+do not transfer through Git; restarting starts empty. The fixture supports D26.
+GitHub checks at `cd8928bbc` passed Jest, Postgres integration, Claude review and
+security checks; recheck future candidate-head CI before promotion.
+No new Production milestone shipped in this rehearsal/stop work.
+
+## Isolated local UI and service rehearsal — 2026-10-07
+
+[VERIFIED via source, final 42 focused tests, API-route and route-lifecycle-auth
+gates with sequential self-tests, types and Chrome] The standalone command
+`node scripts/rehearse-proposal-ranking.js` runs at `http://127.0.0.1:3133` on
+loopback only. Its webpack build replaces persistence, source, identity and access
+dependencies with temporary in-memory adapters while
+using the real Proposal Ranking UI and service. The fixture has six fictional
+proposals (three SE and three MR) and three fictional PDs, including the
+facilitator. The page supports simulating the other two submissions and switching
+role views. Reset clears rehearsal memory after any lifecycle state; a generation
+fence rejects actions delayed from before reset. It loads no environment file or
+live Dataverse/API service and creates no real staff votes.
+
+Chrome verified opening a synthetic round; simulating both other PDs' submissions;
+moving R002 above R001 and submitting the facilitator's SE list (3/3); generating
+and publishing the SE composite; and moving R003 above R002 in the meeting list
+and saving. The composite showed ranks 1.33, 1.67 and 3.00 and a full requested
+total of $457,500. PD A's view showed the published named ranks and saved meeting
+order R001, R003, R002. MR remained private, with fictional Casey's own list
+locked and program progress at 2/3 submissions. Reset after publication returned
+to a clean preview with the acknowledgement unchecked and Open disabled. Desktop
+and 390px DOM checks showed
+the 24px colored dot above the 24px E/W marker, aligned right with no horizontal
+overflow.
+
+Sol identified a reset-generation race and a broken synthetic workbench link.
+Corrections make reset fence delayed actions and the linked page explain its fictional
+content. A bounded OAuth Opus source review found no blockers and noted only
+limitations; it preceded the reset correction. The final 42 focused tests in three
+suites passed. API-route and route-lifecycle-auth gates with their self-tests, and
+types, passed sequentially. Atlas and documentation-currency gates, plus
+fact-consistency checks and their self-tests, passed sequentially. No Production
+data, settings, deployment or real staff rankings changed during the rehearsal.
+Promotion remains pending owner approval. This does not complete the separate Production blank-slate
+requirement: before colleague use, cancel any unpublished trial, restore Beth as
+default facilitator, open a fresh round and verify only initial seed orders with
+no submissions, composites or meeting edits. Preserve source reviewer scores.
+
+## Office walkthrough simplification — 2026-10-08
+
+Opening now uses one Open round button and concise snapshot copy, without an
+acknowledgment checkbox or zero-review warning counts. Actual review warnings,
+readiness checks, preview fingerprint validation and uncertain-opening recovery
+remain. The owner required all participants to submit, so the UI no longer offers
+excusal and the service rejects the action. Source and focused mocked tests are
+the evidence; no live reads, writes or deployment are part of this change.
+
+### Separate working views
+
+[VERIFIED via source and local UI tests] My rankings shows only the current
+participant's own SE/MR lists, including when that participant is the facilitator.
+Facilitate shows progress, generation and publication, with individual lists as
+collapsed read-only reference material and administration collapsed separately.
+Meeting list shows only the selected program's published order; publishing SE
+never exposes MR. Before publication the default is My rankings for participants;
+a published program defaults to Meeting list. View changes remain blocked during
+pending or unresolved saves. Authorization and persisted ranking contracts are unchanged.
+
+The memory-only rehearsal uses named identity links opening separate tabs. Each
+tab retains its fictional identity on reload, and simulation/reset controls are
+under Rehearsal tools. Reset clears shared rehearsal memory; other tabs must reload.
+These UI changes remain on the unmerged feature branch, not promoted runtime.
+
+## Colleague dry-run erasure — 2026-10-08 (branch only)
+
+[VERIFIED via source and memory-adapter tests] An optional `dryRun: true` opening
+creates a clearly labeled trial. Only its current facilitator can invoke
+`resetDryRun`, including after publication. A real round cannot be relabeled or
+erased. Reset confirmation is invalidated by any intervening round write.
+
+The adapter atomically deletes all trial list records, scrubs the frozen snapshot
+and administration log, marks the round canceled and clears the cycle pointer.
+Only a content-free round/reset receipt remains for idempotent retries and delayed
+opening requests. It contains no rankings or composites. A separately opened new
+round uses fresh source inputs with zero submissions and no meeting edits. The
+source proposal and external-review records are untouched. Platform audit/backups
+and already viewed/exported copies are outside this application-record erasure.
+Their retention is UNKNOWN without the separately authorized live preflight.
+
+[PLANNED, not applied] The owner approved preparing Global Delete privilege on
+`wmkf_ProposalRankingList` for the application role only. The role JSON now includes
+it; coordinator and round privileges remain Create/Read/Write. The Production
+readiness probe derives its expected privilege set from that JSON. No live role
+application, reads, deployment, merge or trial erasure occurred in this session.
+Before a colleague Production trial: owner approves promotion and role application,
+verify role/readiness and current round/default facilitator, resolve any existing
+ordinary trial using its existing unpublished cancellation contract, then explicitly
+open a new dry run. Do not publish an old ordinary trial expecting this reset to work.
+
+## Combined SE + MR meeting order — 2026-10-08 (branch-only)
+
+[VERIFIED via source and focused memory tests] After every nonempty program is
+published, the facilitator can create `meeting:co` in the existing list entity.
+The two-character `wmkf_programkey` is `co`; no schema change is required. A round
+ETag-conditional PATCH and unique-key list POST commit together. Confirmation also
+binds that ETag, preventing a stale preview from silently using changed orders.
+
+The seed interleaves the latest SE/MR meeting orders by the next proposal's average
+PD rank (lower first, SE first on equality), preserving each program's internal
+order. It stores source orders/versions and original named ranks alongside its
+baseline. The list is shared immediately with the captured roster; later edits
+are independent of SE/MR. It adds no individual ballots and no source writes.
+Creation retries preserve edits. Dry-run reset deletes the combined row too.
+The UI shows an SE + MR tab after publication, with no individual-ranking view.
+
+This is local/feature-branch implementation, not a Production deployment or live
+Dataverse transaction verification. Existing release/preflight boundaries remain.
 
 ## Source and persistence
 
@@ -24,10 +216,11 @@ changesets under trusted DAL context and the existing target interlock.
 |---|---|---|
 | `wmkf_proposalrankingcycle` | `wmkf_proposalrankingcycles` | One coordinator per cycle, unique cycle key, active-round UUID text and version. Initial creation is POST, not upsert. |
 | `wmkf_proposalrankinground` | `wmkf_proposalrankingrounds` | Frozen proposal cards, score basis, seed orders and roster; facilitator, policy revision, active/canceled state, action receipts and administration events. Unique creation-operation key. |
-| `wmkf_proposalrankinglist` | `wmkf_proposalrankinglists` | One complete order per PD/program or meeting/program. Unique round/list key, ETag, immutable submitted inputs/composite beside mutable meeting order, terminal operation receipts. |
+| `wmkf_proposalrankinglist` | `wmkf_proposalrankinglists` | One complete order per PD/program, meeting/program, or combined `meeting:co`. Unique round/list key, ETag, immutable submitted inputs/composite beside mutable meeting order, terminal operation receipts. |
 
 Schema source: `lib/dataverse/schema/wave32-proposal-ranking/`. Application-only
-Create/Read/Write role: `lib/dataverse/schema/roles/proposal-ranking-app.json`.
+role: `lib/dataverse/schema/roles/proposal-ranking-app.json` (Create/Read/Write on
+all three tables; branch-only Delete addition on ranking lists as described above).
 There are no application lookup relationships on these tables; UUID text does not
 remove Dataverse's implicit audit relationships. Generic query privacy must also
 cover those relationships. Ordinary staff must receive no privileges on these
@@ -35,7 +228,8 @@ three tables. Tenant administrators remain privileged.
 
 Snapshots are bounded to 512 KiB, orders/composite JSON to 64 KiB, and administration
 logs to 128 KiB. Exceeding a bound rejects the write. Canceled rounds and submitted
-inputs are retained; this feature exposes no deletion or submission reopening.
+inputs in ordinary rounds are retained; only explicitly marked dry runs support
+atomic list erasure. Submission reopening remains unavailable.
 No Postgres migration, Blob store, AI call, funding decision writeback, or realtime
 synchronization service is introduced.
 
@@ -61,8 +255,10 @@ GUID in shared `wmkf_appsystemsetting` under
 [VERIFIED via source] The app receives filtered private/no-store responses. Before
 publication, each PD sees their own orders, the facilitator sees all, and a
 nonparticipant superuser receives only transfer metadata. Publishing one program
-reveals only that program's shared order and named submitted ranks. Excused PDs
-remain meeting participants but do not vote. A non-roster facilitator's successful
+reveals only that program's shared order and named submitted ranks. Every captured
+PD must submit; excusal is unavailable in the feature-branch UI and service. Older
+excusal snapshots retain their readable history but cannot generate or publish
+another composite. This 2026-10-08 change is not yet promoted. A non-roster facilitator's successful
 handoff returns a receipt without private data; subsequent access is denied.
 
 The UI serializes saves, retains the latest queued order, shows unconfirmed edits,
@@ -70,7 +266,7 @@ reconciles uncertain outcomes, and invalidates stale responses on scope/access
 changes. Cumulative requested amounts use frozen integer minor units and update
 with the visible order. No automatic budget cutoff is applied.
 
-## Activation checklist — sandbox setup partially complete
+## Historical sandbox activation checklist — before Production setup
 
 1. [VERIFIED via sandbox apply and readiness probe] Wave `32-proposal-ranking`
    is applied on `orgd9e66399.crm.dynamics.com`; all three entity identities, expected
@@ -272,9 +468,10 @@ population and Production metadata were not inspected.
 [VERIFIED via source and mocked regression tests] The source adapter now batches
 reads of eligible requests' applicant accounts and maps only the two verified
 choice values to `institutionGeography: 'East' | 'West' | null`. The preview carries
-that field into its fingerprint and frozen snapshot. The shared proposal card shows
-a prominent E/W in the upper-right corner, with an accessible East/West institution
-label. Unknown/missing values and older snapshots show no letter. Existing snapshots
+that field into its fingerprint and frozen snapshot. The initial shared-card
+implementation showed a prominent E/W in the upper-right corner with an accessible
+East/West institution label. The marker-placement follow-up below moves it to the
+lower-right. Unknown/missing values and older snapshots show no letter. Existing snapshots
 are not rewritten or live-refreshed; ranking calculations and eligibility are unchanged.
 Failed/capped account queries reject the preview through the existing complete-read
 contract. No schema, environment, grant or live data changes were made.
@@ -285,8 +482,9 @@ raw account choices, unknown values, frozen preview/fingerprint and legacy-card
 omission. Changed-file lint, types, Dataverse/OData and Atlas/doc gates pass with
 self-tests run sequentially. The actual card component was rendered in isolated
 Chrome with synthetic fixtures at 1100px and 390px: markers are 24px, at the upper
-right, with no horizontal overflow. This is a component layout check, not live
-sandbox acceptance. Luna implemented; Sol and the orchestrator reviewed without
+right in the original layout, with no horizontal overflow. This is a component
+layout check, not live sandbox acceptance; the later marker placement is verified
+in the isolated rehearsal section above. Luna implemented; Sol and the orchestrator reviewed without
 substantive blockers. After the owner explicitly authorized further OAuth-only
 Opus reviews, `claude-opus-5-5` reviewed `d2cc82fdf` and returned **APPROVE**.
 It traced the raw numeric DTO, strict option mapping, complete reads, snapshot,
@@ -299,10 +497,13 @@ paragraph retains the verdict, scope and disposition. OAuth authentication was
 verified as `claude.ai`; API-key environment variables were removed.
 
 
-## Approximate reviewer-rating color — 2026-10-07
+## Historical approximate reviewer-rating color — 2026-10-07
 
-The shared card displays a 24px lower-right circle using ten solid colors from red
-through yellow to green, from the frozen `score.mean`. `reviewerScoreIndicator` in
+The initial shared-card implementation displayed a 24px lower-right circle using
+ten solid colors from red through yellow to green, from the frozen `score.mean`.
+The later marker-placement checkpoint moved it to the upper-right; the current
+card instead uses reviewer-grade pills, as described in the current placement section.
+`reviewerScoreIndicator` in
 `shared/components/proposal-ranking/model.js` selects
 `Math.round(((mean - 1) / 4) * 9)` for finite means in [1,5] with at least one rated
 review. Other inputs show gray. The numeric score remains visible and the circle
@@ -314,13 +515,14 @@ change source reads, snapshots, displayed scores, seed ordering or composites.
 Validation: 126 tests in 12 ranking/Explorer suites pass; lint, types, Atlas and
 currency gates/self-tests pass. Isolated actual-component Chrome renders at 1100px
 and 390px verified all ten colors plus gray, 24px circle dimensions, editable and
-read-only placement, and no overflow. Luna built; Sol and one bounded subscription
+read-only placement in the original layout, and no overflow. The later marker
+placement is verified in the isolated rehearsal section above. Luna built; Sol and one bounded subscription
 OAuth-only Opus source review approved. Opus's nonblocking tooltip-rounding note
 was corrected to use the same rounding as the visible score, with a regression
 for 4.35 → 4.4. No additional review loop or live data access was needed. Local
 review receipt: `/private/tmp/ranking-rating-opus-review.txt` (not portable).
 
-## Production access and privacy — 2026-10-07
+## Historical Production access and privacy checkpoint — 2026-10-07
 
 [VERIFIED via live apply and independent GET readback] Beth Pruitt is the configured
 default facilitator. Justin Gallivan, John Sader, Jean Kim and Beth have app grants;
@@ -334,7 +536,7 @@ branch generic-reader privacy guards: deploy these before opening a live round.
 Promotion/activation and full browser acceptance remain owner decisions. Effective
 impersonation is not staff OAuth browser proof or populated audit/navigation proof.
 
-## Production activation — 2026-10-07
+## Historical Production activation checkpoint — 2026-10-07
 
 [VERIFIED via full preview builder, single-variable config readback and Chrome]
 Both ranking flags are on; both isolation flags and Dataverse controls remain on.
@@ -398,3 +600,23 @@ The full live read-only preview reports 23 names, zero missing/placeholder names
 `canOpen=true`, four PDs, 11 SE / 12 MR and unchanged 9 East / 14 West. Luna built;
 Sol and one bounded subscription-OAuth Opus review found no substantive blocker.
 No source writes, new round, score edits or snapshot backfill occurred.
+
+[VERIFIED deployed and browser-checked] PR #462 merged as
+`f7a75fc5358649ab30765504ea6e6b35cdf00bb4`; Production deployment
+`dpl_FNFvVWUzPaiNgdQ7Uh1DgK526hHx` is READY with live aliases. Justin's refreshed
+D26 facilitator preview displays names on all 23 cards, no unavailable/N/A labels,
+including Johns Hopkins, UT Southwestern and UC Santa Barbara. Open acknowledgement
+remains unchecked; no round was opened. Full CI passed on `e9d40cfc5`; the final
+merge `cc6ef1823` changed only SESSION_PROMPT.md to retain the concurrently restored
+main handoff, passed documentation gates, and had identical runtime/test source.
+The mandatory unpublished-trial reset before colleague use remains in force.
+
+## Current card context placement — feature branch
+
+[VERIFIED via current `ProposalRankingApp.js` source] Program and institution
+geography badges sit at the upper right. Geography is visible only in published
+Meeting list cards, alongside research history; preparation views hide both.
+Reviewer-grade pills and their numeric mean remain visible in all card views.
+Named PD ranks and their average appear on composite/meeting cards. No Production
+deployment or current live appearance is claimed here. These displays change no
+scientific score, calculation, eligibility or frozen source data.

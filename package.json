@@ -113,6 +113,7 @@
     "report:claim-evidence-pilot": "node scripts/report-claim-evidence-pilot.js"
   },
   "dependencies": {
+    "@hello-pangea/dnd": "18.0.1",
     "@tiptap/extension-link": "^3.31.3",
     "@tiptap/extension-subscript": "^3.31.3",
     "@tiptap/extension-superscript": "^3.31.3",

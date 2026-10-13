@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
 import { Button, Card, PageHeader } from '../Layout';
 import { conventionalCycles, cycleCodeToLabel, resolveWorkingCycle } from '../../../lib/utils/cycle-code';
 import { createOperationId, loadProposalRanking, sendProposalRankingAction } from './client';
-import { buildCumulativeTotals, errorMessage, formatMoney, formatScore, moveProposal, PROGRAMS, reviewerScoreIndicator } from './model';
+import { buildCumulativeTotals, buildRankingCsv, errorMessage, formatMoney, moveProposal, PROGRAMS, pdRankColor } from './model';
 
 const EMPTY_CAPABILITIES = {
   preview: false, open: false, saveOwnList: false, submitOwnList: false,
   generate: false, editMeetingOrder: false, publish: false,
-  transferFacilitator: false, excuseParticipant: false, cancelRound: false,
+  transferFacilitator: false, excuseParticipant: false, cancelRound: false, resetDryRun: false,
 };
 const EMPTY_ORDER = [];
 
@@ -32,7 +33,26 @@ function StatusBanner({ kind = 'info', children, className = '' }) {
   return <div role={kind === 'error' ? 'alert' : 'status'} className={`rounded-lg border px-4 py-3 text-sm ${classes[kind]} ${className}`}>{children}</div>;
 }
 
-function ProposalCardRow({ proposal, position, count, total, score, rank, editable, onMove, dragging, onDragStart, onDragOver, onDrop, onDragEnd }) {
+function ResearchFundingContext({ history }) {
+  const known = (history?.status === 'available' || history?.status === 'provisional')
+    && Number.isFinite(history.totalUsd) && history.totalUsd >= 0
+    && Number.isInteger(history.qualifyingGrantCount) && history.qualifyingGrantCount >= 0;
+  const zero = known && history.qualifyingGrantCount === 0 && history.totalUsd === 0;
+  const cycle = typeof history?.lastAwardCycle === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(history.lastAwardCycle)
+    ? new Date(`${history.lastAwardCycle}-01T00:00:00Z`) : null;
+  const total = known ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(history.totalUsd) : 'Unavailable';
+  const latest = !known ? 'Unavailable' : zero ? 'None on record' : cycle
+    ? new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(cycle) : 'Unavailable';
+  return <div className="mt-3 text-xs text-gray-600">
+    <dl aria-label="Institution research funding history" className="flex flex-wrap gap-x-6 gap-y-2">
+      <div><dt>Prior research funding</dt><dd className="font-medium tabular-nums text-gray-800">{total}{known && history.status === 'provisional' ? ' (provisional)' : ''}</dd></div>
+      <div><dt>Latest qualifying award</dt><dd className="font-medium text-gray-800">{latest}</dd></div>
+    </dl>
+    {known && history.status === 'provisional' && <p className="mt-1 text-amber-800">Some historical awards need classification review.</p>}
+  </div>;
+}
+
+function ProposalCardRow({ proposal, position, programCount, total, score, rank, editable, dragging, dragProvided, showInstitutionContext = false }) {
   const amount = proposal.amountMinorUnits == null
     ? 'Requested amount unavailable'
     : formatMoney(proposal.amountMinorUnits, proposal.currency);
@@ -40,84 +60,85 @@ function ProposalCardRow({ proposal, position, count, total, score, rank, editab
     ? formatMoney(total.cumulativeMinorUnits, proposal.currency, { incomplete: !total.complete })
     : 'Total incomplete';
   const rankNames = rank?.participants || [];
-  const scoreIndicator = reviewerScoreIndicator(proposal.score);
   return (
     <li
-      className={`rounded-xl border border-gray-200 bg-white shadow-sm ${dragging ? 'opacity-50' : ''}`}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
+      ref={dragProvided?.innerRef}
+      {...dragProvided?.draggableProps}
+      className={`mb-3 rounded-xl border bg-white ${dragging ? 'border-blue-600 shadow-xl ring-2 ring-blue-500' : 'border-gray-200 shadow-sm'}`}
     >
       <div className="flex min-w-0 items-stretch">
         {editable && <div
-          aria-label={`Drag proposal ${proposal.requestNumber} to reorder`}
-          aria-hidden="true"
-          draggable
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
+          aria-label={`Drag ${proposal.title || 'Untitled proposal'} to reorder`}
+          {...dragProvided?.dragHandleProps}
           title="Drag to reorder"
           className="flex w-8 shrink-0 cursor-grab items-center justify-center border-r border-gray-200 bg-gray-50 text-gray-400 active:cursor-grabbing"
         >
-          <span aria-hidden="true">⠿</span>
+          <svg aria-hidden="true" width="16" height="24" viewBox="0 0 16 24" fill="currentColor"><circle cx="5" cy="6" r="1.5" /><circle cx="11" cy="6" r="1.5" /><circle cx="5" cy="12" r="1.5" /><circle cx="11" cy="12" r="1.5" /><circle cx="5" cy="18" r="1.5" /><circle cx="11" cy="18" r="1.5" /></svg>
         </div>}
-        <div className="min-w-0 flex-1 p-4">
-          <div className="mb-2 flex justify-end">
-            {(proposal.institutionGeography === 'East' || proposal.institutionGeography === 'West') && <p
+        <div className="relative min-w-0 flex-1 space-y-3 p-4">
+          <div className="absolute right-4 top-4 flex gap-2">
+            <span aria-label={`Program: ${proposal.programKey.toUpperCase()}`} className="inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-gray-500 text-sm font-semibold text-gray-800">{proposal.programKey.toUpperCase()}</span>
+            {showInstitutionContext && (proposal.institutionGeography === 'East' || proposal.institutionGeography === 'West') && <span
               role="img"
               aria-label={`${proposal.institutionGeography} institution`}
               title={`${proposal.institutionGeography} institution`}
-              className="text-2xl font-bold leading-none text-gray-900"
-            >{proposal.institutionGeography[0]}</p>}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border-2 border-gray-500 text-sm font-semibold text-gray-800"
+            >{proposal.institutionGeography[0]}</span>}
           </div>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                {proposal.programKey.toUpperCase()} · Position {position + 1} of {count} · #{proposal.requestNumber}
+          <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[auto_minmax(0,1fr)]">
+            <span aria-label={`Rank ${position + 1}: ${proposal.title || 'Untitled proposal'}`} className="min-w-8 shrink-0 text-3xl font-bold leading-none tabular-nums text-gray-900">{position + 1}</span>
+            <div className="min-w-0">
+              <h3 className="break-words pr-24 text-base font-semibold leading-snug text-gray-900">{proposal.organization || 'Organization unavailable'}</h3>
+              <p className="mt-1 break-words pr-24 text-sm">
+                <a href={`/workbench/${encodeURIComponent(proposal.requestId)}`} className="text-blue-800 underline underline-offset-2 hover:text-blue-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">{proposal.title || 'Untitled proposal'}</a>
               </p>
-              <h3 className="mt-1 break-words text-base font-semibold text-gray-900">{proposal.title || 'Untitled proposal'}</h3>
-              <p className="mt-1 text-sm text-gray-600">{proposal.organization || 'Organization unavailable'}</p>
-              {proposal.leadName && <p className="mt-1 text-sm text-gray-600">Lead PD: {proposal.leadName}</p>}
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                <span><span className="font-medium text-gray-700">Requested:</span> {amount}</span>
-                <span><span className="font-medium text-gray-700">Review score:</span> {formatScore(proposal.score)}</span>
-                {score && <span><span className="font-medium text-gray-700">Composite:</span> {score.averageRank.toFixed(2)}{score.tied ? ' · tied' : ''}</span>}
-                {rank?.disagreement && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">Disagreement</span>}
+              {(proposal.leadName || rank?.disagreement) && <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-medium text-gray-600">
+                {proposal.leadName && <span>Lead PD: {proposal.leadName}</span>}
+                {rank?.disagreement && <span className="rounded-md bg-amber-100 px-2 py-0.5 text-amber-900">Disagreement</span>}
+              </div>}
+              {showInstitutionContext && <ResearchFundingContext history={proposal.researchFunding} />}
+              <div className="mt-3 space-y-3">
+                <div className="flex flex-wrap items-center gap-1.5 text-sm">
+                  <span className="mr-1 font-medium text-gray-700">Reviews</span>
+                  {proposal.score?.ratedCount > 0 && proposal.score?.distribution
+                    ? [['Excellent', 'E'], ['Very Good', 'VG'], ['Good', 'G'], ['Fair', 'F'], ['Poor', 'P']].flatMap(([rating, grade]) =>
+                      Array.from({ length: proposal.score.distribution[rating] || 0 }, (_, index) => <span
+                        key={`${rating}-${index}`}
+                        title={rating}
+                        aria-label={rating}
+                        className="inline-flex min-w-7 items-center justify-center rounded-md bg-gray-100 px-2 py-0.5 font-semibold text-gray-800"
+                      >{grade}</span>))
+                    : <span className="text-gray-500">Not scored</span>}
+                  {proposal.score?.ratedCount > 0 && Number.isFinite(proposal.score?.displayMean) && <span title="Average reviewer grade" aria-label={`Average reviewer grade: ${proposal.score.displayMean.toFixed(1)}`} className="ml-1 inline-flex min-w-7 items-center justify-center rounded-md bg-gray-100 px-2 py-0.5 font-semibold text-gray-800">{proposal.score.displayMean.toFixed(1)}</span>}
+                </div>
+                <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+                  {rankNames.length > 0 && (
+                    <ul aria-label="PD ranks" className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-700">
+                      {rankNames.map((entry) => <li key={entry.systemUserId} className="flex items-center gap-1.5 font-semibold" title={`${entry.name}: rank ${entry.rank} of ${programCount}`}>
+                        {entry.name.trim().split(/\s+/)[0] || 'PD'}
+                        <span aria-label={`${entry.name}: rank ${entry.rank} of ${programCount}`} style={{ backgroundColor: `${pdRankColor(entry.rank, programCount)}33` }} className="inline-flex min-w-7 items-center justify-center rounded-md px-2 py-0.5 font-semibold text-gray-900">{entry.rank}</span>
+                      </li>)}
+                      {score && <li className="flex items-center gap-1.5 font-semibold">
+                        Average
+                        <span aria-label={`Average PD rank: ${score.averageRank.toFixed(2)}`} title={`Average PD rank within ${proposal.programKey.toUpperCase()}${score.tied ? ' · tied' : ''}`} style={{ backgroundColor: `${pdRankColor(score.averageRank, programCount)}33` }} className="inline-flex min-w-7 items-center justify-center rounded-md px-2 py-0.5 font-semibold text-gray-900">{score.averageRank.toFixed(2)}</span>
+                        {score.tied && <span className="text-xs font-normal text-gray-500">tied</span>}
+                      </li>}
+                    </ul>
+                  )}
+                  <div className="ml-auto flex flex-wrap justify-end items-start gap-x-6 gap-y-2 text-right text-sm">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-gray-600">Requested</p>
+                      <p className="mt-1 font-semibold tabular-nums text-gray-900">{amount}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-gray-600">Cumulative Budget</p>
+                      <p className="mt-1 font-semibold tabular-nums text-gray-900">{accumulated}</p>
+                      {!total?.complete && <p className="mt-1 text-xs text-amber-800">A requested amount is missing or incompatible.</p>}
+                    </div>
+                  </div>
+                </div>
               </div>
-              {proposal.score?.distribution && <details className="mt-2 text-xs text-gray-600">
-                <summary className="cursor-pointer font-medium">Review rating distribution</summary>
-                <p className="mt-1">{Object.entries(proposal.score.distribution).map(([rating, count]) => `${rating}: ${count}`).join(' · ') || 'No scored reviews'}</p>
-              </details>}
-              {rankNames.length > 0 && (
-                <details className="mt-2 text-sm text-gray-700">
-                  <summary className="cursor-pointer font-medium">Named PD ranks ({rankNames.length})</summary>
-                  <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                    {rankNames.map((entry) => <li key={entry.systemUserId}>{entry.name}: {entry.rank}</li>)}
-                  </ul>
-                  <p className="mt-1 text-xs text-gray-500">Range: {rank.minRank}–{rank.maxRank}</p>
-                </details>
-              )}
-              <a
-                href={`/workbench/${encodeURIComponent(proposal.requestId)}`}
-                className="mt-2 inline-flex text-sm font-semibold text-blue-800 underline underline-offset-2 hover:text-blue-950"
-              >Open proposal #{proposal.requestNumber}</a>
             </div>
-            <div className="w-full rounded-lg bg-gray-50 p-3 text-sm sm:w-52">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Requested through this rank</p>
-              <p className="mt-1 font-semibold tabular-nums text-gray-900">{accumulated}</p>
-              {!total?.complete && <p className="mt-1 text-xs text-amber-800">A requested amount is missing or incompatible.</p>}
-            </div>
-          </div>
-          <div className="mt-3 flex items-center justify-between gap-3">
-            {editable ? <div className="flex gap-2">
-              <button type="button" aria-label={`Move proposal ${proposal.requestNumber} up`} disabled={position === 0} onClick={() => onMove(position, position - 1)} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">Move up</button>
-              <button type="button" aria-label={`Move proposal ${proposal.requestNumber} down`} disabled={position >= count - 1} onClick={() => onMove(position, position + 1)} className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">Move down</button>
-            </div> : <span />}
-            <span
-              role="img"
-              aria-label={scoreIndicator.label}
-              title={scoreIndicator.label}
-              className="h-6 w-6 shrink-0 rounded-full border border-gray-600"
-              style={{ backgroundColor: scoreIndicator.color }}
-            />
           </div>
         </div>
       </div>
@@ -125,8 +146,9 @@ function ProposalCardRow({ proposal, position, count, total, score, rank, editab
   );
 }
 
-function ProposalOrder({ list, proposals, order, editable, saveState, composite, remoteOrder, onMove, onRetry }) {
-  const [draggingIndex, setDraggingIndex] = useState(null);
+function ProposalOrder({ list, proposals, order, editable, saveState, composite, remoteOrder, onMove, onRetry, showInstitutionContext = false }) {
+  const [dropPosition, setDropPosition] = useState(null);
+  const previewId = useId();
   const byId = useMemo(() => new Map(proposals.map((proposal) => [proposal.requestId, proposal])), [proposals]);
   const activeOrder = order || list?.order || EMPTY_ORDER;
   const totals = useMemo(() => buildCumulativeTotals(activeOrder, proposals), [activeOrder, proposals]);
@@ -146,43 +168,44 @@ function ProposalOrder({ list, proposals, order, editable, saveState, composite,
           <p className="mt-1">{remoteOrder.map((requestId) => `#${byId.get(requestId)?.requestNumber || requestId}`).join(' → ')}</p>
         </details>}
       </div>}
-      <ol className="space-y-3" aria-label="Proposal ranking order">
-        {activeOrder.map((requestId, position) => {
-          const proposal = byId.get(requestId);
-          if (!proposal) return null;
-          const score = composite?.scores?.[requestId];
-          return <ProposalCardRow
-            key={requestId}
-            proposal={proposal}
-            position={position}
-            count={activeOrder.length}
-            total={totalsById.get(requestId)}
-            score={score || null}
-            rank={ranksById.get(requestId)}
-            editable={editable}
-            dragging={draggingIndex === position}
-            onMove={onMove}
-            onDragStart={(event) => {
-              setDraggingIndex(position);
-              try { event.dataTransfer?.setData('text/plain', String(position)); } catch { /* test/browser may omit dataTransfer */ }
-              try { if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'; } catch { /* test/browser may omit dataTransfer */ }
-            }}
-            onDragOver={(event) => { if (draggingIndex !== null) event.preventDefault(); }}
-            onDrop={(event) => {
-              event.preventDefault();
-              const from = draggingIndex;
-              if (from !== null && from !== position) onMove(from, position);
-              setDraggingIndex(null);
-            }}
-            onDragEnd={() => setDraggingIndex(null)}
-          />;
-        })}
-      </ol>
+      <DragDropContext
+        onDragStart={({ source }) => setDropPosition(source.index)}
+        onDragUpdate={({ destination }) => setDropPosition(destination?.index ?? null)}
+        onDragEnd={({ source, destination, reason }) => {
+          setDropPosition(null);
+          if (editable && reason === 'DROP' && destination && destination.droppableId === source.droppableId && destination.index !== source.index) onMove(source.index, destination.index);
+        }}
+      >
+        {dropPosition !== null && <p className="pointer-events-none fixed bottom-6 right-6 z-50 rounded-md bg-blue-800 px-3 py-2 text-sm font-semibold text-white">Drop at position {dropPosition + 1} of {activeOrder.length}</p>}
+        <Droppable droppableId={list?.listKey || previewId} isDropDisabled={!editable}>
+          {(provided, snapshot) => <ol ref={provided.innerRef} {...provided.droppableProps} className={`rounded-xl ${snapshot.isDraggingOver ? 'bg-blue-100 ring-2 ring-blue-400' : ''}`} aria-label="Proposal ranking order">
+            {activeOrder.map((requestId, position) => {
+              const proposal = byId.get(requestId);
+              if (!proposal) return null;
+              return <Draggable key={requestId} draggableId={requestId} index={position} isDragDisabled={!editable}>
+                {(dragProvided, dragSnapshot) => <ProposalCardRow
+                  proposal={proposal}
+                  showInstitutionContext={showInstitutionContext}
+                  position={position}
+                  programCount={proposals.filter((item) => item.programKey === proposal.programKey).length}
+                  total={totalsById.get(requestId)}
+                  score={composite?.scores?.[requestId] || null}
+                  rank={ranksById.get(requestId)}
+                  editable={editable}
+                  dragging={dragSnapshot.isDragging}
+                  dragProvided={dragProvided}
+                />}
+              </Draggable>;
+            })}
+            {provided.placeholder}
+          </ol>}
+        </Droppable>
+      </DragDropContext>
     </div>
   );
 }
 
-function SubmissionLists({ response, program, proposals, isFacilitator, onSubmit, submitting, saveStates, localOrders, remoteOrders, onMove, onRetry }) {
+function SubmissionLists({ response, program, proposals, isFacilitator, readOnly = false, onSubmit, submitting, saveStates, localOrders, remoteOrders, onMove, onRetry }) {
   const data = response.programs?.[program.key];
   const lists = isFacilitator
     ? (data?.facilitatorLists || [])
@@ -193,7 +216,7 @@ function SubmissionLists({ response, program, proposals, isFacilitator, onSubmit
   return <div className="space-y-4">
     {lists.map((list) => {
       const localOrder = localOrders[list.listKey];
-      const editable = list.owner?.systemUserId === response.viewer.systemUserId
+      const editable = !readOnly && list.owner?.systemUserId === response.viewer.systemUserId
         && response.viewer.capabilities.saveOwnList
         && list.status === 'draft'
         && response.round.state === 'active';
@@ -233,7 +256,8 @@ function ConfirmationBox({ confirmation, label, busy, onConfirm, onCancel }) {
   </div>;
 }
 
-function ProgramPanel({ response, program, isFacilitator, localOrders, remoteOrders, saveStates, actionBusy, hasUnresolvedSave, submitting, onMove, onSubmit, onGenerate, onPublish, pendingConfirmation, setPendingConfirmation, confirmations, onRetry }) {
+function ProgramPanel({ response, program, isFacilitator, view, localOrders, remoteOrders, saveStates, actionBusy, hasUnresolvedSave, submitting, onMove, onSubmit, onGenerate, onPublish, pendingConfirmation, setPendingConfirmation, confirmations, onRetry }) {
+  const combined = program.key === 'co';
   const programData = response.programs?.[program.key] || {};
   const proposalById = new Map((response.round?.snapshot.proposals || []).map((proposal) => [proposal.requestId, proposal]));
   const proposals = (programData.proposalIds || []).map((id) => proposalById.get(id)).filter(Boolean);
@@ -242,32 +266,72 @@ function ProgramPanel({ response, program, isFacilitator, localOrders, remoteOrd
   const generated = meetingStatus === 'composite-draft' || meetingStatus === 'published';
   const published = meetingStatus === 'published';
   const totalSubmissions = programData.progress || { required: 0, submitted: 0, outstandingNames: [] };
-  const activeConfirmation = pendingConfirmation?.programKey === program.key ? pendingConfirmation : null;
+  const activeConfirmation = view === 'facilitate' && pendingConfirmation?.programKey === program.key ? pendingConfirmation : null;
   const currentConfirmations = confirmations || response.confirmations;
-  const meetingCanEdit = Boolean(response.round.state === 'active' && response.viewer.capabilities.editMeetingOrder && (meetingStatus === 'composite-draft' || published));
+  const meetingCanEdit = Boolean(response.round.state === 'active' && response.viewer.capabilities.editMeetingOrder && published);
   const listKey = meeting?.listKey;
+  const exportOrder = () => {
+    if (!published || actionBusy || hasUnresolvedSave) return;
+    const csv = buildRankingCsv(meeting.order, proposals);
+    const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `proposal-ranking-${response.cycleCode}-${program.key}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
   return <section aria-labelledby={`program-heading-${program.key}`} className="mt-5">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h2 id={`program-heading-${program.key}`} className="text-xl font-semibold text-gray-900">{program.label}</h2>
-        {programData.proposalIds?.length > 0 && <p className="mt-1 text-sm text-gray-600">{totalSubmissions.submitted} of {totalSubmissions.required} required PD submissions received.</p>}
+        {!combined && programData.proposalIds?.length > 0 && <p className="mt-1 text-sm text-gray-600">{totalSubmissions.submitted} of {totalSubmissions.required} required PD submissions received.</p>}
       </div>
       <div className="flex flex-wrap gap-2">
-        {response.round.state === 'active' && response.viewer.capabilities.generate && meetingStatus === 'collecting' && <Button type="button" size="sm" disabled={actionBusy || hasUnresolvedSave || !currentConfirmations.generate?.[program.key]} onClick={() => setPendingConfirmation({ action: 'generate', programKey: program.key })}>Generate {program.shortLabel} draft</Button>}
-        {response.round.state === 'active' && response.viewer.capabilities.publish && meetingStatus === 'composite-draft' && <Button type="button" size="sm" disabled={actionBusy || hasUnresolvedSave || !currentConfirmations.publish?.[program.key]} onClick={() => setPendingConfirmation({ action: 'publish', programKey: program.key })}>Publish {program.shortLabel}</Button>}
+        {view === 'meeting' && published && <Button type="button" variant="outline" size="sm" disabled={actionBusy || hasUnresolvedSave} onClick={exportOrder}>Export ranked list</Button>}
+        {view === 'facilitate' && response.round.state === 'active' && response.viewer.capabilities.generate && (meetingStatus === 'collecting' || (combined && !meeting)) && <Button type="button" size="sm" disabled={actionBusy || hasUnresolvedSave || !currentConfirmations.generate?.[program.key]} onClick={() => setPendingConfirmation({ action: 'generate', programKey: program.key })}>{combined ? 'Create combined meeting list' : `Generate ${program.shortLabel} draft`}</Button>}
+        {view === 'facilitate' && response.round.state === 'active' && response.viewer.capabilities.publish && meetingStatus === 'composite-draft' && <Button type="button" size="sm" disabled={actionBusy || hasUnresolvedSave || !currentConfirmations.publish?.[program.key]} onClick={() => setPendingConfirmation({ action: 'publish', programKey: program.key })}>Publish {program.shortLabel}</Button>}
       </div>
     </div>
+      {activeConfirmation?.action === 'generate' && <ConfirmationBox confirmation={currentConfirmations.generate?.[program.key]} label={combined ? 'create the shared combined meeting list' : `generate the ${program.label} draft`} busy={actionBusy} onConfirm={() => onGenerate(program.key)} onCancel={() => setPendingConfirmation(null)} />}
+      {activeConfirmation?.action === 'publish' && <ConfirmationBox confirmation={currentConfirmations.publish?.[program.key]} label={`publish the ${program.label} order`} busy={actionBusy} onConfirm={() => onPublish(program.key)} onCancel={() => setPendingConfirmation(null)} />}
+    {combined && !meeting && <p className="mt-3 text-sm text-gray-600">Settle the separate SE and MR meeting orders before creating the combined list.</p>}
     {programData.proposalIds?.length === 0 ? <p className="mt-4 rounded-lg bg-gray-50 p-4 text-sm text-gray-600">No proposals in this program. No individual lists or composite are required.</p> : <>
-      {programData.progress && <div className="mt-3 flex flex-wrap gap-2 text-xs">
-        <span className={`rounded-full px-2.5 py-1 font-semibold ${published ? 'bg-green-100 text-green-900' : 'bg-gray-100 text-gray-700'}`}>{published ? 'Published meeting order' : meetingStatus === 'composite-draft' ? 'Facilitator draft' : 'Collecting submissions'}</span>
+      {view === 'meeting' && !published && <StatusBanner className="mt-3">{combined ? 'Waiting for the facilitator to create the combined meeting list.' : 'This program has not been published yet. Your own list is in My rankings.'}</StatusBanner>}
+      {view === 'facilitate' && published && <StatusBanner className="mt-3">Published. Continue the discussion in Meeting list.</StatusBanner>}
+      {view === 'facilitate' && !combined && programData.progress && <div className="mt-3 flex flex-wrap gap-2 text-xs">
+        <span className={`rounded-full px-2.5 py-1 font-semibold ${published ? 'bg-green-100 text-green-900' : 'bg-gray-100 text-gray-700'}`}>{published ? 'Published meeting order' : meetingStatus === 'composite-draft' ? 'Review the draft, then publish' : totalSubmissions.required > 0 && totalSubmissions.submitted === totalSubmissions.required ? (isFacilitator ? 'All rankings submitted. Generate the draft to continue.' : 'All rankings submitted. Waiting for the facilitator to prepare the meeting list.') : 'Collecting submissions'}</span>
       </div>}
-      {isFacilitator && <div className="mt-5">
-        <h3 className="mb-3 text-base font-semibold text-gray-900">Individual PD rankings</h3>
+      {meeting && generated && ((view === 'facilitate' && isFacilitator && !published) || (view === 'meeting' && published && (isFacilitator || response.viewer.isRosterParticipant))) && <div className="mt-6 border-t border-gray-200 pt-5">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">{published ? 'Shared meeting order' : 'Calculated starting order'}</h3>
+            <p className="mt-1 text-sm text-gray-600">{combined ? 'Starting order compares PD average ranks while preserving each program’s order at creation. Edits here and in SE or MR are independent.' : published ? 'The original PD rankings remain separate from this meeting order.' : 'Publish this calculated order unchanged to begin the group discussion. Cards can be moved in the meeting.'}</p>
+          </div>
+          {published && <p className="text-sm text-green-800">Changes save to the shared order. Refresh on other devices to see updates.</p>}
+        </div>
+        <ProposalOrder
+          list={meeting}
+          showInstitutionContext={published}
+          proposals={proposals}
+          order={published ? localOrders[listKey] : meeting.composite?.baselineOrder}
+          editable={meetingCanEdit && !actionBusy}
+          saveState={saveStates[listKey]}
+          composite={meeting.composite}
+          remoteOrder={remoteOrders[listKey]}
+          onMove={(from, to) => onMove(meeting, moveProposal(localOrders[listKey] || meeting.order, from, to), 'edit')}
+          onRetry={() => onRetry(meeting)}
+        />
+      </div>}
+      {view === 'facilitate' && isFacilitator && !combined && <details key={program.key} className="mt-5">
+        <summary className="mb-3 cursor-pointer text-base font-semibold text-gray-900">Individual PD rankings</summary>
         <SubmissionLists
           response={response}
           program={program}
           proposals={proposals}
           isFacilitator
+          readOnly
           onSubmit={onSubmit}
           submitting={submitting}
           saveStates={saveStates}
@@ -276,9 +340,10 @@ function ProgramPanel({ response, program, isFacilitator, localOrders, remoteOrd
           onMove={onMove}
           onRetry={onRetry}
         />
-      </div>}
-      {!isFacilitator && response.viewer.isRosterParticipant && !published && <div className="mt-5">
+      </details>}
+      {view === 'mine' && response.viewer.isRosterParticipant && <div className="mt-5">
         <h3 className="mb-3 text-base font-semibold text-gray-900">Your private ranking</h3>
+        {programData.ownList?.status === 'submitted' && <StatusBanner className="mb-3">{published ? 'Your ranking is submitted. The published order is in Meeting list.' : isFacilitator ? 'Your ranking is submitted. Continue in Facilitate when everyone has submitted.' : 'Submitted—waiting for the facilitator.'}</StatusBanner>}
         <SubmissionLists
           response={response}
           program={program}
@@ -293,28 +358,8 @@ function ProgramPanel({ response, program, isFacilitator, localOrders, remoteOrd
           onRetry={onRetry}
         />
       </div>}
-      {meeting && generated && (isFacilitator || (published && response.viewer.isRosterParticipant)) && <div className="mt-6 border-t border-gray-200 pt-5">
-        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="text-base font-semibold text-gray-900">{published ? 'Shared meeting order' : 'Facilitator composite draft'}</h3>
-            <p className="mt-1 text-sm text-gray-600">The original PD rankings remain separate from this meeting order.</p>
-          </div>
-          {published && <p className="text-sm text-green-800">Changes save to the shared order. Refresh on other devices to see updates.</p>}
-        </div>
-        <ProposalOrder
-          list={meeting}
-          proposals={proposals}
-          order={localOrders[listKey]}
-          editable={meetingCanEdit && !actionBusy}
-          saveState={saveStates[listKey]}
-          composite={meeting.composite}
-          remoteOrder={remoteOrders[listKey]}
-          onMove={(from, to) => onMove(meeting, moveProposal(localOrders[listKey] || meeting.order, from, to), 'edit')}
-          onRetry={() => onRetry(meeting)}
-        />
-      </div>}
-      {activeConfirmation?.action === 'generate' && <ConfirmationBox confirmation={currentConfirmations.generate?.[program.key]} label={`generate the ${program.label} draft`} busy={actionBusy} onConfirm={() => onGenerate(program.key)} onCancel={() => setPendingConfirmation(null)} />}
-      {activeConfirmation?.action === 'publish' && <ConfirmationBox confirmation={currentConfirmations.publish?.[program.key]} label={`publish the ${program.label} order`} busy={actionBusy} onConfirm={() => onPublish(program.key)} onCancel={() => setPendingConfirmation(null)} />}
+
+
     </>}
   </section>;
 }
@@ -323,6 +368,7 @@ export default function ProposalRankingApp() {
   const options = useMemo(() => cycleOptions(), []);
   const [cycleCode, setCycleCode] = useState(() => resolveWorkingCycle(conventionalCycles()) || options[0]?.code || '');
   const [selectedProgram, setSelectedProgram] = useState('se');
+  const [viewChoice, setViewChoice] = useState(null);
   const [response, setResponse] = useState(null);
   const responseRef = useRef(null);
   const [responseScopeKey, setResponseScopeKey] = useState(null);
@@ -338,13 +384,11 @@ export default function ProposalRankingApp() {
   const saveStatesRef = useRef({});
   const [submitting, setSubmitting] = useState(null);
   const [pendingConfirmation, setPendingConfirmation] = useState(null);
-  const [excuseSelection, setExcuseSelection] = useState('');
-  const [excuseReason, setExcuseReason] = useState('');
   const [transferSelection, setTransferSelection] = useState('');
-  const [excuseConfirmed, setExcuseConfirmed] = useState(false);
   const [transferConfirmed, setTransferConfirmed] = useState(false);
   const [cancelConfirmed, setCancelConfirmed] = useState(false);
-  const [openingConfirmed, setOpeningConfirmed] = useState(false);
+  const [dryRun, setDryRun] = useState(false);
+  const [resetConfirmed, setResetConfirmed] = useState(false);
   const [operationNotice, setOperationNotice] = useState(null);
   const [pendingOpen, setPendingOpen] = useState(null);
   const scopeRef = useRef(0);
@@ -357,6 +401,29 @@ export default function ProposalRankingApp() {
 
   const applyResponse = useCallback((next, scope) => {
     if (!mountedRef.current || scope !== scopeRef.current || !next) return false;
+    if (next.round?.erased) {
+      // Erasure is terminal: a delayed response from this scope must never
+      // restore its private contents, even after a new round has been opened.
+      scopeRef.current += 1;
+      loadRef.current += 1;
+      lastOperationRef.current = null;
+      setRequestBusy(false);
+      setActionBusy(false);
+      setSubmitting(null);
+      setPendingConfirmation(null);
+      setSettledScopeKey(scopeKeyRef.current);
+      setDryRun(false);
+      queuesRef.current.clear();
+      localOrdersRef.current = {};
+      saveStatesRef.current = {};
+      remoteOrdersRef.current = {};
+      setLocalOrders({});
+      setSaveStates({});
+      setRemoteOrders({});
+    }
+    if (!next.round?.erased && !next.programs?.co?.available) {
+      setSelectedProgram((key) => key === 'co' ? 'se' : key);
+    }
     responseRef.current = next;
     setResponse(next);
     setResponseScopeKey(scopeKeyRef.current);
@@ -540,7 +607,6 @@ export default function ProposalRankingApp() {
       if (operationId) lastOperationRef.current = null;
       if (operationId) setOperationNotice(`Saved (${next.operation?.result || action.action}).`);
       setPendingConfirmation(null);
-      setExcuseConfirmed(false);
       setTransferConfirmed(false);
       setCancelConfirmed(false);
       return next;
@@ -604,10 +670,6 @@ export default function ProposalRankingApp() {
     saveStatesRef.current = {};
     setRequestBusy(false);
     setPendingConfirmation(null);
-    setOpeningConfirmed(false);
-    setExcuseSelection('');
-    setExcuseReason('');
-    setExcuseConfirmed(false);
     setTransferSelection('');
     setTransferConfirmed(false);
     setCancelConfirmed(false);
@@ -674,7 +736,7 @@ export default function ProposalRankingApp() {
             clearLocalOrder(list.listKey, job.scope);
             setRemoteOrder(list.listKey, null, job.scope);
             assignSaveState(list.listKey, 'saved', job.scope);
-            setOperationNotice(`Saved ${job.programKey.toUpperCase()} order.`);
+            setOperationNotice(`Saved ${job.programKey === 'co' ? 'SE + MR' : job.programKey.toUpperCase()} order.`);
           } catch (err) {
             if (!mountedRef.current || job.scope !== scopeRef.current) continue;
             const currentResponse = responseError(err);
@@ -695,6 +757,7 @@ export default function ProposalRankingApp() {
                 const reconciled = await sendProposalRankingAction({ action: 'read', roundId: latest.roundId, operationId });
                 if (!mountedRef.current || job.scope !== scopeRef.current) continue;
                 applyMutationResponse(reconciled, job.scope);
+                if (job.scope !== scopeRef.current) continue;
                 const serverOrder = findListOrder(reconciled, list.listKey);
                 const desired = localOrdersRef.current[list.listKey] || job.order;
                 if (serverOrder && sameOrder(serverOrder, desired)) {
@@ -751,16 +814,21 @@ export default function ProposalRankingApp() {
 
   const openRound = () => {
     const preview = responseRef.current?.preview;
-    if (!preview || !openingConfirmed || pendingOpen || actionBusy) return;
-    void runAction({ action: 'open', cycleCode, previewFingerprint: preview.previewFingerprint, operationId: createOperationId() });
+    if (!preview?.canOpen || pendingOpen || actionBusy) return;
+    void runAction({ action: 'open', dryRun, cycleCode, previewFingerprint: preview.previewFingerprint, operationId: createOperationId() });
   };
 
   const generateProgram = (programKey) => {
     const current = responseRef.current;
     const token = current?.confirmations?.generate?.[programKey];
     const meeting = current?.programs?.[programKey]?.meeting;
-    if (!current?.roundId || !token || !meeting) return;
+    if (!current?.roundId || !token || (!meeting && programKey !== 'co')) return;
     setPendingConfirmation(null);
+    if (programKey === 'co') {
+      setViewChoice(null);
+      void runAction({ action: 'combine', roundId: current.roundId, policyRevision: current.round.policyRevision, confirmationFingerprint: token.fingerprint, operationId: createOperationId() });
+      return;
+    }
     void runAction({ action: 'generate', roundId: current.roundId, programKey, etag: meeting.etag, policyRevision: current.round.policyRevision, confirmationFingerprint: token.fingerprint, operationId: createOperationId() });
   };
 
@@ -773,11 +841,12 @@ export default function ProposalRankingApp() {
     void runAction({ action: 'publish', roundId: current.roundId, programKey, etag: meeting.etag, policyRevision: current.round.policyRevision, confirmationFingerprint: token.fingerprint, operationId: createOperationId() });
   };
 
-  const confirmExcuse = () => {
+  const confirmDryRunReset = () => {
     const current = responseRef.current;
-    const token = current?.confirmations?.excuse;
-    if (!current?.roundId || !token || !excuseSelection || !excuseReason.trim() || !excuseConfirmed || hasUnresolvedSave) return;
-    void runAction({ action: 'excuse', roundId: current.roundId, participantSystemUserId: excuseSelection, reason: excuseReason.trim(), policyRevision: current.round.policyRevision, confirmationFingerprint: token.fingerprint, operationId: createOperationId() });
+    const token = current?.confirmations?.resetDryRun;
+    if (!current?.roundId || !token || resetConfirmed !== token.fingerprint || hasUnresolvedSave || actionBusy) return;
+    setResetConfirmed(false);
+    void runAction({ action: 'resetDryRun', roundId: current.roundId, policyRevision: current.round.policyRevision, confirmationFingerprint: token.fingerprint, operationId: createOperationId() });
   };
 
   const confirmCancel = () => {
@@ -798,13 +867,24 @@ export default function ProposalRankingApp() {
   const activeResponse = responseForCurrentScope;
   const currentProposalData = activeResponse?.mode === 'preview' ? activeResponse.preview : activeResponse?.mode === 'round' ? activeResponse.round?.snapshot : null;
   const currentProposalById = new Map((currentProposalData?.proposals || []).map((proposal) => [proposal.requestId, proposal]));
+  const viewScope = `${activeResponse?.roundId}:${activeResponse?.viewer?.systemUserId}:${selectedProgram}`;
+  const hasPublishedProgram = Object.values(activeResponse?.programs || {}).some((data) => (data.meetingStatus || data.meeting?.status) === 'published');
+  const selectedPublished = (activeResponse?.programs?.[selectedProgram]?.meetingStatus || activeResponse?.programs?.[selectedProgram]?.meeting?.status) === 'published';
+  const availableViews = [
+    ...(selectedProgram !== 'co' && activeResponse?.viewer?.isRosterParticipant ? [{ key: 'mine', label: 'My rankings' }] : []),
+    ...(isFacilitator ? [{ key: 'facilitate', label: 'Facilitate' }] : []),
+    ...(hasPublishedProgram && (isFacilitator || activeResponse?.viewer?.isRosterParticipant) ? [{ key: 'meeting', label: 'Meeting list' }] : []),
+  ];
+  const defaultView = selectedPublished ? 'meeting' : selectedProgram === 'co' ? (isFacilitator ? 'facilitate' : 'meeting') : activeResponse?.viewer?.isRosterParticipant ? 'mine' : 'facilitate';
+  const view = viewChoice?.scope === viewScope && availableViews.some((item) => item.key === viewChoice.key) ? viewChoice.key : defaultView;
   const preview = activeResponse?.preview;
+  const unscoredCount = (preview?.proposals || []).filter((proposal) => !proposal.score?.ratedCount).length;
 
   return <div className="mx-auto max-w-7xl px-4 pb-10">
     <PageHeader title="Proposal Ranking" subtitle="Prepare private PD rankings and facilitate the funding-cycle discussion." icon="▤">
       <div className="mx-auto mt-5 flex max-w-lg flex-wrap items-end justify-center gap-3 text-left">
         <label className="min-w-48 flex-1 text-sm font-medium text-gray-700" htmlFor="proposal-ranking-cycle">Funding cycle
-        <select id="proposal-ranking-cycle" value={cycleCode} onChange={(event) => changeCycle(event.target.value)} disabled={loading || actionBusy || hasUnresolvedSave} className="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50">
+        <select id="proposal-ranking-cycle" value={cycleCode} onChange={(event) => { setDryRun(false); changeCycle(event.target.value); }} disabled={loading || actionBusy || hasUnresolvedSave} className="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50">
             {options.map((option) => <option value={option.code} key={option.code}>{option.label}</option>)}
           </select>
         </label>
@@ -829,26 +909,26 @@ export default function ProposalRankingApp() {
         <Card hover={false}>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Review the {activeResponse.cycleCode} proposal pool</h2>
-              <p className="mt-1 text-sm text-gray-600">Opening freezes this proposal set, roster, card details, scores, amounts and starting order.</p>
+              <h2 className="text-lg font-semibold text-gray-900">{activeResponse.cycleCode} proposal pool</h2>
+              <p className="mt-1 text-sm text-gray-600">Opening saves the current proposals and review scores for this round.</p>
             </div>
             <p className="text-sm font-medium text-gray-700">{preview?.proposals?.length || 0} proposals · {preview?.roster?.length || 0} PDs</p>
           </div>
-          <p className="mt-3 text-sm text-gray-700">{preview?.outstandingReviewCount || 0} outstanding external reviews · {(preview?.proposals || []).filter((proposal) => !proposal.score?.ratedCount).length} unscored proposals</p>
+          {(preview?.outstandingReviewCount > 0 || unscoredCount > 0) && <p className="mt-3 text-sm text-amber-900">{preview?.outstandingReviewCount || 0} outstanding external reviews · {unscoredCount} unscored proposals</p>}
           <p className="mt-2 text-sm text-gray-700">Participating PDs: {(preview?.roster || []).map((person) => person.name || 'Unnamed PD').join(', ') || 'None assigned'}</p>
           {preview?.warnings?.length > 0 && <ul className="mt-4 list-disc space-y-1 rounded-lg bg-amber-50 p-4 pl-8 text-sm text-amber-950">{preview.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
           {preview?.unexpectedStatuses?.length > 0 && <StatusBanner kind="warning" className="mt-3">Unexpected proposal statuses need review: {preview.unexpectedStatuses.join(', ')}.</StatusBanner>}
           {preview?.roster?.some((person) => !person.hasAppAccess) && <StatusBanner kind="error" className="mt-3">Every captured PD needs Proposal Ranking app access before this round can open.</StatusBanner>}
+          {capabilities.open && <label className="mt-4 flex items-start gap-2 text-sm text-gray-700">
+            <input type="checkbox" checked={dryRun} onChange={(event) => setDryRun(event.target.checked)} disabled={actionBusy || Boolean(pendingOpen)} className="mt-0.5 rounded border-gray-300" />
+            Open as a dry run. The facilitator can permanently erase its rankings, even after publication.
+          </label>}
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <label className="flex items-start gap-2 text-sm text-gray-700">
-              <input type="checkbox" checked={openingConfirmed} onChange={(event) => setOpeningConfirmed(event.target.checked)} disabled={actionBusy} className="mt-0.5 rounded border-gray-300" />
-              I reviewed the proposal pool, roster, warnings and starting order.
-            </label>
-            {capabilities.open && <Button type="button" disabled={actionBusy || Boolean(pendingOpen) || !openingConfirmed || !preview?.canOpen} loading={actionBusy} onClick={openRound}>Open round</Button>}
+            {capabilities.open && <Button type="button" disabled={actionBusy || Boolean(pendingOpen) || !preview?.canOpen} loading={actionBusy} onClick={openRound}>{dryRun ? 'Open dry run' : 'Open round'}</Button>}
           </div>
         </Card>
         <div className="grid gap-4 lg:grid-cols-2">
-          {PROGRAMS.map((program) => {
+          {PROGRAMS.filter((program) => program.key !== 'co').map((program) => {
             const ids = activeResponse.preview?.seedOrders?.[program.key] || [];
             const programCards = ids.map((id) => currentProposalById.get(id)).filter(Boolean).map((proposal) => ({
               ...proposal,
@@ -863,7 +943,10 @@ export default function ProposalRankingApp() {
       </>}
 
       {!loading && activeResponse?.mode === 'round' && round && <>
-        {round.state === 'canceled' && <StatusBanner kind="warning">This round was canceled and is read-only. <Button type="button" variant="outline" size="sm" onClick={() => loadCurrent({ keepDrafts: false, cyclePreview: true })}>View current cycle preview</Button></StatusBanner>}
+        {round.dryRun && !round.erased && <StatusBanner kind="warning">Dry run — practice rankings only. The facilitator can permanently erase this run after testing.</StatusBanner>}
+        {round.state === 'canceled' && <StatusBanner kind="warning">{round.erased ? 'Dry-run rankings permanently erased. You can open a fresh round.' : 'This round was canceled and is read-only.'} <Button type="button" variant="outline" size="sm" onClick={() => loadCurrent({ keepDrafts: false, cyclePreview: true })}>View current cycle preview</Button></StatusBanner>}
+        {!round.erased && <>
+        {round.state === 'active' && round.snapshot.roster.some((person) => person.excluded) && <StatusBanner kind="warning">Every participant is required. This older round contains an excusal and cannot generate or publish another composite.</StatusBanner>}
         <Card hover={false} padding="p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -871,17 +954,20 @@ export default function ProposalRankingApp() {
               <p className="mt-1 text-sm text-gray-600">Facilitator: {round.facilitator.name} · {round.snapshot.proposals.length} frozen proposals · {round.snapshot.roster.length} PDs</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {PROGRAMS.map((program) => <Button key={program.key} type="button" variant={selectedProgram === program.key ? 'primary' : 'outline'} size="sm" aria-pressed={selectedProgram === program.key} disabled={loading || actionBusy || hasUnresolvedSave} onClick={() => changeProgram(program.key)}>{program.shortLabel}</Button>)}
+              {PROGRAMS.filter((program) => program.key !== 'co' || activeResponse.programs?.co?.available).map((program) => <Button key={program.key} type="button" variant={selectedProgram === program.key ? 'primary' : 'outline'} size="sm" aria-pressed={selectedProgram === program.key} disabled={loading || actionBusy || hasUnresolvedSave} onClick={() => changeProgram(program.key)}>{program.shortLabel}</Button>)}
             </div>
           </div>
         </Card>
-        {activeResponse.viewer.isRosterParticipant && !isFacilitator && <StatusBanner>Before publication, only your own ranking is shown. Published program orders include named PD ranks.</StatusBanner>}
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <nav aria-label="Ranking views" className="flex flex-wrap gap-2">
+          {availableViews.map((item) => <Button key={item.key} type="button" variant={view === item.key ? 'primary' : 'outline'} aria-pressed={view === item.key} disabled={loading || actionBusy || hasUnresolvedSave} onClick={() => { setViewChoice({ scope: viewScope, key: item.key }); setPendingConfirmation(null); }}>{item.label}</Button>)}
+        </nav>
+        <div className={view === 'facilitate' ? 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]' : 'space-y-4'}>
           <Card hover={false}>
             <ProgramPanel
               response={activeResponse}
               program={PROGRAMS.find((program) => program.key === selectedProgram)}
               isFacilitator={isFacilitator}
+              view={view}
               localOrders={localOrders}
               remoteOrders={remoteOrders}
               saveStates={saveStates}
@@ -897,18 +983,18 @@ export default function ProposalRankingApp() {
               onRetry={retryUnsaved}
             />
           </Card>
-          <aside className="space-y-4">
+          {view === 'facilitate' && <aside className="space-y-4">
             <Card hover={false} padding="p-4">
               <h2 className="font-semibold text-gray-900">Round progress</h2>
               <ul className="mt-3 space-y-3">
-                {PROGRAMS.map((program) => {
+                {PROGRAMS.filter((program) => program.key !== 'co').map((program) => {
                   const data = activeResponse.programs?.[program.key];
                   return <li key={program.key} className="rounded-lg bg-gray-50 p-3 text-sm">
                     <p className="font-semibold text-gray-900">{program.shortLabel}</p>
                     {data?.proposalIds?.length === 0 ? <p className="mt-1 text-gray-600">No proposals</p> : <>
                       <p className="mt-1 text-gray-700">{data?.progress?.submitted || 0} / {data?.progress?.required || 0} submissions</p>
                       {data?.progress?.outstandingNames?.length > 0 && <p className="mt-1 text-xs text-gray-600">Waiting for {data.progress.outstandingNames.join(', ')}</p>}
-                      <p className="mt-1 text-xs text-gray-600">{(data?.meetingStatus || data?.meeting?.status) === 'published' ? 'Published' : (data?.meetingStatus || data?.meeting?.status) === 'composite-draft' ? 'Draft ready' : 'Collecting'}</p>
+                      <p className="mt-1 text-xs text-gray-600">{(data?.meetingStatus || data?.meeting?.status) === 'published' ? 'Published' : (data?.meetingStatus || data?.meeting?.status) === 'composite-draft' ? 'Draft ready' : data?.progress?.required > 0 && data.progress.submitted === data.progress.required ? 'Ready to generate' : 'Waiting for submissions'}</p>
                     </>}
                   </li>;
                 })}
@@ -923,31 +1009,10 @@ export default function ProposalRankingApp() {
                 </li>)}
               </ul>
             </Card>
-          </aside>
+          </aside>}
         </div>
-        {activeResponse.viewer.capabilities.excuseParticipant && <Card hover={false}>
-          <h2 className="font-semibold text-gray-900">Excuse a PD</h2>
-          <p className="mt-1 text-sm text-gray-600">This exceptional action applies to both programs and is unavailable after either composite is generated. Their saved lists remain retained but are excluded from calculation.</p>
-          {activeResponse.confirmations?.excuse ? <div className="mt-3 space-y-3">
-            <label className="block text-sm font-medium text-gray-700">PD to excuse
-              <select value={excuseSelection} onChange={(event) => { setExcuseSelection(event.target.value); setExcuseConfirmed(false); }} disabled={actionBusy || hasUnresolvedSave} className="mt-1 h-10 w-full max-w-md rounded-lg border border-gray-300 bg-white px-3">
-                <option value="">Choose a PD</option>
-                {round.snapshot.roster.filter((person) => !person.excluded).map((person) => <option key={person.systemUserId} value={person.systemUserId}>{person.name}</option>)}
-              </select>
-            </label>
-            <label className="block text-sm font-medium text-gray-700">Recorded reason
-              <textarea value={excuseReason} onChange={(event) => setExcuseReason(event.target.value)} rows={3} maxLength={1000} disabled={actionBusy || hasUnresolvedSave} placeholder="Explain why this PD is being excused from voting." className="mt-1 w-full max-w-2xl rounded-lg border border-gray-300 px-3 py-2" />
-            </label>
-            <label className="flex items-start gap-2 text-sm text-gray-700">
-              <input type="checkbox" checked={excuseConfirmed} onChange={(event) => setExcuseConfirmed(event.target.checked)} disabled={actionBusy || hasUnresolvedSave || !excuseSelection || !excuseReason.trim()} className="mt-0.5 rounded border-gray-300" />
-              I confirm this recorded excusal applies to both programs and cannot be reversed in this round.
-            </label>
-            <p className="text-sm text-amber-900">{activeResponse.confirmations.excuse.message}</p>
-            <Button type="button" variant="danger" size="sm" disabled={actionBusy || hasUnresolvedSave || !excuseConfirmed || !excuseSelection || !excuseReason.trim()} onClick={confirmExcuse}>Excuse PD</Button>
-          </div> : <p className="mt-2 text-sm text-gray-600">Excusal is not available after the first composite is generated.</p>}
-        </Card>}
-        {(capabilities.transferFacilitator || capabilities.cancelRound) && <Card hover={false}>
-          <h2 className="font-semibold text-gray-900">Round administration</h2>
+        {(view === 'facilitate' || !isFacilitator) && (capabilities.transferFacilitator || capabilities.cancelRound || capabilities.resetDryRun) && <Card hover={false}>
+          <details><summary className="cursor-pointer font-semibold text-gray-900">Round administration</summary>
           {capabilities.transferFacilitator && <div className="mt-3 space-y-3">
             <label className="block text-sm font-medium text-gray-700">Transfer facilitation to
               <select value={transferSelection} onChange={(event) => { setTransferSelection(event.target.value); setTransferConfirmed(false); }} disabled={actionBusy || hasUnresolvedSave} className="mt-1 h-10 w-full max-w-md rounded-lg border border-gray-300 bg-white px-3">
@@ -961,6 +1026,15 @@ export default function ProposalRankingApp() {
             </label>
             <Button type="button" size="sm" disabled={actionBusy || hasUnresolvedSave || !transferSelection || !transferConfirmed} onClick={transferFacilitator}>Transfer facilitation</Button>
           </div>}
+          {capabilities.resetDryRun && activeResponse.confirmations?.resetDryRun && <div className="mt-5 border-t border-gray-200 pt-4">
+            <h3 className="font-medium text-gray-900">Erase this dry run</h3>
+            <p className="mt-2 text-sm text-amber-900">{activeResponse.confirmations.resetDryRun.message}</p>
+            <label className="mt-3 flex items-start gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={resetConfirmed === activeResponse.confirmations.resetDryRun.fingerprint} onChange={(event) => setResetConfirmed(event.target.checked ? activeResponse.confirmations.resetDryRun.fingerprint : false)} disabled={actionBusy || hasUnresolvedSave} className="mt-0.5 rounded border-gray-300" />
+              I understand all rankings in this dry run will be permanently erased and cannot be restored in this app.
+            </label>
+            <Button type="button" variant="danger" size="sm" disabled={actionBusy || hasUnresolvedSave || resetConfirmed !== activeResponse.confirmations.resetDryRun.fingerprint} onClick={confirmDryRunReset} className="mt-3">Permanently erase dry run</Button>
+          </div>}
           {capabilities.cancelRound && <div className="mt-5 border-t border-gray-200 pt-4">
             <h3 className="font-medium text-gray-900">Cancel this round</h3>
             <p className="mt-1 text-sm text-gray-600">Cancellation is available only before either program is published. The round remains read-only and a replacement uses fresh snapshots.</p>
@@ -973,11 +1047,13 @@ export default function ProposalRankingApp() {
               <Button type="button" variant="danger" size="sm" disabled={actionBusy || hasUnresolvedSave || !cancelConfirmed} onClick={confirmCancel} className="mt-3">Cancel round</Button>
             </> : <p className="mt-2 text-sm text-gray-600">Cancellation is unavailable after a program is published.</p>}
           </div>}
+          </details>
         </Card>}
         {Object.entries(saveStates).some(([, state]) => state === 'unsaved' || state === 'conflict') && <div className="flex flex-wrap items-center gap-3">
           <StatusBanner kind="warning">An order has unconfirmed changes. Refresh the round, compare the current list, then retry the displayed order before submitting or continuing.</StatusBanner>
           <Button type="button" variant="outline" size="sm" disabled={loading || actionBusy} onClick={() => loadCurrent({ keepDrafts: true })}>Refresh current state</Button>
         </div>}
+        </>}
       </>}
     </div>
   </div>;

@@ -1,6 +1,7 @@
 export const PROGRAMS = [
   { key: 'se', label: 'Science & Engineering', shortLabel: 'SE' },
   { key: 'mr', label: 'Medical Research', shortLabel: 'MR' },
+  { key: 'co', label: 'Combined SE + MR', shortLabel: 'SE + MR' },
 ];
 
 export const REVIEWER_SCORE_COLORS = Object.freeze([
@@ -20,6 +21,13 @@ export function reviewerScoreIndicator(score) {
     color: REVIEWER_SCORE_COLORS[index],
     label: `Average reviewer score: ${(Math.round(mean * 10) / 10).toFixed(1)} out of 5 (approximate color)`,
   };
+}
+
+/** Rank colors use the same palette as review scores, with first place best. */
+export function pdRankColor(rank, programCount) {
+  if (!Number.isFinite(rank) || !Number.isInteger(programCount) || programCount < 1 || rank < 1 || rank > programCount) return UNSCORED_REVIEWER_SCORE_COLOR;
+  const fraction = programCount === 1 ? 1 : (programCount - rank) / (programCount - 1);
+  return REVIEWER_SCORE_COLORS[Math.round(fraction * (REVIEWER_SCORE_COLORS.length - 1))];
 }
 
 export function moveProposal(order, from, to) {
@@ -93,4 +101,24 @@ export function errorMessage(error) {
   if (error.status === 409) return error.message || 'This round changed elsewhere. Refresh before continuing.';
   if (error.status === 503) return error.message || 'Proposal Ranking is temporarily unavailable. Try again later.';
   return error.message || 'Proposal Ranking could not complete that action.';
+}
+
+/** Export the displayed program's saved meeting order; never infer a funding decision. */
+export function buildRankingCsv(order, proposals) {
+  const byId = new Map(proposals.map((proposal) => [proposal.requestId, proposal]));
+  const cell = (value) => {
+    const text = String(value ?? '');
+    const safe = /^[\s]*[=+@-]/.test(text) ? `'${text}` : text;
+    return `"${safe.replace(/"/g, '""')}"`;
+  };
+  const rows = [['Rank', 'Program', 'Request number', 'Institution', 'Proposal', 'Requested amount', 'Currency']];
+  order.forEach((id, index) => {
+    const proposal = byId.get(id);
+    if (!proposal) throw new Error('The saved ranking contains an unavailable proposal. Refresh before exporting.');
+    const amount = Number.isSafeInteger(proposal.amountMinorUnits) && Number.isInteger(proposal.currency?.precision)
+      ? (proposal.amountMinorUnits / (10 ** proposal.currency.precision)).toFixed(proposal.currency.precision) : '';
+    rows.push([index + 1, proposal.programKey.toUpperCase(), proposal.requestNumber, proposal.organization,
+      proposal.title, amount, proposal.currency?.code]);
+  });
+  return rows.map((row) => row.map(cell).join(',')).join('\r\n') + '\r\n';
 }

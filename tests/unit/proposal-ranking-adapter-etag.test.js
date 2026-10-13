@@ -12,6 +12,8 @@ import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import { executeChangeset } from '../../lib/services/dynamics/changeset.js';
 import { processAnnotations } from '../../lib/services/dynamics/annotations.js';
 import {
+  createCombinedMeeting,
+  eraseDryRunChangeset,
   findCycleCoordinator,
   listRoundRows,
   patchRoundAndList,
@@ -44,4 +46,37 @@ test('ranking adapter restores the ETag shape removed by DynamicsService annotat
   await patchRoundAndList(round, list, { wmkf_lastoperationkind: 'save' }, { wmkf_version: 2 });
   const operations = executeChangeset.mock.calls[0][1];
   expect(operations.map((operation) => operation.ifMatch)).toEqual([ETAG, ETAG]);
+});
+
+test('dry-run erasure uses one conditional changeset and never targets source entities', async () => {
+  const round = { wmkf_proposalrankingroundid: ROUND_ID, wmkf_snapshotjson: '{"dryRun":true}', '@odata.etag': ETAG };
+  const coordinator = { wmkf_proposalrankingcycleid: CYCLE_ID, wmkf_activeroundid: ROUND_ID, '@odata.etag': ETAG };
+  const list = { wmkf_proposalrankinglistid: '10000000-0000-4000-8000-000000000003', wmkf_roundid: ROUND_ID, '@odata.etag': ETAG };
+  await eraseDryRunChangeset(round, [list], { wmkf_state: 100000001 }, coordinator, { wmkf_activeroundid: null });
+  expect(executeChangeset).toHaveBeenCalledTimes(1);
+  expect(executeChangeset.mock.calls[0][1]).toEqual([
+    { method: 'PATCH', url: `wmkf_proposalrankingrounds(${ROUND_ID})`, ifMatch: ETAG, body: { wmkf_state: 100000001 } },
+    { method: 'DELETE', url: `wmkf_proposalrankinglists(${list.wmkf_proposalrankinglistid})`, ifMatch: ETAG },
+    { method: 'PATCH', url: `wmkf_proposalrankingcycles(${CYCLE_ID})`, ifMatch: ETAG, body: { wmkf_activeroundid: null } },
+  ]);
+  executeChangeset.mockClear();
+  await expect(eraseDryRunChangeset(round, [{ ...list, wmkf_roundid: CYCLE_ID }], {}, coordinator, {})).rejects.toThrow('belong to this dry run');
+  await expect(eraseDryRunChangeset({ ...round, wmkf_snapshotjson: '{}' }, [list], {}, coordinator, {})).rejects.toThrow('active dry run');
+  await expect(eraseDryRunChangeset(round, [{ ...list, '@odata.etag': null }], {}, coordinator, {})).rejects.toThrow('current revision');
+  expect(executeChangeset).not.toHaveBeenCalled();
+});
+
+
+test('combined creation atomically fences the source round and inserts one unique meeting row', async () => {
+  const round = { wmkf_proposalrankingroundid: ROUND_ID, '@odata.etag': ETAG };
+  const list = { wmkf_roundid: ROUND_ID, wmkf_programkey: 'co', wmkf_listkey: 'meeting:co' };
+  await createCombinedMeeting(round, { wmkf_policyrevision: 4 }, list);
+  expect(executeChangeset.mock.calls[0][1]).toEqual([
+    { method: 'PATCH', url: `wmkf_proposalrankingrounds(${ROUND_ID})`, ifMatch: ETAG, body: { wmkf_policyrevision: 4 } },
+    { method: 'POST', url: 'wmkf_proposalrankinglists', body: list },
+  ]);
+  executeChangeset.mockClear();
+  await expect(createCombinedMeeting({ ...round, '@odata.etag': null }, {}, list)).rejects.toThrow('current round');
+  await expect(createCombinedMeeting(round, {}, { ...list, wmkf_roundid: CYCLE_ID })).rejects.toThrow('current round');
+  expect(executeChangeset).not.toHaveBeenCalled();
 });
