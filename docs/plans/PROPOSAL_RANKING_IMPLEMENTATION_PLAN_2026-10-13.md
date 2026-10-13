@@ -172,19 +172,57 @@ choosing reuse or adding one; do not add a library during this documentation tas
 
 ## 5. Build sequence and acceptance gates
 
-Each phase is a reviewable implementation increment on a feature branch. Bring the
+Begin with the documentation-only UX phase below; subsequent implementation phases
+are reviewable increments on a feature branch. Bring the
 current design into the paused branch deliberately or start a clean branch; do not
 merge its incompatible combine/reset/CSV behavior wholesale.
 
 | Phase | Deliverable | Required proof before advancing |
 |---|---|---|
+| 0. Impeccable shape — before app code | Review the agreed workflow and incumbent interface; produce a concise UX brief with screen sketches and interaction specifications. | Owner confirms the brief or supplies one correction round. Keep agreed ranking rules, privacy and reset semantics intact; no app code. |
 | 1. Baseline and compatibility | Inspect current main/branch changes, live test-environment schema/role, source eligibility and existing rounds. Finalize versioned field/DTO mapping and caps. | Old-round fixtures readable without fabricated assessments; raw persisted field/status fan-out audit; unknown versions fail closed. |
 | 2. Pure assessment calculations | Thirds, boundaries, pair merge, exact combined aggregation, unanimous bars and section totals. | Adversarial short/unequal/empty lists, alternate pair winners, equal/missing scores, strict permutation, no weighted confidence/history/sentiment. |
 | 3. Additive persistence and private preparation | New schema/readers/writers, own program/combined edits, explicit rebuild, readiness/reopen and own reset. | Actor isolation, combined invalidation, transactional order/bars/confidence saves, cap tests, replay and stale-write cases. Probe schema after approved application. |
 | 4. Reveal and shared resets | Atomic all-ready reveal, collective edits, reopen after reveal, collective reset, full restart, read-only history. | Two-identity concurrent saves/reveal/reset; all-or-nothing failure injection; retry after later edits; coordinator conflict; no deleted reveals or cross-version votes. |
 | 5. Complete interaction | Private MR/SE and combined views, draggable/keyboard bars/cards, ready progress, reveal, group comparisons/totals and clear reset confirmations. | Browser walkthrough with separate PD/facilitator identities, focus/keyboard accessibility, pending-save and stale-response behavior, private payload inspection. |
 | 6. Context and workbook | Research count/year, optional authorized sentiment, two-sheet saved-revision XLSX. | Missing/provisional history, present-but-unauthorized sentiment, withdrawal/currentness, >50 IDs, dependency failure, workbook cell types/provenance and reset/export race. |
+| 6a. Impeccable critique and audit — working interface | Review the complete built flow, including context-rich cards and reset/export states, for usability, visual hierarchy, accessibility and responsive behavior. | Record prioritized findings, fix the agreed batch, and verify once more. No unresolved blocking usability/accessibility defects before rehearsal/release review. |
 | 7. Rehearsal and release review | Repeatable local/sandbox walkthrough at every stage, source/Atlas/API/catalogue updates and scoped gates. | Complete acceptance matrix below, independent whole-flow review, sandbox receipt and deliberate promotion/rollback plan. No production changes inferred from test success. |
+
+### Impeccable review scope and limits
+
+**Before implementation — shape:** use the installed Impeccable skill's context and
+shape workflow, in Operate mode. Read the existing product/design context and inspect
+the incumbent interface; preserve its established visual language unless a change is
+explicitly agreed. Treat the revision-5 product decisions as settled inputs, asking
+only about material interaction gaps. Focus the brief and sketches on:
+
+- Navigation between MR, SE and combined preparation, including out-of-date combined
+  work, explicit rebuild, readiness and the move into group discussion.
+- Card and separator movement, confidence controls, keyboard alternatives, focus and
+  feedback; distinguish A/B/C assessment from collective funding sections.
+- Group-card hierarchy: proposal/reviewer information, individual disagreement,
+  Research history and optional expandable sentiment, without crowding the list.
+- Reset confirmations that explain scope, replaced work and preserved history;
+  private versus shared versions, pending/uncertain saves, and read-only past reveals.
+
+Deliver one concise brief with representative screen sketches and interaction/state
+specifications, including empty/loading/error/permission states and realistic long
+lists. Present it for owner confirmation or one correction round, as shape requires;
+then stop. This is a bounded UX planning step, not a second product-policy negotiation
+or authorization to implement. Record the confirmed brief beside this plan and link
+it here before building; do not claim that it already exists.
+
+**After phases 5–6 — critique and audit:** inspect the working UI using realistic
+proposal content and separate PD/facilitator roles. Critique task clarity, hierarchy,
+card density and reset language; audit keyboard operation, focus, accessible names,
+contrast, drag alternatives, responsive layouts and material error/permission states.
+Check desktop and narrow-screen layouts together. Produce one prioritized findings
+list, fix in one batch, then perform at most one confirmation pass. Record any deferred
+nonblocking issues explicitly; do not expand into open-ended visual polishing.
+The UX review complements, and does not replace, transaction/privacy tests or the
+multi-person acceptance walkthrough. These Impeccable passes are scheduled work;
+neither has been executed by this plan update.
 
 Do not split phase 4's durable reveal/reset safety across releases where an incomplete
 transition becomes callable. UI can follow durable service tests, but new public
@@ -261,7 +299,16 @@ are unchanged from the cited baseline. These checks cover documentation integrit
 not correctness of the proposed workflow.
 
 Sweep verdict: **RECONCILED for the bounded changed decisions and documentation**.
-Plan verdict: **READY TO IMPLEMENT when the owner requests app changes**, with the
-verification gates above. No product choice remains open; live-state and capacity
+Plan verdict: **READY FOR THE PRE-BUILD SHAPE PASS**; app implementation follows a
+confirmed UX brief and an owner request for app changes, with the verification gates
+above. No ranking-policy choice remains open; live-state and capacity
 claims remain UNKNOWN / NOT TESTED until implementation preflight. This receipt is
 not implementation acceptance or permission to deploy.
+
+### UX review sequencing amendment — 2026-10-13
+
+Owner requested adding Impeccable reviews to this plan: shape before app code, then
+critique/audit against the working interface. Phase 0 and phase 6a above are new planned
+gates; the earlier independent review and 25-check receipt cover the preceding plan
+revision, not execution of these reviews. This amendment changes no product rule or
+runtime behavior.
