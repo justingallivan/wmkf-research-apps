@@ -2,8 +2,8 @@
 title: Staff discussion sentiment meter
 domain: transcription
 kind: plan
-status: planned
-summary: "Planned, not built. Reads each proposal's Staff Discussion Transcript, records enthusiasm, reception, disagreement and uncertainty with named, quoted evidence, and compares chosen proposals."
+status: shipped
+summary: "Shipped 2026-10-13 (Meeting Tracker). Reads each proposal's Staff Discussion Transcript, records enthusiasm, reception, disagreement and uncertainty with named, quoted evidence, and compares chosen proposals."
 owner: product-engineering
 related:
   - docs/plans/PAIRED_SUMMARIES_PLAN_2026-10-08.md
@@ -15,7 +15,7 @@ related:
 
 # Staff discussion sentiment meter
 
-Date: 2026-10-13 (Session 601). Status: **PLANNED; owner decisions recorded (§2). Nothing in this document is built.**
+Date: 2026-10-13 (Session 601). Status: **SHIPPED 2026-10-13** (merge `62963a352`, quote-match fix `1bb83c3a2`; migration 082 applied and prompt v1 seeded in Production by the owner). Calibration (§6 item 5) and Proposal Ranking wiring remain open; see §9.
 Owner: Justin.
 
 ## 1. Purpose
@@ -476,3 +476,9 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
   plus the folded canonical slice (a partial and a full ellipsis match are one piece of evidence); the
   verification event is emitted after the terminal write (`completeRun` / `failRun`) and bounded by a 2 s
   deadline, so a hung recorder cannot stall or fail a run.
+- **Shipped and verified in Production (2026-10-13):** PR #475 merged as `62963a352`; the owner applied migration 082
+  (`applied_by` `owner-sentiment-2026-10-13`) and seeded prompt v1. The tolerant-match fix merged as `1bb83c3a2`
+  (deploy Ready); the owner re-ran #1003038, which had failed `sentiment_evidence_unverified`, and it succeeded.
+  #1002852 also succeeded (Positive / High). Open: calibration on 3–5 discussions (waiting on more staff-discussion
+  video uploads), then the owner decides transcript version, summaries only, or both; Proposal Ranking consumer
+  not wired.

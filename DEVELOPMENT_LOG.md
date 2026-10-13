@@ -10,6 +10,19 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Discussion Sentiment meter in Meeting Tracker (Session 601)
+
+**Milestone:** staff can compare how proposals were received in the staff discussions — enthusiasm, reception, disagreement and uncertainty — each backed by named, quoted, server-verified evidence, on a new Meeting Tracker page.
+**Sessions:** 601 (Opus orchestrating; Sonnet built, Opus and Fable reviewed, Codex adversarial review to approve).
+**Ship state:**
+- Page `/meeting-tracker/discussion-sentiment`, four routes, migration 082 `staff_discussion_sentiments` (owner-applied in Production), prompt `meeting-transcript.staff-discussion-sentiment` v1 seeded and editable in Admin (merge `62963a352`, PR #475).
+- Staff Accept/Withdraw; read service `getDeliberationSentiments` returns only accepted, current results (no consumer wired yet).
+- Same-day production fix: tolerant time/text matching, unverifiable quotes dropped instead of failing the run, content-free verification event (merge `1bb83c3a2`).
+**Why it matters:** gives staff a side-by-side reminder of which proposals drew enthusiasm and where they disagreed or were unsure; calibration against the AI summaries decides whether the transcript version stays.
+**Pointers:** `docs/plans/DELIBERATION_SENTIMENT_PLAN_2026-10-13.md`; `docs/atlas/postgres-staff-discussion-sentiments.md`; `lib/services/post-presentation-materials/discussion-sentiment-service.js`.
+
+---
+
 ## October 2026 — Site Visit automatic split transcripts, inline video, real supersede reasons; Sonnet/Haiku 5.5 tiers (Session 600)
 
 **Milestone:** publishing a meeting-transcript correction now regenerates the presentation and staff-discussion split transcripts automatically; staff watch the review video inline; a superseded video says why. The `sonnet`/`haiku` tiers now resolve to Claude Sonnet 5.5 and Haiku 5.5, and prompt max tokens are editable in Admin → Prompt Templates.

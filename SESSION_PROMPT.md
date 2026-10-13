@@ -1,9 +1,50 @@
-# Session 601 Prompt: Confirm the transcription cleanup closed; security mitigation Release 1; Site Visit owner checks
+# Session 602 Prompt: Discussion Sentiment calibration (after uploads); transcription cleanup check; security mitigation Release 1
 
-Numbering: two sessions ran as "599" on 2026-10-12 PT. The Codex security-review close keeps the 599 label
-(below). The Claude session that shipped Site Visit C1–C3 is recorded as **600**; the next session is 601.
-Both handoffs below are current; the Codex section's Verified Open items (security Releases 1–4, provider
-confirmation) still stand.
+## Session 601 close — Discussion Sentiment meter shipped to Meeting Tracker (Claude Opus orchestrating Sonnet build, Opus/Fable review, Codex adversarial; shared checkout `main`, 2026-10-13 PT)
+
+### What Was Completed
+
+1. **Startup gate fix:** `check:docs-catalog` was red (security mitigation plan summary over 160 chars); shortened and regenerated (`c7e98df60`). The owner confirmed the security mitigation Releases are documentation only for now.
+2. **Discussion Sentiment meter (new production capability).** Page `/meeting-tracker/discussion-sentiment` (link next to "Create session"): pick proposals that have a Staff Discussion Transcript, Analyze each, compare them sorted favorable first. Each analysis records enthusiasm, reception, disagreement and uncertainty with named, quoted evidence; the model gives only time + quote, the server derives the speaker from structured turns and checks every quote. Staff Accept or Withdraw; `getDeliberationSentiments` (accepted + current only, live meeting-tracker access, cap 50) is the read service for other apps. Migration 082 `staff_discussion_sentiments`. Plan and full review record: `docs/plans/DELIBERATION_SENTIMENT_PLAN_2026-10-13.md` (§2 decisions, §9 stage log). PR #475 merged `62963a352`.
+   - Owner applied migration 082 in Production (`applied_by` `owner-sentiment-2026-10-13`) and seeded prompt v1 (editable in Admin → Prompt Templates).
+3. **Production fix — quote check too strict.** #1003038 failed `sentiment_evidence_unverified`. Now times compare as seconds, text folds case/quotes/dashes/ellipsis (the exact transcript slice is stored), unmatched items are dropped (the run fails only if a strong rating loses all its evidence), and a content-free `sentiment_evidence_verification` operational event records counts. Merged `1bb83c3a2`, deploy Ready; **owner re-ran #1003038 and it succeeded.** #1002852 also succeeded (Positive / High).
+4. **Memory:** `feedback-keep-the-owners-named-input-source` (the owner asked for summaries; I recommended transcripts and the build grew — present source changes as scope choices with the effort cost); dev-environment note that `vercel ls` writes its table to stderr.
+5. **Docs reconciled at close:** plan → `shipped`; Atlas page/index and the route matrix no longer say branch-only.
+
+### Commits (first-parent on `main`)
+- `c7e98df60` docs-catalog summary fix
+- `e304e22a6`, `c9da8f5c1`, `9ac8f6639`, `4d6d29e74`, `d518d0946` sentiment plan, owner decisions, Codex plan review
+- `d132c8b55` memory: keep the owner's named input source
+- `62963a352` merge: Discussion Sentiment meter (PR #475)
+- `1bb83c3a2` merge: tolerant quote matching, drop unverifiable items, content-free diagnostics
+- `f3c8259a2` memory: vercel ls stderr
+
+## Next Items (Session 601)
+
+### Verified Open
+
+1. **Calibration (waiting on the owner):** the owner is uploading more staff-discussion videos first. Then run 3–5 real discussions on the page (#1002852 and #1003038 already done), compare each result with that proposal's AI summary, and decide: keep the transcript version, simplify to summaries only (the owner's original ask), or both. Evidence: plan §6 item 5, §9 last entry.
+2. **Accept results** the owner agrees with (#1002852, #1003038); only accepted results reach other apps.
+3. **Proposal Ranking consumer** for `getDeliberationSentiments` — not wired (follow-on; Proposal Ranking itself is paused, PR #463).
+4. If an analysis drops quotes, Admin → Operational events shows `sentiment_evidence_verification` counts — use them to judge whether matching needs more tuning.
+
+### Known limits (accepted)
+- Formatter drift: any change to the transcript turn layout makes every bound discussion TXT fail `sentiment_transcript_mismatch`; decide a recovery path before changing the formatter (plan §9 "Durable hazard").
+- The request-listing helper drops its `capped` flag (shared with the dashboard).
+- Duplicate or same-speaker disagreements are now dropped, not run-fatal.
+
+### Verify Before Acting
+- Remote branch `claude/discussion-sentiment` still exists on GitHub (merged); the owner may delete it. Local worktrees, branches and the `wmkf-sentiment-pg-test` container are already removed.
+
+**Carried from Session 600 (below) and still open, not rechecked this session:** transcription cleanup confirmation after the 2026-10-14 03:00 UTC cron (production read needs the owner's OK); C3/C1 owner browser checks; correction-draft server re-check; three meeting-tracker pg tests (migration 077 harness); 4-vCPU measurement; Dependabot #471; stale `model_override` rows; `claude/ui-work` branch. Session 599 (Codex) security Releases 1–4 and provider confirmation also still stand.
+
+### Gotchas
+- Production Dataverse writes (e.g. prompt seeding) need `DATAVERSE_PROD_WRITE_ACK` typed by the owner in their own shell; agents never set it.
+- Production deploy check: `vercel ls 2>&1` (the table goes to stderr), then match the merge commit.
+
+**Milestone determination:** Discussion Sentiment is a new production capability — DEVELOPMENT_LOG entry added ("Discussion Sentiment meter in Meeting Tracker (Session 601)").
+
+---
 
 ## Session 600 close — Site Visit C1–C3, Plan A follow-ups, transcription cleanup fix, pg SSL warning (Claude Opus orchestrating Sonnet + Codex, shared checkout `main`, 2026-10-12/13 PT)
 

@@ -2,8 +2,8 @@
 title: "Atlas: Staff discussion sentiments (Postgres)"
 domain: postgres
 kind: state-page
-status: source-built
-summary: "staff_discussion_sentiments (migration 082) holds one row per staff discussion sentiment analysis run: a generating row before the provider call, the validated DeliberationSentiment record on ready rows, and Accept/Withdraw columns. Source-built on branch claude/discussion-sentiment only; migration 082 is not applied anywhere, the prompt is not seeded, and the Meeting Tracker routes and page exist in source only."
+status: live
+summary: "staff_discussion_sentiments (migration 082) holds one row per staff discussion sentiment analysis run: a generating row before the provider call, the validated DeliberationSentiment record on ready rows, and Accept/Withdraw columns. Live since 2026-10-13: merge 62963a352; migration 082 applied in Production by the owner and the prompt seeded."
 canonical: true
 cataloged: 2026-10-13
 owner: product-engineering
@@ -20,7 +20,7 @@ related:
 
 ## Status
 
-**[PLANNED to apply; source-built only (Stages 1 to 5 of `docs/plans/DELIBERATION_SENTIMENT_PLAN_2026-10-13.md`, branch `claude/discussion-sentiment`, not on `main`).]** Migration 082 has not been applied to any database and the `meeting-transcript.staff-discussion-sentiment` prompt row is not seeded. The routes, page and read service below exist in source only; nothing reads or writes the table until the owner applies the migration, seeds the prompt and the branch ships.
+**[Shipped 2026-10-13 (merge `62963a352`; tolerant quote-match fix `1bb83c3a2`). Migration 082 was applied to Production by the owner (`applied_by` `owner-sentiment-2026-10-13`) and the `meeting-transcript.staff-discussion-sentiment` prompt v1 is seeded.]** The Meeting Tracker routes, the Discussion Sentiment page and the read service below are live; no consumer app calls the read service yet.
 
 ## Ownership and contract
 
