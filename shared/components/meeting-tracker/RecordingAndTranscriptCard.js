@@ -14,6 +14,7 @@ import { REQUEST_DOCUMENT_ARTIFACT_TYPE } from '../../config/requestDocument';
 import { PAIRED_SUMMARY_ACKNOWLEDGMENT, SUMMARY_TEXT_MAX_CHARS } from '../../config/transcriptSummary';
 import { Button } from '../Layout';
 import ArtifactRow from './ArtifactRow';
+import PresentationVideoPlayer from '../PresentationVideoPlayer';
 import OverflowMenu from '../workbench/OverflowMenu';
 import { formatTranscriptTurnTime, getTranscriptSpeakers, groupTranscriptByTurn } from '../../../lib/services/transcription-pilot/transcript-format';
 import { MAX_TRANSCRIPTION_BYTES as MAX_AUDIO_BYTES, MAX_TRANSCRIPTION_MIB } from '../../../lib/services/transcription-pilot/limits';
@@ -3275,6 +3276,8 @@ function PresentationVideoLine({ v }) {
     path, available, newest, processing, busy, message, confirming, setConfirming, loaded, loadFailed,
     load, create, approve, confirmTargetLive,
   } = v;
+  // The player is open only for the video it was opened on, so a new newest video starts collapsed.
+  const [watchingId, setWatchingId] = useState(null);
   if (!loaded && loadFailed) {
     return (
       <ArtifactRow name="Presentation video" status={{ tone: 'gray', label: 'Not loaded' }} detail="Couldn’t load the video status." testId="presentation-video-line"
@@ -3299,17 +3302,30 @@ function PresentationVideoLine({ v }) {
   // A current video is replaced from the menu (behind a confirmation); anything else offers creation inline.
   const createLabel = state === 'review' ? 'Create it again' : 'Create presentation video';
   const startCreate = () => (current ? setConfirming({ kind: 'recreate', splitId: newest?.id || null }) : void create());
+  const watching = current && watchingId === newest.id;
+  const watchButton = current
+    ? <Button size="sm" variant="outline" type="button" aria-expanded={watching} onClick={() => setWatchingId(watching ? null : newest.id)}>{watching ? 'Hide video' : 'Watch'}</Button>
+    : null;
   const action = state === 'review'
-    ? <Button size="sm" variant="outline" type="button" onClick={() => setConfirming({ kind: 'approve', splitId: newest.id })} disabled={busy}>Check the ending and approve</Button>
+    ? <>{watchButton}<Button size="sm" variant="outline" type="button" onClick={() => setConfirming({ kind: 'approve', splitId: newest.id })} disabled={busy}>Check the ending and approve</Button></>
+    : current ? watchButton
     : state === 'registering'
       ? <Button size="sm" variant="outline" type="button" onClick={() => void approve(newest.id)} disabled={busy}>{busy ? 'Working…' : 'Finish approving'}</Button>
       : canCreate && !current
         ? <Button size="sm" variant="outline" type="button" onClick={startCreate} disabled={busy}>{busy ? 'Working…' : createLabel}</Button>
         : null;
-  const menuItems = canCreate && current ? [{ key: 'recreate', label: createLabel, disabled: busy, onSelect: startCreate }] : [];
+  const menuItems = current ? [
+    { key: 'download', label: 'Download video', href: openHref },
+    ...(canCreate ? [{ key: 'recreate', label: createLabel, disabled: busy, onSelect: startCreate }] : []),
+  ] : [];
   const detail = state === 'approved' && newest.boardReady == null ? 'Couldn’t check the Board status.' : null;
   return (
-    <ArtifactRow name="Presentation video" href={current ? openHref : null} status={status} detail={detail} action={action} menuItems={menuItems} testId="presentation-video-line">
+    <ArtifactRow name="Presentation video" status={status} detail={detail} action={action} menuItems={menuItems} testId="presentation-video-line">
+      {watching && (
+        <div className="mt-2 max-w-3xl">
+          <PresentationVideoPlayer key={newest.id} size="compact" label="Watch the presentation video" srcFor={(attempt) => `${openHref}?attempt=${attempt}`} />
+        </div>
+      )}
       <div aria-live="polite">
         {loadFailed && <p className="mt-1 text-xs text-gray-700">Couldn’t refresh the video status. Retrying…</p>}
         {boardStale && <p className="mt-1 text-sm text-gray-700">{PV_STALE_TEXT}</p>}

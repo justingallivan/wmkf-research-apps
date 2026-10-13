@@ -494,7 +494,7 @@ work is in progress. Builders tick each line off in the slice that moves it, and
 | Load latest (`:2805`), Publish summary, Save draft, Discard draft (`:2827-2835`) | draft editor | unchanged (open editor); the row's inline action **Review and publish** opens it |
 | Open (split transcripts, `:3020`) | transcript lines | the transcript name is the link |
 | Download TXT / VTT (split transcripts) | not offered | still not offered: the download route serves only the full TRANSCRIPT artifact (`downloadMeetingTranscript`, `lib/services/meeting-tracker-transcription/service.js:615-622`), so adding it is a server change outside this build |
-| Open video (`:3148`) | video line | the video name is the link (streams once C3 ships) |
+| Open video (`:3148`) | video line | a Watch button reveals the inline player (streams); Download video is in the "…" menu |
 | Check the ending and approve / Approve video / Not yet (`:3149`, `:3157-3158`) | video line | inline action on the video row; confirmation unchanged |
 | Finish approving (`:3150`) | video line | inline action |
 | Create presentation video / Create it again / Create again / Keep current video (`:3151`, `:3166-3167`) | video line | inline when there is no video or it is out of date; otherwise row menu; confirmation unchanged |
@@ -842,7 +842,7 @@ an uploaded transcript gets Open without downloads.
 
   The materials key follows the card's own heading precedence (closed, then needs attention, then saving), not the
   tracker list's classifier, so the chip cannot contradict the card.
-- **Server slices C1-C3 (§6):** C1 and C3 are not started.
+- **Server slices C1-C3 (§6):** C1 is not started; C3 is built on its branch (see §10).
   - **C1 owner decisions (2026-10-12):** a small Postgres queue plus a once-a-minute cron drain (the
     presentation-video / Zoom-copy pattern, not Vercel Workflow), written when a correction publish carries a
     confirmed presentation end (a first publish never does, `service.js` builds it with `presentationEnd: null`);
@@ -852,6 +852,7 @@ an uploaded transcript gets Open without downloads.
   - **C3 finding (2026-10-12, owner check-in pending on placement):** reuse `shared/components/PresentationVideoPlayer.js`
     (Board page and Workbench already play the same 302-to-Graph route with Range seeking); route change limited to
     allowing an `attempt` query key and `nosniff`; Vercel proxy streaming and Graph `preview` rejected. **[BUILT 2026-10-12, branch `claude/site-visit-c2-supersede-reason`]** C2 (the real reason a presentation video was superseded) is built on that branch.
+  **[BUILT 2026-10-12, branch `claude/site-visit-c3-video-player`]** C3: a Watch button reveals `PresentationVideoPlayer` inline in the Results row (current `review`/`approved` only), Download video moved to the "…" menu, and the open route accepts an integer `attempt` key and sets `nosniff`.
 - **[BUILT 2026-10-12, branch `claude/button-link-variant`; owner desktop check pending]** Text-link
   variant: the shared `Button` gains `variant="link"` (the former `BTN_LINK` look: underlined gray text,
   no padding or background, blue keyboard focus ring, dimmed when disabled), and all 11 card `BTN_LINK`
