@@ -191,6 +191,10 @@ merge its incompatible combine/reset/CSV behavior wholesale.
 
 ### Impeccable review scope and limits
 
+Phase 0 draft: [Proposal Ranking UX brief](PROPOSAL_RANKING_UX_BRIEF_2026-10-13.md),
+with three screen sketches. The owner confirmed shared-screen discussion plus PD
+laptops; the proposed interaction brief awaits confirmation. No app code changed.
+
 **Before implementation — shape:** use the installed Impeccable skill's context and
 shape workflow, in Operate mode. Read the existing product/design context and inspect
 the incumbent interface; preserve its established visual language unless a change is
