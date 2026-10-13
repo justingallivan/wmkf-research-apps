@@ -224,3 +224,18 @@ describe('reviewed Opus 5.5 pricing', () => {
     expect(estimateCostCents('claude-opus-5', 0, 0, 0, 1_000_000)).toBe(50);
   });
 });
+
+describe('reviewed Sonnet 5.5 and Haiku 5.5 pricing', () => {
+  test('Sonnet 5.5 uses $2/$10 with $0.10 cache reads', () => {
+    expect(lookupPricing('claude-sonnet-5-5')).toBe(MODEL_PRICING['claude-sonnet-5-5']);
+    expect(lookupPricing('claude-sonnet-5')).toBe(MODEL_PRICING['claude-sonnet-5']);
+    expect(estimateCostCents('claude-sonnet-5-5', 1_000_000, 1_000_000, 1_000_000, 1_000_000, 1_000_000)).toBeCloseTo(1860, 6);
+    expect(estimateCostCents('claude-sonnet-5-5', 0, 0, 0, 1_000_000)).toBe(10);
+  });
+
+  test('Haiku 5.5 encodes the up-to-100K-prompt tier ($0.10/$0.50, $0.01 cache reads)', () => {
+    expect(lookupPricing('claude-haiku-5-5')).toBe(MODEL_PRICING['claude-haiku-5-5']);
+    expect(lookupPricing('claude-haiku-4-5')).toBe(MODEL_PRICING['claude-haiku-4-5']);
+    expect(estimateCostCents('claude-haiku-5-5', 1_000_000, 1_000_000, 1_000_000, 1_000_000, 1_000_000)).toBeCloseTo(93.5, 6);
+  });
+});
