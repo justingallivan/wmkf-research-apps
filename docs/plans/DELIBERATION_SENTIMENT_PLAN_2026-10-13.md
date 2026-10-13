@@ -313,3 +313,18 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
 - The read service returns nothing for an unaccepted, withdrawn or out-of-date row. Mutation: drop the
   accepted filter and the test must fail.
 - Routes refuse requests without app access and never return records to Board or briefing tokens.
+
+## 9. Stage log
+
+- **Stages 1–3 built** (Sonnet) on `claude/discussion-sentiment`: `4e75f1b79` loader extraction,
+  `57be45ccc` prompt source/seed/config test/A7 `inv: 35`, `35a7f3247` migration 082, store,
+  service. Orchestrator added the Executor budget rows and the matching
+  `executor-budget-service.test.js` fixture/count update (the fixture enumerates every budget name).
+  Fresh-install shape comes from the manifest via `scripts/lib/fresh-database-bootstrap.js`, so
+  `scripts/setup-database.js` is not edited (same as 070–081).
+- **Release-order requirement (found in Stage 2):** once the budget row is on `main`, the admin
+  budget publish reads every registered prompt's current row (`assertModelCeilings`) and returns
+  409 `executor_prompt_not_found` until `meeting-transcript.staff-discussion-sentiment` is seeded
+  in that environment. Seed the prompt in Production (owner, after wording approval) **before or
+  together with** the merge, and in any Preview environment used for testing.
+- Open for Stage 4: map prompt-store `NOT_FOUND`/`DUPLICATE_CURRENT` in accept/read to typed 409s.

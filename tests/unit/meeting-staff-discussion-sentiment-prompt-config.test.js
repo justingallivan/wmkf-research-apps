@@ -12,9 +12,11 @@ import {
   PROMPT_NAME, SYSTEM_PROMPT, USER_PROMPT_TEMPLATE, PROMPT_VARIABLES, PROMPT_OUTPUT_SCHEMA, SENTIMENT_JSON_SCHEMA,
   DISCUSSION_TRANSCRIPT_MAX_CHARS, SENTIMENT_LIMITS,
 } from '../../shared/config/prompts/meeting-staff-discussion-sentiment';
+import { EXECUTOR_BUDGET_DEFAULTS } from '../../shared/config/executorBudgets';
 
-test('prompt name is pinned', () => {
+test('prompt name is pinned and has the discussion summary standing budget', () => {
   expect(PROMPT_NAME).toBe('meeting-transcript.staff-discussion-sentiment');
+  expect(EXECUTOR_BUDGET_DEFAULTS[PROMPT_NAME]).toEqual(EXECUTOR_BUDGET_DEFAULTS['meeting-transcript.staff-discussion-summary']);
 });
 
 test('declares exactly one untrusted override variable', () => {
