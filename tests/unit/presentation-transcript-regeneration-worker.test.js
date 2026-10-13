@@ -86,6 +86,8 @@ describe('outcome table', () => {
     ['flagged transient', Object.assign(new Error('t'), { isTransient: true })],
     ['no response', Object.assign(new Error('t'), { noResponse: true })],
     ['429 throttled', httpError(429, 'graph_throttled')],
+    ['slot busy (a crashed worker\'s material lease)', httpError(409, 'post_presentation_slot_busy', { body: { retryable: true } })],
+    ['any error flagged retryable', httpError(409, 'some_other_code', { body: { retryable: true } })],
   ])('%s -> retry (pending with backoff, or failed at the cap, decided by the store)', async (_label, error) => {
     const deps = harness({ generate: jest.fn(async () => { throw error; }) });
     const result = await tick(deps);
@@ -99,6 +101,21 @@ describe('outcome table', () => {
     const result = await tick(deps);
     expect(deps.retryPresentationTranscriptRegeneration).toHaveBeenCalledWith({ ...FENCE, failureCode: 'post_presentation_schema_not_ready' });
     expect(result.results[0]).toEqual({ outcome: 'failed', code: 'post_presentation_schema_not_ready' });
+  });
+
+  test('a recovered row whose generator hits slot_busy goes back to pending, and fails only at the attempt cap', async () => {
+    const busy = () => { throw httpError(409, 'post_presentation_slot_busy', { body: { retryable: true } }); };
+    const early = harness({ generate: jest.fn(async () => busy()) });
+    expect((await tick(early)).results[0]).toEqual({ outcome: 'pending', code: 'post_presentation_slot_busy' });
+    expect(early.failPresentationTranscriptRegeneration).not.toHaveBeenCalled();
+    const capped = harness({ claims: [{ ...ROW, attempts: 3 }], generate: jest.fn(async () => busy()), moves: { retry: { state: 'failed' } } });
+    expect((await tick(capped)).results[0]).toEqual({ outcome: 'failed', code: 'post_presentation_slot_busy' });
+    expect(capped.retryPresentationTranscriptRegeneration).toHaveBeenCalledWith({ ...FENCE, failureCode: 'post_presentation_slot_busy' });
+  });
+
+  test('current_changed and supervised-test keep their meaning', () => {
+    expect(classifyGenerationError(httpError(409, 'meeting_transcript_current_changed', { body: { retryable: true } })).kind).toBe('superseded');
+    expect(classifyGenerationError(httpError(409, 'meeting_transcription_supervised_test_unsupported', { body: { retryable: true } })).kind).toBe('failed');
   });
 
   test('a transient error with an unusable code is stored under a safe fallback code', async () => {

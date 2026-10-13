@@ -25,7 +25,7 @@ function harness(respond = () => ({ rows: [{ id: ID }], rowCount: 1 })) {
   return { store: createPresentationTranscriptRegenerationStore(database), calls };
 }
 const duplicate = () => Object.assign(new Error('dup'), { code: '23505' });
-const ENQUEUE = { requestId: REQ, transcriptArtifactId: ART, transcriptFingerprint: FP, actorProfileId: 7, actingUserSystemId: ACTOR };
+const ENQUEUE = { requestId: REQ, transcriptArtifactId: ART, transcriptFingerprint: FP, transcriptSlotVersion: 5, actorProfileId: 7, actingUserSystemId: ACTOR };
 
 describe('enqueue (latest publish wins)', () => {
   test('upserts the single pending row, replacing artifact, fingerprint, actors and attempts', async () => {
@@ -39,10 +39,43 @@ describe('enqueue (latest publish wins)', () => {
     expect(text).toContain('acting_user_system_id = EXCLUDED.acting_user_system_id');
     expect(text).toContain('attempts = 0');
     expect(text).not.toMatch(/state = 'running'/);
-    expect(params.slice(1)).toEqual([REQ, ART, FP, 7, ACTOR]);
+    expect(params.slice(1)).toEqual([REQ, ART, FP, 7, ACTOR, 5]);
+    expect(text).toContain('transcript_slot_version = EXCLUDED.transcript_slot_version');
+  });
+
+  test('publication order: only a strictly newer slot version replaces the pending row, so a delayed older enqueue is a no-op', async () => {
+    const { store, calls } = harness(() => ({ rows: [] }));
+    expect(await store.enqueuePresentationTranscriptRegeneration({ ...ENQUEUE, transcriptSlotVersion: 4 })).toBeNull();
+    expect(calls[0].text).toContain('WHERE presentation_transcript_regenerations.transcript_slot_version < EXCLUDED.transcript_slot_version');
+    expect(calls[0].text.indexOf('WHERE presentation_transcript_regenerations.transcript_slot_version')).toBeGreaterThan(calls[0].text.indexOf('DO UPDATE'));
+    expect(calls[0].params[6]).toBe(4);
+  });
+
+  test('a simulated pending slot honors the guard in both arrival orders (B newer, A older)', async () => {
+    // In-memory stand-in for the single pending row, applying exactly the guard the SQL states.
+    let pending = null;
+    const database = { query: async (text, params) => {
+      if (!text.includes('ON CONFLICT')) return { rows: [] };
+      const incoming = { artifact: params[2], version: params[6] };
+      if (!pending) { pending = incoming; return { rows: [{ id: ID }] }; }
+      if (text.includes('transcript_slot_version < EXCLUDED.transcript_slot_version') && pending.version < incoming.version) { pending = incoming; return { rows: [{ id: ID }] }; }
+      if (!text.includes('transcript_slot_version < EXCLUDED.transcript_slot_version')) { pending = incoming; return { rows: [{ id: ID }] }; }
+      return { rows: [] };
+    } };
+    const store = createPresentationTranscriptRegenerationStore(database);
+    const A = { ...ENQUEUE, transcriptArtifactId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', transcriptSlotVersion: 3 };
+    const B = { ...ENQUEUE, transcriptArtifactId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', transcriptSlotVersion: 4 };
+    await store.enqueuePresentationTranscriptRegeneration(B);
+    await store.enqueuePresentationTranscriptRegeneration(A);
+    expect(pending.artifact).toBe(B.transcriptArtifactId);
+    pending = null;
+    await store.enqueuePresentationTranscriptRegeneration(A);
+    await store.enqueuePresentationTranscriptRegeneration(B);
+    expect(pending.artifact).toBe(B.transcriptArtifactId);
   });
 
   test.each([
+    ['slot version', { transcriptSlotVersion: 0 }],
     ['requestId', { requestId: 'nope' }], ['artifact id', { transcriptArtifactId: 'nope' }],
     ['acting user', { actingUserSystemId: 'nope' }], ['fingerprint', { transcriptFingerprint: 'ABC' }],
     ['profile', { actorProfileId: 0 }],

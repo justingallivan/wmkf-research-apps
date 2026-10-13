@@ -107,7 +107,7 @@ function readyCorrection() {
   publisher.prepareMeetingTranscriptBundlePublication.mockResolvedValue({ candidatePaths: { txt: 'a', vtt: 'b', source: 'c' } });
   store.freezeMeetingTranscriptCorrectionDraft.mockResolvedValue({ leaseToken: 'lease' });
   publisher.publishMeetingTranscriptBundle.mockResolvedValue({ artifactId: newArtifactId, fingerprint: 'b'.repeat(64),
-    manifest: { files: [] }, bundleEditable: true });
+    manifest: { files: [] }, bundleEditable: true, slotVersion: 9 });
   store.transitionMeetingTranscriptPublication.mockResolvedValue({ state: 'published' });
 }
 const publish = () => publishMeetingCorrection({ requestId, ownerProfileId: 12, actingUserSystemId: actor, operationId: draftId, body: { expectedVersion: 2 } });
@@ -119,8 +119,20 @@ describe('correction publish enqueues generation', () => {
     const result = await publish();
     expect(regen.enqueuePresentationTranscriptRegeneration).toHaveBeenCalledTimes(1);
     expect(regen.enqueuePresentationTranscriptRegeneration).toHaveBeenCalledWith({ requestId, transcriptArtifactId: newArtifactId,
-      transcriptFingerprint: 'b'.repeat(64), actorProfileId: 12, actingUserSystemId: actor });
+      transcriptFingerprint: 'b'.repeat(64), transcriptSlotVersion: 9, actorProfileId: 12, actingUserSystemId: actor });
     expect(result).toMatchObject({ publication: { state: 'published' }, currentArtifact: { id: newArtifactId, fingerprint: 'b'.repeat(64) }, regenerationQueued: true });
+  });
+
+  test('a delayed enqueue that loses to a newer publish (store returns null) still reports queued, and a RUNNING newer row keeps updating keyed on the current artifact', async () => {
+    readyCorrection();
+    regen.enqueuePresentationTranscriptRegeneration.mockResolvedValue(null);
+    expect((await publish()).regenerationQueued).toBe(true);
+    // An older artifact's pending row (inserted behind a running row for the current one) never sets updating.
+    regen.listActivePresentationTranscriptRegenerations.mockResolvedValue([{ transcript_artifact_id: newArtifactId }, { transcript_artifact_id: artifactId }]);
+    const artifact = (await getMeetingTranscriptionOverview({ requestId, ownerProfileId: 12 })).currentArtifact;
+    expect(artifact.presentationTranscript.updating).toBe(true);
+    regen.listActivePresentationTranscriptRegenerations.mockResolvedValue([{ transcript_artifact_id: newArtifactId }]);
+    expect((await getMeetingTranscriptionOverview({ requestId, ownerProfileId: 12 })).currentArtifact.presentationTranscript).not.toHaveProperty('updating');
   });
 
   test('enqueues only after the published transition is durable', async () => {

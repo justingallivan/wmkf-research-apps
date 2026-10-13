@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS presentation_transcript_regenerations (
   request_id UUID NOT NULL,
   transcript_artifact_id UUID NOT NULL,
   transcript_fingerprint TEXT NOT NULL CHECK (transcript_fingerprint ~ '^[0-9a-f]{64}$'),
+  transcript_slot_version BIGINT NOT NULL CHECK (transcript_slot_version > 0),
   actor_profile_id INTEGER NOT NULL REFERENCES user_profiles(id),
   acting_user_system_id UUID NOT NULL,
   state TEXT NOT NULL CHECK (state IN ('pending','running','done','failed','superseded')),
@@ -34,5 +35,6 @@ CREATE INDEX IF NOT EXISTS idx_presentation_transcript_regenerations_work
   ON presentation_transcript_regenerations (state, next_attempt_at, lease_expires_at) WHERE state IN ('pending','running');
 COMMENT ON TABLE presentation_transcript_regenerations IS 'Queue of automatic presentation and staff discussion transcript generations after a correction publish. One pending and one running row per request at most, and the newest publish replaces the pending row. Identifiers, a fingerprint, state and counters only.';
 COMMENT ON COLUMN presentation_transcript_regenerations.transcript_artifact_id IS 'The published transcript (Request Document id) the generation was queued for. Compared with the current artifact id to decide whether the card shows Updating.';
+COMMENT ON COLUMN presentation_transcript_regenerations.transcript_slot_version IS 'Publication order: the TRANSCRIPT slot fence of the publish that queued the row, strictly increasing per request. A pending row is replaced only by a higher value, so a delayed enqueue for an older publish cannot overwrite a newer one.';
 COMMENT ON COLUMN presentation_transcript_regenerations.acting_user_system_id IS 'Dataverse user id of the staff member who published, and generation writes run as them.';
 COMMENT ON COLUMN presentation_transcript_regenerations.attempts IS 'Counted when a row is claimed. A claim that finds a transient fault re-queues with backoff until 3, then fails with the last code.';
