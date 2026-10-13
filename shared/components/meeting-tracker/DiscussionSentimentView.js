@@ -153,6 +153,9 @@ export default function DiscussionSentimentView() {
   const [programs, setPrograms] = useState([]);
   const [cycles, setCycles] = useState([]);
   const [proposals, setProposals] = useState([]);
+  // Lowercase ids of the cycle's proposals whose staff discussion transcript is bound, and whether that list may be incomplete.
+  const [candidateIds, setCandidateIds] = useState(() => new Set());
+  const [capped, setCapped] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [from, setFrom] = useState('');
@@ -176,6 +179,9 @@ export default function DiscussionSentimentView() {
     const token = ++loadToken.current;
     setLoading(true);
     setError(null);
+    setProposals([]);
+    setCandidateIds(new Set());
+    setCapped(false);
     const fetchDashboard = async (programKey, cycleKey) => {
       const query = new URLSearchParams({ projection: 'schedule', scope: 'all' });
       if (programKey) query.set('programId', programKey);
@@ -185,24 +191,37 @@ export default function DiscussionSentimentView() {
       return envelope.data;
     };
     try {
+      const fetchCandidates = async (cycleKey) => {
+        const envelope = await requestEnvelope(`/api/meeting-tracker/discussion-sentiment/candidates?${new URLSearchParams({ cycleCode: cycleKey })}`, { tolerantBody: true });
+        if (!envelope.ok) throw new Error(envelope.data?.error || 'The proposals with a staff discussion transcript could not be loaded. Try again.');
+        return envelope.data;
+      };
       let body = await fetchDashboard(nextProgramId, nextCycleCode);
       if (!mountedRef.current || token !== loadToken.current) return;
-      setPrograms((current) => body.programs || current);
-      setCycles((current) => body.cycles || current);
-      if (!nextProgramId && body.programId) setProgramId(body.programId);
+      // Copied before `body` is reassigned below: state updaters run later and must not see the second response.
+      const { programs: nextPrograms, cycles: nextCycles, programId: defaultProgramId } = body;
+      setPrograms((current) => nextPrograms || current);
+      setCycles((current) => nextCycles || current);
+      if (!nextProgramId && defaultProgramId) setProgramId(defaultProgramId);
+      let cycleKey = nextCycleCode;
       let visits = body.proposals || [];
+      let candidates = null;
       if (!nextCycleCode) {
         // The no-cycle response lists cycles only; load the default cycle's visits next.
-        const defaultCycle = body.defaultCycleCode || body.cycles?.[0]?.code || '';
-        setCycleCode(defaultCycle);
+        cycleKey = body.defaultCycleCode || nextCycles?.[0]?.code || '';
+        setCycleCode(cycleKey);
         visits = [];
-        if (defaultCycle) {
-          body = await fetchDashboard(nextProgramId || body.programId || '', defaultCycle);
-          if (!mountedRef.current || token !== loadToken.current) return;
+        if (cycleKey) {
+          [body, candidates] = await Promise.all([fetchDashboard(nextProgramId || defaultProgramId || '', cycleKey), fetchCandidates(cycleKey)]);
           visits = body.proposals || [];
         }
+      } else {
+        candidates = await fetchCandidates(cycleKey);
       }
+      if (!mountedRef.current || token !== loadToken.current) return;
       setProposals(visits);
+      setCandidateIds(new Set((candidates?.requestIds || []).map((id) => String(id).toLowerCase())));
+      setCapped(candidates?.capped === true);
       setLoading(false);
     } catch (loadError) {
       if (!mountedRef.current || token !== loadToken.current) return;
@@ -281,8 +300,7 @@ export default function DiscussionSentimentView() {
     const day = start.slice(0, 10);
     return (!from || day >= from) && (!to || day <= to);
   };
-  const visible = proposals.filter((proposal) => proposal.siteVisit && inRange(proposal));
-  const hiddenNoVisit = proposals.filter((proposal) => !proposal.siteVisit).length;
+  const visible = proposals.filter((proposal) => candidateIds.has(String(proposal.requestId).toLowerCase()) && inRange(proposal));
 
   const selectedRows = sortSentimentRows(order.map((id) => ({ ...rows[id], id, record: rows[id]?.data?.runCurrent ? rows[id].data.run?.record : null })));
 
@@ -328,15 +346,16 @@ export default function DiscussionSentimentView() {
                 <input id={`pick-${proposal.requestId}`} type="checkbox" className="h-5 w-5" checked={Boolean(rows[proposal.requestId])} onChange={() => toggle(proposal)} />
                 <label htmlFor={`pick-${proposal.requestId}`} className="min-w-0 flex-1 text-sm text-gray-900">
                   <span className="font-semibold">#{proposal.requestNumber}</span> {proposal.title || 'Untitled request'}
-                  <span className="ml-2 text-gray-500">{fmt(DAY, proposal.siteVisit.scheduledStartIso)}</span>
+                  <span className="ml-2 text-gray-500">{fmt(DAY, proposal.siteVisit?.scheduledStartIso)}</span>
                 </label>
               </li>
             ))}
           </ul>
         ) : (
-          !error && <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600">No site visits match. Choose another cycle or dates.</div>
+          !error && <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600">No proposals with a staff discussion transcript match. Choose another cycle or dates.</div>
         )}
-        {!loading && hiddenNoVisit > 0 && <p className="mt-2 text-xs text-gray-500">{hiddenNoVisit} proposal{hiddenNoVisit === 1 ? ' has' : 's have'} no site visit and {hiddenNoVisit === 1 ? 'is' : 'are'} not listed.</p>}
+        {!loading && !error && <p className="mt-2 text-xs text-gray-500">Showing proposals with a staff discussion transcript.</p>}
+        {!loading && !error && capped && <p role="status" className="mt-1 text-sm text-amber-900">This list may be incomplete: the cycle has more documents than can be read at once. Ask an administrator if a proposal is missing.</p>}
       </section>
 
       <section aria-labelledby="sentiment-compare">

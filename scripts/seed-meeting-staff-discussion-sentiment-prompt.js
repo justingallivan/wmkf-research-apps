@@ -12,7 +12,7 @@
  * requireNoPersistence: true and auditRetention: 'content-free', validates the record itself, and
  * stores it in staff_discussion_sentiments.
  *
- * DO NOT RUN until the owner has approved the prompt wording (the source file header says so).
+ * The owner approved the wording 2026-10-13. Run it only when the owner seeds an environment.
  * Model: 'sonnet' on the prompt row, as the review synthesis prompt does for native structured output.
  * The output budget is the code-owned standing default in shared/config/executorBudgets.js
  * (Admin-tunable).

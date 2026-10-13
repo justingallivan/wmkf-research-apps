@@ -1,8 +1,7 @@
 /**
  * Site Visit staff discussion sentiment prompt — source of truth.
  *
- * DRAFT WORDING: PENDING OWNER APPROVAL. The owner approves the wording before this prompt is seeded
- * (as with the discussion summary). The rubric lives in the prompt text on purpose, so it can be edited
+ * Wording approved by the owner 2026-10-13. Seed it per environment with the seed script. The rubric lives in the prompt text on purpose, so it can be edited
  * in Admin → Prompt Templates without a code change; this file is only the starting text.
  *
  * Canonical text that `scripts/seed-meeting-staff-discussion-sentiment-prompt.js` writes into the

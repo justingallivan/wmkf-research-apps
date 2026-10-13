@@ -8,6 +8,9 @@ jest.mock('../../lib/services/post-presentation-materials/discussion-sentiment-s
   acceptDiscussionSentiment: jest.fn(async () => ({ run: { id: 'r' } })),
   withdrawDiscussionSentiment: jest.fn(async () => ({ run: { id: 'r' } })),
 }));
+jest.mock('../../lib/services/post-presentation-materials/discussion-sentiment-candidates.js', () => ({
+  listDiscussionSentimentCandidates: jest.fn(async () => ({ requestIds: [], capped: false })),
+}));
 
 import { requireAppAccess } from '../../lib/utils/auth.js';
 import { withDalContext } from '../../lib/dataverse/core/context.js';
@@ -16,6 +19,8 @@ import * as service from '../../lib/services/post-presentation-materials/discuss
 import sentiment, { config as sentimentConfig } from '../../pages/api/meeting-tracker/visits/[requestId]/discussion-sentiment.js';
 import accept from '../../pages/api/meeting-tracker/visits/[requestId]/discussion-sentiment/accept.js';
 import withdraw from '../../pages/api/meeting-tracker/visits/[requestId]/discussion-sentiment/withdraw.js';
+import candidates from '../../pages/api/meeting-tracker/discussion-sentiment/candidates.js';
+import { listDiscussionSentimentCandidates } from '../../lib/services/post-presentation-materials/discussion-sentiment-candidates.js';
 import { config as summaryConfig } from '../../pages/api/meeting-tracker/visits/[requestId]/transcriptions/summary-draft.js';
 
 const requestId = '11111111-1111-4111-8111-111111111111';
@@ -141,5 +146,52 @@ describe.each([['accept', accept, service.acceptDiscussionSentiment], ['withdraw
     const res = await call(handler, { method: 'POST', body });
     expect(res.statusCode).toBe(400);
     expect(serviceFn).not.toHaveBeenCalled();
+  });
+});
+
+describe('candidates route', () => {
+  const get = (query, method = 'GET') => { const res = response(); return candidates({ method, query }, res).then(() => res); };
+
+  test('no app access is refused before any query', async () => {
+    requireAppAccess.mockImplementationOnce(async (_req, res) => { res.status(403).json({ error: 'no access' }); return null; });
+    const res = await get({ cycleCode: 'D26' });
+    expect(res.statusCode).toBe(403);
+    expect(requireAppAccess).toHaveBeenCalledWith(expect.anything(), res, 'meeting-tracker');
+    expect(listDiscussionSentimentCandidates).not.toHaveBeenCalled();
+    expect(withDalContext).not.toHaveBeenCalled();
+  });
+
+  test.each([undefined, '', 'nope', 'D2', "D26' or 1 eq 1", ['D26', 'J26']])('a bad cycleCode %p is 400 and never reaches the service', async (cycleCode) => {
+    const res = await get({ cycleCode });
+    expect(res.statusCode).toBe(400);
+    expect(listDiscussionSentimentCandidates).not.toHaveBeenCalled();
+  });
+
+  test('passes the cycle and the session profile (a query-string profile is ignored), private no-store, in a DAL context', async () => {
+    listDiscussionSentimentCandidates.mockResolvedValueOnce({ requestIds: [requestId], capped: true });
+    const res = await get({ cycleCode: 'd26', ownerProfileId: '1' });
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ requestIds: [requestId], capped: true });
+    expect(listDiscussionSentimentCandidates).toHaveBeenCalledWith({ cycleCode: 'd26', ownerProfileId: 9 });
+    expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'private, no-store');
+    expect(withDalContext).toHaveBeenCalledTimes(1);
+  });
+
+  test('a wrong method is 405, a missing profile is 401, and a 5xx hides the message', async () => {
+    expect((await get({ cycleCode: 'D26' }, 'POST')).statusCode).toBe(405);
+    requireAppAccess.mockResolvedValueOnce({ profileId: null, session: {} });
+    expect((await get({ cycleCode: 'D26' })).statusCode).toBe(401);
+    listDiscussionSentimentCandidates.mockRejectedValueOnce(Object.assign(new Error('dataverse detail'), { code: 'boom' }));
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await get({ cycleCode: 'D26' });
+    expect(res.statusCode).toBe(500);
+    expect(JSON.stringify(res.body)).not.toContain('dataverse detail');
+  });
+
+  test('a typed service refusal keeps its status and code', async () => {
+    listDiscussionSentimentCandidates.mockRejectedValueOnce(new ServiceHttpError('off', { httpStatus: 503, code: 'post_presentation_schema_not_ready', body: { error: 'off', code: 'post_presentation_schema_not_ready' } }));
+    const res = await get({ cycleCode: 'D26' });
+    expect(res.statusCode).toBe(503);
+    expect(res.body.code).toBe('post_presentation_schema_not_ready');
   });
 });

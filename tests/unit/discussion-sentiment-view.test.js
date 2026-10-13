@@ -1,5 +1,5 @@
 /** @jest-environment jsdom */
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import DiscussionSentimentView from '../../shared/components/meeting-tracker/DiscussionSentimentView';
 import { sortSentimentRows } from '../../shared/utils/discussion-sentiment-order';
 
@@ -36,9 +36,13 @@ beforeEach(() => {
   pending = {}; handlers = {};
   global.fetch = jest.fn(async (url, options = {}) => {
     const path = String(url);
+    if (path.includes('/discussion-sentiment/candidates')) {
+      if (handlers.candidates) return handlers.candidates(path);
+      return json({ requestIds: [A, B], capped: false });
+    }
     if (path.includes('/api/meeting-tracker/dashboard')) {
       return json(path.includes('cycleCode=')
-        ? { proposals } : { programs: [{ programId: 'p1', name: 'Program One' }], programId: 'p1', cycles: [{ code: 'D26', label: 'Dec 2026' }], defaultCycleCode: 'D26' });
+        ? { proposals } : { programs: [{ programId: 'p1', name: 'Program One' }], programId: 'p1', cycles: [{ code: 'D26', label: 'Dec 2026' }, { code: 'J27', label: 'Jun 2027' }], defaultCycleCode: 'D26' });
     }
     const key = `${options.method || 'GET'} ${path}`;
     if (handlers[key]) return handlers[key]();
@@ -49,14 +53,80 @@ beforeEach(() => {
 const url = (id, suffix = '') => `/api/meeting-tracker/visits/${id}/discussion-sentiment${suffix}`;
 const tick = (name) => fireEvent.click(screen.getByLabelText(new RegExp(name)));
 
-test('lists only proposals with a site visit, uses the schedule dashboard, and shows no internal ids', async () => {
+test('lists only proposals with a bound staff discussion transcript, from the schedule dashboard and the candidates route, with no internal ids', async () => {
+  handlers.candidates = async () => json({ requestIds: [A.toUpperCase()], capped: false });
   render(<DiscussionSentimentView />);
   expect(await screen.findByLabelText(/Alpha tissue repair/)).toBeInTheDocument();
+  expect(screen.queryByLabelText(/Beta imaging/)).not.toBeInTheDocument();
   expect(screen.queryByText(/Gamma no visit/)).not.toBeInTheDocument();
-  expect(screen.getByText(/1 proposal has no site visit/)).toBeInTheDocument();
+  expect(screen.getByText('Showing proposals with a staff discussion transcript.')).toBeInTheDocument();
+  expect(screen.queryByText(/may be incomplete/)).not.toBeInTheDocument();
   const urls = global.fetch.mock.calls.map(([u]) => String(u));
-  expect(urls.every((u) => u.includes('projection=schedule') && u.includes('scope=all'))).toBe(true);
+  expect(urls.filter((u) => u.includes('/dashboard')).every((u) => u.includes('projection=schedule') && u.includes('scope=all'))).toBe(true);
+  expect(urls.some((u) => u.includes('/discussion-sentiment/candidates?cycleCode=D26'))).toBe(true);
   expect(document.body.textContent).not.toContain(A);
+});
+
+test('a candidate with no site visit is still listed (the transcript, not the visit, decides)', async () => {
+  handlers.candidates = async () => json({ requestIds: ['33333333-3333-4333-8333-333333333333'], capped: false });
+  render(<DiscussionSentimentView />);
+  expect(await screen.findByLabelText(/Gamma no visit/)).toBeInTheDocument();
+});
+
+test('a capped candidate list says it may be incomplete', async () => {
+  handlers.candidates = async () => json({ requestIds: [A], capped: true });
+  render(<DiscussionSentimentView />);
+  await screen.findByLabelText(/Alpha/);
+  expect(screen.getByRole('status')).toHaveTextContent('may be incomplete');
+});
+
+test('a failed candidates call shows an error with Try again and never lists every proposal', async () => {
+  let calls = 0;
+  handlers.candidates = async () => { calls += 1; return calls === 1 ? json({ error: 'The proposal list could not be loaded.' }, false, 502) : json({ requestIds: [B], capped: false }); };
+  render(<DiscussionSentimentView />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('could not be loaded');
+  expect(screen.queryByLabelText(/Alpha/)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(/Beta/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  expect(await screen.findByLabelText(/Beta imaging/)).toBeInTheDocument();
+  expect(screen.queryByLabelText(/Alpha/)).not.toBeInTheDocument();
+});
+
+test('the program and cycle selects are populated from the first response and keep their options after the default cycle loads', async () => {
+  render(<DiscussionSentimentView />);
+  await screen.findByLabelText(/Alpha/);
+  expect(screen.getByLabelText('Grant program')).toHaveValue('p1');
+  expect(screen.getByLabelText('Grant cycle')).toHaveValue('D26');
+  expect(within(screen.getByLabelText('Grant cycle')).getAllByRole('option').map((o) => o.value)).toEqual(['D26', 'J27']);
+});
+
+test('an empty candidate list shows no proposals rather than every proposal', async () => {
+  handlers.candidates = async () => json({ requestIds: [], capped: false });
+  render(<DiscussionSentimentView />);
+  expect(await screen.findByText(/No proposals with a staff discussion transcript match/)).toBeInTheDocument();
+  expect(screen.queryByLabelText(/Alpha/)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(/Beta/)).not.toBeInTheDocument();
+});
+
+test('a slow candidates response for a previous cycle is ignored after the cycle changes back', async () => {
+  const slow = deferred();
+  let slowAsked = false;
+  handlers.candidates = (path) => {
+    if (path.includes('cycleCode=D26')) return Promise.resolve(json({ requestIds: [A], capped: false }));
+    slowAsked = true;
+    return slow.promise;
+  };
+  render(<DiscussionSentimentView />);
+  await screen.findByLabelText(/Alpha/);
+  const cycleSelect = screen.getByLabelText('Grant cycle');
+  fireEvent.change(cycleSelect, { target: { value: 'J27' } });
+  await waitFor(() => expect(slowAsked).toBe(true)); // the J27 load is now waiting on its candidates
+  fireEvent.change(cycleSelect, { target: { value: 'D26' } });
+  expect(await screen.findByLabelText(/Alpha/)).toBeInTheDocument();
+  await act(async () => { slow.resolve(json({ requestIds: [B], capped: true })); });
+  expect(screen.queryByLabelText(/Beta/)).not.toBeInTheDocument();
+  expect(screen.getByLabelText(/Alpha/)).toBeInTheDocument();
+  expect(screen.queryByText(/may be incomplete/)).not.toBeInTheDocument();
 });
 
 test('choosing a proposal reads only that proposal, and shows each status label', async () => {
@@ -71,10 +141,10 @@ test('choosing a proposal reads only that proposal, and shows each status label'
     handlers[`GET ${url(A)}`] = async () => json(data);
     const { unmount } = render(<DiscussionSentimentView />);
     await screen.findByLabelText(/Alpha tissue repair/);
-    expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/discussion-sentiment'))).toBe(false);
+    expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/visits/'))).toBe(false);
     tick('Alpha');
     expect(await screen.findByText(text)).toBeInTheDocument();
-    expect(global.fetch.mock.calls.filter(([u]) => String(u).includes('/discussion-sentiment'))).toHaveLength(1);
+    expect(global.fetch.mock.calls.filter(([u]) => String(u).includes('/visits/'))).toHaveLength(1);
     unmount();
     global.fetch.mockClear();
   }

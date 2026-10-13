@@ -46,6 +46,9 @@ staff members, and writing ranks automatically into Proposal Ranking are out of 
 | AI consent step | **None.** The analysis does not add a consent acknowledgment. |
 | Provider data handling | **Owner accepted** the second model pass over the transcript; the Session 599 provider-confirmation item does not block this feature. |
 | Calibration | **Owner picks 3–5 real discussions** for a read-only calibration run (owner authorizes that production read at the time). |
+| Picker scope | **Transcript-only (2026-10-13).** The picker lists only proposals whose Staff Discussion Transcript is currently bound, not every site visit. |
+| Comparison order | **Most favourable first (2026-10-13), as built:** reception, then enthusiasm, then fewer disagreements, then fewer uncertainties; rows without a current result last. |
+| Prompt wording | **Approved as written (2026-10-13).** The seed script may run when the owner seeds each environment (the release-order note in §9 still applies). |
 | Review before sharing | **Staff "Accept" required** before the read service returns a record to any other app. The Meeting Tracker page shows unaccepted results labelled "AI analysis; check the quotes". |
 
 ## 3. Current state the plan builds on
@@ -133,7 +136,7 @@ the number of disagreements and uncertainties.
 ### 4.3 Prompt
 
 - New seed source `shared/config/prompts/meeting-staff-discussion-sentiment.js`, a seed script,
-  and a `wmkf_ai_prompts` row (the owner approves the wording before seeding, as with the discussion
+  and a `wmkf_ai_prompts` row (the owner approved the wording on 2026-10-13, before seeding, as with the discussion
   summary). The rubric (what counts as high enthusiasm, a disagreement, uncertainty) lives in the
   prompt text, so it can be changed in Dataverse/`/admin` without a code change
   (`feedback-mutable-parameters-not-in-code`).
@@ -266,10 +269,15 @@ row (no `docs/SERVICE_AND_UTILITY_CATALOG.md` entry: the sibling summary service
   Add rows to `docs/API_ROUTE_SECURITY_MATRIX.md` and `ROUTE_NAMESPACE_LIFECYCLE`.
 - **Staff-only:** never served on the Board presentation page or the briefing link, the same
   rule as the Staff Discussion Summary.
-- **As built (Stage 4, §9):** the picker lists every site visit in the chosen cycle from the existing
-  schedule dashboard, and transcript presence shows only after a proposal is ticked (no list route; the
-  `GET` route reads one request). Owner confirmation of that picker scope and of the sort direction is
-  pending; `ROUTE_NAMESPACE_LIFECYCLE` has no `/api/meeting-tracker` entry, so it is unchanged.
+- **As built (Stage 4, §9):** the picker shows the cycle's dashboard proposals (existing
+  `/api/meeting-tracker/dashboard?projection=schedule&scope=all`) intersected with
+  `GET /api/meeting-tracker/discussion-sentiment/candidates?cycleCode=`, which returns request ids whose
+  discussion transcript is bound. Two cycle-wide queries (TRANSCRIPT and STAFF_DISCUSSION_TRANSCRIPT, with the
+  bundle manifest) are grouped by request and each group goes through the analysis's own `bindCurrent`, so a stale
+  or missing discussion TXT is excluded exactly as analyze would refuse it; no per-proposal reads. A `capped` result
+  (the export record cap) makes the page say the list may be incomplete. "No staff discussion transcript" can still
+  appear after ticking if the transcript went stale in between. `ROUTE_NAMESPACE_LIFECYCLE` has no
+  `/api/meeting-tracker` entry, so it is unchanged.
 
 ### 4.6 Consumer contract (Proposal Ranking and others)
 
@@ -347,7 +355,7 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
 - **Release-order requirement (found in Stage 2):** once the budget row is on `main`, the admin
   budget publish reads every registered prompt's current row (`assertModelCeilings`) and returns
   409 `executor_prompt_not_found` until `meeting-transcript.staff-discussion-sentiment` is seeded
-  in that environment. Seed the prompt in Production (owner, after wording approval) **before or
+  in that environment. Seed the prompt in Production (owner; wording approved 2026-10-13) **before or
   together with** the merge, and in any Preview environment used for testing.
 - Open for Stage 4: map prompt-store `NOT_FOUND`/`DUPLICATE_CURRENT` in accept/read to typed 409s.
 - **Review fixes (Opus review, 2026-10-13):** the prompt text now states every validator
@@ -398,8 +406,9 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
   (no new list route); status is read only for proposals staff tick, never for every visit. The model-override
   gate did not need a route change (`loadModelOverrides()` stays inside `analyzeDiscussionSentiment`), and
   `ROUTE_NAMESPACE_LIFECYCLE` has no `/api/meeting-tracker` entry, so it is unchanged. Sort order (reception,
-  enthusiasm, then fewer disagreements, then fewer uncertainties; no-result rows last) is `sortSentimentRows`;
-  the plan did not fix the direction, so confirm it. Out-of-date results show no comparable values.
+  enthusiasm, then fewer disagreements, then fewer uncertainties; no-result rows last) is `sortSentimentRows`
+  (owner confirmed 2026-10-13). Out-of-date results show no comparable values. The picker originally listed every
+  site visit; the owner decided transcript-only on 2026-10-13 (see the candidates entry below).
 - **Stage 5 built** (this is item 6 of §6; calibration, item 5, is the owner's separate read-only run):
   `getDeliberationSentiments(requestIds, accessContext)` in
   `discussion-sentiment-reader.js`; no consumer wired, Proposal Ranking untouched. It refuses (403) unless the
@@ -423,3 +432,11 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
   orchestrator): a withdrawn run still offered Accept, which the store always refuses
   (`accepted_at IS NULL`). Accept now requires a never-accepted run; a withdrawn run shows "Withdrawn.
   Re-analyze to accept a new result." View test covers accept → withdraw → reload (mutation-checked).
+- **Owner decisions and transcript-only picker (2026-10-13):** picker transcript-only, sort order kept, prompt
+  approved (all in §2). Built on the exact path: `discussion-sentiment-candidates.js`
+  (`listDiscussionSentimentCandidates`) behind `GET /api/meeting-tracker/discussion-sentiment/candidates`;
+  `request-document.js` `findByCycle` gained an opt-in `includeMeetingTranscriptBundle` (default off, other
+  callers unchanged) so the TRANSCRIPT row's boundary manifest comes back. Only TRANSCRIPT and
+  STAFF_DISCUSSION_TRANSCRIPT are fetched: `bindStaffDiscussionTranscript` reads only those winners and the
+  projection chooses each type's winner independently. Also fixed a page bug: the program and cycle options were
+  read from a variable reassigned before React ran the updater, so the selects could stay empty.
