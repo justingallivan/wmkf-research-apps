@@ -1,97 +1,186 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1160" viewBox="0 0 1280 1160" role="img" aria-label="Group discussion"><style>text{font-family:Inter,Arial,sans-serif}</style><rect width="1280" height="1160" fill="#f9fafb"/>
-<text x="36" y="32" font-size="13" fill="#6b7280" font-weight="600">PROPOSAL RANKING / SHAPE REVISION 2 / FICTIONAL EXAMPLES</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1210" viewBox="0 0 1280 1210" role="img" aria-label="Group discussion"><style>text{font-family:Inter,Arial,sans-serif}</style><rect width="1280" height="1210" fill="#f9fafb"/>
+<text x="36" y="32" font-size="13" fill="#6b7280" font-weight="600">PROPOSAL RANKING / SHAPE REVISION 3 / FICTIONAL EXAMPLES</text>
 <text x="36" y="77" font-size="28" fill="#111827" font-weight="600">Group discussion</text>
-<text x="36" y="108" font-size="17" fill="#374151" font-weight="400">D26 · Reveal 1 · Current group order · Saved · Last refreshed 10:42</text>
-<rect x="1040" y="54" width="204" height="40" rx="8" fill="#111827" stroke="#d1d5db"/>
-<text x="1053" y="80" font-size="16" fill="#fff" font-weight="600">Export workbook</text>
-<rect x="36" y="132" width="1208" height="68" rx="8" fill="#fff" stroke="#d1d5db"/>
-<text x="54" y="158" font-size="13" fill="#6b7280" font-weight="600">RECOMMEND FUNDING</text>
-<text x="54" y="185" font-size="20" fill="#111827" font-weight="600">1 proposal · $125,000 · West 1 / East 0 / Unknown 0</text>
-<text x="1055" y="174" font-size="17" fill="#374151" font-weight="400">Refresh</text>
-<text x="36" y="232" font-size="19" fill="#111827" font-weight="600">Recommend funding</text>
-<rect x="36" y="248" width="1208" height="340" rx="8" fill="#fff" stroke="#d1d5db"/>
-<text x="54" y="290" font-size="23" fill="#6b7280" font-weight="400">⋮⋮</text>
-<text x="90" y="291" font-size="26" fill="#111827" font-weight="600">1</text>
-<text x="145" y="283" font-size="23" fill="#111827" font-weight="600">Synthetic Institution 1</text>
-<text x="145" y="315" font-size="19" fill="#1e40af" font-weight="400">Science and Engineering Sample 1</text>
-<text x="145" y="344" font-size="15" fill="#6b7280" font-weight="400">Example 01 · Lead PD: Alex</text>
-<rect x="1012" y="268" width="65" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="1022" y="289" font-size="16" fill="#374151" font-weight="600">SE</text>
-<rect x="1087" y="268" width="91" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="1097" y="289" font-size="16" fill="#374151" font-weight="600">West</text>
-<text x="1206" y="291" font-size="22" fill="#374151" font-weight="400">⋯</text>
-<text x="145" y="381" font-size="16" fill="#374151" font-weight="600">Peer reviews</text>
-<rect x="278" y="359" width="98" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="288" y="380" font-size="16" fill="#374151" font-weight="600">Excellent</text>
-<rect x="384" y="359" width="98" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="394" y="380" font-size="16" fill="#374151" font-weight="600">Excellent</text>
-<rect x="490" y="359" width="108" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="500" y="380" font-size="16" fill="#374151" font-weight="600">Very good</text>
-<text x="768" y="381" font-size="17" fill="#111827" font-weight="600">Mean 4.7 · 3 scored</text>
-<path d="M145 402L1216 402" stroke="#e5e7eb"/>
-<text x="145" y="429" font-size="16" fill="#374151" font-weight="600">PD assessments · At reveal</text>
-<text x="786" y="429" font-size="16" fill="#374151" font-weight="600">Starting mean rank 1.33</text>
-<text x="145" y="458" font-size="17" fill="#111827" font-weight="600">Alex</text>
-<text x="233" y="458" font-size="17" fill="#374151" font-weight="400">Rank 1 · A</text>
-<text x="145" y="483" font-size="16" fill="#374151" font-weight="400">Confident</text>
-<text x="487" y="458" font-size="17" fill="#111827" font-weight="600">Casey</text>
-<text x="575" y="458" font-size="17" fill="#374151" font-weight="400">Rank 2 · A</text>
-<text x="487" y="483" font-size="16" fill="#92400e" font-weight="400">Not sure</text>
-<text x="829" y="458" font-size="17" fill="#111827" font-weight="600">Morgan</text>
-<text x="917" y="458" font-size="17" fill="#374151" font-weight="400">Rank 1 · A</text>
-<text x="829" y="483" font-size="16" fill="#374151" font-weight="400">Confident</text>
-<path d="M145 495L1216 495" stroke="#e5e7eb"/>
-<text x="145" y="521" font-size="15" fill="#374151" font-weight="400">Research: 2 awards · Latest 2021</text>
-<text x="555" y="521" font-size="15" fill="#374151" font-weight="400">Earlier sentiment: Positive · High enthusiasm   ▸ Evidence</text>
-<text x="145" y="559" font-size="16" fill="#374151" font-weight="600">All PDs graded A</text>
-<text x="824" y="548" font-size="13" fill="#6b7280" font-weight="400">Requested</text>
-<text x="1050" y="548" font-size="13" fill="#6b7280" font-weight="400">Cumulative requested</text>
-<text x="824" y="573" font-size="20" fill="#111827" font-weight="600">$125,000</text>
-<text x="1050" y="573" font-size="20" fill="#111827" font-weight="600">$125,000</text>
-<rect x="36" y="601" width="1208" height="44" rx="4" fill="#eaf0f5" stroke="#94a3b8"/>
-<text x="52" y="630" font-size="22" fill="#374151" font-weight="400">⋮⋮</text>
-<text x="87" y="630" font-size="18" fill="#111827" font-weight="600">End of Recommend funding · 1 proposal · $125,000</text>
-<text x="1064" y="629" font-size="16" fill="#374151" font-weight="400">Set position…</text>
-<text x="36" y="681" font-size="19" fill="#111827" font-weight="600">Alternates</text>
-<rect x="36" y="699" width="1208" height="340" rx="8" fill="#fff" stroke="#d1d5db"/>
-<text x="54" y="741" font-size="23" fill="#6b7280" font-weight="400">⋮⋮</text>
-<text x="90" y="742" font-size="26" fill="#111827" font-weight="600">2</text>
-<text x="145" y="734" font-size="23" fill="#111827" font-weight="600">Synthetic Institution 3</text>
-<text x="145" y="766" font-size="19" fill="#1e40af" font-weight="400">Medical Research Sample 3</text>
-<text x="145" y="795" font-size="15" fill="#6b7280" font-weight="400">Example 02 · Lead PD: Morgan</text>
-<rect x="1012" y="719" width="65" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="1022" y="740" font-size="16" fill="#374151" font-weight="600">MR</text>
-<rect x="1087" y="719" width="91" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="1097" y="740" font-size="16" fill="#374151" font-weight="600">East</text>
-<text x="1206" y="742" font-size="22" fill="#374151" font-weight="400">⋯</text>
-<text x="145" y="832" font-size="16" fill="#374151" font-weight="600">Peer reviews</text>
-<rect x="278" y="810" width="98" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="288" y="831" font-size="16" fill="#374151" font-weight="600">Excellent</text>
-<rect x="384" y="810" width="108" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="394" y="831" font-size="16" fill="#374151" font-weight="600">Very good</text>
-<rect x="500" y="810" width="74" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="510" y="831" font-size="16" fill="#374151" font-weight="600">Good</text>
-<text x="768" y="832" font-size="17" fill="#111827" font-weight="600">Mean 4.0 · 3 scored</text>
-<path d="M145 853L1216 853" stroke="#e5e7eb"/>
-<text x="145" y="880" font-size="16" fill="#374151" font-weight="600">PD assessments · At reveal</text>
-<text x="786" y="880" font-size="16" fill="#374151" font-weight="600">Starting mean rank 3.00</text>
-<text x="145" y="909" font-size="17" fill="#111827" font-weight="600">Alex</text>
-<text x="233" y="909" font-size="17" fill="#374151" font-weight="400">Rank 2 · A</text>
-<text x="145" y="934" font-size="16" fill="#374151" font-weight="400">Confident</text>
-<text x="487" y="909" font-size="17" fill="#111827" font-weight="600">Casey</text>
-<text x="575" y="909" font-size="17" fill="#374151" font-weight="400">Rank 3 · B</text>
-<text x="487" y="934" font-size="16" fill="#374151" font-weight="400">Confident</text>
-<text x="829" y="909" font-size="17" fill="#111827" font-weight="600">Morgan</text>
-<text x="917" y="909" font-size="17" fill="#374151" font-weight="400">Rank 4 · B</text>
-<text x="829" y="934" font-size="16" fill="#92400e" font-weight="400">Not sure</text>
-<path d="M145 946L1216 946" stroke="#e5e7eb"/>
-<text x="145" y="972" font-size="15" fill="#374151" font-weight="400">Research: No recorded awards</text>
-<text x="555" y="972" font-size="15" fill="#374151" font-weight="400">Earlier sentiment: Mixed · Moderate enthusiasm   ▸ Evidence</text>
-<text x="145" y="1010" font-size="16" fill="#92400e" font-weight="600">Grades differ</text>
-<text x="824" y="999" font-size="13" fill="#6b7280" font-weight="400">Requested</text>
-<text x="1050" y="999" font-size="13" fill="#6b7280" font-weight="400">Cumulative requested</text>
-<text x="824" y="1024" font-size="20" fill="#111827" font-weight="600">$87,500</text>
-<text x="1050" y="1024" font-size="20" fill="#111827" font-weight="600">$212,500</text>
-<text x="36" y="1080" font-size="16" fill="#374151" font-weight="400">List excerpt: remaining alternates, the second divider and Do not recommend continue below.</text>
-<text x="36" y="1138" font-size="14" fill="#6b7280" font-weight="400">Draft for confirmation · Static layout sketch, not a working interface. Content and motion requirements are in the brief.</text>
+<text x="36" y="108" font-size="17" fill="#374151" font-weight="400">D26 · Reveal 1 · All changes saved</text>
+<rect x="1040" y="52" width="204" height="40" rx="8" fill="#111827" stroke="#d1d5db"/>
+<text x="1053" y="78" font-size="16" fill="#fff" font-weight="600">Export workbook</text>
+<text x="36" y="143" font-size="15" fill="#475569" font-weight="400">Recommend funding</text>
+<text x="216" y="145" font-size="25" fill="#111827" font-weight="600">$125,000</text>
+<text x="373" y="143" font-size="16" fill="#374151" font-weight="400">1 award  ·  W 1 / E 0 / Unknown 0</text>
+<text x="966" y="143" font-size="15" fill="#475569" font-weight="400">10:42  ·  Refresh</text>
+<text x="36" y="191" font-size="15" fill="#475569" font-weight="600">PD assessment</text>
+<rect x="172" y="169" width="32" height="30" rx="6" fill="#dcfce7" stroke="none"/>
+<text x="182" y="191" font-size="18" fill="#166534" font-weight="600">A</text>
+<text x="213" y="191" font-size="15" fill="#374151" font-weight="400">Fund</text>
+<rect x="290" y="169" width="32" height="30" rx="6" fill="#fef3c7" stroke="none"/>
+<text x="300" y="191" font-size="18" fill="#92400e" font-weight="600">B</text>
+<text x="331" y="191" font-size="15" fill="#374151" font-weight="400">Maybe</text>
+<rect x="431" y="169" width="32" height="30" rx="6" fill="#e2e8f0" stroke="none"/>
+<text x="441" y="191" font-size="18" fill="#475569" font-weight="600">C</text>
+<text x="472" y="191" font-size="15" fill="#374151" font-weight="400">Don’t fund</text>
+<text x="634" y="191" font-size="15" fill="#374151" font-weight="400">✓ Confident     ? Not sure     # Individual rank at reveal</text>
+<text x="36" y="228" font-size="13" fill="#64748b" font-weight="400">Peer grades: E Excellent · VG Very good · G Good · F Fair · P Poor   |   SE/MR program · E/W geography</text>
+<rect x="36" y="249" width="1208" height="186" rx="9" fill="#fff" stroke="#d8dee5"/>
+<text x="54" y="287" font-size="20" fill="#94a3b8" font-weight="400">⋮⋮</text>
+<text x="83" y="288" font-size="25" fill="#111827" font-weight="600">1</text>
+<text x="126" y="283" font-size="22" fill="#111827" font-weight="600">Northlake University</text>
+<text x="126" y="310" font-size="17" fill="#1e40af" font-weight="400">Mapping the mechanics of cellular repair</text>
+<text x="716" y="281" font-size="15" fill="#475569" font-weight="600">MR / W</text>
+<text x="855" y="283" font-size="21" fill="#374151" font-weight="400">⋯</text>
+<text x="126" y="334" font-size="13" fill="#64748b" font-weight="400">Example 01 · Lead: Alex</text>
+<text x="454" y="334" font-size="14" fill="#475569" font-weight="400">Peer: E · E · VG  /  4.7</text>
+<text x="110" y="370" font-size="15" fill="#475569" font-weight="400">Alex</text>
+<rect x="169" y="348" width="32" height="30" rx="6" fill="#dcfce7" stroke="none"/>
+<text x="179" y="370" font-size="18" fill="#166534" font-weight="600">A</text>
+<text x="206" y="370" font-size="19" fill="#475569" font-weight="600">✓</text>
+<text x="229" y="369" font-size="15" fill="#475569" font-weight="400">#1</text>
+<text x="270" y="370" font-size="15" fill="#475569" font-weight="400">Casey</text>
+<rect x="329" y="348" width="32" height="30" rx="6" fill="#dcfce7" stroke="none"/>
+<text x="339" y="370" font-size="18" fill="#166534" font-weight="600">A</text>
+<text x="366" y="370" font-size="19" fill="#475569" font-weight="600">✓</text>
+<text x="389" y="369" font-size="15" fill="#475569" font-weight="400">#1</text>
+<text x="430" y="370" font-size="15" fill="#475569" font-weight="400">Morgan</text>
+<rect x="489" y="348" width="32" height="30" rx="6" fill="#dcfce7" stroke="none"/>
+<text x="499" y="370" font-size="18" fill="#166534" font-weight="600">A</text>
+<text x="526" y="370" font-size="19" fill="#475569" font-weight="600">✓</text>
+<text x="549" y="369" font-size="15" fill="#475569" font-weight="400">#1</text>
+<text x="590" y="370" font-size="15" fill="#475569" font-weight="400">Dana</text>
+<rect x="649" y="348" width="32" height="30" rx="6" fill="#dcfce7" stroke="none"/>
+<text x="659" y="370" font-size="18" fill="#166534" font-weight="600">A</text>
+<text x="686" y="370" font-size="19" fill="#475569" font-weight="600">✓</text>
+<text x="709" y="369" font-size="15" fill="#475569" font-weight="400">#1</text>
+<text x="126" y="402" font-size="13" fill="#64748b" font-weight="400">Research: 2 awards · latest 2021</text>
+<text x="444" y="402" font-size="13" fill="#64748b" font-weight="400">Earlier discussion: Positive · high enthusiasm  ▸</text>
+<text x="126" y="424" font-size="13" fill="#64748b" font-weight="400">Same grade across PDs</text>
+<text x="625" y="424" font-size="13" fill="#64748b" font-weight="400">Starting mean rank 1.00</text>
+<path d="M913 269L913 413" stroke="#e5e7eb"/>
+<text x="942" y="286" font-size="11" fill="#64748b" font-weight="600">REQUESTED</text>
+<text x="942" y="320" font-size="27" fill="#111827" font-weight="600">$125,000</text>
+<text x="942" y="359" font-size="11" fill="#64748b" font-weight="600">CUMULATIVE</text>
+<text x="942" y="387" font-size="21" fill="#475569" font-weight="600">$125,000</text>
+<path d="M36 464L1244 464" stroke="#e5e7eb"/>
+<rect x="68" y="444" width="780" height="40" rx="0" fill="#f9fafb" stroke="none"/>
+<text x="80" y="470" font-size="18" fill="#166534" font-weight="600">⋮⋮  End of Recommend funding</text>
+<text x="932" y="470" font-size="18" fill="#166534" font-weight="600">$125,000</text>
+<rect x="36" y="494" width="1208" height="186" rx="9" fill="#fff" stroke="#d8dee5"/>
+<rect x="36" y="506" width="4" height="162" rx="2" fill="#d97706" stroke="none"/>
+<text x="54" y="532" font-size="20" fill="#94a3b8" font-weight="400">⋮⋮</text>
+<text x="83" y="533" font-size="25" fill="#111827" font-weight="600">2</text>
+<text x="126" y="528" font-size="22" fill="#111827" font-weight="600">Redwood Institute</text>
+<text x="126" y="555" font-size="17" fill="#1e40af" font-weight="400">A new window into quantum materials</text>
+<text x="716" y="526" font-size="15" fill="#475569" font-weight="600">SE / W</text>
+<text x="855" y="528" font-size="21" fill="#374151" font-weight="400">⋯</text>
+<text x="126" y="579" font-size="13" fill="#64748b" font-weight="400">Example 02 · Lead: Morgan</text>
+<text x="454" y="579" font-size="14" fill="#475569" font-weight="400">Peer: E · VG · VG  /  4.3</text>
+<text x="110" y="615" font-size="15" fill="#475569" font-weight="400">Alex</text>
+<rect x="169" y="593" width="32" height="30" rx="6" fill="#dcfce7" stroke="none"/>
+<text x="179" y="615" font-size="18" fill="#166534" font-weight="600">A</text>
+<text x="206" y="615" font-size="19" fill="#475569" font-weight="600">✓</text>
+<text x="229" y="614" font-size="15" fill="#475569" font-weight="400">#2</text>
+<text x="270" y="615" font-size="15" fill="#475569" font-weight="400">Casey</text>
+<rect x="329" y="593" width="32" height="30" rx="6" fill="#dcfce7" stroke="none"/>
+<text x="339" y="615" font-size="18" fill="#166534" font-weight="600">A</text>
+<text x="366" y="615" font-size="19" fill="#475569" font-weight="600">✓</text>
+<text x="389" y="614" font-size="15" fill="#475569" font-weight="400">#2</text>
+<text x="430" y="615" font-size="15" fill="#475569" font-weight="400">Morgan</text>
+<rect x="489" y="593" width="32" height="30" rx="6" fill="#dcfce7" stroke="none"/>
+<text x="499" y="615" font-size="18" fill="#166534" font-weight="600">A</text>
+<text x="526" y="615" font-size="19" fill="#475569" font-weight="600">✓</text>
+<text x="549" y="614" font-size="15" fill="#475569" font-weight="400">#2</text>
+<text x="590" y="615" font-size="15" fill="#475569" font-weight="400">Dana</text>
+<rect x="649" y="593" width="32" height="30" rx="6" fill="#fef3c7" stroke="none"/>
+<text x="659" y="615" font-size="18" fill="#92400e" font-weight="600">B</text>
+<text x="686" y="615" font-size="19" fill="#92400e" font-weight="600">?</text>
+<text x="709" y="614" font-size="15" fill="#475569" font-weight="400">#2</text>
+<text x="126" y="647" font-size="13" fill="#64748b" font-weight="400">Research: 0 recorded awards</text>
+<text x="444" y="647" font-size="13" fill="#64748b" font-weight="400">Earlier discussion: Positive · moderate enthusiasm  ▸</text>
+<text x="126" y="669" font-size="13" fill="#92400e" font-weight="600">↔ Grades differ</text>
+<text x="625" y="669" font-size="13" fill="#64748b" font-weight="400">Starting mean rank 2.00</text>
+<path d="M913 514L913 658" stroke="#e5e7eb"/>
+<text x="942" y="531" font-size="11" fill="#64748b" font-weight="600">REQUESTED</text>
+<text x="942" y="565" font-size="27" fill="#111827" font-weight="600">$87,500</text>
+<text x="942" y="604" font-size="11" fill="#64748b" font-weight="600">CUMULATIVE</text>
+<text x="942" y="632" font-size="21" fill="#475569" font-weight="600">$212,500</text>
+<rect x="36" y="693" width="1208" height="186" rx="9" fill="#fff" stroke="#d8dee5"/>
+<rect x="36" y="705" width="4" height="162" rx="2" fill="#d97706" stroke="none"/>
+<text x="54" y="731" font-size="20" fill="#94a3b8" font-weight="400">⋮⋮</text>
+<text x="83" y="732" font-size="25" fill="#111827" font-weight="600">3</text>
+<text x="126" y="727" font-size="22" fill="#111827" font-weight="600">Eastbridge University</text>
+<text x="126" y="754" font-size="17" fill="#1e40af" font-weight="400">Decoding immune memory across tissues</text>
+<text x="716" y="725" font-size="15" fill="#475569" font-weight="600">MR / E</text>
+<text x="855" y="727" font-size="21" fill="#374151" font-weight="400">⋯</text>
+<text x="126" y="778" font-size="13" fill="#64748b" font-weight="400">Example 03 · Lead: Casey</text>
+<text x="454" y="778" font-size="14" fill="#475569" font-weight="400">Peer: E · G · F  /  3.3</text>
+<text x="110" y="814" font-size="15" fill="#475569" font-weight="400">Alex</text>
+<rect x="169" y="792" width="32" height="30" rx="6" fill="#dcfce7" stroke="none"/>
+<text x="179" y="814" font-size="18" fill="#166534" font-weight="600">A</text>
+<text x="206" y="814" font-size="19" fill="#475569" font-weight="600">✓</text>
+<text x="229" y="813" font-size="15" fill="#475569" font-weight="400">#3</text>
+<text x="270" y="814" font-size="15" fill="#475569" font-weight="400">Casey</text>
+<rect x="329" y="792" width="32" height="30" rx="6" fill="#fef3c7" stroke="none"/>
+<text x="339" y="814" font-size="18" fill="#92400e" font-weight="600">B</text>
+<text x="366" y="814" font-size="19" fill="#92400e" font-weight="600">?</text>
+<text x="389" y="813" font-size="15" fill="#475569" font-weight="400">#3</text>
+<text x="430" y="814" font-size="15" fill="#475569" font-weight="400">Morgan</text>
+<rect x="489" y="792" width="32" height="30" rx="6" fill="#e2e8f0" stroke="none"/>
+<text x="499" y="814" font-size="18" fill="#475569" font-weight="600">C</text>
+<text x="526" y="814" font-size="19" fill="#92400e" font-weight="600">?</text>
+<text x="549" y="813" font-size="15" fill="#475569" font-weight="400">#4</text>
+<text x="590" y="814" font-size="15" fill="#475569" font-weight="400">Dana</text>
+<rect x="649" y="792" width="32" height="30" rx="6" fill="#fef3c7" stroke="none"/>
+<text x="659" y="814" font-size="18" fill="#92400e" font-weight="600">B</text>
+<text x="686" y="814" font-size="19" fill="#475569" font-weight="600">✓</text>
+<text x="709" y="813" font-size="15" fill="#475569" font-weight="400">#3</text>
+<text x="126" y="846" font-size="13" fill="#64748b" font-weight="400">Research: 1 award · latest 2019</text>
+<text x="444" y="846" font-size="13" fill="#64748b" font-weight="400">Earlier discussion: Mixed · moderate enthusiasm  ▸</text>
+<text x="126" y="868" font-size="13" fill="#92400e" font-weight="600">↔ Grades differ</text>
+<text x="625" y="868" font-size="13" fill="#64748b" font-weight="400">Starting mean rank 3.25</text>
+<path d="M913 713L913 857" stroke="#e5e7eb"/>
+<text x="942" y="730" font-size="11" fill="#64748b" font-weight="600">REQUESTED</text>
+<text x="942" y="764" font-size="27" fill="#111827" font-weight="600">$245,000</text>
+<text x="942" y="803" font-size="11" fill="#64748b" font-weight="600">CUMULATIVE</text>
+<text x="942" y="831" font-size="21" fill="#475569" font-weight="600">$457,500</text>
+<path d="M36 908L1244 908" stroke="#e5e7eb"/>
+<rect x="68" y="888" width="780" height="40" rx="0" fill="#f9fafb" stroke="none"/>
+<text x="80" y="914" font-size="18" fill="#334155" font-weight="600">⋮⋮  End of Alternates</text>
+<text x="932" y="914" font-size="18" fill="#334155" font-weight="600">Do not recommend below</text>
+<rect x="36" y="938" width="1208" height="186" rx="9" fill="#fff" stroke="#d8dee5"/>
+<text x="54" y="976" font-size="20" fill="#94a3b8" font-weight="400">⋮⋮</text>
+<text x="83" y="977" font-size="25" fill="#111827" font-weight="600">4</text>
+<text x="126" y="972" font-size="22" fill="#111827" font-weight="600">Pine Harbor Research Center</text>
+<text x="126" y="999" font-size="17" fill="#1e40af" font-weight="400">Programmable surfaces for optical sensing</text>
+<text x="716" y="970" font-size="15" fill="#475569" font-weight="600">SE / W</text>
+<text x="855" y="972" font-size="21" fill="#374151" font-weight="400">⋯</text>
+<text x="126" y="1023" font-size="13" fill="#64748b" font-weight="400">Example 04 · Lead: Dana</text>
+<text x="454" y="1023" font-size="14" fill="#475569" font-weight="400">Peer: G · F · F  /  2.3</text>
+<text x="110" y="1059" font-size="15" fill="#475569" font-weight="400">Alex</text>
+<rect x="169" y="1037" width="32" height="30" rx="6" fill="#e2e8f0" stroke="none"/>
+<text x="179" y="1059" font-size="18" fill="#475569" font-weight="600">C</text>
+<text x="206" y="1059" font-size="19" fill="#475569" font-weight="600">✓</text>
+<text x="229" y="1058" font-size="15" fill="#475569" font-weight="400">#4</text>
+<text x="270" y="1059" font-size="15" fill="#475569" font-weight="400">Casey</text>
+<rect x="329" y="1037" width="32" height="30" rx="6" fill="#e2e8f0" stroke="none"/>
+<text x="339" y="1059" font-size="18" fill="#475569" font-weight="600">C</text>
+<text x="366" y="1059" font-size="19" fill="#475569" font-weight="600">✓</text>
+<text x="389" y="1058" font-size="15" fill="#475569" font-weight="400">#4</text>
+<text x="430" y="1059" font-size="15" fill="#475569" font-weight="400">Morgan</text>
+<rect x="489" y="1037" width="32" height="30" rx="6" fill="#e2e8f0" stroke="none"/>
+<text x="499" y="1059" font-size="18" fill="#475569" font-weight="600">C</text>
+<text x="526" y="1059" font-size="19" fill="#475569" font-weight="600">✓</text>
+<text x="549" y="1058" font-size="15" fill="#475569" font-weight="400">#3</text>
+<text x="590" y="1059" font-size="15" fill="#475569" font-weight="400">Dana</text>
+<rect x="649" y="1037" width="32" height="30" rx="6" fill="#e2e8f0" stroke="none"/>
+<text x="659" y="1059" font-size="18" fill="#475569" font-weight="600">C</text>
+<text x="686" y="1059" font-size="19" fill="#475569" font-weight="600">✓</text>
+<text x="709" y="1058" font-size="15" fill="#475569" font-weight="400">#4</text>
+<text x="126" y="1091" font-size="13" fill="#64748b" font-weight="400">Research: History unavailable</text>
+<text x="444" y="1091" font-size="13" fill="#64748b" font-weight="400">Earlier discussion: Not available  ▸</text>
+<text x="126" y="1113" font-size="13" fill="#64748b" font-weight="400">Same grade across PDs</text>
+<text x="625" y="1113" font-size="13" fill="#64748b" font-weight="400">Starting mean rank 3.75</text>
+<path d="M913 958L913 1102" stroke="#e5e7eb"/>
+<text x="942" y="975" font-size="11" fill="#64748b" font-weight="600">REQUESTED</text>
+<text x="942" y="1009" font-size="27" fill="#111827" font-weight="600">$150,000</text>
+<text x="942" y="1048" font-size="11" fill="#64748b" font-weight="600">CUMULATIVE</text>
+<text x="942" y="1076" font-size="21" fill="#475569" font-weight="600">$607,500</text>
+<text x="36" y="1188" font-size="14" fill="#6b7280" font-weight="400">Draft for confirmation · Static layout sketch, not a working interface. Content and motion requirements are in the brief.</text>
 </svg>

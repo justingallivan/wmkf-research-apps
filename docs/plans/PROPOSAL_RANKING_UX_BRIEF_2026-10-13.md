@@ -1,6 +1,6 @@
 # Proposal Ranking — Impeccable shape brief
 
-Date: 2026-10-13. Revision: 2. Status: **DRAFT FOR OWNER CONFIRMATION — no app changes.**
+Date: 2026-10-13. Revision: 3. Status: **DRAFT FOR OWNER CONFIRMATION — no app changes.**
 Controlling product rules: [design revision 5](PROPOSAL_RANKING_DESIGN_2026-10-07.md).
 Build sequence: [implementation plan](PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md).
 This is phase 0's proposed interaction design, not an implemented or confirmed interface.
@@ -16,7 +16,9 @@ funding total without maintaining a spreadsheet.
 Mode: **Operate**. Page type: **Workspace / Tool** containing an ordered working list.
 Inherit PRODUCT.md and DESIGN.md: desktop first, neutral surfaces, Inter/system type,
 left-aligned compact header, dark primary actions, restrained semantic color, shared
-buttons and visible keyboard focus. No new visual identity or design-system changes.
+buttons and visible keyboard focus. The owner requested a surface-specific use of
+green/amber/slate A/B/C badges and confidence symbols after finding revision 2 busy
+and bland. This extends the ranking visual treatment without changing the suite design system.
 This is a focused extension of the existing ranking surface: the agreed single-list,
 movable-separator workflow fixes the structure; no unrelated layout tournament is needed.
 
@@ -43,7 +45,7 @@ was not endorsed. Use them as a content checklist, not a fixed visual template. 
 ranking-specific Impeccable critique/shape record was found in the inspected artifacts
 or handoffs; the earlier app-wide critique is not evidence these cards were reviewed.
 The initial October 13 sketches omitted too much information and are superseded by
-revision 2's sketches below. This is a correction to the draft, not an accepted redesign.
+revision 3's sketches below. This is a correction to the draft, not an accepted redesign.
 
 No matching Proposal Ranking surface brief was found by Impeccable context. Its other
 surface briefs concern Meeting Tracker and Workbench. DESIGN.md is the visual authority;
@@ -105,14 +107,14 @@ of a long list when useful. One visible saved-state message covers the active li
 
 ### Content checklist and hierarchy
 
-| Earlier card content | Revision-2 placement |
+| Earlier card content | Revision-3 placement |
 |---|---|
 | Position, institution, linked project title | Stable left rank gutter; institution heading with linked title on its own line below. Never concatenate both into one long heading. |
 | Request number and lead PD | Quiet, visible identity line below the title. |
-| MR/SE and E/W | Two labelled compact markers at top right; distinguish program from geography. Use East/West text to avoid confusion with Excellent's E. |
+| MR/SE and E/W | Compact SE/MR and E/W markers in a stable location, with a visible legend and full accessible names; never leave an isolated ambiguous E. |
 | Individual reviewer grades and numeric mean | Visible **Peer reviews** strip, with each grade badge and a clearly labelled mean/scored count. Expanded detail supplements this strip rather than replacing it. |
 | Named PD ranks and average | Group cards always show each PD's combined rank, now with A/B/C and confidence alongside it. Clearly labelled **At reveal**; display starting mean rank separately from current collective position. |
-| Requested amount and cumulative budget | Consistent monetary footer, right-aligned on desktop; cumulative requested cost in group view. Private cards keep requested amount without introducing a personal funding cutoff. |
+| Requested amount and cumulative budget | Dedicated aligned amount column on desktop; cumulative requested cost in group view. Private cards keep requested amount without introducing a personal funding cutoff. |
 | Research history | Group context line: qualifying Research award count/latest year, no dollars; unavailable/provisional qualifications visible. |
 | Smooth dragging | Reuse the retained branch's `@hello-pangea/dnd` integration as the implementation starting point; extend deliberately for dividers. |
 
@@ -121,7 +123,7 @@ Private card, in reading order:
 1. Institution/title identity block and rank gutter; program/geography markers.
 2. Request number and lead PD, then the visible reviewer-grade strip and mean.
 3. **Confidence in my assessment:** explicit **Confident / Not sure** radio choices,
-   initially unanswered. Keep requested amount aligned in the footer. Program and
+   initially unanswered. Keep requested amount aligned in the right-hand amount column. Program and
    combined cards use the same anatomy; the surrounding section supplies A/B/C.
 4. A quiet card menu exposes a non-drag movement option. Keep extra controls off the
    default card face. No sentiment, peer PD assessments, notes or new score fields.
@@ -133,10 +135,32 @@ individual review distribution with the mean alone. For unusually many reviewers
 wrap the badge row; never silently omit reviews. Long names/titles wrap rather than
 push badges, money or controls out of the card.
 
-Show the grade as text derived from its section, not an independently editable grade
-field. A and C are judgments, not green success and red error states. Prefer neutral
-section labels and restrained divider emphasis; reserve amber for actual uncertainty
-or unsaved/conflicting work. Do not conflate reviewer ratings with the PD's A/B/C.
+### Color, symbols and scan hierarchy — owner-directed revision 3
+
+Grade badges use restrained **green A**, **amber B**, and **slate C**, with the letter
+always visible. This is a local assessment vocabulary, not a claim that an A is an
+approved award or a C is an error. Keep grade colors off reviewer scores and sentiment.
+Use **✓ Confident** and **? Not sure** in a persistent legend. In group comparison
+strips show each PD's name, grade, confidence symbol and `#` individual combined rank.
+Use full accessible names such as “Casey: grade B, not sure, individual rank 3.”
+Private confidence controls retain both text labels, radio semantics and explicit
+unanswered state; a missing answer never becomes a question mark by default.
+
+A thin amber edge and **↔ Grades differ** identify cards with different PD grades.
+Consensus cards stay visually quiet, with no extra colored consensus banner. This
+uses exact grade differences, not a newly invented numerical disagreement threshold.
+Symbols are reinforced by labels/legend and accessible names; color is redundant.
+
+Institution/title leads; the compact PD strip is the principal comparison surface;
+aligned requested/cumulative amounts form a separate right-hand column. Reviewer
+grades stay visible as neutral E/VG/G/F/P marks plus mean, under a visible legend.
+History and earlier sentiment are short secondary lines. Remove repeated box outlines
+and source headings from every subsection; keep enough labels to distinguish reviewer
+results, preserved individual judgments, and the current collective order.
+
+The grade follows its section, not a second editable control. Dividers retain the
+full A/B/C or collective section names. Narrow layouts stack the amount column and
+wrap the comparison strip without dropping people or their assessments.
 
 Two full-width movable divider bars sit in the list: **End of A · Fund** and
 **End of B · Maybe fund**. The C section follows. Group bars instead read
@@ -187,9 +211,8 @@ context, not a quota meter that turns red when the group disagrees with it.
 Every group card shows identity/program/geography, reviewer grades and mean, and an
 **At reveal** comparison row for each PD: name, combined rank, A/B/C and confidence.
 Use a compact aligned grid on desktop that stacks by PD on narrow screens. Named
-comparisons are visible by default, not behind a disclosure. Do not infer confidence
-from a colored rank badge. Text carries each meaning; a restrained amber emphasis may
-call attention to Not sure and an explicit **Grades differ** label.
+comparisons are visible by default, not behind a disclosure. Confidence has its own ✓ / ? symbol beside the grade, reinforced by the legend and
+accessible names. Color never substitutes for a confidence answer.
 
 Keep **Starting mean rank** alongside these preserved inputs. The large rank gutter
 always means the current collective position; it may differ after group reordering.
@@ -205,12 +228,12 @@ Neither sentiment nor history becomes a colored overall proposal score. Separate
 **Peer reviews**, **PD assessments at reveal**, and **Earlier discussion sentiment**
 with explicit labels so three different sources cannot be mistaken for one verdict.
 
-The monetary footer consistently shows Requested and Cumulative requested. The funding
+The aligned right-hand amount column consistently shows Requested and Cumulative requested. The funding
 bar repeats its section total, so the decision boundary is readable without inspecting
 another card. Allow content-driven card height; do not fit more cards by hiding named
 comparisons or reducing text to unreadable size on a shared screen. Check representative
-24-proposal lists in the built critique; the sketches show selected cards, not a complete
-cycle. Neutral card borders and alignment organize the density without colored boxes
+24-proposal lists in the built critique; the revised group sketch shows four fictional
+proposals together: unanimous A, mostly A, A/B/C disagreement, and unanimous C. Neutral card borders and alignment organize the density without colored boxes
 around every number.
 
 The facilitator shares this same group view; no special presentation mode is required.
@@ -308,8 +331,8 @@ app implementation is requested. Until then it stays a draft; do not write a dir
 contract, replace DESIGN.md, or change runtime code. Later critique/audit reviews the
 actual built surface once, fixes one batch and confirms once, per the implementation plan.
 
-Revision-2 verification: content checklist checked against retained branch source and
-October 8 commit history. Four static sketches illustrate the revised hierarchy and
-motion requirements; they do not demonstrate working animation. No app, dependency,
+Revision-3 verification: content checklist checked against retained branch source and
+October 8 commit history. The preparation and discussion sketches now use color/symbols and a compact
+comparison strip. Reset and movement sketches retain the prior interaction specification; they do not demonstrate working animation. No app, dependency,
 schema or design-system file changed. Owner confirmation of this revised draft remains
 pending; earlier sketches do not carry approval.

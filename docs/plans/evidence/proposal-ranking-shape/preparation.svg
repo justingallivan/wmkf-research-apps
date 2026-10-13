@@ -1,76 +1,78 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1160" viewBox="0 0 1280 1160" role="img" aria-label="My preparation"><style>text{font-family:Inter,Arial,sans-serif}</style><rect width="1280" height="1160" fill="#f9fafb"/>
-<text x="36" y="32" font-size="13" fill="#6b7280" font-weight="600">PROPOSAL RANKING / SHAPE REVISION 2 / FICTIONAL EXAMPLES</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="970" viewBox="0 0 1280 970" role="img" aria-label="My preparation"><style>text{font-family:Inter,Arial,sans-serif}</style><rect width="1280" height="970" fill="#f9fafb"/>
+<text x="36" y="32" font-size="13" fill="#6b7280" font-weight="600">PROPOSAL RANKING / SHAPE REVISION 3 / FICTIONAL EXAMPLES</text>
 <text x="36" y="77" font-size="28" fill="#111827" font-weight="600">My preparation</text>
 <text x="36" y="108" font-size="17" fill="#374151" font-weight="400">D26 · Private to you and the facilitator · Programs → Combined list → Ready</text>
-<text x="36" y="153" font-size="17" fill="#374151" font-weight="400">Medical Research</text>
-<text x="234" y="153" font-size="17" fill="#111827" font-weight="600">Science &amp; Engineering</text>
-<path d="M234 164L438 164" stroke="#e5e7eb"/>
-<text x="790" y="153" font-size="16" fill="#374151" font-weight="400">2 of 3 confidence answers · Saved</text>
-<text x="36" y="201" font-size="19" fill="#111827" font-weight="600">A · Fund</text>
-<text x="1050" y="201" font-size="16" fill="#374151" font-weight="400">Find proposal</text>
-<rect x="36" y="219" width="1208" height="218" rx="8" fill="#fff" stroke="#d1d5db"/>
-<text x="54" y="261" font-size="23" fill="#6b7280" font-weight="400">⋮⋮</text>
-<text x="90" y="262" font-size="26" fill="#111827" font-weight="600">1</text>
-<text x="145" y="254" font-size="23" fill="#111827" font-weight="600">Synthetic Institution 1</text>
-<text x="145" y="286" font-size="19" fill="#1e40af" font-weight="400">Science and Engineering Sample 1</text>
-<text x="145" y="315" font-size="15" fill="#6b7280" font-weight="400">Example 01 · Lead PD: Alex</text>
-<rect x="1012" y="239" width="65" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="1022" y="260" font-size="16" fill="#374151" font-weight="600">SE</text>
-<rect x="1087" y="239" width="91" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="1097" y="260" font-size="16" fill="#374151" font-weight="600">West</text>
-<text x="1206" y="262" font-size="22" fill="#374151" font-weight="400">⋯</text>
-<text x="145" y="353" font-size="16" fill="#374151" font-weight="600">Peer reviews</text>
-<rect x="278" y="331" width="98" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="288" y="352" font-size="16" fill="#374151" font-weight="600">Excellent</text>
-<rect x="384" y="331" width="98" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="394" y="352" font-size="16" fill="#374151" font-weight="600">Excellent</text>
-<rect x="490" y="331" width="108" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="500" y="352" font-size="16" fill="#374151" font-weight="600">Very good</text>
-<text x="768" y="353" font-size="17" fill="#111827" font-weight="600">Mean 4.7 · 3 scored</text>
-<path d="M145 377L1216 377" stroke="#e5e7eb"/>
-<text x="145" y="412" font-size="16" fill="#374151" font-weight="600">My confidence</text>
-<text x="290" y="412" font-size="17" fill="#374151" font-weight="400">● Confident     ○ Not sure</text>
-<text x="940" y="406" font-size="13" fill="#6b7280" font-weight="400">Requested</text>
-<text x="1065" y="408" font-size="20" fill="#111827" font-weight="600">$125,000</text>
-<rect x="36" y="450" width="1208" height="44" rx="4" fill="#eaf0f5" stroke="#94a3b8"/>
-<text x="52" y="479" font-size="22" fill="#374151" font-weight="400">⋮⋮</text>
-<text x="87" y="479" font-size="18" fill="#111827" font-weight="600">End of A · Fund · 1 proposal</text>
-<text x="1064" y="478" font-size="16" fill="#374151" font-weight="400">Set position…</text>
-<text x="36" y="534" font-size="19" fill="#111827" font-weight="600">B · Maybe fund</text>
-<rect x="36" y="550" width="1208" height="218" rx="8" fill="#fff" stroke="#d1d5db"/>
-<text x="54" y="592" font-size="23" fill="#6b7280" font-weight="400">⋮⋮</text>
-<text x="90" y="593" font-size="26" fill="#111827" font-weight="600">2</text>
-<text x="145" y="585" font-size="23" fill="#111827" font-weight="600">Synthetic Institution 2</text>
-<text x="145" y="617" font-size="19" fill="#1e40af" font-weight="400">Science and Engineering Sample 2</text>
-<text x="145" y="646" font-size="15" fill="#6b7280" font-weight="400">Example 02 · Lead PD: Casey</text>
-<rect x="1012" y="570" width="65" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="1022" y="591" font-size="16" fill="#374151" font-weight="600">SE</text>
-<rect x="1087" y="570" width="91" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="1097" y="591" font-size="16" fill="#374151" font-weight="600">East</text>
-<text x="1206" y="593" font-size="22" fill="#374151" font-weight="400">⋯</text>
-<text x="145" y="684" font-size="16" fill="#374151" font-weight="600">Peer reviews</text>
-<rect x="278" y="662" width="108" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="288" y="683" font-size="16" fill="#374151" font-weight="600">Very good</text>
-<rect x="394" y="662" width="74" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="404" y="683" font-size="16" fill="#374151" font-weight="600">Good</text>
-<rect x="476" y="662" width="98" height="30" rx="5" fill="#f3f4f6" stroke="#e5e7eb"/>
-<text x="486" y="683" font-size="16" fill="#374151" font-weight="600">Excellent</text>
-<text x="768" y="684" font-size="17" fill="#111827" font-weight="600">Mean 4.0 · 3 scored</text>
-<path d="M145 708L1216 708" stroke="#e5e7eb"/>
-<text x="145" y="743" font-size="16" fill="#374151" font-weight="600">My confidence</text>
-<text x="290" y="743" font-size="17" fill="#374151" font-weight="400">○ Confident     ● Not sure</text>
-<text x="940" y="737" font-size="13" fill="#6b7280" font-weight="400">Requested</text>
-<text x="1065" y="739" font-size="20" fill="#111827" font-weight="600">$245,000</text>
-<rect x="36" y="781" width="1208" height="44" rx="4" fill="#eaf0f5" stroke="#94a3b8"/>
-<text x="52" y="810" font-size="22" fill="#374151" font-weight="400">⋮⋮</text>
-<text x="87" y="810" font-size="18" fill="#111827" font-weight="600">End of B · Maybe fund · 1 proposal</text>
-<text x="1064" y="809" font-size="16" fill="#374151" font-weight="400">Set position…</text>
-<text x="36" y="862" font-size="19" fill="#111827" font-weight="600">C · Don’t fund</text>
-<rect x="36" y="880" width="1208" height="102" rx="8" fill="#fff" stroke="#d1d5db"/>
-<text x="90" y="923" font-size="26" fill="#111827" font-weight="600">3</text>
-<text x="145" y="918" font-size="23" fill="#111827" font-weight="600">Synthetic Institution 3</text>
-<text x="145" y="951" font-size="17" fill="#374151" font-weight="400">Next proposal continues with the same card anatomy · Confidence unanswered</text>
-<text x="36" y="1033" font-size="17" fill="#374151" font-weight="400">Drag using the rank gutter, or open the card menu for Move to position…</text>
-<text x="36" y="1067" font-size="17" fill="#374151" font-weight="400">Complete confidence in both programs before creating the combined list.</text>
-<text x="36" y="1138" font-size="14" fill="#6b7280" font-weight="400">Draft for confirmation · Static layout sketch, not a working interface. Content and motion requirements are in the brief.</text>
+<text x="36" y="151" font-size="17" fill="#374151" font-weight="400">Medical Research</text>
+<text x="234" y="151" font-size="17" fill="#111827" font-weight="600">Science &amp; Engineering</text>
+<text x="845" y="151" font-size="16" fill="#374151" font-weight="400">2 of 3 confidence answers · Saved</text>
+<text x="36" y="197" font-size="15" fill="#475569" font-weight="600">PD assessment</text>
+<rect x="172" y="175" width="32" height="30" rx="6" fill="#dcfce7" stroke="none"/>
+<text x="182" y="197" font-size="18" fill="#166534" font-weight="600">A</text>
+<text x="213" y="197" font-size="15" fill="#374151" font-weight="400">Fund</text>
+<rect x="290" y="175" width="32" height="30" rx="6" fill="#fef3c7" stroke="none"/>
+<text x="300" y="197" font-size="18" fill="#92400e" font-weight="600">B</text>
+<text x="331" y="197" font-size="15" fill="#374151" font-weight="400">Maybe</text>
+<rect x="431" y="175" width="32" height="30" rx="6" fill="#e2e8f0" stroke="none"/>
+<text x="441" y="197" font-size="18" fill="#475569" font-weight="600">C</text>
+<text x="472" y="197" font-size="15" fill="#374151" font-weight="400">Don’t fund</text>
+<text x="634" y="197" font-size="15" fill="#374151" font-weight="400">✓ Confident     ? Not sure</text>
+<text x="36" y="231" font-size="13" fill="#64748b" font-weight="400">Peer: E Excellent · VG Very good · G Good · F Fair · P Poor   |   Letters remain visible without color.</text>
+<rect x="36" y="253" width="1208" height="164" rx="9" fill="#fff" stroke="#d8dee5"/>
+<text x="54" y="289" font-size="20" fill="#94a3b8" font-weight="400">⋮⋮</text>
+<text x="83" y="290" font-size="25" fill="#111827" font-weight="600">1</text>
+<text x="126" y="287" font-size="22" fill="#111827" font-weight="600">Redwood Institute</text>
+<text x="126" y="314" font-size="17" fill="#1e40af" font-weight="400">A new window into quantum materials</text>
+<text x="126" y="340" font-size="13" fill="#64748b" font-weight="400">Example 01 · SE / W · Lead: Alex</text>
+<text x="126" y="372" font-size="15" fill="#475569" font-weight="400">Peer: E · VG · VG  /  4.3</text>
+<rect x="690" y="349" width="32" height="30" rx="6" fill="#dcfce7" stroke="none"/>
+<text x="700" y="371" font-size="18" fill="#166534" font-weight="600">A</text>
+<text x="942" y="290" font-size="11" fill="#64748b" font-weight="600">REQUESTED</text>
+<text x="942" y="326" font-size="27" fill="#111827" font-weight="600">$87,500</text>
+<text x="775" y="374" font-size="13" fill="#64748b" font-weight="400">My confidence</text>
+<rect x="942" y="352" width="128" height="34" rx="6" fill="#eff6ff" stroke="#2563eb"/>
+<text x="951" y="374" font-size="15" fill="#1e40af" font-weight="600">✓ Confident</text>
+<rect x="1080" y="352" width="128" height="34" rx="6" fill="#fff" stroke="#cbd5e1"/>
+<text x="1089" y="374" font-size="15" fill="#475569" font-weight="400">? Not sure</text>
+<path d="M36 449L1244 449" stroke="#e5e7eb"/>
+<rect x="68" y="429" width="780" height="40" rx="0" fill="#f9fafb" stroke="none"/>
+<text x="80" y="455" font-size="18" fill="#166534" font-weight="600">⋮⋮  End of A · Fund</text>
+<text x="932" y="455" font-size="18" fill="#166534" font-weight="600">1 proposal</text>
+<rect x="36" y="484" width="1208" height="164" rx="9" fill="#fff" stroke="#d8dee5"/>
+<text x="54" y="520" font-size="20" fill="#94a3b8" font-weight="400">⋮⋮</text>
+<text x="83" y="521" font-size="25" fill="#111827" font-weight="600">2</text>
+<text x="126" y="518" font-size="22" fill="#111827" font-weight="600">Eastbridge University</text>
+<text x="126" y="545" font-size="17" fill="#1e40af" font-weight="400">Acoustic imaging beyond the diffraction limit</text>
+<text x="126" y="571" font-size="13" fill="#64748b" font-weight="400">Example 02 · SE / E · Lead: Casey</text>
+<text x="126" y="603" font-size="15" fill="#475569" font-weight="400">Peer: VG · G · G  /  3.3</text>
+<rect x="690" y="580" width="32" height="30" rx="6" fill="#fef3c7" stroke="none"/>
+<text x="700" y="602" font-size="18" fill="#92400e" font-weight="600">B</text>
+<text x="942" y="521" font-size="11" fill="#64748b" font-weight="600">REQUESTED</text>
+<text x="942" y="557" font-size="27" fill="#111827" font-weight="600">$245,000</text>
+<text x="775" y="605" font-size="13" fill="#64748b" font-weight="400">My confidence</text>
+<rect x="942" y="583" width="128" height="34" rx="6" fill="#fff" stroke="#cbd5e1"/>
+<text x="951" y="605" font-size="15" fill="#475569" font-weight="400">✓ Confident</text>
+<rect x="1080" y="583" width="128" height="34" rx="6" fill="#eff6ff" stroke="#2563eb"/>
+<text x="1089" y="605" font-size="15" fill="#1e40af" font-weight="600">? Not sure</text>
+<path d="M36 680L1244 680" stroke="#e5e7eb"/>
+<rect x="68" y="660" width="780" height="40" rx="0" fill="#f9fafb" stroke="none"/>
+<text x="80" y="686" font-size="18" fill="#92400e" font-weight="600">⋮⋮  End of B · Maybe fund</text>
+<text x="932" y="686" font-size="18" fill="#92400e" font-weight="600">1 proposal</text>
+<rect x="36" y="715" width="1208" height="164" rx="9" fill="#fff" stroke="#d8dee5"/>
+<text x="54" y="751" font-size="20" fill="#94a3b8" font-weight="400">⋮⋮</text>
+<text x="83" y="752" font-size="25" fill="#111827" font-weight="600">3</text>
+<text x="126" y="749" font-size="22" fill="#111827" font-weight="600">Pine Harbor Research Center</text>
+<text x="126" y="776" font-size="17" fill="#1e40af" font-weight="400">Programmable surfaces for optical sensing</text>
+<text x="126" y="802" font-size="13" fill="#64748b" font-weight="400">Example 03 · SE / W · Lead: Morgan</text>
+<text x="126" y="834" font-size="15" fill="#475569" font-weight="400">Peer: G · F · F  /  2.3</text>
+<rect x="690" y="811" width="32" height="30" rx="6" fill="#e2e8f0" stroke="none"/>
+<text x="700" y="833" font-size="18" fill="#475569" font-weight="600">C</text>
+<text x="942" y="752" font-size="11" fill="#64748b" font-weight="600">REQUESTED</text>
+<text x="942" y="788" font-size="27" fill="#111827" font-weight="600">$150,000</text>
+<text x="775" y="836" font-size="13" fill="#64748b" font-weight="400">My confidence</text>
+<rect x="942" y="814" width="128" height="34" rx="6" fill="#fff" stroke="#cbd5e1"/>
+<text x="951" y="836" font-size="15" fill="#475569" font-weight="400">✓ Confident</text>
+<rect x="1080" y="814" width="128" height="34" rx="6" fill="#fff" stroke="#cbd5e1"/>
+<text x="1089" y="836" font-size="15" fill="#475569" font-weight="400">? Not sure</text>
+<text x="36" y="916" font-size="16" fill="#374151" font-weight="400">Confidence unanswered on proposal 3. Answer both programs before creating your combined list.</text>
+<text x="36" y="948" font-size="14" fill="#6b7280" font-weight="400">Draft for confirmation · Static layout sketch, not a working interface. Content and motion requirements are in the brief.</text>
 </svg>
