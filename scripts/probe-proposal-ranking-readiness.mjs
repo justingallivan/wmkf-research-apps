@@ -23,6 +23,13 @@ import cycleSchema from '../lib/dataverse/schema/wave32-proposal-ranking/wmkf_pr
 import roundSchema from '../lib/dataverse/schema/wave32-proposal-ranking/wmkf_proposalrankinground.json' with { type: 'json' };
 import listSchema from '../lib/dataverse/schema/wave32-proposal-ranking/wmkf_proposalrankinglist.json' with { type: 'json' };
 
+const workflowV2 = process.argv.includes('--workflow-v2');
+if (workflowV2) {
+  for (const [spec, name] of [[roundSchema, 'wmkf_proposalrankinground'], [listSchema, 'wmkf_proposalrankinglist']]) {
+    const additions = JSON.parse(readFileSync(new URL(`../lib/dataverse/schema/wave33-proposal-ranking-assessments/${name}.json`, import.meta.url), 'utf8'));
+    spec.attributes.push(...additions.attributes);
+  }
+}
 const require = createRequire(import.meta.url);
 const { createClient, getAccessToken } = require('../lib/dataverse/client.js');
 const EXPECTED_ROLE = 'WMKF Proposal Ranking Application User';
@@ -272,6 +279,7 @@ async function main() {
   const report = {
     target: hostname,
     writesPerformed: false,
+    workflowV2,
     identityAndRole: who,
     schema,
     isolation: {

@@ -1,9 +1,60 @@
 # Proposal Ranking — implementation plan
 
-Date: 2026-10-13. Status: **[PLANNED] Documentation only; no implementation or release authorized.**
+Date: 2026-10-13. Status: **IMPLEMENTATION IN PROGRESS on `codex/proposal-ranking-v2`; UX accepted and app work authorized. Not deployed or enabled.**
 Product authority: revision 5 of `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md`.
 API boundary: `docs/plans/PROPOSAL_RANKING_API_CONTRACT.md` §§1–5 are existing;
 §6 is the replacement contract. Storage inventory: `docs/atlas/dataverse-proposal-ranking.md`.
+
+## Current implementation receipt — 2026-10-13
+
+The owner accepted UX brief revision 3 and requested implementation including smooth
+dragging and all-stage resets. [VERIFIED via branch source] The build adds private
+MR/SE assessment, explicit per-grade paired combined merge, confidence/confirmation,
+ready/reopen, immutable all-ready reveal, collective edits, non-destructive resets,
+paged history, authorized group sentiment and a saved-revision two-sheet workbook.
+The original version-1 path remains separate. No deployment or live writes occurred.
+
+Selected persistence: additive wave33 `wmkf_workflowjson` (65,536) and
+`wmkf_assessmentjson` (524,288), using existing round/list entities. Current read keys
+are bounded to active preparation/reveal; history pages contain at most ten entries.
+Immutable operation receipts use `o:<UUID>` list keys and bind the original request.
+A supported opening is capped at 100 proposals and 12 distinct PDs; serialized field
+limits are checked before changeset dispatch. These code limits still need live
+Dataverse changeset rehearsal. Resets retain old rounds/reveals and never DELETE.
+
+New creation requires both `PROPOSAL_RANKING_WORKFLOW_V2=on` and
+`PROPOSAL_RANKING_V2_SCHEMA_READY=on`, in addition to existing ranking readiness.
+Unset/other values do not enable v2 creation. Neither flag was enabled by this task.
+Once v2 data exists, keep a v2-aware reader as the rollback floor.
+
+[VERIFIED via read-only sandbox readiness probe] Existing ranking entities/keys were
+present, but both wave33 fields and default facilitator configuration were absent;
+the probed cycle had no eligible proposals. No production probe or schema/role writes
+were performed. Saved sandbox walkthrough remains pending this setup and a verified
+eligible source pool. `probe-proposal-ranking-readiness.mjs --workflow-v2` checks the
+additive attributes along with the incumbent schema.
+
+Local verification: 19 ranking suites / 134 tests pass; the production Turbopack build,
+type check and scoped lint pass (the build retains four unrelated document-renderer
+tracing warnings). The 100-proposal / 12-PD reveal fits the additive field cap in a
+serialized fixture. Tests cover pure calculations, atomic adapter simulations, stale writes,
+replay after later edits, immutable history, restart, workbook types/provenance, and
+sentiment batching/access loss/reveal races. The isolated browser rehearsal renders
+the actual React component against fictional in-memory workflow state; it is not an
+alternative live backend. Keyboard movement across the funding bar, tally changes,
+collective reset, dialog focus return, reopening and a narrow 390px layout were checked.
+Fresh review found StrictMode refresh, restart-tab and numeric-history ordering bugs;
+all three were fixed with regressions. Full multi-person saved-data acceptance,
+long-list drag/autoscroll and final release review remain open. Client edits are
+serialized by disabling movement during saves; failed/uncertain operations retain
+an explicit recovery action rather than replaying a drag automatically.
+
+Documentation updates cover current Ranking status in the design, brief, API/Atlas,
+service catalogue, route matrix, sentiment plan/Atlas and session routing. This is a
+bounded changed-surface update, not an exhaustive audit of unrelated session history.
+
+The numbered build sequence below remains the acceptance checklist. Historical
+pre-build documentation receipts at the end describe their dated scope only.
 
 ## 1. Outcome and evidence
 
@@ -48,9 +99,8 @@ changeset capacity before implementing this mapping.
 - Add a round workflow JSON field for active preparation version, active reveal
   identity and stage. Add a list assessment JSON field for two boundary positions,
   confidence by request ID, combined source versions/confirmation and ready receipt.
-  Suggested names are `wmkf_workflowjson` and `wmkf_assessmentjson`; neither exists
-  merely because it is named here. Select the next available additive schema wave
-  during implementation; do not rewrite historical wave32 as if already deployed.
+  Selected names are `wmkf_workflowjson` and `wmkf_assessmentjson` in additive
+  `wave33-proposal-ranking-assessments`. They are not yet provisioned in the probed sandbox.
 - Keep order in the existing order field. Derive grades from order plus boundaries;
   do not keep a second writable grade map. Validate `0 <= first <= second <= N`,
   integer positions, exact proposal membership and confidence keys/allowed values.
@@ -168,7 +218,7 @@ identifiable after resets. Use numeric cells for amounts/ranks and safe text cel
 for untrusted titles/names; prevent formula injection. Export fails clearly on a
 stale requested revision or unavailable source, never mixes two revisions. No new
 finalization lock and no sentiment. Inspect the installed workbook dependency before
-choosing reuse or adding one; do not add a library during this documentation task.
+choosing reuse or adding one. The branch reuses the existing ExcelJS dependency.
 
 ## 5. Build sequence and acceptance gates
 
@@ -197,7 +247,7 @@ serve as a content checklist, not a fixed visual design; retain their smooth dra
 using the branch's existing `@hello-pangea/dnd` integration. Reviewer grades and named
 PD comparisons remain visible by default, with restrained grade colors, confidence
 symbols and an aligned amount column. The owner confirmed shared-screen discussion plus PD
-laptops; the proposed interaction brief awaits confirmation. No app code changed.
+laptops and accepted revision 3; app implementation is now authorized. See the current receipt above.
 
 **Before implementation — shape:** use the installed Impeccable skill's context and
 shape workflow, in Operate mode. Read the existing product/design context and inspect
@@ -229,8 +279,8 @@ Check desktop and narrow-screen layouts together. Produce one prioritized findin
 list, fix in one batch, then perform at most one confirmation pass. Record any deferred
 nonblocking issues explicitly; do not expand into open-ended visual polishing.
 The UX review complements, and does not replace, transaction/privacy tests or the
-multi-person acceptance walkthrough. These Impeccable passes are scheduled work;
-neither has been executed by this plan update.
+multi-person acceptance walkthrough. Phase 0 is complete and accepted. The current implementation receipt records the
+bounded local UI checks and remaining phase-6a/7 acceptance work.
 
 Do not split phase 4's durable reveal/reset safety across releases where an incomplete
 transition becomes callable. UI can follow durable service tests, but new public
@@ -266,7 +316,7 @@ parser after creating version-2 active rounds. If rollout fails, stop new writes
 retain rounds/receipts for diagnosis; never erase data or silently restore an old
 coordinator pointer. Owner-approved legacy-trial cleanup is a separate operation.
 
-## 7. Contract review and documentation receipt
+## 7. Historical pre-build contract review and documentation receipt
 
 Contract-reconcile Mode A: whole-flow and durable surfaces are mapped in §§1–6;
 partial success and stale async state in §3; helper semantics in §4; status/projection

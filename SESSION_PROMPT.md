@@ -1,6 +1,6 @@
 # Session 602 Prompt: Discussion Sentiment calibration (after uploads); transcription cleanup check; security mitigation Release 1
 
-## Current Proposal Ranking note — 2026-10-13 (Codex; documentation only)
+## Current Proposal Ranking note — 2026-10-13 (Codex; owner-authorized v2 branch implementation)
 
 [VERIFIED via owner decisions in the October 13 conversation] The revised workflow is agreed:
 separate reviewer-seeded MR/SE lists with roughly equal A/B/C sections and explicit confidence;
@@ -14,18 +14,15 @@ all-history qualifying regular Research award count/latest year, and resets at e
 for the walkthrough. Prior reveals remain preserved; reopening private preparation requires
 everyone ready and a fresh facilitator reveal. Future restrictions on resets are undecided.
 
-The current product authority is [design revision 5](docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md).
-The [October 13 reconciliation audit](docs/audits/PROPOSAL_RANKING_WORKFLOW_RECONCILIATION_2026-10-13.md)
-records the historical revision-4 source comparison and its verification results. The current
-[implementation plan](docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md) carries
-revision 5 and the follow-up decisions. Independent read-only review approved the plan; all
-25 scoped documentation gate/self-test checks passed. The plan records the bounded receipt. No app implementation or fresh live-data/deployment verification is claimed.
-
-Implementation remains paused until the owner requests app changes. The current request authorizes
-implementation planning and documentation only. Historical Proposal Ranking handoffs
-below preserve earlier decisions, branch checkpoints, and dated evidence; their former “current” or
-“next” instructions do not override revision 5 or authorize implementation, promotion, or trial cleanup.
-Unrelated workstream handoffs and carryovers retain their existing scope.
+The current product authority is [design revision 5](docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md)
+and the owner-accepted revision-3 UX direction. The owner authorized implementation,
+smooth dragging and resets at every stage. Source is built on `codex/proposal-ranking-v2`;
+the [implementation plan](docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md)
+records local verification and remaining acceptance. The branch is not merged or deployed.
+Read-only sandbox verification found the additive v2 fields and default facilitator absent;
+saved multi-identity acceptance remains outstanding. Historical handoffs below do not
+override this authorization or authorize production promotion, writes or trial cleanup.
+Unrelated workstream handoffs retain their existing scope.
 
 
 ## Session 601 close — Discussion Sentiment meter shipped to Meeting Tracker (Claude Opus orchestrating Sonnet build, Opus/Fable review, Codex adversarial; shared checkout `main`, 2026-10-13 PT)
@@ -53,7 +50,7 @@ Unrelated workstream handoffs and carryovers retain their existing scope.
 
 1. **Calibration (waiting on the owner):** the owner is uploading more staff-discussion videos first. Then run 3–5 real discussions on the page (#1002852 and #1003038 already done), compare each result with that proposal's AI summary, and decide: keep the transcript version, simplify to summaries only (the owner's original ask), or both. Evidence: plan §6 item 5, §9 last entry.
 2. **Accept results** the owner agrees with (#1002852, #1003038); only accepted results reach other apps.
-3. **Proposal Ranking consumer** for `getDeliberationSentiments` — not wired. The October 13 agreed design includes accepted/current sentiment on group-discussion cards only; implementation remains paused until requested. See the current Proposal Ranking note above.
+3. **Proposal Ranking consumer:** accepted/current group-only sentiment is source-built on `codex/proposal-ranking-v2`, not merged or deployed. Sandbox setup and saved acceptance remain outstanding; see the current note above.
 4. If an analysis drops quotes, Admin → Operational events shows `sentiment_evidence_verification` counts — use them to judge whether matching needs more tuning.
 
 ### Known limits (accepted)

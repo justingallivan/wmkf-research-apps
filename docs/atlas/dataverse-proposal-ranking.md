@@ -4,11 +4,11 @@ Last source comparison: 2026-10-13, main `b3219f4aa`; paused local branch
 `codex/proposal-ranking` at `0d161d60f`. **Source verification only; no new live probe.**
 Current product authority: revision 5 of
 `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md` (agreed October 13).
-The new assessment/reveal/reset workflow is **[PLANNED]**, not implemented by this docs update.
+The assessment/reveal/reset workflow is **branch-built on `codex/proposal-ranking-v2`, not deployed or enabled**. The owner accepted UX revision 3 and authorized implementation.
 Implementation stages and proposed durable contracts are in
 `docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`; they are not provisioned state.
 
-## Current source and historical deployment boundary
+## Incumbent version-1 source and historical deployment boundary
 
 [VERIFIED via main source] The existing app still stores separate individual SE/MR
 orders, locks each on submission, and generates/publishes separate program composites.
@@ -100,23 +100,28 @@ labelled never funded by the Foundation; unavailable/provisional coverage stays 
 ready to merge as the revised workflow. Branch role/delete behavior is not deployed
 by the documentation comparison; no dry-run erase is authorized here.
 
-## Planned persistence and consumers
+## Version-2 branch persistence and consumers
 
-[PLANNED] Revision 5 requires durable grades, confidence, separator positions,
+[VERIFIED via branch source] Revision 5 implements grades, confidence, separator positions,
 individual combined orders, readiness/reopen versions, immutable reveal revisions and
 one active collective recommendation with funding sections. Resets must be available at every
 stage for the walkthrough: preserve prior reveal records, require everyone ready plus a fresh
 facilitator reveal after reopening private preparation, and make a PD combined-list rebuild
 explicit rather than silently overwrite cross-program edits. Future restrictions on those reset
 controls remain undecided. Initial collective separators enclose only the unanimous-A prefix
-and unanimous-C suffix of the calculated order; the middle is Alternates. Proposed
-schema/version/transition mapping belongs to the implementation plan; none is provisioned.
-The API document preserves the actual main wire contract separately from planned
-changes. New design does not authorize rewriting old round data.
+and unanimous-C suffix of the calculated order; the middle is Alternates. Additive wave33 defines round `wmkf_workflowjson` (65,536) and list
+`wmkf_assessmentjson` (524,288). Current reads query active keys only; immutable
+`o:<UUID>` receipts resolve retries and `h:<ordinal>` history pages are bounded to ten.
+All writes use one round-fenced changeset. Opening caps are 100 proposals / 12 PDs.
+[VERIFIED via read-only sandbox probe, October 13] Both new fields and default
+facilitator configuration are absent in the sandbox. Production was not probed.
+The API document preserves the incumbent wire contract separately from branch v2
+actions. New design does not authorize rewriting old round data.
 
-[VERIFIED via source; consumer PLANNED] Accepted/current sentiment already has a
+[VERIFIED via branch source] Accepted/current sentiment already has a
 read service, `getDeliberationSentiments`, backed by `staff_discussion_sentiments`
-(see `docs/atlas/postgres-staff-discussion-sentiments.md`). Ranking does not call it.
+(see `docs/atlas/postgres-staff-discussion-sentiments.md`). The v2 `workflow-service.js` consumer calls it only for active revealed rounds,
+in batches of up to 50, and rechecks the round after enrichment.
 It requires Meeting Tracker access or superuser authority, caps requests at 50, and
 rechecks source/prompt currentness. Only group-discussion cards should consume it;
 private preparation and the agreed workbook do not. No ranking AI call is needed.
@@ -131,7 +136,9 @@ Read current state under separately authorized access before choosing any reset 
 Main prohibits cancellation after either program publishes; branch-only erase is
 not authority to delete existing production data.
 
-Implementation remains paused pending an implementation instruction, schema/contract
-work, tests, and deliberate promotion. Full multi-identity acceptance is not established
+Implementation is authorized and branch-built; sandbox setup, saved multi-identity
+acceptance and deliberate promotion remain pending. New creation requires literal-on
+`PROPOSAL_RANKING_WORKFLOW_V2` and `PROPOSAL_RANKING_V2_SCHEMA_READY` in addition to
+existing readiness. Neither was enabled by this task. Full multi-identity acceptance is not established
 by the historical waiting-state smoke. No live writes, role changes, facilitator
 restoration, branch cleanup, merge, or deployment occurred in this reconciliation.

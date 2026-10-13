@@ -1,9 +1,9 @@
 # Proposal Ranking — Impeccable shape brief
 
-Date: 2026-10-13. Revision: 3. Status: **DRAFT FOR OWNER CONFIRMATION — no app changes.**
+Date: 2026-10-13. Revision: 3. Status: **ACCEPTED — implementation authorized 2026-10-13.**
 Controlling product rules: [design revision 5](PROPOSAL_RANKING_DESIGN_2026-10-07.md).
 Build sequence: [implementation plan](PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md).
-This is phase 0's proposed interaction design, not an implemented or confirmed interface.
+Phase 0 was accepted by the owner: “This is better. Let's use this direction and start implementing the updated workflow, including the smooth dragging and resets at every stage.” Branch implementation and remaining acceptance work are tracked in the implementation plan.
 
 ## Job, audience and visual authority
 
@@ -45,7 +45,7 @@ was not endorsed. Use them as a content checklist, not a fixed visual template. 
 ranking-specific Impeccable critique/shape record was found in the inspected artifacts
 or handoffs; the earlier app-wide critique is not evidence these cards were reviewed.
 The initial October 13 sketches omitted too much information and are superseded by
-revision 3's sketches below. This is a correction to the draft, not an accepted redesign.
+revision 3's sketches below. Revision 3 is the owner-accepted direction. Earlier revisions remain superseded.
 
 No matching Proposal Ranking surface brief was found by Impeccable context. Its other
 surface briefs concern Meeting Tracker and Workbench. DESIGN.md is the visual authority;
@@ -318,21 +318,16 @@ announcements, sensible heading order, contrast verification and usable zoom. Th
 brief does not invent a suite-wide conformance certification. Measure the built UI
 in the scheduled critique/audit; sketches do not prove accessibility.
 
-## Confirmation and implementation consequence
+## Acceptance and implementation consequence
 
-Proposed decisions to confirm together: single active preparation list, compact stage
-navigation, visible reviewer grades and named PD comparisons, retained smooth dragging,
-same group view for the projector/laptops with
-independent browsing and explicit refresh, and contextual named reset actions.
-No scoring, merge, reveal, history-scope or reset policy has been changed.
+The owner accepted revision 3 and explicitly requested app implementation, smooth
+dragging and resets at every stage on October 13. No ranking, merge, privacy or
+reset policy changed. The four sketches remain the visual/interaction reference.
 
-After confirmation, link this brief as phase 0's accepted output and proceed only when
-app implementation is requested. Until then it stays a draft; do not write a direction
-contract, replace DESIGN.md, or change runtime code. Later critique/audit reviews the
-actual built surface once, fixes one batch and confirms once, per the implementation plan.
-
-Revision-3 verification: content checklist checked against retained branch source and
-October 8 commit history. The preparation and discussion sketches now use color/symbols and a compact
-comparison strip. Reset and movement sketches retain the prior interaction specification; they do not demonstrate working animation. No app, dependency,
-schema or design-system file changed. Owner confirmation of this revised draft remains
-pending; earlier sketches do not carry approval.
+[VERIFIED via branch source and local browser] `codex/proposal-ranking-v2` now
+implements the mixed card/divider list with `@hello-pangea/dnd`, grade/confidence
+symbols, visible named comparisons and contextual resets. A local four-proposal
+rehearsal exercised keyboard movement, collective reset, reopened preparation and
+390px layout. This is synthetic UI evidence, not saved Dataverse acceptance.
+The implementation plan records remaining long-list, multi-identity and sandbox
+checks. DESIGN.md and the suite design system remain unchanged.

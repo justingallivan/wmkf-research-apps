@@ -20,7 +20,7 @@ related:
 
 ## Status
 
-**[Shipped 2026-10-13 (merge `62963a352`; tolerant quote-match fix `1bb83c3a2`). Migration 082 was applied to Production by the owner (`applied_by` `owner-sentiment-2026-10-13`) and the `meeting-transcript.staff-discussion-sentiment` prompt v1 is seeded.]** The Meeting Tracker routes, the Discussion Sentiment page and the read service below are live; no consumer app calls the read service yet.
+**[Shipped 2026-10-13 (merge `62963a352`; tolerant quote-match fix `1bb83c3a2`). Migration 082 was applied to Production by the owner (`applied_by` `owner-sentiment-2026-10-13`) and the `meeting-transcript.staff-discussion-sentiment` prompt v1 is seeded.]** The Meeting Tracker routes, the Discussion Sentiment page and the read service below are live; Proposal Ranking consumes the reader on `codex/proposal-ranking-v2` only; that consumer is not deployed.
 
 ## Ownership and contract
 
@@ -60,17 +60,17 @@ Currentness is computed in code (`isRunCurrent`): the source artifact id and con
 | Routes | `pages/api/meeting-tracker/visits/[requestId]/discussion-sentiment.js` (GET read, POST analyze), `.../discussion-sentiment/accept.js`, `.../discussion-sentiment/withdraw.js` | `requireAppAccess('meeting-tracker')`; actor from the session only. Staff-only: no Board or briefing token route imports them (`tests/unit/discussion-sentiment-exposure.test.js`). |
 | Picker candidates | `lib/services/post-presentation-materials/discussion-sentiment-candidates.js` behind `pages/api/meeting-tracker/discussion-sentiment/candidates.js` | `requireAppAccess('meeting-tracker')`. Lists the cycle's requests server-side (the schedule dashboard's own `loadMeetingTrackerSelection`), loads their TRANSCRIPT and STAFF_DISCUSSION_TRANSCRIPT documents by request id across all document cycles (`findByRequests`, with the bundle manifest) and returns the request ids whose discussion transcript is bound, via the analysis's own `bindCurrent`; `capped` when a document query hit the export cap. No write; no Postgres. |
 | Page | `pages/meeting-tracker/discussion-sentiment.js` (`DiscussionSentimentView`) | Meeting Tracker staff. Picker lists the cycle's dashboard proposals (existing schedule route) intersected with the candidates route (transcript-only). |
-| Consumer read service | `lib/services/post-presentation-materials/discussion-sentiment-reader.js` (`getDeliberationSentiments`) | Active profile with the Meeting Tracker grant or superuser, checked live. Returns a sentiment only for the accepted, not withdrawn, current row. No consumer wired. |
+| Consumer read service | `lib/services/post-presentation-materials/discussion-sentiment-reader.js` (`getDeliberationSentiments`) | Active profile with the Meeting Tracker grant or superuser, checked live. Returns a sentiment only for the accepted, not withdrawn, current row. Branch consumer: Proposal Ranking v2 active revealed group cards; not deployed. |
 
 ## Not covered
 
-Proposal Ranking wiring and calibration. The October 13 owner-approved ranking
-workflow plans accepted/current sentiment only on group-discussion cards after
-reveal, with no ordering weight or individual-preparation exposure. It is not wired;
+Calibration and saved-environment consumer acceptance remain pending. The October 13
+branch-built ranking workflow requests accepted/current sentiment only on group-discussion cards after
+reveal, with no ordering weight or individual-preparation exposure. The consumer is wired on the feature branch;
 see `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md` §7 and the API contract §6
 (`docs/plans/PROPOSAL_RANKING_API_CONTRACT.md`). Meeting Tracker access remains
 required; the integration must preserve currentness/withdrawal and the 50-ID cap.
 The revision-5 reset workflow hides this context when private preparation is reopened
 and requires a fresh reveal before displaying it again. Retained prior reveals do not
-freeze sentiment or bypass withdrawal. Planned integration stages are in
+freeze sentiment or bypass withdrawal. Integration evidence and remaining checks are in
 `docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`. The automated integration suite `tests/integration/discussion-sentiments.pg.test.js` targets loopback Postgres (opt-in via `DISCUSSION_SENTIMENT_PG_TEST_URL`; skipped otherwise); unit tests use an in-memory stand-in. These test receipts do not establish a shared-environment integration-suite run. They are distinct from the dated Production migration and application-use receipt in Status above.

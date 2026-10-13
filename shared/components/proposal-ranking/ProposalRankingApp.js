@@ -1,3 +1,4 @@
+import AssessmentWorkflow from './AssessmentWorkflow';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Card, PageHeader } from '../Layout';
 import { conventionalCycles, cycleCodeToLabel, resolveWorkingCycle } from '../../../lib/utils/cycle-code';
@@ -799,6 +800,8 @@ export default function ProposalRankingApp() {
   const currentProposalData = activeResponse?.mode === 'preview' ? activeResponse.preview : activeResponse?.mode === 'round' ? activeResponse.round?.snapshot : null;
   const currentProposalById = new Map((currentProposalData?.proposals || []).map((proposal) => [proposal.requestId, proposal]));
   const preview = activeResponse?.preview;
+
+  if (activeResponse?.workflowVersion === 2) return <AssessmentWorkflow key={`${activeResponse.roundId}:${activeResponse.viewer.systemUserId}`} initial={activeResponse} cycleOptions={options} onCycleChange={changeCycle}/>;
 
   return <div className="mx-auto max-w-7xl px-4 pb-10">
     <PageHeader title="Proposal Ranking" subtitle="Prepare private PD rankings and facilitate the funding-cycle discussion." icon="▤">

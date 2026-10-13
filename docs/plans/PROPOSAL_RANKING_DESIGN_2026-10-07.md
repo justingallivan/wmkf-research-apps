@@ -1,7 +1,7 @@
 # Proposal Ranking — agreed assessment and recommendation workflow
 
 Updated: 2026-10-13. Revision: 5. Owner: Justin.
-Status: **[PLANNED] Product workflow agreed; implementation not authorized in this task.**
+Status: **Product workflow agreed; revision-3 UX accepted and implementation authorized 2026-10-13. Branch build awaiting sandbox acceptance.**
 The filename is retained for existing links; October 7 is the original design date,
 not the date of this revision. This revision incorporates the later October 13
 reset/default decisions and resolves revision 4's open product choices. It supersedes
@@ -10,7 +10,7 @@ revision 3's workflow and the October 11 branch's combined-meeting approach.
 Authority: Justin's October 13 decisions in the current conversation, including the
 colleague-reviewed text and the supplied October 11–12 conversation/handoff.
 That handoff's Word proposal is prior context, not authority over these newer decisions.
-No runtime, schema, permission, prompt, or live-data change is made by this revision.
+Implementation now proceeds on `codex/proposal-ranking-v2`; this design does not authorize production promotion or legacy-data cleanup.
 
 Implementation evidence and source comparison:
 `docs/audits/PROPOSAL_RANKING_WORKFLOW_RECONCILIATION_2026-10-13.md`.
@@ -194,7 +194,7 @@ and caps each call at 50 request IDs. It requires live Meeting Tracker access (o
 superuser authority), not merely Proposal Ranking access, and runs under trusted
 DAL context. Infrastructure failures throw; they are not empty-history results.
 
-[PLANNED] Ranking must consume this service through its authenticated server layer,
+[VERIFIED via branch source] Ranking consumes this service through `workflow-service.js` in its authenticated server layer. The contract remains:
 respect its additional authorization, and omit data from private-preparation
 responses. Handle absent data, access denial, and dependency errors distinctly;
 never copy previously seen sentiment into an unauthorized response. No new grant
@@ -286,5 +286,7 @@ and both workbook sheets from confirmed data. Exercise separate identities and
 conflicting browser sessions. Run relevant gates with their self-tests sequentially.
 
 Current source tests and old production receipts validate their dated implementations,
-not this new workflow. This task updates documents only. No app implementation,
-branch merge, deployment, source-data change, or legacy-round cleanup is authorized.
+not this new workflow. The owner has authorized app implementation on the accepted
+UX direction. Branch merge, deployment, source-data changes and legacy-round cleanup
+remain separate release work. Current branch evidence and outstanding checks are in
+the implementation plan.

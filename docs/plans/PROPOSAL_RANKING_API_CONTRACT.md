@@ -3,8 +3,8 @@
 Updated 2026-10-13. Sections 1–5 below describe **[VERIFIED via main source at
 `b3219f4aa`] the existing revision-3 API**, not the agreed replacement workflow.
 Revision 5 product authority is `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md`.
-The planned changes in §6 are semantic requirements, not callable endpoints or
-provisioned fields. The paused branch `0d161d60f` differs from main (§7).
+Section 6 describes the branch-built v2 actions and semantics; additive fields are
+not provisioned in the probed sandbox and v2 creation remains disabled. The paused branch `0d161d60f` differs from main (§7).
 Deployment facts are dated receipts in `docs/atlas/dataverse-proposal-ranking.md`;
 no live activation or multi-identity acceptance was reverified in this docs task.
 
@@ -214,12 +214,45 @@ ID in the UI's “Resolve opening attempt” control, so retry cannot create a
 replacement for the original round after cancellation.
 
 
-## 6. Planned revision-5 contract — not implemented
+## 6. Branch version-2 contract — not deployed or enabled
 
-Use the agreed design for the product rules. Exact action tokens, versioned DTOs,
-and storage mapping are proposed in `docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`; do not send invented actions
-to the current route. Preserve session-derived actors, server-side app/roster checks,
-private/no-store headers, strict input validation, ETags and operation readback.
+Use the agreed design for product rules. `service.js` dispatches snapshot version 2
+to `workflow-service.js`; legacy actions/readers remain a separate version-1 path.
+The authenticated route, session-derived actor, app grant and private/no-store headers
+are unchanged. New opening requires both literal-on v2 creation/schema flags.
+
+All mutations carry `action`, `roundId`, UUID `operationId`, `roundEtag`,
+`policyRevision`, `preparationVersion` and `revealId` (null before reveal).
+
+| Action token | Additional payload |
+|---|---|
+| `saveAssessment` | `programKey` (`mr`, `se`, `co`), `listVersion`, `assessment: {order, boundaries, confidence}` |
+| `buildCombined` | `confirmationFingerprint` |
+| `confirmCombined`, `ready`, `reopenOwn` | None |
+| `resetProgram` | `programKey` (`mr`, `se`), `confirmationFingerprint` |
+| `reveal`, `resetCollective`, `reopenPreparation`, `restartWalkthrough` | `confirmationFingerprint` |
+| `editCollective` | `listVersion`, `order`, `boundaries` |
+| `history` (read-only POST) | Only `roundId` and optional `before` ordinal; at most ten entries |
+| `sentiment`, `exportWorkbook` (read-only POST) | `roundId`, `roundEtag`, `preparationVersion`, `revealId`, `listVersion` |
+
+V2 round responses identify `workflowVersion: 2` and contain `workflow` stage/pointers,
+`own` assessments, readiness `progress`, facilitator-only `facilitatorLists`, and
+`collective` only after reveal. Assessment order plus two boundary positions owns grade;
+confidence is keyed by proposal (`confident` / `not-sure`, absent until answered).
+`confirmations` is keyed by action (program reset uses `resetProgram:<program>`).
+Canceled/replaced runs are read-only and carry the successor pointer.
+
+The service stores immutable operation receipts containing request hashes. To resolve
+an ambiguous write, resubmit the identical payload/operation UUID; the stored outcome
+is returned alongside the current authorized view, without executing it again.
+An operation UUID reused with different input conflicts. Serialized storage limits
+are enforced before the atomic changeset; historical receipts are not loaded into
+ordinary views. Version-1 operation readback remains as described in §4.
+
+Sentiment returns optional current envelopes or an explicit access/dependency status;
+any failed batch clears the entire enrichment. A round change during the read rejects
+the response. Workbook export returns `{filename, base64}` for one saved
+group revision, with the matching individual inputs and no sentiment.
 
 | Semantic operation | Required contract |
 |---|---|

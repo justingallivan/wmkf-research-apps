@@ -15,7 +15,7 @@ related:
 
 # Staff discussion sentiment meter
 
-Date: 2026-10-13 (Session 601). Status: **SHIPPED 2026-10-13** (merge `62963a352`, quote-match fix `1bb83c3a2`; migration 082 applied and prompt v1 seeded in Production by the owner). Calibration (§6 item 5) and Proposal Ranking wiring remain open; see §9.
+Date: 2026-10-13 (Session 601). Status: **SHIPPED 2026-10-13** (merge `62963a352`, quote-match fix `1bb83c3a2`; migration 082 applied and prompt v1 seeded in Production by the owner). Calibration (§6 item 5) remains open. Proposal Ranking consumer wiring is source-built on `codex/proposal-ranking-v2`, not merged or deployed; live acceptance remains outstanding. See §9.
 Owner: Justin.
 
 ## 1. Purpose
@@ -312,20 +312,20 @@ The authenticated caller must have live Meeting Tracker access or superuser auth
 a consumer app grant alone does not suffice. At most 50 GUID request IDs per call,
 inside the caller's trusted DAL context. No consumer app is wired on main.
 
-**[PLANNED — owner agreed 2026-10-13]** Proposal Ranking will show **Earlier discussion
+**[SOURCE-BUILT on `codex/proposal-ranking-v2`, 2026-10-13; not deployed]** Proposal Ranking shows **Earlier discussion
 sentiment only on group-discussion cards after reveal**, not on private PD preparation.
 Compact reception/enthusiasm expands to evidence and disagreements/uncertainties.
 Missing, unaccepted, withdrawn, or stale analyses show Not available; authorization
 and infrastructure errors remain distinct from absence. Sentiment never weights or
 orders ranking and is not part of the agreed two-sheet workbook. Do not freeze a
 copy that can survive withdrawal/currentness checks. Access checks are preserved;
-no new grant is implied. Consumer read timing/error handling remains an engineering
-prerequisite. The controlling workflow is revision 5 of
+no new grant is implied. The consumer batches at most 50 IDs, clears partial results
+on reader failure and rechecks the round ETag before returning. The controlling workflow is revision 5 of
 `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md` §7; wire-contract planning is in
 `docs/plans/PROPOSAL_RANKING_API_CONTRACT.md` §6; implementation stages are in
 `docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`. Reopening private
 preparation hides sentiment again until a fresh reveal; old reveal records do not
-authorize stale or withdrawn sentiment. Wiring is still a separate change.
+authorize stale or withdrawn sentiment. Saved-environment acceptance remains pending.
 
 Known per-request unavailability (transcription disabled, schema not ready, request
 not allowed) reads `none`. If the sentiment prompt is unseeded or duplicated, an
@@ -494,4 +494,9 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
   (deploy Ready); the owner re-ran #1003038, which had failed `sentiment_evidence_unverified`, and it succeeded.
   #1002852 also succeeded (Positive / High). Open: calibration on 3–5 discussions (waiting on more staff-discussion
   video uploads), then the owner decides transcript version, summaries only, or both; Proposal Ranking consumer
-  not wired.
+  not wired on main at that production checkpoint.
+
+- **Proposal Ranking v2 consumer branch (2026-10-13):** owner authorized the accepted UX
+  direction, smooth dragging and all-stage resets. Group-only sentiment is wired on
+  `codex/proposal-ranking-v2` with batching, live access and scope rechecks. It is not
+  deployed; see the ranking implementation plan for sandbox setup and acceptance.
