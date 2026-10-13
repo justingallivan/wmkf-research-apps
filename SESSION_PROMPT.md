@@ -1,4 +1,100 @@
-# Session 600 Prompt: Security mitigation implementation and provider confirmation
+# Session 601 Prompt: Confirm the transcription cleanup closed; security mitigation Release 1; Site Visit owner checks
+
+Numbering: two sessions ran as "599" on 2026-10-12 PT. The Codex security-review close keeps the 599 label
+(below). The Claude session that shipped Site Visit C1–C3 is recorded as **600**; the next session is 601.
+Both handoffs below are current; the Codex section's Verified Open items (security Releases 1–4, provider
+confirmation) still stand.
+
+## Session 600 close — Site Visit C1–C3, Plan A follow-ups, transcription cleanup fix, pg SSL warning (Claude Opus orchestrating Sonnet + Codex, shared checkout `main`, 2026-10-12/13 PT)
+
+### What Was Completed
+
+1. **pg SSL warning silenced (Production).** `lib/db/pg-connection-string.js` `withVerifyFullSslmode`
+   rewrites `sslmode=prefer|require|verify-ca` to `verify-full` (same behavior pg 8 already applied; no
+   warning; survives pg 9). Used by `irs-bmf-service.js`, `intake/submit.js`, `cron/drain-submissions.js`
+   (the every-2-min source of the `/admin` noise). Merge `64a88a313` (pushed by the owner). Factory ledger
+   URLs and `scripts/apply-migrations.js` untouched (local warning only).
+2. **Site Visit C2 — real supersede reasons (Production).** Codes `presentation_video_transcript_changed`,
+   `presentation_video_source_changed`, `presentation_video_output_changed`; legacy/NULL codes keep the
+   generic text. No retry pre-check (owner scope, plan §4.1). Merge `c090c473a`, Codex approve.
+3. **Site Visit C3 — inline staff video player (Production).** Watch/Hide in the Results row reveals
+   `PresentationVideoPlayer` (compact); "Download video" moved to the "…" menu; the split `open.js` route
+   accepts an `attempt` key and sends nosniff. Merge `309220636`, Codex approve.
+4. **Site Visit C1 — automatic split transcripts after a correction publish (Production).** Owner
+   decisions: small queue + cron; actor = the publisher; transcripts only (summaries stay manual); failure
+   falls back to Out of date + Regenerate. Migration 081 `presentation_transcript_regenerations`
+   (applied by the owner, `owner-c1-2026-10-12`), cron `drain-presentation-transcript-regenerations`
+   (every minute), card shows "Updating…" with 15 s polls. Codex 3 rounds (slot_busy transient,
+   publication-order fence, version-aware retry), then approve. Merge `fe5b3734a`; docs `dc5031764`,
+   counts 296→297 `2962dee70`.
+5. **Plan A follow-ups (Production).** Max tokens editable in Prompt Templates (validated ≤ the model's
+   max output); `claude-sonnet-5-5` / `claude-haiku-5-5` added to capabilities and pricing (Haiku 5.5
+   long-prompt tier over 100K tokens); owner approved the tier shift, so `sonnet`/`haiku` now resolve to
+   the 5.5 models. Codex 3 rounds (cold model cache; Haiku long-prompt pricing), then approve. Merge
+   `6fa1e2dae`.
+6. **Staff-discussion summary prompt v2 (Production Dataverse, owner-approved publish via the owner's
+   browser session).** Attributes points to named speakers only; never to "Unidentified speaker"/numbered
+   speakers or inferred names; names owners of follow-ups. Seed file synced `8cd5e331b`.
+7. **Transcription cleanup fix (Production).** Diagnosis (owner-authorized read-only prod reads): all 20
+   `transcription_jobs` never completed local cleanup because `finishLocalCleanup` retained the input path
+   while `upload_valid_until` was set and nothing cleared it → daily "transcription cron incomplete" alert.
+   A throwaway Blob store test (deleted by the owner) showed Vercel Blob rejects every write with an expired
+   client token server-side, including `completeMultipartUpload`. Fix: once the upload window has passed
+   on the **database clock** (5-minute skew margin) and `head()` confirms the blob absent, cleanup clears
+   `upload_valid_until` and completes. Codex round 1 (worker-clock ordering) fixed, round 2 approve. Merge
+   `8127dcffd`, deploy Ready.
+8. **Housekeeping.** 13 merged worktrees removed (owner approved); `/admin` live check recorded done
+   (owner); the auto-mode merge rule needed no change (done).
+
+### Commits (merges on `main`)
+- `64a88a313` pg sslmode · `c090c473a` C2 · `309220636` C3 · `6fa1e2dae` Plan A follow-ups
+- `8cd5e331b` prompt v2 seed sync · `fe5b3734a` C1 · `dc5031764`, `2962dee70` C1 docs/counts
+- `8127dcffd` transcription cleanup fix
+
+## Next Items (Session 600)
+
+### Verified Open
+
+1. **Confirm the transcription cleanup closed the 20 jobs** after the first post-fix `drain-transcriptions`
+   run (`0 3 * * *` UTC → 2026-10-14 03:00 UTC). Expect every job's `local_cleanup_completed_at` set and no
+   new "transcription cron incomplete" alert; the 14 `ready` jobs keep their Zoom transcript until content
+   expiry by design. Production read needs the owner's OK. Evidence: merge `8127dcffd`.
+2. **Owner browser checks:** C3 playback/seek in the Results row; C1 "Updating…" then fresh split
+   transcripts after the next correction publish. Evidence: merges `309220636`, `fe5b3734a`.
+3. **Correction-draft server re-check** — loading/saving/publishing an existing draft is still not
+   re-checked on the server while a newer transcript is pending. Evidence: Site Visit plan line ~866.
+   Keep it a separate change.
+4. **Three meeting-tracker pg integration tests fail on `main`** (`frozen_source_provenance` missing):
+   the test harness does not apply migration 077. Test plumbing only.
+5. **Measure a 4-vCPU cut, then lower `PRESENTATION_VIDEO_SANDBOX_TIMEOUT_MS`** (carried, not rechecked).
+   Evidence: `docs/CREDENTIALS_RUNBOOK.md` Stage 4 table.
+
+### Owner Decision Needed
+
+1. **Proposal Ranking stays paused** (PR #463 draft, open; worktree `WMKF_Apps-codex-proposal-ranking`).
+2. **`codex/leadership-dashboard-testing`** worktree kept (unmerged commits + uncommitted lock file).
+
+### Verify Before Acting
+
+1. **Dependabot PR #471** (open): keep the lock npm-10 compatible (`npx -y npm@10 ci --dry-run`).
+2. **Stale `model_override:<key>` rows** — delete only on an explicit owner request after listing them.
+3. **Local branch `claude/ui-work`** survives (its worktree was removed; git refused the branch delete
+   over an upstream difference). Check it is in `origin/main` before deleting.
+
+### Gotchas
+
+- `vercel blob create-store` must run from an unlinked directory, or it can connect the store to the
+  project and overwrite the production `BLOB_READ_WRITE_TOKEN`. The CLI refuses `blob delete-store` for
+  agents; the owner runs it.
+- Codex: `codex-companion.mjs adversarial-review --model gpt-6-astra -C <worktree> --base <ref> "<focus>"`.
+- Do not commit docs while `check:fact-consistency` is red (happened once this session; fixed).
+
+**Milestone determination:** C1–C3 and the model tier shift are new production capabilities —
+DEVELOPMENT_LOG entry added ("Site Visit automatic split transcripts, inline video, real supersede
+reasons; Sonnet/Haiku 5.5 tiers (Session 600)").
+
+---
+
 
 ## Session 599 close — IT security review and approved mitigation direction (Codex, 2026-10-12 PT)
 

@@ -10,6 +10,20 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## October 2026 — Site Visit automatic split transcripts, inline video, real supersede reasons; Sonnet/Haiku 5.5 tiers (Session 600)
+
+**Milestone:** publishing a meeting-transcript correction now regenerates the presentation and staff-discussion split transcripts automatically; staff watch the review video inline; a superseded video says why. The `sonnet`/`haiku` tiers now resolve to Claude Sonnet 5.5 and Haiku 5.5, and prompt max tokens are editable in Admin → Prompt Templates.
+**Sessions:** 600 (Opus orchestrating; Sonnet built, Opus reviewed, Codex adversarial review to approve on every change).
+**Ship state:**
+- C1: migration 081 `presentation_transcript_regenerations` + every-minute cron `drain-presentation-transcript-regenerations`, publication-order fence, card shows "Updating…"; failure falls back to Out of date + Regenerate (merge `fe5b3734a`).
+- C2 supersede codes (transcript / recording / saved file changed) (merge `c090c473a`); C3 inline `PresentationVideoPlayer` with Download in the "…" menu (merge `309220636`).
+- Model registry and pricing gained `claude-sonnet-5-5` / `claude-haiku-5-5` (Haiku long-prompt tier); owner-approved tier shift (merge `6fa1e2dae`).
+- Also: transcription cleanup no longer stalls on `upload_valid_until` (merge `8127dcffd`); pg sslmode warning silenced (merge `64a88a313`).
+**Why it matters:** corrections no longer leave split transcripts stale until someone clicks Regenerate, and every AI tier moved to the current models in one owner-approved step.
+**Pointers:** `docs/plans/SITE_VISIT_PAGE_REDESIGN_PLAN_2026-10-10.md` §10; `lib/services/model-capabilities.js`; `lib/utils/model-pricing.js`.
+
+---
+
 ## October 2026 — Tool-app prompts and models editable in Admin → Prompt Templates (Plan A, Session 598)
 
 **Milestone:** the five standalone AI tool apps (Expertise Finder, Funding Gap Analyzer, Expense Reporter, Literature Analyzer, Multi-Perspective Evaluator) read their prompt text, model and max tokens from 14 Dataverse prompt rows, so superusers change prompts and models without a redeploy. Not the Executor: routes keep their own `LLMClient` calls and write no `wmkf_ai_run` rows.
