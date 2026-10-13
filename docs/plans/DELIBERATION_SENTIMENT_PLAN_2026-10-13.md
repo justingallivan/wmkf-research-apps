@@ -391,3 +391,11 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
   `ROUTE_NAMESPACE_LIFECYCLE` has no `/api/meeting-tracker` entry, so it is unchanged. Sort order (reception,
   enthusiasm, then fewer disagreements, then fewer uncertainties; no-result rows last) is `sortSentimentRows`;
   the plan did not fix the direction, so confirm it. Out-of-date results show no comparable values.
+- **Stage 5 built** (this is item 6 of §6; calibration, item 5, is the owner's separate read-only run):
+  `getDeliberationSentiments(requestIds, accessContext)` in
+  `discussion-sentiment-reader.js`; no consumer wired, Proposal Ranking untouched. It refuses (403) unless the
+  profile in `accessContext.profileId` is active and holds the `meeting-tracker` grant or the superuser role,
+  checked live like `requireAppAccess` and `assertReviewPanelAccess` (Postgres `is_active` and superuser read, then
+  `listAppKeysForUser`); it does not trust a caller-supplied grant list.
+  At most 50 GUID request ids; results are keyed by lowercase GUID. A `sentiment` is returned only for the
+  accepted, not withdrawn, `ready`, current row (re-checked in code as well as in the store query).
