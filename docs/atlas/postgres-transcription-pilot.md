@@ -225,11 +225,14 @@ Receipt expiry also redacts evaluation/model/size/duration metadata at read time
 identifiers required for unresolved cleanup. `upload_valid_until` is reserved
 before token minting and equals the latest client-token expiry. While it is
 unset-or-future, issued-capability input and Zoom-transcript targets stay
-tracked and are re-reaped. Once it is past (database `NOW()` inside the
-`finishLocalCleanup` lock), the worker `head`s each retained path and
+tracked and are re-reaped. Once it is past by more than a 5-minute skew margin
+(clock differences between the minting server, Blob and the database, not an
+upload grace; database `NOW()`), the worker first asks the store
+(`isTranscriptionUploadWindowClosed`, lease/version fenced) and only then
+`head`s each retained path and
 acknowledges only a Blob NotFound as `verifiedAbsentPaths`; the store then
 clears the path and pointer, and clears `upload_valid_until` when neither path
-remains, so `local_cleanup_completed_at` can be set. An existing blob or any
+remains, so `local_cleanup_completed_at` can be set; `finishLocalCleanup` re-checks the same margin inside its lock. An existing blob or any
 other `head` error keeps today's retention. [VERIFIED via owner-authorized
 test, 2026-10-13, throwaway private store, @vercel/blob 2.8.0: a multipart
 part, `completeMultipartUpload`, or single put issued after token expiry is

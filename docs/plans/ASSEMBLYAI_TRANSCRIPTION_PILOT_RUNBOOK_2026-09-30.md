@@ -527,7 +527,7 @@ disable the cleanup/recovery drain if deployed jobs still require cleanup.
 that nothing can commit at a path after the token expires (parts, multipart
 complete, and single put are all rejected server-side). Input and Zoom
 cleanup targets are therefore retained while the window is open and closed
-once it has passed and `head` returns NotFound; no grace period. See
+once the database clock shows it passed by more than a 5-minute skew margin (checked before any `head` probe and again under the store lock) and `head` returns NotFound; the margin absorbs clock skew and is not an upload grace. See
 `docs/atlas/postgres-transcription-pilot.md`. Evaluation metadata expires
 independently.
 

@@ -482,6 +482,33 @@ describeIf('transcription pilot store (isolated local Postgres proof)', () => {
     expect(repeatedFinish.receipt_purged_at).toBeTruthy();
   });
 
+  it('honours verifiedAbsentPaths only after the window closed by more than the skew margin', async () => {
+    const queued = await makeQueuedJob();
+    await pool.query(
+      `UPDATE transcription_jobs SET cleanup_requested_at=NOW(), upload_valid_until=NOW()-INTERVAL '4 minutes' WHERE id=$1`, [queued.id],
+    );
+    let claim = await store.claimCleanup({ jobId: queued.id });
+    expect(await store.isUploadWindowClosed({ jobId: queued.id, leaseToken: claim.leaseToken, expectedVersion: claim.job.version })).toBe(false);
+    let finished = await store.finishLocalCleanup({
+      jobId: queued.id, leaseToken: claim.leaseToken, expectedVersion: claim.job.version,
+      deletedPaths: ['input_cleanup_pathname'], verifiedAbsentPaths: ['input_cleanup_pathname'],
+    });
+    expect(finished.input_cleanup_pathname).toBe(queued.input_cleanup_pathname);
+    expect(finished.upload_valid_until).toBeTruthy();
+    expect(finished.local_cleanup_completed_at).toBeNull();
+    await pool.query(`UPDATE transcription_jobs SET lease_expires_at=NOW()-INTERVAL '1 second',
+      upload_valid_until=NOW()-INTERVAL '6 minutes' WHERE id=$1`, [queued.id]);
+    claim = await store.claimCleanup({ jobId: queued.id });
+    expect(await store.isUploadWindowClosed({ jobId: queued.id, leaseToken: claim.leaseToken, expectedVersion: claim.job.version })).toBe(true);
+    finished = await store.finishLocalCleanup({
+      jobId: queued.id, leaseToken: claim.leaseToken, expectedVersion: claim.job.version,
+      deletedPaths: ['input_cleanup_pathname'], verifiedAbsentPaths: ['input_cleanup_pathname'],
+    });
+    expect(finished.input_cleanup_pathname).toBeNull();
+    expect(finished.upload_valid_until).toBeNull();
+    expect(finished.local_cleanup_completed_at).toBeTruthy();
+  });
+
   it('does not resolve a conflicting provider binding through DELETE cleanup', async () => {
     const queued = await makeQueuedJob();
     await pool.query(

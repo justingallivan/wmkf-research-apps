@@ -758,7 +758,17 @@ describe('Zoom transcript and speaker alignment persistence', () => {
         const tx = { query: jest.fn().mockResolvedValueOnce({ rows: [] }) };
         const db = { query: jest.fn(), transaction: jest.fn(async fn => fn(tx)) };
         await createTranscriptionPilotStore(db).finishLocalCleanup({ jobId: JOB, leaseToken: TOKEN, expectedVersion: 5 });
-        expect(tx.query.mock.calls[0][0]).toMatch(/upload_valid_until < NOW\(\)\) AS upload_window_closed/);
+        expect(tx.query.mock.calls[0][0]).toMatch(/upload_valid_until < NOW\(\) - interval '5 minutes'\) AS upload_window_closed/);
+      });
+
+      it('isUploadWindowClosed reads the database clock with the margin under the lease fence', async () => {
+        const db = { transaction: jest.fn(), query: jest.fn().mockResolvedValueOnce({ rows: [{ closed: true }] }).mockResolvedValueOnce({ rows: [] }) };
+        const store = createTranscriptionPilotStore(db);
+        const args = { jobId: JOB, leaseToken: TOKEN, expectedVersion: 5 };
+        await expect(store.isUploadWindowClosed(args)).resolves.toBe(true);
+        expect(db.query.mock.calls[0][0]).toMatch(/upload_valid_until < NOW\(\) - interval '5 minutes'/);
+        expect(db.query.mock.calls[0][0]).toMatch(/lease_token = \$2[\s\S]*version = \$3/);
+        await expect(store.isUploadWindowClosed(args)).resolves.toBe(false);
       });
 
       it('window passed: clears both paths and upload_valid_until and completes', async () => {

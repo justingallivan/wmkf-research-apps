@@ -11,6 +11,7 @@ jest.mock('../../lib/services/transcription-pilot/store', () => ({
   claimTranscriptionCleanup: jest.fn(),
   getTranscriptionJob: jest.fn(),
   finishTranscriptionLocalCleanup: jest.fn(),
+  isTranscriptionUploadWindowClosed: jest.fn(),
   getLeasedTranscriptionJob: jest.fn(),
   markExpiredTranscriptionSubmissionsUncertain: jest.fn(),
   markTranscriptionAudioDeleted: jest.fn(),
@@ -684,17 +685,20 @@ describe('transcription worker submission safety', () => {
       arrange(job, { ...job, version: 10, input_cleanup_pathname: null, output_cleanup_pathname: null,
         zoom_transcript_cleanup_pathname: null, upload_valid_until: null, local_cleanup_completed_at: new Date() });
       runtime.confirmPrivatePathAbsent.mockResolvedValue(true);
+      store.isTranscriptionUploadWindowClosed.mockResolvedValue(true);
       const result = await drainTranscriptionCleanup({ maxJobs: 3 });
       expect(store.finishTranscriptionLocalCleanup).toHaveBeenCalledWith(expect.objectContaining({
         verifiedAbsentPaths: ['input_cleanup_pathname', 'zoom_transcript_cleanup_pathname'] }));
       expect(result.incomplete).toBe(false);
     });
 
-    it('does not head while the upload window is still open', async () => {
-      const job = zoomReadyJob({ cleanup_requested_at: new Date(), upload_valid_until: new Date(Date.now() + 60_000) });
+    it('does not head when the database says the window is not closed, even if the worker clock says so', async () => {
+      const job = closed();
       arrange(job, { ...job, version: 10, output_cleanup_pathname: null });
       runtime.confirmPrivatePathAbsent.mockResolvedValue(true);
+      store.isTranscriptionUploadWindowClosed.mockResolvedValue(false);
       await drainTranscriptionCleanup({ maxJobs: 1 });
+      expect(store.isTranscriptionUploadWindowClosed).toHaveBeenCalledWith(expect.objectContaining({ jobId: job.id, leaseToken: job.lease_token }));
       expect(runtime.confirmPrivatePathAbsent).not.toHaveBeenCalled();
       expect(store.finishTranscriptionLocalCleanup).toHaveBeenCalledWith(expect.objectContaining({ verifiedAbsentPaths: [] }));
     });
@@ -703,6 +707,7 @@ describe('transcription worker submission safety', () => {
       const job = closed();
       arrange(job, { ...job, version: 10, output_cleanup_pathname: null });
       runtime.confirmPrivatePathAbsent.mockResolvedValue(false);
+      store.isTranscriptionUploadWindowClosed.mockResolvedValue(true);
       const result = await drainTranscriptionCleanup({ maxJobs: 3 });
       expect(store.finishTranscriptionLocalCleanup).toHaveBeenCalledWith(expect.objectContaining({ verifiedAbsentPaths: [] }));
       expect(result.incomplete).toBe(true);
@@ -712,6 +717,7 @@ describe('transcription worker submission safety', () => {
       const job = closed();
       arrange(job, { ...job, version: 10, output_cleanup_pathname: null });
       runtime.confirmPrivatePathAbsent.mockRejectedValue(new Error('Blob unavailable'));
+      store.isTranscriptionUploadWindowClosed.mockResolvedValue(true);
       const result = await drainTranscriptionCleanup({ maxJobs: 3 });
       expect(store.finishTranscriptionLocalCleanup).toHaveBeenCalledWith(expect.objectContaining({ verifiedAbsentPaths: [] }));
       expect(result.incomplete).toBe(true);
