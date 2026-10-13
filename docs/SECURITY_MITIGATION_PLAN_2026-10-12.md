@@ -3,7 +3,7 @@ title: Security Controls and Application Authority Implementation Plan
 domain: security-auth
 kind: plan
 status: active
-summary: Owner-approved direction for mandatory security controls, scan quarantine, explicit write authority, and attributable elevated actions; implementation not started.
+summary: Owner-approved plan for mandatory security controls, scan quarantine, explicit write authority, and attributable elevated actions; not implemented.
 canonical: false
 cataloged: 2026-10-12
 last_verified: 2026-10-12
