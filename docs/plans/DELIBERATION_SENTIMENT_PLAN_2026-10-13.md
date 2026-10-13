@@ -172,18 +172,34 @@ requires the formatted result to equal the verified TXT sent to the model exactl
 `[time] Label: text`, with labels from `speakerNameFor` (a mapped name, or `Speaker <id>`) and
 `Unidentified speaker` for excluded attribution
 [VERIFIED via `lib/services/transcription-pilot/transcript-format.js:91-94,205-213,229-237`].
-For each evidence item there must be exactly one turn whose `[time]` equals `time` and whose
-text contains `quote` (both sides control-character-replaced and whitespace-collapsed by the
-service's `normalizeSpace`; that goes beyond the TXT's own `safePlainText`, which replaces
-control characters and line breaks but keeps doubled spaces, so a quote copied from the TXT
-matches whether or not the model preserved them). The server then sets `speakerLabel` to that turn's label
-and `speaker` to the label only when it is not `Speaker <id>`, not `Unidentified speaker`, and
-not absent. Older unattributed discussions therefore pass with `speaker: null`. A disagreement is also rejected
-(`sentiment_evidence_unverified`) when two sides resolve to the same turn and the same normalized quote, or
-when every side resolves to the same non-null speaker; sides with a null speaker may differ. A record
-with any unmatched or ambiguous item is rejected as `sentiment_evidence_unverified` and not
-saved; staff see "Couldn't verify the analysis. Try again." Tests cover named, numbered,
-excluded and label-free turns.
+For each evidence item there must be exactly one turn whose time, as whole seconds, equals the model's
+`time` and whose text contains `quote`. **Tolerant match (2026-10-13 amendment):** times accept
+`M:SS`, `MM:SS`, `H:MM:SS`, `HH:MM:SS`, zero-padding optional, with optional surrounding whitespace and one
+pair of brackets (a staff discussion past one hour is the usual case: the turn says `1:02:15`, the model
+writes `01:02:15`). Text compares after `normalizeSpace` (control characters replaced, whitespace collapsed)
+plus case folding, curly single/double quotes to straight, en/em dash and minus to `-`, `…` to `...` and
+non-breaking space to space; folding is for matching only. The stored evidence carries the TURN's canonical
+formatted time and the exact slice of the turn's text that matched (not the model's strings). The server
+then sets `speakerLabel` to that turn's label and `speaker` to the label only when it is not
+`Speaker <id>`, not `Unidentified speaker`, and not absent. Older unattributed discussions therefore pass
+with `speaker: null`.
+
+**Drop, don't reject.** An evidence item with no unique matching turn (`time_not_found`,
+`text_not_in_turn`, or `ambiguous` when two turns match) is dropped, not fatal. Afterwards a disagreement
+left with fewer than two sides, or whose sides resolve to the same turn and normalized quote or to the same
+non-null speaker, is dropped; an uncertainty left with no evidence is dropped; sides with a null speaker
+may differ. The surviving record is re-run through `validateSentimentOutput`, so the run fails as
+`sentiment_evidence_unverified` only if a strong rating (enthusiasm high/low or reception
+positive/negative) is left with no evidence in any list; staff then see "Couldn't verify the analysis. Try
+again." The shape check before this step is unchanged and still fails the run (`sentiment_output_invalid`).
+
+**Diagnostics (content-free).** When anything was dropped, and always when the run fails as
+`sentiment_evidence_unverified`, the service records one operational event
+`sentiment_evidence_verification` (best-effort, injected `recordEvent`, a throwing recorder never affects the
+run) with ids, outcome and counts only: `total`, `time_not_found`, `text_not_in_turn`, `ambiguous`,
+`disagreements_dropped`, `uncertainties_dropped`. No quote, topic, headline, name or transcript text. A
+saved record that had drops also carries `verification: { dropped: {...same five counts}, total }`; a clean
+record has no `verification` key. Tests cover named, numbered, excluded and label-free turns.
 
 **Storage:** one new Postgres table, `staff_discussion_sentiments` (migration 082, if still free).
 
@@ -334,15 +350,20 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
 
 ## 7. Tests that must have teeth
 
-- A quote that is not a substring of the transcript, and a speaker name not in the transcript,
-  must each reject the record. Mutation: remove the check and both tests must fail.
+- A quote that is not a substring of one turn's folded text, and a speaker name not in the transcript, are
+  dropped (never saved, never attributed). Mutation: revert to whole-record rejection and the drop tests
+  must fail. A strong rating left with no verified evidence fails; remove that guard and its test must fail.
+- Time tolerance: `01:02:15`, `[1:02:15]` and ` 1:02:15 ` match a `1:02:15` turn; `02:15` matches `2:15`.
+  Mutation: revert to exact time match and the padded-hour test must fail.
+- The verification event holds counts only. Mutation: add quote text to it and the scan-the-serialized-event
+  test must fail. A throwing `recordEvent` does not fail the run.
 - A record for an older `source_content_hash` must read as out of date.
 - Prompt config: `untrusted: true`, `target.kind: 'none'`, `rawOutputRetention: 'none'`; the
   caller passes both retention flags.
 - Valid JSON with invalid nested values (bad enum, one-sided disagreement, empty evidence) is
   rejected before the quote check.
 - The model cannot set `speaker`. A quote from a "Speaker 3" turn is saved with `speaker: null`.
-  A quote whose time matches a different turn is rejected.
+  A quote whose time matches a different turn is dropped.
 - A prompt version bump makes existing records out of date with the transcript unchanged.
 - The read service returns nothing for an unaccepted, withdrawn or out-of-date row. Mutation: drop the
   accepted filter and the test must fail.
@@ -445,3 +466,13 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
   it now comes from the request listing and the documents are loaded by request id (adapter unchanged; the
   earlier `findByCycle` bundle option was reverted). Also fixed a page bug: the program and cycle options were
   read from a variable reassigned before React ran the updater, so the selects could stay empty.
+- **Tolerant evidence match (2026-10-13, `claude/sentiment-tolerant-quotes`):** a production analysis failed
+  `sentiment_evidence_unverified` on one item (an hour-plus discussion: exact `time` string and exact text
+  required, any miss rejected the record). Now times compare as seconds, text folds case/quotes/dashes/
+  ellipsis, unmatched items are dropped with the surrounding disagreements/uncertainties cleaned up, the run
+  fails only when a strong rating loses all evidence, and a content-free `sentiment_evidence_verification`
+  event plus `record.verification` carry the counts (§4.4, §7).
+- **Tolerant-match review fixes (Codex, 2026-10-13):** the disagreement duplicate key is now the resolved turn
+  plus the folded canonical slice (a partial and a full ellipsis match are one piece of evidence); the
+  verification event is emitted after the terminal write (`completeRun` / `failRun`) and bounded by a 2 s
+  deadline, so a hung recorder cannot stall or fail a run.
