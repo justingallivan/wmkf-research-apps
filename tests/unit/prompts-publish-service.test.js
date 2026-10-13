@@ -326,6 +326,74 @@ describe('publishPrompt', () => {
     });
   });
 
+  describe('editable maxTokens', () => {
+    const editArgs = (over = {}) => ({ name: NAME, body: VALID_BODY, profileId: 7, ...over });
+    const limitBody = (n, id) => expect.objectContaining({
+      status: 'invalid_model',
+      code: 'model_output_limit_exceeded',
+      error: expect.stringContaining(`${n}`),
+    });
+
+    beforeEach(() => {
+      aiPrompt.queryCurrentIdVersions.mockResolvedValue({ records: [{ wmkf_ai_promptid: 'new-row' }] });
+    });
+
+    it('publishes a valid maxTokens edit and carries it on the new row', async () => {
+      aiPrompt.queryCurrentRows.mockResolvedValue({ records: [currentRow({ model: 'claude-sonnet-4-6', maxTokens: 8000 })] });
+      const r = await publishPrompt(editArgs({ model: 'claude-sonnet-4-6', maxTokens: 20000 }));
+      expect(r).toMatchObject({ status: 'completed' });
+      expect(aiPrompt.create).toHaveBeenCalledWith(expect.objectContaining({ wmkf_ai_maxtokens: 20000 }));
+    });
+
+    it('accepts exactly the model ceiling', async () => {
+      aiPrompt.queryCurrentRows.mockResolvedValue({ records: [currentRow()] });
+      await publishPrompt(editArgs({ model: 'claude-sonnet-4-5', maxTokens: 64000 }));
+      expect(aiPrompt.create).toHaveBeenCalledWith(expect.objectContaining({ wmkf_ai_maxtokens: 64000 }));
+    });
+
+    it('omitted maxTokens keeps the prior row value', async () => {
+      aiPrompt.queryCurrentRows.mockResolvedValue({ records: [currentRow({ maxTokens: 9000 })] });
+      await publishPrompt(editArgs());
+      expect(aiPrompt.create).toHaveBeenCalledWith(expect.objectContaining({ wmkf_ai_maxtokens: 9000 }));
+    });
+
+    it.each([[1.5], ['100'], [0], [-5], [Number.NaN], [true]])('rejects invalid maxTokens %p before any audit or write', async (bad) => {
+      aiPrompt.queryCurrentRows.mockResolvedValue({ records: [currentRow()] });
+      await expect(publishPrompt(editArgs({ maxTokens: bad }))).rejects.toMatchObject({
+        httpStatus: 400,
+        body: expect.objectContaining({ status: 'invalid_max_tokens' }),
+      });
+      expect(sql).not.toHaveBeenCalled();
+      expect(aiPrompt.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects maxTokens above the selected concrete model ceiling (non-native prompt)', async () => {
+      aiPrompt.queryCurrentRows.mockResolvedValue({ records: [currentRow()] });
+      await expect(publishPrompt(editArgs({ model: 'claude-sonnet-4-5', maxTokens: 64001 })))
+        .rejects.toMatchObject({ httpStatus: 400, body: limitBody(64001) });
+      expect(aiPrompt.create).not.toHaveBeenCalled();
+    });
+
+    it('a model change that makes the existing maxTokens exceed the new ceiling is refused', async () => {
+      aiPrompt.queryCurrentRows.mockResolvedValue({ records: [currentRow({ model: 'claude-sonnet-4-6', maxTokens: 100000 })] });
+      await expect(publishPrompt(editArgs({ model: 'claude-sonnet-4-5' })))
+        .rejects.toMatchObject({ httpStatus: 400, body: limitBody(100000) });
+      expect(aiPrompt.create).not.toHaveBeenCalled();
+    });
+
+    it('applies the ceiling to a tier through its resolved concrete model', async () => {
+      aiPrompt.queryCurrentRows.mockResolvedValue({ records: [currentRow()] });
+      await expect(publishPrompt(editArgs({ model: 'haiku', maxTokens: 128001 })))
+        .rejects.toMatchObject({ body: expect.objectContaining({ code: 'model_output_limit_exceeded' }) });
+    });
+
+    it('skips the ceiling when the model is blank (Executor fallback)', async () => {
+      aiPrompt.queryCurrentRows.mockResolvedValue({ records: [currentRow()] });
+      await publishPrompt(editArgs({ model: '', maxTokens: 500000 }));
+      expect(aiPrompt.create).toHaveBeenCalledWith(expect.objectContaining({ wmkf_ai_maxtokens: 500000 }));
+    });
+  });
+
   it('refuses a governed prompt model that conflicts with the durable Executor budget', async () => {
     aiPrompt.queryCurrentRows.mockResolvedValue({ records: [preSiteRow()] });
     assertExecutorBudgetForPromptModel.mockRejectedValueOnce(new ServiceHttpError(

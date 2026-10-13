@@ -158,8 +158,10 @@ behaviour with no prompt edit. Both tiers (`opus`, `sonnet`) now resolve to
 thinking-default models; reverting the alias alone is not a fix.
 
 **Why it was invisible.** The prompt row stores a tier alias, not a concrete id;
-admin publish clones `wmkf_ai_maxtokens` from the prior version and exposes no budget
-input; standing budgets (`EXECUTOR_BUDGET_DEFAULTS`) cover only listed prompts
+admin publish used to clone `wmkf_ai_maxtokens` from the prior version with no budget
+input (since 2026-10-12 the Prompt Templates form has a Max output tokens field; publish
+validates a positive integer <= the resolved model's `maxOutputTokens`, and a model change
+re-checks the stored value — blank keeps the stored value); standing budgets (`EXECUTOR_BUDGET_DEFAULTS`) cover only listed prompts
 (`initial-assessment.generate` was added in the same PR: standing 12,000 / 120 s,
 limits 4,096–32,000, threaded through the IA facade via `getExecutorBudget`). A
 model-only republish therefore never re-reviews the budget. Adaptive thinking may skip
