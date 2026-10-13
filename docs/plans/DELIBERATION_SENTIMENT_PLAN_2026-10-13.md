@@ -419,3 +419,7 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
   writes to the re-ticked row (per-pick guard, view test); an abandoned `generating` row (no longer live, not yet
   marked failed) reads as a failed last run so the page says the last analysis did not finish; matrix accept row
   lists 404 `sentiment_not_found`; §4.5 carries the as-built picker note.
+- **Final Codex branch review** (`gpt-6-astra`, needs-attention, 1 finding, confirmed and fixed by the
+  orchestrator): a withdrawn run still offered Accept, which the store always refuses
+  (`accepted_at IS NULL`). Accept now requires a never-accepted run; a withdrawn run shows "Withdrawn.
+  Re-analyze to accept a new result." View test covers accept → withdraw → reload (mutation-checked).

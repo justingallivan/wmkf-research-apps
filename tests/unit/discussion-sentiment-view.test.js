@@ -246,6 +246,17 @@ test('an accepted result can be withdrawn when the transcript is no longer bound
   expect(JSON.parse(call[1].body)).toEqual({ runId: 'a1' });
 });
 
+test('a withdrawn result offers Re-analyze, not Accept, and says why (accept, withdraw, reload)', async () => {
+  const run = { ...status().run, acceptedAt: '2026-10-13T18:00:00Z', withdrawnAt: '2026-10-13T19:00:00Z' };
+  handlers[`GET ${url(A)}`] = async () => json(status({ run, accepted: null }));
+  render(<DiscussionSentimentView />);
+  await screen.findByLabelText(/Alpha/); tick('Alpha');
+  expect(await screen.findByText('Withdrawn. Re-analyze to accept a new result.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Re-analyze' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Accept' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Withdraw' })).not.toBeInTheDocument();
+});
+
 test('the date filter narrows the picker by site visit date', async () => {
   render(<DiscussionSentimentView />);
   await screen.findByLabelText(/Alpha/);

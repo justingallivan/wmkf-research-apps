@@ -84,7 +84,10 @@ function SentimentRow({ row, expanded, onToggle, onAnalyze, onRefresh, onAccept,
   const run = data?.run;
   const accepted = data?.accepted;
   const acceptedThisRun = Boolean(accepted && run && accepted.id === run.id);
-  const canAccept = phase === 'ready' && Boolean(record) && !acceptedThisRun && state !== 'no_transcript';
+  // A run can be accepted once: a withdrawn run stays withdrawn (the store requires accepted_at IS NULL),
+  // so only a fresh analysis can be accepted again.
+  const withdrawnThisRun = Boolean(run?.acceptedAt) && !acceptedThisRun;
+  const canAccept = phase === 'ready' && Boolean(record) && !run?.acceptedAt && state !== 'no_transcript';
   const canAnalyze = phase === 'ready' && state && state !== 'no_transcript';
   const working = Boolean(busy);
   return (
@@ -112,6 +115,7 @@ function SentimentRow({ row, expanded, onToggle, onAnalyze, onRefresh, onAccept,
               {accepted.current ? '' : ' (out of date)'}
             </p>
           )}
+          {withdrawnThisRun && record && <p className="mt-1 text-xs text-gray-600">Withdrawn. Re-analyze to accept a new result.</p>}
           {busy === 'analyzing' && <p className="mt-1 text-xs text-gray-600">This can take a few minutes. Keep this page open.</p>}
           {state === 'analyzing' && busy !== 'analyzing' && (
             <button type="button" className={`${outlineButton} mt-2`} onClick={onRefresh}>Check again</button>
