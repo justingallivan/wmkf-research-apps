@@ -150,6 +150,21 @@ describeIf('staff discussion sentiment store (isolated local Postgres proof)', (
     await expect(getAcceptedRun({ requestId })).resolves.toMatchObject({ id: second });
   });
 
+  it('a stale acceptance of an older ready row cannot displace a newer accepted one', async () => {
+    const v1 = await ready();
+    const v2 = await ready();
+    await acceptRun({ id: v2, requestId, profileId: profileA, expected: expected() });
+    await expect(acceptRun({ id: v1, requestId, profileId: profileB, expected: expected() }))
+      .resolves.toEqual({ conflict: { code: 'sentiment_newer_result_accepted' } });
+    expect((await accepted()).map((r) => r.id)).toEqual([v2]);
+    expect((await row(v2)).withdrawn_at).toBeNull();
+    expect((await row(v1)).accepted_at).toBeNull();
+    // A newer row can still replace an older accepted one (the guard is one-directional).
+    const v3 = await ready();
+    await expect(acceptRun({ id: v3, requestId, profileId: profileB, expected: expected() })).resolves.toMatchObject({ id: v3 });
+    expect((await accepted()).map((r) => r.id)).toEqual([v3]);
+  });
+
   it('withdraw has no fallback, a second withdraw is null, and a withdrawn row cannot be accepted again', async () => {
     const first = await ready();
     await acceptRun({ id: first, requestId, profileId: profileA, expected: expected() });

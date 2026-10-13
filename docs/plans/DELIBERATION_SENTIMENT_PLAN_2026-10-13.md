@@ -175,7 +175,9 @@ service's `normalizeSpace`; that goes beyond the TXT's own `safePlainText`, whic
 control characters and line breaks but keeps doubled spaces, so a quote copied from the TXT
 matches whether or not the model preserved them). The server then sets `speakerLabel` to that turn's label
 and `speaker` to the label only when it is not `Speaker <id>`, not `Unidentified speaker`, and
-not absent. Older unattributed discussions therefore pass with `speaker: null`. A record
+not absent. Older unattributed discussions therefore pass with `speaker: null`. A disagreement is also rejected
+(`sentiment_evidence_unverified`) when two sides resolve to the same turn and the same normalized quote, or
+when every side resolves to the same non-null speaker; sides with a null speaker may differ. A record
 with any unmatched or ambiguous item is rejected as `sentiment_evidence_unverified` and not
 saved; staff see "Couldn't verify the analysis. Try again." Tests cover named, numbered,
 excluded and label-free turns.
@@ -221,6 +223,10 @@ Additional columns: `accepted_by_profile_id`, `accepted_at`, `withdrawn_by_profi
 **Accept and withdraw:**
 - Accept is a conditional update on a `ready`, current row; an out-of-date row cannot be
   accepted.
+- An older result can never displace a newer accepted one: `acceptRun` refuses (409
+  `sentiment_newer_result_accepted`) when an accepted, not withdrawn row is newer in
+  `(completed_at, id)` order, checked under the request lock before any withdraw. A stale acceptance that
+  displaces nothing is harmless because consumers re-check currentness at read time.
 - At most one row per request is accepted and not withdrawn (partial unique index). Accepting a
   new row withdraws the previous accepted row in the same transaction, recording the actor.
 - Withdraw marks the accepted row withdrawn and keeps its acceptance history. Withdrawal never
@@ -368,3 +374,7 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
   today. Decide the recovery path (a formatter-version component in the key, or re-cutting the
   boundary) before changing the formatter; `discussion-sentiment-service.test.js` pins the literal
   layout.
+- **Codex adversarial review of Stages 1-3 (2026-10-13), two confirmed defects fixed:** a stale acceptance
+  computed before the request lock could withdraw a newer accepted result (monotonic guard in `acceptRun`,
+  pg-tested for the v1/v2 interleaving); duplicate or same-speaker evidence could manufacture a
+  disagreement (rejected after turn resolution).

@@ -102,6 +102,12 @@ jest.mock('@vercel/postgres', () => {
             && row.source_artifact_id === artifact && row.source_content_hash === hash && row.prompt_version === version;
           return { rows: ok ? [{ id }] : [] };
         }
+        if (/o\.completed_at, o\.id\) >/.test(text)) {
+          const target = find(params[1]);
+          const newerRow = rows.find((o) => o.request_id === params[0] && o.accepted_at && !o.withdrawn_at && o.id !== params[1]
+            && (o.completed_at > target.completed_at || (o.completed_at.getTime() === target.completed_at.getTime() && o.id > target.id)));
+          return { rows: newerRow ? [{ id: newerRow.id }] : [] };
+        }
         if (/SET withdrawn_by_profile_id = \$2, withdrawn_at = NOW\(\) WHERE request_id = \$1/.test(text)) {
           rows.filter((row) => row.request_id === params[0] && row.accepted_at && !row.withdrawn_at)
             .forEach((row) => Object.assign(row, { withdrawn_by_profile_id: params[1], withdrawn_at: new Date() }));
@@ -298,6 +304,41 @@ describe('analysis run', () => {
     expect(run.record.uncertainties[0].evidence[0]).toMatchObject({ speakerLabel: 'Speaker 3', speaker: null });
   });
 
+  describe('disagreement evidence rules', () => {
+    // 00:03 Dr. Lee, 00:10 Pat Kim (named); 00:40 and 00:50 are speaker-null turns.
+    const run = (sides) => {
+      execute.mockResolvedValueOnce({ parsed: goodRecord({ disagreements: dis(sides) }), meta: { promptVersion: 1 } });
+      return analyze();
+    };
+    const Q1 = ev('00:10', 'budget is far too large');
+    test('an exact-duplicate quote cannot make two sides', async () => {
+      await expect(run([Q1, { ...Q1 }])).rejects.toMatchObject({ code: 'sentiment_evidence_unverified' });
+    });
+    test('a whitespace-equivalent duplicate is the same evidence', async () => {
+      await expect(run([Q1, ev('00:10', 'budget  is far\ntoo large')])).rejects.toMatchObject({ code: 'sentiment_evidence_unverified' });
+    });
+    test('duplicate evidence on a speaker-null turn is still rejected (the duplicate rule, not the speaker rule)', async () => {
+      const Q = ev('00:40', 'Plain remark without any label');
+      await expect(run([Q, { ...Q }])).rejects.toMatchObject({ code: 'sentiment_evidence_unverified' });
+      await expect(run([Q, ev('00:40', 'Plain   remark without\nany label')])).rejects.toMatchObject({ code: 'sentiment_evidence_unverified' });
+    });
+    test('two different quotes from one named speaker are not a disagreement', async () => {
+      await expect(run([ev('00:10', 'I worry the budget'), ev('00:10', 'too large for the plan')]))
+        .rejects.toMatchObject({ code: 'sentiment_evidence_unverified' });
+    });
+    test('a named speaker against a speaker-null side is allowed', async () => {
+      const { run: saved } = await run([Q1, ev('00:40', 'Plain remark without any label')]);
+      expect(saved.record.disagreements[0].sides.map((s) => s.speaker)).toEqual(['Pat Kim', null]);
+    });
+    test('two speaker-null sides with different quotes are allowed', async () => {
+      const { run: saved } = await run([ev('00:40', 'Plain remark without any label'), ev('00:50', 'I think the budget is fine')]);
+      expect(saved.record.disagreements[0].sides.map((s) => s.speaker)).toEqual([null, null]);
+    });
+    test('two different named speakers are allowed', async () => {
+      await expect(run([Q1, ev('00:03', 'This team is excellent')])).resolves.toMatchObject({ run: { status: 'ready' } });
+    });
+  });
+
   test('an empty discussion records a failed row, makes no provider call and returns 422', async () => {
     loaded = { ...loaded, utteranceCount: 0, transcriptText: null };
     await expect(analyze()).rejects.toMatchObject({ httpStatus: 422, code: 'staff_discussion_not_recorded' });
@@ -423,6 +464,23 @@ describe('currentness, accept and withdraw', () => {
     expect(row(second.id).withdrawn_at).toBeNull();
     expect(rows().filter((r) => r.accepted_at && !r.withdrawn_at)).toHaveLength(1);
     await expect(store.getAcceptedRun({ requestId: REQUEST_ID })).resolves.toMatchObject({ id: second.id });
+  });
+
+  test('a stale acceptance of an older result cannot displace a newer accepted one (409, nothing changes)', async () => {
+    const older = (await analyze()).run;
+    const newer = (await analyze()).run;
+    await accept(newer.id);
+    await expect(accept(older.id)).rejects.toMatchObject({ httpStatus: 409, code: 'sentiment_newer_result_accepted' });
+    expect(row(older.id).accepted_at).toBeNull();
+    expect(rows().filter((r) => r.accepted_at && !r.withdrawn_at).map((r) => r.id)).toEqual([newer.id]);
+    expect(row(newer.id).withdrawn_at).toBeNull();
+  });
+
+  test('the service maps the store conflict to sentiment_newer_result_accepted', async () => {
+    const { run } = await analyze();
+    deps.sentiments = { ...store, acceptRun: jest.fn(async () => ({ conflict: { code: 'sentiment_newer_result_accepted' } })) };
+    await expect(accept(run.id)).rejects.toMatchObject({ httpStatus: 409, code: 'sentiment_newer_result_accepted' });
+    expect(deps.sentiments.acceptRun).toHaveBeenCalledTimes(1);
   });
 
   test('withdraw never falls back to an older accepted row', async () => {
