@@ -24,7 +24,7 @@ related:
 
 ## Ownership and contract
 
-One row per analysis run over a request's Staff Discussion Transcript. The model returns only a turn time and a quote for each evidence item; the service validates the record's shape, finds the one turn each quote came from in the same verified TXT, and derives the speaker from that turn. The record is stored only on `ready` rows.
+One row per analysis run over a request's Staff Discussion Transcript. The model returns only a turn time and a quote for each evidence item; the service validates the record's shape, rebuilds the speaker turns from the verified source content the TXT was produced from (refusing unless they reproduce the TXT exactly), finds the one turn each quote came from, and derives the speaker from that turn. The record is stored only on `ready` rows.
 
 | Column group | Meaning |
 |---|---|
@@ -60,4 +60,4 @@ Currentness is computed in code (`isRunCurrent`): the source artifact id and con
 
 ## Not covered
 
-Routes, the comparison page, the consumer read service and Proposal Ranking wiring (Stages 4 to 6). The SQL has been exercised only against an in-memory stand-in in unit tests, not against Postgres.
+Routes, the comparison page, the consumer read service and Proposal Ranking wiring (Stages 4 to 6). The SQL is exercised against a loopback Postgres by `tests/integration/discussion-sentiments.pg.test.js` (opt-in via `DISCUSSION_SENTIMENT_PG_TEST_URL`; skipped otherwise) and against an in-memory stand-in in the unit tests; it has not run against any shared environment.

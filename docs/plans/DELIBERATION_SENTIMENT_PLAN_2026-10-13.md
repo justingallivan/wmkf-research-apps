@@ -170,8 +170,10 @@ requires the formatted result to equal the verified TXT sent to the model exactl
 `Unidentified speaker` for excluded attribution
 [VERIFIED via `lib/services/transcription-pilot/transcript-format.js:91-94,205-213,229-237`].
 For each evidence item there must be exactly one turn whose `[time]` equals `time` and whose
-text contains `quote` (whitespace normalized; matched against the TXT, so `safePlainText`
-transforms are already applied). The server then sets `speakerLabel` to that turn's label
+text contains `quote` (both sides control-character-replaced and whitespace-collapsed by the
+service's `normalizeSpace`; that goes beyond the TXT's own `safePlainText`, which replaces
+control characters and line breaks but keeps doubled spaces, so a quote copied from the TXT
+matches whether or not the model preserved them). The server then sets `speakerLabel` to that turn's label
 and `speaker` to the label only when it is not `Speaker <id>`, not `Unidentified speaker`, and
 not absent. Older unattributed discussions therefore pass with `speaker: null`. A record
 with any unmatched or ambiguous item is rejected as `sentiment_evidence_unverified` and not
@@ -333,11 +335,36 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
   in that environment. Seed the prompt in Production (owner, after wording approval) **before or
   together with** the merge, and in any Preview environment used for testing.
 - Open for Stage 4: map prompt-store `NOT_FOUND`/`DUPLICATE_CURRENT` in accept/read to typed 409s.
-- **Review fixes (Opus review, 2026-10-13):** prompt text and JSON schema now state every validator
-  bound (`sidesMax`, `uncertaintyEvidenceMax`, one evidence item per uncertainty, `quoteMin` 12);
+- **Review fixes (Opus review, 2026-10-13):** the prompt text now states every validator
+  bound (`sidesMax`, `uncertaintyEvidenceMax`, one evidence item per uncertainty, `quoteMin` 12;
+  the provider JSON schema carries no `minItems`/`maxItems` because Anthropic native structured
+  output rejects array-size keywords and `llm-client.js` sends the schema unmodified, so list
+  sizes and the two-sides/one-evidence minimums are enforced only by the prompt and
+  `validateSentimentOutput`, where a miss is `sentiment_output_invalid` and staff retry);
   attribution comes from structured turns (formatter grouping over the loader's `discussionContent`,
   with an exact-equality check against the verified TXT, `sentiment_transcript_mismatch` before any
   run row or provider call) instead of parsing TXT labels; `assertEnabled` arguments are asserted;
   `getLatestCurrentReadyRun`/`getAcceptedRun` covered; the 400,000 cap is one shared constant; and a
   loopback-only Postgres test (`tests/integration/discussion-sentiments.pg.test.js`,
   `DISCUSSION_SENTIMENT_PG_TEST_URL`) proves reserve, CAS fence, accept/withdraw and the indexes.
+- **Final review (Fable, 2026-10-13):** the exact-equality check reproduces every TXT the
+  producer has written: the producer formats `buildStaffDiscussionTranscriptText(source.content,
+  source.speakerNames, endMs)` over the same `loadVerifiedSource` result the loader uses, prefixed
+  with a UTF-8 BOM that the reader strips [VERIFIED via
+  `lib/services/post-presentation-materials/presentation-transcript-service.js:130-155,288,344-345`,
+  `transcript-summary-service.js:232`]; bundles before schema v7 carry no attribution decision, so
+  `resolveDiscussionAttribution` is a no-op and the pre-v7 formatter output is unchanged [VERIFIED via
+  `lib/services/meeting-tracker-transcription/bundle.js:38,231`, `presentation-boundary.js:119-125`];
+  an attribution or boundary change publishes a new source revision, which unbinds the TXT as
+  `discussion_stale` (409 `staff_discussion_transcript_not_ready`) rather than mismatching [VERIFIED
+  via `meeting-tracker-transcription/service.js:600-601` (`publishMeetingCorrection` sets
+  `revisionId: operationId`; the recovery path at `:746-755` does the same),
+  `presentation-transcript-binding.js:133-139`].
+  **Durable hazard:** any future change to the turn layout (`formatTranscriptText`,
+  `groupTranscriptByTurn`, `safePlainText`, `formatTranscriptTurnTime`, `speakerNameFor`) makes
+  every already-bound discussion TXT fail `sentiment_transcript_mismatch` until that TXT is
+  rewritten, and the derivative generation key is revision + boundary with no formatter version
+  [VERIFIED via `presentation-transcript-binding.js:30-36`], so there is no regenerate-in-place path
+  today. Decide the recovery path (a formatter-version component in the key, or re-cutting the
+  boundary) before changing the formatter; `discussion-sentiment-service.test.js` pins the literal
+  layout.

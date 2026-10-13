@@ -512,6 +512,19 @@ describe('preconditions and reads', () => {
 
 describe('pure helpers', () => {
   test('rebuildTurns returns labels from structured data and null when the TXT is not reproduced', () => {
+    // Pinned literal: the on-disk turn layout every bound discussion TXT was written with. A formatter
+    // change that alters this fails every existing discussion with sentiment_transcript_mismatch.
+    expect(TRANSCRIPT).toBe([
+      '[00:03] Dr. Lee: This team is excellent and I am excited about it.',
+      '[00:10] Pat Kim: I worry the budget is far too large for the plan.',
+      '[00:20] Speaker 3: Not sure the timeline works at all.',
+      '[00:30] Unidentified speaker: I would fund it tomorrow.',
+      '[00:40] Plain remark without any label.',
+      '[00:50] Pat Kim: I think the budget is fine really.',
+      '[1:02:05] Smith: Jr.: Honestly the review panel will love this.',
+      '[1:06:40] Pat Kim: Same second remark from Pat.',
+      '[1:06:40] Dr. Lee: Same second remark from Lee.',
+    ].join('\n\n') + '\n');
     const turns = rebuildTurns(CONTENT, SPEAKER_NAMES, TRANSCRIPT);
     expect(turns.map((t) => [t.time, t.label, t.named])).toEqual([
       ['00:03', 'Dr. Lee', true], ['00:10', 'Pat Kim', true], ['00:20', 'Speaker 3', false], ['00:30', 'Unidentified speaker', false],

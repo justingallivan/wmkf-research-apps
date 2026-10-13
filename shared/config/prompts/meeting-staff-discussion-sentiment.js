@@ -126,7 +126,6 @@ export const SENTIMENT_JSON_SCHEMA = {
     concernPoints: { type: 'array', items: EVIDENCE_SCHEMA },
     disagreements: {
       type: 'array',
-     
       items: {
         type: 'object',
         additionalProperties: false,
@@ -136,7 +135,6 @@ export const SENTIMENT_JSON_SCHEMA = {
     },
     uncertainties: {
       type: 'array',
-     
       items: {
         type: 'object',
         additionalProperties: false,
