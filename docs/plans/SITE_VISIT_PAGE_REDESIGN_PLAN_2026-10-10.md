@@ -842,7 +842,8 @@ an uploaded transcript gets Open without downloads.
 
   The materials key follows the card's own heading precedence (closed, then needs attention, then saving), not the
   tracker list's classifier, so the chip cannot contradict the card.
-- **Server slices C1-C3 (§6):** C1 is not started; C3 is built on its branch (see §10).
+- **Server slices C1-C3 (§6):** all three shipped 2026-10-12.
+  - **[SHIPPED 2026-10-12, Codex approve after three rounds]** C1: migration 081 (`presentation_transcript_regenerations`) applied to Production by the owner before merge (`applied_by` `owner-c1-2026-10-12`). Atlas: `docs/atlas/postgres-presentation-transcript-regenerations.md`.
   - **C1 owner decisions (2026-10-12):** a small Postgres queue plus a once-a-minute cron drain (the
     presentation-video / Zoom-copy pattern, not Vercel Workflow), written when a correction publish carries a
     confirmed presentation end (a first publish never does, `service.js` builds it with `presentationEnd: null`);
@@ -851,8 +852,8 @@ an uploaded transcript gets Open without downloads.
     "Updating…" truthful.
   - **C3 finding (2026-10-12, owner check-in pending on placement):** reuse `shared/components/PresentationVideoPlayer.js`
     (Board page and Workbench already play the same 302-to-Graph route with Range seeking); route change limited to
-    allowing an `attempt` query key and `nosniff`; Vercel proxy streaming and Graph `preview` rejected. **[BUILT 2026-10-12, branch `claude/site-visit-c2-supersede-reason`]** C2 (the real reason a presentation video was superseded) is built on that branch.
-  **[BUILT 2026-10-12, branch `claude/site-visit-c3-video-player`]** C3: a Watch button reveals `PresentationVideoPlayer` inline in the Results row (current `review`/`approved` only), Download video moved to the "…" menu, and the open route accepts an integer `attempt` key and sets `nosniff`.
+    allowing an `attempt` query key and `nosniff`; Vercel proxy streaming and Graph `preview` rejected. **[SHIPPED 2026-10-12, merge `c090c473a`, Codex approve]** C2 (the real reason a presentation video was superseded) is live.
+  **[SHIPPED 2026-10-12, merge `309220636`, Codex approve; owner browser check of playback pending]** C3: a Watch button reveals `PresentationVideoPlayer` inline in the Results row (current `review`/`approved` only), Download video moved to the "…" menu, and the open route accepts an integer `attempt` key and sets `nosniff`.
 - **[BUILT 2026-10-12, branch `claude/button-link-variant`; owner desktop check pending]** Text-link
   variant: the shared `Button` gains `variant="link"` (the former `BTN_LINK` look: underlined gray text,
   no padding or background, blue keyboard focus ring, dimmed when disabled), and all 11 card `BTN_LINK`

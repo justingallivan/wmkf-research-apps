@@ -769,6 +769,120 @@ describe('presentation end', () => {
     expect(stepMenuItem('Edit speaker names')).toBeEnabled();
   });
 
+  test('a correction publish that queued generation says the transcripts update automatically and keeps the summary manual', async () => {
+    const artifact = boundaryArtifact();
+    const updatingArtifact = boundaryArtifact({
+      presentationTranscript: { state: 'stale', artifactId: null, updating: true },
+      staffDiscussionTranscript: { state: 'stale', artifactId: null, updating: true },
+    });
+    const state = { materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: artifact }), detail: detailFor({}) };
+    route(state, {
+      [`/corrections/${CORRECTION_ID}/publish`]: { method: 'POST', respond: () => {
+        state.collection = collection({ jobs: [], currentArtifact: updatingArtifact });
+        return response({ publication: { state: 'published' }, currentArtifact: updatingArtifact, regenerationQueued: true });
+      } },
+      '/corrections': { method: 'POST', respond: () => response(correctionDetail(artifact, { correction: attendanceDraft({ speakerNames: {} }) })) },
+      [`/corrections/${CORRECTION_ID}`]: { method: 'PATCH', respond: (path, options) => response({ correction: attendanceDraft({ version: 2, speakerNames: JSON.parse(options.body).speakerNames }) }) },
+    });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    await stepAction('Edit speaker names');
+    // The warning before publishing now names the automatic update.
+    expect(await screen.findByText(/while the presentation and staff discussion transcripts update automatically/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Name for Speaker A'), { target: { value: 'Alex' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await screen.findByText('Saved');
+    fireEvent.click(screen.getByRole('button', { name: 'Publish transcript' }));
+    expect(await screen.findByText(/transcripts are updating automatically\. Summarize again when they finish/)).toBeInTheDocument();
+    expect(screen.queryByText(/Generate the presentation and staff discussion transcripts, then summarize again/)).not.toBeInTheDocument();
+    expect(await screen.findByTestId('presentation-transcript-row')).toHaveTextContent('Updating…');
+  });
+
+  test('while the server updates the transcripts both rows show Updating… and Regenerate is hidden', async () => {
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact({
+      presentationTranscript: { state: 'stale', artifactId: null, updating: true },
+      staffDiscussionTranscript: { state: 'stale', artifactId: null, updating: true },
+    }) }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await findRow('presentation-transcript-row')).toHaveTextContent('Updating…');
+    expect(row('discussion-transcript-row')).toHaveTextContent('Updating…');
+    expect(row('presentation-transcript-row')).not.toHaveTextContent('Out of date');
+    expect(screen.queryByRole('button', { name: 'Generate transcripts' })).not.toBeInTheDocument();
+  });
+
+  test('a missing row that is being generated also shows Updating…', async () => {
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact({
+      presentationTranscript: { state: 'missing', artifactId: null, updating: true },
+      staffDiscussionTranscript: { state: 'missing', artifactId: null, updating: true },
+    }) }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await findRow('presentation-transcript-row')).toHaveTextContent('Updating…');
+    expect(screen.queryByRole('button', { name: 'Generate transcripts' })).not.toBeInTheDocument();
+  });
+
+  test('without updating the stale rows keep Out of date and Regenerate (failure fallback)', async () => {
+    route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact({
+      presentationTranscript: { state: 'stale', artifactId: null },
+      staffDiscussionTranscript: { state: 'stale', artifactId: null },
+    }) }), detail: detailFor({}) });
+    render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+    expect(await findRow('presentation-transcript-row')).toHaveTextContent('Out of date');
+    expect(row('presentation-transcript-row')).not.toHaveTextContent('Updating…');
+    expect(screen.getAllByRole('button', { name: 'Generate transcripts' }).length).toBeGreaterThan(0);
+  });
+
+  describe('polling while updating', () => {
+    beforeEach(() => { jest.useFakeTimers(); });
+    afterEach(() => { jest.useRealTimers(); });
+    const updatingArtifact = () => boundaryArtifact({
+      presentationTranscript: { state: 'stale', artifactId: null, updating: true },
+      staffDiscussionTranscript: { state: 'stale', artifactId: null, updating: true },
+    });
+    const statusReads = () => global.fetch.mock.calls.filter(([url, options]) => String(url).endsWith('/transcriptions') && (options?.method || 'GET') === 'GET').length;
+    const flush = async (ms) => { await act(async () => { await jest.advanceTimersByTimeAsync(ms); }); };
+
+    test('re-reads the status until updating clears, then shows Ready and stops polling', async () => {
+      const state = { materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: updatingArtifact() }), detail: detailFor({}) };
+      route(state);
+      render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+      await flush(0);
+      expect(row('presentation-transcript-row')).toHaveTextContent('Updating…');
+      const initial = statusReads();
+      await flush(15_000);
+      expect(statusReads()).toBe(initial + 1);
+      expect(row('presentation-transcript-row')).toHaveTextContent('Updating…');
+      state.collection = collection({ jobs: [], currentArtifact: boundaryArtifact() });
+      await flush(15_000);
+      expect(row('presentation-transcript-row')).toHaveTextContent('Ready');
+      const settled = statusReads();
+      await flush(60_000);
+      expect(statusReads()).toBe(settled);
+    });
+
+    test('after a failed generation the next read falls back to Out of date with Regenerate', async () => {
+      const state = { materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: updatingArtifact() }), detail: detailFor({}) };
+      route(state);
+      render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+      await flush(0);
+      state.collection = collection({ jobs: [], currentArtifact: boundaryArtifact({
+        presentationTranscript: { state: 'stale', artifactId: null }, staffDiscussionTranscript: { state: 'stale', artifactId: null } }) });
+      await flush(15_000);
+      expect(row('presentation-transcript-row')).toHaveTextContent('Out of date');
+      expect(screen.getAllByRole('button', { name: 'Generate transcripts' }).length).toBeGreaterThan(0);
+    });
+
+    test('polling is bounded: past about 22 minutes the card stops re-reading and offers Regenerate', async () => {
+      route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: updatingArtifact() }), detail: detailFor({}) });
+      render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);
+      await flush(0);
+      await flush(15_000 * 92);
+      expect(row('presentation-transcript-row')).toHaveTextContent('Out of date');
+      expect(screen.getAllByRole('button', { name: 'Generate transcripts' }).length).toBeGreaterThan(0);
+      const settled = statusReads();
+      await flush(15_000 * 10);
+      expect(statusReads()).toBe(settled);
+    });
+  });
+
   test('both halves bound shows both ready lines; a missing discussion alone shows an info notice and Generate', async () => {
     route({ materials: [transcriptRow()], collection: collection({ jobs: [], currentArtifact: boundaryArtifact() }), detail: detailFor({}) });
     const view = render(<RecordingAndTranscriptCard requestId={REQUEST_ID} />);

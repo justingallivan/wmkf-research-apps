@@ -1483,6 +1483,30 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFR
     return () => { cancelled = true; };
   }, [loadCollection, requestId]);
 
+  // Site Visit C1: after a correction publish the server generates the presentation and staff discussion transcripts
+  // (`updating` on the current artifact). Re-read the status until it clears, for a bounded time; past the bound the
+  // card gives up on "Updating…" and shows the ordinary Out of date + Regenerate.
+  const serverUpdating = Boolean(collection?.currentArtifact?.presentationTranscript?.updating
+    || collection?.currentArtifact?.staffDiscussionTranscript?.updating);
+  const [updatingGaveUp, setUpdatingGaveUp] = useState(false);
+  const transcriptUpdating = serverUpdating && !updatingGaveUp;
+  const wasUpdatingRef = useRef(false);
+  useEffect(() => {
+    if (!serverUpdating) { setUpdatingGaveUp(false); return undefined; }
+    let polls = 0;
+    const timer = setInterval(() => {
+      if (polls >= TRANSCRIPT_UPDATING_MAX_POLLS) { clearInterval(timer); setUpdatingGaveUp(true); return; }
+      polls += 1;
+      void loadCollection();
+    }, TRANSCRIPT_UPDATING_POLL_MS);
+    return () => clearInterval(timer);
+  }, [serverUpdating, loadCollection]);
+  useEffect(() => {
+    // The generated rows are Board materials: refresh that list once when the work finishes.
+    if (wasUpdatingRef.current && !transcriptUpdating) void onMaterialsChangedRef.current?.();
+    wasUpdatingRef.current = transcriptUpdating;
+  }, [transcriptUpdating]);
+
   const loadDetail = useCallback(async (jobId, { preserve = false } = {}) => {
     if (!requestId || !jobId) return;
     const generation = generationRef.current;
@@ -1689,7 +1713,9 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFR
       if (!isCurrent(generation) || editorKeyRef.current !== targetKey) return;
       if (result.currentArtifact) setCollection((state) => (state ? { ...state, currentArtifact: result.currentArtifact } : state));
       announcePublication(result.publication || { state: 'unknown' }, false);
-      if (result.publication?.state === 'published') setNotice('Transcript updated. Generate the presentation and staff discussion transcripts, then summarize again to restore Board derivatives.');
+      if (result.publication?.state === 'published') setNotice(result.regenerationQueued === true
+        ? 'Transcript updated. The presentation and staff discussion transcripts are updating automatically. Summarize again when they finish to restore the summary.'
+        : 'Transcript updated. Generate the presentation and staff discussion transcripts, then summarize again to restore Board derivatives.');
       setCorrectionDetail(null);
       await loadCollection();
       await onMaterialsChangedRef.current?.();
@@ -2002,7 +2028,7 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFR
     correction, correctionDetail, content, speakerIds, names, setNames: editNames, baseline, dirtyNames, dirtyEnd, dirty, presentationEndMs, setPresentationEndMs, suggestionPicks, setSuggestionPicks,
     detail, audioFile, vttFile, setVttFile, acknowledged, setAcknowledged, uploadProgress, busy, error, notice, conflict,
     closeAcknowledgedId, setCloseAcknowledgedId, confirmNoVtt, setNoVttConfirmation,
-    newerTranscriptPending, loadCollection, reviewRun, refreshReview, saveNames, publishJob, publishCorrection, generatePresentationTranscript, beginEditNames, cancelEditNames,
+    newerTranscriptPending, transcriptUpdating, loadCollection, reviewRun, refreshReview, saveNames, publishJob, publishCorrection, generatePresentationTranscript, beginEditNames, cancelEditNames,
     discardRun, checkPublication, closePublication, chooseFiles, uploadAndStart,
   };
 }
@@ -2012,6 +2038,10 @@ function useTranscription(requestId, { onMaterialsChanged, summaryRefresh = REFR
 // environments without Zoom keep today's step 1. Every async write is dropped when the card changed or unmounted.
 const COPY_ACTIVE_STATES = new Set(['queued', 'copying', 'registering']);
 const COPY_POLL_MS = 10_000;
+// Status re-reads while the server generates transcripts after a correction publish. The bound covers the worker's
+// 1 and 5 minute retry waits (90 x 15 s is about 22 minutes).
+const TRANSCRIPT_UPDATING_POLL_MS = 15_000;
+const TRANSCRIPT_UPDATING_MAX_POLLS = 90;
 const megabytes = (value) => `${Math.round((Number(value) || 0) / 1_000_000).toLocaleString()} MB`;
 const copyPercent = (copy) => (copy.declaredSize > 0 ? Math.max(0, Math.min(100, Math.floor((copy.bytesConfirmed / copy.declaredSize) * 100))) : 0);
 
@@ -2589,7 +2619,7 @@ function ReviewBlock({ t }) {
           <Button size="sm" variant="outline" type="button" onClick={t.saveNames} disabled={!dirty || Boolean(busy) || matchingActive}>{busy === 'speakers' ? (correction ? 'Saving…' : 'Saving names…') : (correction ? 'Save changes' : 'Save names')}</Button>
           <Button size="sm" variant="primary" type="button" onClick={correction ? t.publishCorrection : t.publishJob} disabled={Boolean(publishBlockedReason) || Boolean(busy)}>{busy === 'publish' ? 'Publishing…' : 'Publish transcript'}</Button>
         </div>
-        {correction && <div className="mt-2"><Notice tone="warning">Publishing this correction, including a names-only change, withholds the Board presentation transcript and summary until you generate the presentation transcripts and summarize again.</Notice></div>}
+        {correction && <div className="mt-2"><Notice tone="warning">Publishing this correction, including a names-only change, withholds the Board presentation transcript and summary while the presentation and staff discussion transcripts update automatically, which takes a few minutes. The summary stays out of date until you summarize again.</Notice></div>}
         {publishBlockedReason && <p className="mt-2 text-xs leading-5 text-gray-600">{publishBlockedReason}</p>}
       </>}
       {conflict && <p className="mt-3 text-sm text-amber-950" role="alert">Another session changed this. Refresh to load the latest version; your edits stay in the fields.</p>}
@@ -3131,14 +3161,17 @@ const DERIVATIVE_STATUS = Object.freeze({
   stale: { tone: 'amber', label: 'Out of date' },
   missing: { tone: 'gray', label: 'Not made yet' },
 });
-function DerivativeRow({ state, label, material, testId, action = null, needsEnd = false, requestId = null }) {
+function DerivativeRow({ state, label, material, testId, action = null, needsEnd = false, requestId = null, updating = false }) {
   const url = state === 'bound' && material ? materialHref(requestId, material) : null;
-  const status = DERIVATIVE_STATUS[state] || { tone: 'gray', label: 'Not available' };
   const pending = state === 'stale' || state === 'missing';
+  // The server is generating this row after a correction publish: say so and offer no manual Regenerate.
+  const isUpdating = updating && pending;
+  const status = isUpdating ? { tone: 'gray', label: 'Updating…' } : DERIVATIVE_STATUS[state] || { tone: 'gray', label: 'Not available' };
   const detail = state === 'bound' ? fmtDateTime(material?.createdAt)
-    : pending && needsEnd ? 'Confirm the presentation end in step 2'
+    : isUpdating ? 'Updating automatically'
+      : pending && needsEnd ? 'Confirm the presentation end in step 2'
         : state === 'stale' ? 'Made from an earlier transcript' : null;
-  return <ArtifactRow name={label} href={url} status={status} detail={detail} action={action} testId={testId} />;
+  return <ArtifactRow name={label} href={url} status={status} detail={detail} action={isUpdating ? null : action} testId={testId} />;
 }
 
 // Stage 4 slice 5: the Video line under Presentation. Hidden when the feature is off for this request. Staff only; ids
@@ -3400,7 +3433,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
   const editBlocked = Boolean(t.busy) || newerPending;
   const pendingSuffix = newerPending ? ' · wait for the newer transcript' : '';
   const canGenerate = editable && Boolean(presentationEnd) && !editing;
-  const generateAnchor = !canGenerate ? null : ['missing', 'stale'].includes(boundaryState) ? 'presentation'
+  const generateAnchor = !canGenerate || t.transcriptUpdating ? null : ['missing', 'stale'].includes(boundaryState) ? 'presentation'
     : ['missing', 'stale'].includes(discussionState) ? 'discussion' : null;
   const generateButton = <Button size="sm" variant="outline" type="button" onClick={t.generatePresentationTranscript} disabled={Boolean(t.busy)}>{t.busy === 'presentation-transcript' ? 'Generating…' : 'Generate transcripts'}</Button>;
   const presentationEndText = presentationEnd
@@ -3556,7 +3589,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
         <ul className="mt-3 divide-y divide-gray-100 border-t border-gray-200">
           <PresentationVideoLine v={video} />
           <SummaryBlock t={t} s={t.presentationSummary} materials={materials} request={summarizeRequest} setRequest={setSummarizeRequest} requestId={requestId} />
-          <DerivativeRow state={boundaryState} label="Presentation transcript" material={presentationMaterial} requestId={requestId} testId="presentation-transcript-row"
+          <DerivativeRow state={boundaryState} label="Presentation transcript" material={presentationMaterial} requestId={requestId} testId="presentation-transcript-row" updating={t.transcriptUpdating}
             action={generateAnchor === 'presentation' ? generateButton : null} needsEnd={editable && !presentationEnd} />
         </ul>
       )}
@@ -3568,7 +3601,7 @@ function TranscriptWorkflow({ m, t, z, requestId, transcriptInputRef, refreshTok
       {showProducts && (
         <ul className="mt-3 divide-y divide-gray-100 border-t border-gray-200">
           <SummaryBlock t={t} s={t.discussionSummary} kind="discussion" materials={materials} request={summarizeRequest} setRequest={setSummarizeRequest} requestId={requestId} />
-          <DerivativeRow state={discussionState} label="Staff discussion transcript" material={discussionMaterial} requestId={requestId} testId="discussion-transcript-row"
+          <DerivativeRow state={discussionState} label="Staff discussion transcript" material={discussionMaterial} requestId={requestId} testId="discussion-transcript-row" updating={t.transcriptUpdating}
             action={generateAnchor === 'discussion' ? generateButton : null} needsEnd={editable && !presentationEnd} />
         </ul>
       )}
