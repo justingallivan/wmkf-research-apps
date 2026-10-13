@@ -248,7 +248,7 @@ describe('slice 4 approval writers', () => {
     await store.releasePresentationVideoApproval({ token: TOKEN });
     await store.yieldPresentationVideoApproval({ token: TOKEN });
     await store.markPresentationVideoApproved({ token: TOKEN, requestDocumentId: DOC, approvedBy: 7 });
-    await store.settleStalePresentationVideoApproval({ token: TOKEN, supersededDocumentId: DOC });
+    await store.settleStalePresentationVideoApproval({ token: TOKEN, failureCode: 'presentation_video_source_changed', supersededDocumentId: DOC });
     const [attempted, release, yielded, approved, settled] = calls.map(c => c.text);
     expect(attempted).toContain('approval_registration_attempted = TRUE, approval_claimed_at = NOW()');
     expect(attempted).toContain("approval_claim_token = $1 AND state = 'registering'");
@@ -258,16 +258,22 @@ describe('slice 4 approval writers', () => {
     expect(yielded).not.toContain("state = 'review'");
     expect(approved).toContain("SET state = 'approved', request_document_id = $2, approved_by_profile_id = $3, approved_at = NOW(), approval_claim_token = NULL");
     expect(approved).toContain("approval_claim_token = $1 AND state = 'registering'");
-    expect(settled).toContain("state = 'superseded', failure_code = 'presentation_video_approval_stale', superseded_document_id = $2");
+    expect(settled).toContain("state = 'superseded', failure_code = $3, superseded_document_id = $2");
     expect(settled).toContain("approval_claim_token = $1 AND state = 'registering'");
     expect(calls.map(c => c.params[0])).toEqual(Array(5).fill(TOKEN));
     expect(calls[3].params).toEqual([TOKEN, DOC, 7]);
-    expect(calls[4].params).toEqual([TOKEN, DOC]);
+    expect(calls[4].params).toEqual([TOKEN, DOC, 'presentation_video_source_changed']);
   });
   test('settle with no orphan passes a null document id', async () => {
     const { store, calls } = harness();
-    await store.settleStalePresentationVideoApproval({ token: TOKEN });
-    expect(calls[0].params).toEqual([TOKEN, null]);
+    await store.settleStalePresentationVideoApproval({ token: TOKEN, failureCode: 'presentation_video_output_changed' });
+    expect(calls[0].params).toEqual([TOKEN, null, 'presentation_video_output_changed']);
+  });
+  test('settle requires a well-formed failure code', async () => {
+    const { store, calls } = harness();
+    await expect(store.settleStalePresentationVideoApproval({ token: TOKEN })).rejects.toThrow();
+    await expect(store.settleStalePresentationVideoApproval({ token: TOKEN, failureCode: 'Bad Code' })).rejects.toThrow();
+    expect(calls).toHaveLength(0);
   });
   test('supersedeApproved touches only older approved rows of the request, never the kept one', async () => {
     const { store, calls } = harness(() => [{ id: DOC }]);

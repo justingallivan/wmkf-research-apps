@@ -122,6 +122,30 @@ describe('Video line', () => {
     expect(within(el).getByRole('button', { name: 'Create presentation video' })).toBeInTheDocument();
   });
 
+  const STALE = 'The transcript or video changed. Create it again.';
+  test.each([
+    ['presentation_video_transcript_changed', 'The transcript or presentation end has changed. Create it again.'],
+    ['presentation_video_source_changed', 'The recording has changed. Create it again.'],
+    ['presentation_video_output_changed', 'The saved video file was changed or removed. Create it again.'],
+  ])('superseded with %s shows the specific reason, not the generic one', async (failureCode, text) => {
+    route({ state: { splits: { available: true, splits: [split({ state: 'superseded', failureCode })] } } });
+    await renderLine();
+    const el = await line();
+    expect(el).toHaveTextContent('Out of date');
+    expect(el).toHaveTextContent(text);
+    expect(el).not.toHaveTextContent(STALE);
+  });
+  test.each([[null], [undefined], ['presentation_video_approval_stale'], ['something_unknown']])('superseded with code %s keeps the generic reason', async (failureCode) => {
+    route({ state: { splits: { available: true, splits: [split({ state: 'superseded', failureCode })] } } });
+    await renderLine();
+    expect(await line()).toHaveTextContent(STALE);
+  });
+  test('failed rows keep their existing text', async () => {
+    route({ state: { splits: { available: true, splits: [split({ state: 'failed', failureCode: 'presentation_video_transcript_changed' })] } } });
+    await renderLine();
+    expect(await line()).toHaveTextContent(STALE);
+  });
+
   test.each([
     ['unsupported_timeline', /timing can’t be cut safely/],
     ['upload_failed', /could not be saved/],
@@ -196,11 +220,13 @@ describe('actions', () => {
     await renderLine();
     const el = await line();
     const before = getCount();
-    state.splits = { available: true, splits: [split({ state: 'superseded', failureCode: 'presentation_video_approval_stale' })] };
+    state.splits = { available: true, splits: [split({ state: 'superseded', failureCode: 'presentation_video_transcript_changed' })] };
     fireEvent.click(within(el).getByRole('button', { name: 'Check the ending and approve' }));
     fireEvent.click(within(el).getByRole('button', { name: 'Approve video' }));
     await waitFor(() => expect(el).toHaveTextContent('Out of date'));
+    // The toast keys on the route's code (still approval_stale) and says the generic text; the row says what changed.
     expect(within(el).getAllByText('The transcript or video changed. Create it again.').length).toBeGreaterThan(0);
+    expect(within(el).getAllByText('The transcript or presentation end has changed. Create it again.').length).toBeGreaterThan(0);
     expect(getCount()).toBeGreaterThan(before);
   });
 });
