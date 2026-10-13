@@ -19,8 +19,13 @@ and the owner-accepted revision-3 UX direction. The owner authorized implementat
 smooth dragging and resets at every stage. Source is built on `codex/proposal-ranking-v2`;
 the [implementation plan](docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md)
 records local verification and remaining acceptance. The branch is not merged or deployed.
-Read-only sandbox verification found the additive v2 fields and default facilitator absent;
-saved multi-identity acceptance remains outstanding. Historical handoffs below do not
+Sandbox wave33 fields are applied/exact and Beth is the saved default facilitator.
+Thirteen retained D98 saved-service-persona checks passed (six fictional proposals/four
+enabled sandbox identities); independent SSO/app-grant and source-eligible acceptance
+remain open. Chrome blocks saved-browser port 3136 (`ERR_BLOCKED_BY_CLIENT`); no live
+sentiment or reviewer-badge visual proof is claimed. See
+`docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md`. Production and
+deployed flags are unchanged. Historical handoffs below do not
 override this authorization or authorize production promotion, writes or trial cleanup.
 Unrelated workstream handoffs retain their existing scope.
 
@@ -50,7 +55,7 @@ Unrelated workstream handoffs retain their existing scope.
 
 1. **Calibration (waiting on the owner):** the owner is uploading more staff-discussion videos first. Then run 3–5 real discussions on the page (#1002852 and #1003038 already done), compare each result with that proposal's AI summary, and decide: keep the transcript version, simplify to summaries only (the owner's original ask), or both. Evidence: plan §6 item 5, §9 last entry.
 2. **Accept results** the owner agrees with (#1002852, #1003038); only accepted results reach other apps.
-3. **Proposal Ranking consumer:** accepted/current group-only sentiment is source-built on `codex/proposal-ranking-v2`, not merged or deployed. Sandbox setup and saved acceptance remain outstanding; see the current note above.
+3. **Proposal Ranking consumer:** accepted/current group-only sentiment is source-built on `codex/proposal-ranking-v2`, not merged or deployed. Bounded sandbox persistence rehearsal passed; independent-user/browser and live sentiment acceptance remain outstanding; see the current note above.
 4. If an analysis drops quotes, Admin → Operational events shows `sentiment_evidence_verification` counts — use them to judge whether matching needs more tuning.
 
 ### Known limits (accepted)

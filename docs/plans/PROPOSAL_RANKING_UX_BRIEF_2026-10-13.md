@@ -329,5 +329,10 @@ implements the mixed card/divider list with `@hello-pangea/dnd`, grade/confidenc
 symbols, visible named comparisons and contextual resets. A local four-proposal
 rehearsal exercised keyboard movement, collective reset, reopened preparation and
 390px layout. This is synthetic UI evidence, not saved Dataverse acceptance.
-The implementation plan records remaining long-list, multi-identity and sandbox
-checks. DESIGN.md and the suite design system remain unchanged.
+The later saved sandbox rehearsal passed 13 service-persona checks, but Chrome
+blocked port 3136 (`ERR_BLOCKED_BY_CLIENT`), so saved-browser and independent-SSO
+acceptance remain open. Retained D98 cards have numeric reviewer-distribution keys
+and cannot establish reviewer-badge visual acceptance; future fixture generation
+uses labels without rewriting the retained snapshot. The implementation plan and
+`docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md` record the bounded
+proof and remaining long-list, independent-user and live-sentiment checks. DESIGN.md and the suite design system remain unchanged.

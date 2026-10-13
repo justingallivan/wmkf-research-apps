@@ -1,0 +1,75 @@
+# Proposal Ranking v2 — bounded sandbox rehearsal receipt
+
+Date: 2026-10-13. Branch source: `codex/proposal-ranking-v2` at `b6676e15e`, with the local sandbox rehearsal scripts. **Saved service-persona rehearsal passed; browser/independent-user acceptance remains open.**
+
+## Target and setup
+
+[VERIFIED via `apply-dataverse-schema.js --target=sandbox --wave=33-proposal-ranking-assessments --execute` and subsequent readiness metadata readback]
+Additive wave33 fields `wmkf_workflowjson` (65,536) and `wmkf_assessmentjson`
+(524,288) were applied to the registered sandbox `https://orgd9e66399.crm.dynamics.com`.
+Beth Pruitt was saved and reread as that sandbox's default facilitator. Production
+was untouched; deployed readiness flags were unchanged. This supersedes the earlier
+same-day absent-fields/default-setting probe, not the dated Production v1 receipts.
+
+## Saved rehearsal and retained records
+
+[VERIFIED via `scripts/rehearse-proposal-ranking-sandbox.mjs`, its saved JSON receipt,
+and the 13 PASS lines in the execution log] Six fictional D98 proposals and four
+enabled sandbox identities (Beth Pruitt, Justin Gallivan, Rob Harrison, Jean Kim)
+were exercised through trusted service personas and actual sandbox Dataverse persistence.
+No source proposal was created or changed. The receipt completed at 2026-10-13
+21:08:08 UTC (2:08:08 p.m. Pacific).
+
+- Initial round: `db817cce-62de-43bd-878d-9b606ab177ca`.
+- Retained restart rounds: `2e5be300-40b0-41dc-8faf-49bee03e12ab`,
+  `6d08102d-af65-4166-bee1-28438b56b0a2`, `aa6d7109-9fbd-43d8-b59e-888ea0cf0373`.
+- Final round: `a616a60d-2694-4d12-8d44-f274dac5317a`.
+- Final reveal: `fe3733b0-7549-407f-b9df-e706bf9c2cdc`.
+
+Thirteen saved checks passed: restart at initial private stage; each PD's two program
+resets; owner/facilitator filtering and outsider denial; own reopen blocking reveal;
+restart when all ready; source reset preserving the combined draft until explicit
+rebuild; collective stale-write rejection/reset/replay preserving revealed inputs;
+restart after reveal/editing; two-sheet workbook with six proposals and 24 individual
+assessments; collective reset after export; private reopen hiding active group context
+while preserving readable history and allowing a fresh reveal; full restart after
+export; and fresh completion after those resets. Prior rounds/reveals remain retained.
+
+## Final readback and local checks
+
+[VERIFIED via `/tmp/ranking-sandbox-final-readiness.json`] The final read-only probe
+confirmed exact identities/attributes and Active alternate keys for all three ranking
+entities, and a present default-facilitator setting with a valid GUID. Source selects
+succeeded, but the ordinary eligible proposal pool remained empty. No roles changed.
+Search exclusion was explicitly **not verified by entity metadata**; the October 7
+search-exclusion receipt remains dated evidence, not a fresh check.
+
+The final saved readback showed the retained round revealed with all four participants
+ready. Local HTTP harness checks loaded that saved revealed view for all four trusted
+personas and rejected foreign Origin, missing rehearsal header, and cross-site POST
+requests with 403. This tests the rehearsal harness boundary, not production SSO or
+app-grant enforcement. The focused local suite rerun passed 19 suites / 134 tests.
+
+## Evidence limits and next acceptance
+
+- These are service-persona checks, **not independent Microsoft SSO, app-grant or
+  authenticated-route acceptance**. Service actor filtering does not prove those layers.
+- The sandbox source eligibility probe returned an empty pool. Fictional frozen
+  cards test persistence/transitions, not source-preview-to-opening end-to-end behavior.
+- No live sentiment acceptance occurred. The browser harness stubs empty enrichment;
+  the stale supplement rejection proves stage fencing, not sentiment access/currentness.
+- The retained D98 fixture originally used numeric review-distribution keys. Future
+  fixture generation now uses rating labels, but frozen D98 was deliberately not
+  rewritten. It is unsuitable for reviewer-badge visual proof; persistence, ordering,
+  reset and export row-count checks above are unaffected.
+- Chrome blocked the saved-data browser surface on port 3136 with
+  `ERR_BLOCKED_BY_CLIENT`. No saved-browser success is claimed. Independent users,
+  long-list dragging/autoscroll and live sentiment still need acceptance.
+- The 100-proposal/12-PD supported-cap fixture remains local serialization evidence;
+  six proposals/four personas do not prove maximum-capacity Dataverse transactions.
+- No production schema, flags, grants, source data, deployment or trial cleanup changed.
+
+Local evidence: `/private/tmp/proposal-ranking-v2-sandbox-receipt.json`,
+`/tmp/ranking-sandbox-walkthrough.log`, and `/private/tmp/proposal-ranking-v2-sandbox.xlsx`.
+These temporary files are not portable; this receipt retains the material outcomes.
+Do not rerun `--execute` or replace retained D98 data to manufacture acceptance.

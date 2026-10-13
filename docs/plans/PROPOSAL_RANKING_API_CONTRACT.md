@@ -4,9 +4,11 @@ Updated 2026-10-13. Sections 1–5 below describe **[VERIFIED via main source at
 `b3219f4aa`] the existing revision-3 API**, not the agreed replacement workflow.
 Revision 5 product authority is `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md`.
 Section 6 describes the branch-built v2 actions and semantics; additive fields are
-not provisioned in the probed sandbox and v2 creation remains disabled. The paused branch `0d161d60f` differs from main (§7).
+provisioned and metadata-verified in the sandbox; deployed v2 creation flags remain unchanged. The paused branch `0d161d60f` differs from main (§7).
 Deployment facts are dated receipts in `docs/atlas/dataverse-proposal-ranking.md`;
-no live activation or multi-identity acceptance was reverified in this docs task.
+the October 13 saved rehearsal exercised trusted service personas, not independent
+SSO/app-grant or authenticated-route acceptance. See
+`docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md` for limits.
 
 ## 1. Existing route
 

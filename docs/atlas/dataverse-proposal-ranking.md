@@ -1,12 +1,12 @@
 # Proposal Ranking — storage, implementation, and planned workflow
 
 Last source comparison: 2026-10-13, main `b3219f4aa`; paused local branch
-`codex/proposal-ranking` at `0d161d60f`. **Source verification only; no new live probe.**
+`codex/proposal-ranking` at `0d161d60f`. **Incumbent source baseline; later sandbox-only v2 evidence is below.**
 Current product authority: revision 5 of
 `docs/plans/PROPOSAL_RANKING_DESIGN_2026-10-07.md` (agreed October 13).
 The assessment/reveal/reset workflow is **branch-built on `codex/proposal-ranking-v2`, not deployed or enabled**. The owner accepted UX revision 3 and authorized implementation.
 Implementation stages and proposed durable contracts are in
-`docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`; they are not provisioned state.
+`docs/plans/PROPOSAL_RANKING_IMPLEMENTATION_PLAN_2026-10-13.md`; sandbox provisioning is recorded below; Production provisioning is not claimed.
 
 ## Incumbent version-1 source and historical deployment boundary
 
@@ -113,8 +113,11 @@ and unanimous-C suffix of the calculated order; the middle is Alternates. Additi
 `wmkf_assessmentjson` (524,288). Current reads query active keys only; immutable
 `o:<UUID>` receipts resolve retries and `h:<ordinal>` history pages are bounded to ten.
 All writes use one round-fenced changeset. Opening caps are 100 proposals / 12 PDs.
-[VERIFIED via read-only sandbox probe, October 13] Both new fields and default
-facilitator configuration are absent in the sandbox. Production was not probed.
+[VERIFIED via sandbox setup/readback and saved rehearsal, October 13] Both new fields
+are applied with exact metadata; Beth is the saved sandbox default facilitator. Thirteen
+D98 service-persona checks passed with six fictional proposals/four enabled identities.
+See `docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md`. This supersedes
+the earlier absent-fields/default-setting probe. Production was not changed.
 The API document preserves the incumbent wire contract separately from branch v2
 actions. New design does not authorize rewriting old round data.
 
@@ -136,9 +139,12 @@ Read current state under separately authorized access before choosing any reset 
 Main prohibits cancellation after either program publishes; branch-only erase is
 not authority to delete existing production data.
 
-Implementation is authorized and branch-built; sandbox setup, saved multi-identity
-acceptance and deliberate promotion remain pending. New creation requires literal-on
+Implementation is authorized and branch-built; sandbox setup and bounded saved
+service-persona rehearsal passed. Independent SSO/app-grant, source-eligible opening,
+live sentiment, and saved-browser acceptance remain open; Chrome blocked port 3136
+with `ERR_BLOCKED_BY_CLIENT`. Retained D98 reviewer-distribution keys do not support
+reviewer-badge visual proof. Deliberate promotion remains pending. New creation requires literal-on
 `PROPOSAL_RANKING_WORKFLOW_V2` and `PROPOSAL_RANKING_V2_SCHEMA_READY` in addition to
 existing readiness. Neither was enabled by this task. Full multi-identity acceptance is not established
-by the historical waiting-state smoke. No live writes, role changes, facilitator
-restoration, branch cleanup, merge, or deployment occurred in this reconciliation.
+by the historical waiting-state smoke. Only the authorized sandbox schema, default facilitator and retained synthetic ranking
+state changed in this follow-up. No Production change, branch cleanup, merge or deployment occurred.

@@ -12,27 +12,33 @@ dragging and all-stage resets. [VERIFIED via branch source] The build adds priva
 MR/SE assessment, explicit per-grade paired combined merge, confidence/confirmation,
 ready/reopen, immutable all-ready reveal, collective edits, non-destructive resets,
 paged history, authorized group sentiment and a saved-revision two-sheet workbook.
-The original version-1 path remains separate. No deployment or live writes occurred.
+The original version-1 path remains separate. No deployment or Production writes occurred;
+owner-authorized sandbox setup and retained synthetic writes are recorded below.
 
 Selected persistence: additive wave33 `wmkf_workflowjson` (65,536) and
 `wmkf_assessmentjson` (524,288), using existing round/list entities. Current read keys
 are bounded to active preparation/reveal; history pages contain at most ten entries.
 Immutable operation receipts use `o:<UUID>` list keys and bind the original request.
 A supported opening is capped at 100 proposals and 12 distinct PDs; serialized field
-limits are checked before changeset dispatch. These code limits still need live
-Dataverse changeset rehearsal. Resets retain old rounds/reveals and never DELETE.
+limits are checked before changeset dispatch. The supported maximum still needs live capacity rehearsal; the six-proposal/four-persona
+sandbox run below proves only its bounded Dataverse changesets. Resets retain old rounds/reveals and never DELETE.
 
 New creation requires both `PROPOSAL_RANKING_WORKFLOW_V2=on` and
 `PROPOSAL_RANKING_V2_SCHEMA_READY=on`, in addition to existing ranking readiness.
 Unset/other values do not enable v2 creation. Neither flag was enabled by this task.
 Once v2 data exists, keep a v2-aware reader as the rollback floor.
 
-[VERIFIED via read-only sandbox readiness probe] Existing ranking entities/keys were
-present, but both wave33 fields and default facilitator configuration were absent;
-the probed cycle had no eligible proposals. No production probe or schema/role writes
-were performed. Saved sandbox walkthrough remains pending this setup and a verified
-eligible source pool. `probe-proposal-ranking-readiness.mjs --workflow-v2` checks the
-additive attributes along with the incumbent schema.
+[VERIFIED via sandbox setup/readback and saved rehearsal, October 13] Both wave33
+fields are now applied with exact metadata and Beth is the sandbox default facilitator.
+Thirteen retained D98 service-persona checks passed with six fictional proposals and
+four enabled sandbox identities, including all-stage resets, stale writes, replay,
+preserved reveals and two-sheet workbook export. This supersedes the earlier absent
+fields/setting probe. The eligible source pool remains empty. Independent SSO/app-grant
+acceptance, live sentiment and saved-browser acceptance are not established; Chrome
+blocked port 3136 with `ERR_BLOCKED_BY_CLIENT`. The retained fixture's numeric review
+distribution keys also prevent using it as reviewer-badge visual proof. See the
+[bounded sandbox receipt](../audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md).
+`probe-proposal-ranking-readiness.mjs --workflow-v2` checks additive attributes.
 
 Local verification: 19 ranking suites / 134 tests pass; the production Turbopack build,
 type check and scoped lint pass (the build retains four unrelated document-renderer
@@ -70,8 +76,9 @@ trace is retained in the explicitly historical revision-4 reconciliation report,
 `docs/audits/PROPOSAL_RANKING_WORKFLOW_RECONCILIATION_2026-10-13.md`.
 The paused local branch at `0d161d60f` adds group-program interleaving, Research funding
 context, CSV and a destructive dry-run reset; it does not implement individual
-combined preparation. No fresh remote PR, deployment, live schema or grant probe
-was performed for this plan. Those states remain **UNKNOWN** until preflight.
+combined preparation. The original planning comparison did not probe remote PR/deployment/schema/grants.
+The later sandbox setup and bounded saved rehearsal are recorded above; Production
+and independent participant access remain outside that proof.
 
 Existing seams to extend, subject to implementation tests:
 
@@ -100,7 +107,7 @@ changeset capacity before implementing this mapping.
   identity and stage. Add a list assessment JSON field for two boundary positions,
   confidence by request ID, combined source versions/confirmation and ready receipt.
   Selected names are `wmkf_workflowjson` and `wmkf_assessmentjson` in additive
-  `wave33-proposal-ranking-assessments`. They are not yet provisioned in the probed sandbox.
+  `wave33-proposal-ranking-assessments`. They are now provisioned and metadata-verified in the sandbox; Production was not changed.
 - Keep order in the existing order field. Derive grades from order plus boundaries;
   do not keep a second writable grade map. Validate `0 <= first <= second <= N`,
   integer positions, exact proposal membership and confidence keys/allowed values.
