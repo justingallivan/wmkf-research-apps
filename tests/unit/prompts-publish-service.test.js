@@ -387,6 +387,38 @@ describe('publishPrompt', () => {
         .rejects.toMatchObject({ body: expect.objectContaining({ code: 'model_output_limit_exceeded' }) });
     });
 
+    describe('cold model cache', () => {
+      const { clearAvailableModelsCache } = require('../../lib/services/model-resolver');
+      const realFetch = global.fetch;
+      const realKey = process.env.CLAUDE_API_KEY;
+      beforeEach(() => {
+        clearAvailableModelsCache();
+        process.env.CLAUDE_API_KEY = 'test-key';
+        global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ data: [
+          { id: 'claude-haiku-4-5', created_at: '2025-10-01T00:00:00Z' },
+          { id: 'claude-haiku-5-5', created_at: '2026-10-01T00:00:00Z' },
+        ] }) }));
+      });
+      afterEach(() => {
+        clearAvailableModelsCache();
+        global.fetch = realFetch;
+        if (realKey === undefined) delete process.env.CLAUDE_API_KEY; else process.env.CLAUDE_API_KEY = realKey;
+      });
+
+      it('loads the live model list before checking a tier ceiling (80k fits Haiku 5.5, not the 4.5 fallback)', async () => {
+        aiPrompt.queryCurrentRows.mockResolvedValue({ records: [currentRow()] });
+        await publishPrompt(editArgs({ model: 'haiku', maxTokens: 80000 }));
+        expect(global.fetch).toHaveBeenCalled();
+        expect(aiPrompt.create).toHaveBeenCalledWith(expect.objectContaining({ wmkf_ai_maxtokens: 80000 }));
+      });
+
+      it('accepts a body-only edit that inherits an 80k budget on a haiku-tier row', async () => {
+        aiPrompt.queryCurrentRows.mockResolvedValue({ records: [currentRow({ model: 'haiku', maxTokens: 80000 })] });
+        await publishPrompt(editArgs({}));
+        expect(aiPrompt.create).toHaveBeenCalledWith(expect.objectContaining({ wmkf_ai_maxtokens: 80000 }));
+      });
+    });
+
     it('skips the ceiling when the model is blank (Executor fallback)', async () => {
       aiPrompt.queryCurrentRows.mockResolvedValue({ records: [currentRow()] });
       await publishPrompt(editArgs({ model: '', maxTokens: 500000 }));
