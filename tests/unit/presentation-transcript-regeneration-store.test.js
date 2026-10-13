@@ -164,18 +164,6 @@ describe('retry', () => {
     expect(calls[0].params).toEqual([ID, TOKEN, 'graph_unavailable', 3]);
   });
 
-  test('a newer pending row (unique violation) turns the retry into superseded', async () => {
-    const { store, calls } = harness((text) => {
-      if (text.includes("SET state = 'failed'")) return { rows: [] };
-      if (text.includes("SET state = 'pending'")) return duplicate();
-      return { rows: [{ id: ID }] };
-    });
-    const outcome = await store.retryPresentationTranscriptRegeneration({ id: ID, leaseToken: TOKEN, failureCode: 'graph_unavailable' });
-    expect(outcome).toEqual({ state: 'superseded' });
-    expect(calls[2].text).toContain("SET state = 'superseded'");
-    expect(calls[2].params[2]).toBe('presentation_transcript_regeneration_replaced');
-  });
-
   test('a lost lease returns null', async () => {
     const { store } = harness(() => ({ rows: [] }));
     expect(await store.retryPresentationTranscriptRegeneration({ id: ID, leaseToken: TOKEN, failureCode: 'graph_unavailable' })).toBeNull();
@@ -203,15 +191,82 @@ describe('lease reclaim', () => {
     expect(calls[1].text).toContain("lease_expires_at <= NOW()");
     expect(calls[2].text).toContain("SET state = 'failed', failure_code = 'presentation_transcript_regeneration_lease_expired'");
   });
+});
 
-  test('a newer pending row supersedes the expired one', async () => {
-    const { store, calls } = harness((text) => {
-      if (/^SELECT/.test(text)) return { rows: [{ id: ID, attempts: 1 }] };
-      if (text.includes("SET state = 'pending'")) return duplicate();
-      return { rows: [{ id: ID }], rowCount: 1 };
-    });
+// Stateful stand-in for the table: models the pending unique index and interprets the store's UPDATEs by their text.
+const A_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const B_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+function tableFake(rows) {
+  const calls = [];
+  const byId = id => rows.find(r => r.id === id);
+  const database = { query: async (text, params = []) => {
+    const t = flat(text); calls.push(t);
+    if (/^SELECT id, attempts/.test(t)) return { rows: rows.filter(r => r.state === 'running').map(r => ({ id: r.id, attempts: r.attempts })) };
+    if (t.includes("SET state = 'failed'")) return { rows: [], rowCount: 0 };
+    if (t.includes("SET state = 'pending'")) {
+      const r = byId(params[0]);
+      if (rows.some(o => o !== r && o.request_id === r.request_id && o.state === 'pending')) throw duplicate();
+      r.state = 'pending'; return { rows: [{ id: r.id }], rowCount: 1 };
+    }
+    if (t.includes("request_id = (SELECT request_id")) {
+      const r = byId(params[0]);
+      const hit = rows.filter(o => o.request_id === r.request_id && o.state === 'pending' && o.version < r.version);
+      hit.forEach(o => { o.state = 'superseded'; o.code = 'presentation_transcript_regeneration_replaced'; });
+      return { rows: hit.map(o => ({ id: o.id })), rowCount: hit.length };
+    }
+    if (t.includes("SET state = 'superseded'")) { const r = byId(params[0]); r.state = 'superseded'; return { rows: [{ id: r.id }], rowCount: 1 }; }
+    return { rows: [], rowCount: 0 };
+  } };
+  return { store: createPresentationTranscriptRegenerationStore(database), calls };
+}
+const trio = (runningVersion, pendingVersion) => [
+  { id: B_ID, request_id: REQ, state: 'running', version: runningVersion, attempts: 1 },
+  { id: A_ID, request_id: REQ, state: 'pending', version: pendingVersion, attempts: 0 },
+];
+
+describe('returning a running row to pending when a pending row already exists', () => {
+  test('(a) retry: running B v6 beats pending A v5: A is superseded as replaced and B goes pending', async () => {
+    const rows = trio(6, 5); const { store } = tableFake(rows);
+    expect(await store.retryPresentationTranscriptRegeneration({ id: B_ID, leaseToken: TOKEN, failureCode: 'graph_unavailable' })).toEqual({ state: 'pending' });
+    expect(rows[1]).toMatchObject({ state: 'superseded', code: 'presentation_transcript_regeneration_replaced' });
+    expect(rows[0]).toMatchObject({ state: 'pending', attempts: 1 });
+  });
+
+  test('(b) retry: running B v5 loses to pending C v6: B is superseded and C is untouched', async () => {
+    const rows = trio(5, 6); const { store } = tableFake(rows);
+    expect(await store.retryPresentationTranscriptRegeneration({ id: B_ID, leaseToken: TOKEN, failureCode: 'graph_unavailable' })).toEqual({ state: 'superseded' });
+    expect(rows[0].state).toBe('superseded');
+    expect(rows[1]).toMatchObject({ state: 'pending', attempts: 0 });
+  });
+
+  test('retry: an equal version is not older, so the running row is superseded', async () => {
+    const rows = trio(5, 5); const { store } = tableFake(rows);
+    expect(await store.retryPresentationTranscriptRegeneration({ id: B_ID, leaseToken: TOKEN, failureCode: 'x' })).toEqual({ state: 'superseded' });
+    expect(rows[1].state).toBe('pending');
+  });
+
+  test('(c) recovery: expired running B v6 beats pending A v5', async () => {
+    const rows = trio(6, 5); const { store } = tableFake(rows);
     expect(await store.recoverExpiredPresentationTranscriptRegenerations()).toBe(1);
-    expect(calls[2].text).toContain("SET state = 'superseded'");
+    expect(rows[1]).toMatchObject({ state: 'superseded', code: 'presentation_transcript_regeneration_replaced' });
+    expect(rows[0]).toMatchObject({ state: 'pending', attempts: 1 });
+  });
+
+  test('(c) recovery: expired running B v5 loses to pending C v6', async () => {
+    const rows = trio(5, 6); const { store } = tableFake(rows);
+    expect(await store.recoverExpiredPresentationTranscriptRegenerations()).toBe(1);
+    expect(rows[0].state).toBe('superseded');
+    expect(rows[1].state).toBe('pending');
+  });
+
+  test('the older-pending supersede and the retried move are the exact statements', async () => {
+    const { store, calls } = tableFake(trio(6, 5));
+    await store.retryPresentationTranscriptRegeneration({ id: B_ID, leaseToken: TOKEN, failureCode: 'x' });
+    const step1 = calls.find(c => c.includes('request_id = (SELECT request_id'));
+    expect(step1).toContain("SET state = 'superseded', failure_code = 'presentation_transcript_regeneration_replaced'");
+    expect(step1).toContain("WHERE state = 'pending'");
+    expect(step1).toContain('transcript_slot_version < (SELECT transcript_slot_version');
+    expect(calls.filter(c => c.includes("SET state = 'pending'"))).toHaveLength(2);
   });
 });
 

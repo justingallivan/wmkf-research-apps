@@ -59,6 +59,7 @@ The publish (SharePoint + Dataverse) and the enqueue (Postgres) are not one tran
 | `running` | `failed` | `failPresentationTranscriptRegeneration` | Supervised-test refusal or any other non-transient 4xx. |
 | `running` | `pending` | `retryPresentationTranscriptRegeneration` | Transient fault (5xx, timeout, network error, 408, 429, no status): backoff 1 minute after the first attempt, 5 after the second. |
 | `running` | `failed` | `retryPresentationTranscriptRegeneration` | Transient fault on the third claimed attempt: fails with the last code. |
+| `pending` (older) | `superseded` | `moveRunningToPending` (inside retry and recovery) | When a running row's return to `pending` hits the pending unique index and the existing pending row has a LOWER `transcript_slot_version` (a delayed enqueue for an older publish), that pending row is superseded (`presentation_transcript_regeneration_replaced`) and the running row's move is retried once. If the pending row is newer or equal, or the retry conflicts again, the running row is superseded instead. |
 | `running` | `pending` / `failed` / `superseded` | `recoverExpiredPresentationTranscriptRegenerations` | Lease expired (worker died). Back to `pending` under the cap, `failed` (`presentation_transcript_regeneration_lease_expired`) at the cap, `superseded` if a newer pending row exists. |
 
 Every worker transition is fenced by `lease_token = $x AND lease_expires_at > NOW()` and its own from-state. After `failed` the card falls back to "Out of date" with Regenerate.
