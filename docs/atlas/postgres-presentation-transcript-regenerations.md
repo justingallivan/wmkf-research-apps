@@ -3,7 +3,7 @@ title: "Atlas: Presentation transcript regenerations (Postgres)"
 domain: postgres
 kind: state-page
 status: source-built
-summary: "presentation_transcript_regenerations (migration 081) is the queue behind automatic presentation and staff discussion transcripts after a meeting-transcript correction publish. One pending and one running row per request at most, latest publish wins, drained once a minute by a cron as the staff member who published. Built on branch claude/site-visit-c1-auto-transcripts; not merged; migration 081 not applied."
+summary: "presentation_transcript_regenerations (migration 081) is the queue behind automatic presentation and staff discussion transcripts after a meeting-transcript correction publish. One pending and one running row per request at most, latest publish wins, drained once a minute by a cron as the staff member who published. Shipped 2026-10-12 (merge fe5b3734a); migration 081 applied to Production by the owner before merge."
 canonical: true
 cataloged: 2026-10-12
 owner: product-engineering
@@ -22,7 +22,7 @@ related:
 
 ## Status
 
-**[Site Visit redesign slice C1, built 2026-10-12 on branch `claude/site-visit-c1-auto-transcripts`. Not merged. Migration 081 is not applied to any database; the owner applies it to Production after review and before merge.]** Before the table exists the enqueue fails and is swallowed, the cron idles (`schema_not_ready`), and the card read treats the missing table as "not updating", so a deploy that lands first is harmless.
+**[Site Visit redesign slice C1, shipped 2026-10-12 (merge `fe5b3734a`). Migration 081 was applied to Production by the owner before merge (`applied_by` `owner-c1-2026-10-12`).]** Before the table exists the enqueue fails and is swallowed, the cron idles (`schema_not_ready`), and the card read treats the missing table as "not updating", so a deploy that lands first is harmless.
 
 ## Ownership and contract
 
