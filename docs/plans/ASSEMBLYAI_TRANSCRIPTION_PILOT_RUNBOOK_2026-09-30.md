@@ -522,16 +522,14 @@ retry. Staff "Cancel this transcription" (the same DELETE) is offered for `queue
 `TRANSCRIPTION_SUBMISSIONS_ENABLED` disabled when pausing user work; do not
 disable the cleanup/recovery drain if deployed jobs still require cleanup.
 
-**Unclosed direct-upload capability:** source reserves `upload_valid_until`
-before minting a token. Expiry is not evidence that an already-started remote
-upload cannot commit later. Input cleanup targets for issued capabilities are
-therefore retained and repeatedly reaped after observed deletion;
-`local_cleanup_completed_at` remains unset. This is minimal cleanup tracking,
-not a promise of final erasure. Evaluation metadata expires independently.
-The owner accepts this unresolved risk for the non-sensitive pilot. Establish
-and verify a completion/revocation protocol or an enforced vendor completion
-bound before any tombstone-closing change or confidential-use approval.
-Do not manually remove targets or substitute an assumed grace period.
+**Direct-upload capability (closed 2026-10-13):** source reserves
+`upload_valid_until` before minting a token. A Blob test on 2026-10-13 showed
+that nothing can commit at a path after the token expires (parts, multipart
+complete, and single put are all rejected server-side). Input and Zoom
+cleanup targets are therefore retained while the window is open and closed
+once it has passed and `head` returns NotFound; no grace period. See
+`docs/atlas/postgres-transcription-pilot.md`. Evaluation metadata expires
+independently.
 
 Conflicting provider IDs retain the uncertain slot after DELETE. Automatic
 cleanup cannot erase conflict evidence or declare remote resolution; the owner

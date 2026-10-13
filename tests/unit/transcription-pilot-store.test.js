@@ -714,10 +714,10 @@ describe('Zoom transcript and speaker alignment persistence', () => {
       diagnostic_cleanup_pathname: null, diagnostic_pathname: null,
       zoom_transcript_cleanup_pathname: zoom, zoom_transcript_pathname: zoom,
     };
-    function run(row, deletedPaths) {
+    function run(row, deletedPaths, verifiedAbsentPaths) {
       const tx = { query: jest.fn().mockResolvedValueOnce({ rows: [row] }).mockResolvedValueOnce({ rows: [{ id: JOB }] }) };
       const db = { query: jest.fn(), transaction: jest.fn(async fn => fn(tx)) };
-      return createTranscriptionPilotStore(db).finishLocalCleanup({ jobId: JOB, leaseToken: TOKEN, expectedVersion: 5, deletedPaths })
+      return createTranscriptionPilotStore(db).finishLocalCleanup({ jobId: JOB, leaseToken: TOKEN, expectedVersion: 5, deletedPaths, verifiedAbsentPaths })
         .then(() => tx.query.mock.calls[1]);
     }
 
@@ -746,6 +746,49 @@ describe('Zoom transcript and speaker alignment persistence', () => {
 
     it('rejects a non-column acknowledgement', async () => {
       await expect(run(baseRow, ['zoom_transcript_pathname'])).rejects.toMatchObject({ code: 'transcription_invalid_value' });
+    });
+
+    describe('verified-absent acknowledgement', () => {
+      const input = 'transcription-pilot/7/job/input/audio.mp3';
+      const windowRow = (closed, extra = {}) => ({ ...baseRow, input_cleanup_pathname: input, audio_pathname: input,
+        upload_valid_until: new Date(Date.now() + (closed ? -60000 : 60000)), upload_window_closed: closed, ...extra });
+      const both = ['input_cleanup_pathname', 'zoom_transcript_cleanup_pathname'];
+
+      it('selects the window state from the database clock', async () => {
+        const tx = { query: jest.fn().mockResolvedValueOnce({ rows: [] }) };
+        const db = { query: jest.fn(), transaction: jest.fn(async fn => fn(tx)) };
+        await createTranscriptionPilotStore(db).finishLocalCleanup({ jobId: JOB, leaseToken: TOKEN, expectedVersion: 5 });
+        expect(tx.query.mock.calls[0][0]).toMatch(/upload_valid_until < NOW\(\)\) AS upload_window_closed/);
+      });
+
+      it('window passed: clears both paths and upload_valid_until and completes', async () => {
+        const [query, params] = await run(windowRow(true), [], both);
+        expect(query).toMatch(/input_cleanup_pathname = \$/);
+        expect(query).toMatch(/zoom_transcript_cleanup_pathname = \$/);
+        expect(query).toMatch(/upload_valid_until = \$/);
+        expect(query).toMatch(/local_cleanup_completed_at = NOW\(\)/);
+        expect(query).toMatch(/content_purged_at = \$/);
+        expect(params.filter(value => value === null).length).toBeGreaterThanOrEqual(5);
+      });
+
+      it('window still open: ignores the acknowledgement', async () => {
+        const [query] = await run(windowRow(false), [], both);
+        expect(query).not.toMatch(/input_cleanup_pathname = \$/);
+        expect(query).not.toMatch(/zoom_transcript_cleanup_pathname = \$/);
+        expect(query).not.toMatch(/upload_valid_until = \$/);
+        expect(query).not.toMatch(/local_cleanup_completed_at/);
+      });
+
+      it('window passed but only one path verified: keeps upload_valid_until and does not complete', async () => {
+        const [query] = await run(windowRow(true), [], ['zoom_transcript_cleanup_pathname']);
+        expect(query).toMatch(/zoom_transcript_cleanup_pathname = \$/);
+        expect(query).not.toMatch(/upload_valid_until = \$/);
+        expect(query).not.toMatch(/local_cleanup_completed_at/);
+      });
+
+      it('rejects an invalid acknowledgement field like deletedPaths', async () => {
+        await expect(run(windowRow(true), [], ['audio_pathname'])).rejects.toMatchObject({ code: 'transcription_invalid_value' });
+      });
     });
   });
 
