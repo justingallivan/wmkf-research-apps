@@ -233,9 +233,20 @@ describe('reviewed Sonnet 5.5 and Haiku 5.5 pricing', () => {
     expect(estimateCostCents('claude-sonnet-5-5', 0, 0, 0, 1_000_000)).toBe(10);
   });
 
-  test('Haiku 5.5 encodes the up-to-100K-prompt tier ($0.10/$0.50, $0.01 cache reads)', () => {
+  test('Haiku 5.5 bills prompts up to 100K tokens at $0.10/$0.50 ($0.01 cache reads)', () => {
     expect(lookupPricing('claude-haiku-5-5')).toBe(MODEL_PRICING['claude-haiku-5-5']);
     expect(lookupPricing('claude-haiku-4-5')).toBe(MODEL_PRICING['claude-haiku-4-5']);
-    expect(estimateCostCents('claude-haiku-5-5', 1_000_000, 1_000_000, 1_000_000, 1_000_000, 1_000_000)).toBeCloseTo(93.5, 6);
+    // Exactly 100K prompt tokens stays on the base tier.
+    expect(estimateCostCents('claude-haiku-5-5', 100_000, 10_000)).toBeCloseTo(1.5, 6);
+    expect(estimateCostCents('claude-haiku-5-5', 0, 0, 0, 100_000)).toBeCloseTo(0.1, 6);
+  });
+
+  test('Haiku 5.5 bills a prompt over 100K tokens at $0.50/$2.50 for the whole call', () => {
+    // Codex probe: 200K in + 10K out = 10 + 2.5 cents (not 2.5).
+    expect(estimateCostCents('claude-haiku-5-5', 200_000, 10_000)).toBeCloseTo(12.5, 6);
+    expect(estimateCostCents('claude-haiku-5-5', 100_001, 0)).toBeCloseTo(5.00005, 6);
+    // Cache tokens count toward the prompt length: 60K input + 50K cache reads crosses the threshold.
+    expect(estimateCostCents('claude-haiku-5-5', 60_000, 0, 0, 50_000)).toBeCloseTo(3 + 0.25, 6);
+    expect(estimateCostCents('claude-haiku-5-5', 1_000_000, 1_000_000, 1_000_000, 1_000_000, 1_000_000)).toBeCloseTo(467.5, 6);
   });
 });
