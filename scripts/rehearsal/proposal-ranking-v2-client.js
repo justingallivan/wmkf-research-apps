@@ -3,7 +3,7 @@ import {
   initialPreparation,
   transitionWorkflow,
 } from '../../lib/services/proposal-ranking/workflow';
-const ids = ['a', 'b', 'c', 'd'];
+let ids = ['a', 'b', 'c', 'd'];
 export const snapshot = {
   version: 2,
   cycleCode: 'J27',
@@ -78,6 +78,27 @@ export const snapshot = {
     }),
   ),
 };
+const smallSnapshot = structuredClone(snapshot);
+export function chooseFixture(large = false) {
+  Object.assign(snapshot, structuredClone(smallSnapshot));
+  if (large) {
+    snapshot.roster = Array.from({ length: 12 }, (_, i) => ({
+      name: `Example PD ${i + 1}`, systemUserId: `pd-${i}`,
+    }));
+    snapshot.proposals = Array.from({ length: 100 }, (_, i) => ({
+      ...structuredClone(smallSnapshot.proposals[i % 4]),
+      requestId: `example-${i + 1}`,
+      requestNumber: `Example ${i + 1}`,
+      organization: `Example Institution ${i + 1}`,
+    }));
+    snapshot.seedOrders = Object.fromEntries(['mr', 'se'].map((program) => [
+      program, snapshot.proposals.filter((p) => p.programKey === program).map((p) => p.requestId),
+    ]));
+  }
+  ids = snapshot.proposals.map((p) => p.requestId);
+  actor = 'pd-0';
+  return seed(true);
+}
 let state;
 let actor = 'pd-0';
 let revision = 0;
@@ -156,9 +177,11 @@ export function seed(group = false) {
     snapshot.roster.forEach((p, i) => {
       const person = state.participants[p.systemUserId];
       person.co = {
-        order: i === 2 ? ['a', 'b', 'd', 'c'] : ids,
+        order: i === 2 ? [...ids.slice(0, 2), ids[3], ids[2], ...ids.slice(4)] : ids,
         boundaries:
-          i === 0 ? [3, 3] : i === 1 ? [2, 3] : i === 2 ? [2, 2] : [1, 3],
+          ids.length > 4
+            ? [i === 0 ? 34 : 33, 67]
+            : i === 0 ? [3, 3] : i === 1 ? [2, 3] : i === 2 ? [2, 2] : [1, 3],
         confidence: Object.fromEntries(
           ids.map((id) => [
             id,

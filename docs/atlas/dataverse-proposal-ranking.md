@@ -144,8 +144,10 @@ service-persona rehearsal passed, followed by a saved-D98 browser walkthrough wi
 four trusted personas in normal Chrome. The earlier port-3136 browser block is historical.
 Final full browser restart returned all four participants to Preparing, with confidence
 cleared and reveal disabled, after a successful second reveal. Independent SSO/app-grant,
-source-eligible opening, live sentiment, pointer smoothness and long-list acceptance
-remain open. Retained D98 reviewer-distribution keys do not support
+source-eligible opening, live sentiment, pointer smoothness and long-list autoscroll
+remain open. The fresh read-only eligibility probe still returned zero; a separate
+memory-only 100/12 UI fixture passed rendering/navigation/keyboard/reset checks but
+does not prove saved maximum-capacity transactions. Retained D98 reviewer-distribution keys do not support
 reviewer-badge visual proof. Deliberate promotion remains pending. New creation requires literal-on
 `PROPOSAL_RANKING_WORKFLOW_V2` and `PROPOSAL_RANKING_V2_SCHEMA_READY` in addition to
 existing readiness. Neither was enabled by this task. Full multi-identity acceptance is not established

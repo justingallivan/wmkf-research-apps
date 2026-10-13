@@ -27,7 +27,9 @@ personas, replacing the earlier port-3136 browser block; no independent SSO, liv
 sentiment or reviewer-badge visual proof is claimed. Final second reveal preserved
 the disagreement/cutoff, then full restart returned all four to Preparing with
 confidence cleared and reveal disabled. Keyboard dragging persisted; pointer
-smoothness and long-list acceptance remain pending. See
+smoothness and long-list autoscroll remain pending. A separate memory-only 100/12
+fixture passed rendering, Find 100, keyboard reorder/Refresh and reset; saved
+maximum-capacity transactions remain unverified. Fresh source eligibility is still zero. See
 `docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md`. Production and
 deployed flags are unchanged. Historical handoffs below do not
 override this authorization or authorize production promotion, writes or trial cleanup.

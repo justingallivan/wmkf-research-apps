@@ -97,6 +97,28 @@ Keyboard dragging persisted as described above. Automated pointer dragging visib
 moved the item but did not produce an observed drop/save, including in active Chrome;
 **pointer smoothness and long-list drag/autoscroll acceptance remain pending**.
 
+## Additional bounded checks — 2026-10-13
+
+[VERIFIED via the memory-only rehearsal selector and in-app browser] The local
+100-proposal/12-PD fixture rendered 100 proposal headings and 12 PD assessments per
+card. Find 100 scrolled to the final proposal; keyboard movement changed its position
+from 100 to 99, Refresh retained that in-memory order, and collective reset restored
+position 100. This is UI and in-memory state evidence, not Dataverse persistence or
+maximum-capacity changeset acceptance. Pointer smoothness and long-list autoscroll
+remain unaccepted.
+
+The fresh read-only `/tmp/ranking-remaining-readiness.json` probe again returned zero
+ordinary eligible proposals. Focused API/workflow-service/sentiment-reader tests passed
+(3 suites / 49 tests), and rehearsal fixture lint passed. No runtime app code or
+Production state changed in this continuation.
+
+Pointer automation remains inconclusive: native automation dropped back at the original
+position; CDP movement visibly moved the item but produced no observed completed drop.
+This does not establish an app defect or successful pointer acceptance. A human pointer
+check is pending. Independent SSO/app-grant and live sentiment still require usable
+sandbox accounts and accepted analysis; those prerequisites have been requested but
+are not yet supplied. The overall acceptance task is not complete.
+
 ## Evidence limits and next acceptance
 
 - These are service-persona checks, **not independent Microsoft SSO, app-grant or
@@ -109,11 +131,12 @@ moved the item but did not produce an observed drop/save, including in active Ch
   fixture generation now uses rating labels, but frozen D98 was deliberately not
   rewritten. It is unsuitable for reviewer-badge visual proof; persistence, ordering,
   reset and export row-count checks above are unaffected.
-- Saved-browser evidence is limited to the six-card/four-persona walkthrough above.
-  Independent users, pointer dragging/smoothness, long-list dragging/autoscroll and
-  live sentiment still need acceptance.
-- The 100-proposal/12-PD supported-cap fixture remains local serialization evidence;
-  six proposals/four personas do not prove maximum-capacity Dataverse transactions.
+- Saved-browser Dataverse evidence is limited to the six-card/four-persona walkthrough
+  above. The separate 100/12 UI fixture is memory-only. Independent users, pointer
+  dragging/smoothness, long-list autoscroll and live sentiment still need acceptance.
+- The 100-proposal/12-PD supported-cap fixture has local serialization and bounded
+  in-memory UI evidence; six saved proposals/four personas do not prove maximum-capacity
+  Dataverse transactions.
 - No production schema, flags, grants, source data, deployment or trial cleanup changed.
 
 Local evidence: `/private/tmp/proposal-ranking-v2-sandbox-receipt.json`,

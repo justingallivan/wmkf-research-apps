@@ -340,4 +340,7 @@ did not produce an observed saved drop; pointer smoothness remains unaccepted. R
 and cannot establish reviewer-badge visual acceptance; future fixture generation
 uses labels without rewriting the retained snapshot. The implementation plan and
 `docs/audits/PROPOSAL_RANKING_V2_SANDBOX_REHEARSAL_2026-10-13.md` record the bounded
-proof and remaining long-list, independent-user and live-sentiment checks. DESIGN.md and the suite design system remain unchanged.
+proof and remaining pointer/autoscroll, independent-user and live-sentiment checks.
+A separate memory-only 100-proposal/12-PD fixture passed rendering, Find 100, keyboard
+100→99 movement, Refresh retention and collective reset; saved maximum-capacity
+transactions remain unverified. DESIGN.md and the suite design system remain unchanged.

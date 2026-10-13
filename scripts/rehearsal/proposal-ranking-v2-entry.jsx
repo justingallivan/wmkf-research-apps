@@ -4,6 +4,7 @@ import AssessmentWorkflow from '../../shared/components/proposal-ranking/Assessm
 import {
   currentView,
   chooseActor,
+  chooseFixture,
   seed,
   snapshot,
 } from './proposal-ranking-v2-client';
@@ -18,6 +19,12 @@ function Rehearsal() {
     <>
       <aside className="border-b bg-amber-50 px-4 py-3 text-sm">
         <strong>Fictional UI rehearsal · memory only</strong>
+        <button className="ml-4 underline" onClick={() => change(chooseFixture(true))}>
+          Load 100 proposals / 12 PDs
+        </button>
+        <button className="ml-4 underline" onClick={() => change(chooseFixture(false))}>
+          Load four-card examples
+        </button>
         <label className="ml-4">
           Viewing as{' '}
           <select

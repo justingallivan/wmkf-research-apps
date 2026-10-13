@@ -44,7 +44,9 @@ distribution keys also prevent using it as reviewer-badge visual proof. See the
 Local verification after the saved-browser fixes: 135 ranking tests, type check and
 scoped lint pass; the current production Turbopack build passed (exit 0) (the build retains four unrelated document-renderer
 tracing warnings). The 100-proposal / 12-PD reveal fits the additive field cap in a
-serialized fixture. Tests cover pure calculations, atomic adapter simulations, stale writes,
+serialized fixture. A memory-only 100/12 browser check also passed rendering, Find 100,
+keyboard position 100→99, Refresh retention and collective reset to 100; this does not
+prove saved maximum-capacity transactions or pointer/autoscroll behavior. Tests cover pure calculations, atomic adapter simulations, stale writes,
 replay after later edits, immutable history, restart, workbook types/provenance, and
 sentiment batching/access loss/reveal races. The isolated browser rehearsal renders
 the actual React component against fictional in-memory workflow state; it is not an
