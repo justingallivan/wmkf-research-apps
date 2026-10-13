@@ -154,6 +154,10 @@ IT should establish or confirm the following against the live environments:
 - **Retention and recovery:** policies for SharePoint versions, Dataverse AI-run content, PostgreSQL business/operational records, private Blob artifacts and provider copies; backup windows and tested cross-store recovery procedures. This brief does not claim a verified RPO/RTO or a completed disaster-recovery drill.
 - **Monitoring and support:** responsibility for failed/stalled jobs, uncertain email sends, provider cleanup failures, integration health, secret expiry, cost alerts and security/dependency findings. Health checks, operational alerts and usage records exist, but require an assigned response owner.
 
+## Security review follow-up
+
+The subsequent [security mitigation plan](SECURITY_MITIGATION_PLAN_2026-10-12.md) records the owner-approved direction for mandatory controls and explicit application authority, plus dated production-setting evidence. Its mitigations are planned, not implemented. The [provider data-handling review](PROVIDER_DATA_HANDLING_REVIEW_2026-10-12.md) records official documentation, public retention limitations, and account-specific confirmation questions. Neither document attests provider account entitlements or tenant least privilege.
+
 ## Source references
 
 These are implementation references, not substitutes for live configuration checks:

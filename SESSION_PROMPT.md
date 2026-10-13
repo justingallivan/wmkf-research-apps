@@ -1,4 +1,38 @@
-# Session 599 Prompt: Plan A done; Site Visit server slices C1–C3; worktree pruning; /admin live check
+# Session 600 Prompt: Security mitigation implementation and provider confirmation
+
+## Session 599 close — IT security review and approved mitigation direction (Codex, 2026-10-12 PT)
+
+### Completed
+
+- Saved `docs/SECURITY_MITIGATION_PLAN_2026-10-12.md`: dated source/config evidence, approved decisions, four implementation releases, tests, rollout and rollback criteria. **PLANNED, not implemented.**
+- Saved `docs/PROVIDER_DATA_HANDLING_REVIEW_2026-10-12.md`: owner-requested subagent research with official links, public limitations, account-specific unknowns, and vendor confirmation questions.
+- Earlier conversation deliverables: leadership overview (`166e25613`) and technical brief (`6c4f67eb8`), already incorporated in main. Current security evidence baseline is `2962dee705`; do not confuse it with the older brief's measurement baseline.
+- Read-only production project settings showed auth, impersonation, scanning and both Dataverse guards enabled. This is not runtime attestation or a tenant least-privilege audit.
+- No runtime, configuration, schema, business-data or vendor-account change. No vendor contacted.
+
+### Verified open
+
+1. **Configuration/scan mitigation, PLANNED:** missing flags can still disable protections and intake can mark skipped scans clean. Evidence: source pointers and release criteria in the mitigation plan. Begin with Release 1 and caller inventories after current-head preflight.
+2. **Explicit write authority, PLANNED:** generic impersonated 403 fallback remains; shared request-abstract behavior is intentionally app-authorized. Preserve strict user-authority workflows. Evidence: mitigation plan baseline and Releases 3–4.
+3. **Provider confirmation, UNKNOWN:** obtain account-setting/contract evidence using the provider register. The owner approved research, not account changes or outreach. No confidential-transcription expansion is approved.
+
+### Decisions preserved
+
+The owner accepted mandatory controls, safe quarantine/rejection during scanner outages, explicit shared-workflow authority, and removal of generic permission-denied escalation. Do not ask for these same policy decisions again. Implementation was not performed; production release/tenant changes remain separate.
+
+### Verification and gotchas
+
+- Focused Jest attempt stopped before tests because Next/Workflow initialization attempted a generated source write and the sandbox blocked it. No passing-test claim. Use an isolated writable checkout when implementing.
+- Current-session claim-evidence report: local state unavailable; no observation row invented.
+- The former `WMKF_Apps-codex` checkout was deleted by another session; work used `/Users/gallivan/Code/WMKF_Apps` on main.
+- Unrelated previous handoffs are preserved below. Their carryovers require fresh verification. In particular C1 is already shipped in main (`fe5b3734a`, follow-up `dc5031764`); do not resume the older “C1–C3 not started” list literally. Other workstreams were not re-audited here.
+- Milestone determination: documentation/review only; no DEVELOPMENT_LOG entry required.
+
+---
+
+## Prior session handoffs — historical carryovers, verify before acting
+
+## Previous Session 599 Prompt: Plan A done; Site Visit server slices C1–C3; worktree pruning; /admin live check
 
 ## Session 598 close — tool-app prompts and models editable in /admin (Plan A, Stages 0–6), four streaming-error fixes, Plans B and Postgres parked (Claude Opus orchestrating Sonnet + Codex, shared checkout `main`, 2026-10-12 PT)
 
