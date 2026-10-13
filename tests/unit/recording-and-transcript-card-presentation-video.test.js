@@ -124,9 +124,9 @@ describe('Video line', () => {
 
   const STALE = 'The transcript or video changed. Create it again.';
   test.each([
-    ['presentation_video_transcript_changed', 'The transcript or presentation end changed since this video was cut. Create it again.'],
-    ['presentation_video_source_changed', 'The recording changed since this video was cut. Create it again.'],
-    ['presentation_video_output_changed', 'The saved video file was changed or removed after it was cut. Create it again.'],
+    ['presentation_video_transcript_changed', 'The transcript or presentation end has changed. Create it again.'],
+    ['presentation_video_source_changed', 'The recording has changed. Create it again.'],
+    ['presentation_video_output_changed', 'The saved video file was changed or removed. Create it again.'],
   ])('superseded with %s shows the specific reason, not the generic one', async (failureCode, text) => {
     route({ state: { splits: { available: true, splits: [split({ state: 'superseded', failureCode })] } } });
     await renderLine();
@@ -226,7 +226,7 @@ describe('actions', () => {
     await waitFor(() => expect(el).toHaveTextContent('Out of date'));
     // The toast keys on the route's code (still approval_stale) and says the generic text; the row says what changed.
     expect(within(el).getAllByText('The transcript or video changed. Create it again.').length).toBeGreaterThan(0);
-    expect(within(el).getAllByText('The transcript or presentation end changed since this video was cut. Create it again.').length).toBeGreaterThan(0);
+    expect(within(el).getAllByText('The transcript or presentation end has changed. Create it again.').length).toBeGreaterThan(0);
     expect(getCount()).toBeGreaterThan(before);
   });
 });

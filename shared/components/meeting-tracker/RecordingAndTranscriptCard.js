@@ -3159,9 +3159,9 @@ const PV_FAILURE_TEXT = Object.freeze({
 });
 // A superseded newest row says what changed; legacy approval_stale, NULL and unknown codes keep PV_STALE_TEXT.
 const PV_SUPERSEDED_TEXT = Object.freeze({
-  presentation_video_transcript_changed: 'The transcript or presentation end changed since this video was cut. Create it again.',
-  presentation_video_source_changed: 'The recording changed since this video was cut. Create it again.',
-  presentation_video_output_changed: 'The saved video file was changed or removed after it was cut. Create it again.',
+  presentation_video_transcript_changed: 'The transcript or presentation end has changed. Create it again.',
+  presentation_video_source_changed: 'The recording has changed. Create it again.',
+  presentation_video_output_changed: 'The saved video file was changed or removed. Create it again.',
 });
 const PV_SUPERSEDED_REASON_TEXT = (code) => PV_SUPERSEDED_TEXT[code] || PV_STALE_TEXT;
 const PV_IN_PROGRESS_TEXT = 'Approval is still in progress. Try again in a few minutes.';

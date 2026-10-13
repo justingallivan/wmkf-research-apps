@@ -232,7 +232,7 @@ The same row pattern as Results (§4):
 | | `approved`, Board ready | Approved (green) | menu: Create again |
 | | `approved`, `boardReady === false` | Out of date (amber) | inline **Create again** |
 | | `approved`, `boardReady == null` | Approved + muted "Board status not checked" | menu |
-| | `superseded` | Out of date (amber) + reason chosen by `failureCode` (transcript, recording or saved-file changed; generic text for NULL, legacy or unknown codes; see C2) | inline **Create again** only when a retry can succeed |
+| | `superseded` | Out of date (amber) + reason chosen by `failureCode` (transcript, recording or saved-file changed; generic text for NULL, legacy or unknown codes; see C2) | inline **Create again**, always offered (owner scope decision 2026-10-12: no retry pre-check; a start that cannot succeed is refused with its specific reason, e.g. confirm the presentation end, copy the video again) |
 | | `failed` | Failed (red) + `PV_FAILURE_TEXT` reason | inline **Try again** when retryable |
 | Full recording | RECORDING material present | Copied / Linked (gray) | menu: Replace, Upload manually |
 | Full transcript | generated | Published (green) | menu: Download TXT, VTT |
@@ -842,7 +842,16 @@ an uploaded transcript gets Open without downloads.
 
   The materials key follows the card's own heading precedence (closed, then needs attention, then saving), not the
   tracker list's classifier, so the chip cannot contradict the card.
-- **Server slices C1-C3 (§6):** C1 (automatic split-transcript generation after a publish with a confirmed end) and C3 (streaming the review video instead of downloading it) are not started. **[BUILT 2026-10-12, branch `claude/site-visit-c2-supersede-reason`]** C2 (the real reason a presentation video was superseded) is built on that branch.
+- **Server slices C1-C3 (§6):** C1 and C3 are not started.
+  - **C1 owner decisions (2026-10-12):** a small Postgres queue plus a once-a-minute cron drain (the
+    presentation-video / Zoom-copy pattern, not Vercel Workflow), written when a correction publish carries a
+    confirmed presentation end (a first publish never does, `service.js` builds it with `presentationEnd: null`);
+    generation runs as the publishing staff member; transcripts only, summaries stay a manual "Summarize again";
+    after retries are exhausted the row falls back to "Out of date" with Regenerate. The queue row is what makes
+    "Updating…" truthful.
+  - **C3 finding (2026-10-12, owner check-in pending on placement):** reuse `shared/components/PresentationVideoPlayer.js`
+    (Board page and Workbench already play the same 302-to-Graph route with Range seeking); route change limited to
+    allowing an `attempt` query key and `nosniff`; Vercel proxy streaming and Graph `preview` rejected. **[BUILT 2026-10-12, branch `claude/site-visit-c2-supersede-reason`]** C2 (the real reason a presentation video was superseded) is built on that branch.
 - **[BUILT 2026-10-12, branch `claude/button-link-variant`; owner desktop check pending]** Text-link
   variant: the shared `Button` gains `variant="link"` (the former `BTN_LINK` look: underlined gray text,
   no padding or background, blue keyboard focus ring, dimmed when disabled), and all 11 card `BTN_LINK`
