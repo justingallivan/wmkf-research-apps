@@ -150,6 +150,17 @@ describe('startPresentationVideoSplit: refusals', () => {
   });
 
   test.each([
+    ['upload', resolved({ status: 'upload' }), /was uploaded.*Earlier runs/],
+    ['legacy_unknown', { status: 'legacy_unknown', provenance: null }, /Zoom source wasn't recorded.*Import the recording from Zoom again/],
+    ['invalid', { status: 'invalid', provenance: null }, /Zoom source wasn't recorded.*Import the recording from Zoom again/],
+  ])('a %s source names its next step', async (_status, value, message) => {
+    resolveCurrentMeetingTranscriptSource.mockResolvedValue(value);
+    const error = await rejection(startPresentationVideoSplit(args()));
+    expect(error).toMatchObject({ httpStatus: 422, code: 'presentation_video_source_not_zoom' });
+    expect(error.message).toMatch(message);
+  });
+
+  test.each([
     ['active', 'presentation_video_split_active'],
     ['approval_in_progress', 'presentation_video_approval_in_progress'],
   ])('store outcome %s maps to 409 %s', async (status, code) => {
