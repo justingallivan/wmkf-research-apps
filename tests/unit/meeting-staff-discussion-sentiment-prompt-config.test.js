@@ -63,13 +63,8 @@ test('the prompt text and JSON schema state every bound the service validator en
   expect(SYSTEM_PROMPT).toContain(`at least two and at most ${L.sidesMax} sides`);
   expect(SYSTEM_PROMPT).toContain(`at least one and at most ${L.uncertaintyEvidenceMax} quoted evidence items`);
   expect(SYSTEM_PROMPT).toContain(`no more than ${L.pointsMax} points in each list, ${L.disagreementsMax} disagreements and ${L.uncertaintiesMax} uncertainties`);
-  const props = SENTIMENT_JSON_SCHEMA.properties;
-  expect(props.supportPoints.maxItems).toBe(L.pointsMax);
-  expect(props.concernPoints.maxItems).toBe(L.pointsMax);
-  expect(props.disagreements.maxItems).toBe(L.disagreementsMax);
-  expect(props.disagreements.items.properties.sides).toMatchObject({ minItems: 2, maxItems: L.sidesMax });
-  expect(props.uncertainties.maxItems).toBe(L.uncertaintiesMax);
-  expect(props.uncertainties.items.properties.evidence).toMatchObject({ minItems: 1, maxItems: L.uncertaintyEvidenceMax });
+  // The provider schema carries no array-size keywords (unsupported by native structured output).
+  expect(JSON.stringify(SENTIMENT_JSON_SCHEMA)).not.toMatch(/minItems|maxItems/);
 });
 
 test('the transcript cap is the discussion summary constant, not a copy', () => {

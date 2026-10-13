@@ -122,30 +122,34 @@ export const SENTIMENT_JSON_SCHEMA = {
     enthusiasm: { type: 'string', enum: [...ENTHUSIASM_VALUES] },
     reception: { type: 'string', enum: [...RECEPTION_VALUES] },
     headline: { type: 'string' },
-    supportPoints: { type: 'array', maxItems: SENTIMENT_LIMITS.pointsMax, items: EVIDENCE_SCHEMA },
-    concernPoints: { type: 'array', maxItems: SENTIMENT_LIMITS.pointsMax, items: EVIDENCE_SCHEMA },
+    supportPoints: { type: 'array', items: EVIDENCE_SCHEMA },
+    concernPoints: { type: 'array', items: EVIDENCE_SCHEMA },
     disagreements: {
       type: 'array',
-      maxItems: SENTIMENT_LIMITS.disagreementsMax,
+     
       items: {
         type: 'object',
         additionalProperties: false,
         required: ['topic', 'sides'],
-        properties: { topic: { type: 'string' }, sides: { type: 'array', minItems: 2, maxItems: SENTIMENT_LIMITS.sidesMax, items: EVIDENCE_SCHEMA } },
+        properties: { topic: { type: 'string' }, sides: { type: 'array', items: EVIDENCE_SCHEMA } },
       },
     },
     uncertainties: {
       type: 'array',
-      maxItems: SENTIMENT_LIMITS.uncertaintiesMax,
+     
       items: {
         type: 'object',
         additionalProperties: false,
         required: ['topic', 'evidence'],
-        properties: { topic: { type: 'string' }, evidence: { type: 'array', minItems: 1, maxItems: SENTIMENT_LIMITS.uncertaintyEvidenceMax, items: EVIDENCE_SCHEMA } },
+        properties: { topic: { type: 'string' }, evidence: { type: 'array', items: EVIDENCE_SCHEMA } },
       },
     },
   },
 };
+
+// No minItems/maxItems here: Anthropic native structured output does not support complex array
+// constraints, and llm-client sends this schema unmodified. The limits are stated in the prompt
+// and enforced by the service's validateSentimentOutput.
 
 /** One JSON record → parseMode 'json', a single output returned to the caller; raw output not retained. */
 export const PROMPT_OUTPUT_SCHEMA = {
