@@ -63,7 +63,7 @@ test('lists only proposals with a bound staff discussion transcript, from the sc
   expect(screen.queryByText(/may be incomplete/)).not.toBeInTheDocument();
   const urls = global.fetch.mock.calls.map(([u]) => String(u));
   expect(urls.filter((u) => u.includes('/dashboard')).every((u) => u.includes('projection=schedule') && u.includes('scope=all'))).toBe(true);
-  expect(urls.some((u) => u.includes('/discussion-sentiment/candidates?cycleCode=D26'))).toBe(true);
+  expect(urls.some((u) => u.includes('/discussion-sentiment/candidates?cycleCode=D26&programId=p1'))).toBe(true);
   expect(document.body.textContent).not.toContain(A);
 });
 

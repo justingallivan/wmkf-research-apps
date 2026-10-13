@@ -191,8 +191,10 @@ export default function DiscussionSentimentView() {
       return envelope.data;
     };
     try {
-      const fetchCandidates = async (cycleKey) => {
-        const envelope = await requestEnvelope(`/api/meeting-tracker/discussion-sentiment/candidates?${new URLSearchParams({ cycleCode: cycleKey })}`, { tolerantBody: true });
+      const fetchCandidates = async (cycleKey, programKey) => {
+        const query = new URLSearchParams({ cycleCode: cycleKey });
+        if (programKey) query.set('programId', programKey);
+        const envelope = await requestEnvelope(`/api/meeting-tracker/discussion-sentiment/candidates?${query}`, { tolerantBody: true });
         if (!envelope.ok) throw new Error(envelope.data?.error || 'The proposals with a staff discussion transcript could not be loaded. Try again.');
         return envelope.data;
       };
@@ -212,11 +214,11 @@ export default function DiscussionSentimentView() {
         setCycleCode(cycleKey);
         visits = [];
         if (cycleKey) {
-          [body, candidates] = await Promise.all([fetchDashboard(nextProgramId || defaultProgramId || '', cycleKey), fetchCandidates(cycleKey)]);
+          [body, candidates] = await Promise.all([fetchDashboard(nextProgramId || defaultProgramId || '', cycleKey), fetchCandidates(cycleKey, nextProgramId || defaultProgramId || '')]);
           visits = body.proposals || [];
         }
       } else {
-        candidates = await fetchCandidates(cycleKey);
+        candidates = await fetchCandidates(cycleKey, nextProgramId);
       }
       if (!mountedRef.current || token !== loadToken.current) return;
       setProposals(visits);

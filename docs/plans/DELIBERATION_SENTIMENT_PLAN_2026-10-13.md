@@ -271,13 +271,17 @@ row (no `docs/SERVICE_AND_UTILITY_CATALOG.md` entry: the sibling summary service
   rule as the Staff Discussion Summary.
 - **As built (Stage 4, §9):** the picker shows the cycle's dashboard proposals (existing
   `/api/meeting-tracker/dashboard?projection=schedule&scope=all`) intersected with
-  `GET /api/meeting-tracker/discussion-sentiment/candidates?cycleCode=`, which returns request ids whose
-  discussion transcript is bound. Two cycle-wide queries (TRANSCRIPT and STAFF_DISCUSSION_TRANSCRIPT, with the
-  bundle manifest) are grouped by request and each group goes through the analysis's own `bindCurrent`, so a stale
-  or missing discussion TXT is excluded exactly as analyze would refuse it; no per-proposal reads. A `capped` result
-  (the export record cap) makes the page say the list may be incomplete. "No staff discussion transcript" can still
-  appear after ticking if the transcript went stale in between. `ROUTE_NAMESPACE_LIFECYCLE` has no
-  `/api/meeting-tracker` entry, so it is unchanged.
+  `GET /api/meeting-tracker/discussion-sentiment/candidates?cycleCode=&programId=`, which returns request ids whose
+  discussion transcript is bound. The cycle's request ids come from the server-side Meeting Tracker schedule listing
+  (`loadMeetingTrackerSelection`, scope all, the dashboard's own source; never from the client). Their TRANSCRIPT
+  and STAFF_DISCUSSION_TRANSCRIPT documents are loaded by request id across all document cycles
+  (`findByRequests`, with the bundle manifest), because a document's `wmkf_cyclecode` is stamped at publication and
+  a request that changed cycle in between would otherwise be dropped. Each request's rows go through the
+  analysis's own `bindCurrent`, so a stale or missing discussion TXT is excluded exactly as analyze would refuse
+  it. A `capped` or `hasMore` document result makes the page say the list may be incomplete (the request listing
+  exposes no cap, as the dashboard does not). "No staff discussion transcript" can still appear after ticking if
+  the transcript went stale in between. `ROUTE_NAMESPACE_LIFECYCLE` has no `/api/meeting-tracker` entry, so it is
+  unchanged.
 
 ### 4.6 Consumer contract (Proposal Ranking and others)
 
@@ -434,9 +438,10 @@ prompt make it Tier 1 or above). Codex adversarial review before merging.
   Re-analyze to accept a new result." View test covers accept → withdraw → reload (mutation-checked).
 - **Owner decisions and transcript-only picker (2026-10-13):** picker transcript-only, sort order kept, prompt
   approved (all in §2). Built on the exact path: `discussion-sentiment-candidates.js`
-  (`listDiscussionSentimentCandidates`) behind `GET /api/meeting-tracker/discussion-sentiment/candidates`;
-  `request-document.js` `findByCycle` gained an opt-in `includeMeetingTranscriptBundle` (default off, other
-  callers unchanged) so the TRANSCRIPT row's boundary manifest comes back. Only TRANSCRIPT and
-  STAFF_DISCUSSION_TRANSCRIPT are fetched: `bindStaffDiscussionTranscript` reads only those winners and the
-  projection chooses each type's winner independently. Also fixed a page bug: the program and cycle options were
+  (`listDiscussionSentimentCandidates`) behind `GET /api/meeting-tracker/discussion-sentiment/candidates`. Only
+  TRANSCRIPT and STAFF_DISCUSSION_TRANSCRIPT are fetched: `bindStaffDiscussionTranscript` reads only those winners
+  and the projection chooses each type's winner independently. Codex review fix: membership first came from
+  cycle-filtered documents, which silently dropped a request whose two documents carry different cycle stamps;
+  it now comes from the request listing and the documents are loaded by request id (adapter unchanged; the
+  earlier `findByCycle` bundle option was reverted). Also fixed a page bug: the program and cycle options were
   read from a variable reassigned before React ran the updater, so the selects could stay empty.

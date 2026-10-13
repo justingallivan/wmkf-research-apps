@@ -34,7 +34,7 @@ const call = async (handler, req) => { const res = response(); await handler({ q
 
 beforeEach(() => {
   jest.clearAllMocks();
-  requireAppAccess.mockResolvedValue({ profileId: 9, session: { user: {} } });
+  requireAppAccess.mockResolvedValue({ profileId: 9, session: { user: { azureEmail: 'staff@example.org' } } });
 });
 
 const routes = [
@@ -172,9 +172,26 @@ describe('candidates route', () => {
     const res = await get({ cycleCode: 'd26', ownerProfileId: '1' });
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({ requestIds: [requestId], capped: true });
-    expect(listDiscussionSentimentCandidates).toHaveBeenCalledWith({ cycleCode: 'd26', ownerProfileId: 9 });
+    expect(listDiscussionSentimentCandidates).toHaveBeenCalledWith({ cycleCode: 'd26', ownerProfileId: 9,
+      caller: { azureEmail: 'staff@example.org', profileId: 9, callerSystemId: ACTOR, programId: undefined } });
     expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'private, no-store');
     expect(withDalContext).toHaveBeenCalledTimes(1);
+  });
+
+  test('a program id must be a GUID, and is passed through; no request ids are accepted from the query', async () => {
+    expect((await get({ cycleCode: 'D26', programId: 'nope' })).statusCode).toBe(400);
+    expect((await get({ cycleCode: 'D26', programId: ['a', 'b'] })).statusCode).toBe(400);
+    expect(listDiscussionSentimentCandidates).not.toHaveBeenCalled();
+    await get({ cycleCode: 'D26', programId: requestId, requestIds: runId });
+    const args = listDiscussionSentimentCandidates.mock.calls[0][0];
+    expect(args.caller.programId).toBe(requestId);
+    expect(JSON.stringify(args)).not.toContain(runId);
+  });
+
+  test('a session with no email is 400 before any query', async () => {
+    requireAppAccess.mockResolvedValueOnce({ profileId: 9, session: { user: {} } });
+    expect((await get({ cycleCode: 'D26' })).statusCode).toBe(400);
+    expect(listDiscussionSentimentCandidates).not.toHaveBeenCalled();
   });
 
   test('a wrong method is 405, a missing profile is 401, and a 5xx hides the message', async () => {
