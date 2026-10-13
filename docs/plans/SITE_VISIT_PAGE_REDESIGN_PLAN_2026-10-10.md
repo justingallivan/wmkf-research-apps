@@ -842,8 +842,8 @@ an uploaded transcript gets Open without downloads.
 
   The materials key follows the card's own heading precedence (closed, then needs attention, then saving), not the
   tracker list's classifier, so the chip cannot contradict the card.
-- **Server slices C1-C3 (§6):** C2 and C3 are shipped (see §10).
-  - **[BUILT 2026-10-12, branch `claude/site-visit-c1-auto-transcripts`; not merged]** C1: migration 081 (`presentation_transcript_regenerations`) must be applied by the owner after review and before merge. Atlas: `docs/atlas/postgres-presentation-transcript-regenerations.md`.
+- **Server slices C1-C3 (§6):** all three shipped 2026-10-12.
+  - **[SHIPPED 2026-10-12, Codex approve after three rounds]** C1: migration 081 (`presentation_transcript_regenerations`) applied to Production by the owner before merge (`applied_by` `owner-c1-2026-10-12`). Atlas: `docs/atlas/postgres-presentation-transcript-regenerations.md`.
   - **C1 owner decisions (2026-10-12):** a small Postgres queue plus a once-a-minute cron drain (the
     presentation-video / Zoom-copy pattern, not Vercel Workflow), written when a correction publish carries a
     confirmed presentation end (a first publish never does, `service.js` builds it with `presentationEnd: null`);
