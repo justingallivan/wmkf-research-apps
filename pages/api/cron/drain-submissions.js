@@ -31,6 +31,7 @@
  */
 
 import pkg from 'pg';
+import { withVerifyFullSslmode } from '../../../lib/db/pg-connection-string';
 import MaintenanceService from '../../../lib/services/maintenance-service';
 import { constantTimeEqual } from '../../../lib/utils/cron-auth';
 import {
@@ -48,7 +49,7 @@ function getPool() {
   if (_pool) return _pool;
   const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
   if (!connectionString) throw new Error('POSTGRES_URL not configured');
-  _pool = new Pool({ connectionString, max: 5 });
+  _pool = new Pool({ connectionString: withVerifyFullSslmode(connectionString), max: 5 });
   return _pool;
 }
 

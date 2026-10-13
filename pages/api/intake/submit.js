@@ -52,6 +52,7 @@
 
 import crypto from 'crypto';
 import pkg from 'pg';
+import { withVerifyFullSslmode } from '../../../lib/db/pg-connection-string';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { hasSubmitterRole } from '../../../lib/services/membership-service';
@@ -84,7 +85,7 @@ function jsonError(res, status, error, extra = {}) {
 function newPool() {
   const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
   if (!connectionString) throw new Error('POSTGRES_URL not configured');
-  return new Pool({ connectionString });
+  return new Pool({ connectionString: withVerifyFullSslmode(connectionString) });
 }
 
 // ---------- handler ----------
