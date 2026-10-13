@@ -23,6 +23,7 @@ const STATUS_COPY = {
   duplicate_current_rows:{ tone: 'red',   text: 'Multiple current rows (store corruption). Resolve in Dynamics.' },
   invalid_body:          { tone: 'red',   text: 'Prompt body failed validation.' },
   invalid_model:         { tone: 'red',   text: 'The selected model is not compatible with this prompt.' },
+  invalid_max_tokens:    { tone: 'red',   text: 'Max tokens must be a positive whole number.' },
   invalid_output_schema: { tone: 'red',   text: 'The stored output schema is invalid.' },
   invalid_variables:     { tone: 'red',   text: 'The stored prompt-variable declaration is invalid.' },
   idempotency_key_reuse: { tone: 'red',   text: 'This edit changed after publishing began. Retry the edited payload.' },
@@ -715,11 +716,40 @@ function buildModelOptions(prompt, modelCatalog) {
   return { nativeStructured, options };
 }
 
+// Mirrors prompts-publish-service.js: the reviewed output ceiling of the
+// selected model (a tier resolves to its current concrete model; a blank model
+// has no knowable ceiling, so none is enforced).
+function modelOutputCeiling(model, modelCatalog) {
+  const raw = String(model || '').trim();
+  if (!raw) return null;
+  const tier = (modelCatalog?.tiers || []).find((t) => t.key === raw);
+  const id = tier ? tier.resolvedId : raw;
+  const ceiling = id ? modelCatalog?.modelStatuses?.[id]?.capability?.maxOutputTokens : null;
+  return Number.isInteger(ceiling) ? ceiling : null;
+}
+
+// Blank is allowed (keeps the stored budget). Otherwise a positive whole number
+// no larger than the selected model's ceiling.
+function validateMaxTokensInput(text, ceiling) {
+  const trimmed = String(text).trim();
+  if (trimmed === '') return { valid: true, value: null };
+  if (!/^\d+$/.test(trimmed) || Number(trimmed) <= 0) {
+    return { valid: false, issue: 'Max tokens must be a positive whole number.' };
+  }
+  const value = Number(trimmed);
+  if (ceiling != null && value > ceiling) {
+    return { valid: false, issue: `Max tokens ${fmtInt(value)} exceeds this model's output limit of ${fmtInt(ceiling)}.` };
+  }
+  return { valid: true, value };
+}
+
 function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome }) {
   const [systemPrompt, setSystemPrompt] = useState(prompt.systemPrompt || '');
   const [body, setBody] = useState(prompt.body || '');
   const [outputSchema, setOutputSchema] = useState(prompt.outputSchema || '');
   const [model, setModel] = useState(prompt.model || '');
+  const initialMaxTokens = Number.isInteger(prompt.maxTokens) && prompt.maxTokens > 0 ? String(prompt.maxTokens) : '';
+  const [maxTokensText, setMaxTokensText] = useState(initialMaxTokens);
   const [submitting, setSubmitting] = useState(false);
   const requestRef = useRef({ payloadKey: null, requestId: null });
   const { nativeStructured, options: modelOptions } = buildModelOptions(prompt, modelCatalog);
@@ -727,8 +757,11 @@ function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome }) {
     || modelOptions.some((option) => option.value === model && !option.disabled);
   const outputSchemaValidation = validateOutputSchemaText(outputSchema);
 
+  const modelCeiling = modelOutputCeiling(model, modelCatalog);
+  const maxTokensValidation = validateMaxTokensInput(maxTokensText, modelCeiling);
   const validation = validatePromptForSave(prompt.name, body);
-  const unchanged = body === (prompt.body || '')
+  const unchanged = maxTokensText.trim() === initialMaxTokens
+    && body === (prompt.body || '')
     && systemPrompt === (prompt.systemPrompt || '')
     && outputSchema === (prompt.outputSchema || '')
     && model === (prompt.model || '');
@@ -741,6 +774,7 @@ function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome }) {
         systemPrompt,
         outputSchema,
         model,
+        maxTokens: maxTokensValidation.value,
         expectedVersion: prompt.version,
       });
       if (requestRef.current.payloadKey !== payloadKey) {
@@ -760,6 +794,8 @@ function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome }) {
           systemPrompt,
           outputSchema,
           model,
+          // Omitted when blank so the server keeps the stored budget.
+          ...(maxTokensValidation.value != null ? { maxTokens: maxTokensValidation.value } : {}),
           expectedVersion: prompt.version,
           requestId: requestRef.current.requestId,
         },
@@ -795,6 +831,32 @@ function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome }) {
             : 'Choose a reviewed tier or concrete model. Publishing creates a new prompt version.'}
         </div>
       </label>
+
+      <label className="block text-xs text-gray-700">
+        Max output tokens
+        <input
+          type="number"
+          min={1}
+          step={1}
+          inputMode="numeric"
+          value={maxTokensText}
+          onChange={(e) => setMaxTokensText(e.target.value)}
+          placeholder={`default ${fmtInt(ROW_DEFAULT_MAX_TOKENS)}`}
+          className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+        />
+        <div className="mt-1 text-[10px] text-gray-400">
+          {modelCeiling != null
+            ? `Whole number up to ${fmtInt(modelCeiling)} (the selected model's reviewed output limit).`
+            : 'Whole number. The selected model has no reviewed output limit to check against.'}
+          {' '}Leave blank to keep the stored value. Publishing creates a new prompt version.
+        </div>
+      </label>
+
+      {!maxTokensValidation.valid && (
+        <div className={`text-xs px-3 py-2 rounded border ${TONE.red}`}>
+          {maxTokensValidation.issue}
+        </div>
+      )}
 
       <label className="block text-xs text-gray-700">
         Output schema <span className="text-gray-400">(JSON object; blank for none)</span>
@@ -858,6 +920,7 @@ function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome }) {
             setSystemPrompt(prompt.systemPrompt || '');
             setOutputSchema(prompt.outputSchema || '');
             setModel(prompt.model || '');
+            setMaxTokensText(initialMaxTokens);
           }}
           disabled={unchanged}
           className="text-xs text-gray-600 hover:text-gray-900 disabled:opacity-40"
@@ -867,7 +930,7 @@ function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome }) {
         <button
           onClick={submit}
           disabled={submitting || !validation.valid || !outputSchemaValidation.valid
-            || unchanged || !prompt.hasCurrent || !nativeModelCompatible}
+            || !maxTokensValidation.valid || unchanged || !prompt.hasCurrent || !nativeModelCompatible}
           className="px-4 py-1.5 bg-gray-900 text-white text-sm font-medium rounded hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {submitting ? 'Publishing…' : `Publish v${(prompt.version ?? 0) + 1}`}
@@ -885,6 +948,7 @@ function OutcomeBanner({ outcome, onDismiss }) {
         <div className="flex-1">
           <div className="font-medium">{meta.text}</div>
           {outcome.newPromptId && <div className="mt-1 text-xs">New version: v{outcome.targetVersion} (<code>{outcome.newPromptId}</code>)</div>}
+          {outcome.error && <div className="mt-1 text-xs">{outcome.error}</div>}
           {outcome.issues && outcome.issues.length > 0 && (
             <ul className="mt-1 text-xs list-disc ml-5">{outcome.issues.map((x, i) => (<li key={i}>{x}</li>))}</ul>
           )}
